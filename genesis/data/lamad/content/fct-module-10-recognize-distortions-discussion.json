@@ -1,40 +1,54 @@
 {
   "id": "fct-module-10-recognize-distortions-discussion",
-  "contentType": "exercise",
-  "reach": "commons",
-  "title": "Discussion: Creating Shared Understanding: Recognize Distortions",
-  "description": "Group discussion and reflection activity",
-  "content": "**Instructions:** Think of church \"experiences\" you have worked on, supported, or participated in. Where might they have contributed to or amplified any of these distortions?\n\nWhat design features can increase or combat distortion in our shared understanding?\n\nHow have I contributed to or been affected by the breakdown of shared understanding?  \nWhat steps can I take to foster greater understanding in my digital interactions?\n\nHow can our church/Christian community better leverage technology to create shared understanding?  \nWhat principles should guide our use of social media and other digital platforms?\n\n**Activity Type:** discussion\n\n**Group Size:** small-group\n\n**Estimated Time:** 15-20 minutes\n\n",
+  "contentType": "discussion",
+  "title": "Discussion: Recognizing Distortions",
+  "description": "Discussion & Activity  1.",
+  "content": "## Discussion & Activity\n\n1. **The church's own funhouse.** Think of church \"experiences\" you have worked on, supported, or attended. Where might they have contributed to or amplified any of the nine distortions — engaging-content pressure on sermon clips, moral outrage in the church's social feeds, othering of those outside?\n2. **Design levers.** What design features increase distortion in shared understanding, and what features combat it? Draw on every prior module's toolkit.\n3. **Personal audit.** How have I contributed to, and been formed by, the breakdown of shared understanding? What one step would foster greater understanding in my digital interactions this week?\n4. **Principles.** What principles should guide our church's use of social media and digital platforms — written down, not assumed?",
   "contentFormat": "markdown",
-  "sourcePath": "fct/v1/Module 10 - Creating Shared Understanding - Recognize Distortions.md",
+  "sourcePath": "docs/content/fct/fct-course/content/m10.md",
+  "reach": "commons",
   "tags": [
-    "activity",
-    "discussion",
     "fct",
-    "understanding"
-  ],
-  "relatedNodeIds": [
-    "fct-module-10-recognize-distortions"
+    "christian-technology",
+    "humane-tech",
+    "movement-4",
+    "module-10",
+    "discussion"
   ],
   "metadata": {
-    "category": "fct-activity",
-    "sourceModule": "fct-module-10-recognize-distortions",
-    "activityType": "discussion",
-    "originalContentType": "activity"
+    "category": "fct",
+    "courseId": "foundations-christian-technology",
+    "courseVersion": "review draft v2, 2026-09-16",
+    "sourceWorkbook": "fct-course",
+    "moduleNumber": 10,
+    "movement": 4,
+    "movementTitle": "Rebuilding Common Life",
+    "day": "Day 8",
+    "form": "discussion"
   },
+  "relationships": [
+    {
+      "target": "fct-module-10-recognize-distortions",
+      "type": "BELONGS_TO",
+      "role": "discussion"
+    }
+  ],
   "createdAt": "2025-11-28T21:10:19.214672",
-  "updatedAt": "2025-12-24T03:05:26.198Z",
+  "updatedAt": "2026-09-27T00:00:00.000Z",
+  "stewardedBy": [
+    {
+      "humanId": "human-pete-pastor",
+      "affinity": 0.7,
+      "role": "steward"
+    },
+    {
+      "humanId": "human-matthew-manager",
+      "affinity": 0.3,
+      "role": "endorser"
+    }
+  ],
   "did": "did:web:elohim.host:content:fct:module 10 - creating shared understanding - recognize distortions",
   "activityPubType": "Page",
-  "openGraphMetadata": {
-    "ogTitle": "Discussion: Creating Shared Understanding: Recognize Distortions",
-    "ogDescription": "Group discussion and reflection activity",
-    "ogType": "website",
-    "ogUrl": "https://elohim-protocol.org/content/fct-module-10-recognize-distortions-discussion",
-    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
-    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/activity.jpg",
-    "ogImageAlt": "Discussion: Creating Shared Understanding: Recognize Distortions - Elohim Protocol"
-  },
   "linkedData": {
     "@context": "https://schema.org/",
     "@type": "CreativeWork",
@@ -49,17 +63,5 @@
       "@id": "https://elohim-protocol.org",
       "name": "Elohim Protocol"
     }
-  },
-  "stewardedBy": [
-    {
-      "humanId": "human-pete-pastor",
-      "affinity": 0.7,
-      "role": "steward"
-    },
-    {
-      "humanId": "human-matthew-manager",
-      "affinity": 0.3,
-      "role": "endorser"
-    }
-  ]
+  }
 }

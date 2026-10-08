@@ -1,0 +1,51 @@
+{
+  "id": "fct-module-09-fruits-of-spirit-lane-tech-workers",
+  "contentType": "practice",
+  "title": "Tech workers: Fruit as Metric",
+  "description": "Tech workers  Draft fruit-KPIs for something you build — two indicators that would show your product growing peace, patience, or self-control in users, alongside one known-harm metric you commit to reducing.",
+  "content": "## Tech workers\n\nDraft fruit-KPIs for something you build — two indicators that would show your product growing peace, patience, or self-control in users, alongside one known-harm metric you commit to reducing. Audit your team against the four trustworthiness components (integrity, competency, accountability, education), then retro-cast: describe the fruit your product bears in five years if all goes *right*, and work backward to this quarter's decisions.",
+  "contentFormat": "markdown",
+  "sourcePath": "docs/content/fct/fct-course/content/m09.md",
+  "reach": "commons",
+  "tags": [
+    "fct",
+    "christian-technology",
+    "humane-tech",
+    "movement-3",
+    "module-9",
+    "practice-lane"
+  ],
+  "metadata": {
+    "category": "fct",
+    "courseId": "foundations-christian-technology",
+    "courseVersion": "review draft v2, 2026-09-16",
+    "sourceWorkbook": "fct-course",
+    "moduleNumber": 9,
+    "movement": 3,
+    "movementTitle": "Reordering Loves",
+    "day": "Day 7",
+    "form": "practice-lane",
+    "audience": "tech-workers"
+  },
+  "relationships": [
+    {
+      "target": "fct-module-09-fruits-of-spirit-application",
+      "type": "BELONGS_TO",
+      "role": "lane"
+    }
+  ],
+  "createdAt": "2026-09-27T00:00:00.000Z",
+  "updatedAt": "2026-09-27T00:00:00.000Z",
+  "stewardedBy": [
+    {
+      "humanId": "human-pete-pastor",
+      "affinity": 0.7,
+      "role": "steward"
+    },
+    {
+      "humanId": "human-matthew-manager",
+      "affinity": 0.3,
+      "role": "endorser"
+    }
+  ]
+}

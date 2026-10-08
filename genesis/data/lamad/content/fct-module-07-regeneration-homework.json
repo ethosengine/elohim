@@ -1,0 +1,60 @@
+{
+  "id": "fct-module-07-regeneration-homework",
+  "contentType": "practice",
+  "title": "Homework: Regeneration & Reconciliation",
+  "description": "Homework  Complete FHT Module 4: Centering Values.",
+  "content": "## Homework\n\nComplete FHT Module 4: *Centering Values*. One assignment; the values survey comes tomorrow with Module 8.",
+  "contentFormat": "markdown",
+  "sourcePath": "docs/content/fct/fct-course/content/m07.md",
+  "reach": "commons",
+  "tags": [
+    "fct",
+    "christian-technology",
+    "humane-tech",
+    "movement-2",
+    "module-7",
+    "homework"
+  ],
+  "metadata": {
+    "category": "fct",
+    "courseId": "foundations-christian-technology",
+    "courseVersion": "review draft v2, 2026-09-16",
+    "sourceWorkbook": "fct-course",
+    "moduleNumber": 7,
+    "movement": 2,
+    "movementTitle": "Turning — Repentance & Repair",
+    "day": "Day 5",
+    "form": "homework"
+  },
+  "relationships": [
+    {
+      "target": "fct-module-04-scaling-wisdom",
+      "type": "RELATES_TO",
+      "role": "callback"
+    },
+    {
+      "target": "fct-module-08-centering-love",
+      "type": "RELATES_TO",
+      "role": "callback"
+    },
+    {
+      "target": "fct-module-07-regeneration",
+      "type": "BELONGS_TO",
+      "role": "homework"
+    }
+  ],
+  "createdAt": "2026-09-27T00:00:00.000Z",
+  "updatedAt": "2026-09-27T00:00:00.000Z",
+  "stewardedBy": [
+    {
+      "humanId": "human-pete-pastor",
+      "affinity": 0.7,
+      "role": "steward"
+    },
+    {
+      "humanId": "human-matthew-manager",
+      "affinity": 0.3,
+      "role": "endorser"
+    }
+  ]
+}

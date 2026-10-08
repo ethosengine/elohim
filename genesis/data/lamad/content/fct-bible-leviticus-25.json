@@ -1,0 +1,21 @@
+{
+  "id": "fct-bible-leviticus-25",
+  "contentType": "reference",
+  "title": "Leviticus 25",
+  "description": "Scripture: Leviticus 25",
+  "content": "## Leviticus 25\n\nRead Leviticus 25 in your own Bible, or [online](https://www.biblegateway.com/passage/?search=Leviticus+25).\n",
+  "contentFormat": "markdown",
+  "reach": "commons",
+  "tags": [
+    "bible",
+    "scripture",
+    "fct"
+  ],
+  "metadata": {
+    "category": "scripture",
+    "courseId": "foundations-christian-technology",
+    "generatedBy": "fct-course/recompose.py"
+  },
+  "createdAt": "2026-09-27T00:00:00.000Z",
+  "updatedAt": "2026-09-27T00:00:00.000Z"
+}

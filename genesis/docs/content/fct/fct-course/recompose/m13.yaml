@@ -1,0 +1,45 @@
+# Module 13 — Helping People Thrive. Mark the one correct choice " *".
+quiz:
+  - q: "Why can't engagement metrics measure thriving?"
+    choices:
+      - "Engagement is too hard to count"
+      - "Addictive experiences mimic thriving — stimulation impersonating meaning — while undermining the real thing *"
+      - "Thriving is only spiritual"
+      - "Metrics are unbiblical"
+    bloom: understand
+  - q: "What do the gleaning laws legislate?"
+    choices:
+      - "Maximum harvest"
+      - "Mandated inefficiency: un-optimized edges left so the vulnerable thrive inside the same economy *"
+      - "A tithe of grain"
+      - "A ban on foreign workers"
+    bloom: analyze
+  - q: "Which mimic does Romans 5:3-5 expose?"
+    choices:
+      - "Thriving without relationships"
+      - "Thriving with the pain surgically removed — a definition that cannot include suffering is a mimic *"
+      - "Thriving without rest"
+      - "Thriving without learning"
+    bloom: analyze
+  - q: "Which design principle comes from the feeding of the five thousand?"
+    choices:
+      - "Broadcast at scale"
+      - "Manufacture desire"
+      - "Abundance without excess: everyone satisfied and twelve baskets gathered *"
+      - "Source everything externally"
+    bloom: understand
+  - q: "What does 'regret as a metric' ask?"
+    choices:
+      - "Whether users returned daily"
+      - "Whether users are glad, a week later, for the time they gave you *"
+      - "Whether users shared the product"
+      - "Whether revenue grew"
+    bloom: apply
+reflections:
+  - title: "Our thriving story"
+    prompt: "Write your congregation's (or product's) thriving story in one sentence as it is stated, then in one sentence as it is lived. Where does practice mimic thriving, and which metric quietly steers you there?"
+    placeholder: "Stated: ... Lived: ... The mimic is... the metric behind it is..."
+    criteria:
+      - "Both sentences are present"
+      - "Names a mimic and the metric behind it"
+    bloom: evaluate

@@ -1,0 +1,101 @@
+{
+  "id": "fct-module-08-centering-love-reflection",
+  "contentType": "assessment",
+  "title": "Stated versus demonstrated",
+  "description": "Choose an organization you know well — your product, your congregation, your household. What do its defaults, calendars and dashboards demonstrate that it values, whatever its stated values say? Name one gap and one love-centered modificati",
+  "content": [
+    {
+      "id": "fct-module-08-centering-love-reflection",
+      "purpose": "reflection",
+      "content": {
+        "content": "[[☃ free-response 1]]",
+        "images": {},
+        "widgets": {
+          "free-response 1": {
+            "type": "free-response",
+            "options": {
+              "allowUnlimitedCharacters": false,
+              "characterLimit": 1500,
+              "placeholder": "We say we value... our defaults demonstrate...",
+              "question": "Choose an organization you know well — your product, your congregation, your household. What do its defaults, calendars and dashboards demonstrate that it values, whatever its stated values say? Name one gap and one love-centered modification.",
+              "scoringCriteria": [
+                {
+                  "text": "Names a demonstrated value from concrete evidence"
+                },
+                {
+                  "text": "Names one concrete modification"
+                }
+              ]
+            },
+            "graded": false,
+            "version": {
+              "major": 0,
+              "minor": 0
+            }
+          }
+        }
+      },
+      "metadata": {
+        "sourceContentId": "fct-module-08-centering-love-reflection",
+        "assessesContentId": "fct-module-08-centering-love",
+        "bloomsLevel": "evaluate",
+        "estimatedTimeSeconds": 600,
+        "questionType": "open-response",
+        "tags": [
+          "fct",
+          "reflection"
+        ]
+      }
+    }
+  ],
+  "contentFormat": "sophia-quiz-json",
+  "sourcePath": "docs/content/fct/fct-course/content/m08.md",
+  "reach": "commons",
+  "tags": [
+    "fct",
+    "christian-technology",
+    "humane-tech",
+    "movement-3",
+    "module-8",
+    "reflection"
+  ],
+  "metadata": {
+    "category": "fct",
+    "courseId": "foundations-christian-technology",
+    "courseVersion": "review draft v2, 2026-09-16",
+    "sourceWorkbook": "fct-course",
+    "moduleNumber": 8,
+    "movement": 3,
+    "movementTitle": "Reordering Loves",
+    "day": "Day 6",
+    "form": "reflection",
+    "assessmentType": "reflection",
+    "questionCount": 1
+  },
+  "relationships": [
+    {
+      "target": "fct-module-08-centering-love",
+      "type": "VALIDATES",
+      "role": "reflection"
+    },
+    {
+      "target": "fct-module-08-centering-love",
+      "type": "BELONGS_TO",
+      "role": "reflection"
+    }
+  ],
+  "createdAt": "2026-09-27T00:00:00.000Z",
+  "updatedAt": "2026-09-27T00:00:00.000Z",
+  "stewardedBy": [
+    {
+      "humanId": "human-pete-pastor",
+      "affinity": 0.7,
+      "role": "steward"
+    },
+    {
+      "humanId": "human-matthew-manager",
+      "affinity": 0.3,
+      "role": "endorser"
+    }
+  ]
+}

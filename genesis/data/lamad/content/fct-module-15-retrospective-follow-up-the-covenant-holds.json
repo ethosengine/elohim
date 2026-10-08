@@ -1,0 +1,55 @@
+{
+  "id": "fct-module-15-retrospective-follow-up-the-covenant-holds",
+  "contentType": "practice",
+  "title": "Follow-Up — The Covenant Holds",
+  "description": "Follow-Up — The Covenant Holds  Each participant pairs with an accountability partner from the course and shares their action plan.",
+  "content": "## Follow-Up — The Covenant Holds\n\nEach participant pairs with an accountability partner from the course and shares their action plan. Schedule a follow-up gathering in one to three months to check progress, tell stories of impact, and pray again — the first repeat interaction (Module 4) of the community this course has become. He who began a good work will carry it on to completion.\n\n*The course ends where it began, transformed: Day 0 opened with a groan God heard; Day 13 closes with a people God sends.*",
+  "contentFormat": "markdown",
+  "sourcePath": "docs/content/fct/fct-course/content/m15.md",
+  "reach": "commons",
+  "tags": [
+    "fct",
+    "christian-technology",
+    "humane-tech",
+    "movement-5",
+    "module-15",
+    "practice"
+  ],
+  "metadata": {
+    "category": "fct",
+    "courseId": "foundations-christian-technology",
+    "courseVersion": "review draft v2, 2026-09-16",
+    "sourceWorkbook": "fct-course",
+    "moduleNumber": 15,
+    "movement": 5,
+    "movementTitle": "Abundant Life & Sending",
+    "day": "Day 13",
+    "form": "practice"
+  },
+  "relationships": [
+    {
+      "target": "fct-module-04-scaling-wisdom",
+      "type": "RELATES_TO",
+      "role": "callback"
+    },
+    {
+      "target": "fct-module-15-retrospective",
+      "type": "BELONGS_TO",
+      "role": "practice"
+    }
+  ],
+  "createdAt": "2026-09-27T00:00:00.000Z",
+  "updatedAt": "2026-09-27T00:00:00.000Z",
+  "stewardedBy": [
+    {
+      "humanId": "human-pete-pastor",
+      "affinity": 0.7,
+      "role": "steward"
+    },
+    {
+      "humanId": "human-matthew-manager",
+      "affinity": 0.3,
+      "role": "endorser"
+    }
+  ]
+}

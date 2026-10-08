@@ -1,0 +1,55 @@
+{
+  "id": "fct-module-15-retrospective-retrospective-liturgy",
+  "contentType": "practice",
+  "title": "The Retrospective Liturgy",
+  "description": "The Retrospective Liturgy  1.",
+  "content": "## The Retrospective Liturgy\n\n1. **Opening prayer** (5 min) — as above.\n2. **Set the stage** (5 min) — the facilitator recaps the five movements in a few sentences (the Overview tab's map serves well) and explains the retrospective process.\n3. **Gather data** (15 min) — on sticky notes, each participant answers: *What key insights about faith and technology have you gained? Where have you seen God at work in your engagement with technology during this course? What challenges or tensions remain in aligning your tech use or development with your faith?*\n4. **Generate insights** (20 min) — in small groups, share and cluster the notes, looking for patterns. Discuss: *How do these insights reflect our calling as digital disciples? Where do we see opportunities to be salt and light in the tech world?*\n5. **Decide what to do** (20 min) — individually, then in pairs, refine yesterday's drafted action plans into three commitments: one immediate change in personal tech habits; one initiative to start or join in church or community; one way to advocate for Christ-centered approaches in professional tech engagement.\n6. **Close the retrospective** (15 min) — each person shares their top action item with the whole group. Then, together, compose the **Digital Discipleship Manifesto**: a short list of commitments this cohort makes to steward technology in a way that honors God and serves humanity — this group's own \"song of witness\" (Module 6), written down and kept.\n7. **Closing prayer of commissioning** (5 min) — end with Matthew 28:19-20: \"go and make disciples of all nations... and surely I am with you always, to the very end of the age.\" The promise of presence covers the digital age too. Ask God's strength for what each person now carries.",
+  "contentFormat": "markdown",
+  "sourcePath": "docs/content/fct/fct-course/content/m15.md",
+  "reach": "commons",
+  "tags": [
+    "fct",
+    "christian-technology",
+    "humane-tech",
+    "movement-5",
+    "module-15",
+    "practice"
+  ],
+  "metadata": {
+    "category": "fct",
+    "courseId": "foundations-christian-technology",
+    "courseVersion": "review draft v2, 2026-09-16",
+    "sourceWorkbook": "fct-course",
+    "moduleNumber": 15,
+    "movement": 5,
+    "movementTitle": "Abundant Life & Sending",
+    "day": "Day 13",
+    "form": "practice"
+  },
+  "relationships": [
+    {
+      "target": "fct-module-06-harmful-consequences",
+      "type": "RELATES_TO",
+      "role": "callback"
+    },
+    {
+      "target": "fct-module-15-retrospective",
+      "type": "BELONGS_TO",
+      "role": "practice"
+    }
+  ],
+  "createdAt": "2026-09-27T00:00:00.000Z",
+  "updatedAt": "2026-09-27T00:00:00.000Z",
+  "stewardedBy": [
+    {
+      "humanId": "human-pete-pastor",
+      "affinity": 0.7,
+      "role": "steward"
+    },
+    {
+      "humanId": "human-matthew-manager",
+      "affinity": 0.3,
+      "role": "endorser"
+    }
+  ]
+}

@@ -1,0 +1,50 @@
+{
+  "id": "fct-module-14-ready-to-act-homework",
+  "contentType": "practice",
+  "title": "Homework: Ready to Act",
+  "description": "Homework  Two short items feeding tomorrow's capstone: complete the course feedback, and draft your personal action plan — one change in personal tech habits, one initiative to start or join in your church, one advocacy commitment in your p",
+  "content": "## Homework\n\nTwo short items feeding tomorrow's capstone: complete the course feedback, and draft your personal action plan — one change in personal tech habits, one initiative to start or join in your church, one advocacy commitment in your professional or public life. Tomorrow you will refine and covenant it.",
+  "contentFormat": "markdown",
+  "sourcePath": "docs/content/fct/fct-course/content/m14.md",
+  "reach": "commons",
+  "tags": [
+    "fct",
+    "christian-technology",
+    "humane-tech",
+    "movement-5",
+    "module-14",
+    "homework"
+  ],
+  "metadata": {
+    "category": "fct",
+    "courseId": "foundations-christian-technology",
+    "courseVersion": "review draft v2, 2026-09-16",
+    "sourceWorkbook": "fct-course",
+    "moduleNumber": 14,
+    "movement": 5,
+    "movementTitle": "Abundant Life & Sending",
+    "day": "Day 12",
+    "form": "homework"
+  },
+  "relationships": [
+    {
+      "target": "fct-module-14-ready-to-act",
+      "type": "BELONGS_TO",
+      "role": "homework"
+    }
+  ],
+  "createdAt": "2026-09-27T00:00:00.000Z",
+  "updatedAt": "2026-09-27T00:00:00.000Z",
+  "stewardedBy": [
+    {
+      "humanId": "human-pete-pastor",
+      "affinity": 0.7,
+      "role": "steward"
+    },
+    {
+      "humanId": "human-matthew-manager",
+      "affinity": 0.3,
+      "role": "endorser"
+    }
+  ]
+}

@@ -1,0 +1,56 @@
+{
+  "id": "fct-module-07-regeneration-lane-church-leaders",
+  "contentType": "practice",
+  "title": "Church leaders: Regeneration & Reconciliation",
+  "description": "Church leaders  Bind your scale to responsibility.",
+  "content": "## Church leaders\n\nBind your scale to responsibility. (1) *Universal-Body growth*: treat other congregations' flourishing as your metric too — share what you do well, and let planting, building, or relocating regenerate the places you leave. (2) *Operational regeneration*: right-size buildings and debt, run on renewable energy, design for walking/biking/transit, extend the church's capacity into health care, social services, and income stabilization. (3) *Institutional repentance* (received from Module 4): exceed legal minimums on sexual misconduct, tax law, and equity — racial and class — boldly and publicly; doing more than required is how broken institutions rebuild trust. (4) *Outcome-honest discernment*: we cannot be a community serving the poor, prisoners, immigrants, orphans, and widows while supporting, from whichever side of the aisle, what measurably leaves those same neighbors poorer, more endangered, or more alone — we cannot go on sinning that grace may abound. Judge every political commitment the congregation holds, whatever its direction, by measurable outcomes, not stated goals — and inspect your own side's fruit first. (5) *Vocation support*: build ministry capacity that helps members realign their work with their values.",
+  "contentFormat": "markdown",
+  "sourcePath": "docs/content/fct/fct-course/content/m07.md",
+  "reach": "commons",
+  "tags": [
+    "fct",
+    "christian-technology",
+    "humane-tech",
+    "movement-2",
+    "module-7",
+    "practice-lane"
+  ],
+  "metadata": {
+    "category": "fct",
+    "courseId": "foundations-christian-technology",
+    "courseVersion": "review draft v2, 2026-09-16",
+    "sourceWorkbook": "fct-course",
+    "moduleNumber": 7,
+    "movement": 2,
+    "movementTitle": "Turning — Repentance & Repair",
+    "day": "Day 5",
+    "form": "practice-lane",
+    "audience": "church-leaders"
+  },
+  "relationships": [
+    {
+      "target": "fct-module-07-regeneration-application",
+      "type": "BELONGS_TO",
+      "role": "lane"
+    },
+    {
+      "target": "fct-module-04-scaling-wisdom",
+      "type": "RELATES_TO",
+      "role": "callback"
+    }
+  ],
+  "createdAt": "2026-09-27T00:00:00.000Z",
+  "updatedAt": "2026-09-27T00:00:00.000Z",
+  "stewardedBy": [
+    {
+      "humanId": "human-pete-pastor",
+      "affinity": 0.7,
+      "role": "steward"
+    },
+    {
+      "humanId": "human-matthew-manager",
+      "affinity": 0.3,
+      "role": "endorser"
+    }
+  ]
+}

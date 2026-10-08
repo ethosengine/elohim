@@ -1,0 +1,101 @@
+{
+  "id": "fct-module-10-recognize-distortions-reflection",
+  "contentType": "assessment",
+  "title": "Your feed's picture of your brother",
+  "description": "Name one person or group your feed has shown you in bent glass. Which distortion rewarded you for believing it? What would speaking truth with them — as members of one Body — require of you this week?",
+  "content": [
+    {
+      "id": "fct-module-10-recognize-distortions-reflection",
+      "purpose": "reflection",
+      "content": {
+        "content": "[[☃ free-response 1]]",
+        "images": {},
+        "widgets": {
+          "free-response 1": {
+            "type": "free-response",
+            "options": {
+              "allowUnlimitedCharacters": false,
+              "characterLimit": 1500,
+              "placeholder": "My feed showed me... the distortion was... this week I will...",
+              "question": "Name one person or group your feed has shown you in bent glass. Which distortion rewarded you for believing it? What would speaking truth with them — as members of one Body — require of you this week?",
+              "scoringCriteria": [
+                {
+                  "text": "Names a specific distortion at work"
+                },
+                {
+                  "text": "Names a concrete relational act for this week"
+                }
+              ]
+            },
+            "graded": false,
+            "version": {
+              "major": 0,
+              "minor": 0
+            }
+          }
+        }
+      },
+      "metadata": {
+        "sourceContentId": "fct-module-10-recognize-distortions-reflection",
+        "assessesContentId": "fct-module-10-recognize-distortions",
+        "bloomsLevel": "evaluate",
+        "estimatedTimeSeconds": 600,
+        "questionType": "open-response",
+        "tags": [
+          "fct",
+          "reflection"
+        ]
+      }
+    }
+  ],
+  "contentFormat": "sophia-quiz-json",
+  "sourcePath": "docs/content/fct/fct-course/content/m10.md",
+  "reach": "commons",
+  "tags": [
+    "fct",
+    "christian-technology",
+    "humane-tech",
+    "movement-4",
+    "module-10",
+    "reflection"
+  ],
+  "metadata": {
+    "category": "fct",
+    "courseId": "foundations-christian-technology",
+    "courseVersion": "review draft v2, 2026-09-16",
+    "sourceWorkbook": "fct-course",
+    "moduleNumber": 10,
+    "movement": 4,
+    "movementTitle": "Rebuilding Common Life",
+    "day": "Day 8",
+    "form": "reflection",
+    "assessmentType": "reflection",
+    "questionCount": 1
+  },
+  "relationships": [
+    {
+      "target": "fct-module-10-recognize-distortions",
+      "type": "VALIDATES",
+      "role": "reflection"
+    },
+    {
+      "target": "fct-module-10-recognize-distortions",
+      "type": "BELONGS_TO",
+      "role": "reflection"
+    }
+  ],
+  "createdAt": "2026-09-27T00:00:00.000Z",
+  "updatedAt": "2026-09-27T00:00:00.000Z",
+  "stewardedBy": [
+    {
+      "humanId": "human-pete-pastor",
+      "affinity": 0.7,
+      "role": "steward"
+    },
+    {
+      "humanId": "human-matthew-manager",
+      "affinity": 0.3,
+      "role": "endorser"
+    }
+  ]
+}

@@ -1,69 +1,120 @@
 {
   "id": "fct-module-09-fruits-of-spirit",
   "contentType": "lesson",
-  "reach": "commons",
-  "title": "FCT 9: Centering Values: Fruits of the Spirit",
-  "description": "Modern technology companies rely heavily on easily quantifiable metrics to drive decision-making, often optimized through A/B testing.  \nMetrics like revenue, daily active users, or time spent are often essential for managing massive systems with hundreds of thousands to billions of data points. Quantification enables efficient decision-making that appears rigorous and objective. Metrics and A/B tests summarize vast amounts of data, providing comfort in what appears to be an ever more empirical ",
-  "content": "**Introduction:** Modern technology companies rely heavily on easily quantifiable metrics to drive decision-making, often optimized through A/B testing.  \nMetrics like revenue, daily active users, or time spent are often essential for managing massive systems with hundreds of thousands to billions of data points. Quantification enables efficient decision-making that appears rigorous and objective. Metrics and A/B tests summarize vast amounts of data, providing comfort in what appears to be an ever more empirical picture of the user and their choices.  \nMetrics certainly make decision-making and product development more efficient, but just as you explored in the previous module, this efficiency can create, amplify, and mask harms.  \nAs an app or service starts up, it seems “obvious” that optimizing for core metrics is a good thing. It’s exciting when daily active users go from 10 to 100 to 1,000. But as we optimize for metrics, we can lose sight of the original values the metrics were meant to support. When daily active users go from 1,000 to 1,000,000, it is increasingly difficult to know if users have an experience that aligns with our original intentions. That’s especially true when new users live with very different conditions from our own. The bigger the system that’s run on a handful of metrics, the easier it is to be out of touch with harms happening underneath:  \nGrowth in GDP might mean more addicted citizens  \nGrowth in patients treated might mean more sick people  \nGrowth in engagement might mean more anxious, distracted teenagers\n\nWhile metrics are useful for managing scale, their quantitative objectivity is often confused for ethical neutrality. In reality, metrics have deep impact on the behavior of social systems—and not always in desirable ways:\n\n**Conclusion:** Taking a humanely oriented, complex systems perspective requires us to be “epistemically humble” and to accept the inherent uncertainty of living in a world in which everything is subject to change:\n\nOptimizing the parts doesn't always lead to optimization of the whole, especially in complex systems. As David Stroh wrote in Systems Thinking for Social Change:\n\n“In order to optimize the performance of the entire system, people need to shift from trying to optimize their part of the system to improving relationships among its constituent parts.”\n\nHere, the “whole” is how a technology impacts the user and their wider community. The “parts” are individual elements of the technology such as specific algorithms, features, and metrics. Technology teams must move in and out, from parts to whole and whole to parts, so that they can grow in their understanding of the technology's effect on individual users and communities.\n\nThis process is often under-appreciated and under-resourced. Ask yourself where you could investigate these types of relationships. This may entail expanding your role to be more cross-functional, or hiring a new person to take on that role. These types of jobs are not common, often because their contributions are not conveniently captured by simple metrics.\n\nSo let us reimagine measures of success based on the Fruits of the Spirit:\n\nLove:  \nShift focus from attendance numbers to meaningful relationships formed.  \nMeasure the number of reconciliations facilitated within the church and community.  \nTrack instances of sacrificial giving and service to those in need.\n\nJoy:  \nAssess the church's impact on mental health in the community.  \nMeasure participation in community celebrations and cultural events.  \nSurvey members' sense of purpose and fulfillment in their faith journey.\n\nPeace:  \nTrack resolution of conflicts within the church and wider community.  \nMeasure reduction in domestic violence rates in the church community.  \nAssess the church's involvement in local peacemaking initiatives.\n\nPatience:  \nEvaluate long-term commitment to discipleship and spiritual growth programs.  \nMeasure retention and growth of new believers over time.  \nAssess willingness to engage in long-term community development projects.\n\nKindness:  \nTrack acts of unexpected generosity by church members.  \nMeasure the church's welcome and support of marginalized groups.  \nAssess the church's environmental stewardship efforts.\n\nGoodness:  \nEvaluate the church's impact on local crime rates and addiction recovery.  \nMeasure ethical business practices among church members.  \nTrack instances of members standing up against injustice.\n\nFaithfulness:  \nAssess depth of biblical knowledge and application among members.  \nMeasure long-term commitment to missions and community service.  \nEvaluate integrity in personal and professional lives of members.\n\nGentleness:  \nMeasure the church's approach to disagreements and conflicts.  \nAssess the tone and content of social media engagement by members.  \nEvaluate the church's approach to discipline and correction.\n\nSelf-control:  \nAssess members' media consumption habits and their impact.  \nMeasure responsible financial practices among members.  \nEvaluate the church's use of resources and environmental impact.\n\n**Raw Markdown:** \n\n## Centering Values \\- Metrics are Not Neutral, Centering the Fruits of the Spirit\n\n### Day\n\n7.0\n\n### Objective\n\n4.0\n\n### Foundations of Humane Tech Concepts Review\n\nCentering Values \\- Part 2: Implementing Value-Centered Approaches in Technology\n\nValues Inquiry in Technology Design  \n\\- The importance of regularly discussing and prioritizing values  \n\\- Techniques for understanding and integrating diverse stakeholder values  \n\\- Balancing efficiency with resilience and stewardship\n\nAligning Products with Values  \n\\- Moving from \"growth at all costs\" to \"binding scale to responsibility\"  \n\\- Identifying the true purpose of a system through observation of behavior  \n\\- Creating technology that reflects values while remaining open to learning and growth\n\nBuilding Trustworthy Technology  \n\\- Components of trustworthiness: integrity, competency, accountability, and education  \n\\- Strategies for maintaining alignment with stated values  \n\\- Balancing success in the market with upholding core values\n\nPractical Approaches for Humane Technologists  \n\\- Using retro-casting to work backward from desired futures  \n\\- Implementing value-sensitive design principles  \n\\- Shifting focus from optimizing parts to improving relationships within systems\n\n### Foundations of Christians and Technology Learning Objectives\n\nPart 2: Centering the Fruits of the Spirit\n\nExplore the Fruits of the Spirit (Galatians 5:22-23) as a metric for discerning the value and impact of technology on individuals and communities, in light of Jesus' teaching that \"a good tree cannot bear bad fruit, and a bad tree cannot bear good fruit\" (Matthew 7:18).  \nAnalyze how technology can be designed to foster and support the growth of love, joy, peace, patience, kindness, goodness, faithfulness, gentleness, and self-control in users.  \nDevelop criteria for evaluating technologies based on their ability to produce or hinder the Fruits of the Spirit in users' lives and communities, using Jesus' tree and fruit analogy as a framework for discernment.  \nExamine current tech industry and church practices through the lens of the Fruits of the Spirit, identifying areas where current approaches may be undermining spiritual growth or producing \"bad fruit.\"  \nCreate strategies for implementing design principles that promote the Fruits of the Spirit in technology development and use, considering impact on individual spiritual formation, community relationships, and societal well-being.  \nDiscuss how the Fruits of the Spirit and Jesus' tree analogy can inform a Christian approach to data collection, user privacy, and algorithmic decision-making, critiquing current practices in both secular and religious contexts.  \nExplore how focusing on the Fruits of the Spirit can help Christians navigate the limitations of quantitative metrics and avoid the pitfalls of Goodhart's Law in both tech development and church practices.  \nDevelop a framework for ongoing discernment in technology use and development, based on Jesus' teaching that \"by their fruit you will recognize them\" (Matthew 7:16), encouraging regular evaluation of the outcomes of our technological choices.\n\nThese revised objectives now incorporate Jesus' teaching about good and bad trees and their fruit, emphasizing the importance of discernment and evaluation based on outcomes rather than intentions or surface-level metrics.\n\nA safe choice is centering on metrics that reduce KNOWN harm, start with the low hanging fruit, ready for harvest. \n\n### Introduction\n\nModern technology companies rely heavily on easily quantifiable metrics to drive decision-making, often optimized through A/B testing.  \nMetrics like revenue, daily active users, or time spent are often essential for managing massive systems with hundreds of thousands to billions of data points. Quantification enables efficient decision-making that appears rigorous and objective. Metrics and A/B tests summarize vast amounts of data, providing comfort in what appears to be an ever more empirical picture of the user and their choices.  \nMetrics certainly make decision-making and product development more efficient, but just as you explored in the previous module, this efficiency can create, amplify, and mask harms.  \nAs an app or service starts up, it seems “obvious” that optimizing for core metrics is a good thing. It’s exciting when daily active users go from 10 to 100 to 1,000. But as we optimize for metrics, we can lose sight of the original values the metrics were meant to support. When daily active users go from 1,000 to 1,000,000, it is increasingly difficult to know if users have an experience that aligns with our original intentions. That’s especially true when new users live with very different conditions from our own. The bigger the system that’s run on a handful of metrics, the easier it is to be out of touch with harms happening underneath:  \nGrowth in GDP might mean more addicted citizens  \nGrowth in patients treated might mean more sick people  \nGrowth in engagement might mean more anxious, distracted teenagers\n\nWhile metrics are useful for managing scale, their quantitative objectivity is often confused for ethical neutrality. In reality, metrics have deep impact on the behavior of social systems—and not always in desirable ways:\n\n### Bible Reference(s)\n\nPaul's wrote optimistically for the Church in Corinth. \n\nMatthew 7:15-19 “Watch out for false prophets. They come to you in sheep’s clothing, but inwardly they are ferocious wolves. 16 By their fruit you will recognize them. Do people pick grapes from thornbushes, or figs from thistles? 17 Likewise, every good tree bears good fruit, but a bad tree bears bad fruit. 18 A good tree cannot bear bad fruit, and a bad tree cannot bear good fruit. 19 Every tree that does not bear good fruit is cut down and thrown into the fire. 20 Thus, by their fruit you will recognize them.\n\nJames 1:27 ASV  \n27 Pure religion and undefiled before our God and Father is this, to visit the fatherless and widows in their affliction, and to keep oneself unspotted from the world.\n\n### Story \n\nSheila Gregoire, a passionate advocate for healthy Christian marriages, embarked on a groundbreaking journey that led to the writing of her book, \"The Great Sex Rescue.\" Sheila, a regular contributor to Focus on the Family, was deeply troubled after reading \"Love & Respect\" and seeing dozens of comments from women on their website decrying the book for enabling abuse in their marriages. Driven by her concern, Sheila sent a detailed letter along with a meta-analysis of the comments to Focus on the Family, encouraging them to respond to their own feedback and stop promoting the book. However, Focus on the Family ignored her plea, which inspired Sheila to embark on a comprehensive survey and project to uncover the truth.\n\nSheila conducted a survey of over 20,000 Christian women, delving into their marital and sexual satisfaction. Her findings were illuminating and sometimes startling, revealing that certain widely taught beliefs were significantly harming women's marital happiness and sexual satisfaction. For instance, the belief that a wife is obligated to have sex to prevent her husband from straying was linked to lower sexual and marital satisfaction. Armed with this data, Sheila wrote \"The Great Sex Rescue,\" where she not only presented her findings but also offered new frameworks for understanding and teaching about sex in marriage based on mutuality, respect, and true biblical principles.\n\nUpon publishing her book, Focus on the Family responded by scrubbing Sheila's name from their website and any comment that mentioned her name. Despite this, new Focus on the Family contributors Julie Slattery and Gary Thomas adopted nearly word-for-word the message denouncing the most harmful obligation sex-message without acknowledging Sheila’s significant contribution. However, they continued to couch their findings in teachings that Sheila had exposed as harmful.\n\nThe story of Sheila Gregoire and her work aligns beautifully with the biblical wisdom of Matthew 7: \"By their fruit you shall know them.\" In a world obsessed with metrics like profit, engagement, and growth, Sheila did something truly remarkable by championing \"metrics that reduce known harm.\" Her focus on the actual well-being and satisfaction of women in marriages offers a powerful lesson in wisdom. Sheila’s work shows how true wisdom lies in seeking and measuring the presence of the fruits of the Spirit, as listed in Galatians 5: love, joy, peace, patience, kindness, goodness, faithfulness, gentleness, and self-control. By putting in the work to measure these spiritual fruits, just as Sheila did, we can truly reap a harvest that leads to flourishing lives. This proves that the true measure of any teaching is found in the presence of these fruits in our lives.\n\n### Discussion Question or Activity\n\nMetrics and Benchmarks\n\n\"If we truly believe that 'by their fruit you will recognize them' (Matthew 7:16), how might we reimagine our measures of success and growth in the church to reflect the Fruits of the Spirit (Galatians 5:22-23)? Consider both personal spiritual development and communal church life in your response.\"  \nThis elevated version:\n\nGrounds the question in scripture, reminding participants of the biblical basis for this approach.  \nDirectly references the Fruits of the Spirit, encouraging participants to consider each one (love, joy, peace, patience, kindness, goodness, faithfulness, gentleness, self-control).  \nChallenges the notion of \"metrics\" by using the more holistic term \"measures of success and growth.\"  \nEncourages participants to think beyond just church attendance or giving, which are often default metrics.  \nPrompts consideration of both individual and community aspects of spiritual growth.  \nImplicitly questions current church practices without being confrontational.  \nInvites creative thinking about how abstract spiritual concepts might be practically observed or cultivated.\n\nThis reframed question should lead to a richer discussion about what truly matters in Christian life and how we might realign our focus and practices to nurture the Fruits of the Spirit in ourselves and our communities.\n\n### Conclusion\n\nTaking a humanely oriented, complex systems perspective requires us to be “epistemically humble” and to accept the inherent uncertainty of living in a world in which everything is subject to change:\n\nOptimizing the parts doesn't always lead to optimization of the whole, especially in complex systems. As David Stroh wrote in Systems Thinking for Social Change:\n\n“In order to optimize the performance of the entire system, people need to shift from trying to optimize their part of the system to improving relationships among its constituent parts.”\n\nHere, the “whole” is how a technology impacts the user and their wider community. The “parts” are individual elements of the technology such as specific algorithms, features, and metrics. Technology teams must move in and out, from parts to whole and whole to parts, so that they can grow in their understanding of the technology's effect on individual users and communities.\n\nThis process is often under-appreciated and under-resourced. Ask yourself where you could investigate these types of relationships. This may entail expanding your role to be more cross-functional, or hiring a new person to take on that role. These types of jobs are not common, often because their contributions are not conveniently captured by simple metrics.\n\nSo let us reimagine measures of success based on the Fruits of the Spirit:\n\nLove:  \nShift focus from attendance numbers to meaningful relationships formed.  \nMeasure the number of reconciliations facilitated within the church and community.  \nTrack instances of sacrificial giving and service to those in need.\n\nJoy:  \nAssess the church's impact on mental health in the community.  \nMeasure participation in community celebrations and cultural events.  \nSurvey members' sense of purpose and fulfillment in their faith journey.\n\nPeace:  \nTrack resolution of conflicts within the church and wider community.  \nMeasure reduction in domestic violence rates in the church community.  \nAssess the church's involvement in local peacemaking initiatives.\n\nPatience:  \nEvaluate long-term commitment to discipleship and spiritual growth programs.  \nMeasure retention and growth of new believers over time.  \nAssess willingness to engage in long-term community development projects.\n\nKindness:  \nTrack acts of unexpected generosity by church members.  \nMeasure the church's welcome and support of marginalized groups.  \nAssess the church's environmental stewardship efforts.\n\nGoodness:  \nEvaluate the church's impact on local crime rates and addiction recovery.  \nMeasure ethical business practices among church members.  \nTrack instances of members standing up against injustice.\n\nFaithfulness:  \nAssess depth of biblical knowledge and application among members.  \nMeasure long-term commitment to missions and community service.  \nEvaluate integrity in personal and professional lives of members.\n\nGentleness:  \nMeasure the church's approach to disagreements and conflicts.  \nAssess the tone and content of social media engagement by members.  \nEvaluate the church's approach to discipline and correction.\n\nSelf-control:  \nAssess members' media consumption habits and their impact.  \nMeasure responsible financial practices among members.  \nEvaluate the church's use of resources and environmental impact.\n\n### Application \n\nTo implement these measures, the church might:  \nDevelop a \"Fruit of the Spirit\" assessment tool for individual and communal reflection.  \nCreate small groups focused on cultivating specific fruits.  \nImplement a mentoring program pairing mature believers with newer ones.  \nRedesign church programs to intentionally foster these fruits.  \nPartner with local organizations to measure community impact.  \nUse technology to facilitate connection, accountability, and growth in these areas.\n\nThis approach would require a significant shift from typical suburban church metrics, focusing on qualitative growth and community impact rather than numbers and budgets. It would challenge members to live out their faith more intentionally and holistically, addressing the externalities of their lifestyles and consumption habits. The result could be a church that truly embodies the Fruits of the Spirit, making a tangible difference in individual lives and the broader community.\n\n### Class Homework\n\nCHT 5, Creating Shared Understanding\n\n### Other Media / Go Deeper / Class Maps\n\nMore than half of U.S. counties have no access or very limited access to local news \\- Medill \\- Northwestern University (Local Media has Collapsed)\n\nHow the Collapse of Local Newsrooms Made All Politics National \\- Columbia Journalism Review   \n\n\n",
+  "title": "FCT 9: Fruit as Metric",
+  "description": "from optimizing the measurable → to discerning by fruit: \"a good tree cannot bear bad fruit.\"",
+  "content": "**Movement III — Reordering Loves · Day 7**\n\n*Arc: from optimizing the measurable → to discerning by fruit: \"a good tree cannot bear bad fruit.\"*\n\n*Anchor text: Matthew 7:15-20 · Supporting: Galatians 5:22-23; James 1:27 · Story: Sheila Gregoire and the metrics of known harm*\n\nModule 8 centered love; this module builds its instrumentation. If we refuse to let engagement, attendance, and revenue define success, we still need something to watch — and Jesus supplied the discernment framework in agricultural form: by their fruit you will recognize them. This module closes Movement III by translating the fruits of the Spirit from devotional poster to working dashboard.\n\n## Opening — Religion's True Metric\n\nRead James 1:27: \"Pure religion and undefiled before our God and Father is this: to visit the fatherless and widows in their affliction, and to keep oneself unspotted from the world.\" Scripture is not shy about metrics — it simply chooses shocking ones. Not size, not reach: orphans visited, widows attended, integrity kept. Pray: *Father, you measure what we have not thought to count. Teach us to watch what you watch, and to call nothing success that bears no fruit.*\n\n## Humane Tech Concepts in View\n\nThis module pairs with FHT's *Centering Values, Part 2 — Implementing Value-Centered Approaches*:\n\n- **Metric drift at scale.** Metrics make massive systems manageable, and optimizing them feels obviously good when users grow from 10 to 1,000. But at 1,000,000, the handful of numbers can no longer see the harms underneath: growth in GDP might mean more addicted citizens; growth in patients treated, more sick people; growth in engagement, more anxious teenagers. The metric outlives the value it was meant to serve.\n- **Values inquiry as ongoing practice** — regularly re-asking what we value, integrating diverse stakeholders, discovering a system's *true* purpose by observing its behavior rather than reading its mission statement.\n- **Trustworthy technology** has four components: integrity, competency, accountability, and education — alignment maintained even when the market rewards drift.\n- **Practical tools:** retro-casting (working backward from the future we actually want) and value-sensitive design. And the pragmatic starting point: center metrics that reduce *known* harm — the low-hanging fruit, ready for harvest.\n\n## Learning Objectives\n\nBy the end of this session, participants will be able to:\n\n1. Explain how metric optimization drifts from original values as systems scale, extending Goodhart's Law from Module 8 into lived examples.\n2. Apply Jesus' tree-and-fruit test (Matthew 7:15-20) as an outcomes-based discernment framework for technologies, teachings, and ministries.\n3. Translate each fruit of the Spirit (Galatians 5:22-23) into observable indicators for personal, product, and congregational life.\n4. Analyze the four components of trustworthy technology as fruit-consistent institutional character.\n5. Practice retro-casting: describe a fruit-filled future for one system, then work backward to present decisions.\n6. Evaluate a real case of measuring known harm against institutional resistance, and articulate what faithfulness to the data required.\n\n## Teaching\n\n### Introduction: When the Number Outlives the Value\n\nQuantification is a genuine gift — no one runs a system with a billion data points on vibes. A/B tests and dashboards summarize oceans of behavior into decisions that feel rigorous and objective. The trouble is subtle: metrics were installed to *serve* values, and at scale they quietly replace them. The bigger the system run on a handful of numbers, the easier it becomes to be out of touch with the harms underneath — and quantitative objectivity gets mistaken for ethical neutrality all the way down. The way out is not abandoning measurement but repenting of *what* we measure: choosing indicators that track the outcomes love actually cares about, starting with metrics that reduce known harm. The church sits inside this lesson, not outside it: Lifeway's 2026 discipleship study found the average churchgoer — thirty years attending, nearly five services a month — scoring a D+ across discipleship's marks. Decades of optimizing the countable did not grow the fruit.\n\n**The Discipleship Deficit** — average U.S. Protestant churchgoer, scored 0–100 per signpost (overall 68.1, a \"D+\"). Source: Lifeway Research, *State of Discipleship* (2026).\n\n| Signpost | Score |\n| --- | --- |\n| Seeking God | 78.5 |\n| Obeying God & Denying Self | 75.1 |\n| Serving God & Others | 73.1 |\n| Exercising Faith | 71.6 |\n| Bible Engagement | 69.8 |\n| Building Relationships | 64.0 |\n| Living Unashamed | 61.0 |\n| Sharing Christ | 54.8 |\n\n### Scripture Engagement\n\n**Matthew 7:15-20 — the anchor.** Jesus' warning about false prophets is an epistemology: \"They come to you in sheep's clothing\" — the branding is excellent, the stated values impeccable — \"but by their fruit you will recognize them.\" Grapes don't come from thornbushes; a good tree *cannot* bear bad fruit, and a bad tree cannot bear good. Jesus authorizes outcome-based discernment: not the mission statement, not the intentions, not the production values — the fruit. Applied to technology: a platform whose fruit is anxiety, outrage, and isolation is a bad tree, whatever its About page says. Applied to church: the same test, unflinchingly.\n\n**Galatians 5:22-23 — the dashboard.** \"Love, joy, peace, patience, kindness, goodness, faithfulness, gentleness, and self-control. Against such things there is no law.\" Nine observable qualities of persons and communities — qualitative, yes, but not unmeasurable. People can tell you whether they have peace; communities show whether they practice gentleness; self-control leaves visible traces in media habits and budgets. Paul's list is the counter-dashboard to the attention economy's: where engagement metrics track what technology extracts from people, the fruits track what the Spirit grows in them. And notice the reach of this test: the fruit hermeneutic by which Christians discern teachings — and even weigh texts — is the very one this course applies to technologies. One discernment, two domains.\n\n**James 1:27 — the precedent.** Scripture has always been willing to name concrete indicators for spiritual realities. Orphans and widows visited is a *measure* — auditable, falsifiable, and entirely unlike counting rams and rivers of oil (Micah 6:7, yesterday's warning).\n\n### Eminence-Based vs. Evidence-Based Theology\n\nThe story has a shelf and a research arm. *The Great Sex Rescue* (2021, with Rebecca Gregoire Lindenbach and Joanna Sawatsky), *She Deserves Better* (2023), and *The Marriage You Want* (2025, with Keith Gregoire) each begin from the same wager: take Jesus at his word that a good tree cannot bear bad fruit — so survey tens of thousands, measure the outcomes the teachings actually produce, and follow the harvest data wherever it leads. And the work is now institutional: the **Good Fruit Faith Initiative** of the Bosko Foundation funds Bare Marriage's ongoing research and peer-reviewed publication — Matthew 7 with a methods section, and a standing invitation for the church to build its own evidence base.\n\nName what this replaces: **eminence-based theology** — teaching trusted because of who said it and how large the platform grew, the operating system of much of the last century's evangelical media. Jesus' test points the opposite direction: out of the citation circle of the eminent and into God's creation, where fruit can actually be observed. Taken seriously, \"by their fruit you will recognize them\" is a standing call to empirical research — and the scientific process itself (observe creation honestly, submit claims to testing, hold conclusions with epistemic humility, revise toward God's emergent, consensus truth) is a spiritual discipline by another name. It even offers a way past the church's political deadlocks: outcome data is neither red nor blue, and a people who covenant to inspect fruit together can set tribal priors aside long enough to see the light that creation is showing them.\n\nThis thought has a confessional address: the **Experience** arm of the Wesleyan Quadrilateral — Scripture, tradition, reason, experience, Albert Outler's map of John Wesley's method, with Outler's own insistence that Scripture stays primary (*prima scriptura*). Wesley called his theology *experimental divinity*, in the eighteenth-century sense of tested-in-experience, and he built the testing into church order: class and band meetings were structured weekly examination of souls' actual fruit — arguably the church's first longitudinal outcomes study — while Wesley himself ran electrical experiments and published home medicine. Empirical research is the Experience arm at scale, disciplined by Reason, under Scripture: not a rival authority but the quadrilateral doing its job. And the lineage runs wider than Methodism: the church has long read God's *two books*, Scripture and creation — \"a most elegant book\" (Belgic Confession, Article 2; Psalm 19:1-4; Romans 1:20) — so a church that inspects fruit empirically is simply reading the second book with care. To the charge that outcomes research is scientism invading theology, the reply is gentle: no — this is Wesley; this is the three-legged stool grown its fourth leg; this is the book of nature, open.\n\n## Conclusion — Movement III Closes\n\nOur loves are reordered and instrumented: love centered as the root dependency, and the fruits of the Spirit installed as the dashboard that keeps us honest about whether love is actually what we're growing. We carry two warnings forward — Micah's rivers of oil and Goodhart's Law, the same warning in two dialects — and one working method: inspect fruit, reduce known harm, trust outcomes over branding.\n\nBut fruit inspection has a prerequisite this movement has quietly assumed: the ability to *see clearly* — shared, trustworthy perception of what is actually happening. And that is precisely what our information environment now distorts at scale. More than half of U.S. counties have little or no local news; the feeds that replaced it are engineered for engagement, not truth. Movement IV rebuilds the commons of shared understanding, and it begins by learning to recognize the distortions: **Module 10 — Recognizing Distortions.**\n\n## Go Deeper\n\n\"More than half of U.S. counties have no access or very limited access to local news\" (Medill, Northwestern — the news-desert research) · \"How the Collapse of Local Newsrooms Made All Politics National\" (Columbia Journalism Review) — both are the on-ramp to Movement IV. And the evidence-based shelf: Sheila Wray Gregoire, Rebecca Gregoire Lindenbach & Joanna Sawatsky, *The Great Sex Rescue* (2021) and *She Deserves Better* (2023) · Sheila & Keith Gregoire with Joanna Sawatsky, *The Marriage You Want* (2025) · the Bare Marriage podcast and blog (baremarriage.com) · the Good Fruit Faith Initiative of the Bosko Foundation — the church's research arm, fund it.\n",
   "contentFormat": "markdown",
-  "sourcePath": "fct/v1/Module 9 - Centering Values - Metrics are Not Neutral, Centering the Fruits of the Spirit.md",
+  "sourcePath": "docs/content/fct/fct-course/content/m09.md",
+  "reach": "commons",
   "tags": [
     "fct",
     "christian-technology",
     "humane-tech",
-    "cht-module-4",
-    "values",
-    "values-centered"
-  ],
-  "relatedNodeIds": [
-    "manifesto",
-    "value-scanner-epic"
-  ],
-  "children": [
-    "fct-bible-matthew-7-15-19",
-    "fct-bible-james-1-27",
-    "fct-module-09-fruits-of-spirit-discussion",
-    "fct-module-09-fruits-of-spirit-story",
-    "fct-module-09-fruits-of-spirit-application"
+    "movement-3",
+    "module-9",
+    "lesson"
   ],
   "metadata": {
     "category": "fct",
     "courseId": "foundations-christian-technology",
+    "courseVersion": "review draft v2, 2026-09-16",
+    "sourceWorkbook": "fct-course",
     "moduleNumber": 9,
-    "chapter": "values",
-    "chtModule": "Module 4",
-    "sharedConcepts": [
-      "values-centered"
-    ],
-    "sectionCount": 15,
-    "hasVideo": false,
-    "hasBibleReferences": true,
-    "hasDiscussion": true,
-    "estimatedDuration": "20-30 minutes",
-    "originalContentType": "course-module"
+    "movement": 3,
+    "movementTitle": "Reordering Loves",
+    "day": "Day 7",
+    "form": "lesson",
+    "learningObjectiveCount": 6
   },
-  "learningObjectives": [],
-  "chtConcepts": [],
-  "richMedia": {
-    "videoCount": 0,
-    "bookCount": 0,
-    "bibleVerseCount": 2
-  },
+  "relationships": [
+    {
+      "target": "fct-bible-matthew-7-15-20",
+      "type": "REFERENCES",
+      "role": "anchor"
+    },
+    {
+      "target": "fct-bible-galatians-5-22-23",
+      "type": "REFERENCES",
+      "role": "supporting"
+    },
+    {
+      "target": "fct-bible-james-1-27",
+      "type": "REFERENCES",
+      "role": "supporting"
+    },
+    {
+      "target": "fct-module-09-fruits-of-spirit-story",
+      "type": "CONTAINS",
+      "role": "story"
+    },
+    {
+      "target": "fct-module-09-fruits-of-spirit-discussion",
+      "type": "CONTAINS",
+      "role": "discussion"
+    },
+    {
+      "target": "fct-module-09-fruits-of-spirit-fruit-of-the-spirit-dashboard",
+      "type": "CONTAINS",
+      "role": "practice"
+    },
+    {
+      "target": "fct-module-09-fruits-of-spirit-application",
+      "type": "CONTAINS",
+      "role": "practice"
+    },
+    {
+      "target": "fct-module-09-fruits-of-spirit-homework",
+      "type": "CONTAINS",
+      "role": "homework"
+    },
+    {
+      "target": "fct-module-09-fruits-of-spirit-quiz",
+      "type": "CONTAINS",
+      "role": "quiz"
+    },
+    {
+      "target": "fct-module-09-fruits-of-spirit-reflection",
+      "type": "CONTAINS",
+      "role": "reflection"
+    },
+    {
+      "target": "fct-module-08-centering-love",
+      "type": "FOLLOWS",
+      "role": "sequence"
+    },
+    {
+      "target": "fct-course",
+      "type": "REFERENCES",
+      "role": "source-workbook"
+    },
+    {
+      "target": "fct-module-08-centering-love",
+      "type": "RELATES_TO",
+      "role": "callback"
+    },
+    {
+      "target": "fct-module-10-recognize-distortions",
+      "type": "RELATES_TO",
+      "role": "callback"
+    }
+  ],
   "createdAt": "2025-11-28T21:10:19.210782",
-  "updatedAt": "2025-12-24T03:05:26.197Z",
+  "updatedAt": "2026-09-27T00:00:00.000Z",
+  "stewardedBy": [
+    {
+      "humanId": "human-pete-pastor",
+      "affinity": 0.7,
+      "role": "steward"
+    },
+    {
+      "humanId": "human-matthew-manager",
+      "affinity": 0.3,
+      "role": "endorser"
+    }
+  ],
   "did": "did:web:elohim.host:content:fct:module 9 - centering values - metrics are not neutral, centering the fruits of the spirit",
   "activityPubType": "Article",
-  "openGraphMetadata": {
-    "ogTitle": "FCT 9: Centering Values: Fruits of the Spirit",
-    "ogDescription": "Modern technology companies rely heavily on easily quantifiable metrics to drive decision-making, often optimized through A/B testing.  \nMetrics like revenue, daily active users, or time spent are oft",
-    "ogType": "article",
-    "ogUrl": "https://elohim-protocol.org/content/fct-module-09-fruits-of-spirit",
-    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
-    "articlePublishedTime": "2025-11-28T21:10:19.210782",
-    "articleModifiedTime": "2025-11-28T21:10:19.210783",
-    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/course-module.jpg",
-    "ogImageAlt": "FCT 9: Centering Values: Fruits of the Spirit - Elohim Protocol"
-  },
   "linkedData": {
     "@context": "https://schema.org/",
     "@type": "LearningResource",
@@ -79,16 +130,28 @@
       "name": "Elohim Protocol"
     }
   },
-  "stewardedBy": [
-    {
-      "humanId": "human-pete-pastor",
-      "affinity": 0.7,
-      "role": "steward"
-    },
-    {
-      "humanId": "human-matthew-manager",
-      "affinity": 0.3,
-      "role": "endorser"
-    }
+  "learningObjectives": [
+    "Explain how metric optimization drifts from original values as systems scale, extending Goodhart's Law from Module 8 into lived examples.",
+    "Apply Jesus' tree-and-fruit test (Matthew 7:15-20) as an outcomes-based discernment framework for technologies, teachings, and ministries.",
+    "Translate each fruit of the Spirit (Galatians 5:22-23) into observable indicators for personal, product, and congregational life.",
+    "Analyze the four components of trustworthy technology as fruit-consistent institutional character.",
+    "Practice retro-casting: describe a fruit-filled future for one system, then work backward to present decisions.",
+    "Evaluate a real case of measuring known harm against institutional resistance, and articulate what faithfulness to the data required."
+  ],
+  "children": [
+    "fct-module-09-fruits-of-spirit-story",
+    "fct-module-09-fruits-of-spirit-discussion",
+    "fct-module-09-fruits-of-spirit-fruit-of-the-spirit-dashboard",
+    "fct-module-09-fruits-of-spirit-application",
+    "fct-module-09-fruits-of-spirit-homework",
+    "fct-module-09-fruits-of-spirit-quiz",
+    "fct-module-09-fruits-of-spirit-reflection",
+    "fct-bible-matthew-7-15-20",
+    "fct-bible-galatians-5-22-23",
+    "fct-bible-james-1-27"
+  ],
+  "relatedNodeIds": [
+    "fct-module-08-centering-love",
+    "fct-module-10-recognize-distortions"
   ]
 }

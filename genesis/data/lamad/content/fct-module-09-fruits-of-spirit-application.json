@@ -1,39 +1,69 @@
 {
   "id": "fct-module-09-fruits-of-spirit-application",
-  "contentType": "exercise",
-  "reach": "commons",
-  "title": "Application: Centering Values: Fruits of the Spirit",
-  "description": "Practical application and action steps",
-  "content": "**Instructions:** To implement these measures, the church might:  \nDevelop a \"Fruit of the Spirit\" assessment tool for individual and communal reflection.  \nCreate small groups focused on cultivating specific fruits.  \nImplement a mentoring program pairing mature believers with newer ones.  \nRedesign church programs to intentionally foster these fruits.  \nPartner with local organizations to measure community impact.  \nUse technology to facilitate connection, accountability, and growth in these areas.\n\nThis approach would require a significant shift from typical suburban church metrics, focusing on qualitative growth and community impact rather than numbers and budgets. It would challenge members to live out their faith more intentionally and holistically, addressing the externalities of their lifestyles and consumption habits. The result could be a church that truly embodies the Fruits of the Spirit, making a tangible difference in individual lives and the broader community.\n**PracticeType:** application",
+  "contentType": "practice",
+  "title": "Practice: Fruit as Metric",
+  "description": "Application — Three Lanes  - Tech workers: Draft fruit-KPIs for something you build — two indicators that would show your product growing peace, patience, or self-control in users, alongside one known-harm metric you commit to reducing.",
+  "content": "## Application — Three Lanes\n\n- **Tech workers:** Draft fruit-KPIs for something you build — two indicators that would show your product growing peace, patience, or self-control in users, alongside one known-harm metric you commit to reducing. Audit your team against the four trustworthiness components (integrity, competency, accountability, education), then retro-cast: describe the fruit your product bears in five years if all goes *right*, and work backward to this quarter's decisions.\n- **Households:** Institute a monthly family fruit check-in: each person names where they saw the fruits growing at home and where the household's systems (schedules, screens, spending) worked against them. Adjust one system, not one person.\n- **Church leaders:** Begin the shift the dashboard implies: develop a fruit-of-the-Spirit assessment rhythm for individual and communal reflection; form small groups around cultivating specific fruits; pair mature believers with newer ones; redesign one program explicitly around the fruit it should bear; partner with local organizations who can tell you honestly what your community's fruit tastes like from outside. Let technology serve connection and accountability in this — never the scoreboard.",
   "contentFormat": "markdown",
-  "sourcePath": "fct/v1/Module 9 - Centering Values - Metrics are Not Neutral, Centering the Fruits of the Spirit.md",
+  "sourcePath": "docs/content/fct/fct-course/content/m09.md",
+  "reach": "commons",
   "tags": [
-    "application",
-    "practice",
     "fct",
-    "values"
-  ],
-  "relatedNodeIds": [
-    "fct-module-09-fruits-of-spirit"
+    "christian-technology",
+    "humane-tech",
+    "movement-3",
+    "module-9",
+    "practice-lanes"
   ],
   "metadata": {
-    "category": "fct-practice",
-    "sourceModule": "fct-module-09-fruits-of-spirit",
-    "originalContentType": "practice"
+    "category": "fct",
+    "courseId": "foundations-christian-technology",
+    "courseVersion": "review draft v2, 2026-09-16",
+    "sourceWorkbook": "fct-course",
+    "moduleNumber": 9,
+    "movement": 3,
+    "movementTitle": "Reordering Loves",
+    "day": "Day 7",
+    "form": "practice-lanes"
   },
+  "relationships": [
+    {
+      "target": "fct-module-09-fruits-of-spirit-lane-tech-workers",
+      "type": "CONTAINS",
+      "role": "lane"
+    },
+    {
+      "target": "fct-module-09-fruits-of-spirit-lane-households",
+      "type": "CONTAINS",
+      "role": "lane"
+    },
+    {
+      "target": "fct-module-09-fruits-of-spirit-lane-church-leaders",
+      "type": "CONTAINS",
+      "role": "lane"
+    },
+    {
+      "target": "fct-module-09-fruits-of-spirit",
+      "type": "BELONGS_TO",
+      "role": "practice"
+    }
+  ],
   "createdAt": "2025-11-28T21:10:19.210675",
-  "updatedAt": "2025-12-26T21:04:01.831Z",
+  "updatedAt": "2026-09-27T00:00:00.000Z",
+  "stewardedBy": [
+    {
+      "humanId": "human-pete-pastor",
+      "affinity": 0.7,
+      "role": "steward"
+    },
+    {
+      "humanId": "human-matthew-manager",
+      "affinity": 0.3,
+      "role": "endorser"
+    }
+  ],
   "did": "did:web:elohim.host:content:fct:module 9 - centering values - metrics are not neutral, centering the fruits of the spirit",
   "activityPubType": "Page",
-  "openGraphMetadata": {
-    "ogTitle": "Application: Centering Values: Fruits of the Spirit",
-    "ogDescription": "Practical application and action steps",
-    "ogType": "website",
-    "ogUrl": "https://elohim-protocol.org/content/fct-module-09-fruits-of-spirit-application",
-    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
-    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/practice.jpg",
-    "ogImageAlt": "Application: Centering Values: Fruits of the Spirit - Elohim Protocol"
-  },
   "linkedData": {
     "@context": "https://schema.org/",
     "@type": "CreativeWork",
@@ -48,17 +78,5 @@
       "@id": "https://elohim-protocol.org",
       "name": "Elohim Protocol"
     }
-  },
-  "stewardedBy": [
-    {
-      "humanId": "human-pete-pastor",
-      "affinity": 0.7,
-      "role": "steward"
-    },
-    {
-      "humanId": "human-matthew-manager",
-      "affinity": 0.3,
-      "role": "endorser"
-    }
-  ]
+  }
 }

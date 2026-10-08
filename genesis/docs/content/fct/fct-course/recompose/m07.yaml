@@ -1,0 +1,47 @@
+# Module 7 — Regeneration & Reconciliation. Mark the one correct choice " *".
+quiz:
+  - q: "What does 'bind scale to responsibility' mean?"
+    choices:
+      - "Smaller is always better"
+      - "As reach grows, so must accountability *"
+      - "Growth should be unlimited"
+      - "Responsibility belongs to regulators only"
+    bloom: understand
+  - q: "'When you find yourself in a hole, stop digging' applies to:"
+    choices:
+      - "Solving technology's problems with more technology at extractive scale, which compounds them *"
+      - "Church building projects"
+      - "Learning new software"
+      - "Reducing staff"
+    bloom: apply
+  - q: "Haggai 1's 'wages in a bag with holes' names:"
+    choices:
+      - "Poor budgeting"
+      - "Theft by employers"
+      - "Maximum activity and minimum flourishing: extraction without regeneration *"
+      - "Inflation"
+    bloom: analyze
+  - q: "In Acts 2:42-47, what is growth attributed to?"
+    choices:
+      - "An attractional production"
+      - "A campaign strategy"
+      - "The overflow of a community whose life together is the witness; the Lord added daily *"
+      - "Strong marketing"
+    hints:
+      - "Notice what the passage does not attribute growth to."
+    bloom: understand
+  - q: "What did Joash's chest with the bored lid purchase?"
+    choices:
+      - "Faster collections"
+      - "Trust at the base through accountability at the top *"
+      - "Priestly privilege"
+      - "A larger temple"
+    bloom: analyze
+reflections:
+  - title: "Two anti-KPIs"
+    prompt: "Matthew 6 is Jesus red-teaming visible metrics. Draft two numbers your congregation (or product, or household) commits to NOT optimizing, and for each name what you will watch instead."
+    placeholder: "We will not optimize... instead we will watch..."
+    criteria:
+      - "Names two anti-KPIs"
+      - "Names a replacement indicator for each"
+    bloom: create

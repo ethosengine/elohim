@@ -1,0 +1,101 @@
+{
+  "id": "fct-module-15-retrospective-manifesto-line",
+  "contentType": "assessment",
+  "title": "Your line of the manifesto",
+  "description": "Write one sentence for the cohort's Digital Discipleship Manifesto — a commitment to steward technology in a way that honors God and serves humanity. This is your group's song of witness, written down and kept.",
+  "content": [
+    {
+      "id": "fct-module-15-retrospective-manifesto-line",
+      "purpose": "reflection",
+      "content": {
+        "content": "[[☃ free-response 1]]",
+        "images": {},
+        "widgets": {
+          "free-response 1": {
+            "type": "free-response",
+            "options": {
+              "allowUnlimitedCharacters": false,
+              "characterLimit": 400,
+              "placeholder": "We will...",
+              "question": "Write one sentence for the cohort's Digital Discipleship Manifesto — a commitment to steward technology in a way that honors God and serves humanity. This is your group's song of witness, written down and kept.",
+              "scoringCriteria": [
+                {
+                  "text": "One sentence"
+                },
+                {
+                  "text": "A commitment, not an observation"
+                }
+              ]
+            },
+            "graded": false,
+            "version": {
+              "major": 0,
+              "minor": 0
+            }
+          }
+        }
+      },
+      "metadata": {
+        "sourceContentId": "fct-module-15-retrospective-manifesto-line",
+        "assessesContentId": "fct-module-15-retrospective",
+        "bloomsLevel": "create",
+        "estimatedTimeSeconds": 600,
+        "questionType": "open-response",
+        "tags": [
+          "fct",
+          "reflection"
+        ]
+      }
+    }
+  ],
+  "contentFormat": "sophia-quiz-json",
+  "sourcePath": "docs/content/fct/fct-course/content/m15.md",
+  "reach": "commons",
+  "tags": [
+    "fct",
+    "christian-technology",
+    "humane-tech",
+    "movement-5",
+    "module-15",
+    "reflection"
+  ],
+  "metadata": {
+    "category": "fct",
+    "courseId": "foundations-christian-technology",
+    "courseVersion": "review draft v2, 2026-09-16",
+    "sourceWorkbook": "fct-course",
+    "moduleNumber": 15,
+    "movement": 5,
+    "movementTitle": "Abundant Life & Sending",
+    "day": "Day 13",
+    "form": "reflection",
+    "assessmentType": "reflection",
+    "questionCount": 1
+  },
+  "relationships": [
+    {
+      "target": "fct-module-15-retrospective",
+      "type": "VALIDATES",
+      "role": "reflection"
+    },
+    {
+      "target": "fct-module-15-retrospective",
+      "type": "BELONGS_TO",
+      "role": "reflection"
+    }
+  ],
+  "createdAt": "2026-09-27T00:00:00.000Z",
+  "updatedAt": "2026-09-27T00:00:00.000Z",
+  "stewardedBy": [
+    {
+      "humanId": "human-pete-pastor",
+      "affinity": 0.7,
+      "role": "steward"
+    },
+    {
+      "humanId": "human-matthew-manager",
+      "affinity": 0.3,
+      "role": "endorser"
+    }
+  ]
+}

@@ -1,0 +1,51 @@
+{
+  "id": "fct-module-11-collaboration-sensemaking-lane-tech-workers",
+  "contentType": "practice",
+  "title": "Tech workers: Collaboration & Sensemaking",
+  "description": "Tech workers  Implement the interventions where you build: viral friction before resharing; perception-gap-aware ranking; empathy and context features; harms made transparent; a crisis playbook with blackout options.",
+  "content": "## Tech workers\n\nImplement the interventions where you build: viral friction before resharing; perception-gap-aware ranking; empathy and context features; harms made transparent; a crisis playbook with blackout options. Study Wikipedia's model and Taiwan's civic tech as existence proofs that collaborative truth-seeking scales. Humility is the engineering requirement here: systems that admit their bias outperform systems that deny it.",
+  "contentFormat": "markdown",
+  "sourcePath": "docs/content/fct/fct-course/content/m11.md",
+  "reach": "commons",
+  "tags": [
+    "fct",
+    "christian-technology",
+    "humane-tech",
+    "movement-4",
+    "module-11",
+    "practice-lane"
+  ],
+  "metadata": {
+    "category": "fct",
+    "courseId": "foundations-christian-technology",
+    "courseVersion": "review draft v2, 2026-09-16",
+    "sourceWorkbook": "fct-course",
+    "moduleNumber": 11,
+    "movement": 4,
+    "movementTitle": "Rebuilding Common Life",
+    "day": "Day 9",
+    "form": "practice-lane",
+    "audience": "tech-workers"
+  },
+  "relationships": [
+    {
+      "target": "fct-module-11-collaboration-sensemaking-application",
+      "type": "BELONGS_TO",
+      "role": "lane"
+    }
+  ],
+  "createdAt": "2026-09-27T00:00:00.000Z",
+  "updatedAt": "2026-09-27T00:00:00.000Z",
+  "stewardedBy": [
+    {
+      "humanId": "human-pete-pastor",
+      "affinity": 0.7,
+      "role": "steward"
+    },
+    {
+      "humanId": "human-matthew-manager",
+      "affinity": 0.3,
+      "role": "endorser"
+    }
+  ]
+}

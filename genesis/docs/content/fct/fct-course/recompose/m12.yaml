@@ -1,0 +1,45 @@
+# Module 12 — Fairness & Justice. Mark the one correct choice " *".
+quiz:
+  - q: "The Capability Approach measures justice by:"
+    choices:
+      - "The number of laws passed"
+      - "People's real capability to exercise rights, not rights declared *"
+      - "GDP per capita"
+      - "Charitable giving totals"
+    bloom: understand
+  - q: "What is the master's order in Luke 14?"
+    choices:
+      - "Open the doors and wait"
+      - "Invite the same guests again"
+      - "Go out and compel them to come in, so that my house will be full *"
+      - "Cancel the banquet"
+    bloom: remember
+  - q: "Why are 'edge cases' a justice decision?"
+    choices:
+      - "Edge cases are rare"
+      - "Engineers cannot test them"
+      - "Convenience for the center routinely becomes burden at the margins, and who counts as an edge case is chosen *"
+      - "They cost too much"
+    bloom: analyze
+  - q: "Which design practice does Acts 10:34-35 ground?"
+    choices:
+      - "Designing for the median user"
+      - "Edge-case-first design, testing against the users most likely to be harmed *"
+      - "Personas instead of relationships"
+      - "Rolling out to power users first"
+    bloom: apply
+  - q: "A Digital Jubilee would:"
+    choices:
+      - "Erase all online content every fifty years"
+      - "Periodically and structurally restore access, devices, literacy and opportunity *"
+      - "Celebrate the church's anniversary online"
+      - "Replace charity with nothing"
+    bloom: understand
+reflections:
+  - title: "Feeling generous, acting justly"
+    prompt: "Where does your giving — or your church's programs — insulate you from the impact of daily choices on the most vulnerable near you? Name one everyday choice you will change this month that promotes justice rather than the feeling of generosity."
+    placeholder: "What insulates me is... this month I will..."
+    criteria:
+      - "Names an insulating pattern honestly"
+      - "Names a concrete everyday change"
+    bloom: evaluate

@@ -1,0 +1,45 @@
+# Module 9 — Fruit as Metric. Mark the one correct choice " *".
+quiz:
+  - q: "Why do metrics drift at scale?"
+    choices:
+      - "Computers make rounding errors"
+      - "A handful of numbers can no longer see the harms underneath, and the metric outlives the value it served *"
+      - "People stop collecting data"
+      - "Growth is always bad"
+    bloom: understand
+  - q: "What kind of discernment does Matthew 7:15-20 authorize?"
+    choices:
+      - "Judging by credentials"
+      - "Judging by attendance"
+      - "Outcome-based: judge by fruit, not by branding or stated intentions *"
+      - "Avoiding judgment entirely"
+    bloom: understand
+  - q: "What are the four components of trustworthy technology?"
+    choices:
+      - "Speed, scale, profit, reach"
+      - "Integrity, competency, accountability, education *"
+      - "Privacy, encryption, backups, uptime"
+      - "Faith, hope, love, patience"
+    bloom: remember
+  - q: "What does Sheila Gregoire's story illustrate?"
+    choices:
+      - "Why surveys are unreliable"
+      - "Measuring known harm at scale and trusting outcomes over reputations, despite institutional resistance *"
+      - "The importance of bestseller lists"
+      - "That theology should avoid data"
+    bloom: analyze
+  - q: "What is 'eminence-based theology'?"
+    choices:
+      - "Theology taught by elders"
+      - "Theology grounded in experience"
+      - "Teaching trusted because of who said it and how large the platform grew *"
+      - "Theology that measures outcomes"
+    bloom: remember
+reflections:
+  - title: "Three fruits, three indicators"
+    prompt: "Pick three fruits of the Spirit. For each, draft one honest indicator your congregation (or product, or household) could watch instead of attendance, engagement or budget."
+    placeholder: "Peace — we would watch... Patience — we would watch..."
+    criteria:
+      - "Names three fruits"
+      - "Gives an observable indicator for each"
+    bloom: create

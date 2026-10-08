@@ -1,0 +1,55 @@
+{
+  "id": "fct-module-13-helping-thrive-homework",
+  "contentType": "practice",
+  "title": "Homework: Helping People Thrive",
+  "description": "Homework  Complete FHT Module 8: Ready to Act — the final FHT module, closing the chain begun on Day 0.",
+  "content": "## Homework\n\nComplete FHT Module 8: *Ready to Act* — the final FHT module, closing the chain begun on Day 0. Bring your whole course notebook tomorrow.",
+  "contentFormat": "markdown",
+  "sourcePath": "docs/content/fct/fct-course/content/m13.md",
+  "reach": "commons",
+  "tags": [
+    "fct",
+    "christian-technology",
+    "humane-tech",
+    "movement-5",
+    "module-13",
+    "homework"
+  ],
+  "metadata": {
+    "category": "fct",
+    "courseId": "foundations-christian-technology",
+    "courseVersion": "review draft v2, 2026-09-16",
+    "sourceWorkbook": "fct-course",
+    "moduleNumber": 13,
+    "movement": 5,
+    "movementTitle": "Abundant Life & Sending",
+    "day": "Day 11",
+    "form": "homework"
+  },
+  "relationships": [
+    {
+      "target": "fct-module-08-centering-love",
+      "type": "RELATES_TO",
+      "role": "callback"
+    },
+    {
+      "target": "fct-module-13-helping-thrive",
+      "type": "BELONGS_TO",
+      "role": "homework"
+    }
+  ],
+  "createdAt": "2026-09-27T00:00:00.000Z",
+  "updatedAt": "2026-09-27T00:00:00.000Z",
+  "stewardedBy": [
+    {
+      "humanId": "human-pete-pastor",
+      "affinity": 0.7,
+      "role": "steward"
+    },
+    {
+      "humanId": "human-matthew-manager",
+      "affinity": 0.3,
+      "role": "endorser"
+    }
+  ]
+}

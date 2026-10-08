@@ -1,0 +1,47 @@
+# Module 8 — Centering Love. Mark the one correct choice " *".
+quiz:
+  - q: "Why does the module reject 'technology is neutral'?"
+    choices:
+      - "Because technology is always harmful"
+      - "Every design choice expresses values; neutrality claims multiply with scale as a way to decline responsibility *"
+      - "Because only governments make value choices"
+      - "Because users cannot be trusted"
+    bloom: understand
+  - q: "Goodhart's Law says:"
+    choices:
+      - "Metrics always improve outcomes"
+      - "Bigger datasets remove bias"
+      - "When a measure becomes a target, it ceases to be a good measure *"
+      - "Targets should be kept secret"
+    hints:
+      - "Micah 6:7 said it about rams and rivers of oil first."
+    bloom: remember
+  - q: "In Matthew 22:36-40, how does the module read the word 'depend'?"
+    choices:
+      - "As a suggestion among many rules"
+      - "As a ranking of ceremonial laws"
+      - "Love of God and neighbor is the root dependency of the whole moral codebase *"
+      - "As a description of the Sabbath"
+    bloom: analyze
+  - q: "How does Romans 13:10 function in design?"
+    choices:
+      - "As a floor: the first acceptance test — does this harm the neighbor it touches? *"
+      - "As a marketing slogan"
+      - "As a rule only for churches"
+      - "As an argument for fewer features"
+    bloom: apply
+  - q: "What is a 'bad victory'?"
+    choices:
+      - "Losing a competition"
+      - "Seeming to win by means that are not neutral, at the cost of your soul *"
+      - "A victory with low engagement"
+      - "Winning without celebrating"
+    bloom: understand
+reflections:
+  - title: "Stated versus demonstrated"
+    prompt: "Choose an organization you know well — your product, your congregation, your household. What do its defaults, calendars and dashboards demonstrate that it values, whatever its stated values say? Name one gap and one love-centered modification."
+    placeholder: "We say we value... our defaults demonstrate..."
+    criteria:
+      - "Names a demonstrated value from concrete evidence"
+      - "Names one concrete modification"
+    bloom: evaluate

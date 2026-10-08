@@ -1,80 +1,170 @@
 {
   "id": "fct-module-06-harmful-consequences",
   "contentType": "lesson",
-  "reach": "commons",
-  "title": "FCT 6: Minimizing Harmful Consequences",
-  "description": "When a company becomes wildly profitable it often does so by moving out of balance:  \n\\-towards extraction and away from stewardship  \n\\-towards efficiency and away from resilience  \n\\-towards competition and away from collaboration",
-  "content": "**Introduction:** When a company becomes wildly profitable it often does so by moving out of balance:  \n\\-towards extraction and away from stewardship  \n\\-towards efficiency and away from resilience  \n\\-towards competition and away from collaboration\n\nHumane technologists understand how to find a balance: how to embrace efficiency and growth in places where powerful forms of value can be created, and to embrace stewardship and collaboration when powerful forms of value are at risk of being destroyed.\n\n**Conclusion:** As we conclude this first part of our exploration into minimizing harmful consequences, we're reminded of Joseph's wisdom in ancient Egypt. Like Joseph, we're called to be stewards who anticipate future challenges and act responsibly with the resources and technologies at our disposal.  \nWe've learned that externalities \\- the hidden costs of our actions \\- can accumulate to create large-scale problems in our interconnected world. As followers of Christ, we're challenged to look beyond immediate profits or conveniences to consider the long-term impacts of our technological choices on our neighbors, communities, and God's creation.  \nThe story of Joseph teaches us that responsible stewardship often requires us to go against the grain of prevailing practices. In our context, this may mean resisting the temptation to extract and consume resources unsustainably, or to prioritize efficiency and competition at the expense of resilience and collaboration.  \nAs we move forward, let's commit to:\n\nCultivating a prophetic mindset that anticipates potential harms  \nIntegrating Christian ethical frameworks in our assessment of technological impacts  \nStriving for regenerative systems that align with God's vision of renewal and restoration  \nBalancing growth with stewardship, efficiency with resilience, and competition with collaboration\n\nRemember, our goal isn't just to avoid harm, but to actively promote flourishing \\- for individuals, communities, and creation as a whole. This aligns with Jesus' promise in John 10:10 that He came that we \"may have life, and have it abundantly.\"  \nLet's pray for wisdom as we navigate these complex issues, always seeking to align our technological practices with God's will. May we be salt and light in the tech industry, championing approaches that respect human dignity, promote justice, and care for God's creation.  \nIn our next session, we'll explore practical tools and strategies for implementing these principles. Until then, let's reflect on how we can be better stewards of the technologies in our own lives and spheres of influence. Amen.\n\n**Raw Markdown:** \n\n## Minimizing Harmful Consequences \\- Externalities, Tragedy of the Commons, and  Arms Races\n\n### Day\n\n4.0\n\n### Objective\n\n3.0\n\n### Foundations of Humane Tech Concepts Review\n\nMinimizing Harmful Consequences  Part 1: Understanding Externalities and Current Systems  \nUnderstand the concept of externalities and their relevance to technology development  \nRecognize how technology can interact with social structures to produce negative externalities at scale  \nLearn to identify and assess potential externalities using tools like the Externality Rubric  \nExplore ways to address and mitigate externalities, including regulation and shifting to regenerative systems  \nDevelop skills to spot externalities early in the product development process  \nUnderstand the importance of balancing efficiency/growth with stewardship/collaboration  \nLearn practical tips for identifying negative externalities, like red-teaming and using anti-KPIs  \nPractice using tools like the \"Identifying Externalities\" worksheet to systematically consider potential impacts  \nRecognize the value of taking a long-term, sustainable approach rather than always seeking technological fixes  \nUnderstand how humane technologists can help build technology that strengthens open societies\n\nUnderstanding Externalities  \n\\-Definition and importance of externalities in technology  \n\\-How externalities accumulate and create large-scale problems\n\nEconomic Systems and Extraction  \n\\-How current economic paradigms encourage extraction over stewardship  \n\\-The role of efficiency, scale, and competition in creating externalities\n\nImpact of Externalities  \n\\-How unchecked pursuit of profitability can lead to harmful consequences  \n\\-The need for new measures of success beyond GDP\n\nAddressing Externalities  \n\\-Tools for assessing and mitigating externalities (e.g., Externality Rubric)  \n\\-The importance of systemic prevention over isolated mitigation\n\n### Size\n\n32.0\n\n### Foundations of Christians and Technology Learning Objectives\n\n Reflect on how the concept of externalities relates to Christian stewardship and care for God's creation.  \n Consider how technology's impacts align with or diverge from Jesus's teachings on loving one's neighbor and caring for the marginalized.  \n Integrate Christian ethical frameworks and principles of discernment when assessing potential externalities.  \n Examine how regenerative systems align with biblical concepts of restoration and renewal.  \n Cultivate a prophetic mindset that anticipates potential harms, inspired by biblical examples of foresight and warning.  \n Reflect on biblical teachings about responsible growth and collaborative community to inform technological development.  \n Consider how these practices align with Christian principles of self-examination and accountability.  \n Incorporate prayer and spiritual discernment alongside analytical tools when considering technological impacts.  \n Relate this approach to Christian concepts of patience, long-suffering, and trust in God's timing.  \n Explore how technology can be developed to promote Christian values of justice, equality, and human dignity in society.\n\n### Introduction\n\nWhen a company becomes wildly profitable it often does so by moving out of balance:  \n\\-towards extraction and away from stewardship  \n\\-towards efficiency and away from resilience  \n\\-towards competition and away from collaboration\n\nHumane technologists understand how to find a balance: how to embrace efficiency and growth in places where powerful forms of value can be created, and to embrace stewardship and collaboration when powerful forms of value are at risk of being destroyed.\n\n### Bible Reference(s)\n\nThe Cost of Discipleship\n\n25Now great crowds accompanied him, and he turned and said to them, 26“If anyone comes to me and does not hate his own father and mother and wife and children and brothers and sisters, yes, and even his own life, he cannot be my disciple. 27Whoever does not bear his own cross and come after me cannot be my disciple. 28For which of you, desiring to build a tower, does not first sit down and count the cost, whether he has enough to complete it? 29Otherwise, when he has laid a foundation and is not able to finish, all who see it begin to mock him, 30saying, ‘This man began to build and was not able to finish.’ 31Or what king, going out to encounter another king in war, will not sit down first and deliberate whether he is able with ten thousand to meet him who comes against him with twenty thousand? 32And if not, while the other is yet a great way off, he sends a delegation and asks for terms of peace. 33So therefore, any one of you who does not renounce all that he has cannot be my disciple.  \n\nStewardship and care for creation:  \nGenesis 2:15 \\- \"The Lord God took the man and put him in the Garden of Eden to work it and take care of it.\"  \nLoving neighbors and caring for the marginalized:  \nMatthew 22:39 \\- \"And the second is like it: 'Love your neighbor as yourself.'\"  \nEthical frameworks and discernment:  \nPhilippians 1:9-10 \\- \"And this is my prayer: that your love may abound more and more in knowledge and depth of insight, so that you may be able to discern what is best...\"  \nRegenerative systems and restoration:  \nRevelation 21:5 \\- \"He who was seated on the throne said, 'I am making everything new\\!'\"  \nProphetic mindset and foresight:  \nAmos 3:7 \\- \"Surely the Sovereign Lord does nothing without revealing his plan to his servants the prophets.\"  \nResponsible growth and collaborative community:  \n1 Corinthians 3:6-9 \\- \"I planted the seed, Apollos watered it, but God has been making it grow...\"  \nSelf-examination and accountability:  \nGalatians 6:4-5 \\- \"Each one should test their own actions. Then they can take pride in themselves alone, without comparing themselves to someone else...\"  \nPrayer and spiritual discernment:  \nJames 1:5 \\- \"If any of you lacks wisdom, you should ask God, who gives generously to all without finding fault, and it will be given to you.\"  \nPatience and trust in God's timing:  \n2 Peter 3:8-9 \\- \"But do not forget this one thing, dear friends: With the Lord a day is like a thousand years, and a thousand years are like a day...\"  \nPromoting justice, equality, and human dignity:  \nMicah 6:8 \\- \"He has shown you, O mortal, what is good. And what does the Lord require of you? To act justly and to love mercy and to walk humbly with your God.\"\n\n### Story \n\nThe story of Joseph interpreting Pharaoh's dreams and managing Egypt's resources in Genesis 41-47 provides an example of Minimizing Harmful Consequences in the bible:\n\n\"Joseph and the Seven Years of Plenty and Famine\"  \nIn this story:  \nPharaoh has dreams of seven fat cows being eaten by seven thin cows, and seven healthy ears of grain being devoured by seven thin ears.  \nJoseph interprets these dreams as a prediction of seven years of abundance followed by seven years of severe famine.  \nJoseph advises Pharaoh to appoint a wise manager to oversee the collection and storage of surplus grain during the seven years of plenty.  \nDuring the abundant years, Joseph implements a system to collect and store one-fifth of the harvest.  \nWhen the famine hits, Egypt is prepared and can provide for its people and even sell grain to neighboring regions.\n\nThis narrative illustrates:  \nExternalities: The future famine is an external factor that would have devastating consequences if not addressed.  \nTragedy of the Commons: Without Joseph's intervention, people might have consumed all the abundant crops, leaving nothing for the lean years \\- similar to overfishing a lake.  \nArms Race: While not explicitly an arms race, the story shows how preparation and wise resource management can prevent a destructive competition for scarce resources during the famine.  \nStewardship: Joseph's management demonstrates responsible stewardship of resources, considering long-term consequences and the common good.  \nProactive Problem-Solving: The story emphasizes the importance of recognizing potential future problems and taking action to mitigate them.\n\nThis biblical narrative can be used to discuss how foresight, wise management, and consideration of long-term consequences are crucial in technology development and use. It also demonstrates how addressing potential \"tragedies of the commons\" can benefit not just one group, but surrounding communities as well.\n\n### Discussion Question or Activity\n\nIdentifying Externalities Worksheet \n\n### Conclusion\n\nAs we conclude this first part of our exploration into minimizing harmful consequences, we're reminded of Joseph's wisdom in ancient Egypt. Like Joseph, we're called to be stewards who anticipate future challenges and act responsibly with the resources and technologies at our disposal.  \nWe've learned that externalities \\- the hidden costs of our actions \\- can accumulate to create large-scale problems in our interconnected world. As followers of Christ, we're challenged to look beyond immediate profits or conveniences to consider the long-term impacts of our technological choices on our neighbors, communities, and God's creation.  \nThe story of Joseph teaches us that responsible stewardship often requires us to go against the grain of prevailing practices. In our context, this may mean resisting the temptation to extract and consume resources unsustainably, or to prioritize efficiency and competition at the expense of resilience and collaboration.  \nAs we move forward, let's commit to:\n\nCultivating a prophetic mindset that anticipates potential harms  \nIntegrating Christian ethical frameworks in our assessment of technological impacts  \nStriving for regenerative systems that align with God's vision of renewal and restoration  \nBalancing growth with stewardship, efficiency with resilience, and competition with collaboration\n\nRemember, our goal isn't just to avoid harm, but to actively promote flourishing \\- for individuals, communities, and creation as a whole. This aligns with Jesus' promise in John 10:10 that He came that we \"may have life, and have it abundantly.\"  \nLet's pray for wisdom as we navigate these complex issues, always seeking to align our technological practices with God's will. May we be salt and light in the tech industry, championing approaches that respect human dignity, promote justice, and care for God's creation.  \nIn our next session, we'll explore practical tools and strategies for implementing these principles. Until then, let's reflect on how we can be better stewards of the technologies in our own lives and spheres of influence. Amen.\n\n### Application \n\n\\* We must see ourselves as Christans in a universal sense, if we are growing because other smaller congregations aren't as resourced are as capable as we are, or poaching from other christian communities, does not count toward growth as a body.   \n\\--As such, we should develop some ministry which seeks the development and success of other communities of christians, what we do well MUST be shared with the body, the full body, of Christ.  \n\\-- Church planting, building campaings, or relocating in such a way which chases and subsists primarly from our culture of suburban development needs to stop.   \n\n\\* We need to minimize the operational burdens of all \"infrastructure\" where we can, large buildings, debt-servicing, huge energy bills, transportation, health-care cost, risk-transfer.\n\n\\* We need a positive model for political discernment of the body which is judged by real measurable outcomes not lipservice to stated goals, we cannot be a community which serves the poor, prisoners, immigrants, orphans, and widows, while voting for a political representatives who impoverish, imprison, criminalize, orphan, and widow.  ( We cannot continue sinning, \\[or advocate for consequences\\], so that grace may abound )\n\n\\* Our lives must reflect our identity as christians,   \n\\--if we-members are working in industry that is generating externalities, we could dedicate capacity to helping people re-align their vocation with those values, without penalty or disruption.   \n\\--if we-members are living in such a way that is generating externalities (Parable of the Polygons), we should encourage people to make active choices and not rely on passive hope that someone will happen upon what a life well lived looks like. \n\n### Class Homework\n\nParable of the Polygons (ncase.me Simulation)  \nEvolution of Trust (ncase.me) \n\n### Other Media / Go Deeper / Class Maps\n\nInside Job \\- Financial Externalities  \nNo End In Sight \\- The High Cost of Political Externalities  \nWalmart \\- The High Cost of Low Price (Documentary)   \nJesus Camp \\-   \nHow Our Property Tax System Robs The Poor to Pay For The Wealthy  \n, Strong Towns, Youtube\n\nNot Just Bikes \\- Orange Pill  \nCar Centric Design   \nCarspiracy  \nFood Inc.  \nClimate Townn  \n\\- Water Usage in the US West  \n\\- Why Suburbs Suck  \nLet Grow \\- Leading the Movement for Childhood Independence  \nYour Yard Is EVIL \n\n\"Jesus Camp\" (2006), This documentary follows evangelical Christian children at a summer camp.  \nExternality: Diminished capacity for empathy and understanding towards those with different beliefs.  \nThis externality impacts Christians and the church by:  \nLimiting the ability to \"love your neighbor as yourself\" (Mark 12:31) when the \"neighbor\" holds different beliefs. Reducing the effectiveness of Christian witness by creating barriers to meaningful dialogue with non-believers. Potentially fostering a judgmental attitude that contradicts Jesus' teachings on love and acceptance. This externality hinders the church's ability to embody Christ's unconditional love by creating an \"us vs. them\" mentality, rather than seeing all people as equally worthy of God's love and grace.\n\n\"Shiny Happy People: Duggar Family Secrets\" (2023): This docuseries about the Duggar family and their involvement with the Institute in Basic Life Principles (IBLP) also highlights several externalities:  \nAbuse and trauma: The series exposes how the teachings of IBLP created an environment where abuse could occur and be hidden, creating significant negative externalities for victims.  \nThis externality impacts Christians and the church by:  \nMaking it more difficult for genuine, loving Christian communities to reach those hurt by religious abuse.  \nPotentially causing some to reject faith altogether, limiting opportunities for sharing Christ's love.  \nCreating a barrier for the church to be seen as a place of healing and unconditional acceptance, as Jesus exemplified.  \nThis externality challenges the church's ability to be a reflection of Christ's unconditional love by associating Christianity with control and abuse rather than freedom and grace, contradicting Jesus' words in John 8:36, \"So if the Son sets you free, you will be free indeed.\"  \nIn both cases, these externalities demonstrate how certain practices within Christian communities can unintentionally create obstacles to living out and sharing the unconditional love of Christ. They highlight the importance of constantly examining our methods and motivations against the standard of Jesus' life and teachings, ensuring that our actions produce fruit that aligns with God's love for all people.\n\n",
+  "title": "FCT 6: Externalities & the Commons",
+  "description": "from counting only intended benefits → to counting the unpriced costs borne by neighbor and creation.",
+  "content": "**Movement II — Turning · Day 4**\n\n*Arc: from counting only intended benefits → to counting the unpriced costs borne by neighbor and creation.*\n\n*Anchor text: Luke 10:25-37 · Supporting: Genesis 2:15; Luke 14:28-33; Deuteronomy 31:14-23; Micah 6:8 (refrain) · Story: Joseph and the seven years (Genesis 41)*\n\nYesterday we reclaimed attention as sacred; today the turning widens. Captured attention is not only a private loss — everything we build and buy casts costs onto people who never agreed to pay them. Economists call these externalities. Scripture has an older word for the people who absorb them: *neighbors*. This module pairs with FHT's *Minimizing Harmful Consequences, Part 1* — the counting; Module 7 takes up the cure.\n\n## Opening — Love Mercy\n\nThe refrain returns. Read Micah 6:8 together, and rest today on its second clause: *love mercy*. Mercy is the discipline of seeing costs that fall on others — the ones our balance sheets are designed not to show. Pray: *Lord, you see every sparrow and every moderator, every miner, every child downstream of what we build and buy. Give us eyes for the whole receipt, and hearts that love mercy more than margin.*\n\n## Humane Tech Concepts in View\n\n- **Externalities** — costs of an activity that land on parties outside the transaction. In technology they accumulate at scale: individually invisible, collectively civilization-shaping.\n- **The imbalance of profitability.** Companies become wildly profitable by moving out of balance: toward extraction and away from stewardship; toward efficiency and away from resilience; toward competition and away from collaboration. The humane skill is knowing when each pole creates value and when it destroys it.\n- **Tragedy of the commons and arms races** — the system shapes (from Modules 2–3) by which rational individual moves produce collective ruin; externalities are their exhaust.\n- **Counting tools** — the Externality Rubric and Identifying Externalities worksheet; red-teaming and anti-KPIs as early-warning instruments; spotting harms in the design phase rather than the lawsuit phase; and the recognition that success needs measures beyond GDP and growth.\n\n## Learning Objectives\n\nBy the end of this session, participants will be able to:\n\n1. Define externalities and explain how technology interacting with social structures produces them at civilization scale.\n2. Apply the Identifying Externalities worksheet to a product, ministry, or household pattern, surfacing costs the current accounting hides.\n3. Interpret the Good Samaritan as externality theology: the neighbor question answered as the cost question.\n4. Connect Genesis 2:15 stewardship and Luke 14's count-the-cost discipleship to full-cost accounting as a spiritual discipline.\n5. Cultivate prophetic foresight — Joseph's storehouses, Moses' song of witness — that anticipates harm before it lands.\n6. Evaluate externalities generated by church practices themselves, using documented case studies with honesty and grace.\n\n## Teaching\n\n### Introduction: The Whole Receipt\n\nEvery transaction prints two receipts. One lists what we paid; the other — the one nobody prints — lists what everyone else paid: the attention of a teenager three time zones away, the wages of a content moderator, an aquifer, a downtown, a family dinner. Wild profitability is very often the art of maximizing the second receipt while displaying only the first. Minimizing harmful consequences begins as an accounting discipline: learn to see the whole receipt. That is not cynicism; it is mercy with a spreadsheet.\n\n### Scripture Engagement\n\n**Luke 10:25-37 — the anchor.** The lawyer asks Jesus the externality question of all time: \"who is my neighbor?\" — which is to say, *where may I stop counting?* Jesus answers with a man lying in the road: the absorbed cost of a system everyone else is moving through. The robbers extracted from him directly; the priest and Levite externalize him — his suffering is real but off their books, and they pass by on the other side, the very posture of externalized cost. The Samaritan does full-cost accounting: he sees, he stops, he pays out of his own pocket (\"whatever more you spend, I will repay\"). Jesus' closing inversion is the module's thesis: the question is not \"who counts as my neighbor?\" but \"to whom will I *be* a neighbor?\" — not where may I stop counting, but where will I start paying.\n\n**Genesis 2:15 with Luke 14:28-33 — stewardship counts the cost.** Adam is placed in the garden \"to work it and take care of it\" — cultivation coupled to keeping, the original balance of efficiency and stewardship. And Jesus makes cost-counting a mark of discipleship: which of you, building a tower, does not first sit down and count the cost? The church has read Luke 14 as counting the cost *to ourselves* of following Jesus. This module extends the same discipline outward: no tower — no platform, no program, no campaign — without counting its full cost, including the portion others will pay.\n\n**Deuteronomy 31:14-23 — the song of witness.** At the edge of the land, God tells Moses plainly that prosperity will produce forgetting: \"when they have eaten their fill and grown fat, they will turn to other gods.\" And God's countermeasure is remarkable — not a wall, but a *song*, taught in advance, \"a witness for me against the Israelites,\" living in their mouths so that when the troubles come the truth is already on their lips. God institutionalizes an anti-KPI: a liturgy designed to testify against the community's own future extraction. Churches that build honest counter-testimony into their worship — lament, confession, the whole receipt read aloud — are following a design pattern God himself established.\n\n## Conclusion\n\nLike Joseph, we are called to steward with foresight — to book the famine during the feast. We have learned to read the whole receipt: extraction's costs to neighbors we never see, efficiency's costs to resilience, competition's costs to the collaborative fabric that everything else depends on. And we have let the discipline turn homeward, counting the church's own exhaust without flinching, because the song of witness is sung first about ourselves. But counting is not the destination. Mercy loved rightly moves from seeing costs to healing systems — from \"stop digging\" to planting something that regenerates. That reimagining — and the changed definition of success it demands — is tomorrow: **Module 7 — Regeneration & Reconciliation.**\n\n## Go Deeper\n\nExternalities on film, by domain: *Inside Job* (financial) · *No End in Sight* (political) · *Walmart: The High Cost of Low Price* (labor) · *Food, Inc.* (food systems) · Strong Towns, \"How Our Property Tax System Robs the Poor to Pay for the Wealthy\" · Not Just Bikes (car-centric design; the \"Orange Pill\" series) · Climate Town on western water use and suburban design · Let Grow — the movement for childhood independence (what safety-optimization costs children). And one book to anchor the shelf: Matthew Desmond, *Poverty, by America* (2023). It is the Polygons lesson at book length. Poverty persists not because the comfortable choose it but because our defaults were arranged for us, in zoning, banking, schooling, and the subsidized mortgage, and we live passively inside them. Passivity, neutrality, and ignorance are the mechanism. Read it with Module 9 in view: the habits we live by, not the values we state, reveal the fruit of our spirit. The book returns with the full justice shelf in Module 12.\n",
   "contentFormat": "markdown",
-  "sourcePath": "fct/v1/Module 6 - Minimizing Harmful Consequences - Externalities, Tragedy of the Commons, and  Arms Races.md",
+  "sourcePath": "docs/content/fct/fct-course/content/m06.md",
+  "reach": "commons",
   "tags": [
     "fct",
     "christian-technology",
     "humane-tech",
-    "cht-module-3",
-    "human-nature",
-    "externalities"
-  ],
-  "relatedNodeIds": [
-    "economic-coordination-epic",
-    "public-observer-epic"
-  ],
-  "children": [
-    "fct-bible-genesis-2-15",
-    "fct-bible-matthew-22-39",
-    "fct-bible-philippians-1-9-10",
-    "fct-bible-revelation-21-5",
-    "fct-bible-amos-3-7",
-    "fct-bible-1-corinthians-3-6-9",
-    "fct-bible-galatians-6-4-5",
-    "fct-bible-james-1-5",
-    "fct-bible-2-peter-3-8-9",
-    "fct-bible-micah-6-8",
-    "fct-media-05-video-jesus-camp",
-    "fct-media-05-video-love-your-neighbor-a",
-    "fct-media-05-video-shiny-happy-people-d",
-    "fct-module-06-harmful-consequences-discussion",
-    "fct-module-06-harmful-consequences-story",
-    "fct-module-06-harmful-consequences-application"
+    "movement-2",
+    "module-6",
+    "lesson"
   ],
   "metadata": {
     "category": "fct",
     "courseId": "foundations-christian-technology",
+    "courseVersion": "review draft v2, 2026-09-16",
+    "sourceWorkbook": "fct-course",
     "moduleNumber": 6,
-    "chapter": "human-nature",
-    "chtModule": "Module 3",
-    "sharedConcepts": [
-      "externalities"
-    ],
-    "sectionCount": 16,
-    "hasVideo": true,
-    "hasBibleReferences": true,
-    "hasDiscussion": true,
-    "estimatedDuration": "20-30 minutes",
-    "originalContentType": "course-module"
+    "movement": 2,
+    "movementTitle": "Turning — Repentance & Repair",
+    "day": "Day 4",
+    "form": "lesson",
+    "learningObjectiveCount": 6
   },
-  "learningObjectives": [],
-  "chtConcepts": [],
-  "richMedia": {
-    "videoCount": 3,
-    "bookCount": 0,
-    "bibleVerseCount": 10
-  },
+  "relationships": [
+    {
+      "target": "fct-bible-luke-10-25-37",
+      "type": "REFERENCES",
+      "role": "anchor"
+    },
+    {
+      "target": "fct-bible-genesis-2-15",
+      "type": "REFERENCES",
+      "role": "supporting"
+    },
+    {
+      "target": "fct-bible-luke-14-28-33",
+      "type": "REFERENCES",
+      "role": "supporting"
+    },
+    {
+      "target": "fct-bible-deuteronomy-31-14-23",
+      "type": "REFERENCES",
+      "role": "supporting"
+    },
+    {
+      "target": "fct-bible-micah-6-8",
+      "type": "REFERENCES",
+      "role": "refrain"
+    },
+    {
+      "target": "fct-bible-genesis-41",
+      "type": "REFERENCES",
+      "role": "story-text"
+    },
+    {
+      "target": "fct-module-06-harmful-consequences-story",
+      "type": "CONTAINS",
+      "role": "story"
+    },
+    {
+      "target": "fct-module-06-harmful-consequences-discussion",
+      "type": "CONTAINS",
+      "role": "discussion"
+    },
+    {
+      "target": "fct-module-06-harmful-consequences-application",
+      "type": "CONTAINS",
+      "role": "practice"
+    },
+    {
+      "target": "fct-module-06-harmful-consequences-homework",
+      "type": "CONTAINS",
+      "role": "homework"
+    },
+    {
+      "target": "fct-module-06-harmful-consequences-quiz",
+      "type": "CONTAINS",
+      "role": "quiz"
+    },
+    {
+      "target": "fct-module-06-harmful-consequences-reflection",
+      "type": "CONTAINS",
+      "role": "reflection"
+    },
+    {
+      "target": "fct-media-06-lab-parable-of-the-polygons",
+      "type": "RELATES_TO",
+      "role": "lab"
+    },
+    {
+      "target": "fct-module-05-respecting-human-nature",
+      "type": "FOLLOWS",
+      "role": "sequence"
+    },
+    {
+      "target": "fct-course",
+      "type": "REFERENCES",
+      "role": "source-workbook"
+    },
+    {
+      "target": "fct-media-05-video-jesus-camp",
+      "type": "REFERENCES",
+      "role": "media"
+    },
+    {
+      "target": "fct-media-06-lab-parable-of-the-polygons",
+      "type": "REFERENCES",
+      "role": "assignment"
+    },
+    {
+      "target": "fct-media-11-book-poverty-by-america",
+      "type": "REFERENCES",
+      "role": "go-deeper"
+    },
+    {
+      "target": "fct-media-11-book-revisit-this-interac",
+      "type": "REFERENCES",
+      "role": "assignment"
+    },
+    {
+      "target": "fct-module-02-systems-thinking",
+      "type": "RELATES_TO",
+      "role": "callback"
+    },
+    {
+      "target": "fct-module-03-problem-well-stated",
+      "type": "RELATES_TO",
+      "role": "callback"
+    },
+    {
+      "target": "fct-module-07-regeneration",
+      "type": "RELATES_TO",
+      "role": "callback"
+    },
+    {
+      "target": "fct-module-09-fruits-of-spirit",
+      "type": "RELATES_TO",
+      "role": "callback"
+    },
+    {
+      "target": "fct-module-12-fairness-justice",
+      "type": "RELATES_TO",
+      "role": "callback"
+    }
+  ],
   "createdAt": "2025-11-28T21:10:19.207114",
-  "updatedAt": "2025-12-24T03:05:26.192Z",
+  "updatedAt": "2026-09-27T00:00:00.000Z",
+  "stewardedBy": [
+    {
+      "humanId": "human-pete-pastor",
+      "affinity": 0.7,
+      "role": "steward"
+    },
+    {
+      "humanId": "human-matthew-manager",
+      "affinity": 0.3,
+      "role": "endorser"
+    }
+  ],
   "did": "did:web:elohim.host:content:fct:module 6 - minimizing harmful consequences - externalities, tragedy of the commons, and  arms races",
   "activityPubType": "Article",
-  "openGraphMetadata": {
-    "ogTitle": "FCT 6: Minimizing Harmful Consequences",
-    "ogDescription": "When a company becomes wildly profitable it often does so by moving out of balance:  \n\\-towards extraction and away from stewardship  \n\\-towards efficiency and away from resilience  \n\\-towards competi",
-    "ogType": "article",
-    "ogUrl": "https://elohim-protocol.org/content/fct-module-06-harmful-consequences",
-    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
-    "articlePublishedTime": "2025-11-28T21:10:19.207114",
-    "articleModifiedTime": "2025-11-28T21:10:19.207115",
-    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/course-module.jpg",
-    "ogImageAlt": "FCT 6: Minimizing Harmful Consequences - Elohim Protocol"
-  },
   "linkedData": {
     "@context": "https://schema.org/",
     "@type": "LearningResource",
@@ -90,16 +180,34 @@
       "name": "Elohim Protocol"
     }
   },
-  "stewardedBy": [
-    {
-      "humanId": "human-pete-pastor",
-      "affinity": 0.7,
-      "role": "steward"
-    },
-    {
-      "humanId": "human-matthew-manager",
-      "affinity": 0.3,
-      "role": "endorser"
-    }
+  "learningObjectives": [
+    "Define externalities and explain how technology interacting with social structures produces them at civilization scale.",
+    "Apply the Identifying Externalities worksheet to a product, ministry, or household pattern, surfacing costs the current accounting hides.",
+    "Interpret the Good Samaritan as externality theology: the neighbor question answered as the cost question.",
+    "Connect Genesis 2:15 stewardship and Luke 14's count-the-cost discipleship to full-cost accounting as a spiritual discipline.",
+    "Cultivate prophetic foresight — Joseph's storehouses, Moses' song of witness — that anticipates harm before it lands.",
+    "Evaluate externalities generated by church practices themselves, using documented case studies with honesty and grace."
+  ],
+  "children": [
+    "fct-module-06-harmful-consequences-story",
+    "fct-module-06-harmful-consequences-discussion",
+    "fct-module-06-harmful-consequences-application",
+    "fct-module-06-harmful-consequences-homework",
+    "fct-module-06-harmful-consequences-quiz",
+    "fct-module-06-harmful-consequences-reflection",
+    "fct-bible-luke-10-25-37",
+    "fct-bible-genesis-2-15",
+    "fct-bible-luke-14-28-33",
+    "fct-bible-deuteronomy-31-14-23",
+    "fct-bible-micah-6-8",
+    "fct-bible-genesis-41"
+  ],
+  "relatedNodeIds": [
+    "fct-media-06-lab-parable-of-the-polygons",
+    "fct-module-02-systems-thinking",
+    "fct-module-03-problem-well-stated",
+    "fct-module-07-regeneration",
+    "fct-module-09-fruits-of-spirit",
+    "fct-module-12-fairness-justice"
   ]
 }

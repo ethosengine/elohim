@@ -1,0 +1,51 @@
+{
+  "id": "fct-module-10-recognize-distortions-lane-households",
+  "contentType": "practice",
+  "title": "Households: Recognizing Distortions",
+  "description": "Households  Adopt the hygiene disciplines together: an intentional media diet anchored in reputable local sources; verification before sharing (make \"did we check this?\" a family reflex); emotional checking — pausing to notice anger or fear",
+  "content": "## Households\n\nAdopt the hygiene disciplines together: an intentional media diet anchored in reputable local sources; verification before sharing (make \"did we check this?\" a family reflex); emotional checking — pausing to notice anger or fear before engaging; regular digital fasting; and privacy practices that shrink the surface available for microtargeting. Model mindful engagement: be the voice of reason and empathy you wish the feed had.",
+  "contentFormat": "markdown",
+  "sourcePath": "docs/content/fct/fct-course/content/m10.md",
+  "reach": "commons",
+  "tags": [
+    "fct",
+    "christian-technology",
+    "humane-tech",
+    "movement-4",
+    "module-10",
+    "practice-lane"
+  ],
+  "metadata": {
+    "category": "fct",
+    "courseId": "foundations-christian-technology",
+    "courseVersion": "review draft v2, 2026-09-16",
+    "sourceWorkbook": "fct-course",
+    "moduleNumber": 10,
+    "movement": 4,
+    "movementTitle": "Rebuilding Common Life",
+    "day": "Day 8",
+    "form": "practice-lane",
+    "audience": "households"
+  },
+  "relationships": [
+    {
+      "target": "fct-module-10-recognize-distortions-application",
+      "type": "BELONGS_TO",
+      "role": "lane"
+    }
+  ],
+  "createdAt": "2026-09-27T00:00:00.000Z",
+  "updatedAt": "2026-09-27T00:00:00.000Z",
+  "stewardedBy": [
+    {
+      "humanId": "human-pete-pastor",
+      "affinity": 0.7,
+      "role": "steward"
+    },
+    {
+      "humanId": "human-matthew-manager",
+      "affinity": 0.3,
+      "role": "endorser"
+    }
+  ]
+}

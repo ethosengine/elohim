@@ -1,0 +1,51 @@
+{
+  "id": "fct-module-10-recognize-distortions-lane-tech-workers",
+  "contentType": "practice",
+  "title": "Tech workers: Recognizing Distortions",
+  "description": "Tech workers  Take the nine distortions to work as a red-team checklist: which does your product structurally reward, even unintentionally?",
+  "content": "## Tech workers\n\nTake the nine distortions to work as a red-team checklist: which does your product structurally reward, even unintentionally? Prototype one counter-distortion feature — friction before sharing, context before outrage, provenance made visible. Deepen your platform knowledge: you cannot design against dynamics you cannot name.",
+  "contentFormat": "markdown",
+  "sourcePath": "docs/content/fct/fct-course/content/m10.md",
+  "reach": "commons",
+  "tags": [
+    "fct",
+    "christian-technology",
+    "humane-tech",
+    "movement-4",
+    "module-10",
+    "practice-lane"
+  ],
+  "metadata": {
+    "category": "fct",
+    "courseId": "foundations-christian-technology",
+    "courseVersion": "review draft v2, 2026-09-16",
+    "sourceWorkbook": "fct-course",
+    "moduleNumber": 10,
+    "movement": 4,
+    "movementTitle": "Rebuilding Common Life",
+    "day": "Day 8",
+    "form": "practice-lane",
+    "audience": "tech-workers"
+  },
+  "relationships": [
+    {
+      "target": "fct-module-10-recognize-distortions-application",
+      "type": "BELONGS_TO",
+      "role": "lane"
+    }
+  ],
+  "createdAt": "2026-09-27T00:00:00.000Z",
+  "updatedAt": "2026-09-27T00:00:00.000Z",
+  "stewardedBy": [
+    {
+      "humanId": "human-pete-pastor",
+      "affinity": 0.7,
+      "role": "steward"
+    },
+    {
+      "humanId": "human-matthew-manager",
+      "affinity": 0.3,
+      "role": "endorser"
+    }
+  ]
+}

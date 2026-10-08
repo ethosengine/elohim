@@ -1,40 +1,54 @@
 {
   "id": "fct-module-12-fairness-justice-discussion",
-  "contentType": "exercise",
-  "reach": "commons",
-  "title": "Discussion: Supporting Fairness and Justice",
-  "description": "Group discussion and reflection activity",
-  "content": "**Instructions:** \"Let's reflect on our daily lives. Consider your morning routine: the coffee you drink, the car you drive to work, the neighborhood you live in. Now think about the homeless person you passed on your way here. How do our lifestyle choices \\- where we live, how we commute, what we consume \\- contribute to the economic systems that lead to homelessness? In what ways might our feelings of generosity when we donate to church programs actually insulate us from confronting the real impact of our daily decisions? How can we move beyond 'feeling good' about occasional charity to make choices that promote justice in our everyday lives?\"  \nThis question aims to:\n\nGround the discussion in familiar, everyday experiences (morning routines, commutes, consumer choices).  \nDirectly link personal lifestyle choices to broader systemic issues like homelessness.  \nChallenge the notion that church donations alone are sufficient to address injustice.  \nEncourage critical self-reflection on how our comfortable lifestyles might perpetuate injustice.  \nPrompt consideration of how 'feeling good' about charity can sometimes prevent deeper engagement with issues of justice.  \nInvite participants to think about concrete ways they can promote justice through their daily choices, not just through church activities.  \nEmphasize personal responsibility within systemic injustice, moving away from an 'us vs. them' mentality.\n\nThis framing should help participants see themselves as active participants in systems of injustice or justice, rather than passive observers or occasional charitable givers. It challenges them to consider how their everyday choices, not just their church involvement, impact issues of justice in their community.\n\n**Activity Type:** discussion\n\n**Group Size:** small-group\n\n**Estimated Time:** 15-20 minutes\n\n",
+  "contentType": "discussion",
+  "title": "Discussion: Fairness & Justice",
+  "description": "Discussion & Activity  Sit with the uncomfortable reflection: consider your morning routine — the coffee, the commute, the neighborhood — and then the homeless person you passed on the way here.",
+  "content": "## Discussion & Activity\n\nSit with the uncomfortable reflection: consider your morning routine — the coffee, the commute, the neighborhood — and then the homeless person you passed on the way here. How do our lifestyle choices — where we live, how we move, what we consume — contribute to the economic systems that produce homelessness? In what ways do our feelings of generosity when we give to church programs actually *insulate* us from confronting the impact of our daily decisions? How do we move beyond feeling good about occasional charity to choices that promote justice in everyday life? (The aim is participation, not guilt: we are naming ourselves as actors inside systems of justice or injustice, never mere observers — the Polygons lesson, now personal.)",
   "contentFormat": "markdown",
-  "sourcePath": "fct/v1/Module 12 - Supporting Fairness and Justice.md",
+  "sourcePath": "docs/content/fct/fct-course/content/m12.md",
+  "reach": "commons",
   "tags": [
-    "activity",
-    "discussion",
     "fct",
-    "action"
-  ],
-  "relatedNodeIds": [
-    "fct-module-12-fairness-justice"
+    "christian-technology",
+    "humane-tech",
+    "movement-4",
+    "module-12",
+    "discussion"
   ],
   "metadata": {
-    "category": "fct-activity",
-    "sourceModule": "fct-module-12-fairness-justice",
-    "activityType": "discussion",
-    "originalContentType": "activity"
+    "category": "fct",
+    "courseId": "foundations-christian-technology",
+    "courseVersion": "review draft v2, 2026-09-16",
+    "sourceWorkbook": "fct-course",
+    "moduleNumber": 12,
+    "movement": 4,
+    "movementTitle": "Rebuilding Common Life",
+    "day": "Day 10",
+    "form": "discussion"
   },
+  "relationships": [
+    {
+      "target": "fct-module-12-fairness-justice",
+      "type": "BELONGS_TO",
+      "role": "discussion"
+    }
+  ],
   "createdAt": "2025-11-28T21:10:19.223579",
-  "updatedAt": "2025-12-24T03:05:26.200Z",
+  "updatedAt": "2026-09-27T00:00:00.000Z",
+  "stewardedBy": [
+    {
+      "humanId": "human-pete-pastor",
+      "affinity": 0.7,
+      "role": "steward"
+    },
+    {
+      "humanId": "human-matthew-manager",
+      "affinity": 0.3,
+      "role": "endorser"
+    }
+  ],
   "did": "did:web:elohim.host:content:fct:module 12 - supporting fairness and justice",
   "activityPubType": "Page",
-  "openGraphMetadata": {
-    "ogTitle": "Discussion: Supporting Fairness and Justice",
-    "ogDescription": "Group discussion and reflection activity",
-    "ogType": "website",
-    "ogUrl": "https://elohim-protocol.org/content/fct-module-12-fairness-justice-discussion",
-    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
-    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/activity.jpg",
-    "ogImageAlt": "Discussion: Supporting Fairness and Justice - Elohim Protocol"
-  },
   "linkedData": {
     "@context": "https://schema.org/",
     "@type": "CreativeWork",
@@ -49,17 +63,5 @@
       "@id": "https://elohim-protocol.org",
       "name": "Elohim Protocol"
     }
-  },
-  "stewardedBy": [
-    {
-      "humanId": "human-pete-pastor",
-      "affinity": 0.7,
-      "role": "steward"
-    },
-    {
-      "humanId": "human-matthew-manager",
-      "affinity": 0.3,
-      "role": "endorser"
-    }
-  ]
+  }
 }

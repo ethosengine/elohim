@@ -1,0 +1,57 @@
+# Module 14 — Ready to Act. The commissioning module: a mastery check, the testimony,
+# and Mind the Gap revisited from Module 4. Mark the one correct choice " *".
+quiz:
+  - q: "Salt and light are two modes of witness. Which is which?"
+    choices:
+      - "Preaching and singing"
+      - "Salt works dissolved and hidden from inside; light is visible and raised as a common life *"
+      - "Giving and fasting"
+      - "Online and offline"
+    bloom: understand
+  - q: "In Matthew 25:14-30, which servant is condemned?"
+    choices:
+      - "The one who lost money trading"
+      - "The one who buried the talent out of fear *"
+      - "The one who gained the most"
+      - "The master"
+    bloom: remember
+  - q: "What are the four culture-change steps?"
+    choices:
+      - "Protest, boycott, petition, vote"
+      - "Tell your story, find collaborators, achieve small wins, champion a new definition of success *"
+      - "Plan, build, test, ship"
+      - "Pray, fast, give, serve"
+    bloom: remember
+  - q: "What deployment pattern does Acts 1:8 give digital disciples?"
+    choices:
+      - "One global launch"
+      - "Witness in expanding circles: congregation, neighborhood, industry, world *"
+      - "Retreat to Jerusalem"
+      - "Industry first, church last"
+    bloom: apply
+  - q: "What does the redwood image teach?"
+    choices:
+      - "Wait for perfect conditions"
+      - "Seeds germinate after fire: plant small wins now so growth is ready when a crisis opens the canopy *"
+      - "Fire is always destructive"
+      - "Only old trees matter"
+    bloom: understand
+reflections:
+  - id: testimony
+    title: "Your testimony"
+    prompt: "In two minutes of speech — about 250 words — tell where this course changed what you believe, and what you do, about technology. Practice it here; you will tell it again outside."
+    placeholder: "Before this course I believed... now I..."
+    characterLimit: 2000
+    criteria:
+      - "Names a belief that changed"
+      - "Names a practice that changed"
+    bloom: evaluate
+    time: "15 minutes"
+  - id: mind-the-gap-revisited
+    title: "Mind the Gap, revisited"
+    prompt: "Retrieve your Module 4 answer. What does the world need? Who are you at your core? Has the gap between your values and your life narrowed over these twelve days? Name what moved it, and the next adjustment."
+    criteria:
+      - "Refers back to the Module 4 answer"
+      - "Names the next adjustment"
+    bloom: evaluate
+    time: "15 minutes"

@@ -1,40 +1,69 @@
 {
   "id": "fct-module-13-helping-thrive-story",
-  "contentType": "example",
-  "reach": "commons",
-  "title": "Recognizing and Addressing Real Needs:",
-  "description": "Biblical story or example illustrating module concepts",
-  "content": "**Narrative:** The story of Jesus feeding of the 5000, illustrates many of the principles we're aiming for in technology design, found in all four Gospels (Matthew 14:13-21, Mark 6:30-44, Luke 9:10-17, John 6:1-14). This story encapsulates several key design principles that align with both Christian values and humane technology:\n\nRecognizing and Addressing Real Needs:  \nJesus saw the crowd's hunger and responded to their physical need, not just their spiritual one. This parallels our goal of creating technology that addresses genuine human needs rather than manufacturing artificial desires.  \nStewardship of Resources:  \nJesus used what was available (five loaves and two fish) and transformed it into abundance. This exemplifies efficient use of resources and sustainable design.  \nCommunity and Sharing:  \nThe miracle involved everyone sharing and participating in the distribution. This mirrors our aim to create technology that fosters community and collaboration rather than isolation.  \nIntentionality and Mindfulness:  \nJesus had the crowd sit down in groups, creating order and allowing for a more mindful experience of the meal. This reflects our goal of designing for intentional, focused use rather than mindless consumption.  \nAbundance Without Excess:  \nThere was enough for everyone to be satisfied, but Jesus also instructed that the leftovers be gathered, avoiding waste. This balance of abundance without excess is a key principle for sustainable, ethical technology.  \nHolistic Care:  \nJesus addressed both spiritual and physical needs, demonstrating care for the whole person. Our technology should similarly support holistic well-being, not just isolated aspects of human experience.\n\nChristian Design Principles we're trying to elevate:\n\nServant-Hearted Design: Creating technology that serves human needs rather than exploiting human vulnerabilities.  \nStewardship: Developing sustainable technologies that use resources wisely and minimize harmful environmental impact.  \nCommunity-Centric: Prioritizing features that build and strengthen real-world communities and relationships.  \nSabbath-Honoring: Incorporating rest and disconnection into the design, respecting human limits and the need for renewal.  \nTruth-Promoting: Designing systems that elevate truth and combat misinformation, reflecting God's nature as the source of truth.  \nJustice-Oriented: Creating inclusive technologies that consider the needs of all, especially the marginalized.  \nAttention-Respecting: Treating human attention as sacred, designing to enhance focus rather than fragment it.  \nVirtue-Fostering: Encouraging the development of Christian virtues (love, joy, peace, patience, kindness, etc.) through technology use.  \nCreation-Affirming: Leveraging technology to help users engage more deeply with the physical world and God's creation, not escape from it.  \nKingdom-Advancing: Aligning technological innovation with the values and goals of God's Kingdom, seeking to bring more of heaven to earth through our creations.\n\nThese principles, grounded in the story of Jesus feeding the 5000, provide a framework for developing technology that truly helps people thrive in a way that honors God and serves humanity.\n**NarrativeType:** biblical-example",
+  "contentType": "article",
+  "title": "Story: Five Loaves, Two Fish, Twelve Baskets",
+  "description": "Five Loaves, Two Fish, Twelve Baskets  The feeding of the five thousand — the only miracle in all four Gospels (John 6:1-14 and parallels) — reads as a masterclass in design for thriving.",
+  "content": "## Five Loaves, Two Fish, Twelve Baskets\n\nThe feeding of the five thousand — the only miracle in all four Gospels (John 6:1-14 and parallels) — reads as a masterclass in design for thriving. Jesus **recognizes real need** (hunger, not manufactured desire) and addresses the whole person, physical and spiritual. He practices **stewardship**: five loaves and two fish, what is actually at hand, transformed rather than externally sourced. The miracle is **communal** — distribution through participation, not broadcast. He designs for **mindfulness**: the crowd seated in ordered groups, a meal experienced rather than consumed on the move. And the economics are **abundance without excess**: everyone satisfied, and twelve baskets gathered so nothing is wasted.\n\nFrom this story, the course's ten **Christian design principles**: servant-hearted design (serve needs, never exploit vulnerabilities) · stewardship (sustainable, resource-wise) · community-centric (strengthen real-world relationship) · Sabbath-honoring (rest and disconnection built in — and Sabbath bent toward doing good, Matthew 12:12) · truth-promoting · justice-oriented (the marginalized designed for first) · attention-respecting (Module 5's sacredness) · virtue-fostering (Module 9's fruits) · creation-affirming (deeper engagement with the physical world, not escape from it) · Kingdom-advancing (more of heaven brought to earth through what we make).",
   "contentFormat": "markdown",
-  "sourcePath": "fct/v1/Module 13 - Helping People Thrive - A Christian Definition .md",
+  "sourcePath": "docs/content/fct/fct-course/content/m13.md",
+  "reach": "commons",
   "tags": [
-    "story",
-    "narrative",
     "fct",
-    "biblical-example",
-    "action"
-  ],
-  "relatedNodeIds": [
-    "fct-module-13-helping-thrive"
+    "christian-technology",
+    "humane-tech",
+    "movement-5",
+    "module-13",
+    "story"
   ],
   "metadata": {
-    "category": "fct-narrative",
-    "sourceModule": "fct-module-13-helping-thrive",
-    "originalContentType": "narrative"
+    "category": "fct",
+    "courseId": "foundations-christian-technology",
+    "courseVersion": "review draft v2, 2026-09-16",
+    "sourceWorkbook": "fct-course",
+    "moduleNumber": 13,
+    "movement": 5,
+    "movementTitle": "Abundant Life & Sending",
+    "day": "Day 11",
+    "form": "story"
   },
+  "relationships": [
+    {
+      "target": "fct-bible-john-6-1-14",
+      "type": "REFERENCES",
+      "role": "story-text"
+    },
+    {
+      "target": "fct-module-05-respecting-human-nature",
+      "type": "RELATES_TO",
+      "role": "callback"
+    },
+    {
+      "target": "fct-module-09-fruits-of-spirit",
+      "type": "RELATES_TO",
+      "role": "callback"
+    },
+    {
+      "target": "fct-module-13-helping-thrive",
+      "type": "BELONGS_TO",
+      "role": "story"
+    }
+  ],
   "createdAt": "2025-11-28T21:10:19.224372",
-  "updatedAt": "2025-12-26T21:04:01.844Z",
+  "updatedAt": "2026-09-27T00:00:00.000Z",
+  "stewardedBy": [
+    {
+      "humanId": "human-pete-pastor",
+      "affinity": 0.7,
+      "role": "steward"
+    },
+    {
+      "humanId": "human-matthew-manager",
+      "affinity": 0.3,
+      "role": "endorser"
+    }
+  ],
   "did": "did:web:elohim.host:content:fct:module 13 - helping people thrive - a christian definition ",
   "activityPubType": "Page",
-  "openGraphMetadata": {
-    "ogTitle": "Recognizing and Addressing Real Needs:",
-    "ogDescription": "Biblical story or example illustrating module concepts",
-    "ogType": "website",
-    "ogUrl": "https://elohim-protocol.org/content/fct-module-13-helping-thrive-story",
-    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
-    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/narrative.jpg",
-    "ogImageAlt": "Recognizing and Addressing Real Needs: - Elohim Protocol"
-  },
   "linkedData": {
     "@context": "https://schema.org/",
     "@type": "CreativeWork",
@@ -49,17 +78,5 @@
       "@id": "https://elohim-protocol.org",
       "name": "Elohim Protocol"
     }
-  },
-  "stewardedBy": [
-    {
-      "humanId": "human-pete-pastor",
-      "affinity": 0.7,
-      "role": "steward"
-    },
-    {
-      "humanId": "human-matthew-manager",
-      "affinity": 0.3,
-      "role": "endorser"
-    }
-  ]
+  }
 }

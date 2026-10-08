@@ -1,0 +1,51 @@
+{
+  "id": "fct-module-05-respecting-human-nature-lane-church-leaders",
+  "contentType": "practice",
+  "title": "Church leaders: Our Attention is Sacred",
+  "description": "Church leaders  Structure community within real human capacity.",
+  "content": "## Church leaders\n\nStructure community within real human capacity. The Dunbar layers — anthropologist Robin Dunbar's nested limits of human relationship: roughly 150 acquaintances, 50 casual friends, 15 close, 5 intimate — are the created limits of relational attention; design your congregation's groups, care structures, and expectations to honor them rather than pretending one pastor or one feed can hold everyone. And protect the sacred hour: audit Sunday itself for engineered distraction — countdown clocks, announcements, production — asking of each element the Mary question: does this help people sit down at Jesus' feet?",
+  "contentFormat": "markdown",
+  "sourcePath": "docs/content/fct/fct-course/content/m05.md",
+  "reach": "commons",
+  "tags": [
+    "fct",
+    "christian-technology",
+    "humane-tech",
+    "movement-2",
+    "module-5",
+    "practice-lane"
+  ],
+  "metadata": {
+    "category": "fct",
+    "courseId": "foundations-christian-technology",
+    "courseVersion": "review draft v2, 2026-09-16",
+    "sourceWorkbook": "fct-course",
+    "moduleNumber": 5,
+    "movement": 2,
+    "movementTitle": "Turning — Repentance & Repair",
+    "day": "Day 3",
+    "form": "practice-lane",
+    "audience": "church-leaders"
+  },
+  "relationships": [
+    {
+      "target": "fct-module-05-respecting-human-nature-application",
+      "type": "BELONGS_TO",
+      "role": "lane"
+    }
+  ],
+  "createdAt": "2026-09-27T00:00:00.000Z",
+  "updatedAt": "2026-09-27T00:00:00.000Z",
+  "stewardedBy": [
+    {
+      "humanId": "human-pete-pastor",
+      "affinity": 0.7,
+      "role": "steward"
+    },
+    {
+      "humanId": "human-matthew-manager",
+      "affinity": 0.3,
+      "role": "endorser"
+    }
+  ]
+}

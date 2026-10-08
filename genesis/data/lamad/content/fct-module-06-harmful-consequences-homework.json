@@ -1,0 +1,60 @@
+{
+  "id": "fct-module-06-harmful-consequences-homework",
+  "contentType": "practice",
+  "title": "Homework: Externalities & the Commons",
+  "description": "Homework  Play the Parable of the Polygons (ncase.me) — the lab on how small biases compound into segregated systems.",
+  "content": "## Homework\n\nPlay the Parable of the Polygons (ncase.me) — the lab on how small biases compound into segregated systems. (If you haven't yet played Module 4's Evolution of Trust, pair them; they're two halves of one lesson.) Bring your polygon insights: Module 7 opens with them.",
+  "contentFormat": "markdown",
+  "sourcePath": "docs/content/fct/fct-course/content/m06.md",
+  "reach": "commons",
+  "tags": [
+    "fct",
+    "christian-technology",
+    "humane-tech",
+    "movement-2",
+    "module-6",
+    "homework"
+  ],
+  "metadata": {
+    "category": "fct",
+    "courseId": "foundations-christian-technology",
+    "courseVersion": "review draft v2, 2026-09-16",
+    "sourceWorkbook": "fct-course",
+    "moduleNumber": 6,
+    "movement": 2,
+    "movementTitle": "Turning — Repentance & Repair",
+    "day": "Day 4",
+    "form": "homework"
+  },
+  "relationships": [
+    {
+      "target": "fct-module-04-scaling-wisdom",
+      "type": "RELATES_TO",
+      "role": "callback"
+    },
+    {
+      "target": "fct-module-07-regeneration",
+      "type": "RELATES_TO",
+      "role": "callback"
+    },
+    {
+      "target": "fct-module-06-harmful-consequences",
+      "type": "BELONGS_TO",
+      "role": "homework"
+    }
+  ],
+  "createdAt": "2026-09-27T00:00:00.000Z",
+  "updatedAt": "2026-09-27T00:00:00.000Z",
+  "stewardedBy": [
+    {
+      "humanId": "human-pete-pastor",
+      "affinity": 0.7,
+      "role": "steward"
+    },
+    {
+      "humanId": "human-matthew-manager",
+      "affinity": 0.3,
+      "role": "endorser"
+    }
+  ]
+}

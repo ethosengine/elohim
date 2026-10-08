@@ -1,0 +1,45 @@
+# Module 10 — Recognizing Distortions. Mark the one correct choice " *".
+quiz:
+  - q: "What does the 'funhouse mirror' image mean?"
+    choices:
+      - "Social media reflects society accurately"
+      - "Social media distorts our picture of ourselves and one another, as an externality of engagement-maximizing models *"
+      - "Online images are always flattering"
+      - "Mirrors are a metaphor for prayer"
+    bloom: understand
+  - q: "Which of these is one of the nine distortions?"
+    choices:
+      - "Slow news"
+      - "Moral outrage: indignation travels farthest *"
+      - "Local reporting"
+      - "Long-form reading"
+    bloom: remember
+  - q: "Ephesians 4:25 grounds truth-telling in:"
+    choices:
+      - "Legal accuracy"
+      - "Personal reputation"
+      - "Membership: we are members one of another, so falsehood between members is autoimmune disease *"
+      - "Freedom of speech"
+    bloom: analyze
+  - q: "What did the 2019 investigation of the top Christian Facebook pages find?"
+    choices:
+      - "They were all run by denominations"
+      - "19 of the top 20 were run by foreign click farms monetizing believers' attention *"
+      - "They carried no political content"
+      - "They were mostly inactive"
+    bloom: remember
+  - q: "Where does Amos 8's chain of dishonest scales end?"
+    choices:
+      - "In an economic boom"
+      - "In military victory"
+      - "In a famine of hearing the words of the LORD — an epistemic catastrophe *"
+      - "In a new temple"
+    bloom: understand
+reflections:
+  - title: "Your feed's picture of your brother"
+    prompt: "Name one person or group your feed has shown you in bent glass. Which distortion rewarded you for believing it? What would speaking truth with them — as members of one Body — require of you this week?"
+    placeholder: "My feed showed me... the distortion was... this week I will..."
+    criteria:
+      - "Names a specific distortion at work"
+      - "Names a concrete relational act for this week"
+    bloom: evaluate

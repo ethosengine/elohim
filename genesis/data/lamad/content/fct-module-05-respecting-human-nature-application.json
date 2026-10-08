@@ -1,39 +1,84 @@
 {
   "id": "fct-module-05-respecting-human-nature-application",
-  "contentType": "exercise",
-  "reach": "commons",
-  "title": "Application: Respecting Human Nature",
-  "description": "Practical application and action steps",
-  "content": "**Instructions:** \\*The Messages we get on a Sunday are filtered through what we the audience want to hear, Preachers are subject to audience capture, conflict of interest, and bias. Consider balancing career-preaching with traveling ministers of the Word, who can have independence from our congregation to be honest with our community when we need to hear hard truths existentially important to our successful formation of a faith community.   \n\n\\* The Structure of our Church collaborations should respect the Dunbar Number for each individual member to optimize for our capacity for relationship:  \n\\--150 Aquaintances  \n\\-- 50 Casual   \n\\-- 15 Close  \n\\-- 5 Intimate\n**PracticeType:** application",
+  "contentType": "practice",
+  "title": "Practice: Our Attention is Sacred",
+  "description": "Application — Three Lanes  - Tech workers: Build attention sanctuaries — spaces in your product that facilitate depth rather than churn.",
+  "content": "## Application — Three Lanes\n\n- **Tech workers:** Build attention sanctuaries — spaces in your product that facilitate depth rather than churn. Add cognitive-bias safeguards that help users notice their own reactivity; integrate value-alignment moments (\"is this how you meant to spend this hour?\"); implement sacred pauses in flows that currently exploit momentum. Bring your Design Guide map to Module 8 with your Module 4 wisdom-feature sketch.\n- **Households:** Module 1's audit now becomes covenant. Reclaim the Shema's architecture for your home: guard the thresholds (first and last thirty minutes of the day device-free), the table (a screen-free meal as daily liturgy), and the doorframes (chargers live outside bedrooms). Filter what enters by Philippians 4:8 — whatever is true, noble, right, pure, lovely — as the household's content policy.\n- **Church leaders:** Structure community within real human capacity. The Dunbar layers — anthropologist Robin Dunbar's nested limits of human relationship: roughly 150 acquaintances, 50 casual friends, 15 close, 5 intimate — are the created limits of relational attention; design your congregation's groups, care structures, and expectations to honor them rather than pretending one pastor or one feed can hold everyone. And protect the sacred hour: audit Sunday itself for engineered distraction — countdown clocks, announcements, production — asking of each element the Mary question: does this help people sit down at Jesus' feet?",
   "contentFormat": "markdown",
-  "sourcePath": "fct/v1/Module 5 - Respecting Human Nature - Our Attention is Sacred.md",
+  "sourcePath": "docs/content/fct/fct-course/content/m05.md",
+  "reach": "commons",
   "tags": [
-    "application",
-    "practice",
     "fct",
-    "human-nature"
-  ],
-  "relatedNodeIds": [
-    "fct-module-05-respecting-human-nature"
+    "christian-technology",
+    "humane-tech",
+    "movement-2",
+    "module-5",
+    "practice-lanes"
   ],
   "metadata": {
-    "category": "fct-practice",
-    "sourceModule": "fct-module-05-respecting-human-nature",
-    "originalContentType": "practice"
+    "category": "fct",
+    "courseId": "foundations-christian-technology",
+    "courseVersion": "review draft v2, 2026-09-16",
+    "sourceWorkbook": "fct-course",
+    "moduleNumber": 5,
+    "movement": 2,
+    "movementTitle": "Turning — Repentance & Repair",
+    "day": "Day 3",
+    "form": "practice-lanes"
   },
+  "relationships": [
+    {
+      "target": "fct-module-01-church-dilemma",
+      "type": "RELATES_TO",
+      "role": "callback"
+    },
+    {
+      "target": "fct-module-04-scaling-wisdom",
+      "type": "RELATES_TO",
+      "role": "callback"
+    },
+    {
+      "target": "fct-module-08-centering-love",
+      "type": "RELATES_TO",
+      "role": "callback"
+    },
+    {
+      "target": "fct-module-05-respecting-human-nature-lane-tech-workers",
+      "type": "CONTAINS",
+      "role": "lane"
+    },
+    {
+      "target": "fct-module-05-respecting-human-nature-lane-households",
+      "type": "CONTAINS",
+      "role": "lane"
+    },
+    {
+      "target": "fct-module-05-respecting-human-nature-lane-church-leaders",
+      "type": "CONTAINS",
+      "role": "lane"
+    },
+    {
+      "target": "fct-module-05-respecting-human-nature",
+      "type": "BELONGS_TO",
+      "role": "practice"
+    }
+  ],
   "createdAt": "2025-11-28T21:10:19.201021",
-  "updatedAt": "2025-12-26T21:04:01.829Z",
+  "updatedAt": "2026-09-27T00:00:00.000Z",
+  "stewardedBy": [
+    {
+      "humanId": "human-pete-pastor",
+      "affinity": 0.7,
+      "role": "steward"
+    },
+    {
+      "humanId": "human-matthew-manager",
+      "affinity": 0.3,
+      "role": "endorser"
+    }
+  ],
   "did": "did:web:elohim.host:content:fct:module 5 - respecting human nature - our attention is sacred",
   "activityPubType": "Page",
-  "openGraphMetadata": {
-    "ogTitle": "Application: Respecting Human Nature",
-    "ogDescription": "Practical application and action steps",
-    "ogType": "website",
-    "ogUrl": "https://elohim-protocol.org/content/fct-module-05-respecting-human-nature-application",
-    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
-    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/practice.jpg",
-    "ogImageAlt": "Application: Respecting Human Nature - Elohim Protocol"
-  },
   "linkedData": {
     "@context": "https://schema.org/",
     "@type": "CreativeWork",
@@ -48,17 +93,5 @@
       "@id": "https://elohim-protocol.org",
       "name": "Elohim Protocol"
     }
-  },
-  "stewardedBy": [
-    {
-      "humanId": "human-pete-pastor",
-      "affinity": 0.7,
-      "role": "steward"
-    },
-    {
-      "humanId": "human-matthew-manager",
-      "affinity": 0.3,
-      "role": "endorser"
-    }
-  ]
+  }
 }

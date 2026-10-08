@@ -1,0 +1,344 @@
+{
+  "id": "fct-module-05-respecting-human-nature-quiz",
+  "contentType": "assessment",
+  "title": "Check your understanding: Our Attention is Sacred",
+  "description": "Mastery check for Module 5, drawn from its learning objectives.",
+  "content": [
+    {
+      "id": "fct-module-05-respecting-human-nature-q1",
+      "purpose": "mastery",
+      "content": {
+        "content": "Why do our evolved heuristics matter for technology design?\n\n[[☃ radio 1]]",
+        "images": {},
+        "widgets": {
+          "radio 1": {
+            "type": "radio",
+            "options": {
+              "choices": [
+                {
+                  "content": "They make people immune to persuasion",
+                  "correct": false,
+                  "id": "fct-module-05-respecting-human-nature-q1-c0"
+                },
+                {
+                  "content": "They misfire as biases that can be systematically exploited at scale",
+                  "correct": true,
+                  "id": "fct-module-05-respecting-human-nature-q1-c1"
+                },
+                {
+                  "content": "They only affect children",
+                  "correct": false,
+                  "id": "fct-module-05-respecting-human-nature-q1-c2"
+                },
+                {
+                  "content": "They stop mattering once people are educated",
+                  "correct": false,
+                  "id": "fct-module-05-respecting-human-nature-q1-c3"
+                }
+              ],
+              "randomize": true,
+              "multipleSelect": false
+            },
+            "graded": true,
+            "version": {
+              "major": 0,
+              "minor": 0
+            }
+          }
+        }
+      },
+      "hints": [
+        {
+          "content": "Every human brain is subject to these forces, so technology that targets them affects everyone.",
+          "images": {},
+          "widgets": {}
+        }
+      ],
+      "metadata": {
+        "sourceContentId": "fct-module-05-respecting-human-nature-quiz",
+        "assessesContentId": "fct-module-05-respecting-human-nature",
+        "bloomsLevel": "understand",
+        "difficulty": "medium",
+        "estimatedTimeSeconds": 60,
+        "questionType": "core",
+        "tags": [
+          "fct"
+        ]
+      }
+    },
+    {
+      "id": "fct-module-05-respecting-human-nature-q2",
+      "purpose": "mastery",
+      "content": {
+        "content": "What does the module say about 'giving people what they want'?\n\n[[☃ radio 1]]",
+        "images": {},
+        "widgets": {
+          "radio 1": {
+            "type": "radio",
+            "options": {
+              "choices": [
+                {
+                  "content": "It is the gold standard of humane design",
+                  "correct": false,
+                  "id": "fct-module-05-respecting-human-nature-q2-c0"
+                },
+                {
+                  "content": "It is only a problem for small companies",
+                  "correct": false,
+                  "id": "fct-module-05-respecting-human-nature-q2-c1"
+                },
+                {
+                  "content": "It collapses when what people click diverges from what they value",
+                  "correct": true,
+                  "id": "fct-module-05-respecting-human-nature-q2-c2"
+                },
+                {
+                  "content": "It means asking users in surveys",
+                  "correct": false,
+                  "id": "fct-module-05-respecting-human-nature-q2-c3"
+                }
+              ],
+              "randomize": true,
+              "multipleSelect": false
+            },
+            "graded": true,
+            "version": {
+              "major": 0,
+              "minor": 0
+            }
+          }
+        }
+      },
+      "hints": [],
+      "metadata": {
+        "sourceContentId": "fct-module-05-respecting-human-nature-quiz",
+        "assessesContentId": "fct-module-05-respecting-human-nature",
+        "bloomsLevel": "understand",
+        "difficulty": "medium",
+        "estimatedTimeSeconds": 60,
+        "questionType": "core",
+        "tags": [
+          "fct"
+        ]
+      }
+    },
+    {
+      "id": "fct-module-05-respecting-human-nature-q3",
+      "purpose": "mastery",
+      "content": {
+        "content": "In Luke 10:38-42, what is Martha's trap?\n\n[[☃ radio 1]]",
+        "images": {},
+        "widgets": {
+          "radio 1": {
+            "type": "radio",
+            "options": {
+              "choices": [
+                {
+                  "content": "She is doing something wrong",
+                  "correct": false,
+                  "id": "fct-module-05-respecting-human-nature-q3-c0"
+                },
+                {
+                  "content": "Many necessary preparations that keep her from the one thing needed",
+                  "correct": true,
+                  "id": "fct-module-05-respecting-human-nature-q3-c1"
+                },
+                {
+                  "content": "She refuses to serve",
+                  "correct": false,
+                  "id": "fct-module-05-respecting-human-nature-q3-c2"
+                },
+                {
+                  "content": "She ignores Jesus entirely",
+                  "correct": false,
+                  "id": "fct-module-05-respecting-human-nature-q3-c3"
+                }
+              ],
+              "randomize": true,
+              "multipleSelect": false
+            },
+            "graded": true,
+            "version": {
+              "major": 0,
+              "minor": 0
+            }
+          }
+        }
+      },
+      "hints": [],
+      "metadata": {
+        "sourceContentId": "fct-module-05-respecting-human-nature-quiz",
+        "assessesContentId": "fct-module-05-respecting-human-nature",
+        "bloomsLevel": "analyze",
+        "difficulty": "medium",
+        "estimatedTimeSeconds": 60,
+        "questionType": "core",
+        "tags": [
+          "fct"
+        ]
+      }
+    },
+    {
+      "id": "fct-module-05-respecting-human-nature-q4",
+      "purpose": "mastery",
+      "content": {
+        "content": "What do the manners of Christ in Revelation 3:20 model for technology?\n\n[[☃ radio 1]]",
+        "images": {},
+        "widgets": {
+          "radio 1": {
+            "type": "radio",
+            "options": {
+              "choices": [
+                {
+                  "content": "He knocks and waits for attention freely given; he does not autoplay or push through",
+                  "correct": true,
+                  "id": "fct-module-05-respecting-human-nature-q4-c0"
+                },
+                {
+                  "content": "He enters whenever he chooses",
+                  "correct": false,
+                  "id": "fct-module-05-respecting-human-nature-q4-c1"
+                },
+                {
+                  "content": "He sends constant reminders",
+                  "correct": false,
+                  "id": "fct-module-05-respecting-human-nature-q4-c2"
+                },
+                {
+                  "content": "He competes for attention with louder signals",
+                  "correct": false,
+                  "id": "fct-module-05-respecting-human-nature-q4-c3"
+                }
+              ],
+              "randomize": true,
+              "multipleSelect": false
+            },
+            "graded": true,
+            "version": {
+              "major": 0,
+              "minor": 0
+            }
+          }
+        }
+      },
+      "hints": [],
+      "metadata": {
+        "sourceContentId": "fct-module-05-respecting-human-nature-quiz",
+        "assessesContentId": "fct-module-05-respecting-human-nature",
+        "bloomsLevel": "understand",
+        "difficulty": "medium",
+        "estimatedTimeSeconds": 60,
+        "questionType": "core",
+        "tags": [
+          "fct"
+        ]
+      }
+    },
+    {
+      "id": "fct-module-05-respecting-human-nature-q5",
+      "purpose": "mastery",
+      "content": {
+        "content": "Which design move does the Shema (Deuteronomy 6 and 11) suggest for a household?\n\n[[☃ radio 1]]",
+        "images": {},
+        "widgets": {
+          "radio 1": {
+            "type": "radio",
+            "options": {
+              "choices": [
+                {
+                  "content": "Remove all technology from the home",
+                  "correct": false,
+                  "id": "fct-module-05-respecting-human-nature-q5-c0"
+                },
+                {
+                  "content": "Let each person decide alone",
+                  "correct": false,
+                  "id": "fct-module-05-respecting-human-nature-q5-c1"
+                },
+                {
+                  "content": "An ambient attention architecture: guard the thresholds, the table and the doorframes",
+                  "correct": true,
+                  "id": "fct-module-05-respecting-human-nature-q5-c2"
+                },
+                {
+                  "content": "Replace old devices with newer devices",
+                  "correct": false,
+                  "id": "fct-module-05-respecting-human-nature-q5-c3"
+                }
+              ],
+              "randomize": true,
+              "multipleSelect": false
+            },
+            "graded": true,
+            "version": {
+              "major": 0,
+              "minor": 0
+            }
+          }
+        }
+      },
+      "hints": [],
+      "metadata": {
+        "sourceContentId": "fct-module-05-respecting-human-nature-quiz",
+        "assessesContentId": "fct-module-05-respecting-human-nature",
+        "bloomsLevel": "apply",
+        "difficulty": "medium",
+        "estimatedTimeSeconds": 60,
+        "questionType": "core",
+        "tags": [
+          "fct"
+        ]
+      }
+    }
+  ],
+  "contentFormat": "sophia-quiz-json",
+  "sourcePath": "docs/content/fct/fct-course/content/m05.md",
+  "reach": "commons",
+  "tags": [
+    "fct",
+    "christian-technology",
+    "humane-tech",
+    "movement-2",
+    "module-5",
+    "quiz"
+  ],
+  "metadata": {
+    "category": "fct",
+    "courseId": "foundations-christian-technology",
+    "courseVersion": "review draft v2, 2026-09-16",
+    "sourceWorkbook": "fct-course",
+    "moduleNumber": 5,
+    "movement": 2,
+    "movementTitle": "Turning — Repentance & Repair",
+    "day": "Day 3",
+    "form": "quiz",
+    "assessmentType": "mastery",
+    "questionCount": 5
+  },
+  "relationships": [
+    {
+      "target": "fct-module-05-respecting-human-nature",
+      "type": "VALIDATES",
+      "role": "mastery"
+    },
+    {
+      "target": "fct-module-05-respecting-human-nature",
+      "type": "BELONGS_TO",
+      "role": "quiz"
+    }
+  ],
+  "createdAt": "2026-09-27T00:00:00.000Z",
+  "updatedAt": "2026-09-27T00:00:00.000Z",
+  "stewardedBy": [
+    {
+      "humanId": "human-pete-pastor",
+      "affinity": 0.7,
+      "role": "steward"
+    },
+    {
+      "humanId": "human-matthew-manager",
+      "affinity": 0.3,
+      "role": "endorser"
+    }
+  ]
+}

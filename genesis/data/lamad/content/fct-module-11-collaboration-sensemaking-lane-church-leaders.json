@@ -1,0 +1,56 @@
+{
+  "id": "fct-module-11-collaboration-sensemaking-lane-church-leaders",
+  "contentType": "practice",
+  "title": "Church leaders: Collaboration & Sensemaking",
+  "description": "Church leaders  Rebuild a well-moderated, hyper-local, embodied media culture, in three clusters.",
+  "content": "## Church leaders\n\nRebuild a well-moderated, hyper-local, *embodied* media culture, in three clusters. **Become the commons:** an inclusive third space (co-working, café, recreation, transit-accessible); church facilities as community information hubs; media-literacy workshops open to all; a civic-journalism initiative and youth media corps covering local events and government; a fact-check hotline; a moderated digital town hall; support — including financial — for local news outlets. **Weave the generations:** intergenerational wisdom exchange and community storytelling projects that build empathy across age and difference — with the exchange running both directions, for sometimes the word comes to the youngest in the house (Samuel under Eli, 1 Samuel 3; young Jeremiah, Jeremiah 1:6-7). **Re-root the economy** (extending Module 7's regeneration): exit-to-community investing, land trusts, micro-lending, time banking, Sabbath-economics education, simplicity and \"do less\" challenges, and support for members intentionally downshifting. Trust is rebuilt where information, relationship, and economics are re-localized together.",
+  "contentFormat": "markdown",
+  "sourcePath": "docs/content/fct/fct-course/content/m11.md",
+  "reach": "commons",
+  "tags": [
+    "fct",
+    "christian-technology",
+    "humane-tech",
+    "movement-4",
+    "module-11",
+    "practice-lane"
+  ],
+  "metadata": {
+    "category": "fct",
+    "courseId": "foundations-christian-technology",
+    "courseVersion": "review draft v2, 2026-09-16",
+    "sourceWorkbook": "fct-course",
+    "moduleNumber": 11,
+    "movement": 4,
+    "movementTitle": "Rebuilding Common Life",
+    "day": "Day 9",
+    "form": "practice-lane",
+    "audience": "church-leaders"
+  },
+  "relationships": [
+    {
+      "target": "fct-module-11-collaboration-sensemaking-application",
+      "type": "BELONGS_TO",
+      "role": "lane"
+    },
+    {
+      "target": "fct-module-07-regeneration",
+      "type": "RELATES_TO",
+      "role": "callback"
+    }
+  ],
+  "createdAt": "2026-09-27T00:00:00.000Z",
+  "updatedAt": "2026-09-27T00:00:00.000Z",
+  "stewardedBy": [
+    {
+      "humanId": "human-pete-pastor",
+      "affinity": 0.7,
+      "role": "steward"
+    },
+    {
+      "humanId": "human-matthew-manager",
+      "affinity": 0.3,
+      "role": "endorser"
+    }
+  ]
+}

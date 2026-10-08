@@ -1,0 +1,56 @@
+{
+  "id": "fct-module-06-harmful-consequences-lane-tech-workers",
+  "contentType": "practice",
+  "title": "Tech workers: Externalities & the Commons",
+  "description": "Tech workers  Run the Externality Rubric on something you actually ship.",
+  "content": "## Tech workers\n\nRun the Externality Rubric on something you actually ship. Draft one anti-KPI — a number that would warn you the product is succeeding at someone else's expense — and identify the earliest point in your development process where externalities could be caught. Bring the Module 1 metric-vs-love note; it likely names your first externality.",
+  "contentFormat": "markdown",
+  "sourcePath": "docs/content/fct/fct-course/content/m06.md",
+  "reach": "commons",
+  "tags": [
+    "fct",
+    "christian-technology",
+    "humane-tech",
+    "movement-2",
+    "module-6",
+    "practice-lane"
+  ],
+  "metadata": {
+    "category": "fct",
+    "courseId": "foundations-christian-technology",
+    "courseVersion": "review draft v2, 2026-09-16",
+    "sourceWorkbook": "fct-course",
+    "moduleNumber": 6,
+    "movement": 2,
+    "movementTitle": "Turning — Repentance & Repair",
+    "day": "Day 4",
+    "form": "practice-lane",
+    "audience": "tech-workers"
+  },
+  "relationships": [
+    {
+      "target": "fct-module-06-harmful-consequences-application",
+      "type": "BELONGS_TO",
+      "role": "lane"
+    },
+    {
+      "target": "fct-module-01-church-dilemma",
+      "type": "RELATES_TO",
+      "role": "callback"
+    }
+  ],
+  "createdAt": "2026-09-27T00:00:00.000Z",
+  "updatedAt": "2026-09-27T00:00:00.000Z",
+  "stewardedBy": [
+    {
+      "humanId": "human-pete-pastor",
+      "affinity": 0.7,
+      "role": "steward"
+    },
+    {
+      "humanId": "human-matthew-manager",
+      "affinity": 0.3,
+      "role": "endorser"
+    }
+  ]
+}

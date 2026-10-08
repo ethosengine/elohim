@@ -1,0 +1,55 @@
+{
+  "id": "fct-module-12-fairness-justice-homework",
+  "contentType": "practice",
+  "title": "Homework: Fairness & Justice",
+  "description": "Homework  Complete FHT Module 7: Helping People Thrive.",
+  "content": "## Homework\n\nComplete FHT Module 7: *Helping People Thrive*. One assignment; bring one line-item from your lifestyle or church audit.",
+  "contentFormat": "markdown",
+  "sourcePath": "docs/content/fct/fct-course/content/m12.md",
+  "reach": "commons",
+  "tags": [
+    "fct",
+    "christian-technology",
+    "humane-tech",
+    "movement-4",
+    "module-12",
+    "homework"
+  ],
+  "metadata": {
+    "category": "fct",
+    "courseId": "foundations-christian-technology",
+    "courseVersion": "review draft v2, 2026-09-16",
+    "sourceWorkbook": "fct-course",
+    "moduleNumber": 12,
+    "movement": 4,
+    "movementTitle": "Rebuilding Common Life",
+    "day": "Day 10",
+    "form": "homework"
+  },
+  "relationships": [
+    {
+      "target": "fct-module-07-regeneration",
+      "type": "RELATES_TO",
+      "role": "callback"
+    },
+    {
+      "target": "fct-module-12-fairness-justice",
+      "type": "BELONGS_TO",
+      "role": "homework"
+    }
+  ],
+  "createdAt": "2026-09-27T00:00:00.000Z",
+  "updatedAt": "2026-09-27T00:00:00.000Z",
+  "stewardedBy": [
+    {
+      "humanId": "human-pete-pastor",
+      "affinity": 0.7,
+      "role": "steward"
+    },
+    {
+      "humanId": "human-matthew-manager",
+      "affinity": 0.3,
+      "role": "endorser"
+    }
+  ]
+}

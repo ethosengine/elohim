@@ -1,0 +1,51 @@
+{
+  "id": "fct-module-14-ready-to-act-lane-individual",
+  "contentType": "practice",
+  "title": "The individual: Ready to Act",
+  "description": "The individual  Conduct a digital-discipleship audit of your own habits and skills; offer your tech skills to your church (website, digital literacy for seniors, media help); commit to continuous learning at the faith-and-technology interse",
+  "content": "## The individual\n\nConduct a digital-discipleship audit of your own habits and skills; offer your tech skills to your church (website, digital literacy for seniors, media help); commit to continuous learning at the faith-and-technology intersection; keep a regular digital Sabbath as witness and rest; engage online interfaith dialogue on tech ethics with a Christ-centered voice.",
+  "contentFormat": "markdown",
+  "sourcePath": "docs/content/fct/fct-course/content/m14.md",
+  "reach": "commons",
+  "tags": [
+    "fct",
+    "christian-technology",
+    "humane-tech",
+    "movement-5",
+    "module-14",
+    "practice-lane"
+  ],
+  "metadata": {
+    "category": "fct",
+    "courseId": "foundations-christian-technology",
+    "courseVersion": "review draft v2, 2026-09-16",
+    "sourceWorkbook": "fct-course",
+    "moduleNumber": 14,
+    "movement": 5,
+    "movementTitle": "Abundant Life & Sending",
+    "day": "Day 12",
+    "form": "practice-lane",
+    "audience": "individual"
+  },
+  "relationships": [
+    {
+      "target": "fct-module-14-ready-to-act-application",
+      "type": "BELONGS_TO",
+      "role": "lane"
+    }
+  ],
+  "createdAt": "2026-09-27T00:00:00.000Z",
+  "updatedAt": "2026-09-27T00:00:00.000Z",
+  "stewardedBy": [
+    {
+      "humanId": "human-pete-pastor",
+      "affinity": 0.7,
+      "role": "steward"
+    },
+    {
+      "humanId": "human-matthew-manager",
+      "affinity": 0.3,
+      "role": "endorser"
+    }
+  ]
+}

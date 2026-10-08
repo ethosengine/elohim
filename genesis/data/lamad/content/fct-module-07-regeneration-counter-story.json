@@ -1,0 +1,60 @@
+{
+  "id": "fct-module-07-regeneration-counter-story",
+  "contentType": "article",
+  "title": "Counter-Story: The Sabbath Year Under Siege (1 Maccabees 6)",
+  "description": "The Sabbath Year Under Siege (1 Maccabees 6)  Regeneration has enemies, and the intertestamental record preserves the collision.",
+  "content": "## The Sabbath Year Under Siege (1 Maccabees 6)\n\nRegeneration has enemies, and the intertestamental record preserves the collision. During the Maccabean wars, Judea's defenders ran out of food at the worst possible moment \"because it was the seventh year\" — the sabbatical rest of the land (1 Maccabees 6:49-54). The regenerative rhythm God commanded had become a military liability under siege; the pressure to abandon the Sabbath year was not spiritual laziness but survival logic inside an arms race. Name the pattern honestly, because it is ours: the attention economy, like the Seleucid empire, needs your surplus — and it punishes every community that tries to keep an economics of enough. The question this module leaves with the church is the Maccabean question: can we sustain an alternative economic logic while embedded in a system built to break it? That is exactly why regeneration must be communal (Acts 2), designed (the chest), and covenanted (Module 15's manifesto): no household keeps Sabbath economics alone under siege.",
+  "contentFormat": "markdown",
+  "sourcePath": "docs/content/fct/fct-course/content/m07.md",
+  "reach": "commons",
+  "tags": [
+    "fct",
+    "christian-technology",
+    "humane-tech",
+    "movement-2",
+    "module-7",
+    "counter-story"
+  ],
+  "metadata": {
+    "category": "fct",
+    "courseId": "foundations-christian-technology",
+    "courseVersion": "review draft v2, 2026-09-16",
+    "sourceWorkbook": "fct-course",
+    "moduleNumber": 7,
+    "movement": 2,
+    "movementTitle": "Turning — Repentance & Repair",
+    "day": "Day 5",
+    "form": "counter-story"
+  },
+  "relationships": [
+    {
+      "target": "fct-bible-1-maccabees-6",
+      "type": "REFERENCES",
+      "role": "story-text"
+    },
+    {
+      "target": "fct-module-15-retrospective",
+      "type": "RELATES_TO",
+      "role": "callback"
+    },
+    {
+      "target": "fct-module-07-regeneration",
+      "type": "BELONGS_TO",
+      "role": "counter-story"
+    }
+  ],
+  "createdAt": "2026-09-27T00:00:00.000Z",
+  "updatedAt": "2026-09-27T00:00:00.000Z",
+  "stewardedBy": [
+    {
+      "humanId": "human-pete-pastor",
+      "affinity": 0.7,
+      "role": "steward"
+    },
+    {
+      "humanId": "human-matthew-manager",
+      "affinity": 0.3,
+      "role": "endorser"
+    }
+  ]
+}

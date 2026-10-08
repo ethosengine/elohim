@@ -1,0 +1,101 @@
+{
+  "id": "fct-module-15-retrospective-three-commitments",
+  "contentType": "assessment",
+  "title": "Three commitments",
+  "description": "Refine yesterday's plan into three covenanted actions: one immediate change in your personal tech habits; one initiative to start or join in your church or community; one way to advocate for Christ-centered approaches in your professional o",
+  "content": [
+    {
+      "id": "fct-module-15-retrospective-three-commitments",
+      "purpose": "reflection",
+      "content": {
+        "content": "[[☃ free-response 1]]",
+        "images": {},
+        "widgets": {
+          "free-response 1": {
+            "type": "free-response",
+            "options": {
+              "allowUnlimitedCharacters": false,
+              "characterLimit": 2000,
+              "placeholder": "Personally I will... In my church I will... In my work I will...",
+              "question": "Refine yesterday's plan into three covenanted actions: one immediate change in your personal tech habits; one initiative to start or join in your church or community; one way to advocate for Christ-centered approaches in your professional or public life.",
+              "scoringCriteria": [
+                {
+                  "text": "Three commitments, one per sphere"
+                },
+                {
+                  "text": "Each is concrete enough to check at the follow-up gathering"
+                }
+              ]
+            },
+            "graded": false,
+            "version": {
+              "major": 0,
+              "minor": 0
+            }
+          }
+        }
+      },
+      "metadata": {
+        "sourceContentId": "fct-module-15-retrospective-three-commitments",
+        "assessesContentId": "fct-module-15-retrospective",
+        "bloomsLevel": "create",
+        "estimatedTimeSeconds": 600,
+        "questionType": "open-response",
+        "tags": [
+          "fct",
+          "reflection"
+        ]
+      }
+    }
+  ],
+  "contentFormat": "sophia-quiz-json",
+  "sourcePath": "docs/content/fct/fct-course/content/m15.md",
+  "reach": "commons",
+  "tags": [
+    "fct",
+    "christian-technology",
+    "humane-tech",
+    "movement-5",
+    "module-15",
+    "reflection"
+  ],
+  "metadata": {
+    "category": "fct",
+    "courseId": "foundations-christian-technology",
+    "courseVersion": "review draft v2, 2026-09-16",
+    "sourceWorkbook": "fct-course",
+    "moduleNumber": 15,
+    "movement": 5,
+    "movementTitle": "Abundant Life & Sending",
+    "day": "Day 13",
+    "form": "reflection",
+    "assessmentType": "reflection",
+    "questionCount": 1
+  },
+  "relationships": [
+    {
+      "target": "fct-module-15-retrospective",
+      "type": "VALIDATES",
+      "role": "reflection"
+    },
+    {
+      "target": "fct-module-15-retrospective",
+      "type": "BELONGS_TO",
+      "role": "reflection"
+    }
+  ],
+  "createdAt": "2026-09-27T00:00:00.000Z",
+  "updatedAt": "2026-09-27T00:00:00.000Z",
+  "stewardedBy": [
+    {
+      "humanId": "human-pete-pastor",
+      "affinity": 0.7,
+      "role": "steward"
+    },
+    {
+      "humanId": "human-matthew-manager",
+      "affinity": 0.3,
+      "role": "endorser"
+    }
+  ]
+}

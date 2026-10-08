@@ -94,6 +94,11 @@
       "role": "source-workbook"
     },
     {
+      "target": "fct-media-06-lab-parable-of-the-polygons",
+      "type": "REFERENCES",
+      "role": "go-deeper"
+    },
+    {
       "target": "fct-media-11-book-revisit-this-interac",
       "type": "REFERENCES",
       "role": "go-deeper"

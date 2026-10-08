@@ -1,0 +1,50 @@
+{
+  "id": "fct-module-10-recognize-distortions-homework",
+  "contentType": "practice",
+  "title": "Homework: Recognizing Distortions",
+  "description": "Homework  Practice: Reclaiming Your Sacred Attention on Social Media (~75 minutes, then a follow-up).",
+  "content": "## Homework\n\nPractice: **Reclaiming Your Sacred Attention on Social Media** (~75 minutes, then a follow-up). (1) *Audit your feed*: identify accounts that trigger strong emotion, exist mainly for engagement, or may spread misinformation. (2) *The great unfollow*: unfollow or mute at least five, noting why. (3) *Mindful following*: add five reputable organizations or experts, noting what each contributes. (4) *Rebuilding bridges*: prayerfully consider unblocking friends or family cut off over disagreements — we are called to unity — and plan how to engage more constructively. (5) *Reflect* (150–200 words) on what changed and what will be hard. One week later, spend ten minutes reviewing the difference. This is intentional attention, not isolation from diverse viewpoints.",
+  "contentFormat": "markdown",
+  "sourcePath": "docs/content/fct/fct-course/content/m10.md",
+  "reach": "commons",
+  "tags": [
+    "fct",
+    "christian-technology",
+    "humane-tech",
+    "movement-4",
+    "module-10",
+    "homework"
+  ],
+  "metadata": {
+    "category": "fct",
+    "courseId": "foundations-christian-technology",
+    "courseVersion": "review draft v2, 2026-09-16",
+    "sourceWorkbook": "fct-course",
+    "moduleNumber": 10,
+    "movement": 4,
+    "movementTitle": "Rebuilding Common Life",
+    "day": "Day 8",
+    "form": "homework"
+  },
+  "relationships": [
+    {
+      "target": "fct-module-10-recognize-distortions",
+      "type": "BELONGS_TO",
+      "role": "homework"
+    }
+  ],
+  "createdAt": "2026-09-27T00:00:00.000Z",
+  "updatedAt": "2026-09-27T00:00:00.000Z",
+  "stewardedBy": [
+    {
+      "humanId": "human-pete-pastor",
+      "affinity": 0.7,
+      "role": "steward"
+    },
+    {
+      "humanId": "human-matthew-manager",
+      "affinity": 0.3,
+      "role": "endorser"
+    }
+  ]
+}

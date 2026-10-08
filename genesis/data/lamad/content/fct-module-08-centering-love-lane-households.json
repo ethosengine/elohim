@@ -1,0 +1,51 @@
+{
+  "id": "fct-module-08-centering-love-lane-households",
+  "contentType": "practice",
+  "title": "Households: Centering Love",
+  "description": "Households  Work the three-part reflection as a family, each member naming one misaligned practice and one modification.",
+  "content": "## Households\n\nWork the three-part reflection as a family, each member naming one misaligned practice and one modification. Frame it positively: the household is choosing what its technology will be *for* — and love, not scarcity, is the reason for every boundary set.",
+  "contentFormat": "markdown",
+  "sourcePath": "docs/content/fct/fct-course/content/m08.md",
+  "reach": "commons",
+  "tags": [
+    "fct",
+    "christian-technology",
+    "humane-tech",
+    "movement-3",
+    "module-8",
+    "practice-lane"
+  ],
+  "metadata": {
+    "category": "fct",
+    "courseId": "foundations-christian-technology",
+    "courseVersion": "review draft v2, 2026-09-16",
+    "sourceWorkbook": "fct-course",
+    "moduleNumber": 8,
+    "movement": 3,
+    "movementTitle": "Reordering Loves",
+    "day": "Day 6",
+    "form": "practice-lane",
+    "audience": "households"
+  },
+  "relationships": [
+    {
+      "target": "fct-module-08-centering-love-application",
+      "type": "BELONGS_TO",
+      "role": "lane"
+    }
+  ],
+  "createdAt": "2026-09-27T00:00:00.000Z",
+  "updatedAt": "2026-09-27T00:00:00.000Z",
+  "stewardedBy": [
+    {
+      "humanId": "human-pete-pastor",
+      "affinity": 0.7,
+      "role": "steward"
+    },
+    {
+      "humanId": "human-matthew-manager",
+      "affinity": 0.3,
+      "role": "endorser"
+    }
+  ]
+}

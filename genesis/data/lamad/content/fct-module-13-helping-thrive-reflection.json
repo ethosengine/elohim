@@ -1,0 +1,101 @@
+{
+  "id": "fct-module-13-helping-thrive-reflection",
+  "contentType": "assessment",
+  "title": "Our thriving story",
+  "description": "Write your congregation's (or product's) thriving story in one sentence as it is stated, then in one sentence as it is lived. Where does practice mimic thriving, and which metric quietly steers you there?",
+  "content": [
+    {
+      "id": "fct-module-13-helping-thrive-reflection",
+      "purpose": "reflection",
+      "content": {
+        "content": "[[☃ free-response 1]]",
+        "images": {},
+        "widgets": {
+          "free-response 1": {
+            "type": "free-response",
+            "options": {
+              "allowUnlimitedCharacters": false,
+              "characterLimit": 1500,
+              "placeholder": "Stated: ... Lived: ... The mimic is... the metric behind it is...",
+              "question": "Write your congregation's (or product's) thriving story in one sentence as it is stated, then in one sentence as it is lived. Where does practice mimic thriving, and which metric quietly steers you there?",
+              "scoringCriteria": [
+                {
+                  "text": "Both sentences are present"
+                },
+                {
+                  "text": "Names a mimic and the metric behind it"
+                }
+              ]
+            },
+            "graded": false,
+            "version": {
+              "major": 0,
+              "minor": 0
+            }
+          }
+        }
+      },
+      "metadata": {
+        "sourceContentId": "fct-module-13-helping-thrive-reflection",
+        "assessesContentId": "fct-module-13-helping-thrive",
+        "bloomsLevel": "evaluate",
+        "estimatedTimeSeconds": 600,
+        "questionType": "open-response",
+        "tags": [
+          "fct",
+          "reflection"
+        ]
+      }
+    }
+  ],
+  "contentFormat": "sophia-quiz-json",
+  "sourcePath": "docs/content/fct/fct-course/content/m13.md",
+  "reach": "commons",
+  "tags": [
+    "fct",
+    "christian-technology",
+    "humane-tech",
+    "movement-5",
+    "module-13",
+    "reflection"
+  ],
+  "metadata": {
+    "category": "fct",
+    "courseId": "foundations-christian-technology",
+    "courseVersion": "review draft v2, 2026-09-16",
+    "sourceWorkbook": "fct-course",
+    "moduleNumber": 13,
+    "movement": 5,
+    "movementTitle": "Abundant Life & Sending",
+    "day": "Day 11",
+    "form": "reflection",
+    "assessmentType": "reflection",
+    "questionCount": 1
+  },
+  "relationships": [
+    {
+      "target": "fct-module-13-helping-thrive",
+      "type": "VALIDATES",
+      "role": "reflection"
+    },
+    {
+      "target": "fct-module-13-helping-thrive",
+      "type": "BELONGS_TO",
+      "role": "reflection"
+    }
+  ],
+  "createdAt": "2026-09-27T00:00:00.000Z",
+  "updatedAt": "2026-09-27T00:00:00.000Z",
+  "stewardedBy": [
+    {
+      "humanId": "human-pete-pastor",
+      "affinity": 0.7,
+      "role": "steward"
+    },
+    {
+      "humanId": "human-matthew-manager",
+      "affinity": 0.3,
+      "role": "endorser"
+    }
+  ]
+}

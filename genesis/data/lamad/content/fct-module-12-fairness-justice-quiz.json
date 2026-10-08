@@ -1,0 +1,338 @@
+{
+  "id": "fct-module-12-fairness-justice-quiz",
+  "contentType": "assessment",
+  "title": "Check your understanding: Fairness & Justice",
+  "description": "Mastery check for Module 12, drawn from its learning objectives.",
+  "content": [
+    {
+      "id": "fct-module-12-fairness-justice-q1",
+      "purpose": "mastery",
+      "content": {
+        "content": "The Capability Approach measures justice by:\n\n[[☃ radio 1]]",
+        "images": {},
+        "widgets": {
+          "radio 1": {
+            "type": "radio",
+            "options": {
+              "choices": [
+                {
+                  "content": "The number of laws passed",
+                  "correct": false,
+                  "id": "fct-module-12-fairness-justice-q1-c0"
+                },
+                {
+                  "content": "People's real capability to exercise rights, not rights declared",
+                  "correct": true,
+                  "id": "fct-module-12-fairness-justice-q1-c1"
+                },
+                {
+                  "content": "GDP per capita",
+                  "correct": false,
+                  "id": "fct-module-12-fairness-justice-q1-c2"
+                },
+                {
+                  "content": "Charitable giving totals",
+                  "correct": false,
+                  "id": "fct-module-12-fairness-justice-q1-c3"
+                }
+              ],
+              "randomize": true,
+              "multipleSelect": false
+            },
+            "graded": true,
+            "version": {
+              "major": 0,
+              "minor": 0
+            }
+          }
+        }
+      },
+      "hints": [],
+      "metadata": {
+        "sourceContentId": "fct-module-12-fairness-justice-quiz",
+        "assessesContentId": "fct-module-12-fairness-justice",
+        "bloomsLevel": "understand",
+        "difficulty": "medium",
+        "estimatedTimeSeconds": 60,
+        "questionType": "core",
+        "tags": [
+          "fct"
+        ]
+      }
+    },
+    {
+      "id": "fct-module-12-fairness-justice-q2",
+      "purpose": "mastery",
+      "content": {
+        "content": "What is the master's order in Luke 14?\n\n[[☃ radio 1]]",
+        "images": {},
+        "widgets": {
+          "radio 1": {
+            "type": "radio",
+            "options": {
+              "choices": [
+                {
+                  "content": "Open the doors and wait",
+                  "correct": false,
+                  "id": "fct-module-12-fairness-justice-q2-c0"
+                },
+                {
+                  "content": "Invite the same guests again",
+                  "correct": false,
+                  "id": "fct-module-12-fairness-justice-q2-c1"
+                },
+                {
+                  "content": "Go out and compel them to come in, so that my house will be full",
+                  "correct": true,
+                  "id": "fct-module-12-fairness-justice-q2-c2"
+                },
+                {
+                  "content": "Cancel the banquet",
+                  "correct": false,
+                  "id": "fct-module-12-fairness-justice-q2-c3"
+                }
+              ],
+              "randomize": true,
+              "multipleSelect": false
+            },
+            "graded": true,
+            "version": {
+              "major": 0,
+              "minor": 0
+            }
+          }
+        }
+      },
+      "hints": [],
+      "metadata": {
+        "sourceContentId": "fct-module-12-fairness-justice-quiz",
+        "assessesContentId": "fct-module-12-fairness-justice",
+        "bloomsLevel": "remember",
+        "difficulty": "medium",
+        "estimatedTimeSeconds": 60,
+        "questionType": "core",
+        "tags": [
+          "fct"
+        ]
+      }
+    },
+    {
+      "id": "fct-module-12-fairness-justice-q3",
+      "purpose": "mastery",
+      "content": {
+        "content": "Why are 'edge cases' a justice decision?\n\n[[☃ radio 1]]",
+        "images": {},
+        "widgets": {
+          "radio 1": {
+            "type": "radio",
+            "options": {
+              "choices": [
+                {
+                  "content": "Edge cases are rare",
+                  "correct": false,
+                  "id": "fct-module-12-fairness-justice-q3-c0"
+                },
+                {
+                  "content": "Engineers cannot test them",
+                  "correct": false,
+                  "id": "fct-module-12-fairness-justice-q3-c1"
+                },
+                {
+                  "content": "Convenience for the center routinely becomes burden at the margins, and who counts as an edge case is chosen",
+                  "correct": true,
+                  "id": "fct-module-12-fairness-justice-q3-c2"
+                },
+                {
+                  "content": "They cost too much",
+                  "correct": false,
+                  "id": "fct-module-12-fairness-justice-q3-c3"
+                }
+              ],
+              "randomize": true,
+              "multipleSelect": false
+            },
+            "graded": true,
+            "version": {
+              "major": 0,
+              "minor": 0
+            }
+          }
+        }
+      },
+      "hints": [],
+      "metadata": {
+        "sourceContentId": "fct-module-12-fairness-justice-quiz",
+        "assessesContentId": "fct-module-12-fairness-justice",
+        "bloomsLevel": "analyze",
+        "difficulty": "medium",
+        "estimatedTimeSeconds": 60,
+        "questionType": "core",
+        "tags": [
+          "fct"
+        ]
+      }
+    },
+    {
+      "id": "fct-module-12-fairness-justice-q4",
+      "purpose": "mastery",
+      "content": {
+        "content": "Which design practice does Acts 10:34-35 ground?\n\n[[☃ radio 1]]",
+        "images": {},
+        "widgets": {
+          "radio 1": {
+            "type": "radio",
+            "options": {
+              "choices": [
+                {
+                  "content": "Designing for the median user",
+                  "correct": false,
+                  "id": "fct-module-12-fairness-justice-q4-c0"
+                },
+                {
+                  "content": "Edge-case-first design, testing against the users most likely to be harmed",
+                  "correct": true,
+                  "id": "fct-module-12-fairness-justice-q4-c1"
+                },
+                {
+                  "content": "Personas instead of relationships",
+                  "correct": false,
+                  "id": "fct-module-12-fairness-justice-q4-c2"
+                },
+                {
+                  "content": "Rolling out to power users first",
+                  "correct": false,
+                  "id": "fct-module-12-fairness-justice-q4-c3"
+                }
+              ],
+              "randomize": true,
+              "multipleSelect": false
+            },
+            "graded": true,
+            "version": {
+              "major": 0,
+              "minor": 0
+            }
+          }
+        }
+      },
+      "hints": [],
+      "metadata": {
+        "sourceContentId": "fct-module-12-fairness-justice-quiz",
+        "assessesContentId": "fct-module-12-fairness-justice",
+        "bloomsLevel": "apply",
+        "difficulty": "medium",
+        "estimatedTimeSeconds": 60,
+        "questionType": "core",
+        "tags": [
+          "fct"
+        ]
+      }
+    },
+    {
+      "id": "fct-module-12-fairness-justice-q5",
+      "purpose": "mastery",
+      "content": {
+        "content": "A Digital Jubilee would:\n\n[[☃ radio 1]]",
+        "images": {},
+        "widgets": {
+          "radio 1": {
+            "type": "radio",
+            "options": {
+              "choices": [
+                {
+                  "content": "Erase all online content every fifty years",
+                  "correct": false,
+                  "id": "fct-module-12-fairness-justice-q5-c0"
+                },
+                {
+                  "content": "Periodically and structurally restore access, devices, literacy and opportunity",
+                  "correct": true,
+                  "id": "fct-module-12-fairness-justice-q5-c1"
+                },
+                {
+                  "content": "Celebrate the church's anniversary online",
+                  "correct": false,
+                  "id": "fct-module-12-fairness-justice-q5-c2"
+                },
+                {
+                  "content": "Replace charity with nothing",
+                  "correct": false,
+                  "id": "fct-module-12-fairness-justice-q5-c3"
+                }
+              ],
+              "randomize": true,
+              "multipleSelect": false
+            },
+            "graded": true,
+            "version": {
+              "major": 0,
+              "minor": 0
+            }
+          }
+        }
+      },
+      "hints": [],
+      "metadata": {
+        "sourceContentId": "fct-module-12-fairness-justice-quiz",
+        "assessesContentId": "fct-module-12-fairness-justice",
+        "bloomsLevel": "understand",
+        "difficulty": "medium",
+        "estimatedTimeSeconds": 60,
+        "questionType": "core",
+        "tags": [
+          "fct"
+        ]
+      }
+    }
+  ],
+  "contentFormat": "sophia-quiz-json",
+  "sourcePath": "docs/content/fct/fct-course/content/m12.md",
+  "reach": "commons",
+  "tags": [
+    "fct",
+    "christian-technology",
+    "humane-tech",
+    "movement-4",
+    "module-12",
+    "quiz"
+  ],
+  "metadata": {
+    "category": "fct",
+    "courseId": "foundations-christian-technology",
+    "courseVersion": "review draft v2, 2026-09-16",
+    "sourceWorkbook": "fct-course",
+    "moduleNumber": 12,
+    "movement": 4,
+    "movementTitle": "Rebuilding Common Life",
+    "day": "Day 10",
+    "form": "quiz",
+    "assessmentType": "mastery",
+    "questionCount": 5
+  },
+  "relationships": [
+    {
+      "target": "fct-module-12-fairness-justice",
+      "type": "VALIDATES",
+      "role": "mastery"
+    },
+    {
+      "target": "fct-module-12-fairness-justice",
+      "type": "BELONGS_TO",
+      "role": "quiz"
+    }
+  ],
+  "createdAt": "2026-09-27T00:00:00.000Z",
+  "updatedAt": "2026-09-27T00:00:00.000Z",
+  "stewardedBy": [
+    {
+      "humanId": "human-pete-pastor",
+      "affinity": 0.7,
+      "role": "steward"
+    },
+    {
+      "humanId": "human-matthew-manager",
+      "affinity": 0.3,
+      "role": "endorser"
+    }
+  ]
+}

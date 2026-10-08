@@ -1,40 +1,54 @@
 {
   "id": "fct-module-08-centering-love-discussion",
-  "contentType": "exercise",
-  "reach": "commons",
-  "title": "Discussion: Centering Values: Love",
-  "description": "Group discussion and reflection activity",
-  "content": "**Instructions:** Reflect on your daily technology use and answer the following:\n\nIdentify three specific ways you currently use technology that may not fully align with Jesus' command to love God and neighbor.  \nHow could you practically modify or replace these practices to better embody this commandment?  \nBrainstorm a new technology, system, or lifestyle change that would help you better love God and neighbor. Be as specific and practical as possible in your proposal.\"\n\nThis three-part question now:\n\nEncourages critical self-examination of current habits  \nPrompts practical thinking about immediate changes  \nFosters creativity in imagining new, love-centered approaches to technology  \nBalances critique with constructive problem-solving  \nAllows for a range of responses, from simple habit changes to complex technological innovations  \nDirectly applies the module's concepts to personal life and potential future developments  \nBridges individual behavior with broader systemic thinking\n\nThis comprehensive approach should lead to a rich discussion that covers personal reflection, practical changes, and innovative thinking, all centered on the greatest commandment.\n\n**Activity Type:** discussion\n\n**Group Size:** small-group\n\n**Estimated Time:** 15-20 minutes\n\n",
+  "contentType": "discussion",
+  "title": "Discussion: Centering Love",
+  "description": "Discussion & Activity  A three-part personal reflection, worked alone and then shared:  1.",
+  "content": "## Discussion & Activity\n\nA three-part personal reflection, worked alone and then shared:\n\n1. **Examine.** Identify three specific ways you currently use technology that may not fully align with Jesus' command to love God and neighbor. (Common honest answers: social media use that breeds comparison and envy; streaming that displaces prayer, study, and community; shopping habits that trade others' labor conditions and creation's health for convenience and price.)\n2. **Modify.** How could you practically change or replace these practices? (Time limits with the freed hours given to face-to-face relationship; one streaming hour traded for study or service; researching ethical alternatives and buying locally even at some cost.)\n3. **Create.** Brainstorm a new technology, system, or lifestyle change that would help you better love God and neighbor — as specific and practical as possible. The point of part 3: love is not only a filter on what exists; it is a generator of what should.",
   "contentFormat": "markdown",
-  "sourcePath": "fct/v1/Module 8 - Centering Values - Part 1, Centering the greatest value, Love.md",
+  "sourcePath": "docs/content/fct/fct-course/content/m08.md",
+  "reach": "commons",
   "tags": [
-    "activity",
-    "discussion",
     "fct",
-    "values"
-  ],
-  "relatedNodeIds": [
-    "fct-module-08-centering-love"
+    "christian-technology",
+    "humane-tech",
+    "movement-3",
+    "module-8",
+    "discussion"
   ],
   "metadata": {
-    "category": "fct-activity",
-    "sourceModule": "fct-module-08-centering-love",
-    "activityType": "discussion",
-    "originalContentType": "activity"
+    "category": "fct",
+    "courseId": "foundations-christian-technology",
+    "courseVersion": "review draft v2, 2026-09-16",
+    "sourceWorkbook": "fct-course",
+    "moduleNumber": 8,
+    "movement": 3,
+    "movementTitle": "Reordering Loves",
+    "day": "Day 6",
+    "form": "discussion"
   },
+  "relationships": [
+    {
+      "target": "fct-module-08-centering-love",
+      "type": "BELONGS_TO",
+      "role": "discussion"
+    }
+  ],
   "createdAt": "2025-11-28T21:10:19.209905",
-  "updatedAt": "2025-12-24T03:05:26.196Z",
+  "updatedAt": "2026-09-27T00:00:00.000Z",
+  "stewardedBy": [
+    {
+      "humanId": "human-pete-pastor",
+      "affinity": 0.7,
+      "role": "steward"
+    },
+    {
+      "humanId": "human-matthew-manager",
+      "affinity": 0.3,
+      "role": "endorser"
+    }
+  ],
   "did": "did:web:elohim.host:content:fct:module 8 - centering values - part 1, centering the greatest value, love",
   "activityPubType": "Page",
-  "openGraphMetadata": {
-    "ogTitle": "Discussion: Centering Values: Love",
-    "ogDescription": "Group discussion and reflection activity",
-    "ogType": "website",
-    "ogUrl": "https://elohim-protocol.org/content/fct-module-08-centering-love-discussion",
-    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
-    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/activity.jpg",
-    "ogImageAlt": "Discussion: Centering Values: Love - Elohim Protocol"
-  },
   "linkedData": {
     "@context": "https://schema.org/",
     "@type": "CreativeWork",
@@ -49,17 +63,5 @@
       "@id": "https://elohim-protocol.org",
       "name": "Elohim Protocol"
     }
-  },
-  "stewardedBy": [
-    {
-      "humanId": "human-pete-pastor",
-      "affinity": 0.7,
-      "role": "steward"
-    },
-    {
-      "humanId": "human-matthew-manager",
-      "affinity": 0.3,
-      "role": "endorser"
-    }
-  ]
+  }
 }

@@ -1,0 +1,51 @@
+{
+  "id": "fct-module-14-ready-to-act-lane-ecumenical-body",
+  "contentType": "practice",
+  "title": "The ecumenical Body: Ready to Act",
+  "description": "The ecumenical Body  Convene or join Faith & Technology summits across traditions; build shared cross-denominational resource platforms; form united advocacy for ethical tech policy — data privacy, AI ethics, digital equality — as one Chris",
+  "content": "## The ecumenical Body\n\nConvene or join Faith & Technology summits across traditions; build shared cross-denominational resource platforms; form united advocacy for ethical tech policy — data privacy, AI ethics, digital equality — as one Christian voice; launch a collaborative Christian innovation lab; join interfaith tech-ethics councils; coordinate global digital-missions efforts; and run ecumenical digital-literacy programs serving underprivileged communities first. What we do well must be shared with the full Body of Christ.",
+  "contentFormat": "markdown",
+  "sourcePath": "docs/content/fct/fct-course/content/m14.md",
+  "reach": "commons",
+  "tags": [
+    "fct",
+    "christian-technology",
+    "humane-tech",
+    "movement-5",
+    "module-14",
+    "practice-lane"
+  ],
+  "metadata": {
+    "category": "fct",
+    "courseId": "foundations-christian-technology",
+    "courseVersion": "review draft v2, 2026-09-16",
+    "sourceWorkbook": "fct-course",
+    "moduleNumber": 14,
+    "movement": 5,
+    "movementTitle": "Abundant Life & Sending",
+    "day": "Day 12",
+    "form": "practice-lane",
+    "audience": "ecumenical-body"
+  },
+  "relationships": [
+    {
+      "target": "fct-module-14-ready-to-act-application",
+      "type": "BELONGS_TO",
+      "role": "lane"
+    }
+  ],
+  "createdAt": "2026-09-27T00:00:00.000Z",
+  "updatedAt": "2026-09-27T00:00:00.000Z",
+  "stewardedBy": [
+    {
+      "humanId": "human-pete-pastor",
+      "affinity": 0.7,
+      "role": "steward"
+    },
+    {
+      "humanId": "human-matthew-manager",
+      "affinity": 0.3,
+      "role": "endorser"
+    }
+  ]
+}

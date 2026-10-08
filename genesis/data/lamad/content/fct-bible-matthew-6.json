@@ -1,0 +1,21 @@
+{
+  "id": "fct-bible-matthew-6",
+  "contentType": "reference",
+  "title": "Matthew 6",
+  "description": "Scripture: Matthew 6",
+  "content": "## Matthew 6\n\nRead Matthew 6 in your own Bible, or [online](https://www.biblegateway.com/passage/?search=Matthew+6).\n",
+  "contentFormat": "markdown",
+  "reach": "commons",
+  "tags": [
+    "bible",
+    "scripture",
+    "fct"
+  ],
+  "metadata": {
+    "category": "scripture",
+    "courseId": "foundations-christian-technology",
+    "generatedBy": "fct-course/recompose.py"
+  },
+  "createdAt": "2026-09-27T00:00:00.000Z",
+  "updatedAt": "2026-09-27T00:00:00.000Z"
+}

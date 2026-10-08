@@ -1,0 +1,61 @@
+{
+  "id": "fct-module-05-respecting-human-nature-lane-tech-workers",
+  "contentType": "practice",
+  "title": "Tech workers: Our Attention is Sacred",
+  "description": "Tech workers  Build attention sanctuaries — spaces in your product that facilitate depth rather than churn.",
+  "content": "## Tech workers\n\nBuild attention sanctuaries — spaces in your product that facilitate depth rather than churn. Add cognitive-bias safeguards that help users notice their own reactivity; integrate value-alignment moments (\"is this how you meant to spend this hour?\"); implement sacred pauses in flows that currently exploit momentum. Bring your Design Guide map to Module 8 with your Module 4 wisdom-feature sketch.",
+  "contentFormat": "markdown",
+  "sourcePath": "docs/content/fct/fct-course/content/m05.md",
+  "reach": "commons",
+  "tags": [
+    "fct",
+    "christian-technology",
+    "humane-tech",
+    "movement-2",
+    "module-5",
+    "practice-lane"
+  ],
+  "metadata": {
+    "category": "fct",
+    "courseId": "foundations-christian-technology",
+    "courseVersion": "review draft v2, 2026-09-16",
+    "sourceWorkbook": "fct-course",
+    "moduleNumber": 5,
+    "movement": 2,
+    "movementTitle": "Turning — Repentance & Repair",
+    "day": "Day 3",
+    "form": "practice-lane",
+    "audience": "tech-workers"
+  },
+  "relationships": [
+    {
+      "target": "fct-module-05-respecting-human-nature-application",
+      "type": "BELONGS_TO",
+      "role": "lane"
+    },
+    {
+      "target": "fct-module-04-scaling-wisdom",
+      "type": "RELATES_TO",
+      "role": "callback"
+    },
+    {
+      "target": "fct-module-08-centering-love",
+      "type": "RELATES_TO",
+      "role": "callback"
+    }
+  ],
+  "createdAt": "2026-09-27T00:00:00.000Z",
+  "updatedAt": "2026-09-27T00:00:00.000Z",
+  "stewardedBy": [
+    {
+      "humanId": "human-pete-pastor",
+      "affinity": 0.7,
+      "role": "steward"
+    },
+    {
+      "humanId": "human-matthew-manager",
+      "affinity": 0.3,
+      "role": "endorser"
+    }
+  ]
+}

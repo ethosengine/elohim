@@ -1,0 +1,51 @@
+{
+  "id": "fct-module-13-helping-thrive-lane-tech-workers",
+  "contentType": "practice",
+  "title": "Tech workers: Helping People Thrive",
+  "description": "Tech workers  Adopt regret as a metric: instrument one honest signal of whether users are glad, a week later, for the time they gave you.",
+  "content": "## Tech workers\n\nAdopt regret as a metric: instrument one honest signal of whether users are glad, a week later, for the time they gave you. Design one feature *for the off-screen life* — something whose success is measured by what happens away from the product. Then grade your product against the ten Christian design principles and pick the weakest to improve.",
+  "contentFormat": "markdown",
+  "sourcePath": "docs/content/fct/fct-course/content/m13.md",
+  "reach": "commons",
+  "tags": [
+    "fct",
+    "christian-technology",
+    "humane-tech",
+    "movement-5",
+    "module-13",
+    "practice-lane"
+  ],
+  "metadata": {
+    "category": "fct",
+    "courseId": "foundations-christian-technology",
+    "courseVersion": "review draft v2, 2026-09-16",
+    "sourceWorkbook": "fct-course",
+    "moduleNumber": 13,
+    "movement": 5,
+    "movementTitle": "Abundant Life & Sending",
+    "day": "Day 11",
+    "form": "practice-lane",
+    "audience": "tech-workers"
+  },
+  "relationships": [
+    {
+      "target": "fct-module-13-helping-thrive-application",
+      "type": "BELONGS_TO",
+      "role": "lane"
+    }
+  ],
+  "createdAt": "2026-09-27T00:00:00.000Z",
+  "updatedAt": "2026-09-27T00:00:00.000Z",
+  "stewardedBy": [
+    {
+      "humanId": "human-pete-pastor",
+      "affinity": 0.7,
+      "role": "steward"
+    },
+    {
+      "humanId": "human-matthew-manager",
+      "affinity": 0.3,
+      "role": "endorser"
+    }
+  ]
+}

@@ -1,0 +1,101 @@
+{
+  "id": "fct-module-06-harmful-consequences-reflection",
+  "contentType": "assessment",
+  "title": "The whole receipt",
+  "description": "Pick one routine — a product you ship, a ministry you run, a household habit. Write the second receipt: who pays what never appears in your accounting? One line per party. Do not propose a fix yet; this is the counting week.",
+  "content": [
+    {
+      "id": "fct-module-06-harmful-consequences-reflection",
+      "purpose": "reflection",
+      "content": {
+        "content": "[[☃ free-response 1]]",
+        "images": {},
+        "widgets": {
+          "free-response 1": {
+            "type": "free-response",
+            "options": {
+              "allowUnlimitedCharacters": false,
+              "characterLimit": 1500,
+              "placeholder": "The moderator pays... the neighborhood pays... the smaller congregation pays...",
+              "question": "Pick one routine — a product you ship, a ministry you run, a household habit. Write the second receipt: who pays what never appears in your accounting? One line per party. Do not propose a fix yet; this is the counting week.",
+              "scoringCriteria": [
+                {
+                  "text": "Names at least two parties outside the transaction"
+                },
+                {
+                  "text": "Names the cost each one pays"
+                }
+              ]
+            },
+            "graded": false,
+            "version": {
+              "major": 0,
+              "minor": 0
+            }
+          }
+        }
+      },
+      "metadata": {
+        "sourceContentId": "fct-module-06-harmful-consequences-reflection",
+        "assessesContentId": "fct-module-06-harmful-consequences",
+        "bloomsLevel": "evaluate",
+        "estimatedTimeSeconds": 600,
+        "questionType": "open-response",
+        "tags": [
+          "fct",
+          "reflection"
+        ]
+      }
+    }
+  ],
+  "contentFormat": "sophia-quiz-json",
+  "sourcePath": "docs/content/fct/fct-course/content/m06.md",
+  "reach": "commons",
+  "tags": [
+    "fct",
+    "christian-technology",
+    "humane-tech",
+    "movement-2",
+    "module-6",
+    "reflection"
+  ],
+  "metadata": {
+    "category": "fct",
+    "courseId": "foundations-christian-technology",
+    "courseVersion": "review draft v2, 2026-09-16",
+    "sourceWorkbook": "fct-course",
+    "moduleNumber": 6,
+    "movement": 2,
+    "movementTitle": "Turning — Repentance & Repair",
+    "day": "Day 4",
+    "form": "reflection",
+    "assessmentType": "reflection",
+    "questionCount": 1
+  },
+  "relationships": [
+    {
+      "target": "fct-module-06-harmful-consequences",
+      "type": "VALIDATES",
+      "role": "reflection"
+    },
+    {
+      "target": "fct-module-06-harmful-consequences",
+      "type": "BELONGS_TO",
+      "role": "reflection"
+    }
+  ],
+  "createdAt": "2026-09-27T00:00:00.000Z",
+  "updatedAt": "2026-09-27T00:00:00.000Z",
+  "stewardedBy": [
+    {
+      "humanId": "human-pete-pastor",
+      "affinity": 0.7,
+      "role": "steward"
+    },
+    {
+      "humanId": "human-matthew-manager",
+      "affinity": 0.3,
+      "role": "endorser"
+    }
+  ]
+}

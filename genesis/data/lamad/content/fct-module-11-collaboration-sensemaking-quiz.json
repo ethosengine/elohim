@@ -1,0 +1,344 @@
+{
+  "id": "fct-module-11-collaboration-sensemaking-quiz",
+  "contentType": "assessment",
+  "title": "Check your understanding: Collaboration & Sensemaking",
+  "description": "Mastery check for Module 11, drawn from its learning objectives.",
+  "content": [
+    {
+      "id": "fct-module-11-collaboration-sensemaking-q1",
+      "purpose": "mastery",
+      "content": {
+        "content": "What is the three-part repair?\n\n[[☃ radio 1]]",
+        "images": {},
+        "widgets": {
+          "radio 1": {
+            "type": "radio",
+            "options": {
+              "choices": [
+                {
+                  "content": "Delete, block, report",
+                  "correct": false,
+                  "id": "fct-module-11-collaboration-sensemaking-q1-c0"
+                },
+                {
+                  "content": "Curtail the causes, address the ongoing crises, heal toxic habits",
+                  "correct": true,
+                  "id": "fct-module-11-collaboration-sensemaking-q1-c1"
+                },
+                {
+                  "content": "Pray, preach, publish",
+                  "correct": false,
+                  "id": "fct-module-11-collaboration-sensemaking-q1-c2"
+                },
+                {
+                  "content": "Regulate, litigate, legislate",
+                  "correct": false,
+                  "id": "fct-module-11-collaboration-sensemaking-q1-c3"
+                }
+              ],
+              "randomize": true,
+              "multipleSelect": false
+            },
+            "graded": true,
+            "version": {
+              "major": 0,
+              "minor": 0
+            }
+          }
+        }
+      },
+      "hints": [],
+      "metadata": {
+        "sourceContentId": "fct-module-11-collaboration-sensemaking-quiz",
+        "assessesContentId": "fct-module-11-collaboration-sensemaking",
+        "bloomsLevel": "remember",
+        "difficulty": "medium",
+        "estimatedTimeSeconds": 60,
+        "questionType": "core",
+        "tags": [
+          "fct"
+        ]
+      }
+    },
+    {
+      "id": "fct-module-11-collaboration-sensemaking-q2",
+      "purpose": "mastery",
+      "content": {
+        "content": "In John 17:20-23, what is unity for?\n\n[[☃ radio 1]]",
+        "images": {},
+        "widgets": {
+          "radio 1": {
+            "type": "radio",
+            "options": {
+              "choices": [
+                {
+                  "content": "Administrative efficiency",
+                  "correct": false,
+                  "id": "fct-module-11-collaboration-sensemaking-q2-c0"
+                },
+                {
+                  "content": "The world's believing: it is the church's evidential infrastructure",
+                  "correct": true,
+                  "id": "fct-module-11-collaboration-sensemaking-q2-c1"
+                },
+                {
+                  "content": "Avoiding conflict",
+                  "correct": false,
+                  "id": "fct-module-11-collaboration-sensemaking-q2-c2"
+                },
+                {
+                  "content": "Doctrinal uniformity",
+                  "correct": false,
+                  "id": "fct-module-11-collaboration-sensemaking-q2-c3"
+                }
+              ],
+              "randomize": true,
+              "multipleSelect": false
+            },
+            "graded": true,
+            "version": {
+              "major": 0,
+              "minor": 0
+            }
+          }
+        }
+      },
+      "hints": [],
+      "metadata": {
+        "sourceContentId": "fct-module-11-collaboration-sensemaking-quiz",
+        "assessesContentId": "fct-module-11-collaboration-sensemaking",
+        "bloomsLevel": "understand",
+        "difficulty": "medium",
+        "estimatedTimeSeconds": 60,
+        "questionType": "core",
+        "tags": [
+          "fct"
+        ]
+      }
+    },
+    {
+      "id": "fct-module-11-collaboration-sensemaking-q3",
+      "purpose": "mastery",
+      "content": {
+        "content": "The word behind 'perfectly united' in 1 Corinthians 1:10 pictures:\n\n[[☃ radio 1]]",
+        "images": {},
+        "widgets": {
+          "radio 1": {
+            "type": "radio",
+            "options": {
+              "choices": [
+                {
+                  "content": "Forging a sword",
+                  "correct": false,
+                  "id": "fct-module-11-collaboration-sensemaking-q3-c0"
+                },
+                {
+                  "content": "Mending torn fishing nets",
+                  "correct": true,
+                  "id": "fct-module-11-collaboration-sensemaking-q3-c1"
+                },
+                {
+                  "content": "Building a wall",
+                  "correct": false,
+                  "id": "fct-module-11-collaboration-sensemaking-q3-c2"
+                },
+                {
+                  "content": "Planting a vineyard",
+                  "correct": false,
+                  "id": "fct-module-11-collaboration-sensemaking-q3-c3"
+                }
+              ],
+              "randomize": true,
+              "multipleSelect": false
+            },
+            "graded": true,
+            "version": {
+              "major": 0,
+              "minor": 0
+            }
+          }
+        }
+      },
+      "hints": [
+        {
+          "content": "Matthew uses the same word for James and John repairing nets with their father.",
+          "images": {},
+          "widgets": {}
+        }
+      ],
+      "metadata": {
+        "sourceContentId": "fct-module-11-collaboration-sensemaking-quiz",
+        "assessesContentId": "fct-module-11-collaboration-sensemaking",
+        "bloomsLevel": "remember",
+        "difficulty": "medium",
+        "estimatedTimeSeconds": 60,
+        "questionType": "core",
+        "tags": [
+          "fct"
+        ]
+      }
+    },
+    {
+      "id": "fct-module-11-collaboration-sensemaking-q4",
+      "purpose": "mastery",
+      "content": {
+        "content": "What is the perception gap?\n\n[[☃ radio 1]]",
+        "images": {},
+        "widgets": {
+          "radio 1": {
+            "type": "radio",
+            "options": {
+              "choices": [
+                {
+                  "content": "The distance between screen and eye",
+                  "correct": false,
+                  "id": "fct-module-11-collaboration-sensemaking-q4-c0"
+                },
+                {
+                  "content": "Partisans dramatically misestimate what the other side actually believes",
+                  "correct": true,
+                  "id": "fct-module-11-collaboration-sensemaking-q4-c1"
+                },
+                {
+                  "content": "A gap in broadband coverage",
+                  "correct": false,
+                  "id": "fct-module-11-collaboration-sensemaking-q4-c2"
+                },
+                {
+                  "content": "The difference between stated and demonstrated values",
+                  "correct": false,
+                  "id": "fct-module-11-collaboration-sensemaking-q4-c3"
+                }
+              ],
+              "randomize": true,
+              "multipleSelect": false
+            },
+            "graded": true,
+            "version": {
+              "major": 0,
+              "minor": 0
+            }
+          }
+        }
+      },
+      "hints": [],
+      "metadata": {
+        "sourceContentId": "fct-module-11-collaboration-sensemaking-quiz",
+        "assessesContentId": "fct-module-11-collaboration-sensemaking",
+        "bloomsLevel": "understand",
+        "difficulty": "medium",
+        "estimatedTimeSeconds": 60,
+        "questionType": "core",
+        "tags": [
+          "fct"
+        ]
+      }
+    },
+    {
+      "id": "fct-module-11-collaboration-sensemaking-q5",
+      "purpose": "mastery",
+      "content": {
+        "content": "Trustville compounds a ___ while Skeptica pays a ___.\n\n[[☃ radio 1]]",
+        "images": {},
+        "widgets": {
+          "radio 1": {
+            "type": "radio",
+            "options": {
+              "choices": [
+                {
+                  "content": "surplus; deficit",
+                  "correct": false,
+                  "id": "fct-module-11-collaboration-sensemaking-q5-c0"
+                },
+                {
+                  "content": "trust dividend; suspicion tax",
+                  "correct": true,
+                  "id": "fct-module-11-collaboration-sensemaking-q5-c1"
+                },
+                {
+                  "content": "harvest; famine",
+                  "correct": false,
+                  "id": "fct-module-11-collaboration-sensemaking-q5-c2"
+                },
+                {
+                  "content": "budget; debt",
+                  "correct": false,
+                  "id": "fct-module-11-collaboration-sensemaking-q5-c3"
+                }
+              ],
+              "randomize": true,
+              "multipleSelect": false
+            },
+            "graded": true,
+            "version": {
+              "major": 0,
+              "minor": 0
+            }
+          }
+        }
+      },
+      "hints": [],
+      "metadata": {
+        "sourceContentId": "fct-module-11-collaboration-sensemaking-quiz",
+        "assessesContentId": "fct-module-11-collaboration-sensemaking",
+        "bloomsLevel": "remember",
+        "difficulty": "medium",
+        "estimatedTimeSeconds": 60,
+        "questionType": "core",
+        "tags": [
+          "fct"
+        ]
+      }
+    }
+  ],
+  "contentFormat": "sophia-quiz-json",
+  "sourcePath": "docs/content/fct/fct-course/content/m11.md",
+  "reach": "commons",
+  "tags": [
+    "fct",
+    "christian-technology",
+    "humane-tech",
+    "movement-4",
+    "module-11",
+    "quiz"
+  ],
+  "metadata": {
+    "category": "fct",
+    "courseId": "foundations-christian-technology",
+    "courseVersion": "review draft v2, 2026-09-16",
+    "sourceWorkbook": "fct-course",
+    "moduleNumber": 11,
+    "movement": 4,
+    "movementTitle": "Rebuilding Common Life",
+    "day": "Day 9",
+    "form": "quiz",
+    "assessmentType": "mastery",
+    "questionCount": 5
+  },
+  "relationships": [
+    {
+      "target": "fct-module-11-collaboration-sensemaking",
+      "type": "VALIDATES",
+      "role": "mastery"
+    },
+    {
+      "target": "fct-module-11-collaboration-sensemaking",
+      "type": "BELONGS_TO",
+      "role": "quiz"
+    }
+  ],
+  "createdAt": "2026-09-27T00:00:00.000Z",
+  "updatedAt": "2026-09-27T00:00:00.000Z",
+  "stewardedBy": [
+    {
+      "humanId": "human-pete-pastor",
+      "affinity": 0.7,
+      "role": "steward"
+    },
+    {
+      "humanId": "human-matthew-manager",
+      "affinity": 0.3,
+      "role": "endorser"
+    }
+  ]
+}

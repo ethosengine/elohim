@@ -1,0 +1,51 @@
+{
+  "id": "fct-module-09-fruits-of-spirit-lane-households",
+  "contentType": "practice",
+  "title": "Households: Fruit as Metric",
+  "description": "Households  Institute a monthly family fruit check-in: each person names where they saw the fruits growing at home and where the household's systems (schedules, screens, spending) worked against them.",
+  "content": "## Households\n\nInstitute a monthly family fruit check-in: each person names where they saw the fruits growing at home and where the household's systems (schedules, screens, spending) worked against them. Adjust one system, not one person.",
+  "contentFormat": "markdown",
+  "sourcePath": "docs/content/fct/fct-course/content/m09.md",
+  "reach": "commons",
+  "tags": [
+    "fct",
+    "christian-technology",
+    "humane-tech",
+    "movement-3",
+    "module-9",
+    "practice-lane"
+  ],
+  "metadata": {
+    "category": "fct",
+    "courseId": "foundations-christian-technology",
+    "courseVersion": "review draft v2, 2026-09-16",
+    "sourceWorkbook": "fct-course",
+    "moduleNumber": 9,
+    "movement": 3,
+    "movementTitle": "Reordering Loves",
+    "day": "Day 7",
+    "form": "practice-lane",
+    "audience": "households"
+  },
+  "relationships": [
+    {
+      "target": "fct-module-09-fruits-of-spirit-application",
+      "type": "BELONGS_TO",
+      "role": "lane"
+    }
+  ],
+  "createdAt": "2026-09-27T00:00:00.000Z",
+  "updatedAt": "2026-09-27T00:00:00.000Z",
+  "stewardedBy": [
+    {
+      "humanId": "human-pete-pastor",
+      "affinity": 0.7,
+      "role": "steward"
+    },
+    {
+      "humanId": "human-matthew-manager",
+      "affinity": 0.3,
+      "role": "endorser"
+    }
+  ]
+}

@@ -1,0 +1,338 @@
+{
+  "id": "fct-module-14-ready-to-act-quiz",
+  "contentType": "assessment",
+  "title": "Check your understanding: Ready to Act",
+  "description": "Mastery check for Module 14, drawn from its learning objectives.",
+  "content": [
+    {
+      "id": "fct-module-14-ready-to-act-q1",
+      "purpose": "mastery",
+      "content": {
+        "content": "Salt and light are two modes of witness. Which is which?\n\n[[☃ radio 1]]",
+        "images": {},
+        "widgets": {
+          "radio 1": {
+            "type": "radio",
+            "options": {
+              "choices": [
+                {
+                  "content": "Preaching and singing",
+                  "correct": false,
+                  "id": "fct-module-14-ready-to-act-q1-c0"
+                },
+                {
+                  "content": "Salt works dissolved and hidden from inside; light is visible and raised as a common life",
+                  "correct": true,
+                  "id": "fct-module-14-ready-to-act-q1-c1"
+                },
+                {
+                  "content": "Giving and fasting",
+                  "correct": false,
+                  "id": "fct-module-14-ready-to-act-q1-c2"
+                },
+                {
+                  "content": "Online and offline",
+                  "correct": false,
+                  "id": "fct-module-14-ready-to-act-q1-c3"
+                }
+              ],
+              "randomize": true,
+              "multipleSelect": false
+            },
+            "graded": true,
+            "version": {
+              "major": 0,
+              "minor": 0
+            }
+          }
+        }
+      },
+      "hints": [],
+      "metadata": {
+        "sourceContentId": "fct-module-14-ready-to-act-quiz",
+        "assessesContentId": "fct-module-14-ready-to-act",
+        "bloomsLevel": "understand",
+        "difficulty": "medium",
+        "estimatedTimeSeconds": 60,
+        "questionType": "core",
+        "tags": [
+          "fct"
+        ]
+      }
+    },
+    {
+      "id": "fct-module-14-ready-to-act-q2",
+      "purpose": "mastery",
+      "content": {
+        "content": "In Matthew 25:14-30, which servant is condemned?\n\n[[☃ radio 1]]",
+        "images": {},
+        "widgets": {
+          "radio 1": {
+            "type": "radio",
+            "options": {
+              "choices": [
+                {
+                  "content": "The one who lost money trading",
+                  "correct": false,
+                  "id": "fct-module-14-ready-to-act-q2-c0"
+                },
+                {
+                  "content": "The one who buried the talent out of fear",
+                  "correct": true,
+                  "id": "fct-module-14-ready-to-act-q2-c1"
+                },
+                {
+                  "content": "The one who gained the most",
+                  "correct": false,
+                  "id": "fct-module-14-ready-to-act-q2-c2"
+                },
+                {
+                  "content": "The master",
+                  "correct": false,
+                  "id": "fct-module-14-ready-to-act-q2-c3"
+                }
+              ],
+              "randomize": true,
+              "multipleSelect": false
+            },
+            "graded": true,
+            "version": {
+              "major": 0,
+              "minor": 0
+            }
+          }
+        }
+      },
+      "hints": [],
+      "metadata": {
+        "sourceContentId": "fct-module-14-ready-to-act-quiz",
+        "assessesContentId": "fct-module-14-ready-to-act",
+        "bloomsLevel": "remember",
+        "difficulty": "medium",
+        "estimatedTimeSeconds": 60,
+        "questionType": "core",
+        "tags": [
+          "fct"
+        ]
+      }
+    },
+    {
+      "id": "fct-module-14-ready-to-act-q3",
+      "purpose": "mastery",
+      "content": {
+        "content": "What are the four culture-change steps?\n\n[[☃ radio 1]]",
+        "images": {},
+        "widgets": {
+          "radio 1": {
+            "type": "radio",
+            "options": {
+              "choices": [
+                {
+                  "content": "Protest, boycott, petition, vote",
+                  "correct": false,
+                  "id": "fct-module-14-ready-to-act-q3-c0"
+                },
+                {
+                  "content": "Tell your story, find collaborators, achieve small wins, champion a new definition of success",
+                  "correct": true,
+                  "id": "fct-module-14-ready-to-act-q3-c1"
+                },
+                {
+                  "content": "Plan, build, test, ship",
+                  "correct": false,
+                  "id": "fct-module-14-ready-to-act-q3-c2"
+                },
+                {
+                  "content": "Pray, fast, give, serve",
+                  "correct": false,
+                  "id": "fct-module-14-ready-to-act-q3-c3"
+                }
+              ],
+              "randomize": true,
+              "multipleSelect": false
+            },
+            "graded": true,
+            "version": {
+              "major": 0,
+              "minor": 0
+            }
+          }
+        }
+      },
+      "hints": [],
+      "metadata": {
+        "sourceContentId": "fct-module-14-ready-to-act-quiz",
+        "assessesContentId": "fct-module-14-ready-to-act",
+        "bloomsLevel": "remember",
+        "difficulty": "medium",
+        "estimatedTimeSeconds": 60,
+        "questionType": "core",
+        "tags": [
+          "fct"
+        ]
+      }
+    },
+    {
+      "id": "fct-module-14-ready-to-act-q4",
+      "purpose": "mastery",
+      "content": {
+        "content": "What deployment pattern does Acts 1:8 give digital disciples?\n\n[[☃ radio 1]]",
+        "images": {},
+        "widgets": {
+          "radio 1": {
+            "type": "radio",
+            "options": {
+              "choices": [
+                {
+                  "content": "One global launch",
+                  "correct": false,
+                  "id": "fct-module-14-ready-to-act-q4-c0"
+                },
+                {
+                  "content": "Witness in expanding circles: congregation, neighborhood, industry, world",
+                  "correct": true,
+                  "id": "fct-module-14-ready-to-act-q4-c1"
+                },
+                {
+                  "content": "Retreat to Jerusalem",
+                  "correct": false,
+                  "id": "fct-module-14-ready-to-act-q4-c2"
+                },
+                {
+                  "content": "Industry first, church last",
+                  "correct": false,
+                  "id": "fct-module-14-ready-to-act-q4-c3"
+                }
+              ],
+              "randomize": true,
+              "multipleSelect": false
+            },
+            "graded": true,
+            "version": {
+              "major": 0,
+              "minor": 0
+            }
+          }
+        }
+      },
+      "hints": [],
+      "metadata": {
+        "sourceContentId": "fct-module-14-ready-to-act-quiz",
+        "assessesContentId": "fct-module-14-ready-to-act",
+        "bloomsLevel": "apply",
+        "difficulty": "medium",
+        "estimatedTimeSeconds": 60,
+        "questionType": "core",
+        "tags": [
+          "fct"
+        ]
+      }
+    },
+    {
+      "id": "fct-module-14-ready-to-act-q5",
+      "purpose": "mastery",
+      "content": {
+        "content": "What does the redwood image teach?\n\n[[☃ radio 1]]",
+        "images": {},
+        "widgets": {
+          "radio 1": {
+            "type": "radio",
+            "options": {
+              "choices": [
+                {
+                  "content": "Wait for perfect conditions",
+                  "correct": false,
+                  "id": "fct-module-14-ready-to-act-q5-c0"
+                },
+                {
+                  "content": "Seeds germinate after fire: plant small wins now so growth is ready when a crisis opens the canopy",
+                  "correct": true,
+                  "id": "fct-module-14-ready-to-act-q5-c1"
+                },
+                {
+                  "content": "Fire is always destructive",
+                  "correct": false,
+                  "id": "fct-module-14-ready-to-act-q5-c2"
+                },
+                {
+                  "content": "Only old trees matter",
+                  "correct": false,
+                  "id": "fct-module-14-ready-to-act-q5-c3"
+                }
+              ],
+              "randomize": true,
+              "multipleSelect": false
+            },
+            "graded": true,
+            "version": {
+              "major": 0,
+              "minor": 0
+            }
+          }
+        }
+      },
+      "hints": [],
+      "metadata": {
+        "sourceContentId": "fct-module-14-ready-to-act-quiz",
+        "assessesContentId": "fct-module-14-ready-to-act",
+        "bloomsLevel": "understand",
+        "difficulty": "medium",
+        "estimatedTimeSeconds": 60,
+        "questionType": "core",
+        "tags": [
+          "fct"
+        ]
+      }
+    }
+  ],
+  "contentFormat": "sophia-quiz-json",
+  "sourcePath": "docs/content/fct/fct-course/content/m14.md",
+  "reach": "commons",
+  "tags": [
+    "fct",
+    "christian-technology",
+    "humane-tech",
+    "movement-5",
+    "module-14",
+    "quiz"
+  ],
+  "metadata": {
+    "category": "fct",
+    "courseId": "foundations-christian-technology",
+    "courseVersion": "review draft v2, 2026-09-16",
+    "sourceWorkbook": "fct-course",
+    "moduleNumber": 14,
+    "movement": 5,
+    "movementTitle": "Abundant Life & Sending",
+    "day": "Day 12",
+    "form": "quiz",
+    "assessmentType": "mastery",
+    "questionCount": 5
+  },
+  "relationships": [
+    {
+      "target": "fct-module-14-ready-to-act",
+      "type": "VALIDATES",
+      "role": "mastery"
+    },
+    {
+      "target": "fct-module-14-ready-to-act",
+      "type": "BELONGS_TO",
+      "role": "quiz"
+    }
+  ],
+  "createdAt": "2026-09-27T00:00:00.000Z",
+  "updatedAt": "2026-09-27T00:00:00.000Z",
+  "stewardedBy": [
+    {
+      "humanId": "human-pete-pastor",
+      "affinity": 0.7,
+      "role": "steward"
+    },
+    {
+      "humanId": "human-matthew-manager",
+      "affinity": 0.3,
+      "role": "endorser"
+    }
+  ]
+}

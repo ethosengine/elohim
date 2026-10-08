@@ -1,0 +1,24 @@
+# Module 15 — Digital Discipleship Retrospective. Deliberately no mastery check: the
+# session is consecration, not content. The two reflections are the covenant.
+quiz:
+reflections:
+  - id: three-commitments
+    title: "Three commitments"
+    prompt: "Refine yesterday's plan into three covenanted actions: one immediate change in your personal tech habits; one initiative to start or join in your church or community; one way to advocate for Christ-centered approaches in your professional or public life."
+    placeholder: "Personally I will... In my church I will... In my work I will..."
+    characterLimit: 2000
+    criteria:
+      - "Three commitments, one per sphere"
+      - "Each is concrete enough to check at the follow-up gathering"
+    bloom: create
+    time: "20 minutes"
+  - id: manifesto-line
+    title: "Your line of the manifesto"
+    prompt: "Write one sentence for the cohort's Digital Discipleship Manifesto — a commitment to steward technology in a way that honors God and serves humanity. This is your group's song of witness, written down and kept."
+    placeholder: "We will..."
+    characterLimit: 400
+    criteria:
+      - "One sentence"
+      - "A commitment, not an observation"
+    bloom: create
+    time: "10 minutes"

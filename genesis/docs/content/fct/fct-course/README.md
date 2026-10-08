@@ -32,8 +32,8 @@ then open `site/index.html` in a browser, or host the `site/` folder as-is.
                              course home so the site carries its own source
     build.py                 regenerates site/ from content/ (and the .docx)
     recompose.py             regenerates the platform's content nodes and course
-                             path from content/; by default only Movement I,
-                             `--modules 1-15` for all (see "Recomposing into content nodes")
+                             path from content/ — the whole course by default
+                             (see "Recomposing into content nodes")
     recompose/mNN.yaml       per-module assessment questions and simulation labs
                              that the markdown does not carry
     README.md                this file
@@ -139,24 +139,27 @@ named `fct-module-*` were first generated from that v1 text.
 `recompose.py` regenerates them from this v2 source: for each module it
 writes a lesson, its story, discussion, practice lanes, homework and
 assessments as separate linked content nodes, and rewrites the course path
-as five movements. A module not yet recomposed keeps its v1 lesson on the
-path. `python3 recompose.py --check` says whether the committed nodes match
-this directory; the path's `metadata.recomposedModules` lists which modules
-are v2.
+as five movements. All fifteen modules are recomposed; the path's
+`metadata.recomposedModules` records that. `python3 recompose.py --check`
+says whether the committed nodes match this directory.
 
 ## Recomposing into content nodes
 
 Needs Python 3 and PyYAML (`pip install pyyaml`); it does not need the
-platform running. With no arguments it recomposes Movement I only, the slice
-recomposed and reviewed so far; name modules to go further.
+platform running. With no arguments it recomposes the whole course; name
+modules to regenerate a slice.
 
-    python3 recompose.py                  # Movement I (modules 1-4)
-    python3 recompose.py --modules 1-15   # the whole course
+    python3 recompose.py                  # the whole course (modules 1-15)
+    python3 recompose.py --modules 1-4    # Movement I only
     python3 recompose.py --check          # exit 1 if any output is stale
 
 The markdown here stays the source of truth. What the prose cannot say, a
 module's assessment questions and the simulations it points to, lives in
-`recompose/mNN.yaml`. Everything else is read from the markdown: the anchor
+`recompose/mNN.yaml` — one per module (Module 15 declares `quiz:` empty on
+purpose: the retrospective is consecration, not content, so it carries only
+its two covenant reflections). The two simulation labs the course threads
+through — Module 4's Evolution of Trust and Module 6's Parable of the
+Polygons — are named there and stand as their own steps on the path. Everything else is read from the markdown: the anchor
 and supporting scripture from the module's first lines, the three practice
 lanes from the Application bullets, and callbacks from every "Module N"
 mention. Existing curated scripture nodes (with verse text) are inputs and

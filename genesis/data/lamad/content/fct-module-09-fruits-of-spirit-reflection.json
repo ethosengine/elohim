@@ -1,0 +1,101 @@
+{
+  "id": "fct-module-09-fruits-of-spirit-reflection",
+  "contentType": "assessment",
+  "title": "Three fruits, three indicators",
+  "description": "Pick three fruits of the Spirit. For each, draft one honest indicator your congregation (or product, or household) could watch instead of attendance, engagement or budget.",
+  "content": [
+    {
+      "id": "fct-module-09-fruits-of-spirit-reflection",
+      "purpose": "reflection",
+      "content": {
+        "content": "[[☃ free-response 1]]",
+        "images": {},
+        "widgets": {
+          "free-response 1": {
+            "type": "free-response",
+            "options": {
+              "allowUnlimitedCharacters": false,
+              "characterLimit": 1500,
+              "placeholder": "Peace — we would watch... Patience — we would watch...",
+              "question": "Pick three fruits of the Spirit. For each, draft one honest indicator your congregation (or product, or household) could watch instead of attendance, engagement or budget.",
+              "scoringCriteria": [
+                {
+                  "text": "Names three fruits"
+                },
+                {
+                  "text": "Gives an observable indicator for each"
+                }
+              ]
+            },
+            "graded": false,
+            "version": {
+              "major": 0,
+              "minor": 0
+            }
+          }
+        }
+      },
+      "metadata": {
+        "sourceContentId": "fct-module-09-fruits-of-spirit-reflection",
+        "assessesContentId": "fct-module-09-fruits-of-spirit",
+        "bloomsLevel": "create",
+        "estimatedTimeSeconds": 600,
+        "questionType": "open-response",
+        "tags": [
+          "fct",
+          "reflection"
+        ]
+      }
+    }
+  ],
+  "contentFormat": "sophia-quiz-json",
+  "sourcePath": "docs/content/fct/fct-course/content/m09.md",
+  "reach": "commons",
+  "tags": [
+    "fct",
+    "christian-technology",
+    "humane-tech",
+    "movement-3",
+    "module-9",
+    "reflection"
+  ],
+  "metadata": {
+    "category": "fct",
+    "courseId": "foundations-christian-technology",
+    "courseVersion": "review draft v2, 2026-09-16",
+    "sourceWorkbook": "fct-course",
+    "moduleNumber": 9,
+    "movement": 3,
+    "movementTitle": "Reordering Loves",
+    "day": "Day 7",
+    "form": "reflection",
+    "assessmentType": "reflection",
+    "questionCount": 1
+  },
+  "relationships": [
+    {
+      "target": "fct-module-09-fruits-of-spirit",
+      "type": "VALIDATES",
+      "role": "reflection"
+    },
+    {
+      "target": "fct-module-09-fruits-of-spirit",
+      "type": "BELONGS_TO",
+      "role": "reflection"
+    }
+  ],
+  "createdAt": "2026-09-27T00:00:00.000Z",
+  "updatedAt": "2026-09-27T00:00:00.000Z",
+  "stewardedBy": [
+    {
+      "humanId": "human-pete-pastor",
+      "affinity": 0.7,
+      "role": "steward"
+    },
+    {
+      "humanId": "human-matthew-manager",
+      "affinity": 0.3,
+      "role": "endorser"
+    }
+  ]
+}

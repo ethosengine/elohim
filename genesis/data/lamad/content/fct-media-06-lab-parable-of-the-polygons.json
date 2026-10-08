@@ -1,0 +1,24 @@
+{
+  "id": "fct-media-06-lab-parable-of-the-polygons",
+  "contentType": "reference",
+  "title": "Parable of the Polygons",
+  "description": "Nicky Case and Vi Hart's playable post on the shape of society: how a small individual preference for neighbors like yourself compounds into a segregated system, and why it does not undo itself when the bias stops.",
+  "content": "## Parable of the Polygons\n\nA playable post on the shape of society, by Vi Hart and Nicky Case.\n\n[Play it at ncase.me/polygons](https://ncase.me/polygons/) — about twenty minutes.\n\nThe course draws three lessons from it (Module 7 opens with them):\n\n1. **Small individual bias produces large collective bias.** Naming a culture's failure is not an attack on its individuals.\n2. **The past haunts the present.** A floor does not stop being dirty because you stopped dropping food; creating equity is ongoing work.\n3. **Demand diversity near you.** If everyone around you is a triangle, you are missing some amazing squares — and that is unfair to everyone.\n\nPair it with Module 4's lab, *The Evolution of Trust*, by the same author: they are two halves of one lesson about how the rules of a game shape its players.\n",
+  "contentFormat": "markdown",
+  "url": "https://ncase.me/polygons/",
+  "sourcePath": "docs/content/fct/fct-course/content/m06.md",
+  "reach": "commons",
+  "tags": ["fct", "christian-technology", "humane-tech", "simulation", "interactive", "explorable-explanation", "lab", "module-6"],
+  "metadata": {
+    "category": "interactive-simulation",
+    "courseId": "foundations-christian-technology",
+    "author": "Vi Hart and Nicky Case",
+    "sourceUrl": "https://ncase.me/polygons/",
+    "license": "CC0 Public Domain",
+    "mediaType": "simulation",
+    "year": "2014"
+  },
+  "relatedNodeIds": ["fct-module-06-harmful-consequences", "fct-module-07-regeneration", "evolution-of-trust"],
+  "createdAt": "2026-10-08T00:00:00.000Z",
+  "updatedAt": "2026-10-08T00:00:00.000Z"
+}

@@ -1,0 +1,51 @@
+{
+  "id": "fct-module-12-fairness-justice-lane-tech-workers",
+  "contentType": "practice",
+  "title": "Tech workers: Fairness & Justice",
+  "description": "Tech workers  Practice redemption engineering: pick one algorithmic system in your reach and trace where it inherits bias — training data, proxies, edge-case handling — then design the correction, testing against the users most likely to be",
+  "content": "## Tech workers\n\nPractice redemption engineering: pick one algorithmic system in your reach and trace where it inherits bias — training data, proxies, edge-case handling — then design the correction, testing against the users most likely to be harmed first (Acts 10:34 as QA policy). Build real relationships with vulnerable users rather than personas of them. If you manage by dashboard, audit what your algorithmic management does to workers' agency and dignity.",
+  "contentFormat": "markdown",
+  "sourcePath": "docs/content/fct/fct-course/content/m12.md",
+  "reach": "commons",
+  "tags": [
+    "fct",
+    "christian-technology",
+    "humane-tech",
+    "movement-4",
+    "module-12",
+    "practice-lane"
+  ],
+  "metadata": {
+    "category": "fct",
+    "courseId": "foundations-christian-technology",
+    "courseVersion": "review draft v2, 2026-09-16",
+    "sourceWorkbook": "fct-course",
+    "moduleNumber": 12,
+    "movement": 4,
+    "movementTitle": "Rebuilding Common Life",
+    "day": "Day 10",
+    "form": "practice-lane",
+    "audience": "tech-workers"
+  },
+  "relationships": [
+    {
+      "target": "fct-module-12-fairness-justice-application",
+      "type": "BELONGS_TO",
+      "role": "lane"
+    }
+  ],
+  "createdAt": "2026-09-27T00:00:00.000Z",
+  "updatedAt": "2026-09-27T00:00:00.000Z",
+  "stewardedBy": [
+    {
+      "humanId": "human-pete-pastor",
+      "affinity": 0.7,
+      "role": "steward"
+    },
+    {
+      "humanId": "human-matthew-manager",
+      "affinity": 0.3,
+      "role": "endorser"
+    }
+  ]
+}

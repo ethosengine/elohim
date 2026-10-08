@@ -1,0 +1,338 @@
+{
+  "id": "fct-module-09-fruits-of-spirit-quiz",
+  "contentType": "assessment",
+  "title": "Check your understanding: Fruit as Metric",
+  "description": "Mastery check for Module 9, drawn from its learning objectives.",
+  "content": [
+    {
+      "id": "fct-module-09-fruits-of-spirit-q1",
+      "purpose": "mastery",
+      "content": {
+        "content": "Why do metrics drift at scale?\n\n[[☃ radio 1]]",
+        "images": {},
+        "widgets": {
+          "radio 1": {
+            "type": "radio",
+            "options": {
+              "choices": [
+                {
+                  "content": "Computers make rounding errors",
+                  "correct": false,
+                  "id": "fct-module-09-fruits-of-spirit-q1-c0"
+                },
+                {
+                  "content": "A handful of numbers can no longer see the harms underneath, and the metric outlives the value it served",
+                  "correct": true,
+                  "id": "fct-module-09-fruits-of-spirit-q1-c1"
+                },
+                {
+                  "content": "People stop collecting data",
+                  "correct": false,
+                  "id": "fct-module-09-fruits-of-spirit-q1-c2"
+                },
+                {
+                  "content": "Growth is always bad",
+                  "correct": false,
+                  "id": "fct-module-09-fruits-of-spirit-q1-c3"
+                }
+              ],
+              "randomize": true,
+              "multipleSelect": false
+            },
+            "graded": true,
+            "version": {
+              "major": 0,
+              "minor": 0
+            }
+          }
+        }
+      },
+      "hints": [],
+      "metadata": {
+        "sourceContentId": "fct-module-09-fruits-of-spirit-quiz",
+        "assessesContentId": "fct-module-09-fruits-of-spirit",
+        "bloomsLevel": "understand",
+        "difficulty": "medium",
+        "estimatedTimeSeconds": 60,
+        "questionType": "core",
+        "tags": [
+          "fct"
+        ]
+      }
+    },
+    {
+      "id": "fct-module-09-fruits-of-spirit-q2",
+      "purpose": "mastery",
+      "content": {
+        "content": "What kind of discernment does Matthew 7:15-20 authorize?\n\n[[☃ radio 1]]",
+        "images": {},
+        "widgets": {
+          "radio 1": {
+            "type": "radio",
+            "options": {
+              "choices": [
+                {
+                  "content": "Judging by credentials",
+                  "correct": false,
+                  "id": "fct-module-09-fruits-of-spirit-q2-c0"
+                },
+                {
+                  "content": "Judging by attendance",
+                  "correct": false,
+                  "id": "fct-module-09-fruits-of-spirit-q2-c1"
+                },
+                {
+                  "content": "Outcome-based: judge by fruit, not by branding or stated intentions",
+                  "correct": true,
+                  "id": "fct-module-09-fruits-of-spirit-q2-c2"
+                },
+                {
+                  "content": "Avoiding judgment entirely",
+                  "correct": false,
+                  "id": "fct-module-09-fruits-of-spirit-q2-c3"
+                }
+              ],
+              "randomize": true,
+              "multipleSelect": false
+            },
+            "graded": true,
+            "version": {
+              "major": 0,
+              "minor": 0
+            }
+          }
+        }
+      },
+      "hints": [],
+      "metadata": {
+        "sourceContentId": "fct-module-09-fruits-of-spirit-quiz",
+        "assessesContentId": "fct-module-09-fruits-of-spirit",
+        "bloomsLevel": "understand",
+        "difficulty": "medium",
+        "estimatedTimeSeconds": 60,
+        "questionType": "core",
+        "tags": [
+          "fct"
+        ]
+      }
+    },
+    {
+      "id": "fct-module-09-fruits-of-spirit-q3",
+      "purpose": "mastery",
+      "content": {
+        "content": "What are the four components of trustworthy technology?\n\n[[☃ radio 1]]",
+        "images": {},
+        "widgets": {
+          "radio 1": {
+            "type": "radio",
+            "options": {
+              "choices": [
+                {
+                  "content": "Speed, scale, profit, reach",
+                  "correct": false,
+                  "id": "fct-module-09-fruits-of-spirit-q3-c0"
+                },
+                {
+                  "content": "Integrity, competency, accountability, education",
+                  "correct": true,
+                  "id": "fct-module-09-fruits-of-spirit-q3-c1"
+                },
+                {
+                  "content": "Privacy, encryption, backups, uptime",
+                  "correct": false,
+                  "id": "fct-module-09-fruits-of-spirit-q3-c2"
+                },
+                {
+                  "content": "Faith, hope, love, patience",
+                  "correct": false,
+                  "id": "fct-module-09-fruits-of-spirit-q3-c3"
+                }
+              ],
+              "randomize": true,
+              "multipleSelect": false
+            },
+            "graded": true,
+            "version": {
+              "major": 0,
+              "minor": 0
+            }
+          }
+        }
+      },
+      "hints": [],
+      "metadata": {
+        "sourceContentId": "fct-module-09-fruits-of-spirit-quiz",
+        "assessesContentId": "fct-module-09-fruits-of-spirit",
+        "bloomsLevel": "remember",
+        "difficulty": "medium",
+        "estimatedTimeSeconds": 60,
+        "questionType": "core",
+        "tags": [
+          "fct"
+        ]
+      }
+    },
+    {
+      "id": "fct-module-09-fruits-of-spirit-q4",
+      "purpose": "mastery",
+      "content": {
+        "content": "What does Sheila Gregoire's story illustrate?\n\n[[☃ radio 1]]",
+        "images": {},
+        "widgets": {
+          "radio 1": {
+            "type": "radio",
+            "options": {
+              "choices": [
+                {
+                  "content": "Why surveys are unreliable",
+                  "correct": false,
+                  "id": "fct-module-09-fruits-of-spirit-q4-c0"
+                },
+                {
+                  "content": "Measuring known harm at scale and trusting outcomes over reputations, despite institutional resistance",
+                  "correct": true,
+                  "id": "fct-module-09-fruits-of-spirit-q4-c1"
+                },
+                {
+                  "content": "The importance of bestseller lists",
+                  "correct": false,
+                  "id": "fct-module-09-fruits-of-spirit-q4-c2"
+                },
+                {
+                  "content": "That theology should avoid data",
+                  "correct": false,
+                  "id": "fct-module-09-fruits-of-spirit-q4-c3"
+                }
+              ],
+              "randomize": true,
+              "multipleSelect": false
+            },
+            "graded": true,
+            "version": {
+              "major": 0,
+              "minor": 0
+            }
+          }
+        }
+      },
+      "hints": [],
+      "metadata": {
+        "sourceContentId": "fct-module-09-fruits-of-spirit-quiz",
+        "assessesContentId": "fct-module-09-fruits-of-spirit",
+        "bloomsLevel": "analyze",
+        "difficulty": "medium",
+        "estimatedTimeSeconds": 60,
+        "questionType": "core",
+        "tags": [
+          "fct"
+        ]
+      }
+    },
+    {
+      "id": "fct-module-09-fruits-of-spirit-q5",
+      "purpose": "mastery",
+      "content": {
+        "content": "What is 'eminence-based theology'?\n\n[[☃ radio 1]]",
+        "images": {},
+        "widgets": {
+          "radio 1": {
+            "type": "radio",
+            "options": {
+              "choices": [
+                {
+                  "content": "Theology taught by elders",
+                  "correct": false,
+                  "id": "fct-module-09-fruits-of-spirit-q5-c0"
+                },
+                {
+                  "content": "Theology grounded in experience",
+                  "correct": false,
+                  "id": "fct-module-09-fruits-of-spirit-q5-c1"
+                },
+                {
+                  "content": "Teaching trusted because of who said it and how large the platform grew",
+                  "correct": true,
+                  "id": "fct-module-09-fruits-of-spirit-q5-c2"
+                },
+                {
+                  "content": "Theology that measures outcomes",
+                  "correct": false,
+                  "id": "fct-module-09-fruits-of-spirit-q5-c3"
+                }
+              ],
+              "randomize": true,
+              "multipleSelect": false
+            },
+            "graded": true,
+            "version": {
+              "major": 0,
+              "minor": 0
+            }
+          }
+        }
+      },
+      "hints": [],
+      "metadata": {
+        "sourceContentId": "fct-module-09-fruits-of-spirit-quiz",
+        "assessesContentId": "fct-module-09-fruits-of-spirit",
+        "bloomsLevel": "remember",
+        "difficulty": "medium",
+        "estimatedTimeSeconds": 60,
+        "questionType": "core",
+        "tags": [
+          "fct"
+        ]
+      }
+    }
+  ],
+  "contentFormat": "sophia-quiz-json",
+  "sourcePath": "docs/content/fct/fct-course/content/m09.md",
+  "reach": "commons",
+  "tags": [
+    "fct",
+    "christian-technology",
+    "humane-tech",
+    "movement-3",
+    "module-9",
+    "quiz"
+  ],
+  "metadata": {
+    "category": "fct",
+    "courseId": "foundations-christian-technology",
+    "courseVersion": "review draft v2, 2026-09-16",
+    "sourceWorkbook": "fct-course",
+    "moduleNumber": 9,
+    "movement": 3,
+    "movementTitle": "Reordering Loves",
+    "day": "Day 7",
+    "form": "quiz",
+    "assessmentType": "mastery",
+    "questionCount": 5
+  },
+  "relationships": [
+    {
+      "target": "fct-module-09-fruits-of-spirit",
+      "type": "VALIDATES",
+      "role": "mastery"
+    },
+    {
+      "target": "fct-module-09-fruits-of-spirit",
+      "type": "BELONGS_TO",
+      "role": "quiz"
+    }
+  ],
+  "createdAt": "2026-09-27T00:00:00.000Z",
+  "updatedAt": "2026-09-27T00:00:00.000Z",
+  "stewardedBy": [
+    {
+      "humanId": "human-pete-pastor",
+      "affinity": 0.7,
+      "role": "steward"
+    },
+    {
+      "humanId": "human-matthew-manager",
+      "affinity": 0.3,
+      "role": "endorser"
+    }
+  ]
+}

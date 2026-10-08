@@ -1,0 +1,55 @@
+{
+  "id": "fct-module-11-collaboration-sensemaking-homework",
+  "contentType": "practice",
+  "title": "Homework: Collaboration & Sensemaking",
+  "description": "Homework  Complete FHT Module 6: Supporting Fairness and Justice.",
+  "content": "## Homework\n\nComplete FHT Module 6: *Supporting Fairness and Justice*. One assignment; bring your group's Trustville plan notes forward.",
+  "contentFormat": "markdown",
+  "sourcePath": "docs/content/fct/fct-course/content/m11.md",
+  "reach": "commons",
+  "tags": [
+    "fct",
+    "christian-technology",
+    "humane-tech",
+    "movement-4",
+    "module-11",
+    "homework"
+  ],
+  "metadata": {
+    "category": "fct",
+    "courseId": "foundations-christian-technology",
+    "courseVersion": "review draft v2, 2026-09-16",
+    "sourceWorkbook": "fct-course",
+    "moduleNumber": 11,
+    "movement": 4,
+    "movementTitle": "Rebuilding Common Life",
+    "day": "Day 9",
+    "form": "homework"
+  },
+  "relationships": [
+    {
+      "target": "fct-module-06-harmful-consequences",
+      "type": "RELATES_TO",
+      "role": "callback"
+    },
+    {
+      "target": "fct-module-11-collaboration-sensemaking",
+      "type": "BELONGS_TO",
+      "role": "homework"
+    }
+  ],
+  "createdAt": "2026-09-27T00:00:00.000Z",
+  "updatedAt": "2026-09-27T00:00:00.000Z",
+  "stewardedBy": [
+    {
+      "humanId": "human-pete-pastor",
+      "affinity": 0.7,
+      "role": "steward"
+    },
+    {
+      "humanId": "human-matthew-manager",
+      "affinity": 0.3,
+      "role": "endorser"
+    }
+  ]
+}

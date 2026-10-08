@@ -1,0 +1,55 @@
+{
+  "id": "fct-module-14-ready-to-act-discussion",
+  "contentType": "discussion",
+  "title": "Discussion: Ready to Act",
+  "description": "Discussion & Activity  (Written new for v2 — this cell was empty in v1.) Four rounds, run as a commissioning workshop:  1.",
+  "content": "## Discussion & Activity\n\n*(Written new for v2 — this cell was empty in v1.)* Four rounds, run as a commissioning workshop:\n\n1. **Tell your story (testimony round).** FHT's first culture-change step, in the church's oldest form. Each participant gives a two-minute testimony: where did this course change what you believe, and what you do, about technology? Practice it here — you will tell it again outside.\n2. **Mind the Gap, revisited.** Retrieve your Module 4 notes. What does the world need? Who are you at your core? Has the gap between your values and your life narrowed over these twelve days? Name what moved it — and the next adjustment.\n3. **Collaborators and small wins.** Map your people: who in your congregation, workplace, or family shares this vision? Choose one *small win* achievable within a month that would demonstrate impact — and name the person you'll pursue it with.\n4. **Champion the new success.** In one sentence, write the definition of success you will now advocate for in your context — your team's, your family's, your church's. Read them aloud; these are the seeds.",
+  "contentFormat": "markdown",
+  "sourcePath": "docs/content/fct/fct-course/content/m14.md",
+  "reach": "commons",
+  "tags": [
+    "fct",
+    "christian-technology",
+    "humane-tech",
+    "movement-5",
+    "module-14",
+    "discussion"
+  ],
+  "metadata": {
+    "category": "fct",
+    "courseId": "foundations-christian-technology",
+    "courseVersion": "review draft v2, 2026-09-16",
+    "sourceWorkbook": "fct-course",
+    "moduleNumber": 14,
+    "movement": 5,
+    "movementTitle": "Abundant Life & Sending",
+    "day": "Day 12",
+    "form": "discussion"
+  },
+  "relationships": [
+    {
+      "target": "fct-module-04-scaling-wisdom",
+      "type": "RELATES_TO",
+      "role": "callback"
+    },
+    {
+      "target": "fct-module-14-ready-to-act",
+      "type": "BELONGS_TO",
+      "role": "discussion"
+    }
+  ],
+  "createdAt": "2026-09-27T00:00:00.000Z",
+  "updatedAt": "2026-09-27T00:00:00.000Z",
+  "stewardedBy": [
+    {
+      "humanId": "human-pete-pastor",
+      "affinity": 0.7,
+      "role": "steward"
+    },
+    {
+      "humanId": "human-matthew-manager",
+      "affinity": 0.3,
+      "role": "endorser"
+    }
+  ]
+}

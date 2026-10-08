@@ -1,40 +1,54 @@
 {
   "id": "fct-module-09-fruits-of-spirit-story",
-  "contentType": "example",
-  "reach": "commons",
-  "title": "Story: Centering Values: Fruits of the Spirit",
-  "description": "Biblical story or example illustrating module concepts",
-  "content": "**Narrative:** Sheila Gregoire, a passionate advocate for healthy Christian marriages, embarked on a groundbreaking journey that led to the writing of her book, \"The Great Sex Rescue.\" Sheila, a regular contributor to Focus on the Family, was deeply troubled after reading \"Love & Respect\" and seeing dozens of comments from women on their website decrying the book for enabling abuse in their marriages. Driven by her concern, Sheila sent a detailed letter along with a meta-analysis of the comments to Focus on the Family, encouraging them to respond to their own feedback and stop promoting the book. However, Focus on the Family ignored her plea, which inspired Sheila to embark on a comprehensive survey and project to uncover the truth.\n\nSheila conducted a survey of over 20,000 Christian women, delving into their marital and sexual satisfaction. Her findings were illuminating and sometimes startling, revealing that certain widely taught beliefs were significantly harming women's marital happiness and sexual satisfaction. For instance, the belief that a wife is obligated to have sex to prevent her husband from straying was linked to lower sexual and marital satisfaction. Armed with this data, Sheila wrote \"The Great Sex Rescue,\" where she not only presented her findings but also offered new frameworks for understanding and teaching about sex in marriage based on mutuality, respect, and true biblical principles.\n\nUpon publishing her book, Focus on the Family responded by scrubbing Sheila's name from their website and any comment that mentioned her name. Despite this, new Focus on the Family contributors Julie Slattery and Gary Thomas adopted nearly word-for-word the message denouncing the most harmful obligation sex-message without acknowledging Sheila’s significant contribution. However, they continued to couch their findings in teachings that Sheila had exposed as harmful.\n\nThe story of Sheila Gregoire and her work aligns beautifully with the biblical wisdom of Matthew 7: \"By their fruit you shall know them.\" In a world obsessed with metrics like profit, engagement, and growth, Sheila did something truly remarkable by championing \"metrics that reduce known harm.\" Her focus on the actual well-being and satisfaction of women in marriages offers a powerful lesson in wisdom. Sheila’s work shows how true wisdom lies in seeking and measuring the presence of the fruits of the Spirit, as listed in Galatians 5: love, joy, peace, patience, kindness, goodness, faithfulness, gentleness, and self-control. By putting in the work to measure these spiritual fruits, just as Sheila did, we can truly reap a harvest that leads to flourishing lives. This proves that the true measure of any teaching is found in the presence of these fruits in our lives.\n**NarrativeType:** biblical-example",
+  "contentType": "article",
+  "title": "Story: Measuring the Known Harm",
+  "description": "Measuring the Known Harm  Sheila Gregoire, a longtime advocate for healthy Christian marriages and a regular contributor to a major family ministry, grew troubled reading comment after comment from women describing how a best-selling marria",
+  "content": "## Measuring the Known Harm\n\nSheila Gregoire, a longtime advocate for healthy Christian marriages and a regular contributor to a major family ministry, grew troubled reading comment after comment from women describing how a best-selling marriage book had enabled abuse in their homes. She compiled the feedback into a meta-analysis and sent it to the ministry, asking them to respond to their own audience's testimony and stop promoting the book. They did not. So she did the work herself: a survey of more than 20,000 Christian women on marital and sexual satisfaction — real fruit inspection at scale. The findings showed that specific widely-taught beliefs measurably harmed the women taught them. She published the results in *The Great Sex Rescue*, proposing frameworks grounded in mutuality and respect. The institution's response was to remove her name from its website — even as newer contributors quietly adopted her most important conclusion without credit, still couched in frameworks her data had discredited.\n\nRead this story with Matthew 7 open. Here was a teaching tree with impeccable sheep's clothing — bestselling, endorsed, institutionally protected — and one researcher who insisted on inspecting the fruit. Her method is this module's method: center the metrics that reduce known harm; trust outcomes over reputations; and expect that institutions optimizing for their own metrics may resist the harvest data. By their fruit — not their platform — you will recognize them.",
   "contentFormat": "markdown",
-  "sourcePath": "fct/v1/Module 9 - Centering Values - Metrics are Not Neutral, Centering the Fruits of the Spirit.md",
+  "sourcePath": "docs/content/fct/fct-course/content/m09.md",
+  "reach": "commons",
   "tags": [
-    "story",
-    "narrative",
     "fct",
-    "biblical-example",
-    "values"
-  ],
-  "relatedNodeIds": [
-    "fct-module-09-fruits-of-spirit"
+    "christian-technology",
+    "humane-tech",
+    "movement-3",
+    "module-9",
+    "story"
   ],
   "metadata": {
-    "category": "fct-narrative",
-    "sourceModule": "fct-module-09-fruits-of-spirit",
-    "originalContentType": "narrative"
+    "category": "fct",
+    "courseId": "foundations-christian-technology",
+    "courseVersion": "review draft v2, 2026-09-16",
+    "sourceWorkbook": "fct-course",
+    "moduleNumber": 9,
+    "movement": 3,
+    "movementTitle": "Reordering Loves",
+    "day": "Day 7",
+    "form": "story"
   },
+  "relationships": [
+    {
+      "target": "fct-module-09-fruits-of-spirit",
+      "type": "BELONGS_TO",
+      "role": "story"
+    }
+  ],
   "createdAt": "2025-11-28T21:10:19.210672",
-  "updatedAt": "2025-12-26T21:04:01.842Z",
+  "updatedAt": "2026-09-27T00:00:00.000Z",
+  "stewardedBy": [
+    {
+      "humanId": "human-pete-pastor",
+      "affinity": 0.7,
+      "role": "steward"
+    },
+    {
+      "humanId": "human-matthew-manager",
+      "affinity": 0.3,
+      "role": "endorser"
+    }
+  ],
   "did": "did:web:elohim.host:content:fct:module 9 - centering values - metrics are not neutral, centering the fruits of the spirit",
   "activityPubType": "Page",
-  "openGraphMetadata": {
-    "ogTitle": "Story: Centering Values: Fruits of the Spirit",
-    "ogDescription": "Biblical story or example illustrating module concepts",
-    "ogType": "website",
-    "ogUrl": "https://elohim-protocol.org/content/fct-module-09-fruits-of-spirit-story",
-    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
-    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/narrative.jpg",
-    "ogImageAlt": "Story: Centering Values: Fruits of the Spirit - Elohim Protocol"
-  },
   "linkedData": {
     "@context": "https://schema.org/",
     "@type": "CreativeWork",
@@ -49,17 +63,5 @@
       "@id": "https://elohim-protocol.org",
       "name": "Elohim Protocol"
     }
-  },
-  "stewardedBy": [
-    {
-      "humanId": "human-pete-pastor",
-      "affinity": 0.7,
-      "role": "steward"
-    },
-    {
-      "humanId": "human-matthew-manager",
-      "affinity": 0.3,
-      "role": "endorser"
-    }
-  ]
+  }
 }

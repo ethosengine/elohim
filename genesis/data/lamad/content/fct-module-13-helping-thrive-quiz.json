@@ -1,0 +1,338 @@
+{
+  "id": "fct-module-13-helping-thrive-quiz",
+  "contentType": "assessment",
+  "title": "Check your understanding: Helping People Thrive",
+  "description": "Mastery check for Module 13, drawn from its learning objectives.",
+  "content": [
+    {
+      "id": "fct-module-13-helping-thrive-q1",
+      "purpose": "mastery",
+      "content": {
+        "content": "Why can't engagement metrics measure thriving?\n\n[[☃ radio 1]]",
+        "images": {},
+        "widgets": {
+          "radio 1": {
+            "type": "radio",
+            "options": {
+              "choices": [
+                {
+                  "content": "Engagement is too hard to count",
+                  "correct": false,
+                  "id": "fct-module-13-helping-thrive-q1-c0"
+                },
+                {
+                  "content": "Addictive experiences mimic thriving — stimulation impersonating meaning — while undermining the real thing",
+                  "correct": true,
+                  "id": "fct-module-13-helping-thrive-q1-c1"
+                },
+                {
+                  "content": "Thriving is only spiritual",
+                  "correct": false,
+                  "id": "fct-module-13-helping-thrive-q1-c2"
+                },
+                {
+                  "content": "Metrics are unbiblical",
+                  "correct": false,
+                  "id": "fct-module-13-helping-thrive-q1-c3"
+                }
+              ],
+              "randomize": true,
+              "multipleSelect": false
+            },
+            "graded": true,
+            "version": {
+              "major": 0,
+              "minor": 0
+            }
+          }
+        }
+      },
+      "hints": [],
+      "metadata": {
+        "sourceContentId": "fct-module-13-helping-thrive-quiz",
+        "assessesContentId": "fct-module-13-helping-thrive",
+        "bloomsLevel": "understand",
+        "difficulty": "medium",
+        "estimatedTimeSeconds": 60,
+        "questionType": "core",
+        "tags": [
+          "fct"
+        ]
+      }
+    },
+    {
+      "id": "fct-module-13-helping-thrive-q2",
+      "purpose": "mastery",
+      "content": {
+        "content": "What do the gleaning laws legislate?\n\n[[☃ radio 1]]",
+        "images": {},
+        "widgets": {
+          "radio 1": {
+            "type": "radio",
+            "options": {
+              "choices": [
+                {
+                  "content": "Maximum harvest",
+                  "correct": false,
+                  "id": "fct-module-13-helping-thrive-q2-c0"
+                },
+                {
+                  "content": "Mandated inefficiency: un-optimized edges left so the vulnerable thrive inside the same economy",
+                  "correct": true,
+                  "id": "fct-module-13-helping-thrive-q2-c1"
+                },
+                {
+                  "content": "A tithe of grain",
+                  "correct": false,
+                  "id": "fct-module-13-helping-thrive-q2-c2"
+                },
+                {
+                  "content": "A ban on foreign workers",
+                  "correct": false,
+                  "id": "fct-module-13-helping-thrive-q2-c3"
+                }
+              ],
+              "randomize": true,
+              "multipleSelect": false
+            },
+            "graded": true,
+            "version": {
+              "major": 0,
+              "minor": 0
+            }
+          }
+        }
+      },
+      "hints": [],
+      "metadata": {
+        "sourceContentId": "fct-module-13-helping-thrive-quiz",
+        "assessesContentId": "fct-module-13-helping-thrive",
+        "bloomsLevel": "analyze",
+        "difficulty": "medium",
+        "estimatedTimeSeconds": 60,
+        "questionType": "core",
+        "tags": [
+          "fct"
+        ]
+      }
+    },
+    {
+      "id": "fct-module-13-helping-thrive-q3",
+      "purpose": "mastery",
+      "content": {
+        "content": "Which mimic does Romans 5:3-5 expose?\n\n[[☃ radio 1]]",
+        "images": {},
+        "widgets": {
+          "radio 1": {
+            "type": "radio",
+            "options": {
+              "choices": [
+                {
+                  "content": "Thriving without relationships",
+                  "correct": false,
+                  "id": "fct-module-13-helping-thrive-q3-c0"
+                },
+                {
+                  "content": "Thriving with the pain surgically removed — a definition that cannot include suffering is a mimic",
+                  "correct": true,
+                  "id": "fct-module-13-helping-thrive-q3-c1"
+                },
+                {
+                  "content": "Thriving without rest",
+                  "correct": false,
+                  "id": "fct-module-13-helping-thrive-q3-c2"
+                },
+                {
+                  "content": "Thriving without learning",
+                  "correct": false,
+                  "id": "fct-module-13-helping-thrive-q3-c3"
+                }
+              ],
+              "randomize": true,
+              "multipleSelect": false
+            },
+            "graded": true,
+            "version": {
+              "major": 0,
+              "minor": 0
+            }
+          }
+        }
+      },
+      "hints": [],
+      "metadata": {
+        "sourceContentId": "fct-module-13-helping-thrive-quiz",
+        "assessesContentId": "fct-module-13-helping-thrive",
+        "bloomsLevel": "analyze",
+        "difficulty": "medium",
+        "estimatedTimeSeconds": 60,
+        "questionType": "core",
+        "tags": [
+          "fct"
+        ]
+      }
+    },
+    {
+      "id": "fct-module-13-helping-thrive-q4",
+      "purpose": "mastery",
+      "content": {
+        "content": "Which design principle comes from the feeding of the five thousand?\n\n[[☃ radio 1]]",
+        "images": {},
+        "widgets": {
+          "radio 1": {
+            "type": "radio",
+            "options": {
+              "choices": [
+                {
+                  "content": "Broadcast at scale",
+                  "correct": false,
+                  "id": "fct-module-13-helping-thrive-q4-c0"
+                },
+                {
+                  "content": "Manufacture desire",
+                  "correct": false,
+                  "id": "fct-module-13-helping-thrive-q4-c1"
+                },
+                {
+                  "content": "Abundance without excess: everyone satisfied and twelve baskets gathered",
+                  "correct": true,
+                  "id": "fct-module-13-helping-thrive-q4-c2"
+                },
+                {
+                  "content": "Source everything externally",
+                  "correct": false,
+                  "id": "fct-module-13-helping-thrive-q4-c3"
+                }
+              ],
+              "randomize": true,
+              "multipleSelect": false
+            },
+            "graded": true,
+            "version": {
+              "major": 0,
+              "minor": 0
+            }
+          }
+        }
+      },
+      "hints": [],
+      "metadata": {
+        "sourceContentId": "fct-module-13-helping-thrive-quiz",
+        "assessesContentId": "fct-module-13-helping-thrive",
+        "bloomsLevel": "understand",
+        "difficulty": "medium",
+        "estimatedTimeSeconds": 60,
+        "questionType": "core",
+        "tags": [
+          "fct"
+        ]
+      }
+    },
+    {
+      "id": "fct-module-13-helping-thrive-q5",
+      "purpose": "mastery",
+      "content": {
+        "content": "What does 'regret as a metric' ask?\n\n[[☃ radio 1]]",
+        "images": {},
+        "widgets": {
+          "radio 1": {
+            "type": "radio",
+            "options": {
+              "choices": [
+                {
+                  "content": "Whether users returned daily",
+                  "correct": false,
+                  "id": "fct-module-13-helping-thrive-q5-c0"
+                },
+                {
+                  "content": "Whether users are glad, a week later, for the time they gave you",
+                  "correct": true,
+                  "id": "fct-module-13-helping-thrive-q5-c1"
+                },
+                {
+                  "content": "Whether users shared the product",
+                  "correct": false,
+                  "id": "fct-module-13-helping-thrive-q5-c2"
+                },
+                {
+                  "content": "Whether revenue grew",
+                  "correct": false,
+                  "id": "fct-module-13-helping-thrive-q5-c3"
+                }
+              ],
+              "randomize": true,
+              "multipleSelect": false
+            },
+            "graded": true,
+            "version": {
+              "major": 0,
+              "minor": 0
+            }
+          }
+        }
+      },
+      "hints": [],
+      "metadata": {
+        "sourceContentId": "fct-module-13-helping-thrive-quiz",
+        "assessesContentId": "fct-module-13-helping-thrive",
+        "bloomsLevel": "apply",
+        "difficulty": "medium",
+        "estimatedTimeSeconds": 60,
+        "questionType": "core",
+        "tags": [
+          "fct"
+        ]
+      }
+    }
+  ],
+  "contentFormat": "sophia-quiz-json",
+  "sourcePath": "docs/content/fct/fct-course/content/m13.md",
+  "reach": "commons",
+  "tags": [
+    "fct",
+    "christian-technology",
+    "humane-tech",
+    "movement-5",
+    "module-13",
+    "quiz"
+  ],
+  "metadata": {
+    "category": "fct",
+    "courseId": "foundations-christian-technology",
+    "courseVersion": "review draft v2, 2026-09-16",
+    "sourceWorkbook": "fct-course",
+    "moduleNumber": 13,
+    "movement": 5,
+    "movementTitle": "Abundant Life & Sending",
+    "day": "Day 11",
+    "form": "quiz",
+    "assessmentType": "mastery",
+    "questionCount": 5
+  },
+  "relationships": [
+    {
+      "target": "fct-module-13-helping-thrive",
+      "type": "VALIDATES",
+      "role": "mastery"
+    },
+    {
+      "target": "fct-module-13-helping-thrive",
+      "type": "BELONGS_TO",
+      "role": "quiz"
+    }
+  ],
+  "createdAt": "2026-09-27T00:00:00.000Z",
+  "updatedAt": "2026-09-27T00:00:00.000Z",
+  "stewardedBy": [
+    {
+      "humanId": "human-pete-pastor",
+      "affinity": 0.7,
+      "role": "steward"
+    },
+    {
+      "humanId": "human-matthew-manager",
+      "affinity": 0.3,
+      "role": "endorser"
+    }
+  ]
+}

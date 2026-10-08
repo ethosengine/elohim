@@ -1,0 +1,338 @@
+{
+  "id": "fct-module-10-recognize-distortions-quiz",
+  "contentType": "assessment",
+  "title": "Check your understanding: Recognizing Distortions",
+  "description": "Mastery check for Module 10, drawn from its learning objectives.",
+  "content": [
+    {
+      "id": "fct-module-10-recognize-distortions-q1",
+      "purpose": "mastery",
+      "content": {
+        "content": "What does the 'funhouse mirror' image mean?\n\n[[☃ radio 1]]",
+        "images": {},
+        "widgets": {
+          "radio 1": {
+            "type": "radio",
+            "options": {
+              "choices": [
+                {
+                  "content": "Social media reflects society accurately",
+                  "correct": false,
+                  "id": "fct-module-10-recognize-distortions-q1-c0"
+                },
+                {
+                  "content": "Social media distorts our picture of ourselves and one another, as an externality of engagement-maximizing models",
+                  "correct": true,
+                  "id": "fct-module-10-recognize-distortions-q1-c1"
+                },
+                {
+                  "content": "Online images are always flattering",
+                  "correct": false,
+                  "id": "fct-module-10-recognize-distortions-q1-c2"
+                },
+                {
+                  "content": "Mirrors are a metaphor for prayer",
+                  "correct": false,
+                  "id": "fct-module-10-recognize-distortions-q1-c3"
+                }
+              ],
+              "randomize": true,
+              "multipleSelect": false
+            },
+            "graded": true,
+            "version": {
+              "major": 0,
+              "minor": 0
+            }
+          }
+        }
+      },
+      "hints": [],
+      "metadata": {
+        "sourceContentId": "fct-module-10-recognize-distortions-quiz",
+        "assessesContentId": "fct-module-10-recognize-distortions",
+        "bloomsLevel": "understand",
+        "difficulty": "medium",
+        "estimatedTimeSeconds": 60,
+        "questionType": "core",
+        "tags": [
+          "fct"
+        ]
+      }
+    },
+    {
+      "id": "fct-module-10-recognize-distortions-q2",
+      "purpose": "mastery",
+      "content": {
+        "content": "Which of these is one of the nine distortions?\n\n[[☃ radio 1]]",
+        "images": {},
+        "widgets": {
+          "radio 1": {
+            "type": "radio",
+            "options": {
+              "choices": [
+                {
+                  "content": "Slow news",
+                  "correct": false,
+                  "id": "fct-module-10-recognize-distortions-q2-c0"
+                },
+                {
+                  "content": "Moral outrage: indignation travels farthest",
+                  "correct": true,
+                  "id": "fct-module-10-recognize-distortions-q2-c1"
+                },
+                {
+                  "content": "Local reporting",
+                  "correct": false,
+                  "id": "fct-module-10-recognize-distortions-q2-c2"
+                },
+                {
+                  "content": "Long-form reading",
+                  "correct": false,
+                  "id": "fct-module-10-recognize-distortions-q2-c3"
+                }
+              ],
+              "randomize": true,
+              "multipleSelect": false
+            },
+            "graded": true,
+            "version": {
+              "major": 0,
+              "minor": 0
+            }
+          }
+        }
+      },
+      "hints": [],
+      "metadata": {
+        "sourceContentId": "fct-module-10-recognize-distortions-quiz",
+        "assessesContentId": "fct-module-10-recognize-distortions",
+        "bloomsLevel": "remember",
+        "difficulty": "medium",
+        "estimatedTimeSeconds": 60,
+        "questionType": "core",
+        "tags": [
+          "fct"
+        ]
+      }
+    },
+    {
+      "id": "fct-module-10-recognize-distortions-q3",
+      "purpose": "mastery",
+      "content": {
+        "content": "Ephesians 4:25 grounds truth-telling in:\n\n[[☃ radio 1]]",
+        "images": {},
+        "widgets": {
+          "radio 1": {
+            "type": "radio",
+            "options": {
+              "choices": [
+                {
+                  "content": "Legal accuracy",
+                  "correct": false,
+                  "id": "fct-module-10-recognize-distortions-q3-c0"
+                },
+                {
+                  "content": "Personal reputation",
+                  "correct": false,
+                  "id": "fct-module-10-recognize-distortions-q3-c1"
+                },
+                {
+                  "content": "Membership: we are members one of another, so falsehood between members is autoimmune disease",
+                  "correct": true,
+                  "id": "fct-module-10-recognize-distortions-q3-c2"
+                },
+                {
+                  "content": "Freedom of speech",
+                  "correct": false,
+                  "id": "fct-module-10-recognize-distortions-q3-c3"
+                }
+              ],
+              "randomize": true,
+              "multipleSelect": false
+            },
+            "graded": true,
+            "version": {
+              "major": 0,
+              "minor": 0
+            }
+          }
+        }
+      },
+      "hints": [],
+      "metadata": {
+        "sourceContentId": "fct-module-10-recognize-distortions-quiz",
+        "assessesContentId": "fct-module-10-recognize-distortions",
+        "bloomsLevel": "analyze",
+        "difficulty": "medium",
+        "estimatedTimeSeconds": 60,
+        "questionType": "core",
+        "tags": [
+          "fct"
+        ]
+      }
+    },
+    {
+      "id": "fct-module-10-recognize-distortions-q4",
+      "purpose": "mastery",
+      "content": {
+        "content": "What did the 2019 investigation of the top Christian Facebook pages find?\n\n[[☃ radio 1]]",
+        "images": {},
+        "widgets": {
+          "radio 1": {
+            "type": "radio",
+            "options": {
+              "choices": [
+                {
+                  "content": "They were all run by denominations",
+                  "correct": false,
+                  "id": "fct-module-10-recognize-distortions-q4-c0"
+                },
+                {
+                  "content": "19 of the top 20 were run by foreign click farms monetizing believers' attention",
+                  "correct": true,
+                  "id": "fct-module-10-recognize-distortions-q4-c1"
+                },
+                {
+                  "content": "They carried no political content",
+                  "correct": false,
+                  "id": "fct-module-10-recognize-distortions-q4-c2"
+                },
+                {
+                  "content": "They were mostly inactive",
+                  "correct": false,
+                  "id": "fct-module-10-recognize-distortions-q4-c3"
+                }
+              ],
+              "randomize": true,
+              "multipleSelect": false
+            },
+            "graded": true,
+            "version": {
+              "major": 0,
+              "minor": 0
+            }
+          }
+        }
+      },
+      "hints": [],
+      "metadata": {
+        "sourceContentId": "fct-module-10-recognize-distortions-quiz",
+        "assessesContentId": "fct-module-10-recognize-distortions",
+        "bloomsLevel": "remember",
+        "difficulty": "medium",
+        "estimatedTimeSeconds": 60,
+        "questionType": "core",
+        "tags": [
+          "fct"
+        ]
+      }
+    },
+    {
+      "id": "fct-module-10-recognize-distortions-q5",
+      "purpose": "mastery",
+      "content": {
+        "content": "Where does Amos 8's chain of dishonest scales end?\n\n[[☃ radio 1]]",
+        "images": {},
+        "widgets": {
+          "radio 1": {
+            "type": "radio",
+            "options": {
+              "choices": [
+                {
+                  "content": "In an economic boom",
+                  "correct": false,
+                  "id": "fct-module-10-recognize-distortions-q5-c0"
+                },
+                {
+                  "content": "In military victory",
+                  "correct": false,
+                  "id": "fct-module-10-recognize-distortions-q5-c1"
+                },
+                {
+                  "content": "In a famine of hearing the words of the LORD — an epistemic catastrophe",
+                  "correct": true,
+                  "id": "fct-module-10-recognize-distortions-q5-c2"
+                },
+                {
+                  "content": "In a new temple",
+                  "correct": false,
+                  "id": "fct-module-10-recognize-distortions-q5-c3"
+                }
+              ],
+              "randomize": true,
+              "multipleSelect": false
+            },
+            "graded": true,
+            "version": {
+              "major": 0,
+              "minor": 0
+            }
+          }
+        }
+      },
+      "hints": [],
+      "metadata": {
+        "sourceContentId": "fct-module-10-recognize-distortions-quiz",
+        "assessesContentId": "fct-module-10-recognize-distortions",
+        "bloomsLevel": "understand",
+        "difficulty": "medium",
+        "estimatedTimeSeconds": 60,
+        "questionType": "core",
+        "tags": [
+          "fct"
+        ]
+      }
+    }
+  ],
+  "contentFormat": "sophia-quiz-json",
+  "sourcePath": "docs/content/fct/fct-course/content/m10.md",
+  "reach": "commons",
+  "tags": [
+    "fct",
+    "christian-technology",
+    "humane-tech",
+    "movement-4",
+    "module-10",
+    "quiz"
+  ],
+  "metadata": {
+    "category": "fct",
+    "courseId": "foundations-christian-technology",
+    "courseVersion": "review draft v2, 2026-09-16",
+    "sourceWorkbook": "fct-course",
+    "moduleNumber": 10,
+    "movement": 4,
+    "movementTitle": "Rebuilding Common Life",
+    "day": "Day 8",
+    "form": "quiz",
+    "assessmentType": "mastery",
+    "questionCount": 5
+  },
+  "relationships": [
+    {
+      "target": "fct-module-10-recognize-distortions",
+      "type": "VALIDATES",
+      "role": "mastery"
+    },
+    {
+      "target": "fct-module-10-recognize-distortions",
+      "type": "BELONGS_TO",
+      "role": "quiz"
+    }
+  ],
+  "createdAt": "2026-09-27T00:00:00.000Z",
+  "updatedAt": "2026-09-27T00:00:00.000Z",
+  "stewardedBy": [
+    {
+      "humanId": "human-pete-pastor",
+      "affinity": 0.7,
+      "role": "steward"
+    },
+    {
+      "humanId": "human-matthew-manager",
+      "affinity": 0.3,
+      "role": "endorser"
+    }
+  ]
+}

@@ -1,0 +1,344 @@
+{
+  "id": "fct-module-07-regeneration-quiz",
+  "contentType": "assessment",
+  "title": "Check your understanding: Regeneration & Reconciliation",
+  "description": "Mastery check for Module 7, drawn from its learning objectives.",
+  "content": [
+    {
+      "id": "fct-module-07-regeneration-q1",
+      "purpose": "mastery",
+      "content": {
+        "content": "What does 'bind scale to responsibility' mean?\n\n[[☃ radio 1]]",
+        "images": {},
+        "widgets": {
+          "radio 1": {
+            "type": "radio",
+            "options": {
+              "choices": [
+                {
+                  "content": "Smaller is always better",
+                  "correct": false,
+                  "id": "fct-module-07-regeneration-q1-c0"
+                },
+                {
+                  "content": "As reach grows, so must accountability",
+                  "correct": true,
+                  "id": "fct-module-07-regeneration-q1-c1"
+                },
+                {
+                  "content": "Growth should be unlimited",
+                  "correct": false,
+                  "id": "fct-module-07-regeneration-q1-c2"
+                },
+                {
+                  "content": "Responsibility belongs to regulators only",
+                  "correct": false,
+                  "id": "fct-module-07-regeneration-q1-c3"
+                }
+              ],
+              "randomize": true,
+              "multipleSelect": false
+            },
+            "graded": true,
+            "version": {
+              "major": 0,
+              "minor": 0
+            }
+          }
+        }
+      },
+      "hints": [],
+      "metadata": {
+        "sourceContentId": "fct-module-07-regeneration-quiz",
+        "assessesContentId": "fct-module-07-regeneration",
+        "bloomsLevel": "understand",
+        "difficulty": "medium",
+        "estimatedTimeSeconds": 60,
+        "questionType": "core",
+        "tags": [
+          "fct"
+        ]
+      }
+    },
+    {
+      "id": "fct-module-07-regeneration-q2",
+      "purpose": "mastery",
+      "content": {
+        "content": "'When you find yourself in a hole, stop digging' applies to:\n\n[[☃ radio 1]]",
+        "images": {},
+        "widgets": {
+          "radio 1": {
+            "type": "radio",
+            "options": {
+              "choices": [
+                {
+                  "content": "Solving technology's problems with more technology at extractive scale, which compounds them",
+                  "correct": true,
+                  "id": "fct-module-07-regeneration-q2-c0"
+                },
+                {
+                  "content": "Church building projects",
+                  "correct": false,
+                  "id": "fct-module-07-regeneration-q2-c1"
+                },
+                {
+                  "content": "Learning new software",
+                  "correct": false,
+                  "id": "fct-module-07-regeneration-q2-c2"
+                },
+                {
+                  "content": "Reducing staff",
+                  "correct": false,
+                  "id": "fct-module-07-regeneration-q2-c3"
+                }
+              ],
+              "randomize": true,
+              "multipleSelect": false
+            },
+            "graded": true,
+            "version": {
+              "major": 0,
+              "minor": 0
+            }
+          }
+        }
+      },
+      "hints": [],
+      "metadata": {
+        "sourceContentId": "fct-module-07-regeneration-quiz",
+        "assessesContentId": "fct-module-07-regeneration",
+        "bloomsLevel": "apply",
+        "difficulty": "medium",
+        "estimatedTimeSeconds": 60,
+        "questionType": "core",
+        "tags": [
+          "fct"
+        ]
+      }
+    },
+    {
+      "id": "fct-module-07-regeneration-q3",
+      "purpose": "mastery",
+      "content": {
+        "content": "Haggai 1's 'wages in a bag with holes' names:\n\n[[☃ radio 1]]",
+        "images": {},
+        "widgets": {
+          "radio 1": {
+            "type": "radio",
+            "options": {
+              "choices": [
+                {
+                  "content": "Poor budgeting",
+                  "correct": false,
+                  "id": "fct-module-07-regeneration-q3-c0"
+                },
+                {
+                  "content": "Theft by employers",
+                  "correct": false,
+                  "id": "fct-module-07-regeneration-q3-c1"
+                },
+                {
+                  "content": "Maximum activity and minimum flourishing: extraction without regeneration",
+                  "correct": true,
+                  "id": "fct-module-07-regeneration-q3-c2"
+                },
+                {
+                  "content": "Inflation",
+                  "correct": false,
+                  "id": "fct-module-07-regeneration-q3-c3"
+                }
+              ],
+              "randomize": true,
+              "multipleSelect": false
+            },
+            "graded": true,
+            "version": {
+              "major": 0,
+              "minor": 0
+            }
+          }
+        }
+      },
+      "hints": [],
+      "metadata": {
+        "sourceContentId": "fct-module-07-regeneration-quiz",
+        "assessesContentId": "fct-module-07-regeneration",
+        "bloomsLevel": "analyze",
+        "difficulty": "medium",
+        "estimatedTimeSeconds": 60,
+        "questionType": "core",
+        "tags": [
+          "fct"
+        ]
+      }
+    },
+    {
+      "id": "fct-module-07-regeneration-q4",
+      "purpose": "mastery",
+      "content": {
+        "content": "In Acts 2:42-47, what is growth attributed to?\n\n[[☃ radio 1]]",
+        "images": {},
+        "widgets": {
+          "radio 1": {
+            "type": "radio",
+            "options": {
+              "choices": [
+                {
+                  "content": "An attractional production",
+                  "correct": false,
+                  "id": "fct-module-07-regeneration-q4-c0"
+                },
+                {
+                  "content": "A campaign strategy",
+                  "correct": false,
+                  "id": "fct-module-07-regeneration-q4-c1"
+                },
+                {
+                  "content": "The overflow of a community whose life together is the witness; the Lord added daily",
+                  "correct": true,
+                  "id": "fct-module-07-regeneration-q4-c2"
+                },
+                {
+                  "content": "Strong marketing",
+                  "correct": false,
+                  "id": "fct-module-07-regeneration-q4-c3"
+                }
+              ],
+              "randomize": true,
+              "multipleSelect": false
+            },
+            "graded": true,
+            "version": {
+              "major": 0,
+              "minor": 0
+            }
+          }
+        }
+      },
+      "hints": [
+        {
+          "content": "Notice what the passage does not attribute growth to.",
+          "images": {},
+          "widgets": {}
+        }
+      ],
+      "metadata": {
+        "sourceContentId": "fct-module-07-regeneration-quiz",
+        "assessesContentId": "fct-module-07-regeneration",
+        "bloomsLevel": "understand",
+        "difficulty": "medium",
+        "estimatedTimeSeconds": 60,
+        "questionType": "core",
+        "tags": [
+          "fct"
+        ]
+      }
+    },
+    {
+      "id": "fct-module-07-regeneration-q5",
+      "purpose": "mastery",
+      "content": {
+        "content": "What did Joash's chest with the bored lid purchase?\n\n[[☃ radio 1]]",
+        "images": {},
+        "widgets": {
+          "radio 1": {
+            "type": "radio",
+            "options": {
+              "choices": [
+                {
+                  "content": "Faster collections",
+                  "correct": false,
+                  "id": "fct-module-07-regeneration-q5-c0"
+                },
+                {
+                  "content": "Trust at the base through accountability at the top",
+                  "correct": true,
+                  "id": "fct-module-07-regeneration-q5-c1"
+                },
+                {
+                  "content": "Priestly privilege",
+                  "correct": false,
+                  "id": "fct-module-07-regeneration-q5-c2"
+                },
+                {
+                  "content": "A larger temple",
+                  "correct": false,
+                  "id": "fct-module-07-regeneration-q5-c3"
+                }
+              ],
+              "randomize": true,
+              "multipleSelect": false
+            },
+            "graded": true,
+            "version": {
+              "major": 0,
+              "minor": 0
+            }
+          }
+        }
+      },
+      "hints": [],
+      "metadata": {
+        "sourceContentId": "fct-module-07-regeneration-quiz",
+        "assessesContentId": "fct-module-07-regeneration",
+        "bloomsLevel": "analyze",
+        "difficulty": "medium",
+        "estimatedTimeSeconds": 60,
+        "questionType": "core",
+        "tags": [
+          "fct"
+        ]
+      }
+    }
+  ],
+  "contentFormat": "sophia-quiz-json",
+  "sourcePath": "docs/content/fct/fct-course/content/m07.md",
+  "reach": "commons",
+  "tags": [
+    "fct",
+    "christian-technology",
+    "humane-tech",
+    "movement-2",
+    "module-7",
+    "quiz"
+  ],
+  "metadata": {
+    "category": "fct",
+    "courseId": "foundations-christian-technology",
+    "courseVersion": "review draft v2, 2026-09-16",
+    "sourceWorkbook": "fct-course",
+    "moduleNumber": 7,
+    "movement": 2,
+    "movementTitle": "Turning — Repentance & Repair",
+    "day": "Day 5",
+    "form": "quiz",
+    "assessmentType": "mastery",
+    "questionCount": 5
+  },
+  "relationships": [
+    {
+      "target": "fct-module-07-regeneration",
+      "type": "VALIDATES",
+      "role": "mastery"
+    },
+    {
+      "target": "fct-module-07-regeneration",
+      "type": "BELONGS_TO",
+      "role": "quiz"
+    }
+  ],
+  "createdAt": "2026-09-27T00:00:00.000Z",
+  "updatedAt": "2026-09-27T00:00:00.000Z",
+  "stewardedBy": [
+    {
+      "humanId": "human-pete-pastor",
+      "affinity": 0.7,
+      "role": "steward"
+    },
+    {
+      "humanId": "human-matthew-manager",
+      "affinity": 0.3,
+      "role": "endorser"
+    }
+  ]
+}

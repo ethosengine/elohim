@@ -139,7 +139,18 @@
       1,
       2,
       3,
-      4
+      4,
+      5,
+      6,
+      7,
+      8,
+      9,
+      10,
+      11,
+      12,
+      13,
+      14,
+      15
     ]
   },
   "reach": "commons",
@@ -666,54 +677,377 @@
         {
           "id": "fct-m05",
           "title": "5. Our Attention is Sacred",
-          "description": "",
+          "description": "from attention as commodity → to attention as the dwelling place God desires.",
           "order": 0,
           "steps": [
             {
               "order": 0,
               "resourceId": "fct-module-05-respecting-human-nature",
               "stepTitle": "Our Attention is Sacred",
-              "stepNarrative": "The 2025 edition of this module. Its recomposition from the v2 course is next.",
+              "stepNarrative": "from attention as commodity → to attention as the dwelling place God desires.",
+              "learningObjectives": [
+                "Explain how evolved heuristics become exploitable biases, and why exploitation at scale implicates every user and builder.",
+                "Critique \"giving people what they want\" and mass A/B testing as an ethics of exploitation dressed as service.",
+                "Trace the biblical arc — Sinai's dwelling, the Shema's bound words, Emmanuel, the knock at the door — as the story of a God who seeks freely given attention as the site of communion.",
+                "Apply the Mary and Martha story to personal and congregational attention practices, distinguishing the necessary from the one thing needed.",
+                "Map one product or experience with the Humane Tech Design Guide, redesigning it to respect attention.",
+                "Structure community life within real human relational capacity (the Dunbar layers) as an act of respecting human nature."
+              ],
               "completionCriteria": [
                 "view"
               ],
-              "estimatedTime": "30-45 minutes"
+              "estimatedTime": "5-15 minutes"
+            },
+            {
+              "order": 1,
+              "resourceId": "fct-module-05-respecting-human-nature-story",
+              "stepTitle": "Story: A God Who Wants to Dwell",
+              "stepNarrative": "The Exodus is the story of a God who wants his people's attention — not as surveillance, but as communion.",
+              "estimatedTime": "5-15 minutes",
+              "completionCriteria": [
+                "view"
+              ]
+            },
+            {
+              "order": 2,
+              "resourceId": "fct-module-05-respecting-human-nature-discussion",
+              "stepTitle": "Gather: discussion and activity",
+              "stepNarrative": "1.",
+              "estimatedTime": "5-15 minutes",
+              "completionCriteria": [
+                "view"
+              ]
+            },
+            {
+              "order": 3,
+              "resourceId": "fct-module-05-respecting-human-nature-application",
+              "stepTitle": "Practice: choose your lane",
+              "stepNarrative": "- Tech workers: Build attention sanctuaries — spaces in your product that facilitate depth rather than churn.",
+              "estimatedTime": "5-15 minutes",
+              "completionCriteria": [
+                "view"
+              ]
+            },
+            {
+              "order": 4,
+              "resourceId": "fct-module-05-respecting-human-nature-lane-tech-workers",
+              "stepTitle": "Practice for tech workers",
+              "stepNarrative": "Build attention sanctuaries — spaces in your product that facilitate depth rather than churn.",
+              "optional": true,
+              "estimatedTime": "one week",
+              "completionCriteria": [
+                "view"
+              ]
+            },
+            {
+              "order": 5,
+              "resourceId": "fct-module-05-respecting-human-nature-lane-households",
+              "stepTitle": "Practice for households",
+              "stepNarrative": "Module 1's audit now becomes covenant.",
+              "optional": true,
+              "estimatedTime": "one week",
+              "completionCriteria": [
+                "view"
+              ]
+            },
+            {
+              "order": 6,
+              "resourceId": "fct-module-05-respecting-human-nature-lane-church-leaders",
+              "stepTitle": "Practice for church leaders",
+              "stepNarrative": "Structure community within real human capacity.",
+              "optional": true,
+              "estimatedTime": "one week",
+              "completionCriteria": [
+                "view"
+              ]
+            },
+            {
+              "order": 7,
+              "resourceId": "fct-module-05-respecting-human-nature-homework",
+              "stepTitle": "The one assignment",
+              "stepNarrative": "Complete FHT Module 3: Minimizing Harmful Consequences.",
+              "estimatedTime": "varies",
+              "completionCriteria": [
+                "view"
+              ]
+            },
+            {
+              "order": 8,
+              "resourceId": "fct-module-05-respecting-human-nature-quiz",
+              "stepTitle": "Check your understanding",
+              "stepNarrative": "Mastery check for Module 5, drawn from its learning objectives.",
+              "estimatedTime": "10 minutes",
+              "completionCriteria": [
+                "score"
+              ]
+            },
+            {
+              "order": 9,
+              "resourceId": "fct-module-05-respecting-human-nature-reflection",
+              "stepTitle": "The manners of your technology",
+              "stepNarrative": "Not graded: your answer is for you and your group.",
+              "estimatedTime": "10 minutes",
+              "completionCriteria": [
+                "score"
+              ]
             }
           ]
         },
         {
           "id": "fct-m06",
           "title": "6. Externalities & the Commons",
-          "description": "",
+          "description": "from counting only intended benefits → to counting the unpriced costs borne by neighbor and creation.",
           "order": 1,
           "steps": [
             {
               "order": 0,
               "resourceId": "fct-module-06-harmful-consequences",
               "stepTitle": "Externalities & the Commons",
-              "stepNarrative": "The 2025 edition of this module. Its recomposition from the v2 course is next.",
+              "stepNarrative": "from counting only intended benefits → to counting the unpriced costs borne by neighbor and creation.",
+              "learningObjectives": [
+                "Define externalities and explain how technology interacting with social structures produces them at civilization scale.",
+                "Apply the Identifying Externalities worksheet to a product, ministry, or household pattern, surfacing costs the current accounting hides.",
+                "Interpret the Good Samaritan as externality theology: the neighbor question answered as the cost question.",
+                "Connect Genesis 2:15 stewardship and Luke 14's count-the-cost discipleship to full-cost accounting as a spiritual discipline.",
+                "Cultivate prophetic foresight — Joseph's storehouses, Moses' song of witness — that anticipates harm before it lands.",
+                "Evaluate externalities generated by church practices themselves, using documented case studies with honesty and grace."
+              ],
               "completionCriteria": [
                 "view"
               ],
-              "estimatedTime": "30-45 minutes"
+              "estimatedTime": "5-15 minutes"
+            },
+            {
+              "order": 1,
+              "resourceId": "fct-media-06-lab-parable-of-the-polygons",
+              "stepTitle": "Lab: Parable of the Polygons",
+              "stepNarrative": "Play it before Module 7: how small individual bias compounds into a segregated system, and why the past haunts the present.",
+              "completionCriteria": [
+                "interaction"
+              ],
+              "estimatedTime": "30 minutes"
+            },
+            {
+              "order": 2,
+              "resourceId": "fct-module-06-harmful-consequences-story",
+              "stepTitle": "Story: Joseph and the Seven Years",
+              "stepNarrative": "Genesis 41 shows foresight as statecraft.",
+              "estimatedTime": "5-15 minutes",
+              "completionCriteria": [
+                "view"
+              ]
+            },
+            {
+              "order": 3,
+              "resourceId": "fct-module-06-harmful-consequences-discussion",
+              "stepTitle": "Gather: discussion and activity",
+              "stepNarrative": "1.",
+              "estimatedTime": "5-15 minutes",
+              "completionCriteria": [
+                "view"
+              ]
+            },
+            {
+              "order": 4,
+              "resourceId": "fct-module-06-harmful-consequences-application",
+              "stepTitle": "Practice: choose your lane",
+              "stepNarrative": "This is Part 1 — the counting week.",
+              "estimatedTime": "5-15 minutes",
+              "completionCriteria": [
+                "view"
+              ]
+            },
+            {
+              "order": 5,
+              "resourceId": "fct-module-06-harmful-consequences-lane-tech-workers",
+              "stepTitle": "Practice for tech workers",
+              "stepNarrative": "Run the Externality Rubric on something you actually ship.",
+              "optional": true,
+              "estimatedTime": "one week",
+              "completionCriteria": [
+                "view"
+              ]
+            },
+            {
+              "order": 6,
+              "resourceId": "fct-module-06-harmful-consequences-lane-households",
+              "stepTitle": "Practice for households",
+              "stepNarrative": "Print the whole receipt for one household routine — the commute, the delivery habit, the streaming default.",
+              "optional": true,
+              "estimatedTime": "one week",
+              "completionCriteria": [
+                "view"
+              ]
+            },
+            {
+              "order": 7,
+              "resourceId": "fct-module-06-harmful-consequences-lane-church-leaders",
+              "stepTitle": "Practice for church leaders",
+              "stepNarrative": "Inventory one flagship ministry with the worksheet — the Sunday production, the building, the missions model.",
+              "optional": true,
+              "estimatedTime": "one week",
+              "completionCriteria": [
+                "view"
+              ]
+            },
+            {
+              "order": 8,
+              "resourceId": "fct-module-06-harmful-consequences-homework",
+              "stepTitle": "The one assignment",
+              "stepNarrative": "Play the Parable of the Polygons (ncase.me) — the lab on how small biases compound into segregated systems.",
+              "estimatedTime": "varies",
+              "completionCriteria": [
+                "view"
+              ]
+            },
+            {
+              "order": 9,
+              "resourceId": "fct-module-06-harmful-consequences-quiz",
+              "stepTitle": "Check your understanding",
+              "stepNarrative": "Mastery check for Module 6, drawn from its learning objectives.",
+              "estimatedTime": "10 minutes",
+              "completionCriteria": [
+                "score"
+              ]
+            },
+            {
+              "order": 10,
+              "resourceId": "fct-module-06-harmful-consequences-reflection",
+              "stepTitle": "The whole receipt",
+              "stepNarrative": "Not graded: your answer is for you and your group.",
+              "estimatedTime": "10 minutes",
+              "completionCriteria": [
+                "score"
+              ]
             }
           ]
         },
         {
           "id": "fct-m07",
           "title": "7. Regeneration & Reconciliation",
-          "description": "",
+          "description": "from extractive growth-at-all-costs church success → to regenerative, right-sized community.",
           "order": 2,
           "steps": [
             {
               "order": 0,
               "resourceId": "fct-module-07-regeneration",
               "stepTitle": "Regeneration & Reconciliation",
-              "stepNarrative": "The 2025 edition of this module. Its recomposition from the v2 course is next.",
+              "stepNarrative": "from extractive growth-at-all-costs church success → to regenerative, right-sized community.",
+              "learningObjectives": [
+                "Distinguish regenerative from extractive systems and apply Doughnut Economics as a picture of right-sized community life.",
+                "Evaluate their own church's practices for extraction — where growth is subsidized by unpriced costs to members, neighbors, or the wider Body of Christ.",
+                "Interpret Haggai 1 and Acts 2:42-47 as contrasting economies: wages in a bag with holes versus a fellowship where no one lacked.",
+                "Apply \"bind scale to responsibility\" to church institutions — including exceeding legal minimums on misconduct, finances, and equity as institutional repentance that rebuilds trust.",
+                "Redefine church success beyond attendance and production value, and design one regenerative practice for resource use, community engagement, or technology adoption.",
+                "Articulate how a church can serve as a prophetic voice for regenerative approaches to technology in wider society."
+              ],
               "completionCriteria": [
                 "view"
               ],
-              "estimatedTime": "30-45 minutes"
+              "estimatedTime": "5-15 minutes"
+            },
+            {
+              "order": 1,
+              "resourceId": "fct-module-07-regeneration-story",
+              "stepTitle": "Story: Jesus' Economics of the Secret (Matthew 6)",
+              "stepNarrative": "Matthew 6 reads like Jesus red-teaming the metrics of religious life.",
+              "estimatedTime": "5-15 minutes",
+              "completionCriteria": [
+                "view"
+              ]
+            },
+            {
+              "order": 2,
+              "resourceId": "fct-module-07-regeneration-counter-story",
+              "stepTitle": "Counter-Story: The Sabbath Year Under Siege (1 Maccabees 6)",
+              "stepNarrative": "Regeneration has enemies, and the intertestamental record preserves the collision.",
+              "estimatedTime": "5-15 minutes",
+              "completionCriteria": [
+                "view"
+              ]
+            },
+            {
+              "order": 3,
+              "resourceId": "fct-module-07-regeneration-discussion",
+              "stepTitle": "Gather: discussion and activity",
+              "stepNarrative": "Central question: How can churches embody Christ's vision of regeneration and reconciliation in their use and development of technology, while avoiding extractive systems and harmful externalities?",
+              "estimatedTime": "5-15 minutes",
+              "completionCriteria": [
+                "view"
+              ]
+            },
+            {
+              "order": 4,
+              "resourceId": "fct-module-07-regeneration-application",
+              "stepTitle": "Practice: choose your lane",
+              "stepNarrative": "- Tech workers: Take \"externalities as design criteria\" into your actual backlog: propose one red-team exercise or anti-KPI for a product you touch.",
+              "estimatedTime": "5-15 minutes",
+              "completionCriteria": [
+                "view"
+              ]
+            },
+            {
+              "order": 5,
+              "resourceId": "fct-module-07-regeneration-lane-tech-workers",
+              "stepTitle": "Practice for tech workers",
+              "stepNarrative": "Take \"externalities as design criteria\" into your actual backlog: propose one red-team exercise or anti-KPI for a product you touch.",
+              "optional": true,
+              "estimatedTime": "one week",
+              "completionCriteria": [
+                "view"
+              ]
+            },
+            {
+              "order": 6,
+              "resourceId": "fct-module-07-regeneration-lane-households",
+              "stepTitle": "Practice for households",
+              "stepNarrative": "Apply \"do less\": choose one consumption pattern to shrink rather than optimize.",
+              "optional": true,
+              "estimatedTime": "one week",
+              "completionCriteria": [
+                "view"
+              ]
+            },
+            {
+              "order": 7,
+              "resourceId": "fct-module-07-regeneration-lane-church-leaders",
+              "stepTitle": "Practice for church leaders",
+              "stepNarrative": "Bind your scale to responsibility.",
+              "optional": true,
+              "estimatedTime": "one week",
+              "completionCriteria": [
+                "view"
+              ]
+            },
+            {
+              "order": 8,
+              "resourceId": "fct-module-07-regeneration-homework",
+              "stepTitle": "The one assignment",
+              "stepNarrative": "Complete FHT Module 4: Centering Values.",
+              "estimatedTime": "varies",
+              "completionCriteria": [
+                "view"
+              ]
+            },
+            {
+              "order": 9,
+              "resourceId": "fct-module-07-regeneration-quiz",
+              "stepTitle": "Check your understanding",
+              "stepNarrative": "Mastery check for Module 7, drawn from its learning objectives.",
+              "estimatedTime": "10 minutes",
+              "completionCriteria": [
+                "score"
+              ]
+            },
+            {
+              "order": 10,
+              "resourceId": "fct-module-07-regeneration-reflection",
+              "stepTitle": "Two anti-KPIs",
+              "stepNarrative": "Not graded: your answer is for you and your group.",
+              "estimatedTime": "10 minutes",
+              "completionCriteria": [
+                "score"
+              ]
             }
           ]
         }
@@ -728,36 +1062,248 @@
         {
           "id": "fct-m08",
           "title": "8. Centering Love",
-          "description": "",
+          "description": "from the myth of neutral technology → to design and use flowing from the greatest commandment.",
           "order": 0,
           "steps": [
             {
               "order": 0,
               "resourceId": "fct-module-08-centering-love",
               "stepTitle": "Centering Love",
-              "stepNarrative": "The 2025 edition of this module. Its recomposition from the v2 course is next.",
+              "stepNarrative": "from the myth of neutral technology → to design and use flowing from the greatest commandment.",
+              "learningObjectives": [
+                "Refute the myth of technological neutrality, explaining how values and societal conditions shape every artifact.",
+                "Articulate a working definition of love from Matthew 22:36-40 and John 13:34-35 — personal and systemic, active and sacrificial, reconciling — robust enough to function as a design principle.",
+                "Evaluate current metrics in church and tech settings (attendance, engagement, retention) against the command to love, identifying alignment and conflict.",
+                "Analyze data collection, privacy, and algorithmic decision-making through the lens of \"love does no harm to a neighbor\" (Romans 13:10).",
+                "Distinguish stated from demonstrated values in an organization they know well, including their own congregation.",
+                "Create one love-centered modification to their personal, professional, or congregational technology practice."
+              ],
               "completionCriteria": [
                 "view"
               ],
-              "estimatedTime": "30-45 minutes"
+              "estimatedTime": "5-15 minutes"
+            },
+            {
+              "order": 1,
+              "resourceId": "fct-module-08-centering-love-story",
+              "stepTitle": "Story: Bad Victories",
+              "stepNarrative": "There are such things as bad victories for a Christian — ways of seeming to win that cost you your soul.",
+              "estimatedTime": "5-15 minutes",
+              "completionCriteria": [
+                "view"
+              ]
+            },
+            {
+              "order": 2,
+              "resourceId": "fct-module-08-centering-love-discussion",
+              "stepTitle": "Gather: discussion and activity",
+              "stepNarrative": "A three-part personal reflection, worked alone and then shared:  1.",
+              "estimatedTime": "5-15 minutes",
+              "completionCriteria": [
+                "view"
+              ]
+            },
+            {
+              "order": 3,
+              "resourceId": "fct-module-08-centering-love-application",
+              "stepTitle": "Practice: choose your lane",
+              "stepNarrative": "- Tech workers: Run the stated-vs-demonstrated audit on your own product: what do the defaults, dark patterns, and data practices demonstrate, whatever the values page states?",
+              "estimatedTime": "5-15 minutes",
+              "completionCriteria": [
+                "view"
+              ]
+            },
+            {
+              "order": 4,
+              "resourceId": "fct-module-08-centering-love-lane-tech-workers",
+              "stepTitle": "Practice for tech workers",
+              "stepNarrative": "Run the stated-vs-demonstrated audit on your own product: what do the defaults, dark patterns, and data practices demonstrate, whatever the values page states?",
+              "optional": true,
+              "estimatedTime": "one week",
+              "completionCriteria": [
+                "view"
+              ]
+            },
+            {
+              "order": 5,
+              "resourceId": "fct-module-08-centering-love-lane-households",
+              "stepTitle": "Practice for households",
+              "stepNarrative": "Work the three-part reflection as a family, each member naming one misaligned practice and one modification.",
+              "optional": true,
+              "estimatedTime": "one week",
+              "completionCriteria": [
+                "view"
+              ]
+            },
+            {
+              "order": 6,
+              "resourceId": "fct-module-08-centering-love-lane-church-leaders",
+              "stepTitle": "Practice for church leaders",
+              "stepNarrative": "Evaluate your congregation's actual metrics — attendance, giving, online engagement, program participation — against John 13:35: would an outsider watching our dashboards conclude that love is what we optimize?",
+              "optional": true,
+              "estimatedTime": "one week",
+              "completionCriteria": [
+                "view"
+              ]
+            },
+            {
+              "order": 7,
+              "resourceId": "fct-module-08-centering-love-homework",
+              "stepTitle": "The one assignment",
+              "stepNarrative": "Complete the Gyfted values survey — the free online values assessment paired with FHT (moved here from Module 7's slot — this is its natural home).",
+              "estimatedTime": "varies",
+              "completionCriteria": [
+                "view"
+              ]
+            },
+            {
+              "order": 8,
+              "resourceId": "fct-module-08-centering-love-quiz",
+              "stepTitle": "Check your understanding",
+              "stepNarrative": "Mastery check for Module 8, drawn from its learning objectives.",
+              "estimatedTime": "10 minutes",
+              "completionCriteria": [
+                "score"
+              ]
+            },
+            {
+              "order": 9,
+              "resourceId": "fct-module-08-centering-love-reflection",
+              "stepTitle": "Stated versus demonstrated",
+              "stepNarrative": "Not graded: your answer is for you and your group.",
+              "estimatedTime": "10 minutes",
+              "completionCriteria": [
+                "score"
+              ]
             }
           ]
         },
         {
           "id": "fct-m09",
           "title": "9. Fruit as Metric",
-          "description": "",
+          "description": "from optimizing the measurable → to discerning by fruit: \"a good tree cannot bear bad fruit.\"",
           "order": 1,
           "steps": [
             {
               "order": 0,
               "resourceId": "fct-module-09-fruits-of-spirit",
               "stepTitle": "Fruit as Metric",
-              "stepNarrative": "The 2025 edition of this module. Its recomposition from the v2 course is next.",
+              "stepNarrative": "from optimizing the measurable → to discerning by fruit: \"a good tree cannot bear bad fruit.\"",
+              "learningObjectives": [
+                "Explain how metric optimization drifts from original values as systems scale, extending Goodhart's Law from Module 8 into lived examples.",
+                "Apply Jesus' tree-and-fruit test (Matthew 7:15-20) as an outcomes-based discernment framework for technologies, teachings, and ministries.",
+                "Translate each fruit of the Spirit (Galatians 5:22-23) into observable indicators for personal, product, and congregational life.",
+                "Analyze the four components of trustworthy technology as fruit-consistent institutional character.",
+                "Practice retro-casting: describe a fruit-filled future for one system, then work backward to present decisions.",
+                "Evaluate a real case of measuring known harm against institutional resistance, and articulate what faithfulness to the data required."
+              ],
               "completionCriteria": [
                 "view"
               ],
-              "estimatedTime": "30-45 minutes"
+              "estimatedTime": "10-20 minutes"
+            },
+            {
+              "order": 1,
+              "resourceId": "fct-module-09-fruits-of-spirit-story",
+              "stepTitle": "Story: Measuring the Known Harm",
+              "stepNarrative": "Sheila Gregoire, a longtime advocate for healthy Christian marriages and a regular contributor to a major family ministry, grew troubled reading comment after comment from women describing how a best-selling marriage book had enabled abuse ",
+              "estimatedTime": "5-15 minutes",
+              "completionCriteria": [
+                "view"
+              ]
+            },
+            {
+              "order": 2,
+              "resourceId": "fct-module-09-fruits-of-spirit-discussion",
+              "stepTitle": "Gather: discussion and activity",
+              "stepNarrative": "Central question: If we truly believe that \"by their fruit you will recognize them,\" how might we reimagine our measures of success and growth in the church to reflect the fruits of the Spirit?",
+              "estimatedTime": "5-15 minutes",
+              "completionCriteria": [
+                "view"
+              ]
+            },
+            {
+              "order": 3,
+              "resourceId": "fct-module-09-fruits-of-spirit-fruit-of-the-spirit-dashboard",
+              "stepTitle": "A Fruit-of-the-Spirit Dashboard",
+              "stepNarrative": "Example measures a church might watch instead of attendance and budget:  | Fruit | What we might measure instead | | --- | --- | | Love | Meaningful relationships formed; reconciliations facilitated; sacrificial giving and service to those ",
+              "estimatedTime": "5-15 minutes",
+              "completionCriteria": [
+                "view"
+              ]
+            },
+            {
+              "order": 4,
+              "resourceId": "fct-module-09-fruits-of-spirit-application",
+              "stepTitle": "Practice: choose your lane",
+              "stepNarrative": "- Tech workers: Draft fruit-KPIs for something you build — two indicators that would show your product growing peace, patience, or self-control in users, alongside one known-harm metric you commit to reducing.",
+              "estimatedTime": "5-15 minutes",
+              "completionCriteria": [
+                "view"
+              ]
+            },
+            {
+              "order": 5,
+              "resourceId": "fct-module-09-fruits-of-spirit-lane-tech-workers",
+              "stepTitle": "Practice for tech workers",
+              "stepNarrative": "Draft fruit-KPIs for something you build — two indicators that would show your product growing peace, patience, or self-control in users, alongside one known-harm metric you commit to reducing.",
+              "optional": true,
+              "estimatedTime": "one week",
+              "completionCriteria": [
+                "view"
+              ]
+            },
+            {
+              "order": 6,
+              "resourceId": "fct-module-09-fruits-of-spirit-lane-households",
+              "stepTitle": "Practice for households",
+              "stepNarrative": "Institute a monthly family fruit check-in: each person names where they saw the fruits growing at home and where the household's systems (schedules, screens, spending) worked against them.",
+              "optional": true,
+              "estimatedTime": "one week",
+              "completionCriteria": [
+                "view"
+              ]
+            },
+            {
+              "order": 7,
+              "resourceId": "fct-module-09-fruits-of-spirit-lane-church-leaders",
+              "stepTitle": "Practice for church leaders",
+              "stepNarrative": "Begin the shift the dashboard implies: develop a fruit-of-the-Spirit assessment rhythm for individual and communal reflection; form small groups around cultivating specific fruits; pair mature believers with newer ones; redesign one program",
+              "optional": true,
+              "estimatedTime": "one week",
+              "completionCriteria": [
+                "view"
+              ]
+            },
+            {
+              "order": 8,
+              "resourceId": "fct-module-09-fruits-of-spirit-homework",
+              "stepTitle": "The one assignment",
+              "stepNarrative": "Complete FHT Module 5: Creating Shared Understanding.",
+              "estimatedTime": "varies",
+              "completionCriteria": [
+                "view"
+              ]
+            },
+            {
+              "order": 9,
+              "resourceId": "fct-module-09-fruits-of-spirit-quiz",
+              "stepTitle": "Check your understanding",
+              "stepNarrative": "Mastery check for Module 9, drawn from its learning objectives.",
+              "estimatedTime": "10 minutes",
+              "completionCriteria": [
+                "score"
+              ]
+            },
+            {
+              "order": 10,
+              "resourceId": "fct-module-09-fruits-of-spirit-reflection",
+              "stepTitle": "Three fruits, three indicators",
+              "stepNarrative": "Not graded: your answer is for you and your group.",
+              "estimatedTime": "10 minutes",
+              "completionCriteria": [
+                "score"
+              ]
             }
           ]
         }
@@ -772,54 +1318,357 @@
         {
           "id": "fct-m10",
           "title": "10. Recognizing Distortions",
-          "description": "",
+          "description": "from passive consumption of warped feeds → to disciplined discernment of how algorithms shape perception.",
           "order": 0,
           "steps": [
             {
               "order": 0,
               "resourceId": "fct-module-10-recognize-distortions",
               "stepTitle": "Recognizing Distortions",
-              "stepNarrative": "The 2025 edition of this module. Its recomposition from the v2 course is next.",
+              "stepNarrative": "from passive consumption of warped feeds → to disciplined discernment of how algorithms shape perception.",
+              "learningObjectives": [
+                "Explain how engagement-driven systems distort perception of self, neighbor, and society — the funhouse mirror rather than the mirror.",
+                "Identify each of the nine distortions in the wild, with examples from their own feeds and from Christian discourse specifically.",
+                "Relate the distortions to biblical categories: false witness, slander, discord-sowing, and the tongue as fire.",
+                "Evaluate how these distortions compromise the church's unity and its witness, including in their own congregation's media presence.",
+                "Assess their personal contribution to and formation by the breakdown of shared understanding.",
+                "Practice concrete social-media hygiene that defends attention and truth without retreating into isolation."
+              ],
               "completionCriteria": [
                 "view"
               ],
-              "estimatedTime": "30-45 minutes"
+              "estimatedTime": "10-20 minutes"
+            },
+            {
+              "order": 1,
+              "resourceId": "fct-module-10-recognize-distortions-story",
+              "stepTitle": "Story: The Counterfeit Body",
+              "stepNarrative": "Imagine the bustling digital marketplace of faith: millions of Christians daily sharing prayers, verses, and testimonies — the global, interconnected Body we long envisioned.",
+              "estimatedTime": "5-15 minutes",
+              "completionCriteria": [
+                "view"
+              ]
+            },
+            {
+              "order": 2,
+              "resourceId": "fct-module-10-recognize-distortions-discussion",
+              "stepTitle": "Gather: discussion and activity",
+              "stepNarrative": "1.",
+              "estimatedTime": "5-15 minutes",
+              "completionCriteria": [
+                "view"
+              ]
+            },
+            {
+              "order": 3,
+              "resourceId": "fct-module-10-recognize-distortions-application",
+              "stepTitle": "Practice: choose your lane",
+              "stepNarrative": "- Tech workers: Take the nine distortions to work as a red-team checklist: which does your product structurally reward, even unintentionally?",
+              "estimatedTime": "5-15 minutes",
+              "completionCriteria": [
+                "view"
+              ]
+            },
+            {
+              "order": 4,
+              "resourceId": "fct-module-10-recognize-distortions-lane-tech-workers",
+              "stepTitle": "Practice for tech workers",
+              "stepNarrative": "Take the nine distortions to work as a red-team checklist: which does your product structurally reward, even unintentionally?",
+              "optional": true,
+              "estimatedTime": "one week",
+              "completionCriteria": [
+                "view"
+              ]
+            },
+            {
+              "order": 5,
+              "resourceId": "fct-module-10-recognize-distortions-lane-households",
+              "stepTitle": "Practice for households",
+              "stepNarrative": "Adopt the hygiene disciplines together: an intentional media diet anchored in reputable local sources; verification before sharing (make \"did we check this?\" a family reflex); emotional checking — pausing to notice anger or fear before enga",
+              "optional": true,
+              "estimatedTime": "one week",
+              "completionCriteria": [
+                "view"
+              ]
+            },
+            {
+              "order": 6,
+              "resourceId": "fct-module-10-recognize-distortions-lane-church-leaders",
+              "stepTitle": "Practice for church leaders",
+              "stepNarrative": "Make digital literacy a discipleship ministry — fact-checking, algorithmic awareness, and misinformation recognition taught as seriously as financial stewardship.",
+              "optional": true,
+              "estimatedTime": "one week",
+              "completionCriteria": [
+                "view"
+              ]
+            },
+            {
+              "order": 7,
+              "resourceId": "fct-module-10-recognize-distortions-homework",
+              "stepTitle": "The one assignment",
+              "stepNarrative": "Practice: Reclaiming Your Sacred Attention on Social Media (~75 minutes, then a follow-up).",
+              "estimatedTime": "varies",
+              "completionCriteria": [
+                "view"
+              ]
+            },
+            {
+              "order": 8,
+              "resourceId": "fct-module-10-recognize-distortions-quiz",
+              "stepTitle": "Check your understanding",
+              "stepNarrative": "Mastery check for Module 10, drawn from its learning objectives.",
+              "estimatedTime": "10 minutes",
+              "completionCriteria": [
+                "score"
+              ]
+            },
+            {
+              "order": 9,
+              "resourceId": "fct-module-10-recognize-distortions-reflection",
+              "stepTitle": "Your feed's picture of your brother",
+              "stepNarrative": "Not graded: your answer is for you and your group.",
+              "estimatedTime": "10 minutes",
+              "completionCriteria": [
+                "score"
+              ]
             }
           ]
         },
         {
           "id": "fct-m11",
           "title": "11. Collaboration & Sensemaking",
-          "description": "",
+          "description": "from private discernment → to communal truth-practices and unity in the Body.",
           "order": 1,
           "steps": [
             {
               "order": 0,
               "resourceId": "fct-module-11-collaboration-sensemaking",
               "stepTitle": "Collaboration & Sensemaking",
-              "stepNarrative": "The 2025 edition of this module. Its recomposition from the v2 course is next.",
+              "stepNarrative": "from private discernment → to communal truth-practices and unity in the Body.",
+              "learningObjectives": [
+                "Articulate the biblical imperative for unity and shared understanding (John 17:20-23; 1 Corinthians 1:10) as the theological ground of sensemaking work.",
+                "Apply the three-part repair — curtail causes, address crises, heal habits — to a specific community they belong to.",
+                "Evaluate \"Minimally Viable Truth\" and Wikipedia's collaborative model in light of Christian humility (Philippians 2:3-4; James 4:10; 1 Peter 5:5).",
+                "Explain the perception gap and select interventions — friction, facilitation, exposure — that measurably shrink it.",
+                "Connect connection-as-cure (the addiction research) to Christian fellowship as sensemaking infrastructure (Acts 2:42-47; Hebrews 10:24-25).",
+                "Design a \"digital Trustville\" transformation plan for a real context, applying Module 4's trust conditions at community scale."
+              ],
               "completionCriteria": [
                 "view"
               ],
-              "estimatedTime": "30-45 minutes"
+              "estimatedTime": "5-15 minutes"
+            },
+            {
+              "order": 1,
+              "resourceId": "fct-module-11-collaboration-sensemaking-story",
+              "stepTitle": "Story: Trustville and Skeptica",
+              "stepNarrative": "Imagine two neighboring villages, identical in size, resources, and challenges.",
+              "estimatedTime": "5-15 minutes",
+              "completionCriteria": [
+                "view"
+              ]
+            },
+            {
+              "order": 2,
+              "resourceId": "fct-module-11-collaboration-sensemaking-discussion",
+              "stepTitle": "Gather: discussion and activity",
+              "stepNarrative": "Building Trustville.",
+              "estimatedTime": "5-15 minutes",
+              "completionCriteria": [
+                "view"
+              ]
+            },
+            {
+              "order": 3,
+              "resourceId": "fct-module-11-collaboration-sensemaking-application",
+              "stepTitle": "Practice: choose your lane",
+              "stepNarrative": "- Tech workers: Implement the interventions where you build: viral friction before resharing; perception-gap-aware ranking; empathy and context features; harms made transparent; a crisis playbook with blackout options.",
+              "estimatedTime": "5-15 minutes",
+              "completionCriteria": [
+                "view"
+              ]
+            },
+            {
+              "order": 4,
+              "resourceId": "fct-module-11-collaboration-sensemaking-lane-tech-workers",
+              "stepTitle": "Practice for tech workers",
+              "stepNarrative": "Implement the interventions where you build: viral friction before resharing; perception-gap-aware ranking; empathy and context features; harms made transparent; a crisis playbook with blackout options.",
+              "optional": true,
+              "estimatedTime": "one week",
+              "completionCriteria": [
+                "view"
+              ]
+            },
+            {
+              "order": 5,
+              "resourceId": "fct-module-11-collaboration-sensemaking-lane-households",
+              "stepTitle": "Practice for households",
+              "stepNarrative": "Practice mutual understanding as a learnable skill at your own table: charitable interpretation as the house rule, one small facilitated conversation across a real divide this month (invite them to dinner — embodied beats threaded), and con",
+              "optional": true,
+              "estimatedTime": "one week",
+              "completionCriteria": [
+                "view"
+              ]
+            },
+            {
+              "order": 6,
+              "resourceId": "fct-module-11-collaboration-sensemaking-lane-church-leaders",
+              "stepTitle": "Practice for church leaders",
+              "stepNarrative": "Rebuild a well-moderated, hyper-local, embodied media culture, in three clusters.",
+              "optional": true,
+              "estimatedTime": "one week",
+              "completionCriteria": [
+                "view"
+              ]
+            },
+            {
+              "order": 7,
+              "resourceId": "fct-module-11-collaboration-sensemaking-homework",
+              "stepTitle": "The one assignment",
+              "stepNarrative": "Complete FHT Module 6: Supporting Fairness and Justice.",
+              "estimatedTime": "varies",
+              "completionCriteria": [
+                "view"
+              ]
+            },
+            {
+              "order": 8,
+              "resourceId": "fct-module-11-collaboration-sensemaking-quiz",
+              "stepTitle": "Check your understanding",
+              "stepNarrative": "Mastery check for Module 11, drawn from its learning objectives.",
+              "estimatedTime": "10 minutes",
+              "completionCriteria": [
+                "score"
+              ]
+            },
+            {
+              "order": 9,
+              "resourceId": "fct-module-11-collaboration-sensemaking-reflection",
+              "stepTitle": "From Skeptica to Trustville",
+              "stepNarrative": "Not graded: your answer is for you and your group.",
+              "estimatedTime": "10 minutes",
+              "completionCriteria": [
+                "score"
+              ]
             }
           ]
         },
         {
           "id": "fct-m12",
           "title": "12. Fairness & Justice",
-          "description": "",
+          "description": "from accessibility as afterthought → to actively compelling the excluded in until the house is full.",
           "order": 2,
           "steps": [
             {
               "order": 0,
               "resourceId": "fct-module-12-fairness-justice",
               "stepTitle": "Fairness & Justice",
-              "stepNarrative": "The 2025 edition of this module. Its recomposition from the v2 course is next.",
+              "stepNarrative": "from accessibility as afterthought → to actively compelling the excluded in until the house is full.",
+              "learningObjectives": [
+                "Explain the Capability Approach and connect it to biblical justice (*mishpat*) as enacted participation — faith that does, not merely says (Matthew 7:21; James 2:17).",
+                "Interpret the Great Banquet as a divine imperative for *active* inclusion: urgency (\"compel them\"), abundance (\"still room\"), and boundary-crossing (roads and country lanes).",
+                "Analyze algorithmic bias through the doctrine of fallenness, and describe what \"redeeming\" an algorithm requires in concrete cases.",
+                "Apply Imago Dei and divine impartiality (Acts 10:34-35) to design decisions about edge cases, moderation, and vulnerable communities.",
+                "Develop a \"Digital Jubilee\" vision from Leviticus 25 — periodic, structural restoration of access, literacy, and opportunity.",
+                "Evaluate their own lifestyle and congregational practices for the ways charity can insulate rather than transform, and chart the move from feeling generous to acting justly."
+              ],
               "completionCriteria": [
                 "view"
               ],
-              "estimatedTime": "30-45 minutes"
+              "estimatedTime": "5-15 minutes"
+            },
+            {
+              "order": 1,
+              "resourceId": "fct-module-12-fairness-justice-story",
+              "stepTitle": "Story: Dignity Written into Law",
+              "stepNarrative": "In the rubble of post-war Germany, an extraordinary experiment asked whether a society could be rebuilt so that its worst history could not recur.",
+              "estimatedTime": "5-15 minutes",
+              "completionCriteria": [
+                "view"
+              ]
+            },
+            {
+              "order": 2,
+              "resourceId": "fct-module-12-fairness-justice-discussion",
+              "stepTitle": "Gather: discussion and activity",
+              "stepNarrative": "Sit with the uncomfortable reflection: consider your morning routine — the coffee, the commute, the neighborhood — and then the homeless person you passed on the way here.",
+              "estimatedTime": "5-15 minutes",
+              "completionCriteria": [
+                "view"
+              ]
+            },
+            {
+              "order": 3,
+              "resourceId": "fct-module-12-fairness-justice-application",
+              "stepTitle": "Practice: choose your lane",
+              "stepNarrative": "- Tech workers: Practice redemption engineering: pick one algorithmic system in your reach and trace where it inherits bias — training data, proxies, edge-case handling — then design the correction, testing against the users most likely to ",
+              "estimatedTime": "5-15 minutes",
+              "completionCriteria": [
+                "view"
+              ]
+            },
+            {
+              "order": 4,
+              "resourceId": "fct-module-12-fairness-justice-lane-tech-workers",
+              "stepTitle": "Practice for tech workers",
+              "stepNarrative": "Practice redemption engineering: pick one algorithmic system in your reach and trace where it inherits bias — training data, proxies, edge-case handling — then design the correction, testing against the users most likely to be harmed first ",
+              "optional": true,
+              "estimatedTime": "one week",
+              "completionCriteria": [
+                "view"
+              ]
+            },
+            {
+              "order": 5,
+              "resourceId": "fct-module-12-fairness-justice-lane-households",
+              "stepTitle": "Practice for households",
+              "stepNarrative": "Run the personal lifestyle audit: map how your consumption, housing, transportation, and giving actually land on your community's most vulnerable.",
+              "optional": true,
+              "estimatedTime": "one week",
+              "completionCriteria": [
+                "view"
+              ]
+            },
+            {
+              "order": 6,
+              "resourceId": "fct-module-12-fairness-justice-lane-church-leaders",
+              "stepTitle": "Practice for church leaders",
+              "stepNarrative": "Extend the audit to the whole institution — budget, facilities, hiring, worship accessibility across socioeconomic lines, and the church's digital presence.",
+              "optional": true,
+              "estimatedTime": "one week",
+              "completionCriteria": [
+                "view"
+              ]
+            },
+            {
+              "order": 7,
+              "resourceId": "fct-module-12-fairness-justice-homework",
+              "stepTitle": "The one assignment",
+              "stepNarrative": "Complete FHT Module 7: Helping People Thrive.",
+              "estimatedTime": "varies",
+              "completionCriteria": [
+                "view"
+              ]
+            },
+            {
+              "order": 8,
+              "resourceId": "fct-module-12-fairness-justice-quiz",
+              "stepTitle": "Check your understanding",
+              "stepNarrative": "Mastery check for Module 12, drawn from its learning objectives.",
+              "estimatedTime": "10 minutes",
+              "completionCriteria": [
+                "score"
+              ]
+            },
+            {
+              "order": 9,
+              "resourceId": "fct-module-12-fairness-justice-reflection",
+              "stepTitle": "Feeling generous, acting justly",
+              "stepNarrative": "Not graded: your answer is for you and your group.",
+              "estimatedTime": "10 minutes",
+              "completionCriteria": [
+                "score"
+              ]
             }
           ]
         }
@@ -834,54 +1683,307 @@
         {
           "id": "fct-m13",
           "title": "13. Helping People Thrive",
-          "description": "",
+          "description": "from engagement as success → to abundant life in the Kingdom as the telos of everything we build.",
           "order": 0,
           "steps": [
             {
               "order": 0,
               "resourceId": "fct-module-13-helping-thrive",
               "stepTitle": "Helping People Thrive",
-              "stepNarrative": "The 2025 edition of this module. Its recomposition from the v2 course is next.",
+              "stepNarrative": "from engagement as success → to abundant life in the Kingdom as the telos of everything we build.",
+              "learningObjectives": [
+                "Define thriving in both FHT's terms and Scripture's — abundant life — and explain why engagement metrics cannot measure it.",
+                "Trace the biblical progression from Promised Land to Kingdom of God as the theology of flourishing, including the gleaning laws as designed margin for the vulnerable.",
+                "Distinguish genuine thriving from its addictive mimics in specific products and church practices.",
+                "Apply the three design principles — protected attention, intentionality, deeply valuable experiences — with their Christian groundings.",
+                "Evaluate the \"thriving stories\" of major platforms and of their own church's mission statement for authenticity and drift.",
+                "Derive design principles from the feeding of the five thousand and apply one to something they build or lead."
+              ],
               "completionCriteria": [
                 "view"
               ],
-              "estimatedTime": "30-45 minutes"
+              "estimatedTime": "5-15 minutes"
+            },
+            {
+              "order": 1,
+              "resourceId": "fct-module-13-helping-thrive-story",
+              "stepTitle": "Story: Five Loaves, Two Fish, Twelve Baskets",
+              "stepNarrative": "The feeding of the five thousand — the only miracle in all four Gospels (John 6:1-14 and parallels) — reads as a masterclass in design for thriving.",
+              "estimatedTime": "5-15 minutes",
+              "completionCriteria": [
+                "view"
+              ]
+            },
+            {
+              "order": 2,
+              "resourceId": "fct-module-13-helping-thrive-discussion",
+              "stepTitle": "Gather: discussion and activity",
+              "stepNarrative": "1.",
+              "estimatedTime": "5-15 minutes",
+              "completionCriteria": [
+                "view"
+              ]
+            },
+            {
+              "order": 3,
+              "resourceId": "fct-module-13-helping-thrive-application",
+              "stepTitle": "Practice: choose your lane",
+              "stepNarrative": "- Tech workers: Adopt regret as a metric: instrument one honest signal of whether users are glad, a week later, for the time they gave you.",
+              "estimatedTime": "5-15 minutes",
+              "completionCriteria": [
+                "view"
+              ]
+            },
+            {
+              "order": 4,
+              "resourceId": "fct-module-13-helping-thrive-lane-tech-workers",
+              "stepTitle": "Practice for tech workers",
+              "stepNarrative": "Adopt regret as a metric: instrument one honest signal of whether users are glad, a week later, for the time they gave you.",
+              "optional": true,
+              "estimatedTime": "one week",
+              "completionCriteria": [
+                "view"
+              ]
+            },
+            {
+              "order": 5,
+              "resourceId": "fct-module-13-helping-thrive-lane-households",
+              "stepTitle": "Practice for households",
+              "stepNarrative": "Take the 30-day Sacred Attention challenge as a family — digital fasting rhythms, contemplative prayer, mindful use — and extend Module 12's lifestyle audit toward thriving: do our schedules and screens produce deeply valuable experiences o",
+              "optional": true,
+              "estimatedTime": "one week",
+              "completionCriteria": [
+                "view"
+              ]
+            },
+            {
+              "order": 6,
+              "resourceId": "fct-module-13-helping-thrive-lane-church-leaders",
+              "stepTitle": "Practice for church leaders",
+              "stepNarrative": "Build the thriving-oriented church: redefine success metrics away from attendance and giving toward relationship, formation, and neighborhood impact (Module 9's dashboard, now operational); redesign gatherings for deep interaction over pass",
+              "optional": true,
+              "estimatedTime": "one week",
+              "completionCriteria": [
+                "view"
+              ]
+            },
+            {
+              "order": 7,
+              "resourceId": "fct-module-13-helping-thrive-homework",
+              "stepTitle": "The one assignment",
+              "stepNarrative": "Complete FHT Module 8: Ready to Act — the final FHT module, closing the chain begun on Day 0.",
+              "estimatedTime": "varies",
+              "completionCriteria": [
+                "view"
+              ]
+            },
+            {
+              "order": 8,
+              "resourceId": "fct-module-13-helping-thrive-quiz",
+              "stepTitle": "Check your understanding",
+              "stepNarrative": "Mastery check for Module 13, drawn from its learning objectives.",
+              "estimatedTime": "10 minutes",
+              "completionCriteria": [
+                "score"
+              ]
+            },
+            {
+              "order": 9,
+              "resourceId": "fct-module-13-helping-thrive-reflection",
+              "stepTitle": "Our thriving story",
+              "stepNarrative": "Not graded: your answer is for you and your group.",
+              "estimatedTime": "10 minutes",
+              "completionCriteria": [
+                "score"
+              ]
             }
           ]
         },
         {
           "id": "fct-m14",
           "title": "14. Ready to Act",
-          "description": "",
+          "description": "from insight → to vocation: commissioned as salt and light in the tech world.",
           "order": 1,
           "steps": [
             {
               "order": 0,
               "resourceId": "fct-module-14-ready-to-act",
               "stepTitle": "Ready to Act",
-              "stepNarrative": "The 2025 edition of this module. Its recomposition from the v2 course is next.",
+              "stepNarrative": "from insight → to vocation: commissioned as salt and light in the tech world.",
+              "learningObjectives": [
+                "Synthesize the course into a cohesive Christian framework for engaging and shaping technology, module by module.",
+                "Articulate technology development and use as Christian vocation — salt and light expressed through work, parenting, and ministry.",
+                "Craft and deliver a personal testimony of how faith now informs their technology choices and building.",
+                "Apply the four culture-change steps within an Acts 1:8 pattern of expanding witness — congregation, neighborhood, industry, world.",
+                "Revisit Mind the Gap and measure movement since Module 4, committing to one next adjustment.",
+                "Identify their community of ongoing support — Christian tech networks, ecumenical partners, and the broader humane technology movement — and their contribution to it."
+              ],
               "completionCriteria": [
                 "view"
               ],
-              "estimatedTime": "30-45 minutes"
+              "estimatedTime": "5-15 minutes"
+            },
+            {
+              "order": 1,
+              "resourceId": "fct-module-14-ready-to-act-story",
+              "stepTitle": "Story: The Ark and the Redwoods",
+              "stepNarrative": "In the days of Noah, the earth was corrupt and filled with violence — and God's response was not abandonment but a commission: build.",
+              "estimatedTime": "5-15 minutes",
+              "completionCriteria": [
+                "view"
+              ]
+            },
+            {
+              "order": 2,
+              "resourceId": "fct-module-14-ready-to-act-discussion",
+              "stepTitle": "Gather: discussion and activity",
+              "stepNarrative": "(Written new for v2 — this cell was empty in v1.) Four rounds, run as a commissioning workshop:  1.",
+              "estimatedTime": "5-15 minutes",
+              "completionCriteria": [
+                "view"
+              ]
+            },
+            {
+              "order": 3,
+              "resourceId": "fct-module-14-ready-to-act-application",
+              "stepTitle": "Practice: The Expanding Circles (Acts 1:8)",
+              "stepNarrative": "The usual three lanes widen into sending circles for this module:",
+              "estimatedTime": "5-15 minutes",
+              "completionCriteria": [
+                "view"
+              ]
+            },
+            {
+              "order": 4,
+              "resourceId": "fct-module-14-ready-to-act-lane-individual",
+              "stepTitle": "Practice for the individual",
+              "stepNarrative": "Conduct a digital-discipleship audit of your own habits and skills; offer your tech skills to your church (website, digital literacy for seniors, media help); commit to continuous learning at the faith-and-technology intersection; keep a re",
+              "optional": true,
+              "estimatedTime": "one week",
+              "completionCriteria": [
+                "view"
+              ]
+            },
+            {
+              "order": 5,
+              "resourceId": "fct-module-14-ready-to-act-lane-our-church",
+              "stepTitle": "Practice for our church",
+              "stepNarrative": "Establish a Technology Stewardship team; map the congregation's tech skills and match them to needs; draft a church-wide ethical technology policy grounded in biblical principle and humane-tech practice; pair tech-savvy youth with elders fo",
+              "optional": true,
+              "estimatedTime": "one week",
+              "completionCriteria": [
+                "view"
+              ]
+            },
+            {
+              "order": 6,
+              "resourceId": "fct-module-14-ready-to-act-lane-ecumenical-body",
+              "stepTitle": "Practice for the ecumenical body",
+              "stepNarrative": "Convene or join Faith & Technology summits across traditions; build shared cross-denominational resource platforms; form united advocacy for ethical tech policy — data privacy, AI ethics, digital equality — as one Christian voice; launch a ",
+              "optional": true,
+              "estimatedTime": "one week",
+              "completionCriteria": [
+                "view"
+              ]
+            },
+            {
+              "order": 7,
+              "resourceId": "fct-module-14-ready-to-act-homework",
+              "stepTitle": "The one assignment",
+              "stepNarrative": "Two short items feeding tomorrow's capstone: complete the course feedback, and draft your personal action plan — one change in personal tech habits, one initiative to start or join in your church, one advocacy commitment in your professiona",
+              "estimatedTime": "varies",
+              "completionCriteria": [
+                "view"
+              ]
+            },
+            {
+              "order": 8,
+              "resourceId": "fct-module-14-ready-to-act-quiz",
+              "stepTitle": "Check your understanding",
+              "stepNarrative": "Mastery check for Module 14, drawn from its learning objectives.",
+              "estimatedTime": "10 minutes",
+              "completionCriteria": [
+                "score"
+              ]
+            },
+            {
+              "order": 9,
+              "resourceId": "fct-module-14-ready-to-act-testimony",
+              "stepTitle": "Your testimony",
+              "stepNarrative": "Not graded: your answer is for you and your group.",
+              "estimatedTime": "15 minutes",
+              "completionCriteria": [
+                "score"
+              ]
+            },
+            {
+              "order": 10,
+              "resourceId": "fct-module-14-ready-to-act-mind-the-gap-revisited",
+              "stepTitle": "Mind the Gap, revisited",
+              "stepNarrative": "Not graded: your answer is for you and your group.",
+              "estimatedTime": "15 minutes",
+              "completionCriteria": [
+                "score"
+              ]
             }
           ]
         },
         {
           "id": "fct-m15",
           "title": "15. Digital Discipleship Retrospective",
-          "description": "",
+          "description": "from course participant → to covenanted digital disciple with a rule of life and accountability.",
           "order": 2,
           "steps": [
             {
               "order": 0,
               "resourceId": "fct-module-15-retrospective",
               "stepTitle": "Digital Discipleship Retrospective",
-              "stepNarrative": "The 2025 edition of this module. Its recomposition from the v2 course is next.",
+              "stepNarrative": "from course participant → to covenanted digital disciple with a rule of life and accountability.",
+              "learningObjectives": [],
               "completionCriteria": [
                 "view"
               ],
-              "estimatedTime": "30-45 minutes"
+              "estimatedTime": "5-15 minutes"
+            },
+            {
+              "order": 1,
+              "resourceId": "fct-module-15-retrospective-retrospective-liturgy",
+              "stepTitle": "The Retrospective Liturgy",
+              "stepNarrative": "1.",
+              "estimatedTime": "5-15 minutes",
+              "completionCriteria": [
+                "view"
+              ]
+            },
+            {
+              "order": 2,
+              "resourceId": "fct-module-15-retrospective-follow-up-the-covenant-holds",
+              "stepTitle": "Follow-Up — The Covenant Holds",
+              "stepNarrative": "Each participant pairs with an accountability partner from the course and shares their action plan.",
+              "estimatedTime": "5-15 minutes",
+              "completionCriteria": [
+                "view"
+              ]
+            },
+            {
+              "order": 3,
+              "resourceId": "fct-module-15-retrospective-three-commitments",
+              "stepTitle": "Three commitments",
+              "stepNarrative": "Not graded: your answer is for you and your group.",
+              "estimatedTime": "20 minutes",
+              "completionCriteria": [
+                "score"
+              ]
+            },
+            {
+              "order": 4,
+              "resourceId": "fct-module-15-retrospective-manifesto-line",
+              "stepTitle": "Your line of the manifesto",
+              "stepNarrative": "Not graded: your answer is for you and your group.",
+              "estimatedTime": "10 minutes",
+              "completionCriteria": [
+                "score"
+              ]
             }
           ]
         }
@@ -1366,111 +2468,1202 @@
       "order": 43,
       "resourceId": "fct-module-05-respecting-human-nature",
       "stepTitle": "Our Attention is Sacred",
-      "stepNarrative": "The 2025 edition of this module. Its recomposition from the v2 course is next.",
+      "stepNarrative": "from attention as commodity → to attention as the dwelling place God desires.",
+      "learningObjectives": [
+        "Explain how evolved heuristics become exploitable biases, and why exploitation at scale implicates every user and builder.",
+        "Critique \"giving people what they want\" and mass A/B testing as an ethics of exploitation dressed as service.",
+        "Trace the biblical arc — Sinai's dwelling, the Shema's bound words, Emmanuel, the knock at the door — as the story of a God who seeks freely given attention as the site of communion.",
+        "Apply the Mary and Martha story to personal and congregational attention practices, distinguishing the necessary from the one thing needed.",
+        "Map one product or experience with the Humane Tech Design Guide, redesigning it to respect attention.",
+        "Structure community life within real human relational capacity (the Dunbar layers) as an act of respecting human nature."
+      ],
       "completionCriteria": [
         "view"
       ],
-      "estimatedTime": "30-45 minutes"
+      "estimatedTime": "5-15 minutes"
     },
     {
       "order": 44,
-      "resourceId": "fct-module-06-harmful-consequences",
-      "stepTitle": "Externalities & the Commons",
-      "stepNarrative": "The 2025 edition of this module. Its recomposition from the v2 course is next.",
+      "resourceId": "fct-module-05-respecting-human-nature-story",
+      "stepTitle": "Story: A God Who Wants to Dwell",
+      "stepNarrative": "The Exodus is the story of a God who wants his people's attention — not as surveillance, but as communion.",
+      "estimatedTime": "5-15 minutes",
       "completionCriteria": [
         "view"
-      ],
-      "estimatedTime": "30-45 minutes"
+      ]
     },
     {
       "order": 45,
-      "resourceId": "fct-module-07-regeneration",
-      "stepTitle": "Regeneration & Reconciliation",
-      "stepNarrative": "The 2025 edition of this module. Its recomposition from the v2 course is next.",
+      "resourceId": "fct-module-05-respecting-human-nature-discussion",
+      "stepTitle": "Gather: discussion and activity",
+      "stepNarrative": "1.",
+      "estimatedTime": "5-15 minutes",
       "completionCriteria": [
         "view"
-      ],
-      "estimatedTime": "30-45 minutes"
+      ]
     },
     {
       "order": 46,
-      "resourceId": "fct-module-08-centering-love",
-      "stepTitle": "Centering Love",
-      "stepNarrative": "The 2025 edition of this module. Its recomposition from the v2 course is next.",
+      "resourceId": "fct-module-05-respecting-human-nature-application",
+      "stepTitle": "Practice: choose your lane",
+      "stepNarrative": "- Tech workers: Build attention sanctuaries — spaces in your product that facilitate depth rather than churn.",
+      "estimatedTime": "5-15 minutes",
       "completionCriteria": [
         "view"
-      ],
-      "estimatedTime": "30-45 minutes"
+      ]
     },
     {
       "order": 47,
-      "resourceId": "fct-module-09-fruits-of-spirit",
-      "stepTitle": "Fruit as Metric",
-      "stepNarrative": "The 2025 edition of this module. Its recomposition from the v2 course is next.",
+      "resourceId": "fct-module-05-respecting-human-nature-lane-tech-workers",
+      "stepTitle": "Practice for tech workers",
+      "stepNarrative": "Build attention sanctuaries — spaces in your product that facilitate depth rather than churn.",
+      "optional": true,
+      "estimatedTime": "one week",
       "completionCriteria": [
         "view"
-      ],
-      "estimatedTime": "30-45 minutes"
+      ]
     },
     {
       "order": 48,
-      "resourceId": "fct-module-10-recognize-distortions",
-      "stepTitle": "Recognizing Distortions",
-      "stepNarrative": "The 2025 edition of this module. Its recomposition from the v2 course is next.",
+      "resourceId": "fct-module-05-respecting-human-nature-lane-households",
+      "stepTitle": "Practice for households",
+      "stepNarrative": "Module 1's audit now becomes covenant.",
+      "optional": true,
+      "estimatedTime": "one week",
       "completionCriteria": [
         "view"
-      ],
-      "estimatedTime": "30-45 minutes"
+      ]
     },
     {
       "order": 49,
-      "resourceId": "fct-module-11-collaboration-sensemaking",
-      "stepTitle": "Collaboration & Sensemaking",
-      "stepNarrative": "The 2025 edition of this module. Its recomposition from the v2 course is next.",
+      "resourceId": "fct-module-05-respecting-human-nature-lane-church-leaders",
+      "stepTitle": "Practice for church leaders",
+      "stepNarrative": "Structure community within real human capacity.",
+      "optional": true,
+      "estimatedTime": "one week",
       "completionCriteria": [
         "view"
-      ],
-      "estimatedTime": "30-45 minutes"
+      ]
     },
     {
       "order": 50,
-      "resourceId": "fct-module-12-fairness-justice",
-      "stepTitle": "Fairness & Justice",
-      "stepNarrative": "The 2025 edition of this module. Its recomposition from the v2 course is next.",
+      "resourceId": "fct-module-05-respecting-human-nature-homework",
+      "stepTitle": "The one assignment",
+      "stepNarrative": "Complete FHT Module 3: Minimizing Harmful Consequences.",
+      "estimatedTime": "varies",
       "completionCriteria": [
         "view"
-      ],
-      "estimatedTime": "30-45 minutes"
+      ]
     },
     {
       "order": 51,
-      "resourceId": "fct-module-13-helping-thrive",
-      "stepTitle": "Helping People Thrive",
-      "stepNarrative": "The 2025 edition of this module. Its recomposition from the v2 course is next.",
+      "resourceId": "fct-module-05-respecting-human-nature-quiz",
+      "stepTitle": "Check your understanding",
+      "stepNarrative": "Mastery check for Module 5, drawn from its learning objectives.",
+      "estimatedTime": "10 minutes",
       "completionCriteria": [
-        "view"
-      ],
-      "estimatedTime": "30-45 minutes"
+        "score"
+      ]
     },
     {
       "order": 52,
-      "resourceId": "fct-module-14-ready-to-act",
-      "stepTitle": "Ready to Act",
-      "stepNarrative": "The 2025 edition of this module. Its recomposition from the v2 course is next.",
+      "resourceId": "fct-module-05-respecting-human-nature-reflection",
+      "stepTitle": "The manners of your technology",
+      "stepNarrative": "Not graded: your answer is for you and your group.",
+      "estimatedTime": "10 minutes",
       "completionCriteria": [
-        "view"
-      ],
-      "estimatedTime": "30-45 minutes"
+        "score"
+      ]
     },
     {
       "order": 53,
-      "resourceId": "fct-module-15-retrospective",
-      "stepTitle": "Digital Discipleship Retrospective",
-      "stepNarrative": "The 2025 edition of this module. Its recomposition from the v2 course is next.",
+      "resourceId": "fct-module-06-harmful-consequences",
+      "stepTitle": "Externalities & the Commons",
+      "stepNarrative": "from counting only intended benefits → to counting the unpriced costs borne by neighbor and creation.",
+      "learningObjectives": [
+        "Define externalities and explain how technology interacting with social structures produces them at civilization scale.",
+        "Apply the Identifying Externalities worksheet to a product, ministry, or household pattern, surfacing costs the current accounting hides.",
+        "Interpret the Good Samaritan as externality theology: the neighbor question answered as the cost question.",
+        "Connect Genesis 2:15 stewardship and Luke 14's count-the-cost discipleship to full-cost accounting as a spiritual discipline.",
+        "Cultivate prophetic foresight — Joseph's storehouses, Moses' song of witness — that anticipates harm before it lands.",
+        "Evaluate externalities generated by church practices themselves, using documented case studies with honesty and grace."
+      ],
       "completionCriteria": [
         "view"
       ],
-      "estimatedTime": "30-45 minutes"
+      "estimatedTime": "5-15 minutes"
+    },
+    {
+      "order": 54,
+      "resourceId": "fct-media-06-lab-parable-of-the-polygons",
+      "stepTitle": "Lab: Parable of the Polygons",
+      "stepNarrative": "Play it before Module 7: how small individual bias compounds into a segregated system, and why the past haunts the present.",
+      "completionCriteria": [
+        "interaction"
+      ],
+      "estimatedTime": "30 minutes"
+    },
+    {
+      "order": 55,
+      "resourceId": "fct-module-06-harmful-consequences-story",
+      "stepTitle": "Story: Joseph and the Seven Years",
+      "stepNarrative": "Genesis 41 shows foresight as statecraft.",
+      "estimatedTime": "5-15 minutes",
+      "completionCriteria": [
+        "view"
+      ]
+    },
+    {
+      "order": 56,
+      "resourceId": "fct-module-06-harmful-consequences-discussion",
+      "stepTitle": "Gather: discussion and activity",
+      "stepNarrative": "1.",
+      "estimatedTime": "5-15 minutes",
+      "completionCriteria": [
+        "view"
+      ]
+    },
+    {
+      "order": 57,
+      "resourceId": "fct-module-06-harmful-consequences-application",
+      "stepTitle": "Practice: choose your lane",
+      "stepNarrative": "This is Part 1 — the counting week.",
+      "estimatedTime": "5-15 minutes",
+      "completionCriteria": [
+        "view"
+      ]
+    },
+    {
+      "order": 58,
+      "resourceId": "fct-module-06-harmful-consequences-lane-tech-workers",
+      "stepTitle": "Practice for tech workers",
+      "stepNarrative": "Run the Externality Rubric on something you actually ship.",
+      "optional": true,
+      "estimatedTime": "one week",
+      "completionCriteria": [
+        "view"
+      ]
+    },
+    {
+      "order": 59,
+      "resourceId": "fct-module-06-harmful-consequences-lane-households",
+      "stepTitle": "Practice for households",
+      "stepNarrative": "Print the whole receipt for one household routine — the commute, the delivery habit, the streaming default.",
+      "optional": true,
+      "estimatedTime": "one week",
+      "completionCriteria": [
+        "view"
+      ]
+    },
+    {
+      "order": 60,
+      "resourceId": "fct-module-06-harmful-consequences-lane-church-leaders",
+      "stepTitle": "Practice for church leaders",
+      "stepNarrative": "Inventory one flagship ministry with the worksheet — the Sunday production, the building, the missions model.",
+      "optional": true,
+      "estimatedTime": "one week",
+      "completionCriteria": [
+        "view"
+      ]
+    },
+    {
+      "order": 61,
+      "resourceId": "fct-module-06-harmful-consequences-homework",
+      "stepTitle": "The one assignment",
+      "stepNarrative": "Play the Parable of the Polygons (ncase.me) — the lab on how small biases compound into segregated systems.",
+      "estimatedTime": "varies",
+      "completionCriteria": [
+        "view"
+      ]
+    },
+    {
+      "order": 62,
+      "resourceId": "fct-module-06-harmful-consequences-quiz",
+      "stepTitle": "Check your understanding",
+      "stepNarrative": "Mastery check for Module 6, drawn from its learning objectives.",
+      "estimatedTime": "10 minutes",
+      "completionCriteria": [
+        "score"
+      ]
+    },
+    {
+      "order": 63,
+      "resourceId": "fct-module-06-harmful-consequences-reflection",
+      "stepTitle": "The whole receipt",
+      "stepNarrative": "Not graded: your answer is for you and your group.",
+      "estimatedTime": "10 minutes",
+      "completionCriteria": [
+        "score"
+      ]
+    },
+    {
+      "order": 64,
+      "resourceId": "fct-module-07-regeneration",
+      "stepTitle": "Regeneration & Reconciliation",
+      "stepNarrative": "from extractive growth-at-all-costs church success → to regenerative, right-sized community.",
+      "learningObjectives": [
+        "Distinguish regenerative from extractive systems and apply Doughnut Economics as a picture of right-sized community life.",
+        "Evaluate their own church's practices for extraction — where growth is subsidized by unpriced costs to members, neighbors, or the wider Body of Christ.",
+        "Interpret Haggai 1 and Acts 2:42-47 as contrasting economies: wages in a bag with holes versus a fellowship where no one lacked.",
+        "Apply \"bind scale to responsibility\" to church institutions — including exceeding legal minimums on misconduct, finances, and equity as institutional repentance that rebuilds trust.",
+        "Redefine church success beyond attendance and production value, and design one regenerative practice for resource use, community engagement, or technology adoption.",
+        "Articulate how a church can serve as a prophetic voice for regenerative approaches to technology in wider society."
+      ],
+      "completionCriteria": [
+        "view"
+      ],
+      "estimatedTime": "5-15 minutes"
+    },
+    {
+      "order": 65,
+      "resourceId": "fct-module-07-regeneration-story",
+      "stepTitle": "Story: Jesus' Economics of the Secret (Matthew 6)",
+      "stepNarrative": "Matthew 6 reads like Jesus red-teaming the metrics of religious life.",
+      "estimatedTime": "5-15 minutes",
+      "completionCriteria": [
+        "view"
+      ]
+    },
+    {
+      "order": 66,
+      "resourceId": "fct-module-07-regeneration-counter-story",
+      "stepTitle": "Counter-Story: The Sabbath Year Under Siege (1 Maccabees 6)",
+      "stepNarrative": "Regeneration has enemies, and the intertestamental record preserves the collision.",
+      "estimatedTime": "5-15 minutes",
+      "completionCriteria": [
+        "view"
+      ]
+    },
+    {
+      "order": 67,
+      "resourceId": "fct-module-07-regeneration-discussion",
+      "stepTitle": "Gather: discussion and activity",
+      "stepNarrative": "Central question: How can churches embody Christ's vision of regeneration and reconciliation in their use and development of technology, while avoiding extractive systems and harmful externalities?",
+      "estimatedTime": "5-15 minutes",
+      "completionCriteria": [
+        "view"
+      ]
+    },
+    {
+      "order": 68,
+      "resourceId": "fct-module-07-regeneration-application",
+      "stepTitle": "Practice: choose your lane",
+      "stepNarrative": "- Tech workers: Take \"externalities as design criteria\" into your actual backlog: propose one red-team exercise or anti-KPI for a product you touch.",
+      "estimatedTime": "5-15 minutes",
+      "completionCriteria": [
+        "view"
+      ]
+    },
+    {
+      "order": 69,
+      "resourceId": "fct-module-07-regeneration-lane-tech-workers",
+      "stepTitle": "Practice for tech workers",
+      "stepNarrative": "Take \"externalities as design criteria\" into your actual backlog: propose one red-team exercise or anti-KPI for a product you touch.",
+      "optional": true,
+      "estimatedTime": "one week",
+      "completionCriteria": [
+        "view"
+      ]
+    },
+    {
+      "order": 70,
+      "resourceId": "fct-module-07-regeneration-lane-households",
+      "stepTitle": "Practice for households",
+      "stepNarrative": "Apply \"do less\": choose one consumption pattern to shrink rather than optimize.",
+      "optional": true,
+      "estimatedTime": "one week",
+      "completionCriteria": [
+        "view"
+      ]
+    },
+    {
+      "order": 71,
+      "resourceId": "fct-module-07-regeneration-lane-church-leaders",
+      "stepTitle": "Practice for church leaders",
+      "stepNarrative": "Bind your scale to responsibility.",
+      "optional": true,
+      "estimatedTime": "one week",
+      "completionCriteria": [
+        "view"
+      ]
+    },
+    {
+      "order": 72,
+      "resourceId": "fct-module-07-regeneration-homework",
+      "stepTitle": "The one assignment",
+      "stepNarrative": "Complete FHT Module 4: Centering Values.",
+      "estimatedTime": "varies",
+      "completionCriteria": [
+        "view"
+      ]
+    },
+    {
+      "order": 73,
+      "resourceId": "fct-module-07-regeneration-quiz",
+      "stepTitle": "Check your understanding",
+      "stepNarrative": "Mastery check for Module 7, drawn from its learning objectives.",
+      "estimatedTime": "10 minutes",
+      "completionCriteria": [
+        "score"
+      ]
+    },
+    {
+      "order": 74,
+      "resourceId": "fct-module-07-regeneration-reflection",
+      "stepTitle": "Two anti-KPIs",
+      "stepNarrative": "Not graded: your answer is for you and your group.",
+      "estimatedTime": "10 minutes",
+      "completionCriteria": [
+        "score"
+      ]
+    },
+    {
+      "order": 75,
+      "resourceId": "fct-module-08-centering-love",
+      "stepTitle": "Centering Love",
+      "stepNarrative": "from the myth of neutral technology → to design and use flowing from the greatest commandment.",
+      "learningObjectives": [
+        "Refute the myth of technological neutrality, explaining how values and societal conditions shape every artifact.",
+        "Articulate a working definition of love from Matthew 22:36-40 and John 13:34-35 — personal and systemic, active and sacrificial, reconciling — robust enough to function as a design principle.",
+        "Evaluate current metrics in church and tech settings (attendance, engagement, retention) against the command to love, identifying alignment and conflict.",
+        "Analyze data collection, privacy, and algorithmic decision-making through the lens of \"love does no harm to a neighbor\" (Romans 13:10).",
+        "Distinguish stated from demonstrated values in an organization they know well, including their own congregation.",
+        "Create one love-centered modification to their personal, professional, or congregational technology practice."
+      ],
+      "completionCriteria": [
+        "view"
+      ],
+      "estimatedTime": "5-15 minutes"
+    },
+    {
+      "order": 76,
+      "resourceId": "fct-module-08-centering-love-story",
+      "stepTitle": "Story: Bad Victories",
+      "stepNarrative": "There are such things as bad victories for a Christian — ways of seeming to win that cost you your soul.",
+      "estimatedTime": "5-15 minutes",
+      "completionCriteria": [
+        "view"
+      ]
+    },
+    {
+      "order": 77,
+      "resourceId": "fct-module-08-centering-love-discussion",
+      "stepTitle": "Gather: discussion and activity",
+      "stepNarrative": "A three-part personal reflection, worked alone and then shared:  1.",
+      "estimatedTime": "5-15 minutes",
+      "completionCriteria": [
+        "view"
+      ]
+    },
+    {
+      "order": 78,
+      "resourceId": "fct-module-08-centering-love-application",
+      "stepTitle": "Practice: choose your lane",
+      "stepNarrative": "- Tech workers: Run the stated-vs-demonstrated audit on your own product: what do the defaults, dark patterns, and data practices demonstrate, whatever the values page states?",
+      "estimatedTime": "5-15 minutes",
+      "completionCriteria": [
+        "view"
+      ]
+    },
+    {
+      "order": 79,
+      "resourceId": "fct-module-08-centering-love-lane-tech-workers",
+      "stepTitle": "Practice for tech workers",
+      "stepNarrative": "Run the stated-vs-demonstrated audit on your own product: what do the defaults, dark patterns, and data practices demonstrate, whatever the values page states?",
+      "optional": true,
+      "estimatedTime": "one week",
+      "completionCriteria": [
+        "view"
+      ]
+    },
+    {
+      "order": 80,
+      "resourceId": "fct-module-08-centering-love-lane-households",
+      "stepTitle": "Practice for households",
+      "stepNarrative": "Work the three-part reflection as a family, each member naming one misaligned practice and one modification.",
+      "optional": true,
+      "estimatedTime": "one week",
+      "completionCriteria": [
+        "view"
+      ]
+    },
+    {
+      "order": 81,
+      "resourceId": "fct-module-08-centering-love-lane-church-leaders",
+      "stepTitle": "Practice for church leaders",
+      "stepNarrative": "Evaluate your congregation's actual metrics — attendance, giving, online engagement, program participation — against John 13:35: would an outsider watching our dashboards conclude that love is what we optimize?",
+      "optional": true,
+      "estimatedTime": "one week",
+      "completionCriteria": [
+        "view"
+      ]
+    },
+    {
+      "order": 82,
+      "resourceId": "fct-module-08-centering-love-homework",
+      "stepTitle": "The one assignment",
+      "stepNarrative": "Complete the Gyfted values survey — the free online values assessment paired with FHT (moved here from Module 7's slot — this is its natural home).",
+      "estimatedTime": "varies",
+      "completionCriteria": [
+        "view"
+      ]
+    },
+    {
+      "order": 83,
+      "resourceId": "fct-module-08-centering-love-quiz",
+      "stepTitle": "Check your understanding",
+      "stepNarrative": "Mastery check for Module 8, drawn from its learning objectives.",
+      "estimatedTime": "10 minutes",
+      "completionCriteria": [
+        "score"
+      ]
+    },
+    {
+      "order": 84,
+      "resourceId": "fct-module-08-centering-love-reflection",
+      "stepTitle": "Stated versus demonstrated",
+      "stepNarrative": "Not graded: your answer is for you and your group.",
+      "estimatedTime": "10 minutes",
+      "completionCriteria": [
+        "score"
+      ]
+    },
+    {
+      "order": 85,
+      "resourceId": "fct-module-09-fruits-of-spirit",
+      "stepTitle": "Fruit as Metric",
+      "stepNarrative": "from optimizing the measurable → to discerning by fruit: \"a good tree cannot bear bad fruit.\"",
+      "learningObjectives": [
+        "Explain how metric optimization drifts from original values as systems scale, extending Goodhart's Law from Module 8 into lived examples.",
+        "Apply Jesus' tree-and-fruit test (Matthew 7:15-20) as an outcomes-based discernment framework for technologies, teachings, and ministries.",
+        "Translate each fruit of the Spirit (Galatians 5:22-23) into observable indicators for personal, product, and congregational life.",
+        "Analyze the four components of trustworthy technology as fruit-consistent institutional character.",
+        "Practice retro-casting: describe a fruit-filled future for one system, then work backward to present decisions.",
+        "Evaluate a real case of measuring known harm against institutional resistance, and articulate what faithfulness to the data required."
+      ],
+      "completionCriteria": [
+        "view"
+      ],
+      "estimatedTime": "10-20 minutes"
+    },
+    {
+      "order": 86,
+      "resourceId": "fct-module-09-fruits-of-spirit-story",
+      "stepTitle": "Story: Measuring the Known Harm",
+      "stepNarrative": "Sheila Gregoire, a longtime advocate for healthy Christian marriages and a regular contributor to a major family ministry, grew troubled reading comment after comment from women describing how a best-selling marriage book had enabled abuse ",
+      "estimatedTime": "5-15 minutes",
+      "completionCriteria": [
+        "view"
+      ]
+    },
+    {
+      "order": 87,
+      "resourceId": "fct-module-09-fruits-of-spirit-discussion",
+      "stepTitle": "Gather: discussion and activity",
+      "stepNarrative": "Central question: If we truly believe that \"by their fruit you will recognize them,\" how might we reimagine our measures of success and growth in the church to reflect the fruits of the Spirit?",
+      "estimatedTime": "5-15 minutes",
+      "completionCriteria": [
+        "view"
+      ]
+    },
+    {
+      "order": 88,
+      "resourceId": "fct-module-09-fruits-of-spirit-fruit-of-the-spirit-dashboard",
+      "stepTitle": "A Fruit-of-the-Spirit Dashboard",
+      "stepNarrative": "Example measures a church might watch instead of attendance and budget:  | Fruit | What we might measure instead | | --- | --- | | Love | Meaningful relationships formed; reconciliations facilitated; sacrificial giving and service to those ",
+      "estimatedTime": "5-15 minutes",
+      "completionCriteria": [
+        "view"
+      ]
+    },
+    {
+      "order": 89,
+      "resourceId": "fct-module-09-fruits-of-spirit-application",
+      "stepTitle": "Practice: choose your lane",
+      "stepNarrative": "- Tech workers: Draft fruit-KPIs for something you build — two indicators that would show your product growing peace, patience, or self-control in users, alongside one known-harm metric you commit to reducing.",
+      "estimatedTime": "5-15 minutes",
+      "completionCriteria": [
+        "view"
+      ]
+    },
+    {
+      "order": 90,
+      "resourceId": "fct-module-09-fruits-of-spirit-lane-tech-workers",
+      "stepTitle": "Practice for tech workers",
+      "stepNarrative": "Draft fruit-KPIs for something you build — two indicators that would show your product growing peace, patience, or self-control in users, alongside one known-harm metric you commit to reducing.",
+      "optional": true,
+      "estimatedTime": "one week",
+      "completionCriteria": [
+        "view"
+      ]
+    },
+    {
+      "order": 91,
+      "resourceId": "fct-module-09-fruits-of-spirit-lane-households",
+      "stepTitle": "Practice for households",
+      "stepNarrative": "Institute a monthly family fruit check-in: each person names where they saw the fruits growing at home and where the household's systems (schedules, screens, spending) worked against them.",
+      "optional": true,
+      "estimatedTime": "one week",
+      "completionCriteria": [
+        "view"
+      ]
+    },
+    {
+      "order": 92,
+      "resourceId": "fct-module-09-fruits-of-spirit-lane-church-leaders",
+      "stepTitle": "Practice for church leaders",
+      "stepNarrative": "Begin the shift the dashboard implies: develop a fruit-of-the-Spirit assessment rhythm for individual and communal reflection; form small groups around cultivating specific fruits; pair mature believers with newer ones; redesign one program",
+      "optional": true,
+      "estimatedTime": "one week",
+      "completionCriteria": [
+        "view"
+      ]
+    },
+    {
+      "order": 93,
+      "resourceId": "fct-module-09-fruits-of-spirit-homework",
+      "stepTitle": "The one assignment",
+      "stepNarrative": "Complete FHT Module 5: Creating Shared Understanding.",
+      "estimatedTime": "varies",
+      "completionCriteria": [
+        "view"
+      ]
+    },
+    {
+      "order": 94,
+      "resourceId": "fct-module-09-fruits-of-spirit-quiz",
+      "stepTitle": "Check your understanding",
+      "stepNarrative": "Mastery check for Module 9, drawn from its learning objectives.",
+      "estimatedTime": "10 minutes",
+      "completionCriteria": [
+        "score"
+      ]
+    },
+    {
+      "order": 95,
+      "resourceId": "fct-module-09-fruits-of-spirit-reflection",
+      "stepTitle": "Three fruits, three indicators",
+      "stepNarrative": "Not graded: your answer is for you and your group.",
+      "estimatedTime": "10 minutes",
+      "completionCriteria": [
+        "score"
+      ]
+    },
+    {
+      "order": 96,
+      "resourceId": "fct-module-10-recognize-distortions",
+      "stepTitle": "Recognizing Distortions",
+      "stepNarrative": "from passive consumption of warped feeds → to disciplined discernment of how algorithms shape perception.",
+      "learningObjectives": [
+        "Explain how engagement-driven systems distort perception of self, neighbor, and society — the funhouse mirror rather than the mirror.",
+        "Identify each of the nine distortions in the wild, with examples from their own feeds and from Christian discourse specifically.",
+        "Relate the distortions to biblical categories: false witness, slander, discord-sowing, and the tongue as fire.",
+        "Evaluate how these distortions compromise the church's unity and its witness, including in their own congregation's media presence.",
+        "Assess their personal contribution to and formation by the breakdown of shared understanding.",
+        "Practice concrete social-media hygiene that defends attention and truth without retreating into isolation."
+      ],
+      "completionCriteria": [
+        "view"
+      ],
+      "estimatedTime": "10-20 minutes"
+    },
+    {
+      "order": 97,
+      "resourceId": "fct-module-10-recognize-distortions-story",
+      "stepTitle": "Story: The Counterfeit Body",
+      "stepNarrative": "Imagine the bustling digital marketplace of faith: millions of Christians daily sharing prayers, verses, and testimonies — the global, interconnected Body we long envisioned.",
+      "estimatedTime": "5-15 minutes",
+      "completionCriteria": [
+        "view"
+      ]
+    },
+    {
+      "order": 98,
+      "resourceId": "fct-module-10-recognize-distortions-discussion",
+      "stepTitle": "Gather: discussion and activity",
+      "stepNarrative": "1.",
+      "estimatedTime": "5-15 minutes",
+      "completionCriteria": [
+        "view"
+      ]
+    },
+    {
+      "order": 99,
+      "resourceId": "fct-module-10-recognize-distortions-application",
+      "stepTitle": "Practice: choose your lane",
+      "stepNarrative": "- Tech workers: Take the nine distortions to work as a red-team checklist: which does your product structurally reward, even unintentionally?",
+      "estimatedTime": "5-15 minutes",
+      "completionCriteria": [
+        "view"
+      ]
+    },
+    {
+      "order": 100,
+      "resourceId": "fct-module-10-recognize-distortions-lane-tech-workers",
+      "stepTitle": "Practice for tech workers",
+      "stepNarrative": "Take the nine distortions to work as a red-team checklist: which does your product structurally reward, even unintentionally?",
+      "optional": true,
+      "estimatedTime": "one week",
+      "completionCriteria": [
+        "view"
+      ]
+    },
+    {
+      "order": 101,
+      "resourceId": "fct-module-10-recognize-distortions-lane-households",
+      "stepTitle": "Practice for households",
+      "stepNarrative": "Adopt the hygiene disciplines together: an intentional media diet anchored in reputable local sources; verification before sharing (make \"did we check this?\" a family reflex); emotional checking — pausing to notice anger or fear before enga",
+      "optional": true,
+      "estimatedTime": "one week",
+      "completionCriteria": [
+        "view"
+      ]
+    },
+    {
+      "order": 102,
+      "resourceId": "fct-module-10-recognize-distortions-lane-church-leaders",
+      "stepTitle": "Practice for church leaders",
+      "stepNarrative": "Make digital literacy a discipleship ministry — fact-checking, algorithmic awareness, and misinformation recognition taught as seriously as financial stewardship.",
+      "optional": true,
+      "estimatedTime": "one week",
+      "completionCriteria": [
+        "view"
+      ]
+    },
+    {
+      "order": 103,
+      "resourceId": "fct-module-10-recognize-distortions-homework",
+      "stepTitle": "The one assignment",
+      "stepNarrative": "Practice: Reclaiming Your Sacred Attention on Social Media (~75 minutes, then a follow-up).",
+      "estimatedTime": "varies",
+      "completionCriteria": [
+        "view"
+      ]
+    },
+    {
+      "order": 104,
+      "resourceId": "fct-module-10-recognize-distortions-quiz",
+      "stepTitle": "Check your understanding",
+      "stepNarrative": "Mastery check for Module 10, drawn from its learning objectives.",
+      "estimatedTime": "10 minutes",
+      "completionCriteria": [
+        "score"
+      ]
+    },
+    {
+      "order": 105,
+      "resourceId": "fct-module-10-recognize-distortions-reflection",
+      "stepTitle": "Your feed's picture of your brother",
+      "stepNarrative": "Not graded: your answer is for you and your group.",
+      "estimatedTime": "10 minutes",
+      "completionCriteria": [
+        "score"
+      ]
+    },
+    {
+      "order": 106,
+      "resourceId": "fct-module-11-collaboration-sensemaking",
+      "stepTitle": "Collaboration & Sensemaking",
+      "stepNarrative": "from private discernment → to communal truth-practices and unity in the Body.",
+      "learningObjectives": [
+        "Articulate the biblical imperative for unity and shared understanding (John 17:20-23; 1 Corinthians 1:10) as the theological ground of sensemaking work.",
+        "Apply the three-part repair — curtail causes, address crises, heal habits — to a specific community they belong to.",
+        "Evaluate \"Minimally Viable Truth\" and Wikipedia's collaborative model in light of Christian humility (Philippians 2:3-4; James 4:10; 1 Peter 5:5).",
+        "Explain the perception gap and select interventions — friction, facilitation, exposure — that measurably shrink it.",
+        "Connect connection-as-cure (the addiction research) to Christian fellowship as sensemaking infrastructure (Acts 2:42-47; Hebrews 10:24-25).",
+        "Design a \"digital Trustville\" transformation plan for a real context, applying Module 4's trust conditions at community scale."
+      ],
+      "completionCriteria": [
+        "view"
+      ],
+      "estimatedTime": "5-15 minutes"
+    },
+    {
+      "order": 107,
+      "resourceId": "fct-module-11-collaboration-sensemaking-story",
+      "stepTitle": "Story: Trustville and Skeptica",
+      "stepNarrative": "Imagine two neighboring villages, identical in size, resources, and challenges.",
+      "estimatedTime": "5-15 minutes",
+      "completionCriteria": [
+        "view"
+      ]
+    },
+    {
+      "order": 108,
+      "resourceId": "fct-module-11-collaboration-sensemaking-discussion",
+      "stepTitle": "Gather: discussion and activity",
+      "stepNarrative": "Building Trustville.",
+      "estimatedTime": "5-15 minutes",
+      "completionCriteria": [
+        "view"
+      ]
+    },
+    {
+      "order": 109,
+      "resourceId": "fct-module-11-collaboration-sensemaking-application",
+      "stepTitle": "Practice: choose your lane",
+      "stepNarrative": "- Tech workers: Implement the interventions where you build: viral friction before resharing; perception-gap-aware ranking; empathy and context features; harms made transparent; a crisis playbook with blackout options.",
+      "estimatedTime": "5-15 minutes",
+      "completionCriteria": [
+        "view"
+      ]
+    },
+    {
+      "order": 110,
+      "resourceId": "fct-module-11-collaboration-sensemaking-lane-tech-workers",
+      "stepTitle": "Practice for tech workers",
+      "stepNarrative": "Implement the interventions where you build: viral friction before resharing; perception-gap-aware ranking; empathy and context features; harms made transparent; a crisis playbook with blackout options.",
+      "optional": true,
+      "estimatedTime": "one week",
+      "completionCriteria": [
+        "view"
+      ]
+    },
+    {
+      "order": 111,
+      "resourceId": "fct-module-11-collaboration-sensemaking-lane-households",
+      "stepTitle": "Practice for households",
+      "stepNarrative": "Practice mutual understanding as a learnable skill at your own table: charitable interpretation as the house rule, one small facilitated conversation across a real divide this month (invite them to dinner — embodied beats threaded), and con",
+      "optional": true,
+      "estimatedTime": "one week",
+      "completionCriteria": [
+        "view"
+      ]
+    },
+    {
+      "order": 112,
+      "resourceId": "fct-module-11-collaboration-sensemaking-lane-church-leaders",
+      "stepTitle": "Practice for church leaders",
+      "stepNarrative": "Rebuild a well-moderated, hyper-local, embodied media culture, in three clusters.",
+      "optional": true,
+      "estimatedTime": "one week",
+      "completionCriteria": [
+        "view"
+      ]
+    },
+    {
+      "order": 113,
+      "resourceId": "fct-module-11-collaboration-sensemaking-homework",
+      "stepTitle": "The one assignment",
+      "stepNarrative": "Complete FHT Module 6: Supporting Fairness and Justice.",
+      "estimatedTime": "varies",
+      "completionCriteria": [
+        "view"
+      ]
+    },
+    {
+      "order": 114,
+      "resourceId": "fct-module-11-collaboration-sensemaking-quiz",
+      "stepTitle": "Check your understanding",
+      "stepNarrative": "Mastery check for Module 11, drawn from its learning objectives.",
+      "estimatedTime": "10 minutes",
+      "completionCriteria": [
+        "score"
+      ]
+    },
+    {
+      "order": 115,
+      "resourceId": "fct-module-11-collaboration-sensemaking-reflection",
+      "stepTitle": "From Skeptica to Trustville",
+      "stepNarrative": "Not graded: your answer is for you and your group.",
+      "estimatedTime": "10 minutes",
+      "completionCriteria": [
+        "score"
+      ]
+    },
+    {
+      "order": 116,
+      "resourceId": "fct-module-12-fairness-justice",
+      "stepTitle": "Fairness & Justice",
+      "stepNarrative": "from accessibility as afterthought → to actively compelling the excluded in until the house is full.",
+      "learningObjectives": [
+        "Explain the Capability Approach and connect it to biblical justice (*mishpat*) as enacted participation — faith that does, not merely says (Matthew 7:21; James 2:17).",
+        "Interpret the Great Banquet as a divine imperative for *active* inclusion: urgency (\"compel them\"), abundance (\"still room\"), and boundary-crossing (roads and country lanes).",
+        "Analyze algorithmic bias through the doctrine of fallenness, and describe what \"redeeming\" an algorithm requires in concrete cases.",
+        "Apply Imago Dei and divine impartiality (Acts 10:34-35) to design decisions about edge cases, moderation, and vulnerable communities.",
+        "Develop a \"Digital Jubilee\" vision from Leviticus 25 — periodic, structural restoration of access, literacy, and opportunity.",
+        "Evaluate their own lifestyle and congregational practices for the ways charity can insulate rather than transform, and chart the move from feeling generous to acting justly."
+      ],
+      "completionCriteria": [
+        "view"
+      ],
+      "estimatedTime": "5-15 minutes"
+    },
+    {
+      "order": 117,
+      "resourceId": "fct-module-12-fairness-justice-story",
+      "stepTitle": "Story: Dignity Written into Law",
+      "stepNarrative": "In the rubble of post-war Germany, an extraordinary experiment asked whether a society could be rebuilt so that its worst history could not recur.",
+      "estimatedTime": "5-15 minutes",
+      "completionCriteria": [
+        "view"
+      ]
+    },
+    {
+      "order": 118,
+      "resourceId": "fct-module-12-fairness-justice-discussion",
+      "stepTitle": "Gather: discussion and activity",
+      "stepNarrative": "Sit with the uncomfortable reflection: consider your morning routine — the coffee, the commute, the neighborhood — and then the homeless person you passed on the way here.",
+      "estimatedTime": "5-15 minutes",
+      "completionCriteria": [
+        "view"
+      ]
+    },
+    {
+      "order": 119,
+      "resourceId": "fct-module-12-fairness-justice-application",
+      "stepTitle": "Practice: choose your lane",
+      "stepNarrative": "- Tech workers: Practice redemption engineering: pick one algorithmic system in your reach and trace where it inherits bias — training data, proxies, edge-case handling — then design the correction, testing against the users most likely to ",
+      "estimatedTime": "5-15 minutes",
+      "completionCriteria": [
+        "view"
+      ]
+    },
+    {
+      "order": 120,
+      "resourceId": "fct-module-12-fairness-justice-lane-tech-workers",
+      "stepTitle": "Practice for tech workers",
+      "stepNarrative": "Practice redemption engineering: pick one algorithmic system in your reach and trace where it inherits bias — training data, proxies, edge-case handling — then design the correction, testing against the users most likely to be harmed first ",
+      "optional": true,
+      "estimatedTime": "one week",
+      "completionCriteria": [
+        "view"
+      ]
+    },
+    {
+      "order": 121,
+      "resourceId": "fct-module-12-fairness-justice-lane-households",
+      "stepTitle": "Practice for households",
+      "stepNarrative": "Run the personal lifestyle audit: map how your consumption, housing, transportation, and giving actually land on your community's most vulnerable.",
+      "optional": true,
+      "estimatedTime": "one week",
+      "completionCriteria": [
+        "view"
+      ]
+    },
+    {
+      "order": 122,
+      "resourceId": "fct-module-12-fairness-justice-lane-church-leaders",
+      "stepTitle": "Practice for church leaders",
+      "stepNarrative": "Extend the audit to the whole institution — budget, facilities, hiring, worship accessibility across socioeconomic lines, and the church's digital presence.",
+      "optional": true,
+      "estimatedTime": "one week",
+      "completionCriteria": [
+        "view"
+      ]
+    },
+    {
+      "order": 123,
+      "resourceId": "fct-module-12-fairness-justice-homework",
+      "stepTitle": "The one assignment",
+      "stepNarrative": "Complete FHT Module 7: Helping People Thrive.",
+      "estimatedTime": "varies",
+      "completionCriteria": [
+        "view"
+      ]
+    },
+    {
+      "order": 124,
+      "resourceId": "fct-module-12-fairness-justice-quiz",
+      "stepTitle": "Check your understanding",
+      "stepNarrative": "Mastery check for Module 12, drawn from its learning objectives.",
+      "estimatedTime": "10 minutes",
+      "completionCriteria": [
+        "score"
+      ]
+    },
+    {
+      "order": 125,
+      "resourceId": "fct-module-12-fairness-justice-reflection",
+      "stepTitle": "Feeling generous, acting justly",
+      "stepNarrative": "Not graded: your answer is for you and your group.",
+      "estimatedTime": "10 minutes",
+      "completionCriteria": [
+        "score"
+      ]
+    },
+    {
+      "order": 126,
+      "resourceId": "fct-module-13-helping-thrive",
+      "stepTitle": "Helping People Thrive",
+      "stepNarrative": "from engagement as success → to abundant life in the Kingdom as the telos of everything we build.",
+      "learningObjectives": [
+        "Define thriving in both FHT's terms and Scripture's — abundant life — and explain why engagement metrics cannot measure it.",
+        "Trace the biblical progression from Promised Land to Kingdom of God as the theology of flourishing, including the gleaning laws as designed margin for the vulnerable.",
+        "Distinguish genuine thriving from its addictive mimics in specific products and church practices.",
+        "Apply the three design principles — protected attention, intentionality, deeply valuable experiences — with their Christian groundings.",
+        "Evaluate the \"thriving stories\" of major platforms and of their own church's mission statement for authenticity and drift.",
+        "Derive design principles from the feeding of the five thousand and apply one to something they build or lead."
+      ],
+      "completionCriteria": [
+        "view"
+      ],
+      "estimatedTime": "5-15 minutes"
+    },
+    {
+      "order": 127,
+      "resourceId": "fct-module-13-helping-thrive-story",
+      "stepTitle": "Story: Five Loaves, Two Fish, Twelve Baskets",
+      "stepNarrative": "The feeding of the five thousand — the only miracle in all four Gospels (John 6:1-14 and parallels) — reads as a masterclass in design for thriving.",
+      "estimatedTime": "5-15 minutes",
+      "completionCriteria": [
+        "view"
+      ]
+    },
+    {
+      "order": 128,
+      "resourceId": "fct-module-13-helping-thrive-discussion",
+      "stepTitle": "Gather: discussion and activity",
+      "stepNarrative": "1.",
+      "estimatedTime": "5-15 minutes",
+      "completionCriteria": [
+        "view"
+      ]
+    },
+    {
+      "order": 129,
+      "resourceId": "fct-module-13-helping-thrive-application",
+      "stepTitle": "Practice: choose your lane",
+      "stepNarrative": "- Tech workers: Adopt regret as a metric: instrument one honest signal of whether users are glad, a week later, for the time they gave you.",
+      "estimatedTime": "5-15 minutes",
+      "completionCriteria": [
+        "view"
+      ]
+    },
+    {
+      "order": 130,
+      "resourceId": "fct-module-13-helping-thrive-lane-tech-workers",
+      "stepTitle": "Practice for tech workers",
+      "stepNarrative": "Adopt regret as a metric: instrument one honest signal of whether users are glad, a week later, for the time they gave you.",
+      "optional": true,
+      "estimatedTime": "one week",
+      "completionCriteria": [
+        "view"
+      ]
+    },
+    {
+      "order": 131,
+      "resourceId": "fct-module-13-helping-thrive-lane-households",
+      "stepTitle": "Practice for households",
+      "stepNarrative": "Take the 30-day Sacred Attention challenge as a family — digital fasting rhythms, contemplative prayer, mindful use — and extend Module 12's lifestyle audit toward thriving: do our schedules and screens produce deeply valuable experiences o",
+      "optional": true,
+      "estimatedTime": "one week",
+      "completionCriteria": [
+        "view"
+      ]
+    },
+    {
+      "order": 132,
+      "resourceId": "fct-module-13-helping-thrive-lane-church-leaders",
+      "stepTitle": "Practice for church leaders",
+      "stepNarrative": "Build the thriving-oriented church: redefine success metrics away from attendance and giving toward relationship, formation, and neighborhood impact (Module 9's dashboard, now operational); redesign gatherings for deep interaction over pass",
+      "optional": true,
+      "estimatedTime": "one week",
+      "completionCriteria": [
+        "view"
+      ]
+    },
+    {
+      "order": 133,
+      "resourceId": "fct-module-13-helping-thrive-homework",
+      "stepTitle": "The one assignment",
+      "stepNarrative": "Complete FHT Module 8: Ready to Act — the final FHT module, closing the chain begun on Day 0.",
+      "estimatedTime": "varies",
+      "completionCriteria": [
+        "view"
+      ]
+    },
+    {
+      "order": 134,
+      "resourceId": "fct-module-13-helping-thrive-quiz",
+      "stepTitle": "Check your understanding",
+      "stepNarrative": "Mastery check for Module 13, drawn from its learning objectives.",
+      "estimatedTime": "10 minutes",
+      "completionCriteria": [
+        "score"
+      ]
+    },
+    {
+      "order": 135,
+      "resourceId": "fct-module-13-helping-thrive-reflection",
+      "stepTitle": "Our thriving story",
+      "stepNarrative": "Not graded: your answer is for you and your group.",
+      "estimatedTime": "10 minutes",
+      "completionCriteria": [
+        "score"
+      ]
+    },
+    {
+      "order": 136,
+      "resourceId": "fct-module-14-ready-to-act",
+      "stepTitle": "Ready to Act",
+      "stepNarrative": "from insight → to vocation: commissioned as salt and light in the tech world.",
+      "learningObjectives": [
+        "Synthesize the course into a cohesive Christian framework for engaging and shaping technology, module by module.",
+        "Articulate technology development and use as Christian vocation — salt and light expressed through work, parenting, and ministry.",
+        "Craft and deliver a personal testimony of how faith now informs their technology choices and building.",
+        "Apply the four culture-change steps within an Acts 1:8 pattern of expanding witness — congregation, neighborhood, industry, world.",
+        "Revisit Mind the Gap and measure movement since Module 4, committing to one next adjustment.",
+        "Identify their community of ongoing support — Christian tech networks, ecumenical partners, and the broader humane technology movement — and their contribution to it."
+      ],
+      "completionCriteria": [
+        "view"
+      ],
+      "estimatedTime": "5-15 minutes"
+    },
+    {
+      "order": 137,
+      "resourceId": "fct-module-14-ready-to-act-story",
+      "stepTitle": "Story: The Ark and the Redwoods",
+      "stepNarrative": "In the days of Noah, the earth was corrupt and filled with violence — and God's response was not abandonment but a commission: build.",
+      "estimatedTime": "5-15 minutes",
+      "completionCriteria": [
+        "view"
+      ]
+    },
+    {
+      "order": 138,
+      "resourceId": "fct-module-14-ready-to-act-discussion",
+      "stepTitle": "Gather: discussion and activity",
+      "stepNarrative": "(Written new for v2 — this cell was empty in v1.) Four rounds, run as a commissioning workshop:  1.",
+      "estimatedTime": "5-15 minutes",
+      "completionCriteria": [
+        "view"
+      ]
+    },
+    {
+      "order": 139,
+      "resourceId": "fct-module-14-ready-to-act-application",
+      "stepTitle": "Practice: The Expanding Circles (Acts 1:8)",
+      "stepNarrative": "The usual three lanes widen into sending circles for this module:",
+      "estimatedTime": "5-15 minutes",
+      "completionCriteria": [
+        "view"
+      ]
+    },
+    {
+      "order": 140,
+      "resourceId": "fct-module-14-ready-to-act-lane-individual",
+      "stepTitle": "Practice for the individual",
+      "stepNarrative": "Conduct a digital-discipleship audit of your own habits and skills; offer your tech skills to your church (website, digital literacy for seniors, media help); commit to continuous learning at the faith-and-technology intersection; keep a re",
+      "optional": true,
+      "estimatedTime": "one week",
+      "completionCriteria": [
+        "view"
+      ]
+    },
+    {
+      "order": 141,
+      "resourceId": "fct-module-14-ready-to-act-lane-our-church",
+      "stepTitle": "Practice for our church",
+      "stepNarrative": "Establish a Technology Stewardship team; map the congregation's tech skills and match them to needs; draft a church-wide ethical technology policy grounded in biblical principle and humane-tech practice; pair tech-savvy youth with elders fo",
+      "optional": true,
+      "estimatedTime": "one week",
+      "completionCriteria": [
+        "view"
+      ]
+    },
+    {
+      "order": 142,
+      "resourceId": "fct-module-14-ready-to-act-lane-ecumenical-body",
+      "stepTitle": "Practice for the ecumenical body",
+      "stepNarrative": "Convene or join Faith & Technology summits across traditions; build shared cross-denominational resource platforms; form united advocacy for ethical tech policy — data privacy, AI ethics, digital equality — as one Christian voice; launch a ",
+      "optional": true,
+      "estimatedTime": "one week",
+      "completionCriteria": [
+        "view"
+      ]
+    },
+    {
+      "order": 143,
+      "resourceId": "fct-module-14-ready-to-act-homework",
+      "stepTitle": "The one assignment",
+      "stepNarrative": "Two short items feeding tomorrow's capstone: complete the course feedback, and draft your personal action plan — one change in personal tech habits, one initiative to start or join in your church, one advocacy commitment in your professiona",
+      "estimatedTime": "varies",
+      "completionCriteria": [
+        "view"
+      ]
+    },
+    {
+      "order": 144,
+      "resourceId": "fct-module-14-ready-to-act-quiz",
+      "stepTitle": "Check your understanding",
+      "stepNarrative": "Mastery check for Module 14, drawn from its learning objectives.",
+      "estimatedTime": "10 minutes",
+      "completionCriteria": [
+        "score"
+      ]
+    },
+    {
+      "order": 145,
+      "resourceId": "fct-module-14-ready-to-act-testimony",
+      "stepTitle": "Your testimony",
+      "stepNarrative": "Not graded: your answer is for you and your group.",
+      "estimatedTime": "15 minutes",
+      "completionCriteria": [
+        "score"
+      ]
+    },
+    {
+      "order": 146,
+      "resourceId": "fct-module-14-ready-to-act-mind-the-gap-revisited",
+      "stepTitle": "Mind the Gap, revisited",
+      "stepNarrative": "Not graded: your answer is for you and your group.",
+      "estimatedTime": "15 minutes",
+      "completionCriteria": [
+        "score"
+      ]
+    },
+    {
+      "order": 147,
+      "resourceId": "fct-module-15-retrospective",
+      "stepTitle": "Digital Discipleship Retrospective",
+      "stepNarrative": "from course participant → to covenanted digital disciple with a rule of life and accountability.",
+      "learningObjectives": [],
+      "completionCriteria": [
+        "view"
+      ],
+      "estimatedTime": "5-15 minutes"
+    },
+    {
+      "order": 148,
+      "resourceId": "fct-module-15-retrospective-retrospective-liturgy",
+      "stepTitle": "The Retrospective Liturgy",
+      "stepNarrative": "1.",
+      "estimatedTime": "5-15 minutes",
+      "completionCriteria": [
+        "view"
+      ]
+    },
+    {
+      "order": 149,
+      "resourceId": "fct-module-15-retrospective-follow-up-the-covenant-holds",
+      "stepTitle": "Follow-Up — The Covenant Holds",
+      "stepNarrative": "Each participant pairs with an accountability partner from the course and shares their action plan.",
+      "estimatedTime": "5-15 minutes",
+      "completionCriteria": [
+        "view"
+      ]
+    },
+    {
+      "order": 150,
+      "resourceId": "fct-module-15-retrospective-three-commitments",
+      "stepTitle": "Three commitments",
+      "stepNarrative": "Not graded: your answer is for you and your group.",
+      "estimatedTime": "20 minutes",
+      "completionCriteria": [
+        "score"
+      ]
+    },
+    {
+      "order": 151,
+      "resourceId": "fct-module-15-retrospective-manifesto-line",
+      "stepTitle": "Your line of the manifesto",
+      "stepNarrative": "Not graded: your answer is for you and your group.",
+      "estimatedTime": "10 minutes",
+      "completionCriteria": [
+        "score"
+      ]
     }
   ]
 }

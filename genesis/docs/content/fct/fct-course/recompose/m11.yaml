@@ -1,0 +1,47 @@
+# Module 11 — Collaboration & Sensemaking. Mark the one correct choice " *".
+quiz:
+  - q: "What is the three-part repair?"
+    choices:
+      - "Delete, block, report"
+      - "Curtail the causes, address the ongoing crises, heal toxic habits *"
+      - "Pray, preach, publish"
+      - "Regulate, litigate, legislate"
+    bloom: remember
+  - q: "In John 17:20-23, what is unity for?"
+    choices:
+      - "Administrative efficiency"
+      - "The world's believing: it is the church's evidential infrastructure *"
+      - "Avoiding conflict"
+      - "Doctrinal uniformity"
+    bloom: understand
+  - q: "The word behind 'perfectly united' in 1 Corinthians 1:10 pictures:"
+    choices:
+      - "Forging a sword"
+      - "Mending torn fishing nets *"
+      - "Building a wall"
+      - "Planting a vineyard"
+    hints:
+      - "Matthew uses the same word for James and John repairing nets with their father."
+    bloom: remember
+  - q: "What is the perception gap?"
+    choices:
+      - "The distance between screen and eye"
+      - "Partisans dramatically misestimate what the other side actually believes *"
+      - "A gap in broadband coverage"
+      - "The difference between stated and demonstrated values"
+    bloom: understand
+  - q: "Trustville compounds a ___ while Skeptica pays a ___."
+    choices:
+      - "surplus; deficit"
+      - "trust dividend; suspicion tax *"
+      - "harvest; famine"
+      - "budget; debt"
+    bloom: remember
+reflections:
+  - title: "From Skeptica to Trustville"
+    prompt: "Name one digital Skeptica you belong to. Which of Module 4's trust conditions — repeat interactions, possible win-wins, low miscommunication — is weakest there, and what one practice or policy would strengthen it?"
+    placeholder: "Our Skeptica is... the weakest condition is... we would..."
+    criteria:
+      - "Names a real community"
+      - "Names a trust condition and one concrete intervention"
+    bloom: create

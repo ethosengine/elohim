@@ -16,8 +16,8 @@ the graph.
 Output is deterministic: the same inputs always write the same bytes, so seeding
 can recognise an unchanged atom and leave it alone.
 
-    python3 recompose.py              # Movement I (modules 1-4), the default slice
-    python3 recompose.py --modules 1-15
+    python3 recompose.py              # the whole course (modules 1-15)
+    python3 recompose.py --modules 1-4
     python3 recompose.py --check      # exit 1 if any output would change
 """
 from __future__ import annotations
@@ -347,6 +347,17 @@ class Composer:
                 atom[key] = lesson_prior[key]
         return atom
 
+    def ensure_scripture(self, ref_id: str, display: str) -> None:
+        """A scripture atom for every reference an edge names, so no edge dangles.
+
+        Atoms that already exist and were not written by this script are curated (the
+        2025 import carries verse text); they are inputs here, never overwritten. Atoms
+        this script wrote are regenerated from their reference alone.
+        """
+        existing = self.existing(ref_id)
+        if ref_id not in self.atoms and (not existing or existing.get("metadata", {}).get("generatedBy") == GENERATOR):
+            self.add(scripture_atom(ref_id, display))
+
     def edge(self, atom: dict, target: str, rtype: str, role: str) -> None:
         if rtype not in RELATIONSHIP_TYPES:
             raise SystemExit(f"{atom['id']}: relationship type {rtype} is not in the lamad manifest")
@@ -408,8 +419,9 @@ class Composer:
                         form = "counter-story" if kind == "Counter-Story" else "story"
                         atom = self.base(mod, f"{lesson_id}-{form}", "article",
                                          f"{kind}: {stitle}", f"## {stitle}\n\n{sub.body}", form)
-                        for ref_id, _display in scripture_refs(sub.heading + " " + mod.texts.get("Story", "")):
+                        for ref_id, display in scripture_refs(sub.heading + " " + mod.texts.get("Story", "")):
                             self.edge(atom, ref_id, "REFERENCES", "story-text")
+                            self.ensure_scripture(ref_id, display)
                         self.callbacks(atom, sub.body, mod.number)
                         children.append((self.add(atom), form, {
                             "stepTitle": f"{kind}: {stitle}",
@@ -445,7 +457,7 @@ class Composer:
                 lesson_parts.append(f"## {h}\n\n{block.body}")
             else:
                 # A module-specific practice (e.g. The Class Covenant) stands as its own atom.
-                atom = self.base(mod, f"{lesson_id}-{slug(re.sub(r'^The ', '', h))}", "practice", h,
+                atom = self.base(mod, f"{lesson_id}-{slug(re.sub(r'^(The|A) ', '', h))}", "practice", h,
                                  f"## {h}\n\n{block.body}", "practice")
                 self.callbacks(atom, block.body, mod.number)
                 children.append((self.add(atom), "practice", {
@@ -463,12 +475,7 @@ class Composer:
         lesson["learningObjectives"] = objectives
         for ref_id, display, role in role_refs(mod.texts):
             self.edge(lesson, ref_id, "REFERENCES", role)
-            # Scripture atoms that already exist and were not written by this script are
-            # curated (the 2025 import carries verse text); they are inputs here, never
-            # overwritten. Atoms this script wrote are regenerated from their reference alone.
-            existing = self.existing(ref_id)
-            if ref_id not in self.atoms and (not existing or existing.get("metadata", {}).get("generatedBy") == GENERATOR):
-                self.add(scripture_atom(ref_id, display))
+            self.ensure_scripture(ref_id, display)
         for child_id, role, _ in children:
             if role == "lane":
                 continue  # a lane belongs to its module's practice hub, not the lesson
@@ -537,8 +544,12 @@ class Composer:
                         f"## {heading}\n\n" + ("\n".join(intro).strip() or block.body), "practice-lanes")
         if not lane_texts:
             hub["content"] = f"## {heading}\n\n{block.body}"
+        standard_lanes = bool(lane_texts) and all(label.lower() in LANES for label in lane_texts)
+        # A module that widens the three lanes (Module 14's sending circles) is titled
+        # by its own heading rather than invited to "choose a lane".
+        widened_title = "Practice: " + re.sub(r"^Application\s*[—-]\s*", "", heading)
         steps = [(self.add(hub), "practice", {
-            "stepTitle": "Practice: choose your lane" if lane_texts else heading,
+            "stepTitle": "Practice: choose your lane" if standard_lanes else (widened_title if lane_texts else heading),
             "stepNarrative": first_sentence("\n".join(intro) or block.body),
             "estimatedTime": minutes(block.body),
         })]
@@ -593,7 +604,9 @@ class Composer:
                 "stepNarrative": r.get("narrative", "Not graded: your answer is for you and your group."),
                 "estimatedTime": r.get("time", "10 minutes"),
             }))
-        if not quiz:
+        # A sidecar that names `quiz:` with nothing under it declares the absence
+        # (Module 15 is consecration, not content); a sidecar that never mentions it is a gap.
+        if not quiz and "quiz" not in sidecar:
             self.report.append(f"m{mod.number:02d}: no quiz authored in recompose/m{mod.number:02d}.yaml")
         return out
 
@@ -745,7 +758,7 @@ def parse_range(text: str) -> list[int]:
 
 def main() -> int:
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
-    ap.add_argument("--modules", default="1-4", help="module numbers to recompose (default 1-4)")
+    ap.add_argument("--modules", default="1-15", help="module numbers to recompose (default 1-15, the whole course)")
     ap.add_argument("--check", action="store_true", help="write nothing; exit 1 if outputs would change")
     args = ap.parse_args()
 

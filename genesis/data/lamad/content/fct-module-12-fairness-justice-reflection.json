@@ -1,0 +1,101 @@
+{
+  "id": "fct-module-12-fairness-justice-reflection",
+  "contentType": "assessment",
+  "title": "Feeling generous, acting justly",
+  "description": "Where does your giving — or your church's programs — insulate you from the impact of daily choices on the most vulnerable near you? Name one everyday choice you will change this month that promotes justice rather than the feeling of generos",
+  "content": [
+    {
+      "id": "fct-module-12-fairness-justice-reflection",
+      "purpose": "reflection",
+      "content": {
+        "content": "[[☃ free-response 1]]",
+        "images": {},
+        "widgets": {
+          "free-response 1": {
+            "type": "free-response",
+            "options": {
+              "allowUnlimitedCharacters": false,
+              "characterLimit": 1500,
+              "placeholder": "What insulates me is... this month I will...",
+              "question": "Where does your giving — or your church's programs — insulate you from the impact of daily choices on the most vulnerable near you? Name one everyday choice you will change this month that promotes justice rather than the feeling of generosity.",
+              "scoringCriteria": [
+                {
+                  "text": "Names an insulating pattern honestly"
+                },
+                {
+                  "text": "Names a concrete everyday change"
+                }
+              ]
+            },
+            "graded": false,
+            "version": {
+              "major": 0,
+              "minor": 0
+            }
+          }
+        }
+      },
+      "metadata": {
+        "sourceContentId": "fct-module-12-fairness-justice-reflection",
+        "assessesContentId": "fct-module-12-fairness-justice",
+        "bloomsLevel": "evaluate",
+        "estimatedTimeSeconds": 600,
+        "questionType": "open-response",
+        "tags": [
+          "fct",
+          "reflection"
+        ]
+      }
+    }
+  ],
+  "contentFormat": "sophia-quiz-json",
+  "sourcePath": "docs/content/fct/fct-course/content/m12.md",
+  "reach": "commons",
+  "tags": [
+    "fct",
+    "christian-technology",
+    "humane-tech",
+    "movement-4",
+    "module-12",
+    "reflection"
+  ],
+  "metadata": {
+    "category": "fct",
+    "courseId": "foundations-christian-technology",
+    "courseVersion": "review draft v2, 2026-09-16",
+    "sourceWorkbook": "fct-course",
+    "moduleNumber": 12,
+    "movement": 4,
+    "movementTitle": "Rebuilding Common Life",
+    "day": "Day 10",
+    "form": "reflection",
+    "assessmentType": "reflection",
+    "questionCount": 1
+  },
+  "relationships": [
+    {
+      "target": "fct-module-12-fairness-justice",
+      "type": "VALIDATES",
+      "role": "reflection"
+    },
+    {
+      "target": "fct-module-12-fairness-justice",
+      "type": "BELONGS_TO",
+      "role": "reflection"
+    }
+  ],
+  "createdAt": "2026-09-27T00:00:00.000Z",
+  "updatedAt": "2026-09-27T00:00:00.000Z",
+  "stewardedBy": [
+    {
+      "humanId": "human-pete-pastor",
+      "affinity": 0.7,
+      "role": "steward"
+    },
+    {
+      "humanId": "human-matthew-manager",
+      "affinity": 0.3,
+      "role": "endorser"
+    }
+  ]
+}

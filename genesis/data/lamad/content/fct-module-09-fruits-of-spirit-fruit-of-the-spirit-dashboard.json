@@ -1,0 +1,50 @@
+{
+  "id": "fct-module-09-fruits-of-spirit-fruit-of-the-spirit-dashboard",
+  "contentType": "practice",
+  "title": "A Fruit-of-the-Spirit Dashboard",
+  "description": "A Fruit-of-the-Spirit Dashboard  Example measures a church might watch instead of attendance and budget:  | Fruit | What we might measure instead | | --- | --- | | Love | Meaningful relationships formed; reconciliations facilitated; sacrifi",
+  "content": "## A Fruit-of-the-Spirit Dashboard\n\nExample measures a church might watch instead of attendance and budget:\n\n| Fruit | What we might measure instead |\n| --- | --- |\n| Love | Meaningful relationships formed; reconciliations facilitated; sacrificial giving and service to those in need |\n| Joy | Members' sense of purpose in their faith journey; the church's impact on community mental health; shared celebration |\n| Peace | Conflicts resolved in church and community; reduction in domestic violence within the congregation's reach; local peacemaking involvement |\n| Patience | Long-term discipleship commitment; retention and growth of new believers over years; endurance in slow community-development work |\n| Kindness | Unexpected generosity; welcome and support of marginalized groups; care for creation |\n| Goodness | Impact on local recovery and crime; ethical business practice among members; members standing against injustice |\n| Faithfulness | Depth of Scripture engagement and application; sustained commitment to mission and service; integrity in personal and professional life |\n| Gentleness | How disagreements are conducted; the tone of members' public and online speech; restorative approaches to correction |\n| Self-control | Media consumption habits and their effects; responsible financial practice; stewardship of the church's own resources and footprint |",
+  "contentFormat": "markdown",
+  "sourcePath": "docs/content/fct/fct-course/content/m09.md",
+  "reach": "commons",
+  "tags": [
+    "fct",
+    "christian-technology",
+    "humane-tech",
+    "movement-3",
+    "module-9",
+    "practice"
+  ],
+  "metadata": {
+    "category": "fct",
+    "courseId": "foundations-christian-technology",
+    "courseVersion": "review draft v2, 2026-09-16",
+    "sourceWorkbook": "fct-course",
+    "moduleNumber": 9,
+    "movement": 3,
+    "movementTitle": "Reordering Loves",
+    "day": "Day 7",
+    "form": "practice"
+  },
+  "relationships": [
+    {
+      "target": "fct-module-09-fruits-of-spirit",
+      "type": "BELONGS_TO",
+      "role": "practice"
+    }
+  ],
+  "createdAt": "2026-09-27T00:00:00.000Z",
+  "updatedAt": "2026-09-27T00:00:00.000Z",
+  "stewardedBy": [
+    {
+      "humanId": "human-pete-pastor",
+      "affinity": 0.7,
+      "role": "steward"
+    },
+    {
+      "humanId": "human-matthew-manager",
+      "affinity": 0.3,
+      "role": "endorser"
+    }
+  ]
+}

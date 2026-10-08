@@ -1,0 +1,56 @@
+{
+  "id": "fct-module-06-harmful-consequences-lane-church-leaders",
+  "contentType": "practice",
+  "title": "Church leaders: Externalities & the Commons",
+  "description": "Church leaders  Inventory one flagship ministry with the worksheet — the Sunday production, the building, the missions model.",
+  "content": "## Church leaders\n\nInventory one flagship ministry with the worksheet — the Sunday production, the building, the missions model. Count costs to members (volunteer burnout, formation displaced by performance), to the neighborhood (traffic, land use, a campus dark six days a week), and to the wider Body (the smaller congregations your growth draws from — counted fully in Module 7's remedies). Present the uncomfortable line items to leadership before any solutions are proposed.",
+  "contentFormat": "markdown",
+  "sourcePath": "docs/content/fct/fct-course/content/m06.md",
+  "reach": "commons",
+  "tags": [
+    "fct",
+    "christian-technology",
+    "humane-tech",
+    "movement-2",
+    "module-6",
+    "practice-lane"
+  ],
+  "metadata": {
+    "category": "fct",
+    "courseId": "foundations-christian-technology",
+    "courseVersion": "review draft v2, 2026-09-16",
+    "sourceWorkbook": "fct-course",
+    "moduleNumber": 6,
+    "movement": 2,
+    "movementTitle": "Turning — Repentance & Repair",
+    "day": "Day 4",
+    "form": "practice-lane",
+    "audience": "church-leaders"
+  },
+  "relationships": [
+    {
+      "target": "fct-module-06-harmful-consequences-application",
+      "type": "BELONGS_TO",
+      "role": "lane"
+    },
+    {
+      "target": "fct-module-07-regeneration",
+      "type": "RELATES_TO",
+      "role": "callback"
+    }
+  ],
+  "createdAt": "2026-09-27T00:00:00.000Z",
+  "updatedAt": "2026-09-27T00:00:00.000Z",
+  "stewardedBy": [
+    {
+      "humanId": "human-pete-pastor",
+      "affinity": 0.7,
+      "role": "steward"
+    },
+    {
+      "humanId": "human-matthew-manager",
+      "affinity": 0.3,
+      "role": "endorser"
+    }
+  ]
+}

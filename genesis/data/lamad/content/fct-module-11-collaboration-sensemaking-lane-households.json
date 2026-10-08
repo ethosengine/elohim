@@ -1,0 +1,51 @@
+{
+  "id": "fct-module-11-collaboration-sensemaking-lane-households",
+  "contentType": "practice",
+  "title": "Households: Collaboration & Sensemaking",
+  "description": "Households  Practice mutual understanding as a learnable skill at your own table: charitable interpretation as the house rule, one small facilitated conversation across a real divide this month (invite them to dinner — embodied beats thread",
+  "content": "## Households\n\nPractice mutual understanding as a learnable skill at your own table: charitable interpretation as the house rule, one small facilitated conversation across a real divide this month (invite them to dinner — embodied beats threaded), and connection as the household's first response to a struggling member, remembering that the opposite of addiction is not sobriety but connection.",
+  "contentFormat": "markdown",
+  "sourcePath": "docs/content/fct/fct-course/content/m11.md",
+  "reach": "commons",
+  "tags": [
+    "fct",
+    "christian-technology",
+    "humane-tech",
+    "movement-4",
+    "module-11",
+    "practice-lane"
+  ],
+  "metadata": {
+    "category": "fct",
+    "courseId": "foundations-christian-technology",
+    "courseVersion": "review draft v2, 2026-09-16",
+    "sourceWorkbook": "fct-course",
+    "moduleNumber": 11,
+    "movement": 4,
+    "movementTitle": "Rebuilding Common Life",
+    "day": "Day 9",
+    "form": "practice-lane",
+    "audience": "households"
+  },
+  "relationships": [
+    {
+      "target": "fct-module-11-collaboration-sensemaking-application",
+      "type": "BELONGS_TO",
+      "role": "lane"
+    }
+  ],
+  "createdAt": "2026-09-27T00:00:00.000Z",
+  "updatedAt": "2026-09-27T00:00:00.000Z",
+  "stewardedBy": [
+    {
+      "humanId": "human-pete-pastor",
+      "affinity": 0.7,
+      "role": "steward"
+    },
+    {
+      "humanId": "human-matthew-manager",
+      "affinity": 0.3,
+      "role": "endorser"
+    }
+  ]
+}

@@ -1,0 +1,51 @@
+{
+  "id": "fct-module-09-fruits-of-spirit-lane-church-leaders",
+  "contentType": "practice",
+  "title": "Church leaders: Fruit as Metric",
+  "description": "Church leaders  Begin the shift the dashboard implies: develop a fruit-of-the-Spirit assessment rhythm for individual and communal reflection; form small groups around cultivating specific fruits; pair mature believers with newer ones; rede",
+  "content": "## Church leaders\n\nBegin the shift the dashboard implies: develop a fruit-of-the-Spirit assessment rhythm for individual and communal reflection; form small groups around cultivating specific fruits; pair mature believers with newer ones; redesign one program explicitly around the fruit it should bear; partner with local organizations who can tell you honestly what your community's fruit tastes like from outside. Let technology serve connection and accountability in this — never the scoreboard.",
+  "contentFormat": "markdown",
+  "sourcePath": "docs/content/fct/fct-course/content/m09.md",
+  "reach": "commons",
+  "tags": [
+    "fct",
+    "christian-technology",
+    "humane-tech",
+    "movement-3",
+    "module-9",
+    "practice-lane"
+  ],
+  "metadata": {
+    "category": "fct",
+    "courseId": "foundations-christian-technology",
+    "courseVersion": "review draft v2, 2026-09-16",
+    "sourceWorkbook": "fct-course",
+    "moduleNumber": 9,
+    "movement": 3,
+    "movementTitle": "Reordering Loves",
+    "day": "Day 7",
+    "form": "practice-lane",
+    "audience": "church-leaders"
+  },
+  "relationships": [
+    {
+      "target": "fct-module-09-fruits-of-spirit-application",
+      "type": "BELONGS_TO",
+      "role": "lane"
+    }
+  ],
+  "createdAt": "2026-09-27T00:00:00.000Z",
+  "updatedAt": "2026-09-27T00:00:00.000Z",
+  "stewardedBy": [
+    {
+      "humanId": "human-pete-pastor",
+      "affinity": 0.7,
+      "role": "steward"
+    },
+    {
+      "humanId": "human-matthew-manager",
+      "affinity": 0.3,
+      "role": "endorser"
+    }
+  ]
+}

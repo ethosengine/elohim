@@ -1,0 +1,55 @@
+{
+  "id": "fct-module-09-fruits-of-spirit-homework",
+  "contentType": "practice",
+  "title": "Homework: Fruit as Metric",
+  "description": "Homework  Complete FHT Module 5: Creating Shared Understanding.",
+  "content": "## Homework\n\nComplete FHT Module 5: *Creating Shared Understanding*. One assignment; bring one fruit-KPI draft to class.",
+  "contentFormat": "markdown",
+  "sourcePath": "docs/content/fct/fct-course/content/m09.md",
+  "reach": "commons",
+  "tags": [
+    "fct",
+    "christian-technology",
+    "humane-tech",
+    "movement-3",
+    "module-9",
+    "homework"
+  ],
+  "metadata": {
+    "category": "fct",
+    "courseId": "foundations-christian-technology",
+    "courseVersion": "review draft v2, 2026-09-16",
+    "sourceWorkbook": "fct-course",
+    "moduleNumber": 9,
+    "movement": 3,
+    "movementTitle": "Reordering Loves",
+    "day": "Day 7",
+    "form": "homework"
+  },
+  "relationships": [
+    {
+      "target": "fct-module-05-respecting-human-nature",
+      "type": "RELATES_TO",
+      "role": "callback"
+    },
+    {
+      "target": "fct-module-09-fruits-of-spirit",
+      "type": "BELONGS_TO",
+      "role": "homework"
+    }
+  ],
+  "createdAt": "2026-09-27T00:00:00.000Z",
+  "updatedAt": "2026-09-27T00:00:00.000Z",
+  "stewardedBy": [
+    {
+      "humanId": "human-pete-pastor",
+      "affinity": 0.7,
+      "role": "steward"
+    },
+    {
+      "humanId": "human-matthew-manager",
+      "affinity": 0.3,
+      "role": "endorser"
+    }
+  ]
+}

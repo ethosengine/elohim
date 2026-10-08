@@ -1,40 +1,54 @@
 {
   "id": "fct-module-06-harmful-consequences-discussion",
-  "contentType": "exercise",
-  "reach": "commons",
-  "title": "Discussion: Minimizing Harmful Consequences",
-  "description": "Group discussion and reflection activity",
-  "content": "**Instructions:** Identifying Externalities Worksheet\n\n**Activity Type:** discussion\n\n**Group Size:** small-group\n\n**Estimated Time:** 15-20 minutes\n\n",
+  "contentType": "discussion",
+  "title": "Discussion: Externalities & the Commons",
+  "description": "Discussion & Activity  1.",
+  "content": "## Discussion & Activity\n\n1. **Activity — the worksheet.** Work the Identifying Externalities worksheet on a chosen product, ministry, or household pattern. For each stakeholder ask: what do they pay that never appears in our accounting — attention, trust, health, place, formation?\n2. **Case studies — the church's own exhaust.** Externalities are not only Silicon Valley's. Consider two documented cases with honesty and grace: *Jesus Camp* (2006), where a formation model produced diminished empathy toward those of different beliefs — a cost paid in the church's capacity to love neighbor and be heard as witness; and *Shiny Happy People* (2023), where an authority system enabled hidden abuse — a cost paid by victims first, and then by every community now met with earned distrust, and by those who rejected faith altogether. Discuss: what did each system optimize for, and who absorbed the unpriced cost? What would the \"song of witness\" have sounded like in those communities?\n3. **Where do we pass by?** Name one place our congregation currently moves to the other side of the road — a cost we know about and have arranged not to see.",
   "contentFormat": "markdown",
-  "sourcePath": "fct/v1/Module 6 - Minimizing Harmful Consequences - Externalities, Tragedy of the Commons, and  Arms Races.md",
+  "sourcePath": "docs/content/fct/fct-course/content/m06.md",
+  "reach": "commons",
   "tags": [
-    "activity",
-    "discussion",
     "fct",
-    "human-nature"
-  ],
-  "relatedNodeIds": [
-    "fct-module-06-harmful-consequences"
+    "christian-technology",
+    "humane-tech",
+    "movement-2",
+    "module-6",
+    "discussion"
   ],
   "metadata": {
-    "category": "fct-activity",
-    "sourceModule": "fct-module-06-harmful-consequences",
-    "activityType": "discussion",
-    "originalContentType": "activity"
+    "category": "fct",
+    "courseId": "foundations-christian-technology",
+    "courseVersion": "review draft v2, 2026-09-16",
+    "sourceWorkbook": "fct-course",
+    "moduleNumber": 6,
+    "movement": 2,
+    "movementTitle": "Turning — Repentance & Repair",
+    "day": "Day 4",
+    "form": "discussion"
   },
+  "relationships": [
+    {
+      "target": "fct-module-06-harmful-consequences",
+      "type": "BELONGS_TO",
+      "role": "discussion"
+    }
+  ],
   "createdAt": "2025-11-28T21:10:19.206992",
-  "updatedAt": "2025-12-24T03:05:26.192Z",
+  "updatedAt": "2026-09-27T00:00:00.000Z",
+  "stewardedBy": [
+    {
+      "humanId": "human-pete-pastor",
+      "affinity": 0.7,
+      "role": "steward"
+    },
+    {
+      "humanId": "human-matthew-manager",
+      "affinity": 0.3,
+      "role": "endorser"
+    }
+  ],
   "did": "did:web:elohim.host:content:fct:module 6 - minimizing harmful consequences - externalities, tragedy of the commons, and  arms races",
   "activityPubType": "Page",
-  "openGraphMetadata": {
-    "ogTitle": "Discussion: Minimizing Harmful Consequences",
-    "ogDescription": "Group discussion and reflection activity",
-    "ogType": "website",
-    "ogUrl": "https://elohim-protocol.org/content/fct-module-06-harmful-consequences-discussion",
-    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
-    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/activity.jpg",
-    "ogImageAlt": "Discussion: Minimizing Harmful Consequences - Elohim Protocol"
-  },
   "linkedData": {
     "@context": "https://schema.org/",
     "@type": "CreativeWork",
@@ -49,17 +63,5 @@
       "@id": "https://elohim-protocol.org",
       "name": "Elohim Protocol"
     }
-  },
-  "stewardedBy": [
-    {
-      "humanId": "human-pete-pastor",
-      "affinity": 0.7,
-      "role": "steward"
-    },
-    {
-      "humanId": "human-matthew-manager",
-      "affinity": 0.3,
-      "role": "endorser"
-    }
-  ]
+  }
 }

@@ -1,0 +1,48 @@
+# Module 5 — Our Attention is Sacred. What the prose cannot carry: the mastery check
+# and the reflection. Mark the one correct choice with a trailing " *".
+quiz:
+  - q: "Why do our evolved heuristics matter for technology design?"
+    choices:
+      - "They make people immune to persuasion"
+      - "They misfire as biases that can be systematically exploited at scale *"
+      - "They only affect children"
+      - "They stop mattering once people are educated"
+    hints:
+      - "Every human brain is subject to these forces, so technology that targets them affects everyone."
+    bloom: understand
+  - q: "What does the module say about 'giving people what they want'?"
+    choices:
+      - "It is the gold standard of humane design"
+      - "It is only a problem for small companies"
+      - "It collapses when what people click diverges from what they value *"
+      - "It means asking users in surveys"
+    bloom: understand
+  - q: "In Luke 10:38-42, what is Martha's trap?"
+    choices:
+      - "She is doing something wrong"
+      - "Many necessary preparations that keep her from the one thing needed *"
+      - "She refuses to serve"
+      - "She ignores Jesus entirely"
+    bloom: analyze
+  - q: "What do the manners of Christ in Revelation 3:20 model for technology?"
+    choices:
+      - "He knocks and waits for attention freely given; he does not autoplay or push through *"
+      - "He enters whenever he chooses"
+      - "He sends constant reminders"
+      - "He competes for attention with louder signals"
+    bloom: understand
+  - q: "Which design move does the Shema (Deuteronomy 6 and 11) suggest for a household?"
+    choices:
+      - "Remove all technology from the home"
+      - "Let each person decide alone"
+      - "An ambient attention architecture: guard the thresholds, the table and the doorframes *"
+      - "Replace old devices with newer devices"
+    bloom: apply
+reflections:
+  - title: "The manners of your technology"
+    prompt: "List three technologies in your life by their manners: which wait to be invited, and which let themselves in? Then name one flow you will give the manners of Christ this week — a sacred pause, a threshold kept, a default that honors what you actually value."
+    placeholder: "The one that knocks... the one that barges in..."
+    criteria:
+      - "Names specific technologies and their manners"
+      - "Names one concrete change for this week"
+    bloom: evaluate

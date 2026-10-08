@@ -1,0 +1,54 @@
+# Module 6 — Externalities & the Commons. The lab is the Parable of the Polygons,
+# this module's homework and Module 7's opening. Mark the one correct choice " *".
+labs:
+  - fct-media-06-lab-parable-of-the-polygons
+labTitles:
+  fct-media-06-lab-parable-of-the-polygons: "Lab: Parable of the Polygons"
+labNarratives:
+  fct-media-06-lab-parable-of-the-polygons: "Play it before Module 7: how small individual bias compounds into a segregated system, and why the past haunts the present."
+quiz:
+  - q: "What is an externality?"
+    choices:
+      - "A product feature nobody asked for"
+      - "A cost of an activity that lands on parties outside the transaction *"
+      - "A tax on profits"
+      - "A charitable donation"
+    bloom: remember
+  - q: "In the Good Samaritan, what posture do the priest and the Levite embody?"
+    choices:
+      - "Direct extraction, like the robbers"
+      - "Full-cost accounting"
+      - "Externalized cost: the man's suffering is real but off their books *"
+      - "Neutral observation with no moral weight"
+    hints:
+      - "They pass by on the other side."
+    bloom: analyze
+  - q: "Jesus' closing inversion in Luke 10 reframes the lawyer's question as:"
+    choices:
+      - "Who deserves help?"
+      - "Not 'where may I stop counting?' but 'to whom will I be a neighbor?' *"
+      - "How much can I afford?"
+      - "Which neighbor is closest?"
+    bloom: understand
+  - q: "What is the 'song of witness' in Deuteronomy 31?"
+    choices:
+      - "A victory hymn"
+      - "A wall against enemies"
+      - "A liturgy taught in advance to testify against the community's own future extraction — an anti-KPI *"
+      - "A harvest celebration"
+    bloom: understand
+  - q: "What does Joseph's storehouse strategy model?"
+    choices:
+      - "Hoarding for Pharaoh's household only"
+      - "Trusting the market to correct itself"
+      - "Consuming the surplus now"
+      - "Foresight that books the famine during the feast and provisions neighbors beyond the palace *"
+    bloom: apply
+reflections:
+  - title: "The whole receipt"
+    prompt: "Pick one routine — a product you ship, a ministry you run, a household habit. Write the second receipt: who pays what never appears in your accounting? One line per party. Do not propose a fix yet; this is the counting week."
+    placeholder: "The moderator pays... the neighborhood pays... the smaller congregation pays..."
+    criteria:
+      - "Names at least two parties outside the transaction"
+      - "Names the cost each one pays"
+    bloom: evaluate

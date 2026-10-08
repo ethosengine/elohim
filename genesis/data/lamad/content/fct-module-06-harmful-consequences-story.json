@@ -1,40 +1,59 @@
 {
   "id": "fct-module-06-harmful-consequences-story",
-  "contentType": "example",
-  "reach": "commons",
-  "title": "\"Joseph and the Seven Years of Plenty and Famine\"",
-  "description": "Biblical story or example illustrating module concepts",
-  "content": "**Narrative:** The story of Joseph interpreting Pharaoh's dreams and managing Egypt's resources in Genesis 41-47 provides an example of Minimizing Harmful Consequences in the bible:\n\n\"Joseph and the Seven Years of Plenty and Famine\"  \nIn this story:  \nPharaoh has dreams of seven fat cows being eaten by seven thin cows, and seven healthy ears of grain being devoured by seven thin ears.  \nJoseph interprets these dreams as a prediction of seven years of abundance followed by seven years of severe famine.  \nJoseph advises Pharaoh to appoint a wise manager to oversee the collection and storage of surplus grain during the seven years of plenty.  \nDuring the abundant years, Joseph implements a system to collect and store one-fifth of the harvest.  \nWhen the famine hits, Egypt is prepared and can provide for its people and even sell grain to neighboring regions.\n\nThis narrative illustrates:  \nExternalities: The future famine is an external factor that would have devastating consequences if not addressed.  \nTragedy of the Commons: Without Joseph's intervention, people might have consumed all the abundant crops, leaving nothing for the lean years \\- similar to overfishing a lake.  \nArms Race: While not explicitly an arms race, the story shows how preparation and wise resource management can prevent a destructive competition for scarce resources during the famine.  \nStewardship: Joseph's management demonstrates responsible stewardship of resources, considering long-term consequences and the common good.  \nProactive Problem-Solving: The story emphasizes the importance of recognizing potential future problems and taking action to mitigate them.\n\nThis biblical narrative can be used to discuss how foresight, wise management, and consideration of long-term consequences are crucial in technology development and use. It also demonstrates how addressing potential \"tragedies of the commons\" can benefit not just one group, but surrounding communities as well.\n**NarrativeType:** biblical-example",
+  "contentType": "article",
+  "title": "Story: Joseph and the Seven Years",
+  "description": "Joseph and the Seven Years  Genesis 41 shows foresight as statecraft.",
+  "content": "## Joseph and the Seven Years\n\nGenesis 41 shows foresight as statecraft. Pharaoh's dreams — fat cows devoured by thin ones — are a forecast of a cost arriving fourteen years out. Joseph's interpretation would be worthless without administration: a fifth of every harvest stored through the years of plenty, so that when the famine lands, Egypt feeds itself and its neighbors. Read through this module's lenses: the famine is the externality no one wants to book during the boom; unmanaged plenty would be a tragedy of the commons (consume it all now, starve together later); and Joseph's storehouses convert competition over scarcity into provision for the surrounding nations. Stewardship here is not private virtue — it is systems design under prophetic foresight, and it blesses people far outside the palace.",
   "contentFormat": "markdown",
-  "sourcePath": "fct/v1/Module 6 - Minimizing Harmful Consequences - Externalities, Tragedy of the Commons, and  Arms Races.md",
+  "sourcePath": "docs/content/fct/fct-course/content/m06.md",
+  "reach": "commons",
   "tags": [
-    "story",
-    "narrative",
     "fct",
-    "biblical-example",
-    "human-nature"
-  ],
-  "relatedNodeIds": [
-    "fct-module-06-harmful-consequences"
+    "christian-technology",
+    "humane-tech",
+    "movement-2",
+    "module-6",
+    "story"
   ],
   "metadata": {
-    "category": "fct-narrative",
-    "sourceModule": "fct-module-06-harmful-consequences",
-    "originalContentType": "narrative"
+    "category": "fct",
+    "courseId": "foundations-christian-technology",
+    "courseVersion": "review draft v2, 2026-09-16",
+    "sourceWorkbook": "fct-course",
+    "moduleNumber": 6,
+    "movement": 2,
+    "movementTitle": "Turning — Repentance & Repair",
+    "day": "Day 4",
+    "form": "story"
   },
+  "relationships": [
+    {
+      "target": "fct-bible-genesis-41",
+      "type": "REFERENCES",
+      "role": "story-text"
+    },
+    {
+      "target": "fct-module-06-harmful-consequences",
+      "type": "BELONGS_TO",
+      "role": "story"
+    }
+  ],
   "createdAt": "2025-11-28T21:10:19.207000",
-  "updatedAt": "2025-12-26T21:04:01.829Z",
+  "updatedAt": "2026-09-27T00:00:00.000Z",
+  "stewardedBy": [
+    {
+      "humanId": "human-pete-pastor",
+      "affinity": 0.7,
+      "role": "steward"
+    },
+    {
+      "humanId": "human-matthew-manager",
+      "affinity": 0.3,
+      "role": "endorser"
+    }
+  ],
   "did": "did:web:elohim.host:content:fct:module 6 - minimizing harmful consequences - externalities, tragedy of the commons, and  arms races",
   "activityPubType": "Page",
-  "openGraphMetadata": {
-    "ogTitle": "\"Joseph and the Seven Years of Plenty and Famine\"",
-    "ogDescription": "Biblical story or example illustrating module concepts",
-    "ogType": "website",
-    "ogUrl": "https://elohim-protocol.org/content/fct-module-06-harmful-consequences-story",
-    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
-    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/narrative.jpg",
-    "ogImageAlt": "\"Joseph and the Seven Years of Plenty and Famine\" - Elohim Protocol"
-  },
   "linkedData": {
     "@context": "https://schema.org/",
     "@type": "CreativeWork",
@@ -49,17 +68,5 @@
       "@id": "https://elohim-protocol.org",
       "name": "Elohim Protocol"
     }
-  },
-  "stewardedBy": [
-    {
-      "humanId": "human-pete-pastor",
-      "affinity": 0.7,
-      "role": "steward"
-    },
-    {
-      "humanId": "human-matthew-manager",
-      "affinity": 0.3,
-      "role": "endorser"
-    }
-  ]
+  }
 }

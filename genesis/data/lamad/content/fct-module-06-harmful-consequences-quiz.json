@@ -1,0 +1,344 @@
+{
+  "id": "fct-module-06-harmful-consequences-quiz",
+  "contentType": "assessment",
+  "title": "Check your understanding: Externalities & the Commons",
+  "description": "Mastery check for Module 6, drawn from its learning objectives.",
+  "content": [
+    {
+      "id": "fct-module-06-harmful-consequences-q1",
+      "purpose": "mastery",
+      "content": {
+        "content": "What is an externality?\n\n[[☃ radio 1]]",
+        "images": {},
+        "widgets": {
+          "radio 1": {
+            "type": "radio",
+            "options": {
+              "choices": [
+                {
+                  "content": "A product feature nobody asked for",
+                  "correct": false,
+                  "id": "fct-module-06-harmful-consequences-q1-c0"
+                },
+                {
+                  "content": "A cost of an activity that lands on parties outside the transaction",
+                  "correct": true,
+                  "id": "fct-module-06-harmful-consequences-q1-c1"
+                },
+                {
+                  "content": "A tax on profits",
+                  "correct": false,
+                  "id": "fct-module-06-harmful-consequences-q1-c2"
+                },
+                {
+                  "content": "A charitable donation",
+                  "correct": false,
+                  "id": "fct-module-06-harmful-consequences-q1-c3"
+                }
+              ],
+              "randomize": true,
+              "multipleSelect": false
+            },
+            "graded": true,
+            "version": {
+              "major": 0,
+              "minor": 0
+            }
+          }
+        }
+      },
+      "hints": [],
+      "metadata": {
+        "sourceContentId": "fct-module-06-harmful-consequences-quiz",
+        "assessesContentId": "fct-module-06-harmful-consequences",
+        "bloomsLevel": "remember",
+        "difficulty": "medium",
+        "estimatedTimeSeconds": 60,
+        "questionType": "core",
+        "tags": [
+          "fct"
+        ]
+      }
+    },
+    {
+      "id": "fct-module-06-harmful-consequences-q2",
+      "purpose": "mastery",
+      "content": {
+        "content": "In the Good Samaritan, what posture do the priest and the Levite embody?\n\n[[☃ radio 1]]",
+        "images": {},
+        "widgets": {
+          "radio 1": {
+            "type": "radio",
+            "options": {
+              "choices": [
+                {
+                  "content": "Direct extraction, like the robbers",
+                  "correct": false,
+                  "id": "fct-module-06-harmful-consequences-q2-c0"
+                },
+                {
+                  "content": "Full-cost accounting",
+                  "correct": false,
+                  "id": "fct-module-06-harmful-consequences-q2-c1"
+                },
+                {
+                  "content": "Externalized cost: the man's suffering is real but off their books",
+                  "correct": true,
+                  "id": "fct-module-06-harmful-consequences-q2-c2"
+                },
+                {
+                  "content": "Neutral observation with no moral weight",
+                  "correct": false,
+                  "id": "fct-module-06-harmful-consequences-q2-c3"
+                }
+              ],
+              "randomize": true,
+              "multipleSelect": false
+            },
+            "graded": true,
+            "version": {
+              "major": 0,
+              "minor": 0
+            }
+          }
+        }
+      },
+      "hints": [
+        {
+          "content": "They pass by on the other side.",
+          "images": {},
+          "widgets": {}
+        }
+      ],
+      "metadata": {
+        "sourceContentId": "fct-module-06-harmful-consequences-quiz",
+        "assessesContentId": "fct-module-06-harmful-consequences",
+        "bloomsLevel": "analyze",
+        "difficulty": "medium",
+        "estimatedTimeSeconds": 60,
+        "questionType": "core",
+        "tags": [
+          "fct"
+        ]
+      }
+    },
+    {
+      "id": "fct-module-06-harmful-consequences-q3",
+      "purpose": "mastery",
+      "content": {
+        "content": "Jesus' closing inversion in Luke 10 reframes the lawyer's question as:\n\n[[☃ radio 1]]",
+        "images": {},
+        "widgets": {
+          "radio 1": {
+            "type": "radio",
+            "options": {
+              "choices": [
+                {
+                  "content": "Who deserves help?",
+                  "correct": false,
+                  "id": "fct-module-06-harmful-consequences-q3-c0"
+                },
+                {
+                  "content": "Not 'where may I stop counting?' but 'to whom will I be a neighbor?'",
+                  "correct": true,
+                  "id": "fct-module-06-harmful-consequences-q3-c1"
+                },
+                {
+                  "content": "How much can I afford?",
+                  "correct": false,
+                  "id": "fct-module-06-harmful-consequences-q3-c2"
+                },
+                {
+                  "content": "Which neighbor is closest?",
+                  "correct": false,
+                  "id": "fct-module-06-harmful-consequences-q3-c3"
+                }
+              ],
+              "randomize": true,
+              "multipleSelect": false
+            },
+            "graded": true,
+            "version": {
+              "major": 0,
+              "minor": 0
+            }
+          }
+        }
+      },
+      "hints": [],
+      "metadata": {
+        "sourceContentId": "fct-module-06-harmful-consequences-quiz",
+        "assessesContentId": "fct-module-06-harmful-consequences",
+        "bloomsLevel": "understand",
+        "difficulty": "medium",
+        "estimatedTimeSeconds": 60,
+        "questionType": "core",
+        "tags": [
+          "fct"
+        ]
+      }
+    },
+    {
+      "id": "fct-module-06-harmful-consequences-q4",
+      "purpose": "mastery",
+      "content": {
+        "content": "What is the 'song of witness' in Deuteronomy 31?\n\n[[☃ radio 1]]",
+        "images": {},
+        "widgets": {
+          "radio 1": {
+            "type": "radio",
+            "options": {
+              "choices": [
+                {
+                  "content": "A victory hymn",
+                  "correct": false,
+                  "id": "fct-module-06-harmful-consequences-q4-c0"
+                },
+                {
+                  "content": "A wall against enemies",
+                  "correct": false,
+                  "id": "fct-module-06-harmful-consequences-q4-c1"
+                },
+                {
+                  "content": "A liturgy taught in advance to testify against the community's own future extraction — an anti-KPI",
+                  "correct": true,
+                  "id": "fct-module-06-harmful-consequences-q4-c2"
+                },
+                {
+                  "content": "A harvest celebration",
+                  "correct": false,
+                  "id": "fct-module-06-harmful-consequences-q4-c3"
+                }
+              ],
+              "randomize": true,
+              "multipleSelect": false
+            },
+            "graded": true,
+            "version": {
+              "major": 0,
+              "minor": 0
+            }
+          }
+        }
+      },
+      "hints": [],
+      "metadata": {
+        "sourceContentId": "fct-module-06-harmful-consequences-quiz",
+        "assessesContentId": "fct-module-06-harmful-consequences",
+        "bloomsLevel": "understand",
+        "difficulty": "medium",
+        "estimatedTimeSeconds": 60,
+        "questionType": "core",
+        "tags": [
+          "fct"
+        ]
+      }
+    },
+    {
+      "id": "fct-module-06-harmful-consequences-q5",
+      "purpose": "mastery",
+      "content": {
+        "content": "What does Joseph's storehouse strategy model?\n\n[[☃ radio 1]]",
+        "images": {},
+        "widgets": {
+          "radio 1": {
+            "type": "radio",
+            "options": {
+              "choices": [
+                {
+                  "content": "Hoarding for Pharaoh's household only",
+                  "correct": false,
+                  "id": "fct-module-06-harmful-consequences-q5-c0"
+                },
+                {
+                  "content": "Trusting the market to correct itself",
+                  "correct": false,
+                  "id": "fct-module-06-harmful-consequences-q5-c1"
+                },
+                {
+                  "content": "Consuming the surplus now",
+                  "correct": false,
+                  "id": "fct-module-06-harmful-consequences-q5-c2"
+                },
+                {
+                  "content": "Foresight that books the famine during the feast and provisions neighbors beyond the palace",
+                  "correct": true,
+                  "id": "fct-module-06-harmful-consequences-q5-c3"
+                }
+              ],
+              "randomize": true,
+              "multipleSelect": false
+            },
+            "graded": true,
+            "version": {
+              "major": 0,
+              "minor": 0
+            }
+          }
+        }
+      },
+      "hints": [],
+      "metadata": {
+        "sourceContentId": "fct-module-06-harmful-consequences-quiz",
+        "assessesContentId": "fct-module-06-harmful-consequences",
+        "bloomsLevel": "apply",
+        "difficulty": "medium",
+        "estimatedTimeSeconds": 60,
+        "questionType": "core",
+        "tags": [
+          "fct"
+        ]
+      }
+    }
+  ],
+  "contentFormat": "sophia-quiz-json",
+  "sourcePath": "docs/content/fct/fct-course/content/m06.md",
+  "reach": "commons",
+  "tags": [
+    "fct",
+    "christian-technology",
+    "humane-tech",
+    "movement-2",
+    "module-6",
+    "quiz"
+  ],
+  "metadata": {
+    "category": "fct",
+    "courseId": "foundations-christian-technology",
+    "courseVersion": "review draft v2, 2026-09-16",
+    "sourceWorkbook": "fct-course",
+    "moduleNumber": 6,
+    "movement": 2,
+    "movementTitle": "Turning — Repentance & Repair",
+    "day": "Day 4",
+    "form": "quiz",
+    "assessmentType": "mastery",
+    "questionCount": 5
+  },
+  "relationships": [
+    {
+      "target": "fct-module-06-harmful-consequences",
+      "type": "VALIDATES",
+      "role": "mastery"
+    },
+    {
+      "target": "fct-module-06-harmful-consequences",
+      "type": "BELONGS_TO",
+      "role": "quiz"
+    }
+  ],
+  "createdAt": "2026-09-27T00:00:00.000Z",
+  "updatedAt": "2026-09-27T00:00:00.000Z",
+  "stewardedBy": [
+    {
+      "humanId": "human-pete-pastor",
+      "affinity": 0.7,
+      "role": "steward"
+    },
+    {
+      "humanId": "human-matthew-manager",
+      "affinity": 0.3,
+      "role": "endorser"
+    }
+  ]
+}

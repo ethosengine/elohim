@@ -1,0 +1,344 @@
+{
+  "id": "fct-module-08-centering-love-quiz",
+  "contentType": "assessment",
+  "title": "Check your understanding: Centering Love",
+  "description": "Mastery check for Module 8, drawn from its learning objectives.",
+  "content": [
+    {
+      "id": "fct-module-08-centering-love-q1",
+      "purpose": "mastery",
+      "content": {
+        "content": "Why does the module reject 'technology is neutral'?\n\n[[☃ radio 1]]",
+        "images": {},
+        "widgets": {
+          "radio 1": {
+            "type": "radio",
+            "options": {
+              "choices": [
+                {
+                  "content": "Because technology is always harmful",
+                  "correct": false,
+                  "id": "fct-module-08-centering-love-q1-c0"
+                },
+                {
+                  "content": "Every design choice expresses values; neutrality claims multiply with scale as a way to decline responsibility",
+                  "correct": true,
+                  "id": "fct-module-08-centering-love-q1-c1"
+                },
+                {
+                  "content": "Because only governments make value choices",
+                  "correct": false,
+                  "id": "fct-module-08-centering-love-q1-c2"
+                },
+                {
+                  "content": "Because users cannot be trusted",
+                  "correct": false,
+                  "id": "fct-module-08-centering-love-q1-c3"
+                }
+              ],
+              "randomize": true,
+              "multipleSelect": false
+            },
+            "graded": true,
+            "version": {
+              "major": 0,
+              "minor": 0
+            }
+          }
+        }
+      },
+      "hints": [],
+      "metadata": {
+        "sourceContentId": "fct-module-08-centering-love-quiz",
+        "assessesContentId": "fct-module-08-centering-love",
+        "bloomsLevel": "understand",
+        "difficulty": "medium",
+        "estimatedTimeSeconds": 60,
+        "questionType": "core",
+        "tags": [
+          "fct"
+        ]
+      }
+    },
+    {
+      "id": "fct-module-08-centering-love-q2",
+      "purpose": "mastery",
+      "content": {
+        "content": "Goodhart's Law says:\n\n[[☃ radio 1]]",
+        "images": {},
+        "widgets": {
+          "radio 1": {
+            "type": "radio",
+            "options": {
+              "choices": [
+                {
+                  "content": "Metrics always improve outcomes",
+                  "correct": false,
+                  "id": "fct-module-08-centering-love-q2-c0"
+                },
+                {
+                  "content": "Bigger datasets remove bias",
+                  "correct": false,
+                  "id": "fct-module-08-centering-love-q2-c1"
+                },
+                {
+                  "content": "When a measure becomes a target, it ceases to be a good measure",
+                  "correct": true,
+                  "id": "fct-module-08-centering-love-q2-c2"
+                },
+                {
+                  "content": "Targets should be kept secret",
+                  "correct": false,
+                  "id": "fct-module-08-centering-love-q2-c3"
+                }
+              ],
+              "randomize": true,
+              "multipleSelect": false
+            },
+            "graded": true,
+            "version": {
+              "major": 0,
+              "minor": 0
+            }
+          }
+        }
+      },
+      "hints": [
+        {
+          "content": "Micah 6:7 said it about rams and rivers of oil first.",
+          "images": {},
+          "widgets": {}
+        }
+      ],
+      "metadata": {
+        "sourceContentId": "fct-module-08-centering-love-quiz",
+        "assessesContentId": "fct-module-08-centering-love",
+        "bloomsLevel": "remember",
+        "difficulty": "medium",
+        "estimatedTimeSeconds": 60,
+        "questionType": "core",
+        "tags": [
+          "fct"
+        ]
+      }
+    },
+    {
+      "id": "fct-module-08-centering-love-q3",
+      "purpose": "mastery",
+      "content": {
+        "content": "In Matthew 22:36-40, how does the module read the word 'depend'?\n\n[[☃ radio 1]]",
+        "images": {},
+        "widgets": {
+          "radio 1": {
+            "type": "radio",
+            "options": {
+              "choices": [
+                {
+                  "content": "As a suggestion among many rules",
+                  "correct": false,
+                  "id": "fct-module-08-centering-love-q3-c0"
+                },
+                {
+                  "content": "As a ranking of ceremonial laws",
+                  "correct": false,
+                  "id": "fct-module-08-centering-love-q3-c1"
+                },
+                {
+                  "content": "Love of God and neighbor is the root dependency of the whole moral codebase",
+                  "correct": true,
+                  "id": "fct-module-08-centering-love-q3-c2"
+                },
+                {
+                  "content": "As a description of the Sabbath",
+                  "correct": false,
+                  "id": "fct-module-08-centering-love-q3-c3"
+                }
+              ],
+              "randomize": true,
+              "multipleSelect": false
+            },
+            "graded": true,
+            "version": {
+              "major": 0,
+              "minor": 0
+            }
+          }
+        }
+      },
+      "hints": [],
+      "metadata": {
+        "sourceContentId": "fct-module-08-centering-love-quiz",
+        "assessesContentId": "fct-module-08-centering-love",
+        "bloomsLevel": "analyze",
+        "difficulty": "medium",
+        "estimatedTimeSeconds": 60,
+        "questionType": "core",
+        "tags": [
+          "fct"
+        ]
+      }
+    },
+    {
+      "id": "fct-module-08-centering-love-q4",
+      "purpose": "mastery",
+      "content": {
+        "content": "How does Romans 13:10 function in design?\n\n[[☃ radio 1]]",
+        "images": {},
+        "widgets": {
+          "radio 1": {
+            "type": "radio",
+            "options": {
+              "choices": [
+                {
+                  "content": "As a floor: the first acceptance test — does this harm the neighbor it touches?",
+                  "correct": true,
+                  "id": "fct-module-08-centering-love-q4-c0"
+                },
+                {
+                  "content": "As a marketing slogan",
+                  "correct": false,
+                  "id": "fct-module-08-centering-love-q4-c1"
+                },
+                {
+                  "content": "As a rule only for churches",
+                  "correct": false,
+                  "id": "fct-module-08-centering-love-q4-c2"
+                },
+                {
+                  "content": "As an argument for fewer features",
+                  "correct": false,
+                  "id": "fct-module-08-centering-love-q4-c3"
+                }
+              ],
+              "randomize": true,
+              "multipleSelect": false
+            },
+            "graded": true,
+            "version": {
+              "major": 0,
+              "minor": 0
+            }
+          }
+        }
+      },
+      "hints": [],
+      "metadata": {
+        "sourceContentId": "fct-module-08-centering-love-quiz",
+        "assessesContentId": "fct-module-08-centering-love",
+        "bloomsLevel": "apply",
+        "difficulty": "medium",
+        "estimatedTimeSeconds": 60,
+        "questionType": "core",
+        "tags": [
+          "fct"
+        ]
+      }
+    },
+    {
+      "id": "fct-module-08-centering-love-q5",
+      "purpose": "mastery",
+      "content": {
+        "content": "What is a 'bad victory'?\n\n[[☃ radio 1]]",
+        "images": {},
+        "widgets": {
+          "radio 1": {
+            "type": "radio",
+            "options": {
+              "choices": [
+                {
+                  "content": "Losing a competition",
+                  "correct": false,
+                  "id": "fct-module-08-centering-love-q5-c0"
+                },
+                {
+                  "content": "Seeming to win by means that are not neutral, at the cost of your soul",
+                  "correct": true,
+                  "id": "fct-module-08-centering-love-q5-c1"
+                },
+                {
+                  "content": "A victory with low engagement",
+                  "correct": false,
+                  "id": "fct-module-08-centering-love-q5-c2"
+                },
+                {
+                  "content": "Winning without celebrating",
+                  "correct": false,
+                  "id": "fct-module-08-centering-love-q5-c3"
+                }
+              ],
+              "randomize": true,
+              "multipleSelect": false
+            },
+            "graded": true,
+            "version": {
+              "major": 0,
+              "minor": 0
+            }
+          }
+        }
+      },
+      "hints": [],
+      "metadata": {
+        "sourceContentId": "fct-module-08-centering-love-quiz",
+        "assessesContentId": "fct-module-08-centering-love",
+        "bloomsLevel": "understand",
+        "difficulty": "medium",
+        "estimatedTimeSeconds": 60,
+        "questionType": "core",
+        "tags": [
+          "fct"
+        ]
+      }
+    }
+  ],
+  "contentFormat": "sophia-quiz-json",
+  "sourcePath": "docs/content/fct/fct-course/content/m08.md",
+  "reach": "commons",
+  "tags": [
+    "fct",
+    "christian-technology",
+    "humane-tech",
+    "movement-3",
+    "module-8",
+    "quiz"
+  ],
+  "metadata": {
+    "category": "fct",
+    "courseId": "foundations-christian-technology",
+    "courseVersion": "review draft v2, 2026-09-16",
+    "sourceWorkbook": "fct-course",
+    "moduleNumber": 8,
+    "movement": 3,
+    "movementTitle": "Reordering Loves",
+    "day": "Day 6",
+    "form": "quiz",
+    "assessmentType": "mastery",
+    "questionCount": 5
+  },
+  "relationships": [
+    {
+      "target": "fct-module-08-centering-love",
+      "type": "VALIDATES",
+      "role": "mastery"
+    },
+    {
+      "target": "fct-module-08-centering-love",
+      "type": "BELONGS_TO",
+      "role": "quiz"
+    }
+  ],
+  "createdAt": "2026-09-27T00:00:00.000Z",
+  "updatedAt": "2026-09-27T00:00:00.000Z",
+  "stewardedBy": [
+    {
+      "humanId": "human-pete-pastor",
+      "affinity": 0.7,
+      "role": "steward"
+    },
+    {
+      "humanId": "human-matthew-manager",
+      "affinity": 0.3,
+      "role": "endorser"
+    }
+  ]
+}
