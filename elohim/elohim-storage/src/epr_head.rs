@@ -206,7 +206,34 @@ fn election_witness(content: &db::models::Content) -> Option<EprHeadElectionView
         canonical_declared_at: render_micros_rfc3339(declared_at)?,
         earned: content.canonical_earned == Some(1),
         link_hash: content.canonical_link_hash.clone(),
+        // Never projected: only a live read names the elector.
+        elector: None,
     })
+}
+
+/// The elector of `live`, when it is the SAME election `witness` records —
+/// matched on the effective tiebreak (the root-accepted ordering hash for a
+/// delegated declaration, otherwise the winning link — what
+/// `canonical_link_hash` stores). A witness with no tiebreak, a conductor that
+/// did not answer, a different election, or a coordinator that names no
+/// author all yield `None`: the witness never borrows an elector from an
+/// election it does not record.
+pub fn live_elector_for_witness(
+    witness: &EprHeadElectionView,
+    live: &crate::services::live_earned::LocalElection,
+) -> Option<String> {
+    let crate::services::live_earned::LocalElection::Answered(Some(election)) = live else {
+        return None;
+    };
+    let recorded = witness.link_hash.as_deref()?;
+    let live_tiebreak = election
+        .canonical_ordering_hash
+        .as_ref()
+        .or(election.canonical_link_hash.as_ref())?;
+    if live_tiebreak.0 != recorded {
+        return None;
+    }
+    election.winner_author.as_ref().map(|a| a.0.clone())
 }
 
 /// Render a DHT `Timestamp` (microseconds since the Unix epoch) as RFC3339 UTC

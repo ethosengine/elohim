@@ -221,6 +221,9 @@ pub fn content_head_view_from_content(c: &Content) -> Option<ContentHeadView> {
         // columns the heal guard keys on. Witness, not authority.
         canonical_declared_at: c.canonical_declared_at,
         canonical_link_hash: c.canonical_link_hash.clone(),
+        // The elector is never projected: only a live-election read names it.
+        elector: None,
+        elector_source: None,
     })
 }
 

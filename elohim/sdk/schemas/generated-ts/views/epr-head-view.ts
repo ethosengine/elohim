@@ -112,6 +112,10 @@ export interface EprHeadView {
      */
     earned: boolean;
     /**
+     * The ELECTOR — the agent (AgentPubKey, u-prefixed base64) that signed the winning declaration link — present ONLY on a ?election=live read whose own conductor answered the SAME election this witness records (same tiebreak). Never projected; absent on a plain read and whenever no live answer names it.
+     */
+    elector?: string;
+    /**
      * The election's tiebreak, from content.canonical_link_hash (Holochain u-prefixed base64): the winning declaration link, or the root-accepted head action for a delegated declaration. Omitted when NULL — an election recorded before the tiebreak travelled.
      */
     linkHash?: string;

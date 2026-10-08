@@ -188,6 +188,12 @@ pub struct EprHeadElectionView {
     /// The election's tiebreak (u-prefixed base64). Omitted when unknown.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub link_hash: Option<String>,
+    /// The ELECTOR — the agent that signed the winning declaration link —
+    /// present ONLY on a `?election=live` read whose own conductor answered
+    /// the SAME election this witness records (same tiebreak). Never
+    /// projected; absent on a plain read and whenever no live answer names it.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub elector: Option<String>,
 }
 
 impl From<EprHead> for EprHeadView {

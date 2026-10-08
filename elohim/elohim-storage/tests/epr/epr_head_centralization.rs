@@ -23,7 +23,9 @@ use diesel::{prelude::*, RunQueryDsl};
 use elohim_storage::db::content_diesel::{create_content, CreateContentInput};
 use elohim_storage::db::context::AppContext;
 use elohim_storage::epr_codec::{decode_epr_head, encode_epr_head};
-use elohim_storage::epr_head::{compose_head_view, derive_epr_head, derive_epr_head_with_election};
+use elohim_storage::epr_head::{
+    compose_head_view, derive_epr_head, derive_epr_head_with_election, live_elector_for_witness,
+};
 use elohim_storage::test_util::test_pool;
 
 // ---------------------------------------------------------------------------
@@ -836,5 +838,72 @@ fn epr_head_election_renders_clock_tier_and_tiebreak() {
             "canonicalDeclaredAt": "2026-09-20T02:00:30.000001Z",
             "earned": false,
         })
+    );
+}
+
+/// The elector rides only on a live answer for the SAME election the witness
+/// records (matched on the effective tiebreak) — never borrowed from another.
+#[test]
+fn epr_head_elector_is_named_only_by_a_live_answer_for_the_recorded_election() {
+    use elohim_storage::services::live_earned::{ElectionUnavailable, LocalElection};
+    use elohim_storage::views_convert::epr::EprHeadElectionView;
+
+    let witness = EprHeadElectionView {
+        canonical_declared_at: "2026-10-08T14:00:00.123456Z".to_string(),
+        earned: true,
+        link_hash: Some("uhCkkRecordedLink".to_string()),
+        elector: None,
+    };
+    let wire = |link: &str, ordering: Option<&str>, author: Option<&str>| {
+        LocalElection::Answered(Some(
+            serde_json::from_value(serde_json::json!({
+                "winner_target": "uhCkkWinner",
+                "canonical_declared_at": 1,
+                "canonical_earned": true,
+                "canonical_link_hash": link,
+                "canonical_ordering_hash": ordering,
+                "winner_author": author,
+            }))
+            .expect("election wire"),
+        ))
+    };
+
+    assert_eq!(
+        live_elector_for_witness(
+            &witness,
+            &wire("uhCkkRecordedLink", None, Some("uhCAkElector"))
+        ),
+        Some("uhCAkElector".to_string())
+    );
+    // A delegated election: the ordering hash is the tiebreak the column holds.
+    assert_eq!(
+        live_elector_for_witness(
+            &witness,
+            &wire(
+                "uhCkkActualLink",
+                Some("uhCkkRecordedLink"),
+                Some("uhCAkDelegate")
+            )
+        ),
+        Some("uhCAkDelegate".to_string())
+    );
+    // A different election, an author-less coordinator, no answer: absent.
+    assert_eq!(
+        live_elector_for_witness(
+            &witness,
+            &wire("uhCkkOtherLink", None, Some("uhCAkElector"))
+        ),
+        None
+    );
+    assert_eq!(
+        live_elector_for_witness(&witness, &wire("uhCkkRecordedLink", None, None)),
+        None
+    );
+    assert_eq!(
+        live_elector_for_witness(
+            &witness,
+            &LocalElection::Unavailable(ElectionUnavailable::NoClient)
+        ),
+        None
     );
 }

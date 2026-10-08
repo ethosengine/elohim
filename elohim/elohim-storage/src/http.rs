@@ -9294,6 +9294,12 @@ impl HttpServer {
         }
         view.earned = verdict.earned;
         view.earned_source = Some(verdict.source);
+        view.elector = crate::services::live_earned::live_elector(&view.head_action_hash, election);
+        view.elector_source = Some(if view.elector.is_some() {
+            elohim_views::lamad::EarnedSource::Live
+        } else {
+            elohim_views::lamad::EarnedSource::Cached
+        });
         view
     }
 
@@ -15641,9 +15647,27 @@ impl HttpServer {
                 // peers. `compose_head_view` is the single pure
                 // derive+encode+stamp path (same provenance gate, no pillar
                 // enrichment) this branch has always run.
-                if let Some(view) =
+                if let Some(mut view) =
                     crate::epr_head::compose_head_view(&mut conn, &app_ctx, id, true)?
                 {
+                    // `?election=live`: name the ELECTOR of the election the
+                    // witness records, from this peer's own conductor. Never
+                    // projected, never addressed — the dag-cbor arm above is
+                    // untouched and `cid` was minted before this.
+                    let live_election = req.uri().query().is_some_and(|query| {
+                        url::form_urlencoded::parse(query.as_bytes())
+                            .any(|(key, value)| key == "election" && value == "live")
+                    });
+                    if live_election && view.election.is_some() {
+                        drop(conn);
+                        let deadline = tokio::time::Instant::now()
+                            + crate::services::live_earned::LIVE_ELECTION_BUDGET;
+                        let (_hc, live) = self.ask_local_election(id, deadline).await;
+                        if let Some(witness) = view.election.as_mut() {
+                            witness.elector =
+                                crate::epr_head::live_elector_for_witness(witness, &live);
+                        }
+                    }
                     return Ok(Response::builder()
                         .status(StatusCode::OK)
                         .header(header::CONTENT_TYPE, "application/json")

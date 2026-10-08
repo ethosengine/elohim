@@ -11620,6 +11620,7 @@ mod tests {
                 // staging candidate beneath it.
                 staging_candidate: None,
                 staging_candidate_declared_at: None,
+                winner_author: None,
             }),
         );
         for id in unattempted {

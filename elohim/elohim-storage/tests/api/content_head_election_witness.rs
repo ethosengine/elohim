@@ -134,3 +134,25 @@ async fn epr_head_carries_the_election_witness_beside_an_unmoved_cid() {
     );
     assert!(elected["cid"].is_string(), "{elected}");
 }
+
+/// The elector has exactly one producer — this peer's own conductor on a
+/// `?election=live` read. With no conductor (none here) the field is ABSENT on
+/// both reads, and the content head's `electorSource` says why.
+#[tokio::test]
+async fn without_a_conductor_no_elector_is_named_and_the_source_says_so() {
+    let base = serve().await;
+    let (status, plain) = get(&base, &format!("/db/content/{ELECTED}/head")).await;
+    assert_eq!(status, 200, "{plain}");
+    assert!(plain.get("elector").is_none(), "{plain}");
+    assert!(plain.get("electorSource").is_none(), "{plain}");
+
+    let (status, live) = get(&base, &format!("/db/content/{ELECTED}/head?election=live")).await;
+    assert_eq!(status, 200, "{live}");
+    assert!(live.get("elector").is_none(), "{live}");
+    assert_eq!(live["electorSource"], "cached", "{live}");
+
+    let (status, head) = get(&base, &format!("/epr-head/{ELECTED}?election=live")).await;
+    assert_eq!(status, 200, "{head}");
+    assert!(head["election"].is_object(), "{head}");
+    assert!(head["election"].get("elector").is_none(), "{head}");
+}

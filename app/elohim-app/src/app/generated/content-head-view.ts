@@ -62,6 +62,14 @@ export interface ContentHeadView {
    */
   canonicalDeclaredAt?: number | null;
   /**
+   * The ELECTOR — the agent (Holochain AgentPubKey, u-prefixed base64) that signed the winning canonical-head declaration link — as this peer's own conductor answered it on a live-election read (?election=live) whose winner IS the declared head. Never projected or cached: absent on a plain read, absent when the conductor did not answer in budget, absent when the live winner is a different head or the coordinator predates the field. electorSource says which.
+   */
+  elector?: string;
+  /**
+   * Present ONLY on a live-election read. live: the conductor answered and named the elector. cached: no live elector was answered, and because the projection never stores an elector, elector is absent.
+   */
+  electorSource?: 'live' | 'cached';
+  /**
    * The election's tiebreak (content.canonical_link_hash, Holochain u-prefixed base64): the winning declaration link, or the root-accepted head action for a delegated declaration. null = unknown (no election recorded, or one recorded before the tiebreak travelled). Additive: absent from older serving nodes.
    */
   canonicalLinkHash?: string | null;

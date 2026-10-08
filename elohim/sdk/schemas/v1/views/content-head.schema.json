@@ -65,6 +65,15 @@
       "type": ["integer", "null"],
       "description": "The DHT timestamp (microseconds since the Unix epoch — same convention as ProjectionInventoryEntry.declaredHeadAt) of the canonical-head declaration link that select_canonical_winner elected, as this peer's projection recorded it (content.canonical_declared_at). The election clock: with canonicalLinkHash it lets a reader tell a stale election from a different one. null = no election recorded on this row (single provenance: the row answered). Additive: absent from older serving nodes."
     },
+    "elector": {
+      "type": "string",
+      "description": "The ELECTOR — the agent (Holochain AgentPubKey, u-prefixed base64) that signed the winning canonical-head declaration link — as this peer's own conductor answered it on a live-election read (?election=live) whose winner IS the declared head. Never projected or cached: absent on a plain read, absent when the conductor did not answer in budget, absent when the live winner is a different head or the coordinator predates the field. electorSource says which."
+    },
+    "electorSource": {
+      "type": "string",
+      "enum": ["live", "cached"],
+      "description": "Present ONLY on a live-election read. live: the conductor answered and named the elector. cached: no live elector was answered, and because the projection never stores an elector, elector is absent."
+    },
     "canonicalLinkHash": {
       "type": ["string", "null"],
       "description": "The election's tiebreak (content.canonical_link_hash, Holochain u-prefixed base64): the winning declaration link, or the root-accepted head action for a delegated declaration. null = unknown (no election recorded, or one recorded before the tiebreak travelled). Additive: absent from older serving nodes."

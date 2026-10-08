@@ -136,4 +136,22 @@ canonicalDeclaredAt?: number | null,
  * base64). `None` = no election recorded, or one recorded before the
  * tiebreak travelled (wire: `canonicalLinkHash`).
  */
-canonicalLinkHash?: string, };
+canonicalLinkHash?: string, 
+/**
+ * The ELECTOR — the agent that signed the winning declaration link — as
+ * this peer's own conductor answered it on a live-election read
+ * (`?election=live`) whose winner IS the declared head. Never projected,
+ * never cached: absent on a plain read, absent when the conductor did not
+ * answer, absent when the live winner is a different head (wire:
+ * `elector`).
+ */
+elector?: string, 
+/**
+ * Where [`Self::elector`] came from, present ONLY on a live-election read:
+ * `live` — the conductor answered and named the elector; `cached` — no
+ * live elector was answered (no conductor, out of budget, a different
+ * winner, or a coordinator that predates the field), and since the
+ * projection never stores one, `elector` is absent (wire:
+ * `electorSource`).
+ */
+electorSource?: EarnedSource, };

@@ -119,6 +119,10 @@
           "type": "boolean",
           "description": "Election tier: true iff content.canonical_earned = 1 (EARNED — beats any staging declaration regardless of recency); false for a staging/unmarked election (0) or an unrecorded tier (NULL)."
         },
+        "elector": {
+          "type": "string",
+          "description": "The ELECTOR — the agent (AgentPubKey, u-prefixed base64) that signed the winning declaration link — present ONLY on a ?election=live read whose own conductor answered the SAME election this witness records (same tiebreak). Never projected; absent on a plain read and whenever no live answer names it."
+        },
         "linkHash": {
           "type": "string",
           "description": "The election's tiebreak, from content.canonical_link_hash (Holochain u-prefixed base64): the winning declaration link, or the root-accepted head action for a delegated declaration. Omitted when NULL — an election recorded before the tiebreak travelled."

@@ -210,6 +210,8 @@ fn content_head_view_matches_schema() {
         canonical_link_hash: Some(
             "uhCkkLINK0123456789012345678901234567890123456789012345678901".to_string(),
         ),
+        elector: Some("uhCAkELECTOR012345678901234567890123456789012345678901".to_string()),
+        elector_source: Some(EarnedSource::Live),
     };
     let json = serde_json::to_value(&declared).unwrap();
     assert_eq!(json["canonicalDeclaredAt"], 1_791_446_400_123_456_i64);
@@ -240,6 +242,8 @@ fn content_head_view_matches_schema() {
         // No election recorded: both fields serialize as null.
         canonical_declared_at: None,
         canonical_link_hash: None,
+        elector: None,
+        elector_source: None,
     };
     let json = serde_json::to_value(&anchor_only).unwrap();
     assert!(
@@ -251,10 +255,16 @@ fn content_head_view_matches_schema() {
     // Live-election read whose conductor did not answer: the column stands.
     let cached = ContentHeadView {
         earned_source: Some(EarnedSource::Cached),
+        elector_source: Some(EarnedSource::Cached),
         ..anchor_only
     };
     let json = serde_json::to_value(&cached).unwrap();
     assert_eq!(json["earnedSource"], "cached");
+    assert!(
+        json.get("elector").is_none(),
+        "no live elector answered: the field is absent and electorSource says so"
+    );
+    assert_eq!(json["electorSource"], "cached");
     validate_against_schema("views/content-head.schema.json", &json);
 }
 
@@ -6539,6 +6549,7 @@ fn epr_head_view_matches_schema() {
             link_hash: Some(
                 "uhCkkLINK0123456789012345678901234567890123456789012345678901".to_string(),
             ),
+            elector: Some("uhCAkELECTOR012345678901234567890123456789012345678901".to_string()),
         }),
     };
     let json = serde_json::to_value(&full).unwrap();
@@ -6592,6 +6603,7 @@ fn epr_head_view_matches_schema() {
             canonical_declared_at: "2026-10-08T14:00:00.000001Z".to_string(),
             earned: false,
             link_hash: None,
+            elector: None,
         }),
         ..minimal
     };
