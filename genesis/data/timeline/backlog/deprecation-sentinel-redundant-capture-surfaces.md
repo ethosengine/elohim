@@ -747,7 +747,10 @@ second. The fix is to normalize this in `fingerprint()`, the way Class 5
 strips the Node pid. A candidate is
 `re.sub(r"^\d{1,2}:\d{2}:\d{2}\s*(?:[AP]M)?\s+", "", norm)`. It needs a
 must-capture harness, and it needs the same operator approval as Guard V
-because it edits the same hook.
+because it edits the same hook. **Recurrence 2026-10-08:** a third
+timestamped emission minted `19d73e162a53` (`12:28:04 AM [vite] warning: …`)
+and dispatched a full triage run that found nothing new. Every vitest run in
+`app/lamad` can repeat this until the normalization lands.
 
 **Class 14 (observed 2026-09-26, recorded, not fixed): Guard C misreads
 commit-body bullets as diff hunks.** Guard C keeps `+`/`-` lines from a

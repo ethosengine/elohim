@@ -11,7 +11,7 @@ status: "backlog"
 priority: "low"
 deprecation_status: blocked
 severity: low
-fingerprints: ["612e34199acb", "8a122f0ee621"]
+fingerprints: ["612e34199acb", "8a122f0ee621", "19d73e162a53"]
 relatedNodeIds: []
 tags: [deprecation, vite, vite-8, rolldown, analogjs, vite-plugin-angular, vitest, lamad, elohim-app, elohim-library, peer-dependency]
 cites:
@@ -30,7 +30,7 @@ cites:
 [vite] warning: `optimizeDeps.esbuildOptions` option was specified by "@analogjs/vite-plugin-angular" plugin. This option is deprecated, please use `optimizeDeps.rolldownOptions` instead.
 ```
 
-This warning has been captured twice so far:
+This warning has been captured three times so far:
 
 - `612e34199acb`, from `pnpm exec vitest run --config vite.config.ts` in
   `app/lamad`.
@@ -39,6 +39,9 @@ This warning has been captured twice so far:
   line the sentinel hashes, so every timestamped emission gets a new
   fingerprint. This is recorded as Class 13 in
   `deprecation-sentinel-redundant-capture-surfaces.md`.
+- `19d73e162a53` (2026-10-08), the same text again behind a logger prefix
+  (`12:28:04 AM [vite] warning: …`), from a vitest run in `app/lamad`. This is
+  the second Class 13 re-mint, not a new concern.
 
 ## Usage inventory
 
@@ -105,6 +108,15 @@ pass. The sentinel will not dispatch again on `612e34199acb` or
 `8a122f0ee621` (both ledger rows are `blocked`). A new timestamped emission
 can still mint a new fingerprint until Class 13 is normalized. When that
 happens, fold the fingerprint in here.
+
+**Re-checked 2026-10-08 (fingerprint `19d73e162a53`).** The skew is
+unchanged. From `app/lamad`, `vitest@4.1.11` resolves `vite@8.1.5` and
+`@analogjs/vite-plugin-angular@2.6.4` resolves `vite@7.3.1`. Both
+`app/elohim-app/package.json` and `app/elohim-library/package.json` still
+declare `"vite": "^7.3.1"`. The blocker and the plan above still stand. Each
+new timestamped re-mint should be folded in here and set to `blocked` until
+Class 13 lands. The real fix for the re-mints is the `fingerprint()`
+normalization in the sentinel entry, and that is waiting on operator approval.
 
 ## Verification
 
