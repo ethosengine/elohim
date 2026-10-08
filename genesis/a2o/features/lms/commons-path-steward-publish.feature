@@ -104,6 +104,27 @@ Feature: A steward publishes a commons learning path from his own peer, and seed
   that withdrawal never happened. The broader withdrawal scenarios below remain
   work in progress until their native witnesses and household checks are wired.
 
+  The course was first published as a single workbook: one web bundle holding all
+  fifteen modules, with its own table of contents inside. The rework took that
+  workbook apart into the path above, so the workbook is now the SOURCE the
+  pieces were cut from, which each lesson still names, and never a step on the
+  path: a step that carried the whole course subdivided inside itself would put a
+  second, unwalkable table of contents inside the first module.
+
+  Reach is also what a reader meets. Narrower still than intimate is private:
+  held for its author alone. An older seeder gave that reach to every row it
+  wrote without a declared one, and a peer keeps a row's reach until the
+  author's new head reaches it, which is how a piece of a commons course can
+  sit at private reach on a peer today. Standing is the reader's recognized
+  relationship to the circle a reach names: anyone has it for commons, a
+  signed-in member for community, a household member for intimate, nobody but
+  the author for private. A peer that holds a piece at a narrower reach than
+  the reader has standing for answers the read "held, at this reach": the piece
+  exists there, and the hold is a decision. That is a different answer from "no
+  such piece", and the reader must be told which one they got. A reader's device
+  may keep an offline copy of a piece it was once allowed to read; a hold must
+  not be answered with that copy as if the piece were open.
+
   # Sprint 1.4 closes one exact item; the full course and lifecycle scenarios stay held.
   Scenario: Che publishes two consecutive updates to Matthew's item without the pipeline
     Given the original Che peer has verified credentials for one Matthew-authored commons item
@@ -189,3 +210,27 @@ Feature: A steward publishes a commons learning path from his own peer, and seed
     When that peer verifies the claimed authorization for the update
     Then it requires the controller's complete witnessed history for that exact exercise
     And missing history leaves publication pending
+
+  @wip @regression
+  Scenario: The workbook the course was cut from is not a step on the path
+    # Regression 2026-10-08: the recomposed path carried the workbook as the twelfth step of
+    # "The Church Dilemma", so module 1 ended in a second table of contents.
+    Given the "Foundations for Christian Technology" path as published
+    When its steps are listed in walking order, the order a learner meets them from the first movement to the last piece
+    Then no step is the course's source workbook
+    And "The Church Dilemma" ends with its own reflection piece, not with the workbook
+    And every lesson still names that workbook as the source it was cut from
+    And each module's pieces follow its lesson with no gap in that order
+
+  @wip @regression
+  Scenario: A reader reaching a piece held at a narrower reach is told it is held, not missing
+    # Regression 2026-10-08: the step view answered a refused read with "not yet available, it may
+    # not have been seeded", the message for a piece that does not exist.
+    Given a reader with no standing beyond commons opens "Foundations for Christian Technology" on doorway "alpha"
+    And the peer behind that doorway still holds one step's piece at "private" reach
+    And the steward's commons declaration for that piece has not yet reached that peer
+    When the reader opens that step
+    Then the step says the piece exists and names "private" as the reach it is held at
+    And it offers the two ways in: sign in with standing for that reach, or ask the steward to widen it
+    And it does not say the piece is missing or was never seeded
+    And the reader's offline copy of that piece, if any, is not shown in its place
