@@ -52,7 +52,12 @@ Feature: A new build of an app reaches every peer by election, not by being writ
   An app is BOUND to a channel when its own record names that channel.
   Binding is the app's own choice, written in its own record: a release can
   only move the apps that chose its channel, and an app that chose a channel
-  is moved by nothing else. A CANARY is a peer that takes up staging
+  is moved by nothing else. Binding and following are two different
+  declarations: the app's record binds the app, and a peer FOLLOWS a channel
+  when that peer's own runtime is told to look at it. An app bound to a
+  channel on a peer that does not follow it is still held by the channel —
+  nothing else may move its record — but nobody takes releases up for it, so
+  that peer keeps serving whatever bundles the record named last. A CANARY is a peer that takes up staging
   releases as well as earned ones. In this household every peer is a canary
   for this channel, so a staged release reaches all three.
 
@@ -69,10 +74,12 @@ Feature: A new build of an app reaches every peer by election, not by being writ
   nothing: the record names its elector once, and nothing else moves it.
 
   A DOORWAY is the household's gateway to the ordinary web. It is where
-  matthew's build uploads its files and where a visitor asks for a page; it
-  serves whatever its peer's record for the app says. A doorway re-reads
-  those records every 30 seconds, which is why the serving checks below
-  allow 75: two re-reads plus slack.
+  matthew's build uploads its files and where a visitor asks for a page.
+  Each doorway reads ONE peer's records and serves whatever that peer's
+  record for the app says; a household may stand several doorways, each in
+  front of a different peer, and doorway "alpha" in this story reads
+  matthew's. A doorway re-reads those records every 30 seconds, which is
+  why the serving checks below allow 75: two re-reads plus slack.
 
   The story runs as a test on the household's own mesh. "This run" means
   one execution of it, which creates its own two apps and its own channel
@@ -85,7 +92,10 @@ Feature: A new build of an app reaches every peer by election, not by being writ
   when its page loads and throws no uncaught script error. The first five scenarios are
   numbered as STATIONS: stages of one journey, each taking up where the one
   before left off. The sixth guards a regression: a stamped head pulling a
-  released build back. The last stands alone, as a guard against a build
+  released build back. The seventh guards a second regression and overrides
+  the Background's healthy household to do it: a doorway serving a stale
+  build because the peer it reads never joined the channel, and the peer
+  joining by its own act. The last stands alone, as a guard against a build
   that cannot boot.
 
   Three people share this house. matthew stewards the channel and runs the
@@ -146,23 +156,25 @@ Feature: A new build of an app reaches every peer by election, not by being writ
     And within 75 seconds doorway "alpha" still serves the first app's page naming the new browser bundle's entry script
 
   @wip @regression
-  Scenario: A doorway serves only what the peer it reads has taken up, so that peer joins the channel
-    # Provenance: alpha, 2026-10-08. After the stamped-head cure above, the channel's vehicle is the
-    # only writer of an app's record. elohim.host reads adam's peer, and adam followed no app-bundle
-    # channel — the fleet's declaration of who follows it believed that doorway read jessica, which
-    # stopped being true on 2026-05-27. Nothing was left that could move adam's record: elohim.host
-    # served the 2026-09-22 build while doorway-alpha served the new one, and the release ledger
-    # read "adopted" on every peer that was measured, because the stale peer was never measured.
-    Given a doorway in this household reads jessica's peer for every app it serves
-    And jessica's peer follows no app-bundle channel
-    And every other household peer follows that channel as a canary
+  Scenario: A doorway can only serve what the peer it reads has taken up, so a peer that follows no channel joins it by its own act
+    # Provenance: alpha, 2026-10-08. After the stamped-head cure above, the channel became the only
+    # writer of an app's record. One of the household's doorways read a peer that followed no
+    # app-bundle channel, so nothing was left that could move that peer's record: that doorway served
+    # a build from two weeks earlier while the other doorway served the current release.
+    # (On alpha the peer was adam and the doorway elohim.host.)
+    # First arc: the problem. Second arc: the cure.
+    Given the household from the Background, except that jessica's peer has left the channel's followers and follows no app-bundle channel
+    And a second doorway in this household reads jessica's peer for every app it serves
     When matthew publishes a new build of both apps as one release through doorway "alpha"
-    And every other household peer has taken the release up
-    Then jessica's record for each app still names the earlier bundles, held by the channel and moved by nobody
-    And that doorway still serves each app's earlier page
-    When jessica's peer joins the channel as a canary through its own door
+    And matthew's and james's peers have taken the release up
+    Then jessica's record for each app still names the earlier bundles
+    And jessica's pointer-audit sweep counts its visit to each app's record as held by the channel, not as a heal
+    # Her apps are bound to the channel, so the sweep holds their records; her peer follows no channel, so nobody takes a release up for them.
+    And the second doorway still serves each app's earlier page
+    And the release's adoption measure, which asks only the peers that follow the channel, reads "adopted" with jessica's peer never asked
+    When jessica's peer joins the channel as a canary by its own act, through its own admin endpoint, with no steward writing onto it
     Then on jessica's peer each app's record names the release's browser bundle and its server bundle
-    And within 75 seconds that doorway serves each app's page naming the new browser bundle's entry script
+    And within 75 seconds the second doorway serves each app's page naming the new browser bundle's entry script
 
   Scenario: A build that cannot start is refused by every peer, and nothing moves
     Given every household peer has taken up the channel's earned head
