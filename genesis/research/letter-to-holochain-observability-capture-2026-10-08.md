@@ -1,8 +1,9 @@
 ---
 title: "A Letter to Holo and Holochain Core: Why We Added a Prometheus Endpoint to the Conductor"
 id: letter-to-holochain-observability-capture-2026-10-08
-status: Capture
+status: Sent
 date: 2026-10-08
+sent: 2026-10-08 14:19 CT, by email from Matthew Dowell to Rob Lyón (Holo, Head of Growth), in reply to his 09:29 question; a follow-up at 14:21 carried the TL;DR
 sovereignty-frame: bridge-legibility
 ---
 
@@ -36,7 +37,7 @@ Our theory of the gap, in the order we would bet on it: the instruments were bui
 
 We run two things. A household mesh: three conductors, three storage peers, two doorways (our web-facing gateways) and a relay on one machine, started and stopped by one command, where every protocol scenario runs first. And an alpha neighbourhood: seven long-lived pods on a cluster we operate, with real network paths, hosted accounts on the doorways (the hosting path is real; the people in it are still our test fixtures, because we are designing for hosted people before anyone real signs in), a dataplane above the conductor (our own storage peers on libp2p and iroh with SQLite, and doorways serving it to the web), and months of accumulated state.
 
-This part is personal, so I'll write it as me. I never had a HoloPort. I learned Kubernetes as a developer hoping that its whole model of scaling containers would solve the reliability problems of self-hosting, if I could only work out how it worked. Once I had, I saw that it is built for hyperscalers, not for self-hosters or for ordinary people behind a dynamic DNS address: it is superpowers of scale for a datacenter. When this project started, the edge-node release was the first point where I could begin from what I already knew, cloud-native as a homelab hobbyist and a corporate web-app developer by day, bring Holochain into my cloud-native workspace, and work from the other direction: use those datacenter superpowers to give peer-to-peer technology, Holochain included, the powers a hyperscaler has. I never seriously considered Wind Tunnel or the hc tooling, because Kubernetes solved that problem more or less out of the box; I only needed to make it legible to my own bench. To be clear, we use Kubernetes only for compute and hardware; we don't model protocol behaviour in it. It's our test bench, not the network. The goal of the whole architecture is the inversion: bring hyperscaler superpowers to everyday peer-to-peer, and with them subsume and escape the internet's existing capture by the corporate datacenter.
+This part is personal, so I'll write it as me. I never had a HoloPort. I learned Kubernetes as a developer hoping that its whole model of scaling containers would solve the reliability problems of self-hosting, if I could only work out how it worked. Once I had, I saw that it is built for hyperscalers, not for self-hosters or for ordinary people behind a dynamic DNS address: it is superpowers of scale for a datacenter. When this project started, the Holochain edgenode release was the first point where I could begin from what I already knew, cloud-native as a homelab hobbyist and a corporate web-app developer by day, bring Holochain into my cloud-native workspace, and work from the other direction: use those datacenter superpowers to design for peer-to-peer technology. I never seriously considered Wind Tunnel or the hc tooling, because Kubernetes solved that problem more or less out of the box; I only needed to make it legible to my own bench. To be clear, we use Kubernetes only for compute and hardware; we don't model protocol behaviour in it. It's our test bench, not the network. The goal of the whole architecture is the inversion: bring hyperscaler superpowers to everyday peer-to-peer, and with them subsume and escape the internet's existing capture by the corporate datacenter.
 
 What it lets us measure, and a 30-minute run can't, is how a conductor behaves after a month. Every serious defect we found this quarter lived there. One was a zome call whose fixed cost grew with the caller's chain length (a no-op went from 7 ms at about 120 actions to 469 ms at about 18,300). Others were a validation loop retrying a record nobody had, a write lock held for an entire publish sweep, and two sync bugs in our own storage layer. None of them showed up until the network had been running for weeks.
 
@@ -74,7 +75,7 @@ Ours sits alongside it. Above the conductor we run a separate storage layer for 
 
 The commons question sits on top of both. We have a research line on commons data pools (shared indexes, shared models, shared compute on committed devices) whose design decision is that a pool is a collective holding a resource, with contributions as notarised commitments and draws admitted by membership and reach. Sharding decides who holds which bytes; the pool decides who may draw on them and under what standing. We think the two fit together.
 
-## 7. Capture: the problem neither bench solved
+## 7. Another capture vector: the problem neither bench solved
 
 Our exporter did not just expose the conductor to Prometheus. It also meant our cluster's Prometheus was collecting per-person data, and nobody had decided it should. Whoever holds the collector is responsible for what it captures, and on our fleet nobody held that responsibility: the cluster's Prometheus held per-agent series for every hosted account, with no record of who allowed it, what it covered, how long it was kept, or how someone could object. Those accounts are still test fixtures, so nobody was harmed; but the data was being collected all the same, and it would not have changed shape on the day a real person signed in. A Holo host holds the same for every hosted participant on a port. We did not declare it, and we suspect no host has had reason to yet. A bench never has this problem because a bench has no subjects; Wind Tunnel's agents are fixtures. Our fleet runs the hosting path with fixture people in it, so now, before real people sign in, is when to fix it.
 
@@ -91,7 +92,7 @@ How this lands in our tree, each step useful alone. First, strip the per-person 
 
 Wind Tunnel already uses observers. Its `dht_sync_lag` run splits the fleet 85/15 into writers and a minority whose only job is to watch what the writers did. We want that observer role to be permanent and permission-based, not a weekly test.
 
-## 8. How it fits together
+## 8. How Holochain and the Elohim Protocol fit together
 
 Holochain is the foundation: agent-centric source chains, a DHT that notarises, integrity zomes that every peer validates, a conductor that can be upgraded by hot-swap or by lineage. On top of it we build a layer we call EPR, with these rules:
 
@@ -104,5 +105,7 @@ Holochain is the foundation: agent-centric source chains, a DHT that notarises, 
 
 The exporter is a tiny instance of that: keep the sensor Holochain built, declare who holds the collector, limit what leaves. The upgrade manifest is another: keep the DNA hash Holochain mints, declare the lineage and the soak. The storage layer is another: keep the notary, move the bytes. The pattern is the same each time. Holochain supplies the part that has to be true: the sensor, the hash, the notary. We add the part that says who holds it, who may change it, and how far it travels. Neither project does the other's half. That is why the Prometheus question matters to us more than an exporter should: it is the first place the two halves meet on something core ships.
 
-With respect,
+Sincerely,
 Matthew Dowell, for the Elohim Protocol
+
+*As sent, the email led with a TL;DR: "We needed to make the metrics logs legible in our Kubernetes test bench", and a follow-up added "Holochain core should add a listener, but default it to 127.0.0.1 with a `danger_` override, matching core's own convention." The letter's first ask (the read behind the admin interface, `DumpMetrics` plus a sidecar) is the stronger form; the TL;DR names the floor.*
