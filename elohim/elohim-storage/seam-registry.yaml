@@ -1134,6 +1134,43 @@ decisionPoints:
         testName: the_election_obey_transition_is_courier_gated_and_lands_settled
         kind: unit
 
+  - name: should_probe_same_head_ordering
+    kind: pure-decision-predicate
+    sourceLocation:
+      file: src/services/head_adoption_trigger.rs
+      modulePath: services::head_adoption_trigger::should_probe
+      line: 454
+    summary: >
+      Should the head-adoption trigger spend an own-conductor probe on a row that ALREADY names
+      the doc's head, because the doc carries a headOrdering (hint-only) the row has not
+      recorded? Answered by CanonicalOrdering::advances - the same-head verdict of the stamp,
+      replayed - and each distinct (id, carried ordering) claim probes at most once
+      (gate_ordering_probe over the courier refusal memo's cap and TTL).
+    concernIds:
+      - id: C6a
+        status: answered
+        justification: >
+          Bounded work: a claim the row already records, or one that does not advance it, never
+          probes; an advancing claim probes once per memo TTL, and the memo is hard-capped at
+          PROBE_MEMO_CAP entries (oldest evicted, never cleared wholesale) -
+          the_probe_memo_is_capped.
+      - id: C2
+        status: answered
+        justification: >
+          This predicate only routes attention. The forward-monotonic refresh itself is
+          canonical_move_verdict's question (registered under that seam); a doc ordering is a
+          hint and never reaches a head, anchor or ordering column.
+    contractTests:
+      - path: elohim/elohim-storage/src/services/head_adoption_trigger.rs
+        testName: the_probe_memo_is_capped
+        kind: unit
+      - path: elohim/elohim-storage/src/services/head_adoption_trigger.rs
+        testName: none_ordering_answer_does_not_reprobe_forever
+        kind: unit
+      - path: elohim/elohim-storage/src/db/content_diesel.rs
+        testName: ordering_advances_replays_the_stamp_verdict
+        kind: unit
+
   - name: should_probe_declared_divergence_election
     kind: pure-decision-predicate
     sourceLocation:

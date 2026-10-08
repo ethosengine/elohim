@@ -240,6 +240,21 @@ impl SyncManager {
         }
     }
 
+    /// Load a document without creating it. `Ok(None)` for an absent id: unlike
+    /// `get_or_create_doc`, a read here never leaves an empty doc behind.
+    pub async fn read_doc(
+        &self,
+        h_app_id: &str,
+        doc_id: &str,
+    ) -> Result<Option<Automerge>, StorageError> {
+        match self.doc_store.get(h_app_id, doc_id).await? {
+            Some(stored) => Automerge::load(&stored.data)
+                .map(Some)
+                .map_err(|e| StorageError::Sync(format!("Failed to load doc: {e}"))),
+            None => Ok(None),
+        }
+    }
+
     /// Read a single top-level string field from a document.
     ///
     /// Read-only accessor used by `sync::projector` and the convergence tests
@@ -313,6 +328,31 @@ mod tests {
         );
         let stream_tracker = Arc::new(StreamTracker::new());
         (SyncManager::new(doc_store, stream_tracker), temp_dir)
+    }
+
+    #[tokio::test]
+    async fn read_doc_returns_none_for_an_absent_doc() {
+        let (sync, _tmp) = test_sync_manager().await;
+        assert!(sync
+            .read_doc("elohim", "node:absent")
+            .await
+            .unwrap()
+            .is_none());
+        // Non-creating: the doc must still be absent afterwards.
+        assert!(sync
+            .read_doc("elohim", "node:absent")
+            .await
+            .unwrap()
+            .is_none());
+        let _ = sync
+            .get_or_create_doc("elohim", "node:present")
+            .await
+            .unwrap();
+        assert!(sync
+            .read_doc("elohim", "node:present")
+            .await
+            .unwrap()
+            .is_some());
     }
 
     /// Author two changes, then ask for ONE by hash: the returned bytes must be

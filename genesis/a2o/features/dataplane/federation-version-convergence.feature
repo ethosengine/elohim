@@ -172,8 +172,10 @@ Feature: Federation version convergence — two doorways that disagree serve the
   # leaves the author's device unless the page's TEXT also changed.
   #
   # Measured: the announcement is sent when the fields it carries change — title, type, format,
-  # reach, description, body, blob — and the head is NOT one of those fields. So a re-declaration
-  # that changes only the head is "already current" on the author's device, no notice goes out, and
+  # reach, description, body, blob. The head IS projected (`headActionHash`), but the declaration's
+  # ORDERING (earned tier, notarized clock, tiebreak) is not, so re-electing the SAME head changes
+  # nothing the device announces. So such a re-declaration is "already current" on the author's
+  # device, no notice goes out, and
   # the peers learn of the new head only through the DHT's sweep — which FILLS a missing head and
   # never MOVES a declared one. 21 pages re-declared from the author's device that evening sat at
   # their 2025 head on every other peer; the 9 whose body also changed moved within seconds.
