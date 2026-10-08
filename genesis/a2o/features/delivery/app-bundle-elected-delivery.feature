@@ -59,8 +59,10 @@ Feature: A new build of an app reaches every peer by election, not by being writ
   Two older mechanisms still touch an app's record, and both must defer to its
   channel. Before channels existed, the build PIPELINE stamped a HEAD straight
   onto each app's record, and some records still carry that stamp beside their
-  channel binding; the stamped head's own record names the bundle that was
-  current then. A peer's POINTER-AUDIT SWEEP visits records on a timer and,
+  channel binding. A head is a pointer to one past version of the app's record;
+  "the stamped head's own record" is the version it points to, which names the
+  bundle that was current then. The channel head and a stamped head are
+  different pointers: one belongs to the channel, the other to the app's past. A peer's POINTER-AUDIT SWEEP visits records on a timer and,
   when a record's bundle disagrees with the head it carries, would normally
   HEAL it by writing that head's bundle back. On a record bound to a channel
   the sweep must instead count the visit as HELD by the channel and write
