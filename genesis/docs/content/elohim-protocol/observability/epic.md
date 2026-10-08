@@ -328,13 +328,21 @@ The protocol already has the shape for declaring it. A stewardship grant in
 the identity pillar carries a steward and a subject, an authority basis with
 evidence and a verifier, a set of capabilities one of which is literally
 activity monitoring, a mandatory expiry and review date, a delegation depth,
-and an appeal. What it lacks is **scope**: which observation kinds, which
-labels, at which reach, retained for how long. That scope is the one addition
-this plane asks of the identity pillar, and it rides the consolidated
-stewardship-grant attestation or a link on the grant, never a new entry type.
+and an appeal. What it lacks is **scope**: a content-addressed declaration
+the grant names by CID, answering the gradient reading's questions plane by
+plane for each observation kind: which labels may leave; the reach of the raw
+rows, of the summaries and of each reference to them, each its own answer;
+custody (the holder set, the threshold, how independence is observed);
+freshness (how stale a read may be, at what stakes); linkability (what
+holding, serving or viewing reveals about the subject); cost bearer; and
+retention. Reach is not one dial, so the grant points at a declaration rather
+than picking a level. That scope is the one addition this plane asks of the
+identity pillar, and it rides the consolidated stewardship-grant attestation
+or a link on the grant, never a new entry type.
 
 With scope declared, "observability scales with relationship" becomes
-mechanical. It is the trust gradient applied to capture:
+mechanical. It is the trust gradient applied to capture. The four below are
+example declarations a grant could name, not rungs on a ladder:
 
 - **A peer and itself.** It reads its own instruments. No grant, no cost,
   nothing leaves the host.
