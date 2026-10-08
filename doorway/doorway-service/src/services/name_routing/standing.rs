@@ -174,11 +174,11 @@ pub fn same_origin(a: &str, b: &str) -> bool {
     norm(a) == norm(b)
 }
 
-/// Whether this doorway serves the same declared head as the name's holder for
-/// the request in hand.
+/// Whether this doorway serves the same bundle as the name's holder for the
+/// request in hand.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum HeadAgreement {
-    /// Both sides state a declared head for the covering mount, and it is the
+    /// Both sides state a served bundle for the covering mount, and it is the
     /// same one.
     Same,
     /// The heads differ — OR either side states none, so sameness cannot be
@@ -187,13 +187,15 @@ pub enum HeadAgreement {
     Differs,
 }
 
-/// Compare the declared head this doorway would serve with the one the holder
+/// Compare the bundle this doorway would serve with the one the holder
 /// advertises for the same (host, path).
 ///
-/// The declared head is the browser bundle blob address each doorway's
+/// The served bundle is the browser bundle blob address each doorway's
 /// bundle-heads reconciler last read for the mounted EPR on the contract's
-/// channel (`routes::coherence::declared_head_for`), advertised per mount as
-/// `EprHeadFingerprint::declared_head`. Not the EPR id: two doorways mounting
+/// channel (`routes::coherence::served_bundle_for`), advertised per mount as
+/// `EprHeadFingerprint::served_bundle` (`servedBundle` on the wire). The
+/// head itself is declared by the peer; a doorway only reports which bundle
+/// it took up. Not the EPR id: two doorways mounting
 /// the same EPR can still serve different versions of it while one lags.
 /// Absent on either side is `Differs`.
 pub fn head_agreement(own_head: Option<&str>, holder_head: Option<&str>) -> HeadAgreement {
@@ -250,7 +252,7 @@ pub enum NameDecision {
 ///    currently advertised, not that everybody is misdirected; refusing would
 ///    turn a membership outage into a total one.
 /// 2. **The holder → `Serve`.** Its answer is the name's reference answer.
-/// 3. **Another member → `Serve`** when it serves the SAME declared head as the
+/// 3. **Another member → `Serve`** when it serves the SAME bundle as the
 ///    holder advertises for the covering mount; **`Relay(holder)`** when the
 ///    heads differ or either is unknown, so a visitor never receives a version
 ///    a lagging member only believes is current.

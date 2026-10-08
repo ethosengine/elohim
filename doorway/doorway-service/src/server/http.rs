@@ -7204,7 +7204,7 @@ mod name_relay_request_tests {
             host: None,
             commitment_id: None,
             epr_id: None,
-            declared_head: None,
+            served_bundle: None,
             liveness: HolderLiveness::Serving,
             relay_mode: RelayMode::Proxy,
             shed_weight: WEIGHT_UNCONSTRAINED,
@@ -7510,7 +7510,7 @@ async fn answer_under_name_standing(
     };
     let key = RouteKey::new(ctx.host.as_deref(), path);
     // The holder's contract for this (host, path), if it has reached this
-    // doorway's name-route table: its advertised declared head, and its id.
+    // doorway's name-route table: the bundle it advertises serving, and its id.
     let holder_contract = |holder: &crate::services::name_routing::standing::PublicNameMember| {
         state
             .name_routes
@@ -7523,12 +7523,12 @@ async fn answer_under_name_standing(
             .epr_router
             .dispatch(ctx.host.as_deref(), path)
             .and_then(|projection| {
-                crate::routes::coherence::declared_head_for(
+                crate::routes::coherence::served_bundle_for(
                     &state.renderer_registry.bundle_heads(),
                     &projection,
                 )
             });
-        let theirs = holder_contract(holder).and_then(|contract| contract.declared_head);
+        let theirs = holder_contract(holder).and_then(|contract| contract.served_bundle);
         head_agreement(own.as_deref(), theirs.as_deref())
     })?;
 
@@ -7557,7 +7557,7 @@ async fn answer_under_name_standing(
                 host: ctx.host.clone(),
                 commitment_id: None,
                 epr_id: None,
-                declared_head: None,
+                served_bundle: None,
                 liveness: HolderLiveness::default(),
                 relay_mode: RelayMode::Proxy,
                 shed_weight: WEIGHT_UNCONSTRAINED,
