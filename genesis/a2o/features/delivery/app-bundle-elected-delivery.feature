@@ -56,6 +56,16 @@ Feature: A new build of an app reaches every peer by election, not by being writ
   releases as well as earned ones. In this household every peer is a canary
   for this channel, so a staged release reaches all three.
 
+  Two older mechanisms still touch an app's record, and both must defer to its
+  channel. Before channels existed, the build PIPELINE stamped a HEAD straight
+  onto each app's record, and some records still carry that stamp beside their
+  channel binding; the stamped head's own record names the bundle that was
+  current then. A peer's POINTER-AUDIT SWEEP visits records on a timer and,
+  when a record's bundle disagrees with the head it carries, would normally
+  HEAL it by writing that head's bundle back. On a record bound to a channel
+  the sweep must instead count the visit as HELD by the channel and write
+  nothing: the record names its elector once, and nothing else moves it.
+
   A DOORWAY is the household's gateway to the ordinary web. It is where
   matthew's build uploads its files and where a visitor asks for a page; it
   serves whatever its peer's record for the app says. A doorway re-reads
@@ -72,8 +82,9 @@ Feature: A new build of an app reaches every peer by election, not by being writ
   cannot BOOT — start in a browser at all. An app starts "without an error"
   when its page loads and throws no uncaught script error. The first five scenarios are
   numbered as STATIONS: stages of one journey, each taking up where the one
-  before left off. The last scenario stands alone, as a guard against a
-  build that cannot boot.
+  before left off. The sixth guards a regression: a stamped head pulling a
+  released build back. The last stands alone, as a guard against a build
+  that cannot boot.
 
   Three people share this house. matthew stewards the channel and runs the
   ceremonies. jessica and james run peers of their own; nobody asks either
@@ -121,13 +132,12 @@ Feature: A new build of an app reaches every peer by election, not by being writ
     And within 75 seconds doorway "alpha" serves each app's earlier page
 
   @wip @regression
-  Scenario: A slug's own older head never pulls a released build back
-    # alpha, 2026-10-07: the vehicle moved lamad-spa to the new build at 21:07:51Z; at
-    # 21:08:41Z the pointer-audit sweep, trusting the legacy head the pipeline had stamped
-    # on the slug in September, put the sixteen-day-old blob back, and the adoption ledger
-    # kept reading "applied". A slug's record names its elector once; nothing else moves it.
+  Scenario: An app's stamped head never pulls a released build back
+    # Provenance: alpha, 2026-10-07 21:07:51Z the release moved lamad-spa; 21:08:41Z the
+    # sweep put the September bundle back and the adoption ledger kept reading "applied".
     Given every household peer has taken up matthew's new release
-    And the first app's record still carries the head the old pipeline once stamped on it, whose own record names the earlier browser bundle
+    And the first app's record still carries a head the old pipeline once stamped on it
+    And that stamped head's own record names the earlier browser bundle
     When each peer's pointer-audit sweep next visits the first app's record
     Then on matthew's, jessica's, and james's peers the first app's record still names the release's browser bundle
     And each peer counts the visit as held by the app's release channel, not as a heal
