@@ -179,7 +179,7 @@ reach-vocabulary call the operator/architect owns; CLAUDE.md forbids canonizing 
    (Tauri `ACAO:*` sidecar, mesh peers, in-cluster lateral) is exposed.
 5. **`GET /db/content/{id}` P2P-fallback branch** returns `ContentView` at `http.rs:7701` WITHOUT
    re-running Layer 1/1.5 — relies on the remote peer's gate. Residual.
-6. **Integrity (not confidentiality): `PUT /epr-head/{id}` and `PUT /api/v1/epr/{cid}`** take no
+6. **Integrity (not confidentiality): `PUT /epr-head/{id}` and `PUT /api/v1/epr/{cid}`** (in flight: slug-leftovers sprint lane C) take no
    auth/ownership check — an attacker can rewrite a row's declared head or ingest atoms at any reach.
    Separate class; file under a governance/integrity row, not this confidentiality one.
 
@@ -223,7 +223,7 @@ conflated in EITHER direction (see [[project_head_reach_freshness_semantics]]).
 - `GET /apps/{id}/{file}` (http.rs:8227, `handle_app_request`) serves app-bundle BODY bytes by blob,
   bypassing the `/blob` gate; doorway-proxied (open web). SUBTLETY: correct gating needs slug-vs-CID
   reach resolution — `blob_reach_refusal` keys on the blob hash, so the CID path gates but a
-  SLUG-addressed app resolves via `slug_index` and would slip through unless the content-row reach is
+  SLUG-addressed app resolves via `slug_index` (in flight: slug-leftovers sprint lane C) and would slip through unless the content-row reach is
   resolved BY IDENTIFIER. Requires threading `agent_id`/`req` into the handler (currently
   `handle_app_request(&self, path, query)` — no req) + a content-row reach lookup by identifier.
 - `GET /shard/{h}`, `GET /ipfs/{cid}`, `GET /dag/{cid}` — byte/block plane, no reach check, but

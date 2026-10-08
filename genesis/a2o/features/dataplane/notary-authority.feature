@@ -168,3 +168,22 @@ Feature: Notary authority — the federation converges on ONE earned canonical h
     Given EPR "elohim-host-landing" has a declared canonical head on peer "alpha-A"
     When the canonical head declaration is announced to the federation
     Then EPR "elohim-host-landing" resolves the same canonical head across peers "alpha-A" and "elohim.host" within one sync window
+
+  # ── A name is answered by a binding (row 17 design gate, 2026-10-08) ─────────
+  # Observed 2026-10-08: elohim.host and doorway-alpha answered "lamad-spa" with two CIDs.
+  # Doorway B reads adam's storage; adam followed no app-bundle channel, and the channel's
+  # vehicle is the only writer of a bound slug's pointer, so adam stayed on its last pointer.
+  # Neither answer named who elected it or when, so a stale election and a different one read
+  # the same. The ruling: a slug is a projection of a NameBinding (name x elector x scope CID x
+  # head x election clock x standing proof). Two answers for one name are legitimate only when
+  # they name two electors or two clocks; one binding with two heads is the defect.
+  #
+  # @wip: no name answer carries its elector or clock yet; the coordinator bridge view
+  # (resolve_name_binding) is owed. Design: genesis/docs/superpowers/specs/2026-10-08-name-binding-design.md
+  @wip @regression @requires:multi-node
+  Scenario: Two doorways answering one name with two addresses name two electors or two clocks, never one binding
+    Given peer "alpha-A" and peer "elohim.host" each answer the name "lamad-spa"
+    When the two answers name different CIDs
+    Then each answer names the elector and the election clock of the binding behind it
+    And the two answers differ in elector or in election clock
+    And no single binding of "lamad-spa" is answered with two heads

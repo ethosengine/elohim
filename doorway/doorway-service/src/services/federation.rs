@@ -58,10 +58,25 @@ pub struct FederationConfig {
     pub region: Option<String>,
     /// Heartbeat interval in seconds (default: 60)
     pub heartbeat_interval_secs: u64,
+    /// Notarize a peer-health observation only on a TRANSITION (first
+    /// observation, or a status change that holds two consecutive probe
+    /// rounds); samples are ephemeral. Env `DOORWAY_HEALTH_ATTEST_ON_TRANSITION`,
+    /// default true; `0`/`false` restores the legacy attest-every-probe
+    /// behaviour (only for a before/after measurement).
+    pub attest_on_transition: bool,
     /// Role name in the hApp for infrastructure DNA
     pub infrastructure_role: String,
     /// Zome name within infrastructure DNA
     pub zome_name: String,
+}
+
+/// Parse `DOORWAY_HEALTH_ATTEST_ON_TRANSITION`: unset or anything but
+/// `0`/`false` (case-insensitive) means on.
+fn attest_on_transition_from_env(raw: Option<&str>) -> bool {
+    !matches!(
+        raw.map(|v| v.trim().to_ascii_lowercase()).as_deref(),
+        Some("0") | Some("false")
+    )
 }
 
 impl FederationConfig {
@@ -111,6 +126,11 @@ impl FederationConfig {
             endpoints,
             region: args.region.clone(),
             heartbeat_interval_secs: 60,
+            attest_on_transition: attest_on_transition_from_env(
+                std::env::var("DOORWAY_HEALTH_ATTEST_ON_TRANSITION")
+                    .ok()
+                    .as_deref(),
+            ),
             infrastructure_role: "infrastructure".to_string(),
             zome_name: "infrastructure".to_string(),
         })
@@ -475,6 +495,37 @@ struct ProbeRosterEntry {
     record_serial: Option<u64>,
     /// Round of this peer's last grace re-probe, if any since it last lived.
     last_grace_round: Option<u64>,
+    /// What was last notarized for this peer (status + conductor flag; never
+    /// the response time).
+    last_attested: Option<AttestedState>,
+    /// A differing observation awaiting its second consecutive round:
+    /// `(status, conductor_healthy, first round seen)`.
+    pending: Option<(String, Option<bool>, u64)>,
+}
+
+/// The notarized health state of one peer.
+#[derive(Debug, Clone, PartialEq, Eq)]
+struct AttestedState {
+    status: String,
+    conductor_healthy: Option<bool>,
+    round: u64,
+}
+
+/// What the probe loop should do with one observation.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum AttestDecision {
+    /// Nothing notarized yet for this peer and the observation is not
+    /// `unreachable` (an unreachable first sight has no prior state, so it is
+    /// held like any other change): attest.
+    FirstObservation,
+    /// Transition-only attestation is off: every probe is attested.
+    Legacy,
+    /// A changed state has held two consecutive rounds: attest.
+    Transition,
+    /// A changed state seen once; hold until it repeats.
+    Pending,
+    /// Same as what was notarized: skip.
+    Unchanged,
 }
 
 impl ProbeRosterEntry {
@@ -506,6 +557,11 @@ impl ProbeRoster {
         let round = self.round;
         let present: std::collections::HashSet<&str> =
             roster.iter().map(|peer| peer.id.as_str()).collect();
+        // The book never outgrows the roster. A failed seed fetch must not reach
+        // here as an empty roster: `refresh_peer_cache` keeps the last known
+        // roster when every seed answered nothing, so attested peer-health
+        // state survives a fetch outage and is not re-notarized as a first
+        // observation when the registry answers again.
         self.peers.retain(|id, _| present.contains(id.as_str()));
 
         for peer in roster {
@@ -516,6 +572,8 @@ impl ProbeRoster {
                     last_live_round: round,
                     record_serial: peer.record_serial,
                     last_grace_round: None,
+                    last_attested: None,
+                    pending: None,
                 });
             if peer.record_serial.is_some() && peer.record_serial != entry.record_serial {
                 entry.record_serial = peer.record_serial;
@@ -566,6 +624,96 @@ impl ProbeRoster {
                 id
             })
             .collect()
+    }
+
+    /// Decide whether this round's observation is notarized.
+    ///
+    /// This is the reset-and-time half of hysteresis that
+    /// `elohim/epr/src/algedonic.rs` (header, "a latch is not hysteresis")
+    /// does not yet provide: a change must hold two consecutive rounds before
+    /// it is a transition, and an observation equal to the notarized state
+    /// resets the hold. It is kept local because algedonic emission has one
+    /// consumer today; promote it when that lands.
+    ///
+    /// Pure bookkeeping on the roster's round counter (no clock).
+    ///
+    /// The hold test is `first < round` ("seen in an earlier round"), not
+    /// `first + 1 == round`: it survives a skipped round (a round where the
+    /// peer was not probed), which an exact-consecutive test would reset.
+    ///
+    /// `response_time_ms` is deliberately not an input. The decision does not
+    /// advance the notarized state: call [`Self::mark_attested`] only after
+    /// the write succeeded, so a failed write is retried next round.
+    pub fn attest_decision(
+        &mut self,
+        peer_id: &str,
+        status: &str,
+        conductor_healthy: Option<bool>,
+    ) -> AttestDecision {
+        let round = self.round;
+        let Some(entry) = self.peers.get_mut(peer_id) else {
+            return if status != "unreachable" {
+                AttestDecision::FirstObservation
+            } else {
+                AttestDecision::Pending
+            };
+        };
+        match &entry.last_attested {
+            None if status != "unreachable" => return AttestDecision::FirstObservation,
+            Some(last) if last.status == status && last.conductor_healthy == conductor_healthy => {
+                entry.pending = None;
+                return AttestDecision::Unchanged;
+            }
+            _ => {}
+        }
+        match &entry.pending {
+            Some((s, c, first)) if s == status && *c == conductor_healthy && *first < round => {
+                AttestDecision::Transition
+            }
+            Some((s, c, _)) if s == status && *c == conductor_healthy => AttestDecision::Pending,
+            _ => {
+                entry.pending = Some((status.to_string(), conductor_healthy, round));
+                AttestDecision::Pending
+            }
+        }
+    }
+
+    /// The round in which this peer's current notarized state was written.
+    pub fn attested_round(&self, peer_id: &str) -> Option<u64> {
+        self.peers
+            .get(peer_id)
+            .and_then(|e| e.last_attested.as_ref())
+            .map(|a| a.round)
+    }
+
+    /// Record that `status` was notarized this round (call only on a
+    /// successful write).
+    pub fn mark_attested(&mut self, peer_id: &str, status: &str, conductor_healthy: Option<bool>) {
+        let round = self.round;
+        if let Some(entry) = self.peers.get_mut(peer_id) {
+            entry.last_attested = Some(AttestedState {
+                status: status.to_string(),
+                conductor_healthy,
+                round,
+            });
+            entry.pending = None;
+        }
+    }
+
+    /// [`Self::attest_decision`] unless transition-only attestation is off, in
+    /// which case every probe is attested (legacy behaviour).
+    pub fn decide(
+        &mut self,
+        attest_on_transition: bool,
+        peer_id: &str,
+        status: &str,
+        conductor_healthy: Option<bool>,
+    ) -> AttestDecision {
+        if attest_on_transition {
+            self.attest_decision(peer_id, status, conductor_healthy)
+        } else {
+            AttestDecision::Legacy
+        }
     }
 
     /// Record one probe's outcome in the current round. `answered` is true for
@@ -675,6 +823,43 @@ pub fn spawn_heartbeat_task(
                         };
                     roster.observe(&peer.id, observed_status != "unreachable");
 
+                    match roster.decide(
+                        config.attest_on_transition,
+                        &peer.id,
+                        &observed_status,
+                        conductor_healthy,
+                    ) {
+                        AttestDecision::FirstObservation
+                        | AttestDecision::Transition
+                        | AttestDecision::Legacy => {}
+                        AttestDecision::Pending => {
+                            debug!(
+                                peer = %peer.id,
+                                status = %observed_status,
+                                attested_round = ?roster.attested_round(&peer.id),
+                                "Health change held for a second round before attesting"
+                            );
+                            crate::metrics::record_doorbell(
+                                crate::services::federation_doorbell::SIDE_PROBE,
+                                crate::services::federation_doorbell::OUTCOME_ATTEST_PENDING,
+                            );
+                            continue;
+                        }
+                        AttestDecision::Unchanged => {
+                            debug!(
+                                peer = %peer.id,
+                                status = %observed_status,
+                                attested_round = ?roster.attested_round(&peer.id),
+                                "Health unchanged since last attestation; not re-attested"
+                            );
+                            crate::metrics::record_doorbell(
+                                crate::services::federation_doorbell::SIDE_PROBE,
+                                crate::services::federation_doorbell::OUTCOME_ATTEST_SKIPPED_UNCHANGED,
+                            );
+                            continue;
+                        }
+                    }
+
                     let attestation_input = RecordHealthAttestationInput {
                         attestor_doorway_id: config.doorway_id.clone(),
                         subject_doorway_id: peer.id.clone(),
@@ -695,6 +880,11 @@ pub fn spawn_heartbeat_task(
                                 .await
                             {
                                 Ok(_) => {
+                                    roster.mark_attested(
+                                        &peer.id,
+                                        &observed_status,
+                                        conductor_healthy,
+                                    );
                                     debug!(
                                         peer = %peer.id,
                                         status = %observed_status,
@@ -1649,18 +1839,34 @@ pub async fn refresh_peer_cache(peer_urls: &[String], self_id: Option<&str>, cac
     }
 
     let count = all_peers.len();
+    if count == 0 {
+        // Every configured seed answered nothing. A fetch outage looks exactly
+        // like an emptied federation from here, and the probe roster treats an
+        // empty roster as "every member left" (its attested peer-health state
+        // goes with them, and the next real roster would re-notarize each
+        // member as a first observation). Keep the last known roster instead;
+        // a federation that truly emptied is re-read on the next refresh, and
+        // an operator who removes every seed clears the cache above.
+        let kept = cache.read().await.len();
+        if kept > 0 {
+            warn!(
+                kept,
+                sources = peer_urls.len(),
+                "Every federation seed answered nothing; the last known peer roster was kept"
+            );
+        }
+        return;
+    }
     {
         let mut cache_write = cache.write().await;
         *cache_write = all_peers;
     }
 
-    if count > 0 {
-        info!(
-            peers = count,
-            sources = peer_urls.len(),
-            "Federation peer cache refreshed"
-        );
-    }
+    info!(
+        peers = count,
+        sources = peer_urls.len(),
+        "Federation peer cache refreshed"
+    );
 }
 
 /// Normalize a candidate seed URL to a comparable origin form, or `None` if it
@@ -2881,6 +3087,215 @@ mod tests {
 
         fn ids(peers: &[PeerDoorway]) -> Vec<&str> {
             peers.iter().map(|p| p.id.as_str()).collect()
+        }
+
+        // ── attest on transition only ─────────────────────────────────────
+        // A sample is ephemeral; only a first observation or a change that
+        // holds two consecutive rounds is notarized.
+
+        fn attest_round(
+            roster: &mut ProbeRoster,
+            status: &str,
+            ch: Option<bool>,
+        ) -> AttestDecision {
+            roster.begin_round(&[peer("sibling", Some(1))]);
+            roster.observe("sibling", status != "unreachable");
+            roster.decide(true, "sibling", status, ch)
+        }
+
+        /// A round whose write succeeds, as the loop does.
+        fn attest_ok(roster: &mut ProbeRoster, status: &str, ch: Option<bool>) -> AttestDecision {
+            let d = attest_round(roster, status, ch);
+            if matches!(
+                d,
+                AttestDecision::FirstObservation | AttestDecision::Transition
+            ) {
+                roster.mark_attested("sibling", status, ch);
+            }
+            d
+        }
+
+        #[test]
+        fn a_first_observation_is_attested() {
+            let mut roster = ProbeRoster::new();
+            assert_eq!(
+                attest_ok(&mut roster, "online", Some(true)),
+                AttestDecision::FirstObservation
+            );
+            assert_eq!(roster.attested_round("sibling"), Some(1));
+        }
+
+        #[test]
+        fn a_first_observation_of_unreachable_is_held_not_attested() {
+            let mut roster = ProbeRoster::new();
+            assert_eq!(
+                attest_ok(&mut roster, "unreachable", None),
+                AttestDecision::Pending
+            );
+            assert_eq!(roster.attested_round("sibling"), None);
+            assert_eq!(
+                attest_ok(&mut roster, "unreachable", None),
+                AttestDecision::Transition
+            );
+            assert_eq!(roster.attested_round("sibling"), Some(2));
+        }
+
+        #[test]
+        fn a_roster_that_truly_empties_forgets_attested_state() {
+            // The book never outgrows the roster: an empty roster is "every
+            // member left". The guard against a fetch OUTAGE reading as an
+            // empty roster lives in `refresh_peer_cache`, which keeps the last
+            // known roster when every seed answers nothing (tested below).
+            let mut roster = ProbeRoster::new();
+            attest_ok(&mut roster, "online", Some(true));
+            roster.begin_round(&[]);
+            assert!(roster.peers.is_empty());
+            assert_eq!(
+                attest_ok(&mut roster, "online", Some(true)),
+                AttestDecision::FirstObservation
+            );
+        }
+
+        #[tokio::test]
+        async fn a_failed_roster_fetch_keeps_the_previous_peer_cache() {
+            // Every configured seed answers nothing (connection refused): the
+            // last known roster stays, so attested peer-health state survives
+            // the outage instead of being re-notarized as first observations.
+            let cache = new_peer_cache();
+            cache.write().await.push(PeerDoorway {
+                id: "kept".into(),
+                url: "https://kept.example".into(),
+                region: None,
+                capabilities: vec![],
+                source_peer: "seed".into(),
+                record_serial: None,
+            });
+            refresh_peer_cache(&["http://127.0.0.1:9".to_string()], Some("alpha"), &cache).await;
+            let stored = cache.read().await.clone();
+            assert_eq!(stored.len(), 1, "a failed fetch must not empty the roster");
+            assert_eq!(stored[0].id, "kept");
+        }
+
+        #[test]
+        fn an_unchanged_status_is_never_re_attested() {
+            let mut roster = ProbeRoster::new();
+            attest_ok(&mut roster, "online", Some(true));
+            for _ in 0..50 {
+                assert_eq!(
+                    attest_ok(&mut roster, "online", Some(true)),
+                    AttestDecision::Unchanged
+                );
+            }
+        }
+
+        #[test]
+        fn a_status_change_is_attested_only_after_it_holds_two_rounds() {
+            let mut roster = ProbeRoster::new();
+            attest_ok(&mut roster, "online", Some(true));
+            assert_eq!(
+                attest_ok(&mut roster, "degraded", Some(false)),
+                AttestDecision::Pending
+            );
+            assert_eq!(
+                attest_ok(&mut roster, "degraded", Some(false)),
+                AttestDecision::Transition
+            );
+            // The new state is now the notarized one.
+            assert_eq!(
+                attest_ok(&mut roster, "degraded", Some(false)),
+                AttestDecision::Unchanged
+            );
+        }
+
+        #[test]
+        fn a_status_that_flaps_every_round_is_never_attested() {
+            let mut roster = ProbeRoster::new();
+            attest_ok(&mut roster, "online", Some(true));
+            for i in 0..20 {
+                let d = if i % 2 == 0 {
+                    attest_ok(&mut roster, "degraded", Some(false))
+                } else {
+                    attest_ok(&mut roster, "online", Some(true))
+                };
+                assert!(
+                    matches!(d, AttestDecision::Pending | AttestDecision::Unchanged),
+                    "round {i} attested: {d:?}"
+                );
+            }
+            // Flapping between two NEW states never settles either.
+            for i in 0..20 {
+                let d = if i % 2 == 0 {
+                    attest_ok(&mut roster, "degraded", None)
+                } else {
+                    attest_ok(&mut roster, "unreachable", None)
+                };
+                assert_eq!(d, AttestDecision::Pending, "round {i}");
+            }
+        }
+
+        #[test]
+        fn response_time_alone_never_changes_the_attest_decision() {
+            // The decision takes no response time at all: the same state at
+            // any latency is Unchanged.
+            let mut roster = ProbeRoster::new();
+            attest_ok(&mut roster, "online", Some(true));
+            for _ in 0..5 {
+                assert_eq!(
+                    attest_round(&mut roster, "online", Some(true)),
+                    AttestDecision::Unchanged
+                );
+            }
+        }
+
+        #[test]
+        fn a_failed_attestation_write_is_retried_next_round() {
+            let mut roster = ProbeRoster::new();
+            // First observation: write fails, state does not advance.
+            assert_eq!(
+                attest_round(&mut roster, "online", Some(true)),
+                AttestDecision::FirstObservation
+            );
+            assert_eq!(
+                attest_round(&mut roster, "online", Some(true)),
+                AttestDecision::FirstObservation
+            );
+            roster.mark_attested("sibling", "online", Some(true));
+            // Transition: write fails, so it is a Transition again next round.
+            attest_round(&mut roster, "degraded", Some(false));
+            assert_eq!(
+                attest_round(&mut roster, "degraded", Some(false)),
+                AttestDecision::Transition
+            );
+            assert_eq!(
+                attest_round(&mut roster, "degraded", Some(false)),
+                AttestDecision::Transition
+            );
+        }
+
+        #[test]
+        fn ids_that_leave_the_roster_forget_their_attested_state() {
+            let mut roster = ProbeRoster::new();
+            attest_ok(&mut roster, "online", Some(true));
+            roster.begin_round(&[peer("other", Some(1))]);
+            assert_eq!(
+                attest_ok(&mut roster, "online", Some(true)),
+                AttestDecision::FirstObservation
+            );
+        }
+
+        #[test]
+        fn attest_on_transition_env_off_restores_every_probe() {
+            let mut roster = ProbeRoster::new();
+            roster.begin_round(&[peer("sibling", Some(1))]);
+            for _ in 0..5 {
+                let d = roster.decide(false, "sibling", "online", Some(true));
+                assert_eq!(d, AttestDecision::Legacy);
+                roster.mark_attested("sibling", "online", Some(true));
+            }
+            assert!(attest_on_transition_from_env(None));
+            assert!(attest_on_transition_from_env(Some("1")));
+            assert!(!attest_on_transition_from_env(Some("0")));
+            assert!(!attest_on_transition_from_env(Some("FALSE")));
         }
 
         #[test]

@@ -143,12 +143,76 @@ fn projected_fields(content: &Content) -> Vec<(&'static str, FieldVal)> {
     // HINT only, never an authority signal: any peer can put any bytes in a
     // CRDT doc, so consumers must never treat the converged value as
     // notarization — see the REQ-N5 guard on `reverse_project_content_doc`.
+    // The sibling `headOrdering` key below carries the same status: hint-only,
+    // never a head or anchor column.
     if let Some(h) = &content.declared_head_action_hash {
         if !h.is_empty() {
             fields.push(("headActionHash", FieldVal::S(h.clone())));
         }
     }
+    // `headOrdering` — the ordering (earned tier, notarized clock, tiebreak)
+    // behind that head, as ONE JSON string so a head and its ordering cannot be
+    // merged apart by concurrent puts. Present only with a stored election.
+    // Without it a re-declaration that re-elects the SAME head with a new
+    // ordering projected identically and never announced. HINT ONLY, exactly
+    // like `headActionHash`: it routes attention to the receiver's own
+    // conductor, which verifies the declaration in wasm.
+    if let Some(ordering) = Option::<content_diesel::DocHeadOrdering>::from(content) {
+        fields.push(("headOrdering", FieldVal::S(ordering.to_json())));
+    }
     fields
+}
+
+/// The head-ordering hint a converged doc carries, if it is usable.
+///
+/// Returns `None` when `headOrdering` is absent or malformed. When the key is
+/// well-formed but names a DIFFERENT head than the doc's `headActionHash`
+/// (a pre-ordering peer moved the head and left a stale ordering behind), the
+/// ordering belongs to another declaration and is IGNORED: this returns `None`
+/// rather than a struct with zeroed fields, so a caller can never mistake it
+/// for an ordering of the current head. Callers wanting only the head read
+/// `headActionHash` directly; a pre-ordering doc still yields that.
+///
+/// LEFTOVER-KEY ALIASING (known, hint-only). A doc never ERASES `headOrdering`:
+/// a head change by a peer that does not project the key leaves the previous
+/// value in place. The head-equality check catches the common case, but a head
+/// that RETURNS to an old value without a new election (A -> B -> A) can read
+/// the stale ordering of its first tenure as if it were current. That can only
+/// cost a wasted or a missed probe - the receiver's own conductor and the stamp
+/// guard decide every move - never a wrong head, because the hint never reaches
+/// a head or anchor column.
+///
+/// A hint, never authority (REQ-N5): the result routes attention only.
+pub fn doc_head_hint(doc: &Automerge) -> Option<content_diesel::DocHeadOrdering> {
+    doc_head_hint_at(doc, now_micros())
+}
+
+/// How far past the local clock a doc's carried `canonicalDeclaredAt` may sit
+/// before the hint is refused: 10 minutes, in microseconds.
+///
+/// The clock is a notarized microsecond timestamp, and the key is monotonic - it
+/// advances and never moves backwards. A peer that puts one dominant ordering
+/// with a clock far in the future would therefore freeze the key for that id:
+/// every honest row would read as dominated and never overwrite it. Refusing a
+/// hint beyond ordinary clock skew treats it as "no ordering", so an honest row
+/// overwrites it instead of being respected.
+pub const HEAD_ORDERING_MAX_FUTURE_SKEW_US: i64 = 10 * 60 * 1_000_000;
+
+fn now_micros() -> i64 {
+    std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .map_or(0, |d| i64::try_from(d.as_micros()).unwrap_or(i64::MAX))
+}
+
+/// [`doc_head_hint`] against an explicit `now` (microseconds since the epoch).
+fn doc_head_hint_at(doc: &Automerge, now_us: i64) -> Option<content_diesel::DocHeadOrdering> {
+    let parsed: content_diesel::DocHeadOrdering =
+        serde_json::from_str(&root_str(doc, "headOrdering")?).ok()?;
+    let doc_head = root_str(doc, "headActionHash")?;
+    if parsed.canonical_declared_at > now_us.saturating_add(HEAD_ORDERING_MAX_FUTURE_SKEW_US) {
+        return None;
+    }
+    (parsed.head == doc_head).then_some(parsed)
 }
 
 /// The version-DAG key for a content row's current serving version (Plan C2).
@@ -202,12 +266,11 @@ pub(crate) fn read_head_blob_hash(doc: &Automerge) -> Option<String> {
 /// Read the doc's `headActionHash` observability/hint scalar (Plan C2) — the
 /// author's DECLARED version-DAG head action, projected by `projected_fields`.
 ///
-/// Test-only: the adoption trigger reads the hint through
-/// `SyncManager::get_doc_field`, and nothing serves on it. Returns `None` when
-/// the doc carries no declared head (pre-C2 / never-declared).
-#[cfg(test)]
+/// Nothing serves on it: the adoption trigger reads it (with [`doc_head_hint`])
+/// to route attention. Returns `None` when the doc carries no declared head
+/// (pre-C2 / never-declared) or an empty one.
 pub(crate) fn doc_head_action_hash(doc: &Automerge) -> Option<String> {
-    root_str(doc, "headActionHash")
+    root_str(doc, "headActionHash").filter(|h| !h.trim().is_empty())
 }
 
 /// Whether the doc's version-DAG already records `version_cid` as head with its
@@ -222,6 +285,58 @@ fn version_dag_current(doc: &Automerge, version_cid: &str) -> bool {
             matches!(doc.get(&versions_id, version_cid), Ok(Some(_)))
         }
         _ => false,
+    }
+}
+
+/// Does the doc's `headOrdering` already DOMINATE-or-EQUAL the row's, for the
+/// same head? Then the row has nothing to add and must not rewrite it.
+///
+/// The key is a monotonic hint: it fills and advances, never moves backwards.
+/// "Advances" is the stamp's own verdict (`CanonicalOrdering::advances`:
+/// `canonical_move_verdict` plus the same-election rule), so two peers holding
+/// legitimately different orderings of one head (one with the tiebreak unknown,
+/// one with it filled; one healed to earned, one still staging) do not rewrite
+/// the doc against each other on every backfill. A doc that names another head,
+/// carries no usable ordering, or is behind the row is overwritten as before.
+fn doc_ordering_dominates_row(doc: &Automerge, row: &content_diesel::DocHeadOrdering) -> bool {
+    let Some(carried) = doc_head_hint(doc) else {
+        return false;
+    };
+    if carried.head != row.head {
+        return false;
+    }
+    let (Some(row_ordering), carried_ordering) = (row.ordering(), carried.ordering()) else {
+        return false;
+    };
+    // FILL: the same ordering with the tiebreak known only on the row's side is
+    // not an advance for the stamp, but the doc should learn it. Safe against
+    // churn: the other direction (row without, doc with) never puts.
+    if let Some(carried_ordering) = carried_ordering {
+        if row_ordering.same_clock(&carried_ordering)
+            && row_ordering.link.is_some()
+            && carried_ordering.link.is_none()
+        {
+            return false;
+        }
+    }
+    !row_ordering.advances(carried_ordering)
+}
+
+/// Take the `headOrdering` put out of `fields` when the doc already dominates it
+/// ([`doc_ordering_dominates_row`]), so both the idempotency check and the write
+/// treat the doc as matching.
+fn omit_dominated_head_ordering(doc: &Automerge, fields: &mut Vec<(&'static str, FieldVal)>) {
+    let Some(pos) = fields.iter().position(|(k, _)| *k == "headOrdering") else {
+        return;
+    };
+    let FieldVal::S(json) = &fields[pos].1 else {
+        return;
+    };
+    let Ok(row) = serde_json::from_str::<content_diesel::DocHeadOrdering>(json) else {
+        return;
+    };
+    if doc_ordering_dominates_row(doc, &row) {
+        fields.remove(pos);
     }
 }
 
@@ -268,7 +383,8 @@ pub async fn project_content_doc(
     let mut doc = sync
         .get_or_create_doc(PROJECTION_NAMESPACE, &doc_id)
         .await?;
-    let fields = projected_fields(content);
+    let mut fields = projected_fields(content);
+    omit_dominated_head_ordering(&doc, &mut fields);
     let head_vcid = head_version_cid(content);
     // Idempotency now spans BOTH legs: the flat field set AND the version-DAG head
     // (a doc whose flat fields match but whose grow-only `versions`/`head` is not
@@ -650,7 +766,13 @@ pub async fn backfill_content_docs(
 /// marker) ONLY. If
 /// you are about to plumb another doc field into a SQL write, stop: route it
 /// through a conductor-verified path instead.
-/// Guard test: `converged_head_hint_is_never_stamped`.
+///
+/// The same holds for the sibling `headOrdering` key (earned tier, notarized
+/// clock, tiebreak — see [`doc_head_hint`]): it is hint-only. It routes
+/// attention to the OWN conductor, which verifies the declaration in wasm; it
+/// is never written to a head, anchor or election column.
+/// Guard tests: `converged_head_hint_is_never_stamped`,
+/// `converged_ordering_key_is_never_stamped`.
 pub async fn reverse_project_content_doc(
     sync: &SyncManager,
     pool: &DbPool,
@@ -2423,6 +2545,498 @@ mod tests {
             "REQ-N5: the converged headActionHash hint must never be consumed \
              into declared_head_action_hash"
         );
+    }
+
+    fn ordered_content(id: &str, head: &str, at: i64, earned: bool) -> Content {
+        let mut c = sample_content(id, "t");
+        c.declared_head_action_hash = Some(head.to_string());
+        c.canonical_declared_at = Some(at);
+        c.canonical_earned = Some(i32::from(earned));
+        c
+    }
+
+    fn put_str(doc: &mut automerge::Automerge, key: &str, val: &str) {
+        use automerge::transaction::Transactable;
+        let mut tx = doc.transaction();
+        tx.put(automerge::ROOT, key, val).unwrap();
+        tx.commit();
+    }
+
+    /// A re-declaration that re-elects the SAME head with a new ordering must
+    /// reproject (and so announce): the doc now carries the ordering.
+    #[tokio::test]
+    async fn same_head_reelection_reprojects_and_announces() {
+        let (sync, _temp) = test_sync_manager().await;
+        let c1 = ordered_content("reelect", "uhCkk-head", 100, false);
+        assert!(super::project_content_doc(&sync, &c1).await.unwrap());
+        assert!(
+            !super::project_content_doc(&sync, &c1).await.unwrap(),
+            "unchanged row is idempotent"
+        );
+        let c2 = ordered_content("reelect", "uhCkk-head", 200, true);
+        assert!(
+            super::project_content_doc(&sync, &c2).await.unwrap(),
+            "same head, new ordering must reproject"
+        );
+        let heads = sync.get_heads("elohim", "node:reelect").await.unwrap();
+        assert!(!heads.is_empty(), "a reprojected doc has heads to announce");
+        let doc = sync
+            .read_doc("elohim", "node:reelect")
+            .await
+            .unwrap()
+            .unwrap();
+        let hint = super::doc_head_hint(&doc).unwrap();
+        assert_eq!(hint.head, "uhCkk-head");
+        assert_eq!(hint.canonical_declared_at, 200);
+        assert!(hint.earned);
+    }
+
+    #[tokio::test]
+    async fn ordering_key_projects_only_with_an_election() {
+        use automerge::ReadDoc;
+        let (sync, _temp) = test_sync_manager().await;
+        let mut headed = sample_content("no-election", "t");
+        headed.declared_head_action_hash = Some("uhCkk-head".to_string());
+        super::project_content_doc(&sync, &headed).await.unwrap();
+        let doc = sync
+            .read_doc("elohim", "node:no-election")
+            .await
+            .unwrap()
+            .unwrap();
+        assert!(doc.get(automerge::ROOT, "headOrdering").unwrap().is_none());
+        assert!(doc
+            .get(automerge::ROOT, "headActionHash")
+            .unwrap()
+            .is_some());
+
+        let elected = ordered_content("with-election", "uhCkk-head", 7, true);
+        super::project_content_doc(&sync, &elected).await.unwrap();
+        let doc = sync
+            .read_doc("elohim", "node:with-election")
+            .await
+            .unwrap()
+            .unwrap();
+        assert!(doc.get(automerge::ROOT, "headOrdering").unwrap().is_some());
+    }
+
+    #[tokio::test]
+    async fn pre_ordering_doc_without_head_ordering_still_yields_a_head_hint() {
+        let (sync, _temp) = test_sync_manager().await;
+        let mut headed = sample_content("pre-ordering", "t");
+        headed.declared_head_action_hash = Some("uhCkk-old-peer".to_string());
+        super::project_content_doc(&sync, &headed).await.unwrap();
+        assert_eq!(
+            sync.get_doc_field("elohim", "node:pre-ordering", "headActionHash")
+                .await
+                .unwrap(),
+            "uhCkk-old-peer",
+            "the head hint is still readable without an ordering"
+        );
+        let doc = sync
+            .read_doc("elohim", "node:pre-ordering")
+            .await
+            .unwrap()
+            .unwrap();
+        assert!(
+            super::doc_head_hint(&doc).is_none(),
+            "no ordering key: no ordering hint, head still comes from headActionHash"
+        );
+
+        // A stale ordering naming another head is ignored.
+        let mut doc = doc;
+        let stale = crate::db::content_diesel::DocHeadOrdering {
+            head: "uhCkk-other".to_string(),
+            canonical_declared_at: 9,
+            earned: true,
+            tiebreak: None,
+        };
+        put_str(&mut doc, "headOrdering", &stale.to_json());
+        assert!(super::doc_head_hint(&doc).is_none());
+    }
+
+    /// One poisoned dominant put must not freeze the monotonic key: a hint whose
+    /// clock is far past now reads as no ordering, so the honest row overwrites it.
+    #[tokio::test]
+    async fn a_hint_with_a_far_future_clock_is_ignored() {
+        let (sync, _temp) = test_sync_manager().await;
+        let honest = ordered_content("poisoned", "uhCkk-head", 1_000, true);
+        super::project_content_doc(&sync, &honest).await.unwrap();
+        let mut doc = sync
+            .read_doc("elohim", "node:poisoned")
+            .await
+            .unwrap()
+            .unwrap();
+        let now = super::now_micros();
+        let forged = crate::db::content_diesel::DocHeadOrdering {
+            head: "uhCkk-head".to_string(),
+            canonical_declared_at: now + super::HEAD_ORDERING_MAX_FUTURE_SKEW_US * 2,
+            earned: true,
+            tiebreak: None,
+        };
+        put_str(&mut doc, "headOrdering", &forged.to_json());
+        assert!(super::doc_head_hint_at(&doc, now).is_none());
+        // The monotonic-put path shares the rejection: the doc does not
+        // dominate the honest row, so the row's ordering is put again.
+        let row = crate::db::content_diesel::DocHeadOrdering {
+            head: "uhCkk-head".to_string(),
+            canonical_declared_at: 1_000,
+            earned: true,
+            tiebreak: None,
+        };
+        assert!(!super::doc_ordering_dominates_row(&doc, &row));
+        // Within the skew bound the hint stands.
+        let near = crate::db::content_diesel::DocHeadOrdering {
+            canonical_declared_at: now + 1_000_000,
+            ..forged
+        };
+        put_str(&mut doc, "headOrdering", &near.to_json());
+        assert!(super::doc_head_hint_at(&doc, now).is_some());
+    }
+
+    #[tokio::test]
+    async fn doc_matches_ignores_an_ordering_key_an_old_peer_does_not_list() {
+        let (sync, _temp) = test_sync_manager().await;
+        // The doc carries an ordering key; the row projects none (an old peer's
+        // view): the extra key must not make the doc read as stale.
+        let elected = ordered_content("old-peer", "uhCkk-head", 7, true);
+        super::project_content_doc(&sync, &elected).await.unwrap();
+        let mut bare = sample_content("old-peer", "t");
+        bare.declared_head_action_hash = Some("uhCkk-head".to_string());
+        assert!(
+            !super::project_content_doc(&sync, &bare).await.unwrap(),
+            "an unlisted extra key never forces a rewrite"
+        );
+    }
+
+    /// `headOrdering` is hint-only, like `headActionHash`: reverse projection
+    /// never writes it into any head, anchor or election column.
+    #[tokio::test]
+    async fn converged_ordering_key_is_never_stamped() {
+        use crate::db::content_diesel::{self, CreateContentInput};
+        use crate::db::context::AppContext;
+
+        let (sync, _temp) = test_sync_manager().await;
+        let pool = crate::test_util::test_pool();
+        let ctx = AppContext::default_lamad();
+        {
+            let mut conn = pool.get().unwrap();
+            content_diesel::create_content(
+                &mut conn,
+                &ctx,
+                CreateContentInput {
+                    id: "ord-launder".to_string(),
+                    title: "t".to_string(),
+                    description: None,
+                    content_type: "concept".to_string(),
+                    content_format: "markdown".to_string(),
+                    blob_hash: None,
+                    blob_cid: None,
+                    content_size_bytes: None,
+                    metadata_json: None,
+                    reach: "commons".to_string(),
+                    created_by: None,
+                    tags: vec![],
+                    content_body: Some("b".to_string()),
+                    dht_anchor_hash: None,
+                },
+            )
+            .unwrap();
+        }
+        let mut peer = ordered_content("ord-launder", "uhCkk-peer-head", 999, true);
+        peer.blob_hash = Some("sha256-converged".to_string());
+        super::project_content_doc(&sync, &peer).await.unwrap();
+        assert!(sync
+            .get_doc_field("elohim", "node:ord-launder", "headOrdering")
+            .await
+            .is_ok());
+        assert!(
+            super::reverse_project_content_doc(&sync, &pool, "node:ord-launder")
+                .await
+                .unwrap()
+        );
+        let mut conn = pool.get().unwrap();
+        let row = content_diesel::get_content(
+            &mut conn,
+            &ctx,
+            "ord-launder",
+            content_diesel::MinTrust::Invisible,
+        )
+        .unwrap()
+        .unwrap();
+        assert_eq!(row.blob_hash.as_deref(), Some("sha256-converged"));
+        assert!(row.declared_head_action_hash.is_none());
+        assert!(row.dht_anchor_hash.is_none());
+        assert!(row.canonical_declared_at.is_none());
+        assert!(row.canonical_earned.is_none());
+        assert!(row.canonical_link_hash.is_none());
+    }
+
+    /// Two actors each put a COMPLETE `headOrdering`; the merge keeps one whole
+    /// value (LWW on one scalar), never a blend of the two.
+    #[test]
+    fn concurrent_puts_never_mix_head_and_ordering() {
+        use crate::db::content_diesel::DocHeadOrdering;
+        use automerge::{ActorId, Automerge, ReadDoc};
+
+        let mk = |head: &str, at: i64, earned: bool| DocHeadOrdering {
+            head: head.to_string(),
+            canonical_declared_at: at,
+            earned,
+            tiebreak: Some(format!("u{head}")),
+        };
+        let a = mk("uhCkk-A", 100, false);
+        let b = mk("uhCkk-B", 200, true);
+
+        let mut base = Automerge::new();
+        put_str(&mut base, "headActionHash", "uhCkk-0");
+        let mut left = base.fork().with_actor(ActorId::random());
+        let mut right = base.fork().with_actor(ActorId::random());
+        put_str(&mut left, "headOrdering", &a.to_json());
+        put_str(&mut right, "headOrdering", &b.to_json());
+        left.merge(&mut right).unwrap();
+
+        let merged = match left.get(automerge::ROOT, "headOrdering").unwrap() {
+            Some((automerge::Value::Scalar(s), _)) => match s.as_ref() {
+                automerge::ScalarValue::Str(t) => t.to_string(),
+                other => panic!("not a string: {other:?}"),
+            },
+            other => panic!("missing: {other:?}"),
+        };
+        let parsed: DocHeadOrdering = serde_json::from_str(&merged).unwrap();
+        assert!(parsed == a || parsed == b, "blend: {parsed:?}");
+    }
+
+    /// A same-head stamp that changes ONLY tier/clock: the row's projection
+    /// must change (reproject + announce) AND the stamp must emit the content
+    /// touch the listener consumes (`ContentUpdated`).
+    #[tokio::test]
+    async fn tier_only_restamp_reprojects_and_announces() {
+        use crate::db::content_diesel::{
+            self, CanonicalOrdering, CreateContentInput, StampMode, StampOutcome,
+        };
+        use crate::db::context::AppContext;
+
+        // Re-entrant capture seam, not the process-wide sink: nothing installed.
+        let mut touches = crate::rea_projection::touch_capture::TouchCapture::start();
+        let (sync, _temp) = test_sync_manager().await;
+        let pool = crate::test_util::test_pool();
+        let ctx = AppContext::default_lamad();
+        let id = "tier-only";
+        {
+            let mut conn = pool.get().unwrap();
+            content_diesel::create_content(
+                &mut conn,
+                &ctx,
+                CreateContentInput {
+                    id: id.to_string(),
+                    title: "t".to_string(),
+                    description: None,
+                    content_type: "concept".to_string(),
+                    content_format: "markdown".to_string(),
+                    blob_hash: None,
+                    blob_cid: None,
+                    content_size_bytes: None,
+                    metadata_json: None,
+                    reach: "commons".to_string(),
+                    created_by: None,
+                    tags: vec![],
+                    content_body: Some("b".to_string()),
+                    dht_anchor_hash: None,
+                },
+            )
+            .unwrap();
+        }
+        let load = |pool: &crate::db::DbPool| {
+            let mut conn = pool.get().unwrap();
+            content_diesel::get_content(&mut conn, &ctx, id, content_diesel::MinTrust::Invisible)
+                .unwrap()
+                .unwrap()
+        };
+        let stamp = |pool: &crate::db::DbPool, ord: CanonicalOrdering| {
+            let mut conn = pool.get().unwrap();
+            content_diesel::stamp_declared_head_mode(
+                &mut conn,
+                &ctx,
+                id,
+                "uhCkk-same-head",
+                None,
+                None,
+                StampMode::HealCanonical,
+                Some(ord),
+            )
+            .unwrap()
+        };
+
+        assert_eq!(
+            stamp(&pool, CanonicalOrdering::new(100, false)),
+            StampOutcome::Stamped
+        );
+        assert!(touches.touched(id), "a moving stamp announces");
+        assert!(super::project_content_doc(&sync, &load(&pool))
+            .await
+            .unwrap());
+
+        // Same head, tier and clock change only.
+        assert_eq!(
+            stamp(&pool, CanonicalOrdering::new(200, true)),
+            StampOutcome::Refreshed
+        );
+        assert!(
+            touches.touched(id),
+            "a tier/clock-only refresh must emit the touch the listener consumes"
+        );
+        assert!(
+            super::project_content_doc(&sync, &load(&pool))
+                .await
+                .unwrap(),
+            "the changed ordering reprojects"
+        );
+
+        // An identical refresh is silent and idempotent.
+        assert_eq!(
+            stamp(&pool, CanonicalOrdering::new(200, true)),
+            StampOutcome::Refreshed
+        );
+        assert!(!touches.touched(id), "an unchanged refresh stays silent");
+        assert!(!super::project_content_doc(&sync, &load(&pool))
+            .await
+            .unwrap());
+    }
+
+    fn tiebreak_b64(byte: u8) -> String {
+        crate::db::content_diesel::ElectionLink::from_raw(&[byte; 39])
+            .unwrap()
+            .to_b64()
+    }
+
+    /// A row whose stored ordering carries `tiebreak` (or none).
+    fn linked_content(
+        id: &str,
+        head: &str,
+        at: i64,
+        earned: bool,
+        tiebreak: Option<String>,
+    ) -> Content {
+        let mut c = ordered_content(id, head, at, earned);
+        c.canonical_link_hash = tiebreak;
+        c
+    }
+
+    async fn doc_hint_of(
+        sync: &SyncManager,
+        id: &str,
+    ) -> Option<crate::db::content_diesel::DocHeadOrdering> {
+        let doc = sync
+            .read_doc("elohim", &format!("node:{id}"))
+            .await
+            .unwrap()
+            .unwrap();
+        super::doc_head_hint(&doc)
+    }
+
+    /// The key fills and advances; a weaker row never overwrites a stronger doc.
+    #[tokio::test]
+    async fn a_weaker_rows_ordering_never_overwrites_a_stronger_doc_hint() {
+        let (sync, _temp) = test_sync_manager().await;
+        let strong = ordered_content("mono", "uhCkk-head", 200, true);
+        assert!(super::project_content_doc(&sync, &strong).await.unwrap());
+
+        // An older clock, a lower tier, and an un-elected row: all weaker.
+        for weak in [
+            ordered_content("mono", "uhCkk-head", 100, true),
+            ordered_content("mono", "uhCkk-head", 900, false),
+        ] {
+            assert!(
+                !super::project_content_doc(&sync, &weak).await.unwrap(),
+                "a weaker ordering matches the doc: no put"
+            );
+            let hint = doc_hint_of(&sync, "mono").await.unwrap();
+            assert_eq!(hint.canonical_declared_at, 200);
+            assert!(hint.earned, "the doc's stronger ordering stands");
+        }
+        let mut unelected = sample_content("mono", "t");
+        unelected.declared_head_action_hash = Some("uhCkk-head".to_string());
+        assert!(!super::project_content_doc(&sync, &unelected).await.unwrap());
+
+        // A STRONGER row advances it.
+        let newer = ordered_content("mono", "uhCkk-head", 300, true);
+        assert!(super::project_content_doc(&sync, &newer).await.unwrap());
+        assert_eq!(
+            doc_hint_of(&sync, "mono")
+                .await
+                .unwrap()
+                .canonical_declared_at,
+            300
+        );
+
+        // A different head is a different declaration: the doc follows the row.
+        let other = ordered_content("mono", "uhCkk-other", 1, false);
+        assert!(super::project_content_doc(&sync, &other).await.unwrap());
+        let hint = doc_hint_of(&sync, "mono").await.unwrap();
+        assert_eq!(hint.head, "uhCkk-other");
+        assert_eq!(hint.canonical_declared_at, 1);
+    }
+
+    #[tokio::test]
+    async fn a_row_with_the_same_clock_and_no_tiebreak_matches_a_doc_that_has_one() {
+        let (sync, _temp) = test_sync_manager().await;
+        let filled = linked_content("tb", "uhCkk-head", 50, true, Some(tiebreak_b64(4)));
+        assert!(super::project_content_doc(&sync, &filled).await.unwrap());
+
+        let bare = linked_content("tb", "uhCkk-head", 50, true, None);
+        assert!(
+            !super::project_content_doc(&sync, &bare).await.unwrap(),
+            "the same ordering seen without its tiebreak is a match, not a rewrite"
+        );
+        assert_eq!(
+            doc_hint_of(&sync, "tb").await.unwrap().tiebreak,
+            Some(tiebreak_b64(4)),
+            "the doc keeps the tiebreak it has"
+        );
+        // The other direction FILLS: a doc without the tiebreak learns it once.
+        let (sync2, _temp2) = test_sync_manager().await;
+        assert!(super::project_content_doc(&sync2, &bare).await.unwrap());
+        assert!(super::project_content_doc(&sync2, &filled).await.unwrap());
+        assert!(!super::project_content_doc(&sync2, &bare).await.unwrap());
+        assert!(!super::project_content_doc(&sync2, &filled).await.unwrap());
+    }
+
+    /// Actor A puts `headActionHash`=H1 with its `headOrdering`; forked actor B
+    /// puts `headActionHash`=H2 ONLY. Whichever head wins the merge, an ordering
+    /// that names the OTHER head must not read as usable.
+    #[test]
+    fn cross_key_two_actor_merge_leaves_no_usable_hint() {
+        use crate::db::content_diesel::DocHeadOrdering;
+        use automerge::{ActorId, Automerge};
+
+        let ordering_of = |head: &str| DocHeadOrdering {
+            head: head.to_string(),
+            canonical_declared_at: 7,
+            earned: true,
+            tiebreak: None,
+        };
+        let mut base = Automerge::new();
+        put_str(&mut base, "headActionHash", "uhCkk-0");
+        let mut a = base.fork().with_actor(ActorId::random());
+        let mut b = base.fork().with_actor(ActorId::random());
+        put_str(&mut a, "headActionHash", "uhCkk-H1");
+        put_str(&mut a, "headOrdering", &ordering_of("uhCkk-H1").to_json());
+        put_str(&mut b, "headActionHash", "uhCkk-H2");
+        a.merge(&mut b).unwrap();
+
+        let winner = super::doc_head_action_hash(&a).unwrap();
+        let carried = super::doc_head_hint(&a);
+        match winner.as_str() {
+            // H1 won: its own ordering is coherent with it and may be used.
+            "uhCkk-H1" => assert_eq!(carried.map(|o| o.head), Some("uhCkk-H1".to_string())),
+            // H2 won: the surviving ordering names H1, so there is NO usable hint.
+            "uhCkk-H2" => assert!(carried.is_none(), "{carried:?}"),
+            other => panic!("unexpected winner {other}"),
+        }
+        // Whatever won, a hint is never returned for a head it does not name.
+        if let Some(hint) = super::doc_head_hint(&a) {
+            assert_eq!(hint.head, winner);
+        }
     }
 
     /// Seed N content rows and return their ids (helper for the bulk-event tests).

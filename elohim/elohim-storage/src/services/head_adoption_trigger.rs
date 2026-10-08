@@ -162,6 +162,7 @@ use std::time::{Duration, Instant};
 
 use tokio::sync::mpsc;
 
+use crate::db::content_diesel::{DocHeadOrdering, LocalDeclaration};
 use crate::db::{content_diesel, AppContext, DbPool};
 use crate::hc_client::HcClient;
 use crate::services::conductor_writes::{self, ContentHeadWire};
@@ -264,7 +265,7 @@ pub fn retry_delay(attempt: u32) -> Option<Duration> {
 /// Is a re-probe warranted for this id?
 ///
 /// **Only when a doc hint is PRESENT and the local row does not already declare
-/// it.** The hint is the evidence that a head exists at all; with no hint there
+/// it - or declares it under an ordering the doc's carried one advances.** The hint is the evidence that a head exists at all; with no hint there
 /// is nothing to wait for, and re-probing would be speculation charged to the
 /// conductor. That asymmetry is what keeps a 3,500-doc seed of undeclared
 /// content at exactly one probe per id — the storm case — while the measured
@@ -273,10 +274,21 @@ pub fn retry_delay(attempt: u32) -> Option<Duration> {
 /// It is also self-terminating for free: if the sweep adopts in the meantime,
 /// the local row comes to equal the hint and the next retry ends the schedule
 /// without a conductor call.
-pub fn retry_warranted(doc_hint: Option<&str>, local_declared: Option<&str>) -> bool {
-    match doc_hint {
-        None => false,
-        Some(hint) => local_declared != Some(hint),
+pub fn retry_warranted(doc_hint: Option<&DocHint>, local: Option<&LocalDeclaration>) -> bool {
+    let Some(hint) = doc_hint else {
+        return false;
+    };
+    match local {
+        None => true,
+        Some(local) => match local.head.as_deref() {
+            None => true,
+            Some(head) if head != hint.head => true,
+            // The SAME head: a ladder is still owed only while the doc's
+            // carried ordering is one the row has not recorded. A
+            // not-yet-walkable election keeps its rungs; a recorded one ends
+            // the schedule without a conductor call.
+            Some(_) => carried_ordering_advances(local, hint),
+        },
     }
 }
 
@@ -423,7 +435,7 @@ pub fn trigger_candidate_id<'a>(h_app_id: &str, doc_id: &'a str) -> Option<&'a s
 /// |---|---|---|
 /// | absent | – | **probe** — nothing local to be ahead of |
 /// | present | absent | skip — the doc makes no head claim at all |
-/// | present | equal | skip — already obeying exactly this |
+/// | present | equal | skip — already obeying exactly this, unless the doc's carried ordering advances the row's (then **probe**) |
 /// | present | different | **probe** — the row may be behind |
 ///
 /// Note the third row: this is what makes steady-state sync free. Once an
@@ -439,12 +451,57 @@ pub fn trigger_candidate_id<'a>(h_app_id: &str, doc_id: &'a str) -> Option<&'a s
 /// cannot order two action hashes. Ordering is exactly what the conductor and
 /// the monotonic stamp guard decide — so this predicate says only *possibly
 /// behind, worth asking*, and the existing adoption path says *forward or not*.
-pub fn should_probe(local_declared: Option<&str>, doc_hint: Option<&str>) -> bool {
-    match (local_declared, doc_hint) {
-        (None, _) => true,
-        (Some(_), None) => false,
-        (Some(local), Some(hint)) => local != hint,
+pub fn should_probe(local: Option<&LocalDeclaration>, doc_hint: Option<&DocHint>) -> bool {
+    let Some(local_head) = local.and_then(|l| l.head.as_deref()) else {
+        return true;
+    };
+    let Some(hint) = doc_hint else {
+        return false;
+    };
+    if local_head != hint.head {
+        return true;
     }
+    // The SAME head: worth asking only when the doc carries an ordering the row
+    // has not recorded (the stamp's own same-head verdict, replayed).
+    local.is_some_and(|l| carried_ordering_advances(l, hint))
+}
+
+/// What a sync doc says about a content id's head: the head it names and, when
+/// the producing peer projected one, the ordering behind it. HINT ONLY - it
+/// routes attention to the own conductor and is never written to a column.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct DocHint {
+    pub head: String,
+    /// `None` for a pre-ordering doc, or one whose `headOrdering` names another
+    /// head ([`crate::sync::projector::doc_head_hint`]).
+    pub ordering: Option<DocHeadOrdering>,
+}
+
+impl DocHint {
+    /// Read both halves from one loaded doc. `None` when the doc names no head.
+    pub fn from_doc(doc: &automerge::Automerge) -> Option<Self> {
+        Some(Self {
+            head: crate::sync::projector::doc_head_action_hash(doc)?,
+            ordering: crate::sync::projector::doc_head_hint(doc),
+        })
+    }
+
+    /// A hint that names a head and carries no ordering.
+    pub fn head_only(head: &str) -> Self {
+        Self {
+            head: head.to_string(),
+            ordering: None,
+        }
+    }
+}
+
+/// Does the doc's carried ordering advance what the row recorded, for the head
+/// they both name? False when the doc carries none.
+fn carried_ordering_advances(local: &LocalDeclaration, hint: &DocHint) -> bool {
+    hint.ordering
+        .as_ref()
+        .and_then(DocHeadOrdering::ordering)
+        .is_some_and(|carried| carried.advances(local.ordering))
 }
 
 /// What the worker will do with one trigger, decided from LOCAL state alone.
@@ -483,7 +540,7 @@ impl TriggerAction {
 ///
 /// # Why "no local row" is terminal
 ///
-/// `declared_head_with_election` answers `(None, false)` for a MISSING row and
+/// `declared_head_with_election` answers an undeclared, ordering-less declaration for a MISSING row and
 /// for a present-but-undeclared row alike. That collapse is harmless to the
 /// sweep, which only ever iterates rows it already holds — and it is a hole here,
 /// because a trigger's id is chosen by a REMOTE peer. Read as "undeclared", a
@@ -504,17 +561,98 @@ impl TriggerAction {
 /// stick. The trigger therefore acts ONLY on an explicit doc head claim that the
 /// local conductor independently confirms as canonical; everything else is the
 /// sweep's, exactly as before this module existed.
-pub fn decide(row: Option<(Option<&str>, bool)>, doc_hint: Option<&str>) -> TriggerAction {
-    let Some((local_declared, _election)) = row else {
+pub fn decide(row: Option<&LocalDeclaration>, doc_hint: Option<&DocHint>) -> TriggerAction {
+    let Some(row) = row else {
         return TriggerAction::NoLocalRow;
     };
-    let Some(hint) = doc_hint else {
+    if doc_hint.is_none() {
         return TriggerAction::NoHintLeftToSweep;
-    };
-    if !should_probe(local_declared, Some(hint)) {
+    }
+    if !should_probe(Some(row), doc_hint) {
         return TriggerAction::SkippedCurrent;
     }
     TriggerAction::Probe
+}
+
+/// Metric outcome label for a probe whose same-head stamp advanced the row's
+/// ordering (see [`election_refreshed`]).
+pub const ELECTION_REFRESHED_LABEL: &str = "election_refreshed";
+
+/// Cap on the probe memo: distinct `(id, carried ordering)` claims remembered.
+/// Hard, like the claim ledger's: the oldest claim is evicted past it, never the
+/// whole set. Shares [`courier_obey::REFUSAL_CAP`]'s sizing and TTL discipline.
+///
+/// [`courier_obey::REFUSAL_CAP`]: crate::services::courier_obey::REFUSAL_CAP
+pub const PROBE_MEMO_CAP: usize = crate::services::courier_obey::REFUSAL_CAP;
+
+/// The constant "courier" the probe memo files its claims under; the courier
+/// limit is disabled (`u32::MAX`, and claims are never counted against it), so
+/// only the cap and the TTL bound it.
+const PROBE_MEMO_KEY: &str = "ordering-probe";
+
+/// A memo of ordering-only probes, built on the courier refusal memo's cap/TTL
+/// discipline (`(key, id, claim)` with `REFUSAL_TTL`), not a second structure.
+pub fn new_probe_memo(cap: usize) -> crate::services::courier_obey::RefusalMemo {
+    crate::services::courier_obey::RefusalMemo::new(
+        cap,
+        crate::services::courier_obey::REFUSAL_TTL,
+        u32::MAX,
+    )
+}
+
+/// Each distinct carried claim probes ONCE.
+///
+/// An ordering-only probe (the row already names the doc's head; only the doc's
+/// carried ordering advances the row's) can end with the row unchanged - the
+/// conductor answers without an ordering, or the stamp refuses - and the doc
+/// still says the same thing, so every re-offer (the retained pass, the next
+/// sync apply) would probe again forever. The memo keys the claim by
+/// `(id, carried ordering)`: a memoised claim is `SkippedCurrent`; a DIFFERENT
+/// claim on the same row probes once more. Only the first attempt of a trigger
+/// is gated (`first_attempt`) so a ladder already in progress for a
+/// not-yet-walkable election keeps its rungs, and a head that DIFFERS from the
+/// row's is never memoised - that is today's rule, unchanged.
+pub fn gate_ordering_probe(
+    action: TriggerAction,
+    memo: &crate::services::courier_obey::RefusalMemo,
+    id: &str,
+    local: Option<&LocalDeclaration>,
+    doc_hint: Option<&DocHint>,
+    first_attempt: bool,
+    now: Instant,
+) -> TriggerAction {
+    if action != TriggerAction::Probe || !first_attempt {
+        return action;
+    }
+    let (Some(local), Some(hint)) = (local, doc_hint) else {
+        return action;
+    };
+    if local.head.as_deref() != Some(hint.head.as_str()) {
+        return action;
+    }
+    let Some(carried) = hint.ordering.as_ref() else {
+        return action;
+    };
+    let claim = carried.to_json();
+    if memo.is_refused(PROBE_MEMO_KEY, id, &claim, now) {
+        return TriggerAction::SkippedCurrent;
+    }
+    memo.remember(PROBE_MEMO_KEY, id, &claim, now, false);
+    action
+}
+
+/// Did a `Held` adoption in fact REFRESH the row's ordering? True when the row
+/// still names the same head and its recorded ordering changed (filled, newer, or
+/// stronger tier): the same-head stamp did real work, which is not "nothing to
+/// adopt". Pure, over two reads of the row.
+pub fn election_refreshed(
+    before: Option<&LocalDeclaration>,
+    after: Option<&LocalDeclaration>,
+) -> bool {
+    match (before, after) {
+        (Some(b), Some(a)) => b.head.is_some() && a.head == b.head && a.ordering != b.ordering,
+        _ => false,
+    }
 }
 
 /// THE STALE-HEAD GUARD, as a pure function.
@@ -878,6 +1016,7 @@ pub async fn run_head_adoption_trigger_worker(
         crate::services::courier_obey::REFUSAL_TTL,
         crate::services::courier_obey::COURIER_REFUSAL_LIMIT,
     );
+    let probe_memo = new_probe_memo(PROBE_MEMO_CAP);
     tracing::info!(
         target: "elohim_storage::head_adoption_trigger",
         queue_capacity = TRIGGER_QUEUE_CAPACITY,
@@ -902,6 +1041,7 @@ pub async fn run_head_adoption_trigger_worker(
             &ctx,
             &courier,
             &memo,
+            &probe_memo,
             &mut shutdown,
         ))
         .catch_unwind()
@@ -969,33 +1109,57 @@ async fn offer_retained_head_hints(
     ctx: &AppContext,
     offset: i64,
 ) -> Result<i64, crate::error::StorageError> {
+    // Attestations are immutable Creates with no election: a head-ordering
+    // hint has nothing to say about them, so they are not even paged.
     let (rows, total) = {
         let mut conn = pool
             .get()
             .map_err(|e| crate::error::StorageError::Internal(format!("Pool error: {e}")))?;
-        content_diesel::list_content_anchor_inventory(&mut conn, ctx, offset, RETAINED_HINT_PAGE)?
+        content_diesel::list_content_anchor_inventory_scoped(
+            &mut conn,
+            ctx,
+            offset,
+            RETAINED_HINT_PAGE,
+            true,
+        )?
     };
     let next = offset.saturating_add(rows.len() as i64);
+    let mut dropped_full = 0usize;
     for row in rows {
         let doc_id = crate::sync::projector::content_doc_id(&row.id);
+        // ONE doc read per row, as the head-only read it replaces was one doc
+        // load per row: it yields the head and the carried ordering together.
         let hint = sync
-            .get_doc_field(
-                crate::sync::projector::PROJECTION_NAMESPACE,
-                &doc_id,
-                "headActionHash",
-            )
+            .read_doc(crate::sync::projector::PROJECTION_NAMESPACE, &doc_id)
             .await
             .ok()
-            .filter(|h| !h.trim().is_empty());
-        if should_probe(row.declared_head_action_hash.as_deref(), hint.as_deref()) {
+            .flatten()
+            .and_then(|doc| DocHint::from_doc(&doc));
+        let local = LocalDeclaration {
+            head: row.declared_head_action_hash.clone(),
+            ordering: row.canonical_ordering,
+        };
+        if should_probe(Some(&local), hint.as_ref()) {
             // Retained documents have no current supplier to attribute. The
             // worker uses its own conductor, not a fabricated transport peer.
-            if gate.offer(crate::sync::projector::PROJECTION_NAMESPACE, &doc_id, "")
-                == EnqueueDecision::Enqueued
-            {
-                tracing::info!(content_id = %row.id, "retained content-head hint queued for own-conductor verification");
+            let decision = gate.offer(crate::sync::projector::PROJECTION_NAMESPACE, &doc_id, "");
+            crate::metrics::inc_head_adoption_trigger_from(decision.label(), "retained");
+            match decision {
+                EnqueueDecision::Enqueued => {
+                    tracing::info!(content_id = %row.id, "retained content-head hint queued for own-conductor verification");
+                }
+                EnqueueDecision::DroppedFull => dropped_full += 1,
+                _ => {}
             }
         }
+    }
+    if dropped_full > 0 {
+        tracing::warn!(
+            target: "elohim_storage::head_adoption_trigger",
+            dropped_full,
+            "retained content-head hints dropped - the trigger queue was full; the \
+             sweep still covers them and the next pass re-offers"
+        );
     }
     Ok(if next < total { next } else { 0 })
 }
@@ -1012,6 +1176,7 @@ async fn worker_loop(
     ctx: &AppContext,
     courier: &CourierSlot,
     memo: &crate::services::courier_obey::RefusalMemo,
+    probe_memo: &crate::services::courier_obey::RefusalMemo,
     shutdown: &mut tokio::sync::broadcast::Receiver<()>,
 ) -> WorkerExit {
     let mut retained = tokio::time::interval(DEFAULT_TRIGGER_COOLDOWN);
@@ -1032,8 +1197,33 @@ async fn worker_loop(
                 continue;
             },
         };
-        process_trigger(&trigger, conductor, pool, sync, ctx, gate, courier, memo).await;
+        process_trigger(
+            &trigger, conductor, pool, sync, ctx, gate, courier, memo, probe_memo,
+        )
+        .await;
     }
+}
+
+/// What raised this trigger: the retained pass offers with no peer, a sync
+/// apply names the peer it came from. Worker-side outcomes are counted under it
+/// so a retained-driven probe is not booked as `source="sync"`.
+fn trigger_source(trigger: &HeadAdoptionTrigger) -> &'static str {
+    if trigger.peer.is_empty() {
+        "retained"
+    } else {
+        "sync"
+    }
+}
+
+/// Count one worker-side outcome under the source that raised the trigger.
+fn count_outcome(trigger: &HeadAdoptionTrigger, outcome: &str) {
+    crate::metrics::inc_head_adoption_trigger_from(outcome, trigger_source(trigger));
+}
+
+/// Was this probe ORDERING-ONLY: the row already declares exactly the head the
+/// doc names, so the only thing the probe could add is a fresher election?
+pub fn ordering_only_probe(row: Option<&LocalDeclaration>, doc_head: Option<&str>) -> bool {
+    matches!((row.and_then(|r| r.head.as_deref()), doc_head), (Some(r), Some(d)) if r == d)
 }
 
 /// One trigger, start to finish. Separated from the loop so the shutdown/select
@@ -1048,27 +1238,28 @@ async fn process_trigger(
     gate: &Arc<TriggerGate>,
     courier: &CourierSlot,
     memo: &crate::services::courier_obey::RefusalMemo,
+    probe_memo: &crate::services::courier_obey::RefusalMemo,
 ) {
     let id = trigger.content_id.as_str();
     let Some(hc) = conductor.hc() else {
         // No lamad bridge yet. The sweep is the backstop, exactly as before.
-        crate::metrics::inc_head_adoption_trigger("no_bridge");
+        count_outcome(trigger, "no_bridge");
         return;
     };
 
     // ATTENTION-ROUTING read of the doc hint. See the module docs on REQ-N5:
     // this value never reaches SQL and never selects a head — it only answers
     // "is a probe worth spending?".
+    // One doc read yields the head AND the ordering the producer projected
+    // beside it ([`DocHint`]); both are hints.
     let doc_id = format!("node:{id}");
-    let doc_hint = sync
-        .get_doc_field(
-            crate::sync::projector::PROJECTION_NAMESPACE,
-            &doc_id,
-            "headActionHash",
-        )
+    let doc_hint: Option<DocHint> = sync
+        .read_doc(crate::sync::projector::PROJECTION_NAMESPACE, &doc_id)
         .await
         .ok()
-        .filter(|h| !h.trim().is_empty());
+        .flatten()
+        .and_then(|doc| DocHint::from_doc(&doc));
+    let doc_head: Option<&str> = doc_hint.as_ref().map(|h| h.head.as_str());
 
     // ROW PRESENCE, read explicitly — `declared_head_with_election` collapses
     // "missing row" into "undeclared row", which is the hole B1 rode through.
@@ -1082,7 +1273,7 @@ async fn process_trigger(
                     "head-adoption trigger: could not read the local declaration — skipping \
                      (the sweep still covers this id)"
                 );
-                crate::metrics::inc_head_adoption_trigger("failed");
+                count_outcome(trigger, "failed");
                 return;
             }
         },
@@ -1092,7 +1283,7 @@ async fn process_trigger(
                 content_id = %id, error = %e,
                 "head-adoption trigger: db conn unavailable — skipping"
             );
-            crate::metrics::inc_head_adoption_trigger("failed");
+            count_outcome(trigger, "failed");
             return;
         }
     };
@@ -1100,13 +1291,19 @@ async fn process_trigger(
     // THE GATE THAT DECIDES WHETHER A CONDUCTOR IS ASKED AT ALL. Pure, so the
     // question "can remote input cause a zome call here?" is answered by reading
     // `decide` rather than by tracing this function.
-    let local_declared: Option<String> = row.as_ref().and_then(|(d, _)| d.clone());
-    let action = decide(
-        row.as_ref().map(|(d, e)| (d.as_deref(), *e)),
-        doc_hint.as_deref(),
+    let action = decide(row.as_ref(), doc_hint.as_ref());
+    // Each distinct carried claim on an already-agreed head probes once.
+    let action = gate_ordering_probe(
+        action,
+        probe_memo,
+        id,
+        row.as_ref(),
+        doc_hint.as_ref(),
+        trigger.attempt == 0 && !trigger.slow_retry_used,
+        Instant::now(),
     );
     if action != TriggerAction::Probe {
-        crate::metrics::inc_head_adoption_trigger(action.label());
+        count_outcome(trigger, action.label());
         // Settled without a conductor call: the row already names the doc's
         // head, or the doc names none. Release the claim so the NEXT change for
         // this id (the author's next publish) is a new event rather than a
@@ -1149,7 +1346,7 @@ async fn process_trigger(
     // The existing verifier still requires locally held ancestry, authoring
     // standing, election ordering and all version bytes before any stamp.
     let (courier_outcome, probe) = courier_before_local_probe(
-        try_courier(trigger, &hc, pool, ctx, courier, memo, doc_hint.as_deref()),
+        try_courier(trigger, &hc, pool, ctx, courier, memo, doc_head),
         conductor_writes::call_resolve_content_head_classed(
             &hc,
             id,
@@ -1173,7 +1370,7 @@ async fn process_trigger(
         Ok(head) => head,
         Err(e) => {
             // A FAULT, not the race. Does not enter the fast ladder.
-            crate::metrics::inc_head_adoption_trigger(ProbeOutcome::ConductorUnavailable.label());
+            count_outcome(trigger, ProbeOutcome::ConductorUnavailable.label());
             tracing::debug!(
                 target: "elohim_storage::head_adoption_trigger",
                 content_id = %id, attempt = trigger.attempt, error = %e,
@@ -1181,26 +1378,21 @@ async fn process_trigger(
                 "head-adoption trigger: own-conductor resolve FAULTED — one slow re-probe \
                  at most, then the sweep (a fault is not the not-yet-walkable race)"
             );
-            schedule_slow_reprobe(
-                gate,
-                trigger,
-                doc_hint.as_deref(),
-                local_declared.as_deref(),
-            );
+            schedule_slow_reprobe(gate, trigger, doc_hint.as_ref(), row.as_ref());
             return;
         }
     };
 
     // THE STALE-HEAD GUARD — see [`adoptable`] for the table and the reasoning.
-    let Some(head) = adoptable(resolved.as_ref(), doc_hint.as_deref()) else {
-        crate::metrics::inc_head_adoption_trigger(ProbeOutcome::NotYetWalkable.label());
+    let Some(head) = adoptable(resolved.as_ref(), doc_head) else {
+        count_outcome(trigger, ProbeOutcome::NotYetWalkable.label());
         tracing::debug!(
             target: "elohim_storage::head_adoption_trigger",
             content_id = %id,
             attempt = trigger.attempt,
             resolved_head = ?resolved.as_ref().map(|h| h.head_action_hash.as_str()),
             canonical = resolved.as_ref().map(|h| h.canonical),
-            doc_hint = ?doc_hint,
+            doc_hint = ?doc_head,
             "head-adoption trigger: the own conductor cannot yet walk the head this doc \
              names — NOT declaring a stale head; re-probing"
         );
@@ -1211,12 +1403,7 @@ async fn process_trigger(
                 return;
             }
         }
-        schedule_reprobe(
-            gate,
-            trigger,
-            doc_hint.as_deref(),
-            local_declared.as_deref(),
-        );
+        schedule_reprobe(gate, trigger, doc_hint.as_ref(), row.as_ref());
         return;
     };
 
@@ -1228,7 +1415,7 @@ async fn process_trigger(
         // A version that names no blob would leave this row's previous pointer
         // standing under it (`blob_cid: None` preserves the column): the new head
         // would serve the old bytes. Leave it to the sweep's canonical channels.
-        crate::metrics::inc_head_adoption_trigger("adopt_pointer_absent");
+        count_outcome(trigger, "adopt_pointer_absent");
         return;
     }
     if let Some(c) = courier.get() {
@@ -1240,7 +1427,7 @@ async fn process_trigger(
         )
         .await
         {
-            crate::metrics::inc_head_adoption_trigger("adopt_awaiting_bytes");
+            count_outcome(trigger, "adopt_awaiting_bytes");
             tracing::debug!(
                 target: "elohim_storage::head_adoption_trigger",
                 content_id = %id,
@@ -1248,12 +1435,7 @@ async fn process_trigger(
                 "head-adoption trigger: the head is adoptable but its bytes are not held \
                  here yet — requested; the row keeps serving the version it holds"
             );
-            schedule_reprobe(
-                gate,
-                trigger,
-                doc_hint.as_deref(),
-                local_declared.as_deref(),
-            );
+            schedule_reprobe(gate, trigger, doc_hint.as_ref(), row.as_ref());
             return;
         }
     }
@@ -1282,7 +1464,7 @@ async fn process_trigger(
     let elapsed_ms = trigger.raised_at.elapsed().as_millis();
     match outcome {
         AdoptOutcome::Adopted => {
-            crate::metrics::inc_head_adoption_trigger("adopted");
+            count_outcome(trigger, "adopted");
             // The row now names the doc's head; the next change is a new event.
             finish_hosting_or_retry(trigger, &hc, pool, ctx, gate, courier).await;
             // THE confirming line. Pair it with the `Applying changes from peer
@@ -1300,22 +1482,50 @@ async fn process_trigger(
             );
         }
         AdoptOutcome::Held | AdoptOutcome::Contested => {
-            crate::metrics::inc_head_adoption_trigger("held");
+            // A same-head stamp that advanced only the ordering reports `Held`
+            // (the row already had the head). It did real work, and the label
+            // says so - only when the row's ordering in fact changed.
+            let after = pool.get().ok().and_then(|mut conn| {
+                content_diesel::declared_head_for_existing_row(&mut conn, ctx, id)
+                    .ok()
+                    .flatten()
+            });
+            if outcome == AdoptOutcome::Held && election_refreshed(row.as_ref(), after.as_ref()) {
+                count_outcome(trigger, ELECTION_REFRESHED_LABEL);
+                tracing::info!(
+                    target: "elohim_storage::head_adoption_trigger",
+                    content_id = %id,
+                    trigger_to_adopt_ms = elapsed_ms,
+                    attempt = trigger.attempt,
+                    "head-adoption trigger: REFRESHED the election behind the head this row \
+                     already declared - the own conductor confirmed the doc's carried ordering"
+                );
+                finish_hosting_or_retry(trigger, &hc, pool, ctx, gate, courier).await;
+                return;
+            }
+            count_outcome(trigger, "held");
             tracing::debug!(
                 target: "elohim_storage::head_adoption_trigger",
                 content_id = %id, outcome = ?outcome, trigger_to_adopt_ms = elapsed_ms,
                 attempt = trigger.attempt,
                 "head-adoption trigger: nothing to adopt — the row is held or contested"
             );
+            // Judge the warrant on the row AS IT NOW STANDS (the re-read), not
+            // the pre-probe read: the probe may have settled what it carried.
+            let standing = after.as_ref().or(row.as_ref());
+            if ordering_only_probe(row.as_ref(), doc_head) && outcome == AdoptOutcome::Held {
+                // An ordering-only probe (the row already names the doc's head)
+                // that refreshed nothing: the conductor has no newer election to
+                // confirm yet. The 1/2/4/8/15/30 s ladder would pay six conductor
+                // calls for the same answer; at most ONE slow retry, then the
+                // sweep.
+                schedule_slow_reprobe(gate, trigger, doc_hint.as_ref(), standing);
+                return;
+            }
             // A stamp refusal (`SkippedStale`) leaves the row still not naming
             // the doc's head, so the ladder continues — the next rung re-reads
             // the row first and stops for free if anything settles it.
-            schedule_reprobe(
-                gate,
-                trigger,
-                doc_hint.as_deref(),
-                local_declared.as_deref(),
-            );
+            schedule_reprobe(gate, trigger, doc_hint.as_ref(), standing);
         }
         // NOT OURS TO ACT ON. A sync apply is not evidence that a root should be
         // minted; this worker owns no author path and deliberately will not grow
@@ -1323,7 +1533,7 @@ async fn process_trigger(
         AdoptOutcome::Author
         | AdoptOutcome::AuthorUnbacked
         | AdoptOutcome::AuthorThenAdopt { .. } => {
-            crate::metrics::inc_head_adoption_trigger("author_deferred");
+            count_outcome(trigger, "author_deferred");
             tracing::debug!(
                 target: "elohim_storage::head_adoption_trigger",
                 content_id = %id, trigger_to_adopt_ms = elapsed_ms,
@@ -1331,12 +1541,7 @@ async fn process_trigger(
                 "head-adoption trigger: nothing canonical to adopt — leaving the author \
                  path to the sweeps that own one"
             );
-            schedule_reprobe(
-                gate,
-                trigger,
-                doc_hint.as_deref(),
-                local_declared.as_deref(),
-            );
+            schedule_reprobe(gate, trigger, doc_hint.as_ref(), row.as_ref());
         }
     }
 }
@@ -1399,7 +1604,7 @@ async fn try_courier(
         hint,
     )
     .await;
-    crate::metrics::inc_head_adoption_trigger(outcome.label());
+    count_outcome(trigger, outcome.label());
     let elapsed_ms = trigger.raised_at.elapsed().as_millis();
     if outcome == CourierOutcome::Stamped {
         crate::metrics::inc_content_head_adopted();
@@ -1437,14 +1642,14 @@ async fn try_courier(
 fn schedule_reprobe(
     gate: &Arc<TriggerGate>,
     trigger: &HeadAdoptionTrigger,
-    doc_hint: Option<&str>,
-    local_declared: Option<&str>,
+    doc_hint: Option<&DocHint>,
+    local: Option<&LocalDeclaration>,
 ) {
-    if !retry_warranted(doc_hint, local_declared) {
+    if !retry_warranted(doc_hint, local) {
         return;
     }
     let plan = gate.schedule_retry(trigger.clone());
-    crate::metrics::inc_head_adoption_trigger(plan.label());
+    count_outcome(trigger, plan.label());
     if plan == RetryPlan::Exhausted {
         tracing::debug!(
             target: "elohim_storage::head_adoption_trigger",
@@ -1464,18 +1669,21 @@ fn schedule_reprobe(
 fn schedule_slow_reprobe(
     gate: &Arc<TriggerGate>,
     trigger: &HeadAdoptionTrigger,
-    doc_hint: Option<&str>,
-    local_declared: Option<&str>,
+    doc_hint: Option<&DocHint>,
+    local: Option<&LocalDeclaration>,
 ) {
-    if trigger.slow_retry_used || !retry_warranted(doc_hint, local_declared) {
+    if trigger.slow_retry_used || !retry_warranted(doc_hint, local) {
         return;
     }
     let scheduled = gate.schedule_slow_retry(trigger.clone());
-    crate::metrics::inc_head_adoption_trigger(if scheduled {
-        "retry_scheduled_slow"
-    } else {
-        RetryPlan::Exhausted.label()
-    });
+    count_outcome(
+        trigger,
+        if scheduled {
+            "retry_scheduled_slow"
+        } else {
+            RetryPlan::Exhausted.label()
+        },
+    );
 }
 
 #[cfg(test)]
@@ -1517,14 +1725,172 @@ mod tests {
     }
 
     async fn retained_doc(sync: &SyncManager, id: &str, hint: &str) {
+        retained_doc_with_ordering(sync, id, hint, None).await;
+    }
+
+    /// A retained doc that also carries the `headOrdering` the producer projects.
+    async fn retained_doc_with_ordering(
+        sync: &SyncManager,
+        id: &str,
+        hint: &str,
+        ordering: Option<&DocHeadOrdering>,
+    ) {
         use automerge::transaction::Transactable;
         let ns = crate::sync::projector::PROJECTION_NAMESPACE;
         let id = crate::sync::projector::content_doc_id(id);
         let mut doc = sync.get_or_create_doc(ns, &id).await.unwrap();
         let mut tx = doc.transaction();
         tx.put(automerge::ROOT, "headActionHash", hint).unwrap();
+        if let Some(ordering) = ordering {
+            tx.put(automerge::ROOT, "headOrdering", ordering.to_json())
+                .unwrap();
+        }
         tx.commit();
         sync.apply_changes(ns, &id, vec![doc.save()]).await.unwrap();
+    }
+
+    /// Record an election on a retained row (its head is `"old head"`).
+    fn retained_election(pool: &DbPool, id: &str, at: i64, earned: bool) {
+        use crate::db::diesel_schema::content::dsl as c;
+        use diesel::prelude::*;
+        let mut conn = pool.get().unwrap();
+        diesel::update(c::content.filter(c::id.eq(id)))
+            .set((
+                c::canonical_declared_at.eq(Some(at)),
+                c::canonical_earned.eq(Some(i32::from(earned))),
+            ))
+            .execute(&mut conn)
+            .unwrap();
+    }
+
+    fn old_head_ordering(at: i64, earned: bool) -> DocHeadOrdering {
+        DocHeadOrdering {
+            head: "old head".to_string(),
+            canonical_declared_at: at,
+            earned,
+            tiebreak: None,
+        }
+    }
+
+    #[tokio::test]
+    async fn retained_hint_is_free_once_the_election_is_recorded() {
+        let (pool, sync, _dir) = retained_hint_fixture().await;
+        for id in ["recorded", "behind", "unrecorded"] {
+            retained_row(&pool, id, "commons");
+        }
+        retained_election(&pool, "recorded", 200, true);
+        retained_election(&pool, "behind", 100, true);
+        // `unrecorded` keeps a head with no election at all.
+        retained_doc_with_ordering(
+            &sync,
+            "recorded",
+            "old head",
+            Some(&old_head_ordering(200, true)),
+        )
+        .await;
+        retained_doc_with_ordering(
+            &sync,
+            "behind",
+            "old head",
+            Some(&old_head_ordering(300, true)),
+        )
+        .await;
+        retained_doc_with_ordering(
+            &sync,
+            "unrecorded",
+            "old head",
+            Some(&old_head_ordering(300, true)),
+        )
+        .await;
+        let (gate, mut rx) = TriggerGate::new(DEFAULT_TRIGGER_COOLDOWN);
+        offer_retained_head_hints(&gate, &pool, &sync, &AppContext::default_lamad(), 0)
+            .await
+            .unwrap();
+        let mut offered = Vec::new();
+        while let Ok(t) = rx.try_recv() {
+            offered.push(t.content_id);
+        }
+        offered.sort();
+        assert_eq!(
+            offered,
+            vec!["behind".to_string(), "unrecorded".to_string()],
+            "only the rows whose recorded ordering the doc's claim advances are offered"
+        );
+    }
+
+    #[tokio::test]
+    async fn retained_hint_pass_skips_attestation_rows() {
+        use crate::db::diesel_schema::content::dsl as c;
+        use diesel::prelude::*;
+        let (pool, sync, _dir) = retained_hint_fixture().await;
+        retained_row(&pool, "plain", "commons");
+        retained_row(&pool, "vote", "commons");
+        {
+            let mut conn = pool.get().unwrap();
+            diesel::update(c::content.filter(c::id.eq("vote")))
+                .set(c::content_type.eq("attestation:statement-vote"))
+                .execute(&mut conn)
+                .unwrap();
+        }
+        for id in ["plain", "vote"] {
+            retained_doc(&sync, id, "new head").await;
+        }
+        let (gate, mut rx) = TriggerGate::new(DEFAULT_TRIGGER_COOLDOWN);
+        assert_eq!(
+            offer_retained_head_hints(&gate, &pool, &sync, &AppContext::default_lamad(), 0)
+                .await
+                .unwrap(),
+            0
+        );
+        assert_eq!(rx.try_recv().unwrap().content_id, "plain");
+        assert!(
+            rx.try_recv().is_err(),
+            "an attestation is an immutable Create with no election: never offered"
+        );
+        // The served inventory is unchanged: it still lists the attestation.
+        let mut conn = pool.get().unwrap();
+        let (served, _) = content_diesel::list_content_anchor_inventory(
+            &mut conn,
+            &AppContext::default_lamad(),
+            0,
+            RETAINED_HINT_PAGE,
+        )
+        .unwrap();
+        assert_eq!(served.len(), 2);
+    }
+
+    #[tokio::test]
+    async fn a_dropped_retained_offer_is_counted_and_logged_once_per_pass() {
+        let (pool, sync, _dir) = retained_hint_fixture().await;
+        for id in ["drop-a", "drop-b"] {
+            retained_row(&pool, id, "commons");
+            retained_doc(&sync, id, "new head").await;
+        }
+        let (gate, _rx) = TriggerGate::new(DEFAULT_TRIGGER_COOLDOWN);
+        // Fill the bounded queue with distinct claims, never drained.
+        for i in 0..TRIGGER_QUEUE_CAPACITY {
+            assert_eq!(
+                gate.claim_and_send(&format!("filler-{i}"), "p", Instant::now()),
+                EnqueueDecision::Enqueued
+            );
+        }
+        let counter = |outcome: &str| {
+            crate::metrics::HEAD_ADOPTION_TRIGGER
+                .with_label_values(&[outcome, "retained"])
+                .get()
+        };
+        let before = counter("dropped_full");
+        offer_retained_head_hints(&gate, &pool, &sync, &AppContext::default_lamad(), 0)
+            .await
+            .unwrap();
+        assert_eq!(
+            counter("dropped_full") - before,
+            2,
+            "every dropped offer is counted under source=retained"
+        );
+        // The pass emits ONE `warn!` after the loop (not one per row); the
+        // dropped claim was released, so the next pass can re-offer.
+        assert_eq!(gate.claim_count(), TRIGGER_QUEUE_CAPACITY);
     }
 
     #[tokio::test]
@@ -1603,6 +1969,33 @@ mod tests {
         TriggerGate::new(cooldown)
     }
 
+    use crate::db::content_diesel::{CanonicalOrdering, ElectionLink};
+
+    fn local(head: Option<&str>, ordering: Option<CanonicalOrdering>) -> LocalDeclaration {
+        LocalDeclaration {
+            head: head.map(str::to_string),
+            ordering,
+        }
+    }
+
+    /// A doc hint naming only a head.
+    fn h(head: &str) -> DocHint {
+        DocHint::head_only(head)
+    }
+
+    /// A doc hint naming a head and the ordering the producer projected.
+    fn hint(head: &str, ordering: Option<CanonicalOrdering>) -> DocHint {
+        DocHint {
+            head: head.to_string(),
+            ordering: ordering.map(|o| DocHeadOrdering {
+                head: head.to_string(),
+                canonical_declared_at: o.declared_at,
+                earned: o.earned,
+                tiebreak: o.link.map(ElectionLink::to_b64),
+            }),
+        }
+    }
+
     // ── the hot-path pre-filter ──────────────────────────────────────────────
 
     #[test]
@@ -1641,25 +2034,314 @@ mod tests {
     #[test]
     fn should_probe_absent_local_declaration_always_probes() {
         assert!(should_probe(None, None));
-        assert!(should_probe(None, Some("uhCkk-peer")));
+        assert!(should_probe(None, Some(&h("uhCkk-peer"))));
+        assert!(should_probe(
+            Some(&local(None, None)),
+            Some(&h("uhCkk-peer"))
+        ));
     }
 
     #[test]
     fn should_probe_skips_a_row_already_declaring_the_doc_head() {
         // The steady-state leg: once adoption lands, every later change batch
         // for this doc short-circuits here.
-        assert!(!should_probe(Some("uhCkk-same"), Some("uhCkk-same")));
+        assert!(!should_probe(
+            Some(&local(Some("uhCkk-same"), None)),
+            Some(&h("uhCkk-same"))
+        ));
     }
 
     #[test]
     fn should_probe_skips_when_the_doc_makes_no_head_claim() {
         // Absence of a claim is not a claim that the local declaration is stale.
-        assert!(!should_probe(Some("uhCkk-local"), None));
+        assert!(!should_probe(Some(&local(Some("uhCkk-local"), None)), None));
     }
 
     #[test]
     fn should_probe_probes_a_divergent_doc_head() {
-        assert!(should_probe(Some("uhCkk-local"), Some("uhCkk-peer")));
+        assert!(should_probe(
+            Some(&local(Some("uhCkk-local"), None)),
+            Some(&h("uhCkk-peer"))
+        ));
+    }
+
+    // ── same head, different ordering ───────────────────────────────────────
+
+    fn ord(at: i64, earned: bool) -> CanonicalOrdering {
+        CanonicalOrdering::new(at, earned)
+    }
+
+    fn tiebreak(byte: u8) -> ElectionLink {
+        ElectionLink::from_raw(&[byte; 39]).unwrap()
+    }
+
+    #[test]
+    fn should_probe_probes_a_same_head_with_a_newer_election() {
+        let l = local(Some("uhCkk-h"), Some(ord(100, false)));
+        assert!(should_probe(
+            Some(&l),
+            Some(&hint("uhCkk-h", Some(ord(200, false))))
+        ));
+        // A stronger tier at an older clock advances too.
+        assert!(should_probe(
+            Some(&l),
+            Some(&hint("uhCkk-h", Some(ord(50, true))))
+        ));
+    }
+
+    #[test]
+    fn should_probe_probes_a_same_head_when_only_the_doc_carries_an_election() {
+        let l = local(Some("uhCkk-h"), None);
+        assert!(should_probe(
+            Some(&l),
+            Some(&hint("uhCkk-h", Some(ord(100, false))))
+        ));
+    }
+
+    #[test]
+    fn should_probe_skips_a_same_head_with_an_equal_election() {
+        let o = ord(100, true).with_link(Some(tiebreak(7)));
+        let l = local(Some("uhCkk-h"), Some(o));
+        assert!(!should_probe(Some(&l), Some(&hint("uhCkk-h", Some(o)))));
+        // Same clock with the tiebreak known on one side only: the same election.
+        assert!(!should_probe(
+            Some(&l),
+            Some(&hint("uhCkk-h", Some(ord(100, true))))
+        ));
+    }
+
+    #[test]
+    fn should_probe_skips_a_same_head_when_the_doc_carries_no_ordering() {
+        let l = local(Some("uhCkk-h"), Some(ord(100, false)));
+        assert!(!should_probe(Some(&l), Some(&hint("uhCkk-h", None))));
+        let bare = local(Some("uhCkk-h"), None);
+        assert!(!should_probe(Some(&bare), Some(&hint("uhCkk-h", None))));
+    }
+
+    #[test]
+    fn should_probe_skips_a_same_head_with_a_lower_tier_or_older_election() {
+        let l = local(Some("uhCkk-h"), Some(ord(100, true)));
+        assert!(
+            !should_probe(Some(&l), Some(&hint("uhCkk-h", Some(ord(500, false))))),
+            "a staging claim never advances an earned row"
+        );
+        assert!(
+            !should_probe(Some(&l), Some(&hint("uhCkk-h", Some(ord(50, true))))),
+            "an older claim never advances"
+        );
+    }
+
+    #[test]
+    fn decide_reaches_the_conductor_for_a_same_head_newer_election() {
+        let l = local(Some("uhCkk-h"), Some(ord(100, false)));
+        assert_eq!(
+            decide(Some(&l), Some(&hint("uhCkk-h", Some(ord(200, false))))),
+            TriggerAction::Probe
+        );
+        assert_eq!(
+            decide(Some(&l), Some(&hint("uhCkk-h", Some(ord(100, false))))),
+            TriggerAction::SkippedCurrent
+        );
+        assert_eq!(
+            decide(Some(&l), Some(&hint("uhCkk-h", None))),
+            TriggerAction::SkippedCurrent
+        );
+    }
+
+    #[test]
+    fn retry_warranted_ends_once_the_election_is_recorded() {
+        let claim = hint("uhCkk-h", Some(ord(200, true)));
+        assert!(
+            retry_warranted(
+                Some(&claim),
+                Some(&local(Some("uhCkk-h"), Some(ord(100, false))))
+            ),
+            "the election is not recorded yet: a not-yet-walkable answer keeps its ladder"
+        );
+        assert!(
+            !retry_warranted(
+                Some(&claim),
+                Some(&local(Some("uhCkk-h"), Some(ord(200, true))))
+            ),
+            "recorded: the ladder ends"
+        );
+    }
+
+    // ── the probe memo: each distinct claim probes once ──────────────────────
+
+    #[test]
+    fn none_ordering_answer_does_not_reprobe_forever() {
+        // The conductor answers without an ordering, so the row never records
+        // the claim; the doc still carries it. The second offer of the SAME
+        // claim must not reach the conductor again.
+        let memo = new_probe_memo(PROBE_MEMO_CAP);
+        let l = local(Some("uhCkk-h"), None);
+        let claim = hint("uhCkk-h", Some(ord(200, true)));
+        let now = Instant::now();
+        let first = decide(Some(&l), Some(&claim));
+        assert_eq!(first, TriggerAction::Probe);
+        assert_eq!(
+            gate_ordering_probe(first, &memo, "alpha", Some(&l), Some(&claim), true, now),
+            TriggerAction::Probe
+        );
+        let second = decide(Some(&l), Some(&claim));
+        assert_eq!(second, TriggerAction::Probe, "the row is unchanged");
+        assert_eq!(
+            gate_ordering_probe(second, &memo, "alpha", Some(&l), Some(&claim), true, now),
+            TriggerAction::SkippedCurrent
+        );
+        // A rung of the ladder already in progress is not gated.
+        assert_eq!(
+            gate_ordering_probe(second, &memo, "alpha", Some(&l), Some(&claim), false, now),
+            TriggerAction::Probe
+        );
+    }
+
+    #[test]
+    fn a_second_distinct_claim_on_a_memoised_row_still_probes_once() {
+        let memo = new_probe_memo(PROBE_MEMO_CAP);
+        let l = local(Some("uhCkk-h"), None);
+        let now = Instant::now();
+        let a = hint("uhCkk-h", Some(ord(200, true)));
+        let b = hint("uhCkk-h", Some(ord(300, true)));
+        let gate = |claim: &DocHint| {
+            gate_ordering_probe(
+                decide(Some(&l), Some(claim)),
+                &memo,
+                "alpha",
+                Some(&l),
+                Some(claim),
+                true,
+                now,
+            )
+        };
+        assert_eq!(gate(&a), TriggerAction::Probe);
+        assert_eq!(gate(&a), TriggerAction::SkippedCurrent);
+        assert_eq!(gate(&b), TriggerAction::Probe, "a new claim probes once");
+        assert_eq!(gate(&b), TriggerAction::SkippedCurrent);
+        // Another row with the same claim is its own key.
+        assert_eq!(
+            gate_ordering_probe(
+                TriggerAction::Probe,
+                &memo,
+                "beta",
+                Some(&l),
+                Some(&a),
+                true,
+                now
+            ),
+            TriggerAction::Probe
+        );
+    }
+
+    #[test]
+    fn a_differing_head_is_never_memoised() {
+        let memo = new_probe_memo(PROBE_MEMO_CAP);
+        let l = local(Some("uhCkk-old"), None);
+        let claim = hint("uhCkk-new", Some(ord(200, true)));
+        let now = Instant::now();
+        for _ in 0..3 {
+            assert_eq!(
+                gate_ordering_probe(
+                    TriggerAction::Probe,
+                    &memo,
+                    "alpha",
+                    Some(&l),
+                    Some(&claim),
+                    true,
+                    now
+                ),
+                TriggerAction::Probe
+            );
+        }
+        assert!(memo.is_empty());
+    }
+
+    #[test]
+    fn the_probe_memo_is_capped() {
+        let memo = new_probe_memo(3);
+        let l = local(Some("uhCkk-h"), None);
+        let now = Instant::now();
+        for i in 0..10 {
+            let claim = hint("uhCkk-h", Some(ord(100 + i, true)));
+            let _ = gate_ordering_probe(
+                TriggerAction::Probe,
+                &memo,
+                "alpha",
+                Some(&l),
+                Some(&claim),
+                true,
+                now,
+            );
+            assert!(memo.len() <= 3, "hard cap");
+        }
+        assert_eq!(memo.len(), 3);
+        // The oldest was evicted (probes again), the newest still holds.
+        let oldest = hint("uhCkk-h", Some(ord(100, true)));
+        let newest = hint("uhCkk-h", Some(ord(109, true)));
+        assert_eq!(
+            gate_ordering_probe(
+                TriggerAction::Probe,
+                &memo,
+                "alpha",
+                Some(&l),
+                Some(&newest),
+                true,
+                now
+            ),
+            TriggerAction::SkippedCurrent
+        );
+        assert_eq!(
+            gate_ordering_probe(
+                TriggerAction::Probe,
+                &memo,
+                "alpha",
+                Some(&l),
+                Some(&oldest),
+                true,
+                now
+            ),
+            TriggerAction::Probe
+        );
+    }
+
+    #[test]
+    fn an_ordering_only_held_that_refreshed_nothing_does_not_climb_the_ladder() {
+        // The row already names the doc's head: the probe was ordering-only.
+        let row = local(Some("uhCkk-same"), Some(ord(100, true)));
+        assert!(ordering_only_probe(Some(&row), Some("uhCkk-same")));
+        // A different head, an undeclared row, or no row is a real head probe
+        // and keeps the full ladder.
+        assert!(!ordering_only_probe(Some(&row), Some("uhCkk-other")));
+        assert!(!ordering_only_probe(
+            Some(&local(None, None)),
+            Some("uhCkk-same")
+        ));
+        assert!(!ordering_only_probe(None, Some("uhCkk-same")));
+        // The doc's carried ordering still advances the unchanged row, so
+        // `retry_warranted` alone would keep climbing: the worker must not take
+        // the ladder for an ordering-only `Held` that refreshed nothing.
+        let doc = hint("uhCkk-same", Some(ord(200, true)));
+        assert!(retry_warranted(Some(&doc), Some(&row)));
+        assert!(!election_refreshed(Some(&row), Some(&row)));
+        // Once the re-read row records the carried ordering, no retry at all.
+        let after = local(Some("uhCkk-same"), Some(ord(200, true)));
+        assert!(!retry_warranted(Some(&doc), Some(&after)));
+    }
+
+    #[test]
+    fn election_refreshed_needs_the_same_head_and_a_changed_ordering() {
+        let before = local(Some("uhCkk-h"), Some(ord(100, false)));
+        let after = local(Some("uhCkk-h"), Some(ord(200, true)));
+        assert!(election_refreshed(Some(&before), Some(&after)));
+        assert!(!election_refreshed(Some(&before), Some(&before)));
+        let moved = local(Some("uhCkk-other"), Some(ord(200, true)));
+        assert!(!election_refreshed(Some(&before), Some(&moved)));
+        assert!(!election_refreshed(None, Some(&after)));
+        assert!(!election_refreshed(
+            Some(&local(None, None)),
+            Some(&local(None, Some(ord(1, true))))
+        ));
     }
 
     // ── dedup + cooldown (one structure, both obligations) ───────────────────
@@ -1723,7 +2405,10 @@ mod tests {
         );
         let _ = rx.try_recv();
         // …which found no row: terminal, claim kept and marked sleeping.
-        assert_eq!(decide(None, Some("uhCkk-head")), TriggerAction::NoLocalRow);
+        assert_eq!(
+            decide(None, Some(&h("uhCkk-head"))),
+            TriggerAction::NoLocalRow
+        );
         gate.set_sleeping("late-row", true);
 
         // Seconds later the row is stored: a NEW trigger, well inside the
@@ -1739,12 +2424,15 @@ mod tests {
         assert_eq!(trigger.attempt, 0, "a fresh ladder, not a resumed rung");
         // With the row present the same pure gate now reaches the conductor arm.
         assert_eq!(
-            decide(Some((None, false)), Some("uhCkk-head")),
+            decide(row(None).as_ref(), Some(&h("uhCkk-head"))),
             TriggerAction::Probe
         );
 
         // A WITHOUT-a-row id is still never probed, however often it is offered.
-        assert_eq!(decide(None, Some("uhCkk-head")), TriggerAction::NoLocalRow);
+        assert_eq!(
+            decide(None, Some(&h("uhCkk-head"))),
+            TriggerAction::NoLocalRow
+        );
         assert_eq!(gate.claim_count(), 1, "the takeover reused the claim");
     }
 
@@ -1864,14 +2552,17 @@ mod tests {
     fn the_ladder_ends_on_adopt() {
         // Adoption stamps the head, so the row comes to name the hint — and the
         // warrant is exactly that disagreement. No warrant, no next rung.
-        let hint = Some("uhCkk-new");
-        assert!(retry_warranted(hint, None), "absent row: keep probing");
+        let doc = h("uhCkk-new");
         assert!(
-            retry_warranted(hint, Some("uhCkk-old")),
+            retry_warranted(Some(&doc), None),
+            "absent row: keep probing"
+        );
+        assert!(
+            retry_warranted(Some(&doc), Some(&local(Some("uhCkk-old"), None))),
             "stale row: keep probing"
         );
         assert!(
-            !retry_warranted(hint, Some("uhCkk-new")),
+            !retry_warranted(Some(&doc), Some(&local(Some("uhCkk-new"), None))),
             "adopted row: the ladder ends"
         );
     }
@@ -1880,9 +2571,10 @@ mod tests {
     fn the_ladder_ends_early_when_a_sweep_adoption_lands_first() {
         // A rung that wakes to find the sweep already settled the row spends no
         // conductor call: `should_probe` short-circuits, and the warrant is gone.
-        let hint = "uhCkk-new";
-        assert!(!should_probe(Some(hint), Some(hint)));
-        assert!(!retry_warranted(Some(hint), Some(hint)));
+        let doc = h("uhCkk-new");
+        let row = local(Some("uhCkk-new"), None);
+        assert!(!should_probe(Some(&row), Some(&doc)));
+        assert!(!retry_warranted(Some(&doc), Some(&row)));
     }
 
     #[test]
@@ -1890,7 +2582,10 @@ mod tests {
         // The storm case: undeclared content probes ONCE and stops. Retrying with
         // no hint would be speculation charged to the conductor.
         assert!(!retry_warranted(None, None));
-        assert!(!retry_warranted(None, Some("uhCkk-local")));
+        assert!(!retry_warranted(
+            None,
+            Some(&local(Some("uhCkk-local"), None))
+        ));
     }
 
     #[test]
@@ -2253,8 +2948,8 @@ mod tests {
     // ── B1: a peer-named id this node holds no row for is TERMINAL ──────────
 
     /// The row shape `decide` takes for a present row.
-    fn row(declared: Option<&str>) -> Option<(Option<&str>, bool)> {
-        Some((declared, false))
+    fn row(declared: Option<&str>) -> Option<LocalDeclaration> {
+        Some(local(declared, None))
     }
 
     #[test]
@@ -2264,12 +2959,12 @@ mod tests {
         // arm that reaches a conductor, and a missing row can never produce it —
         // not even with a hint, which is what made the old collapse exploitable.
         assert_eq!(
-            decide(None, Some("uhCkk-peer-invented")),
+            decide(None, Some(&h("uhCkk-peer-invented"))),
             TriggerAction::NoLocalRow
         );
         assert_eq!(decide(None, None), TriggerAction::NoLocalRow);
         assert_ne!(
-            decide(None, Some("uhCkk-peer-invented")),
+            decide(None, Some(&h("uhCkk-peer-invented"))),
             TriggerAction::Probe
         );
         // ...and it is terminal for the LADDER too: no probe, so nothing books a
@@ -2279,23 +2974,26 @@ mod tests {
     #[test]
     fn decide_reaches_the_conductor_only_for_a_held_row_with_a_divergent_hint() {
         // The one admitting combination.
-        assert_eq!(decide(row(None), Some("uhCkk-new")), TriggerAction::Probe);
         assert_eq!(
-            decide(row(Some("uhCkk-old")), Some("uhCkk-new")),
+            decide(row(None).as_ref(), Some(&h("uhCkk-new"))),
+            TriggerAction::Probe
+        );
+        assert_eq!(
+            decide(row(Some("uhCkk-old")).as_ref(), Some(&h("uhCkk-new"))),
             TriggerAction::Probe
         );
         // Everything else is terminal.
         assert_eq!(
-            decide(row(Some("uhCkk-new")), Some("uhCkk-new")),
+            decide(row(Some("uhCkk-new")).as_ref(), Some(&h("uhCkk-new"))),
             TriggerAction::SkippedCurrent
         );
         assert_eq!(
-            decide(row(None), None),
+            decide(row(None).as_ref(), None),
             TriggerAction::NoHintLeftToSweep,
             "no head claim ⇒ nothing to confirm; the sweep owns it"
         );
         assert_eq!(
-            decide(row(Some("uhCkk-old")), None),
+            decide(row(Some("uhCkk-old")).as_ref(), None),
             TriggerAction::NoHintLeftToSweep
         );
     }
@@ -2309,7 +3007,15 @@ mod tests {
             (TriggerAction::Probe, "probe"),
         ] {
             assert_eq!(a.label(), l);
+            assert_ne!(
+                a.label(),
+                ELECTION_REFRESHED_LABEL,
+                "the refresh is an outcome of a probe, not a decision about one"
+            );
         }
+        assert_eq!(ELECTION_REFRESHED_LABEL, "election_refreshed");
+        // `dropped_full` stays in the enqueue vocabulary the retained pass counts.
+        assert_eq!(EnqueueDecision::DroppedFull.label(), "dropped_full");
     }
 
     // ── S5: the stale-head guard itself ─────────────────────────────────────
@@ -2465,6 +3171,32 @@ mod tests {
 
     // ── S3: a conductor FAULT does not ride the fast ladder ─────────────────
 
+    #[test]
+    fn worker_outcomes_are_counted_under_the_source_that_raised_the_trigger() {
+        let mk = |peer: &str| HeadAdoptionTrigger {
+            content_id: "src-label".into(),
+            peer: peer.into(),
+            raised_at: Instant::now(),
+            attempt: 0,
+            slow_retry_used: false,
+            hosting_cursor: HostingCursor::default(),
+        };
+        assert_eq!(trigger_source(&mk("")), "retained");
+        assert_eq!(trigger_source(&mk("peerA")), "sync");
+        let counter = |source: &str| {
+            crate::metrics::HEAD_ADOPTION_TRIGGER
+                .with_label_values(&["held_source_probe", source])
+                .get()
+        };
+        let (sync_before, retained_before) = (counter("sync"), counter("retained"));
+        count_outcome(&mk(""), "held_source_probe");
+        assert_eq!(counter("retained"), retained_before + 1);
+        assert_eq!(counter("sync"), sync_before);
+        count_outcome(&mk("peerA"), "held_source_probe");
+        assert_eq!(counter("sync"), sync_before + 1);
+        assert_eq!(counter("retained"), retained_before + 1);
+    }
+
     #[tokio::test]
     async fn a_conductor_fault_gets_one_slow_reprobe_and_only_one() {
         let (gate, _rx) = gate_with(DEFAULT_TRIGGER_COOLDOWN);
@@ -2555,7 +3287,7 @@ mod tests {
         );
         // And the probe predicate itself never reads sweep state: an absent
         // local declaration probes whether or not a leg is running.
-        assert!(should_probe(None, Some("uhCkk-peer")));
+        assert!(should_probe(None, Some(&h("uhCkk-peer"))));
     }
 
     #[test]
@@ -2648,8 +3380,12 @@ mod hosting_attention_tests {
                 EnqueueDecision::Enqueued
             );
             let next = rx.try_recv().unwrap();
-            for hint in [Some("head"), None] {
-                let action = decide(Some((Some("head"), false)), hint);
+            let held = LocalDeclaration {
+                head: Some("head".to_string()),
+                ordering: None,
+            };
+            for doc in [Some(DocHint::head_only("head")), None] {
+                let action = decide(Some(&held), doc.as_ref());
                 assert!(
                     !hosting_retry_needed(action, next.attempt),
                     "fresh settled notifications must spend no inventory/native hosting work"

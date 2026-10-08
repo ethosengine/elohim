@@ -7,7 +7,7 @@ title: "Plural-Mishpat-Lenses spec §5/§13: amend the Lens↔EPR binding key fr
 slug: "plural-mishpat-lenses-binding-key-slug-id-spec-followup"
 written: "2026-06-27"
 author: "plural-mishpat-lenses Wave-1 plan — interface-fit grounding (A3/A6)"
-status: "backlog"
+status: "done"
 priority: "low"
 domain: "D7"
 jobs: [elohim]
@@ -37,3 +37,5 @@ Amend the spec §5 (Lens↔EPR binding row: address = EPR slug-id scope key, not
 §13 (drop "lone DNA-move risk" to "only if a notarized index is later required"). Low priority —
 the plan already encodes the correct behavior; this keeps the canonical spec coherent with the
 plan it spawned. Route through the cite tooling (managed surface).
+
+**Done 2026-10-08:** spec `2026-06-27-plural-mishpat-lenses-over-epr-design.md` §5 binding row now keys on the EPR slug-id and §13 softens the DNA-move risk to apply only if a notarized index is required.

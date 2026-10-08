@@ -1994,7 +1994,7 @@ pub async fn try_adopt_canonical_head_explained(
     // its own authority alone is contestable.
     let (local_declared, local_election) = match pool.get() {
         Ok(mut conn) => match content_diesel::declared_head_with_election(&mut conn, ctx, id) {
-            Ok(v) => v,
+            Ok(d) => (d.head, d.ordering.is_some()),
             Err(e) => {
                 tracing::warn!(
                     content_id = %id, error = %e,
