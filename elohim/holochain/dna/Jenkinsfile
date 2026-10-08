@@ -134,6 +134,14 @@ spec:
 // partition through `nix develop` so runtime libs link, archives the
 // per-shard log + JUnit XML for the post.always aggregator.
 def runSweettestShard(int n, int total, String shardPodYaml) {
+    // A shard pod whose NODE drops out of the cluster is deleted under the
+    // agent ("Agent sweettest-shard-… was deleted; cancelling node body") and
+    // the whole run ends ABORTED with no verdict — #1492 and #1493 (2026-10-08)
+    // both died that way when thinkc-p0t went NotReady with three of the four
+    // shards on it, and the edge roll behind each refused. The retry fires ONLY
+    // on agent loss (kubernetesAgent) or a non-resumable step: a shard whose
+    // tests fail exits non-zero inside the body and is not retried.
+    retry(count: 2, conditions: [kubernetesAgent(handleNonKubernetes: true), nonresumable()]) {
     podTemplate(label: "sweettest-shard-${n}-${total}", yaml: shardPodYaml) {
         node("sweettest-shard-${n}-${total}") {
             container('builder') {
@@ -197,6 +205,7 @@ def runSweettestShard(int n, int total, String shardPodYaml) {
             }
         }
     }
+    } // retry
 }
 
 /**
