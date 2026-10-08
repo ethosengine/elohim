@@ -152,3 +152,11 @@ gertrude 1.6 GiB, susan 6.5 GiB. Recovery is the `refquota` move above, then
 `kubectl delete pod elohim-{adam,eve}-alpha-conductor-0 -n elohim-alpha`; a conductor that still crash-loops
 afterwards on a SQLite corruption line (not 778) is the one case that needs the syncoid snapshot under `backup/tank`.
 
+SEEN 2026-10-08 14:07Z: a crash-looping conductor is not fully silent. Between restarts, one of adam's sweeps
+(14:06Z) got a channel head out of it — `uhCkk6dn7…`, the 2026-10-06 release, the last head his stale DHT view
+holds — and the vehicle pulled both server bundles from a peer and moved `elohim-host-landing` and `lamad-spa` at
+14:07:19Z, so elohim.host now serves c02870e1 (10-06) instead of b65fa335 (09-22). Every later sweep reads
+`conductor_unavailable`. The current head (`uhCkkDv31…`, app #1757) reaches adam by gossip only after the
+`refquota` move and the conductor restart. Read elohim.host's served version as "last head the dying conductor
+could say", not as convergence (dataplane-convergence DELTA 2026-10-08f).
+
