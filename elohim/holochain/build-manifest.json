@@ -188,7 +188,9 @@
           "genesis/orchestrator/environments/**",
           "genesis/orchestrator/data/**",
           "scripts/ci/capture-rollout-evidence.sh",
-          "scripts/ci/capture-rollout-evidence.test.sh"
+          "scripts/ci/capture-rollout-evidence.test.sh",
+          "scripts/ci/grow-conductor-pvc.sh",
+          "scripts/ci/grow-conductor-pvc.test.sh"
         ],
         "buildProcess": [
           "elohim/holochain/Jenkinsfile"

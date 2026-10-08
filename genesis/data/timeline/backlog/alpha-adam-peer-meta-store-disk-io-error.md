@@ -94,3 +94,40 @@ move the data to a new volume under the claim name as doorway-B's key volume was
 matthew). Probe: `kubelet_volume_stats_capacity_bytes{persistentvolumeclaim="holochain-data-elohim-adam-alpha-0"}`
 ≈ 21.5e9 and adam's conductor restarts flat for an hour.
 
+## DELTA 2026-10-08 (the quota DID reach 20Gi; snapshots consumed it again — the 10-07 reading "resize not reaching the dataset" was wrong)
+
+Prometheus `kubelet_volume_stats_capacity_bytes` (kubelet reports a ZFS dataset's capacity as used + available, and
+under `quota` the snapshots decide what is available) for the four shem conductor datasets, 2026-10-01 → 10-08:
+
+| dataset | 10-01 09:00Z | 10-01 21:00Z | 10-03 | 10-05 | 10-07 | 10-08 03:00Z | live used now |
+|---|---|---|---|---|---|---|---|
+| adam | 6.04 GiB | **16.5** | 12.6 | 10.4 | 7.4 | **6.32** | 6.32 |
+| eve | 5.53 | **16.3** | 13.9 | 12.0 | 8.5 | **6.38** | 6.38 |
+| gertrude | 6.86 | **17.2** | 15.7 | 13.6 | 9.4 | 7.29 | 6.12 |
+| susan | 10.8 | **17.0** | 15.7 | 15.0 | 14.0 | 12.6 | 5.66 |
+
+The step to ~16.5 GiB at 10-01 21:00Z is the operator's quota raise and snapshot-retention cut landing; the decline
+since is ~1.4 GiB/day on every dataset in lockstep while live `used` stays flat at ~6 GiB. So the 20Gi quota is real
+and the space is going to snapshots again (`quota` counts them; sanoid hourly 36 → 6 did not hold the churn — the
+daily/weekly tiers and syncoid replication history keep the blocks). Adam and eve reached `available = 0` on ~10-06
+and have sat there since (adam at 1.00 in 36 of the last 37 hourly samples). The Che workspace dataset on shem
+(`storage-workspace0d7b60ba2d3247a9`, 220Gi) is on the same slope: capacity 220 → 50.6 GiB over the week, 82 % used.
+`tank/k8s` itself has 3,169 GiB free — the pool is not full, each dataset's quota is.
+
+What it does now (03:00Z): adam's storage logged 839 conductor-call timeouts in 6 h (every other peer 0); adam's
+conductor writes ~4 blocks/s against jessica/james/matthew's 1,100–3,000/s; eve's conductor restarted 5× in 24 h
+(`last_terminated_reason=Error`). elohim.host reads adam (alpha-b `STORAGE_URL`), so every elohim.host reading of
+dataplane convergence — `deadRemainingStuck`, the FCT rows stuck `private` (lamad habit DELTA 2026-10-08) — is
+downstream of this disk until it is cured; read doorway-alpha (matthew, ethosengine) for the substrate's own state.
+
+Operator move (shem; the datasets behind `holochain-data-elohim-{adam,eve,gertrude,susan}-alpha-0` and the Che
+workspace claim): `zfs set refquota=20G quota=none <dataset>` so snapshots stop counting against the conductor's
+writable space (snapshot space then bounds against the pool's 3 TiB), or take `tank/k8s` out of sanoid autosnap and
+let syncoid keep its own. Then recycle adam's and eve's conductor pods so lair and SQLite see the space.
+Probe: `kubelet_volume_stats_capacity_bytes` for adam/eve ≈ 21.5e9 and flat over a day; zero `code: 778` lines.
+
+Repo (landed with this DELTA): `scripts/ci/grow-conductor-pvc.sh` no longer says `ok` on a claim whose request
+meets the declared size while the filesystem under it is full — it reads `df` through the pod that mounts the claim
+and prints `CONDUCTOR-VOLUME-FULL` naming the snapshot-quota mechanism and the move above (warn-only; the roll goes
+on). Regression: `scripts/ci/grow-conductor-pvc.test.sh`.
+

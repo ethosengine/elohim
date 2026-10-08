@@ -55,8 +55,55 @@ fi
 IFS=$'\t' read -r class requested capacity <<<"$fields"
 say "live class=${class:-?} requested=${requested:-?} capacity=${capacity:-?} declared=$size"
 
-if [ -n "$requested" ] && [ "$(to_bytes "$requested")" -ge "$(to_bytes "$size")" ]; then
+# The claim can say 20Gi while the filesystem under it is full. On a ZFS dataset
+# with `quota` (shem-zfs: 2026-10-01, and again 2026-10-08 after the retention
+# cut did not hold) snapshots count against the quota, so what the conductor can
+# write shrinks ~1.4 GiB/day while the claim object stays at 20Gi and this step
+# said `ok` to it on edge #1568–#1572. Only the mount shows it: read `df` through
+# the pod that mounts the claim (bash + coreutils + kubectl only — this runs in
+# the deploy container; `df -P -k` is POSIX so busybox and coreutils agree).
+# Warn-only like the rest of this script; a roll is never failed by a reading.
+read_filesystem() {
+  local pods pod volname container mount line total used avail
+  pods="$(kubectl get pods -n "$namespace" -o jsonpath='{range .items[*]}{.metadata.name}{"\t"}{range .spec.volumes[*]}{.name}{"="}{.persistentVolumeClaim.claimName}{" "}{end}{"\n"}{end}' 2>/dev/null || true)"
+  pod="$(printf '%s\n' "$pods" | awk -F'\t' -v c="$claim" 'index(" " $2 " ", "=" c " ") { print $1; exit }')"
+  if [ -z "$pod" ]; then
+    say "filesystem not read — no pod mounts the claim yet (it appears with the conductor's pod)"
+    return 0
+  fi
+  volname="$(printf '%s\n' "$pods" | awk -F'\t' -v p="$pod" '$1 == p { n = split($2, a, " "); for (i = 1; i <= n; i++) { split(a[i], kv, "="); if (kv[2] != "") print kv[1] "=" kv[2] } }' | awk -F'=' -v c="$claim" '$2 == c { print $1; exit }')"
+  # which container mounts that volume, and where
+  read -r container mount <<<"$(kubectl get pod "$pod" -n "$namespace" -o jsonpath='{range .spec.containers[*]}{.name}{"\t"}{range .volumeMounts[*]}{.name}{"="}{.mountPath}{" "}{end}{"\n"}{end}' 2>/dev/null \
+    | awk -F'\t' -v v="$volname" '{ n = split($2, a, " "); for (i = 1; i <= n; i++) { split(a[i], kv, "="); if (kv[1] == v) { print $1, kv[2]; exit } } }')"
+  if [ -z "${mount:-}" ]; then
+    say "filesystem not read — pod $pod mounts the claim as volume '${volname:-?}' but no container mounts that volume"
+    return 0
+  fi
+  line="$(kubectl exec -n "$namespace" "$pod" -c "$container" -- df -P -k "$mount" 2>/dev/null | awk 'NR == 2' || true)"
+  if [ -z "$line" ]; then
+    say "filesystem not read — df $mount in $pod/$container answered nothing"
+    return 0
+  fi
+  read -r _ total used avail _ <<<"$line"
+  total=$((total * 1024)); used=$((used * 1024)); avail=$((avail * 1024))
+  local gib=1073741824
+  local shown
+  shown="$(awk -v t="$total" -v u="$used" -v a="$avail" -v g="$gib" 'BEGIN { printf "capacity %.2f GiB, used %.2f GiB, free %.2f GiB", t/g, u/g, a/g }')"
+  # Full means the conductor cannot take a chain write: under 5 % or under 512 MiB free.
+  if [ "$((avail * 20))" -lt "$total" ] || [ "$avail" -lt 536870912 ]; then
+    say "CONDUCTOR-VOLUME-FULL — the claim says ${requested:-?} but the filesystem at $mount in $pod reads $shown: on a ZFS dataset with quota, snapshots count against it (shem 2026-10-01, 2026-10-08); operator: zfs set refquota=$size quota=none on the dataset behind this claim (or take the k8s datasets out of sanoid autosnap), then recycle this conductor's pod so lair and SQLite see the space"
+  elif [ "$((total * 10))" -lt "$((declared_bytes * 9))" ]; then
+    say "filesystem at $mount reads $shown — under the declared $size by more than a tenth: the quota is being consumed outside the filesystem (snapshots); not yet full"
+  else
+    say "filesystem at $mount reads $shown"
+  fi
+  return 0
+}
+
+declared_bytes="$(to_bytes "$size")"
+if [ -n "$requested" ] && [ "$(to_bytes "$requested")" -ge "$declared_bytes" ]; then
   say "ok — the live request already meets the declared size"
+  read_filesystem
   exit 0
 fi
 

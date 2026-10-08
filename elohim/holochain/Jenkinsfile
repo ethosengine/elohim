@@ -404,6 +404,8 @@ def runQualityGates() {
     if (shouldRunStep('cargo-build-doorway') || shouldRunStep('cargo-build-storage')) {
         sh "bash '${env.WORKSPACE}/scripts/ci/quality-gate-no-image-export.test.sh'"
     }
+    // The conductor-volume grow step's reading (a full ZFS dataset under a 20Gi claim must say so).
+    sh "bash '${env.WORKSPACE}/scripts/ci/grow-conductor-pvc.test.sh'"
     def gates = [doorway: { runDoorwayQualityGate() }]
     if (shouldRunStep('cargo-build-storage')) {
         gates.storage = { runStorageQualityGate() }
