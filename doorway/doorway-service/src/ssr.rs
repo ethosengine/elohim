@@ -367,16 +367,69 @@ fn ssr_dns_lookup_is_slow(elapsed_ms: u128) -> bool {
 ///
 /// Resolution itself is unchanged in kind — `tokio::net::lookup_host` runs the
 /// same `getaddrinfo` reqwest's default resolver runs, on the blocking pool.
+///
+/// A lookup that never completes is named too. The render's traced fetcher
+/// cuts a fetch at the soft budget by DROPPING its future
+/// (`tokio::time::timeout` in `elohim_render::traced_fetcher`), and the lookup
+/// future goes with it — so a lookup slow enough to stall a fetch never
+/// reaches the completion arms below. [`LookupInFlight`] logs on that drop.
+/// Without it the instrument is silent in exactly the case it exists for.
 #[derive(Debug, Default, Clone, Copy)]
 pub struct TimedDnsResolver;
+
+/// Marks a name lookup that has started and not yet completed. Dropped while
+/// still armed, it emits the `doorway::ssr::dns` "abandoned" warn: the caller
+/// gave up (the fetch was cut at the soft budget, or the connect timed out)
+/// before `getaddrinfo` answered.
+struct LookupInFlight {
+    host: String,
+    started: Instant,
+    armed: bool,
+    /// Test seam: set when the abandoned arm fires.
+    abandoned: Option<Arc<std::sync::atomic::AtomicBool>>,
+}
+
+impl LookupInFlight {
+    fn new(host: String) -> Self {
+        Self {
+            host,
+            started: Instant::now(),
+            armed: true,
+            abandoned: None,
+        }
+    }
+
+    /// The lookup completed; return how long it took and stand down.
+    fn complete(&mut self) -> u128 {
+        self.armed = false;
+        self.started.elapsed().as_millis()
+    }
+}
+
+impl Drop for LookupInFlight {
+    fn drop(&mut self) {
+        if !self.armed {
+            return;
+        }
+        if let Some(flag) = &self.abandoned {
+            flag.store(true, std::sync::atomic::Ordering::SeqCst);
+        }
+        tracing::warn!(
+            target: "doorway::ssr::dns",
+            host = %self.host,
+            elapsed_ms = self.started.elapsed().as_millis() as u64,
+            "SSR render fetch: name lookup abandoned before it answered"
+        );
+    }
+}
 
 impl reqwest::dns::Resolve for TimedDnsResolver {
     fn resolve(&self, name: reqwest::dns::Name) -> reqwest::dns::Resolving {
         Box::pin(async move {
             let host = name.as_str().to_string();
-            let started = Instant::now();
+            let mut in_flight = LookupInFlight::new(host.clone());
             let looked_up = tokio::net::lookup_host((host.as_str(), 0)).await;
-            let elapsed_ms = started.elapsed().as_millis();
+            let elapsed_ms = in_flight.complete();
             match looked_up {
                 Ok(addrs) => {
                     let addrs: Vec<std::net::SocketAddr> = addrs.collect();
@@ -638,6 +691,30 @@ mod tests {
         assert!(ssr_dns_lookup_is_slow(SSR_DNS_SLOW_LOOKUP_MS));
         // A lookup must be named before it can stall a fetch, never after.
         assert!(SSR_DNS_SLOW_LOOKUP_MS < 1_200);
+    }
+
+    #[test]
+    fn a_lookup_dropped_before_it_answers_is_named_as_abandoned() {
+        use std::sync::atomic::{AtomicBool, Ordering};
+
+        // The soft-budget cut drops the fetch future, and the lookup with it.
+        let abandoned = Arc::new(AtomicBool::new(false));
+        let mut cut = LookupInFlight::new("storage.example".to_string());
+        cut.abandoned = Some(Arc::clone(&abandoned));
+        drop(cut);
+        assert!(abandoned.load(Ordering::SeqCst));
+    }
+
+    #[test]
+    fn a_lookup_that_answered_is_not_named_as_abandoned() {
+        use std::sync::atomic::{AtomicBool, Ordering};
+
+        let abandoned = Arc::new(AtomicBool::new(false));
+        let mut done = LookupInFlight::new("storage.example".to_string());
+        done.abandoned = Some(Arc::clone(&abandoned));
+        let _elapsed_ms = done.complete();
+        drop(done);
+        assert!(!abandoned.load(Ordering::SeqCst));
     }
 
     #[tokio::test]
