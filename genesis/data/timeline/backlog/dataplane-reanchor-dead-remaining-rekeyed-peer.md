@@ -6,7 +6,7 @@ contentFormat: "markdown"
 title: "Re-keyed dead anchors need a heal under the current key — dead_remaining survives a pod restart (mechanism corrected 2026-09-11: the rows are SETTLED-not-skipped, and nothing clears the dead verdict on a settled row)"
 slug: "dataplane-reanchor-dead-remaining-rekeyed-peer"
 written: "2026-09-06"
-updated: "2026-10-07"
+updated: "2026-10-09"
 author: "story-harvest; mechanism corrected 2026-09-11 (runtime-triage, endpoint-confirmed)"
 status: "backlog"
 priority: "high"
@@ -25,6 +25,7 @@ cites:
   - elohim/elohim-storage/src/services/provide_loop_status.rs
   - genesis/data/timeline/backlog/reanchor-dead-remaining-stuck-vs-draining.md
   - .claude/scripts/runtime-harvest.py
+  - genesis/data/timeline/backlog/alpha-adam-peer-meta-store-disk-io-error.md
 ---
 
 > **2026-09-11 — runtime-triage mechanism correction (endpoint-confirmed).** The
@@ -569,3 +570,62 @@ logging SQLite 778 on a full ZFS dataset (`alpha-adam-peer-meta-store-disk-io-er
 2026-10-08). Held is not laundered to live, which is F3 holding on the fleet. Re-read elohim.host
 after the operator sets `refquota` on adam's dataset and recycles the conductor; until then its
 numbers are the disk's, and the ledger row `2b4761b2eaf6` clears by the poller's own clean streak.
+
+## 2026-10-09 — recurrence at poll 195: 16 rows, every one an unanswered conductor probe (the disk, not the seam)
+
+`2b4761b2eaf6` re-filed as a NEW ledger line (`first_poll: 195`, 2026-10-09T03:51Z):
+`provideLoop.deadRemainingStuck reanchorDeadRemaining=16 reanchorPending=99 stuckSweeps=7`.
+
+Re-fetched live at 2026-10-09T03:52Z, `GET https://elohim.host/p2p/status .provideLoop`
+(`/health` `uptime: 42230`, `pools_healthy 6/7`):
+
+```json
+{"active": true, "reanchorPending": 99, "reanchorCompleted": 83, "reanchorFailed": 833,
+ "reanchorCaughtUp": false, "reanchorDeadRemaining": 16, "stuckSweeps": 7,
+ "deadRemainingStuck": true, "reanchorSkippedReach": 0, "reanchorSkippedContentType": 0,
+ "reanchorAdopted": 0, "reanchorHeld": 0, "reanchorHeldBackoff": 16,
+ "reanchorHeldUnbacked": 0, "reanchorHeldUnanswered": 16, "deadSettledByDeclaration": 0,
+ "reanchorAwaitingChannel": 0}
+```
+
+Same instant, A side (`https://doorway-alpha.elohim.host/p2p/status`): `reanchorDeadRemaining 0`,
+`reanchorCaughtUp true`, `deadRemainingStuck false`. `GET https://elohim.host/admin/self-healing`:
+admission `shedTotal 0`, the single upstream `circuit: "closed"`, `conductor-4` `Degraded`.
+
+### Reading
+
+The F1 counters do their job: the arm is named on one HTTP read. **16 of 16 dead rows are
+`reanchorHeldUnanswered`** — the adopt-before-author probe timed out against adam's conductor.
+`reanchorHeldUnbacked 0` and `deadSettledByDeclaration 0` mean the F5 cure had nothing it could
+decide: no conductor answered Absent or Present. F3 is holding as designed (an unanswered row is
+not laundered to `live`, and correctly still counts as stuck). `reanchorFailed 833` sits on the
+never-authored arm (`reanchorPending 99 = 83 never-authored + 16 dead`) — the same conductor
+refusing work.
+
+The cause is the operator-side disk incident
+(`genesis/data/timeline/backlog/alpha-adam-peer-meta-store-disk-io-error.md`): per the dispatch
+context, adam's and eve's conductor datasets are at zero free and crash-looping, and gertrude's
+conductor slot is dead. The growth from 9 (2026-10-08) to 16 fits more rows being stamped while
+probes go unanswered; no reanchor-seam code change is indicated.
+
+### Change made by this triage
+
+The poller's finding line (`.claude/scripts/runtime-harvest.py`, `_provide_loop_stuck_finding`)
+now carries `heldUnanswered=`, `heldUnbacked=` and `settledByDeclaration=`. The fingerprint is
+node + class + provenance, so it is unchanged; the next recurrence names its arm in the ledger
+line itself, and a line reading `heldUnanswered == reanchorDeadRemaining` routes straight to the
+conductor/disk concern.
+
+### Current decision — BLOCKED (2026-10-09) on operator disk action
+
+Cure: the operator restores headroom on adam's and eve's conductor datasets (refquota and snapshot
+pruning; see the disk-incident DELTAs), recycles those conductors, and restores gertrude's slot.
+No kubectl from this lane. Ledger line `2b4761b2eaf6` (`first_poll: 195`) set `status: blocked`,
+`backlog: dataplane-reanchor-dead-remaining-rekeyed-peer`.
+
+### Verification (what would close this)
+
+After the disk action, `elohim.host/p2p/status .provideLoop` reads `reanchorHeldUnanswered 0`, and
+the 16 rows either revive or move to `reanchorHeldUnbacked` (re-decided) or
+`deadSettledByDeclaration`, with `deadRemainingStuck false`. The poller then deletes the ledger
+line after its clean streak. Not verified as of 2026-10-09T03:52Z: the condition is live.

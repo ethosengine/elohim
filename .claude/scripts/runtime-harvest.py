@@ -176,7 +176,15 @@ def _provide_loop_stuck_finding(node, samples):
         "provenance": "p2p-status:provide-loop",
         "line": f"provideLoop.deadRemainingStuck reanchorDeadRemaining="
                 f"{pl.get('reanchorDeadRemaining')} reanchorPending={pl.get('reanchorPending')} "
-                f"stuckSweeps={pl.get('stuckSweeps')}",
+                f"stuckSweeps={pl.get('stuckSweeps')} "
+                # WHY: the held arm decides who owns the cure. heldUnanswered = conductor probes
+                # that timed out (conductor/disk health, not the reanchor seam); heldUnbacked /
+                # settledByDeclaration = the seam itself. Measured 2026-10-09: fp 2b4761b2eaf6
+                # re-filed with 16/16 rows unanswered on adam's full conductor dataset. fp is
+                # node+class+provenance, so enriching the line never changes the fingerprint.
+                f"heldUnanswered={pl.get('reanchorHeldUnanswered')} "
+                f"heldUnbacked={pl.get('reanchorHeldUnbacked')} "
+                f"settledByDeclaration={pl.get('deadSettledByDeclaration')}",
     }
 
 
