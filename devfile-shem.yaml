@@ -38,6 +38,11 @@ metadata:
 #   - after the first start, on shem: exclude the new dataset from hourly snapshots. Every
 #     tank/k8s dataset is snapshotted hourly and the volume quota counts snapshots; build
 #     output would fill it. The dataset name exists only once the PVC is created.
+#     Measured 2026-10-09: this is what happened — sanoid's snapshots pinned deleted build
+#     output until the 220Gi quota had no free space (and the same mechanism exhausted
+#     adam's and eve's conductor runtime bands on alpha). The cure is exclusion (no sanoid
+#     on build churn, or a refquota that does not count snapshots), not a bigger quota;
+#     the quota was grown to 320Gi online that day only to get the workspace moving.
 #   - `shem-zfs` is Retain: deleting the workspace leaves the PV, zfsvolume and dataset
 #     behind for manual removal.
 #   - node: placement is node AFFINITY, not nodeSelector. Che's CheCluster
@@ -302,9 +307,12 @@ components:
 
   # Single PVC — Che consolidates all volumes into one PVC anyway.
   # Nix store lives at /nix/store, XDG caches at /nix/xdg/.
+  # 320Gi = what the live claim holds since 2026-10-09 (the operator expanded the shem-zfs PVC
+  # online from 220Gi after snapshots counted against its quota filled it). A declared size can
+  # only grow a claim, never shrink it, so this must never read less than the claim.
   - name: persistent
     volume:
-      size: 220Gi
+      size: 320Gi
 commands:
   - id: setup-pnpm
     exec:
