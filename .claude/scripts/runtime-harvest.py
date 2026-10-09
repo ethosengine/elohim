@@ -171,12 +171,17 @@ def _provide_loop_stuck_finding(node, samples):
     pl = ps.get("provideLoop") if isinstance(ps, dict) else None
     if not isinstance(pl, dict) or pl.get("deadRemainingStuck") is not True:
         return None
+    # `reanchorSweepsAbandoned` > 0: the verdict is that many sweeps OLD (the sweep ran out of
+    # its wall-clock budget and published nothing). The line says so; the fingerprint keys on
+    # node + class + provenance, so this never re-files a standing finding.
+    abandoned = pl.get("reanchorSweepsAbandoned")
+    stale = f" sweepsAbandoned={abandoned} (snapshot stale)" if isinstance(abandoned, int) and abandoned > 0 else ""
     return {
         "node": node, "class": PROVIDE_LOOP_CLASS,
         "provenance": "p2p-status:provide-loop",
         "line": f"provideLoop.deadRemainingStuck reanchorDeadRemaining="
                 f"{pl.get('reanchorDeadRemaining')} reanchorPending={pl.get('reanchorPending')} "
-                f"stuckSweeps={pl.get('stuckSweeps')}",
+                f"stuckSweeps={pl.get('stuckSweeps')}{stale}",
     }
 
 

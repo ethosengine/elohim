@@ -119,4 +119,14 @@ deadSettledByDeclaration: number,
  * re-anchor work: each authors when its channel adopts. They stay in
  * `reanchorPending`; `caughtUp` reads only the rows beside them.
  */
-reanchorAwaitingChannel: number, };
+reanchorAwaitingChannel: number, 
+/**
+ * Consecutive re-anchor sweeps that ENDED WITHOUT PUBLISHING a result
+ * since the last published one — the sweep's wall-clock budget elapsed
+ * and its future was dropped, or it returned an error before its recount.
+ * Non-zero means every other `reanchor*` count here, `stuckSweeps` and
+ * `deadRemainingStuck` included, is that many sweeps OLD: the loop is
+ * running and the conductor is not answering inside the budget. 0 on a
+ * published sweep.
+ */
+reanchorSweepsAbandoned: number, };

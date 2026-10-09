@@ -2844,6 +2844,7 @@ async fn async_main(
                                 );
                             }
                             Err(e) => {
+                                reanchor_state.note_reanchor_sweep_abandoned().await;
                                 warn!(error = %e, "reanchor_backfill failed (non-fatal)");
                             }
                         }

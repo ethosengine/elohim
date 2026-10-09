@@ -346,6 +346,14 @@ pub struct ProvideLoopStatus {
     /// `reanchorPending`; `caughtUp` reads only the rows beside them.
     #[ts(type = "number")]
     pub reanchor_awaiting_channel: usize,
+    /// Consecutive re-anchor sweeps that ENDED WITHOUT PUBLISHING a result
+    /// since the last published one — the sweep's wall-clock budget elapsed
+    /// and its future was dropped, or it returned an error before its recount.
+    /// Non-zero means every other `reanchor*` count here, `stuckSweeps` and
+    /// `deadRemainingStuck` included, is that many sweeps OLD: the loop is
+    /// running and the conductor is not answering inside the budget. 0 on a
+    /// published sweep.
+    pub reanchor_sweeps_abandoned: u32,
 }
 
 impl Default for ProvideLoopStatus {
@@ -369,6 +377,7 @@ impl Default for ProvideLoopStatus {
             reanchor_held_unanswered: 0,
             dead_settled_by_declaration: 0,
             reanchor_awaiting_channel: 0,
+            reanchor_sweeps_abandoned: 0,
         }
     }
 }
@@ -457,6 +466,25 @@ impl ProvideLoopState {
         s.reanchor_held_unanswered = result.held_unanswered;
         s.dead_settled_by_declaration = result.settled_by_declaration();
         s.reanchor_awaiting_channel = result.awaiting_channel();
+        s.reanchor_sweeps_abandoned = 0;
+    }
+
+    /// Record a re-anchor sweep that ended without a result to publish: its
+    /// wall-clock budget elapsed (the `run_once` future was dropped mid-sweep)
+    /// or it errored before its recount.
+    ///
+    /// Nothing else moves. The sweep produced no counts, so the last published
+    /// snapshot stays exactly as it was — including the stuck verdict, which is
+    /// neither advanced nor cleared on no evidence. What changes is that the
+    /// surface now says the snapshot is OLD: before this, a conductor too slow
+    /// to finish a sweep inside the budget froze `/p2p/status .provideLoop` at
+    /// its last completed sweep with no way to tell (adam, 2026-10-09: five
+    /// sweeps started in 26 minutes, none completed, the surface unchanged for
+    /// an hour and read downstream as a live stuck verdict).
+    pub async fn note_reanchor_sweep_abandoned(&self) {
+        let mut inner = self.inner.write().await;
+        let s = &mut inner.status;
+        s.reanchor_sweeps_abandoned = s.reanchor_sweeps_abandoned.saturating_add(1);
     }
 }
 
@@ -846,5 +874,44 @@ mod tests {
         assert_eq!(snap.reanchor_held_backoff, 0);
         assert_eq!(snap.reanchor_held_unbacked, 0);
         assert_eq!(snap.reanchor_held_unanswered, 0);
+    }
+
+    #[tokio::test]
+    async fn an_abandoned_sweep_ages_the_snapshot_and_moves_nothing_else() {
+        // A sweep whose future was dropped at its wall-clock budget has no
+        // counts to publish. The last published snapshot must stand untouched
+        // — verdict neither advanced nor cleared — and say how old it is.
+        let state = ProvideLoopState::new();
+        let wedged = ReanchorSweepResult {
+            dead_remaining: 3,
+            held: 3,
+            held_unanswered: 3,
+            ..Default::default()
+        };
+        for _ in 0..DEAD_REMAINING_STUCK_SWEEPS {
+            state.publish_reanchor_sweep(wedged).await;
+        }
+        let before = state.status().await;
+        assert!(before.dead_remaining_stuck);
+        assert_eq!(before.reanchor_sweeps_abandoned, 0);
+
+        state.note_reanchor_sweep_abandoned().await;
+        state.note_reanchor_sweep_abandoned().await;
+        let aged = state.status().await;
+        assert_eq!(aged.reanchor_sweeps_abandoned, 2);
+        assert_eq!(
+            aged.stuck_sweeps, before.stuck_sweeps,
+            "no evidence, no advance"
+        );
+        assert_eq!(aged.dead_remaining_stuck, before.dead_remaining_stuck);
+        assert_eq!(aged.reanchor_dead_remaining, before.reanchor_dead_remaining);
+        assert_eq!(aged.reanchor_pending, before.reanchor_pending);
+        assert_eq!(aged.reanchor_failed, before.reanchor_failed);
+
+        // The next sweep that does finish makes the snapshot current again.
+        state.publish_reanchor_sweep(wedged).await;
+        let fresh = state.status().await;
+        assert_eq!(fresh.reanchor_sweeps_abandoned, 0);
+        assert_eq!(fresh.stuck_sweeps, before.stuck_sweeps + 1);
     }
 }

@@ -2904,6 +2904,9 @@ async fn witness_bootstrap(
             // No un-witnessed rows — the seeded corpus is fully witnessed.
         }
         Ok(Err(e)) => {
+            // No result was published: say the standing snapshot is a sweep
+            // older rather than leaving it to read as current.
+            provide_state.note_reanchor_sweep_abandoned().await;
             tracing::warn!(
                 target: "elohim_storage::projection_reconcile",
                 error = %e,
@@ -2911,6 +2914,8 @@ async fn witness_bootstrap(
             );
         }
         Err(_elapsed) => {
+            // The dropped future never reached its recount or its publish.
+            provide_state.note_reanchor_sweep_abandoned().await;
             tracing::warn!(
                 target: "elohim_storage::projection_reconcile",
                 budget_secs = pacing.witness_sweep_budget.as_secs(),

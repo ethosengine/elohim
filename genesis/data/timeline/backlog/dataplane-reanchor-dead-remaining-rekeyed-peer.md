@@ -6,11 +6,11 @@ contentFormat: "markdown"
 title: "Re-keyed dead anchors need a heal under the current key — dead_remaining survives a pod restart (mechanism corrected 2026-09-11: the rows are SETTLED-not-skipped, and nothing clears the dead verdict on a settled row)"
 slug: "dataplane-reanchor-dead-remaining-rekeyed-peer"
 written: "2026-09-06"
-updated: "2026-10-07"
+updated: "2026-10-09"
 author: "story-harvest; mechanism corrected 2026-09-11 (runtime-triage, endpoint-confirmed)"
 status: "backlog"
 priority: "high"
-self_heal_status: blocked
+self_heal_status: in-progress
 severity: medium
 fingerprints: [2b4761b2eaf6]
 nodes: [alpha-b]
@@ -23,6 +23,8 @@ cites:
   - elohim/elohim-storage/src/p2p/projection_reconcile.rs
   - elohim/elohim-storage/src/services/head_adoption.rs
   - elohim/elohim-storage/src/services/provide_loop_status.rs
+  - elohim/elohim-storage/src/services/reanchor_backoff.rs
+  - genesis/data/timeline/backlog/alpha-adam-peer-meta-store-disk-io-error.md
   - genesis/data/timeline/backlog/reanchor-dead-remaining-stuck-vs-draining.md
   - .claude/scripts/runtime-harvest.py
 ---
@@ -569,3 +571,125 @@ logging SQLite 778 on a full ZFS dataset (`alpha-adam-peer-meta-store-disk-io-er
 2026-10-08). Held is not laundered to live, which is F3 holding on the fleet. Re-read elohim.host
 after the operator sets `refquota` on adam's dataset and recycles the conductor; until then its
 numbers are the disk's, and the ledger row `2b4761b2eaf6` clears by the poller's own clean streak.
+
+## 2026-10-09 — re-filed at poll 258: the disk is cured, the conductor is back, and the verdict the poller relayed was an hour old
+
+The ledger row closed by the poller's clean streak after the 2026-10-08 read and was re-filed
+fresh (`seen 1, first_poll 258`, 11:54Z). Same concern, same file; nothing forked.
+
+### What is exhausted
+
+Ledger line: `provideLoop.deadRemainingStuck reanchorDeadRemaining=16 reanchorPending=101 stuckSweeps=4`
+(node `alpha-b`, provenance `p2p-status:provide-loop`).
+
+`https://elohim.host/p2p/status .provideLoop`, re-fetched 12:44Z, 12:45Z, 12:46Z and 12:48Z, the
+same every time:
+
+```json
+{"reanchorPending":101,"reanchorCompleted":32,"reanchorFailed":336,"reanchorCaughtUp":false,
+ "reanchorDeadRemaining":16,"stuckSweeps":4,"deadRemainingStuck":true,
+ "reanchorHeld":0,"reanchorHeldBackoff":16,"reanchorHeldUnbacked":0,"reanchorHeldUnanswered":16,
+ "deadSettledByDeclaration":0,"reanchorAwaitingChannel":0}
+```
+
+`https://doorway-alpha.elohim.host/p2p/status .provideLoop` (matthew) at 12:44Z: `reanchorDeadRemaining 0,
+stuckSweeps 0, deadRemainingStuck false, reanchorCaughtUp true`. The A side is still clean.
+
+### What changed since 2026-10-08 (Prometheus + Loki, read-only, 12:46Z)
+
+- **The disk blocker is cleared.** `kubelet_volume_stats_available_bytes` for
+  `holochain-data-elohim-adam-alpha-0` read 0 at every 15-minute sample through 10:45Z and
+  14,679,408,640 at 11:00Z; capacity 20 GiB, used 6.7 GB. Eve, gertrude and susan stepped to
+  about 14.8 GB available in the same hour. Adam's conductor: 0 lines of `code: 778`, 0 of
+  `database is locked`, 12,026 lines in all from 11:06Z to 12:46Z.
+- **Adam's conductor is a new pod, started 11:01:10Z, 0 restarts** (the pod before it had 10).
+  `/db/p2p/conductor-diagnostics` on elohim.host: 5 running cells, membership authoritative
+  (529 reads, 4 failed), 213 agents, every role `zomePath: live`. Its dominant log lines are
+  kitsune2 gossip-round and iroh stream timeouts: a conductor three days behind, catching up.
+  Eve's conductor is still restarting (7 since 11:07Z); doorway B reads `conductor-6` and
+  `conductor-4` as reconnecting.
+- **Adam's storage pod was not rolled.** It started 08:56Z, so the counters above belong to one
+  process across both the hours with no conductor and the catch-up.
+- **Storage's heal calls time out against the catching-up conductor:** 93 timeout lines in 100
+  minutes, every sampled one `Request timeout: heal conductor call exceeded per-attempt timeout
+  25s` from `projection_reconcile`.
+
+### The defect this read found: a sweep that runs out of budget freezes the surface
+
+Loki, `elohim-adam-alpha-0`: the five most recent `reanchor_backfill` lines are all the
+start-of-sweep line (12:20:31Z, 12:28:49Z, 12:36:05Z, 12:40:23Z, 12:43:45Z, each
+`candidates: 62, dead_candidates: 19`) and none is `sweep complete`. In the same 26 minutes the
+published snapshot did not move, and it names 16 dead rows where the sweep is working 19.
+
+The sweeps are running and not finishing, and the surface had no way to say so:
+
+- `elohim/elohim-storage/src/p2p/projection_reconcile.rs:181` — `WITNESS_SWEEP_BUDGET` is 120 s.
+- `projection_reconcile.rs`, `witness_bootstrap` — `tokio::time::timeout(pacing.witness_sweep_budget, run_once(..))`;
+  on elapse the `run_once` future is dropped.
+- `elohim/elohim-storage/src/services/reanchor_backfill.rs`, `run_once` — the only
+  `state.publish_reanchor_sweep(..)` on a non-empty sweep sits after the candidate loop and the
+  recount. A dropped future never reaches it; neither does a recount error.
+- `elohim/elohim-storage/src/services/provide_loop_status.rs`, `publish_reanchor_sweep` — the
+  stuck detector advances only there.
+- `.claude/scripts/runtime-harvest.py`, `_provide_loop_stuck_finding` — relays the latest
+  sample's `deadRemainingStuck` with no way to know how old the sample is.
+
+A conductor too slow to finish a sweep inside 120 s therefore pins `/p2p/status .provideLoop` at
+the last sweep that did finish. The `stuckSweeps: 4, deadRemainingStuck: true` filed at 11:54Z
+was earned earlier in this process's life and has not been measured again since. It is the last
+thing the loop managed to say, not a current reading.
+
+Whether each of those five sweeps ended on the 120 s budget or on an error was not read (the
+`sweep exceeded wall-clock budget` line was not counted); both arms skip the publish, and the
+fix covers both.
+
+Read beside it and not changed: `reanchor_backoff.rs` holds an unanswered row for
+`REANCHOR_HELD_BACKOFF_SECONDS` = 900 s ("3 sweeps at the 300s cadence") and
+`DEAD_REMAINING_STUCK_SWEEPS` is 3, so one unanswered probe per row earns the verdict with no
+second attempt. The module says a skip leaves `deadRemainingStuck` untouched on purpose and
+`an_unsettled_residue_beside_settled_rows_still_reads_stuck` pins it. Reading rule:
+`reanchorHeldBackoff` = `reanchorHeldUnanswered` = the residue means "asked once, nobody
+answered, waiting out the window".
+
+### Fix path
+
+Landed on dev with this entry:
+
+- `ProvideLoopStatus.reanchorSweepsAbandoned` (wire, additive): consecutive sweeps that ended
+  without publishing since the last published one. `ProvideLoopState::note_reanchor_sweep_abandoned`
+  increments it and moves nothing else. No counts arrived, so the verdict is neither advanced
+  nor cleared. `publish_reanchor_sweep` zeroes it.
+- `witness_bootstrap` calls it on both no-publish arms (budget elapsed, sweep error); the boot
+  pass in `main.rs` calls it on its error arm.
+- `elohim/sdk/schemas/v1/views/p2p-status-view.schema.json`, the schema contract test and the
+  generated TS carry the field.
+- The poller appends `sweepsAbandoned=N (snapshot stale)` to the finding line when the node
+  reports it. The fingerprint keys on node, class and provenance, so a standing row is not re-filed.
+
+Not built: clearing or re-deriving the verdict from a sweep that published nothing. That is a
+decision about what a wedge is when nobody can be asked.
+
+### Current decision — fix applied on dev; the node condition is catch-up (2026-10-09)
+
+The blocker named on 2026-10-08 (the operator's `refquota` move on shem) is done and is no
+longer what this row waits on. Adam's conductor has been up since 11:01Z and is catching up
+three days of gossip; until its calls answer inside 25 s the sweep keeps running out of budget
+and the published snapshot stays where it is. No operator action is owed for this fingerprint.
+
+Ledger `2b4761b2eaf6`: `triaged`. On re-encounter the poller cites this section. Once the edge
+roll carries the field, the surface tells two outcomes apart:
+
+- a sweep finishes and the residue has moved: `stuckSweeps` restarts and the row closes by
+  disappearance;
+- a sweep finishes, `reanchorSweepsAbandoned` reads 0, and the same rows are still
+  `reanchorHeldUnanswered`: that is a current stuck verdict against a conductor answering other
+  calls, and it is a question for `head_adoption`'s probe.
+
+### Verification
+
+Not verified on the fleet. The field reaches adam with the next edge roll, and the exhaustion
+itself is still live as of 12:48Z. Local evidence: the unit test
+`an_abandoned_sweep_ages_the_snapshot_and_moves_nothing_else`, the schema contract case, and the
+`elohim-storage` gate. Fleet read owed after the roll: `elohim.host/p2p/status
+.provideLoop.reanchorSweepsAbandoned` present, and either 0 beside a moving residue or non-zero
+beside a frozen one.

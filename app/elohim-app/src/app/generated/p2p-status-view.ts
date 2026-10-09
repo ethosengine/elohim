@@ -205,6 +205,10 @@ export interface P2PStatusView {
      * Additive/optional. Never-authored rows (of reanchorPending's NULL arm) the LAST sweep held because their slug is bound to a release channel (metadata.releaseChannel), which owns their serving pointer. Not re-anchor work: each authors when its channel adopts. They stay in reanchorPending; reanchorCaughtUp reads only the rows beside them.
      */
     reanchorAwaitingChannel?: number;
+    /**
+     * Additive/optional. Consecutive re-anchor sweeps that ended WITHOUT publishing a result since the last published one: the sweep's wall-clock budget elapsed and it was dropped, or it errored before its recount. Non-zero means every other reanchor* count here, stuckSweeps and deadRemainingStuck included, is that many sweeps OLD — the loop is running and the conductor is not answering inside the budget. 0 on a published sweep. Omitted by nodes predating it.
+     */
+    reanchorSweepsAbandoned?: number;
   } | null;
   /**
    * The co-resident iroh node's NodeId (64-char hex), when this node runs the iroh transport stack alongside libp2p. Additive/optional — OMITTED from the wire on a libp2p-only node (dual-stack boot is mode-exclusive today). Set at the main.rs dual block from iroh_n.node_id().
