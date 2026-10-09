@@ -72,6 +72,7 @@ import {
   GAUGE_SWEEP_POLL_TIMEOUT_MS,
   getRawRidingCatchUp,
   describeCatchUpRide,
+  CATCHUP_RIDE_TIMEOUT_MS,
   CATCHUP_RIDE_STEP_TIMEOUT_MS,
   type ParsedMetrics,
 } from '../src/framework/dataplane/surfaces.js';
@@ -978,14 +979,64 @@ function assetsPromisedByPeer(refs: ShellAssetRef[], shellUrl: string): ShellAss
   return promised;
 }
 
-/** Asset references the peer does NOT answer 200 for, described for a human. */
+/**
+ * Asset references the peer does NOT answer 200 for, described for a human.
+ *
+ * Each read rides the documented catching-up shed, exactly as the page read
+ * that produced `refs` already does, and all of them share ONE ride budget
+ * (CATCHUP_RIDE_TIMEOUT_MS) so the step's ceiling stays derivable. A doorway
+ * that has just restarted serves its warm, last-reconciled shell before its
+ * upstream answers, and sheds that shell's assets 503 catching-up for the few
+ * seconds it takes; reading that window as "this doorway does not hold its
+ * own entry script" is museum trap #19 (a shed surfaced as a verdict) at a
+ * site that answered for itself (edge #1591, fp a529817acb61). Only the
+ * catching-up body is ridden: a 404, a plain 503 or a connect error still
+ * fails on the first read, and a shed that outlasts the budget fails too,
+ * naming how long it was ridden.
+ */
 async function findUnresolvedAssets(refs: ShellAssetRef[], shellUrl: string): Promise<string[]> {
   const unresolved: string[] = [];
+  const deadline = Date.now() + CATCHUP_RIDE_TIMEOUT_MS;
   for (const { ref, kind, url } of assetsPromisedByPeer(refs, shellUrl)) {
-    const { status } = await getRaw(url);
-    if (status !== 200) unresolved.push(`${kind} "${ref}" -> HTTP ${status}`);
+    const res = await getRawRidingCatchUp(url, {
+      timeoutMs: Math.max(1_000, deadline - Date.now()),
+    });
+    if (res.status !== 200) {
+      unresolved.push(`${kind} "${ref}" -> HTTP ${res.status}${describeCatchUpRide(res)}`);
+    }
   }
   return unresolved;
+}
+
+/**
+ * Wait, bounded, until the shell at `url` and every same-doorway asset it names
+ * are past the catching-up shed. The browser-boot scenario calls this BEFORE it
+ * opens a browser: a browser cannot ride a shed (a 503 entry script is a blank
+ * page and a 30s bootstrap timeout), so the ride has to happen first, by the
+ * same rule the static read above follows. Anything that is not the catching-up
+ * shed returns at once and is left for the browser to meet and the scenario to
+ * report. Returns a note for the visit record; empty when nothing was ridden.
+ */
+export async function rideShellPastCatchUp(url: string): Promise<string> {
+  const deadline = Date.now() + CATCHUP_RIDE_TIMEOUT_MS;
+  const page = await getRawRidingCatchUp(url);
+  let rodeMs = page.rodeCatchUpMs ?? 0;
+  if (page.status === 200) {
+    const baseHref = /<base\b[^>]*href=["']([^"']+)["']/i.exec(page.text)?.[1];
+    const documentBase = baseHref ? new URL(baseHref, url).toString() : url;
+    for (const { url: assetUrl } of assetsPromisedByPeer(
+      parseShellAssetRefs(page.text),
+      documentBase
+    )) {
+      const remaining = deadline - Date.now();
+      if (remaining <= 0) break;
+      const res = await getRawRidingCatchUp(assetUrl, { timeoutMs: Math.max(1_000, remaining) });
+      rodeMs += res.rodeCatchUpMs ?? 0;
+    }
+  }
+  return rodeMs > 0
+    ? `rode a catching-up shed for ${Math.round(rodeMs / 1000)}s before the visit`
+    : '';
 }
 
 /**
@@ -1104,8 +1155,9 @@ function requireServedPage(world: E2EWorld, peerName: string): ServedPage {
  */
 Then(
   'every script and stylesheet the page from peer {string} names is one that peer serves',
-  // One bounded fetch per named asset; a page names a handful.
-  { timeout: 90_000 },
+  // One bounded fetch per named asset (a page names a handful), all sharing
+  // one catching-up ride budget.
+  { timeout: CATCHUP_RIDE_STEP_TIMEOUT_MS + 60_000 },
   async function (this: E2EWorld, peerName: string) {
     const page = requireServedPage(this, peerName);
 

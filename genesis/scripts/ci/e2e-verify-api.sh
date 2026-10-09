@@ -92,6 +92,15 @@ else
 fi
 echo ""
 
+# The served-shell stations (served-shell-boots.feature "opens the page ... in a
+# browser") launch Playwright's chromium even in this API-level run; without the
+# browser they red on `browserType.launch: Executable doesn't exist` on every run
+# (genesis #1637/#1639 — the same class edge #1450/#1452 closed in
+# scripts/ci/run-dataplane-validation.sh). A failed install is reported, not
+# fatal, so the non-browser scenarios still measure.
+pnpm exec playwright install --with-deps chromium \
+  || echo "WARNING: playwright chromium install failed — browser stations will report Executable doesn't exist"
+
 E2E_DOORWAY_ALPHA="${DOORWAY_HOST}" \
 E2E_DOORWAY_STAGING="${STAGING_DOORWAY}" \
 E2E_STORAGE_URL="http://${INTERNAL_STORAGE_URL}" \
