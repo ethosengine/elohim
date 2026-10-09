@@ -40,7 +40,7 @@ Feature: A steward publishes a commons learning path from his own peer, and seed
   Reordering Loves, Rebuilding Common Life, and Abundant Life & Sending), each
   movement holds modules (Waking Up opens with "The Church Dilemma"), and each
   module is made of smaller pieces: a lesson, the scripture it rests on, a
-  story, a discussion and practice. Each piece names its links to the others (this
+  story, a discussion, practice and a closing reflection. Each piece names its links to the others (this
   scripture is the lesson's anchor, that practice is meant to be done at home), and those
   links are part of the piece itself. Movements and modules are the path's own
   structure, published inside the path rather than on their own, so below "item"
@@ -103,6 +103,27 @@ Feature: A steward publishes a commons learning path from his own peer, and seed
   verification budget leaves the update pending; a discovery-link miss is no proof
   that withdrawal never happened. The broader withdrawal scenarios below remain
   work in progress until their native witnesses and household checks are wired.
+
+  The course was first published as a single workbook, the item "fct-course":
+  one web bundle holding all fifteen modules, with its own table of contents inside. The rework took that
+  workbook apart into the path above, so the workbook is now the SOURCE the
+  pieces were cut from, which each lesson still names, and never a step on the
+  path: a step that carried the whole course subdivided inside itself would put a
+  second, unwalkable table of contents inside the first module.
+
+  Reach is also what a reader meets. Narrower still than intimate is private:
+  held for its author alone. An older seeder gave that reach to every row it
+  wrote without a declared one, and a peer keeps a row's reach until the
+  author's new head reaches it, which is how a piece of a commons course can
+  sit at private reach on a peer today. Standing is the reader's recognized
+  relationship to the circle a reach names: anyone has it for commons, a
+  signed-in member for community, a household member for intimate, nobody but
+  the author for private. A peer that holds a piece at a narrower reach than
+  the reader has standing for answers the read "held, at this reach": the piece
+  exists there, and the hold is a decision. That is a different answer from "no
+  such piece", and the reader must be told which one they got. A reader's device
+  may keep an offline copy of a piece it was once allowed to read; a hold must
+  not be answered with that copy as if the piece were open.
 
   # Sprint 1.4 closes one exact item; the full course and lifecycle scenarios stay held.
   Scenario: Che publishes two consecutive updates to Matthew's item without the pipeline
@@ -189,3 +210,28 @@ Feature: A steward publishes a commons learning path from his own peer, and seed
     When that peer verifies the claimed authorization for the update
     Then it requires the controller's complete witnessed history for that exact exercise
     And missing history leaves publication pending
+
+  @wip @regression
+  Scenario: The workbook the course was cut from is not a step on the path
+    # Regression 2026-10-08: the recomposed path carried the workbook as the twelfth step of
+    # "The Church Dilemma", so module 1 ended in a second table of contents.
+    Given the "Foundations for Christian Technology" path as Matthew published it: five movements, their modules, each module's pieces, all at commons reach
+    And the workbook "fct-course" the course was cut from is published beside the path, not inside it
+    When its steps are listed in walking order, the order a learner meets them from the first movement to the last piece
+    Then no step is the workbook "fct-course"
+    And "The Church Dilemma" ends with its own reflection piece, not with the workbook that once stood as its twelfth step
+    And every lesson still names that workbook as the source it was cut from
+    And each module's pieces follow its lesson with no gap in that order
+
+  @wip @regression
+  Scenario: A reader reaching a piece held at a narrower reach is told it is held, not missing
+    # Regression 2026-10-08: the step view answered a refused read with "not yet available, it may
+    # not have been seeded", the message for a piece that does not exist.
+    Given a reader with no standing beyond commons opens "Foundations for Christian Technology" on doorway "alpha"
+    And the peer behind that doorway still holds the lesson "The Church Dilemma" at "private" reach, the reach an older seeder gave it
+    And Matthew's commons declaration for that lesson has not yet reached that peer
+    When the reader opens the step that carries that lesson
+    Then the step says the piece exists and names "private" as the reach it is held at
+    And it offers the ways in: sign in with standing for that reach, or ask the steward to widen it
+    And it does not say the piece is missing or was never seeded
+    And the reader's offline copy of that piece, if any, is not shown in its place

@@ -75,7 +75,7 @@
  */
 
 // Main client
-export { ElohimClient, WriteBuffer, ReachEnforcer } from './elohim-client';
+export { ElohimClient, WriteBuffer, ReachEnforcer, ElohimHttpError } from './elohim-client';
 export {
   ConfiguredDoorwayResolver,
   gatewayCandidates,

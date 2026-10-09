@@ -17,9 +17,14 @@ import { pendingUntilEvent } from '@angular/core/rxjs-interop';
 
 import { map, catchError, shareReplay, switchMap } from 'rxjs/operators';
 
-import { Observable, from, of } from 'rxjs';
+import { Observable, from, of, throwError } from 'rxjs';
 
-import { ContentNode, ContentType, ContentReach } from '../models/content-node.model';
+import {
+  ContentNode,
+  ContentType,
+  ContentReach,
+  contentHeldFrom,
+} from '../models/content-node.model';
 import { LearningPath, PathStep, parsePathView } from '../models/learning-path.model';
 import { BLOB_FETCHER, type IBlobFetcher } from '@elohim/service';
 import { ELOHIM_CLIENT, ElohimClient } from '@elohim/service';
@@ -367,8 +372,10 @@ export class ContentBackendService {
       switchMap(data =>
         data ? this.hydrateRawContent(data as unknown as Record<string, unknown>) : of(null)
       ),
-      catchError(_err => {
-        return of(null);
+      catchError(err => {
+        // A reach hold is an answer, not an absence: surface it so the reader is told the truth.
+        const held = contentHeldFrom(id, err);
+        return held ? throwError(() => held) : of(null);
       }),
       shareReplay(1)
     );

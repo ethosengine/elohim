@@ -15,10 +15,15 @@ import { Injectable, inject } from '@angular/core';
 
 import { map, catchError, timeout, shareReplay, switchMap } from 'rxjs/operators';
 
-import { Observable, of } from 'rxjs';
+import { Observable, of, throwError } from 'rxjs';
 
 import { ELOHIM_ENV } from '@elohim/service';
-import { ContentNode, ContentType, ContentReach } from '../models/content-node.model';
+import {
+  ContentNode,
+  ContentType,
+  ContentReach,
+  contentHeldFrom,
+} from '../models/content-node.model';
 import { LearningPath, parsePathView } from '../models/learning-path.model';
 
 import { ContentBackendService } from './content-backend.service';
@@ -278,6 +283,10 @@ export class ProjectionAPIService {
         return node;
       }),
       catchError((err: HttpErrorResponse) => {
+        // 403 with requiredReach is the peer answering "held", not failing: no failure is
+        // recorded and the hold is raised so the loader can name the reach to the reader.
+        const held = contentHeldFrom(id, err);
+        if (held) return throwError(() => held);
         this.recordFailure();
         return this.handleContentError(err, `getContentNode(${id})`);
       }),

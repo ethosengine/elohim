@@ -84,6 +84,13 @@ deletes `STANDARD_SOURCES.conductor`, which is one of the six ids the helper
 above registers; landing them in the wrong order leaves the helper referencing a
 removed key and `registerStandardSource()` throws `Unknown standard source`.
 
+2026-10-08: the conductor concern is unblocked and queued as a single slice
+with this one. See its Current decision for the combined trajectory. That
+caller census also found that `initializeForMode()`, the replacement this
+deprecation names, has **zero production callers**. Retiring
+`registerAllStandardSources()` stays correct. Whether `initializeForMode()`
+survives is an open follow-on question recorded on the conductor entry.
+
 ## Current decision
 
 Bounded, low-risk, ready to execute — **not landed on 2026-07-30 because the two

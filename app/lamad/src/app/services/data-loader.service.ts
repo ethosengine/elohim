@@ -4,7 +4,7 @@ import { Injectable, inject, afterNextRender } from '@angular/core';
 
 import { catchError, finalize, map, shareReplay, tap, switchMap, timeout } from 'rxjs/operators';
 
-import { Observable, of, from, defer, forkJoin } from 'rxjs';
+import { Observable, of, from, defer, forkJoin, throwError } from 'rxjs';
 
 // Models from elohim (local)
 
@@ -16,6 +16,8 @@ import {
   ContentGraph,
   ContentRelationship,
   ContentRelationshipType,
+  ContentHeldError,
+  contentHeldFrom,
 } from '../models/content-node.model';
 import {
   KnowledgeMapIndex,
@@ -324,6 +326,9 @@ export class DataLoaderService {
     const path$ = this.getContent(pathId).pipe(
       map(node => {
         if (!node || node.contentType === 'placeholder') {
+          if (node?.tags?.includes('held')) {
+            throw new Error(`Path held at ${String(node.metadata?.['requiredReach'])} reach: ${pathId}`);
+          }
           // Distinguish true 404 from network-error placeholders:
           // Placeholders from network errors contain the original error in description
           const isNetworkError =
@@ -425,7 +430,13 @@ export class DataLoaderService {
           switchMap(content =>
             content ? of(content) : this.contentService.getContent(resourceId)
           ),
-          catchError(() => this.contentService.getContent(resourceId))
+          catchError((err: unknown) =>
+            // A reach hold is the peer's answer, not a projection outage: do not fall back
+            // to the storage read (which would be held the same way) — raise it.
+            contentHeldFrom(resourceId, err)
+              ? throwError(() => err)
+              : this.contentService.getContent(resourceId)
+          )
         )
       : this.contentService.getContent(resourceId);
 
@@ -447,6 +458,12 @@ export class DataLoaderService {
         }
       }),
       catchError((err: unknown) => {
+        const held = contentHeldFrom(resourceId, err);
+        if (held) {
+          // Held, not missing: never served from a cache the reader has no standing for.
+          this.logger.info('Content held at reach', { resourceId, reach: held.requiredReach });
+          return of(this.createHeldPlaceholder(held));
+        }
         const errMsg = err instanceof Error ? err.message : String(err);
         this.logger.warn('Error loading content, trying IDB cache', { resourceId, error: errMsg });
 
@@ -604,6 +621,32 @@ export class DataLoaderService {
       tags: ['missing', 'placeholder'],
       relatedNodeIds: [],
       metadata: {},
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+    };
+  }
+
+  /**
+   * Placeholder for content a peer HOLDS but refused by reach (403 `requiredReach`).
+   * Says the true thing: it exists, it is held, and what reach would open it — never
+   * "not yet seeded".
+   */
+  private createHeldPlaceholder(held: ContentHeldError): ContentNode {
+    const { resourceId, requiredReach } = held;
+    return {
+      id: resourceId,
+      contentType: 'placeholder',
+      title: `Held at ${requiredReach} reach: ${resourceId}`,
+      description: `"${resourceId}" exists on this peer but is held at ${requiredReach} reach.`,
+      content:
+        `This content is held at **${requiredReach}** reach by its steward, so it is not open to you yet. ` +
+        `It exists on this peer: the hold is a reach decision, not a missing seed.\n\n` +
+        `If you have standing for it, sign in. Otherwise ask the steward to widen its reach.\n\n` +
+        `Resource ID: ${resourceId}`,
+      contentFormat: 'markdown',
+      tags: ['held', 'placeholder'],
+      relatedNodeIds: [],
+      metadata: { requiredReach },
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString(),
     };

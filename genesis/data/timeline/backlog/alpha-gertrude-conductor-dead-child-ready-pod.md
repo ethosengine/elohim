@@ -52,6 +52,21 @@ Decision is the pure `health_status_for(embedded, child)` in `http.rs`, pinned b
 existing probes (readiness 6 × 10 s, liveness 10 × 30 s) a dead child now drops out of the Service in about
 a minute and the container is restarted within five.
 
+## Where the cure stands on the fleet (16:15Z)
+
+Edge #1582 (SUCCESS, 16:10Z) carries 4fecf8185 in the edgenode image and rolled the seven STORAGE pods —
+but a conductor pod keeps the image it is already running unless the conductor fork pin moves or the
+commit says `[conductor-roll]` (`elohim/holochain/Jenkinsfile resolveConductorWorkloadImage`, rung 2).
+gertrude's pod is the same pod (uid 1f68b5b9, restart count 5), still refusing on 4445 at 16:11Z, and
+both doorways still log `Handshake not finished` against her. So the probe fix is on dev and in the
+image, in no conductor pod yet. Two moves, in order:
+
+1. Now: `kubectl delete pod elohim-gertrude-alpha-conductor-0 -n elohim-alpha` — the OLD supervisor
+   restarts her conductor child on boot, which ends the 503s for new hosted humans today.
+2. After adam's and eve's datasets are grown (otherwise their rollouts time out and the conductor phase
+   HALTS the rest of the fleet): one push with `[conductor-roll]` in the commit message, which rolls
+   every conductor pod onto the current image and makes the probe honest fleet-wide.
+
 ## Operator move (now)
 
 Restart `elohim-gertrude-alpha-conductor-0` (`kubectl delete pod … -n elohim-alpha`) — the fix above only

@@ -340,6 +340,54 @@ export interface ContentFlag {
  * community, discovery-assessment, instrument, tool moved to manifest-types.ts. */
 type AppContentTypeExtension = 'placeholder'; // Missing/errored content - shown when content can't be loaded
 
+/**
+ * A read the peer REFUSED by reach: the content exists there, but is held at a reach the reader
+ * has no standing for (HTTP 403 with `requiredReach`). Distinct from absence (404) and from an
+ * outage, so the UI can say "held at private reach" instead of "not yet seeded".
+ */
+export class ContentHeldError extends Error {
+  constructor(
+    public readonly resourceId: string,
+    public readonly requiredReach: string
+  ) {
+    super(`${resourceId} is held at ${requiredReach} reach`);
+    this.name = 'ContentHeldError';
+  }
+}
+
+function reachNamedBy(value: unknown): string | null {
+  if (typeof value === 'string') {
+    try {
+      return reachNamedBy(JSON.parse(value));
+    } catch {
+      return null;
+    }
+  }
+  if (value !== null && typeof value === 'object') {
+    const reach = (value as { requiredReach?: unknown }).requiredReach;
+    if (typeof reach === 'string') return reach;
+  }
+  return null;
+}
+
+/**
+ * Read a reach hold out of any client's 403: an `ElohimHttpError` (`status` + raw `body`), an
+ * Angular `HttpErrorResponse` (`status` + parsed `error`), or a `ContentHeldError` already raised
+ * upstream. Anything else returns null and keeps its ordinary handling.
+ */
+export function contentHeldFrom(resourceId: string, err: unknown): ContentHeldError | null {
+  if (err instanceof ContentHeldError) return err;
+  if (err === null || typeof err !== 'object') return null;
+  const e = err as { status?: unknown; error?: unknown; body?: unknown; requiredReach?: unknown };
+  if (e.status !== 403) return null;
+  const reach =
+    (typeof e.requiredReach === 'string' ? e.requiredReach : null) ??
+    reachNamedBy(e.error) ??
+    reachNamedBy(e.body) ??
+    'private';
+  return new ContentHeldError(resourceId, reach);
+}
+
 export type ContentType = WireContentType | LamadContentType | AppContentTypeExtension;
 
 /** All content types (wire + app extensions) as runtime array */

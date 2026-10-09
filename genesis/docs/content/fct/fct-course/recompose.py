@@ -513,16 +513,10 @@ class Composer:
             step = {"resourceId": child_id, **fields}
             step["completionCriteria"] = ["score"] if role in ("quiz", "reflection") else ["view"]
             steps.append(step)
-        if mod.number == 1:
-            steps.append({
-                "resourceId": WORKBOOK_ID,
-                "stepTitle": "For facilitators: the whole course as a workbook",
-                "stepNarrative": "The course as its author teaches it, with the verse appendix, "
-                                 "bibliography and the editable course document.",
-                "optional": True,
-                "completionCriteria": ["view"],
-                "estimatedTime": "15 minutes",
-            })
+        # The workbook bundle is the SOURCE of this path, never a step on it: a module's structure is
+        # the path's structure, and a step that carries the whole course subdivided inside itself
+        # would put a second, unwalkable table of contents inside module 1 (operator, 2026-10-08).
+        # Each lesson keeps its REFERENCES source-workbook edge as provenance.
         return steps
 
     def application(self, mod: Module, lesson_id: str, heading: str, block: Block) -> list:
