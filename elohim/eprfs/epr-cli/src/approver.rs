@@ -773,10 +773,13 @@ pub(crate) fn pending_lines(view: &PendingView) -> Vec<String> {
 const NO_LOCAL_DISCOVERY: &str = "This node has no local discovery in its transport mode, so \
      nothing can ask it over the private network.";
 
-/// How a device still asks a node that nothing can announce to.
-const CARRY_THE_LINK: &str = "A device can still ask it: on that device run `epr device ask \
-     --label <name>`, which prints a link; approve the link here with `epr device approve \
-     '<link>'`, then give the code it shows back to that device with `epr device redeem`.";
+/// How a device still asks a node that nothing can announce to: by name.
+/// The asking terminal reaches the approving node over plain http before it
+/// asks, and a node answers its identity routes only under names it was told.
+const NAME_THIS_NODE: &str = "A device can still ask it by name: on that device run `epr device \
+     join --label <name> --approver http://<this machine's address>:<this node's port>`, then \
+     approve the link it prints here with `epr device approve '<link>'`. This node answers \
+     under that address only when ELOHIM_ALLOWED_HOSTS lists it.";
 
 /// What `epr device status` found on this machine, before any word is chosen.
 #[derive(Default)]
@@ -833,7 +836,7 @@ pub(crate) fn status_lines(f: &StatusFacts) -> Vec<String> {
     match f.carrier.as_deref() {
         Some("absent") => {
             lines.push(NO_LOCAL_DISCOVERY.into());
-            lines.push(CARRY_THE_LINK.into());
+            lines.push(NAME_THIS_NODE.into());
         }
         Some(_) if f.asking == 0 => lines.push("Nothing is asking it.".into()),
         Some(_) => lines.push(format!(
@@ -898,7 +901,7 @@ pub fn pending(args: &[String]) -> Outcome<ExitCode> {
         json_call_with("GET", &format!("{node}/auth/consent/pending"), None, &[])?;
     if answer.carrier == "absent" {
         println!("{NO_LOCAL_DISCOVERY}");
-        println!("{CARRY_THE_LINK}");
+        println!("{NAME_THIS_NODE}");
         return Ok(ExitCode::SUCCESS);
     }
     if let Some(me) = &answer.approver {
@@ -1627,7 +1630,8 @@ mod tests {
         assert!(signed_out[1].starts_with("It speaks for Matthew, so it is the side that says yes"));
         assert!(signed_out[2].starts_with("Nobody is signed in on it from this terminal"));
         assert_eq!(signed_out[3], NO_LOCAL_DISCOVERY);
-        assert!(signed_out[4].contains("epr device approve '<link>'"));
+        assert!(signed_out[4].contains("--approver http://<this machine's address>"));
+        assert!(signed_out[4].contains("ELOHIM_ALLOWED_HOSTS"));
 
         let asked = status_lines(&StatusFacts {
             speaks: Some("Matthew".into()),
