@@ -95,6 +95,11 @@ in place.
   fallback `case` so a push touching lvi doesn't hit the `*) Unknown project` abort.
 - Path-dep wiring for the sibling crates lvi will consume (workspace deps on eprfs/brit crates;
   Dockerfile `COPY` + manifest watch-path implications noted for later edge work).
+- Read `docs/specs/2026-10-10-workspace-arrival-as-declared-device.md` §3 before minting any
+  `DevspaceSeed` / `Berth` field: it maps every surface a Che workspace inits itself from today
+  (devfile children, SessionStart hooks, pool-policy, hc-mesh) onto the field that owns it, and
+  names the six arrival conditions `just status device` reads (added 2026-10-10; the habit
+  `workspace-device-arrival` retires when the seed carries them).
 
 **Exit criteria:** `cargo build` + `cargo fmt --check` + `cargo clippy -- -D warnings` green on the
 empty workspace (against the pool `CARGO_TARGET_DIR`); the module README + `CLAUDE.md` + `.epr-meta`

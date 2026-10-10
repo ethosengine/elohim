@@ -1,0 +1,41 @@
+#!/usr/bin/env bash
+# device-memory-sync — copy this device's harness auto-memory into the repo's device-local memory dir.
+#
+# Claude Code keeps per-workspace auto-memory OUTSIDE the repository
+# ($CLAUDE_CONFIG_DIR/projects/<slug>/memory/*.md, MEMORY.md is its index). The native recall fold
+# indexes files under the repository only, and `epr flow memory import` refuses sources outside
+# the root and refuses symlinks. So the entries are COPIED into `.claude/memory/device/`, which is
+# gitignored: the device's own index folds them as files and they never reach the tracked
+# projection or another device (the SelfScope ring in practice —
+# elohim/lvi/docs/specs/2026-10-10-workspace-arrival-as-declared-device.md §6.2).
+#
+# Idempotent and one-directional (harness → repo). Never deletes: an entry removed from the harness
+# stays in the device dir until someone removes it there (demotion is a person's act, not a sync's).
+# The devfile's postStart runs this on every workspace start; run it by hand after writing memory
+# mid-session if the fold should see the entry before the next start.
+set -euo pipefail
+
+ROOT="${EPR_ROOT:-/projects/elohim}"
+CONFIG_DIR="${CLAUDE_CONFIG_DIR:-/projects/.claude-config}"
+# The harness names the project dir by its path with `/` → `-`.
+SLUG="$(printf '%s' "$ROOT" | tr '/' '-')"
+SRC="$CONFIG_DIR/projects/$SLUG/memory"
+DST="$ROOT/.claude/memory/device"
+
+if [ ! -d "$SRC" ]; then
+  echo "ok device memory: no harness memory at $SRC (nothing to sync)"
+  exit 0
+fi
+mkdir -p "$DST"
+copied=0; total=0
+for f in "$SRC"/*.md; do
+  [ -e "$f" ] || continue
+  b="$(basename "$f")"
+  [ "$b" = "MEMORY.md" ] && continue   # the harness index is a projection, never an entry
+  total=$((total + 1))
+  if [ ! -e "$DST/$b" ] || ! cmp -s "$f" "$DST/$b"; then
+    cp -p "$f" "$DST/$b"
+    copied=$((copied + 1))
+  fi
+done
+echo "ok device memory: $total entr$([ "$total" = 1 ] && echo y || echo ies) in $DST ($copied refreshed from $SRC)"

@@ -1,0 +1,65 @@
+#!/usr/bin/env bash
+# embed-model-provision — put the PINNED embedding model where the native fold resolves it.
+#
+# The recall executor's semantic provider (`epr flow memory index fold`) embeds under the model
+# manifest `.epr-meta/elohim/algorithms/embedding-models/all-minilm-l6-v2.json`, whose `resolve`
+# list names where the bytes may live. The pinned bytes (model.onnx + tokenizer.json, CID-checked
+# by the embed procedure on every run) are published only in chroma's ONNX tarball, and chroma
+# downloads it under $HOME — which a Che workspace wipes on restart. So the fold on a fresh
+# workspace reads `attested failed: no model directory resolves` until somebody puts the bytes on
+# the PVC. This script is that somebody, idempotently: the devfile's `setup-embed-model`
+# postStart command and `device-preflight`'s REFUSED line both name it.
+#
+# Target (the manifest's second resolve entry): $XDG_CACHE_HOME/elohim/embed-models/all-MiniLM-L6-v2/onnx
+# Override with EPR_EMBED_MODEL_DIR (the manifest's first entry) — this script then fills THAT dir.
+#
+# Exit 0 = the two files are present at the target (already, or now). Exit 1 = could not provision
+# (no network, chromadb missing, bytes absent) — the message names what is missing; nothing is
+# half-written because the copy is into a temp sibling then a rename.
+set -euo pipefail
+
+TARGET="${EPR_EMBED_MODEL_DIR:-${XDG_CACHE_HOME:-$HOME/.cache}/elohim/embed-models/all-MiniLM-L6-v2/onnx}"
+CHROMA_DIR="$HOME/.cache/chroma/onnx_models/all-MiniLM-L6-v2/onnx"
+
+present() { [ -s "$1/model.onnx" ] && [ -s "$1/tokenizer.json" ]; }
+
+if present "$TARGET"; then
+  echo "ok embed model: present at $TARGET"
+  exit 0
+fi
+
+if ! present "$CHROMA_DIR"; then
+  # chroma's downloader hardcodes Path.home(); it verifies the tarball's sha256 before extracting.
+  if ! python3 -c 'import chromadb' 2>/dev/null; then
+    echo "REFUSED embed model: python module 'chromadb' is not importable and $CHROMA_DIR is empty — install chromadb or place model.onnx + tokenizer.json at $TARGET by hand" >&2
+    exit 1
+  fi
+  echo "fetching the pinned all-MiniLM-L6-v2 ONNX bundle via chromadb (network)…"
+  if ! python3 -c 'from chromadb.utils.embedding_functions import ONNXMiniLM_L6_V2 as O; O()(["warm"])' >/dev/null 2>&1; then
+    echo "REFUSED embed model: chromadb could not fetch the bundle (network?) — retry with network, or place model.onnx + tokenizer.json at $TARGET by hand" >&2
+    exit 1
+  fi
+  if ! present "$CHROMA_DIR"; then
+    echo "REFUSED embed model: fetch reported success but $CHROMA_DIR lacks model.onnx + tokenizer.json" >&2
+    exit 1
+  fi
+fi
+
+parent="$(dirname "$TARGET")"
+mkdir -p "$parent"
+tmp="$(mktemp -d "$parent/.onnx.XXXXXX")"
+cp -p "$CHROMA_DIR"/model.onnx "$CHROMA_DIR"/tokenizer.json "$tmp"/
+# Keep the sidecar files chroma ships (config, vocab) — harmless, and a human reading the dir sees the bundle whole.
+for f in config.json special_tokens_map.json tokenizer_config.json vocab.txt; do
+  [ -f "$CHROMA_DIR/$f" ] && cp -p "$CHROMA_DIR/$f" "$tmp"/ || true
+done
+if [ -d "$TARGET" ]; then
+  # A partial earlier copy: replace it whole rather than merging into it.
+  stale="$parent/.onnx.stale.$$"
+  mv "$TARGET" "$stale"
+  mv "$tmp" "$TARGET"
+  rm -rf "$stale"
+else
+  mv "$tmp" "$TARGET"
+fi
+echo "ok embed model: provisioned at $TARGET ($(du -sh "$TARGET" | cut -f1))"

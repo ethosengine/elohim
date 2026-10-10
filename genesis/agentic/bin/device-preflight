@@ -1,0 +1,313 @@
+#!/usr/bin/env python3
+"""
+device-preflight — refuse-before-work: has this workspace ARRIVED as a device?
+
+A Che workspace is one of its human's devices (`elohim/lvi/docs/specs/2026-10-10-workspace-arrival-as-declared-device.md`).
+Arriving is six conditions, each of which today is met by a different undeclared surface (a devfile
+postStart, a SessionStart hook, a hand-run ceremony, a visitor's cache). This script reads them in one
+place and prints one line per condition in the `just mesh preflight` idiom — `ok <name>: <detail>` or
+`REFUSED <name>: <why> — <fix>` — so a REFUSED line always names the command that cures it. Exit 1 on
+any REFUSED, else 0. It never fixes anything itself; the fix commands are the declared arrival ceremony.
+
+The six conditions, in dependency order:
+
+  epr binary     the native evaluator is reachable (EPR_BIN, PATH, or the cargo target pool)
+  device key     ${ELOHIM_DEVICE_KEY_FILE:-$XDG_CONFIG_HOME/elohim/device/ed25519.seed} exists (PVC)
+  roster bound   `epr actor current --device` reads a standing human: this device is in a roster
+  embed model    the model manifest's `resolve` list reaches model.onnx + tokenizer.json
+  fold attested  `epr flow memory index status` reads complete within the measure's foldLag limit
+  berth moored   a live mooring exists in $CLAUDE_CONFIG_DIR/berth/moorings (this session's, if known)
+
+Classification (p2p-design-gate): this script holds nothing — every line is derived from a store
+someone else owns (Ephemeral C read). Fail-open on the READ side is refused: a store it cannot read
+is a REFUSED line that says so, never an `ok`.
+
+Usage: device-preflight [--root DIR] [--handle H] [--session S] [--json]
+Run:   python3 -m unittest genesis.agentic.device_preflight_test
+"""
+from __future__ import annotations
+
+import argparse
+import glob
+import json
+import os
+import shutil
+import subprocess
+import sys
+from dataclasses import dataclass
+from pathlib import Path
+
+MODEL_MANIFEST_REL = ".epr-meta/elohim/algorithms/embedding-models/all-minilm-l6-v2.json"
+INDEX_MEASURE_REL = ".epr-meta/elohim/algorithms/recall-semantic-index.json"
+PARTICIPANTS_REL = ".eprfs/status/participants"
+FOLD_LAG_DEFAULT = 25
+READ_TIMEOUT_S = 10
+
+# Where a compiled `epr` plausibly lives when it is on neither EPR_BIN nor PATH (the symlink in
+# $HOME that usually carries it is wiped on a Che restart). Same globs as
+# .claude/scripts/_lib/epr_client.py — duplicated rather than imported so this workspace-runtime
+# script never reaches into the harness-side library.
+_POOL_GLOBS = (
+    "{pool}/family/*/elohim__eprfs/*/release/epr",
+    "{pool}/family/*/elohim__eprfs/*/debug/epr",
+)
+POOL_ROOT_DEFAULT = "/projects/.cargo-target-pool"
+
+
+@dataclass
+class Line:
+    name: str
+    ok: bool
+    detail: str
+    fix: str = ""
+
+    def render(self) -> str:
+        if self.ok:
+            return f"ok {self.name}: {self.detail}"
+        tail = f" — {self.fix}" if self.fix else ""
+        return f"REFUSED {self.name}: {self.detail}{tail}"
+
+
+def resolve_epr(env: dict[str, str]) -> str | None:
+    pinned = env.get("EPR_BIN")
+    if pinned and Path(pinned).is_file() and os.access(pinned, os.X_OK):
+        return pinned
+    found = shutil.which("epr", path=env.get("PATH"))
+    if found:
+        return found
+    newest, newest_mtime = None, -1.0
+    pool = env.get("CARGO_TARGET_POOL_ROOT") or POOL_ROOT_DEFAULT
+    for pattern in _POOL_GLOBS:
+        for candidate in glob.glob(pattern.format(pool=pool)):
+            try:
+                if not os.access(candidate, os.X_OK):
+                    continue
+                mtime = os.stat(candidate).st_mtime
+            except OSError:
+                continue
+            if mtime > newest_mtime:
+                newest, newest_mtime = candidate, mtime
+    return newest
+
+
+def run_json(argv: list[str], cwd: Path, env: dict[str, str]) -> tuple[dict | None, str]:
+    """(parsed stdout, error text). A command that cannot run or does not answer JSON is an error."""
+    try:
+        r = subprocess.run(argv, cwd=cwd, env=env, capture_output=True, text=True, timeout=READ_TIMEOUT_S)
+    except (OSError, subprocess.SubprocessError) as exc:
+        return None, f"{argv[0]} did not run ({exc})"
+    if r.returncode != 0:
+        return None, (r.stderr or r.stdout).strip().splitlines()[-1:] and (r.stderr or r.stdout).strip().splitlines()[-1] or f"exit {r.returncode}"
+    try:
+        value = json.loads(r.stdout)
+    except ValueError:
+        return None, "answered with something other than JSON"
+    return (value if isinstance(value, dict) else {"value": value}), ""
+
+
+def device_key_path(env: dict[str, str]) -> Path:
+    explicit = env.get("ELOHIM_DEVICE_KEY_FILE")
+    if explicit:
+        return Path(explicit)
+    config_home = env.get("XDG_CONFIG_HOME") or str(Path(env.get("HOME", "~")).expanduser() / ".config")
+    return Path(config_home) / "elohim" / "device" / "ed25519.seed"
+
+
+def expand_resolve_entry(entry: str, env: dict[str, str]) -> Path | None:
+    """Mirror of embedder.rs expand_entry: `$VAR[/rest]` (unset or empty VAR ⇒ skipped), `~` ⇒ $HOME."""
+    if entry.startswith("$"):
+        head, _, rest = entry[1:].partition("/")
+        value = env.get(head, "")
+        if not value:
+            return None
+        return Path(value) / rest if rest else Path(value)
+    if entry == "~" or entry.startswith("~/"):
+        home = env.get("HOME")
+        if not home:
+            return None
+        return Path(home) / entry[2:] if len(entry) > 1 else Path(home)
+    return Path(entry)
+
+
+def roster_handles(root: Path) -> list[str]:
+    d = root / PARTICIPANTS_REL
+    if not d.is_dir():
+        return []
+    return sorted(p.stem for p in d.glob("*.jsonl") if not p.name.startswith("."))
+
+
+def pending_enrollment(root: Path, handle: str) -> Path | None:
+    p = root / PARTICIPANTS_REL / f".enroll-{handle}.json"
+    return p if p.is_file() else None
+
+
+def check_epr(env: dict[str, str]) -> tuple[Line, str | None]:
+    binary = resolve_epr(env)
+    if binary:
+        return Line("epr binary", True, binary), binary
+    return (
+        Line(
+            "epr binary",
+            False,
+            "no `epr` on EPR_BIN, PATH or the cargo target pool",
+            "build it: `just gate eprfs` (or export EPR_BIN=<path>)",
+        ),
+        None,
+    )
+
+
+def check_device_key(env: dict[str, str], handle: str) -> Line:
+    path = device_key_path(env)
+    if path.is_file():
+        return Line("device key", True, str(path))
+    return Line(
+        "device key",
+        False,
+        f"no key at {path}",
+        f"mint it with the enrollment request: `epr actor device enroll --handle {handle}`",
+    )
+
+
+def check_roster(root: Path, env: dict[str, str], binary: str | None, handle: str) -> Line:
+    if binary is None:
+        return Line("roster bound", False, "cannot read: no epr binary", "cure the `epr binary` line first")
+    value, err = run_json([binary, "actor", "current", "--device", "--json", "--root", str(root)], root, env)
+    if value is None:
+        return Line("roster bound", False, f"cannot read: {err}", "cure the `epr binary` line first")
+    standing = value.get("standing")
+    if standing:
+        who = standing.get("subject") or standing.get("human") or handle
+        via = standing.get("via") or standing.get("source") or "roster"
+        return Line("roster bound", True, f"this device stands for human:{who} ({via})")
+    pending = pending_enrollment(root, handle)
+    if pending:
+        try:
+            request = json.loads(pending.read_text()).get("controller", "?")
+        except (OSError, ValueError):
+            request = "?"
+        return Line(
+            "roster bound",
+            False,
+            f"enrollment pending for {handle} (device {request[-8:]})",
+            f"on a device already in {handle}'s roster run `epr actor device authorize '<request>'`, "
+            f"then here `epr actor device bind '<authorization>'` and commit {PARTICIPANTS_REL}/{handle}.jsonl",
+        )
+    return Line(
+        "roster bound",
+        False,
+        f"this device is not in {handle}'s roster",
+        f"`epr actor device enroll --handle {handle}` here, then `epr actor device authorize '<request>'` "
+        f"on a device already in {handle}'s roster, then `epr actor device bind '<authorization>'` here",
+    )
+
+
+def check_embed_model(root: Path, env: dict[str, str]) -> Line:
+    manifest = root / MODEL_MANIFEST_REL
+    try:
+        resolve = json.loads(manifest.read_text()).get("resolve", [])
+    except (OSError, ValueError) as exc:
+        return Line("embed model", False, f"cannot read {MODEL_MANIFEST_REL} ({exc})", "restore the model manifest")
+    tried: list[str] = []
+    for entry in resolve:
+        path = expand_resolve_entry(entry, env)
+        if path is None:
+            continue
+        tried.append(str(path))
+        if (path / "model.onnx").is_file() and (path / "tokenizer.json").is_file():
+            return Line("embed model", True, f"{entry} → {path}")
+    where = ", ".join(tried) if tried else "(every resolve entry names an unset variable)"
+    return Line(
+        "embed model",
+        False,
+        f"no model.onnx + tokenizer.json under {where}",
+        "provision it onto the PVC: `genesis/agentic/bin/embed-model-provision`",
+    )
+
+
+def fold_lag_limit(root: Path) -> int:
+    try:
+        limit = json.loads((root / INDEX_MEASURE_REL).read_text()).get("foldLag", {}).get("limit")
+        return int(limit) if limit is not None else FOLD_LAG_DEFAULT
+    except (OSError, ValueError, TypeError):
+        return FOLD_LAG_DEFAULT
+
+
+def check_fold(root: Path, env: dict[str, str], binary: str | None) -> Line:
+    if binary is None:
+        return Line("fold attested", False, "cannot read: no epr binary", "cure the `epr binary` line first")
+    value, err = run_json([binary, "flow", "memory", "index", "status", "--json", "--root", str(root)], root, env)
+    if value is None:
+        return Line("fold attested", False, f"cannot read: {err}", "run `epr flow memory index fold --max-files 1` and read its refusal")
+    limit = fold_lag_limit(root)
+    lag = value.get("lag")
+    last = value.get("last") or {}
+    state = last.get("state") or {}
+    state_name = state.get("state") if isinstance(state, dict) else state
+    if state_name == "failed":
+        why = state.get("why", "") if isinstance(state, dict) else ""
+        return Line("fold attested", False, f"last fold failed: {why}", "cure the `embed model` line, then `epr flow memory index fold --max-files 1`")
+    try:
+        lag_n = int(lag)
+    except (TypeError, ValueError):
+        return Line("fold attested", False, "status carries no lag", "run `epr flow memory index fold --max-files 1`")
+    if state_name == "complete" and lag_n <= limit:
+        return Line("fold attested", True, f"complete, {lag_n} files behind (limit {limit})")
+    if lag_n > limit:
+        return Line(
+            "fold attested",
+            False,
+            f"{state_name or 'unfolded'}, {lag_n} files behind (limit {limit})",
+            f"catch up in one run: `epr flow memory index fold --max-files {max(lag_n + 50, 100)}`",
+        )
+    return Line("fold attested", False, f"{state_name}, {lag_n} files behind (limit {limit})", "run `epr flow memory index fold --max-files 1`")
+
+
+def check_berth(env: dict[str, str], session: str | None) -> Line:
+    config_dir = env.get("CLAUDE_CONFIG_DIR", "/projects/.claude-config")
+    moorings = Path(config_dir) / "berth" / "moorings"
+    if not moorings.is_dir():
+        return Line("berth moored", False, f"no berth store at {moorings}", "`berth moor --session <id> --runtime claude-code`")
+    if session:
+        record = moorings / f"{session}.json"
+        if record.is_file():
+            return Line("berth moored", True, f"session {session[:8]} moored")
+        return Line("berth moored", False, f"session {session[:8]} has no mooring", f"`berth moor --session {session} --runtime claude-code`")
+    count = len(list(moorings.glob("*.json")))
+    if count:
+        return Line("berth moored", True, f"{count} mooring(s), no session named to check")
+    return Line("berth moored", False, "no moorings at all", "`berth moor --session <id> --runtime claude-code`")
+
+
+def preflight(root: Path, env: dict[str, str], handle: str | None, session: str | None) -> list[Line]:
+    handles = roster_handles(root)
+    handle = handle or (handles[0] if len(handles) == 1 else None) or "<handle>"
+    epr_line, binary = check_epr(env)
+    return [
+        epr_line,
+        check_device_key(env, handle),
+        check_roster(root, env, binary, handle),
+        check_embed_model(root, env),
+        check_fold(root, env, binary),
+        check_berth(env, session),
+    ]
+
+
+def main(argv: list[str] | None = None) -> int:
+    parser = argparse.ArgumentParser(description="has this workspace arrived as a device?")
+    parser.add_argument("--root", default=os.environ.get("EPR_ROOT", "/projects/elohim"))
+    parser.add_argument("--handle", help="the human this device stands for (default: the sole roster)")
+    parser.add_argument("--session", default=os.environ.get("CLAUDE_CODE_SESSION_ID") or None)
+    parser.add_argument("--json", action="store_true")
+    args = parser.parse_args(argv)
+    env = dict(os.environ)
+    lines = preflight(Path(args.root), env, args.handle, args.session)
+    if args.json:
+        print(json.dumps([line.__dict__ for line in lines], indent=1))
+    else:
+        for line in lines:
+            print(line.render())
+    return 0 if all(line.ok for line in lines) else 1
+
+
+if __name__ == "__main__":
+    sys.exit(main())

@@ -115,6 +115,8 @@ Three invariants follow and are restated in §7: the private chain (journeys, re
 
 **The visitor rule.** An outside memory tool may be a declared provider with `ranking_known: false`, budgeted by `provider_bytes` and `provider_seconds`, enveloped, attested, granted by a Mishpat commitment rather than a key, and retirable. It is never the index. The host role stays real only while a visitor is actually in the house, so the palace stays, and the test that says the native layer is done is that the recall contract's `semantic_provider` no longer names it and removing it loses only the second opinion.
 
+*Clarified 2026-10-10 (a second workspace, shem):* whether a visitor is in the house is a **per-device** choice, declared by that device's arrival (the devfile's `setup-mempalace`, off by default; mined by hand on shem as a visitor), and the native fold must never depend on anything the visitor leaves behind. It did: the pinned MiniLM bytes resolved only from the chroma cache MemPalace's mining had filled under `~/.cache`, which a Che restart wipes, so a fresh workspace's native fold read `attested failed` while the palace-less device looked like the native-only configuration this rule asks for. The cure is a device-owned resolve path on the PVC and a provisioning script (`elohim/lvi/docs/specs/2026-10-10-workspace-arrival-as-declared-device.md` §3, §7); the seam-register row "model provisioning per device" carries it.
+
 **What the field confirms, and the one thing it does not.** SuperLocalMemory 4.0 (AGPL-3.0 Python; pattern, never code) independently converged on the same canonical store (SQLite with FTS5 and a vector virtual table, derived projections behind staged verification), on scopes enforced at write admission and as query predicates, on bi-temporal `as_of`, and on per-owner completion proofs. All ten of its published negative results sit in its learned-from-behavior layer, which this design refuses on the epic's grounds and now on engineering grounds. Its two mechanical invariants (prior-distance, join-liveness) are adopted as habit probes. No surveyed tool has a graduated reach model as a first-class primitive; that part has no template.
 
 ---
@@ -183,12 +185,14 @@ The dedupe guard. Before designing anything in this space, find the row; if it i
 | external tooling admission | `.mcp.json`, per-agent allowlists, `REQUIRED_LIMITS` | pools §5 (six parts) | the visitor test closure for the palace | ◐ |
 | household / holon as a kind | none in Rust | commons-holonic stewardship cluster | household = smallest Collective EPR | ⚠ decision |
 | behavior-learned ranking | refused | search epic | refused again, with SuperLocalMemory's evidence | ✅ (by refusal) |
+| model provisioning per device (added 2026-10-10) | the model manifest's `resolve` list (`$EPR_EMBED_MODEL_DIR`, `$XDG_CACHE_HOME/elohim/embed-models/…` on the PVC, the chroma cache last) + `genesis/agentic/bin/embed-model-provision`; read by `just status device` | lvi arrival spec `elohim/lvi/docs/specs/2026-10-10-workspace-arrival-as-declared-device.md` | the pin is the authority, the bytes are re-fetchable; a device's fold must never depend on a visitor's cache | ◐ provisioned by script, not yet by the Berth |
+| contribution acts across devices (added 2026-10-10) | contributions git-tracked; their acts in `.eprfs/status/flows.jsonl`, per device — a second device reads every shared contribution as unattributed | lvi arrival spec §6.3 | none; named as the record-without-witness seam | ⚠ |
 
 ---
 
 ## 7. Invariants (the anti-capture set this spec adds to the carrier's)
 
-1. **The content is synced; the index never is.** Each device re-folds from what it holds. An index that travels is an aggregate that travels.
+1. **The content is synced; the index never is.** Each device re-folds from what it holds. An index that travels is an aggregate that travels. *(First concrete SelfScope instance, 2026-10-10: a workspace's own auto-memory lives in a gitignored `.claude/memory/device/`, is folded by the device's index as files, and never enters the tracked projection — lvi arrival spec §6.2.)*
 2. **A method on every result.** Every candidate names the `IndexMeasure` CID and the producer that ranked it; a `ranking_known: false` provider is declared as such and is never the index.
 3. **Reach is a predicate in the query and a grant at the replication boundary**, never only a render filter and never a mining policy.
 4. **Standing prints as a shape; ranks may fuse for order under a recipe with a CID; standing never enters the fusion.**
