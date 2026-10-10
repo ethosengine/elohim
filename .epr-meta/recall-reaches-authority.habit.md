@@ -322,3 +322,23 @@ were left stale because nobody read their claims). Native `epr flow status` read
 mid-session with "executor bytes changed since this session began", so a session that outlives an `epr`
 rebuild loses its bootstrap continuation unless it adopts. Chronicle:
 `genesis/data/timeline/chronicle/2026-10-06-substrate-currency-hub-doorway-web-seam.md`.
+
+DELTA 2026-10-10 (shem, the second workspace; NO status change, the habit stays red). The native fold
+here read `attested failed: unavailable: no model directory resolves` and `2942 files behind` (ceiling
+25): the manifest's resolve list reached only `$EPR_EMBED_MODEL_DIR` (unset) and MemPalace's chroma
+cache under a wiped `$HOME`, so the native semantic provider had been depending on a visitor's
+leftover and a fresh device had no index at all. Cure, same day: the pinned bytes on the PVC at
+`$XDG_CACHE_HOME/elohim/embed-models/all-MiniLM-L6-v2/onnx` as the manifest's second resolve entry
+(CID-neutral: the store `bafyreigdsx…rn6e` was reused; the first 1-file fold embedded 25 chunks under
+the pinned procedure `bafkreiaki7…i4hu`), `genesis/agentic/bin/embed-model-provision` + the devfile's
+`setup-embed-model` so the next workspace inits itself, the catch-up fold (`--max-files 3000`, running
+81 min on the debug `epr` at the time of this delta, its attestation pending), MemPalace mined here as
+a visitor (10,421 drawers across the three declared surfaces), and the device-local memory ring
+(`.claude/memory/device/`, 15 harness entries, folded as files, never projected). Two findings for
+this habit's frontier: (1) on a second device the 269 shared contributions read as `unattributed` in
+`project --index` (population 284/269) because `ContributionActs` reads `.eprfs/status/flows.jsonl`,
+untracked and per device — the record travels by git, the act does not (lvi arrival spec §6.3; a
+dry-run re-import would mint acts for 33 and skip 233); (2) the SessionStart bootstrap refused
+mid-session again with "executor bytes changed" after the gate rebuilt `epr`. Sibling habit born:
+`workspace-device-arrival` (`just status device` reads 5 of 6 ok on shem now that the R-P8 ceremony
+ran across two real devices; the fold line is the sixth).
