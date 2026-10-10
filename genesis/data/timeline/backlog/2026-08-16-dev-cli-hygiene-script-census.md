@@ -204,3 +204,16 @@ script. Coupled context synced: root `CLAUDE.md` Build & Test (via the `elohim-r
 change no longer falsely refuses the integrity wasm.
 
 - 2026-10-01 campaign 1.4: the mesh lane wrapper generates an invalid Bash variable for the maintained hyphenated late joiner `matthew-device-campaign14`; use the same scoped Cucumber profile and sprint-report builder directly for this proof. Fix is deferred to this CLI home; see `2026-10-01-campaign-1.4-household-restart.md`.
+
+## 2026-10-10 — `status device`: the arrival preflight
+
+`just status device` runs `genesis/agentic/bin/device-preflight`: six `ok`/`REFUSED` lines in the mesh-preflight idiom
+(epr binary · device key · roster bound · embed model · fold attested · berth moored), each `REFUSED` naming the
+command that cures it from the current state, exit 1 on any. It fixes nothing. Two provisioners landed beside it,
+`embed-model-provision` (the pinned MiniLM bytes onto the PVC — the native fold had been reading them from MemPalace's
+chroma cache under a wiped `$HOME`) and `device-memory-sync` (Claude Code's per-workspace auto-memory into the
+gitignored `.claude/memory/device/`), both run by the devfile's postStart (`setup-embed-model`, `setup-device-memory`)
+so a workspace inits itself. No new verb. Coupled context synced: root `CLAUDE.md` Build & Test and Persistent
+workspace work; the `hc-dev-orchestrator` skill is a package projection and is updated through its package (not
+touched here). Spec: `elohim/lvi/docs/specs/2026-10-10-workspace-arrival-as-declared-device.md`; habit
+`workspace-device-arrival`.

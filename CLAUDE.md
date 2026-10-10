@@ -84,6 +84,7 @@ just seed validate            # non-writing schema validation
 just seed apply mesh content  # seed the household mesh THIS host owns (env from hc-mesh.sh mesh_seed_env)
 just look page <url>          # eyes-first render
 just status habits
+just status device            # has this workspace ARRIVED as its human's device: six ok/REFUSED lines (epr binary · device key · roster bound · embed model · fold attested · berth moored), each REFUSED naming its cure; exit 1 on any
 just codegen all verify
 ```
 
