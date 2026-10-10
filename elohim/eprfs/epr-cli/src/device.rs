@@ -80,9 +80,61 @@ pub fn usage() -> &'static str {
      epr device redeem '<code#state>' [--approver <approving node URL>] [--node <this node URL>]\n  \
      epr device pending [--node <this node URL>]\n  \
      epr device approve '<link | number | key fingerprint>' [--only <act>]... [--yes] [--node <this node URL>]\n  \
-     epr device approve <number | key fingerprint> --decline\n\
+     epr device approve <number | key fingerprint> --decline\n  \
+     epr device status [--node <this node URL>]\n    \
+     (whom this machine's node speaks for, what is waiting, and what to run next)\n\
      This machine's node is --node, else ELOHIM_NODE_URL, else the one node of this machine \
      that answers on 8090/8095/8091/8092/8093."
+}
+
+/// The device commands, as a person types them.
+const COMMANDS: [&str; 6] = ["join", "ask", "redeem", "pending", "approve", "status"];
+
+/// The command a mistyped or guessed word most likely meant: a word people
+/// reach for by habit, else a command within two edits of it.
+fn nearest_command(word: &str) -> Option<&'static str> {
+    let habit = match word {
+        "doctor" | "info" | "whoami" | "state" | "check" | "show" => Some("status"),
+        "list" | "ls" | "requests" | "waiting" => Some("pending"),
+        "accept" | "yes" | "confirm" | "allow" => Some("approve"),
+        "add" | "enroll" | "register" | "link" | "pair" => Some("join"),
+        _ => None,
+    };
+    habit.or_else(|| {
+        COMMANDS
+            .iter()
+            .map(|c| (edits(word, c), *c))
+            .filter(|(d, _)| *d <= 2)
+            .min_by_key(|(d, _)| *d)
+            .map(|(_, c)| c)
+    })
+}
+
+/// How many single-letter edits turn `a` into `b`.
+fn edits(a: &str, b: &str) -> usize {
+    let (a, b): (Vec<char>, Vec<char>) = (a.chars().collect(), b.chars().collect());
+    let mut row: Vec<usize> = (0..=b.len()).collect();
+    for (i, ca) in a.iter().enumerate() {
+        let mut last = row[0];
+        row[0] = i + 1;
+        for (j, cb) in b.iter().enumerate() {
+            let next = (last + usize::from(ca != cb))
+                .min(row[j] + 1)
+                .min(row[j + 1] + 1);
+            last = row[j + 1];
+            row[j + 1] = next;
+        }
+    }
+    row[b.len()]
+}
+
+/// What is said to a word that is no device command: the likely command
+/// first, where the person is looking, then the usage.
+fn unknown_command(word: &str) -> String {
+    let hint = nearest_command(word)
+        .map(|c| format!("; did you mean `epr device {c}`?"))
+        .unwrap_or_default();
+    format!("unknown device command `{word}`{hint}\n{}", usage())
 }
 
 pub fn run(args: &[String]) -> Outcome<ExitCode> {
@@ -91,6 +143,7 @@ pub fn run(args: &[String]) -> Outcome<ExitCode> {
         Some("ask") => ask(&args[1..]),
         Some("approve") => crate::approver::approve(&args[1..]),
         Some("pending") => crate::approver::pending(&args[1..]),
+        Some("status") => crate::approver::status(&args[1..]),
         Some("redeem") => {
             let (pasted, opts) = match args.get(1) {
                 Some(p) if !p.starts_with("--") => (p.clone(), Options::parse(&args[2..])?),
@@ -123,8 +176,31 @@ pub fn run(args: &[String]) -> Outcome<ExitCode> {
             }
             Ok(ExitCode::SUCCESS)
         }
-        Some(other) => Err(format!("unknown device command `{other}`\n{}", usage())),
+        Some(other) => Err(unknown_command(other)),
     }
+}
+
+/// The asks this device keeps while it waits on an approving node, oldest
+/// first, in the words `join` uses for them. Reads only: an ask past its
+/// window is left for `join` to forget.
+pub(crate) fn kept_asks() -> Vec<String> {
+    let Ok(dir) = pending_dir() else {
+        return Vec::new();
+    };
+    let now = now_unix();
+    let mut kept: Vec<Pending> = fs::read_dir(dir)
+        .into_iter()
+        .flatten()
+        .flatten()
+        .filter(|e| {
+            let name = e.file_name().to_string_lossy().into_owned();
+            name.ends_with(".json") && !name.ends_with(KEPT_SUFFIX)
+        })
+        .filter_map(|entry| serde_json::from_slice::<Pending>(&fs::read(entry.path()).ok()?).ok())
+        .filter(|p| now < p.open_until())
+        .collect();
+    kept.sort_by_key(|p| p.asked_at_unix);
+    kept.iter().map(Pending::words).collect()
 }
 
 /// This machine's node: `--node`; else `ELOHIM_NODE_URL`; else the storage
@@ -2715,5 +2791,25 @@ mod tests {
         );
         assert_eq!(origin_of("http://127.0.0.1:8191/"), "http://127.0.0.1:8191");
         assert_eq!(origin_of("http://127.0.0.1:8191"), "http://127.0.0.1:8191");
+    }
+
+    #[test]
+    fn a_word_that_is_no_command_is_answered_with_the_likely_one() {
+        assert_eq!(nearest_command("doctor"), Some("status"));
+        assert_eq!(nearest_command("stauts"), Some("status"));
+        assert_eq!(nearest_command("aprove"), Some("approve"));
+        assert_eq!(nearest_command("list"), Some("pending"));
+        assert_eq!(nearest_command("feedback"), None);
+        let said = unknown_command("doctor");
+        assert!(
+            said.starts_with(
+                "unknown device command `doctor`; did you mean `epr device status`?\n"
+            ),
+            "{said}"
+        );
+        assert!(
+            unknown_command("feedback").starts_with("unknown device command `feedback`\nusage:")
+        );
+        assert!(usage().contains("epr device status"));
     }
 }
