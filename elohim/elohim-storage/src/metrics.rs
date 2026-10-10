@@ -1716,12 +1716,20 @@ lazy_static! {
     ///   legible: `row_stored_enqueued` (a trigger was queued — including the
     ///   takeover of a claim an earlier `no_local_row` left sleeping),
     ///   `row_stored_deduped`, `row_stored_dropped_full`, `row_stored_claims_full`.
+    /// - `election_refreshed` — the worker found the row on the doc's head but
+    ///   behind the doc's carried ordering, probed its own conductor, and the
+    ///   same-head stamp advanced the row's ordering columns.
+    ///
+    /// The second label `source` names what raised the offer: `sync` (a content
+    /// sync apply or a row-store re-offer - every pre-existing site) or
+    /// `retained` (the periodic retained-hint pass over docs already held).
+    /// The outcome vocabulary is shared; `source` is never concatenated into it.
     pub static ref HEAD_ADOPTION_TRIGGER: IntCounterVec = IntCounterVec::new(
         Opts::new(
             "elohim_head_adoption_trigger_total",
-            "Event-driven head-adoption trigger outcomes, by outcome.",
+            "Event-driven head-adoption trigger outcomes, by outcome and source.",
         ),
-        &["outcome"],
+        &["outcome", "source"],
     )
     .unwrap();
 
@@ -4567,7 +4575,15 @@ fn observe_sync_projected_apply_staleness_at(
 /// Record one event-driven head-adoption trigger outcome. See
 /// [`HEAD_ADOPTION_TRIGGER`] for the closed `outcome` vocabulary.
 pub fn inc_head_adoption_trigger(outcome: &str) {
-    HEAD_ADOPTION_TRIGGER.with_label_values(&[outcome]).inc();
+    inc_head_adoption_trigger_from(outcome, "sync");
+}
+
+/// [`inc_head_adoption_trigger`] naming what raised the offer (`sync` |
+/// `retained`).
+pub fn inc_head_adoption_trigger_from(outcome: &str, source: &str) {
+    HEAD_ADOPTION_TRIGGER
+        .with_label_values(&[outcome, source])
+        .inc();
 }
 
 /// Publish what one anchor-verify pass found: rows it marked live, and rows

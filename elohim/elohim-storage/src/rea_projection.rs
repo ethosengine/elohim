@@ -85,12 +85,59 @@ pub fn install_content_touch_sink(tx: tokio::sync::mpsc::Sender<String>) -> bool
     CONTENT_TOUCH_TX.set(tx).is_ok()
 }
 
+/// Test-only, re-entrant capture of [`notify_content_touched`] calls. Thread
+/// local, so parallel tests never see each other's touches and nothing installs
+/// the process-wide sink. A guard records every touch made on its thread while
+/// it lives; nesting is fine (each guard owns its own start offset).
+#[cfg(test)]
+pub(crate) mod touch_capture {
+    use std::cell::RefCell;
+
+    thread_local! {
+        static TOUCHES: RefCell<Vec<String>> = const { RefCell::new(Vec::new()) };
+    }
+
+    pub(super) fn record(id: &str) {
+        TOUCHES.with(|t| t.borrow_mut().push(id.to_string()));
+    }
+
+    /// Reads the touches recorded on this thread since [`TouchCapture::start`]
+    /// (or the last [`TouchCapture::drain`]).
+    pub(crate) struct TouchCapture {
+        from: usize,
+    }
+
+    impl TouchCapture {
+        pub(crate) fn start() -> Self {
+            Self {
+                from: TOUCHES.with(|t| t.borrow().len()),
+            }
+        }
+
+        /// The touches since the last drain, consumed.
+        pub(crate) fn drain(&mut self) -> Vec<String> {
+            TOUCHES.with(|t| {
+                let t = t.borrow();
+                let out = t[self.from..].to_vec();
+                self.from = t.len();
+                out
+            })
+        }
+
+        pub(crate) fn touched(&mut self, id: &str) -> bool {
+            self.drain().iter().any(|t| t == id)
+        }
+    }
+}
+
 /// Capacity of the touch channel: a seed-sized burst (~3.4k) fits twice over.
 pub const CONTENT_TOUCH_CAPACITY: usize = 8192;
 
 /// Announce a content-row write made without an `EventBus` in reach (see
 /// [`install_content_touch_sink`]). Safe to call from any writer.
 pub fn notify_content_touched(id: &str) {
+    #[cfg(test)]
+    touch_capture::record(id);
     if let Some(tx) = CONTENT_TOUCH_TX.get() {
         match tx.try_send(id.to_string()) {
             Ok(()) => crate::metrics::inc_content_touch("sent"),

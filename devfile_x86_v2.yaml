@@ -1,0 +1,103 @@
+# devfile_x86_v2.yaml — the SHEM workspace: the shem node, the x86-64-v2 image, shem-zfs storage.
+# Launch with ?devfilePath=devfile_x86_v2.yaml.
+#
+# This file is a CHILD of devfile.base.yaml (everything a workspace needs lives there once).
+# It states only what differs from the default workspace: the name, the image tag (shem's Sandy
+# Bridge Xeons are x86-64-v2 — the UBI 10 x86-64-v3 image dies on them with "CPU does not support
+# x86-64-v3"; a workspace launched from this file ran on shem on 2026-10-09), the memory/CPU
+# envelope, the volume size, and the three placement attributes.
+#
+# Launch notes for shem:
+#   - storage: the `devworkspace-config-shem` DevWorkspaceOperatorConfig in `eclipse-che`
+#     must exist BEFORE the first start: a copy of Che's `devworkspace-config` with
+#     workspace.storageClassName: shem-zfs. The dashboard adds its own config reference
+#     only when this attribute is absent (checked on 7.122.0, 2026-10-01); still confirm
+#     the created PVC's class, because a claim's storage class cannot be changed.
+#   - after the first start, on shem: exclude the new dataset from hourly snapshots. Every
+#     tank/k8s dataset is snapshotted hourly and the volume quota counts snapshots; build
+#     output would fill it. The dataset name exists only once the PVC is created.
+#     Measured 2026-10-09: this is what happened — sanoid's snapshots pinned deleted build
+#     output until the 220Gi quota had no free space (and the same mechanism exhausted
+#     adam's and eve's conductor runtime bands on alpha). The cure is exclusion (no sanoid
+#     on build churn, or a refquota that does not count snapshots), not a bigger quota;
+#     the quota was grown to 320Gi online that day only to get the workspace moving.
+#   - `shem-zfs` is Retain: deleting the workspace leaves the PV, zfsvolume and dataset
+#     behind for manual removal.
+#   - node: placement is node AFFINITY, not nodeSelector. Che's CheCluster
+#     devEnvironments.nodeSelector REPLACES any nodeSelector a devfile sets (tested
+#     2026-10-01: a hostname=shem selector came out as node-type=performance and the pod
+#     went to ethosengine). Affinity survives, but is ANDed with that selector, so this
+#     workspace stays Pending until the CheCluster selector admits shem (e.g. a
+#     che-workspaces=true label on both nodes). Changing that selector alters every
+#     workspace's pod template and restarts running workspaces at the next reconcile.
+#     The toleration is what lets the pod through shem's remote-wan taint; ordinary
+#     workspaces lack it and stay on the LAN node.
+# A new workspace is a new device: it has its own conductor key and enrols as its own
+# device. Never copy another workspace's keystore or signing credentials into it.
+schemaVersion: 2.2.0
+metadata:
+  name: elohim-devspace-shem
+  displayName: Holochain + Angular Development Environment (shem)
+  description: >-
+    Full-stack development with Holochain (Rust/Nix) backend and Angular frontend,
+    plus Claude AI utilities
+  icon: >-
+    https://raw.githubusercontent.com/devfile/devfile-web/main/apps/landing-page/public/pwa-192x192.png
+  tags:
+    - Rust
+    - Nix
+    - Holochain
+    - Angular
+    - Node.js
+    - Java
+    - ubi10
+    - Claude
+    - mempalace
+  projectType: holochain
+  language: Polyglot
+  version: 2.0.0
+
+# A child's top-level attributes replace the parent's key by key, so `pod-overrides` here
+# carries the base's securityContext too (see devfile.base.yaml for why OnRootMismatch).
+attributes:
+  controller.devfile.io/storage-type: per-workspace
+  controller.devfile.io/devworkspace-config:
+    name: devworkspace-config-shem
+    namespace: eclipse-che
+  pod-overrides:
+    spec:
+      affinity:
+        nodeAffinity:
+          requiredDuringSchedulingIgnoredDuringExecution:
+            nodeSelectorTerms:
+              - matchExpressions:
+                  - key: kubernetes.io/hostname
+                    operator: In
+                    values:
+                      - shem
+      tolerations:
+        - key: remote-wan
+          operator: Equal
+          value: 'true'
+          effect: NoSchedule
+      securityContext:
+        fsGroupChangePolicy: OnRootMismatch
+
+parent:
+  # The base on the same branch as this file; Che reads it when a workspace is CREATED.
+  uri: https://raw.githubusercontent.com/ethosengine/elohim/dev/devfile.base.yaml
+  components:
+    - name: tools
+      container:
+        image: harbor.ethosengine.com/devspaces/udi-plus-mem-rust-nix:v2-latest
+        # cpu limit 8 / request 2 so builds do not starve the fleet peers on shem.
+        memoryLimit: 40Gi
+        memoryRequest: 8Gi
+        cpuLimit: '8'
+        cpuRequest: '2'
+    # 320Gi = what the live claim holds since 2026-10-09 (the operator expanded the shem-zfs PVC
+    # online from 220Gi). A declared size can only grow a claim, never shrink it, so this must
+    # never read less than the claim.
+    - name: persistent
+      volume:
+        size: 320Gi

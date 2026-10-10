@@ -1767,6 +1767,11 @@ fn upsert_with_anchor_transaction(
     Ok(())
 }
 
+/// The `content_type` prefix every attestation kind is minted under
+/// (`attestation:gate-decision`, `attestation:statement-vote`, ...). One
+/// definition for the filters that must agree on it.
+pub const ATTESTATION_KIND_PREFIX: &str = "attestation:";
+
 /// One row of the cross-peer content anchor inventory (see
 /// [`list_content_anchor_inventory`]). Named rather than a 4-tuple because the
 /// anchor and the declaration are semantically different claims that read
@@ -1784,6 +1789,22 @@ pub struct ContentAnchorInventoryRow {
     /// Ordering the declaration carried. NOT comparable across peers — see
     /// `ProjectionInventoryEntry::declared_head_at`.
     pub declared_head_at: Option<i64>,
+    /// The ordering behind the declaration (`canonical_*` columns, decoded).
+    /// LOCAL ONLY: never put on the wire (`ProjectionInventoryEntry` does not
+    /// carry it) - the retained-hint pass compares a doc's carried ordering
+    /// against it.
+    pub canonical_ordering: Option<CanonicalOrdering>,
+}
+
+/// What a row locally declares: its head and the ordering behind it, read
+/// together from one row so the pair cannot go inconsistent under a concurrent
+/// stamp. `head` is `None` for an undeclared row (an empty-string declaration is
+/// a corrupt write, not a declaration). `ordering` is `Some` only when the row
+/// records an election (the `canonical_*` columns are written together).
+#[derive(Debug, Clone, PartialEq, Eq, Default)]
+pub struct LocalDeclaration {
+    pub head: Option<String>,
+    pub ordering: Option<CanonicalOrdering>,
 }
 
 /// Read the notary-declared HEAD this row currently carries, if any.
@@ -1855,72 +1876,55 @@ pub fn reach_for(
         .map_err(|e| StorageError::Internal(format!("reach lookup failed: {e}")))
 }
 
-/// [`declared_head_for`] plus WHETHER A DHT ELECTION STANDS BEHIND IT.
+/// The row's declared HEAD plus the ORDERING (election) behind it, as one
+/// [`LocalDeclaration`] - and `None` when the row does not exist.
 ///
-/// The second element is `content.canonical_declared_at IS NOT NULL`. The two
-/// are read together because the adopt-before-author rule needs both to tell a
-/// CONTESTABLE stalemate (this row declared on its own authority; no election
-/// has run) from a SETTLED one (an election ran and this row is obeying it).
-/// Splitting them into two queries would let the pair go inconsistent under a
-/// concurrent stamp — the row could gain an election between the reads and be
-/// contested anyway, re-minting a link against an already-settled question.
-/// [`declared_head_with_election`] that also reports whether the ROW EXISTS.
+/// Head and ordering are read together because the adopt-before-author rule and
+/// the head-adoption trigger need both: the first to tell a CONTESTABLE stalemate
+/// (this row declared on its own authority; no election has run) from a SETTLED
+/// one, the second to tell whether a doc's carried ordering advances the row's.
+/// Two queries would let the pair go inconsistent under a concurrent stamp.
 ///
-/// The distinction the collapsed form cannot make: `declared_head_with_election`
-/// answers `(None, false)` both for "this node holds the row and it declares
-/// nothing" and for "this node has never heard of this id". Those are the same
-/// answer to a sweep — which only ever iterates rows it already holds — and
-/// wildly different answers to anything driven by REMOTE input, where "never
+/// The distinction the collapsed form ([`declared_head_with_election`]) cannot
+/// make: it answers "undeclared" both for "this node holds the row and it
+/// declares nothing" and for "this node has never heard of this id". Those are
+/// the same answer to a sweep - which only ever iterates rows it already holds -
+/// and wildly different answers to anything driven by REMOTE input, where "never
 /// heard of it" means a peer just named an id out of thin air.
-///
-/// Returns `None` when no row exists; otherwise the same pair.
 pub fn declared_head_for_existing_row(
     conn: &mut SqliteConnection,
     ctx: &AppContext,
     id: &str,
-) -> Result<Option<(Option<String>, bool)>, StorageError> {
-    let found: Option<(Option<String>, Option<i64>)> = content::table
+) -> Result<Option<LocalDeclaration>, StorageError> {
+    type Cols = (Option<String>, Option<i64>, Option<i32>, Option<String>);
+    let found: Option<Cols> = content::table
         .filter(content::h_app_id.eq(&ctx.h_app_id))
         .filter(content::id.eq(id))
         .select((
             content::declared_head_action_hash,
             content::canonical_declared_at,
+            content::canonical_earned,
+            content::canonical_link_hash,
         ))
-        .first::<(Option<String>, Option<i64>)>(conn)
+        .first::<Cols>(conn)
         .optional()
         .map_err(|e| StorageError::Internal(format!("declared head lookup failed: {e}")))?;
-    Ok(found.map(|(declared, election)| {
-        (
-            declared.filter(|h| !h.trim().is_empty()),
-            election.is_some(),
-        )
+    Ok(found.map(|(declared, at, earned, link)| LocalDeclaration {
+        // An empty-string declaration is a corrupt write, not a declaration
+        // (same filter as `declared_head_for`).
+        head: declared.filter(|h| !h.trim().is_empty()),
+        ordering: canonical_ordering_from_columns(at, earned, link.as_deref()),
     }))
 }
 
+/// [`declared_head_for_existing_row`] collapsed: a missing row reads as an
+/// undeclared one with no ordering.
 pub fn declared_head_with_election(
     conn: &mut SqliteConnection,
     ctx: &AppContext,
     id: &str,
-) -> Result<(Option<String>, bool), StorageError> {
-    let found: Option<(Option<String>, Option<i64>)> = content::table
-        .filter(content::h_app_id.eq(&ctx.h_app_id))
-        .filter(content::id.eq(id))
-        .select((
-            content::declared_head_action_hash,
-            content::canonical_declared_at,
-        ))
-        .first::<(Option<String>, Option<i64>)>(conn)
-        .optional()
-        .map_err(|e| StorageError::Internal(format!("declared head lookup failed: {e}")))?;
-    match found {
-        None => Ok((None, false)),
-        Some((declared, election)) => Ok((
-            // An empty-string declaration is a corrupt write, not a declaration
-            // (same filter as `declared_head_for`).
-            declared.filter(|h| !h.trim().is_empty()),
-            election.is_some(),
-        )),
-    }
+) -> Result<LocalDeclaration, StorageError> {
+    Ok(declared_head_for_existing_row(conn, ctx, id)?.unwrap_or_default())
 }
 
 /// Batch form of [`declared_head_for`]: the declared HEAD for every id in `ids`
@@ -2171,6 +2175,76 @@ impl ElectionLink {
     }
 }
 
+/// The ordering behind a row's declared head, in the shape the sync document
+/// carries it (`headOrdering`, one JSON string so a head and its ordering can
+/// never be merged apart by concurrent puts).
+///
+/// HINT ONLY. It routes a peer's attention to its OWN conductor, which verifies
+/// the declaration in wasm; it is never written to a head or anchor column.
+/// `tiebreak` is the effective tiebreak exactly as the row stores it (`u`-base64,
+/// the legacy `canonical_link_hash` column) - not a proof locator.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct DocHeadOrdering {
+    pub head: String,
+    pub canonical_declared_at: i64,
+    pub earned: bool,
+    pub tiebreak: Option<String>,
+}
+
+impl DocHeadOrdering {
+    /// The ordering as the stamp guard takes it. A malformed tiebreak reads as
+    /// no tiebreak, never as an error.
+    pub fn ordering(&self) -> Option<CanonicalOrdering> {
+        Some(
+            CanonicalOrdering::new(self.canonical_declared_at, self.earned)
+                .with_link(self.tiebreak.as_deref().and_then(ElectionLink::from_b64)),
+        )
+    }
+
+    /// Serialised form carried in the doc (`headOrdering`).
+    pub fn to_json(&self) -> String {
+        serde_json::to_string(self).expect("DocHeadOrdering serialises")
+    }
+}
+
+impl From<&Content> for Option<DocHeadOrdering> {
+    fn from(content: &Content) -> Self {
+        let head = content
+            .declared_head_action_hash
+            .as_deref()
+            .filter(|h| !h.trim().is_empty())?;
+        let canonical_declared_at = content.canonical_declared_at?;
+        Some(DocHeadOrdering {
+            head: head.to_string(),
+            canonical_declared_at,
+            earned: content.canonical_earned.is_some_and(|e| e != 0),
+            tiebreak: content
+                .canonical_link_hash
+                .as_deref()
+                .filter(|t| !t.is_empty())
+                .map(str::to_string),
+        })
+    }
+}
+
+/// A conductor election answer, in doc shape. Lossy in one field: the wire's
+/// `staging_candidate*` pair has no doc counterpart and is dropped. The wire
+/// tiebreak is normalised through [`ElectionLink`] (so it matches what the row
+/// would store); an undecodable one becomes `None`.
+impl From<&crate::services::conductor_writes::CanonicalElectionWire> for DocHeadOrdering {
+    fn from(wire: &crate::services::conductor_writes::CanonicalElectionWire) -> Self {
+        Self {
+            head: wire.winner_target.0.clone(),
+            canonical_declared_at: wire.canonical_declared_at,
+            earned: wire.canonical_earned,
+            // One decode site: `ordering()` owns the precedence (the ordering
+            // hash beats the link hash; a malformed one does NOT fall back).
+            tiebreak: wire.ordering().link.map(ElectionLink::to_b64),
+        }
+    }
+}
+
 fn canonical_ordering_from_columns(
     declared_at: Option<i64>,
     earned: Option<i32>,
@@ -2310,6 +2384,32 @@ pub fn canonical_move_verdict(
         // order by. An EARNED answer with no clock cannot occur (the zome sets
         // both fields together or neither).
         (None, None) => Err(StaleReason::StoredNull),
+    }
+}
+
+impl CanonicalOrdering {
+    /// Would this ordering ADVANCE a row that stores `stored` for the SAME head?
+    /// The receiver-side replay of the stamp's same-head verdict, so a probe is
+    /// only spent where the stamp could write something.
+    ///
+    /// - stored `None`, self carries an ordering: advances (election presence).
+    /// - both `Some`, same tier and clock, either tiebreak unknown: the SAME
+    ///   ordering seen with or without its tiebreak - a refresh, not an advance
+    ///   (the stamp's same-ordering rule).
+    /// - otherwise [`canonical_move_verdict`] decides.
+    ///
+    /// Never struct `==`: two orderings that differ only in a missing tiebreak
+    /// are equal for this purpose.
+    pub fn advances(&self, stored: Option<CanonicalOrdering>) -> bool {
+        match stored {
+            None => true,
+            Some(stored) => {
+                if self.same_clock(&stored) && (self.link.is_none() || stored.link.is_none()) {
+                    return false;
+                }
+                canonical_move_verdict(Some(*self), Some(stored)).is_ok()
+            }
+        }
     }
 }
 
@@ -2454,7 +2554,7 @@ fn stamp_declared_head_witnessed(
     witness: AnchorWitness,
 ) -> Result<StampOutcome, StorageError> {
     let carries_pointer = patch.as_ref().is_some_and(|p| p.blob_cid.is_some());
-    let (outcome, widened) = super::read_then_write_transaction(conn, |conn| {
+    let (outcome, widened, ordering_changed) = super::read_then_write_transaction(conn, |conn| {
         // The anchor BEFORE the stamp — read inside the transaction, so the
         // "did the hash change?" test below cannot race another writer.
         let prior_anchor: Option<String> = content::table
@@ -2475,6 +2575,7 @@ fn stamp_declared_head_witnessed(
             mode,
             canonical_ordering,
         )?;
+        let ordering_changed = stamped.0 == StampOutcome::Refreshed && stamped.2;
         if matches!(stamped.0, StampOutcome::Stamped | StampOutcome::Refreshed) {
             match witness {
                 AnchorWitness::OwnConductorCanonical => {
@@ -2496,7 +2597,7 @@ fn stamp_declared_head_witnessed(
                 AnchorWitness::None => {}
             }
         }
-        Ok::<_, StorageError>(stamped)
+        Ok::<_, StorageError>((stamped.0, stamped.1, ordering_changed))
     })?;
     let moved =
         outcome == StampOutcome::Stamped || (outcome == StampOutcome::Refreshed && carries_pointer);
@@ -2509,7 +2610,11 @@ fn stamp_declared_head_witnessed(
     // invisible to the doorway until a poll or a doorbell, and the visitor is
     // served the previous version's page. A widened reach (F19) is announced
     // too: the row's audience grew even when its head and pointer stayed put.
-    if moved || widened {
+    // A same-head refresh that changed only the election's tier, clock or
+    // tiebreak is announced too: the sync doc carries that ordering
+    // (`headOrdering`), so the doc is no longer current even though the head
+    // and pointer stayed put.
+    if moved || widened || ordering_changed {
         crate::rea_projection::notify_content_touched(id);
     }
     Ok(outcome)
@@ -2541,7 +2646,7 @@ fn stamp_declared_head_mode_transaction(
     patch: Option<ContentProjectionPatch>,
     mode: StampMode,
     canonical_ordering: Option<CanonicalOrdering>,
-) -> Result<(StampOutcome, bool), StorageError> {
+) -> Result<(StampOutcome, bool, bool), StorageError> {
     use diesel::dsl::sql;
     use diesel::sql_types::Text;
 
@@ -2582,7 +2687,7 @@ fn stamp_declared_head_mode_transaction(
         stored_blob_hash,
         stored_metadata_json,
     ) = match existing {
-        None => return Ok((StampOutcome::NoRow, false)),
+        None => return Ok((StampOutcome::NoRow, false, false)),
         Some(row) => row,
     };
 
@@ -2646,7 +2751,7 @@ fn stamp_declared_head_mode_transaction(
             };
             if incompatible {
                 crate::metrics::inc_projection_refused_stale(StaleReason::ReachNarrowing.label());
-                return Ok((StampOutcome::SkippedStale, false));
+                return Ok((StampOutcome::SkippedStale, false, false));
             }
         }
     }
@@ -2656,7 +2761,7 @@ fn stamp_declared_head_mode_transaction(
         StampMode::LegacySignal => {
             if moving_declared_row && stored_ordering.is_some() {
                 crate::metrics::inc_projection_refused_stale(StaleReason::StoredNull.label());
-                return Ok((StampOutcome::SkippedStale, false));
+                return Ok((StampOutcome::SkippedStale, false, false));
             }
             // T-2 (story 1.4a): decline a MOVE that carries no patch at all — a
             // bare declaration with no content evidence behind it. THE RULE IS
@@ -2667,12 +2772,12 @@ fn stamp_declared_head_mode_transaction(
             // `StaleReason::PointerAbsent`.
             if moving_declared_row && patch.is_none() {
                 crate::metrics::inc_projection_refused_stale(StaleReason::PointerAbsent.label());
-                return Ok((StampOutcome::SkippedStale, false));
+                return Ok((StampOutcome::SkippedStale, false, false));
             }
         }
         StampMode::GapFill => {
             if moving_declared_row {
-                return Ok((StampOutcome::SkippedDeclared, false));
+                return Ok((StampOutcome::SkippedDeclared, false, false));
             }
         }
         StampMode::HealCanonical => {
@@ -2686,7 +2791,7 @@ fn stamp_declared_head_mode_transaction(
                 // clock comparison) stop being indistinguishable.
                 if let Err(reason) = canonical_move_verdict(canonical_ordering, stored_ordering) {
                     crate::metrics::inc_projection_refused_stale(reason.label());
-                    return Ok((StampOutcome::SkippedStale, false));
+                    return Ok((StampOutcome::SkippedStale, false, false));
                 }
                 // T-2 (story 1.4a): the ordering verdict just ALLOWED this move,
                 // but a move that carries no patch at all is still declined —
@@ -2696,7 +2801,7 @@ fn stamp_declared_head_mode_transaction(
                     crate::metrics::inc_projection_refused_stale(
                         StaleReason::PointerAbsent.label(),
                     );
-                    return Ok((StampOutcome::SkippedStale, false));
+                    return Ok((StampOutcome::SkippedStale, false, false));
                 }
             } else if same_declared_head {
                 // A delayed signal for this SAME head must not downgrade the
@@ -2715,7 +2820,7 @@ fn stamp_declared_head_mode_transaction(
                     if incoming != stored && !same_election {
                         if let Err(reason) = canonical_move_verdict(Some(incoming), Some(stored)) {
                             crate::metrics::inc_projection_refused_stale(reason.label());
-                            return Ok((StampOutcome::SkippedStale, false));
+                            return Ok((StampOutcome::SkippedStale, false, false));
                         }
                     }
                 }
@@ -2769,6 +2874,7 @@ fn stamp_declared_head_mode_transaction(
     // an older earned election beat `None` and reopen it (F19). A newer election
     // can still win normally. Same-head stamps carrying nothing also keep what
     // is known (a refresh must not erase an election).
+    let mut columns_changed = false;
     if let Some(incoming) = canonical_ordering {
         // A same-head refresh of the same election that happens to carry no
         // link (an older coordinator answering) keeps the tiebreak already
@@ -2778,6 +2884,7 @@ fn stamp_declared_head_mode_transaction(
                 .filter(|stored| same_declared_head && stored.same_clock(&incoming))
                 .and_then(|stored| stored.link)
         });
+        columns_changed = stored_ordering != Some(CanonicalOrdering { link, ..incoming });
         diesel::update(
             content::table
                 .filter(content::h_app_id.eq(&ctx.h_app_id))
@@ -2849,10 +2956,12 @@ fn stamp_declared_head_mode_transaction(
         apply_content_patch_fields(conn, ctx, id, &patch)?;
     }
 
+    // `columns_changed` rides back so the caller can announce a same-head
+    // refresh that moved only the ordering, without re-reading the columns.
     if same_declared_head {
-        Ok((StampOutcome::Refreshed, widened))
+        Ok((StampOutcome::Refreshed, widened, columns_changed))
     } else {
-        Ok((StampOutcome::Stamped, widened))
+        Ok((StampOutcome::Stamped, widened, columns_changed))
     }
 }
 
@@ -2903,10 +3012,16 @@ pub fn heal_election_columns(
     expected_head: &str,
     live: CanonicalOrdering,
 ) -> Result<ElectionColumnHeal, StorageError> {
-    crate::db::read_then_write_transaction(conn, |conn| {
-        #[allow(clippy::type_complexity)]
-        let existing: Option<(Option<String>, Option<i64>, Option<i32>, Option<String>)> =
-            content::table
+    let outcome = crate::db::read_then_write_transaction(
+        conn,
+        |conn| -> Result<ElectionColumnHeal, StorageError> {
+            #[allow(clippy::type_complexity)]
+            let existing: Option<(
+                Option<String>,
+                Option<i64>,
+                Option<i32>,
+                Option<String>,
+            )> = content::table
                 .filter(content::h_app_id.eq(&ctx.h_app_id))
                 .filter(content::id.eq(id))
                 .select((
@@ -2918,40 +3033,48 @@ pub fn heal_election_columns(
                 .first(conn)
                 .optional()
                 .map_err(|e| StorageError::Internal(format!("Election heal lookup: {e}")))?;
-        let Some((declared, stored_at, stored_earned, stored_link)) = existing else {
-            return Ok(ElectionColumnHeal::NoRow);
-        };
-        if declared.as_deref() != Some(expected_head) {
-            return Ok(ElectionColumnHeal::HeadMismatch);
-        }
-        // A recorded earned bit is never lowered, even on a (defensively
-        // impossible) half-populated row the ordering reads as "no election".
-        if stored_earned == Some(1) && !live.earned {
-            return Ok(ElectionColumnHeal::Unchanged);
-        }
-        let stored =
-            canonical_ordering_from_columns(stored_at, stored_earned, stored_link.as_deref());
-        if stored.is_some_and(|stored| stored.earned == live.earned) {
-            return Ok(ElectionColumnHeal::Unchanged);
-        }
-        if canonical_move_verdict(Some(live), stored).is_err() {
-            return Ok(ElectionColumnHeal::Unchanged);
-        }
-        diesel::update(
-            content::table
-                .filter(content::h_app_id.eq(&ctx.h_app_id))
-                .filter(content::id.eq(id))
-                .filter(content::declared_head_action_hash.eq(expected_head)),
-        )
-        .set((
-            content::canonical_declared_at.eq(Some(live.declared_at)),
-            content::canonical_earned.eq(Some(i32::from(live.earned))),
-            content::canonical_link_hash.eq(live.link.map(ElectionLink::to_b64)),
-        ))
-        .execute(conn)
-        .map_err(|e| StorageError::Internal(format!("Election heal write: {e}")))?;
-        Ok(ElectionColumnHeal::Healed)
-    })
+            let Some((declared, stored_at, stored_earned, stored_link)) = existing else {
+                return Ok(ElectionColumnHeal::NoRow);
+            };
+            if declared.as_deref() != Some(expected_head) {
+                return Ok(ElectionColumnHeal::HeadMismatch);
+            }
+            // A recorded earned bit is never lowered, even on a (defensively
+            // impossible) half-populated row the ordering reads as "no election".
+            if stored_earned == Some(1) && !live.earned {
+                return Ok(ElectionColumnHeal::Unchanged);
+            }
+            let stored =
+                canonical_ordering_from_columns(stored_at, stored_earned, stored_link.as_deref());
+            if stored.is_some_and(|stored| stored.earned == live.earned) {
+                return Ok(ElectionColumnHeal::Unchanged);
+            }
+            if canonical_move_verdict(Some(live), stored).is_err() {
+                return Ok(ElectionColumnHeal::Unchanged);
+            }
+            diesel::update(
+                content::table
+                    .filter(content::h_app_id.eq(&ctx.h_app_id))
+                    .filter(content::id.eq(id))
+                    .filter(content::declared_head_action_hash.eq(expected_head)),
+            )
+            .set((
+                content::canonical_declared_at.eq(Some(live.declared_at)),
+                content::canonical_earned.eq(Some(i32::from(live.earned))),
+                content::canonical_link_hash.eq(live.link.map(ElectionLink::to_b64)),
+            ))
+            .execute(conn)
+            .map_err(|e| StorageError::Internal(format!("Election heal write: {e}")))?;
+            Ok(ElectionColumnHeal::Healed)
+        },
+    )?;
+    // The sync doc carries this ordering (`headOrdering`); a healed row's doc is
+    // stale until it is reprojected. Announced AFTER the transaction returns,
+    // never inside the closure (the listener reads the row).
+    if outcome == ElectionColumnHeal::Healed {
+        crate::rea_projection::notify_content_touched(id);
+    }
+    Ok(outcome)
 }
 
 // ============================================================================
@@ -3176,26 +3299,58 @@ pub fn list_content_anchor_inventory(
     offset: i64,
     cap: i64,
 ) -> Result<(Vec<ContentAnchorInventoryRow>, i64), StorageError> {
+    list_content_anchor_inventory_scoped(conn, ctx, offset, cap, false)
+}
+
+/// [`list_content_anchor_inventory`] with an optional scope narrowing, on the SAME
+/// query. `exclude_attestations` drops rows whose `content_type` starts with
+/// [`ATTESTATION_KIND_PREFIX`] from both the count and the page (so a caller's
+/// offset arithmetic stays honest): attestations are immutable Creates that carry
+/// no election, so a head-ordering hint pass has nothing to say about them. The
+/// served inventory (`false`) is unchanged.
+pub fn list_content_anchor_inventory_scoped(
+    conn: &mut SqliteConnection,
+    ctx: &AppContext,
+    offset: i64,
+    cap: i64,
+    exclude_attestations: bool,
+) -> Result<(Vec<ContentAnchorInventoryRow>, i64), StorageError> {
+    let attestation_like = format!("{ATTESTATION_KIND_PREFIX}%");
     // Honest total: the TRUE count of anchored + distribution-safe rows (the same
     // predicates the page query below filters on), NOT the served page length.
     // A responder that reports served-count as total makes truncation invisible on
     // the wire — the requester cannot tell a full window from the whole corpus, so
     // the cold tail past the cap stays permanently undiscovered.
-    let total: i64 = content::table
+    let mut total_query = content::table
         .filter(content::h_app_id.eq(&ctx.h_app_id))
         .filter(content::dht_anchor_hash.is_not_null())
         .filter(content::reach.eq_any(DISTRIBUTION_SAFE_REACH))
-        .count()
-        .get_result(conn)
-        .map_err(|e| {
-            StorageError::Internal(format!("content anchor inventory count failed: {e}"))
-        })?;
+        .into_boxed();
+    if exclude_attestations {
+        total_query = total_query.filter(content::content_type.not_like(attestation_like.clone()));
+    }
+    let total: i64 = total_query.count().get_result(conn).map_err(|e| {
+        StorageError::Internal(format!("content anchor inventory count failed: {e}"))
+    })?;
 
-    type InventoryTuple = (String, Option<String>, Option<String>, Option<i64>);
-    let rows: Vec<InventoryTuple> = content::table
+    type InventoryTuple = (
+        String,
+        Option<String>,
+        Option<String>,
+        Option<i64>,
+        Option<i64>,
+        Option<i32>,
+        Option<String>,
+    );
+    let mut page_query = content::table
         .filter(content::h_app_id.eq(&ctx.h_app_id))
         .filter(content::dht_anchor_hash.is_not_null())
         .filter(content::reach.eq_any(DISTRIBUTION_SAFE_REACH))
+        .into_boxed();
+    if exclude_attestations {
+        page_query = page_query.filter(content::content_type.not_like(attestation_like));
+    }
+    let rows: Vec<InventoryTuple> = page_query
         .order((content::updated_at.desc(), content::id.asc()))
         .offset(offset.max(0))
         .limit(cap)
@@ -3204,6 +3359,9 @@ pub fn list_content_anchor_inventory(
             content::dht_anchor_hash,
             content::declared_head_action_hash,
             content::declared_head_at,
+            content::canonical_declared_at,
+            content::canonical_earned,
+            content::canonical_link_hash,
         ))
         .load(conn)
         .map_err(|e| {
@@ -3215,16 +3373,23 @@ pub fn list_content_anchor_inventory(
     // as-is — the consumer's diff treats an empty peer anchor as non-divergence.
     let entries = rows
         .into_iter()
-        .filter_map(|(id, anchor, declared_head, declared_at)| {
-            anchor.map(|dht_anchor_hash| ContentAnchorInventoryRow {
-                id,
-                dht_anchor_hash,
-                // An empty-string declaration is a corrupt write, not a
-                // declaration — never advertise one as a hint.
-                declared_head_action_hash: declared_head.filter(|h| !h.trim().is_empty()),
-                declared_head_at: declared_at,
-            })
-        })
+        .filter_map(
+            |(id, anchor, declared_head, declared_at, canon_at, canon_earned, canon_link)| {
+                anchor.map(|dht_anchor_hash| ContentAnchorInventoryRow {
+                    id,
+                    dht_anchor_hash,
+                    // An empty-string declaration is a corrupt write, not a
+                    // declaration — never advertise one as a hint.
+                    declared_head_action_hash: declared_head.filter(|h| !h.trim().is_empty()),
+                    declared_head_at: declared_at,
+                    canonical_ordering: canonical_ordering_from_columns(
+                        canon_at,
+                        canon_earned,
+                        canon_link.as_deref(),
+                    ),
+                })
+            },
+        )
         .collect();
     Ok((entries, total))
 }
@@ -3629,6 +3794,122 @@ mod tests {
     use super::*;
     use diesel::sqlite::SqliteConnection;
     use diesel::Connection;
+
+    // ── head-ordering: the producer shape and the receiver's replay ──────────
+    #[test]
+    fn doc_head_ordering_round_trips_through_json() {
+        let link = ElectionLink::from_raw(&[7u8; 39]).unwrap();
+        let d = DocHeadOrdering {
+            head: "uhCkk-head".to_string(),
+            canonical_declared_at: 1_700_000_000_000_000,
+            earned: true,
+            tiebreak: Some(link.to_b64()),
+        };
+        let json = d.to_json();
+        assert!(!json.to_lowercase().contains("election"), "{json}");
+        assert!(json.contains("canonicalDeclaredAt"), "{json}");
+        let back: DocHeadOrdering = serde_json::from_str(&json).unwrap();
+        assert_eq!(back, d);
+        let ord = back.ordering().unwrap();
+        assert_eq!(ord.declared_at, 1_700_000_000_000_000);
+        assert!(ord.earned);
+        assert_eq!(ord.link, Some(link));
+    }
+
+    #[test]
+    fn doc_head_ordering_with_malformed_tiebreak_has_no_link() {
+        for bad in ["not-base64", "uAAAA", "", "u"] {
+            let d = DocHeadOrdering {
+                head: "h".to_string(),
+                canonical_declared_at: 5,
+                earned: false,
+                tiebreak: Some(bad.to_string()),
+            };
+            let ord = d.ordering().unwrap();
+            assert_eq!(ord.link, None, "tiebreak {bad:?}");
+            assert_eq!(ord.declared_at, 5);
+        }
+    }
+
+    fn dho_wire(
+        ordering_hash: Option<&str>,
+        link_hash: Option<&str>,
+    ) -> crate::services::conductor_writes::CanonicalElectionWire {
+        serde_json::from_value(serde_json::json!({
+            "winner_target": "uhCkk-winner",
+            "canonical_declared_at": 5,
+            "canonical_earned": true,
+            "canonical_ordering_hash": ordering_hash,
+            "canonical_link_hash": link_hash,
+        }))
+        .expect("election wire fixture")
+    }
+
+    #[test]
+    fn wire_ordering_hash_beats_link_hash_and_a_malformed_one_does_not_fall_back() {
+        let a = ElectionLink::from_raw(&[1u8; 39]).unwrap().to_b64();
+        let b = ElectionLink::from_raw(&[2u8; 39]).unwrap().to_b64();
+        // The ordering hash wins over the link hash.
+        let d = DocHeadOrdering::from(&dho_wire(Some(&b), Some(&a)));
+        assert_eq!(d.tiebreak.as_deref(), Some(b.as_str()));
+        // The link hash serves when there is no ordering hash.
+        let d = DocHeadOrdering::from(&dho_wire(None, Some(&a)));
+        assert_eq!(d.tiebreak.as_deref(), Some(a.as_str()));
+        // A malformed ordering hash does NOT fall back to a valid link hash.
+        let d = DocHeadOrdering::from(&dho_wire(Some("not-a-hash"), Some(&a)));
+        assert_eq!(d.tiebreak, None);
+        // And the doc agrees with the stamp's own decode of the same wire.
+        let wire = dho_wire(Some(&b), Some(&a));
+        assert_eq!(
+            DocHeadOrdering::from(&wire).ordering(),
+            Some(wire.ordering())
+        );
+    }
+
+    #[test]
+    fn ordering_advances_replays_the_stamp_verdict() {
+        let at = |t: i64, earned: bool| CanonicalOrdering::new(t, earned);
+        let linked = |t: i64, earned: bool, byte: u8| {
+            at(t, earned).with_link(ElectionLink::from_raw(&[byte; 39]))
+        };
+        // (incoming, stored, advances)
+        let cases = [
+            // equal: a refresh, not an advance
+            (at(10, false), Some(at(10, false)), false),
+            (linked(10, false, 3), Some(linked(10, false, 3)), false),
+            // an ordering where the row has none advances it
+            (at(10, false), None, true),
+            // newer clock / stronger tier
+            (at(20, false), Some(at(10, false)), true),
+            (at(5, true), Some(at(10, false)), true),
+            // older clock / lower tier
+            (at(5, false), Some(at(10, false)), false),
+            (at(99, false), Some(at(10, true)), false),
+            // same clock, either tiebreak unknown: the same ordering, not an advance
+            (linked(10, false, 9), Some(at(10, false)), false),
+            (at(10, false), Some(linked(10, false, 1)), false),
+            // same clock, both tiebreaks known: whatever the verdict says
+            (linked(10, false, 2), Some(linked(10, false, 1)), true),
+            (linked(10, false, 1), Some(linked(10, false, 2)), false),
+        ];
+        for (incoming, stored, want) in cases {
+            assert_eq!(
+                incoming.advances(stored),
+                want,
+                "advances({incoming:?}, {stored:?})"
+            );
+            if let Some(stored) = stored {
+                let same_election = incoming.same_clock(&stored)
+                    && (incoming.link.is_none() || stored.link.is_none());
+                if !same_election {
+                    assert_eq!(
+                        incoming.advances(Some(stored)),
+                        canonical_move_verdict(Some(incoming), Some(stored)).is_ok()
+                    );
+                }
+            }
+        }
+    }
 
     fn setup_test_db() -> SqliteConnection {
         let mut conn =

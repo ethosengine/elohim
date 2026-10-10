@@ -55,7 +55,7 @@ use diesel::prelude::*;
 use crate::db;
 use crate::epr_codec::{EprHead, EprLamadContext, EprQahalContext, EprShefaContext};
 use crate::error::StorageError;
-use crate::views_convert::epr::EprHeadView;
+use crate::views_convert::epr::{EprHeadElectionView, EprHeadView};
 
 /// Derive an [`EprHead`] from the local SQLite read projection for the given
 /// content `id`.
@@ -80,6 +80,27 @@ pub fn derive_epr_head(
     gate_provenance: bool,
     enrich_pillars: bool,
 ) -> Result<Option<EprHead>, StorageError> {
+    Ok(
+        derive_epr_head_with_election(conn, app_ctx, id, gate_provenance, enrich_pillars)?
+            .map(|(head, _election)| head),
+    )
+}
+
+/// [`derive_epr_head`] plus the election witness read from the SAME row.
+///
+/// The witness is ENVELOPE, not addressed: it is returned beside the
+/// [`EprHead`], never inside it, so the canonical dag-cbor bytes (and the cid
+/// minted over them) stay a function of the declared head alone. It is
+/// `None` when `content.canonical_declared_at` is NULL — no election is
+/// recorded on this row, and the wire omits the field rather than inventing
+/// one.
+pub fn derive_epr_head_with_election(
+    conn: &mut SqliteConnection,
+    app_ctx: &db::AppContext,
+    id: &str,
+    gate_provenance: bool,
+    enrich_pillars: bool,
+) -> Result<Option<(EprHead, Option<EprHeadElectionView>)>, StorageError> {
     // Map the passthrough `gate_provenance` bool onto the tri-state trust gate
     // with the fixed migration mapping (`true → Amber`, `false → Invisible`).
     // `derive_epr_head`'s public bool signature is preserved (A2 scope).
@@ -146,7 +167,9 @@ pub fn derive_epr_head(
         attestation_requirements: vec![],
     };
 
-    Ok(Some(EprHead {
+    let election = election_witness(content);
+
+    let head = EprHead {
         version: 1,
         id: content.id.clone(),
         content: content.blob_cid.clone().unwrap_or_default(),
@@ -165,7 +188,61 @@ pub fn derive_epr_head(
         // honest absence) rather than substituting any local time.
         // See epr-head-envelope-design.md §4–5 (Option A).
         updated: content.declared_head_at.and_then(render_declared_head_at),
-    }))
+    };
+
+    Ok(Some((head, election)))
+}
+
+/// Project the row's election columns into the unaddressed witness.
+///
+/// `canonical_declared_at` is the presence key: NULL means no election stands
+/// behind this row's declaration, so there is no witness (honest absence, not
+/// a zeroed clock). `canonical_earned = 1` is the EARNED tier; 0 or NULL is
+/// not-earned. `canonical_link_hash` NULL (an election recorded before the
+/// tiebreak travelled) omits `linkHash` rather than substituting one.
+fn election_witness(content: &db::models::Content) -> Option<EprHeadElectionView> {
+    let declared_at = content.canonical_declared_at?;
+    Some(EprHeadElectionView {
+        canonical_declared_at: render_micros_rfc3339(declared_at)?,
+        earned: content.canonical_earned == Some(1),
+        link_hash: content.canonical_link_hash.clone(),
+        // Never projected: only a live read names the elector.
+        elector: None,
+    })
+}
+
+/// The elector of `live`, when it is the SAME election `witness` records —
+/// matched on the effective tiebreak (the root-accepted ordering hash for a
+/// delegated declaration, otherwise the winning link — what
+/// `canonical_link_hash` stores). A witness with no tiebreak, a conductor that
+/// did not answer, a different election, or a coordinator that names no
+/// author all yield `None`: the witness never borrows an elector from an
+/// election it does not record.
+pub fn live_elector_for_witness(
+    witness: &EprHeadElectionView,
+    live: &crate::services::live_earned::LocalElection,
+) -> Option<String> {
+    let crate::services::live_earned::LocalElection::Answered(Some(election)) = live else {
+        return None;
+    };
+    let recorded = witness.link_hash.as_deref()?;
+    let live_tiebreak = election
+        .canonical_ordering_hash
+        .as_ref()
+        .or(election.canonical_link_hash.as_ref())?;
+    if live_tiebreak.0 != recorded {
+        return None;
+    }
+    election.winner_author.as_ref().map(|a| a.0.clone())
+}
+
+/// Render a DHT `Timestamp` (microseconds since the Unix epoch) as RFC3339 UTC
+/// with MICROSECOND precision — the election clock, where two declarations
+/// can sit inside the same second and seconds precision would lose their
+/// order. Same defensive `None` as [`render_declared_head_at`].
+fn render_micros_rfc3339(micros: i64) -> Option<String> {
+    chrono::DateTime::<chrono::Utc>::from_timestamp_micros(micros)
+        .map(|dt| dt.to_rfc3339_opts(chrono::SecondsFormat::Micros, true))
 }
 
 /// Render `declared_head_at` (microseconds since the Unix epoch — the zome
@@ -202,15 +279,19 @@ pub fn compose_head_view(
     id: &str,
     gate_provenance: bool,
 ) -> Result<Option<EprHeadView>, StorageError> {
-    let head = match derive_epr_head(conn, app_ctx, id, gate_provenance, false)? {
-        Some(h) => h,
-        None => return Ok(None),
-    };
+    let (head, election) =
+        match derive_epr_head_with_election(conn, app_ctx, id, gate_provenance, false)? {
+            Some(pair) => pair,
+            None => return Ok(None),
+        };
 
+    // The cid is minted over `head` alone, BEFORE the witness is attached:
+    // the election never enters the addressed bytes.
     let mut view: EprHeadView = head.clone().into();
     if let Ok((_bytes, cid)) = crate::epr_codec::encode_epr_head(&head) {
         view.cid = Some(cid.to_string());
     }
+    view.election = election;
 
     Ok(Some(view))
 }

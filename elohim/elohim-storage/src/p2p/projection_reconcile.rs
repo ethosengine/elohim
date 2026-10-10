@@ -5530,6 +5530,7 @@ async fn heal_content(
                                             &mut c, &app_ctx, &id,
                                         )
                                         .ok()
+                                        .map(|d| (d.head, d.ordering.is_some()))
                                     })
                                     .unwrap_or((None, true));
                                 if undeclared_divergence_should_route_to_contest(
@@ -5578,6 +5579,7 @@ async fn heal_content(
                                             &mut c, &app_ctx, &id,
                                         )
                                         .ok()
+                                        .map(|d| (d.head, d.ordering.is_some()))
                                     })
                                     .unwrap_or((None, true));
                                 if declared.is_some() && !has_election {
@@ -5620,6 +5622,7 @@ async fn heal_content(
                                         &mut c, &app_ctx, &id,
                                     )
                                     .ok()
+                                    .map(|d| (d.head, d.ordering.is_some()))
                                 })
                                 .unwrap_or((None, true));
                             let peer_differs = peer_head_hints.get(&id).is_some_and(|h| {
@@ -11622,6 +11625,7 @@ mod tests {
                 // staging candidate beneath it.
                 staging_candidate: None,
                 staging_candidate_declared_at: None,
+                winner_author: None,
             }),
         );
         for id in unattempted {

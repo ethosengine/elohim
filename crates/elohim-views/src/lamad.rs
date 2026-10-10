@@ -180,6 +180,38 @@ pub struct ContentHeadView {
     #[serde(skip_serializing_if = "Option::is_none")]
     #[ts(optional)]
     pub earned_source: Option<EarnedSource>,
+    /// The election clock: the DHT timestamp (microseconds since the Unix
+    /// epoch, same convention as `ProjectionInventoryEntry.declared_head_at`)
+    /// of the canonical-head declaration LINK `select_canonical_winner`
+    /// elected, as this peer's projection recorded it
+    /// (`content.canonical_declared_at`). With [`Self::canonical_link_hash`]
+    /// it lets a reader tell a stale election from a different one. `None` =
+    /// no election recorded on this row (wire: `canonicalDeclaredAt`).
+    #[ts(optional, type = "number | null")]
+    pub canonical_declared_at: Option<i64>,
+    /// The election's tiebreak (`content.canonical_link_hash`, u-prefixed
+    /// base64). `None` = no election recorded, or one recorded before the
+    /// tiebreak travelled (wire: `canonicalLinkHash`).
+    #[ts(optional)]
+    pub canonical_link_hash: Option<String>,
+    /// The ELECTOR — the agent that signed the winning declaration link — as
+    /// this peer's own conductor answered it on a live-election read
+    /// (`?election=live`) whose winner IS the declared head. Never projected,
+    /// never cached: absent on a plain read, absent when the conductor did not
+    /// answer, absent when the live winner is a different head (wire:
+    /// `elector`).
+    #[serde(skip_serializing_if = "Option::is_none")]
+    #[ts(optional)]
+    pub elector: Option<String>,
+    /// Where [`Self::elector`] came from, present ONLY on a live-election read:
+    /// `live` — the conductor answered and named the elector; `cached` — no
+    /// live elector was answered (no conductor, out of budget, a different
+    /// winner, or a coordinator that predates the field), and since the
+    /// projection never stores one, `elector` is absent (wire:
+    /// `electorSource`).
+    #[serde(skip_serializing_if = "Option::is_none")]
+    #[ts(optional)]
+    pub elector_source: Option<EarnedSource>,
 }
 
 /// Provenance of [`ContentHeadView::earned`] on a live-election read.

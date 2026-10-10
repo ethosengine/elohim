@@ -46,3 +46,5 @@ Mishpat and REA/ValueFlows schemas outside that slice's blast radius (design doc
 
 **Links.** Design doc: `genesis/a2o/reports/recovery/serving-edge-20260920/epr-head-envelope-design.md` (§3, F6,
 §7; C10 row). Sibling finding from the same reading: `epr-head-envelope-differs-per-peer.md`.
+
+**2026-10-08 DEFER (slug-leftovers sprint):** slug-id vs binding CID wording follows the name-binding design.

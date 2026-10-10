@@ -32,6 +32,7 @@ import {
 import { cancelOwnedCommitmentWithReadback } from '../../src/framework/dataplane/owned-commitment-cleanup.js';
 import { resolveOwnedCommitmentCreate } from '../../src/framework/dataplane/owned-commitment-create.js';
 import {
+  CATCHUP_RIDE_STEP_TIMEOUT_MS,
   getRaw,
   getRawWithHeaders,
   resolvePeerUrl,
@@ -39,7 +40,7 @@ import {
 } from '../../src/framework/dataplane/surfaces.js';
 import { loadHouseholdMeshFixture } from '../../src/framework/fixtures/household-mesh.js';
 import { E2EWorld } from '../../src/framework/world.js';
-import { recordServedPage } from '../dataplane.steps.js';
+import { recordServedPage, rideShellPastCatchUp } from '../dataplane.steps.js';
 
 import {
   buildFixtureBundle,
@@ -1563,9 +1564,16 @@ Then(
 
 When(
   'a visitor opens the page at {string} on peer {string} in a browser',
-  { timeout: 120_000 },
+  // The browser visit's own 120s plus one bounded catching-up ride before it.
+  { timeout: CATCHUP_RIDE_STEP_TIMEOUT_MS + 120_000 },
   async function (this: E2EWorld, urlPath: string, peerName: string) {
     const url = new URL(urlPath, `${resolvePeerUrl(peerName)}/`).toString();
+    // A browser cannot ride the documented catching-up shed, so the ride
+    // happens first (museum trap #19; edge #1591 fp ff1999d4c7f7 timed out on
+    // a just-restarted doorway whose warm shell named assets it was still
+    // shedding). Anything other than that shed is left for the browser.
+    const ride = await rideShellPastCatchUp(url);
+    if (ride) this.attach(`${peerName}: ${ride}`);
     visitMap(this).set(peerName, await visitInBrowser(url));
   }
 );

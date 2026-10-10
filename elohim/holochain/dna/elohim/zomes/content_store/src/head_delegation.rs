@@ -1601,6 +1601,7 @@ mod tests {
             link_hash: ActionHash::from_raw_36(vec![link_byte; 36]),
             target: old.acceptance.as_ref().unwrap().head_action_hash.clone(),
             ordering_hash: None,
+            author: AgentPubKey::from_raw_36(vec![0xa0; 36]),
         };
         let mut replay = make(255, i64::MAX);
         use_accepted_ordering(&mut replay, &old);

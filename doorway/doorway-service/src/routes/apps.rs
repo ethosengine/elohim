@@ -45,6 +45,78 @@ const MAX_RETRIES: u32 = 2;
 /// Base delay between retries (doubles each attempt).
 const RETRY_BASE_DELAY_MS: u64 = 100;
 
+/// How long one storage reach verdict for an app is reused by the cache path.
+/// A row whose reach narrows is honoured within this window.
+const APP_REACH_VERDICT_TTL: std::time::Duration = std::time::Duration::from_secs(30);
+
+/// Storage's reach verdicts for app identifiers, keyed by `storage_url|identifier`:
+/// `true` = storage refused an anonymous caller.
+static APP_REACH_VERDICTS: std::sync::LazyLock<
+    std::sync::Mutex<std::collections::HashMap<String, (std::time::Instant, bool)>>,
+> = std::sync::LazyLock::new(Default::default);
+
+/// The reach gate in front of the projection cache. The doorway owns no
+/// verifier: it asks storage — the one place `/apps/{x}` is judged exactly as
+/// `/db/content/{x}` or `/blob/{x}` would be — whether an anonymous caller
+/// may have this app, via the cheap `HEAD /apps/{x}/_capability` probe, and
+/// reuses the answer for [`APP_REACH_VERDICT_TTL`]. Without this a cache hit
+/// served whatever had once been stocked, whatever the row's reach now says.
+///
+/// Every cache read is anonymous (the cache stocks with no identity), so an
+/// explicit 403 means the cache may not serve it to anyone; the request is
+/// refused rather than proxied. A probe that fails in transport keeps serving
+/// (storage's own fail-open posture for an unreadable projection), logged.
+async fn cached_app_reach_refusal(
+    storage_url: &str,
+    identifier: &str,
+) -> Option<Response<Full<Bytes>>> {
+    let key = format!("{storage_url}|{identifier}");
+    let fresh = APP_REACH_VERDICTS
+        .lock()
+        .ok()
+        .and_then(|m| m.get(&key).copied())
+        .filter(|(at, _)| at.elapsed() < APP_REACH_VERDICT_TTL)
+        .map(|(_, refused)| refused);
+    let refused = match fresh {
+        Some(refused) => refused,
+        None => {
+            let probe = format!(
+                "{}/apps/{}/_capability",
+                storage_url.trim_end_matches('/'),
+                identifier
+            );
+            match reqwest::Client::new()
+                .head(&probe)
+                .timeout(std::time::Duration::from_secs(5))
+                .send()
+                .await
+            {
+                Ok(resp) => {
+                    let refused = resp.status() == reqwest::StatusCode::FORBIDDEN;
+                    if let Ok(mut m) = APP_REACH_VERDICTS.lock() {
+                        m.insert(key, (std::time::Instant::now(), refused));
+                    }
+                    refused
+                }
+                Err(e) => {
+                    warn!(identifier = %identifier, error = %e, "app reach probe failed; serving (fail-open residual)");
+                    false
+                }
+            }
+        }
+    };
+    refused.then(|| {
+        Response::builder()
+            .status(StatusCode::FORBIDDEN)
+            .header("Content-Type", "application/json")
+            .header("X-Cache", "REFUSED")
+            .body(Full::new(Bytes::from(
+                r#"{"error":"Reach authorization required"}"#,
+            )))
+            .unwrap()
+    })
+}
+
 /// Handle app requests with cache-first resolution.
 ///
 /// 1. Parse path into slug and file_path
@@ -122,6 +194,11 @@ pub async fn handle_app_request(state: Arc<AppState>, path: &str) -> Response<Fu
     if let Some(ref cache) = state.app_file_cache {
         if let Some(ref hash) = resolved_hash {
             let cache_slug = content_slug.unwrap_or(slug);
+
+            // Reach before the cache: a cache hit never widens an audience.
+            if let Some(refused) = cached_app_reach_refusal(&storage_url, slug).await {
+                return refused;
+            }
 
             // --- Try cache lookup ---
             if let Some(cached) = cache.get(cache_slug, file_path, hash).await {
@@ -605,6 +682,16 @@ pub async fn handle_app_capability(state: Arc<AppState>, path: &str) -> Response
     let endpoint = format!("{}{}", storage_url.trim_end_matches('/'), path);
     let storage_resp = reqwest::Client::new().head(&endpoint).send().await;
 
+    // Storage's reach verdict passes through: a bundle storage refuses to
+    // describe is not described here either, from the projection or otherwise.
+    if matches!(&storage_resp, Ok(resp) if resp.status() == reqwest::StatusCode::FORBIDDEN) {
+        return Response::builder()
+            .status(StatusCode::FORBIDDEN)
+            .header("Content-Length", "0")
+            .body(Full::new(Bytes::new()))
+            .unwrap();
+    }
+
     // One value per header name. Storage's capability headers are forwarded, then the
     // doorway's own values REPLACE them: an appended second X-Blob-Hash or
     // X-Delivery-Mode reaches a browser as one comma-joined value ("h, h"), which
@@ -696,6 +783,48 @@ fn set_header(headers: &mut HeaderMap, name: &'static str, value: &str) {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[tokio::test]
+    async fn the_cache_path_asks_storage_for_reach_and_refuses_what_storage_refuses() {
+        use wiremock::matchers::{method, path};
+        use wiremock::{Mock, MockServer, ResponseTemplate};
+        let storage = MockServer::start().await;
+        Mock::given(method("HEAD"))
+            .and(path("/apps/household/_capability"))
+            .respond_with(ResponseTemplate::new(403))
+            .expect(1)
+            .mount(&storage)
+            .await;
+        Mock::given(method("HEAD"))
+            .and(path("/apps/open/_capability"))
+            .respond_with(ResponseTemplate::new(200))
+            .mount(&storage)
+            .await;
+        let url = storage.uri();
+        let refused = cached_app_reach_refusal(&url, "household").await.unwrap();
+        assert_eq!(refused.status(), StatusCode::FORBIDDEN);
+        // The verdict is reused inside its window: one probe, not one per asset.
+        assert!(cached_app_reach_refusal(&url, "household").await.is_some());
+        assert!(cached_app_reach_refusal(&url, "open").await.is_none());
+    }
+
+    #[tokio::test]
+    async fn a_capability_storage_refuses_is_refused_without_a_blob_hash() {
+        use clap::Parser;
+        use wiremock::matchers::method;
+        use wiremock::{Mock, MockServer, ResponseTemplate};
+        let storage = MockServer::start().await;
+        Mock::given(method("HEAD"))
+            .respond_with(ResponseTemplate::new(403))
+            .mount(&storage)
+            .await;
+        let mut args = crate::config::Args::parse_from(["doorway", "--listen", "127.0.0.1:0"]);
+        args.storage_url = Some(storage.uri());
+        let state = Arc::new(AppState::new(args));
+        let resp = handle_app_capability(state, "/apps/household/_capability").await;
+        assert_eq!(resp.status(), StatusCode::FORBIDDEN);
+        assert!(resp.headers().get("x-blob-hash").is_none());
+    }
 
     #[test]
     fn test_parse_app_path_normal() {

@@ -308,9 +308,9 @@ pub struct HolderContract {
     /// coherence peer: routable by name, never by commitment reference.
     pub commitment_id: Option<String>,
     pub epr_id: Option<String>,
-    /// The declared head the holder advertised for this mount
-    /// (`EprHeadFingerprint::declared_head`). `None` = the holder stated none.
-    pub declared_head: Option<String>,
+    /// The bundle the holder advertised it serves for this mount
+    /// (`EprHeadFingerprint::served_bundle`). `None` = the holder stated none.
+    pub served_bundle: Option<String>,
 }
 
 impl HolderContract {
@@ -323,13 +323,13 @@ impl HolderContract {
             host: None,
             commitment_id: None,
             epr_id: None,
-            declared_head: None,
+            served_bundle: None,
         }
     }
 
-    /// Carry the declared head the holder advertised for this mount.
-    pub fn with_declared_head(mut self, declared_head: Option<String>) -> Self {
-        self.declared_head = declared_head;
+    /// Carry the bundle the holder advertised it serves for this mount.
+    pub fn with_served_bundle(mut self, served_bundle: Option<String>) -> Self {
+        self.served_bundle = served_bundle;
         self
     }
 
@@ -357,8 +357,8 @@ pub struct NameHolder {
     pub host: Option<String>,
     pub commitment_id: Option<String>,
     pub epr_id: Option<String>,
-    /// See [`HolderContract::declared_head`].
-    pub declared_head: Option<String>,
+    /// See [`HolderContract::served_bundle`].
+    pub served_bundle: Option<String>,
     pub liveness: HolderLiveness,
     /// How this holder is reached. [`RelayMode::Proxy`] for every holder today.
     pub relay_mode: RelayMode,
@@ -551,7 +551,7 @@ pub fn fold_candidate_holders(
                     host: contract.host.clone(),
                     commitment_id: contract.commitment_id.clone(),
                     epr_id: contract.epr_id.clone(),
-                    declared_head: contract.declared_head.clone(),
+                    served_bundle: contract.served_bundle.clone(),
                     liveness: liveness
                         .get(&contract.doorway_id)
                         .copied()
@@ -630,7 +630,7 @@ pub fn fold_all_holders(
                     host: contract.host.clone(),
                     commitment_id: contract.commitment_id.clone(),
                     epr_id: contract.epr_id.clone(),
-                    declared_head: contract.declared_head.clone(),
+                    served_bundle: contract.served_bundle.clone(),
                     liveness: liveness
                         .get(&contract.doorway_id)
                         .copied()
@@ -1134,7 +1134,7 @@ impl NameRouteTable {
                 host: contract.host.clone(),
                 commitment_id: contract.commitment_id.clone(),
                 epr_id: contract.epr_id.clone(),
-                declared_head: contract.declared_head.clone(),
+                served_bundle: contract.served_bundle.clone(),
                 liveness: liveness
                     .get(&contract.doorway_id)
                     .copied()
@@ -1675,7 +1675,7 @@ mod tests {
             host: None,
             commitment_id: None,
             epr_id: None,
-            declared_head: None,
+            served_bundle: None,
             liveness,
             relay_mode: RelayMode::Proxy,
             shed_weight: WEIGHT_UNCONSTRAINED,

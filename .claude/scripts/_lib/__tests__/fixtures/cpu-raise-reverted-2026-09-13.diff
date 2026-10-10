@@ -1,7 +1,7 @@
 diff --git a/genesis/orchestrator/data/deployments.json b/genesis/orchestrator/data/deployments.json
 --- a/genesis/orchestrator/data/deployments.json
 +++ b/genesis/orchestrator/data/deployments.json
-@@ -34,8 +34,9 @@
+@@ -36,8 +36,9 @@
        "edgenodeMemoryRequest": "2Gi",
        "edgenodeMemoryLimit": "8Gi",
        "edgenodeCpuRequest": "1500m",
@@ -10,9 +10,9 @@ diff --git a/genesis/orchestrator/data/deployments.json b/genesis/orchestrator/d
        "edgenodeDbPoolSize": "20",
 +      "$cpuBumpComment2026-09-13": "2026-09-13 (operator decision, served-under-standing sprint): edgenodeCpuLimit 8000m -> 12000m (request unchanged), kept in lockstep with adam-firstman.yaml / adam-firstman-conductor.yaml per $resourceBudgetComment. Live read 2026-09-13: adam's conductor pinned at 3.95 of 4.0 cores (~99% CFS-throttled) at 35% of memory; storage admission gate at 4.28 of 5 in-flight, 668 interactive content_store sheds in 24h, zero heal outcomes in 25 hourly buckets while matthew (same DHT) healed 35 -- the heal leg is never admitted. Conductor 4000m -> 6000m and storage 4000m -> 6000m, which lifts conductor_db_max_readers to 12 and admissible permits 5 -> 9. shem allocatable 24000m; adam+gertrude+susan+eve limits sum 21000m after this change. Restoration condition and falsifier as for matthew ($cpuBumpComment2026-09-13).",
        "runtimeConfig": {
-         "ELOHIM_RELEASE_CHANNELS": "runtime:coordinators:elohim:workspace=observe"
+         "ELOHIM_RELEASE_CHANNELS": "runtime:coordinators:elohim:workspace=observe,runtime:app-bundle:alpha:dev=canary"
        },
-@@ -62,8 +63,9 @@
+@@ -64,8 +65,9 @@
        "edgenodeMemoryRequest": "2Gi",
        "edgenodeMemoryLimit": "8Gi",
        "edgenodeCpuRequest": "1500m",
@@ -54,7 +54,7 @@ diff --git a/genesis/orchestrator/manifests/humans/adam-firstman-conductor.yaml 
  # The split never adds load; validate-deployments.ts check (3) asserts that sum.
  #
  # OPEN, OPERATOR-OWNED: adam's 8000m single-pod limit was chosen 2026-07-07 so
-@@ -383,7 +384,7 @@
+@@ -395,7 +396,7 @@
                cpu: "750m"
              limits:
                memory: "5120Mi"

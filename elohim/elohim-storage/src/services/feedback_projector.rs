@@ -984,6 +984,32 @@ pub struct FeedbackProjector {
 }
 
 impl FeedbackProjector {
+    /// One-time boot purge of content-target members that are not ActionHashes
+    /// (admitted before the steward INSERT was prefiltered). Failure is logged,
+    /// never fatal: the sweep still runs.
+    pub(crate) fn purge_malformed_members(&self) {
+        let result = self
+            .pool
+            .get()
+            .map_err(|e| e.to_string())
+            .and_then(|mut conn| {
+                sub_db::purge_malformed_content_targets(&mut conn).map_err(|e| e.to_string())
+            });
+        match result {
+            Ok(n) if n > 0 => tracing::info!(
+                target: "elohim_storage::feedback_projector",
+                purged = n,
+                "purged content-target members that are not ActionHashes"
+            ),
+            Ok(_) => {}
+            Err(e) => tracing::warn!(
+                target: "elohim_storage::feedback_projector",
+                error = %e,
+                "malformed-member purge failed"
+            ),
+        }
+    }
+
     pub fn new(
         pool: DbPool,
         reader: Arc<dyn FeedbackDhtReader>,
@@ -1037,11 +1063,16 @@ impl FeedbackProjector {
             let generation_id = resolve_generation(&mut conn, &self.evaluator, &self.policy)?;
             // Admit at most eight newly held content anchors per sweep. The anti-join
             // makes progress across the whole set without a second history cursor.
+            // The anchor column is an action reference: only an ActionHash can be a
+            // link base (`uhCkk` = 0x84 0x29 0x24), and the drill fixtures post a
+            // blob sha there. Exact `substr`, not `LIKE`, which is case-insensitive
+            // in SQLite.
             diesel::sql_query(
                 "INSERT OR IGNORE INTO feedback_subscriptions
                 (member_kind, member_key, origin_dna_hash, source, added_at, visit_count)
                 SELECT 'content-target', c.dht_anchor_hash, ?, 'steward', ?, 0
                 FROM content c WHERE c.dht_anchor_hash IS NOT NULL
+                AND substr(c.dht_anchor_hash, 1, 5) = 'uhCkk'
                 AND NOT EXISTS (SELECT 1 FROM feedback_subscriptions s
                     WHERE s.member_kind = 'content-target' AND s.member_key = c.dht_anchor_hash)
                 ORDER BY c.id LIMIT 8",
@@ -1744,11 +1775,26 @@ pub fn admit_notified_signal_with(
             act_ref.origin_dna_hash
         )));
     }
+    // The correction action is a link base for acceptance vouches, so it must be
+    // an ActionHash; a reference that is not one is refused whole.
+    crate::services::conductor_writes::decode_action_hash(&act_ref.action_hash).map_err(|_| {
+        StorageError::InvalidInput(
+            "feedback act reference action hash is not an ActionHash".to_string(),
+        )
+    })?;
+    let mut members = vec![(sub_db::KIND_CORRECTION_ACTION, act_ref.action_hash.as_str())];
+    // A routing key that is not an ActionHash can never be a link base: admit
+    // the act, skip the content-target member.
+    match crate::services::conductor_writes::decode_action_hash(&act_ref.routing_key) {
+        Ok(_) => members.push((sub_db::KIND_CONTENT_TARGET, act_ref.routing_key.as_str())),
+        Err(_) => tracing::warn!(
+            target: "elohim_storage::feedback_projector",
+            routing_key = %act_ref.routing_key,
+            "notified routing key is not an ActionHash — content-target member skipped"
+        ),
+    }
     let now = Utc::now().to_rfc3339();
-    for (kind, key) in [
-        (sub_db::KIND_CORRECTION_ACTION, act_ref.action_hash.as_str()),
-        (sub_db::KIND_CONTENT_TARGET, act_ref.routing_key.as_str()),
-    ] {
+    for (kind, key) in members {
         sub_db::add_member(
             conn,
             kind,
@@ -1784,6 +1830,9 @@ pub fn spawn(projector: FeedbackProjector) -> tokio::task::JoinHandle<()> {
         .filter(|v| *v > 0)
         .unwrap_or(SWEEP_INTERVAL_SECS);
     tokio::spawn(async move {
+        // Once, before the first sweep: a DELETE takes the write lock, so it is
+        // not a per-tick cost.
+        projector.purge_malformed_members();
         let mut ticker = tokio::time::interval(Duration::from_secs(seconds));
         ticker.set_missed_tick_behavior(tokio::time::MissedTickBehavior::Skip);
         loop {

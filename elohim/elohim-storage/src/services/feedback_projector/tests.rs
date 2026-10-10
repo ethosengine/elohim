@@ -90,6 +90,11 @@ fn record(action_hash: &str, author: u8, ts: i64, entry: DhtFeedbackSignal) -> F
     }
 }
 
+/// A valid `uhCkk…` ActionHash display, distinct per seed.
+fn ah(seed: u8) -> String {
+    holochain_types::prelude::ActionHash::from_raw_32(vec![seed; 32]).to_string()
+}
+
 /// A `uhCAk…`-shaped display of a 32-byte key, decodable by
 /// [`decode_agent_display`].
 fn agent_display(seed: u8) -> String {
@@ -714,10 +719,11 @@ fn agent_display_round_trips() {
 #[tokio::test]
 async fn spawned_loop_visits_subscription_on_first_tick() {
     let pool = test_pool();
+    let target = ah(20);
     sub_db::add_member(
         &mut pool.get().unwrap(),
         sub_db::KIND_CONTENT_TARGET,
-        "target",
+        &target,
         DNA,
         sub_db::SOURCE_STEWARD,
         "2026-09-06T00:00:00Z",
@@ -741,7 +747,7 @@ async fn spawned_loop_visits_subscription_on_first_tick() {
     .await;
     task.abort();
     result.expect("registered loop must tick without waiting for its first interval");
-    assert_eq!(reader.state.lock().unwrap().visited, vec!["target"]);
+    assert_eq!(reader.state.lock().unwrap().visited, vec![target]);
 }
 
 fn current_generation(
@@ -947,14 +953,16 @@ async fn quiet_member_goes_cold_after_exactly_three_clean_sweeps() {
 /// cold while nobody says otherwise.
 #[tokio::test]
 async fn notification_re_arms_a_cold_member_to_the_front() {
-    let (pool, reader, projector) = quiet_member_fixture(&["target-a", "target-b", "target-cold"]);
+    let tcold = ah(1);
+    let cnot = ah(2);
+    let (pool, reader, projector) = quiet_member_fixture(&["target-a", "target-b", tcold.as_str()]);
     let scheduler = projector.scheduler();
 
     for _ in 0..COLD_AFTER_CLEAN_SWEEPS {
         projector.tick().await.expect("cooling tick");
     }
     assert!(scheduler
-        .heat(sub_db::KIND_CONTENT_TARGET, "target-cold")
+        .heat(sub_db::KIND_CONTENT_TARGET, &tcold)
         .is_cold());
     let swept_before = reader.visited().len();
 
@@ -962,7 +970,7 @@ async fn notification_re_arms_a_cold_member_to_the_front() {
         let mut conn = pool.get().unwrap();
         let admitted = admit_notified_signal_with(
             &mut conn,
-            Some(&act_ref("corr-notified", "target-cold")),
+            Some(&act_ref(&cnot, &tcold)),
             Some(DNA),
             Some(&scheduler),
         )
@@ -970,7 +978,7 @@ async fn notification_re_arms_a_cold_member_to_the_front() {
         assert!(admitted);
     }
     assert_eq!(
-        scheduler.heat(sub_db::KIND_CONTENT_TARGET, "target-cold"),
+        scheduler.heat(sub_db::KIND_CONTENT_TARGET, &tcold),
         MemberHeat::Hot,
         "a notification naming the member re-arms it"
     );
@@ -980,7 +988,7 @@ async fn notification_re_arms_a_cold_member_to_the_front() {
     let swept_after: Vec<String> = swept_after.split_off(swept_before);
     assert_eq!(
         swept_after.first().map(String::as_str),
-        Some("target-cold"),
+        Some(tcold.as_str()),
         "the re-armed member leads the next rotation; swept: {swept_after:?}"
     );
 }
@@ -1052,9 +1060,11 @@ async fn a_new_act_reference_re_arms_a_cold_member() {
 /// swallow the one signal that makes retirement safe.
 #[tokio::test]
 async fn a_notification_racing_a_sweep_is_not_lost() {
-    let (pool, _reader, projector) = quiet_member_fixture(&["target-race"]);
+    let trace = ah(3);
+    let crace = ah(4);
+    let (pool, _reader, projector) = quiet_member_fixture(&[trace.as_str()]);
     let scheduler = projector.scheduler();
-    let member = (sub_db::KIND_CONTENT_TARGET, "target-race");
+    let member = (sub_db::KIND_CONTENT_TARGET, trace.as_str());
 
     // Two clean sweeps: one more retires it.
     projector.tick().await.expect("tick 1");
@@ -1068,7 +1078,7 @@ async fn a_notification_racing_a_sweep_is_not_lost() {
         let mut conn = pool.get().unwrap();
         admit_notified_signal_with(
             &mut conn,
-            Some(&act_ref("corr-race", "target-race")),
+            Some(&act_ref(&crace, &trace)),
             Some(DNA),
             Some(&scheduler),
         )
@@ -1183,13 +1193,15 @@ async fn publication_still_fires_when_members_have_retired() {
 /// failure; discovery still finds the act.
 #[tokio::test]
 async fn an_act_reference_wakes_the_member_and_its_absence_changes_nothing() {
-    let (pool, _reader, projector) = quiet_member_fixture(&["target-wake"]);
+    let twake = ah(5);
+    let cwake = ah(6);
+    let (pool, _reader, projector) = quiet_member_fixture(&[twake.as_str()]);
     let scheduler = projector.scheduler();
     for _ in 0..COLD_AFTER_CLEAN_SWEEPS {
         projector.tick().await.expect("cooling tick");
     }
     assert!(scheduler
-        .heat(sub_db::KIND_CONTENT_TARGET, "target-wake")
+        .heat(sub_db::KIND_CONTENT_TARGET, &twake)
         .is_cold());
 
     let mut conn = pool.get().unwrap();
@@ -1201,7 +1213,7 @@ async fn an_act_reference_wakes_the_member_and_its_absence_changes_nothing() {
     assert!(!admitted, "nothing was admitted");
     assert!(
         scheduler
-            .heat(sub_db::KIND_CONTENT_TARGET, "target-wake")
+            .heat(sub_db::KIND_CONTENT_TARGET, &twake)
             .is_cold(),
         "heat is unchanged by a notification that names no act"
     );
@@ -1214,19 +1226,19 @@ async fn an_act_reference_wakes_the_member_and_its_absence_changes_nothing() {
     // With one: both keys go Hot, and the act itself joins the durable set.
     let admitted = admit_notified_signal_with(
         &mut conn,
-        Some(&act_ref("corr-wake", "target-wake")),
+        Some(&act_ref(&cwake, &twake)),
         Some(DNA),
         Some(&scheduler),
     )
     .expect("admitted");
     assert!(admitted);
     assert_eq!(
-        scheduler.heat(sub_db::KIND_CONTENT_TARGET, "target-wake"),
+        scheduler.heat(sub_db::KIND_CONTENT_TARGET, &twake),
         MemberHeat::Hot,
         "the routing key's target is re-armed"
     );
     assert_eq!(
-        scheduler.heat(sub_db::KIND_CORRECTION_ACTION, "corr-wake"),
+        scheduler.heat(sub_db::KIND_CORRECTION_ACTION, &cwake),
         MemberHeat::Hot,
         "the act itself is re-armed"
     );
@@ -1262,4 +1274,101 @@ async fn a_foreign_origin_dna_reference_is_refused_at_the_wake() {
         members_before,
         "nothing from a foreign space enters the durable set"
     );
+}
+
+fn insert_content_with_anchor(conn: &mut SqliteConnection, id: &str, anchor: &str) {
+    use diesel::RunQueryDsl;
+    diesel::sql_query("INSERT INTO content (id, title, dht_anchor_hash) VALUES (?, ?, ?)")
+        .bind::<diesel::sql_types::Text, _>(id)
+        .bind::<diesel::sql_types::Text, _>(id)
+        .bind::<diesel::sql_types::Text, _>(anchor)
+        .execute(conn)
+        .expect("insert content");
+}
+
+fn member_keys(conn: &mut SqliteConnection, kind: &str) -> Vec<String> {
+    use crate::db::diesel_schema::feedback_subscriptions::dsl as t;
+    t::feedback_subscriptions
+        .filter(t::member_kind.eq(kind))
+        .select(t::member_key)
+        .load(conn)
+        .expect("members")
+}
+
+#[tokio::test]
+async fn steward_admission_skips_content_whose_anchor_is_not_an_action_hash() {
+    let (pool, _reader, projector) = quiet_member_fixture(&[]);
+    let good = ah(9);
+    {
+        let mut conn = pool.get().unwrap();
+        insert_content_with_anchor(&mut conn, "c-sha", "sha256-0123456789abcdef");
+        insert_content_with_anchor(&mut conn, "c-cid", "bafkreihdwdcefgh4dqkjv67uzcmw7oj");
+        insert_content_with_anchor(&mut conn, "c-good", &good);
+    }
+    projector.tick().await.expect("tick");
+    let mut conn = pool.get().unwrap();
+    assert_eq!(
+        member_keys(&mut conn, sub_db::KIND_CONTENT_TARGET),
+        vec![good],
+        "only the ActionHash anchor becomes a member"
+    );
+}
+
+#[tokio::test]
+async fn a_pre_existing_malformed_member_is_purged_at_start() {
+    let good = ah(10);
+    let (pool, reader, projector) = quiet_member_fixture(&["sha256-deadbeef", good.as_str()]);
+    projector.purge_malformed_members();
+    {
+        let mut conn = pool.get().unwrap();
+        assert_eq!(
+            member_keys(&mut conn, sub_db::KIND_CONTENT_TARGET),
+            vec![good.clone()],
+            "the sha256 member is gone, the ActionHash member kept"
+        );
+    }
+    projector.tick().await.expect("tick");
+    assert_eq!(
+        reader.visited(),
+        vec![good],
+        "the purged member is never visited"
+    );
+}
+
+#[test]
+fn notified_routing_key_that_is_not_an_action_hash_admits_only_the_act() {
+    let pool = test_pool();
+    let mut conn = pool.get().unwrap();
+    let corr = ah(11);
+    let admitted = admit_notified_signal_with(
+        &mut conn,
+        Some(&act_ref(&corr, "sha256-notanaction")),
+        Some(DNA),
+        None,
+    )
+    .expect("the act alone is admitted");
+    assert!(admitted);
+    assert_eq!(
+        member_keys(&mut conn, sub_db::KIND_CORRECTION_ACTION),
+        vec![corr]
+    );
+    assert!(member_keys(&mut conn, sub_db::KIND_CONTENT_TARGET).is_empty());
+}
+
+#[test]
+fn a_notified_act_whose_hash_is_not_an_action_hash_is_refused() {
+    let pool = test_pool();
+    let mut conn = pool.get().unwrap();
+    let err = admit_notified_signal_with(
+        &mut conn,
+        Some(&act_ref("sha256-notanaction", &ah(12))),
+        Some(DNA),
+        None,
+    )
+    .expect_err("refused");
+    assert!(
+        matches!(err, StorageError::InvalidInput(ref m) if m.contains("not an ActionHash")),
+        "{err}"
+    );
+    assert_eq!(sub_db::count(&mut conn).unwrap(), 0);
 }

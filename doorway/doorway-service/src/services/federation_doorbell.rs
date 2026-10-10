@@ -96,6 +96,12 @@ pub const OUTCOME_QUEUED: &str = "queued";
 /// `federation::PROBE_ROSTER_EXPIRY_ROUNDS` rounds — not dialed, nothing
 /// attested this round.
 pub const OUTCOME_SKIPPED_EXPIRED: &str = "skipped_expired";
+/// Probe outcome: a changed health state seen once, held a round before it
+/// is attested (hysteresis).
+pub const OUTCOME_ATTEST_PENDING: &str = "attest_pending";
+/// Probe outcome: the observation equals the last attested state — samples
+/// are ephemeral, nothing notarized.
+pub const OUTCOME_ATTEST_SKIPPED_UNCHANGED: &str = "attest_skipped_unchanged";
 
 /// The full closed outcome vocabulary, for metric pre-touch. Some values only
 /// ever occur on one `side`; pre-touching both is harmless (a handful of
@@ -115,6 +121,8 @@ pub const ALL_OUTCOMES: &[&str] = &[
     OUTCOME_GARBAGE_BODY,
     OUTCOME_QUEUED,
     OUTCOME_SKIPPED_EXPIRED,
+    OUTCOME_ATTEST_PENDING,
+    OUTCOME_ATTEST_SKIPPED_UNCHANGED,
 ];
 
 // ── Receiver-side pull coordination (C6a) ────────────────────────────────────

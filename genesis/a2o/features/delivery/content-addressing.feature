@@ -1,4 +1,4 @@
-@e2e @delivery @requires:doorway @requires:seeded-content @act:i
+@e2e @delivery @concern:content-addressing @requires:doorway @requires:seeded-content @act:i
 Feature: Content-addressed delivery
   As a learner visiting an HTML5 app
   I want content served by both slug and content address
@@ -21,6 +21,19 @@ Feature: Content-addressed delivery
     Then the response status is 200
     And the response includes header "X-Content-Address" with value "bafkreiplaceholder"
     And the response body matches the slug URL response
+
+  # Every seeded app is also an EPR — the protocol's named, versioned content record — and
+  # `/epr-head/<slug>` answers its current version (its head) together with the head's
+  # content address. That answer may also carry a witness of the election that chose the
+  # head: when the winning declaration was made, its tier, and which declaration won. The
+  # witness is reported beside the address, never inside it. The address is a hash of the
+  # head's canonical bytes (the dag-cbor encoding the same URL serves on request), and those
+  # bytes must not mention the election. If they did, two doorways holding the same head but
+  # different records of its election would hand the browser two addresses for one thing,
+  # and every cache keyed on the address would split.
+  Scenario: Attaching the election witness does not move the head's address
+    When the head of EPR "evolution-of-trust" is read from doorway "alpha"
+    Then the address in the answer is computed from bytes that do not include the election witness
 
   @browser-only @wip
   Scenario: Service worker caches by content address

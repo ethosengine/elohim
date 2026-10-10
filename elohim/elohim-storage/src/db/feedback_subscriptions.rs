@@ -69,6 +69,17 @@ pub fn add_member(
     Ok(inserted == 1)
 }
 
+/// Delete content-target members that are not ActionHashes (`uhCkk…`). Run once
+/// at projector start: such a member can never be a link base, so each visit
+/// only fails. Exact `substr`, not `LIKE` (case-insensitive in SQLite).
+pub fn purge_malformed_content_targets(conn: &mut SqliteConnection) -> Result<usize, DieselError> {
+    diesel::sql_query(
+        "DELETE FROM feedback_subscriptions
+         WHERE member_kind = 'content-target' AND substr(member_key, 1, 5) <> 'uhCkk'",
+    )
+    .execute(conn)
+}
+
 pub fn count(conn: &mut SqliteConnection) -> Result<i64, DieselError> {
     use crate::db::diesel_schema::feedback_subscriptions::dsl as t;
     t::feedback_subscriptions.count().get_result(conn)

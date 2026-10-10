@@ -643,6 +643,12 @@ pub struct CanonicalElectionWire {
     /// [`Self::staging_candidate`] is `Some`.
     #[serde(default)]
     pub staging_candidate_declared_at: Option<i64>,
+    /// The ELECTOR: the agent that signed the winning declaration link
+    /// (`content_store::CanonicalElectionOutput::winner_author`). Witness
+    /// only — never part of the ordering. `serde(default)`: a coordinator that
+    /// predates it omits the key and the elector reads as unknown.
+    #[serde(default)]
+    pub winner_author: Option<HoloHashB64>,
 }
 
 impl CanonicalElectionWire {

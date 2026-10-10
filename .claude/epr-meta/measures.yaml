@@ -1277,6 +1277,23 @@ measures:
     default-authority: observation
     established_by: observability-epic-2026-10-08
     why: "every claim of success is supported by a post-action observation, never by the handler"
+  - id: slug-answers-disagree-across-doorways
+    version: 1
+    family: convergence
+    unit: slugs
+    procedure: >
+      For each slug in the doorway manifests' served set (`genesis/orchestrator/manifests/doorway/*.yaml`;
+      today elohim-host-landing and lamad-spa), GET `/epr-head/{slug}` on every doorway of one
+      neighbourhood (household: :8888, :8889, :8890; fleet: doorway-alpha.elohim.host and elohim.host) and
+      count the slugs whose `cid` or `election` (canonicalDeclaredAt, earned, linkHash) differ between any
+      two doorways. A differing `election` with one `cid` is a stale projection, not a different head;
+      a differing `cid` is divergence. Fold within 30 min of a roll.
+    provenance: slug-leftovers sprint 2026-10-08 lane D; chronicle 2026-10-08-lamad-spa-two-cids-one-name; habit dataplane-convergence
+    status: active
+    env-sensitivity: [neighbourhood]
+    default-authority: observation
+    established_by: slug-leftovers-sprint-20261008
+    why: "the 2026-10-08 lamad-spa reading was two CIDs for one name with no way to tell stale from different"
 
 lenses:
   - id: resource-limit-raise-recurrence
@@ -2150,3 +2167,16 @@ lenses:
     status: active
     established_by: observability-epic-2026-10-08
     why: "a verb with no post row is unverified, never success"
+  - id: slug-answers-disagree-ceiling
+    version: 1
+    binding: binding-local
+    class: measure
+    consumes: [slug-answers-disagree-across-doorways@1]
+    subject: .
+    context: within-30m-of-a-roll
+    hard: 0
+    concern: dataplane-convergence
+    retire-when: when every doorway resolves a name through the binding the asker trusts (name-binding design reviewed and wired)
+    status: active
+    established_by: slug-leftovers-sprint-20261008
+    why: "two doorways answering one name differently is the incident; zero is the only honest ceiling"

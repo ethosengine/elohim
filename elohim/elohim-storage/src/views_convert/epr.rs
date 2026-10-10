@@ -161,6 +161,39 @@ pub struct EprHeadView {
     /// CID of the DAG-CBOR encoded head (set after encoding)
     #[serde(skip_serializing_if = "Option::is_none")]
     pub cid: Option<String>,
+    /// The election that chose this head, as this peer's projection recorded
+    /// it — ENVELOPE, not addressed. It rides beside `cid` and is never part
+    /// of the canonical [`EprHead`] bytes, so `cid` stays a function of the
+    /// declared head alone while a reader can still tell a stale election
+    /// from a different one (2026-10-08: two doorways answered `lamad-spa`
+    /// with two CIDs and nothing on the wire said which election either
+    /// read). Omitted when `content.canonical_declared_at` is NULL.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub election: Option<EprHeadElectionView>,
+}
+
+/// Unaddressed election witness on [`EprHeadView`] — clock, tier, tiebreak.
+///
+/// Projected from `content.canonical_declared_at` / `canonical_earned` /
+/// `canonical_link_hash` (Category A, projection of the DHT election). NOT
+/// covered by `cid`; NOT emitted on the dag-cbor arm.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct EprHeadElectionView {
+    /// RFC3339 UTC, microsecond precision — the elected declaration LINK's
+    /// DHT timestamp, so two elections order losslessly.
+    pub canonical_declared_at: String,
+    /// `true` iff the election's tier is EARNED (`canonical_earned = 1`).
+    pub earned: bool,
+    /// The election's tiebreak (u-prefixed base64). Omitted when unknown.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub link_hash: Option<String>,
+    /// The ELECTOR — the agent that signed the winning declaration link —
+    /// present ONLY on a `?election=live` read whose own conductor answered
+    /// the SAME election this witness records (same tiebreak). Never
+    /// projected; absent on a plain read and whenever no live answer names it.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub elector: Option<String>,
 }
 
 impl From<EprHead> for EprHeadView {
@@ -176,6 +209,7 @@ impl From<EprHead> for EprHeadView {
             author: h.author,
             updated: h.updated,
             cid: None,
+            election: None,
         }
     }
 }

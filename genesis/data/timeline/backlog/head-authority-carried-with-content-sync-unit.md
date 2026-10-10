@@ -63,6 +63,16 @@ the acceptance check for item (1) below.
 4. **Ordered `ContentHeadDeclared` delivery observed 0-for-176**, with gossipsub
    `InsufficientPeers`. Needs a diagnostic that names which conjunct of the delivery precondition
    failed, rather than a bare count.
+   **SEEN 2026-10-08 20:16Z (household, conductor hc-fork-c916eddbed02, storage b2f54021f; sprint 2026-10-08
+   Lane 1A run):** the ordered signal DOES reach the author's own storage — matthew.log carries it twice
+   for `federation-head-only-1791490599536` (0.08 s after `Projecting Content from DHT`, and again right
+   after the earned re-declaration at 20:16:42.24) — and both times it is DEFERRED:
+   `authenticated REA/content signal deferred error="Invalid input: ordered ContentHeadDeclared did not
+   resolve its exact canonical payload: <id>"`. No `project_authenticated_content_head`, `Refreshed` or
+   `ordering_changed` line follows, so the author's row never stamps `earned` from the signal; it stamps
+   only when its own `/head?election=live` read runs `heal_election_columns`. The conjunct that fails is
+   named: exact-canonical-payload resolution at signal time, not delivery. The a2o step for the author's
+   side now reads `?election=live` (its own conductor) and says why; the receiver side stays strict.
 5. **Trigger cooldown (60s claim) and the re-probe ladder are compile-time consts**, not
    runtime-config — no lever to retune without a rebuild.
 6. **Defect, 2026-09-18**: james's `adopt-before-author` CONTESTED path re-mints a canonical
@@ -74,6 +84,20 @@ the acceptance check for item (1) below.
 8. **Parked draft**, uncompiled, on branch `sprint/2026-09-17-candidate-head-single-call`
    (commits `5e4dbaa1e` single coordinator extern `resolve_staging_candidate_head`, `462e87498`
    candidate-byte prefetch) — collapses the candidate-head resolve from ~7 zome calls to one.
+9. **Same-anchor election mismatch is invisible to the reconcile sweep** (2026-10-08, primitives
+   review of the gradient sprint): `p2p/projection_reconcile.rs` `classify_content_gap` (~:4551)
+   marks a row Divergent only when the peer-advertised `dht_anchor_hash` differs, and the wire
+   `ProjectionInventoryEntry` carries no `canonical_*`, so a re-election of the same head on the
+   same anchor reads InSync and `elohim_projection_reconcile_divergent` stays flat (the 2026-10-08c
+   incident: 30 flat for 2.5 h across 21 re-declarations). With the ordering carried in the sync
+   document (sprint 2026-10-08 Lane 1A) the 60 s retained-hint pass is the backstop for this class;
+   widening the wire inventory is a sync-protocol change and is not that lane.
+10. **Head-ordering types have no crate-root home** (2026-10-08): `CanonicalOrdering`/`ElectionLink`
+    live in `db/content_diesel.rs` and are built by service wire code (`services/conductor_writes.rs`
+    `CanonicalElectionWire`), a service→db arrow. Future home: a crate-root `head_election` module
+    beside `epr_head.rs`; moved only when a second consumer exists (requisite-variety guidestar
+    §3a), never into `elohim-epr`, whose `head.rs` is the three-pillar envelope and carries no
+    election.
 
 ## Missing node (mintable)
 

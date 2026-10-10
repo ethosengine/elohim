@@ -3068,7 +3068,8 @@ fn create_canonical_head_link(
     // No write occurs between `create_link` and this read, so this is the exact
     // signed CreateLink action's notarized clock — never `sys_time`, the target
     // Content action's clock, or a later get_links arrival time.
-    let (chain_head, _, timestamp) = agent_info()?.chain_head;
+    let info = agent_info()?;
+    let (chain_head, _, timestamp) = info.chain_head;
     if chain_head != link_hash {
         return Err(wasm_error!(WasmErrorInner::Guest(format!(
             "create_canonical_head_link: newly created link {link_hash:?} was not the source-chain \
@@ -3086,6 +3087,7 @@ fn create_canonical_head_link(
         link_hash,
         target: target.clone(),
         ordering_hash: None,
+        author: info.agent_initial_pubkey,
     };
     // The publication gate has already verified this supplied grant/receipt.
     if is_earned {
@@ -3141,6 +3143,10 @@ struct CanonicalCandidate {
     ordering_hash: Option<ActionHash>,
     /// The declared canonical head target (a Content action).
     target: ActionHash,
+    /// The ELECTOR: the agent that signed the declaration link. Carried for
+    /// the wire only ([`CanonicalElectionOutput::winner_author`]); it never
+    /// takes part in choosing the winner.
+    author: AgentPubKey,
 }
 
 /// Select the single WINNING canonical-head declaration from a candidate set,
@@ -3431,6 +3437,7 @@ fn gather_election_candidates(
             link_hash: link.create_link_hash,
             target,
             ordering_hash: None,
+            author: link.author.clone(),
         };
         if is_earned {
             if let Some(standing) = standing.as_ref() {
@@ -3562,6 +3569,7 @@ mod canonical_head_selector_tests {
             ordering_hash: None,
             link_hash: ah(link_seed),
             target: ah(target_seed),
+            author: AgentPubKey::from_raw_36(vec![0xa0; 36]),
         }
     }
 
@@ -6422,6 +6430,12 @@ pub struct CanonicalElectionOutput {
     /// when [`Self::staging_candidate`] is `Some`.
     #[serde(default)]
     pub staging_candidate_declared_at: Option<Timestamp>,
+    /// The ELECTOR: the agent that signed the winning declaration link (for a
+    /// delegated declaration, the delegate who declared, not the root that
+    /// accepted). Witness only — never part of the election's ordering.
+    /// `None` via `serde(default)` from any coordinator that predates it.
+    #[serde(default)]
+    pub winner_author: Option<holo_hash::AgentPubKeyB64>,
 }
 
 impl CanonicalElectionOutput {
@@ -6444,6 +6458,7 @@ impl CanonicalElectionOutput {
                 .as_ref()
                 .map(|c| holo_hash::ActionHashB64::from(c.target.clone())),
             staging_candidate_declared_at: outcome.staging_candidate.as_ref().map(|c| c.timestamp),
+            winner_author: Some(holo_hash::AgentPubKeyB64::from(outcome.winner.author.clone())),
         }
     }
 }
@@ -7059,6 +7074,7 @@ fn prove_carried_declaration(
             link_hash: computed,
             ordering_hash: None,
             target,
+            author: author.clone(),
         },
         declarer: author,
         tag: create_link.tag.0.clone(),

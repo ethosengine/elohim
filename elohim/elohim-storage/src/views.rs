@@ -28,8 +28,8 @@ use serde::{Deserialize, Serialize};
 // Re-exports: free functions that callers reference via `crate::views::<name>` —
 // preserved here so the public surface from before A.3–A.9 still resolves.
 pub use crate::views_convert::epr::{
-    EprHeadInputView, EprHeadView, EprLamadContextInputView, EprQahalContextInputView,
-    EprRelationshipInputView, EprShefaContextInputView,
+    EprHeadElectionView, EprHeadInputView, EprHeadView, EprLamadContextInputView,
+    EprQahalContextInputView, EprRelationshipInputView, EprShefaContextInputView,
 };
 pub use crate::views_convert::imagodei::upsert_policy_to_db_input;
 pub use crate::views_convert::infrastructure::{

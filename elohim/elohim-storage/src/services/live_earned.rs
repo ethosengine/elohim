@@ -142,6 +142,23 @@ pub fn live_earned_verdict(
     }
 }
 
+/// The ELECTOR of the live election, when — and only when — the conductor
+/// answered, its winner IS `projected_head`, and its coordinator names the
+/// winning link's author. Pure and total; every other arm is `None`, because
+/// an elector is never projected or cached: naming the elector of a different
+/// winner, or a remembered one, would be a claim about an election this read
+/// did not see.
+pub fn live_elector(projected_head: &str, live: &LocalElection) -> Option<String> {
+    match live {
+        LocalElection::Answered(Some(election))
+            if election.winner_target.to_string() == projected_head =>
+        {
+            election.winner_author.as_ref().map(|a| a.to_string())
+        }
+        _ => None,
+    }
+}
+
 /// Record a live-proven earned election on the row that is behind it. `None`
 /// when the verdict carries nothing to heal.
 pub fn heal_behind_column(
@@ -174,6 +191,34 @@ mod tests {
             "canonical_earned": earned,
         }))
         .expect("canonical election wire")
+    }
+
+    const ELECTOR: &str = "uhCAkElectorAgentKey0123456789012345678901234567890123";
+
+    #[test]
+    fn live_elector_names_the_author_only_of_the_declared_heads_election() {
+        let mut wire = election(HEAD, true);
+        wire.winner_author = Some(ELECTOR.into());
+        let live = LocalElection::Answered(Some(wire.clone()));
+        assert_eq!(live_elector(HEAD, &live).as_deref(), Some(ELECTOR));
+        // A different winner: its elector is not this head's elector.
+        assert_eq!(live_elector(OTHER, &live), None);
+        // An older coordinator that names no author.
+        assert_eq!(live_elector(HEAD, &answered(HEAD, true)), None);
+        // No election in the local view, or no answer at all.
+        assert_eq!(live_elector(HEAD, &LocalElection::Answered(None)), None);
+        assert_eq!(
+            live_elector(
+                HEAD,
+                &LocalElection::Unavailable(ElectionUnavailable::Deadline)
+            ),
+            None
+        );
+    }
+
+    #[test]
+    fn an_older_coordinator_wire_without_winner_author_still_decodes() {
+        assert_eq!(election(HEAD, true).winner_author, None);
     }
 
     fn answered(winner: &str, earned: bool) -> LocalElection {
@@ -313,6 +358,43 @@ mod tests {
         let answering = async { Ok(Some(election(HEAD, true))) };
         let live = ask_local_election_with(answering, deadline).await;
         assert!(live_earned_verdict(HEAD, false, &live).earned);
+    }
+
+    #[test]
+    fn healed_election_columns_announce_the_touch() {
+        use crate::rea_projection::touch_capture::TouchCapture;
+        let pool = crate::test_util::test_pool();
+        let mut conn = pool.get().unwrap();
+        let ctx = AppContext::new("lamad");
+        row(&mut conn, &ctx, "announced", None);
+        row(&mut conn, &ctx, "unchanged", Some(1));
+        let mut touches = TouchCapture::start();
+
+        // A heal that wrote the columns announces the row: the sync doc carries
+        // this ordering, so its projection is stale until it is reprojected.
+        let verdict = live_earned_verdict(HEAD, false, &answered(HEAD, true));
+        assert_eq!(
+            heal_behind_column(&mut conn, &ctx, "announced", HEAD, &verdict).unwrap(),
+            Some(ElectionColumnHeal::Healed)
+        );
+        assert!(touches.touched("announced"), "a healed row is announced");
+
+        // A heal that wrote nothing stays silent.
+        assert_eq!(
+            content_diesel::heal_election_columns(
+                &mut conn,
+                &ctx,
+                "unchanged",
+                HEAD,
+                election(HEAD, false).ordering()
+            )
+            .unwrap(),
+            ElectionColumnHeal::Unchanged
+        );
+        assert!(
+            touches.drain().is_empty(),
+            "an unchanged row is not announced"
+        );
     }
 
     #[test]

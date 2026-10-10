@@ -3582,7 +3582,8 @@ pub fn elohim_content_decode_miss_count() -> u64 {
 /// action). All other Content entries belong to the REA `ContentCommitted`
 /// arm and are a quiet skip here.
 fn is_elohim_content_owned(content_type: &str) -> bool {
-    content_type.starts_with("attestation:") || content_type.starts_with("governance-action:")
+    content_type.starts_with(crate::db::content_diesel::ATTESTATION_KIND_PREFIX)
+        || content_type.starts_with("governance-action:")
 }
 
 /// Decode a conductor app-signal payload into the flat `ElohimContentSignal`

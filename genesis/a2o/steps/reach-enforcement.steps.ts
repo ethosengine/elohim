@@ -378,3 +378,109 @@ function byteProbe(world: E2EWorld): Map<string, number> {
   w.__byteProbe ??= new Map();
   return w.__byteProbe;
 }
+
+/**
+ * THE WRITE SIDE. `PUT /epr-head/{id}` once accepted a head from anyone and
+ * stored the bytes the peer then served under its own name. It is now a
+ * this-machine act (storage `epr_head_put_refusal`; the doorway forwards only
+ * GET). The body is well-formed so a refusal cannot be mistaken for the parse
+ * error the defect would also have produced.
+ */
+When(
+  'I PUT a well-formed head for {string} on peer {string} anonymously',
+  async function (this: E2EWorld, headId: string, peerName: string) {
+    const base = peerMap(this).get(peerName) ?? resolvePeerUrl(peerName);
+    peerMap(this).set(peerName, base);
+    const head = {
+      id: headId,
+      content: 'a head no one on this machine declared',
+      lamad: { title: 'Reach probe', contentType: 'concept' },
+    };
+    const res = await fetch(`${base}/epr-head/${encodeURIComponent(headId)}`, {
+      method: 'PUT',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify(head),
+      signal: AbortSignal.timeout(15_000),
+    });
+    await res.arrayBuffer();
+    headPutProbe(this).set(headId, res.status);
+  }
+);
+
+Then(
+  'the head PUT for {string} was refused with a non-success status',
+  function (this: E2EWorld, headId: string) {
+    const status = headPutProbe(this).get(headId);
+    assert.ok(
+      status !== undefined,
+      `No head PUT captured for "${headId}" — the When step must run first.`
+    );
+    assert.ok(
+      status < 200 || status >= 300,
+      `UNAUTHENTICATED HEAD WRITE: an anonymous PUT /epr-head/${headId} was accepted ` +
+        `(status ${status}). The route is a this-machine act; a remote caller must be ` +
+        `refused by storage, and the doorway must not forward the write.`
+    );
+  }
+);
+
+/**
+ * THE APP ROUTE. `/apps/{slug}/…` and `/apps/{address}/…` serve one app bundle
+ * two ways; both must answer as the content route and the byte route would.
+ * The address is read from the row's public head (`/epr-head/{id}` carries
+ * `content`, the bundle's address), exactly as the byte-route step does.
+ */
+When(
+  'I fetch the app {string} on peer {string} by its slug and by its content address anonymously',
+  async function (this: E2EWorld, appId: string, peerName: string) {
+    const base = peerMap(this).get(peerName) ?? resolvePeerUrl(peerName);
+    peerMap(this).set(peerName, base);
+    const head = await getRaw(`${base}/epr-head/${appId}`);
+    let address: string | undefined;
+    if (head.status === 200) {
+      try {
+        address = (JSON.parse(head.text) as { content?: string }).content;
+      } catch {
+        address = undefined;
+      }
+    }
+    assert.ok(
+      address,
+      `Could not resolve a bundle address for "${appId}" from /epr-head (status ` +
+        `${head.status}). The scenario needs a bundle-bearing app row.`
+    );
+    const bySlug = await getRaw(`${base}/apps/${encodeURIComponent(appId)}/index.html`);
+    const byAddress = await getRaw(`${base}/apps/${encodeURIComponent(address)}/index.html`);
+    appProbe(this).set(appId, { bySlug: bySlug.status, byAddress: byAddress.status });
+  }
+);
+
+Then(
+  'both app fetches of {string} were refused with a non-success status',
+  function (this: E2EWorld, appId: string) {
+    const probe = appProbe(this).get(appId);
+    assert.ok(probe, `No app-route probe captured for "${appId}" — the When step must run first.`);
+    for (const [form, status] of Object.entries(probe)) {
+      assert.ok(
+        status < 200 || status >= 300,
+        `REACH BYPASS (app route, ${form}): the bundle of "${appId}" was served to an ` +
+          `anonymous caller (status ${status}) even though the content route refuses the ` +
+          `same row. /apps must be judged as /db/content and /blob are.`
+      );
+    }
+  }
+);
+
+/** Per-scenario app-route probe results, keyed by app row id. */
+function appProbe(world: E2EWorld): Map<string, { bySlug: number; byAddress: number }> {
+  const w = world as unknown as { __appProbe?: Map<string, { bySlug: number; byAddress: number }> };
+  w.__appProbe ??= new Map();
+  return w.__appProbe;
+}
+
+/** Per-scenario head-PUT probe results, keyed by head id. */
+function headPutProbe(world: E2EWorld): Map<string, number> {
+  const w = world as unknown as { __headPutProbe?: Map<string, number> };
+  w.__headPutProbe ??= new Map();
+  return w.__headPutProbe;
+}

@@ -27,6 +27,14 @@ fake_json_body() {
         tx5)
           printf '%s\n' '{"agentCount":5,"agents":[{"url":"wss://relay.alpha.elohim.host.:443/a"},{"url":"https://relay.alpha.elohim.host.:443/b"},{"url":"https://relay.elohim.host.:443/c"},{"url":"https://relay.alpha.elohim.host.:443/d"},{"url":"https://relay.elohim.host.:443/e"}]}'
           ;;
+        peer-exile)
+          # ADDRESSED, CONNECTED, AND DROPPED WHOLE (alpha, 2026-10-10): the
+          # peer store is healthy and one connected peer's messages are all
+          # counted blocked; another has been sent millions and answers nothing.
+          # Blocked counts under a url that is NOT a current connection (an
+          # old endpoint key) must not be charged to anyone.
+          printf '%s\n' '{"agentCount":5,"agents":[{"url":"https://relay.alpha.elohim.host.:443/a"},{"url":"https://relay.elohim.host.:443/b"},{"url":"https://relay.alpha.elohim.host.:443/c"},{"url":"https://relay.elohim.host.:443/d"},{"url":"https://relay.alpha.elohim.host.:443/e"}],"transportStats":{"transport_stats":{"connections":[{"pub_key":"aaaa1111aaaa1111","send_message_count":50000,"recv_message_count":40000},{"pub_key":"391346b3dead","send_message_count":981,"recv_message_count":4058544},{"pub_key":"beb7330adeaf","send_message_count":3546981,"recv_message_count":0}]},"blocked_message_counts":{"https://relay.elohim.host:443/391346b3dead":{"uhC0kZezl4k2nZa5":{"incoming":2604358,"outgoing":0},"uhC0kQwOEwmIBZhB":{"incoming":1454187,"outgoing":3}},"https://relay.elohim.host:443/0ld0ld0ld":{"uhC0kZezl4k2nZa5":{"incoming":999999,"outgoing":0}}}}}'
+          ;;
         degraded-peer-store-socket)
           # THE SAME DEGRADED 200, A DIFFERENT CAUSE. A closed websocket, an
           # auth failure and a timeout all land on this body. Before 2026-09-22
@@ -45,7 +53,7 @@ fake_json_body() {
           ;;
         *)
           # Both sovereign hosts use iroh's canonical trailing-dot form.
-          printf '%s\n' '{"agentCount":5,"agents":[{"url":"https://relay.alpha.elohim.host.:443/a"},{"url":"https://relay.elohim.host.:443/b"},{"url":"https://relay.alpha.elohim.host.:443/c"},{"url":"https://relay.elohim.host.:443/d"},{"url":"https://relay.alpha.elohim.host.:443/e"}]}'
+          printf '%s\n' '{"agentCount":5,"agents":[{"url":"https://relay.alpha.elohim.host.:443/a"},{"url":"https://relay.elohim.host.:443/b"},{"url":"https://relay.alpha.elohim.host.:443/c"},{"url":"https://relay.elohim.host.:443/d"},{"url":"https://relay.alpha.elohim.host.:443/e"}],"transportStats":{"transport_stats":{"connections":[{"pub_key":"aaaa1111aaaa1111","send_message_count":50000,"recv_message_count":40000}]},"blocked_message_counts":{"https://relay.elohim.host:443/aaaa1111aaaa1111":{"uhC0kSpaceOne":{"incoming":3,"outgoing":0}}}}}'
           ;;
       esac
       ;;
@@ -350,6 +358,28 @@ fi
 if grep -Fq 'ADVISORY-TORN-ROW' "$UNREADABLE_OUTPUT"; then
   echo "unreadable-head-record falsely read as TORN" >&2
   sed -n '1,200p' "$UNREADABLE_OUTPUT" >&2
+  exit 1
+fi
+
+# peer-exile (seam 7): healthy reads OK on both doorways; a peer dropped whole
+# and a peer that answers nothing are NAMED, the leg stays advisory under
+# --gate, and a degraded body reads SKIP rather than vanishing.
+if [ "$(grep -Fc 'seam-smoke[peer-exile]: OK' "$HEALTHY_OUTPUT")" -ne 2 ]; then
+  echo "Healthy run did not evaluate peer-exile on both doorways" >&2
+  sed -n '1,200p' "$HEALTHY_OUTPUT" >&2
+  exit 1
+fi
+assert_passes peer-exile
+EXILE_OUTPUT="${TEST_ROOT}/peer-exile.log"
+grep -Fq 'seam-smoke[peer-exile]: EXILED — https://doorway-alpha.elohim.host DROPPED peer=391346b3dead blocked=4058545 of received=4058544 spaces=uhC0kZezl4k2,uhC0kQwOEwmI; UNANSWERED peer=beb7330adeaf sent=3546981 received=0' "$EXILE_OUTPUT"
+if grep -Fq 'peer=aaaa1111aaaa' "$EXILE_OUTPUT" || grep -Fq '0ld0ld' "$EXILE_OUTPUT"; then
+  echo "peer-exile charged a healthy peer or a stale endpoint url" >&2
+  sed -n '1,200p' "$EXILE_OUTPUT" >&2
+  exit 1
+fi
+if [ "$(grep -Fc 'seam-smoke[peer-exile]: SKIP' "${TEST_ROOT}/degraded-peer-store.log")" -ne 2 ]; then
+  echo "degraded-peer-store did not print an explicit peer-exile SKIP per doorway" >&2
+  sed -n '1,200p' "${TEST_ROOT}/degraded-peer-store.log" >&2
   exit 1
 fi
 

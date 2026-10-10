@@ -49,3 +49,5 @@ on top of one canonical document. Full agenda: design doc §7 F1.
 **Links.** Design doc: `genesis/a2o/reports/recovery/serving-edge-20260920/epr-head-envelope-design.md` (F1, §7;
 C7 row). Sibling finding from the same reading: `epr-head-envelope-differs-per-peer.md`. Habit:
 `doorway/doorway-service/.epr-meta/doorway-failover.habit.md`.
+
+**2026-10-08 DEFER (slug-leftovers sprint):** one canonical EprHead + explicit public projection, after the name-binding design is reviewed.

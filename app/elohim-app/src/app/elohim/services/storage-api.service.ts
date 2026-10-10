@@ -136,9 +136,12 @@ export class StorageApiService implements IStorageApi, IStorageWriter {
   private readonly logger = inject(LoggerService);
 
   constructor() {
-    // Use storageUrl from environment or fall back to doorway URL
-    this.baseUrl =
-      environment.holochain?.storageUrl ?? resolveDoorwayUrl(environment.client?.doorwayUrl ?? '');
+    // A browser-served bundle talks to the origin that served it; only a
+    // native shell (Tauri) keeps the configured sidecar or doorway URL. A
+    // compiled storageUrl must not send a browser past its doorway.
+    this.baseUrl = resolveDoorwayUrl(
+      environment.holochain?.storageUrl ?? environment.client?.doorwayUrl
+    );
   }
 
   // ==========================================================================

@@ -250,12 +250,14 @@ seams:
     # This is a routing of the CORE crate only, per the birth rule: `elohim-ark-supervisor` and
     # `elohim-ark` carry no row-bearing registry yet (I/O and CLI instantiate decisions minted
     # here). Route them on the commit that mints one.
+    # `holochain`, `holochain_conductor_api` and `holochain_trace` (elohim/holochain-conductor/crates)
+    # carry registries only on the conductor fork's fix/wasm-store-retention-0.7 line (born at
+    # 915acf6bc), NOT at the pinned c916eddbe. Un-routed 2026-10-09 so the harness's
+    # real-not-declared check holds at the current pin; re-add all three in the push that bumps
+    # the elohim/holochain-conductor pin past 915acf6bc (the harness's unrouted check will insist).
     registry_crates:
       - elohim-ark-core
       - elohim-ark-supervisor
-      - holochain
-      - holochain_conductor_api
-      - holochain_trace
     # habits: [declarative-desired-state] — parked 2026-08-13, see plane_note above.
     habits: []
     n_a_concerns: []
@@ -329,7 +331,10 @@ seams:
     # rakia-executor's seam-registry.yaml is not in the pinned elohim/rakia submodule (13cb31d);
     # it rides the next rakia pin bump — re-add it here in that push (the harness's
     # real-not-declared check will insist).
-    registry_crates: [mishpat]
+    # `qahal-types` (elohim/sdk/domains/qahal/types) — the pure InvocationMandate::check containment
+    # predicate: what may be asked, of whom, within which exact bounds. Same admission side as
+    # mishpat; routed 2026-10-09 (its registry was born unrouted at e9e0b3b63, 2026-10-01).
+    registry_crates: [mishpat, qahal-types]
     habits: [doorway-failover, operator-runtime-surface]
     n_a_concerns: []
 
@@ -434,6 +439,10 @@ seams:
     # sits here because epr-cli is its one and only dependent in the tree. Routing the dependent
     # to a runtime column while its dependency stays governing/meta would have split one sidecar
     # across two planes.
-    registry_crates: [elohim-seam-contracts, elohim-epr-rea, elohim-epr-cli]
+    # `eprfs-core`, `eprfs-local`, `eprfs-storage` (elohim/eprfs) — the eprfs content-addressing
+    # family this plane_note names: byte-integrity, verified-closure and private local custody
+    # decisions that explicitly elect no head and publish nothing. Routed 2026-10-09 (registries
+    # born unrouted at bca121bdc, 2026-09-28).
+    registry_crates: [elohim-seam-contracts, elohim-epr-rea, elohim-epr-cli, eprfs-core, eprfs-local, eprfs-storage]
     habits: []
     n_a_concerns: []

@@ -1632,6 +1632,7 @@ mod tests {
                 canonical_ordering_hash: None,
                 staging_candidate: None,
                 staging_candidate_declared_at: None,
+                winner_author: None,
             },
             link_record: vec![1, 2, 3],
         };

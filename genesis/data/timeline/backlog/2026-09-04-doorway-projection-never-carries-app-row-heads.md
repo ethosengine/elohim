@@ -8,7 +8,7 @@ slug: "doorway-projection-never-carries-app-row-heads"
 written: "2026-09-04"
 updated: "2026-09-04"
 author: "claude (landing-shell regression RCA, Opus + Codex converged, Loki-confirmed)"
-status: "open"
+status: "done"
 priority: "high"
 ci_status: open
 jobs: [elohim-edge]
@@ -65,3 +65,5 @@ Verification: `x-projection-ready: true` on `HEAD /apps/<slug>/_capability` afte
 - SSR breaker (`render/breaker.rs`) opened 04:33Z on build #1691's server bundle panic (`isUint8Array`) and its
   "subsequent skips are silent" cooldown never re-probed #1692's bundle — a separate observability gap: a silent open
   breaker should surface on `/health/serving`.
+
+**Done 2026-10-08 (verified in the slug-leftovers sprint):** f64d8c5bf (a projection writer subscribes to signals under every stage), 658a05218 (the `content.updated` event re-projects the row through `ProjectionStore::set`), 32cd99ce4 (`request_content_refresh` coalesces bundle-head refresh bursts) carry the cure.

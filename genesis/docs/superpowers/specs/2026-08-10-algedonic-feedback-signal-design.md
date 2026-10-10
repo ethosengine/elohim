@@ -58,8 +58,18 @@ sensed state against a declared limit.
 Classification (p2p-design-gate output, reviewed 2026-08-10 in-session):
 
 - **Category A (notarized) via the existing `FeedbackSignal` entry type**
-  (elohim DNA, `content_store_integrity/src/feedback_signal.rs`). The
-  `signal_kind` whitelist is string-extensible without moving the DNA hash.
+  (elohim DNA, `content_store_integrity/src/feedback_signal.rs`). ~~The
+  `signal_kind` whitelist is string-extensible without moving the DNA hash.~~
+  **CORRECTED 2026-10-09:** `SIGNAL_KINDS` is a constant checked inside the
+  INTEGRITY zome's validation (`feedback_signal.rs:42-49`, consulted at
+  `:109`), so extending it is DNA-HASH-MOVING, not hash-neutral. The carrier
+  adopted instead is an A2 `CommitmentByState` link on the pledge
+  commitment the pain threatens (`mishpat_integrity/src/lib.rs:385-396`,
+  tags `approaching|ts` / `breached|ts` / `recovered|ts`) — coordinator-only,
+  no new head; see
+  `2026-10-09-elohim-operator-loop-wedged-peer-design.md` §2 E1. The
+  FeedbackSignal kinds below remain the labeled successor carrier for the
+  next planned lamad integrity bump, not a promise.
   Two new kinds: **`algedonic-approach`** (band-edge; the `Approach` sketch)
   and **`algedonic-breach`** (bound crossed / self-heal mechanism exhausted).
 - **Producer/stock/limit/consumer are schema requirements**, generalized from

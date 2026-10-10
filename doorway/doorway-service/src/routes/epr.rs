@@ -2,8 +2,11 @@
 //!
 //! Proxies EPR Head requests to elohim-storage with Accept header forwarding.
 //!
-//! - `GET /api/epr-head/{id}` → `GET {storage_url}/epr-head/{id}`
-//! - `PUT /api/epr-head/{id}` → `PUT {storage_url}/epr-head/{id}`
+//! - `GET /epr-head/{id}` → `GET {storage_url}/epr-head/{id}`
+//!
+//! Read only. `PUT /epr-head/{id}` is a this-machine act on the peer, and a
+//! doorway beside it would carry anyone's write in over the peer's loopback,
+//! so the doorway never forwards one (`epr_head_put_is_not_proxied`).
 //!
 //! ## Validators, not caching (serving-edge story 6.1)
 //!
@@ -17,11 +20,10 @@
 //! is always a `no-cache` variant (revalidate every time, never serve stale)
 //! — `private, no-cache` when the caller is authenticated, since reach can
 //! make the body differ per bearer. Only a `GET` with a 2xx upstream answer
-//! gets a validator: a `PUT` is a write, and an error body is not a
-//! representation to revalidate.
+//! gets a validator: an error body is not a representation to revalidate.
 
 use bytes::Bytes;
-use http_body_util::{BodyExt, Full};
+use http_body_util::Full;
 use hyper::body::Incoming;
 use hyper::{header, Method, Request, Response, StatusCode};
 use tracing::debug;
@@ -88,34 +90,6 @@ pub async fn handle_epr_head_request(
 
             proxy_response_validated(response, if_none_match.as_deref(), authenticated).await
         }
-        Method::PUT => {
-            // Extract Content-Type before consuming the body
-            let content_type = req
-                .headers()
-                .get(header::CONTENT_TYPE)
-                .and_then(|v| v.to_str().ok())
-                .unwrap_or("application/json")
-                .to_string();
-
-            let body = req
-                .collect()
-                .await
-                .map_err(|e| format!("Failed to read body: {e}"))?;
-            let data = body.to_bytes();
-
-            let response = client
-                .put(&upstream_url)
-                .header("Content-Type", &content_type)
-                .body(data.to_vec())
-                .timeout(std::time::Duration::from_secs(10))
-                .send()
-                .await
-                .map_err(|e| format!("Upstream request failed: {e}"))?;
-
-            // A write gets no validator — the answer to a PUT is not a cached
-            // representation and must never be revalidated in its place.
-            proxy_response(response).await
-        }
         _ => Ok(Response::builder()
             .status(StatusCode::METHOD_NOT_ALLOWED)
             .body(Full::new(Bytes::from("Method not allowed")))
@@ -123,9 +97,8 @@ pub async fn handle_epr_head_request(
     }
 }
 
-/// Convert a reqwest response to a hyper response, unchanged. Used for the
-/// `PUT` arm (and by [`proxy_response_validated`] for a non-2xx `GET`
-/// answer): no `ETag`, no `Cache-Control` — nothing here is a representation
+/// Convert a reqwest response to a hyper response, unchanged. Used by
+/// [`proxy_response_validated`] for a non-2xx `GET` answer: no `ETag`, no `Cache-Control` — nothing here is a representation
 /// a client should ever revalidate.
 async fn proxy_response(response: reqwest::Response) -> Result<Response<Full<Bytes>>, String> {
     let status = response.status();
@@ -214,6 +187,7 @@ async fn proxy_response_validated(
 #[cfg(test)]
 mod tests {
     use super::*;
+    use http_body_util::BodyExt;
     use wiremock::matchers::method as wm_method;
     use wiremock::{Mock, MockServer, ResponseTemplate};
 
@@ -340,28 +314,6 @@ mod tests {
 
         let resp = get_validated(&server, None, false).await;
         assert_eq!(resp.status(), StatusCode::NOT_FOUND);
-        assert!(header(&resp, "etag").is_none());
-        assert!(header(&resp, "cache-control").is_none());
-    }
-
-    #[tokio::test]
-    async fn put_arm_gets_no_etag() {
-        // PUT never reaches `proxy_response_validated` at all — it always uses
-        // the unchanged `proxy_response`, which this pins directly: a mocked
-        // 200 upstream answer must carry no ETag / Cache-Control.
-        let server = MockServer::start().await;
-        Mock::given(wm_method("PUT"))
-            .respond_with(ResponseTemplate::new(200).set_body_string(r#"{"ok":true}"#))
-            .mount(&server)
-            .await;
-
-        let response = reqwest::Client::new()
-            .put(server.uri())
-            .send()
-            .await
-            .expect("mock upstream reachable");
-        let resp = proxy_response(response).await.expect("proxy response");
-        assert_eq!(resp.status(), StatusCode::OK);
         assert!(header(&resp, "etag").is_none());
         assert!(header(&resp, "cache-control").is_none());
     }

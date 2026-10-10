@@ -67,3 +67,5 @@ p2p-design-gate question (what is content-derived identity here), not a header t
 `genesis/docs/superpowers/plans/2026-09-19-serving-edge-failover-balance-stream-campaign-plan.md`. Addressing canon:
 `elohim/elohim-storage/CLAUDE.md` §Design Vocabulary (CID-first). Habit:
 `doorway/doorway-service/.epr-meta/doorway-failover.habit.md` DELTA 2026-09-21a.
+
+**2026-10-08 decision (slug-leftovers sprint lane A):** the envelope IS the declared head, addressed; the election (clock, tier, link hash; elector when live) rides beside it unaddressed, omitted when no election is recorded. `cid` stays a function of the declared head alone. Closes when both doorways answer one `cid` for one slug on the fleet.

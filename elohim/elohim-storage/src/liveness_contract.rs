@@ -51,6 +51,11 @@
 //!   `canonical_move_verdict`'s question (C2), registered separately in
 //!   `seam-registry.yaml` with its own contract test. It is why `declared ∧ ¬diverging`
 //!   is [`StateClass::Terminal`] here rather than a state with a refresh self-loop.
+//!   The receiver's attention to it - the head-adoption trigger probing a row that already
+//!   names the doc's head because the doc's carried `headOrdering` advances the row's
+//!   (`head_adoption_trigger::should_probe`, memo-bounded, registered as
+//!   `should_probe_same_head_ordering`) - is the same refresh seen from the doc side and is
+//!   likewise not a state here: it moves no head and only asks the own conductor.
 //! - **The both-sides-conductor-missing pair.** Neither pod can mint a candidate, so
 //!   no storage arm moves it. That is a *documented open residual* of the 2026-08-02
 //!   shift, not a cured wall, and it gets its own witness test —

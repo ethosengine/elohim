@@ -36,7 +36,10 @@ Feature: A doorway answers for a public name only when it stands for that name
   name itself, from its own copy of the site, when it serves the same landing
   bundle for that name as the holder does. Each doorway reports, at its
   coherence endpoint, which bundle it serves at each path; the build stamp is
-  the version the bundle's own version file names. A doorway that stands
+  the version the bundle's own version file names. The two are checked
+  separately: the stamp is a label a build declares, while the bundle is
+  addressed by its bytes, so only the bundle proves two doorways serve the
+  same files. A doorway that stands
   for a name but is not listed at the moment hands the request to the holder
   rather than refusing it. A doorway that does not stand for the name answers
   HTTP 421 Misdirected Request and names the doorways that are listed.
@@ -55,6 +58,16 @@ Feature: A doorway answers for a public name only when it stands for that name
   is the doorway's own decision. Public DNS, TLS and reaching a doorway across
   the internet are not tested here; they belong to the fleet run in sprint 2.3.
 
+  Each doorway takes up a newly published landing bundle on its own clock: it
+  checks its own storage for a new bundle every 30 seconds, and learns which
+  bundle the other doorway serves on its next federation check. For that short
+  window after a publish or a restart the two serve different bundles, and a
+  listed doorway that is not the holder correctly hands visitors to the holder.
+  The scenarios below are about the settled household, so the background first
+  waits, up to two minutes, until both doorways report the same bundle at the
+  landing mount, the site's root path "/". Not converging within two minutes is
+  itself a failure.
+
   Not staged here: a listed doorway whose declared version differs from the
   holder's, and a doorway that stands for a name while it is not listed. Both
   hand the request to the holder. The household cannot yet put one doorway
@@ -64,6 +77,7 @@ Feature: A doorway answers for a public name only when it stands for that name
   Background:
     Given the household's membership documents list doorways "alpha" and "apex" as members of "elohim.local" and "alpha.elohim.local"
     And doorways "alpha", "apex" and "gamma" each read public-name membership from the household's membership directory
+    And doorways "alpha" and "apex" have converged on the bundle each serves at the landing mount, the root path "/"
 
   Scenario: A listed doorway that is not the holder answers the name with the holder's build stamp
     Given doorway "alpha" is the holder of "alpha.elohim.local"

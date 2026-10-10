@@ -255,3 +255,5 @@ Opus-tier a2o feature-authoring task (per this repo's `genesis/a2o/CLAUDE.md`:
 "Feature/scenario authoring is Opus work"), not a comment-only edit — tracked
 here as the explicit deferral this repo's blind-reader-review obligation
 calls for when the operator's task scope constrains the fix.
+
+**2026-10-08** lamad-spa two-CID event examined against the falsification triggers: not falsified (declaration gap, not a two-operator fork); see the chronicle entry `genesis/data/timeline/chronicle/2026-10-08-lamad-spa-two-cids-one-name.md`.

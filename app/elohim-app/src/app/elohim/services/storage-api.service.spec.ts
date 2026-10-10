@@ -1,6 +1,8 @@
 import { TestBed, fakeAsync, tick } from '@angular/core/testing';
 import { provideHttpClientTesting, HttpTestingController } from '@angular/common/http/testing';
 
+import { environment } from '../../../environments/environment';
+
 import { StorageApiService } from './storage-api.service';
 import { provideHttpClient } from '@angular/common/http';
 
@@ -45,6 +47,24 @@ describe('StorageApiService', () => {
 
     it('should initialize baseUrl from environment', () => {
       expect((service as any).baseUrl).toBeDefined();
+    });
+
+    it('a browser-served bundle talks to its serving origin even when storageUrl is compiled', () => {
+      // The dev environment compiles a sidecar storageUrl; a browser must not use it.
+      expect(environment.holochain?.storageUrl).toBeTruthy();
+      expect('__TAURI__' in globalThis).toBe(false);
+      expect((service as any).baseUrl).toBe(globalThis.location.origin);
+      expect((service as any).baseUrl).not.toBe(environment.holochain?.storageUrl);
+    });
+
+    it('Tauri keeps the configured sidecar', () => {
+      (globalThis as Record<string, unknown>)['__TAURI__'] = {};
+      try {
+        const native = TestBed.runInInjectionContext(() => new StorageApiService());
+        expect((native as any).baseUrl).toBe(environment.holochain?.storageUrl);
+      } finally {
+        delete (globalThis as Record<string, unknown>)['__TAURI__'];
+      }
     });
   });
 

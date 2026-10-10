@@ -933,6 +933,9 @@ mod tests {
         use crate::p2p::feedback_signal::{
             FeedbackActRef, FeedbackSignal, SignalKind, StandingImpact,
         };
+        let ah = |seed: u8| {
+            holochain_types::prelude::ActionHash::from_raw_32(vec![seed; 32]).to_string()
+        };
         let signal = FeedbackSignal {
             target_cid: "uhCkkTARGET".to_string(),
             signal_kind: SignalKind::Correction,
@@ -943,8 +946,8 @@ mod tests {
             signature: "sig".to_string(),
             act_ref: Some(FeedbackActRef {
                 origin_dna_hash: origin_dna.to_string(),
-                action_hash: "uhCkkACT".to_string(),
-                routing_key: "uhCkkTARGET".to_string(),
+                action_hash: ah(1),
+                routing_key: ah(2),
             }),
         };
         rmp_serde::to_vec_named(&signal).expect("encode")

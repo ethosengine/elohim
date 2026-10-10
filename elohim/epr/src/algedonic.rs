@@ -364,7 +364,8 @@ pub fn validate(signal: &AlgedonicSignal) -> Result<()> {
     Ok(())
 }
 
-/// The hysteresis predicate — the answer to "may this signal be emitted now?".
+/// The latch predicate — the answer to "may this signal be emitted now?". (A latch, not
+/// hysteresis: see the module header — there is a SET condition and no reset.)
 ///
 /// Two rules, both from the spec's emission-bounds clause:
 ///
