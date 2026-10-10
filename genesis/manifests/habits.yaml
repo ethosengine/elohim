@@ -6004,6 +6004,107 @@ habits:
       authentication is a property of the zomes' shape and this habit is describing the compiler,
       not a practice under watch.
 
+  - id: constitution-ratified
+    declared: elohim/holochain/dna/.epr-meta/constitution-ratified.habit.md
+    invariant: >
+      The constitution text in force at a reach carries a notarized anchor — its content address
+      committed as a validated DHT entry at that reach — and a named ratification mechanism that
+      produced the anchor, so that an elohim harness loading the constitution can refuse a text
+      whose anchor is not the ratified one. A constitution that reads "Hash: [notarized public
+      anchor]" and "Ratified: [consensus mechanism TBD]" binds agents by prose alone; nothing a
+      validator runs can tell a ratified text from an edited copy.
+    status: unwired
+    active: false
+    evidence: >
+      DELTA 2026-10-10: Declared UNWIRED from the WeAll peer review
+      (epr:weall-protocol-peer-review-2026-10-10 §7 challenge 5, §10 T4). WeAll hash-binds its draft
+      constitution into its chain manifest and exposes the hash on its status surface, and refuses
+      amendment until the process is specified; ours reads `constitution.md:198-199` "Hash: [notarized
+      public anchor] / Ratified: [consensus mechanism TBD]". The council-drawn-to-reach commitment
+      (governance-layers-architecture §Constitutional Councils, 2026-10-10) names who may overturn an
+      elohim at each reach; it does not yet name who ratifies the text the elohim reads. No runnable
+      check exists. The check it needs: a probe that reads the constitution's declared anchor, finds
+      the DHT entry at the global reach that commits that CID, and verifies the entry validates and
+      names its ratification Commitment — exit 1 while the anchor field reads `[TBD]`.
+      Credit: Errol Swaby, author of the WeAll Protocol (github.com/errol1swaby2-bit/WeAll-Protocol). His draft constitution is hash-bound into the chain manifest (`constitution_hash`, `constitution_version`) and exposed on the status surface, and his governance fails closed on amendment until the process is specified; that is the discipline this habit borrows, and the question in his frame ('which constitution can a citizen verify?') is the one it answers when it is wired.
+    refs:
+      - genesis/docs/content/elohim-protocol/constitution.md
+      - genesis/docs/content/elohim-protocol/values-forward.md
+      - genesis/research/weall-protocol-peer-review-2026-10-10.md
+    retire-when: >
+      when ratification is a mishpat Commitment of role floor over the global reach, the anchor is
+      read by the elohim harness at load, and a text cannot be in force unanchored — at which point
+      the harness's own refusal is the check and this row adds nothing
+
+  - id: decision-closure
+    declared: elohim/holochain/dna/.epr-meta/decision-closure.habit.md
+    invariant: >
+      Every closed governance decision produces exactly one committed outcome record, scoped to the
+      decision's reach, that any two peers inside that reach compute byte-identically from the
+      signed votes and the proposal they answer, and that is itself a validated entry every
+      validator can check. A tally that exists only as a projection each reader computes from the
+      vote attestations is not closure: two strangers cannot compare it, and a peer that
+      disagrees cannot be shown to be wrong.
+    status: unwired
+    active: false
+    evidence: >
+      DELTA 2026-10-10: Declared UNWIRED from the WeAll peer review
+      (epr:weall-protocol-peer-review-2026-10-10 §7 challenge 1, §8, §10 T2). WeAll's one sentence we
+      cannot answer: name one finished Elohim decision and the single artifact two strangers compute
+      and compare byte for byte. Evidence today: votes are child attestations and the tally is a
+      derived projection (`elohim/holochain/dna/elohim/zomes/content_store/src/governance_action.rs:4,13`;
+      `content_store/src/lib.rs:17761`); the register already records peers binding the same human to
+      different agent keys on all three household peers (`genesis/manifests/habits.yaml:839`), which is
+      the divergence closure must survive. The Hypha survey asked for the same object (a signed
+      outcome attestation, "whoever controls what reached a vote controls the vote"). Design home:
+      commons-holonic-stewardship row 32 (which reach tiers may bind; the closure artifact; the
+      witnessed upward appeal) — p2p-design-gated, because it adds an entry type. The check it needs:
+      two conductors inside the reach each compute the outcome record for one closed proposal and the
+      sweettest asserts the two CIDs are equal and the record validates on both.
+      Credit: Errol Swaby, author of the WeAll Protocol (github.com/errol1swaby2-bit/WeAll-Protocol). His architectural thesis — civic authority as 'open, deterministic, independently verifiable protocol state' with a committed state root any observer reproduces — is the standard this habit holds us to; the question in his frame ('what single artifact can two strangers compute and compare byte for byte?') is the one this habit answers when it is wired.
+    refs:
+      - genesis/research/weall-protocol-peer-review-2026-10-10.md
+      - genesis/data/timeline/backlog/commons-holonic-stewardship-backlog.md
+      - genesis/research/hypha-dao-autonomous-collectives-cross-pollination-2026-06-24.md
+    retire-when: >
+      when the outcome record is the only path by which a decision is read — no projection-side
+      tally remains — so the tally code's own test is this habit's check and the row is redundant
+
+  - id: one-human-one-vote
+    declared: elohim/holochain/dna/.epr-meta/one-human-one-vote.habit.md
+    invariant: >
+      A second vote on the same proposal by the same agent is refused by an integrity zome, where
+      every validator runs it. The refusal is a deterministic property of the vote entry plus
+      `action.author()` and the author's own prior votes on that proposal (`must_get_agent_activity`
+      over the author's chain in this DNA), so every peer refuses it identically. A vote path that
+      accepts any number of votes from one key, or that takes the voter's identity from caller
+      input, does not have this property no matter what a coordinator or a storage projection
+      later de-duplicates.
+    status: unwired
+    active: false
+    evidence: >
+      DELTA 2026-10-10: Declared UNWIRED from the WeAll peer review
+      (epr:weall-protocol-peer-review-2026-10-10 §7 challenge 3, §10 T4). We told the WeAll author in
+      writing that nothing stops one person's free keys from casting many votes; this row makes the
+      register say the same. Evidence today: `elohim/holochain/dna/elohim/zomes/content_store/src/governance_action.rs:396-410`
+      issues a vote as a child attestation with `proof_evidence` the literal `{"class":"witness"}` and
+      no check against the author's prior votes; `elohim/holochain/dna/mishpat/zomes/mishpat/src/lib.rs:1118`
+      takes `voter_id` from caller input and `:1159` returns a zeroed sentinel `ActionHash`. No
+      runnable check exists, so the habit cannot be red or green — it is unwired on purpose. The
+      check it needs: a sweettest in `elohim/holochain/tests/sweettest/` where agent A casts two votes
+      on one proposal through a direct source-chain write and the second conductor REFUSES the second
+      (`two_agent_conductors` + `exchange_peer_info` + `await_consistency` before the assertion; the DNA
+      suite runs `--run-ignored all`). Cure rides authority-in-integrity row 18 (the mishpat crossing).
+      Credit: Errol Swaby, author of the WeAll Protocol (github.com/errol1swaby2-bit/WeAll-Protocol). His repository's claim discipline — a first-screen NO-GO table and a 'current allowed claim' sentence pointed at civic claims, not plumbing — and his constitution's 'one verified human, one civic presence' (Art. IV §2) are why this row exists; the question in his frame ('which file stops one person's 100 free keys from casting 100 votes?') is the one this habit answers when it is wired.
+    refs:
+      - genesis/research/weall-protocol-peer-review-2026-10-10.md
+      - genesis/research/letter-to-weall-peer-review-2026-10-10.md
+      - genesis/data/timeline/backlog/arch-authority-in-integrity-backlog.md
+    retire-when: >
+      when the sweettest that proves decision closure (habit decision-closure) necessarily proves
+      this too — one committed outcome computed from one vote per author — so this row carries no
+      information that row does not
+
   - id: custodial-authority-answerable
     declared: elohim/holochain/dna/imagodei/.epr-meta/custodial-authority-answerable.habit.md
     invariant: >
