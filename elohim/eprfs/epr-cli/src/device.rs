@@ -84,7 +84,9 @@ pub fn usage() -> &'static str {
      epr device status [--node <this node URL>]\n    \
      (whom this machine's node speaks for, what is waiting, and what to run next)\n\
      This machine's node is --node, else ELOHIM_NODE_URL, else the one node of this machine \
-     that answers on 8090/8095/8091/8092/8093."
+     that answers on 8090/8095/8091/8092/8093.\n\
+     These join a node to a person's identity on the network. To put this machine's key on \
+     this repository's roster for a participant instead, see `epr actor device`."
 }
 
 /// The flags the asking commands take.

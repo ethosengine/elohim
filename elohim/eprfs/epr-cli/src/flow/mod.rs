@@ -102,6 +102,14 @@ struct GlobalOpts {
     json: bool,
 }
 
+/// `; did you mean …?` for a flag a flow subcommand does not take: its own
+/// flags and the two every subcommand shares.
+fn flag_hint(word: &str, own: &[&str]) -> String {
+    let mut known = vec!["--json", "--root"];
+    known.extend_from_slice(own);
+    crate::hint::did_you_mean(word, "", &known)
+}
+
 /// Every flow subcommand, as a person types it.
 const SUBCOMMANDS: [&str; 17] = [
     "project", "walk", "status", "seal", "reseal", "hold", "claim", "context", "ledger", "fulfill",
@@ -151,7 +159,8 @@ pub fn run(args: &[String]) -> FlowResult<ExitCode> {
                     }
                     other => {
                         return Err(FlowError::InvalidArguments(format!(
-                            "unknown project argument `{other}`"
+                            "unknown project argument `{other}`{}",
+                            flag_hint(other, &["--recipes", "--adopt-gap-items"])
                         )))
                     }
                 }
@@ -186,7 +195,8 @@ pub fn run(args: &[String]) -> FlowResult<ExitCode> {
             let (opts, rest) = parse_global(&args[2..])?;
             if let Some(other) = rest.first() {
                 return Err(FlowError::InvalidArguments(format!(
-                    "unknown walk argument `{other}`"
+                    "unknown walk argument `{other}`{}",
+                    flag_hint(other, &[])
                 )));
             }
             // A record addressed by its atom CID (a Process or an Intent) walks directly; a
@@ -212,7 +222,8 @@ pub fn run(args: &[String]) -> FlowResult<ExitCode> {
             let (opts, rest) = parse_global(&args[1..])?;
             if let Some(other) = rest.first() {
                 return Err(FlowError::InvalidArguments(format!(
-                    "unknown status argument `{other}`"
+                    "unknown status argument `{other}`{}",
+                    flag_hint(other, &[])
                 )));
             }
             let result = walk::status(&opts.root)?;
@@ -267,7 +278,8 @@ fn run_concerns(args: &[String]) -> FlowResult<ExitCode> {
             "--since" => i += 2,
             other => {
                 return Err(FlowError::InvalidArguments(format!(
-                    "unknown concerns argument `{other}` — today the surface is --corrections"
+                    "unknown concerns argument `{other}`{} — today the surface is --corrections",
+                    flag_hint(other, &["--corrections", "--since"])
                 )))
             }
         }
@@ -416,7 +428,8 @@ fn run_ledger(args: &[String]) -> FlowResult<ExitCode> {
     let (opts, rest) = parse_global(&args[1..])?;
     if let Some(other) = rest.first() {
         return Err(FlowError::InvalidArguments(format!(
-            "unknown ledger argument `{other}`"
+            "unknown ledger argument `{other}`{}",
+            flag_hint(other, &[])
         )));
     }
     let result = ledger::ledger(&opts.root, &target)?;
@@ -446,7 +459,18 @@ fn run_context(args: &[String]) -> FlowResult<ExitCode> {
             "--concerns" | "--all-states" => i += 1,
             other => {
                 return Err(FlowError::InvalidArguments(format!(
-                    "unknown context argument `{other}`"
+                    "unknown context argument `{other}`{}",
+                    flag_hint(
+                        other,
+                        &[
+                            "--notes",
+                            "--offset",
+                            "--limit",
+                            "--section",
+                            "--concerns",
+                            "--all-states"
+                        ]
+                    )
                 )))
             }
         }
@@ -543,7 +567,18 @@ fn run_claim(args: &[String]) -> FlowResult<ExitCode> {
             "--on" | "--as" | "--brief" | "--serves" | "--session" => i += 2,
             other => {
                 return Err(FlowError::InvalidArguments(format!(
-                    "unknown claim argument `{other}`"
+                    "unknown claim argument `{other}`{}",
+                    flag_hint(
+                        other,
+                        &[
+                            "--supersede",
+                            "--on",
+                            "--as",
+                            "--brief",
+                            "--serves",
+                            "--session"
+                        ]
+                    )
                 )))
             }
         }
@@ -605,7 +640,20 @@ fn run_fulfill(args: &[String]) -> FlowResult<ExitCode> {
             }
             other => {
                 return Err(FlowError::InvalidArguments(format!(
-                    "unknown fulfill argument `{other}`"
+                    "unknown fulfill argument `{other}`{}",
+                    flag_hint(
+                        other,
+                        &[
+                            "--dry-run",
+                            "--surface-prefix",
+                            "--commit",
+                            "--on",
+                            "--report",
+                            "--status",
+                            "--as",
+                            "--session"
+                        ]
+                    )
                 )))
             }
         }
@@ -639,7 +687,20 @@ fn run_fulfill_on(args: &[String]) -> FlowResult<ExitCode> {
             "--on" | "--report" | "--status" | "--as" | "--session" => i += 2,
             other => {
                 return Err(FlowError::InvalidArguments(format!(
-                    "unknown fulfill argument `{other}`"
+                    "unknown fulfill argument `{other}`{}",
+                    flag_hint(
+                        other,
+                        &[
+                            "--dry-run",
+                            "--surface-prefix",
+                            "--commit",
+                            "--on",
+                            "--report",
+                            "--status",
+                            "--as",
+                            "--session"
+                        ]
+                    )
                 )))
             }
         }
@@ -1207,7 +1268,8 @@ fn run_stocks(args: &[String]) -> FlowResult<ExitCode> {
             "--window" | "--per" | "--stock" => i += 2,
             other => {
                 return Err(FlowError::InvalidArguments(format!(
-                    "unknown stocks argument `{other}`"
+                    "unknown stocks argument `{other}`{}",
+                    flag_hint(other, &["--check", "--window", "--per", "--stock"])
                 )))
             }
         }

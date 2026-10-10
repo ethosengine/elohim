@@ -250,7 +250,8 @@ fn ready_args(args: &[String]) -> Result<(Option<String>, bool)> {
             }
             other => {
                 return Err(Error::InvalidArguments(format!(
-                    "unknown ready argument `{other}`"
+                    "unknown ready argument `{other}`{}",
+                    elohim_epr_cli::hint::did_you_mean(other, "", &["--target", "--deep"])
                 )))
             }
         }

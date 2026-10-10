@@ -1937,8 +1937,10 @@ pub fn usage() -> String {
      | device enroll --handle <handle> [--root DIR]\n  \
      | device authorize <request-json-or-path> [--root DIR]\n  \
      | device bind <authorization-json-or-path> [--root DIR]\n\
-     >"
-    .to_string()
+     >\n\
+     `actor device` puts this machine's key on this repository's roster for a participant. \
+     To join a node to a person's identity on the network instead, see `epr device`."
+        .to_string()
 }
 
 #[cfg(test)]
