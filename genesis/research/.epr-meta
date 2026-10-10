@@ -65,6 +65,45 @@ rules:
       the surveyed projects keep using the apex-sovereignty frame, so a survey keeps having to
       quote it in order to disagree. This membrane retires when the field it reads from stops
       framing identity that way — observable, not ours to cause.
+  - id: external-audience-blind-reader
+    class: dispatch
+    when: { write: "letter-to-*.md", new: true }
+    parameters:
+      dispatch-agent: blind-reader
+      dispatch-prompt: >
+        Profile cross-repo-peer: you are the author of the OTHER project this document addresses. You
+        know your own code intimately and have never seen the Elohim repository, Holochain beyond the
+        name, or any Elohim vocabulary. Read only this file. List every term, path convention, slug or
+        reference you cannot resolve from the document alone, every sentence about YOUR code whose
+        claim strength (verified / inferred / softened) is unclear, every passage written for the
+        authors' own team, and whether each finding can be filed as an issue as written. Do not edit.
+    why: >
+      The research directory relaxes cold-reader review because its audience is our own team (the
+      messy desk). A document addressed to another project's author has the opposite audience: they
+      know their code and none of ours, and we read their tree the same way. A peer review across two
+      repositories is a council-shaped meaning reconciliation (operator, 2026-10-10, the WeAll
+      engagement), so the relaxation is void for it. The first letter draft shipped with reach,
+      mishpat, integrity zome, elohim and Precedent all unglossed; this rule is the co-located fix.
+      The review document itself (`*-peer-review-*.md`) is covered by the sibling rule below.
+    retire-when: >
+      when the letter is SCAFFOLDED from a template that carries the gloss block and the
+      cross-repo-peer read as a required step, so no letter can be born without them.
+  - id: external-audience-blind-reader-review-doc
+    class: dispatch
+    when: { write: "*peer-review*.md", new: true }
+    parameters:
+      dispatch-agent: blind-reader
+      dispatch-prompt: >
+        Profile cross-repo-peer: you are the author of the project under review, offered this internal
+        document on request. You know your own code and nothing of Elohim or Holochain. Read only this
+        file. List every unresolvable term or reference, every passage that is our own housekeeping
+        (cluster names, habit register, epr: slugs, tooling), and every finding about your code whose
+        verification status is unclear. Do not edit.
+    why: >
+      Same reason as external-audience-blind-reader: a peer review is offered to its subject, so it is
+      external-facing even though it lives on the messy desk. Takes for OUR backlog may stay, but
+      glossed, and the review must survive the subject's cold read.
+    retire-when: with external-audience-blind-reader, on the same condition.
   - id: readme-blind-reader-review
     class: measure
     when: { write: "README*.md" }
