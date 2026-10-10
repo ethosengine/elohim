@@ -3739,8 +3739,8 @@ habits:
       `$XDG_CACHE_HOME/elohim/embed-models/all-MiniLM-L6-v2/onnx` as the manifest's second resolve entry
       (CID-neutral: the store `bafyreigdsx…rn6e` was reused; the first 1-file fold embedded 25 chunks under
       the pinned procedure `bafkreiaki7…i4hu`), `genesis/agentic/bin/embed-model-provision` + the devfile's
-      `setup-embed-model` so the next workspace inits itself, the catch-up fold (`--max-files 3000`, running
-      81 min on the debug `epr` at the time of this delta, its attestation pending), MemPalace mined here as
+      `setup-embed-model` so the next workspace inits itself, the catch-up fold (`--max-files 3000`, attested
+      `complete` after 1h25 on the debug `epr`: 11 files behind the ceiling of 25, the headline `index:` slot green), MemPalace mined here as
       a visitor (10,421 drawers across the three declared surfaces), and the device-local memory ring
       (`.claude/memory/device/`, 15 harness entries, folded as files, never projected). Two findings for
       this habit's frontier: (1) on a second device the 269 shared contributions read as `unattributed` in
@@ -3750,6 +3750,28 @@ habits:
       mid-session again with "executor bytes changed" after the gate rebuilt `epr`. Sibling habit born:
       `workspace-device-arrival` (`just status device` reads 5 of 6 ok on shem now that the R-P8 ceremony
       ran across two real devices; the fold line is the sixth).
+
+      DELTA 2026-10-10 (shem, the second workspace; NO status change, the habit stays red). The native
+      semantic fold here had read `attested failed: unavailable: no model directory resolves` with 2,942
+      files behind, because the pinned MiniLM bytes resolved only from the chroma cache MemPalace's mining
+      had filled under `~/.cache` on ethosengine — a path a Che restart wipes, and one shem had never
+      filled. The native index was borrowing a visitor's cache. Cure, same day: the pinned bytes on the
+      PVC at `$XDG_CACHE_HOME/elohim/embed-models/all-MiniLM-L6-v2/onnx` (`genesis/agentic/bin/embed-model-provision`;
+      the devfile's `setup-embed-model` runs it on start) and that path as the manifest's second `resolve`
+      entry — CID-neutral, the fold store `bafyreigdsx…rn6e` was reused, not rebuilt; the pin test in
+      `flow_memory_recall_index.rs` updated to the three-entry list. One-file fold: 25 chunks embedded.
+      Catch-up fold `--max-files 3000` (debug `epr`): 2,941 files, 37,859 chunks, 40.9 MB, about 1 h 22 min,
+      attested complete; headline `index: 11 files behind the fold within hard 25 ✅`. MemPalace mined on
+      shem as a visitor (10,421 drawers: elohim_protocol 8,370 · memory 1,754 · stories 297). Two
+      observations for this habit's frontier: (1) the record-without-witness seam — the 269 shared
+      contributions are git-tracked and present here, but `ContributionActs` reads their acts from the
+      untracked `flows.jsonl`, so the index projection counts all 269 as unattributed on a second device
+      and only the install guard keeps the tracked MEMORY.md intact (lvi arrival spec §6.3; a re-import
+      dry run would mint acts for 33 and skip 233); (2) `executor bytes changed` refused the bootstrap
+      continuation again after the gate rebuilt `epr` mid-session, the same shape as 2026-10-06c. The
+      device-local ring: 15 harness auto-memory entries under the gitignored `.claude/memory/device/` are
+      folded as files; their contributions live in the ignored `device-contributions/` (the importer
+      refuses symlinks and out-of-root sources).
     guard: >
       Regression risks: (1) greening by widening source_roots to everything — the private recall
       store and other worktrees stay refused, and a scope that admits scratch is not a governed
@@ -3974,7 +3996,7 @@ habits:
       One read (`just status device`) prints every condition, and every REFUSED line names the
       command that cures it. Nothing about arrival depends on a visitor's cache or on another
       workspace's keystore.
-    status: red
+    status: green
     active: false
     checks:
       - "just status device — exit 0 with six `ok` lines on the device the habit is read from (genesis/agentic/bin/device-preflight; unit: python3 -m unittest genesis.agentic.device_preflight_test)"
@@ -4005,6 +4027,21 @@ habits:
       uses, e.g. agent-identity-claim-and-acceptance.feature); the three conditions read on a real workspace
       but not fixture-proven (epr binary, fold attested, berth moored — the @wip scenario); "arrives" proven
       only there.
+
+      DELTA 2026-10-10b (RED → GREEN, evidence): on shem `just status device` exit 0 with six `ok` lines
+      (epr binary · device key · roster bound "this device stands for human:matthew (roster)" · embed model
+      from `$XDG_CACHE_HOME/elohim/embed-models/all-MiniLM-L6-v2/onnx` · fold attested "complete, 11 files
+      behind (limit 25)" · berth moored). The roster binding landed in commit 248f21dd6: the R-P8 ceremony
+      run across two real devices for the first time — `enroll` on shem, `authorize` on ethosengine (a
+      first attempt on shem itself was refused: a device cannot approve itself), `bind` on shem; one row
+      appended to the tracked `matthew.jsonl`, no key crossed. The catch-up fold (`--max-files 3000`, debug
+      `epr`) embedded 2,941 files / 37,859 chunks in about 1 h 22 min (5,276 chunks dropped past the
+      per-file cap) and attested complete; the session headline reads `index: 11 files behind the fold
+      within hard 25 ✅` and `participant: human:matthew (… standing; witnessed …)`. a2o
+      `--profile device-arrival`: 4 scenarios green, 1 @wip (the six-ok fixture). Gate `memory-ceremony`
+      green end to end on 894eaf58f. Standing frontier, not a status question: the three conditions read
+      on the device but not fixture-proven (the @wip scenario), and the record-without-witness seam named
+      in the lvi arrival spec §6.3.
     refs:
       - "spec: elohim/lvi/docs/specs/2026-10-10-workspace-arrival-as-declared-device.md (the mapping of every init surface onto DevspaceSeed / Berth / device key / model pin; the three enrollment layers; the record-without-witness seam §6.3)"
       - "the devfile's arrival commands: devfile.base.yaml `setup-embed-model` + `setup-device-memory` (postStart); the provisioners genesis/agentic/bin/{embed-model-provision,device-memory-sync}"

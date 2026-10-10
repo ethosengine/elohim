@@ -10,7 +10,7 @@ invariant: >
   One read (`just status device`) prints every condition, and every REFUSED line names the
   command that cures it. Nothing about arrival depends on a visitor's cache or on another
   workspace's keystore.
-status: red
+status: green
 active: false
 checks:
   - "just status device — exit 0 with six `ok` lines on the device the habit is read from (genesis/agentic/bin/device-preflight; unit: python3 -m unittest genesis.agentic.device_preflight_test)"
@@ -50,3 +50,18 @@ Deferred by the author, named: vocabulary carried in the comment block (the a2o 
 uses, e.g. agent-identity-claim-and-acceptance.feature); the three conditions read on a real workspace
 but not fixture-proven (epr binary, fold attested, berth moored — the @wip scenario); "arrives" proven
 only there.
+
+DELTA 2026-10-10b (RED → GREEN, evidence): on shem `just status device` exit 0 with six `ok` lines
+(epr binary · device key · roster bound "this device stands for human:matthew (roster)" · embed model
+from `$XDG_CACHE_HOME/elohim/embed-models/all-MiniLM-L6-v2/onnx` · fold attested "complete, 11 files
+behind (limit 25)" · berth moored). The roster binding landed in commit 248f21dd6: the R-P8 ceremony
+run across two real devices for the first time — `enroll` on shem, `authorize` on ethosengine (a
+first attempt on shem itself was refused: a device cannot approve itself), `bind` on shem; one row
+appended to the tracked `matthew.jsonl`, no key crossed. The catch-up fold (`--max-files 3000`, debug
+`epr`) embedded 2,941 files / 37,859 chunks in about 1 h 22 min (5,276 chunks dropped past the
+per-file cap) and attested complete; the session headline reads `index: 11 files behind the fold
+within hard 25 ✅` and `participant: human:matthew (… standing; witnessed …)`. a2o
+`--profile device-arrival`: 4 scenarios green, 1 @wip (the six-ok fixture). Gate `memory-ceremony`
+green end to end on 894eaf58f. Standing frontier, not a status question: the three conditions read
+on the device but not fixture-proven (the @wip scenario), and the record-without-witness seam named
+in the lvi arrival spec §6.3.

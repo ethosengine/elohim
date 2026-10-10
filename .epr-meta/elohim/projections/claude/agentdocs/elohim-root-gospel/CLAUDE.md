@@ -84,6 +84,7 @@ just seed validate            # non-writing schema validation
 just seed apply mesh content  # seed the household mesh THIS host owns (env from hc-mesh.sh mesh_seed_env)
 just look page <url>          # eyes-first render
 just status habits
+just status device            # has this workspace ARRIVED as its human's device: six ok/REFUSED lines (epr binary · device key · roster bound · embed model · fold attested · berth moored), each REFUSED naming its cure; exit 1 on any
 just codegen all verify
 ```
 
@@ -223,6 +224,8 @@ The app runs in four modes with different content loading paths:
 ### Persistent workspace work
 
 Che workspace restarts erase `/tmp`. Keep work in progress, helper scripts, checkpoints, and resumable campaign state under `genesis/local-dev/<campaign>/`, never `/tmp`. Keep Git worktrees under `/projects/elohim/.worktrees/`. Store required durable proof receipts under `genesis/a2o/reports/recovery/` and operator runbooks under `genesis/docs/superpowers/sprints/`. `/tmp` is only for disposable scratch that can be regenerated; never make it the only copy of uncommitted work or evidence. After a restart, resume existing conductor databases and keystores in place; do not reset or recast identities.
+
+A workspace is one of its human's **devices**, and arriving as one is six conditions `just status device` reads in one place (epr binary · device key · roster bound · embed model · fold attested · berth moored), each `REFUSED` line naming its cure. A fresh workspace binds to its human through `epr actor device enroll | authorize | bind` (no key ever crosses; the roster row travels by git) and puts the pinned embedding model on the PVC with `genesis/agentic/bin/embed-model-provision` (the devfile's `setup-embed-model` runs it on start); `$HOME` is wiped, `/nix/xdg/{config,cache}` persist. What the devfile should declare and what lvi's `DevspaceSeed` will: `elohim/lvi/docs/specs/2026-10-10-workspace-arrival-as-declared-device.md`.
 
 
 ### Story-First Default
