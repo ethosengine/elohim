@@ -223,7 +223,12 @@ pub fn run(args: &[String]) -> ActorResult<ExitCode> {
         }
         "device" => run_device(&args[1..]),
         other => Err(ActorError::InvalidArguments(format!(
-            "unknown actor subcommand `{other}`\n{}",
+            "unknown actor subcommand `{other}`{}\n{}",
+            crate::hint::did_you_mean(
+                other,
+                "epr actor",
+                &["claim", "current", "witness", "contest", "device"]
+            ),
             usage()
         ))),
     }
@@ -273,7 +278,8 @@ fn run_device(args: &[String]) -> ActorResult<ExitCode> {
             Ok(ExitCode::SUCCESS)
         }
         other => Err(ActorError::InvalidArguments(format!(
-            "unknown device verb `{other}` — enroll | authorize | bind\n{}",
+            "unknown device verb `{other}`{} — enroll | authorize | bind\n{}",
+            crate::hint::did_you_mean(other, "epr actor device", &["enroll", "authorize", "bind"]),
             usage()
         ))),
     }

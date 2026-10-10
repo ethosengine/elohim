@@ -1830,7 +1830,20 @@ pub fn run(root: &Path, json: bool, rest: &[String]) -> FlowResult<ExitCode> {
             Ok(ExitCode::SUCCESS)
         }
         other => Err(FlowError::InvalidArguments(format!(
-            "unknown cites verb `{other}`\n{}",
+            "unknown cites verb `{other}`{}\n{}",
+            crate::hint::did_you_mean(
+                other,
+                "epr flow cites",
+                &[
+                    "seal",
+                    "assign-id",
+                    "describe",
+                    "verify",
+                    "refresh",
+                    "stamp",
+                    "migrate"
+                ]
+            ),
             usage()
         ))),
     }

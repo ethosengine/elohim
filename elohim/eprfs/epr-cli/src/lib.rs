@@ -18,6 +18,7 @@ pub mod flow;
 pub mod frames;
 pub mod git;
 pub mod govern;
+pub mod hint;
 pub mod process;
 pub mod ready;
 pub mod report;

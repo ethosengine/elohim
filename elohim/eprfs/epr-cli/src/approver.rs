@@ -61,7 +61,15 @@ pub fn run_identity(args: &[String]) -> Outcome<ExitCode> {
             println!("{}", usage());
             Ok(ExitCode::SUCCESS)
         }
-        Some(other) => Err(format!("unknown identity command `{other}`\n{}", usage())),
+        Some(other) => Err(format!(
+            "unknown identity command `{other}`{}\n{}",
+            crate::hint::did_you_mean(
+                other,
+                "epr identity",
+                &["begin", "standing", "show", "secret"]
+            ),
+            usage()
+        )),
     }
 }
 
@@ -96,7 +104,23 @@ impl Options {
                 "--decline" => o.decline = true,
                 "--declare" => o.declare = true,
                 other if other.starts_with("--") => {
-                    return Err(format!("unknown argument `{other}`\n{}", usage()))
+                    return Err(format!(
+                        "unknown argument `{other}`{}\n{}",
+                        crate::hint::did_you_mean(
+                            other,
+                            "",
+                            &[
+                                "--node",
+                                "--name",
+                                "--identifier",
+                                "--only",
+                                "--yes",
+                                "--decline",
+                                "--declare"
+                            ]
+                        ),
+                        usage()
+                    ))
                 }
                 other => o.positional.push(other.to_string()),
             }

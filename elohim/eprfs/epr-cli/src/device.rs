@@ -87,11 +87,22 @@ pub fn usage() -> &'static str {
      that answers on 8090/8095/8091/8092/8093."
 }
 
+/// The flags the asking commands take.
+const FLAGS: [&str; 7] = [
+    "--portal",
+    "--approver",
+    "--node",
+    "--label",
+    "--act",
+    "--loopback",
+    "--announce",
+];
+
 /// The device commands, as a person types them.
 const COMMANDS: [&str; 6] = ["join", "ask", "redeem", "pending", "approve", "status"];
 
 /// The command a mistyped or guessed word most likely meant: a word people
-/// reach for by habit, else a command within two edits of it.
+/// reach for by habit, else the near one (`hint::nearest`).
 fn nearest_command(word: &str) -> Option<&'static str> {
     let habit = match word {
         "doctor" | "info" | "whoami" | "state" | "check" | "show" => Some("status"),
@@ -100,39 +111,14 @@ fn nearest_command(word: &str) -> Option<&'static str> {
         "add" | "enroll" | "register" | "link" | "pair" => Some("join"),
         _ => None,
     };
-    habit.or_else(|| {
-        COMMANDS
-            .iter()
-            .map(|c| (edits(word, c), *c))
-            .filter(|(d, _)| *d <= 2)
-            .min_by_key(|(d, _)| *d)
-            .map(|(_, c)| c)
-    })
-}
-
-/// How many single-letter edits turn `a` into `b`.
-fn edits(a: &str, b: &str) -> usize {
-    let (a, b): (Vec<char>, Vec<char>) = (a.chars().collect(), b.chars().collect());
-    let mut row: Vec<usize> = (0..=b.len()).collect();
-    for (i, ca) in a.iter().enumerate() {
-        let mut last = row[0];
-        row[0] = i + 1;
-        for (j, cb) in b.iter().enumerate() {
-            let next = (last + usize::from(ca != cb))
-                .min(row[j] + 1)
-                .min(row[j + 1] + 1);
-            last = row[j + 1];
-            row[j + 1] = next;
-        }
-    }
-    row[b.len()]
+    habit.or_else(|| crate::hint::nearest(word, &COMMANDS))
 }
 
 /// What is said to a word that is no device command: the likely command
 /// first, where the person is looking, then the usage.
 fn unknown_command(word: &str) -> String {
     let hint = nearest_command(word)
-        .map(|c| format!("; did you mean `epr device {c}`?"))
+        .map(|c| crate::hint::meant("epr device", c))
         .unwrap_or_default();
     format!("unknown device command `{word}`{hint}\n{}", usage())
 }
@@ -434,7 +420,13 @@ impl Options {
                 "--act" => o.acts.push(value()?),
                 "--loopback" => o.loopback = true,
                 "--announce" => o.announce = true,
-                other => return Err(format!("unknown argument `{other}`\n{}", usage())),
+                other => {
+                    return Err(format!(
+                        "unknown argument `{other}`{}\n{}",
+                        crate::hint::did_you_mean(other, "", &FLAGS),
+                        usage()
+                    ))
+                }
             }
             i += 1;
         }

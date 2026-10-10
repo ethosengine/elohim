@@ -102,6 +102,12 @@ struct GlobalOpts {
     json: bool,
 }
 
+/// Every flow subcommand, as a person types it.
+const SUBCOMMANDS: [&str; 17] = [
+    "project", "walk", "status", "seal", "reseal", "hold", "claim", "context", "ledger", "fulfill",
+    "note", "report", "stocks", "concerns", "memory", "cites", "retract",
+];
+
 /// Entry point invoked by `main` for `epr flow …`.
 pub fn run(args: &[String]) -> FlowResult<ExitCode> {
     let Some(sub) = args.first().map(String::as_str) else {
@@ -232,7 +238,8 @@ pub fn run(args: &[String]) -> FlowResult<ExitCode> {
         "cites" => run_cites(&args[1..]),
         "retract" => run_retract(&args[1..]),
         other => Err(FlowError::InvalidArguments(format!(
-            "unknown flow subcommand `{other}`\n{}",
+            "unknown flow subcommand `{other}`{}\n{}",
+            crate::hint::did_you_mean(other, "epr flow", &SUBCOMMANDS),
             usage()
         ))),
     }

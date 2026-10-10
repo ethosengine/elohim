@@ -182,9 +182,30 @@ fn run() -> Result<(Report, bool)> {
             let changes = git::changes_against(&root, &target)?;
             Ok((ready::run(&root, &target, &changes, deep)?, true))
         }
-        _ => Err(Error::InvalidArguments(usage().into())),
+        // A command that exists was given arguments it does not take.
+        known if COMMANDS.contains(&known) => Err(Error::InvalidArguments(usage().into())),
+        other => Err(Error::InvalidArguments(format!(
+            "unknown command `{other}`{}\n{}",
+            elohim_epr_cli::hint::did_you_mean(other, "epr", &COMMANDS),
+            usage()
+        ))),
     }
 }
+
+/// Every top-level command, as a person types it.
+const COMMANDS: [&str; 11] = [
+    "setup",
+    "doctor",
+    "explain",
+    "check",
+    "govern",
+    "ready",
+    "flow",
+    "actor",
+    "canon-lift",
+    "device",
+    "identity",
+];
 
 fn global_args(args: Vec<String>) -> Result<(Option<PathBuf>, Vec<String>)> {
     let mut repo = None;
