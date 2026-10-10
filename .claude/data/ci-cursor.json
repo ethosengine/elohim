@@ -1,10 +1,10 @@
 {
  "jobs": {
   "elohim": 1759,
-  "elohim-edge": 1591,
+  "elohim-edge": 1593,
   "elohim-genesis": 1639,
   "elohim-holochain": 1496,
-  "elohim-orchestrator": 2016,
+  "elohim-orchestrator": 2020,
   "elohim-sophia": 146,
   "elohim-steward": 1,
   "elohim-storybook": 357
@@ -15,13 +15,13 @@
   "elohim-storybook": 357,
   "elohim": 1756,
   "elohim-edge": 1590,
-  "elohim-orchestrator": 2016
+  "elohim-orchestrator": 2020
  },
  "green_streak": {
   "elohim": 0,
   "elohim-edge": 0,
   "elohim-storybook": 10,
-  "elohim-orchestrator": 1,
+  "elohim-orchestrator": 2,
   "elohim-genesis": 0,
   "elohim-holochain": 2,
   "elohim-sophia": 1
@@ -45,8 +45,6 @@
    "UNSTABLE"
   ],
   "elohim-edge": [
-   "ABORTED",
-   "UNSTABLE",
    "SUCCESS",
    "UNSTABLE",
    "FAILURE",
@@ -59,6 +57,8 @@
    "SUCCESS",
    "NOT_BUILT",
    "SUCCESS",
+   "FAILURE",
+   "FAILURE",
    "FAILURE"
   ],
   "elohim-storybook": [
@@ -80,10 +80,6 @@
   ],
   "elohim-orchestrator": [
    "UNSTABLE",
-   "UNSTABLE",
-   "SUCCESS",
-   "SUCCESS",
-   "UNSTABLE",
    "FAILURE",
    "FAILURE",
    "UNSTABLE",
@@ -93,6 +89,10 @@
    "FAILURE",
    "UNSTABLE",
    "UNSTABLE",
+   "SUCCESS",
+   "FAILURE",
+   "FAILURE",
+   "SUCCESS",
    "SUCCESS"
   ],
   "elohim-genesis": [
