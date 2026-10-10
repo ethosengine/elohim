@@ -1,10 +1,10 @@
 {
  "jobs": {
   "elohim": 1759,
-  "elohim-edge": 1593,
+  "elohim-edge": 1594,
   "elohim-genesis": 1639,
   "elohim-holochain": 1496,
-  "elohim-orchestrator": 2020,
+  "elohim-orchestrator": 2021,
   "elohim-sophia": 146,
   "elohim-steward": 1,
   "elohim-storybook": 357
@@ -21,7 +21,7 @@
   "elohim": 0,
   "elohim-edge": 0,
   "elohim-storybook": 10,
-  "elohim-orchestrator": 2,
+  "elohim-orchestrator": 0,
   "elohim-genesis": 0,
   "elohim-holochain": 2,
   "elohim-sophia": 1
@@ -45,7 +45,6 @@
    "UNSTABLE"
   ],
   "elohim-edge": [
-   "SUCCESS",
    "UNSTABLE",
    "FAILURE",
    "SUCCESS",
@@ -57,6 +56,7 @@
    "SUCCESS",
    "NOT_BUILT",
    "SUCCESS",
+   "FAILURE",
    "FAILURE",
    "FAILURE",
    "FAILURE"
@@ -79,7 +79,6 @@
    "SUCCESS"
   ],
   "elohim-orchestrator": [
-   "UNSTABLE",
    "FAILURE",
    "FAILURE",
    "UNSTABLE",
@@ -93,7 +92,8 @@
    "FAILURE",
    "FAILURE",
    "SUCCESS",
-   "SUCCESS"
+   "SUCCESS",
+   "FAILURE"
   ],
   "elohim-genesis": [
    "UNSTABLE",
