@@ -1,0 +1,242 @@
+---
+title: "WeAll Protocol — Peer Review: capture resistance while the room is small"
+id: weall-protocol-peer-review-2026-10-10
+status: Capture
+date: 2026-10-10
+sovereignty-frame: bridge-legibility
+---
+
+# WeAll Protocol — Peer Review
+
+*Invited. On 2026-10-10 Errol Swaby posted in the peer-review channel asking for critical evaluation of the [WeAll Protocol](https://github.com/errol1swaby2-bit/WeAll-Protocol): "how decentralized systems can maintain meaningful individual participation while resisting coordinated capture, particularly during early adoption when participant populations are relatively small," plus Proof-of-Humanity, jurisdictional autonomy, randomized reviewer selection, and the relationship between governance authority and protocol-level consensus. This document is the review, written in the shape of the [Freenet confrontation](epr:freenet-peer-confrontation-2026-07-27): compare, attack in both directions, separate what we **take**, **study**, **watch** and **leave**. The external reply to the author is derived from it (§10 Outputs).*
+
+**Sovereignty frame (bridge-legibility).** WeAll speaks the Bitcoin lineage: legitimacy is *independent replayability* of authority state, identity is a keypair plus a verification tier, and "sovereignty over the chain" is a question about validator keys. We quote that frame where the code embodies it. Our ontology differs and the difference is load-bearing below: identity is imago dei, backstopped by community and institutional expression, never a self-asserted primitive; agency is conferred by relationship (StewardshipGrant, witnessed presence), not by a key; and the governing unit is a holon with a reach gradient, not a flat public ledger. Where WeAll's frame produces a sharper result than ours (it does, several times in §7), we say so.
+
+**Method.** Repo cloned in full (1,228 commits, 2026-04-29 → 2026-10-07, HEAD `111066c`) into `genesis/research/repos/WeAll-Protocol` (manifest entry `weall-protocol`). Seven parallel read-only mappers (governance mechanics · Proof-of-Humanity · disputes and juror selection · consensus-vs-governance power map · groups and "jurisdiction" · evidence/claim discipline · Elohim-side build state), one adversarial advocate briefed to argue WeAll's case against *us*, and one green-team critic briefed to refute the findings. Every load-bearing finding below was then re-opened at its `file:line` by the orchestrator. One bounded run: their hash-locked dev environment was installed in a scratch venv outside the clone (`pip install --require-hashes`, 911 hashes, Python 3.12.14, exit 0), `pytest --collect-only` collected 5,179 tests, and five targeted governance/dispute/PoH test files ran 20 passed, exit 0. The full suite was not run. Nothing was executed from inside the clone.
+
+**Verification key:** ✅ verified in source or by running it · ◐ single-source, plausible (docs only) · ⚠ unverified or contradicted.
+
+**Paths** are relative to `Weall-Protocol/src/weall/` unless noted; `configs/` and `docs/` are under `Weall-Protocol/`.
+
+**Reading the findings — latent, not live.** The green-team pass found what the recon had missed: a **ballot launch gate**. Every vote, governance or dispute, calls `_require_active_ballot_profile` (`runtime/apply/governance.py:63-75, :2011`; `runtime/apply/dispute.py:48-61, :2174`), and under strict governance the gate is inactive until a ballot profile is assigned and, for public modes, an activation receipt with independent review is present (`runtime/ballot_policy.py:118-153`). No transaction writes that receipt; the only switch is an environment variable at genesis bootstrap that satisfies the controlled-testnet profile only ✅. The production chain id forces strict mode and the production genesis also scope-closes PoH, so on the shipped production profile the electorate is frozen at one account and **no ballot can be cast**. Findings F1, F3, F4, F5 and F8 below are therefore defects in code that *switches on* when ballots and tier-2 growth switch on — a controlled testnet with the ballot flag set is exactly that state — not attacks reachable on production today. We say this first because the author's claim discipline earned it.
+
+---
+
+## 1. The bet each project is making
+
+WeAll's thesis, from its README:
+
+> *"Bitcoin demonstrated that a socially important coordination function… can be represented as open, deterministic, independently verifiable protocol state rather than only as records controlled by a central operator. WeAll explores whether selected civic coordination functions can be made similarly inspectable and reproducible."*
+
+So the primitive is a **replayable public civic state machine**: one HotStuff-BFT chain (`runtime/bft_hotstuff.py`), a canonical transaction index of 236 types (`generated/tx_index.json`), SQLite state with a committed state root (`docs/STATE_ROOT_COMMITMENT_CONTRACT.md`), and a hard rule that **nothing consensus-affecting may be private** (`docs/ARCHITECTURE_DECISIONS/0001-public-only-protocol-surface.md`, `0002` removes protocol-native private messaging). Governance is a small whitelist of parameters plus validator-set and upgrade *records*; economics are locked behind a constitutional clock; Proof-of-Humanity is a two-tier native review (async reviewers, live video jurors) that production currently **refuses to run** (`params.poh.human_authority_mode = scope_closed_pending_uniqueness_entropy`).
+
+Ours is the inverse. There is no global chain and no global ordering: each agent holds a signed source chain, peers validate each other's entries against integrity-zome rules, and content carries an 8-level **reach** ordinal (`private → self → intimate → trusted → familiar → community → public → commons`) that makes *scope a gradient rather than a boundary*. Governance records are notarized REA Commitments; decision outcomes are projections. **WeAll buys closure and pays in flatness; we buy gradient and pay in closure.** That single trade predicts most of §3–§7: they can tell you exactly who decided and cannot express a decision that is binding on fewer than everyone; we can express a decision scoped to a household and cannot, today, hand two strangers one artifact that proves it was made.
+
+Two things the frame shares with us and most of the field does not: **an explicit refusal to confer authority it cannot yet justify** (their PoH is scope-closed, not overclaimed), and **an evidence discipline that polices its own README** (§6). Both are closer to our habit register than anything in the Hypha, Playnet, or Freenet engagements.
+
+---
+
+## 2. Where WeAll is simply ahead
+
+State this first.
+
+- **Running code for every mechanism the author asked about.** Proposals, votes, electorate snapshots, dispute panels, appeals, PoH case lifecycles, validator-set transitions, upgrade records — all exist as apply-layer state transitions with tests. Our equivalents (sortition councils, witnessed humanness at scale, limitarian governor as a governance brake) are specs; the sortition draw is `STUB-REJECTED` in our own validator (`genesis/docs/superpowers/specs/2026-06-23-elohim-ceiling-design.md:101`) ✅.
+- **Apply-layer enforcement, not API-layer.** The governance parameter whitelist (`runtime/param_policy.py:21-48`) is checked at proposal create, edit, and execute (`runtime/apply/governance.py:1609, 1811, 2399`) and again inside the rules setter (`:2765-2780`) ✅. Meta-governance is closed: `GOV_RULES_SET` accepts only the `params` and `treasury` roots, and `params.gov_action_allowlist` is not whitelisted, so governance cannot widen its own reach ✅. Our mishpat integrity zome, by contrast, never reads the author of an entry (§7).
+- **A Sybil cost at all.** Account registration requires a 16-bit proof-of-work bound to payload and signer (`runtime/account_registration_work.py:29-30, 211-290`) ✅. Ours is a non-empty-string check (`imagodei_integrity/src/lib.rs:1182-1204`) ✅.
+- **Economics locked where it counts.** `deny_if_econ_disabled` / `deny_if_econ_time_locked` (`runtime/econ_phase.py:180-195`) are imported by every economic apply module; "locked" is a refusal, not a label ✅.
+- **A ballot gate that fails closed with no in-protocol way to open it.** Public ballot profiles require an independent-review activation receipt, and nothing in the tx canon writes one (`runtime/ballot_policy.py:98, :118-153`) ✅. Strict payload schemas (`extra="forbid"`) and a validator lifecycle gate — unique registered node key, active operator responsibility defaulting to reputation 5000, future-epoch activation (`runtime/apply/consensus.py:558-644, :946-992, :1201-1218`; `runtime/node_operator_responsibilities.py:395`) ✅ — are of the same cloth.
+- **Fail-closed amendment.** Under strict governance the constitution cannot be amended at all: `CONSTITUTION_UPGRADE_*` is refused with a reasoned error naming exactly what is unspecified (`governance.py:1517-1540`) ✅. That is the right failure mode for a draft constitution.
+- **Test surface.** 1,079 test files, 5,179 collected tests, **zero** unconditional `skip`/`xfail` marks, plain `pytest -q` over everything in CI including `tests/prod/`, a property-and-mutation gate with a 120 s per-mutant timeout, hash-locked dependencies that actually install ✅. Our DNA sweettests run `--run-ignored all` because `#[ignore]` leaked.
+- **Candour.** `juror_select.py:325`: *"deterministic and \*not\* an unpredictability claim; A20 remains open."* `docs/security/HUMAN_UNIQUENESS_AND_TIER0_LIFECYCLE.md`: *"Tier 0 is an account, not a human."* The README's status table is ten rows of NO-GO. We have said similar things about ourselves; they say them in the first screen.
+
+---
+
+## 3. The author's five questions, mechanism by mechanism
+
+### 3.1 Governance capture resistance at small N
+
+**What is built.** Proposing and voting require PoH tier ≥ 2 (`specs/tx_canon/tx_canon.yaml:504-545`; `runtime/gate_expr.py:182-190`) ✅. The electorate is the set of active tier-2 accounts, snapshotted with a commitment hash when voting opens (`governance.py:713-730, 790-860`) ✅. Default quorum is `ceil(2N/3)` of the electorate (`bft_hotstuff.py:148-162`, reused for governance) ✅. Ballots are one per signer per round, with a nullifier and aggregate-only counts in strict mode (`:1962-2066`) ✅. No reputation weighting anywhere in the vote path ✅ (absence). Allowlisted actions: economics activation, fee and rate-limit policy, quorum and rules setting, treasury spends, **validator set update / candidate approve / suspend / remove**, protocol-upgrade declare/activate, constitution upgrade declare/activate (`governance.py:1398-1420`) ✅.
+
+**F1 — the proposer sets the quorum.** `rules = dict(payload.rules)` at proposal create (`governance.py:1592`); the governed `gov_config.quorum` fills only keys the proposer left *absent* (`:1593-1596`) ✅. `_electorate_required_votes` honours `rules.quorum_bps` as `max(1, ceil(N·bps/10000))` (`:733-749`) ✅, so `quorum_bps = 1` yields **one required vote at any N**. The bounds check at `:2742-2749` guards `GOV_QUORUM_SET` (the config), not a proposal's own rules. Stage lengths are proposer-set with floors of 0/1/0/0/1 blocks (`runtime/gov_engine.py:135-157`) at a 20 s block interval (`configs/chains/weall-genesis.json:13-17`). The auto-progress path enqueues close → tally → execute the moment `total_votes ≥ required` and passes on `yes ≥ required` (`:1031-1033, :1054`) ✅. Their own test confirms proposer-supplied quorum is honoured (`tests/test_m3_closure_regressions.py:141-147`: `quorum_bps: 5000` → required 2) ✅. The engine docstring calls payload rules a *"stealth override vector"* that *"MUST NEVER"* be used (`gov_engine.py:97-104`) — but the stored record **is** the payload.
+
+**Arithmetic with shipped defaults** (N = active tier-2 accounts; R = `ceil(2N/3)`):
+
+| N | R (default) | Colluders to pass (auto path, `yes ≥ R`) | …if the proposer sets `quorum_bps=1` |
+|---|---|---|---|
+| 5 | 4 | 4 | **1** |
+| 12 | 8 | 8 | **1** |
+| 50 | 34 | 34 | **1** |
+
+The default is respectable: two-thirds of the *whole electorate*, not of votes cast. The override erases it. `rules` is untyped `Json` in the schema, the absolute `rules.quorum` path allows 1 as well, `GOV_PROPOSAL_EDIT` also accepts `rules`, and no test asserts a floor; a grep of `docs/audit`, `docs/audits` and `audit-metadata` finds no mention of proposer-chosen quorum, so **this one appears to be new to the authors**. Because `VALIDATOR_SUSPEND` / `VALIDATOR_REMOVE` are on the same allowlist with the same threshold (F8), one tier-2 account can, in a few blocks, shrink the validator set — latent behind the ballot gate, live on any testnet with ballots on.
+
+**Verdict: the small-N answer today is "the room is one person."** In both shipped genesis files (`configs/genesis.ledger.prod.json`, `genesis.ledger.testnet-v1.json`) the accounts are `{@errol-genesis, SYSTEM}` and one pubkey `c195d59d…08be` is the sole validator, sole node operator, sole tier-2 human, `bootstrap_founder_account`, the only `bootstrap_allowlist` entry, and `trusted_authority_pubkeys` in every chain config ✅ (F2). `BFT_MIN_VALIDATORS = 4` and fault tolerance is **0** below it (`bft_hotstuff.py:45, :58-62`) ✅. This is openly declared NO-GO in the README; it is not hidden. But it means the capture-resistance question is not yet *answerable* on this chain: the mechanisms that would resist capture have never had a second participant to resist.
+
+### 3.2 Proof-of-Humanity
+
+**What is built.** Tier 0 = account (16-bit PoW). Tier 1 = native async review by ≥3 reviewers drawn from tier-2 accounts (`runtime/poh/async_scheduler.py:15`; `apply/poh.py:2708-3457`). Tier 2 = live video panel, production overlay 5 jurors / 3 interacting / pass at ≥3 (`runtime/poh/live_quorum.py:8-17`; `poh.py:4517+`) ✅. Only commitment strings go on-chain; raw identity fields are denylisted (`poh.py:121-163, 420-460`) ✅ — good. Production refuses the whole positive-authority lifecycle: 29 tx types rejected under `scope_closed_pending_uniqueness_entropy` (`poh.py:53-83, 4702-4707`; mode constant `runtime/poh/state.py:37-60`; set in `genesis.ledger.prod.json:145`) ✅.
+
+**F6 — what "uniqueness closure" would need is not sketched anywhere.** Their §5 re-enablement list names governance properties (who may challenge, independent adjudication, appeal, privacy). A grep of `docs/` and `specs/v2/source/` finds no biometric, social-graph, web-of-trust, pseudonym-party, or cost-of-identity design ◐. Uniqueness is operationally "reviewers judge live video, then anyone tier-1+ may file a duplicate challenge" (`poh.py:2293-2366`), and those challenges are themselves parked `deferred_pending_a20_entropy` ✅. The field's prior art is unencouraging on exactly this point: Ford's survey of proofs of personhood concludes the online alternatives "currently fall short of satisfying all the key digital personhood goals" and argues that threshold/social-graph verification cannot by itself bound one person to one identity ([arXiv 2011.02412](https://arxiv.org/abs/2011.02412)); the Proof-of-Humanity registry's own forum documents the ring-plus-deepfake attack against vouch-and-challenge.
+
+**Ring verification is unprevented.** `pick_live_jurors` / `pick_async_jurors` exclude only the subject (`runtime/poh/juror_select.py:~310-440`) ✅. A verifies B, B verifies A is permitted; no cooldown, no graph check. Live ranking hashes the applicant-chosen `case_id` into the score. A tier-2 cohort, once in, reviews every later applicant and is self-propagating.
+
+**The account ceiling is a shared stop.** `ACCOUNT_REGISTRATION_PRODUCTION_MAX_ACCOUNTS = 10_000` applies to all account records including system ones, and a registration past it fails for *everyone* with `account_registration_capacity_exhausted` (`account_registration_work.py:29, :224-235`) ✅. Sixteen bits of work is ~65k hashes per account; the whole ceiling costs one laptop an afternoon. A Sybil farm does not need to win the vote; it can close the door. **They know**: `docs/security/ACCOUNT_REGISTRATION_SCARCITY.md:47` says "a distributed attacker can consume capacity," and presents the ceiling as a state-safety bound, not an anti-Sybil device ✅. The trade is accepted openly; our point is only that the bound's failure mode is *denial to newcomers*, which is the one failure a small-N civic network cannot afford.
+
+**Doc-vs-code.** `docs/THREAT_MODEL_CHECKLIST.md:15-19` says peers prove a node key "bound on-chain to a verified account"; `net/peer_identity.py:317-330` checks that the account exists and has one active node device, reading no `poh_tier` ✅ — one node per *account*, not per human. `param_policy.py:29-30` whitelists `live_n_jurors` and `live_interacting_jurors`; **nothing reads them** (the live scheduler uses constants, `runtime/poh/live_scheduler.py:333-334`) ✅ — governance can set two knobs connected to nothing (§6).
+
+### 3.3 Randomized reviewer selection
+
+**F3 — there is no randomness.** The dispute panel selector sorts eligible jurors by `sha256(seed ∥ candidate)` and takes the first *n* (`runtime/apply/dispute.py:552-564`) ✅:
+
+```
+seed = { domain, chain_id, dispute_id, target_type, target_id,
+         opened_at_height, round, candidate_commitment }
+```
+
+Every field is known to the reporter before submission except `opened_at_height`, and `dispute_id` is **the reporter's own free-form payload string** — required, unformatted, not bound to a hash (`_mk_id`, `:1275-1280`; used at `:1610`; `DisputeOpenPayload` in `runtime/tx_schema.py`) ✅. A colluding reporter grinds `dispute_id` offline until the panel has a colluder majority. Hypergeometric odds for *n* = 7 (`:506`): with 6 colluders in a pool of 12, a true 4-of-7 majority comes up in **50 %** of honest draws; with 10 in a pool of 30, 14 %. Two softeners (green team): `opened_at_height` is set by the block builder (`:1665`), so each attempt pays the odds of predicting its own inclusion height at a 20 s cadence, and a failed attempt leaves a visible dispute with an honest panel. Neither changes the shape: the seed is fixed before the reporter commits and every input but one is theirs. The PoH sibling selector carries the admission (*"not an unpredictability claim; A20 remains open"*, `juror_select.py:325`), and their A20-F001 closure (`docs/audit/WeAll-A01-A20-P0-Closure-Manifest-20260930.md:119`) treats the class as removed *because PoH is scope-closed* — **the dispute selector is the same gap outside that closure, and no document names it** ✅.
+
+**F4 — the quorum race.** A dispute resolves the instant `total_votes ≥ ceil(2n/3)` and the outcome is `yes > no` with abstentions counted toward quorum (`dispute.py:1186-1232`) ✅: three *yes* and two *abstain* uphold a report with two ballots still uncast. Substitutes are computed and recorded (`:651, :1713`) and **never promoted** — no reader. The no-show flags `dispute_juror_eligible` / `eligible_for_dispute_jury` are written (`:1136, :2874, :2880`) and **never read**; `eligible_reviewer_ids` ignores them ✅. The "deterministic constitutional review panel" has a safety net drawn on paper.
+
+**F5 — the enrolment floor belongs to the enrolee.** `_role_required_reputation_milli` checks `if key in payload` **before** `if key in params` (`runtime/apply/roles.py:293-306`) ✅; the self-enrol payload (all three juror call sites enforce `acct == env.signer`, and `AccountScopedRolePayload` explicitly admits `reputation_required_milli`) overrides the chain parameter. In effect a no-op today — the default floor is 0 and the governance whitelist cannot set a juror floor — so this is a latent key-precedence bug that bites the day a floor exists. Eligibility is checked at enrolment only (`runtime/reviewer_responsibilities.py:164`) and the pool is read live at dispute open (`dispute.py:1696`), so enrolling just before opening re-rolls the panel (the candidate commitment is in the seed).
+
+**What is right.** Appeals draw a disjoint panel (original panel + substitutes excluded) with the round in the seed (`:2770-2800`) ✅. Strict mode recuses the group's creator, admins, moderators, emissaries and signers from disputes about their group (`:421-490`) ✅. Per-juror ballots are aggregate-only in state (`:2395-2412`) — the claim is unverified against the tx log ⚠.
+
+### 3.4 Jurisdictional autonomy
+
+**F7 — "jurisdiction" is a word in the constitution, not a thing in the code.** It appears in zero source files and in two constitution lines, each in a list of conditions that *may* apply (`docs/constitution/WEALL_GENESIS_CONSTITUTION_DRAFT_2.md:172, :338`) ✅. The realized primitive is the **group**: a flat record with a free-text `charter` nothing parses (`runtime/apply/groups.py:588`), `signers = [creator]` with `threshold = 1`, `moderators = signers` (`:543-600`) ✅. A single moderator removes a member with no reason, no appeal, no check (`:853-871`) ✅. Only a signer may open or finalize an emissary election; candidates need not be members; winners overwrite the signer set (`:1438-1512, :1783-1788`) ✅. `GROUP_ROLE_GRANT` writes free-form role strings that content.py treats as posting authority, to accounts that need not be members (`content.py:256-275`) ✅. Groups cannot nest, secede, federate, dissolve (V2 names `group_dissolution_claim_window`; no code), or set their own quorum, juror count, or reputation; reputation is global (`reputation_matrix.py`: zero hits for "group") ✅. Art. II §6 *Right to Portability* has no code; the only "portab" hit is a Windows fsync comment ✅.
+
+**The one autonomy that is real is read-visibility — and it is the autonomy *denied*.** `_group_is_private` always returns False; `public_only` is forced on create and update (`groups.py:334-338, :571-575`) ✅. That is ADR 0003 doing its job. Commit `111066c` (#46, the HEAD) fences group electorates to one action, `GROUP_TREASURY_SPEND_EXECUTE` (`governance.py:1543-1581`); before it, a group's members could vote protocol-wide actions through. The fence is mode-gated: `_assert_governance_action_electorate_scope` returns early unless strict governance is on (`runtime/ballot_policy.py:63-68`); the production chain id forces strict (`:40-52`) ✅.
+
+**Dead state.** A dispute's `GROUP_MEMBERSHIP_RESTRICT` writes `restricted_members` into `state["groups"]["by_id"]` while the canonical store is `roles.groups_by_id`, and nothing reads it (`dispute.py:1174-1183`) ✅ — a ruling to restrict a member may not bind the group ⚠.
+
+**They know most of this.** "Jurisdiction" is a declared `normative_target` in the V2 spec (`specs/v2/source/requirements.json`: `GEO-002`, `SCP-003` subsidiarity) — acknowledged unbuilt, not overlooked ✅. The removal-authority conflict is named as a remaining defect in their own `docs/audits/M1_M3_COMPREHENSIVE_AUDIT.md:83-85`, deliberately left pending a controlling requirement. What is new here is the `restricted_members` store mismatch and the role-grant-to-non-member path.
+
+So: *jurisdictional autonomy* in WeAll today is a creator-sovereign club with a public reading room. That is honest for a social app; it is not yet subsidiarity.
+
+### 3.5 Governance authority vs protocol-level consensus
+
+**The power map** (who holds the lever today):
+
+| Lever | Holder | Evidence |
+|---|---|---|
+| Ordering, inclusion, liveness, finality | validator set; round-robin leader `vset[view % n]` | `bft_hotstuff.py:164-168`; `block_admission.py:255-262` ✅ |
+| Halt | any 1 of n ≤ 3 | quorum `((2n)+2)//3` ✅ |
+| Add validator | **governance vote** (tier-2 electorate) **and** the candidate's own lifecycle: unique registered node key, active operator responsibility (reputation default 5000), future-epoch activation | `governance.py:1398-1420`; `apply/consensus.py:558-644, :946-992, :1201-1218`; prod `validator_candidate_lifecycle_gate_enabled: true` ✅ |
+| Remove / suspend validator, replace the set | **governance vote**, applied as system txs; no minimum-set-size check found; no validator-side ratification | `apply/consensus.py:688-697, :812-830, :1167-1174` ✅ |
+| Change params | governance vote, 10-path whitelist, apply-enforced | `param_policy.py:21-48` ✅ |
+| Widen the whitelist | nobody in-protocol | `governance.py:1423, :1483-1491` ✅ |
+| Amend the constitution | nobody (strict mode refuses) | `governance.py:1517-1540` ✅ |
+| Upgrade code | **node operators' binary choice**; the chain holds a record only | `apply/protocol.py:277-298`: `software_applied=False`, `operator_action_required=True` ✅ |
+| Activate economics | governance vote after the clock | `econ_phase.py:65-85`; allowlist ✅ |
+| Grant PoH bootstrap | genesis allowlist (one founder), auto-locks at 4 validators | `genesis.ledger.prod.json`; `poh.py:1122-1136` ✅ |
+
+**F8 — docs understate governance's reach.** `docs/consensus_governance_surface.md` lists only parameters as governance-controlled. In code governance also adds, removes, suspends validators and replaces the set. Adding is harder than it first looks — the lifecycle gate means governance cannot seat arbitrary sock-puppets — but **shrinking** the set has no floor, so F1 plus `VALIDATOR_REMOVE` is still a one-account path to a one-validator chain. **F9 — where authority terminates.** Governance outcomes are applied by system transactions that the validators emit and include, and upgrades are records that operators choose whether to honour. Constitutional authority therefore terminates at the people running validator binaries. At genesis that is one operator whose key is also the sole elector. The README says so in effect (NO-GO on public validator readiness); the constitution's Art. X *Node Neutrality* does not yet have a mechanism underneath it.
+
+**F10 — the pinned constitutional clock is stale.** `genesis.ledger.prod.json` sets `genesis_time = 1778368894` (2026-05-09T23:21:34Z) and `economic_unlock_time = 1786144894` (2026-08-07), and `is_econ_unlocked` compares chain time against that constant (`econ_phase.py:65-85`) ✅. The value is generator output — `scripts/build_production_genesis_manifest.py:412` defaults it to `time.time()` and refuses an unlock shorter than 90 days (`:407-408`) ✅ — so the *mechanism* is sound. But the file is hash-pinned as the chain's identity (`configs/chains/weall-genesis.json`), so if this exact identity launches, its "first 90 days" (`docs/THREAT_MODEL_CHECKLIST.md` §2) elapsed before the first block. Relaunching means regenerating. Activation still requires a vote, which the ballot gate blocks on production.
+
+---
+
+## 4. Answering the question as asked
+
+*"How can decentralized systems maintain meaningful individual participation while resisting coordinated capture, particularly during early adoption when participant populations are relatively small?"*
+
+The code answers it in four layers, and only the bottom one is WeAll-specific.
+
+1. **Below ~9 verified humans there is no mechanism, only a founder.** Strict disputes refuse to seat a panel under 9 (`dispute.py:586-589`); BFT has zero fault tolerance under 4 validators; the live-PoH production panel of 5 cannot seat from a pool of 1. WeAll has correctly fenced all three — and so has nothing to say about capture at N < 9 except *"trust the founder's transitional grant."* The grant's `review_condition` is `native_poh_juror_quorum_or_governance_review`; no code retires it after the height-1008 expiry ⚠. **The honest small-N design is a declared, receipt-backed, time-bounded founder dictatorship with a published exit** — WeAll has the declaration and the bound, and lacks the exit.
+2. **Between ~9 and ~50 — on any chain where ballots are switched on — every mechanism is grindable by one participant.** Not because the thresholds are weak (two-thirds of the electorate is strong) but because *the proposer chooses the threshold* (F1), *the reporter chooses the panel seed* (F3), and *the enrolee chooses the enrolment floor* (F5). Capture resistance at small N is almost entirely a question of **who fixes the parameters of the contest, and when, relative to the contestants**. Every one of these is the same bug: an input the adversary controls is read *after* the adversary knows what it does. The fix is the same each time: fix the rule before the actors are known (gov_config overrides proposer rules, not fills them), and fix the randomness after the actors are known (a commit-reveal or beacon that lands *after* the pool and the case are frozen).
+3. **Above ~50, the Sybil cost is the whole question**, and WeAll has correctly refused to answer it with a mechanism it does not have. The 16-bit PoW is anti-spam, not anti-Sybil, and they say so. The field agrees nothing online closes this (Ford 2020). The honest options are the ones WeAll has not yet written down: periodic physical pseudonym parties; a vouch graph with *standing at stake* and decay; or accepting that one-human-one-vote is a regulative ideal and designing the thresholds to be robust to a known Sybil fraction (as Shapiro et al.'s *Constitutional Consensus* does, with Sybil-resilient decision processes governing changes to the participant set — [arXiv 2505.19216](https://arxiv.org/abs/2505.19216)).
+4. **At any N, the validator set is the electorate's landlord.** Governance can replace the validators (good — accountability runs upward), but the validators apply governance (so accountability also runs downward), and the binary each operator runs is outside the chain entirely. This is not a WeAll defect; it is every BFT chain's shape. What WeAll could do that most do not is *record* the operator-side act — a signed `software_applied` attestation per validator per upgrade — so that at least the gap is visible.
+
+**Compressed for the author:** *your defaults are strong and your overrides give them away. Capture at small N is a parameter-ordering problem before it is a threshold problem, and three of your contests let the contestant set the rules after reading the field.*
+
+---
+
+## 5. Prior art the author should have on the desk
+
+- **Kleros** — the shipped randomized-juror system. Stake-weighted drawing, appeal-by-doubling, and the whitepaper's *p + ε* bribery analysis are the baseline any sortition design should cite; the documented subcourt 51 % episode is the cautionary case. WeAll's non-stake, PoH-gated pool is the more democratic design *if* the draw is unpredictable; today it is less safe than Kleros because it is predictable.
+- **Proof of Humanity (Kleros registry), BrightID, Idena, Duniter** — vouch/challenge, social-graph, and liveness-puzzle approaches, with the forum-documented ring-plus-deepfake attack. Ford, *Identity and Personhood in Digital Democracy* (2020) is the survey.
+- **Keidar, Lewis-Pye, Shapiro, Talmon, *Constitutional Consensus for Democratic Governance*** (2025, rev. 2026) — one-person-one-vote over permissioned DAG-BFT where the constitution governs both decisions *and* consensus, and Sybil-resilient processes govern changes to the participant set. The closest academic sibling to WeAll's whole thesis; the paper's treatment of participant-set changes is exactly F8.
+- **DAO participation data** — the Complutense study reported by The Defiant (50 % of DAOs have fewer than ten voters; in 1,000–10,000-member DAOs under 1 % of members hold over half the voting power) and the Compound "Humpy" quorum capture (weekend timing, 81 % of quorum from five delegations). The small-N problem is the *normal* case, not the edge case.
+- **Ostrom's design principles** — nested enterprises and graduated sanctions are what Art. IV §4 *Locality and Group Self-Governance* is reaching for and what a flat group record cannot express.
+- **Our own shelf**: [Hypha DAO](epr:hypha-dao-autonomous-collectives-cross-pollination-2026-06-24) (non-transferable *decaying* standing: "an inactive captor's grip decays on its own," with the caveat that the half-life is itself a governance knob); [Habermas Machine](epr:habermas-machine-2024) (predicted endorsement ≠ defensibility); [Beer](epr:beer-designing-freedom-elohim-critique-2026-06-04) (adaptive variety traded for capture resistance is its own failure mode).
+
+---
+
+## 6. The shared pathology: instruments that report, flags that nobody reads
+
+The Freenet confrontation's most reusable artifact was the *"constant or flag with no reader"* lint. WeAll has the same shape in its most distinctive layer.
+
+**Dead configuration** (grep for readers in `src/`, excluding the declaring file): `params.poh.live_n_jurors`, `live_interacting_jurors`, `live_pass_threshold` and `params.economics.transfer_fee_bps` are whitelisted for governance with bounds and have **zero readers** — the runtime uses `live_pass_threshold_num/den` and `transfer_fee_int` ✅. A valid governance vote on any of them is accepted and changes nothing. Three `protocol_profile.py` flags (`proposal_requires_justify_qc`, `monotonic_block_timestamps_required`, `legacy_sig_domain_allowed`) are hashed into the profile and printed in posture but are not read as toggles; the behaviours they name are enforced elsewhere without consulting them ◐.
+
+**Report-only disabling.** `runtime/launch_matrix.py` defines eleven `FEATURE_*` flags and two helpers, `assert_feature_disabled` / `is_feature_enabled`, with **no caller in `src/`** ✅. The matrix feeds a status payload; the status route hard-codes `public_beta_ready: False` (`api/routes_public_parts/status.py:~1103`). The one launch gate confirmed enforced in apply code is economics. We cannot say the other ten features are *not* refused somewhere else — we did not trace each — but the matrix that *says* they are disabled is not what disables them.
+
+**Prose-pinning as proof.** `scripts/check_reviewer_truth_boundaries.py` scans Markdown for nine risky phrases and passes any hit whose neighbourhood contains a "safe" word by substring — the list includes `no`, `not`, `work`, so `know`, `note`, `network` neutralize it ✅; its own docstring says *"not a semantic proof."* `gen_current_verified_claims.py` hard-codes `evidence_found: True` (L429) and writes `public_beta_ready: False` as a literal (L159-160, 293-295); `--check` is byte-exact (L811), which is good — but it is a byte-exact check of a policy restatement. The prose-pinning tests assert that the "current allowed claim" *sentence* is present, not that it is true. The closure loop (bot regenerates evidence → finding marked closed → bot regenerates) is checked by the same loop that produces it ◐.
+
+**What is real underneath.** The claim generator refuses to emit any readiness boundary while a P0/P1 audit row is open (`SystemExit`, L463-487) ✅; the V2 compiler marks all 755 target requirements `IMPLEMENTATION_NOT_VERIFIED` and never promotes one ✅; and the economics gate refuses in apply. **Take the shape, not the linter**: a claim register that *cannot be loosened without a ledger change* is exactly the habit-register invariant ("flips require evidence"), and theirs is wired into CI where ours is a pre-push `--check`.
+
+---
+
+## 7. The reverse confrontation: WeAll's case against us
+
+We briefed an advocate to argue WeAll's position against our tree. Eight challenges survived contact with the evidence; we re-verified the four marked ✅. We print them because a review that only grades the other party is not a review.
+
+1. **"Civic history that cannot be replayed is the private database again."** Our votes are child attestations; the tally is a projection each reader computes (`elohim/zomes/content_store/src/governance_action.rs:4,13`). There is **no one-vote-per-agent check** in the vote path and `proof_evidence` is the literal `{"class":"witness"}` (`:396-410`) ✅. Our own register records peers binding the same human to different agent keys on all three household peers (`genesis/manifests/habits.yaml:839`). *Two strangers cannot compute one artifact and agree who decided.* WeAll can.
+2. **"Reach makes governance opaque."** Mishpat's vote and statement bridges hard-code `reach: "community"` (`mishpat/src/lib.rs:1138, 1353`); votes inherit the proposal's reach, and the ladder runs to `private`. Family and personal constitutional layers are "never on a public ledger" (`constitution.md:481, 578`) yet bind the elohim that act for people. **We have no counterpart to ADR 0001** — no statement of which reach tiers may carry a *binding* decision. This is the challenge we most owe an answer to, because our whole thesis is that scope is a gradient. The answer is probably "a decision binds only those whose reach includes it, and a sub-public decision must be contestable upward by a witnessed appeal" — but that is prose until a validator says it.
+3. **"Authority is conferred on free keys today."** `validate_human` checks non-empty strings; `genesis_self_check` returns `Valid` unconditionally (`imagodei_integrity/src/lib.rs:1099-1101, 1182-1203`); the mishpat vote takes `voter_id` **from caller input** and returns a zeroed sentinel `ActionHash` (`mishpat/src/lib.rs:1118, 1159`) ✅. Meanwhile `shefa.md:205` says in the present tense that a Sybil "needs a thousand histories." The softened form, which stands: *WeAll refuses to confer authority until it can justify it; we confer it to free keys now.*
+4. **"Anyone can write the law."** Mishpat's integrity `validate()` hands only `app_entry` to every validator — the author is never consulted (`mishpat_integrity/src/lib.rs:415-433`) ✅. A `Precedent` with `binding: "constitutional"` is checked only against a four-string list (`:36-41, :513-526`) ✅; so is a `GovernanceState` of `"approved"` and a `ChallengeOutcome` of `"upheld"`. WeAll's whitelist is enforced at every node; ours is effectively empty. This is one more face of the [authority-in-integrity cluster](epr:arch-authority-in-integrity-backlog), now minted as a row.
+5. **"Only one constitution has its frozen rules in code."** Both drafts are unratified (`constitution.md:198-199`: *"Ratified: [consensus mechanism TBD]"*). WeAll's frozen surfaces are a diffable profile and a tx canon; ours binds a model's reading (*"My interpretation… is subject to correction,"* `:288`).
+6. **"The elohim are an authority dressed as servants."** Global amendments need "elohim consensus across all scales" (`constitution.md:102, 110, 297`); limits are held "against consensus" (`:172, 185`); under the counsel clause a human "cannot dismiss their defending agent mid-attack" (`:272-281`). We flag the tension openly (`:307, 905`); flagging is not bounding. WeAll's Art. X §2 *Client Non-Authority* is the position we have to argue against, not assume past.
+7. **"The roots of authority sit outside any replayable record."** `progenitor_pubkey: ~` three times in `happ.yaml`; reinstall gated by a CI flag; one bootstrap Mongo; synthetic users. WeAll is also founder-run — the surviving point is only that their authority transitions are *in state* and ours are in Jenkins.
+8. **"Your claim discipline points at plumbing."** Of 43 habits (15 green, 26 red, 2 unwired at the time of the run) none watches vote integrity, Sybil cost, or ratification; the only governance-named habit governs repository manifests. WeAll's NO-GO table is about civic claims. This one we simply accept.
+
+**Three questions WeAll would put to us**, which we carry forward as ours: (i) name one finished Elohim governance decision and the single artifact two strangers with no reach grants can compute and compare byte for byte; (ii) which integrity-zome file stops one person's 100 free keys from casting 100 votes, writing a constitutional Precedent, or upholding a challenge — and if none, will the register carry NO-GO rows saying governance outcomes are not yet authoritative; (iii) which reach tiers are barred from carrying binding decisions, and what protocol rule, not prose, keeps an elohim from becoming the final civic authority.
+
+---
+
+## 8. Green-team adjudication
+
+*An opus critic was briefed to refute F1–F10 and to check what the authors already document. Its two structural corrections — the ballot launch gate and the production/testnet profile split — are folded into the text above; the per-finding result is here. Where a finding is SOFTENED the softened form is what the external reply carries.*
+
+| # | Finding | Verdict | What moved it |
+|---|---|---|---|
+| F1 | Proposer sets the quorum; one vote passes any allowlisted action | **STANDS**, latent on production | No floor anywhere; first-yes pass; **not in any of their audit ledgers** — new to them. Unreachable on prod only via the ballot gate and N = 1. |
+| F2 | One key is validator, elector, PoH root, operator | **STANDS**, disclosed | README NO-GO table; a design-stage fact. |
+| F3 | Dispute panel seed is a hash of reporter-chosen inputs | **STANDS**, softened | `opened_at_height` is builder-set; failed grinds are visible. Sibling of their own A20-F001, *outside* its scope closure; no document names the dispute selector. |
+| F4 | Resolution fires at first quorum; substitutes and no-show flags are dead | **STANDS**, harm softened | Appeal window protects targets of wrongful removal; a wrongful "not upheld" has no reporter appeal (`dispute.py:1655-1658`). |
+| F5 | Enrolee's payload overrides the reputation floor | **SOFTENED** | Real key-precedence bug; floor is 0 and not governable, so a no-op today. Tier 2 still required. |
+| F6 | No uniqueness design; 10k ceiling is a shared stop; ring verification unprevented | **SOFTENED**, mostly known | `ACCOUNT_REGISTRATION_SCARCITY.md:47` concedes exhaustion; uniqueness absence declared. New: self-verifying rings, node binding reads no tier, dead `live_*` knobs. |
+| F7 | "Jurisdiction" is not in code; groups are creator-sovereign | **SOFTENED** in framing | `GEO-002` / `SCP-003` declared normative targets; removal conflict in their M1–M3 audit. New: `restricted_members` store mismatch; role grant to non-members. |
+| F8 | Governance can rewrite the validator set; docs understate it | **SOFTENED** | Lifecycle gate (rep 5000, future epoch) blocks arbitrary additions; shrinking/suspending has no floor; no validator-side ratification. Doc understatement stands. |
+| F9 | Constitution hash-bound, largely unenforced; amendment fails closed | **STANDS**, disclosed | `CONSTITUTIONAL_TRACEABILITY.md` lists the same gaps. |
+| F10 | Economics clock anchored to a constant | **SOFTENED** | Generator sets `time.time()` and enforces ≥ 90 days; the *pinned identity* is stale, not the mechanism. |
+
+**Genuinely new to the authors, by this pass:** F1 (no governance floor), F3 (dispute-panel grinding outside A20's closure), F4 (the race and the dead accountability flags), F5 (payload-key precedence), the `restricted_members` mismatch, the dead whitelisted `live_*` and `transfer_fee_bps` parameters, and the node-binding wording in the threat model. Everything else they have already written down somewhere; the review's job there is to connect the documents, not to announce.
+
+---
+
+## 9. Verdicts
+
+**Take** (mint pass → cluster rows, §10):
+
+- **T1 — Authority-in-integrity, mishpat face.** Our validators never read `action.author()`; `constitutional` Precedents, `approved` GovernanceStates, `upheld` ChallengeOutcomes and votes with caller-supplied `voter_id` are writable by any agent. WeAll's apply-layer whitelist is the standard to meet. → `arch-authority-in-integrity-backlog`.
+- **T2 — Declare which reach tiers may carry a binding decision, and the closure artifact.** WeAll ADR 0001 is the adversary position (nothing non-public affects civic state). Ours must name the tier floor, the committed outcome record two strangers can compare (the B2 signed Attestation the Hypha survey already asked for), and the witnessed upward appeal that makes a sub-public decision contestable. → `commons-holonic-stewardship-backlog`.
+- **T3 — Parameter-ordering rule for every contest.** When the sortition floor is built: rules fixed *before* actors are known (the governed config overrides, never fills, a proposer's rules); randomness fixed *after* the pool and the case are frozen (commit-reveal or beacon). WeAll's dispute selector is the worked counterexample to cite in the spec. → `commons-holonic-stewardship-backlog`.
+- **T4 — Civic NO-GO rows in the register.** Declare `unwired` habits for the three claims we cannot currently observe: one-human-one-vote, decision closure, constitution ratified. WeAll's "current allowed claim" line, pointed at civic claims rather than plumbing, is the shape. → `measure-family-borrows-backlog` (the register is the measure; declaring the habits is the operator's call).
+- **T5 — "Flag with no reader" lint, second confirmation.** First named by the Freenet confrontation, never minted; WeAll adds four whitelisted governance parameters and a launch matrix with no callers. Three peers, one pathology — now a row. → `arch-workspace-discipline-backlog`.
+
+**Study:** the fail-closed claim generator (refuses to loosen a boundary while an audit row is open) as a CI-time form of "flips require evidence"; the mutation gate with per-mutant timeout; hash-locked dev installs that actually work on a cold machine; the electorate snapshot-with-commitment at voting open; disjoint appeal panels with the round in the seed.
+
+**Watch:** the ballot-profile activation receipt — who issues it, under what review, and whether F1 is fixed before it is; whether A20 (reviewer entropy) lands and whether it covers dispute panels, not only PoH; whether the founder's transitional tier-2 grant gets a retirement path; whether "jurisdiction" ever becomes more than a group record (V2 names dissolution; nesting and locality are absent); the first second validator.
+
+**Leave:** a global chain as the civic substrate (the flatness is the price of closure, and we have chosen gradient); public-only as an axiom (a household's decisions are not the commons' business, and a protocol that cannot express that is not local-first); the 10,000-account global ceiling as a Sybil defence (it is a Sybil *weapon*); prose-pinning tests as evidence.
+
+---
+
+## 10. Outputs
+
+- **Manifest:** `weall-protocol` added to `genesis/research/research-manifest.json` (pillar `qahal`); clone under `genesis/research/repos/WeAll-Protocol` (gitignored).
+- **Research Index:** new section *The Peer Problem — WeAll* in `genesis/research/README.md`.
+- **Mint pass:** T1 → [arch-authority-in-integrity-backlog](epr:arch-authority-in-integrity-backlog) row 18; T2, T3 → [commons-holonic-stewardship-backlog](epr:commons-holonic-stewardship-backlog) rows 32–33; T4 → [measure-family-borrows-backlog](epr:measure-family-borrows-backlog) row 33; T5 → [arch-workspace-discipline-backlog](epr:arch-workspace-discipline-backlog) row 44. Each row cites this document's slug; the CLUSTERS index is groomed.
+- **External reply:** a reader-facing letter to the author, derived from §2–§5 and §7's three questions, published for the peer-review channel. It carries the softened forms from §8 and names the file:lines so he can check every claim.
+- **Working notes:** `genesis/local-dev/weall-peer-review/` (recon reports, consolidated findings, advocate's case).
+
+**Credits.** Seven sonnet-tier mappers (governance, PoH, disputes, consensus/power map, groups, evidence discipline, Elohim grounding); one opus advocate for WeAll; one opus green-team critic; orchestration, re-verification and this text by the session (Fable 5.1), operator-directed by Matthew Dowell. The author of WeAll has not yet seen this document; the channel post is the first contact.

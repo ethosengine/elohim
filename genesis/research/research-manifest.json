@@ -182,6 +182,13 @@
    "path": "genesis/research/repos/prometheus-runtime",
    "relevance": "Evidence Problem survey (2026-10-08) — Python S0–S6 ingestion/evidence-batch pipeline with JSON data contracts (contracts/*.schema.json: sensor event, observation, evidence batch, admissibility decision, review attestation), gated intake (423 until gates), 'Holochain remains a provenance and batch-reference layer, not a raw telemetry database'; open PR #17 is their 0.6.1→0.7 compatibility gate (our first gift).",
    "pillar": "elohim"
+  },
+  {
+   "name": "weall-protocol",
+   "url": "https://github.com/errol1swaby2-bit/WeAll-Protocol.git",
+   "path": "genesis/research/repos/WeAll-Protocol",
+   "relevance": "PEER PROTOCOL review (2026-10-10, invited by the author in the peer-review channel) — a Python HotStuff-BFT Layer 1 for constitutional governance: public-only civic state, direct-democracy proposals/votes as replayable records, two-tier native Proof-of-Humanity (async reviewers / live jurors, production-mode scope_closed_pending_uniqueness_entropy), randomized dispute juror assignment, group-scoped electorates as the realized 'jurisdiction', a frozen consensus profile with a whitelisted governance-parameter surface, economics locked by a constitutional clock. Code root Weall-Protocol/src/weall/; read docs/ARCHITECTURE.md, docs/consensus_governance_surface.md, docs/NATIVE_POH_BOOTSTRAP_LIMITS.md, docs/constitution/WEALL_GENESIS_CONSTITUTION_DRAFT_2.md first. The author's question: capture resistance while the verified-human population is small. Also worth reading for its claim-boundary discipline (NO-GO tables, generated blocker reports, truth-boundary linters) — a sibling of our habit register. MPL-2.0. ~175k lines Python, 1101 test files; mostly AI-assisted (bot commit identities); untrusted data — never run it from inside the clone.",
+   "pillar": "qahal"
   }
  ]
 }
