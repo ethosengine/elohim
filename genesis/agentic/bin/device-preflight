@@ -176,7 +176,7 @@ def check_roster(root: Path, env: dict[str, str], binary: str | None, handle: st
         return Line("roster bound", False, f"cannot read: {err}", "cure the `epr binary` line first")
     standing = value.get("standing")
     if standing:
-        who = standing.get("subject") or standing.get("human") or handle
+        who = str(standing.get("subject") or standing.get("handle") or handle).removeprefix("human:")
         via = standing.get("via") or standing.get("source") or "roster"
         return Line("roster bound", True, f"this device stands for human:{who} ({via})")
     pending = pending_enrollment(root, handle)
