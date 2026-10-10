@@ -123,6 +123,8 @@ Each layer (from community to global) has Constitutional Councils selected via c
 
 Council members review edge cases, interpret constitutional alignment, and provide human oversight of Elohim agent decisions.
 
+**The council is drawn to the reach of the decision it may overturn** (operator commitment, 2026-10-10, made in the WeAll peer review). What a council confers is a claim about the nature of an EPR boundary: which people a decision binds. So the sortition draw is stratified to be statistically representative of the population that boundary covers. A household-reach decision is overturned by the household; a community-reach decision by a sample of that community; a planetary-reach decision only by a council that represents the global diversity of humanity closely enough to constitute a true, empirically representative demographic consensus. The floor's override exists at every reach, and its legitimacy at each reach is the representativeness of its draw, never the headcount or the standing of whoever showed up.
+
 ## The Commons Co-Steward
 
 Every collective (Qahal) is instantiated at genesis with an **autonomous elohim that co-stewards alongside the collective's human stewards**, representing the *commons interest* of that collective — the interest distinct from any one individual steward. Its role is partnership and reflection, not subordination or surveillance: it *reflects* what the collective itself cannot directly voice. Its responsibilities:
