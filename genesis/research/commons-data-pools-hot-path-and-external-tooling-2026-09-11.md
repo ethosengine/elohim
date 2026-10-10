@@ -176,7 +176,7 @@ The epic's rule is *propose, never rule; settle, never scrape*. For a tool broug
 
 - **UCAN → TAKE-DISC**, not TAKE: the attenuation law is ours; the keypair root is refused (spec 2026-07-22 §UCAN). Note p2panda's shipped ACL-CRDT vs its UCAN marketing.
 - **hREA → already inherited**, not a take; the action is to check its pool patterns before minting parallel structures (feedback: inherit substrate ontology, never duplicate).
-- **Ostrom** ⚠ secondary summary; a primary-source pass is owed before the checklist is canon.
+- **Ostrom** ⚠ secondary summary; a primary-source pass is owed before the checklist is canon. **Paid 2026-10-10** ✅ — [the primary-source pass](epr:ostrom-design-principles-commons-governance-2026-10-10); its §6 is the checklist, planted as the `ostrom-commons-design` skill.
 - **ads.coop** ⚠ fetch blocked; needs a human look before any verdict.
 - **Overture GERS** — the survey asks for "a crisper answer for why CID still wins for entities that mutate." The answer is already canon: identity is the CID of the *record*; a mutable real-world entity is a lineage of records joined by heads that move (`content_head` ≠ identity; reach/head/freshness semantics), and a bridge file to GERS is a `bridges/` concern, never a change to identity. Stated here so the row does not reopen it.
 - **Bluesky feed generators and Stract Optics** are the two production-scale "propose, never rule" precedents; the search research doc §4 should cite them by name (done in the same pass).
