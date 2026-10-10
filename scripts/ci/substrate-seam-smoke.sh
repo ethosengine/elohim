@@ -14,6 +14,7 @@
 #   4. n0-contamination    — peer URLs name only our relays, never n0's fleet
 #   5. no-lingering-tx5    — conductor peer URLs never use the tx5 wss scheme
 #   6. dht-fetch           — advisory: divergent declared heads named
+#   7. peer-exile          — advisory: a connected peer dropped whole or unanswered
 #
 # Usage: substrate-seam-smoke.sh <doorwayA-url> <doorwayB-url> [--gate]
 # Default is ADVISORY (always exit 0, print per-seam verdicts). With
@@ -102,6 +103,7 @@ for side in "$A" "$B"; do
     # Fail-closed on plumbing: a 404/timeout is NOT an empty peer store (the
     # 2026-08-07 partition triage read a doorway 404 as total=0 for hours).
     bad peer-store "PROBE-BROKEN — $side/db/p2p/conductor-diagnostics HTTP:$diag_code (plumbing, not store state; see backlog/probe-conductor-diagnostics-doorway-404)"
+    note peer-exile "SKIP — $side conductor-diagnostics unread (HTTP:$diag_code)"
     continue
   fi
   # DEGRADED-200 IS NOT A THIN STORE. Since 2026-09-22 the route answers 200
@@ -238,6 +240,59 @@ else:
     OK$'\t'*) note no-lingering-tx5 "OK — $side ${tx5_check#*$'\t'}" ;;
     SKIP$'\t'*) note no-lingering-tx5 "SKIP — $side ${tx5_check#*$'\t'}" ;;
     *) bad no-lingering-tx5 "$side ${tx5_check#*$'\t'}" ;;
+  esac
+
+  # ── 7. peer-exile (ADVISORY) ──────────────────────────────────────────────
+  # An ADDRESSED peer is not a HEARD peer. kitsune2 drops every message from a
+  # peer url it holds no access decision for, and its peer store refuses to
+  # insert an agent the conductor has blocked — so a peer warranted for a chain
+  # fork stays in bootstrap, stays connected, passes seam 3, and is dropped
+  # whole by every authority that integrated the warrant. On alpha, 2026-10-10,
+  # matthew had dropped 4,058,545 of adam's 4,058,544 messages while every seam
+  # above read OK (dataplane-convergence DELTA 2026-10-10a). Two readings per
+  # current connection, both from this side's own counters:
+  #   DROPPED    — we count as blocked nearly all we received from the peer
+  #   UNANSWERED — we sent the peer plenty and it has sent nothing back
+  # Advisory, never in --gate: the cure for a warranted key is an operator act
+  # (re-key or unblock), so gating would hold every deploy red on a state no
+  # deploy can change. Flip it into the gate once no steward key is warranted.
+  exile_check=$(DIAG="$diagnostics" \
+    EXILE_MIN_RECV="${EXILE_MIN_RECV:-100}" EXILE_MIN_SENT="${EXILE_MIN_SENT:-10000}" \
+    python3 - <<'PY' 2>/dev/null || printf 'SKIP\tconductor-diagnostics body unparseable\n'
+import json, os
+d = json.loads(os.environ["DIAG"])
+ts = d.get("transportStats") or {}
+conns = (ts.get("transport_stats") or {}).get("connections")
+if conns is None:
+    print("SKIP\ttransportStats carries no connection list (nothing established)")
+    raise SystemExit
+blocked = ts.get("blocked_message_counts") or {}
+min_recv = int(os.environ["EXILE_MIN_RECV"]); min_sent = int(os.environ["EXILE_MIN_SENT"])
+found = []
+for c in conns:
+    key = c.get("pub_key", "")
+    recv = int(c.get("recv_message_count", 0)); sent = int(c.get("send_message_count", 0))
+    spaces = {}
+    for url, per_space in blocked.items():
+        if key and url.rstrip("/").endswith(key):
+            for space, n in per_space.items():
+                spaces[space] = spaces.get(space, 0) + int(n.get("incoming", 0))
+    dropped = sum(spaces.values())
+    if recv >= min_recv and dropped * 10 >= recv * 9:
+        where = ",".join(s[:12] for s, n in sorted(spaces.items(), key=lambda kv: -kv[1]) if n)
+        found.append(f"DROPPED peer={key[:12]} blocked={dropped} of received={recv} spaces={where}")
+    elif sent >= min_sent and recv == 0:
+        found.append(f"UNANSWERED peer={key[:12]} sent={sent} received=0")
+if found:
+    print("EXILED\t" + "; ".join(found))
+else:
+    print(f"OK\t{len(conns)} connection(s), none dropped whole or unanswered")
+PY
+)
+  case "$exile_check" in
+    OK$'\t'*) note peer-exile "OK — $side ${exile_check#*$'\t'}" ;;
+    EXILED$'\t'*) note peer-exile "EXILED — $side ${exile_check#*$'\t'} (advisory; a dropped peer cannot converge by waiting — read the conductors' 'Warrant op is valid, will block the warrantee' lines)" ;;
+    *) note peer-exile "SKIP — $side ${exile_check#*$'\t'}" ;;
   esac
 done
 
