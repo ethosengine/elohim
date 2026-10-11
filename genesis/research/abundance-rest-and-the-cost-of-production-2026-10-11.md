@@ -198,6 +198,15 @@ What the operator calls *laundered in*, graded as a critique and not as fact:
 | Peace is measured on one's own balance sheet | The gap is invisible to the measure, so a household can reach "financial peace" while its neighbor's position worsens, partly because of the same system its investments are in | ◐ critique |
 | Giving is a step or a percentage | Giving is not tied to the gap; Deuteronomy's floor (§4) and Paul's *isotēs* measure giving by the neighbor's need, not one's own milestone | ◐ critique |
 
+**The evidence companion: Matthew Desmond, *Poverty, by America* (2023) ◐.** Desmond's thesis is
+the gap read from the other side. Poverty persists in a rich country because the non-poor benefit
+from it: as employers of low-wage labor, as consumers of cheap goods and services, as landlords and
+lenders who profit from the poor paying more for housing and credit, and as recipients of tax
+breaks that dwarf aid to the poor. His prescription, to become a *poverty abolitionist* who will not
+profit from a neighbor's poverty, is the operator's essay line "our own material success must never
+require another person's poverty" in policy form. The course puts it first on Module 12's reading
+list.
+
 **The take.** Gap-aware finance is not a new instrument. It is the **personal equilibrium** that the
 monetary posture §2.8 and canon §5.5 already name: what right relationship with what one holds
 requires, found by negotiation and never set by a number. The gap is the evidence that negotiation
