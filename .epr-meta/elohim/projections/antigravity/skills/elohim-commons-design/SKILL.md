@@ -1,24 +1,24 @@
 ---
-name: ostrom-commons-design
-description: "Consultable design gate for anything that pools, shares or holds a resource in common — a commons pool, a shared index or model, a collective's charter, a sharing or stewardship feature. Walks the design through Elinor Ostrom's design principles in the eleven-part wording she adopted last (Cox et al. 2010) as functions to satisfy and declarations a charter must carry, never as mechanisms; adds the three conditions the principles presuppose and the places a digital commons bends. Use when 'design a commons pool', 'is this a commons or open access', 'score this collective/charter against Ostrom', 'sharing feature', 'what must the pool declare', or before the p2p-design-gate on any `commons-pool:<kind>` resource. NOT for data-entity classification (p2p-design-gate) or cost/trust reading (gradient-reading)."
+name: elohim-commons-design
+description: "Consultable design gate for anything that pools, shares or holds a resource in common — a commons pool, a shared index or model, a collective's charter, a sharing or stewardship feature. Walks the design through Elinor Ostrom's design principles in the eleven-part wording she adopted last (Cox et al. 2010) as functions to satisfy and declarations a charter must carry, never as mechanisms, and for each principle says what the member's elohim absorbs and what the design must surface to the person: sensing, reading, carrying, drafting and the first-rung notice are the elohim's; the vote, admission, any rung past notice, settlement, recognition and a lens in force are never the elohim's, and there is no pool-elohim. Adds the conditions the principles presuppose, including plurality of judgment, and the places a digital commons bends. Use when 'design a commons pool', 'is this a commons or open access', 'score this collective/charter against Ostrom', 'sharing feature', 'what must the pool declare', 'what does the elohim absorb here and what do we surface to the member', or before the p2p-design-gate on any `commons-pool:<kind>` resource. NOT for data-entity classification (p2p-design-gate) or cost/trust reading (gradient-reading)."
 metadata:
   runtime: antigravity
   sourceRuntime: elohim-agent
   master: package
-  sourcePath: .epr-meta/elohim/packages/skills/ostrom-commons-design.json
+  sourcePath: .epr-meta/elohim/packages/skills/elohim-commons-design.json
   packageKind: SkillPackage
-governance: "epr:elohim-agent/skills/ostrom-commons-design"
+governance: "epr:elohim-agent/skills/elohim-commons-design"
 ---
-# Ostrom Commons Design
+# Elohim Commons Design
 
-A commons that lasts is held by a bounded community under rules it can change, watched by its own members, with consequences that start low and a cheap local place to settle disputes, recognized by the layer above it and nested in it. That is Elinor Ostrom's finding from the long-enduring commons, restated as eleven design principles (her Nobel lecture, 2009, adopting Cox, Arnold & Villamayor-Tomás 2010). This skill walks a design through them. It asks for **functions and declarations**, never mechanisms: Ostrom's own method found that "if there are 10 successful ways to monitor, the correlation between any one way and group performance will be weak" (Wilson, Ostrom & Cox 2013). Her footnote: "Perhaps I should have used the term 'best practices.'"
+A commons that lasts is held by a bounded community under rules it can change, watched by its own members, with consequences that start low and a cheap local place to settle disputes, recognized by the layer above it and nested in it. That is Elinor Ostrom's finding from the long-enduring commons, restated as eleven design principles (her Nobel lecture, 2009, adopting Cox, Arnold & Villamayor-Tomás 2010). This skill walks a design through them, and for each one says what the member's elohim absorbs and what the design must surface to the person, because this architecture pays most of the governance labor Ostrom's commons paid in attention at every member's endpoint. It asks for **functions and declarations**, never mechanisms: Ostrom's own method found that "if there are 10 successful ways to monitor, the correlation between any one way and group performance will be weak" (Wilson, Ostrom & Cox 2013). Her footnote: "Perhaps I should have used the term 'best practices.'"
 
 Load it into the session that holds the design: a pool, a shared index or model, a collective's charter, a sharing or stewardship feature. It is a reading method, not an instrument. It builds nothing and scores nothing.
 
 - The source pass, with every claim graded and every instrument at `file:line`: `genesis/research/ostrom-design-principles-commons-governance-2026-10-10.md`.
 - The design home for pools: `genesis/docs/superpowers/specs/2026-10-04-commons-pool-as-collective-party-design.md` (a pool is a `Collective` that holds a `commons-pool:<kind>` resource and is party to its members' commitments).
-- Canon it leans on: Stance IV.2 (justice is restored capability; "to not respect the limits is to limit your own reach"), governance-layers §Constitutional Councils (the council is drawn to the reach of the decision), `succession.md` §(b) (recognition is a success condition, not a compromise).
-- Backlog rows the gaps already ride: `commons-holonic-stewardship-backlog` rows 32–37; `measure-family-borrows-backlog` row 34.
+- Canon it leans on: the ubiquitous-wisdom reframe (`architecture/ubiquitous-wisdom-dissolves-chokepoint.md`: three gates, no chokepoint), the social-reach nervous system, the interface contract of the AI-stewarded commons plan ("quiet by default, intelligible on demand"; "the person is never the operator"), `succession.md` §5.3 (clerk, not planner), Stance IV.2 (justice is restored capability; "to not respect the limits is to limit your own reach"), governance-layers §Constitutional Councils (the council is drawn to the reach of the decision), `succession.md` §(b) (recognition is a success condition, not a compromise).
+- Backlog rows the gaps already ride: `commons-holonic-stewardship-backlog` rows 32–38; `measure-family-borrows-backlog` row 34.
 
 ## When this fires
 
@@ -58,7 +58,35 @@ Ask them of one pool at a time, in this order — the evidence weights congruenc
 | 8 | 3 collective choice | Members can change the rules | (none today — no charter-update path on `Collective`; row 35) | How a rule changes: who proposes, who decides, at what reach, by what closure artifact | A member-proposed lens change lands and two peers compute the same new charter head |
 | 9 | 6 conflict resolution | A fast, cheap, local arena, and an appeal upward | `StewardshipAppeal` (zero callers); mishpat `Challenge`; Commons Co-Steward mediation | The arena, its reach, and where appeal goes | A challenge opens and closes inside the pool's reach, witnessed |
 | 10 | 7 recognition of rights | The pool's rules bind at its reach and the parent holon says so | `CollabAgreement` with counter-attestation; the council drawn to reach; row 32 | Which parent recognizes the charter, and what it reserves | The parent's attestation of the charter resolves |
-| 11 | 8 nesting and scale | The pool is small enough to talk, or it nests | The reach ladder; subsidiarity | Its reach, its member ceiling, and the pool above it | Member count ≤ declared ceiling, or a parent pool is named |
+| 11 | 8 nesting and scale | The deciding body is small enough to talk, or it nests; the elohim carries coordination at any size | The reach ladder; subsidiarity | Its reach, its member ceiling, and the pool above it | Member count ≤ declared ceiling, or a parent pool is named |
+
+## The elohim's share
+
+The field kept commons small because every principle's labor was paid in members' attention. Here an elohim at every member's endpoint pays most of it: "moderation is centralized because intelligence used to be expensive," and with wisdom at every node it gates at authoring, relay and consumption. The same canon bounds what the agent may absorb: it is "a high-variety attenuator on the person's behalf, not a container for the person"; "no machine here will ever hold final authority over you that a human floor cannot overturn"; an agent that sets a limit "is a central planner with better manners," one that computes, shows and proposes "is a clerk"; and authority is vested in the diversity of the network and the validation of claims, never in a device or an agent. The rule, in one line:
+
+> **The elohim absorbs sensing, reading, carrying, matching, drafting and the first rung of consequence, inside standing mandates, for its own person. The person holds every act that makes a rule, changes a rule, admits or excludes, sanctions beyond notice, settles, recognizes, or stakes their standing.** The elohim's output is a proposal with evidence or an outcome with evidence, never a verdict. There is no pool-elohim: a pool is a party, not a person.
+
+In Beer's terms the elohim is Systems 2 and 3*, the computation in 3, the sensing in 4, and the carriage of the algedonic signal; the members are System 5, the bargain in 3, and every algedonic response past the first rung. This raises Ostrom's ceiling on **coordination**, not on **choice**: every mediation attenuates, so an assent carried through an elohim is not communication with the full set, and Q11 binds the deciding body while the elohim carries coordination at any size.
+
+The three gates pay the principles: **authoring** (1B, 2A, 2B, rung one of 5: the elohim checks holdings, lens and its person's balance and, before the door closes, says "add context, narrow, or proceed?" and records the choice); **relay** (4A by construction, and the carriage for 6: the carry is a witnessed provision event; notices and corrections travel back along the path); **consumption** (1A, 4B, and the human half of 3, 5, 6: membership verified; condition surfaced as care against a bound; one concrete choice when the decision is the person's).
+
+Per question, where the labor sits and what the member's surface is:
+
+| Q | The elohim absorbs | The person sees, or decides | Never |
+|---|---|---|---|
+| 1 (2A) | Applies the lens at all three gates; proposes an amendment with evidence when it misfits | The proposal, as one concrete choice | Authors a lens in force |
+| 2 (2B) | Reads the carrying record; computes its person's balance; warns before a crossing draw; narrows within the rule | Own basis and balance on demand; others' only where the charter says who may list, at what reach | Sets the ratio or the window |
+| 3 (4B) | Reads the pool measure against declared bounds; approach and breach with debounce; fails closed to Unmeasured | A care notice proportional to the limit; on breach one choice, or the agreed plan | A dashboard; a breach from sensor absence |
+| 4 (5) | Rung one only: the notice at the moment of the act, and the record that the person was told and chose; the debit afterwards as context | The choice to proceed, with standing staked; rungs two and up in a human arena with the elohim's evidence | Lectures, blocks, shames; imposes a rung from a constant |
+| 5 (4A) | Watches its own person's draws and the draws its person bears as holder; mints claims; validates others' claims | The last N draws on demand at the declared reach | A monitor role; a pool-elohim watching members |
+| 6 (1A) | Verifies membership at every gate; applies the join and leave rule; refuses naming the rule | Joining and leaving as their own acts | Admits or expels |
+| 7 (1B) | Checks every act against the declared holdings | The boundary on demand, and in the refusal | Infers holdings from what members happened to commit |
+| 8 (3) | Collects views, finds where they agree, drafts, computes closure deterministically, carries the outcome | **The vote**, one human one vote; the proposal and its evidence | Casts, weights, pools or proxies a vote |
+| 9 (6) | Carries the challenge back along the path; assembles the shared record; counsel to its own person; proposes mediation | The arena and the outcome with evidence | Judges; settles with another elohim |
+| 10 (7) | Resolves the parent's attestation; refuses an unrecognized child rule at that reach | Recognition as the parent council's act | Grants recognition |
+| 11 (8) | Routes to the lowest competent reach; escalates along endangered commitments; carries coordination at any size | Nest or split, and the parent's name | Treats carried assent as communication with the full set |
+
+A design that puts any "Never" on the elohim fails that question whatever the charter declares, and the finding is written as a chain gap, not a note. Two consequences the field did not have: the first rung of consequence moves *before* the act (most violations become conversations that end before they happen), and collective choice becomes cheap to convene and impossible to delegate (amendments frequent and small; closure deterministic; the vote untouched).
 
 ## Beneath the eleven
 
@@ -67,6 +95,7 @@ The principles explain "under what conditions trust and reciprocity can be built
 - **Communication is feasible with the full set of participants.** The substrate cannot supply this. A thousand-member pool fails it on day one. Q11 is its proxy: size to the condition, or nest.
 - **Reputations are known.** Supplied: standing is a relational record and reach is earned over time.
 - **Sanctioning is agreed by the participants themselves.** "When participants themselves agree to a sanctioning system they frequently do not need to use sanctions at a high volume"; imposed sanctions "may reduce cooperation." Q4's "the members agreed to" is load-bearing, and a council drawn to the reach of the decision is how the floor agrees.
+- **Plurality of judgment** (ours, not Ostrom's). Authority here is vested in the diversity of the network. If every member's elohim is one model under one prompt, or most members are hosted by one doorway whose elohim and keys are the doorway's, the distributed monitor is one judgment at every node and the chokepoint is rebuilt as a monoculture. The pool declares how many distinct lineages and hosts hold its members' seats and what agreement across them a binding outcome needs (row 38).
 
 ## Reading the result
 
@@ -80,6 +109,8 @@ Present (declaration + probe): Q6 Q7 …            n/11
 Declared, unwired (no probe):   Q1 …
 Absent:                         Q2 Q3 Q4 Q8 …
 Failure-predicting absences:    Q2 Q4
+Labor misplaced on the elohim:  Q8 (agent casts) Q4 (rung two in code) …
+Plurality: lineages=<n> hosts=<n>  closure-across=<rule or UNDECLARED>
 Rights on artifacts held by members: access contribution extraction removal management exclusion
 Alienation: held by no one  (or: NAMED — this is not a commons)
 Gaps, in mintable shape: chain / between A→C / missing node B: <assertion + probe> / current state
@@ -93,6 +124,8 @@ Never a score. A bare 0–11 number is the blueprint critique come true; the cou
 - **Not a blueprint.** "Each design principle stipulates a range of conditions that could satisfy it, rather than a particular rule." Do not demand numbers (member counts, penalty sizes) the charter has not chosen; demand that the charter choose them.
 - **No sanction in code alone.** Rules embedded in code are ex-ante and cannot read the context of an offense; a sanction must "start very low." The ladder is a pool-authored lens; the first rung is a notice; a refusal is never the first rung.
 - **Monitor appropriation, never persons.** Q3 and Q5 watch draws and the resource. A pool that watches its members has swapped Ostrom for surveillance, and a pool whose elohim holds the only monitoring and sanction tools has become the platform the open-data literature warns about.
+- **No pool-elohim.** A pool is a party, not a person; its members' elohim do the sensing, each for its own person, and claims are validated across the network. A steward seat a charter names is born narrow: it Permits alone only what the charter names and Refers the rest to the members.
+- **Proposal or outcome, never verdict.** Whatever the elohim does under a question, its output is a proposal with evidence or an outcome with evidence. Model output never supplies its own permission; a retry does not mint fresh authority; the person is never the operator and never reads a series.
 - **No tokens.** A contribution record is an REA event with a declared reach, never a transferable unit. Token-weighted voting "creates incentives for collusion and vote-buying"; every token-incentivized commons the earlier survey examined failed.
 - **"Owned by no one" means alienable by no one.** Hardin's error was presuming the commons "were owned by no one." Ostrom's commons are held by their members. Say which rights members hold; say alienation is held by nobody; do not say ownerless.
 - **Expect to formalize as you grow.** Growing commons formalize their rule-change process in order to decentralize (Forte; Schweik & English; Rozas). Q8's closure artifact is not a concession to a chain; it is what every scaling commons built.
