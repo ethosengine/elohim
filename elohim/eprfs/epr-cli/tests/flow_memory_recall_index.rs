@@ -298,7 +298,9 @@ fn contract_v15_declares_the_native_semantic_provider_and_repins_the_bank() {
 
 /// Task 4.2: the model manifest pins the embedding procedure's own bytes (the procedure is part
 /// of the method), and resolves the model directory explicit-first: an operator's
-/// `$EPR_EMBED_MODEL_DIR` before the default cache path.
+/// `$EPR_EMBED_MODEL_DIR`, then the device-owned PVC place a workspace provisions on arrival
+/// (`$XDG_CACHE_HOME/…`, 2026-10-10 — the chroma cache under a wiped `$HOME` is a visitor's
+/// leftover, never the fold's dependency), then that chroma cache last.
 #[test]
 fn the_model_manifest_pins_the_embedding_procedure() {
     use elohim_epr_cli::flow::memory::recall::embedder::PROCEDURE_REL;
@@ -328,6 +330,7 @@ fn the_model_manifest_pins_the_embedding_procedure() {
         manifest["resolve"],
         serde_json::json!([
             "$EPR_EMBED_MODEL_DIR",
+            "$XDG_CACHE_HOME/elohim/embed-models/all-MiniLM-L6-v2/onnx",
             "~/.cache/chroma/onnx_models/all-MiniLM-L6-v2/onnx"
         ])
     );

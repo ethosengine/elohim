@@ -322,3 +322,25 @@ were left stale because nobody read their claims). Native `epr flow status` read
 mid-session with "executor bytes changed since this session began", so a session that outlives an `epr`
 rebuild loses its bootstrap continuation unless it adopts. Chronicle:
 `genesis/data/timeline/chronicle/2026-10-06-substrate-currency-hub-doorway-web-seam.md`.
+
+DELTA 2026-10-10 (shem, the second workspace; NO status change, the habit stays red). The native
+semantic fold here had read `attested failed: unavailable: no model directory resolves` with 2,942
+files behind, because the pinned MiniLM bytes resolved only from the chroma cache MemPalace's mining
+had filled under `~/.cache` on ethosengine — a path a Che restart wipes, and one shem had never
+filled. The native index was borrowing a visitor's cache. Cure, same day: the pinned bytes on the
+PVC at `$XDG_CACHE_HOME/elohim/embed-models/all-MiniLM-L6-v2/onnx` (`genesis/agentic/bin/embed-model-provision`;
+the devfile's `setup-embed-model` runs it on start) and that path as the manifest's second `resolve`
+entry — CID-neutral, the fold store `bafyreigdsx…rn6e` was reused, not rebuilt; the pin test in
+`flow_memory_recall_index.rs` updated to the three-entry list. One-file fold: 25 chunks embedded.
+Catch-up fold `--max-files 3000` (debug `epr`): 2,941 files, 37,859 chunks, 40.9 MB, about 1 h 22 min,
+attested complete; headline `index: 11 files behind the fold within hard 25 ✅`. MemPalace mined on
+shem as a visitor (10,421 drawers: elohim_protocol 8,370 · memory 1,754 · stories 297). Two
+observations for this habit's frontier: (1) the record-without-witness seam — the 269 shared
+contributions are git-tracked and present here, but `ContributionActs` reads their acts from the
+untracked `flows.jsonl`, so the index projection counts all 269 as unattributed on a second device
+and only the install guard keeps the tracked MEMORY.md intact (lvi arrival spec §6.3; a re-import
+dry run would mint acts for 33 and skip 233); (2) `executor bytes changed` refused the bootstrap
+continuation again after the gate rebuilt `epr` mid-session, the same shape as 2026-10-06c. The
+device-local ring: 15 harness auto-memory entries under the gitignored `.claude/memory/device/` are
+folded as files; their contributions live in the ignored `device-contributions/` (the importer
+refuses symlinks and out-of-root sources).

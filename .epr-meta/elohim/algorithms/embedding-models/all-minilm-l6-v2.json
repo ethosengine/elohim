@@ -11,6 +11,7 @@
   "source": "sentence-transformers/all-MiniLM-L6-v2",
   "resolve": [
     "$EPR_EMBED_MODEL_DIR",
+    "$XDG_CACHE_HOME/elohim/embed-models/all-MiniLM-L6-v2/onnx",
     "~/.cache/chroma/onnx_models/all-MiniLM-L6-v2/onnx"
   ],
   "procedure": "bafkreiaki7eb57yokssmcxas74g5zwr4tjrqcolnk7gl7nukpnc4rii4hu",

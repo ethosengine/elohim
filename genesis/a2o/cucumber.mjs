@@ -61,6 +61,14 @@ export default function () {
       paths: ['features/devflow/collective-memory.feature'],
       format: ['progress'],
     },
+    // A workspace arriving as one of its person's devices: the real `epr` against a temp
+    // repository and two key files outside it (the ceremony's "no key crosses" is checkable).
+    'device-arrival': {
+      requireModule: ['tsx'],
+      require: ['steps/devflow/workspace-device-arrival.steps.ts'],
+      paths: ['features/devflow/workspace-device-arrival.feature'],
+      format: ['progress'],
+    },
     // Scoped saga profile: cucumber-js MERGES a profile's paths with CLI
     // positionals instead of replacing them, so running the saga dir under
     // `default` executes ~800+ scenarios (content ingests included) — a heavy

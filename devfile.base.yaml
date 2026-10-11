@@ -382,9 +382,34 @@ commands:
         # and when. See .claude/agents/historian.md (mcpServers frontmatter)
         # for the read-side wiring. Probe palace state so postStart logs it.
         mempalace status 2>&1 || true
+
+  # Arrival: the two per-device provisions the native memory fold needs on THIS device, declared
+  # here so a fresh workspace inits itself (elohim/lvi/docs/specs/2026-10-10-workspace-arrival-as-declared-device.md
+  # §3, §7). Both are idempotent and fail-open (a workspace with no network still starts; `just
+  # status device` then names the cure). The remaining arrival conditions (device key, roster
+  # binding, berth) are acts of a person present, never a postStart.
+  - id: setup-embed-model
+    exec:
+      component: tools
+      workingDir: /projects/elohim
+      commandLine: |
+        # The pinned all-MiniLM-L6-v2 ONNX bytes onto the PVC ($XDG_CACHE_HOME/elohim/embed-models/…),
+        # the model manifest's second resolve entry. Without this the semantic fold reads
+        # `attested failed: no model directory resolves` on every fresh workspace.
+        bash genesis/agentic/bin/embed-model-provision || true
+  - id: setup-device-memory
+    exec:
+      component: tools
+      workingDir: /projects/elohim
+      commandLine: |
+        # Claude Code's per-workspace auto-memory → .claude/memory/device/ (gitignored) so the
+        # device's own fold indexes it and nothing tracked ever carries it.
+        bash genesis/agentic/bin/device-memory-sync || true
 events:
   postStart:
     - setup-pnpm
     - setup-vscode-cli
     - setup-claude-mcp
+    - setup-embed-model
+    - setup-device-memory
  #   - setup-mempalace

@@ -78,6 +78,20 @@ the content path entirely for the surfaces the doorways already expose.
   controller_policy`); the coordinator `bind_identity` is the identity-head spec's open
   graduation trigger. The device binding this spec needs **is that primitive's first
   consumer** — W joins matthew's `controllers` set.
+
+  > **Superseded 2026-10-10.** The shipped primitive is Mishpat **device enrollment**
+  > (`elohim/holochain/dna/mishpat/zomes/mishpat/src/device_enrollment.rs`:
+  > `sign_device_enrollment` → `enroll_identity_device` → `verify_device_binding`), whose rule
+  > is the opposite of this bullet's: *no device enters the controller set*. W is a **joining
+  > record** approved by a root controller or an already-joined device, verified by walking its
+  > approvers back to the authority (depth- and visit-bounded), revoked by cascade. The
+  > `household-device-ceremony.ts` run proved it on the household with device = operator key;
+  > a true second-device run is still owed. Station 3 below reads as history; its assertion
+  > ("a fleet peer's `signer_is_known_agent(W)` is true") stands, its mechanism is the joining
+  > record. The developer-layer twin is the eprfs roster row (`epr actor device
+  > enroll|authorize|bind`, ruling R-P8), first run across two real machines on 2026-10-10
+  > (shem ↔ ethosengine). The three layers and the gap between them:
+  > `elohim/lvi/docs/specs/2026-10-10-workspace-arrival-as-declared-device.md` §4.
 - **Authority is a Commitment, checkable today.** `operation_authorization.rs`
   `authorize_operation(performer, capability)` finds the active `delegates-compute` grant
   and runs the shared 7-check bounds validator (fetch · revocation · window · scope ·
