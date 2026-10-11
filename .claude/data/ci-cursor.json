@@ -1,10 +1,10 @@
 {
  "jobs": {
   "elohim": 1759,
-  "elohim-edge": 1603,
+  "elohim-edge": 1605,
   "elohim-genesis": 1639,
   "elohim-holochain": 1496,
-  "elohim-orchestrator": 2033,
+  "elohim-orchestrator": 2035,
   "elohim-sophia": 146,
   "elohim-steward": 1,
   "elohim-storybook": 358
@@ -45,8 +45,6 @@
    "UNSTABLE"
   ],
   "elohim-edge": [
-   "NOT_BUILT",
-   "SUCCESS",
    "FAILURE",
    "FAILURE",
    "FAILURE",
@@ -59,6 +57,8 @@
    "NOT_BUILT",
    "FAILURE",
    "FAILURE",
+   "FAILURE",
+   "NOT_BUILT",
    "FAILURE"
   ],
   "elohim-storybook": [
@@ -79,12 +79,12 @@
    "SUCCESS"
   ],
   "elohim-orchestrator": [
-   "SUCCESS",
-   "SUCCESS",
    "FAILURE",
    "SUCCESS",
    "SUCCESS",
    "SUCCESS",
+   "FAILURE",
+   "FAILURE",
    "FAILURE",
    "FAILURE",
    "FAILURE",
