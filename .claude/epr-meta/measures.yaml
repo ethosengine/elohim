@@ -1295,6 +1295,35 @@ measures:
     established_by: slug-leftovers-sprint-20261008
     why: "the 2026-10-08 lamad-spa reading was two CIDs for one name with no way to tell stale from different"
 
+  # ── the fleet's catch-up wait (algedonic-designer, 2026-10-11; sense=waiting) ──
+  # ci-harvest.py records every edge build's fleet-quiesce gate into quiesce-timeline.jsonl, and
+  # no measure, lens or habit check reads the wait back. Since Dataplane Validation became a
+  # fire-and-forget validate-only sibling (push-delivers-within-budget DELTA 2026-09-27b), the
+  # wait sits outside every delivery wall clock, so delivery-series no longer feels it either.
+  - id: fleet-quiesce-wait
+    version: 1
+    family: convergence
+    unit: seconds
+    procedure: >
+      Read .claude/data/quiesce-timeline.jsonl (`python3 genesis/scripts/quiesce-timeline.py
+      --series` renders the same records). Keep records with source "fleet" (absent = fleet), a
+      non-null time_to_verdict_s and verdict_trustworthy true. Dedupe by build (last record
+      wins) and take the newest ten by build number. Fold the nearest-rank p90 of
+      time_to_verdict_s over those ten. Count every outcome: a no_measure run that burned the
+      whole QUIESCE_DEADLINE_SECS was still waited. Fold with subject `.` and
+      `--env job=elohim-edge`.
+    provenance: ".claude/data/quiesce-timeline.jsonl (fleet records, elohim-edge #1532–#1599, harvested by .claude/scripts/ci-harvest.py's quiesce leg); scripts/ci/fleet-quiesce-gate.sh (DEADLINE 2700 s, SUSTAIN 330 s)"
+    env-sensitivity: [job]
+    default-authority: observation
+    status: active
+    established_by: algedonic-designer-2026-10-11
+    why: >
+      The gate's floor is its own sustain window (~362 s observed). Everything above that is the
+      fleet's storage-A not being caughtUp, which is dataplane-convergence's fleet leg. In
+      2026-10-04..10-11, 35 fleet waits summed 41,908 s (≈11.6 h), and 29,238 s of that was
+      above the floor. Three runs exhausted the 2,700 s deadline without a measure. No channel
+      fired on any of it.
+
 lenses:
   - id: resource-limit-raise-recurrence
     version: 1
@@ -2180,3 +2209,33 @@ lenses:
     status: active
     established_by: slug-leftovers-sprint-20261008
     why: "two doorways answering one name differently is the incident; zero is the only honest ceiling"
+
+  # ── the fleet's catch-up wait bound (algedonic-designer, 2026-10-11; sense=waiting) ──
+  # Rendered by `epr flow report --bound fleet-quiesce-wait-ceiling` and named in the
+  # dataplane-convergence habit's checks (habits-status.py). The SessionStart headline has fixed
+  # slots, and none of them belongs to the fleet's convergence wait.
+  - id: fleet-quiesce-wait-ceiling
+    version: 1
+    binding: binding-local
+    class: measure
+    consumes: [fleet-quiesce-wait@1]
+    env: { job: elohim-edge }
+    subject: .
+    context: edge-dataplane-validation
+    compare: above
+    soft: 1530
+    hard: 2700
+    concern: dataplane-convergence
+    retire-when: >
+      when the fleet is caught up by construction after a roll (dataplane-convergence green on its
+      fleet leg), so the quiesce gate's verdict arrives at its sustain floor and the wait carries no
+      catch-up
+    status: active
+    established_by: algedonic-designer-2026-10-11
+    why: >
+      soft 1530 = the substrate trust contract's I6 restart-churn floor (~20 min = 1200 s,
+      2026-07-12 runbook) + the gate's own QUIESCE_SUSTAIN_SECS 330. A verdict later than that is
+      catch-up beyond the addressing churn the contract already prices. hard 2700 = the gate's
+      own QUIESCE_DEADLINE_SECS default (scripts/ci/fleet-quiesce-gate.sh). Past it the gate ends
+      DID-NOT-MEASURE, so a p90 there means the convergence leg is not being measured at all.
+      Reading at mint (newest ten, #1589–#1599): p90 2233 s, above soft and under hard.
