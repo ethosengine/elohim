@@ -156,8 +156,57 @@ median-wealth arithmetic, are underwater. The claims, graded:
 | The New Testament "modesty" passages target displays of wealth | ◐ | 1 Tim 2:9 and 1 Pet 3:3 both name braided hair, gold, pearls and costly clothing. The context is conspicuous consumption. |
 | Politizane's updated *Wealth Inequality in America* series | ⚠ | Not checked this pass. The 2012 original is well known. Confirm the update before citing it. |
 
+### 4.1 Real finances mind the gap
+
+The operator's follow-on note, the same day:
+
+> Real finances consider not just what we earn, but consequentially how we live relative to your
+> median neighbor, finances that are "real" minds the gap. Holding this thought seriously is what
+> would separate the economics of heaven from the corruption laundered in with the popular but
+> captured stories of "Financial Peace".
+
+This turns §4 around. §4 asked whether the pulpit knows the pew's finances. This asks what counts
+as a finance at all. The usual household picture has two numbers: what comes in (income) and what
+is owned net of what is owed (net worth). **Real finances add a third: the gap**, meaning how a
+household lives compared with its median neighbor, and whose hours that margin requires. A balance
+sheet can be healthy while the gap widens, and on this reading that household is not at peace. It
+is drifting away from its neighbor and calling the drift security.
+
+Scripture keeps this third number. The rich fool of Luke 12:16-21 has excellent finances by the
+first two measures, with a surplus and a plan for bigger barns, and God calls him a fool because he
+is "not rich toward God." Paul's *isotēs* (2 Cor 8:13-15) measures between households, not inside
+one. Amos 6:4-6 condemns those who lie on ivory beds "but are not grieved over the ruin of Joseph":
+their sin is the distance and the indifference to it. ◐
+
+**Financial Peace, read fairly and then for what it leaves out.** Dave Ramsey's *Financial Peace
+University* and *The Total Money Makeover* are the most widely taught household-finance curriculum
+in American churches ◐. The "baby steps" go: a starter emergency fund, the debt snowball, three to
+six months of expenses saved, 15% invested for retirement, college savings, paying off the house,
+then "build wealth and give." The tagline is "live like no one else, so later you can live and give
+like no one else" ◐. **What it gets right deserves saying first.** Consumer debt is a real bondage
+(Proverbs 22:7, "the borrower is the slave of the lender," is its central verse), and the
+programme has helped many households get out of it. The discipline, the intention and the refusal
+of debt-funded consumption are all sound.
+
+What the operator calls *laundered in*, graded as a critique and not as fact:
+
+| What the story assumes | What it leaves out | Grade |
+|---|---|---|
+| The unit of finance is the household alone | Structural extraction (rent on land the community made valuable, stagnant wages, medical debt, payday lending) appears only as a discipline problem for the person paying it | ◐ critique |
+| Proverbs 22:7 is read as advice to the *borrower* | The same canon's usury law addresses the *lender* (§4). The system that profits from the bondage is never called to repentance. The debtor is only taught to escape it, one household at a time | ◐ critique |
+| The end state is accumulation, "live like no one else" | It is Matthew 6:19 deferred: treasure on earth, later. "Like no one else" measures success by distance *above* the neighbor, which is the gap renamed as a reward | ◐ critique |
+| Peace is measured on one's own balance sheet | The gap is invisible to the measure, so a household can reach "financial peace" while its neighbor's position worsens, partly because of the same system its investments are in | ◐ critique |
+| Giving is a step or a percentage | Giving is not tied to the gap; Deuteronomy's floor (§4) and Paul's *isotēs* measure giving by the neighbor's need, not one's own milestone | ◐ critique |
+
+**The take.** Gap-aware finance is not a new instrument. It is the **personal equilibrium** that the
+monetary posture §2.8 and canon §5.5 already name: what right relationship with what one holds
+requires, found by negotiation and never set by a number. The gap is the evidence that negotiation
+reads. It stays a discernment, never a denomination (§3): no household is graded by its distance
+from the median, because that would be the observer trap. But a community that **can see the gap**
+can ask the question Financial Peace's measure cannot ask, which is *peace with whom?*
+
 **Where this goes:** Module 12 of *Foundations for Christians and Technology* now carries the
-tithe-as-floor and usury readings; Module 7 carries the manna, rust and Sabbath reading of
+tithe-as-floor, usury and "real finances mind the gap" readings; Module 7 carries the manna, rust and Sabbath reading of
 demurrage (§7 below). The course states these in its own voice. The essay stays here as the
 operator's own words.
 
