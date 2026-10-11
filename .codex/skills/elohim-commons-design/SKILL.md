@@ -27,7 +27,8 @@ Before the design is proposed, and before `p2p-design-gate` prices its entities,
 - creates or amends a pool, a `Collective` charter, or a `commons-pool:<kind>` resource;
 - lets members contribute to, draw from, or carry something held in common (storage, compute, an index, a model, a tile archive, a treasury, a mutual-credit line);
 - adds a sharing, pooling, stewardship or federation feature;
-- names a group that will govern a resource at any reach.
+- names a group that will govern a resource at any reach;
+- stands up or changes the policy of a doorway. A doorway is a thin, plural web2 federation (names, TLS, caching, and the conductor minutes of its hosted rung) whose capacity is a facility governed by the people who ingress through it; it is a subject of these questions, never a party that governs its users.
 
 If the thing has an owner who can sell it, this skill does not apply; it is private property with guests. If nobody can exclude anyone, it is open access and Hardin applies; this skill's first finding will be that Q6 fails.
 
@@ -95,7 +96,7 @@ The principles explain "under what conditions trust and reciprocity can be built
 - **Communication is feasible with the full set of participants.** The substrate cannot supply this. A thousand-member pool fails it on day one. Q11 is its proxy: size to the condition, or nest.
 - **Reputations are known.** Supplied: standing is a relational record and reach is earned over time.
 - **Sanctioning is agreed by the participants themselves.** "When participants themselves agree to a sanctioning system they frequently do not need to use sanctions at a high volume"; imposed sanctions "may reduce cooperation." Q4's "the members agreed to" is load-bearing, and a council drawn to the reach of the decision is how the floor agrees.
-- **Plurality of judgment** (ours, not Ostrom's). Authority here is vested in the diversity of the network. If every member's elohim is one model under one prompt, or most members are hosted by one doorway whose elohim and keys are the doorway's, the distributed monitor is one judgment at every node and the chokepoint is rebuilt as a monoculture. The pool declares how many distinct lineages and hosts hold its members' seats and what agreement across them a binding outcome needs (row 38).
+- **Plurality of judgment** (ours, not Ostrom's). Authority here is vested in the diversity of the network. If every member's elohim is one model under one prompt, the distributed monitor is one judgment at every node and the chokepoint is rebuilt as a monoculture. The pool declares how many distinct elohim lineages hold its members' seats and what agreement across them a binding outcome needs (row 38). Hosting is not a leg of this: a member in the hosted phase is one member with one elohim, and the doorway fronting them is a thin, plural web2 federation that holds no seat and is itself subject to the commons governance of those who ingress through it.
 
 ## Reading the result
 
@@ -110,7 +111,7 @@ Declared, unwired (no probe):   Q1 …
 Absent:                         Q2 Q3 Q4 Q8 …
 Failure-predicting absences:    Q2 Q4
 Labor misplaced on the elohim:  Q8 (agent casts) Q4 (rung two in code) …
-Plurality: lineages=<n> hosts=<n>  closure-across=<rule or UNDECLARED>
+Plurality: lineages=<n>  closure-across=<rule or UNDECLARED>
 Rights on artifacts held by members: access contribution extraction removal management exclusion
 Alienation: held by no one  (or: NAMED — this is not a commons)
 Gaps, in mintable shape: chain / between A→C / missing node B: <assertion + probe> / current state
