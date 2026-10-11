@@ -32,6 +32,36 @@ noted). Read it as ◐ until a reader checks the wording.
 
 ---
 
+## 0. The first beat: the garden
+
+Scripture's economy opens in a garden and closes in a garden-city. Everything in this note sits
+between those two scenes, and each section can be read as one step from the first toward the
+second.
+
+**What the garden gives (Genesis 1–2).** Provision comes before labour: "I have given you every
+plant… for food" (1:29). Rest comes before work: God rests on the seventh day (2:2-3), and the
+humans made on the sixth begin their life on a day of rest, not of work. Work is real, but its shape
+is care: the man is placed in the garden "to work it and keep it" (2:15). The Hebrew pair *ʿābad /
+šāmar*, serve and guard, describes tending, not extraction. And the abundance has a limit inside
+it: every tree is free but one (2:16-17). **The first economy is gift, rest, keeping, and a
+boundary that makes "enough" possible.** ◐
+
+**What grasping costs (Genesis 3).** The fall in this telling is an act of wanting: the tree was
+"good for food… a delight to the eyes… to be desired" (3:6). What follows is the curse on work:
+"cursed is the ground because of you; in pain you shall eat of it… by the sweat of your face"
+(3:17-19). **Toil is what grasping costs.** Work stops being keeping and becomes compulsion. That is
+§2's claim in its oldest form: when wanting outruns the boundary, the work it compels becomes a
+burden. The story then moves to the first city, built by Cain (4:17), and to Babel's bricks
+(11:3), the first economy of production for its own sake. ◐
+
+**What the law and the wilderness carry forward.** The manna (§1) is the garden's rule carried into
+the wilderness: daily gift, decay instead of hoarding, and a Sabbath portion. Sabbath, the
+seventh-year release and Jubilee (§4) are the garden's rule written into law for a people who now
+hold land: return the land, release the debt, rest the soil, so that no one is shut out of the
+garden for good. Gesell's demurrage (§1) is a modern attempt at the same rule. ◐
+
+---
+
 ## 1. Why demurrage: money kept in relationship with goods
 
 Canon already states the mechanism ✅ ([succession §3.1–3.2](epr:succession)): *money can wait, and
@@ -214,8 +244,36 @@ reads. It stays a discernment, never a denomination (§3): no household is grade
 from the median, because that would be the observer trap. But a community that **can see the gap**
 can ask the question Financial Peace's measure cannot ask, which is *peace with whom?*
 
+### 4.2 The closing beat: the garden-city
+
+The story does not end by going back to Eden. It ends in a city with the garden inside it, which
+answers each of the Genesis losses:
+
+- **The curse on work is lifted.** "No longer will there be anything accursed… and his servants will
+  worship him" (Rev 22:3). The verb for service is the garden's word again: work restored as keeping,
+  not toil. ◐
+- **Abundance comes as a flow, and it is shared.** The tree of life bears "fruit each month" and its
+  leaves are "for the healing of the nations" (22:2). Fruit that comes every month needs no barn.
+  Hoarding has nothing to protect. ◐
+- **There are no gates to keep anyone out.** "Its gates will never be shut by day" (21:25). The
+  essay's "gated suburbs" are the opposite of this city. ◐
+- **Labour is not taken by someone else.** "They shall build houses and inhabit them… they shall not
+  build and another inhabit" (Isaiah 65:21-23). That is a world without rent extraction and with
+  fair wages. "Each under his vine and fig tree, and no one shall make them afraid" (Micah 4:4) is
+  sufficiency held in security, not accumulation, and it follows directly on swords beaten into
+  ploughshares. ◐
+- **Its counterpart is named.** Babylon's merchants grieve over a cargo list that ends "slaves, that
+  is, human souls" (Rev 18:13). That is an economy whose abundance requires someone's poverty, judged
+  at the end of the canon. ◐
+
+**This is where the operator's phrase "exiting wealth into a garden community" points.** It does
+not mean retreating to a smallholding. It means moving one's holdings out of the Babylon pattern of
+extraction and into the garden-city pattern of keeping, sharing and rest, now, as a foretaste. The
+church's local economy (§4) and the protocol's commons are both attempts to live in the second city
+before it arrives. The gap (§4.1) measures how far a household still lives in the first.
+
 **Where this goes:** Module 12 of *Foundations for Christians and Technology* now carries the
-tithe-as-floor, usury and "real finances mind the gap" readings; Module 7 carries the manna, rust and Sabbath reading of
+tithe-as-floor, usury and "real finances mind the gap" readings, closing on the garden-city; Module 7, opening from the garden, carries the manna, rust and Sabbath reading of
 demurrage (§7 below). The course states these in its own voice. The essay stays here as the
 operator's own words.
 
