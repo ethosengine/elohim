@@ -25,7 +25,7 @@ Before the design is proposed, and before `p2p-design-gate` prices its entities,
 - lets members contribute to, draw from, or carry something held in common (storage, compute, an index, a model, a tile archive, a treasury, a mutual-credit line);
 - adds a sharing, pooling, stewardship or federation feature;
 - names a group that will govern a resource at any reach;
-- stands up or changes the policy of a doorway. A doorway is a thin, plural web2 federation (names, TLS, caching, and the conductor minutes of its hosted rung) whose capacity is a facility governed by the people who ingress through it; it is a subject of these questions, never a party that governs its users.
+- stands up or changes the policy of a doorway. A doorway is a thin, plural web2 federation (names, TLS, caching, and the conductor minutes of its hosted rung) whose capacity is a facility governed by the people who ingress through it; it is a subject of these questions, never a party that governs its users. Its moderation UI may be as robust as the inter-instance tooling of federated networks (allow, limit, suspend, reports, relay policy), but every authoritative setting behind that UI is a native record of the holon's DHT dataplane (charter, lenses, the ladder) that the doorway reads; a setting that exists only in doorway configuration fails Q8 and Q4 at once.
 
 If the thing has an owner who can sell it, this skill does not apply; it is private property with guests. If nobody can exclude anyone, it is open access and Hardin applies; this skill's first finding will be that Q6 fails.
 
