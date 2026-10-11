@@ -120,6 +120,12 @@ The evidence bridge adjudicates hard against build state, and both canon and the
 
 [Succession without conquest (canon) →](epr:succession) · [Evidence bridge →](epr:succession-without-conquest-mutualist-lineage-2026-08-23) · [The monetary posture →](epr:monetary-posture-internal-currencies-external-fiat-2026-08-23)
 
+### Which abundance, from the demand side — rest, contentment, and the cost of production
+
+Canon's §5.6 asks *which* abundance from the supply side: some building raises what the land can carry and some uses it up. This note asks the half it leaves out: **how much wanting is the building for?** How much must be produced depends on how much we want, so **abundance compels the work**. Every new want is a claim on somebody's hours, usually the hours of people least able to refuse, and gains in efficiency get spent rather than rested (Keynes' fifteen-hour week never arrived). It also gives the *reason* for Gesell's demurrage, not just its mechanism: money that does not decay stops standing for the goods and labour it represents, which do decay. A carrying cost keeps the symbol tied to the thing, and circulation follows from that. Scripture draws the same line more precisely: the manna rotted when hoarded *except the portion kept for the Sabbath* (preservation for rest is legitimate; accretion is not), and in James 5 the rust on hoarded gold testifies against wages kept back by fraud. The argument opens and closes in the garden: Genesis gives provision before labour, rest before work, keeping as the shape of work, and one boundary inside the abundance, and Genesis 3 makes toil the cost of grasping. Revelation 21–22 lifts the curse on work, bears fruit every month for the healing of the nations, and never shuts the gates. The proposed manifesto line is **abundance is not the most a system can produce; it is a sufficiency people can rest in**, and it requires an input no mechanism supplies: **contentment**, which can be practised and made affordable but never imposed. The note also grades the operator's field observation on flat-rate tithing preached to an underwater congregation, and carries it into *Foundations for Christians and Technology* Modules 7 and 12. **The next link on this map is degrowth / post-growth economics** (Hickel, Kallis, Soper's *alternative hedonism*, Illich, Schumacher, Daly, Brueggemann's *Sabbath as Resistance*). It is noted, not surveyed, and belongs beside Meadows in the Limits Problem below.
+
+[Which abundance, from the demand side →](epr:abundance-rest-and-the-cost-of-production-2026-10-11)
+
 ---
 
 ## The Limits Problem — dynamics under a carrying capacity
@@ -137,6 +143,8 @@ Adjudicated against build state, the ladder reading is a barbell: strong at info
 Two confirmations from a second lineage: friction-gradient limitarianism is Meadows' own Way Out of the success-to-the-successful trap, and `habits.yaml`'s evidence rule is her Way Out of seeking-the-wrong-goal ("don't confuse effort with result"). Two declines, stated plainly: her privatization horn for the commons (our witness layer is a third horn she lacked — make the consequence *felt* without making the resource *ownable*), and leverage point #1's relativism, since two floors here are claim-not-frame — imago dei and physics — non-negotiable for different reasons. One correction offered to canon: the orchestra epic's "overshoot impossible" overstates — a protocol cannot remove the perception-delay term, only collapse it, so the keepable promise is that overshoot becomes *witnessed and priced*.
 
 [Meadows and the Elohim substrate →](epr:meadows-systems-dynamics-cross-pollination-2026-08-11)
+
+**Next exploration, not yet surveyed: degrowth / post-growth.** *Limits to Growth* is degrowth's founding text, so the survey belongs here. The questions it owes this corpus are listed in [which abundance, from the demand side §5](epr:abundance-rest-and-the-cost-of-production-2026-10-11): whether degrowth actually conflicts with canon's "build until the scarcity that yields rent is gone", or whether Hickel's *selective* degrowth is the intensive column under another name; who is asked to degrow, since nobody below the floor can be; chosen sufficiency versus imposed austerity; and whether degrowth has any answer to the rebound effect besides willpower.
 
 ---
 
