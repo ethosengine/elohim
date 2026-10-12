@@ -367,6 +367,7 @@ pub async fn heal_participations(
     hc: &Arc<HcClient>,
     pool: &DbPool,
     pacing: &HealPacing,
+    receipts: &crate::p2p::projection_reconcile::ReadReceipts,
 ) -> ParticipationsHealOutcome {
     use crate::db::memberships::MembershipProjectionOutcome as Outcome;
 
@@ -380,6 +381,14 @@ pub async fn heal_participations(
             crate::services::conductor_writes::get_membership_by_anchor(hc, &anchor)
         })
         .await;
+        // The read completed — receipted unless it was a local refusal
+        // (`conductor_was_asked`). See `ReadReceipts`.
+        crate::p2p::projection_reconcile::receipt_read(
+            receipts,
+            PROJECTION_INVENTORY_TABLE_PARTICIPATIONS,
+            &anchor,
+            &attempt.result,
+        );
         circuit.record(&attempt.result);
         match attempt.result {
             Ok(Some(wire)) => match heal_participation_one(&anchor, &wire, pool) {

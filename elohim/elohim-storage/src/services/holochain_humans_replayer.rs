@@ -264,6 +264,11 @@ pub struct MembershipSnapshot {
     /// (the departed fossil has no live-key partner, so a forced 1:1 would
     /// mis-attribute it onto a new member's key).
     pub withdrawn_households: std::collections::HashSet<String>,
+    /// Households whose membership read the conductor ANSWERED (`Ok`). A
+    /// projection-read failure or an empty household list yields none, and a
+    /// failed per-household read is not counted — the heal leg receipts an
+    /// owed re-admission read only for humans of these households.
+    pub queried_households: std::collections::HashSet<String>,
 }
 
 /// Boot-time snapshot of `(member_cid, household_cid)` pairs from the current
@@ -320,6 +325,7 @@ pub async fn snapshot_household_ids_for_cids(
     for cid in cids {
         match reader.list_memberships(cid).await {
             Ok(records) => {
+                snapshot.queried_households.insert(cid.clone());
                 let (pairs, incomplete, withdrawn_seen) = extract_household_pairs(cid, &records);
                 if incomplete {
                     snapshot.incomplete_households.insert(cid.clone());
@@ -755,6 +761,12 @@ mod tests {
             "a failed household read must be marked incomplete"
         );
         assert!(!snap.incomplete_households.contains("collective:uhCkkUp"));
+        // Only the household the conductor ANSWERED for counts as queried —
+        // the failed read asks nothing the heal leg may receipt.
+        assert_eq!(
+            snap.queried_households,
+            std::collections::HashSet::from(["collective:uhCkkUp".to_string()])
+        );
     }
 
     #[tokio::test]
@@ -825,5 +837,9 @@ mod tests {
             .expect("snapshot");
         assert!(snap.pairs.is_empty());
         assert!(snap.incomplete_households.is_empty());
+        assert!(
+            snap.queried_households.is_empty(),
+            "an empty household list asks the conductor nothing"
+        );
     }
 }

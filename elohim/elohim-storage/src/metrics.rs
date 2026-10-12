@@ -3499,6 +3499,16 @@ pub fn register_all() {
             }
         }
         let _ = REGISTRY.register(Box::new(PROJECTION_MISS_READMISSIONS.clone()));
+        let _ = REGISTRY.register(Box::new(PROJECTION_MISS_OWED_REOFFERS.clone()));
+        let _ = REGISTRY.register(Box::new(PROJECTION_MISS_OWED_EXPIRED.clone()));
+        for stream in ["rea", "content", "collectives", "participations", "humans"] {
+            PROJECTION_MISS_OWED_REOFFERS
+                .with_label_values(&[stream])
+                .inc_by(0);
+            PROJECTION_MISS_OWED_EXPIRED
+                .with_label_values(&[stream])
+                .inc_by(0);
+        }
         // Pre-touch every (stream, rung) pair so "no id has come back from
         // dormancy yet" reads as a measured zero rather than an absent series —
         // the distinction that matters when the question being asked is whether
@@ -5825,6 +5835,54 @@ pub fn add_projection_miss_readmissions(stream: &str, rung: &str, count: usize) 
     PROJECTION_MISS_READMISSIONS
         .with_label_values(&[stream, rung])
         .inc_by(count as u64);
+}
+
+// A separate block: the main `lazy_static!` above sits at the macro recursion
+// limit, so new statics land here.
+lazy_static! {
+    /// A re-admitted id's ONE read was offered again because the previous offer
+    /// was never executed (shed by the leg budget / circuit, backpressure,
+    /// `unattempted`, or a plan dropped by single-flight), by stream. Rising
+    /// alongside a flat `get_*` conductor-call rate is a heal leg that keeps
+    /// shedding the same owed ids.
+    pub static ref PROJECTION_MISS_OWED_REOFFERS: IntCounterVec = IntCounterVec::new(
+        Opts::new(
+            "elohim_projection_reconcile_miss_owed_reoffers_total",
+            "Re-admitted reconcile gaps whose owed read was offered again because the \
+             previous offer was not executed, by stream.",
+        ),
+        &["stream"],
+    )
+    .unwrap();
+
+    /// An owed re-admission read reached `MAX_OWED_REOFFERS` unexecuted offers
+    /// and the id went back to dormancy as if read, by stream — the bound that
+    /// keeps repeated backpressure from becoming a per-sweep hot loop.
+    pub static ref PROJECTION_MISS_OWED_EXPIRED: IntCounterVec = IntCounterVec::new(
+        Opts::new(
+            "elohim_projection_reconcile_miss_owed_expired_total",
+            "Re-admitted reconcile gaps returned to dormancy after the owed read went \
+             unexecuted for MAX_OWED_REOFFERS consecutive sweeps, by stream.",
+        ),
+        &["stream"],
+    )
+    .unwrap();
+
+}
+
+/// Record a sweep's owed-read re-offers and expiries on `stream` (see
+/// [`PROJECTION_MISS_OWED_REOFFERS`] / [`PROJECTION_MISS_OWED_EXPIRED`]).
+pub fn add_projection_miss_owed(stream: &str, reoffered: usize, expired: usize) {
+    if reoffered > 0 {
+        PROJECTION_MISS_OWED_REOFFERS
+            .with_label_values(&[stream])
+            .inc_by(reoffered as u64);
+    }
+    if expired > 0 {
+        PROJECTION_MISS_OWED_EXPIRED
+            .with_label_values(&[stream])
+            .inc_by(expired as u64);
+    }
 }
 
 /// Publish a reconcile stream's last-sweep gauges: discovered `gaps` (pending after
