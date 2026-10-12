@@ -46,7 +46,7 @@ anchor, so it can never answer for a mishpat entry hash, on any conductor, inclu
 819, 937 and 1354 calls on the three peers, each within one of its census count. A restart empties the in-memory miss
 ledger, so every boot re-reads the whole cohort once.
 
-**Cure (in code, not measured).** Commit `89c28f109`: `inventory_for_peer_reconcile` omits rows whose id is a
+**Cure (in code, not measured).** Commit `f37128643`: `inventory_for_peer_reconcile` omits rows whose id is a
 `mishpat_commitments.cid` (an exact join, not a test on id shape), and `total` is counted over the same set. The
 project-scoped inventory the trigger courier uses, and the local diff, are unchanged. The cure is stateless: no table,
 column, wire field or zome change. It had not been measured on the household when this was written; the check is the

@@ -33,7 +33,7 @@ storage restart re-authored a notarized commitment for every desired scope. Meas
 2026-10-12: matthew holds 729 live, unrevoked mirrored rows for 154 scopes, up to 8 per scope, created between
 2026-10-04 and 2026-10-12 at 20, 54, 66, 70, 95, 135, 135 and 154 rows per day; jessica holds 613 and james 202;
 none is revoked on any of the three. `deterministic_valid_from` buckets to the UTC day, so same-day restarts share
-an entry hash and the per-day row count understates the number of conductor writes. The cure is commit `635e9ca6b`
+an entry hash and the per-day row count understates the number of conductor writes. The cure is commit `3eb2b52c3`
 on branch `perf/idle-cpu-residual-sprint`: the author arm now reads live rows under any of the author's own
 agent-key candidates (session key, then cell key). It had not been measured on the household when this was written.
 
