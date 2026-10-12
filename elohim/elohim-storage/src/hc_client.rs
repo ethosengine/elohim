@@ -746,7 +746,14 @@ impl HcClient {
         let adopted = fresh.connection();
         let generation = adopted.generation;
         let app_ws = adopted.app_ws.clone();
+        let replaced = self.connection_generation();
         self.conn.replace(adopted);
+        // The socket this client was using is gone for good: its evidence goes
+        // with it, and a failure still in flight from it must not be read as
+        // news about the mint just adopted.
+        if replaced != generation {
+            crate::hc_client_registry::retire_transport_generation(self.role_key(), replaced);
+        }
         // The handlers were registered on the socket that just died; a fresh
         // websocket knows none of them until they are registered again.
         let handlers: Vec<SignalHandler> = self

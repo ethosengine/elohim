@@ -173,37 +173,96 @@ pub fn bridge_vouched_within(role: &str, generation: u64, window: Duration) -> b
 /// Small on purpose: three in a row on one generation is past any doubt.
 pub const TRANSPORT_CLOSED_REMINT_BOUND: u32 = 3;
 
-/// One role's transport-closed streak, scoped to the mint that produced it.
+/// What the ledger knows about ONE connection (one mint) of a role.
+#[derive(Debug, Default, Clone, Copy)]
+struct MintTransport {
+    streak: u32,
+    /// When bytes last crossed this mint's socket.
+    last_ok: Option<std::time::Instant>,
+    /// The process-wide doubt epoch ([`TransportLedger::raise_doubt`]) the
+    /// newest credited answer was ASKED in. An answer from before the latest
+    /// doubt vouches for nothing.
+    ok_epoch: u64,
+    /// When this record was last written (an answer or a failure): what
+    /// eviction orders by.
+    touched: Option<std::time::Instant>,
+}
+
+/// How many replaced mints a role remembers, to drop their late reports.
+const RETIRED_REMEMBERED_PER_ROLE: usize = 256;
+
+/// How many mints of one role the ledger remembers at once.
+///
+/// A role has one supervised client, a few long-lived unsupervised ones (the
+/// identity fill's `imagodei`, the heal legs' late-connected `lamad`), and
+/// short-lived side clients minted per apply or per lineage tick. The ceiling
+/// is far above the long-lived set so that churn from the short-lived ones
+/// evicts each other, least recently written first, and not a record a
+/// supervisor is still writing to.
+const MINTS_REMEMBERED_PER_ROLE: usize = 64;
+
+/// One role's transport evidence, PER MINT, and the handle its supervisor
+/// waits on.
 #[derive(Debug, Default)]
 struct RoleTransport {
-    generation: u64,
-    streak: u32,
-    /// When bytes last crossed `generation`'s socket. Reset with the mint: an
-    /// answer on a replaced socket says nothing about the one in use.
-    last_ok: Option<std::time::Instant>,
-    /// The process-wide doubt epoch ([`TransportLedger::raise_doubt`]) in force
-    /// when `last_ok` was recorded. An answer from before the latest doubt
-    /// vouches for nothing.
-    ok_epoch: u64,
+    mints: std::collections::BTreeMap<u64, MintTransport>,
+    /// Mints an adoption has replaced. A late failure from one of these says
+    /// nothing about its successor and is dropped.
+    retired: std::collections::BTreeSet<u64>,
     wake: Arc<tokio::sync::Notify>,
 }
 
-/// Process-wide record of transport-closed evidence from the zome-call path,
-/// per role, keyed by connection generation
+impl RoleTransport {
+    /// The record for `generation`, made if absent and stamped as written now.
+    fn mint(&mut self, generation: u64, now: std::time::Instant) -> &mut MintTransport {
+        if !self.mints.contains_key(&generation) && self.mints.len() >= MINTS_REMEMBERED_PER_ROLE {
+            // Forget the LEAST RECENTLY WRITTEN, not the lowest generation: the
+            // supervised client is the oldest mint in the process and the one
+            // whose record matters most. Forgetting is always the asking
+            // direction — an unknown mint has never answered and is pinged.
+            let stalest = self
+                .mints
+                .iter()
+                .min_by_key(|(_, m)| m.touched)
+                .map(|(generation, _)| *generation);
+            if let Some(stalest) = stalest {
+                self.mints.remove(&stalest);
+            }
+        }
+        let mint = self.mints.entry(generation).or_default();
+        mint.touched = Some(now);
+        mint
+    }
+}
+
+/// Process-wide record of transport evidence from the zome-call path, per role
+/// AND per connection generation
 /// ([`crate::hc_client::HcClient::connection_generation`]).
 ///
 /// It carries the one fact the supervisor could not see for itself: that the
-/// socket callers are USING has closed. Reports against an older generation
-/// than the one on record come from a socket already replaced and are dropped,
-/// so a burst of stale failures can never re-arm a re-mint of a healthy
-/// successor.
+/// socket callers are USING has closed — and, since 2026-10-12, when that
+/// socket last answered.
+///
+/// PER MINT, NOT "THE ROLE'S CURRENT MINT". More than one live client can carry
+/// the same role name: the registry's supervised `imagodei` client and the
+/// reconcile controller's own, the supervised `lamad` client and the import
+/// API's. Tracking one generation per role and letting the newest win made the
+/// unsupervised client's traffic displace the supervised one's record: every
+/// answer the supervisor's own pings got was discarded as "older than the mint
+/// on record" (measured: `imagodei` pinged on every tick and never rested),
+/// and its closed-streak read zero whatever its socket did. Generations are
+/// process-wide unique, so keeping them apart needs no other identity.
+///
+/// A failure from a socket an ADOPTION has replaced is dropped
+/// ([`Self::retire`]), so a burst of stale failures can never re-arm a re-mint
+/// of a healthy successor.
 #[derive(Debug, Default)]
 pub struct TransportLedger {
     roles: std::sync::Mutex<std::collections::HashMap<String, RoleTransport>>,
     /// Raised whenever ANYTHING suggests the conductor on the far side may not
     /// be the one the roles' sockets were opened to: a closed app websocket on
     /// any role, a failed admin read, a re-mint. It is an OBLIGATION, not a
-    /// level: every role must get an answer over its own app websocket AFTER
+    /// level: every mint must get an answer over its own app websocket AFTER
     /// the latest raise before it may rest on evidence again, and nothing —
     /// in particular another role's recovery clearing the shared membership
     /// error — discharges that for it.
@@ -216,8 +275,22 @@ impl TransportLedger {
         f(roles.entry(role.to_string()).or_default())
     }
 
+    /// `generation`'s socket has been replaced (its client adopted a fresh
+    /// mint). Its record is dropped and any report still in flight from it is
+    /// ignored from here on.
+    pub fn retire(&self, role: &str, generation: u64) {
+        self.with_role(role, |r| {
+            r.mints.remove(&generation);
+            r.retired.insert(generation);
+            while r.retired.len() > RETIRED_REMEMBERED_PER_ROLE {
+                r.retired.pop_first();
+            }
+        })
+    }
+
     /// Record one transport-closed failure on `generation`'s socket; returns
-    /// the streak on that generation (0 for a stale report, which is dropped).
+    /// the streak on that generation (0 for a report from a retired mint,
+    /// which is dropped).
     ///
     /// Wakes the role's supervisor on the FIRST failure of a generation (so a
     /// dead socket is pinged now rather than up to 20s from now) and again when
@@ -227,16 +300,12 @@ impl TransportLedger {
     pub fn note_closed(&self, role: &str, generation: u64) -> u32 {
         let mut roles = self.roles.lock().unwrap_or_else(|e| e.into_inner());
         let r = roles.entry(role.to_string()).or_default();
-        if generation < r.generation {
+        if r.retired.contains(&generation) {
             return 0;
         }
-        if generation > r.generation {
-            r.generation = generation;
-            r.streak = 0;
-            r.last_ok = None;
-        }
-        r.streak = r.streak.saturating_add(1);
-        let streak = r.streak;
+        let mint = r.mint(generation, std::time::Instant::now());
+        mint.streak = mint.streak.saturating_add(1);
+        let streak = mint.streak;
         if streak == 1 || streak == TRANSPORT_CLOSED_REMINT_BOUND {
             r.wake.notify_one();
         }
@@ -287,7 +356,7 @@ impl TransportLedger {
     /// doubt about it; stamped with the epoch at RECORDING it would discharge
     /// an obligation it predates. An answer from an older epoch still clears
     /// the closed-streak and refreshes the age — bytes did cross — but never
-    /// moves the role's discharged epoch backwards or forwards past its own.
+    /// moves the mint's discharged epoch backwards.
     pub fn note_ok_asked_in(
         &self,
         role: &str,
@@ -296,20 +365,18 @@ impl TransportLedger {
         asked_epoch: u64,
     ) {
         self.with_role(role, |r| {
-            if generation > r.generation {
-                r.generation = generation;
-                r.ok_epoch = 0;
+            if r.retired.contains(&generation) {
+                return;
             }
-            if generation == r.generation {
-                r.streak = 0;
-                r.last_ok = Some(at);
-                r.ok_epoch = r.ok_epoch.max(asked_epoch);
-            }
+            let mint = r.mint(generation, at);
+            mint.streak = 0;
+            mint.last_ok = Some(at);
+            mint.ok_epoch = mint.ok_epoch.max(asked_epoch);
         })
     }
 
     /// Something suggests the conductor may have changed under the roles'
-    /// sockets. Every role owes an answer over its own app websocket after
+    /// sockets. Every mint owes an answer over its own app websocket after
     /// this before it may rest again.
     pub fn raise_doubt(&self) {
         self.doubt_epoch
@@ -320,12 +387,14 @@ impl TransportLedger {
     pub fn answered_since_doubt(&self, role: &str, generation: u64) -> bool {
         let epoch = self.doubt_epoch.load(std::sync::atomic::Ordering::SeqCst);
         self.with_role(role, |r| {
-            r.generation == generation && r.last_ok.is_some() && r.ok_epoch == epoch
+            r.mints
+                .get(&generation)
+                .is_some_and(|m| m.last_ok.is_some() && m.ok_epoch == epoch)
         })
     }
 
     /// How long ago bytes last crossed `generation`'s socket; `None` when they
-    /// never have, or when the ledger is tracking a different mint.
+    /// never have.
     pub fn answered_ago(&self, role: &str, generation: u64) -> Option<Duration> {
         self.answered_ago_at(role, generation, std::time::Instant::now())
     }
@@ -338,23 +407,16 @@ impl TransportLedger {
         now: std::time::Instant,
     ) -> Option<Duration> {
         self.with_role(role, |r| {
-            if r.generation == generation {
-                r.last_ok.map(|at| now.saturating_duration_since(at))
-            } else {
-                None
-            }
+            r.mints
+                .get(&generation)
+                .and_then(|m| m.last_ok)
+                .map(|at| now.saturating_duration_since(at))
         })
     }
 
-    /// The current closed-streak for `generation` (0 for any other).
+    /// The current closed-streak for `generation` (0 when it has none).
     pub fn streak(&self, role: &str, generation: u64) -> u32 {
-        self.with_role(role, |r| {
-            if r.generation == generation {
-                r.streak
-            } else {
-                0
-            }
-        })
+        self.with_role(role, |r| r.mints.get(&generation).map_or(0, |m| m.streak))
     }
 
     /// The handle a role's supervisor waits on between ticks.
@@ -367,6 +429,11 @@ impl TransportLedger {
 pub fn transport_ledger() -> &'static TransportLedger {
     static LEDGER: std::sync::OnceLock<TransportLedger> = std::sync::OnceLock::new();
     LEDGER.get_or_init(TransportLedger::default)
+}
+
+/// `role`'s client has replaced `generation`'s sockets with a fresh mint.
+pub fn retire_transport_generation(role: &str, generation: u64) {
+    transport_ledger().retire(role, generation);
 }
 
 /// A zome call (or ping) on `role`'s client failed transport-closed on the
@@ -1664,6 +1731,10 @@ impl HcClientRegistry {
                                  identity changed) — storing it as a NEW handle; consumers that \
                                  cloned the old one keep failing until they re-read the registry"
                             );
+                            // The abandoned handle's socket is dead and will
+                            // never be adopted into: its late failures are not
+                            // news about the handle now in the slot.
+                            retire_transport_generation(role, hc.connection_generation());
                             fresh
                         }
                     };
@@ -1852,20 +1923,83 @@ mod quiet_probe_tests {
         );
         // Another mint's answer is not this mint's.
         assert_eq!(ledger.answered_ago_at("r", 2, t0), None);
-        // A failure on a NEWER mint replaces the record: the old answer must
-        // not vouch for the socket that just failed.
-        assert_eq!(ledger.note_closed("r", 2), 1);
+        // The client adopts mint 2: mint 1's record goes with it, and a late
+        // answer or failure from the replaced socket is dropped.
+        ledger.retire("r", 1);
         assert_eq!(
-            ledger.answered_ago_at("r", 2, t0 + Duration::from_secs(1)),
+            ledger.answered_ago_at("r", 1, t0 + Duration::from_secs(1)),
             None
         );
-        // A late answer from the replaced mint is dropped.
         ledger.note_ok_at("r", 1, t0 + Duration::from_secs(2));
         assert_eq!(
-            ledger.answered_ago_at("r", 2, t0 + Duration::from_secs(3)),
+            ledger.answered_ago_at("r", 1, t0 + Duration::from_secs(3)),
             None
         );
+        assert_eq!(ledger.note_closed("r", 1), 0);
+        assert_eq!(ledger.note_closed("r", 2), 1);
         assert_eq!(ledger.streak("r", 2), 1);
+    }
+
+    /// THE DEFECT THE FIRST HOUSEHOLD READING SHOWED. Two live clients carry
+    /// the role name `imagodei`: the supervised one (older mint) and the
+    /// reconcile controller's (newer). With one generation per role, the
+    /// newer client's traffic displaced the supervised client's record, every
+    /// answer its pings got was discarded, and it pinged on every tick.
+    #[test]
+    fn two_live_clients_of_one_role_do_not_displace_each_other() {
+        let ledger = TransportLedger::default();
+        let t0 = std::time::Instant::now();
+        let (supervised, unsupervised) = (3, 9);
+        ledger.note_ok_at("imagodei", supervised, t0);
+        // The unsupervised client has traffic of its own, on a NEWER mint.
+        for s in 1..=10 {
+            ledger.note_ok_at("imagodei", unsupervised, t0 + Duration::from_secs(s));
+        }
+        // The supervised client's evidence is still its own, and still there.
+        assert_eq!(
+            ledger.answered_ago_at("imagodei", supervised, t0 + Duration::from_secs(15)),
+            Some(Duration::from_secs(15))
+        );
+        assert!(ledger.answered_since_doubt("imagodei", supervised));
+        ledger.note_ok_at("imagodei", supervised, t0 + Duration::from_secs(20));
+        assert_eq!(
+            ledger.answered_ago_at("imagodei", supervised, t0 + Duration::from_secs(20)),
+            Some(Duration::ZERO)
+        );
+        // And its closed socket is seen, though it is the OLDER mint — before,
+        // a failure on it was dropped as stale and its streak read zero.
+        assert_eq!(ledger.note_closed("imagodei", supervised), 1);
+        assert_eq!(ledger.streak("imagodei", supervised), 1);
+        assert_eq!(ledger.streak("imagodei", unsupervised), 0);
+    }
+
+    /// Short-lived side clients churn through the ledger; the record a
+    /// supervisor keeps writing to must survive them, however old its mint.
+    #[test]
+    fn churn_evicts_the_least_recently_written_mint_never_the_one_in_use() {
+        let ledger = TransportLedger::default();
+        let t0 = std::time::Instant::now();
+        let supervised = 1; // the oldest generation in the process
+        ledger.note_ok_at("r", supervised, t0);
+        let mut generation = 100;
+        for tick in 1..=20u64 {
+            let at = t0 + Duration::from_secs(20 * tick);
+            // The supervisor's own answer, every tick...
+            ledger.note_ok_at("r", supervised, at);
+            // ...and a burst of new side clients, more than the ledger holds.
+            for _ in 0..(MINTS_REMEMBERED_PER_ROLE / 2) {
+                generation += 1;
+                ledger.note_ok_at("r", generation, at);
+            }
+            assert_eq!(
+                ledger.answered_ago_at("r", supervised, at),
+                Some(Duration::ZERO),
+                "tick {tick}: the supervised record was evicted by churn"
+            );
+        }
+        // The stalest side clients were the ones forgotten.
+        assert_eq!(ledger.answered_ago_at("r", 101, t0), None);
+        assert!(ledger.answered_ago_at("r", generation, t0).is_some());
     }
 
     #[tokio::test]
@@ -3144,7 +3278,9 @@ mod transport_remint_tests {
         for _ in 0..5 {
             ledger.note_closed("lamad", 1);
         }
-        // Re-minted: the successor answers.
+        // Re-minted: the client adopts mint 2, retiring mint 1, and the
+        // successor answers.
+        ledger.retire("lamad", 1);
         ledger.note_ok("lamad", 2);
         // In-flight calls that started on the OLD socket fail late.
         for _ in 0..10 {
