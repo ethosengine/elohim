@@ -259,6 +259,39 @@ fn parse_reach_for_topic(reach: &str) -> Option<elohim_epr::Reach> {
     serde_json::from_value::<elohim_epr::Reach>(serde_json::Value::String(reach.to_string())).ok()
 }
 
+/// Does `row` still stand at `now`? A `valid_until` that does not parse counts
+/// as standing (never re-author on unreadable data); that is logged once.
+fn row_unexpired(
+    row: &crate::db::models::MishpatCommitment,
+    now: chrono::DateTime<chrono::Utc>,
+) -> bool {
+    match chrono::DateTime::parse_from_rfc3339(&row.valid_until) {
+        Ok(until) => until.with_timezone(&chrono::Utc) > now,
+        Err(_) => {
+            static WARNED: std::sync::atomic::AtomicBool =
+                std::sync::atomic::AtomicBool::new(false);
+            if !WARNED.swap(true, std::sync::atomic::Ordering::Relaxed) {
+                tracing::warn!(
+                    target: "elohim_storage::provide",
+                    cid = %row.cid,
+                    valid_until = %row.valid_until,
+                    "provide reconcile: unreadable valid_until on a commitment row; counting it as live"
+                );
+            }
+            true
+        }
+    }
+}
+
+/// Does the content reach the projection stored on `row` (`bounds_json.reach`)
+/// equal `desired_reach`? A row whose reach cannot be read counts as a match.
+fn row_reach_matches(row: &crate::db::models::MishpatCommitment, desired_reach: &str) -> bool {
+    serde_json::from_str::<serde_json::Value>(&row.bounds_json)
+        .ok()
+        .and_then(|b| b.get("reach").and_then(|r| r.as_str()).map(str::to_string))
+        .is_none_or(|stored| stored == desired_reach)
+}
+
 /// One desired provide derived from a caught-up pin.
 #[derive(Debug, Clone)]
 pub struct DesiredProvide {
@@ -352,13 +385,16 @@ impl ProvideReconciler {
             .map_err(|e| StorageError::Database(e.to_string()))?;
             (own, legacy)
         };
-        // logical key (self_provider, head_ref==recipient) → its row state.
-        let mut actual: HashMap<(String, String), String> = HashMap::new();
-        for row in &own_rows {
-            actual.insert(
-                (self_provider.to_string(), row.recipient.clone()),
-                row.state.clone(),
-            );
+        // Rows that still stand at `now`: a lapsed commitment must not suppress
+        // renewal. Keyed by logical key (self_provider, head_ref==recipient).
+        let now = chrono::Utc::now();
+        let mut standing: HashMap<(String, String), Vec<&crate::db::models::MishpatCommitment>> =
+            HashMap::new();
+        for row in own_rows.iter().filter(|r| row_unexpired(r, now)) {
+            standing
+                .entry((self_provider.to_string(), row.recipient.clone()))
+                .or_default()
+                .push(row);
         }
 
         let desired_keys: HashSet<(String, String)> = desired
@@ -373,10 +409,15 @@ impl ProvideReconciler {
         for d in desired {
             let key = (self_provider.to_string(), d.head_ref.clone());
 
-            if let Some(state) = actual.get(&key) {
+            // A standing commitment that declares this reach (or whose reach
+            // cannot be read) satisfies the desired provide.
+            let matched = standing
+                .get(&key)
+                .and_then(|rows| rows.iter().find(|r| row_reach_matches(r, &d.reach)));
+            if let Some(row) = matched {
                 // A live commitment already exists (restart re-derivation lands
                 // here even with an empty latch) — never re-author.
-                let stage = if state == "active" {
+                let stage = if row.state == "active" {
                     ProvideStage::Active
                 } else {
                     ProvideStage::Projected
@@ -483,7 +524,7 @@ impl ProvideReconciler {
         // notably terminal `Revoked` keys from un-pinned offers, which otherwise
         // never leave. Keep only keys still desired or still live in `actual`; a
         // key that is re-needed next pass is re-inserted by the walks above.
-        let mut live: HashSet<(String, String)> = actual.keys().cloned().collect();
+        let mut live: HashSet<(String, String)> = standing.keys().cloned().collect();
         live.extend(
             legacy_rows
                 .iter()
@@ -627,6 +668,29 @@ mod tests {
         state: &str,
         revoked: bool,
     ) {
+        seed_commons_row_full(
+            pool,
+            provider,
+            cid,
+            recipient,
+            state,
+            revoked,
+            "2099-12-01T00:00:00Z",
+            r#"{"rate_per_minute":6,"reach_ceiling":"commons"}"#,
+        );
+    }
+
+    #[allow(clippy::too_many_arguments)]
+    fn seed_commons_row_full(
+        pool: &DbPool,
+        provider: &str,
+        cid: &str,
+        recipient: &str,
+        state: &str,
+        revoked: bool,
+        valid_until: &str,
+        bounds_json: &str,
+    ) {
         let mut conn = pool.get().expect("conn");
         crate::db::mishpat_commitments::upsert_with_anchor(
             &mut conn,
@@ -636,9 +700,9 @@ mod tests {
                 scope: "replicates-commons".to_string(),
                 provider: provider.to_string(),
                 recipient: recipient.to_string(),
-                bounds_json: r#"{"rate_per_minute":6,"reach_ceiling":"commons"}"#.to_string(),
+                bounds_json: bounds_json.to_string(),
                 valid_from: "2026-06-01T00:00:00Z".to_string(),
-                valid_until: "2026-12-01T00:00:00Z".to_string(),
+                valid_until: valid_until.to_string(),
                 revoked_at: if revoked {
                     Some("2026-06-10T00:00:00Z".to_string())
                 } else {
@@ -800,6 +864,139 @@ mod tests {
             .expect("pass");
         assert_eq!(n, 1);
         assert_eq!(author.authored.lock().await.len(), 1);
+    }
+
+    const FUTURE: &str = "2099-01-01T00:00:00Z";
+    const PAST: &str = "2020-01-01T00:00:00Z";
+
+    fn bounds_with_reach(reach: &str) -> String {
+        format!(r#"{{"reach":"{reach}","reach_ceiling":"commons","rate_per_minute":6}}"#)
+    }
+
+    async fn reconcile_once(pool: &DbPool, author: &MockAuthor, d: DesiredProvide) -> usize {
+        ProvideReconciler::new()
+            .reconcile_provides(pool, author, TRANSPORT_ID, &[d])
+            .await
+            .expect("pass")
+    }
+
+    #[tokio::test]
+    async fn an_expired_row_does_not_suppress_renewal() {
+        let pool = test_pool();
+        let b = bounds_with_reach("commons");
+        seed_commons_row_full(
+            &pool,
+            MockAuthor::DEFAULT_PROVIDER,
+            "cid:old",
+            "epr:X",
+            "active",
+            false,
+            PAST,
+            &b,
+        );
+        let author = MockAuthor::new();
+        let n = reconcile_once(&pool, &author, desired(1, "epr:X")).await;
+        assert_eq!(n, 1);
+        assert_eq!(author.authored.lock().await.len(), 1);
+    }
+
+    #[tokio::test]
+    async fn a_row_valid_until_the_future_suppresses() {
+        let pool = test_pool();
+        let b = bounds_with_reach("commons");
+        seed_commons_row_full(
+            &pool,
+            MockAuthor::DEFAULT_PROVIDER,
+            "cid:ok",
+            "epr:X",
+            "active",
+            false,
+            FUTURE,
+            &b,
+        );
+        let author = MockAuthor::new();
+        let n = reconcile_once(&pool, &author, desired(1, "epr:X")).await;
+        assert_eq!(n, 0);
+        assert!(author.authored.lock().await.is_empty());
+    }
+
+    #[tokio::test]
+    async fn an_unreadable_validity_counts_as_live() {
+        let pool = test_pool();
+        let b = bounds_with_reach("commons");
+        seed_commons_row_full(
+            &pool,
+            MockAuthor::DEFAULT_PROVIDER,
+            "cid:junk",
+            "epr:X",
+            "active",
+            false,
+            "not-a-date",
+            &b,
+        );
+        let author = MockAuthor::new();
+        let n = reconcile_once(&pool, &author, desired(1, "epr:X")).await;
+        assert_eq!(n, 0);
+        assert!(author.authored.lock().await.is_empty());
+    }
+
+    #[tokio::test]
+    async fn a_changed_reach_is_redeclared_once() {
+        let pool = test_pool();
+        let b = bounds_with_reach("household");
+        seed_commons_row_full(
+            &pool,
+            MockAuthor::DEFAULT_PROVIDER,
+            "cid:hh",
+            "epr:X",
+            "active",
+            false,
+            FUTURE,
+            &b,
+        );
+        let author = MockAuthor::new();
+        let r = ProvideReconciler::new();
+        let mut d = desired(1, "epr:X");
+        d.reach = "commons".to_string();
+        let first = r
+            .reconcile_provides(&pool, &author, TRANSPORT_ID, std::slice::from_ref(&d))
+            .await
+            .expect("first");
+        assert_eq!(first, 1);
+        {
+            let got = author.authored.lock().await;
+            assert_eq!(got.len(), 1);
+            assert_eq!(got[0].reach, "commons");
+        }
+        let second = r
+            .reconcile_provides(&pool, &author, TRANSPORT_ID, std::slice::from_ref(&d))
+            .await
+            .expect("second");
+        assert_eq!(second, 0);
+        assert_eq!(author.authored.lock().await.len(), 1);
+        assert!(author.revoked.lock().await.is_empty());
+    }
+
+    #[tokio::test]
+    async fn the_same_reach_is_not_redeclared() {
+        let pool = test_pool();
+        let b = bounds_with_reach("household");
+        seed_commons_row_full(
+            &pool,
+            MockAuthor::DEFAULT_PROVIDER,
+            "cid:hh",
+            "epr:X",
+            "active",
+            false,
+            FUTURE,
+            &b,
+        );
+        let author = MockAuthor::new();
+        let mut d = desired(1, "epr:X");
+        d.reach = "household".to_string();
+        let n = reconcile_once(&pool, &author, d).await;
+        assert_eq!(n, 0);
+        assert!(author.authored.lock().await.is_empty());
     }
 
     #[tokio::test]
