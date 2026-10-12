@@ -1,5 +1,5 @@
 {
-  "run": 5,
+  "run": 7,
   "known": {
     "31268684003f": {
       "status": "open",
@@ -29,6 +29,18 @@
       "status": "open",
       "first_run": 5,
       "last_run": 5,
+      "seen": 1
+    },
+    "7e418ddbc9a4": {
+      "status": "open",
+      "first_run": 6,
+      "last_run": 6,
+      "seen": 1
+    },
+    "d09a9f01124b": {
+      "status": "open",
+      "first_run": 7,
+      "last_run": 7,
       "seen": 1
     }
   }

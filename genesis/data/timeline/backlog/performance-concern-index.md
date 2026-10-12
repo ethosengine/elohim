@@ -448,3 +448,41 @@ Trust × friction (verify / wait / mechanical / blind):
 Plane: plane-notary 18, plane-custody 9, plane-projection 13, plane-head 6, plane-authority 2, plane-bytes 1, plane-reference 1; fused-planes 27.
 
 Unit: unit-call 16, unit-item 15, unit-once 13, unit-peer 8, unit-history 5, unit-agent 2. Phase: phase-steady 37, phase-transition 23, phase-growth 6. Lane: lane-operator 24, lane-interactive 21, lane-background 15, lane-borrowed 8.
+
+## Sprint 2026-10-11 (idle-CPU residual; the top open entry taken from the reading order, this is the snapshot)
+
+Plan: `genesis/docs/superpowers/sprints/2026-10-11-idle-cpu-residual-sprint.md`. The reading order's first entry
+(`conductor-cap-grant-scan-per-zome-call`) was already cured; the next, `conductor-residual-cpu-full-chain-read-and-perpetual-republish`,
+was the sprint's item. Results are on the atoms, not here:
+
+- `conductor-residual-cpu-full-chain-read-and-perpetual-republish` → the publish-time lock probe reads CLOSED for the
+  current fleet pods (0 lines of every shape in the first 90 minutes and the last 24 h; Loki holds nothing from the
+  original 2026-10-06 window); the publish loop is now the second workflow by wall time on every conductor, not the
+  first; a loop the entry had not named — the scheduler's two reads per running cell every 100 ms — is attributed
+  by cell count on the household and is the sprint's cure (fork branch `perf/scheduler-latch`). Status unchanged
+  until the after half is read.
+- `alpha-conductor-sys-validation-spin-unfetchable-deps` → owns the fleet's largest idle workflow (1.0 s/s on all
+  seven conductors, 10–20 s per run over a capped 10,000-row unindexed selection); a suspected starvation defect
+  is named (`sys_validation_attempts` is never incremented, so the selection is oldest-first and a backlog over
+  10,000 never reaches newer ops); does NOT reproduce on the household (0.002 s/s). Cure shapes weighed, none built.
+- `idle-is-free` habit → the declared check run for the first time since the conductor cures: RED at 20–24 calls/min
+  per peer and 157 CPU s/min; the residual split into a scheduler share proportional to cells (65% of matthew's
+  database checkouts) and a cell-independent base of ≈1,100 checkouts/s per conductor that no workflow metric
+  explains.
+- After half (2026-10-12, latch on): matthew's checkouts 3,068 → 1,007/s and CPU 63.7 → 47.5 s/min; the small
+  conductors unchanged within noise; household 155 → 147 CPU s/min against a budget of 10. The cured share is
+  proportional to hosted cells; the residual-cpu entry now carries `unit-agent` and `custody-everyone`. The
+  cell-independent base (≈1,000 checkouts/s, ≈48 CPU s/min per conductor) is the open frontier; the cure is a
+  three-commit fork branch (`fbdf961df`, reviewed by Sonnet and Codex), pin unmoved.
+- The statement window (60 s, latch binary) named the household's cell-independent base: four kitsune2 gossip
+  round costs (a full-index "new ops since" scan at ~90 ms per side per round, 512 uncached slice-hash reads per
+  snapshot, a dependency check fed by a stuck bookmark, peer-meta reads per candidate agent), fired every second
+  by the mesh's dev gossip acceleration — alpha runs the default 120–300 s cadence, so this base is the fixture's,
+  not the fleet's. New entry: `conductor-gossip-round-op-store-cost` (fork/upstream, medium; scales with op count
+  and peer count). The `idle-is-free` check as declared is confounded by that acceleration; a production-cadence
+  reading is in its ledger.
+- Found on the way, not a performance item: `conductor-sqlcipher-key-logged-by-sqlx-slow-statement` (security,
+  high) — sqlx's slow-statement WARN prints `PRAGMA key` with the SQLCipher key at the default log level; cured on
+  the same fork branch (`96bcd2bee`), fleet logs since the sqlx 0.9 move are to be treated as holding keys.
+- Tally tables above are NOT regenerated in this pass (tag counts for `unit-agent` and `custody-everyone` are each
+  one higher than printed; the two new entries are not in the reading order yet).
