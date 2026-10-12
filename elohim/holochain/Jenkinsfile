@@ -3198,7 +3198,7 @@ AGENT_SDK_TAG=${AGENT_SDK_TAG}
             }
             post {
                 always {
-                    archiveArtifacts artifacts: 'genesis/a2o/reports/sprint-report-dataplane.*,genesis/a2o/reports/served-shell/**', allowEmptyArchive: true
+                    archiveArtifacts artifacts: 'genesis/a2o/reports/sprint-report-dataplane.*,genesis/a2o/reports/cucumber-*-dataplane.*,genesis/a2o/reports/served-shell/**', allowEmptyArchive: true
                 }
             }
         }

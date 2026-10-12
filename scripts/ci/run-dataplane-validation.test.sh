@@ -152,7 +152,7 @@ expect_case() { # name expected_status banner(yes|no) output status
   if [ "$3" = yes ] && ! grep -Fq 'PENDING-ONLY (declared born-red concerns: pain-is-answered): cucumber exited 1 with 0 failed and 0 ambiguous steps; 14 scenario(s)' "$4"; then
     echo "$1: expected the PENDING-ONLY banner" >&2; sed -n '1,200p' "$4" >&2; exit 1
   fi
-  if [ "$3" = no ] && grep -Fq 'PENDING-ONLY' "$4"; then
+  if [ "$3" = no ] && grep -Fq 'PENDING-ONLY (declared' "$4"; then
     echo "$1: must not print the PENDING-ONLY banner" >&2; exit 1
   fi
 }
@@ -184,6 +184,30 @@ expect_case "step without result" 1 no "$O" "$S"
 O="${TEST_ROOT}/c-nosummary.log"
 S="$(TEST_PENDING=14 TEST_CUCUMBER_LOG='progress only' TEST_CUCUMBER_JSON="$(cuke_json pain-is-answered undefined)" run_case 20 1 "$O")"
 expect_case "summary line absent" 1 no "$O" "$S"
+
+O="${TEST_ROOT}/c-efbig.log"
+S="$(TEST_PENDING=14 TEST_CUCUMBER_LOG=$'EFBIG: file too large, write\n1 scenario (1 undefined)' TEST_CUCUMBER_JSON="$(cuke_json pain-is-answered undefined)" run_case 20 1 "$O")"
+expect_case "EFBIG errno" 1 no "$O" "$S"
+
+O="${TEST_ROOT}/c-snippet.log"
+S="$(TEST_PENDING=14 TEST_CUCUMBER_LOG=$'  ? Given x\n      Undefined. Implement with the following snippet:\n\n        Given(\'x\', async function () {\n          // Write code here; throw new Error(\'nope\')\n          return \'pending\';\n        });\n\n14 scenarios (14 undefined)' TEST_CUCUMBER_JSON="$(cuke_json pain-is-answered undefined)" run_case 20 1 "$O")"
+if [ "${S}" -ne 0 ]; then echo "snippet body containing Error must not refuse; got ${S}" >&2; cat "$O" >&2; exit 1; fi
+
+# Modelled on edge #1610: cucumber's non-TTY formatter notice, skipped steps, a held
+# (pending) scenario under an unlisted concern, undefined only under the listed one.
+O="${TEST_ROOT}/c-1610.log"
+FIX_1610="$(printf '[%s,%s]' \
+  "$(cuke_json pain-is-answered undefined skipped | sed 's/^\[//; s/\]$//')" \
+  "$(cuke_json doorway-failover pending skipped | sed 's/^\[//; s/\]$//')")"
+S="$(TEST_PENDING=14 TEST_CUCUMBER_LOG=$'Cannot use \'progress-bar\' formatter for output to \'stdout\' as not a TTY. Switching to \'progress\' formatter.\n149 scenarios (14 undefined, 126 skipped, 9 passed)' TEST_CUCUMBER_JSON="${FIX_1610}" run_case 20 1 "$O")"
+expect_case "edge 1610 shape" 0 yes "$O" "$S"
+
+grep -Fq 'PENDING-ONLY refused: console-error-line — ENOSPC' "${TEST_ROOT}/c-fmt.log" \
+  || { echo "missing refusal line for formatter error" >&2; cat "${TEST_ROOT}/c-fmt.log" >&2; exit 1; }
+grep -Fq 'PENDING-ONLY refused: undefined-under-unlisted-concern' "${TEST_ROOT}/c-unlisted.log" \
+  || { echo "missing refusal line for unlisted concern" >&2; exit 1; }
+grep -Fq 'PENDING-ONLY refused: non-pending-step-status — ambiguous' "${TEST_ROOT}/c-ambiguous.log" \
+  || { echo "missing refusal line for ambiguous" >&2; exit 1; }
 
 O="${TEST_ROOT}/c-noreport.log"
 S="$(TEST_NO_REPORT=1 run_case 20 1 "$O")"
