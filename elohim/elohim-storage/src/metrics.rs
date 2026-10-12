@@ -3697,6 +3697,14 @@ pub fn register_all() {
         let _ = REGISTRY.register(Box::new(CONDUCTOR_ADMISSION_HOLD_MS.clone()));
         let _ = REGISTRY.register(Box::new(CONDUCTOR_ADMISSION_ACQUIRED.clone()));
         let _ = REGISTRY.register(Box::new(CONDUCTOR_ADMISSION_SHED.clone()));
+        // Pre-touch the gated classes so "nothing was shed" reads as a measured 0
+        // rather than an absent series: the idle-is-free lane sums this counter at
+        // both ends of its window and could not measure a household that shed nothing.
+        for class in ["interactive", "background"] {
+            CONDUCTOR_ADMISSION_SHED
+                .with_label_values(&[class, "content_store"])
+                .inc_by(0);
+        }
         let _ = REGISTRY.register(Box::new(SHARD_REGISTRATION_OUTCOMES.clone()));
         let _ = REGISTRY.register(Box::new(CONDUCTOR_CALLS.clone()));
         let _ = REGISTRY.register(Box::new(BRIDGE_PROBES_VOUCHED.clone()));

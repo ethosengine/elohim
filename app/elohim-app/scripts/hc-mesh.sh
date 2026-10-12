@@ -1604,6 +1604,14 @@ mesh_build() { # [storage|doorway|beacon] (default all three)
     [ "$dry" = "1" ] && return 0
     (cd "$REPO_ROOT/$crate" && "${cmd[@]}") || { echo "[mesh build] REFUSED $project: cargo build failed — $dest left unchanged" >&2; return 1; }
     [ "$built" = "$dest" ] || install -D -m 0755 "$built" "$dest" || return 1
+    # An install has returned 0 over a copy that differed from its source (2026-10-12:
+    # same size, bytes differing from 8 MB on, the iroh marker gone, and the next
+    # restart REFUSED on a binary cargo had just built correctly). Compare, retry once.
+    if [ "$built" != "$dest" ] && ! cmp -s "$built" "$dest"; then
+      echo "[mesh build] installed copy differs from $built — reinstalling" >&2
+      install -D -m 0755 "$built" "$dest" && cmp -s "$built" "$dest" || {
+        echo "[mesh build] REFUSED $project: $dest does not match the built binary" >&2; return 1; }
+    fi
     echo "[mesh build] ok $dest"
   }
   if [ "$which" = all ] || [ "$which" = storage ]; then
