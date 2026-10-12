@@ -234,14 +234,26 @@ fn record_provider_unresolved_skip(head_ref: &str) -> u64 {
 /// (b) the pod's own conductor cell key (`HcClient::agent_key_uhcak`, the same
 /// truthful `uhCAk…` source `genesis_self_heal` fills the humans row from).
 /// Returns `None` when NO candidate is a valid `agent_cid` — the author then
-/// SKIPS this tick. PURE.
+/// SKIPS this tick. PURE. Production reads the head of
+/// [`agent_provider_candidates`] directly; this is its first-element view, kept
+/// for the tests that pin the order.
+#[cfg(test)]
 fn resolve_provider(candidates: &[Option<&str>]) -> Option<String> {
-    candidates
-        .iter()
-        .flatten()
-        .map(|s| s.trim())
-        .find(|s| crate::identity_namespace::is_agent_cid(s))
-        .map(|s| s.to_string())
+    agent_provider_candidates(candidates).into_iter().next()
+}
+
+/// Every candidate that passes `is_agent_cid`, trimmed, de-duplicated, caller
+/// order preserved. [`resolve_provider`] is its first element, so the key the
+/// author writes under and the keys the reconciler dedups against come from one
+/// rule. PURE.
+fn agent_provider_candidates(candidates: &[Option<&str>]) -> Vec<String> {
+    let mut out: Vec<String> = Vec::new();
+    for s in candidates.iter().flatten().map(|s| s.trim()) {
+        if crate::identity_namespace::is_agent_cid(s) && !out.iter().any(|o| o == s) {
+            out.push(s.to_string());
+        }
+    }
+    out
 }
 
 /// Build the `revokes-commitment` payload (snake_case JSON) targeting an
@@ -277,8 +289,35 @@ fn validity_until(valid_from_iso: &str) -> Result<String, StorageError> {
     Ok((start + chrono::Duration::days(DEFAULT_VALIDITY_DAYS)).to_rfc3339())
 }
 
+impl ConductorCommitmentAuthor {
+    /// The agent_cid keys this author may write `provider` under, preferred
+    /// first: the active local session's key, then the pod's own cell key.
+    /// `author_commons` writes under the first; the reconciler dedups against
+    /// all of them.
+    fn own_provider_candidates(&self) -> Result<Vec<String>, StorageError> {
+        let session_cid = {
+            let mut sconn = self.pool.get().map_err(|e| {
+                StorageError::Internal(format!("pool checkout for provider resolution: {e}"))
+            })?;
+            crate::db::local_sessions::get_active_session(&mut sconn)
+                .ok()
+                .flatten()
+                .map(|s| s.agent_pub_key)
+        };
+        let cell_key = self.hc.agent_key_uhcak();
+        Ok(agent_provider_candidates(&[
+            session_cid.as_deref(),
+            Some(cell_key.as_str()),
+        ]))
+    }
+}
+
 #[async_trait]
 impl CommitmentAuthor for ConductorCommitmentAuthor {
+    async fn own_providers(&self) -> Vec<String> {
+        self.own_provider_candidates().unwrap_or_default()
+    }
+
     async fn author_commons(&self, req: &ProvideAuthorRequest) -> Result<String, StorageError> {
         let now = chrono::Utc::now();
         let valid_from = deterministic_valid_from(now);
@@ -296,17 +335,7 @@ impl CommitmentAuthor for ConductorCommitmentAuthor {
         // that can never join the card (worse than absence). If neither candidate
         // is an agent_cid, SKIP authoring this tick (rate-sane signal) so the
         // reconciler retries next tick once a truthful key is available.
-        let session_cid = {
-            let mut sconn = self.pool.get().map_err(|e| {
-                StorageError::Internal(format!("pool checkout for provider resolution: {e}"))
-            })?;
-            crate::db::local_sessions::get_active_session(&mut sconn)
-                .ok()
-                .flatten()
-                .map(|s| s.agent_pub_key)
-        };
-        let cell_key = self.hc.agent_key_uhcak();
-        let provider = match resolve_provider(&[session_cid.as_deref(), Some(cell_key.as_str())]) {
+        let provider = match self.own_provider_candidates()?.into_iter().next() {
             Some(p) => p,
             None => {
                 // No truthful agent_cid available — skip rather than write a
@@ -594,6 +623,31 @@ mod tests {
             resolve_provider(&[Some("12D3KooStraySession"), Some("uhCAkCellKey")]).as_deref(),
             Some("uhCAkCellKey")
         );
+    }
+
+    #[test]
+    fn agent_provider_candidates_filters_dedups_and_keeps_order() {
+        let got = agent_provider_candidates(&[
+            Some("12D3KooTransport"),
+            Some(" uhCAkSession "),
+            None,
+            Some("uhCAkCell"),
+            Some("uhCAkSession"),
+        ]);
+        assert_eq!(
+            got,
+            vec!["uhCAkSession".to_string(), "uhCAkCell".to_string()]
+        );
+        // author_commons writes under the first candidate (resolve_provider).
+        assert_eq!(
+            resolve_provider(&[
+                Some("12D3KooTransport"),
+                Some(" uhCAkSession "),
+                Some("uhCAkCell")
+            ]),
+            got.first().cloned()
+        );
+        assert!(agent_provider_candidates(&[None, Some("12D3KooX")]).is_empty());
     }
 
     #[test]

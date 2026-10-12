@@ -237,6 +237,23 @@ pub fn live_commons_provides_for_provider(
         .load(conn)
 }
 
+/// Like [`live_commons_provides_for_provider`], for a node that may write under
+/// more than one agent key (session key, cell key). Empty `providers` loads
+/// nothing.
+pub fn live_commons_provides_for_providers(
+    conn: &mut SqliteConnection,
+    providers: &[String],
+) -> QueryResult<Vec<MishpatCommitment>> {
+    if providers.is_empty() {
+        return Ok(Vec::new());
+    }
+    mc::mishpat_commitments
+        .filter(mc::action.eq("replicates-commons"))
+        .filter(mc::provider.eq_any(providers))
+        .filter(mc::revoked_at.is_null())
+        .load(conn)
+}
+
 // ============================================================================
 // Tests
 // ============================================================================
