@@ -95,7 +95,10 @@ impl GovernorRegistry {
 
 #[derive(Debug, Deserialize)]
 struct GovernorsYaml {
-    #[allow(dead_code)]
+    #[allow(
+        dead_code,
+        reason = "Deserialized so governors.yaml keeps its declared shape; the resolver reads only id, version, status and derive"
+    )]
     #[serde(rename = "edge-governors-version")]
     edge_governors_version: u32,
     policies: Vec<GovernorPolicy>,
@@ -105,14 +108,23 @@ struct GovernorsYaml {
 struct GovernorPolicy {
     id: String,
     version: u32,
-    #[allow(dead_code)]
+    #[allow(
+        dead_code,
+        reason = "Deserialized so governors.yaml keeps its declared shape; the resolver reads only id, version, status and derive"
+    )]
     title: String,
     status: String,
-    #[allow(dead_code)]
+    #[allow(
+        dead_code,
+        reason = "Deserialized so governors.yaml keeps its declared shape; the resolver reads only id, version, status and derive"
+    )]
     established_by: String,
     #[serde(default)]
     derive: Vec<String>,
-    #[allow(dead_code)]
+    #[allow(
+        dead_code,
+        reason = "Deserialized so governors.yaml keeps its declared shape; the resolver reads only id, version, status and derive"
+    )]
     #[serde(default)]
     why: String,
 }

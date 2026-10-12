@@ -10,6 +10,53 @@ use serde_json::Value;
 use crate::error::{Error, Result};
 
 pub const PACKAGE_ROOT: &str = ".epr-meta/elohim/packages";
+pub const PACKAGE_VERIFIER: &str =
+    "elohim/sdk/domains/elohim-agent/scripts/package-projections.mjs";
+
+/// Package sources and their renderer declare the package-fidelity capability.
+/// Consult committed reach endpoints too: deleting both from a candidate must
+/// not silently turn a package-governed repository into a native-only root.
+pub fn package_governance_declared(root: &Path, revisions: &[&str]) -> Result<bool> {
+    for relative in [PACKAGE_ROOT, PACKAGE_VERIFIER] {
+        let path = root.join(relative);
+        match fs::symlink_metadata(&path) {
+            Ok(_) => return Ok(true),
+            // Native governance also supports a single `.epr-meta` file, in
+            // which case the package directory cannot exist beneath it.
+            // Committed markers below still prevent capability downgrades.
+            Err(error)
+                if matches!(
+                    error.kind(),
+                    std::io::ErrorKind::NotFound | std::io::ErrorKind::NotADirectory
+                ) => {}
+            Err(source) => return Err(Error::Read { path, source }),
+        }
+    }
+    for revision in revisions {
+        let exists = crate::process::run("git", &["rev-parse", "--verify", revision], root)?;
+        if !exists.success && *revision == "HEAD" {
+            // Setup is also valid before the first commit.
+            continue;
+        }
+        let tracked = crate::process::require(
+            "git",
+            &[
+                "ls-tree",
+                "-r",
+                "--name-only",
+                revision,
+                "--",
+                PACKAGE_ROOT,
+                PACKAGE_VERIFIER,
+            ],
+            root,
+        )?;
+        if !tracked.stdout.is_empty() {
+            return Ok(true);
+        }
+    }
+    Ok(false)
+}
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "kebab-case")]

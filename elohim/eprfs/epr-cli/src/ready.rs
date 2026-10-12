@@ -3,6 +3,7 @@ use std::path::Path;
 use serde_json::json;
 
 use crate::{
+    authority::PACKAGE_VERIFIER,
     check, doctor,
     error::Result,
     git::{self, ChangedPath},
@@ -11,8 +12,8 @@ use crate::{
 };
 
 pub fn run(root: &Path, target: &str, changes: &[ChangedPath], deep: bool) -> Result<Report> {
-    let doctor = doctor::run(root)?;
     let base = git::merge_base(root, target)?;
+    let doctor = doctor::run_at(root, &["HEAD", &base])?;
     let outcome = check::run_at(root, changes, "HEAD", &base)?;
     let mut report = Report::new("ready", root);
     report.extend(doctor.findings);
@@ -57,8 +58,7 @@ pub fn run(root: &Path, target: &str, changes: &[ChangedPath], deep: bool) -> Re
 }
 
 fn run_package_verify(report: &mut Report, root: &Path) -> bool {
-    let script = "elohim/sdk/domains/elohim-agent/scripts/package-projections.mjs";
-    match process::run("node", &[script, "verify"], root) {
+    match process::run("node", &[PACKAGE_VERIFIER, "verify"], root) {
         Ok(output) if output.success => {
             report.push(Finding::new(
                 "package.verify",
@@ -239,6 +239,9 @@ mod tests {
         fs::write(dir.path().join("AGENTS.md"), "governance\n").unwrap();
         fs::write(dir.path().join("CLAUDE.md"), "governance\n").unwrap();
         fs::create_dir_all(dir.path().join(".epr-meta/elohim/packages")).unwrap();
+        let verifier = dir.path().join(crate::authority::PACKAGE_VERIFIER);
+        fs::create_dir_all(verifier.parent().unwrap()).unwrap();
+        fs::write(verifier, "// package verifier fixture\n").unwrap();
         fs::write(
             dir.path().join(".epr-meta/manifest.md"),
             "---\nepr-meta-version: 1\nroot: true\nrules:\n  - id: born-linked\n    class: deny\n    when: { write: \"*.md\", new: true }\n    require-frontmatter: [id]\n---\n",

@@ -4,13 +4,17 @@ use eprfs_host::HostProfile;
 use serde_json::json;
 
 use crate::{
-    authority::{AuthorityIndex, PACKAGE_ROOT},
-    error::Result,
+    authority::{package_governance_declared, AuthorityIndex, PACKAGE_ROOT, PACKAGE_VERIFIER},
+    error::{Error, Result},
     process,
     report::{Finding, FindingStatus, Report},
 };
 
 pub fn run(root: &Path) -> Result<Report> {
+    run_at(root, &["HEAD"])
+}
+
+pub(crate) fn run_at(root: &Path, revisions: &[&str]) -> Result<Report> {
     let mut report = Report::new("doctor", root);
 
     required_path(
@@ -34,13 +38,62 @@ pub fn run(root: &Path) -> Result<Report> {
         ".epr-meta/manifest.md",
         "constitutional .epr-meta root is present",
     );
-    required_path(
-        &mut report,
-        root,
-        "governance.package-root",
-        PACKAGE_ROOT,
-        "Elohim package authority tree is present",
-    );
+    if root.join(".epr-meta/manifest.md").is_file() {
+        if !eprfs_meta::is_root_manifest(root.join(".epr-meta/manifest.md"))? {
+            report.push(
+                Finding::new(
+                    "governance.root-boundary",
+                    FindingStatus::Fail,
+                    "root manifest must explicitly declare root: true",
+                )
+                .blocking(),
+            );
+        }
+        let evaluation = eprfs_meta::evaluate_path(
+            root,
+            root.join("AGENTS.md"),
+            &eprfs_meta::GovernanceWrite {
+                path: "AGENTS.md".into(),
+                content: None,
+                prior_content: None,
+                is_new: false,
+                is_new_subdir: false,
+            },
+        )?;
+        for diagnostic in evaluation.diagnostics {
+            report.push(
+                Finding::new(
+                    format!("governance.{}", diagnostic.code),
+                    FindingStatus::Fail,
+                    diagnostic.message,
+                )
+                .blocking(),
+            );
+        }
+    }
+    let package_governance = package_governance_declared(root, revisions)?;
+    if package_governance {
+        required_path(
+            &mut report,
+            root,
+            "governance.package-root",
+            PACKAGE_ROOT,
+            "declared package authority tree is present",
+        );
+        required_path(
+            &mut report,
+            root,
+            "governance.package-verifier",
+            PACKAGE_VERIFIER,
+            "declared package fidelity verifier is present",
+        );
+    } else {
+        report.push(Finding::new(
+            "governance.native-root",
+            FindingStatus::Pass,
+            "native root governance applies; no package-fidelity capability is declared",
+        ));
+    }
 
     let index = AuthorityIndex::load(root)?;
     if index.package_count() > 0 {
@@ -67,8 +120,10 @@ pub fn run(root: &Path) -> Result<Report> {
     tool(&mut report, root, "python3", false);
     tool(&mut report, root, "cargo", false);
 
-    check_hooks(&mut report, root);
-    check_runtime_abis(&mut report, root);
+    check_hooks(&mut report, root)?;
+    if package_governance {
+        check_runtime_abis(&mut report, root);
+    }
 
     let host = HostProfile::current_platform();
     report.data = json!({
@@ -78,7 +133,7 @@ pub fn run(root: &Path) -> Result<Report> {
             "metaResolution": true,
             "policyExpansion": true,
             "ruleEvaluation": true,
-            "packageFidelity": "compatibility-adapter"
+            "packageFidelity": if package_governance { "compatibility-adapter" } else { "not-declared" }
         }
     });
     report.recompute();
@@ -87,7 +142,12 @@ pub fn run(root: &Path) -> Result<Report> {
 
 fn required_path(report: &mut Report, root: &Path, code: &str, relative: &str, summary: &str) {
     let path = root.join(relative);
-    if path.exists() {
+    let present = if relative == PACKAGE_ROOT {
+        path.is_dir()
+    } else {
+        path.is_file()
+    };
+    if present {
         report.push(Finding::new(code, FindingStatus::Pass, summary).path(relative));
     } else {
         report.push(
@@ -127,22 +187,42 @@ fn tool(report: &mut Report, root: &Path, program: &str, required: bool) {
     }
 }
 
-fn check_hooks(report: &mut Report, root: &Path) {
-    let configured = process::run("git", &["config", "--get", "core.hooksPath"], root)
-        .ok()
-        .filter(|output| output.success)
-        .map(|output| output.stdout);
-    let Some(configured) = configured.filter(|value| !value.is_empty()) else {
+pub(crate) fn configured_hooks_path(root: &Path) -> Result<Option<String>> {
+    let output = process::build_command("git", &["config", "--get", "core.hooksPath"], root, &[])
+        .output()
+        .map_err(|source| Error::Spawn {
+            program: "git".into(),
+            source,
+        })?;
+    match output.status.code() {
+        Some(0) => {
+            let value = String::from_utf8_lossy(&output.stdout);
+            let value = value.strip_suffix('\n').unwrap_or(&value);
+            if value.is_empty() {
+                return Err(Error::InvalidArguments("core.hooksPath is explicitly empty; configure an executable pre-push reach gate".into()));
+            }
+            Ok(Some(value.to_owned()))
+        }
+        Some(1) => Ok(None),
+        _ => Err(Error::Command {
+            program: "git config".into(),
+            stderr: String::from_utf8_lossy(&output.stderr).into_owned(),
+        }),
+    }
+}
+
+fn check_hooks(report: &mut Report, root: &Path) -> Result<()> {
+    let Some(configured) = configured_hooks_path(root)? else {
         report.push(
             Finding::new(
                 "git.hooks-path",
                 FindingStatus::Fail,
                 "Git hooks are not activated in this worktree",
             )
-            .remediation("run `pnpm install` (or `pnpm exec husky`) in this worktree")
+            .remediation("run `epr setup` to activate the repository reach gate")
             .blocking(),
         );
-        return;
+        return Ok(());
     };
 
     let hook = root.join(&configured).join("pre-push");
@@ -159,11 +239,12 @@ fn check_hooks(report: &mut Report, root: &Path) {
                 FindingStatus::Fail,
                 format!("configured hooks path `{configured}` has no executable pre-push hook"),
             )
-            .remediation("activate Husky in this worktree with `pnpm install`")
+            .remediation("repair the configured executable pre-push hook; epr setup will not replace an explicit hook path")
             .path(hook)
             .blocking(),
         );
     }
+    Ok(())
 }
 
 fn check_runtime_abis(report: &mut Report, root: &Path) {
@@ -283,7 +364,7 @@ fn projected_skill_count(root: &Path) -> usize {
 }
 
 #[cfg(unix)]
-fn is_executable(path: &Path) -> bool {
+pub(crate) fn is_executable(path: &Path) -> bool {
     use std::os::unix::fs::PermissionsExt;
     path.metadata()
         .map(|metadata| metadata.permissions().mode() & 0o111 != 0)
@@ -291,7 +372,7 @@ fn is_executable(path: &Path) -> bool {
 }
 
 #[cfg(not(unix))]
-fn is_executable(path: &Path) -> bool {
+pub(crate) fn is_executable(path: &Path) -> bool {
     path.is_file()
 }
 

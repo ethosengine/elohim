@@ -87,6 +87,12 @@ pub fn parse_meta_file(path: impl AsRef<Path>) -> Result<EprMetaRecord> {
     authored.to_record(None, &path, None)
 }
 
+/// Read the explicit cascade boundary through the same bounded, versioned parser
+/// used by resolution. A projection subject alone does not imply `root: true`.
+pub fn is_root_manifest(path: impl AsRef<Path>) -> Result<bool> {
+    Ok(read_authored_meta(&manifest_path(path.as_ref()))?.root)
+}
+
 pub fn resolve_path(
     repo_root: impl AsRef<Path>,
     target: impl AsRef<Path>,

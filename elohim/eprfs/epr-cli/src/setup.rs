@@ -13,18 +13,27 @@ use crate::{
 /// package manager or writing outside this clone. This changes only local Git
 /// configuration and is therefore both explicit and reversible.
 pub fn run(root: &Path) -> Result<Report> {
-    let hook = root.join(".husky/pre-push");
-    if !hook.is_file() {
+    let existing = doctor::configured_hooks_path(root)?;
+    let configured = existing.clone().unwrap_or_else(|| {
+        if root.join(".husky/pre-push").is_file() {
+            ".husky".into()
+        } else {
+            ".githooks".into()
+        }
+    });
+    let hook = root.join(&configured).join("pre-push");
+    if !hook.is_file() || !doctor::is_executable(&hook) {
         return Err(Error::InvalidArguments(
-            "the repository has no checked-in `.husky/pre-push` reach gate".into(),
+            format!("no executable pre-push reach gate at {}; repair the declared hook or provide .husky/pre-push or .githooks/pre-push", hook.display()),
         ));
     }
-
-    process::require(
-        "git",
-        &["config", "--local", "core.hooksPath", ".husky"],
-        root,
-    )?;
+    if existing.is_none() {
+        process::require(
+            "git",
+            &["config", "--local", "core.hooksPath", &configured],
+            root,
+        )?;
+    }
 
     let mut report = doctor::run(root)?;
     report.command = "setup".into();
@@ -34,7 +43,11 @@ pub fn run(root: &Path) -> Result<Report> {
             FindingStatus::Pass,
             "checked-in reach gate activated for this clone",
         )
-        .detail("Only local Git configuration changed; working-tree authoring remains private."),
+        .detail(if existing.is_none() {
+            "Only local Git configuration changed; working-tree authoring remains private."
+        } else {
+            "Existing hook configuration preserved; no Git configuration changed."
+        }),
     );
     report.recompute();
     Ok(report)
@@ -58,6 +71,9 @@ mod tests {
             fs::write(dir.path().join(path), "governance\n").unwrap();
         }
         fs::create_dir_all(dir.path().join(".epr-meta/elohim/packages")).unwrap();
+        let verifier = dir.path().join(crate::authority::PACKAGE_VERIFIER);
+        fs::create_dir_all(verifier.parent().unwrap()).unwrap();
+        fs::write(verifier, "// package verifier fixture\n").unwrap();
         fs::write(
             dir.path().join(".epr-meta/manifest.md"),
             "---\nepr-meta-version: 1\nroot: true\n---\n",

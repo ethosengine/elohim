@@ -47,6 +47,56 @@ seamLocus: >
   above as pending.
 
 decisionPoints:
+  - name: integrate::integrate
+    kind: state-transition
+    sourceLocation:
+      file: src/integrate.rs
+      modulePath: elohim_epr_cli::integrate
+    summary: >
+      Brit-facing local Git adapter consumes existing appointed acceptance and native
+      reconciliation, runs native readiness and the report-pinned bounded argv gate,
+      then revalidates under the existing flow append lock before an atomic source
+      verification and expected-old target fast-forward. No new authority ledger.
+    concernIds:
+      - id: C0
+        status: answered
+        justification: >
+          Derived local repository integration verdict; no DHT entity, publication,
+          remote election or additional head-plane state is introduced.
+      - id: C1
+        status: answered
+        justification: >
+          Reuses acceptance::validate_record and reconciliation::reconcile. Missing,
+          revised, superseded or contrary acceptance cannot authorize a target move.
+          The authority remains explicit local approval, not cryptographic attestation.
+      - id: C6a
+        status: answered
+        justification: >
+          Report pins gate argv and timeout 1..3600 seconds. Expiry kills only the
+          owned Unix process group and refuses integration without moving refs.
+      - id: C6b
+        status: answered
+        justification: >
+          Rechecks sidecar evidence while holding its existing append transaction.
+          One Git transaction verifies source and expected-old target; replay or
+          concurrent ref movement refuses rather than reusing stale approval.
+      - id: C4
+        status: partial
+        justification: >
+          Missing evidence, dirty source and checked-out target refuse. Sidecar writers
+          cooperate with the append lock; arbitrary external filesystem edits and worktree
+          creation are not atomically serialized with Git refs. Gate subprocess bounds
+          currently require Unix process groups; other platforms fail closed.
+    contractTests:
+      - path: elohim/eprfs/epr-cli/tests/integrate.rs
+        testName: accepted_integration_moves_only_target_and_replay_refuses
+        kind: integration
+      - path: elohim/eprfs/epr-cli/tests/integrate.rs
+        testName: gate_failures_movement_and_contrary_evidence_refuse
+        kind: integration
+      - path: elohim/eprfs/epr-cli/tests/integrate.rs
+        testName: dirty_source_checked_out_target_and_changed_report_refuse
+        kind: integration
   - name: claim::claim / note::note / fulfill::fulfill_on
     kind: state-transition
     sourceLocation:

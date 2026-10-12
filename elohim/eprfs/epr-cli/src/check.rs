@@ -4,7 +4,7 @@ use eprfs_core::GovernanceRuleClass;
 use serde_json::json;
 
 use crate::{
-    authority::{normalize, AuthorityIndex},
+    authority::{normalize, package_governance_declared, AuthorityIndex, PACKAGE_VERIFIER},
     error::Result,
     git::{self, ChangeKind, ChangedPath},
     report::{Finding, FindingStatus, Report},
@@ -42,6 +42,10 @@ fn run_with_revisions(
     revisions: Option<(&str, &str)>,
 ) -> Result<CheckOutcome> {
     let authority = AuthorityIndex::load(root)?;
+    let package_governance = match revisions {
+        Some((head, base)) => package_governance_declared(root, &[head, base])?,
+        None => package_governance_declared(root, &["HEAD"])?,
+    };
     let mut report = Report::new("check", root);
     let mut needs_package_verify = false;
     let mut touches_eprfs = false;
@@ -55,7 +59,8 @@ fn run_with_revisions(
     for change in changes {
         let normalized = normalize(Path::new(&change.path));
         touches_eprfs |= normalized.starts_with("elohim/eprfs/");
-        needs_package_verify |= AuthorityIndex::is_agentic_path(&normalized);
+        needs_package_verify |= package_governance
+            && (AuthorityIndex::is_agentic_path(&normalized) || normalized == PACKAGE_VERIFIER);
 
         if change.kind == ChangeKind::Conflicted {
             report.push(

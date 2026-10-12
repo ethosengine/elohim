@@ -33,6 +33,15 @@ fn main() -> ExitCode {
             }
         };
     }
+    if raw.first().map(String::as_str) == Some("integrate") {
+        return match elohim_epr_cli::integrate::run(&raw[1..]) {
+            Ok(code) => code,
+            Err(error) => {
+                eprintln!("epr integrate: {error}");
+                ExitCode::from(2)
+            }
+        };
+    }
     // `actor` likewise renders its own payload rather than a Report. Its exit code means "did
     // the command run", never "is there a claim": `current` exits 0 with `claim: null` when a
     // session registered nothing, because "nobody claimed" is an answer and "I could not find
@@ -312,5 +321,5 @@ fn print_human(report: &Report) {
 }
 
 fn usage() -> &'static str {
-    "usage: epr [--repo PATH] [--json] <setup|doctor|explain PATH|check [PATH...]|govern --path REL ...|ready [--target REF] [--deep]|flow ...|actor <claim --as agent:<role>@<model> --session ID|current --session ID>|canon-lift [--check|--write]|device <ask|redeem|approve> ...|identity <begin|standing> ...|covenant <offer|show|check|record> --session ID ...>"
+    "usage: epr [--repo PATH] [--json] <setup|doctor|explain PATH|check [PATH...]|govern --path REL ...|ready [--target REF] [--deep]|integrate --acceptance CID [--root DIR]|flow ...|actor <claim --as agent:<role>@<model> --session ID|current --session ID>|canon-lift [--check|--write]|device <ask|redeem|approve> ...|identity <begin|standing> ...|covenant <offer|show|check|record> --session ID ...>"
 }

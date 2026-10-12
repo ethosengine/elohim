@@ -20,6 +20,7 @@ pub mod frames;
 pub mod git;
 pub mod govern;
 pub mod hint;
+pub mod integrate;
 pub mod process;
 pub mod ready;
 pub mod report;
