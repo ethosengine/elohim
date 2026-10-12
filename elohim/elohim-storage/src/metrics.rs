@@ -2270,6 +2270,17 @@ lazy_static! {
     )
     .unwrap();
 
+    /// Pointer-audit candidates the sweep did NOT ask the conductor about,
+    /// because this process already found them in step at the head and blob
+    /// pointer they still carry. Its own series rather than an `outcome` label:
+    /// every `outcome` is an answer the conductor gave, and this is the absence
+    /// of a question.
+    pub static ref CONTENT_POINTER_AUDIT_SETTLED: IntCounter = IntCounter::new(
+        "elohim_content_pointer_audit_settled_total",
+        "Pointer-audit candidates skipped as remembered in step at an unchanged head and blob pointer.",
+    )
+    .unwrap();
+
     /// Divergent REA commitments the heal leg ADJUDICATED without paying for a
     /// `get_rea_commitment` round-trip, by the remembered [`ReaHealSkip`].
     ///
@@ -2580,6 +2591,21 @@ lazy_static! {
             "Conductor calls dispatched, by zome, function and admission class.",
         ),
         &["zome", "fn", "class"],
+    )
+    .unwrap();
+
+    /// Liveness questions NOT put to the conductor because the socket had
+    /// already answered: a supervisor tick (`asker="supervisor"`) or a heartbeat
+    /// sample (`asker="heartbeat"`) that rested on a returned zome call or a
+    /// recent ping. The other half of `elohim_conductor_calls_total{fn="app_info"}`:
+    /// together they are every tick, so a probe that stopped firing is
+    /// distinguishable from one that was spared.
+    pub static ref BRIDGE_PROBES_VOUCHED: IntCounterVec = IntCounterVec::new(
+        Opts::new(
+            "elohim_conductor_bridge_probes_vouched_total",
+            "Bridge liveness probes spared because the role's app websocket had already answered, by role and asker.",
+        ),
+        &["role", "asker"],
     )
     .unwrap();
 
@@ -3319,6 +3345,7 @@ pub fn register_all() {
         let _ = REGISTRY.register(Box::new(CONTENT_CONTEST_BACKOFF_CLEARED.clone()));
         let _ = REGISTRY.register(Box::new(CONTENT_REANCHOR_SKIPPED.clone()));
         let _ = REGISTRY.register(Box::new(CONTENT_POINTER_AUDIT.clone()));
+        let _ = REGISTRY.register(Box::new(CONTENT_POINTER_AUDIT_SETTLED.clone()));
         // Pre-touch every outcome — a torn-row class this sweep never sees
         // (e.g. `not_canonical` on a fully converged corpus) must read as a
         // MEASURED zero, not an absent series.
@@ -3672,6 +3699,7 @@ pub fn register_all() {
         let _ = REGISTRY.register(Box::new(CONDUCTOR_ADMISSION_SHED.clone()));
         let _ = REGISTRY.register(Box::new(SHARD_REGISTRATION_OUTCOMES.clone()));
         let _ = REGISTRY.register(Box::new(CONDUCTOR_CALLS.clone()));
+        let _ = REGISTRY.register(Box::new(BRIDGE_PROBES_VOUCHED.clone()));
         let _ = REGISTRY.register(Box::new(CONDUCTOR_CALL_DURATION_MS.clone()));
         let _ = REGISTRY.register(Box::new(CONDUCTOR_CALL_DROPPED.clone()));
         let _ = REGISTRY.register(Box::new(CONDUCTOR_CALL_TIMEOUTS.clone()));
@@ -3957,6 +3985,13 @@ pub fn inc_head_moved_exhausted(writer: &str) {
 pub fn inc_conductor_call(zome: &str, fn_name: &str, class: &str) {
     CONDUCTOR_CALLS
         .with_label_values(&[zome, fn_name, class])
+        .inc();
+}
+
+/// Count one bridge liveness probe spared by evidence already held.
+pub fn inc_bridge_probe_vouched(role: &str, asker: &str) {
+    BRIDGE_PROBES_VOUCHED
+        .with_label_values(&[role, asker])
         .inc();
 }
 
@@ -5473,6 +5508,12 @@ pub fn inc_reanchor_skipped(reason: ReanchorSkip) {
     CONTENT_REANCHOR_SKIPPED
         .with_label_values(&[reason.label()])
         .inc();
+}
+
+/// Count one pointer-audit candidate NOT asked about: remembered in step at the
+/// head and blob pointer it still carries.
+pub fn inc_pointer_audit_settled() {
+    CONTENT_POINTER_AUDIT_SETTLED.inc();
 }
 
 /// Record one pointer-audit sweep candidate's outcome (story 1.4d).

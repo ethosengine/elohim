@@ -19,6 +19,14 @@ use crate::policy::{evaluate, EvaluatedFlags, LiveState, PolicyConfig};
 use std::time::Duration;
 use tokio::sync::broadcast;
 
+/// How long a returned call on this role's socket stands in for a ping.
+///
+/// One and a half heartbeat ticks: the previous tick's `record_peer_status`
+/// write (60s ago, give or take scheduling) vouches for this tick's sample; a
+/// tick whose write failed or was skipped leaves nothing inside the window, and
+/// the next sample asks.
+pub const HEARTBEAT_VOUCH_WINDOW: Duration = Duration::from_secs(90);
+
 #[derive(Debug, Clone)]
 pub struct Published {
     pub status: String,
@@ -379,7 +387,25 @@ impl LiveProbe for DefaultProbe {
         // the admin socket can stay live while the app socket/token is dead.
         // Resolve through the registry (not a held handle) so a supervisor
         // re-mint is reflected on the very next tick.
+        //
+        // ASKED ONLY WHEN NOTHING HAS ANSWERED. This task's own
+        // `record_peer_status` write crosses the same socket every tick, so a
+        // write that returned inside the window already proves everything a
+        // ping would — and a ping on top of it was one conductor round trip a
+        // minute per node spent re-learning it. Any doubt (no answer on this
+        // mint inside the window, a closed streak, a role not observed `Live`)
+        // falls through to the ping, unchanged.
         let conductor_healthy = match self.registry.client(self.role) {
+            Some(hc)
+                if crate::hc_client_registry::bridge_vouched_within(
+                    self.role,
+                    hc.connection_generation(),
+                    HEARTBEAT_VOUCH_WINDOW,
+                ) =>
+            {
+                crate::metrics::inc_bridge_probe_vouched(self.role, "heartbeat");
+                true
+            }
             Some(hc) => match hc.ping().await {
                 Ok(crate::hc_client::BridgeProbe::Running) => true,
                 // The websocket is fine and the app is not. A node in this

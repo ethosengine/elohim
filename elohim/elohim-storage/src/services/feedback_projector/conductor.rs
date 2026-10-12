@@ -19,7 +19,20 @@ impl ConductorReader {
         input: I,
     ) -> Result<O, StorageError> {
         let payload = rmp_serde::to_vec_named(&input).map_err(invalid)?;
-        let bytes = self.0.call_zome("content_store", name, payload).await?;
+        // BACKGROUND, explicitly. Every caller of this reader is the discovery
+        // sweep or its record fetches — work nobody is waiting on — and the
+        // plain `call_zome` it used to ride defaults to the interactive lane,
+        // so a sweep was spending a person's capacity. Same reasoning as
+        // `pointer_audit::SWEEP_PROBE_CLASS`.
+        let (bytes, _timing) = self
+            .0
+            .call_zome_timed(
+                "content_store",
+                name,
+                payload,
+                crate::conductor_admission::AdmissionClass::Background,
+            )
+            .await?;
         if bytes.len() > MAX_BYTES_PER_SWEEP {
             return Err(invalid("response exceeds sweep byte budget"));
         }

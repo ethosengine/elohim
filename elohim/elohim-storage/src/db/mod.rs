@@ -336,6 +336,7 @@ impl CustomizeConnection<SqliteConnection, diesel::r2d2::Error> for SqlitePragma
         // the process to exit (crashloop). Setting busy_timeout first means every
         // subsequent lock-needing pragma will wait up to 30 s rather than error.
         for pragma in [
+            // == CONNECTION_BUSY_TIMEOUT_MS (pinned by a test below).
             "PRAGMA busy_timeout = 30000",
             "PRAGMA journal_mode = WAL",
             "PRAGMA synchronous = NORMAL",
@@ -353,6 +354,11 @@ impl CustomizeConnection<SqliteConnection, diesel::r2d2::Error> for SqlitePragma
 
 /// Default r2d2 pool size when `STORAGE_DB_POOL_SIZE` is unset. Preserves the
 /// historical hardcoded value so an unset env is a no-op.
+/// The `busy_timeout` every pooled connection is given at acquire (the pragma
+/// list in `SqlitePragmas::on_acquire`). A caller that shortens it for one
+/// statement restores it to this.
+pub const CONNECTION_BUSY_TIMEOUT_MS: u32 = 30_000;
+
 pub const DB_POOL_SIZE_DEFAULT: u32 = 10;
 
 /// Pure parser for the `STORAGE_DB_POOL_SIZE` knob (doorway two-function idiom:
@@ -499,6 +505,11 @@ mod pragma_order_tests {
             .expect("on_acquire should succeed on an uncontested DB");
 
         let timeout = read_busy_timeout(&mut conn);
+        assert_eq!(
+            timeout as u32,
+            super::CONNECTION_BUSY_TIMEOUT_MS,
+            "the constant callers restore to must be the value on_acquire sets"
+        );
         assert_eq!(
             timeout, 30000,
             "busy_timeout must be 30000 after on_acquire; got {}",

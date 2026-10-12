@@ -200,3 +200,109 @@ pub fn mark_visited(
     .execute(conn)?;
     Ok(())
 }
+
+// ---------------------------------------------------------------------------
+// `feedback_subscription_settled` — the sweep's durable retirement evidence.
+// Raw SQL on purpose: three statements over a three-column operational table.
+// ---------------------------------------------------------------------------
+
+#[derive(diesel::QueryableByName)]
+struct SettledKey {
+    #[diesel(sql_type = diesel::sql_types::Text)]
+    member_kind: String,
+    #[diesel(sql_type = diesel::sql_types::Text)]
+    member_key: String,
+}
+
+/// Record that a member went Cold in `generation_id`: it completed the clean
+/// sweeps retirement requires, in that generation.
+pub fn mark_settled(
+    conn: &mut SqliteConnection,
+    member_kind: &str,
+    member_key: &str,
+    generation_id: i32,
+    now: &str,
+) -> Result<(), DieselError> {
+    diesel::sql_query(
+        "INSERT INTO feedback_subscription_settled
+         (member_kind, member_key, generation_id, settled_at) VALUES (?, ?, ?, ?)
+         ON CONFLICT (member_kind, member_key)
+         DO UPDATE SET generation_id = excluded.generation_id, settled_at = excluded.settled_at",
+    )
+    .bind::<diesel::sql_types::Text, _>(member_kind)
+    .bind::<diesel::sql_types::Text, _>(member_key)
+    .bind::<diesel::sql_types::Integer, _>(generation_id)
+    .bind::<diesel::sql_types::Text, _>(now)
+    .execute(conn)?;
+    Ok(())
+}
+
+/// How long [`mark_settled_briefly`] may wait on a contested write lock.
+const SETTLE_BUSY_TIMEOUT_MS: u32 = 250;
+
+/// [`mark_settled`] for a caller that is HOLDING A LOCK while it writes (the
+/// sweep, serializing the insert against a re-arm): the connection's 30 s busy
+/// wait is shortened for this one statement, so a contested database costs the
+/// lock holder a quarter of a second, not thirty. A write that gives up is an
+/// `Err` and leaves no row — the safe direction: an unsettled member is merely
+/// swept again after a restart. The connection's own timeout is restored
+/// before returning, whatever the insert did.
+pub fn mark_settled_briefly(
+    conn: &mut SqliteConnection,
+    member_kind: &str,
+    member_key: &str,
+    generation_id: i32,
+    now: &str,
+) -> Result<(), DieselError> {
+    diesel::sql_query(format!("PRAGMA busy_timeout = {SETTLE_BUSY_TIMEOUT_MS}")).execute(conn)?;
+    let written = mark_settled(conn, member_kind, member_key, generation_id, now);
+    let restored = diesel::sql_query(format!(
+        "PRAGMA busy_timeout = {}",
+        crate::db::CONNECTION_BUSY_TIMEOUT_MS
+    ))
+    .execute(conn);
+    written.and(restored.map(|_| ()))
+}
+
+/// Something re-armed the member: it is no longer settled. Returns whether a
+/// row was removed.
+pub fn clear_settled(
+    conn: &mut SqliteConnection,
+    member_kind: &str,
+    member_key: &str,
+) -> Result<bool, DieselError> {
+    let removed = diesel::sql_query(
+        "DELETE FROM feedback_subscription_settled WHERE member_kind = ? AND member_key = ?",
+    )
+    .bind::<diesel::sql_types::Text, _>(member_kind)
+    .bind::<diesel::sql_types::Text, _>(member_key)
+    .execute(conn)?;
+    Ok(removed > 0)
+}
+
+/// The members settled IN `generation_id`. A row from any other generation is
+/// not evidence about this one and is not returned.
+pub fn settled_in_generation(
+    conn: &mut SqliteConnection,
+    generation_id: i32,
+) -> Result<std::collections::HashSet<(String, String)>, DieselError> {
+    Ok(diesel::sql_query(
+        "SELECT member_kind, member_key FROM feedback_subscription_settled
+         WHERE generation_id = ?",
+    )
+    .bind::<diesel::sql_types::Integer, _>(generation_id)
+    .load::<SettledKey>(conn)?
+    .into_iter()
+    .map(|k| (k.member_kind, k.member_key))
+    .collect())
+}
+
+/// Withdraw every member's retirement in `generation_id` (a rebuild).
+pub fn clear_settled_generation(
+    conn: &mut SqliteConnection,
+    generation_id: i32,
+) -> Result<usize, DieselError> {
+    diesel::sql_query("DELETE FROM feedback_subscription_settled WHERE generation_id = ?")
+        .bind::<diesel::sql_types::Integer, _>(generation_id)
+        .execute(conn)
+}

@@ -371,6 +371,11 @@ pub(crate) struct HcConnection {
     #[allow(dead_code)]
     signer: Arc<ClientAgentSigner>,
     generation: u64,
+    /// The transport ledger's doubt epoch when THIS SNAPSHOT was taken for a
+    /// call (`HcClient::connection`). An answer is credited to the epoch its
+    /// question was asked in: a response that was already in flight when the
+    /// conductor was replaced must not vouch for the socket afterwards.
+    asked_in_doubt_epoch: u64,
 }
 
 /// Process-wide source of [`HcConnection::generation`]. Monotonic, so "older
@@ -708,7 +713,9 @@ impl HcClient {
 
     /// The sockets this call should use, read fresh — see [`HcConnection`].
     fn connection(&self) -> HcConnection {
-        self.conn.current()
+        let mut conn = self.conn.current();
+        conn.asked_in_doubt_epoch = crate::hc_client_registry::transport_ledger().doubt_epoch();
+        conn
     }
 
     /// Which mint this client's sockets currently come from.
@@ -950,6 +957,7 @@ impl HcClient {
                 app_ws,
                 signer: signer_arc,
                 generation: next_connection_generation(),
+                asked_in_doubt_epoch: 0,
             }),
             signal_handlers: std::sync::Mutex::new(Vec::new()),
             cell_id,
@@ -1044,6 +1052,7 @@ impl HcClient {
                             crate::hc_client_registry::note_transport_ok(
                                 self.role_key(),
                                 conn.generation,
+                                conn.asked_in_doubt_epoch,
                             )
                         })
                         .map_err(|e| self.zome_call_failed_on(&heal_cell, conn.generation, e))
@@ -1128,6 +1137,7 @@ impl HcClient {
                             crate::hc_client_registry::note_transport_ok(
                                 self.role_key(),
                                 conn.generation,
+                                conn.asked_in_doubt_epoch,
                             )
                         })
                         .map_err(|e| self.zome_call_failed_on(&heal_cell, conn.generation, e))
@@ -1257,7 +1267,11 @@ impl HcClient {
                 })
                 .await?;
                 if result.is_ok() {
-                    crate::hc_client_registry::note_transport_ok(self.role_key(), conn.generation);
+                    crate::hc_client_registry::note_transport_ok(
+                        self.role_key(),
+                        conn.generation,
+                        conn.asked_in_doubt_epoch,
+                    );
                 }
                 let result = result.map_err(|e| self.zome_call_failed(conn.generation, e));
                 result.map(|bytes| (bytes, admission_wait))
@@ -1989,7 +2003,11 @@ impl HcClient {
             observe_conductor_attempt("-", "app_info", "ungated", conn.app_ws.app_info()).await;
         if answered.is_ok() {
             // Bytes crossed this mint's app websocket: it is not closed.
-            crate::hc_client_registry::note_transport_ok(self.role_key(), conn.generation);
+            crate::hc_client_registry::note_transport_ok(
+                self.role_key(),
+                conn.generation,
+                conn.asked_in_doubt_epoch,
+            );
             // AND THE VERDICT HEARS IT. A failed ping files a transport failure;
             // an answered one must be able to cancel it, or a role whose only
             // failure predates a conductor restart stays `Dead` — latching

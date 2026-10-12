@@ -101,6 +101,21 @@ pub const RETRY_MAX_SECS: i64 = 3600;
 /// `get_links` load rather than removing it.
 pub const COLD_AFTER_CLEAN_SWEEPS: u8 = 3;
 
+/// One Cold member is re-audited every this many sweeps, least recently
+/// visited first.
+///
+/// Heat used to live only in memory, which made a restart the sweep's one
+/// backstop for a lost notification — and made every restart cost the whole
+/// set swept three times over at full budget: 379 members on a household peer
+/// is 142 minutes of 8 `get_links` a minute on a node where nothing happened.
+/// The live sweep now recovers a member's retirement from its durable visit
+/// record at boot ([`SweepScheduler::seed_from_durable`]) and replaces the
+/// accidental backstop with a deliberate one: a slow lap over the Cold set.
+/// At 5 sweeps of 60 s that is one `get_links` per five minutes, and N Cold
+/// members are each looked at again within 5·N minutes whether or not the node
+/// ever restarts — which before this they never were.
+pub const COLD_REAUDIT_EVERY_SWEEPS: u64 = 5;
+
 // ---------------------------------------------------------------------------
 // Wire mirrors of the coordinator's own types
 // ---------------------------------------------------------------------------
@@ -228,6 +243,12 @@ pub struct MemberSweepState {
 pub struct SweepScheduler {
     states: Mutex<HashMap<(String, String), MemberSweepState>>,
     seq: AtomicU64,
+    /// Set by the live sweep ([`spawn`]): recover retirement from the durable
+    /// visit record once, and run the Cold re-audit lap. Off for a scheduler a
+    /// test builds, so the in-memory ladder is asserted exactly as written.
+    durable_heat: std::sync::atomic::AtomicBool,
+    seeded: std::sync::atomic::AtomicBool,
+    sweeps: AtomicU64,
 }
 
 /// The scheduler the live sweep loop is using, so the notification ingress path
@@ -242,6 +263,78 @@ impl SweepScheduler {
         Self::default()
     }
 
+    /// Turn on boot recovery and the Cold re-audit lap. See
+    /// [`COLD_REAUDIT_EVERY_SWEEPS`].
+    pub fn enable_durable_heat(&self) {
+        self.durable_heat.store(true, AtomicOrdering::Relaxed);
+    }
+
+    /// Recover retirement from the durable settled record. Runs ONCE, on the
+    /// first sweep after boot, and never overwrites a state this process has
+    /// already formed (a notification that re-armed a member before the first
+    /// sweep keeps it Hot).
+    ///
+    /// A member starts Cold only when `settled` holds it — a row written when
+    /// it completed [`COLD_AFTER_CLEAN_SWEEPS`] clean sweeps in the CURRENT
+    /// generation and deleted by anything that re-armed it since — and nothing
+    /// of its own is pending. Visit counts are not evidence (a visit is
+    /// recorded before its enumeration, so a failed one counts) and are not
+    /// read. A generation that is new since the rows were written has none, so
+    /// every member is swept again before that generation can publish.
+    ///
+    /// Returns how many members were seeded Cold.
+    pub fn seed_from_durable(
+        &self,
+        rows: &[sub_db::SubscriptionRow],
+        settled: &std::collections::HashSet<(String, String)>,
+        pending: &std::collections::HashSet<String>,
+    ) -> usize {
+        if !self.durable_heat.load(AtomicOrdering::Relaxed)
+            || self.seeded.swap(true, AtomicOrdering::Relaxed)
+        {
+            return 0;
+        }
+        let mut states = self.states.lock().unwrap_or_else(|e| e.into_inner());
+        let mut seeded = 0;
+        for row in rows {
+            let key = (row.member_kind.clone(), row.member_key.clone());
+            if states.contains_key(&key) {
+                continue;
+            }
+            if settled.contains(&key) && !pending.contains(&row.member_key) {
+                states.insert(
+                    key,
+                    MemberSweepState {
+                        heat: MemberHeat::Cold,
+                        last_new_act_seq: 0,
+                    },
+                );
+                seeded += 1;
+            }
+        }
+        seeded
+    }
+
+    /// Run `f` only if the member is Cold, holding the lock every re-arm takes
+    /// for as long as `f` runs. `None` when the member is not Cold.
+    pub fn while_cold<R>(
+        &self,
+        member_kind: &str,
+        member_key: &str,
+        f: impl FnOnce() -> R,
+    ) -> Option<R> {
+        let states = self.states.lock().unwrap_or_else(|e| e.into_inner());
+        let cold = states
+            .get(&(member_kind.to_string(), member_key.to_string()))
+            .is_some_and(|s| s.heat.is_cold());
+        cold.then(f)
+    }
+
+    /// Does the live sweep keep the durable settled record?
+    pub fn durable_heat(&self) -> bool {
+        self.durable_heat.load(AtomicOrdering::Relaxed)
+    }
+
     /// Re-arm a member: Hot, clean-sweep count reset, and stamped at the FRONT
     /// of the order. Called from both re-arm paths the atom names — a
     /// notification ([`admit_notified_signal`]) and the projector seeing a new
@@ -254,6 +347,12 @@ impl SweepScheduler {
             .or_default();
         state.heat = MemberHeat::Hot;
         state.last_new_act_seq = seq;
+    }
+
+    /// Is the one-time boot recovery still owed?
+    pub fn wants_seed(&self) -> bool {
+        self.durable_heat.load(AtomicOrdering::Relaxed)
+            && !self.seeded.load(AtomicOrdering::Relaxed)
     }
 
     /// Take the visit token for a member about to be swept.
@@ -353,6 +452,8 @@ impl SweepScheduler {
         budget: usize,
     ) -> Vec<sub_db::SubscriptionRow> {
         let states = self.states.lock().unwrap_or_else(|e| e.into_inner());
+        // The Cold member longest unvisited: the re-audit lap's next stop.
+        let mut stalest_cold: Option<sub_db::SubscriptionRow> = None;
         let mut live: Vec<(MemberSweepState, sub_db::SubscriptionRow)> = candidates
             .into_iter()
             .filter_map(|row| {
@@ -361,6 +462,12 @@ impl SweepScheduler {
                     .copied()
                     .unwrap_or_default();
                 if state.heat.is_cold() {
+                    if stalest_cold
+                        .as_ref()
+                        .is_none_or(|s| row.last_visited_at < s.last_visited_at)
+                    {
+                        stalest_cold = Some(row);
+                    }
                     None
                 } else {
                     Some((state, row))
@@ -368,6 +475,9 @@ impl SweepScheduler {
             })
             .collect();
         drop(states);
+        let reaudit = self.durable_heat.load(AtomicOrdering::Relaxed)
+            && (self.sweeps.fetch_add(1, AtomicOrdering::Relaxed) + 1)
+                .is_multiple_of(COLD_REAUDIT_EVERY_SWEEPS);
         live.sort_by(|(a, ar), (b, br)| {
             a.heat
                 .rank()
@@ -380,7 +490,16 @@ impl SweepScheduler {
                 .then(ar.member_key.cmp(&br.member_key))
         });
         live.truncate(budget);
-        live.into_iter().map(|(_, row)| row).collect()
+        let mut members: Vec<sub_db::SubscriptionRow> =
+            live.into_iter().map(|(_, row)| row).collect();
+        // The lap rides on spare budget only: live members are never displaced.
+        // The visit goes through the ordinary path, so a re-audited member that
+        // has something open is re-armed Hot and one that is clean stays Cold;
+        // either way its `last_visited_at` moves and the lap advances.
+        if reaudit && members.len() < budget {
+            members.extend(stalest_cold);
+        }
+        members
     }
 }
 
@@ -951,6 +1070,9 @@ pub fn begin_rebuild(conn: &mut SqliteConnection, generation_id: i32) -> Result<
         gen_db::set_status(c, generation_id, GEN_REBUILDING, None)?;
         app_db::clear_generation(c, generation_id)?;
         gen_db::clear_aggregates(c, generation_id)?;
+        // A rebuilt generation must be swept again from nothing: retirement
+        // earned against the state just cleared is not evidence about it.
+        sub_db::clear_settled_generation(c, generation_id)?;
         Ok(())
     })
     .map_err(|e| StorageError::Database(format!("begin_rebuild({generation_id}): {e}")))
@@ -1048,6 +1170,40 @@ impl FeedbackProjector {
         Arc::clone(&self.scheduler)
     }
 
+    /// Make the durable settled record say what the member's heat says now.
+    fn sync_settled(&self, member_kind: &str, member_key: &str, generation_id: i32) {
+        let Ok(mut conn) = self.pool.get() else {
+            return;
+        };
+        // THE INSERT RUNS UNDER THE SAME LOCK A RE-ARM TAKES. A notification
+        // re-arms in memory and then deletes the row. If the insert could land
+        // between a heat read and that delete's completion, a crash right
+        // after it would leave a settled row for a member a COMPLETED
+        // notification had re-armed. Held under the scheduler's lock, the
+        // insert is either before the re-arm (whose delete then follows it) or
+        // after it (and then the member is Hot and nothing is inserted).
+        let now = Utc::now().to_rfc3339();
+        let settled = self.scheduler.while_cold(member_kind, member_key, || {
+            // `_briefly`: this runs with the scheduler's lock held, and a
+            // notification's re-arm is waiting on that lock.
+            sub_db::mark_settled_briefly(&mut conn, member_kind, member_key, generation_id, &now)
+        });
+        let cold = settled.is_some();
+        let written = match settled {
+            Some(result) => result,
+            None => sub_db::clear_settled(&mut conn, member_kind, member_key).map(|_| ()),
+        };
+        if let Err(error) = written {
+            tracing::warn!(
+                target: "elohim_storage::feedback_projector",
+                member = %member_key,
+                cold,
+                %error,
+                "feedback sweep: the settled record could not be brought in step"
+            );
+        }
+    }
+
     /// One sweep. Budgets are sized BEFORE any conductor call is made.
     pub async fn tick(&self) -> Result<TickReport, StorageError> {
         let _writer = rebuild::WRITER.lock().await;
@@ -1095,6 +1251,33 @@ impl FeedbackProjector {
                     .load(&mut conn)
                     .map_err(|e| StorageError::Database(e.to_string()))?
             };
+            // Once per process, before the first selection: recover retirement
+            // from the durable visit record (a no-op unless the live sweep
+            // enabled it, and on every sweep after the first).
+            if self.scheduler.wants_seed() {
+                use crate::db::diesel_schema::feedback_application_member::dsl as m;
+                let pending: std::collections::HashSet<String> = m::feedback_application_member
+                    .filter(m::member_status.eq(MEMBER_STATUS_PENDING))
+                    .select(m::action_hash)
+                    .load::<String>(&mut conn)
+                    .map_err(|e| StorageError::Database(e.to_string()))?
+                    .into_iter()
+                    .collect();
+                let settled = sub_db::settled_in_generation(&mut conn, generation_id)
+                    .map_err(|e| StorageError::Database(e.to_string()))?;
+                let seeded = self
+                    .scheduler
+                    .seed_from_durable(&candidates, &settled, &pending);
+                tracing::info!(
+                    target: "elohim_storage::feedback_projector",
+                    members = candidates.len(),
+                    seeded_cold = seeded,
+                    pending = pending.len(),
+                    generation_id,
+                    "feedback sweep: retirement recovered from the durable settled record; \
+                     Cold members are re-audited one per {COLD_REAUDIT_EVERY_SWEEPS} sweeps"
+                );
+            }
             let members = self
                 .scheduler
                 .schedule(candidates, MAX_MEMBERS_PER_SWEEP as usize);
@@ -1168,6 +1351,24 @@ impl FeedbackProjector {
             let visit_token = self
                 .scheduler
                 .begin_visit(&member.member_kind, &member.member_key);
+            // A Cold member is only here because the re-audit lap chose it.
+            // Its settled row is withdrawn BEFORE the visit and earned back
+            // only by finishing clean: a crash after this visit persists what
+            // it found, but before it records its verdict, must not leave a
+            // row saying the member is settled.
+            if self.scheduler.durable_heat()
+                && self
+                    .scheduler
+                    .heat(&member.member_kind, &member.member_key)
+                    .is_cold()
+            {
+                let mut conn = self
+                    .pool
+                    .get()
+                    .map_err(|e| StorageError::Database(e.to_string()))?;
+                sub_db::clear_settled(&mut conn, &member.member_kind, &member.member_key)
+                    .map_err(|e| StorageError::Database(e.to_string()))?;
+            }
 
             // Mark the visit FIRST, and advance the cursor at the end of the
             // tick regardless of outcome: a member that keeps failing must
@@ -1271,6 +1472,15 @@ impl FeedbackProjector {
                     visit_token,
                     saw_open_act,
                 );
+                // Keep the durable record in step with what the visit decided:
+                // settled exactly while the member is Cold. A write that fails
+                // is logged and costs, at worst, a re-sweep after a restart
+                // (a missing row) — the clear is the one that must not be
+                // skipped silently, and it is retried on the member's next
+                // visit because the member is Hot.
+                if self.scheduler.durable_heat() {
+                    self.sync_settled(&member.member_kind, &member.member_key, generation_id);
+                }
             }
         }
 
@@ -1444,6 +1654,8 @@ impl FeedbackProjector {
         // rather than behind every member the key order happens to precede it.
         self.scheduler
             .rearm(sub_db::KIND_CORRECTION_ACTION, &act.action_hash);
+        sub_db::clear_settled(&mut conn, sub_db::KIND_CORRECTION_ACTION, &act.action_hash)
+            .map_err(|e| StorageError::Database(e.to_string()))?;
 
         let existing = app_db::fetch_application(&mut conn, generation_id, &group_key)
             .map_err(|e| StorageError::Database(e.to_string()))?;
@@ -1807,9 +2019,19 @@ pub fn admit_notified_signal_with(
         // Re-arm whether or not the member was new: an already-known member is
         // exactly the one that may have gone Cold, and it is the one a
         // notification is most worth spending a sweep slot on.
+        // Durably too, whether or not a live scheduler is registered: a
+        // notification that lands before a restart must not find its member
+        // seeded Cold after it. Cleared on BOTH sides of the re-arm: the sweep
+        // inserts a settled row only while the member is Cold and under the
+        // lock `rearm` takes, so after the re-arm no new row can appear, and
+        // the second delete removes one inserted between the first and it.
+        sub_db::clear_settled(conn, kind, key)
+            .map_err(|e| StorageError::Database(e.to_string()))?;
         if let Some(scheduler) = scheduler {
             scheduler.rearm(kind, key);
         }
+        sub_db::clear_settled(conn, kind, key)
+            .map_err(|e| StorageError::Database(e.to_string()))?;
     }
     Ok(true)
 }
@@ -1824,6 +2046,7 @@ pub fn spawn(projector: FeedbackProjector) -> tokio::task::JoinHandle<()> {
     // re-arm it. First registration wins: there is one live projector, and a
     // second one would be an unnoticed split of the same state.
     let _ = LIVE_SCHEDULER.set(projector.scheduler());
+    projector.scheduler().enable_durable_heat();
     let seconds = std::env::var("ELOHIM_FEEDBACK_SWEEP_SECONDS")
         .ok()
         .and_then(|v| v.parse::<u64>().ok())
