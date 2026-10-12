@@ -269,7 +269,7 @@ incident text.
 | [household-lamad-gossip-wedge-large-dht](epr:household-lamad-gossip-wedge-large-dht) | convergence, scale | declared | wait, mechanical | measured | Full-arc gossip on the household lamad DHT cannot complete rounds inside roundTimeoutMs at ~120k ops; fleet risk unconfirmed. | ~120k ops; rounds in 2.5h matthew None, jessica 1, james 2; 63-102 peer_timeouts per peer |
 | [sovereign-peer-network-read-no-authorities](epr:sovereign-peer-network-read-no-authorities) | convergence | trustless | wait | measured | A freshly joined iroh peer cannot read fleet content for hours because live agent-infos advertise no storage arc and gossip fills slowly. | gossip ~90 KB/min (3.29 to 3.74 MB in 5 min); null in 7-10ms; not held after 15 min |
 
-## elohim-storage (22)
+## elohim-storage (24)
 
 | Entry | Mechanism | Trust | Friction | Evidence | What costs what | Figures in the entry |
 |---|---|---|---|---|---|---|
@@ -295,6 +295,8 @@ incident text.
 | [susan-conductor-ws-dead-heal-pacing-blind-to-instant-errors](epr:susan-conductor-ws-dead-heal-pacing-blind-to-instant-errors) | queue | self | mechanical, blind | measured | susan's storage-conductor websocket is dead and HealCircuit pacing never trips on instant connection-closed errors, so heal attempts retry-storm at full speed. | heal_outcomes failed ~64,658 content + 1,849 rea per 12h on susan; others 60k-155k Ok(None) |
 | [sync-edge-susan-timeouts-per-edge-observability](epr:sync-edge-susan-timeouts-per-edge-observability) | latency, telemetry | declared | blind, wait | measured | susan is the fleet's expensive sync edge: every pod times out to her and she to everyone, and nothing in the dataplane prices that edge. | 274 outbound sync failures/6h (susan 93, gertrude 53); susan working set 753 MB of 3 GiB |
 | [transport-route-metrics-pretouch-zero](epr:transport-route-metrics-pretouch-zero) | telemetry | — | blind | cured-unverified | Transport route, path RTT and acquisition dispatch metric series are invisible on the fleet until first decision; pre-touch at zero landed locally, fleet read pending. | — |
+| [provide-revoke-arm-dormant-behind-namespace-mismatch](epr:provide-revoke-arm-dormant-behind-namespace-mismatch) | io, scale | self | mechanical | measured | The provide reconciler read its own commitments under the transport id while they are written under the agent key, so every restart re-authored a notarized commitment per scope; the revoke arm never ran and needs an operator decision. | matthew 729 live rows for 154 scopes, up to 8 per scope; jessica 613; james 202; none revoked |
+| [rea-inventory-advertises-rows-of-another-notary](epr:rea-inventory-advertises-rows-of-another-notary) | cpu, queue | declared | verify, wait | cured-unverified | Peers advertised mishpat commitments that a receiver's content_store can never resolve, so each receiver re-read about 800 ids on the miss ledger's ladder; the inventory now omits them. | get_rea_commitment 63-109 calls/min per peer; 819 / 937 / 1354 calls in the 300 s after a restart |
 
 ## Doorway (4)
 

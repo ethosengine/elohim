@@ -26,6 +26,8 @@ retire-when: >
   model pin and the carrying capacity natively, so that arrival is the seed's own COLD→WARM
   lifecycle and `just status device` reads one berth instead of six stores.
 ---
+DELTA 2026-10-12 (GREEN re-measured, no status change): `just status device` on this workspace at 19:50Z printed six `ok` lines (epr binary, device key, roster bound to human:matthew, embed model, fold attested 0 files behind, berth moored) and exited 0.
+
 DELTA 2026-10-10 (BORN red). Read on shem, the second workspace, before any cure: `just status device`
 printed 3 of 6 ok (epr binary, berth moored, device key after `enroll` minted it) and 3 REFUSED —
 roster bound (enrollment pending: shem's request `did:key:z6Mkm5de…bowj` awaits `authorize` on

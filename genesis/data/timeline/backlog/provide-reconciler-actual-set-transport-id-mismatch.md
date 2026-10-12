@@ -52,3 +52,12 @@ transport id remains correct for the commitment's idempotency-id string
 wrong namespace. Add a regression test: author under agent_cid, run reconcile,
 assert the actual-set query finds the row (suppression fires) and unpin
 triggers the revoke path.
+
+## 2026-10-12 — the suppression half is cured; the revoke half is carried forward
+
+The author arm now reads its live rows under the agent keys the author writes under (commits `635e9ca6b` and
+`7721d4264`), with the regression test this entry asked for
+(`restart_does_not_reauthor_when_rows_carry_the_agent_provider`). Measured on the household: the storage boot at
+20:28Z on the old binary authored 154 / 135 / 38 commitments on matthew / jessica / james; the boots at 21:19Z and
+21:46Z on the new binary authored none. The revoke path this entry also names was deliberately left as it is and
+is carried by `provide-revoke-arm-dormant-behind-namespace-mismatch`, which records why waking it needs a decision.

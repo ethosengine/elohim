@@ -47,3 +47,23 @@ and needs a home.
 
 **Done when.** `household-at-rest.feature` shows no `my_consent_standing` call on a resting peer, and a device
 ceremony scenario shows the first ask after an idle hour listed without a retry.
+
+## 2026-10-12 — planned; needs a decision before it is built
+
+There is no signal to drive a refresh from. Mishpat's `post_commit` emits only `CommitmentCommitted` and
+`ChallengeOutcomeCreated`, on the author's own cell, so nothing fires when a remote revocation integrates;
+`src/main.rs` near line 598 records the same gap. A demand-driven read is buildable in storage alone: one reader,
+triggered by an incoming ask, a pending-list or decide request, or an identity write, and served only if the last
+answered read is at least 30 s old, with the 120 s evidence bound unchanged. It would bring a resting peer's
+`my_consent_standing` from 10 calls per 300 s to 0.
+
+In the safety direction it is no weaker: a node whose record stopped standing stops listing at the next ask. In the
+availability direction it is weaker than the 30 s timer. An idle node holds no evidence when a conductor outage
+begins, so it lists nothing until the conductor answers, where the timer would keep listing for 90 to 120 s into the
+outage. The asking device re-offers every 5 s, so an ask is listed within about 5 s of recovery, and an agreement
+needs the cell to sign anyway.
+
+The decision owed by the operator who owns consent policy: restate the invariant as "never list on evidence older than
+120 s; list whenever the cell can be read", or keep the timer until mishpat emits a standing-change signal (a
+coordinator-zome change). Files a build would touch: `src/services/device_carrier.rs`, `src/http.rs` (about lines
+2114 to 2136 and the three readers) and `src/p2p/mod.rs` (about line 6880). Status unchanged.

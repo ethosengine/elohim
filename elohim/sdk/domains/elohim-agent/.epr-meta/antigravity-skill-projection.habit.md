@@ -33,5 +33,7 @@ and the live compose graph records 123 skill entrypoints plus 9 asset edges acro
 Codex, and Antigravity; 41 Antigravity skills and all 3 packaged assets are present, and the
 context-blind a2o review returned READY.
 
+DELTA 2026-10-12 (GREEN re-measured, no status change): `node elohim/sdk/domains/elohim-agent/scripts/package-projections.mjs selftest` at 19:50Z on 407f93d4c reported `elohim-agent package checks passed: 43 passed`, exit 0.
+
 DELTA 2026-08-29: landing commit re-ran the checks on the integrated tree — projector selftest 43/43,
 package verify 1697/1697, adapter cargo test 6/6 (EXIT=0); status stays green. a2o story remains @wip.
