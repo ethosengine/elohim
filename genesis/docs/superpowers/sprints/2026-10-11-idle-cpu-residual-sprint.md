@@ -188,12 +188,15 @@ matthew 6.8, jessica 6.5, james 6.6 CPU s/min, household 19.9 — against 147 at
 (`lane-after-bef264f46-prodgossip2.log`): precondition passed, budget step FAILED — household CPU 65.8 s/min (per
 process 21.3 / 22.2 / 20.5), DB checkouts 214–300/s per conductor (from ~1,000), refused permits 0, calls a minute
 matthew 502, jessica 569, james 810, almost all `get_rea_commitment` Background (×2,386 / ×2,742 / ×3,946 in 300 s).
-Not the REA heal leg (its window summaries read `to_read 0, attempted_records 0`): the other Background caller,
-`refresh_hosting_by_id` from the trigger courier's hosting reconstruction (`elohim-storage/src/p2p/trigger_courier.rs:274`
-→ `services/rea_commitment_projection.rs:212`), one conductor read per hosting candidate per pass, re-asked
-because at alpha's cadence the candidates do not resolve between passes. So at production cadence the three
-conductors' own idle cost is ≈20 CPU s/min (twice the budget, with 115 cells) and the storage courier is the top
-caller; at the dev cadence the budget is unreachable by construction. The `idle-is-free` DELTA 2026-10-12b carries
+First read as the trigger courier; CORRECTED at ~05:00Z by an Opus read of the storage metrics
+snapshots: it is the REA heal leg's miss re-admission — calls = 3 × `miss_readmissions_total{rung="2"}` to within
+one, a ≈1,316-id stale cohort lapsing out of dormancy together and re-read three times per id (the quiet
+`to_read 0` summary I quoted sat between bursts); the courier is bounded to ≤28 reads per 60 s claim and accounted
+for ≤1 call. Levers: one read per re-admission (3× fewer, permanently), a deterministic +0–50% spread of the
+dormancy window (flattens the burst); neither reaches the 6/min budget while ≈1,300 ids stay stale, and that stale
+set (10× the 2026-09-20 count) is a gossip-convergence question at production cadence. So at production cadence
+the three conductors' own idle cost is ≈20 CPU s/min (twice the budget, with 115 cells), the heal leg's
+re-admission burst is the top caller, and at the dev cadence the budget is unreachable by construction. The `idle-is-free` DELTA 2026-10-12b carries
 the three readings. The household was restored to its declared dev gossip profile afterwards and
 restarted on the final pair `hc-fork-96bcd2bee215-proof` (03:25Z); a metrics-only 300 s window after 10 min
 (`smoke-96bcd2bee.log`, `diff-smoke-96bcd2bee-*.md`): checkouts matthew 1,093 / jessica 1,055 / james 1,128 a
@@ -206,6 +209,37 @@ Sprint status: **stabilized, not finished.** The chosen item's cell-proportional
 branch awaiting the operator's roll; the fleet's own residual (sys-validation spin) is re-read and its selection
 defect verified from source but not cured; the household check is shown to be confounded by its fixture and read
 once without the confounder; one security defect was found and cured on the same branch.
+
+## Shift 2026-10-12T04-10 — the pin on the pipeline overnight
+
+Operator's call at ~03:50Z: push rather than keep measuring locally ("you find it you fix it… commit and push
+/shift on the pipeline overnight"; pin-first framing confirmed). Shift `roll-scheduler-latch-pin-edge-green`,
+bring-up mode (edge red since Oct 9), 9 iterations, 04:10–~11:00Z; journal gitignored under `.claude/shifts/`.
+
+- **Delivery leg — DONE on the fleet.** Fork branch `perf/scheduler-latch` pushed to ethosengine/holochain;
+  gitlink moved `c916eddbe → 96bcd2bee` (`5e4cab277`); orchestrator #2038 built `elohim-edgenode/main` #44
+  (`HC_REF=96bcd2bee215…`, 20.9 min) and ran edge #1608 as a real deploy (105 min, SUCCESS): storage image FROM
+  the new conductor image, seven conductor StatefulSets rolled on the pin-moved rule (`conductor fork pin moved
+  (conductor-c916eddbed02 -> conductor-96bcd2bee215)` ×7; roll gate: six RELEASED, jessica DEADLINE/continued).
+  The measure (last completed deploy run green and naming the pin) read 2 from a fresh trigger. Alpha runs the
+  scheduler latch and no longer prints the SQLCipher key at WARN.
+- **Bring-up leg — the red was the harness, fixed twice, proven live once.** Every edge red since #1591 was a
+  validate-only run turning 14 born-red undefined scenarios into FAILURE. `run-dataplane-validation.sh` now
+  downgrades ONLY the pending-only shape (raw cucumber statuses ⊆ {undefined, pending}, every undefined
+  scenario under a concern declared in `scripts/ci/dataplane-born-red-concerns.txt`, fresh evidence files,
+  console witnesses) and prints `PENDING-ONLY refused: <predicate> — <item>` otherwise (`2059054b5`,
+  `70ed2957f`; Sonnet ×3, Codex ×3; the first fleet run #1610 refused silently on cucumber's benign "Switching to
+  'progress' formatter" notice — fixed). #1612 proved the refusing direction live (one real failed scenario named
+  beside the 14 undefined). The green direction (banner, exit 0) is still unobserved live: #1611 no-measure,
+  #1612 a real red, #1613 pending at close.
+- **Complementary leg — the heal-leg re-admission burst, cured in code.** `4d9cde774`: one read per
+  re-admission spent at execution, declared-exception replays, 8-sweep re-offer cap, rung ≥2 spread; four Opus
+  passes, four Codex rounds; `cargo test --lib --bins` ALL CLEAR twice; household receipt
+  `epr-app-deliverability` 5/5 on the rebuilt storage (the pre-push NO-SERVING-RECEIPT leg demanded it); landed
+  validate-only, carried by the next deploy. Residual named in idle-is-free DELTA 2026-10-12c.
+- **Found on the fleet, captured:** storage `caughtUp` flapped for ~4 h after the roll (quiesce no-measures,
+  `inventory-convergence` red) — appended to `ci-edge-inventory-convergence-caughtup-sawtooth-flap`; a
+  `HUSKY=0` push bypass was denied by policy and not retried (the gate's wait was the right answer).
 
 ## Boundaries
 
