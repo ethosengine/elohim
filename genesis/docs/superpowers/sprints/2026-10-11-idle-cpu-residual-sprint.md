@@ -229,9 +229,10 @@ bring-up mode (edge red since Oct 9), 9 iterations, 04:10–~11:00Z; journal git
   scenario under a concern declared in `scripts/ci/dataplane-born-red-concerns.txt`, fresh evidence files,
   console witnesses) and prints `PENDING-ONLY refused: <predicate> — <item>` otherwise (`2059054b5`,
   `70ed2957f`; Sonnet ×3, Codex ×3; the first fleet run #1610 refused silently on cucumber's benign "Switching to
-  'progress' formatter" notice — fixed). #1612 proved the refusing direction live (one real failed scenario named
-  beside the 14 undefined). The green direction (banner, exit 0) is still unobserved live: #1611 no-measure,
-  #1612 a real red, #1613 pending at close.
+  'progress' formatter" notice — fixed). #1612 and #1613 proved the refusing direction live (one real failed scenario — `inventory-convergence`,
+  `p2p.caughtUp` false on storage-B then storage-A — named beside the 14 undefined). The green direction
+  (banner, exit 0) is unobserved live at close because the fleet has that real red; it shows on the first
+  validate-only run after the storage peers catch up.
 - **Complementary leg — the heal-leg re-admission burst, cured in code.** `4d9cde774`: one read per
   re-admission spent at execution, declared-exception replays, 8-sweep re-offer cap, rung ≥2 spread; four Opus
   passes, four Codex rounds; `cargo test --lib --bins` ALL CLEAR twice; household receipt
