@@ -2,7 +2,7 @@
 title: "Idle call floor sprint 2026-10-12 — the storage peer's own conductor calls at rest, caller by caller"
 id: idle-call-floor-sprint-20261012
 date: 2026-10-12
-status: in-flight
+status: stabilized
 author: "claude-opus-5-5 (owner); reader Explore; at the operator's direction"
 habits: [idle-is-free]
 cites:
@@ -44,3 +44,13 @@ cadence, settled; refused permits 0. The CPU budget is not this sprint's (gossip
 - No budget is raised and no freshness bound is lengthened.
 - A cure that trades detection latency says so where the constant is declared.
 - Lands on `dev` validate-only with the serving receipt; no fleet roll is asked for.
+
+## Close (2026-10-12)
+
+Stabilized, not finished. Four of the five callers are cured in code and three are measured cured (bridge probe,
+pointer audit, anchor verify); the feedback sweep's cure is live but its fully seeded boot is unmeasured; the
+consent refresher was not taken. The done-when is NOT met: the declared check still fails its call budget, and
+the reading that would have passed it would have been luck, because the stale REA cohort's re-admission bursts
+fall outside a five-minute window more often than inside it. The readings, the residuals in order, and the
+missing node are in `idle-is-free` DELTA 2026-10-12d. Follow-ups filed:
+`consent-speaks-refresh-is-a-timer-not-a-demand`, `feedback-generation-publishes-on-lifetime-visits`.
