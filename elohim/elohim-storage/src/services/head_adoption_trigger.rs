@@ -1064,6 +1064,12 @@ impl TriggerGate {
         let Some(content_id) = trigger_candidate_id(h_app_id, doc_id) else {
             return EnqueueDecision::NotContentDoc;
         };
+        // A release channel's head is a content head too, and its adoption
+        // controller may be resting on the old one. Poked on EVERY applied doc
+        // for the id, before the claim: the offer carries no head to compare,
+        // and a deduped offer is still news to the controller. Attention only —
+        // the controller asks its own conductor (see `watch::poke`).
+        crate::services::release_adoption::watch::poke(content_id);
         self.claim_and_send(content_id, peer, Instant::now())
     }
 
@@ -1367,7 +1373,9 @@ async fn offer_retained_head_hints(
         if should_probe(Some(&local), hint.as_ref()) {
             // Retained documents have no current supplier to attribute. The
             // worker uses its own conductor, not a fabricated transport peer.
-            let decision = gate.offer(crate::sync::projector::PROJECTION_NAMESPACE, &doc_id, "");
+            // `claim_and_send`, not `offer`: a re-offered old hint is not news,
+            // and must not keep a followed release channel off its rest.
+            let decision = gate.claim_and_send(&row.id, "", Instant::now());
             crate::metrics::inc_head_adoption_trigger_from(decision.label(), "retained");
             match decision {
                 EnqueueDecision::Enqueued => {
@@ -2472,6 +2480,47 @@ mod tests {
         assert_eq!(decision, EnqueueDecision::Enqueued);
         let t = rx.try_recv().unwrap();
         assert_eq!(trigger_source(&t), "sync");
+    }
+
+    /// Every applied content doc pokes the release-adoption controller for its
+    /// id — a deduped offer too, since the poke is not the probe — and a doc
+    /// that is not a content node pokes nothing.
+    #[test]
+    fn a_sync_offer_pokes_the_release_adoption_controller() {
+        use crate::services::release_adoption::watch::poke_capture;
+        let ns = crate::sync::projector::PROJECTION_NAMESPACE;
+        let (gate, _rx) = TriggerGate::new(DEFAULT_TRIGGER_COOLDOWN);
+        poke_capture::drain();
+
+        assert_eq!(
+            gate.offer(ns, "node:runtime:app-bundle:poked", "peer-a"),
+            EnqueueDecision::Enqueued
+        );
+        assert_eq!(
+            gate.offer(ns, "node:runtime:app-bundle:poked", "peer-b"),
+            EnqueueDecision::Deduped
+        );
+        assert_eq!(
+            gate.offer(ns, "epr:not-a-content-node", "peer-a"),
+            EnqueueDecision::NotContentDoc
+        );
+        assert_eq!(
+            poke_capture::drain(),
+            vec!["runtime:app-bundle:poked", "runtime:app-bundle:poked"]
+        );
+    }
+
+    /// The retained pass re-offers an OLD hint, which is not news: it queues
+    /// the probe and leaves the release-adoption controller's rest alone.
+    #[tokio::test]
+    async fn a_retained_reoffer_does_not_poke_the_release_adoption_controller() {
+        use crate::services::release_adoption::watch::poke_capture;
+        let now = Instant::now();
+        let (pool, sync, _dir, rest) = rested_fixture("stuck", now).await;
+        retained_doc(&sync, "stuck", "newer head").await;
+        poke_capture::drain();
+        assert_eq!(offered(&pool, &sync, &rest, now).await, vec!["stuck"]);
+        assert!(poke_capture::drain().is_empty());
     }
 
     #[test]

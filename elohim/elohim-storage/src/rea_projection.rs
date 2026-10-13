@@ -881,6 +881,10 @@ pub async fn handle_authenticated_content_head_signal(
         ));
     };
 
+    // The ordered twin of the poke in `handle_rea_signal`'s arm — first, so a
+    // failed hydration below still ends a followed release channel's rest.
+    crate::services::release_adoption::watch::poke(&content_id);
+
     // This subscriber is registered through the infrastructure bridge because
     // that app websocket carries every installed cell's signals. The content
     // read itself belongs to lamad, though. Resolve its CURRENT supervised
@@ -1149,6 +1153,11 @@ pub fn handle_rea_signal(
                 hash = %head_action_hash,
                 "Declaring Content HEAD from DHT"
             );
+            // This cell declared a head. If the id is a followed release
+            // channel, its adoption controller should look now rather than
+            // finish a rest — whatever the stamp below decides. Attention
+            // only: the controller asks the conductor itself.
+            crate::services::release_adoption::watch::poke(&content_id);
             // Own-conductor-witnessed HEAD declaration → verified stamp on the
             // EXISTING row only (no insert: a HEAD declaration for a row this
             // node never seeded is a no-op here). No value patch — the HEAD
@@ -1380,6 +1389,42 @@ mod tests {
             Some(10),
             None
         )));
+    }
+
+    /// A head this cell declared pokes the release-adoption controller for
+    /// the id on BOTH signal shapes — the legacy stamp arm even when there is
+    /// no row to stamp, the ordered arm even when its hydration cannot run.
+    #[tokio::test]
+    async fn a_declared_head_pokes_the_release_adoption_controller() {
+        use crate::services::release_adoption::watch::poke_capture;
+        let pool = content_signal_test_pool();
+        let ctx = AppContext::default_lamad();
+        let declared = |id: &str, at, earned| ReaProjectionSignal::ContentHeadDeclared {
+            content_id: id.into(),
+            head_action_hash: HoloHashB64("uhCkk-poke-head".into()),
+            entry_hash: None,
+            author: None,
+            canonical_declared_at: at,
+            canonical_earned: earned,
+            canonical_link_hash: None,
+            canonical_ordering_hash: None,
+        };
+
+        poke_capture::drain();
+        handle_rea_signal(declared("runtime:poke:legacy", None, None), &pool, &ctx)
+            .expect("a legacy declaration with no row is handled");
+        assert_eq!(poke_capture::drain(), vec!["runtime:poke:legacy"]);
+
+        let registry = crate::hc_client_registry::HcClientRegistry::empty();
+        let result = handle_authenticated_content_head_signal(
+            declared("runtime:poke:ordered", Some(10), Some(true)),
+            &registry,
+            &pool,
+            &ctx,
+        )
+        .await;
+        assert!(result.is_err(), "no lamad bridge, so the hydration defers");
+        assert_eq!(poke_capture::drain(), vec!["runtime:poke:ordered"]);
     }
 
     #[tokio::test]
