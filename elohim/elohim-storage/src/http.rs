@@ -17882,6 +17882,13 @@ fn pin_to_view(p: db::models::AcquisitionPin) -> elohim_views::acquisition::PinV
     } else {
         format!("epr:{}", p.head_ref)
     };
+    // Only a retired pin has a hold to end. `None` on a retired pin means its
+    // clock is unreadable, which the re-admission arm treats as due.
+    let readmit_at = if p.status == "retired" {
+        db::acquisition_pins::pin_readmit_at(&p.updated_at, p.consecutive_retirements)
+    } else {
+        None
+    };
     elohim_views::acquisition::PinView {
         id: p.id,
         agent_pub_key: p.agent_pub_key,
@@ -17893,9 +17900,13 @@ fn pin_to_view(p: db::models::AcquisitionPin) -> elohim_views::acquisition::PinV
             .and_then(|s| serde_json::from_str::<serde_json::Value>(s).ok())
             .map(elohim_views::shared::JsonVal),
         priority: p.priority,
+        next_readmit_at: readmit_at.map(|t| t.format("%Y-%m-%dT%H:%M:%SZ").to_string()),
         status: p.status,
         created_at: p.created_at,
         updated_at: p.updated_at,
+        consecutive_retirements: p.consecutive_retirements,
+        held_demand_count: p.held_demand_count,
+        last_outcome: p.last_outcome,
     }
 }
 
@@ -23360,6 +23371,59 @@ mod session_exchange_tests {
         let server = test_server().await;
         let removed = server.test_handle_remove_pin("99999").await;
         assert_eq!(removed.status, 404, "removing an unknown pin must 404");
+    }
+
+    // GET /api/v1/pins names what a retired pin is waiting for: the rung it is
+    // on, when its hold ends, what its last round concluded, and the demand
+    // counted against it meanwhile.
+    #[tokio::test]
+    async fn listed_pin_carries_its_retirement_ledger() {
+        let server = test_server().await;
+        let created = server
+            .test_handle_create_pin_raw(r#"{"headRef":"epr:e2e-unfillable"}"#)
+            .await;
+        let created: serde_json::Value = serde_json::from_slice(&created.body).expect("json");
+        assert_eq!(created["consecutiveRetirements"], 0);
+        assert!(created["nextReadmitAt"].is_null());
+        assert!(created["lastOutcome"].is_null());
+        let id = created["id"].as_i64().expect("id") as i32;
+
+        let retired_at = chrono::DateTime::parse_from_rfc3339("2026-10-13T12:00:00Z")
+            .expect("ts")
+            .with_timezone(&chrono::Utc);
+        {
+            let mut conn = server.get_diesel_conn().expect("conn");
+            db::acquisition_pins::retire_pin(&mut conn, id, retired_at).expect("retire");
+            db::acquisition_pins::readmit_due_pins(
+                &mut conn,
+                retired_at + chrono::Duration::hours(7),
+                25,
+            )
+            .expect("readmit");
+            db::acquisition_pins::retire_pin(&mut conn, id, retired_at).expect("retire again");
+            db::acquisition_pins::record_demand_pin(
+                &mut conn,
+                db::models::NewAcquisitionPin {
+                    agent_pub_key: "local-device".into(),
+                    head_ref: "e2e-unfillable".into(),
+                    kind: "item".into(),
+                    closure_rule_json: None,
+                    priority: 1,
+                },
+                retired_at,
+            )
+            .expect("demand");
+        }
+
+        let listed = server.test_handle_list_pins().await;
+        let body: serde_json::Value = serde_json::from_slice(&listed.body).expect("json");
+        let pin = &body["pins"][0];
+        assert_eq!(pin["status"], "retired");
+        assert_eq!(pin["consecutiveRetirements"], 2);
+        // 12 h on the second rung.
+        assert_eq!(pin["nextReadmitAt"], "2026-10-14T00:00:00Z");
+        assert_eq!(pin["lastOutcome"], "exhausted");
+        assert_eq!(pin["heldDemandCount"], 1);
     }
 
     // The write path strips `epr:` (the reconcile loop joins on the bare content

@@ -22,6 +22,19 @@ pub struct PinView {
     pub status: String,
     pub created_at: String,
     pub updated_at: String,
+    /// Retirements in a row with no fetch and no peer inventory naming the head
+    /// between them. Each one doubles the hold before the next re-probe.
+    pub consecutive_retirements: i32,
+    /// Earliest time a `retired` pin is re-admitted for a re-probe (RFC 3339).
+    /// Null unless `status` is `retired`. A peer inventory naming the head
+    /// re-admits sooner; a busy tick can defer it by minutes.
+    pub next_readmit_at: Option<String>,
+    /// Read-misses recorded while the pin was `retired` or `removed`. Demand
+    /// undoes neither; it is counted. Cleared on re-admission.
+    pub held_demand_count: i32,
+    /// `exhausted` (every connected peer was asked and none supplied the
+    /// bytes), `fetched`, or null when no round has concluded.
+    pub last_outcome: Option<String>,
 }
 
 /// Input body for POST /api/v1/pins.

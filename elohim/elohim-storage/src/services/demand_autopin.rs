@@ -16,9 +16,9 @@
 //! content by id and the local projection does not have it — that IS a demand
 //! signal ("want=DevicePin C → REA Commitment A", opportunity-map row 15). This
 //! controller authors an `item` DevicePin (`head_ref == content id`) via the
-//! existing [`crate::db::acquisition_pins::upsert_pin`] path — the SAME row
-//! shape `POST /api/v1/pins` writes (agent `local-device`, kind `item`, born
-//! `active`). The acquisition loop then fetches the bytes and the provide loop
+//! [`crate::db::acquisition_pins::record_demand_pin`] — the SAME row shape
+//! `POST /api/v1/pins` writes (agent `local-device`, kind `item`, born
+//! `active`), but insert-only: a pin that already exists keeps its status. The acquisition loop then fetches the bytes and the provide loop
 //! authors the notarized commitment.
 //!
 //! This is **demand-driven**, not blanket backfill. It never "pins everything
@@ -49,7 +49,7 @@ use std::time::{Duration, Instant};
 use diesel::sqlite::SqliteConnection;
 use diesel::QueryResult;
 
-use crate::db::acquisition_pins;
+use crate::db::acquisition_pins::{self, DemandPin};
 use crate::db::models::{AcquisitionPin, NewAcquisitionPin};
 
 /// Agent-key placeholder for auto-authored pins — identical to the
@@ -174,8 +174,13 @@ impl DemandAutoPin {
     /// Authors an `item` DevicePin via the shared idempotent upsert when the
     /// controller is enabled and the id is not throttled; otherwise a no-op.
     ///
-    /// Returns `Ok(Some(pin))` when a pin was written, `Ok(None)` when skipped
-    /// (disabled or throttled). Only DB errors surface as `Err`; the caller
+    /// A head whose pin is `retired` or `removed` is NOT re-activated — the
+    /// demand is counted and the pin stays as it is (see
+    /// [`acquisition_pins::record_demand_pin`] for why).
+    ///
+    /// Returns `Ok(Some(pin))` when an active pin now wants the head (authored
+    /// here, or already active), `Ok(None)` when skipped (disabled, throttled,
+    /// or the pin is held). Only DB errors surface as `Err`; the caller
     /// treats those as non-fatal (the read path continues regardless).
     pub fn record_demand(
         &self,
@@ -200,7 +205,7 @@ impl DemandAutoPin {
             );
             return Ok(None);
         }
-        let pin = acquisition_pins::upsert_pin(
+        let demand = acquisition_pins::record_demand_pin(
             conn,
             NewAcquisitionPin {
                 agent_pub_key: AUTOPIN_AGENT.to_string(),
@@ -209,8 +214,40 @@ impl DemandAutoPin {
                 closure_rule_json: None,
                 priority: AUTOPIN_PRIORITY,
             },
+            chrono::Utc::now(),
         )?;
-        Ok(Some(pin))
+        Ok(match demand {
+            DemandPin::Authored(pin) | DemandPin::AlreadyActive(pin) => Some(pin),
+            // Demand does not undo a hold the node just concluded, nor a
+            // person's removal — it is counted, on the row and here.
+            DemandPin::HeldRetired(pin) => {
+                crate::metrics::inc_acquisition_pin_hold_skips(
+                    crate::metrics::PinHoldSkip::DemandRetired,
+                    1,
+                );
+                tracing::debug!(
+                    content_id,
+                    pin_id = pin.id,
+                    consecutive_retirements = pin.consecutive_retirements,
+                    held_demand_count = pin.held_demand_count,
+                    "demand on a retired pin counted; its hold stands"
+                );
+                None
+            }
+            DemandPin::NotRevived(pin) => {
+                crate::metrics::inc_acquisition_pin_hold_skips(
+                    crate::metrics::PinHoldSkip::DemandRemoved,
+                    1,
+                );
+                tracing::debug!(
+                    content_id,
+                    pin_id = pin.id,
+                    status = %pin.status,
+                    "demand on a removed pin counted; not revived"
+                );
+                None
+            }
+        })
     }
 }
 
@@ -421,5 +458,58 @@ mod tests {
         );
         let active = acquisition_pins::list_active_pins(&mut conn).expect("list_active");
         assert_eq!(active.len(), 1);
+    }
+
+    // A read-miss for a head whose pin the substrate RETIRED (no peer could
+    // supply it) or its person REMOVED must not re-activate the pin. Before
+    // this, the demand went through `upsert_pin` and did both: one GET for a
+    // missing id put a retired pin straight back into the pull queue.
+    #[test]
+    fn demand_does_not_reactivate_a_retired_or_removed_pin() {
+        let pool = test_pool();
+        let mut conn = pool.get().expect("conn");
+        let autopin = DemandAutoPin::new(true, Duration::from_secs(0));
+
+        let retired = autopin
+            .record_demand(&mut conn, "epr:nobody-has-it")
+            .unwrap()
+            .expect("first miss authors the pin");
+        acquisition_pins::retire_pin(&mut conn, retired.id, chrono::Utc::now())
+            .unwrap()
+            .expect("retired");
+        let removed = autopin
+            .record_demand(&mut conn, "epr:unpinned")
+            .unwrap()
+            .expect("first miss authors the pin");
+        acquisition_pins::set_pin_status(&mut conn, removed.id, "removed").unwrap();
+
+        for _ in 0..2 {
+            assert!(autopin
+                .record_demand(&mut conn, "epr:nobody-has-it")
+                .unwrap()
+                .is_none());
+            assert!(autopin
+                .record_demand(&mut conn, "epr:unpinned")
+                .unwrap()
+                .is_none());
+        }
+
+        assert!(acquisition_pins::list_active_pins(&mut conn)
+            .unwrap()
+            .is_empty());
+        let mut row = |id| {
+            acquisition_pins::get_pin_by_id(&mut conn, id)
+                .unwrap()
+                .unwrap()
+        };
+        let (retired, removed) = (row(retired.id), row(removed.id));
+        assert_eq!(
+            (retired.status.as_str(), retired.held_demand_count),
+            ("retired", 2)
+        );
+        assert_eq!(
+            (removed.status.as_str(), removed.held_demand_count),
+            ("removed", 2)
+        );
     }
 }

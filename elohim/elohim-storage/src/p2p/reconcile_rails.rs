@@ -147,6 +147,17 @@ impl GapTracker {
             .count()
     }
 
+    /// The retry budget currently applied ([`Self::set_max_retries`]).
+    pub fn max_retries(&self) -> u32 {
+        self.max_retries
+    }
+
+    /// Failed attempts of the most-tried id — how far into the budget this
+    /// tracker is. 0 when nothing has failed.
+    pub fn attempts_used(&self) -> u32 {
+        self.failed.values().copied().max().unwrap_or(0)
+    }
+
     pub fn counts(&self) -> GapCounts {
         let exhausted = self.exhausted_count();
         GapCounts {

@@ -3,4 +3,14 @@
 /**
  * Per-pin progress, served on GET /api/v1/pins (own node only).
  */
-export type PinPullStatus = { pinId: number, total: number, fetched: number, pending: number, failed: number, caughtUp: boolean, };
+export type PinPullStatus = { pinId: number, total: number, fetched: number, pending: number, failed: number, caughtUp: boolean, 
+/**
+ * Fetch attempts the pin's most-tried want has failed in this round.
+ */
+attemptsUsed: number, 
+/**
+ * Attempts a want gets before the pin is retired
+ * ([`retry_budget_for_peers`]); `attemptsUsed == retryBudget` with
+ * `pending == 0` is a pin the next reconcile retires.
+ */
+retryBudget: number, };

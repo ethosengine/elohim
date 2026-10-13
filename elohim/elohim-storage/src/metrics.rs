@@ -2135,6 +2135,51 @@ lazy_static! {
     .unwrap();
 }
 
+// The retired-pin backoff series sit in their own block: the first block is at
+// the crate's macro recursion limit.
+lazy_static! {
+    /// Backoff steps taken by retired acquisition pins. label: hold = the hold
+    /// the pin now serves, "6h" | "12h" | "24h" | "48h" | "96h" | "168h"
+    /// (`db::acquisition_pins::pin_hold_label`). One per retirement.
+    ///
+    /// Mass on "168h" is the population of wants nobody can fill; mass that
+    /// stays on "6h" while `…_backoff_resets_total` rises is pins flapping
+    /// between a peer's advertisement and that peer's failure to serve.
+    pub static ref ACQUISITION_PIN_BACKOFF_STEPS: IntCounterVec = IntCounterVec::new(
+        Opts::new(
+            "elohim_acquisition_pin_backoff_steps_total",
+            "Retired acquisition pin backoff steps by the hold now served.",
+        ),
+        &["hold"],
+    )
+    .unwrap();
+
+    /// Backoff ladders reset to the first rung. label: reason = "fetched" (the
+    /// bytes arrived) | "inventory" (a peer advertised the head while the pin
+    /// was retired). See [`PinBackoffReset`].
+    pub static ref ACQUISITION_PIN_BACKOFF_RESETS: IntCounterVec = IntCounterVec::new(
+        Opts::new(
+            "elohim_acquisition_pin_backoff_resets_total",
+            "Acquisition pin backoff resets by reason.",
+        ),
+        &["reason"],
+    )
+    .unwrap();
+
+    /// Times a held acquisition pin was NOT re-activated when something asked.
+    /// label: reason — see [`PinHoldSkip`]. "tick_bound" counts pin-ticks (a due
+    /// pin deferred for three ticks counts three), so its rate is the standing
+    /// re-admission backlog.
+    pub static ref ACQUISITION_PIN_HOLD_SKIPS: IntCounterVec = IntCounterVec::new(
+        Opts::new(
+            "elohim_acquisition_pin_hold_skips_total",
+            "Held acquisition pins left held, by reason.",
+        ),
+        &["reason"],
+    )
+    .unwrap();
+}
+
 // A SEPARATE `lazy_static!` block, purely to stay under the macro's recursion
 // limit — the single block above was already at the edge of it, and one more
 // entry tips `__lazy_static_internal!` over. No other reason for the split;
@@ -3690,6 +3735,24 @@ pub fn register_all() {
         let _ = REGISTRY.register(Box::new(ACQUISITION_ACTIVE_PINS.clone()));
         let _ = REGISTRY.register(Box::new(ACQUISITION_PINS_RETIRED.clone()));
         let _ = REGISTRY.register(Box::new(ACQUISITION_PIN_RETIREMENTS.clone()));
+        let _ = REGISTRY.register(Box::new(ACQUISITION_PIN_BACKOFF_STEPS.clone()));
+        for hold in crate::db::acquisition_pins::PIN_HOLD_LABELS {
+            ACQUISITION_PIN_BACKOFF_STEPS
+                .with_label_values(&[hold])
+                .inc_by(0);
+        }
+        let _ = REGISTRY.register(Box::new(ACQUISITION_PIN_BACKOFF_RESETS.clone()));
+        for reason in PinBackoffReset::ALL {
+            ACQUISITION_PIN_BACKOFF_RESETS
+                .with_label_values(&[reason.label()])
+                .inc_by(0);
+        }
+        let _ = REGISTRY.register(Box::new(ACQUISITION_PIN_HOLD_SKIPS.clone()));
+        for reason in PinHoldSkip::ALL {
+            ACQUISITION_PIN_HOLD_SKIPS
+                .with_label_values(&[reason.label()])
+                .inc_by(0);
+        }
         let _ = REGISTRY.register(Box::new(SYNC_IN_SYNC_TOTAL.clone()));
         let _ = REGISTRY.register(Box::new(HEAD_BATCH_CALLS.clone()));
         let _ = REGISTRY.register(Box::new(HEAD_BATCH_IDS.clone()));
@@ -6177,6 +6240,75 @@ pub fn set_acquisition_pins_retired(count: u64) {
 pub fn inc_acquisition_pin_retirements(reason: &str, n: u64) {
     ACQUISITION_PIN_RETIREMENTS
         .with_label_values(&[reason])
+        .inc_by(n);
+}
+
+/// Why a retired pin's backoff ladder went back to the first rung.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum PinBackoffReset {
+    /// The wanted bytes are local.
+    Fetched,
+    /// A peer inventory named the head while the pin was retired.
+    Inventory,
+}
+
+impl PinBackoffReset {
+    pub const ALL: [PinBackoffReset; 2] = [PinBackoffReset::Fetched, PinBackoffReset::Inventory];
+
+    pub fn label(self) -> &'static str {
+        match self {
+            PinBackoffReset::Fetched => "fetched",
+            PinBackoffReset::Inventory => "inventory",
+        }
+    }
+}
+
+/// Why a held pin was left held.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum PinHoldSkip {
+    /// A read-miss named a `retired` pin: counted on the row, hold unchanged.
+    DemandRetired,
+    /// A read-miss named a `removed` (or `paused`) pin: not revived.
+    DemandRemoved,
+    /// The pin's hold has elapsed but this tick's re-admission bound was spent.
+    TickBound,
+}
+
+impl PinHoldSkip {
+    pub const ALL: [PinHoldSkip; 3] = [
+        PinHoldSkip::DemandRetired,
+        PinHoldSkip::DemandRemoved,
+        PinHoldSkip::TickBound,
+    ];
+
+    pub fn label(self) -> &'static str {
+        match self {
+            PinHoldSkip::DemandRetired => "demand_retired",
+            PinHoldSkip::DemandRemoved => "demand_removed",
+            PinHoldSkip::TickBound => "tick_bound",
+        }
+    }
+}
+
+/// Record one retirement's backoff step; `hold` is
+/// `db::acquisition_pins::pin_hold_label`.
+pub fn inc_acquisition_pin_backoff_step(hold: &str) {
+    ACQUISITION_PIN_BACKOFF_STEPS
+        .with_label_values(&[hold])
+        .inc();
+}
+
+/// Record `n` backoff ladders reset for `reason`.
+pub fn inc_acquisition_pin_backoff_resets(reason: PinBackoffReset, n: u64) {
+    ACQUISITION_PIN_BACKOFF_RESETS
+        .with_label_values(&[reason.label()])
+        .inc_by(n);
+}
+
+/// Record `n` held pins left held for `reason`.
+pub fn inc_acquisition_pin_hold_skips(reason: PinHoldSkip, n: u64) {
+    ACQUISITION_PIN_HOLD_SKIPS
+        .with_label_values(&[reason.label()])
         .inc_by(n);
 }
 

@@ -2045,6 +2045,10 @@ diesel::table! {
         created_at -> Text,
         updated_at -> Text,
         commitment_cid -> Nullable<Text>,
+        // Migration: 2026-10-13-143107_acquisition_pin_readmit_backoff
+        consecutive_retirements -> Integer,
+        held_demand_count -> Integer,
+        last_outcome -> Nullable<Text>,
     }
 }
 

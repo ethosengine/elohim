@@ -200,30 +200,180 @@ mod first_drain_tests {
 /// person still wants, held back so it stops pinning `pull.caughtUp` false
 /// forever (alpha-A: 73 total / 3 fetched / 70 failed, caughtUp false for 12h+).
 /// It is re-admitted the moment a peer advertises the content again, or after
-/// [`PIN_READMIT_COOLDOWN`].
+/// its hold ([`pin_hold`]) — [`PIN_READMIT_COOLDOWN`] doubled per consecutive
+/// retirement, capped at [`PIN_READMIT_MAX_HOLD`].
 pub const PIN_STATUS_RETIRED: &str = "retired";
 
-/// Backstop re-admission for a retired pin when no inventory ever names it
-/// again. The primary path is inventory-driven (a peer advertising the head_ref
-/// re-activates it immediately); this only bounds the worst case where the pin's
-/// content simply is not being advertised, so the substrate re-checks a few
-/// times a day instead of never.
-pub const PIN_READMIT_COOLDOWN: chrono::Duration = chrono::Duration::hours(6);
+// The hold, its ladder and the per-tick bound live beside the row they are
+// stored on (`db::acquisition_pins`); re-exported so this module stays the one
+// place a reader of the acquisition stream looks.
+pub use crate::db::acquisition_pins::{
+    pin_cooled_down, pin_hold, pin_readmit_at, MAX_PIN_READMITS_PER_TICK, PIN_READMIT_COOLDOWN,
+    PIN_READMIT_MAX_HOLD,
+};
 
-/// Has a retired pin's hold lasted longer than [`PIN_READMIT_COOLDOWN`]?
+/// Republish `elohim_acquisition_pins_retired` from the DB (the durable truth),
+/// never from an incremented counter — a counter drifts across restarts and
+/// concurrent flips; a recount cannot.
+pub fn publish_retired_pin_gauge(conn: &mut diesel::SqliteConnection) {
+    if let Ok(n) = crate::db::acquisition_pins::count_pins_by_status(conn, PIN_STATUS_RETIRED) {
+        crate::metrics::set_acquisition_pins_retired(u64::try_from(n).unwrap_or(0));
+    }
+}
+
+/// Backstop re-admission, shared by the libp2p node and the pure-iroh pull
+/// core: retired pins whose hold has elapsed go back to `active`, at most
+/// [`MAX_PIN_READMITS_PER_TICK`] of them. Returns how many were re-admitted.
 ///
-/// `updated_at` is the retirement clock — `set_pin_status` stamps it, which is
-/// why retirement needs no migration and no new column. The format is
-/// `current_timestamp()`'s RFC 3339 (`%Y-%m-%dT%H:%M:%SZ`).
-///
-/// An UNPARSEABLE timestamp returns `true` — fail toward re-admission. A pin is
-/// something a person asked for; a redundant retry costs one round of fetches,
-/// whereas treating a malformed clock as "not yet cooled" would strand the pin
-/// permanently, which is the exact failure this whole leg exists to remove.
-pub fn pin_cooled_down(updated_at: &str, now: chrono::DateTime<chrono::Utc>) -> bool {
-    match chrono::DateTime::parse_from_rfc3339(updated_at) {
-        Ok(t) => now.signed_duration_since(t.with_timezone(&chrono::Utc)) > PIN_READMIT_COOLDOWN,
-        Err(_) => true,
+/// bounded-work: one read of the retired set and at most
+/// `MAX_PIN_READMITS_PER_TICK` row writes per reconcile tick; a due pin the
+/// bound leaves behind is counted (`hold_skips_total{reason="tick_bound"}`) and
+/// taken by a later tick.
+pub fn readmit_due_pins(conn: &mut diesel::SqliteConnection) -> usize {
+    let pass = match crate::db::acquisition_pins::readmit_due_pins(
+        conn,
+        chrono::Utc::now(),
+        MAX_PIN_READMITS_PER_TICK,
+    ) {
+        Ok(pass) => pass,
+        // A rejected status write here would silently strand pins in `retired`
+        // forever — never invisible again.
+        Err(e) => {
+            tracing::warn!(error = %e, "acquisition: cooldown re-admission failed");
+            return 0;
+        }
+    };
+    for pin in &pass.readmitted {
+        tracing::info!(
+            target: "elohim_storage::acquisition",
+            pin_id = pin.id,
+            head_ref = %pin.head_ref,
+            consecutive_retirements = pin.consecutive_retirements,
+            held_hours = pin_hold(pin.consecutive_retirements).num_hours(),
+            demanded_while_held = pin.held_demand_count,
+            "acquisition pin RE-ADMITTED after its hold — a re-probe; retirement is a hold, \
+             never a delete"
+        );
+    }
+    let readmitted = pass.readmitted.len();
+    crate::metrics::inc_acquisition_pin_retirements("readmitted", readmitted as u64);
+    crate::metrics::inc_acquisition_pin_hold_skips(
+        crate::metrics::PinHoldSkip::TickBound,
+        pass.deferred as u64,
+    );
+    if readmitted > 0 {
+        publish_retired_pin_gauge(conn);
+    }
+    readmitted
+}
+
+/// Primary re-admission arm, shared by both transports: a peer's content
+/// inventory naming a RETIRED pin's `head_ref` is fresh evidence that the bytes
+/// exist somewhere, so the pin goes straight back to `active` with its backoff
+/// ladder reset, and re-enters the pull queue on the next reconcile.
+pub fn readmit_pins_named_by_inventory(
+    conn: &mut diesel::SqliteConnection,
+    remote_ids: &[String],
+) -> usize {
+    let advertised: HashSet<&str> = remote_ids.iter().map(String::as_str).collect();
+    let readmitted = match crate::db::acquisition_pins::readmit_named_pins(
+        conn,
+        &advertised,
+        chrono::Utc::now(),
+    ) {
+        Ok(rows) => rows,
+        // A rejected status write here would silently strand the pin in
+        // `retired` forever — never invisible again.
+        Err(e) => {
+            tracing::warn!(error = %e, "acquisition: inventory-driven re-admission failed");
+            return 0;
+        }
+    };
+    for pin in &readmitted {
+        tracing::info!(
+            target: "elohim_storage::acquisition",
+            pin_id = pin.id,
+            head_ref = %pin.head_ref,
+            consecutive_retirements = pin.consecutive_retirements,
+            "acquisition pin RE-ADMITTED — a peer advertised its content again; backoff reset"
+        );
+    }
+    if !readmitted.is_empty() {
+        let n = readmitted.len() as u64;
+        crate::metrics::inc_acquisition_pin_retirements("readmitted", n);
+        crate::metrics::inc_acquisition_pin_backoff_resets(
+            crate::metrics::PinBackoffReset::Inventory,
+            n,
+        );
+        publish_retired_pin_gauge(conn);
+    }
+    readmitted.len()
+}
+
+/// Flip `exhausted` pins (from [`AcquisitionState::exhausted_pin_ids`]) to
+/// [`PIN_STATUS_RETIRED`], one rung up the backoff ladder each, and republish
+/// the retired gauge. Shared by both transports.
+pub fn retire_exhausted_pins(conn: &mut diesel::SqliteConnection, exhausted: &[i32]) -> usize {
+    let now = chrono::Utc::now();
+    let mut retired = 0u64;
+    for &pin_id in exhausted {
+        match crate::db::acquisition_pins::retire_pin(conn, pin_id, now) {
+            Ok(Some(consecutive_retirements)) => {
+                retired += 1;
+                crate::metrics::inc_acquisition_pin_backoff_step(
+                    crate::db::acquisition_pins::pin_hold_label(consecutive_retirements),
+                );
+                tracing::info!(
+                    target: "elohim_storage::acquisition",
+                    pin_id,
+                    consecutive_retirements,
+                    hold_hours = pin_hold(consecutive_retirements).num_hours(),
+                    "acquisition pin RETIRED — no connected peer could supply its bytes; \
+                     held back until a peer advertises it again or its hold elapses"
+                );
+            }
+            // Un-pinned between the exhaustion read and this write.
+            Ok(None) => {}
+            // A rejected status write (e.g. a CHECK-constraint violation) means
+            // the pin never actually left `active` — the exact failure mode
+            // that made retirement inert until the
+            // 2026-07-31-200000_acquisition_pins_admit_retired migration.
+            // That must never be invisible again.
+            Err(e) => tracing::warn!(error = %e, pin_id, "acquisition: pin retirement failed"),
+        }
+    }
+    crate::metrics::inc_acquisition_pin_retirements("exhausted", retired);
+    // Materialise the sibling series even when nothing revived this cycle, so
+    // "no pin has ever been re-admitted" is distinguishable from "the emitter
+    // never ran".
+    crate::metrics::inc_acquisition_pin_retirements("readmitted", 0);
+    publish_retired_pin_gauge(conn);
+    retired as usize
+}
+
+/// Record on the row that an active pin's bytes are local, resetting its
+/// backoff ladder. `pins` is the tick's active census and `local_has` its
+/// local-presence set, both already in hand — no extra read, and no write once
+/// every fetched pin is settled.
+pub fn settle_fetched_pins(
+    conn: &mut diesel::SqliteConnection,
+    pins: &[crate::db::models::AcquisitionPin],
+    local_has: &HashSet<String>,
+) {
+    let ids = crate::db::acquisition_pins::pins_needing_fetched_settle(pins, local_has);
+    if ids.is_empty() {
+        return;
+    }
+    let was_backed_off = pins
+        .iter()
+        .filter(|p| ids.contains(&p.id) && p.consecutive_retirements > 0)
+        .count() as u64;
+    match crate::db::acquisition_pins::settle_fetched_pins(conn, &ids, chrono::Utc::now()) {
+        Ok(_) => crate::metrics::inc_acquisition_pin_backoff_resets(
+            crate::metrics::PinBackoffReset::Fetched,
+            was_backed_off,
+        ),
+        Err(e) => tracing::warn!(error = %e, "acquisition: fetched-pin settle failed"),
     }
 }
 
@@ -297,6 +447,12 @@ pub struct PinPullStatus {
     pub pending: i32,
     pub failed: i32,
     pub caught_up: bool,
+    /// Fetch attempts the pin's most-tried want has failed in this round.
+    pub attempts_used: u32,
+    /// Attempts a want gets before the pin is retired
+    /// ([`retry_budget_for_peers`]); `attemptsUsed == retryBudget` with
+    /// `pending == 0` is a pin the next reconcile retires.
+    pub retry_budget: u32,
 }
 
 #[derive(Debug, Default)]
@@ -522,6 +678,8 @@ impl AcquisitionState {
                     pending: c.pending as i32,
                     failed: c.failed as i32,
                     caught_up: total > 0 && (c.completed as i32) == total,
+                    attempts_used: t.attempts_used(),
+                    retry_budget: t.max_retries(),
                 }
             })
             .collect();
@@ -928,9 +1086,8 @@ mod tests {
 
     #[test]
     fn cooldown_readmission_uses_updated_at_and_never_strands_a_pin() {
-        // `updated_at` is the retirement clock — this is why Leg B needs no
-        // migration. A pin retired 1h ago is still held; one retired 7h ago is
-        // re-admitted.
+        // `updated_at` is the retirement clock. A pin retired 1h ago is still
+        // held; one retired 7h ago, on its first rung, is re-admitted.
         let now = chrono::Utc::now();
         let fresh = (now - chrono::Duration::hours(1))
             .format("%Y-%m-%dT%H:%M:%SZ")
@@ -938,16 +1095,62 @@ mod tests {
         let stale = (now - chrono::Duration::hours(7))
             .format("%Y-%m-%dT%H:%M:%SZ")
             .to_string();
-        assert!(!pin_cooled_down(&fresh, now), "still within the hold");
-        assert!(pin_cooled_down(&stale, now), "cooled down — re-admit");
+        assert!(!pin_cooled_down(&fresh, 1, now), "still within the hold");
+        assert!(pin_cooled_down(&stale, 1, now), "cooled down — re-admit");
+        assert!(
+            !pin_cooled_down(&stale, 2, now),
+            "the same 7h is inside the second rung's 12h hold"
+        );
 
         // A malformed clock must never strand a pin forever: fail TOWARD
-        // re-admission. Permanent silent hold is the failure this leg removes.
-        assert!(pin_cooled_down("not-a-timestamp", now));
+        // re-admission, on every rung.
+        assert!(pin_cooled_down("not-a-timestamp", 1, now));
         assert!(
-            pin_cooled_down("2026-07-31 12:00:00", now),
+            pin_cooled_down("2026-07-31 12:00:00", 6, now),
             "the SQL-default format (no T/Z) is unparseable here — re-admit, never strand"
         );
+    }
+
+    #[test]
+    fn hold_doubles_from_six_hours_and_caps_at_a_week() {
+        let hours = |n| pin_hold(n).num_hours();
+        assert_eq!(
+            (1..=6).map(hours).collect::<Vec<_>>(),
+            vec![6, 12, 24, 48, 96, 168]
+        );
+        assert_eq!(hours(7), 168, "capped");
+        assert_eq!(hours(i32::MAX), 168, "no overflow at the far end");
+        // A retired row with no backoff state serves the first rung.
+        assert_eq!(hours(0), 6);
+        assert_eq!(hours(-3), 6);
+        assert_eq!(PIN_READMIT_MAX_HOLD, chrono::Duration::days(7));
+    }
+
+    #[test]
+    fn readmit_bound_is_one_dispatch_round() {
+        assert_eq!(MAX_PIN_READMITS_PER_TICK, MAX_ACQUISITION_INFLIGHT);
+    }
+
+    #[tokio::test]
+    async fn per_pin_reports_attempts_used_against_the_budget() {
+        let acq = AcquisitionState::new();
+        let local = HashSet::new();
+        acq.reconcile(vec![(1, vec!["want".into()])], &local, 4)
+            .await;
+        assert_eq!(
+            (
+                acq.per_pin().await[0].attempts_used,
+                acq.per_pin().await[0].retry_budget
+            ),
+            (0, 4)
+        );
+        acq.mark_failed("want").await;
+        acq.reconcile(vec![(1, vec!["want".into()])], &local, 4)
+            .await;
+        acq.mark_failed("want").await;
+        let p = &acq.per_pin().await[0];
+        assert_eq!((p.attempts_used, p.retry_budget), (2, 4));
+        assert!(!p.caught_up);
     }
 
     #[test]

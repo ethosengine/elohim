@@ -9845,9 +9845,10 @@ impl P2PNode {
         // primary arm is inventory-driven (a peer advertising a retired pin's
         // head_ref revives it immediately, in the ContentList receive path); this
         // only bounds the worst case where nobody ever advertises the content
-        // again, so the substrate re-checks a few times a day rather than never.
+        // again, so the substrate re-checks rather than never — on a hold that
+        // doubles per consecutive retirement, and a bounded number per tick.
         // Retirement is a HOLD, not a delete.
-        self.readmit_cooled_down_pins(&mut conn);
+        acquisition::readmit_due_pins(&mut conn);
 
         let pins = match crate::db::acquisition_pins::list_active_pins(&mut conn) {
             Ok(p) => p,
@@ -9889,6 +9890,9 @@ impl P2PNode {
                     return AcquisitionReconcileOutcome::PresenceQueryFailed;
                 }
             };
+        // A pin whose bytes are local has its answer: reset its backoff ladder
+        // on the row. Writes nothing once every fetched pin is settled.
+        acquisition::settle_fetched_pins(&mut conn, &pins, &local_has);
         // DB work is done; drop the connection before the reconcile await so
         // it isn't held across the acquisition write-lock.
         drop(conn);
@@ -9937,7 +9941,7 @@ impl P2PNode {
 
         // Retire pins the fabric cannot satisfy. Held BACK, not deleted: the pin
         // row survives (a person still wants it) and is re-admitted the moment a
-        // peer advertises the content or the cooldown elapses. Without this an
+        // peer advertises the content or its hold elapses. Without this an
         // exhausted pin's tracker keeps `fetched < total` forever and
         // `pull.caughtUp` can never go true (alpha-A: 73 total / 3 fetched / 70
         // failed, caughtUp false for 12h+ with no runtime path to retirement —
@@ -9957,99 +9961,7 @@ impl P2PNode {
         let Some(ref pool) = self.db_pool else { return };
         let exhausted = self.acquisition.exhausted_pin_ids().await;
         let Ok(mut conn) = pool.get() else { return };
-
-        let mut retired = 0u64;
-        for pin_id in exhausted {
-            match crate::db::acquisition_pins::set_pin_status(
-                &mut conn,
-                pin_id,
-                acquisition::PIN_STATUS_RETIRED,
-            ) {
-                Ok(n) if n > 0 => {
-                    retired += 1;
-                    info!(
-                        target: "elohim_storage::acquisition",
-                        pin_id,
-                        "acquisition pin RETIRED — no connected peer could supply its bytes; \
-                         held back until a peer advertises it again or the cooldown elapses"
-                    );
-                }
-                Ok(_) => {}
-                // A rejected status write (e.g. a CHECK-constraint violation)
-                // means the pin never actually left `active` — the exact
-                // failure mode that made retirement inert until the
-                // 2026-07-31-200000_acquisition_pins_admit_retired migration.
-                // That must never be invisible again.
-                Err(e) => warn!(error = %e, pin_id, "acquisition: pin retirement failed"),
-            }
-        }
-        crate::metrics::inc_acquisition_pin_retirements("exhausted", retired);
-        // Materialise the sibling series even when nothing revived this cycle, so
-        // "no pin has ever been re-admitted" is distinguishable from "the emitter
-        // never ran".
-        crate::metrics::inc_acquisition_pin_retirements("readmitted", 0);
-        self.publish_retired_pin_gauge(&mut conn);
-    }
-
-    /// Backstop re-admission: retired pins whose `updated_at` (the retirement
-    /// clock — `set_pin_status` stamps it, so no migration is needed) is older
-    /// than [`acquisition::PIN_READMIT_COOLDOWN`] go back to `active`.
-    fn readmit_cooled_down_pins(&self, conn: &mut diesel::SqliteConnection) {
-        let retired = match crate::db::acquisition_pins::list_pins_by_status(
-            conn,
-            acquisition::PIN_STATUS_RETIRED,
-        ) {
-            Ok(p) => p,
-            Err(e) => {
-                debug!(error = %e, "acquisition: retired-pin load failed");
-                return;
-            }
-        };
-        if retired.is_empty() {
-            return;
-        }
-        let now = chrono::Utc::now();
-        let mut readmitted = 0u64;
-        for pin in &retired {
-            if !acquisition::pin_cooled_down(&pin.updated_at, now) {
-                continue;
-            }
-            match crate::db::acquisition_pins::set_pin_status(conn, pin.id, "active") {
-                Ok(n) if n > 0 => {
-                    readmitted += 1;
-                    info!(
-                        target: "elohim_storage::acquisition",
-                        pin_id = pin.id,
-                        head_ref = %pin.head_ref,
-                        "acquisition pin RE-ADMITTED after cooldown — retirement is a hold, \
-                         never a delete"
-                    );
-                }
-                Ok(_) => {}
-                // A rejected status write here would silently strand the pin
-                // in `retired` forever — never invisible again.
-                Err(e) => warn!(
-                    error = %e,
-                    pin_id = pin.id,
-                    "acquisition: cooldown re-admission write failed"
-                ),
-            }
-        }
-        if readmitted > 0 {
-            crate::metrics::inc_acquisition_pin_retirements("readmitted", readmitted);
-        }
-        self.publish_retired_pin_gauge(conn);
-    }
-
-    /// Republish `elohim_acquisition_pins_retired` from the DB (the durable
-    /// truth), never from an incremented counter — a counter drifts across
-    /// restarts and concurrent flips; a recount cannot.
-    fn publish_retired_pin_gauge(&self, conn: &mut diesel::SqliteConnection) {
-        if let Ok(rows) =
-            crate::db::acquisition_pins::list_pins_by_status(conn, acquisition::PIN_STATUS_RETIRED)
-        {
-            crate::metrics::set_acquisition_pins_retired(rows.len() as u64);
-        }
+        acquisition::retire_exhausted_pins(&mut conn, &exhausted);
     }
 
     /// Primary re-admission arm: a peer's content inventory naming a RETIRED
@@ -10065,44 +9977,7 @@ impl P2PNode {
         }
         let Some(ref pool) = self.db_pool else { return };
         let Ok(mut conn) = pool.get() else { return };
-        let retired = match crate::db::acquisition_pins::list_pins_by_status(
-            &mut conn,
-            acquisition::PIN_STATUS_RETIRED,
-        ) {
-            Ok(p) if !p.is_empty() => p,
-            _ => return,
-        };
-        let advertised: std::collections::HashSet<&str> =
-            remote_ids.iter().map(String::as_str).collect();
-        let mut readmitted = 0u64;
-        for pin in &retired {
-            if !advertised.contains(pin.head_ref.as_str()) {
-                continue;
-            }
-            match crate::db::acquisition_pins::set_pin_status(&mut conn, pin.id, "active") {
-                Ok(n) if n > 0 => {
-                    readmitted += 1;
-                    info!(
-                        target: "elohim_storage::acquisition",
-                        pin_id = pin.id,
-                        head_ref = %pin.head_ref,
-                        "acquisition pin RE-ADMITTED — a peer advertised its content again"
-                    );
-                }
-                Ok(_) => {}
-                // A rejected status write here would silently strand the pin
-                // in `retired` forever — never invisible again.
-                Err(e) => warn!(
-                    error = %e,
-                    pin_id = pin.id,
-                    "acquisition: inventory-driven re-admission write failed"
-                ),
-            }
-        }
-        if readmitted > 0 {
-            crate::metrics::inc_acquisition_pin_retirements("readmitted", readmitted);
-            self.publish_retired_pin_gauge(&mut conn);
-        }
+        acquisition::readmit_pins_named_by_inventory(&mut conn, remote_ids);
     }
 
     /// Provide-loop tick: derive the caught-up commons desired set and run the

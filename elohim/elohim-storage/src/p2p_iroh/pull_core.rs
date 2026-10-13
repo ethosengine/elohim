@@ -437,7 +437,7 @@ impl IrohPullCore {
         let Ok(mut conn) = pool.get() else {
             return AcquisitionReconcileOutcome::DbPoolUnavailable;
         };
-        readmit_cooled_down_pins(&mut conn);
+        acquisition::readmit_due_pins(&mut conn);
         let pins = match crate::db::acquisition_pins::list_active_pins(&mut conn) {
             Ok(p) => p,
             Err(e) => {
@@ -465,6 +465,7 @@ impl IrohPullCore {
                 return AcquisitionReconcileOutcome::PresenceQueryFailed;
             }
         };
+        acquisition::settle_fetched_pins(&mut conn, &pins, &local_has);
         drop(conn);
         let peer_count = self.book_peers().len();
         let to_dispatch = self
@@ -487,6 +488,13 @@ impl IrohPullCore {
         crate::metrics::set_acquisition_reconcile_completed(active_pin_count);
         if first_pass {
             info!(target: "elohim_storage::iroh_pull", active_pins = active_pin_count, desired = want_ids.len(), local = local_has.len(), "acquisition reconcile first pass completed (iroh)");
+        }
+        // Retire pins the book's peers could not satisfy — the same pass the
+        // libp2p node runs. Without it a pin this core re-admits (or a want it
+        // exhausts) stays `active` and holds `pull.caughtUp` false for good.
+        let exhausted = self.ctx.acquisition.exhausted_pin_ids().await;
+        if let Ok(mut conn) = pool.get() {
+            acquisition::retire_exhausted_pins(&mut conn, &exhausted);
         }
         self.refresh_status().await;
         AcquisitionReconcileOutcome::Completed
@@ -513,29 +521,7 @@ impl IrohPullCore {
             return;
         };
         let Ok(mut conn) = pool.get() else { return };
-        let retired = match crate::db::acquisition_pins::list_pins_by_status(
-            &mut conn,
-            acquisition::PIN_STATUS_RETIRED,
-        ) {
-            Ok(p) if !p.is_empty() => p,
-            _ => return,
-        };
-        let advertised: HashSet<&str> = remote_ids.iter().map(String::as_str).collect();
-        let mut readmitted = 0u64;
-        for pin in &retired {
-            if !advertised.contains(pin.head_ref.as_str()) {
-                continue;
-            }
-            if let Ok(n) = crate::db::acquisition_pins::set_pin_status(&mut conn, pin.id, "active")
-            {
-                if n > 0 {
-                    readmitted += 1;
-                }
-            }
-        }
-        if readmitted > 0 {
-            info!(target: "elohim_storage::iroh_pull", readmitted, "readmitted retired pins named by an iroh inventory");
-        }
+        acquisition::readmit_pins_named_by_inventory(&mut conn, remote_ids);
     }
 }
 
@@ -640,27 +626,6 @@ pub fn register_announce_row_fetch(fetch: IrohAnnounceRowFetch) -> bool {
 /// started (the iroh sync plane then leaves an absent row to the inventory walk).
 pub(crate) fn announce_row_fetch() -> Option<&'static IrohAnnounceRowFetch> {
     ANNOUNCE_ROW_FETCH.get()
-}
-
-/// Mirror of `P2PNode::readmit_cooled_down_pins`.
-fn readmit_cooled_down_pins(conn: &mut diesel::SqliteConnection) {
-    let retired = match crate::db::acquisition_pins::list_pins_by_status(
-        conn,
-        acquisition::PIN_STATUS_RETIRED,
-    ) {
-        Ok(p) => p,
-        Err(_) => return,
-    };
-    if retired.is_empty() {
-        return;
-    }
-    let now = chrono::Utc::now();
-    for pin in &retired {
-        if !acquisition::pin_cooled_down(&pin.updated_at, now) {
-            continue;
-        }
-        let _ = crate::db::acquisition_pins::set_pin_status(conn, pin.id, "active");
-    }
 }
 
 #[cfg(test)]

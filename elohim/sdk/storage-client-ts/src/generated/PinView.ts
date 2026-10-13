@@ -11,4 +11,25 @@ export type PinView = { id: number, agentPubKey: string, headRef: string, kind: 
 /**
  * Parsed closure rule (null when not set).
  */
-closureRule: JsonValue | null, priority: number, status: string, createdAt: string, updatedAt: string, };
+closureRule: JsonValue | null, priority: number, status: string, createdAt: string, updatedAt: string, 
+/**
+ * Retirements in a row with no fetch and no peer inventory naming the head
+ * between them. Each one doubles the hold before the next re-probe.
+ */
+consecutiveRetirements: number, 
+/**
+ * Earliest time a `retired` pin is re-admitted for a re-probe (RFC 3339).
+ * Null unless `status` is `retired`. A peer inventory naming the head
+ * re-admits sooner; a busy tick can defer it by minutes.
+ */
+nextReadmitAt: string | null, 
+/**
+ * Read-misses recorded while the pin was `retired` or `removed`. Demand
+ * undoes neither; it is counted. Cleared on re-admission.
+ */
+heldDemandCount: number, 
+/**
+ * `exhausted` (every connected peer was asked and none supplied the
+ * bytes), `fetched`, or null when no round has concluded.
+ */
+lastOutcome: string | null, };

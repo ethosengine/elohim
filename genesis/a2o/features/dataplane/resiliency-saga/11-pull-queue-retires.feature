@@ -82,8 +82,10 @@
 #      false-red the moment re-admission does its job.
 #   2. Retirement is REVERSIBLE — the pin row survives, and it is re-admitted
 #      the moment a peer's inventory names its head_ref again (primary arm),
-#      or after a 6h cooldown (backstop — a second, still-unscenario'd arm of
-#      the same guarantee; see the station below the re-admission scenario).
+#      or after its hold (backstop — 6h, doubling per consecutive retirement
+#      to a 7-day ceiling, at most 25 pins per reconcile tick; a second,
+#      still-unscenario'd arm of the same guarantee; see the station below the
+#      re-admission scenario). A read-miss does not end the hold; it is counted.
 #      Both directions are published as distinct series
 #      (`elohim_acquisition_pin_retirements_total` with `reason` = exhausted |
 #      readmitted), so an operator can always tell "the queue is caught up
