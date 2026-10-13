@@ -50,3 +50,11 @@ reading, which this workspace cannot take.
 
 **Done when.** A household call reading shows `my_consent_standing` answering, and `idle-is-free`'s ledger carries
 what the refresher costs when it does.
+
+## 2026-10-13 — the storage half is built; the fixture half is not
+
+`consent-speaks-refresh-is-a-timer-not-a-demand` now reads on demand by default, so a resting peer makes no
+`my_consent_standing` call whatever its coordinator holds. Under `ELOHIM_CONSENT_SPEAKS_REFRESH=timer` the refresher
+rests on this answer until this process applies a coordinator hot-swap (`happ_manager::coordinator_updates`) or 30
+minutes pass, and says so once at warn. The household's installed mishpat coordinator is unchanged: until it is brought
+up to the built one, no household peer lists an ask over the carrier in either mode. Not measured on the household.

@@ -67,3 +67,29 @@ The decision owed by the operator who owns consent policy: restate the invariant
 120 s; list whenever the cell can be read", or keep the timer until mishpat emits a standing-change signal (a
 coordinator-zome change). Files a build would touch: `src/services/device_carrier.rs`, `src/http.rs` (about lines
 2114 to 2136 and the three readers) and `src/p2p/mod.rs` (about line 6880). Status unchanged.
+
+## 2026-10-13 — decided and built; not measured
+
+The operator restated the invariant: never list on evidence older than 120 s; list whenever the cell can be read. The
+demand-driven read is built in storage (`services/device_carrier.rs`, `http.rs`, a counter in `happ_manager.rs`) and is
+the default. `ELOHIM_CONSENT_SPEAKS_REFRESH=timer`, read once at start, keeps the 30 s refresher as it was; the mode in
+force is logged once at start.
+
+On demand a resting node makes no standing call. An ask, a pending-list or decide request, the signed-out standing and
+an identity write want a read; one runs at a time; an answered read is not repeated for 30 s, and a read the cell did
+not answer may be tried again after 5 s (one re-offer). An ask cannot wait in the transport's event loop, so the first
+ask after rest wakes the reader and is dropped unanswered, as by a node whose standing is unknown, and is listed on the
+device's re-offer about 5 s later. A device not yet on the list is listed only on a read no older than 30 s; a device
+already listed keeps its place on the last read (inside 120 s) while the next is made. The listing proof and the
+controller's Human read ride the same read.
+
+Availability is weaker than the timer during a conductor outage, as planned: an idle node lists nothing until the cell
+answers. The timer now rests on "zome function doesn't exist" until this process applies a coordinator update, or 30
+minutes (a swap from another process is not seen), and a failing read warns once and then logs at debug.
+
+Not built: a classed (background-lane) mishpat call. On demand the read has a person waiting, and the timer is kept as
+it was; the affirmation pass is the one remaining caller, two reads per 30 minutes, and the variant would touch three
+source-scanning rails in `hc_client.rs`, `chain_write_gate.rs` and `cell_probe.rs`.
+
+Not verified: nothing here was run on a household. Both "done when" lines are still owed, and the second reads
+"listed without the person retrying": the first offer is unanswered by design. Status unchanged until measured.

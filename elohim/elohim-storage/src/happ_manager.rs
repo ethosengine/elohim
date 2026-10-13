@@ -65,7 +65,7 @@
 
 use std::collections::{BTreeMap, BTreeSet};
 use std::path::Path;
-use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
 use std::time::Duration;
 
 use holochain_client::{AdminWebsocket, AllowedOrigins, CellInfo, InstallAppPayload};
@@ -583,6 +583,17 @@ const UNINSTALL_PREFLIGHT_BUDGET: Duration = Duration::from_secs(10);
 /// another one — a retry against a half-removed app is how a recoverable
 /// timeout becomes a second round of deletions.
 static UNINSTALL_TORN: AtomicBool = AtomicBool::new(false);
+
+/// Coordinator hot-swaps this process has applied, on any role of any app.
+static COORDINATOR_UPDATES: AtomicU64 = AtomicU64::new(0);
+
+/// How many coordinator hot-swaps this process has applied. A reader resting
+/// on "that zome function doesn't exist" compares it to ask again once the
+/// coordinator may have gained the function. A swap applied by another
+/// process is not counted here.
+pub fn coordinator_updates() -> u64 {
+    COORDINATOR_UPDATES.load(Ordering::Relaxed)
+}
 
 /// The recovery instruction that must travel with a torn uninstall — the node
 /// cannot fix this itself, and guessing (re-installing over a half-removed app)
@@ -1645,6 +1656,7 @@ pub(crate) async fn sweep_app_roles(
                 );
                 report.applied = true;
                 applied_count += 1;
+                COORDINATOR_UPDATES.fetch_add(1, Ordering::Relaxed);
             }
             Err(e) => {
                 error!(role = role.as_str(), error = %e, "update_coordinators failed — role keeps old coordinators");
