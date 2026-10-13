@@ -59,11 +59,13 @@ pub const DEFAULT_SETTLE_SECS: u64 = 30;
 pub const NONE_REST_BASE_SECS: u64 = 5 * 60;
 
 /// Longest rest (seconds) for an agent that keeps answering `Ok(None)`. Cost: a
-/// peer that starts publishing status is noticed at most one cap (plus a sweep)
-/// late. Until its first snapshot lands there is no row for it, so consumers
-/// (`peer_selection`, `household_resilience`) simply do not count it; the
-/// `PEER_STATUS_STALENESS_SECS` window (default 900) only dims rows that exist.
-pub const NONE_REST_CAP_SECS: u64 = 60 * 60;
+/// peer with no row is simply not counted by `peer_selection` or
+/// `household_resilience` (`PEER_STATUS_STALENESS_SECS` only dims rows that
+/// exist), so the cap is how long a newly publishing peer stays out of placement
+/// and resilience counts. 15 minutes keeps a device joining a household
+/// prompt, and still cuts an empty agent's calls to every third sweep at the
+/// default cadence.
+pub const NONE_REST_CAP_SECS: u64 = 15 * 60;
 
 /// A decoded, storage-ready PeerStatus snapshot for one agent, produced by a
 /// [`PeerStatusFetcher`]. This is the boundary type between the conductor-facing
@@ -700,9 +702,9 @@ mod tests {
             }
             t += CADENCE;
         }
-        // Asked at once, then 1, 2, 4, 8 sweeps skipped (5, 10, 20, 40 min
-        // windows beyond the cadence), then the 60 min cap holds at 12.
-        assert_eq!(&gaps[..7], &[0, 1, 2, 4, 8, 12, 12], "gaps={gaps:?}");
+        // Asked at once, then 1, 2 sweeps skipped (5, 10 min windows beyond the
+        // cadence), then the 15 min cap holds at 3.
+        assert_eq!(&gaps[..7], &[0, 1, 2, 3, 3, 3, 3], "gaps={gaps:?}");
     }
 
     #[tokio::test]
