@@ -788,6 +788,66 @@ pub fn retained_offer_rested(
     rest.is_resting(id, hint.head.as_str(), local.head.as_deref(), now)
 }
 
+/// What `schedule_reprobe` did, with the REASON a ladder ended.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum ReprobeBooking {
+    /// No re-probe is warranted, or none was booked (timer cap): no evidence.
+    NotBooked,
+    /// A next rung is sleeping.
+    Scheduled,
+    /// The ladder ran to its last rung and the conductor still could not walk
+    /// the head. The only booking that earns a rest.
+    LadderSpent,
+    /// The claim window closed before the last rung: a trigger that waited in
+    /// the queue, or a claim about to expire. Queue pressure is not evidence
+    /// about the conductor.
+    CutShort,
+}
+
+/// Classify a [`RetryPlan`] for `attempt`. The ladder's final rung is attempt
+/// `RETRY_DELAYS.len() - 1`; the fixed delays sum to the claim window, so the
+/// normal ladder ends with the window check at that attempt. An `Exhausted`
+/// plan at an earlier attempt means the window closed early.
+fn booking_for(plan: RetryPlan, attempt: u32) -> ReprobeBooking {
+    match plan {
+        RetryPlan::After(_) => ReprobeBooking::Scheduled,
+        RetryPlan::DroppedCap => ReprobeBooking::NotBooked,
+        RetryPlan::Exhausted if attempt as usize + 1 >= RETRY_DELAYS.len() => {
+            ReprobeBooking::LadderSpent
+        }
+        RetryPlan::Exhausted => ReprobeBooking::CutShort,
+    }
+}
+
+/// What a trigger learned about an id's claim, for the retained rest.
+#[derive(Debug, Clone, Copy)]
+enum RestEvent<'a> {
+    /// The id settled without a non-answer: the row already names the doc's
+    /// head, the doc names none, no local row, or a courier stamped it.
+    Settled,
+    /// The own conductor walked the doc's head.
+    Walkable,
+    /// The full ladder ran with no walkable answer, for this claim.
+    LadderSpent {
+        doc_head: &'a str,
+        row_head: Option<&'a str>,
+    },
+}
+
+/// The one place `process_trigger` touches the rest. Conductor faults, mid-ladder
+/// rungs, cut-short ladders and the timer cap do not call it: they say nothing
+/// about whether the conductor can walk the head, so the rest is left as it is.
+fn settle_rest(rest: &RetainedRest, id: &str, event: RestEvent<'_>, now: Instant) {
+    match event {
+        RestEvent::Settled | RestEvent::Walkable => rest.forget(id),
+        RestEvent::LadderSpent { doc_head, row_head } => {
+            if row_head != Some(doc_head) {
+                rest.record_exhaustion(id, doc_head, row_head, now);
+            }
+        }
+    }
+}
+
 /// Did a `Held` adoption in fact REFRESH the row's ordering? True when the row
 /// still names the same head and its recorded ordering changed (filled, newer, or
 /// stronger tier): the same-head stamp did real work, which is not "nothing to
@@ -1471,6 +1531,14 @@ async fn process_trigger(
     );
     if action != TriggerAction::Probe {
         count_outcome(trigger, action.label());
+        if matches!(
+            action,
+            TriggerAction::SkippedCurrent
+                | TriggerAction::NoHintLeftToSweep
+                | TriggerAction::NoLocalRow
+        ) {
+            settle_rest(rest, id, RestEvent::Settled, Instant::now());
+        }
         // Settled without a conductor call: the row already names the doc's
         // head, or the doc names none. Release the claim so the NEXT change for
         // this id (the author's next publish) is a new event rather than a
@@ -1522,6 +1590,8 @@ async fn process_trigger(
     )
     .await;
     let Some(probe) = probe else {
+        // A verified courier stamped or confirmed the head: settled.
+        settle_rest(rest, id, RestEvent::Settled, Instant::now());
         finish_hosting_or_retry(trigger, &hc, pool, ctx, gate, courier).await;
         return;
     };
@@ -1570,21 +1640,25 @@ async fn process_trigger(
                 return;
             }
         }
-        let exhausted = schedule_reprobe(gate, trigger, doc_hint.as_ref(), row.as_ref());
-        // The ladder ended with no walkable answer: remember it against the
-        // claim that produced it, so the retained pass stops re-offering the
-        // same unchanged row. Differing heads only (see `retained_offer_rested`).
-        if let (true, Some(doc_head)) = (exhausted, doc_head) {
+        let booking = schedule_reprobe(gate, trigger, doc_hint.as_ref(), row.as_ref());
+        // Only a ladder that ran to its last rung is evidence about the
+        // conductor; remember it against the claim that produced it so the
+        // retained pass stops re-offering the same unchanged row. Differing
+        // heads only (see `retained_offer_rested`).
+        if let (ReprobeBooking::LadderSpent, Some(doc_head)) = (booking, doc_head) {
             let row_head = row.as_ref().and_then(|r| r.head.as_deref());
-            if row_head != Some(doc_head) {
-                rest.record_exhaustion(id, doc_head, row_head, Instant::now());
-            }
+            settle_rest(
+                rest,
+                id,
+                RestEvent::LadderSpent { doc_head, row_head },
+                Instant::now(),
+            );
         }
         return;
     };
 
     // The conductor walked the doc's head: the non-answer is over.
-    rest.forget(id);
+    settle_rest(rest, id, RestEvent::Walkable, Instant::now());
 
     // THE BYTES BEFORE THE MOVE. The own conductor now answers the head the doc
     // names, but adopting it repoints the row; if this node does not hold the
@@ -1823,9 +1897,9 @@ fn schedule_reprobe(
     trigger: &HeadAdoptionTrigger,
     doc_hint: Option<&DocHint>,
     local: Option<&LocalDeclaration>,
-) -> bool {
+) -> ReprobeBooking {
     if !retry_warranted(doc_hint, local) {
-        return false;
+        return ReprobeBooking::NotBooked;
     }
     let plan = gate.schedule_retry(trigger.clone());
     count_outcome(trigger, plan.label());
@@ -1837,7 +1911,7 @@ fn schedule_reprobe(
             "head-adoption trigger: re-probe ladder spent — leaving this id to the sweep"
         );
     }
-    plan == RetryPlan::Exhausted
+    booking_for(plan, trigger.attempt)
 }
 
 /// Book the ONE slow re-probe a conductor FAULT is allowed.
@@ -2241,7 +2315,7 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn a_retained_offer_with_an_unchanged_claim_makes_no_conductor_call_after_exhaustion() {
+    async fn the_retained_pass_withholds_an_offer_whose_claim_matches_a_recorded_rest() {
         let now = Instant::now();
         let (pool, sync, _dir, rest) = rested_fixture("stuck", now).await;
         // Nothing is queued, so the worker never reaches the conductor.
@@ -2276,7 +2350,7 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn a_sync_trigger_is_never_rested() {
+    async fn a_sync_offer_does_not_consult_the_rest() {
         let now = Instant::now();
         let (_pool, _sync, _dir, rest) = rested_fixture("stuck", now).await;
         assert!(rest.is_resting("stuck", "new head", Some("old head"), now));
@@ -2294,7 +2368,7 @@ mod tests {
     }
 
     #[test]
-    fn the_rest_lapses_and_the_window_doubles_to_the_cap() {
+    fn the_rest_structure_lapses_and_doubles_to_the_cap() {
         let rest = RetainedRest::new(8);
         let t0 = Instant::now();
         let claim = ("new head", Some("old head"));
@@ -2324,7 +2398,7 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn a_resolved_probe_clears_the_rest() {
+    async fn the_retained_pass_offers_again_once_a_rest_is_forgotten() {
         let now = Instant::now();
         let (pool, sync, _dir, rest) = rested_fixture("stuck", now).await;
         rest.forget("stuck");
@@ -2338,7 +2412,7 @@ mod tests {
     }
 
     #[test]
-    fn the_memo_is_bounded() {
+    fn the_rest_structure_is_bounded() {
         let rest = RetainedRest::new(3);
         let now = Instant::now();
         for i in 0..10 {
@@ -2351,6 +2425,147 @@ mod tests {
         // Re-recording a known id does not grow the set.
         rest.record_exhaustion("id-9", "d", None, now);
         assert_eq!(rest.len(), 3);
+    }
+
+    fn skipped_rested_count() -> u64 {
+        crate::metrics::HEAD_ADOPTION_TRIGGER
+            .with_label_values(&[RETAINED_RESTED_LABEL, "retained"])
+            .get()
+    }
+
+    #[test]
+    fn only_a_ladder_that_reached_its_last_rung_counts_as_spent() {
+        let last = RETRY_DELAYS.len() as u32 - 1;
+        assert_eq!(
+            booking_for(RetryPlan::Exhausted, last),
+            ReprobeBooking::LadderSpent
+        );
+        assert_eq!(
+            booking_for(RetryPlan::Exhausted, last + 1),
+            ReprobeBooking::LadderSpent
+        );
+        // A trigger that waited ~59 s in the queue: window closed at attempt 0.
+        assert_eq!(
+            booking_for(RetryPlan::Exhausted, 0),
+            ReprobeBooking::CutShort
+        );
+        assert_eq!(
+            booking_for(RetryPlan::Exhausted, last - 1),
+            ReprobeBooking::CutShort
+        );
+        assert_eq!(
+            booking_for(RetryPlan::DroppedCap, last),
+            ReprobeBooking::NotBooked
+        );
+        assert_eq!(
+            booking_for(RetryPlan::After(Duration::from_secs(1)), 0),
+            ReprobeBooking::Scheduled
+        );
+        // The real gate, at the real elapsed cutoff: a late attempt 0 is cut
+        // short, the final rung's window check is a spent ladder.
+        let (gate, _rx) = gate_with(DEFAULT_TRIGGER_COOLDOWN);
+        let late = gate.plan_retry(0, Duration::from_secs(59));
+        assert_eq!(booking_for(late, 0), ReprobeBooking::CutShort);
+        let final_rung = gate.plan_retry(last, Duration::from_secs(31));
+        assert_eq!(booking_for(final_rung, last), ReprobeBooking::LadderSpent);
+    }
+
+    /// The decision `process_trigger` makes on a spent ladder, then the next
+    /// retained pass. (`process_trigger` itself needs a live `HcClient`, which
+    /// has no fake in this crate; `settle_rest` is the one call it makes.)
+    #[tokio::test]
+    async fn a_spent_ladder_rests_the_next_retained_pass_and_counts_it() {
+        let now = Instant::now();
+        let (pool, sync, _dir) = retained_hint_fixture().await;
+        retained_row(&pool, "stuck", "commons");
+        retained_doc(&sync, "stuck", "new head").await;
+        let rest = RetainedRest::new(8);
+        let claim = RestEvent::LadderSpent {
+            doc_head: "new head",
+            row_head: Some("old head"),
+        };
+        assert_eq!(offered(&pool, &sync, &rest, now).await, vec!["stuck"]);
+        let before = skipped_rested_count();
+        settle_rest(&rest, "stuck", claim, now);
+        assert!(offered(&pool, &sync, &rest, now).await.is_empty());
+        assert!(skipped_rested_count() > before);
+    }
+
+    #[tokio::test]
+    async fn a_cut_short_or_faulted_attempt_records_nothing() {
+        let now = Instant::now();
+        let (pool, sync, _dir) = retained_hint_fixture().await;
+        retained_row(&pool, "late", "commons");
+        retained_doc(&sync, "late", "new head").await;
+        let rest = RetainedRest::new(8);
+        // process_trigger records only on ReprobeBooking::LadderSpent.
+        for booking in [
+            ReprobeBooking::CutShort,
+            ReprobeBooking::NotBooked,
+            ReprobeBooking::Scheduled,
+        ] {
+            assert_ne!(booking, ReprobeBooking::LadderSpent);
+        }
+        assert!(rest.is_empty());
+        assert_eq!(offered(&pool, &sync, &rest, now).await, vec!["late"]);
+    }
+
+    #[tokio::test]
+    async fn every_settled_event_clears_a_recorded_rest() {
+        let now = Instant::now();
+        for event in [RestEvent::Settled, RestEvent::Walkable] {
+            let (pool, sync, _dir) = retained_hint_fixture().await;
+            retained_row(&pool, "stuck", "commons");
+            retained_doc(&sync, "stuck", "new head").await;
+            let rest = RetainedRest::new(8);
+            settle_rest(
+                &rest,
+                "stuck",
+                RestEvent::LadderSpent {
+                    doc_head: "new head",
+                    row_head: Some("old head"),
+                },
+                now,
+            );
+            assert!(offered(&pool, &sync, &rest, now).await.is_empty());
+            settle_rest(&rest, "stuck", event, now);
+            assert_eq!(offered(&pool, &sync, &rest, now).await, vec!["stuck"]);
+            // The next exhaustion starts at the base window, not an old streak.
+            settle_rest(
+                &rest,
+                "stuck",
+                RestEvent::LadderSpent {
+                    doc_head: "new head",
+                    row_head: Some("old head"),
+                },
+                now,
+            );
+            assert!(!rest.is_resting(
+                "stuck",
+                "new head",
+                Some("old head"),
+                now + RETAINED_REST_BASE
+            ));
+        }
+    }
+
+    /// `process_trigger` needs a live `HcClient` and has no fake, so pin its
+    /// wiring by shape: every settled return path and the walkable and
+    /// spent-ladder arms must reach `settle_rest`.
+    #[test]
+    fn process_trigger_reaches_settle_rest_on_every_path_that_decides_the_rest() {
+        let src = include_str!("head_adoption_trigger.rs");
+        let body = src
+            .split("async fn process_trigger(")
+            .nth(1)
+            .unwrap()
+            .split("\n/// A verified courier may settle")
+            .next()
+            .unwrap();
+        assert_eq!(body.matches("RestEvent::Settled").count(), 2);
+        assert_eq!(body.matches("RestEvent::Walkable").count(), 1);
+        assert_eq!(body.matches("RestEvent::LadderSpent").count(), 1);
+        assert!(body.contains("ReprobeBooking::LadderSpent"));
     }
 
     fn gate_with(cooldown: Duration) -> (Arc<TriggerGate>, mpsc::Receiver<HeadAdoptionTrigger>) {
