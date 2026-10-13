@@ -516,6 +516,10 @@ pub struct HcClientRegistry {
     /// knows no URLs, and [`Self::connect_app`] fails closed there rather than
     /// guessing a localhost default.
     inputs: Option<HcRegistryInputs>,
+    /// One gate per [`SUPERVISED_ROLES`] entry, held by whoever is filling
+    /// that role's EMPTY slot: a late connect ([`Self::supervised_client`]) or
+    /// the supervisor's re-mint. See [`acquire_through_slot`].
+    connect_gates: [tokio::sync::Mutex<()>; SUPERVISED_ROLES.len()],
 }
 
 /// The roles the supervisor keeps alive. Ordered coldest-first, matching the
@@ -823,6 +827,46 @@ pub(crate) async fn execute_not_running_action(
     .await
 }
 
+/// The handle in `slot`, connecting and storing one if the slot is empty.
+///
+/// `gate` makes filling a slot single-flight. Without it two waiters on an
+/// empty slot would each dial, and the loser would walk away holding a client
+/// that is not the one in the slot — unsupervised, which is the defect
+/// [`HcClientRegistry::supervised_client`] exists to prevent. The supervisor
+/// holds the same gate from before it clears a slot until the re-minted
+/// handle is back in it, so a waiter arriving mid-re-mint gets that handle
+/// instead of storing a rival the supervisor would then overwrite.
+///
+/// Generic over the handle so the slot discipline is testable without a
+/// conductor. `connect` returns `None` only when it gave up (shutdown).
+pub(crate) async fn acquire_through_slot<T, F, Fut>(
+    slot: &RwLock<Option<Arc<T>>>,
+    gate: &tokio::sync::Mutex<()>,
+    mut shutdown: tokio::sync::broadcast::Receiver<()>,
+    connect: F,
+) -> Option<Arc<T>>
+where
+    F: FnOnce(tokio::sync::broadcast::Receiver<()>) -> Fut,
+    Fut: std::future::Future<Output = Option<Arc<T>>>,
+{
+    let held =
+        |slot: &RwLock<Option<Arc<T>>>| slot.read().unwrap_or_else(|e| e.into_inner()).clone();
+    if let Some(hc) = held(slot) {
+        return Some(hc);
+    }
+    let _filling = tokio::select! {
+        guard = gate.lock() => guard,
+        _ = shutdown.recv() => return None,
+    };
+    // Whoever held the gate may have filled the slot while this waited.
+    if let Some(hc) = held(slot) {
+        return Some(hc);
+    }
+    let fresh = connect(shutdown).await?;
+    *slot.write().unwrap_or_else(|e| e.into_inner()) = Some(Arc::clone(&fresh));
+    Some(fresh)
+}
+
 /// Connection inputs. Mirrors the relevant CLI args without depending on
 /// the Args struct directly (cleaner test surface).
 #[derive(Debug, Clone)]
@@ -852,6 +896,7 @@ impl HcClientRegistry {
             lamad: RwLock::new(lamad),
             node_registry: RwLock::new(node_registry),
             inputs: Some(inputs.clone()),
+            connect_gates: Default::default(),
         }
     }
 
@@ -864,6 +909,7 @@ impl HcClientRegistry {
             lamad: RwLock::new(None),
             node_registry: RwLock::new(None),
             inputs: None,
+            connect_gates: Default::default(),
         }
     }
 
@@ -928,6 +974,43 @@ impl HcClientRegistry {
         if let Some(slot) = self.slot(role) {
             *slot.write().unwrap_or_else(|e| e.into_inner()) = hc;
         }
+    }
+
+    fn connect_gate(&self, role: &str) -> Option<&tokio::sync::Mutex<()>> {
+        let at = SUPERVISED_ROLES.iter().position(|r| *r == role)?;
+        self.connect_gates.get(at)
+    }
+
+    /// The SUPERVISED handle for `role`, waiting for it if the role is not
+    /// connected yet. `None` only on shutdown, for a role with no slot, or on
+    /// a registry that never dialed a conductor and holds no handle.
+    ///
+    /// For a long-lived task that keeps the handle for the life of the
+    /// process. [`Self::connect_role_forever`] hands back a client nothing
+    /// watches: the supervisor re-mints only the handle in the slot, so after
+    /// a conductor restart a privately connected client holds a closed socket
+    /// for good — and each of its failures is filed against the role, waking
+    /// the supervisor to ping a bridge that is fine. The handle returned here
+    /// is the one in the slot, so the re-mint's in-place adoption reaches it.
+    ///
+    /// When the bounded boot ramp left the slot empty this connects (forever,
+    /// like `connect_role_forever`) and STORES the result, which is also what
+    /// brings a late role under the supervisor at all: its loop skips a role
+    /// whose slot is empty.
+    pub async fn supervised_client(
+        &self,
+        role: &str,
+        shutdown: tokio::sync::broadcast::Receiver<()>,
+    ) -> Option<Arc<HcClient>> {
+        acquire_through_slot(
+            self.slot(role)?,
+            self.connect_gate(role)?,
+            shutdown,
+            |shutdown| async move {
+                Self::connect_role_forever(self.inputs.as_ref()?, role, shutdown).await
+            },
+        )
+        .await
     }
 
     /// Snapshot the current `infrastructure` handle.
@@ -1682,6 +1765,14 @@ impl HcClientRegistry {
                         }
                     }
 
+                    // Hold the role's connect gate for as long as the slot is
+                    // empty, so a `supervised_client` waiter takes the handle
+                    // this re-mint stores rather than dialing one of its own.
+                    let filling = match registry.connect_gate(role) {
+                        Some(gate) => Some(gate.lock().await),
+                        None => None,
+                    };
+
                     // Clear the slot FIRST, so nothing NEW picks up the dead
                     // handle and `/health` stops advertising its DNA hashes.
                     // `hc` itself is KEPT: it is the handle every long-lived
@@ -1739,6 +1830,7 @@ impl HcClientRegistry {
                         }
                     };
                     registry.set_client(role, Some(Arc::clone(&serving)));
+                    drop(filling);
 
                     // "Live" is said about the socket zome calls will use, and
                     // only after it has answered.
@@ -2211,6 +2303,151 @@ mod supervised_slot_tests {
             "the cross-cell driver must itself be a supervised role, or nothing spawns the task \
              that tends mishpat"
         );
+    }
+
+    // ---- a late role is acquired THROUGH its slot -------------------------
+
+    /// Stands in for an `HcClient`: only its identity matters here.
+    struct Handle;
+
+    fn shutdown_pair() -> (
+        tokio::sync::broadcast::Sender<()>,
+        tokio::sync::broadcast::Receiver<()>,
+    ) {
+        tokio::sync::broadcast::channel::<()>(1)
+    }
+
+    fn in_slot(slot: &RwLock<Option<Arc<Handle>>>) -> Option<Arc<Handle>> {
+        slot.read().unwrap().clone()
+    }
+
+    /// The property a long-lived task depends on: the handle it is given for a
+    /// role that connected late IS the one in the slot, because the slot's
+    /// handle is the only one the supervisor re-mints after a conductor
+    /// restart. A handle from `connect_role_forever` alone is in no slot.
+    #[tokio::test]
+    async fn a_late_connection_is_stored_in_the_slot_it_was_awaited_through() {
+        let slot = RwLock::new(None);
+        let gate = tokio::sync::Mutex::new(());
+        let (_tx, rx) = shutdown_pair();
+
+        let got = acquire_through_slot(&slot, &gate, rx, |_| async { Some(Arc::new(Handle)) })
+            .await
+            .expect("connected");
+
+        let supervised = in_slot(&slot).expect("the late connection reached the slot");
+        assert!(Arc::ptr_eq(&got, &supervised));
+    }
+
+    #[tokio::test]
+    async fn a_connected_role_is_handed_out_without_dialing() {
+        let boot = Arc::new(Handle);
+        let slot = RwLock::new(Some(Arc::clone(&boot)));
+        let gate = tokio::sync::Mutex::new(());
+        let (_tx, rx) = shutdown_pair();
+
+        let got = acquire_through_slot(&slot, &gate, rx, |_| async {
+            panic!("a role that is already connected is never dialed again")
+        })
+        .await
+        .expect("held");
+
+        assert!(Arc::ptr_eq(&got, &boot));
+    }
+
+    #[tokio::test]
+    async fn waiters_on_one_empty_slot_share_one_connection() {
+        let slot = RwLock::new(None);
+        let gate = tokio::sync::Mutex::new(());
+        let dials = std::sync::atomic::AtomicU32::new(0);
+        let (tx, _rx) = shutdown_pair();
+        let dials = &dials;
+        let dial = |_: tokio::sync::broadcast::Receiver<()>| async move {
+            dials.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
+            // Stay in the connect long enough for the other waiter to arrive.
+            tokio::task::yield_now().await;
+            Some(Arc::new(Handle))
+        };
+
+        let (a, b) = tokio::join!(
+            acquire_through_slot(&slot, &gate, tx.subscribe(), dial),
+            acquire_through_slot(&slot, &gate, tx.subscribe(), dial),
+        );
+
+        assert_eq!(dials.load(std::sync::atomic::Ordering::SeqCst), 1);
+        let supervised = in_slot(&slot).expect("stored");
+        assert!(Arc::ptr_eq(&a.expect("a"), &supervised));
+        assert!(Arc::ptr_eq(&b.expect("b"), &supervised));
+    }
+
+    /// The supervisor clears the slot for the length of a re-mint and then
+    /// puts the handle it adopted into back. A waiter that arrives in that gap
+    /// must leave with that handle, not store a rival the supervisor's write
+    /// would displace.
+    #[tokio::test]
+    async fn a_waiter_arriving_mid_remint_takes_the_reminted_handle() {
+        let slot = Arc::new(RwLock::new(None));
+        let gate = Arc::new(tokio::sync::Mutex::new(()));
+        let (_tx, rx) = shutdown_pair();
+
+        let reminting = gate.clone().lock_owned().await;
+        let waiter = tokio::spawn({
+            let (slot, gate) = (Arc::clone(&slot), Arc::clone(&gate));
+            async move {
+                acquire_through_slot(&slot, &gate, rx, |_| async {
+                    panic!("the re-mint in flight owns this slot")
+                })
+                .await
+            }
+        });
+        tokio::task::yield_now().await;
+        assert!(!waiter.is_finished(), "it waits on the re-mint");
+
+        let reminted = Arc::new(Handle);
+        *slot.write().unwrap() = Some(Arc::clone(&reminted));
+        drop(reminting);
+
+        let got = waiter.await.expect("joined").expect("handle");
+        assert!(Arc::ptr_eq(&got, &reminted));
+    }
+
+    #[tokio::test]
+    async fn shutdown_releases_a_waiter_held_behind_the_gate() {
+        let slot: Arc<RwLock<Option<Arc<Handle>>>> = Arc::new(RwLock::new(None));
+        let gate = Arc::new(tokio::sync::Mutex::new(()));
+        let (tx, rx) = shutdown_pair();
+
+        let _filling = gate.clone().lock_owned().await;
+        let waiter = tokio::spawn({
+            let (slot, gate) = (Arc::clone(&slot), Arc::clone(&gate));
+            async move {
+                acquire_through_slot(&slot, &gate, rx, |_| async {
+                    panic!("shutdown came first")
+                })
+                .await
+            }
+        });
+        tokio::task::yield_now().await;
+        tx.send(()).expect("a waiter is subscribed");
+
+        assert!(waiter.await.expect("joined").is_none());
+    }
+
+    #[tokio::test]
+    async fn a_registry_with_no_conductor_and_no_handle_has_nothing_to_wait_for() {
+        let reg = HcClientRegistry::empty();
+        let (tx, _rx) = shutdown_pair();
+        // No slot for the role: a miss, not a hang.
+        assert!(reg
+            .supervised_client("qahal", tx.subscribe())
+            .await
+            .is_none());
+        // A slot, but no conductor URLs to dial with.
+        assert!(reg
+            .supervised_client("imagodei", tx.subscribe())
+            .await
+            .is_none());
+        assert!(reg.imagodei_client().is_none());
     }
 
     #[test]

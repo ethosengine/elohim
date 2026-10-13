@@ -2758,13 +2758,7 @@ async fn async_main(
                     let reanchor_pool = db_pool.clone();
                     let reanchor_state = provide_loop_state.clone();
                     let reanchor_lamad_boot = registry.lamad_client();
-                    let reanchor_late_inputs =
-                        elohim_storage::hc_client_registry::HcRegistryInputs {
-                            admin_url: admin_url.clone(),
-                            app_url: args.app_url.clone(),
-                            app_id: args.app_id.clone(),
-                            lineage: std::sync::Arc::clone(&lineage_roles),
-                        };
+                    let reanchor_registry = registry.clone();
                     let reanchor_shutdown = shutdown_tx.subscribe();
                     tokio::spawn(async move {
                         let Some(pool) = reanchor_pool else {
@@ -2780,12 +2774,9 @@ async fn async_main(
                                 info!(
                                     "reanchor_backfill: lamad bridge not up at boot — awaiting late connect"
                                 );
-                                match elohim_storage::hc_client_registry::HcClientRegistry::connect_role_forever(
-                                    &reanchor_late_inputs,
-                                    "lamad",
-                                    reanchor_shutdown,
-                                )
-                                .await
+                                match reanchor_registry
+                                    .supervised_client("lamad", reanchor_shutdown)
+                                    .await
                                 {
                                     Some(hc) => hc,
                                     None => {
@@ -2872,12 +2863,10 @@ async fn async_main(
                 if config.pointer_audit_enabled {
                     let pa_pool = db_pool.clone();
                     let pa_lamad_boot = registry.lamad_client();
-                    let pa_late_inputs = elohim_storage::hc_client_registry::HcRegistryInputs {
-                        admin_url: admin_url.clone(),
-                        app_url: args.app_url.clone(),
-                        app_id: args.app_id.clone(),
-                        lineage: std::sync::Arc::clone(&lineage_roles),
-                    };
+                    // The sweep holds its handle for the life of the process,
+                    // so a late one is taken through the registry: that is the
+                    // handle a conductor restart re-mints.
+                    let pa_registry = registry.clone();
                     let pa_connect_shutdown = shutdown_tx.subscribe();
                     let mut pa_shutdown = shutdown_tx.subscribe();
                     tokio::spawn(async move {
@@ -2891,12 +2880,9 @@ async fn async_main(
                                 info!(
                                     "pointer_audit: lamad bridge not up at boot — awaiting late connect"
                                 );
-                                match elohim_storage::hc_client_registry::HcClientRegistry::connect_role_forever(
-                                    &pa_late_inputs,
-                                    "lamad",
-                                    pa_connect_shutdown,
-                                )
-                                .await
+                                match pa_registry
+                                    .supervised_client("lamad", pa_connect_shutdown)
+                                    .await
                                 {
                                     Some(hc) => hc,
                                     None => {
@@ -2977,26 +2963,18 @@ async fn async_main(
                 // to enable, permanently 503ing the PATCH /db/content re-notarize
                 // path. Spawn a forever-retry that STORES the late connection into
                 // the shared registry the HTTP server reads -- wiring the notarize
-                // path identically to the boot-success path.
+                // path identically to the boot-success path. `supervised_client`
+                // does the storing, and shares one connection with every other
+                // task waiting on the same role.
                 if registry.lamad_client().is_none() {
                     let lamad_reg = registry.clone();
-                    let lamad_late_inputs = elohim_storage::hc_client_registry::HcRegistryInputs {
-                        admin_url: admin_url.clone(),
-                        app_url: args.app_url.clone(),
-                        app_id: args.app_id.clone(),
-                        lineage: std::sync::Arc::clone(&lineage_roles),
-                    };
                     let lamad_late_shutdown = shutdown_tx.subscribe();
                     tokio::spawn(async move {
-                        if let Some(hc) =
-                            elohim_storage::hc_client_registry::HcClientRegistry::connect_role_forever(
-                                &lamad_late_inputs,
-                                "lamad",
-                                lamad_late_shutdown,
-                            )
+                        if lamad_reg
+                            .supervised_client("lamad", lamad_late_shutdown)
                             .await
+                            .is_some()
                         {
-                            lamad_reg.set_lamad(Some(hc));
                             info!(
                                 "registry.lamad populated via late connect -- HTTP re-notarize path now live"
                             );
@@ -5332,8 +5310,10 @@ async fn async_main(
     // membership truth and fills-never-moves: create if absent, fill NULL keys,
     // never overwrite a set key (supersede stays the boot reconcile's job).
     // Gated on IDENTITY_FILL_SECS (default 300; `0` disables). The imagodei
-    // bridge is acquired INSIDE the task via connect_role_forever — a late
-    // connect is as good as a boot one (same rationale as the fan-in above).
+    // bridge is acquired INSIDE the task — a late connect is as good as a boot
+    // one — and THROUGH the registry (`supervised_client`), because this loop
+    // holds the handle for the life of the process: only the registry's handle
+    // is re-minted when the conductor restarts under a running storage.
     if let (Some(pool), Some(admin_url)) = (db_pool.as_ref(), saved_admin_url.clone()) {
         let fill_secs = std::env::var("IDENTITY_FILL_SECS")
             .ok()
@@ -5349,18 +5329,29 @@ async fn async_main(
                 app_id: args.app_id.clone(),
                 lineage: std::sync::Arc::clone(&lineage_roles),
             };
+            let fill_registry = hc_registry_for_http.clone();
             let connect_shutdown = shutdown_tx.subscribe();
             let fill_shutdown = shutdown_tx.subscribe();
             tokio::spawn(async move {
-                let hc = match elohim_storage::hc_client_registry::HcClientRegistry::connect_role_forever(
-                    &fill_inputs,
-                    "imagodei",
-                    connect_shutdown,
-                )
-                .await
-                {
-                    Some(hc) => hc,
-                    None => return, // only None on shutdown
+                let hc = match fill_registry {
+                    Some(registry) => {
+                        registry
+                            .supervised_client("imagodei", connect_shutdown)
+                            .await
+                    }
+                    // No registry was built: nothing supervises any bridge on
+                    // this node, so a client of the loop's own is all there is.
+                    None => {
+                        elohim_storage::hc_client_registry::HcClientRegistry::connect_role_forever(
+                            &fill_inputs,
+                            "imagodei",
+                            connect_shutdown,
+                        )
+                        .await
+                    }
+                };
+                let Some(hc) = hc else {
+                    return; // only None on shutdown
                 };
                 let source = std::sync::Arc::new(
                     elohim_storage::services::identity_fill::ConductorMembershipKeySource::new(
@@ -5936,18 +5927,29 @@ async fn async_main(
                     // Late path: acquire off-ticker with forever-retry.
                     let cell = hc_cell.clone();
                     let acq_shutdown = shutdown_tx.subscribe();
+                    // The heal leg reads this handle on every tick for the life
+                    // of the process, so it is taken through the registry: that
+                    // is the handle a conductor restart re-mints.
+                    let acq_registry = hc_registry_for_http.clone();
                     tokio::spawn(async move {
                         info!(
                             "projection-reconcile: lamad bridge not up at boot — acquiring \
                              off-ticker (discovery runs meanwhile, heal enables once it lands)"
                         );
-                        match elohim_storage::hc_client_registry::HcClientRegistry::connect_role_forever(
-                            &inputs,
-                            "lamad",
-                            acq_shutdown,
-                        )
-                        .await
-                        {
+                        let late = match acq_registry {
+                            Some(registry) => {
+                                registry.supervised_client("lamad", acq_shutdown).await
+                            }
+                            None => {
+                                elohim_storage::hc_client_registry::HcClientRegistry::connect_role_forever(
+                                    &inputs,
+                                    "lamad",
+                                    acq_shutdown,
+                                )
+                                .await
+                            }
+                        };
+                        match late {
                             Some(hc) => {
                                 let _ = cell.set(hc);
                                 info!("projection-reconcile: lamad bridge connected (late) — heal leg enabled");
