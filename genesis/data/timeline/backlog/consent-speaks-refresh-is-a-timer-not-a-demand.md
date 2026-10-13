@@ -77,7 +77,8 @@ counter in `happ_manager.rs`) and is the default. `ELOHIM_CONSENT_SPEAKS_REFRESH
 30 s refresher; the mode in force is logged once at start.
 
 On demand a resting node makes no standing call. A device's signed ask, a pending-list, decide or signed-out standing
-request, and an identity write want a read. One read runs at a time, and a caller that queued behind one is judged when
+request, and an identity write that changed something (a 201 from bootstrap, begin or enroll) want a read. A refused
+write reads nothing; a write that succeeded without writing reads as a request does. One read runs at a time, and a caller that queued behind one is judged when
 its turn comes. Reads wanted by requests (one of which needs no sign-in) are at most one attempt per 30 s, answered or
 not; only a device's ask may retry 5 s after a read the cell did not answer. An ask cannot wait in the transport's
 event loop, so the first ask after rest wakes the reader and is dropped unanswered, as by a node whose standing is
@@ -91,21 +92,32 @@ restated 120 s invariant:
 - A new ask is listed on evidence up to 30 s old. The timer's evidence is also up to 30 s old, but its reads fall every
   30 s regardless; a demand read falls only when something asked. A record that stops standing just after a demand read
   is listed on for up to 30 s more, where the timer's next read could have caught it sooner.
-- The same ceremony (same device, same peer, same request with its state and challenge) keeps its place on evidence up
-  to 120 s old while the next read is made, where a healthy timer would have re-read within 30 s. If that next read is
-  not answered, it stays listed until the evidence reaches 120 s. A new ceremony from a listed device is a new ask and
-  takes the 30 s rule.
+- The very ask already listed (same peer; the request, what the device says of itself, its declared approver and its
+  proof all equal) keeps its place on evidence up to 120 s old while the next read is made, where a healthy timer would
+  have re-read within 30 s. If that next read is not answered, it stays listed until the evidence reaches 120 s.
+  Anything else from a listed device is a new ask and takes the 30 s rule.
+- An ask that was already waiting when a read began is listed on that read at any age under 120 s. This is for a cell
+  that is readable but slow: evidence is stamped when the read began, so a read that takes over 30 s would otherwise
+  never list a new ask. The carrier remembers when up to 64 unlisted signed asks first arrived (4 a peer, each for an
+  ask's 5 minutes); an ask there is no room to remember falls back to the 30 s rule. An ask that arrives after the read
+  began has no claim on it.
 - Listing is not authority: a decision still runs the agree path, and the cell signs.
 
 Availability is weaker than the timer during a conductor outage, as planned: an idle node lists nothing until the cell
 answers.
+
+**What time is.** Every age and pace (evidence, the 30 s and 5 s pacing, the timer's rest) is counted on a clock that
+cannot be set: time since boot with suspend counted (`CLOCK_BOOTTIME`) on Linux, the process's monotonic clock
+elsewhere. A wall-clock step neither extends nor shortens anything. The wall clock still times an ask's 5 minutes on
+the list.
 
 **One deliberate tightening of timer mode.** Evidence is now stamped when the read's turn came, before the cell was
 asked, not when the read finished. Timer evidence therefore expires up to one read-duration earlier than before, and a
 read that takes longer than 120 s is unknown when it lands. Two other timer differences: the timer rests on "zome
 function doesn't exist" (matched on the zome and function named) until this process applies a coordinator update or 30
 minutes pass, and a failing read warns once and then logs at debug. The listing proof moved off the timer's loop to
-its own worker in both modes.
+its own worker in both modes, a timer turn that waited behind an identity write's read does not read again on its
+heels, and the reader, timer and prover are restarted 5 s after a panic.
 
 Not built: a classed (background-lane) mishpat call. On demand the read has a person waiting, and the timer is kept on
 its lane; the affirmation pass is the one remaining caller, two reads per 30 minutes, and the variant would touch three

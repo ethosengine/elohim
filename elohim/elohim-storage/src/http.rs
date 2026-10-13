@@ -2123,36 +2123,43 @@ impl HttpServer {
                     "device carrier: how whom this node speaks for is kept"
                 );
             }
+            // Each worker is started again if it panics (`supervised`).
+            // bounded-work: `demand_reader` reads nothing while no ask wants
+            // a read; `timer_reader` reads once per SPEAKS_REFRESH_SECS;
+            // neither reads per incoming ask.
             let server = self.clone();
-            tokio::spawn(async move {
-                let names = server.identifier_source();
-                let cell = {
-                    let server = server.clone();
-                    move || server.own_controller_cell()
-                };
-                let updates = crate::happ_manager::coordinator_updates;
-                // bounded-work: `demand_reader` reads nothing while no ask
-                // wants a read; `timer_reader` reads once per
-                // SPEAKS_REFRESH_SECS; neither reads per incoming ask.
-                match carrier::carrier().refresh() {
-                    carrier::SpeaksRefresh::Demand => {
-                        carrier::demand_reader(carrier::carrier(), cell, &names, updates).await
-                    }
-                    carrier::SpeaksRefresh::Timer => {
-                        carrier::timer_reader(carrier::carrier(), cell, &names, updates).await
+            tokio::spawn(carrier::supervised("speaks reader", move || {
+                let server = server.clone();
+                async move {
+                    let names = server.identifier_source();
+                    let cell = {
+                        let server = server.clone();
+                        move || server.own_controller_cell()
+                    };
+                    let updates = crate::happ_manager::coordinator_updates;
+                    match carrier::carrier().refresh() {
+                        carrier::SpeaksRefresh::Demand => {
+                            carrier::demand_reader(carrier::carrier(), cell, &names, updates).await
+                        }
+                        carrier::SpeaksRefresh::Timer => {
+                            carrier::timer_reader(carrier::carrier(), cell, &names, updates).await
+                        }
                     }
                 }
-            });
+            }));
             // The listing proof has a worker of its own: its signature waits
             // on this node's chain with no deadline, and no read waits on it.
             // bounded-work: one mandated signature per key and transport id
             // for the process's life.
             if let Some(link) = self.carrier_link() {
                 let server = self.clone();
-                tokio::spawn(async move {
-                    let cell = move || server.own_controller_cell();
-                    carrier::prover(carrier::carrier(), cell, link.as_ref()).await
-                });
+                tokio::spawn(carrier::supervised("listing prover", move || {
+                    let (server, link) = (server.clone(), link.clone());
+                    async move {
+                        let cell = move || server.own_controller_cell();
+                        carrier::prover(carrier::carrier(), cell, link.as_ref()).await
+                    }
+                }));
             }
         }
         // Each device of the person affirms the others it saw join.
@@ -3222,14 +3229,14 @@ impl HttpServer {
             }
             (Method::POST, "/auth/identity/bootstrap") => {
                 let answer = Box::pin(self.handle_identity(req, true)).await;
-                self.refresh_speaks_now().await;
+                self.read_speaks_after_write(&answer).await;
                 answer
             }
             // Begin a person's identity on this node with no doorway: their
             // Human, its authority and a session. This machine only.
             (Method::POST, "/auth/identity/begin") => {
                 let answer = Box::pin(self.handle_identity_begin(req)).await;
-                self.refresh_speaks_now().await;
+                self.read_speaks_after_write(&answer).await;
                 answer
             }
             (Method::GET, "/auth/identity/declaration") => {
@@ -3253,7 +3260,7 @@ impl HttpServer {
                 let enrolling = req.method() == Method::POST;
                 let answer = Box::pin(self.handle_device_step(req)).await;
                 if enrolling {
-                    self.refresh_speaks_now().await;
+                    self.read_speaks_after_write(&answer).await;
                 }
                 answer
             }
@@ -14165,10 +14172,23 @@ impl HttpServer {
         })
     }
 
+    /// After a write to this node's identity over its routes, read whom it
+    /// speaks for as the answer warrants (`Want::after_write`): now when the
+    /// write created something, no more than any request when it succeeded
+    /// without writing, and not at all when it was refused, so a refused
+    /// write sent again and again reads nothing.
+    async fn read_speaks_after_write(&self, answer: &Result<Response<Full<Bytes>>, StorageError>) {
+        let status = answer.as_ref().map_or(500, |a| a.status().as_u16());
+        if let Some(want) = crate::services::device_carrier::Want::after_write(status) {
+            self.read_speaks(want).await;
+        }
+    }
+
     /// Read whom this node speaks for now, before answering, so the next
     /// request (the portal's pending list right after begin) sees it. Found
     /// in the browser run: the list said "does not speak for anyone" for the
-    /// seconds the background refresh took.
+    /// seconds the background refresh took. For a write that did change this
+    /// node's identity only.
     async fn refresh_speaks_now(&self) {
         self.read_speaks(crate::services::device_carrier::Want::Now)
             .await;
@@ -14204,7 +14224,7 @@ impl HttpServer {
         if carrier::carrier().refresh() == carrier::SpeaksRefresh::Demand {
             self.read_speaks(carrier::Want::Request).await;
         }
-        carrier::carrier().speaks(chrono::Utc::now().timestamp_micros())
+        carrier::carrier().speaks()
     }
 
     /// Where this node reads back its person's sign-in word.
