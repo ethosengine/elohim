@@ -17612,6 +17612,12 @@ impl HttpServer {
         if rows == 0 {
             return Ok(response::not_found(&format!("pin {} not found", id)));
         }
+        // The removal time the status flip just wrote. The revocation is signed
+        // with it, here and in the reconciler's backstop, so both would carry
+        // the same entry.
+        let removed_at = db::acquisition_pins::get_pin_by_id(&mut conn, id)
+            .map_err(|e| StorageError::Database(e.to_string()))?
+            .map(|p| p.updated_at);
         drop(conn);
 
         // Withdraw the commons offer: author a revokes-commitment targeting the
@@ -17621,7 +17627,7 @@ impl HttpServer {
             offer_cid,
             self.hc_registry.as_ref().and_then(|r| r.lamad_client()),
         ) {
-            let signed_at = crate::db::models::current_timestamp();
+            let signed_at = removed_at.unwrap_or_else(crate::db::models::current_timestamp);
             let payload_json = crate::services::conductor_commitment_author::build_revoke_payload(
                 &target_cid,
                 &signed_at,
@@ -17631,15 +17637,33 @@ impl HttpServer {
                 payload_json,
                 signed_at,
             };
-            if let Err(e) =
-                crate::services::conductor_writes::call_create_commitment(&hc, input).await
-            {
+            let outcome =
+                crate::services::conductor_writes::call_create_commitment(&hc, input).await;
+            // An accepted revocation is recorded, so the reconciler's
+            // removed-pin arm does not submit a second one if this one's
+            // projection is lost. A refused one is left unrecorded: that arm is
+            // its backstop.
+            if outcome.is_ok() {
+                if let Ok(mut conn) = self.get_diesel_conn() {
+                    if matches!(
+                        db::mishpat_revocations::begin_issue(&mut conn, &target_cid),
+                        Ok(true)
+                    ) {
+                        let _ = db::mishpat_revocations::finish_issue(
+                            &mut conn,
+                            &target_cid,
+                            db::mishpat_revocations::ISSUE_ISSUED,
+                        );
+                    }
+                }
+            }
+            if let Err(e) = outcome {
                 tracing::warn!(
                     target: "elohim_storage::provide",
                     pin = id,
                     target_cid = %target_cid,
                     error = %e,
-                    "un-pin: revokes-commitment author failed; reconciler stranded-row arm will retry"
+                    "un-pin: revokes-commitment author failed; the reconciler's removed-pin arm is the backstop when it is switched on"
                 );
             }
         }

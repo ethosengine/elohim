@@ -1562,6 +1562,16 @@ impl HcClient {
         self.cell_id.agent_pubkey().to_string()
     }
 
+    /// The agent key of the MISHPAT cell as `uhCAk…`, or `None` when that cell
+    /// is not provisioned. [`Self::call_zome_mishpat`] targets exactly this
+    /// cell, and a zome call is made as its cell's agent, so this is the key a
+    /// mishpat write from this client is authored under.
+    pub fn mishpat_agent_key_uhcak(&self) -> Option<String> {
+        self.mishpat_cell_id
+            .as_ref()
+            .map(|cell| cell.agent_pubkey().to_string())
+    }
+
     /// Get conductor health metrics for backpressure decisions
     ///
     /// Fetches storage info, network stats, and network metrics from the conductor.

@@ -86,17 +86,22 @@ decide, per network.
 Recommended first step: (2). Whether to run (3) is the operator's call per network (the household fixture and alpha
 are different cases), after (2) has been measured.
 
-**2026-10-13: option 2 taken (operator-approved), option 3 still open.** The arm now reads this node's rows under
-the author's own agent keys, targets `row.cid`, revokes each row once per process lifetime (kept per row, because one
-scope can hold several rows), issues at most 4 revocations a tick, and waits until a row has been seen stranded on 3
-passes in a row. It runs only when the caller computed the whole desired set that pass, and
-`ELOHIM_PROVIDE_REVOKE_ARM=0` turns it off at startup. A node whose desired set is empty and known now revokes what
-it left behind. Stranded is decided per scope: every live row of a scope that is still desired is left standing, so
-the duplicates above are untouched and remain option 3's. A fourth way the old arm was wrong, found by the census:
-the commons capacity pledge is projected under the same action with an empty recipient (one such row on matthew and
-on jessica), and the old arm would have revoked it as stranded; the arm now acts on content provides only. Read-only
-census of the household the same day: 0 rows stranded on matthew, jessica and james (183 / 159 / 41 scopes, all
-desired), 574 / 477 / 164 duplicate rows of desired scopes. Not yet run on the household or the fleet.
+**2026-10-13: option 2 taken (operator-approved), narrowed after review; option 3 still open.** A first cut
+(`a298a00b2`) revoked any row whose scope was absent from the desired set. An independent review found that unsafe:
+absence is not evidence (missing content, an automatically retired pin, an empty pins table all read as withdrawal).
+The arm now acts only on positive evidence and is OFF by default (`ELOHIM_PROVIDE_REVOKE_ARM=off|dry-run|apply`).
+A scope is withdrawn when it has a pin in status `removed` and no pin in any other status; scopes are compared with
+the `epr:` prefix stripped on both sides. Only rows provided by the mishpat cell's own agent key (the key that signs
+the revocation) are considered, and only rows whose bounds positively read as a content provide for that scope, so
+the commons capacity pledge (same action, empty recipient; one each on matthew and jessica) is never touched. A row
+is revoked after 3 observed passes in a row (any pass that cannot observe starts the count over), at most 4 a tick,
+re-checked against fresh pin and row state before each call, targeting `row.cid`. Each submission is recorded in the
+new `mishpat_revocations` table before the conductor is called and is never made twice, across restarts and after a
+call that errored. The same table keeps a tombstone for every projected revocation, and `upsert_with_anchor` no
+longer clears `revoked_at` on a replayed commitment signal: that replay defect was independent of this arm. The
+duplicates above (several live rows for a scope that is still pinned) are untouched and remain option 3's. Read-only
+census of the household the same day under the new rule: no pin is in status `removed` on any peer, so apply mode
+would revoke 0 rows on matthew, jessica and james. Not yet run on the household or the fleet.
 
 **Done when.** The operator has chosen among the options, and for the chosen one a test shows a revocation marks the
 row it targets (the entry hash case), is issued once per row, and is bounded per tick; or the choice is (1) and this

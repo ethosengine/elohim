@@ -1939,6 +1939,18 @@ diesel::table! {
     }
 }
 
+// Migration: 2026-10-13-210000_mishpat_revocations
+diesel::table! {
+    mishpat_revocations (target_cid) {
+        target_cid -> Text,
+        revoked_at -> Nullable<Text>,
+        issued_at -> Nullable<Text>,
+        issue_outcome -> Nullable<Text>,
+        created_at -> Text,
+        updated_at -> Text,
+    }
+}
+
 // Lens projection — `author-lens` Mishpat::Commitment cache (Category A, DHT projection).
 // Source of truth: Holochain DHT (mishpat DNA Commitment entry, action='author-lens').
 // Populated from the create_commitment post-commit signal (plan S3). A NULL
@@ -2121,6 +2133,7 @@ diesel::allow_tables_to_appear_in_same_query!(
     manifests,
     mechanism_selection,
     mishpat_commitments,
+    mishpat_revocations,
     mutuality_audit_log,
     node_account,
     node_signin_sessions,

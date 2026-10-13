@@ -108,6 +108,14 @@ mod tests {
                 dht_anchor_hash TEXT,
                 created_at TEXT NOT NULL,
                 updated_at TEXT NOT NULL
+            );
+            CREATE TABLE mishpat_revocations (
+                target_cid TEXT PRIMARY KEY NOT NULL,
+                revoked_at TEXT,
+                issued_at TEXT,
+                issue_outcome TEXT,
+                created_at TEXT NOT NULL,
+                updated_at TEXT NOT NULL
             );",
         )
         .expect("create table");

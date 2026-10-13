@@ -11,24 +11,30 @@
 //!   the commitment row).
 //!
 //! The diff authors a Commitment only when a desired key has NO live actual
-//! row, and authors a revocation only when a live actual row has NO desired key
-//! (un-pin → withdraw the offer).
+//! row. It never revokes: absence from the desired set is not evidence that
+//! the offer was withdrawn (content may be missing, a pin may be held back).
 //!
-//! ## The revoke arm (stranded rows only)
+//! ## The revoke arm (removed pins only)
 //!
-//! A revocation is a notarized, irreversible act, so the arm is narrow:
+//! A revocation is notarized and irreversible, so
+//! [`ProvideReconciler::revoke_withdrawn`] acts only on POSITIVE evidence that
+//! the operator withdrew a scope, and is off unless switched on
+//! ([`REVOKE_ARM_ENV`]):
 //!
-//! - it reads this node's rows under the author's own agent keys (the namespace
-//!   they are written in), and considers only CONTENT provides — the commons
-//!   capacity pledge shares the action and is never touched;
-//! - a row is **stranded** when its scope (`head_ref`) is in NO desired provide.
-//!   Several live rows for a scope that IS desired are duplicates, not stranded
-//!   rows: the arm leaves every one of them standing, whatever their reach;
-//! - it runs only under [`StrandedRevoke::Sweep`], which the caller passes when
-//!   the desired set was fully computed this pass and the arm is switched on;
-//! - a row must be seen stranded on [`REVOKE_AFTER_STRANDED_PASSES`] passes in
-//!   a row before it is revoked, at most [`REVOKES_PER_TICK`] rows a pass, and
-//!   once per row for the life of the process;
+//! - a scope is **withdrawn** when it has a pin whose status is `removed` and
+//!   no pin in any other status ([`withdrawn_scopes`]). No pin row, a `retired`
+//!   or paused pin, missing content and failed eligibility are not evidence;
+//! - scopes are compared through [`scope_key`] on both sides (pins are stored
+//!   bare, commitments keep the spelling they were authored with);
+//! - only rows provided by the agent key the revocation would be signed with
+//!   ([`CommitmentAuthor::revoke_authority`]) are considered, and only rows
+//!   whose bounds positively read as a content provide for that scope;
+//! - a row must be seen withdrawn on [`REVOKE_AFTER_STRANDED_PASSES`] passes
+//!   in a row, and any pass that could not observe starts every count over;
+//! - at most [`REVOKES_PER_TICK`] rows a pass, each re-checked against fresh
+//!   pin and row state immediately before it is submitted;
+//! - a submission is recorded in `mishpat_revocations` before the conductor is
+//!   called, and a row with a record is never submitted again;
 //! - the revocation targets the row's `cid` (the commitment's entry hash),
 //!   which is what the projection matches to set `revoked_at`.
 //!
@@ -61,51 +67,136 @@ const PIN_KIND_ITEM: &str = "item";
 /// excluded; a removed pin's offer is revoked, not re-authored).
 const PIN_STATUS_ACTIVE: &str = "active";
 
-/// Passes in a row a row must be seen stranded before it is revoked. The tick
-/// is 60 s, so a scope that drops out of the desired set for under two minutes
-/// (a pin retired and revived, a content row replaced) costs no revocation and
-/// no re-authoring. It is also the grace after boot: the first pass of a
-/// process never revokes. The un-pin path revokes at once and does not wait
-/// on this.
+/// Pin `status` the HTTP un-pin writes: the operator's explicit withdrawal, and
+/// the only pin state the revoke arm treats as evidence.
+pub const PIN_STATUS_REMOVED: &str = "removed";
+
+/// Passes in a row a row must be seen withdrawn before it is revoked. The tick
+/// is 60 s, so a pin removed and restored within two minutes costs nothing, and
+/// the first passes after boot never revoke. The un-pin path itself revokes at
+/// once and does not wait on this.
 pub const REVOKE_AFTER_STRANDED_PASSES: u32 = 3;
 
-/// Most revocations one pass may issue. Each is one `create_commitment` on the
-/// node's single source chain, taken one at a time behind the chain write
-/// gate, so four keeps the provide writer's turn at the gate to a few conductor
-/// round trips. At a 60 s tick that is 240 an hour: a backlog of several
-/// hundred rows drains within hours, and a wrong desired set costs at most four
-/// irreversible acts a minute while the operator reaches the switch.
+/// Most revocations one pass may submit. Each is one `create_commitment` on the
+/// node's single mishpat source chain, taken one at a time behind the chain
+/// write gate, so four keeps the provide writer's turn at the gate to a few
+/// conductor round trips, and a mistake costs at most four irreversible acts a
+/// minute while the operator reaches the switch.
 pub const REVOKES_PER_TICK: usize = 4;
 
-/// Environment switch for the revoke arm, read once at startup. Unset or any
-/// other value leaves the arm on; `0`, `false`, `no` or `off` turns it off.
+/// Environment switch for the revoke arm, read once at startup:
+/// `off` (the default) | `dry-run` | `apply`.
 pub const REVOKE_ARM_ENV: &str = "ELOHIM_PROVIDE_REVOKE_ARM";
 
-/// Is the revoke arm switched on, given the raw value of [`REVOKE_ARM_ENV`]?
-pub fn revoke_arm_enabled(raw: Option<&str>) -> bool {
-    !matches!(
-        raw.map(|v| v.trim().to_ascii_lowercase()).as_deref(),
-        Some("0" | "false" | "no" | "off")
-    )
+/// What the revoke arm does on a pass.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub enum RevokeArmMode {
+    /// Does nothing and reads nothing.
+    #[default]
+    Off,
+    /// Computes the plan `Apply` would act on and logs it. No conductor call.
+    DryRun,
+    /// Submits the planned revocations.
+    Apply,
 }
 
-/// Whether one reconcile pass may revoke stranded rows.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum StrandedRevoke {
-    /// Issue no revocation: the arm is switched off, or the caller could not
-    /// fully compute the desired set this pass.
-    Hold,
-    /// The desired set is complete: a row whose scope is outside it is stranded.
-    Sweep,
+impl RevokeArmMode {
+    /// Parse the raw value of [`REVOKE_ARM_ENV`]. Anything that is not exactly
+    /// `apply` or `dry-run` (case and surrounding space aside) is `Off`.
+    pub fn parse(raw: Option<&str>) -> Self {
+        match raw.map(|v| v.trim().to_ascii_lowercase()).as_deref() {
+            Some("apply") => Self::Apply,
+            Some("dry-run") => Self::DryRun,
+            _ => Self::Off,
+        }
+    }
+
+    pub fn label(self) -> &'static str {
+        match self {
+            Self::Off => "off",
+            Self::DryRun => "dry-run",
+            Self::Apply => "apply",
+        }
+    }
 }
 
-/// What the revoke arm remembers about one live row, keyed by its `cid`.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-enum StrandedRow {
-    /// Seen stranded on this many passes in a row; not yet revoked.
-    Seen(u32),
-    /// A revocation was issued this lifetime; awaiting its projection.
-    Issued,
+/// The one spelling a scope is compared in. The pin API stores a head_ref bare
+/// (`X`); a commitment keeps the spelling it was authored with (`epr:X` or
+/// `X`). Both name the same scope.
+pub fn scope_key(head_ref: &str) -> &str {
+    head_ref.strip_prefix("epr:").unwrap_or(head_ref)
+}
+
+/// The evidence that a scope was withdrawn: the removed pin that says so.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct WithdrawnScope {
+    pub pin_id: i32,
+    /// When the pin was removed (its `updated_at`).
+    pub removed_at: String,
+}
+
+/// The scopes the operator withdrew, keyed by [`scope_key`]: those with a pin
+/// in status `removed` and NO pin (of any kind, under any agent) in any other
+/// status. `pins` must be every pin row; an empty table withdraws nothing.
+pub fn withdrawn_scopes(
+    pins: &[crate::db::models::AcquisitionPin],
+) -> HashMap<String, WithdrawnScope> {
+    let mut held: HashSet<&str> = HashSet::new();
+    let mut removed: HashMap<&str, &crate::db::models::AcquisitionPin> = HashMap::new();
+    for pin in pins {
+        let key = scope_key(&pin.head_ref);
+        if pin.status == PIN_STATUS_REMOVED {
+            let latest = removed.entry(key).or_insert(pin);
+            if pin.updated_at > latest.updated_at {
+                *latest = pin;
+            }
+        } else {
+            held.insert(key);
+        }
+    }
+    removed
+        .into_iter()
+        .filter(|(key, _)| !held.contains(key))
+        .map(|(key, pin)| {
+            (
+                key.to_string(),
+                WithdrawnScope {
+                    pin_id: pin.id,
+                    removed_at: pin.updated_at.clone(),
+                },
+            )
+        })
+        .collect()
+}
+
+/// One revocation the arm plans: a live row of this node for a withdrawn scope.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct PlannedRevocation {
+    /// The row's `cid`: the commitment's entry hash, the revocation's target.
+    pub cid: String,
+    /// The row's scope as the commitment spells it.
+    pub head_ref: String,
+    /// The row's provider: the agent key the revocation is signed with.
+    pub provider: String,
+    pub pin_id: i32,
+    pub removed_at: String,
+}
+
+/// What one pass of the revoke arm saw and did.
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
+pub struct RevokeSweep {
+    /// False when the arm is off or the pass could not observe (and so reset
+    /// every count).
+    pub observed: bool,
+    /// Live rows of this node for withdrawn scopes, not yet submitted.
+    pub withdrawn_rows: usize,
+    /// The rows that have been seen long enough to revoke.
+    pub planned: Vec<PlannedRevocation>,
+    /// Cids whose revocation the conductor accepted this pass.
+    pub issued: Vec<String>,
+    /// Cids whose revocation call returned an error this pass. Recorded as
+    /// unconfirmed and not submitted again.
+    pub unconfirmed: Vec<String>,
 }
 
 /// Lifecycle of one logical provide `(provider, head_ref)` as the reconciler
@@ -148,6 +239,12 @@ pub struct ProvideRevokeRequest {
     /// revoke projection matches. Never the action hash (`dht_anchor_hash`).
     pub target_cid: String,
     pub head_ref: String,
+    /// The target row's provider. The author refuses unless this is the agent
+    /// key it signs with.
+    pub provider: String,
+    /// The revocation's `signed_at`: when the pin was removed. Fixed by the
+    /// evidence, so a second submission for the same row carries the same entry.
+    pub signed_at: String,
 }
 
 /// Author seam — the conductor write of a `replicates-commons` Commitment or a
@@ -167,6 +264,11 @@ pub trait CommitmentAuthor: Send + Sync {
     /// `mishpat_commitments.provider`, so the reconciler dedups against them,
     /// not against the transport id. Empty = none resolvable right now.
     async fn own_providers(&self) -> Vec<String>;
+
+    /// The agent key (`uhCAk…`) a revocation from this author is signed with:
+    /// the conductor cell's own key, never a session key. The revoke arm acts
+    /// only on rows this key provides. `None` = not established right now.
+    async fn revoke_authority(&self) -> Option<String>;
 }
 
 /// In-memory author for unit tests. Records every author/revoke call so a test
@@ -179,6 +281,9 @@ pub struct MockAuthor {
     /// Agent-namespace providers this mock "writes under". `None` = the default
     /// [`MockAuthor::DEFAULT_PROVIDER`].
     providers: Option<Vec<String>>,
+    /// The key this mock "signs revocations with". `None` = the default
+    /// [`MockAuthor::DEFAULT_PROVIDER`]; `Some(None)` = not established.
+    authority: Option<Option<String>>,
 }
 
 impl MockAuthor {
@@ -194,6 +299,10 @@ impl MockAuthor {
             providers: Some(providers),
             ..Self::default()
         }
+    }
+    pub fn with_authority(mut self, authority: Option<&str>) -> Self {
+        self.authority = Some(authority.map(str::to_string));
+        self
     }
     pub async fn authored_keys(&self) -> Vec<(String, String)> {
         self.authored
@@ -211,6 +320,11 @@ impl CommitmentAuthor for MockAuthor {
         self.providers
             .clone()
             .unwrap_or_else(|| vec![Self::DEFAULT_PROVIDER.to_string()])
+    }
+    async fn revoke_authority(&self) -> Option<String> {
+        self.authority
+            .clone()
+            .unwrap_or_else(|| Some(Self::DEFAULT_PROVIDER.to_string()))
     }
     async fn author_commons(&self, req: &ProvideAuthorRequest) -> Result<String, StorageError> {
         self.authored.lock().await.push(req.clone());
@@ -358,14 +472,28 @@ fn row_reach_matches(row: &crate::db::models::MishpatCommitment, desired_reach: 
         .is_none_or(|stored| stored == desired_reach)
 }
 
-/// Is `row` a content provide, the only kind this loop authors? The commons
-/// capacity pledge is projected under the same action with no counterparty and
-/// `commons_bytes` in its bounds; it is not this loop's to revoke.
+/// Is `row` POSITIVELY a content provide for its own recipient? Its bounds must
+/// parse to an object that scopes the commitment to exactly that recipient
+/// (`epr_scope: [recipient]`, as the projection writes a content commitment)
+/// and carry no `commons_bytes` (the capacity pledge, projected under the same
+/// action). Malformed, null or unrecognised bounds are not content.
 fn is_content_provide(row: &crate::db::models::MishpatCommitment) -> bool {
-    !row.recipient.is_empty()
-        && serde_json::from_str::<serde_json::Value>(&row.bounds_json)
-            .ok()
-            .is_none_or(|b| b.get("commons_bytes").is_none())
+    if row.recipient.is_empty() {
+        return false;
+    }
+    let Ok(serde_json::Value::Object(bounds)) =
+        serde_json::from_str::<serde_json::Value>(&row.bounds_json)
+    else {
+        return false;
+    };
+    if bounds.contains_key("commons_bytes") {
+        return false;
+    }
+    matches!(
+        bounds.get("epr_scope"),
+        Some(serde_json::Value::Array(scope))
+            if scope.len() == 1 && scope[0].as_str() == Some(row.recipient.as_str())
+    )
 }
 
 /// May the revoke arm act on `row` at `now`? Only when its `valid_until` reads
@@ -404,11 +532,14 @@ pub struct DesiredProvide {
 pub struct ProvideReconciler {
     /// `(provider, head_ref)` → stage. Pure optimisation — emptied on restart.
     latch: Arc<Mutex<HashMap<(String, String), ProvideStage>>>,
-    /// Row `cid` → what the revoke arm has seen or done. A scope can hold
-    /// several live rows, so revoke-once is kept per ROW, not per logical key.
-    /// Emptied on restart: a revocation whose projection landed removed its row
-    /// from the live set, so it is not issued again.
-    stranded: Arc<Mutex<HashMap<String, StrandedRow>>>,
+    /// What the revoke arm does; fixed at construction.
+    revoke_mode: RevokeArmMode,
+    /// Row `cid` → passes in a row it has been seen withdrawn. Cleared by any
+    /// pass that could not observe. Whether a revocation was SUBMITTED is not
+    /// kept here: that is durable, in `mishpat_revocations`.
+    sightings: Arc<Mutex<HashMap<String, u32>>>,
+    /// Cids a dry run has already logged, so each is logged once a process.
+    dry_run_logged: Arc<Mutex<HashSet<String>>>,
 }
 
 impl Default for ProvideReconciler {
@@ -418,11 +549,60 @@ impl Default for ProvideReconciler {
 }
 
 impl ProvideReconciler {
+    /// A reconciler whose revoke arm is off.
     pub fn new() -> Self {
+        Self::with_revoke_mode(RevokeArmMode::Off)
+    }
+
+    pub fn with_revoke_mode(revoke_mode: RevokeArmMode) -> Self {
         Self {
             latch: Arc::new(Mutex::new(HashMap::new())),
-            stranded: Arc::new(Mutex::new(HashMap::new())),
+            revoke_mode,
+            sightings: Arc::new(Mutex::new(HashMap::new())),
+            dry_run_logged: Arc::new(Mutex::new(HashSet::new())),
         }
+    }
+
+    /// Build the reconciler from the raw value of [`REVOKE_ARM_ENV`], logging
+    /// once which mode is in force. The startup path calls this, so the mode
+    /// that was parsed is the mode the reconciler runs.
+    pub fn from_revoke_env(raw: Option<&str>) -> Self {
+        let mode = RevokeArmMode::parse(raw);
+        let unrecognised = raw.is_some_and(|v| {
+            mode == RevokeArmMode::Off
+                && !matches!(v.trim().to_ascii_lowercase().as_str(), "" | "off")
+        });
+        if unrecognised {
+            tracing::warn!(
+                target: "elohim_storage::provide",
+                value = raw.unwrap_or_default(),
+                "provide revoke arm: unrecognised ELOHIM_PROVIDE_REVOKE_ARM value (expected off | dry-run | apply); the arm is OFF"
+            );
+        }
+        match mode {
+            RevokeArmMode::Off => tracing::info!(
+                target: "elohim_storage::provide",
+                "provide revoke arm: OFF (default). Commitments for removed pins are left standing; \
+                 set ELOHIM_PROVIDE_REVOKE_ARM=dry-run to log what apply would revoke"
+            ),
+            RevokeArmMode::DryRun => tracing::info!(
+                target: "elohim_storage::provide",
+                "provide revoke arm: DRY-RUN. Logs the commitments apply would revoke; submits nothing"
+            ),
+            RevokeArmMode::Apply => tracing::warn!(
+                target: "elohim_storage::provide",
+                per_tick = REVOKES_PER_TICK,
+                after_passes = REVOKE_AFTER_STRANDED_PASSES,
+                "provide revoke arm: APPLY. A live content commitment of this node whose scope has a \
+                 removed pin and no other pin is revoked (notarized, irreversible)"
+            ),
+        }
+        Self::with_revoke_mode(mode)
+    }
+
+    /// The revoke arm's mode (fixed at construction).
+    pub fn revoke_mode(&self) -> RevokeArmMode {
+        self.revoke_mode
     }
 
     /// Read the current stage for a logical key (test/diagnostic accessor).
@@ -442,11 +622,6 @@ impl ProvideReconciler {
     /// caller — see [`Self::derive_desired`]). The actual set is read fresh from
     /// the projection so dedup survives a restart.
     ///
-    /// `revoke` says whether this pass may withdraw stranded rows. Pass
-    /// [`StrandedRevoke::Sweep`] only when `desired` is the node's WHOLE desired
-    /// set; with a partial or unknown set every missing scope would read as
-    /// stranded.
-    ///
     /// Returns the number of NEW author calls issued this pass (for metrics/tests).
     pub async fn reconcile_provides<A: CommitmentAuthor + ?Sized>(
         &self,
@@ -454,7 +629,6 @@ impl ProvideReconciler {
         author: &A,
         self_provider: &str,
         desired: &[DesiredProvide],
-        revoke: StrandedRevoke,
     ) -> Result<usize, StorageError> {
         // The commitment's `provider` is the node's agent key (what the author
         // writes), not the transport `self_provider` — dedup reads that namespace.
@@ -543,8 +717,9 @@ impl ProvideReconciler {
                     // Back-fill the pin's commitment_cid back-reference. The T10
                     // un-pin revoke path reads this, so a silent failure here
                     // would later strand the offer (un-pin couldn't target it) —
-                    // warn loudly. The reconciler's stranded-row revoke arm is
-                    // the eventual backstop, but the back-ref is the fast path.
+                    // warn loudly. The removed-pin revoke arm is the eventual
+                    // backstop when it is switched on; the back-ref is the fast
+                    // path.
                     match pool.get() {
                         Ok(mut conn) => {
                             if let Err(e) = crate::db::acquisition_pins::set_commitment_cid(
@@ -556,7 +731,7 @@ impl ProvideReconciler {
                                     commitment_cid = %cid,
                                     error = %e,
                                     "provide reconcile: set_commitment_cid back-fill failed; \
-                                     un-pin revoke will fall back to the stranded-row arm"
+                                     un-pin revoke will fall back to the removed-pin arm"
                                 );
                             }
                         }
@@ -583,110 +758,272 @@ impl ProvideReconciler {
             }
         }
 
-        // ── revoke arm: live content rows whose scope left the desired set ───
-        // Stranded is decided per SCOPE, never per row: a scope that is still
-        // desired keeps every live row it has (duplicates included).
-        let mut stranded = self.stranded.lock().await;
-        match revoke {
-            StrandedRevoke::Hold => {
-                // No sighting counts on a pass that may not revoke.
-                let live: HashSet<&str> = own_rows.iter().map(|r| r.cid.as_str()).collect();
-                stranded.retain(|cid, s| *s == StrandedRow::Issued && live.contains(cid.as_str()));
-            }
-            StrandedRevoke::Sweep => {
-                let desired_scopes: HashSet<&str> =
-                    desired.iter().map(|d| d.head_ref.as_str()).collect();
-                let mut rows: Vec<&crate::db::models::MishpatCommitment> = own_rows
-                    .iter()
-                    .filter(|r| is_content_provide(r) && row_stands_readably(r, now))
-                    .filter(|r| !desired_scopes.contains(r.recipient.as_str()))
-                    .collect();
-                // Oldest first, so a backlog drains in a stable order.
-                rows.sort_by(|a, b| {
-                    a.created_at
-                        .cmp(&b.created_at)
-                        .then_with(|| a.cid.cmp(&b.cid))
-                });
-
-                let mut issued = 0usize;
-                let mut conductor_refused = false;
-                for row in &rows {
-                    let seen = match stranded.get(&row.cid) {
-                        // Issued once this lifetime; its projection is pending.
-                        Some(StrandedRow::Issued) => continue,
-                        Some(StrandedRow::Seen(n)) => n.saturating_add(1),
-                        None => 1,
-                    };
-                    stranded.insert(row.cid.clone(), StrandedRow::Seen(seen));
-                    if seen < REVOKE_AFTER_STRANDED_PASSES
-                        || issued >= REVOKES_PER_TICK
-                        || conductor_refused
-                    {
-                        continue;
-                    }
-                    let req = ProvideRevokeRequest {
-                        target_cid: row.cid.clone(),
-                        head_ref: row.recipient.clone(),
-                    };
-                    issued += 1;
-                    match crate::chain_write_gate::as_writer(
-                        crate::chain_write_gate::WriterKind::Provide,
-                        author.revoke_commons(&req),
-                    )
-                    .await
-                    {
-                        Ok(()) => {
-                            stranded.insert(row.cid.clone(), StrandedRow::Issued);
-                            latch.insert(
-                                (self_provider.to_string(), row.recipient.clone()),
-                                ProvideStage::Revoked,
-                            );
-                            tracing::info!(
-                                target: "elohim_storage::provide",
-                                head_ref = %row.recipient,
-                                target_cid = %row.cid,
-                                "provide reconcile: revoked a stranded commitment (scope no longer desired)"
-                            );
-                        }
-                        Err(e) => {
-                            // The conductor is not answering: issue nothing more
-                            // this pass. The row keeps its count and is retried.
-                            conductor_refused = true;
-                            tracing::warn!(
-                                target: "elohim_storage::provide",
-                                head_ref = %row.recipient,
-                                target_cid = %row.cid,
-                                error = %e,
-                                "provide reconcile: revoke_commons failed; will retry next tick"
-                            );
-                        }
-                    }
-                }
-                // Forget rows that are no longer stranded (their count starts
-                // over if they strand again). An issued row is remembered for as
-                // long as it is live, so it is never revoked twice.
-                let live: HashSet<&str> = own_rows.iter().map(|r| r.cid.as_str()).collect();
-                let now_stranded: HashSet<&str> = rows.iter().map(|r| r.cid.as_str()).collect();
-                stranded.retain(|cid, s| {
-                    live.contains(cid.as_str())
-                        && (*s == StrandedRow::Issued || now_stranded.contains(cid.as_str()))
-                });
-            }
-        }
-        drop(stranded);
+        // No revoke arm here: a key missing from `desired` is not evidence of
+        // withdrawal. Revocation is [`Self::revoke_withdrawn`]'s, on removed
+        // pins only.
 
         // Prune the per-process latch. It is a pure optimisation, but without a
         // sweep it accumulates a key for every (provider, head_ref) ever seen —
         // notably terminal `Revoked` keys from un-pinned offers, which otherwise
         // never leave. Keep only keys still desired or still live in `actual`; a
         // key that is re-needed next pass is re-inserted by the walks above.
-        let live: HashSet<(String, String)> = own_rows
-            .iter()
-            .map(|r| (self_provider.to_string(), r.recipient.clone()))
-            .collect();
+        let live: HashSet<(String, String)> = standing.keys().cloned().collect();
         latch.retain(|k, _| desired_keys.contains(k) || live.contains(k));
 
         Ok(authored)
+    }
+
+    /// One pass of the revoke arm: withdraw this node's live content
+    /// commitments for scopes the operator un-pinned. See the module doc for
+    /// the rules; every one of them is decided here from state this method
+    /// reads itself, never from the caller's desired set.
+    ///
+    /// Infallible by design: a pass that cannot observe (no signing key, a
+    /// failed read) submits nothing and starts every count over.
+    pub async fn revoke_withdrawn<A: CommitmentAuthor + ?Sized>(
+        &self,
+        pool: &DbPool,
+        author: &A,
+    ) -> RevokeSweep {
+        if self.revoke_mode == RevokeArmMode::Off {
+            return RevokeSweep::default();
+        }
+        let mut sightings = self.sightings.lock().await;
+        let withdrawn = match Self::observe_withdrawn(pool, author).await {
+            Ok(rows) => rows,
+            Err(reason) => {
+                // An unobserved pass is not a sighting, and it breaks the run.
+                sightings.clear();
+                tracing::debug!(
+                    target: "elohim_storage::provide",
+                    reason = %reason,
+                    "provide revoke arm: pass could not observe; counts start over"
+                );
+                return RevokeSweep::default();
+            }
+        };
+        // Count this sighting. A row not withdrawn on this pass is dropped, so
+        // its count starts over if it is withdrawn again.
+        let counted: HashMap<String, u32> = withdrawn
+            .iter()
+            .map(|w| {
+                let seen = sightings.get(&w.cid).copied().unwrap_or(0);
+                (w.cid.clone(), seen.saturating_add(1))
+            })
+            .collect();
+        *sightings = counted;
+
+        let mut sweep = RevokeSweep {
+            observed: true,
+            withdrawn_rows: withdrawn.len(),
+            ..RevokeSweep::default()
+        };
+        sweep.planned = withdrawn
+            .into_iter()
+            .filter(|w| sightings.get(&w.cid).copied().unwrap_or(0) >= REVOKE_AFTER_STRANDED_PASSES)
+            .collect();
+
+        if self.revoke_mode == RevokeArmMode::DryRun {
+            let mut logged = self.dry_run_logged.lock().await;
+            let mut fresh = 0usize;
+            for plan in &sweep.planned {
+                if logged.insert(plan.cid.clone()) {
+                    fresh += 1;
+                    tracing::info!(
+                        target: "elohim_storage::provide",
+                        target_cid = %plan.cid,
+                        head_ref = %plan.head_ref,
+                        pin_id = plan.pin_id,
+                        removed_at = %plan.removed_at,
+                        "provide revoke arm (dry-run): apply would revoke this commitment"
+                    );
+                }
+            }
+            if fresh > 0 {
+                tracing::info!(
+                    target: "elohim_storage::provide",
+                    would_revoke = sweep.planned.len(),
+                    withdrawn_rows = sweep.withdrawn_rows,
+                    per_tick = REVOKES_PER_TICK,
+                    "provide revoke arm (dry-run): totals; nothing was submitted"
+                );
+            }
+            return sweep;
+        }
+
+        for plan in sweep.planned.iter().take(REVOKES_PER_TICK) {
+            // The evidence is re-read now: pins and the row may have changed
+            // since the pass observed them (the chain gate can make a call wait).
+            match Self::claim_revocation(pool, author, plan).await {
+                Ok(true) => {}
+                Ok(false) => {
+                    sightings.remove(&plan.cid);
+                    continue;
+                }
+                Err(reason) => {
+                    sightings.clear();
+                    tracing::warn!(
+                        target: "elohim_storage::provide",
+                        target_cid = %plan.cid,
+                        reason = %reason,
+                        "provide revoke arm: could not re-check before revoking; nothing more this pass"
+                    );
+                    break;
+                }
+            }
+            let req = ProvideRevokeRequest {
+                target_cid: plan.cid.clone(),
+                head_ref: plan.head_ref.clone(),
+                provider: plan.provider.clone(),
+                signed_at: plan.removed_at.clone(),
+            };
+            let outcome = crate::chain_write_gate::as_writer(
+                crate::chain_write_gate::WriterKind::Provide,
+                author.revoke_commons(&req),
+            )
+            .await;
+            let recorded = if outcome.is_ok() {
+                crate::db::mishpat_revocations::ISSUE_ISSUED
+            } else {
+                crate::db::mishpat_revocations::ISSUE_UNCONFIRMED
+            };
+            match pool.get() {
+                Ok(mut conn) => {
+                    if let Err(e) =
+                        crate::db::mishpat_revocations::finish_issue(&mut conn, &plan.cid, recorded)
+                    {
+                        tracing::warn!(
+                            target: "elohim_storage::provide",
+                            target_cid = %plan.cid,
+                            error = %e,
+                            "provide revoke arm: outcome not recorded; the submission stays recorded as pending"
+                        );
+                    }
+                }
+                Err(e) => tracing::warn!(
+                    target: "elohim_storage::provide",
+                    target_cid = %plan.cid,
+                    error = %e,
+                    "provide revoke arm: outcome not recorded; the submission stays recorded as pending"
+                ),
+            }
+            sightings.remove(&plan.cid);
+            match outcome {
+                Ok(()) => {
+                    tracing::info!(
+                        target: "elohim_storage::provide",
+                        target_cid = %plan.cid,
+                        head_ref = %plan.head_ref,
+                        pin_id = plan.pin_id,
+                        removed_at = %plan.removed_at,
+                        "provide revoke arm: revoked the commitment of a removed pin"
+                    );
+                    sweep.issued.push(plan.cid.clone());
+                }
+                Err(e) => {
+                    // The call may have committed before it failed, so it is
+                    // not submitted again; and the conductor is not answering,
+                    // so nothing more is submitted this pass.
+                    tracing::warn!(
+                        target: "elohim_storage::provide",
+                        target_cid = %plan.cid,
+                        head_ref = %plan.head_ref,
+                        error = %e,
+                        "provide revoke arm: revoke_commons failed; recorded as unconfirmed and NOT retried \
+                         (clear its mishpat_revocations row to allow another submission)"
+                    );
+                    sweep.unconfirmed.push(plan.cid.clone());
+                    break;
+                }
+            }
+        }
+        sweep
+    }
+
+    /// Read what the revoke arm decides on: this node's live content rows for
+    /// withdrawn scopes that have no recorded submission, oldest first.
+    /// `Err` = the pass could not observe.
+    async fn observe_withdrawn<A: CommitmentAuthor + ?Sized>(
+        pool: &DbPool,
+        author: &A,
+    ) -> Result<Vec<PlannedRevocation>, String> {
+        let authority = author
+            .revoke_authority()
+            .await
+            .ok_or_else(|| "no signing agent key established".to_string())?;
+        let mut conn = pool.get().map_err(|e| format!("pool: {e}"))?;
+        let pins = crate::db::acquisition_pins::list_all_pins(&mut conn)
+            .map_err(|e| format!("pin read: {e}"))?;
+        let withdrawn = withdrawn_scopes(&pins);
+        if withdrawn.is_empty() {
+            return Ok(Vec::new());
+        }
+        // Rows the signing key provides, and no others (not a session key's).
+        let mut rows = crate::db::mishpat_commitments::live_commons_provides_for_provider(
+            &mut conn, &authority,
+        )
+        .map_err(|e| format!("commitment read: {e}"))?;
+        let submitted = crate::db::mishpat_revocations::issued_targets(&mut conn)
+            .map_err(|e| format!("revocation record read: {e}"))?;
+        rows.sort_by(|a, b| {
+            a.created_at
+                .cmp(&b.created_at)
+                .then_with(|| a.cid.cmp(&b.cid))
+        });
+        let now = chrono::Utc::now();
+        Ok(rows
+            .into_iter()
+            .filter(|r| is_content_provide(r) && row_stands_readably(r, now))
+            .filter(|r| !submitted.contains(&r.cid))
+            .filter_map(|r| {
+                let scope = withdrawn.get(scope_key(&r.recipient))?;
+                Some(PlannedRevocation {
+                    cid: r.cid,
+                    head_ref: r.recipient,
+                    provider: r.provider,
+                    pin_id: scope.pin_id,
+                    removed_at: scope.removed_at.clone(),
+                })
+            })
+            .collect())
+    }
+
+    /// Re-check `plan` against fresh state and, if it still holds, record the
+    /// submission. `Ok(true)` = recorded, submit now. `Ok(false)` = the plan no
+    /// longer holds (or a submission is already recorded); submit nothing.
+    async fn claim_revocation<A: CommitmentAuthor + ?Sized>(
+        pool: &DbPool,
+        author: &A,
+        plan: &PlannedRevocation,
+    ) -> Result<bool, String> {
+        // The key that will sign must still be the row's provider.
+        if author.revoke_authority().await.as_deref() != Some(plan.provider.as_str()) {
+            return Ok(false);
+        }
+        let mut conn = pool.get().map_err(|e| format!("pool: {e}"))?;
+        let pins = crate::db::acquisition_pins::list_all_pins(&mut conn)
+            .map_err(|e| format!("pin read: {e}"))?;
+        let still_withdrawn = withdrawn_scopes(&pins)
+            .get(scope_key(&plan.head_ref))
+            .is_some_and(|w| w.pin_id == plan.pin_id && w.removed_at == plan.removed_at);
+        if !still_withdrawn {
+            return Ok(false);
+        }
+        let row = crate::db::mishpat_commitments::get_by_cid(&mut conn, &plan.cid)
+            .map_err(|e| format!("commitment read: {e}"))?;
+        let still_stands = row.is_some_and(|r| {
+            r.revoked_at.is_none()
+                && r.action == "replicates-commons"
+                && r.provider == plan.provider
+                && r.recipient == plan.head_ref
+                && is_content_provide(&r)
+                && row_stands_readably(&r, chrono::Utc::now())
+        });
+        if !still_stands {
+            return Ok(false);
+        }
+        crate::db::mishpat_revocations::begin_issue(&mut conn, &plan.cid)
+            .map_err(|e| format!("revocation record write: {e}"))
     }
 
     /// Observe-only pass: re-derive the per-key stage latch from the live DHT
@@ -877,13 +1214,7 @@ mod tests {
         let desired = vec![desired(1, "epr:album-1"), desired(2, "epr:album-2")];
 
         let n = r
-            .reconcile_provides(
-                &pool,
-                &author,
-                "agent:self",
-                &desired,
-                StrandedRevoke::Sweep,
-            )
+            .reconcile_provides(&pool, &author, "agent:self", &desired)
             .await
             .expect("first pass");
         assert_eq!(n, 2, "two unprovided keys → two authors");
@@ -892,13 +1223,7 @@ mod tests {
         // Latch now says Authoring for both — a second pass with NO projection
         // landing must NOT re-author (within-process dedup).
         let n2 = r
-            .reconcile_provides(
-                &pool,
-                &author,
-                "agent:self",
-                &desired,
-                StrandedRevoke::Sweep,
-            )
+            .reconcile_provides(&pool, &author, "agent:self", &desired)
             .await
             .expect("second pass");
         assert_eq!(n2, 0, "Authoring-latched keys must not re-author");
@@ -916,13 +1241,7 @@ mod tests {
         let author = MockAuthor::new();
         let fresh = ProvideReconciler::new(); // empty latch — the restart case
         let n = fresh
-            .reconcile_provides(
-                &pool,
-                &author,
-                "agent:self",
-                &[desired(1, "epr:album-1")],
-                StrandedRevoke::Sweep,
-            )
+            .reconcile_provides(&pool, &author, "agent:self", &[desired(1, "epr:album-1")])
             .await
             .expect("restart pass");
 
@@ -947,15 +1266,9 @@ mod tests {
         seed_commons_row(&pool, "cid:grad", "epr:album-1", "active", false);
         let author = MockAuthor::new();
         let r = ProvideReconciler::new();
-        r.reconcile_provides(
-            &pool,
-            &author,
-            "agent:self",
-            &[desired(1, "epr:album-1")],
-            StrandedRevoke::Sweep,
-        )
-        .await
-        .expect("pass");
+        r.reconcile_provides(&pool, &author, "agent:self", &[desired(1, "epr:album-1")])
+            .await
+            .expect("pass");
         assert_eq!(
             r.stage("agent:self", "epr:album-1").await,
             Some(ProvideStage::Active),
@@ -973,13 +1286,7 @@ mod tests {
         let author = MockAuthor::new();
         let r = ProvideReconciler::new();
         let n = r
-            .reconcile_provides(
-                &pool,
-                &author,
-                "agent:self",
-                &[desired(1, "epr:album-1")],
-                StrandedRevoke::Sweep,
-            )
+            .reconcile_provides(&pool, &author, "agent:self", &[desired(1, "epr:album-1")])
             .await
             .expect("pass");
         assert_eq!(n, 1, "a revoked row does not satisfy the desired key");
@@ -997,13 +1304,7 @@ mod tests {
         let author = MockAuthor::new();
         let fresh = ProvideReconciler::new();
         let n = fresh
-            .reconcile_provides(
-                &pool,
-                &author,
-                TRANSPORT_ID,
-                &[desired(1, "epr:X")],
-                StrandedRevoke::Sweep,
-            )
+            .reconcile_provides(&pool, &author, TRANSPORT_ID, &[desired(1, "epr:X")])
             .await
             .expect("restart pass");
         assert_eq!(n, 0);
@@ -1023,13 +1324,7 @@ mod tests {
             "uhCAkCellKey".to_string(),
         ]);
         let n = ProvideReconciler::new()
-            .reconcile_provides(
-                &pool,
-                &author,
-                TRANSPORT_ID,
-                &[desired(1, "epr:X")],
-                StrandedRevoke::Sweep,
-            )
+            .reconcile_provides(&pool, &author, TRANSPORT_ID, &[desired(1, "epr:X")])
             .await
             .expect("pass");
         assert_eq!(n, 0);
@@ -1041,13 +1336,7 @@ mod tests {
         let pool = test_pool();
         let author = MockAuthor::with_providers(vec![]);
         let n = ProvideReconciler::new()
-            .reconcile_provides(
-                &pool,
-                &author,
-                TRANSPORT_ID,
-                &[desired(1, "epr:X")],
-                StrandedRevoke::Sweep,
-            )
+            .reconcile_provides(&pool, &author, TRANSPORT_ID, &[desired(1, "epr:X")])
             .await
             .expect("pass");
         assert_eq!(n, 0);
@@ -1061,13 +1350,7 @@ mod tests {
         seed_commons_row(&pool, "cid:was-revoked", "epr:X", "proposed", true);
         let author = MockAuthor::new();
         let n = ProvideReconciler::new()
-            .reconcile_provides(
-                &pool,
-                &author,
-                TRANSPORT_ID,
-                &[desired(1, "epr:X")],
-                StrandedRevoke::Sweep,
-            )
+            .reconcile_provides(&pool, &author, TRANSPORT_ID, &[desired(1, "epr:X")])
             .await
             .expect("pass");
         assert_eq!(n, 1);
@@ -1083,7 +1366,7 @@ mod tests {
 
     async fn reconcile_once(pool: &DbPool, author: &MockAuthor, d: DesiredProvide) -> usize {
         ProvideReconciler::new()
-            .reconcile_provides(pool, author, TRANSPORT_ID, &[d], StrandedRevoke::Sweep)
+            .reconcile_provides(pool, author, TRANSPORT_ID, &[d])
             .await
             .expect("pass")
     }
@@ -1167,13 +1450,7 @@ mod tests {
         let mut d = desired(1, "epr:X");
         d.reach = "commons".to_string();
         let first = r
-            .reconcile_provides(
-                &pool,
-                &author,
-                TRANSPORT_ID,
-                std::slice::from_ref(&d),
-                StrandedRevoke::Sweep,
-            )
+            .reconcile_provides(&pool, &author, TRANSPORT_ID, std::slice::from_ref(&d))
             .await
             .expect("first");
         assert_eq!(first, 1);
@@ -1183,13 +1460,7 @@ mod tests {
             assert_eq!(got[0].reach, "commons");
         }
         let second = r
-            .reconcile_provides(
-                &pool,
-                &author,
-                TRANSPORT_ID,
-                std::slice::from_ref(&d),
-                StrandedRevoke::Sweep,
-            )
+            .reconcile_provides(&pool, &author, TRANSPORT_ID, std::slice::from_ref(&d))
             .await
             .expect("second");
         assert_eq!(second, 0);
@@ -1219,21 +1490,80 @@ mod tests {
         assert!(author.authored.lock().await.is_empty());
     }
 
-    // ── revoke arm ──────────────────────────────────────────────────────
+    // ── revoke arm (removed pins only) ──────────────────────────────────
 
-    /// Run `passes` sweep passes over `desired` (the whole desired set).
-    async fn sweep<A: CommitmentAuthor>(
+    const CELL: &str = MockAuthor::DEFAULT_PROVIDER;
+
+    fn applying() -> ProvideReconciler {
+        ProvideReconciler::with_revoke_mode(RevokeArmMode::Apply)
+    }
+
+    /// Insert a pin under `agent` and leave it in `status`. Returns its id.
+    fn pin_as(pool: &DbPool, agent: &str, head_ref: &str, status: &str) -> i32 {
+        let mut conn = pool.get().expect("conn");
+        let pin = crate::db::acquisition_pins::upsert_pin(
+            &mut conn,
+            crate::db::models::NewAcquisitionPin {
+                agent_pub_key: agent.to_string(),
+                head_ref: head_ref.to_string(),
+                kind: "item".to_string(),
+                closure_rule_json: None,
+                priority: 1,
+            },
+        )
+        .expect("pin");
+        if status != PIN_STATUS_ACTIVE {
+            crate::db::acquisition_pins::set_pin_status(&mut conn, pin.id, status)
+                .expect("pin status");
+        }
+        pin.id
+    }
+
+    fn pin(pool: &DbPool, head_ref: &str, status: &str) -> i32 {
+        pin_as(pool, "local-device", head_ref, status)
+    }
+
+    fn removed_at(pool: &DbPool, pin_id: i32) -> String {
+        let mut conn = pool.get().expect("conn");
+        crate::db::acquisition_pins::get_pin_by_id(&mut conn, pin_id)
+            .expect("pin read")
+            .expect("pin")
+            .updated_at
+    }
+
+    /// Bounds as the projection writes them for a content commitment.
+    fn content_bounds(recipient: &str) -> String {
+        format!(
+            r#"{{"epr_scope":["{recipient}"],"reach":"commons","reach_ceiling":"commons","rate_per_minute":60}}"#
+        )
+    }
+
+    /// A live, unexpired content row under `provider`.
+    fn content_row(pool: &DbPool, provider: &str, cid: &str, recipient: &str) {
+        seed_commons_row_full(
+            pool,
+            provider,
+            cid,
+            recipient,
+            "active",
+            false,
+            FUTURE,
+            &content_bounds(recipient),
+        );
+    }
+
+    /// Run `passes` passes of the revoke arm; returns the last pass's report.
+    async fn revoke_passes<A: CommitmentAuthor>(
         r: &ProvideReconciler,
         pool: &DbPool,
         author: &A,
-        desired: &[DesiredProvide],
         passes: u32,
-    ) {
+    ) -> RevokeSweep {
+        let mut last = RevokeSweep::default();
         for _ in 0..passes {
-            r.reconcile_provides(pool, author, TRANSPORT_ID, desired, StrandedRevoke::Sweep)
-                .await
-                .expect("sweep pass");
+            last = r.revoke_withdrawn(pool, author).await;
         }
+        last
     }
 
     async fn revoked_targets(author: &MockAuthor) -> Vec<String> {
@@ -1255,7 +1585,7 @@ mod tests {
         crate::signals::MishpatSignal::CommitmentCommitted {
             action_hash: action_hash.into(),
             entry_hash: entry_hash.into(),
-            author: MockAuthor::DEFAULT_PROVIDER.into(),
+            author: CELL.into(),
             commitment: crate::mishpat_projection::CommitmentPayload {
                 action: action.to_string(),
                 payload_json,
@@ -1268,7 +1598,7 @@ mod tests {
     /// row carries `cid` = entry hash and `dht_anchor_hash` = action hash.
     fn project_content_commitment(pool: &DbPool, head_ref: &str, entry: &str, action: &str) {
         let payload = crate::services::conductor_commitment_author::build_content_payload(
-            MockAuthor::DEFAULT_PROVIDER,
+            CELL,
             head_ref,
             "commons",
             "2026-10-01T00:00:00+00:00",
@@ -1285,11 +1615,9 @@ mod tests {
     }
 
     /// Project a revocation of `target` the way the post-commit signal does.
-    fn project_revocation(pool: &DbPool, target: &str) {
-        let payload = crate::services::conductor_commitment_author::build_revoke_payload(
-            target,
-            "2026-10-13T00:00:00+00:00",
-        );
+    fn project_revocation(pool: &DbPool, target: &str, signed_at: &str) {
+        let payload =
+            crate::services::conductor_commitment_author::build_revoke_payload(target, signed_at);
         let mut conn = pool.get().expect("conn");
         crate::signals::handle_mishpat_signal(
             &mut conn,
@@ -1302,316 +1630,277 @@ mod tests {
     fn live_cids(pool: &DbPool) -> Vec<String> {
         let mut conn = pool.get().expect("conn");
         let mut cids: Vec<String> =
-            crate::db::mishpat_commitments::live_commons_provides_for_provider(
-                &mut conn,
-                MockAuthor::DEFAULT_PROVIDER,
-            )
-            .expect("live rows")
-            .into_iter()
-            .map(|r| r.cid)
-            .collect();
+            crate::db::mishpat_commitments::live_commons_provides_for_provider(&mut conn, CELL)
+                .expect("live rows")
+                .into_iter()
+                .map(|r| r.cid)
+                .collect();
         cids.sort();
         cids
+    }
+
+    fn recorded_outcome(pool: &DbPool, cid: &str) -> Option<String> {
+        let mut conn = pool.get().expect("conn");
+        crate::db::mishpat_revocations::issue_outcome(&mut conn, cid).expect("record read")
     }
 
     /// An author whose revocation takes the production path back into the
     /// database: the production payload, through `handle_mishpat_signal`.
     struct ProjectingAuthor {
         pool: DbPool,
-        revoked: Mutex<Vec<ProvideRevokeRequest>>,
+        inner: MockAuthor,
     }
 
     #[async_trait]
     impl CommitmentAuthor for ProjectingAuthor {
         async fn own_providers(&self) -> Vec<String> {
-            vec![MockAuthor::DEFAULT_PROVIDER.to_string()]
+            self.inner.own_providers().await
+        }
+        async fn revoke_authority(&self) -> Option<String> {
+            self.inner.revoke_authority().await
         }
         async fn author_commons(&self, req: &ProvideAuthorRequest) -> Result<String, StorageError> {
-            Err(StorageError::Internal(format!(
-                "unexpected author for {}",
-                req.head_ref
-            )))
+            self.inner.author_commons(req).await
         }
         async fn revoke_commons(&self, req: &ProvideRevokeRequest) -> Result<(), StorageError> {
-            self.revoked.lock().await.push(req.clone());
-            project_revocation(&self.pool, &req.target_cid);
-            Ok(())
+            project_revocation(&self.pool, &req.target_cid, &req.signed_at);
+            self.inner.revoke_commons(req).await
         }
     }
 
     #[tokio::test]
     async fn a_revocation_issued_by_the_arm_marks_the_row_it_targets() {
         let pool = test_pool();
-        project_content_commitment(&pool, "epr:gone", "uhCEkStranded", "uhCkkStranded");
+        // The commitment keeps the `epr:` spelling; the pin API stores it bare.
+        project_content_commitment(&pool, "epr:gone", "uhCEkGone", "uhCkkGone");
         project_content_commitment(&pool, "epr:kept", "uhCEkKept", "uhCkkKept");
-        assert_eq!(live_cids(&pool), vec!["uhCEkKept", "uhCEkStranded"]);
+        let gone = pin(&pool, "gone", PIN_STATUS_REMOVED);
+        pin(&pool, "kept", PIN_STATUS_ACTIVE);
+        assert_eq!(live_cids(&pool), vec!["uhCEkGone", "uhCEkKept"]);
 
         let author = ProjectingAuthor {
             pool: pool.clone(),
-            revoked: Mutex::new(Vec::new()),
+            inner: MockAuthor::new(),
         };
-        let r = ProvideReconciler::new();
-        let kept = [desired(1, "epr:kept")];
-        sweep(&r, &pool, &author, &kept, REVOKE_AFTER_STRANDED_PASSES).await;
+        let r = applying();
+        revoke_passes(&r, &pool, &author, REVOKE_AFTER_STRANDED_PASSES).await;
 
         {
-            let revoked = author.revoked.lock().await;
+            let revoked = author.inner.revoked.lock().await;
             assert_eq!(revoked.len(), 1);
             assert_eq!(
-                revoked[0].target_cid, "uhCEkStranded",
+                revoked[0].target_cid, "uhCEkGone",
                 "the target is the entry hash, the projection's key"
             );
             assert_eq!(revoked[0].head_ref, "epr:gone");
+            assert_eq!(revoked[0].provider, CELL);
+            assert_eq!(revoked[0].signed_at, removed_at(&pool, gone));
         }
         assert_eq!(
             live_cids(&pool),
             vec!["uhCEkKept"],
             "the revocation the arm issued marked the row it targeted"
         );
+        assert_eq!(
+            recorded_outcome(&pool, "uhCEkGone").as_deref(),
+            Some(crate::db::mishpat_revocations::ISSUE_ISSUED)
+        );
 
-        // The row has left the live set: later passes issue nothing.
-        sweep(&r, &pool, &author, &kept, 5).await;
-        assert_eq!(author.revoked.lock().await.len(), 1);
+        revoke_passes(&r, &pool, &author, 5).await;
+        assert_eq!(author.inner.revoked.lock().await.len(), 1);
     }
 
     #[test]
     fn a_revocation_targeting_the_action_hash_marks_nothing() {
-        // The old arm's target. The projection matches `cid`, the entry hash.
         let pool = test_pool();
-        project_content_commitment(&pool, "epr:gone", "uhCEkStranded", "uhCkkStranded");
-        project_revocation(&pool, "uhCkkStranded");
-        assert_eq!(live_cids(&pool), vec!["uhCEkStranded"]);
-        project_revocation(&pool, "uhCEkStranded");
+        project_content_commitment(&pool, "epr:gone", "uhCEkGone", "uhCkkGone");
+        project_revocation(&pool, "uhCkkGone", "2026-10-13T00:00:00Z");
+        assert_eq!(live_cids(&pool), vec!["uhCEkGone"]);
+        project_revocation(&pool, "uhCEkGone", "2026-10-13T00:00:00Z");
         assert!(live_cids(&pool).is_empty());
     }
 
-    #[tokio::test]
-    async fn a_stranded_row_is_revoked_once() {
-        // MockAuthor projects nothing, so the row stays live after the
-        // revocation: the worst case for re-issue.
+    #[test]
+    fn a_replayed_commitment_does_not_un_revoke_its_row() {
         let pool = test_pool();
-        seed_commons_row(&pool, "cid:stranded", "epr:gone", "proposed", false);
-        let author = MockAuthor::new();
-        let r = ProvideReconciler::new();
-
-        // An empty desired set that is known still revokes.
-        sweep(&r, &pool, &author, &[], REVOKE_AFTER_STRANDED_PASSES).await;
-        assert_eq!(revoked_targets(&author).await, vec!["cid:stranded"]);
-        assert_eq!(
-            r.stage(TRANSPORT_ID, "epr:gone").await,
-            Some(ProvideStage::Revoked)
-        );
-
-        sweep(&r, &pool, &author, &[], 10).await;
-        assert_eq!(
-            revoked_targets(&author).await,
-            vec!["cid:stranded"],
-            "one revocation per row, however long its projection takes"
-        );
-        assert!(author.authored.lock().await.is_empty());
-    }
-
-    #[tokio::test]
-    async fn a_row_is_revoked_only_after_it_stays_stranded() {
-        let pool = test_pool();
-        seed_commons_row(&pool, "cid:flap", "epr:flap", "active", false);
-        let author = MockAuthor::new();
-        let r = ProvideReconciler::new();
-
-        sweep(&r, &pool, &author, &[], REVOKE_AFTER_STRANDED_PASSES - 1).await;
-        assert!(revoked_targets(&author).await.is_empty());
-
-        // The scope is desired again for one pass: the count starts over.
-        sweep(&r, &pool, &author, &[desired(1, "epr:flap")], 1).await;
-        sweep(&r, &pool, &author, &[], REVOKE_AFTER_STRANDED_PASSES - 1).await;
-        assert!(revoked_targets(&author).await.is_empty());
-
-        sweep(&r, &pool, &author, &[], 1).await;
-        assert_eq!(revoked_targets(&author).await, vec!["cid:flap"]);
-    }
-
-    #[tokio::test]
-    async fn revocations_are_bounded_per_tick() {
-        let pool = test_pool();
-        let total = REVOKES_PER_TICK * 2 + 2;
-        for i in 0..total {
-            seed_commons_row(
-                &pool,
-                &format!("cid:gone-{i:02}"),
-                &format!("epr:gone-{i:02}"),
-                "active",
-                false,
-            );
-        }
-        let author = MockAuthor::new();
-        let r = ProvideReconciler::new();
-
-        sweep(&r, &pool, &author, &[], REVOKE_AFTER_STRANDED_PASSES - 1).await;
-        assert!(revoked_targets(&author).await.is_empty());
-        sweep(&r, &pool, &author, &[], 1).await;
-        assert_eq!(revoked_targets(&author).await.len(), REVOKES_PER_TICK);
-        sweep(&r, &pool, &author, &[], 1).await;
-        assert_eq!(revoked_targets(&author).await.len(), REVOKES_PER_TICK * 2);
-        sweep(&r, &pool, &author, &[], 5).await;
-        let all = revoked_targets(&author).await;
-        assert_eq!(all.len(), total, "the backlog drains, then stops");
-        let distinct: HashSet<&String> = all.iter().collect();
-        assert_eq!(distinct.len(), total, "no row is revoked twice");
-    }
-
-    #[tokio::test]
-    async fn nothing_is_revoked_while_desire_is_unknown() {
-        // `Hold` is what the caller passes when it could not compute the whole
-        // desired set, and what the disable switch turns every pass into.
-        let pool = test_pool();
-        seed_commons_row(&pool, "cid:stranded", "epr:gone", "active", false);
-        let author = MockAuthor::new();
-        let r = ProvideReconciler::new();
-        for _ in 0..10 {
-            r.reconcile_provides(&pool, &author, TRANSPORT_ID, &[], StrandedRevoke::Hold)
-                .await
-                .expect("hold pass");
-        }
-        assert!(revoked_targets(&author).await.is_empty());
-
-        // Held passes count for nothing: the row still needs its full run.
-        sweep(&r, &pool, &author, &[], REVOKE_AFTER_STRANDED_PASSES - 1).await;
-        assert!(revoked_targets(&author).await.is_empty());
-        r.reconcile_provides(&pool, &author, TRANSPORT_ID, &[], StrandedRevoke::Hold)
-            .await
-            .expect("hold pass");
-        sweep(&r, &pool, &author, &[], REVOKE_AFTER_STRANDED_PASSES - 1).await;
-        assert!(revoked_targets(&author).await.is_empty());
+        project_content_commitment(&pool, "epr:gone", "uhCEkGone", "uhCkkGone");
+        project_revocation(&pool, "uhCEkGone", "2026-10-13T00:00:00Z");
+        assert!(live_cids(&pool).is_empty());
+        // The commitment's own signal is delivered again.
+        project_content_commitment(&pool, "epr:gone", "uhCEkGone", "uhCkkGone");
+        assert!(live_cids(&pool).is_empty(), "revocation survives replay");
     }
 
     #[test]
-    fn the_revoke_arm_switch_defaults_on_and_turns_off() {
-        assert!(revoke_arm_enabled(None));
-        assert!(revoke_arm_enabled(Some("")));
-        assert!(revoke_arm_enabled(Some("1")));
-        assert!(revoke_arm_enabled(Some("on")));
-        for off in ["0", "false", "no", "off", " OFF ", "False"] {
-            assert!(!revoke_arm_enabled(Some(off)), "{off:?} turns the arm off");
-        }
+    fn a_revocation_that_lands_before_its_target_is_not_lost() {
+        let pool = test_pool();
+        project_revocation(&pool, "uhCEkLate", "2026-10-13T00:00:00Z");
+        project_content_commitment(&pool, "epr:late", "uhCEkLate", "uhCkkLate");
+        assert!(live_cids(&pool).is_empty());
+        let mut conn = pool.get().expect("conn");
+        let row = crate::db::mishpat_commitments::get_by_cid(&mut conn, "uhCEkLate")
+            .expect("read")
+            .expect("row");
+        assert_eq!(row.revoked_at.as_deref(), Some("2026-10-13T00:00:00Z"));
+    }
+
+    #[test]
+    fn only_a_removed_pin_with_no_other_pin_withdraws_a_scope() {
+        let pool = test_pool();
+        let gone = pin(&pool, "gone", PIN_STATUS_REMOVED);
+        pin(&pool, "retired", "retired");
+        pin(&pool, "paused", "paused");
+        pin(&pool, "active", PIN_STATUS_ACTIVE);
+        // Removed under one agent, still pinned under another.
+        pin(&pool, "shared", PIN_STATUS_REMOVED);
+        pin_as(&pool, "another-device", "shared", PIN_STATUS_ACTIVE);
+        // Removed in one spelling, retired in the other.
+        pin(&pool, "epr:respelt", PIN_STATUS_REMOVED);
+        pin(&pool, "respelt", "retired");
+        let pins = {
+            let mut conn = pool.get().expect("conn");
+            crate::db::acquisition_pins::list_all_pins(&mut conn).expect("pins")
+        };
+        let withdrawn = withdrawn_scopes(&pins);
+        assert_eq!(withdrawn.len(), 1, "{withdrawn:?}");
+        assert_eq!(withdrawn["gone"].pin_id, gone);
+        assert!(withdrawn_scopes(&[]).is_empty());
+    }
+
+    #[test]
+    fn scope_key_reads_both_spellings_as_one_scope() {
+        assert_eq!(scope_key("epr:X"), "X");
+        assert_eq!(scope_key("X"), "X");
+        assert_eq!(scope_key("epr:X"), scope_key("X"));
     }
 
     #[tokio::test]
-    async fn duplicates_of_a_desired_scope_are_left_standing() {
-        // The scope boundary: stranded is decided per scope. A desired scope
-        // keeps every live row it has; de-duplicating them is a separate,
-        // owner-authored pass.
+    async fn a_scope_is_matched_across_the_epr_prefix() {
         let pool = test_pool();
-        for i in 0..4 {
-            seed_commons_row(&pool, &format!("cid:dup-{i}"), "epr:X", "active", false);
-        }
-        // A duplicate that declares another reach is still a row of a desired scope.
-        seed_commons_row_full(
-            &pool,
-            MockAuthor::DEFAULT_PROVIDER,
-            "cid:dup-household",
-            "epr:X",
-            "active",
-            false,
-            FUTURE,
-            &bounds_with_reach("household"),
-        );
-        // An undesired scope loses every row it has, duplicates included.
-        for i in 0..3 {
-            seed_commons_row(&pool, &format!("cid:gone-{i}"), "epr:gone", "active", false);
-        }
-        let author = MockAuthor::new();
-        let r = ProvideReconciler::new();
-        sweep(&r, &pool, &author, &[desired(1, "epr:X")], 8).await;
+        // Pin stored bare, commitment spelt with the prefix; and the reverse.
+        pin(&pool, "X", PIN_STATUS_REMOVED);
+        content_row(&pool, CELL, "cid:x", "epr:X");
+        pin(&pool, "epr:Y", PIN_STATUS_REMOVED);
+        content_row(&pool, CELL, "cid:y", "Y");
+        // Removed bare, but still actively pinned under the other spelling.
+        pin(&pool, "Z", PIN_STATUS_REMOVED);
+        pin(&pool, "epr:Z", PIN_STATUS_ACTIVE);
+        content_row(&pool, CELL, "cid:z", "epr:Z");
 
+        let author = MockAuthor::new();
+        revoke_passes(&applying(), &pool, &author, 8).await;
+        let mut revoked = revoked_targets(&author).await;
+        revoked.sort();
+        assert_eq!(revoked, vec!["cid:x", "cid:y"]);
+    }
+
+    #[tokio::test]
+    async fn absence_is_never_evidence() {
+        let pool = test_pool();
+        // No pin row at all.
+        content_row(&pool, CELL, "cid:unpinned", "epr:unpinned");
+        // A retired pin (the substrate's temporary hold) and a paused one.
+        pin(&pool, "retired", "retired");
+        content_row(&pool, CELL, "cid:retired", "epr:retired");
+        pin(&pool, "paused", "paused");
+        content_row(&pool, CELL, "cid:paused", "epr:paused");
+        // Removed, with another pin for the same scope still active.
+        pin(&pool, "shared", PIN_STATUS_REMOVED);
+        pin_as(&pool, "another-device", "shared", PIN_STATUS_ACTIVE);
+        content_row(&pool, CELL, "cid:shared", "epr:shared");
+        // An active pin with several rows: duplicates are not this arm's.
+        pin(&pool, "dup", PIN_STATUS_ACTIVE);
+        for i in 0..4 {
+            content_row(&pool, CELL, &format!("cid:dup-{i}"), "epr:dup");
+        }
+
+        let author = MockAuthor::new();
+        let r = applying();
+        let sweep = revoke_passes(&r, &pool, &author, 8).await;
+        assert!(sweep.observed);
+        assert_eq!(sweep.withdrawn_rows, 0);
+        assert!(revoked_targets(&author).await.is_empty());
+
+        // The author arm never revokes either, whatever the desired set omits.
+        r.reconcile_provides(&pool, &author, TRANSPORT_ID, &[desired(1, "epr:dup")])
+            .await
+            .expect("author pass");
+        assert!(revoked_targets(&author).await.is_empty());
+    }
+
+    #[tokio::test]
+    async fn an_empty_pins_table_revokes_nothing() {
+        let pool = test_pool();
+        content_row(&pool, CELL, "cid:a", "epr:a");
+        content_row(&pool, CELL, "cid:b", "epr:b");
+        let author = MockAuthor::new();
+        let sweep = revoke_passes(&applying(), &pool, &author, 8).await;
+        assert!(sweep.observed);
+        assert!(sweep.planned.is_empty());
+        assert!(revoked_targets(&author).await.is_empty());
+    }
+
+    #[tokio::test]
+    async fn every_row_of_a_removed_scope_is_revoked_once() {
+        let pool = test_pool();
+        pin(&pool, "gone", PIN_STATUS_REMOVED);
+        for i in 0..3 {
+            content_row(&pool, CELL, &format!("cid:gone-{i}"), "epr:gone");
+        }
+        // MockAuthor projects nothing, so the rows stay live: the worst case.
+        let author = MockAuthor::new();
+        let r = applying();
+        revoke_passes(&r, &pool, &author, 12).await;
         let mut revoked = revoked_targets(&author).await;
         revoked.sort();
         assert_eq!(revoked, vec!["cid:gone-0", "cid:gone-1", "cid:gone-2"]);
-        assert!(author.authored.lock().await.is_empty());
     }
 
     #[tokio::test]
-    async fn only_standing_content_rows_of_this_node_are_revoked() {
+    async fn a_restart_does_not_issue_a_second_revocation() {
         let pool = test_pool();
-        // The commons capacity pledge: same action, no counterparty.
-        seed_commons_row_full(
-            &pool,
-            MockAuthor::DEFAULT_PROVIDER,
-            "cid:capacity",
-            "",
-            "proposed",
-            false,
-            "",
-            r#"{"commons_bytes":26843545600,"rate_per_minute":12,"reach_ceiling":"commons"}"#,
-        );
-        seed_commons_row_full(
-            &pool,
-            MockAuthor::DEFAULT_PROVIDER,
-            "cid:capacity-with-recipient",
-            "epr:pledge",
-            "proposed",
-            false,
-            FUTURE,
-            r#"{"commons_bytes":1,"reach_ceiling":"commons"}"#,
-        );
-        // A lapsed offer needs no revocation; unreadable validity stops the write.
-        let b = bounds_with_reach("commons");
-        seed_commons_row_full(
-            &pool,
-            MockAuthor::DEFAULT_PROVIDER,
-            "cid:lapsed",
-            "epr:lapsed",
-            "active",
-            false,
-            PAST,
-            &b,
-        );
-        seed_commons_row_full(
-            &pool,
-            MockAuthor::DEFAULT_PROVIDER,
-            "cid:junk",
-            "epr:junk",
-            "active",
-            false,
-            "not-a-date",
-            &b,
-        );
-        // Rows under another agent, and under this node's transport id.
-        seed_commons_row_for(
-            &pool,
-            "uhCAkSomeoneElse",
-            "cid:theirs",
-            "epr:theirs",
-            "active",
-            false,
-        );
-        seed_commons_row_for(
-            &pool,
-            TRANSPORT_ID,
-            "cid:transport",
-            "epr:transport",
-            "active",
-            false,
-        );
-        seed_commons_row(&pool, "cid:stranded", "epr:gone", "active", false);
-
+        pin(&pool, "gone", PIN_STATUS_REMOVED);
+        content_row(&pool, CELL, "cid:gone", "epr:gone");
         let author = MockAuthor::new();
-        let r = ProvideReconciler::new();
-        sweep(&r, &pool, &author, &[], 8).await;
-        assert_eq!(revoked_targets(&author).await, vec!["cid:stranded"]);
+        revoke_passes(&applying(), &pool, &author, REVOKE_AFTER_STRANDED_PASSES).await;
+        assert_eq!(revoked_targets(&author).await, vec!["cid:gone"]);
+        assert_eq!(
+            live_cids(&pool),
+            vec!["cid:gone"],
+            "its projection never landed"
+        );
+
+        // A new process: empty memory, same database.
+        let restarted = applying();
+        let sweep = revoke_passes(&restarted, &pool, &author, 10).await;
+        assert_eq!(
+            sweep.withdrawn_rows, 0,
+            "a submitted row is not planned again"
+        );
+        assert_eq!(revoked_targets(&author).await, vec!["cid:gone"]);
     }
 
-    /// An author whose conductor refuses revocations while `refuse` is set.
+    /// An author that can be made to refuse revocations, to lose its signing
+    /// key, or to re-pin a scope while it is revoking another.
     #[derive(Default)]
-    struct RefusingAuthor {
+    struct FlakyAuthor {
         refuse: std::sync::atomic::AtomicBool,
+        no_authority: std::sync::atomic::AtomicBool,
         attempts: std::sync::atomic::AtomicUsize,
+        repin_on_revoke: Option<(DbPool, String)>,
         inner: MockAuthor,
     }
 
     #[async_trait]
-    impl CommitmentAuthor for RefusingAuthor {
+    impl CommitmentAuthor for FlakyAuthor {
         async fn own_providers(&self) -> Vec<String> {
             self.inner.own_providers().await
+        }
+        async fn revoke_authority(&self) -> Option<String> {
+            if self.no_authority.load(std::sync::atomic::Ordering::SeqCst) {
+                return None;
+            }
+            self.inner.revoke_authority().await
         }
         async fn author_commons(&self, req: &ProvideAuthorRequest) -> Result<String, StorageError> {
             self.inner.author_commons(req).await
@@ -1619,6 +1908,9 @@ mod tests {
         async fn revoke_commons(&self, req: &ProvideRevokeRequest) -> Result<(), StorageError> {
             use std::sync::atomic::Ordering;
             self.attempts.fetch_add(1, Ordering::SeqCst);
+            if let Some((pool, head_ref)) = &self.repin_on_revoke {
+                pin(pool, head_ref, PIN_STATUS_ACTIVE);
+            }
             if self.refuse.load(Ordering::SeqCst) {
                 return Err(StorageError::Internal("conductor not answering".into()));
             }
@@ -1627,33 +1919,325 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn a_refused_revocation_stops_the_pass_and_is_retried() {
+    async fn a_call_that_errors_is_recorded_and_never_submitted_again() {
         use std::sync::atomic::Ordering;
         let pool = test_pool();
-        for i in 0..REVOKES_PER_TICK + 1 {
-            seed_commons_row(
-                &pool,
-                &format!("cid:gone-{i}"),
-                &format!("epr:gone-{i}"),
-                "active",
-                false,
-            );
-        }
-        let author = RefusingAuthor::default();
+        pin(&pool, "a", PIN_STATUS_REMOVED);
+        pin(&pool, "b", PIN_STATUS_REMOVED);
+        content_row(&pool, CELL, "cid:a", "epr:a");
+        content_row(&pool, CELL, "cid:b", "epr:b");
+        let author = FlakyAuthor::default();
         author.refuse.store(true, Ordering::SeqCst);
-        let r = ProvideReconciler::new();
+        let r = applying();
 
-        sweep(&r, &pool, &author, &[], REVOKE_AFTER_STRANDED_PASSES).await;
+        let sweep = revoke_passes(&r, &pool, &author, REVOKE_AFTER_STRANDED_PASSES).await;
+        assert_eq!(sweep.unconfirmed, vec!["cid:a"]);
         assert_eq!(
             author.attempts.load(Ordering::SeqCst),
             1,
-            "one refusal ends the pass"
+            "one error ends the pass"
         );
-        assert!(revoked_targets(&author.inner).await.is_empty());
+        assert_eq!(
+            recorded_outcome(&pool, "cid:a").as_deref(),
+            Some(crate::db::mishpat_revocations::ISSUE_UNCONFIRMED)
+        );
 
+        // The conductor answers again. The call that errored may have
+        // committed, so `cid:a` is not submitted again: not in this process,
+        // not after a restart. `cid:b` was never attempted and goes ahead.
         author.refuse.store(false, Ordering::SeqCst);
-        sweep(&r, &pool, &author, &[], 1).await;
-        assert_eq!(revoked_targets(&author.inner).await.len(), REVOKES_PER_TICK);
+        revoke_passes(&r, &pool, &author, 5).await;
+        revoke_passes(&applying(), &pool, &author, 5).await;
+        assert_eq!(revoked_targets(&author.inner).await, vec!["cid:b"]);
+        assert_eq!(author.attempts.load(Ordering::SeqCst), 2);
+    }
+
+    #[tokio::test]
+    async fn a_pass_that_cannot_observe_starts_the_count_over() {
+        use std::sync::atomic::Ordering;
+        let pool = test_pool();
+        pin(&pool, "gone", PIN_STATUS_REMOVED);
+        content_row(&pool, CELL, "cid:gone", "epr:gone");
+        let author = FlakyAuthor::default();
+        let r = applying();
+
+        revoke_passes(&r, &pool, &author, 2).await;
+        // One pass with no signing key established: nothing observed.
+        author.no_authority.store(true, Ordering::SeqCst);
+        let held = revoke_passes(&r, &pool, &author, 1).await;
+        assert!(!held.observed);
+        author.no_authority.store(false, Ordering::SeqCst);
+
+        // Two seen + a gap + two more must not revoke.
+        revoke_passes(&r, &pool, &author, 2).await;
+        assert_eq!(author.attempts.load(Ordering::SeqCst), 0);
+        revoke_passes(&r, &pool, &author, 1).await;
+        assert_eq!(revoked_targets(&author.inner).await, vec!["cid:gone"]);
+    }
+
+    #[tokio::test]
+    async fn a_pin_restored_for_a_pass_starts_the_count_over() {
+        let pool = test_pool();
+        let id = pin(&pool, "flap", PIN_STATUS_REMOVED);
+        content_row(&pool, CELL, "cid:flap", "epr:flap");
+        let author = MockAuthor::new();
+        let r = applying();
+        revoke_passes(&r, &pool, &author, 2).await;
+        pin(&pool, "flap", PIN_STATUS_ACTIVE);
+        revoke_passes(&r, &pool, &author, 1).await;
+        {
+            let mut conn = pool.get().expect("conn");
+            crate::db::acquisition_pins::set_pin_status(&mut conn, id, PIN_STATUS_REMOVED)
+                .expect("remove");
+        }
+        revoke_passes(&r, &pool, &author, 2).await;
+        assert!(revoked_targets(&author).await.is_empty());
+        revoke_passes(&r, &pool, &author, 1).await;
+        assert_eq!(revoked_targets(&author).await, vec!["cid:flap"]);
+    }
+
+    #[tokio::test]
+    async fn the_evidence_is_read_again_before_each_revocation() {
+        let pool = test_pool();
+        pin(&pool, "a", PIN_STATUS_REMOVED);
+        pin(&pool, "b", PIN_STATUS_REMOVED);
+        content_row(&pool, CELL, "cid:a", "epr:a");
+        content_row(&pool, CELL, "cid:b", "epr:b");
+        // While `a` is being revoked, the operator pins `b` again.
+        let author = FlakyAuthor {
+            repin_on_revoke: Some((pool.clone(), "b".to_string())),
+            ..FlakyAuthor::default()
+        };
+        let sweep = revoke_passes(&applying(), &pool, &author, REVOKE_AFTER_STRANDED_PASSES).await;
+        assert_eq!(
+            sweep.planned.len(),
+            2,
+            "both were planned from the pass's read"
+        );
+        assert_eq!(sweep.issued, vec!["cid:a"]);
+        assert_eq!(revoked_targets(&author.inner).await, vec!["cid:a"]);
+        assert_eq!(recorded_outcome(&pool, "cid:b"), None);
+    }
+
+    #[tokio::test]
+    async fn revocations_are_bounded_per_tick() {
+        assert_eq!(REVOKES_PER_TICK, 4);
+        assert_eq!(REVOKE_AFTER_STRANDED_PASSES, 3);
+        let pool = test_pool();
+        for i in 0..10 {
+            pin(&pool, &format!("gone-{i:02}"), PIN_STATUS_REMOVED);
+            content_row(
+                &pool,
+                CELL,
+                &format!("cid:gone-{i:02}"),
+                &format!("epr:gone-{i:02}"),
+            );
+        }
+        let author = MockAuthor::new();
+        let r = applying();
+
+        revoke_passes(&r, &pool, &author, 2).await;
+        assert!(revoked_targets(&author).await.is_empty());
+        revoke_passes(&r, &pool, &author, 1).await;
+        assert_eq!(revoked_targets(&author).await.len(), 4);
+        revoke_passes(&r, &pool, &author, 1).await;
+        assert_eq!(revoked_targets(&author).await.len(), 8);
+        revoke_passes(&r, &pool, &author, 5).await;
+        let all = revoked_targets(&author).await;
+        assert_eq!(all.len(), 10, "the backlog drains, then stops");
+        let distinct: HashSet<&String> = all.iter().collect();
+        assert_eq!(distinct.len(), 10, "no row is revoked twice");
+    }
+
+    #[tokio::test]
+    async fn only_rows_the_signing_cell_key_provides_are_revoked() {
+        let pool = test_pool();
+        pin(&pool, "gone", PIN_STATUS_REMOVED);
+        content_row(&pool, "uhCAkCellKey", "cid:cell", "epr:gone");
+        // A session key this node may also author under, another agent, and
+        // this node's transport id: none is the key that signs.
+        content_row(&pool, "uhCAkSessionKey", "cid:session", "epr:gone");
+        content_row(&pool, "uhCAkSomeoneElse", "cid:theirs", "epr:gone");
+        content_row(&pool, TRANSPORT_ID, "cid:transport", "epr:gone");
+        let author = MockAuthor::with_providers(vec![
+            "uhCAkSessionKey".to_string(),
+            "uhCAkCellKey".to_string(),
+        ])
+        .with_authority(Some("uhCAkCellKey"));
+        revoke_passes(&applying(), &pool, &author, 8).await;
+        {
+            let revoked = author.revoked.lock().await;
+            assert_eq!(revoked.len(), 1);
+            assert_eq!(revoked[0].target_cid, "cid:cell");
+            assert_eq!(revoked[0].provider, "uhCAkCellKey");
+        }
+
+        // With no signing key established, nothing is revoked at all.
+        let pool = test_pool();
+        pin(&pool, "gone", PIN_STATUS_REMOVED);
+        content_row(&pool, CELL, "cid:cell", "epr:gone");
+        let keyless = MockAuthor::new().with_authority(None);
+        let sweep = revoke_passes(&applying(), &pool, &keyless, 8).await;
+        assert!(!sweep.observed);
+        assert!(revoked_targets(&keyless).await.is_empty());
+    }
+
+    #[tokio::test]
+    async fn only_rows_that_positively_read_as_content_are_revoked() {
+        let pool = test_pool();
+        let row = |cid: &str, recipient: &str, valid_until: &str, bounds: &str| {
+            seed_commons_row_full(
+                &pool,
+                CELL,
+                cid,
+                recipient,
+                "active",
+                false,
+                valid_until,
+                bounds,
+            );
+        };
+        for scope in [
+            "junk", "null", "array", "empty", "unscoped", "other", "two", "pledge", "lapsed",
+            "undated", "good",
+        ] {
+            pin(&pool, scope, PIN_STATUS_REMOVED);
+        }
+        row("cid:junk", "epr:junk", FUTURE, "not json");
+        row("cid:null", "epr:null", FUTURE, "null");
+        row("cid:array", "epr:array", FUTURE, "[]");
+        row("cid:empty", "epr:empty", FUTURE, "{}");
+        row(
+            "cid:unscoped",
+            "epr:unscoped",
+            FUTURE,
+            r#"{"rate_per_minute":6,"reach_ceiling":"commons"}"#,
+        );
+        row(
+            "cid:other",
+            "epr:other",
+            FUTURE,
+            &content_bounds("epr:else"),
+        );
+        row(
+            "cid:two",
+            "epr:two",
+            FUTURE,
+            r#"{"epr_scope":["epr:two","epr:more"]}"#,
+        );
+        // A capacity pledge, with and without a counterparty.
+        row(
+            "cid:pledge",
+            "epr:pledge",
+            FUTURE,
+            r#"{"epr_scope":["epr:pledge"],"commons_bytes":1}"#,
+        );
+        pin(&pool, "", PIN_STATUS_REMOVED);
+        row(
+            "cid:capacity",
+            "",
+            "",
+            r#"{"commons_bytes":26843545600,"rate_per_minute":12,"reach_ceiling":"commons"}"#,
+        );
+        // A lapsed offer needs no revocation; unreadable validity stops the write.
+        row(
+            "cid:lapsed",
+            "epr:lapsed",
+            PAST,
+            &content_bounds("epr:lapsed"),
+        );
+        row(
+            "cid:undated",
+            "epr:undated",
+            "not-a-date",
+            &content_bounds("epr:undated"),
+        );
+        row("cid:good", "epr:good", FUTURE, &content_bounds("epr:good"));
+
+        let author = MockAuthor::new();
+        revoke_passes(&applying(), &pool, &author, 8).await;
+        assert_eq!(revoked_targets(&author).await, vec!["cid:good"]);
+    }
+
+    #[tokio::test]
+    async fn a_dry_run_plans_and_submits_nothing() {
+        let pool = test_pool();
+        let gone = pin(&pool, "gone", PIN_STATUS_REMOVED);
+        content_row(&pool, CELL, "cid:gone", "epr:gone");
+        let author = FlakyAuthor::default();
+        let r = ProvideReconciler::with_revoke_mode(RevokeArmMode::DryRun);
+
+        let early = revoke_passes(&r, &pool, &author, 2).await;
+        assert_eq!(early.withdrawn_rows, 1);
+        assert!(
+            early.planned.is_empty(),
+            "the same three-pass rule as apply"
+        );
+        let sweep = revoke_passes(&r, &pool, &author, 8).await;
+        assert_eq!(
+            sweep.planned,
+            vec![PlannedRevocation {
+                cid: "cid:gone".to_string(),
+                head_ref: "epr:gone".to_string(),
+                provider: CELL.to_string(),
+                pin_id: gone,
+                removed_at: removed_at(&pool, gone),
+            }]
+        );
+        assert!(sweep.issued.is_empty());
+        assert_eq!(
+            author.attempts.load(std::sync::atomic::Ordering::SeqCst),
+            0,
+            "a dry run never calls the conductor"
+        );
+        assert_eq!(recorded_outcome(&pool, "cid:gone"), None);
+        assert_eq!(live_cids(&pool), vec!["cid:gone"]);
+    }
+
+    #[tokio::test]
+    async fn the_arm_is_off_unless_switched_on() {
+        assert_eq!(RevokeArmMode::default(), RevokeArmMode::Off);
+        assert_eq!(RevokeArmMode::parse(None), RevokeArmMode::Off);
+        for off in ["", "off", "0", "1", "on", "true", "yes", "enabled", "dry"] {
+            assert_eq!(
+                RevokeArmMode::parse(Some(off)),
+                RevokeArmMode::Off,
+                "{off:?}"
+            );
+        }
+        assert_eq!(RevokeArmMode::parse(Some("apply")), RevokeArmMode::Apply);
+        assert_eq!(RevokeArmMode::parse(Some(" Apply ")), RevokeArmMode::Apply);
+        assert_eq!(RevokeArmMode::parse(Some("dry-run")), RevokeArmMode::DryRun);
+        assert_eq!(RevokeArmMode::parse(Some("DRY-RUN")), RevokeArmMode::DryRun);
+
+        // What the startup path builds carries the mode it parsed.
+        assert_eq!(ProvideReconciler::new().revoke_mode(), RevokeArmMode::Off);
+        assert_eq!(
+            ProvideReconciler::from_revoke_env(None).revoke_mode(),
+            RevokeArmMode::Off
+        );
+        assert_eq!(
+            ProvideReconciler::from_revoke_env(Some("bogus")).revoke_mode(),
+            RevokeArmMode::Off
+        );
+        assert_eq!(
+            ProvideReconciler::from_revoke_env(Some("dry-run")).revoke_mode(),
+            RevokeArmMode::DryRun
+        );
+
+        // And the mode it carries is the mode it runs.
+        let pool = test_pool();
+        pin(&pool, "gone", PIN_STATUS_REMOVED);
+        content_row(&pool, CELL, "cid:gone", "epr:gone");
+        let author = MockAuthor::new();
+        let off = ProvideReconciler::from_revoke_env(None);
+        let sweep = revoke_passes(&off, &pool, &author, 8).await;
+        assert_eq!(sweep, RevokeSweep::default(), "off reads and does nothing");
+        assert!(revoked_targets(&author).await.is_empty());
+
+        let applying = ProvideReconciler::from_revoke_env(Some("apply"));
+        revoke_passes(&applying, &pool, &author, REVOKE_AFTER_STRANDED_PASSES).await;
+        assert_eq!(revoked_targets(&author).await, vec!["cid:gone"]);
     }
 
     #[tokio::test]

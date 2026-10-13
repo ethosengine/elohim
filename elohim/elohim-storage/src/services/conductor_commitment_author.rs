@@ -256,6 +256,24 @@ fn agent_provider_candidates(candidates: &[Option<&str>]) -> Vec<String> {
     out
 }
 
+/// May a client whose mishpat writes are authored by `signer` revoke the row
+/// `req` names? Only when the row's provider IS that signer: a revocation is
+/// the provider withdrawing its own offer, and this node signs as no one else.
+fn authorize_revoke(signer: Option<&str>, req: &ProvideRevokeRequest) -> Result<(), StorageError> {
+    match signer {
+        Some(signer)
+            if crate::identity_namespace::is_agent_cid(signer) && signer == req.provider =>
+        {
+            Ok(())
+        }
+        _ => Err(StorageError::Internal(format!(
+            "provide revoke: commitment {} is provided by {}, not by this conductor's \
+             mishpat cell agent; refusing to revoke it",
+            req.target_cid, req.provider
+        ))),
+    }
+}
+
 /// Build the `revokes-commitment` payload (snake_case JSON) targeting an
 /// existing commitment CID. PURE for unit-testability.
 pub fn build_revoke_payload(target_cid: &str, signed_at: &str) -> String {
@@ -316,6 +334,12 @@ impl ConductorCommitmentAuthor {
 impl CommitmentAuthor for ConductorCommitmentAuthor {
     async fn own_providers(&self) -> Vec<String> {
         self.own_provider_candidates().unwrap_or_default()
+    }
+
+    async fn revoke_authority(&self) -> Option<String> {
+        self.hc
+            .mishpat_agent_key_uhcak()
+            .filter(|key| crate::identity_namespace::is_agent_cid(key))
     }
 
     async fn author_commons(&self, req: &ProvideAuthorRequest) -> Result<String, StorageError> {
@@ -431,14 +455,19 @@ impl CommitmentAuthor for ConductorCommitmentAuthor {
     }
 
     async fn revoke_commons(&self, req: &ProvideRevokeRequest) -> Result<(), StorageError> {
-        let signed_at = chrono::Utc::now().to_rfc3339();
-        let payload_json = build_revoke_payload(&req.target_cid, &signed_at);
+        // One client for the check and the call: the key compared here is the
+        // key of the cell `call_create_commitment` writes on.
+        let hc = &self.hc;
+        authorize_revoke(hc.mishpat_agent_key_uhcak().as_deref(), req)?;
+        // `signed_at` comes with the request (the time the pin was removed), so
+        // a second submission for the same row would carry the same entry.
+        let payload_json = build_revoke_payload(&req.target_cid, &req.signed_at);
         conductor_writes::call_create_commitment(
-            &self.hc,
+            hc,
             CreateMishpatCommitmentInput {
                 action: "revokes-commitment".to_string(),
                 payload_json,
-                signed_at,
+                signed_at: req.signed_at.clone(),
             },
         )
         .await?;
@@ -450,6 +479,25 @@ impl CommitmentAuthor for ConductorCommitmentAuthor {
 mod tests {
     use super::*;
     use serde_json::Value;
+
+    fn revoke_req(provider: &str) -> ProvideRevokeRequest {
+        ProvideRevokeRequest {
+            target_cid: "uhCEkTarget".to_string(),
+            head_ref: "epr:X".to_string(),
+            provider: provider.to_string(),
+            signed_at: "2026-10-13T00:00:00Z".to_string(),
+        }
+    }
+
+    #[test]
+    fn only_the_signing_cell_agent_may_revoke_its_own_row() {
+        assert!(authorize_revoke(Some("uhCAkCell"), &revoke_req("uhCAkCell")).is_ok());
+        // A row another agent provides (a session key handed off by a doorway).
+        assert!(authorize_revoke(Some("uhCAkCell"), &revoke_req("uhCAkSession")).is_err());
+        // No mishpat cell, or a signer that is not an agent key.
+        assert!(authorize_revoke(None, &revoke_req("uhCAkCell")).is_err());
+        assert!(authorize_revoke(Some("12D3Koo"), &revoke_req("12D3Koo")).is_err());
+    }
 
     // -----------------------------------------------------------------------
     // build_content_payload — the wire contract. The conductor round-trip is

@@ -1006,6 +1006,12 @@ pub fn handle_mishpat_signal(
                     // both; each no-ops (0 rows) when the CID lives in the other
                     // table. Without the lenses call a revoke targeting a lens
                     // silently matched 0 rows and the lens stayed live in the market.
+                    // Keep the revocation apart from the row it names, so a
+                    // replay of the commitment cannot read as live again and a
+                    // revocation that lands before its target is not lost
+                    // (`upsert_with_anchor` applies it when the row arrives).
+                    crate::db::mishpat_revocations::record_projected(conn, &target_cid, &signed_at)
+                        .map_err(|e| StorageError::Database(e.to_string()))?;
                     let affected_commitments = crate::db::mishpat_commitments::set_revoked_at(
                         conn,
                         &target_cid,

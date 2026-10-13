@@ -29,6 +29,12 @@ use super::models::{current_timestamp, MishpatCommitment, NewMishpatCommitment};
 /// written anchor — doing so would silently strip the notarised provenance that
 /// the `ProjectionCommitmentFetcher` requires before granting a bounds-pass.
 ///
+/// **Revocation is monotonic:** `revoked_at` is written only when the incoming
+/// `new.revoked_at` is `Some(_)`. A commitment signal carries no revocation, so
+/// a replay of one (with `None`) leaves a revoked row revoked. A revocation
+/// projected before its target landed is held in `mishpat_revocations` and
+/// applied here when the row arrives.
+///
 /// Timestamps are always computed in Rust via `current_timestamp()` so every
 /// row uses ISO 8601 `YYYY-MM-DDTHH:MM:SSZ` format instead of the SQL
 /// `datetime('now')` default (`YYYY-MM-DD HH:MM:SS`).
@@ -65,8 +71,8 @@ pub fn upsert_with_anchor(
             mc::bounds_json.eq(new.bounds_json.clone()),
             mc::valid_from.eq(new.valid_from.clone()),
             mc::valid_until.eq(new.valid_until.clone()),
-            mc::revoked_at.eq(new.revoked_at.clone()),
             mc::state.eq(new.state.clone()),
+            // `revoked_at` is absent on purpose (monotonic; see below).
             // Anchor-preservation: only overwrite when incoming is Some(_).
             // When None, the existing column value is kept via the EXCLUDED
             // trick: we update only the non-null path by branching in Rust
@@ -87,6 +93,29 @@ pub fn upsert_with_anchor(
     }
     // If incoming anchor is None, leave dht_anchor_hash untouched — a non-null
     // anchor written by an earlier upsert is preserved.
+
+    // Revocation only ever moves one way. An incoming `Some` is written; an
+    // incoming `None` keeps what the row has, and a revocation already
+    // projected for this cid (before the row existed, or lost from the row) is
+    // applied from its tombstone.
+    match &new.revoked_at {
+        Some(ts) => {
+            diesel::update(mc::mishpat_commitments.filter(mc::cid.eq(&new.cid)))
+                .set(mc::revoked_at.eq(ts))
+                .execute(conn)?;
+        }
+        None => {
+            if let Some(ts) = super::mishpat_revocations::projected_revoked_at(conn, &new.cid)? {
+                diesel::update(
+                    mc::mishpat_commitments
+                        .filter(mc::cid.eq(&new.cid))
+                        .filter(mc::revoked_at.is_null()),
+                )
+                .set(mc::revoked_at.eq(&ts))
+                .execute(conn)?;
+            }
+        }
+    }
 
     mc::mishpat_commitments
         .filter(mc::cid.eq(&new.cid))

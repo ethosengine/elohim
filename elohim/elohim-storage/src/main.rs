@@ -2315,8 +2315,17 @@ async fn async_main(
                                 provide_pool.clone(),
                             ),
                         );
+                        // The removed-pin revoke arm's mode is read here, once
+                        // (ELOHIM_PROVIDE_REVOKE_ARM=off|dry-run|apply, default
+                        // off), logged, and carried by the reconciler itself.
                         let reconciler = std::sync::Arc::new(
-                            elohim_storage::services::provide_reconcile::ProvideReconciler::new(),
+                            elohim_storage::services::provide_reconcile::ProvideReconciler::from_revoke_env(
+                                std::env::var(
+                                    elohim_storage::services::provide_reconcile::REVOKE_ARM_ENV,
+                                )
+                                .ok()
+                                .as_deref(),
+                            ),
                         );
                         // Reach-aware provide-eligibility resolver (lamad pillar).
                         // Commons is openly providable; non-commons requires
@@ -2327,30 +2336,6 @@ async fn async_main(
                                 "lamad",
                             ),
                         );
-                        // Revoke arm switch, read once here (never on the tick).
-                        // Default on; ELOHIM_PROVIDE_REVOKE_ARM=0|false|no|off
-                        // turns it off for this node without a rebuild.
-                        let revoke_arm_on =
-                            elohim_storage::services::provide_reconcile::revoke_arm_enabled(
-                                std::env::var(
-                                    elohim_storage::services::provide_reconcile::REVOKE_ARM_ENV,
-                                )
-                                .ok()
-                                .as_deref(),
-                            );
-                        if revoke_arm_on {
-                            info!(
-                                per_tick = elohim_storage::services::provide_reconcile::REVOKES_PER_TICK,
-                                after_passes = elohim_storage::services::provide_reconcile::REVOKE_AFTER_STRANDED_PASSES,
-                                "provide-loop revoke arm ENABLED: a live content commitment whose scope has left \
-                                 the desired set is revoked (set ELOHIM_PROVIDE_REVOKE_ARM=0 to turn it off)"
-                            );
-                        } else {
-                            warn!(
-                                "provide-loop revoke arm DISABLED by ELOHIM_PROVIDE_REVOKE_ARM: stranded \
-                                 commitments are left standing"
-                            );
-                        }
                         let self_cid_for_log = self_cid.clone();
                         let mut provide_shutdown = shutdown_tx.subscribe();
                         tokio::spawn(async move {
@@ -2361,14 +2346,16 @@ async fn async_main(
                             loop {
                                 tokio::select! {
                                     _ = ticker.tick() => {
+                                        // Removed-pin revoke arm. It runs before,
+                                        // and apart from, the desired set: it
+                                        // reads pin state itself, so an empty or
+                                        // unreadable desired set neither feeds
+                                        // nor skips it. Does nothing when off.
+                                        reconciler.revoke_withdrawn(&provide_pool, &*author).await;
                                         // Derive desired set: active `item` pins
                                         // whose content is locally present AND
                                         // commons-reach (the caught-up proxy).
-                                        // `desire_known` goes false when a read
-                                        // the desired set depends on fails: the set
-                                        // is then partial, and the revoke arm holds.
-                                        let (desired, desire_known) = {
-                                            let mut desire_known = true;
+                                        let desired = {
                                             let mut conn = match provide_pool.get() {
                                                 Ok(c) => c,
                                                 Err(e) => {
@@ -2390,18 +2377,16 @@ async fn async_main(
                                             // derive_desired matches sets against `p.head_ref` verbatim.
                                             // (Raw head_refs here made `present` empty for every pin,
                                             // so the author tick never fired for anything.)
-                                            let id_for = |h: &str| h.strip_prefix("epr:").unwrap_or(h).to_string();
+                                            let id_for = |h: &str| {
+                                                elohim_storage::services::provide_reconcile::scope_key(h).to_string()
+                                            };
                                             let bare_ids: Vec<String> =
                                                 pins.iter().map(|p| id_for(&p.head_ref)).collect();
                                             // Caught-up proxy: reach-agnostic local presence.
                                             let present_ids = elohim_storage::db::content_diesel::content_ids_present(
                                                 &mut conn, &app_ctx, &bare_ids,
                                             )
-                                            .unwrap_or_else(|e| {
-                                                tracing::warn!(error = %e, "provide author tick: content presence read failed (no revocations this tick)");
-                                                desire_known = false;
-                                                Default::default()
-                                            });
+                                            .unwrap_or_default();
                                             let present: std::collections::HashSet<String> = pins
                                                 .iter()
                                                 .filter(|p| present_ids.contains(&id_for(&p.head_ref)))
@@ -2412,11 +2397,7 @@ async fn async_main(
                                             let candidates_by_id: Vec<(String, String)> = elohim_storage::db::content_diesel::content_reaches_for_ids(
                                                 &mut conn, &app_ctx, &bare_ids,
                                             )
-                                            .unwrap_or_else(|e| {
-                                                tracing::warn!(error = %e, "provide author tick: content reach read failed (no revocations this tick)");
-                                                desire_known = false;
-                                                Default::default()
-                                            });
+                                            .unwrap_or_default();
                                             let reach_by_id: std::collections::HashMap<String, String> =
                                                 candidates_by_id.iter().cloned().collect();
                                             let candidates: Vec<(String, String)> = pins
@@ -2433,26 +2414,14 @@ async fn async_main(
                                             // content's own reach (not a hardcoded commons).
                                             let reach_by_head_ref: std::collections::HashMap<String, String> =
                                                 candidates.iter().cloned().collect();
-                                            let desired = elohim_storage::services::provide_reconcile::ProvideReconciler::derive_desired(
+                                            elohim_storage::services::provide_reconcile::ProvideReconciler::derive_desired(
                                                 &pins, &present, &eligible, &reach_by_head_ref,
-                                            );
-                                            (desired, desire_known)
+                                            )
                                         };
-                                        use elohim_storage::services::provide_reconcile::StrandedRevoke;
-                                        let revoke = if revoke_arm_on && desire_known {
-                                            StrandedRevoke::Sweep
-                                        } else {
-                                            StrandedRevoke::Hold
-                                        };
-                                        // Nothing to author and nothing that may
-                                        // be revoked: skip the pass. An empty
-                                        // desired set that IS known still runs, so
-                                        // a node that un-pinned everything
-                                        // withdraws the offers it left behind.
-                                        if desired.is_empty() && revoke == StrandedRevoke::Hold {
+                                        if desired.is_empty() {
                                             continue;
                                         }
-                                        match reconciler.reconcile_provides(&provide_pool, &*author, &self_cid, &desired, revoke).await {
+                                        match reconciler.reconcile_provides(&provide_pool, &*author, &self_cid, &desired).await {
                                             Ok(authored) if authored > 0 => {
                                                 tracing::info!(
                                                     target: "elohim_storage::provide",
