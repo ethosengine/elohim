@@ -35,28 +35,51 @@
 //! How the read is kept (`SpeaksRefresh`, chosen once at start by
 //! `ELOHIM_CONSENT_SPEAKS_REFRESH`):
 //! - `demand` (the default). A resting node reads nothing. A read is wanted
-//!   by an incoming ask, by a pending-list or decide request, and by an
-//!   identity write. One read runs at a time, and however many asks arrive an
-//!   answered read is not repeated for `SPEAKS_REFRESH_SECS` (a read the cell
-//!   did not answer may be tried again after `SPEAKS_RETRY_SECS`). An ask
-//!   cannot wait for a read (the transport's event loop answers it), so an ask
-//!   that finds no fresh read wants one and is dropped unanswered, exactly as
-//!   by a node whose standing is unknown; the asking device offers again
-//!   every `ROUND_SECS` and is listed then. A device not yet on this node's
-//!   list is listed only on a read no older than `SPEAKS_REFRESH_SECS`, so a
-//!   node whose record stopped standing never lists a new ask on what it read
-//!   before; a device already on the list keeps its place on the last read
-//!   while the next one is made, which is what the timer does between reads.
-//!   An idle node holds no evidence, so it lists nothing while its conductor
-//!   cannot answer, where the timer lists for up to `SPEAKS_MAX_AGE_MICROS`
-//!   into an outage.
+//!   by a device's signed ask, by a pending-list, decide or signed-out
+//!   standing request, and by an identity write. One read runs at a time, and
+//!   a caller that waited behind one is judged against it when its turn
+//!   comes. A read wanted by a request is not made within
+//!   `SPEAKS_REFRESH_SECS` of the last attempt, answered or not; only a
+//!   device's ask may try again `SPEAKS_RETRY_SECS` after a read the cell did
+//!   not answer (the re-offer that retry exists for). An identity write
+//!   always reads. An ask cannot wait for a read (the transport's event loop
+//!   answers it), so an ask that finds no fresh read wants one and is dropped
+//!   unanswered, exactly as by a node whose standing is unknown; the asking
+//!   device offers again every `ROUND_SECS` and is listed then.
 //! - `timer`. One refresher reads every `SPEAKS_REFRESH_SECS` and at once when
 //!   this node's identity may have changed (`identity_changed`), whether or
 //!   not anyone asks. It rests when the coordinator answers that the standing
 //!   function does not exist: that answer cannot change until the coordinator
 //!   does, so it asks again when a coordinator update is applied by this
 //!   process (`happ_manager::coordinator_updates`) or, since an update made
-//!   from elsewhere is not seen here, after `SPEAKS_REST_MAX_SECS`.
+//!   from elsewhere is not seen here, at the first turn after
+//!   `SPEAKS_REST_MAX_SECS`.
+//!
+//! What demand gives up against a healthy timer. This is a difference in the
+//! safety direction, not only in availability, and it is inside the bound
+//! above, not outside it:
+//! - A new ask is listed on a read up to `SPEAKS_REFRESH_SECS` old, and no
+//!   read is made on its account until that read is that old. So is the
+//!   timer's, but the timer's reads fall every `SPEAKS_REFRESH_SECS` whatever
+//!   happens, and a demand read falls only when something asked: a record
+//!   that stops standing just after a demand read is listed on for up to
+//!   `SPEAKS_REFRESH_SECS` more.
+//! - The same ceremony, offered again by the same device from the same peer,
+//!   keeps its place on a read up to `SPEAKS_MAX_AGE_MICROS` old while the
+//!   next read is made, where a healthy timer would have read again within
+//!   `SPEAKS_REFRESH_SECS`. If that next read is not answered, the ceremony
+//!   stays listed until the old read reaches the bound.
+//! - An idle node holds no evidence, so it lists nothing while its conductor
+//!   cannot answer, where the timer lists for up to `SPEAKS_MAX_AGE_MICROS`
+//!   into an outage.
+//!
+//! When a read is taken to have been made. Its evidence is stamped when its
+//! turn came, before the cell was asked, so it is never counted newer than it
+//! is: a read that took longer than `SPEAKS_MAX_AGE_MICROS` is unknown the
+//! moment it lands. The next read is paced from when this one finished.
+//!
+//! This node's listing proof is made by its own worker (`prover`), woken by a
+//! read that says the node speaks for someone. A read never waits for it.
 //!
 //! Identity namespaces stay apart: the carrier sees a transport id, kept only
 //! to answer the peer that asked; the request names the device's agent key,
@@ -134,8 +157,14 @@ impl SpeaksRefresh {
 /// Why a read of whom this node speaks for is made.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Want {
-    /// Something asked: read unless a read was made recently enough.
-    IfDue,
+    /// A device's signed ask wants it: read unless the last answered read
+    /// finished within `SPEAKS_REFRESH_SECS`, or the last unanswered one
+    /// within `SPEAKS_RETRY_SECS`.
+    Ask,
+    /// A request on this node's routes wants it, which anyone may send:
+    /// read unless a read was tried within `SPEAKS_REFRESH_SECS`, answered
+    /// or not.
+    Request,
     /// The timer's turn, or this node's identity was just written: read.
     Now,
 }
@@ -143,7 +172,8 @@ pub enum Want {
 /// What the reads of whom this node speaks for have done lately.
 #[derive(Default)]
 struct SpeaksReads {
-    /// When the last read began, and whether the cell answered it.
+    /// When the last read finished and whether the cell answered it; while a
+    /// read is out, when it began, unanswered.
     last: Option<(i64, bool)>,
     /// The timer's rest on a coordinator without the standing function: the
     /// coordinator updates seen when it began, and when it ends regardless.
@@ -151,14 +181,6 @@ struct SpeaksReads {
     /// The read is failing and has said so once: whether for want of the
     /// function.
     failing: Option<bool>,
-}
-
-/// Whether the conductor answered that the zome function does not exist: an
-/// answer that stands until the coordinator changes.
-fn function_missing(why: &super::device_consent::CellFailure) -> bool {
-    use super::device_consent::CellFailure;
-    let (CellFailure::Unavailable(message) | CellFailure::Refused(message)) = why;
-    message.contains("zome function that doesn't exist")
 }
 
 /// Everything the carrier holds, for this process.
@@ -186,9 +208,16 @@ pub struct Carrier {
     refresh: OnceLock<SpeaksRefresh>,
     /// Woken when something wants that read and one is due.
     speaks_wanted: tokio::sync::Notify,
-    /// Held across a read, so one runs at a time.
+    /// Held across a read, so one runs at a time. Never held across the
+    /// listing proof.
     reading: tokio::sync::Mutex<()>,
     reads: Mutex<SpeaksReads>,
+    /// Woken when a read says this node speaks for someone.
+    proof_wanted: tokio::sync::Notify,
+    /// Held while the listing proof is made, so one is made at a time.
+    proving: tokio::sync::Mutex<()>,
+    /// The time, in microseconds; a test's own clock in tests.
+    clock: Box<dyn Fn() -> i64 + Send + Sync>,
 }
 
 /// The device's side of one ask.
@@ -228,20 +257,7 @@ impl Announce {
 
 pub fn carrier() -> &'static Carrier {
     static CARRIER: OnceLock<Carrier> = OnceLock::new();
-    CARRIER.get_or_init(|| Carrier {
-        pending: PendingAsks::new(),
-        deliveries: Arc::new(MemoryStore::new()),
-        self_key: OnceLock::new(),
-        listed_proof: Mutex::new(None),
-        proven: Mutex::new(None),
-        announce: Mutex::new(None),
-        speaks: Mutex::new(None),
-        speaks_changed: tokio::sync::Notify::new(),
-        refresh: OnceLock::new(),
-        speaks_wanted: tokio::sync::Notify::new(),
-        reading: tokio::sync::Mutex::new(()),
-        reads: Mutex::new(SpeaksReads::default()),
-    })
+    CARRIER.get_or_init(Carrier::new)
 }
 
 fn now_micros() -> i64 {
@@ -249,6 +265,30 @@ fn now_micros() -> i64 {
 }
 
 impl Carrier {
+    fn new() -> Self {
+        Self {
+            pending: PendingAsks::new(),
+            deliveries: Arc::new(MemoryStore::new()),
+            self_key: OnceLock::new(),
+            listed_proof: Mutex::new(None),
+            proven: Mutex::new(None),
+            announce: Mutex::new(None),
+            speaks: Mutex::new(None),
+            speaks_changed: tokio::sync::Notify::new(),
+            refresh: OnceLock::new(),
+            speaks_wanted: tokio::sync::Notify::new(),
+            reading: tokio::sync::Mutex::new(()),
+            reads: Mutex::new(SpeaksReads::default()),
+            proof_wanted: tokio::sync::Notify::new(),
+            proving: tokio::sync::Mutex::new(()),
+            clock: Box::new(now_micros),
+        }
+    }
+
+    fn now(&self) -> i64 {
+        (self.clock)()
+    }
+
     pub fn set_self_key(&self, key: String) {
         let _ = self.self_key.set(key);
     }
@@ -284,49 +324,55 @@ impl Carrier {
         self.reads.lock().unwrap_or_else(|e| e.into_inner())
     }
 
-    /// Whether a read on demand may be made now: none was made yet, the last
-    /// one the cell answered began `SPEAKS_REFRESH_SECS` ago or more, or the
-    /// last one it did not answer began `SPEAKS_RETRY_SECS` ago or more.
-    pub fn read_due(&self, now_micros: i64) -> bool {
-        match self.reads_lock().last {
-            None => true,
-            Some((at, true)) => now_micros >= at.saturating_add(SPEAKS_REFRESH_MICROS),
-            Some((at, false)) => now_micros >= at.saturating_add(SPEAKS_RETRY_MICROS),
+    /// Whether a read wanted for `want` may be made at `now_micros` (`Want`).
+    pub fn read_due(&self, want: Want, now_micros: i64) -> bool {
+        let last = self.reads_lock().last;
+        match (want, last) {
+            (Want::Now, _) | (_, None) => true,
+            (Want::Ask, Some((at, false))) => now_micros >= at.saturating_add(SPEAKS_RETRY_MICROS),
+            (Want::Ask | Want::Request, Some((at, _))) => {
+                now_micros >= at.saturating_add(SPEAKS_REFRESH_MICROS)
+            }
         }
     }
 
-    /// Something wants whom this node speaks for and cannot wait for it (an
-    /// ask, in the transport's event loop): wake the reader when a read is
-    /// due. Nothing by timer, which reads without being asked.
+    /// A device's ask wants whom this node speaks for and cannot wait for it
+    /// (it is answered in the transport's event loop): wake the reader when a
+    /// read is due. Nothing by timer, which reads without being asked.
     pub fn want_speaks(&self, now_micros: i64) {
-        if self.refresh() == SpeaksRefresh::Demand && self.read_due(now_micros) {
+        if self.refresh() == SpeaksRefresh::Demand && self.read_due(Want::Ask, now_micros) {
             self.speaks_wanted.notify_one();
         }
     }
 
-    /// Wait until something wants whom this node speaks for.
+    /// Wait until an ask wants whom this node speaks for.
     pub async fn speaks_wanted(&self) {
         self.speaks_wanted.notified().await
     }
 
     /// What an ask from `source` is listed on. By timer, the last read. On
-    /// demand the ask wants a read, and is listed on one no older than
-    /// `SPEAKS_REFRESH_SECS`; only a device already on this node's list, from
-    /// the same peer, keeps its place on an older one while the next is made.
+    /// demand an ask its device signed from `source` wants a read, and the ask
+    /// is listed on a read no older than `SPEAKS_REFRESH_SECS`. Only the same
+    /// ceremony (the same request, state and challenge included) already on
+    /// this node's list from the same peer keeps its place on an older read,
+    /// inside `SPEAKS_MAX_AGE_MICROS`, while the next is made; a new ceremony
+    /// from a listed device is a new ask.
     fn speaks_for_ask(&self, source: &str, ask: &Ask, now_micros: i64) -> Speaks {
         if self.refresh() == SpeaksRefresh::Timer {
             return self.speaks(now_micros);
         }
-        self.want_speaks(now_micros);
+        if ask.signed_from(source) {
+            self.want_speaks(now_micros);
+        }
         match self.speaks_within(now_micros, SPEAKS_REFRESH_MICROS) {
             Speaks::Unknown => {}
             fresh => return fresh,
         }
-        let waiting = self
+        let same_ceremony = self
             .pending
             .pick(&ask.request.device_key, now_micros)
-            .is_some_and(|p| p.source == source);
-        if waiting {
+            .is_some_and(|p| p.source == source && p.ask.request == ask.request);
+        if same_ceremony {
             self.speaks(now_micros)
         } else {
             Speaks::Unknown
@@ -336,10 +382,11 @@ impl Carrier {
     /// Whether the timer is resting on a coordinator without the standing
     /// function. The rest ends when this process has applied a coordinator
     /// update since it began, or at its cap.
-    pub fn resting(&self, now_micros: i64, coordinator_updates: u64) -> bool {
+    pub fn resting(&self, coordinator_updates: u64) -> bool {
+        let now = self.now();
         let mut reads = self.reads_lock();
         match reads.rest {
-            Some((seen, until)) if seen == coordinator_updates && now_micros < until => true,
+            Some((seen, until)) if seen == coordinator_updates && now < until => true,
             Some(_) => {
                 info!("device carrier: asking the coordinator for this node's standing again");
                 reads.rest = None;
@@ -349,34 +396,42 @@ impl Carrier {
         }
     }
 
-    /// Take what one read answered. A read the cell could not answer leaves
-    /// the last one to age into unknown. A failing read says so once at warn
-    /// and then at debug until it answers.
+    /// Take what one read answered: its evidence as of `began_micros`, when
+    /// its turn came and before the cell was asked, and the next read paced
+    /// from `done_micros`. A read the cell could not answer leaves the last
+    /// one to age into unknown. A failing read says so once at warn and then
+    /// at debug until it answers.
     fn note_read(
         &self,
         read: Result<Speaks, super::device_consent::CellFailure>,
-        now_micros: i64,
+        began_micros: i64,
+        done_micros: i64,
         coordinator_updates: u64,
     ) {
         match read {
             Ok(speaks) => {
-                self.set_speaks(speaks, now_micros);
+                let person = speaks.person().is_some();
+                self.set_speaks(speaks, began_micros);
                 let mut reads = self.reads_lock();
-                reads.last = Some((now_micros, true));
+                reads.last = Some((done_micros, true));
                 reads.rest = None;
                 if reads.failing.take().is_some() {
                     info!("device carrier: whom this node speaks for can be read again");
                 }
+                drop(reads);
+                if person {
+                    self.proof_wanted.notify_one();
+                }
             }
             Err(why) => {
-                let missing = function_missing(&why);
+                let missing = super::device_consent_cell::standing_function_missing(&why);
                 let mut reads = self.reads_lock();
                 // The function's absence is an answer, and a lasting one.
-                reads.last = Some((now_micros, missing));
+                reads.last = Some((done_micros, missing));
                 if missing {
                     reads.rest = Some((
                         coordinator_updates,
-                        now_micros.saturating_add(SPEAKS_REST_MAX_MICROS),
+                        done_micros.saturating_add(SPEAKS_REST_MAX_MICROS),
                     ));
                 }
                 if reads.failing.replace(missing) == Some(missing) {
@@ -400,35 +455,38 @@ impl Carrier {
         }
     }
 
-    /// One read of whom this node speaks for, from its own cell, and this
-    /// node's listing proof after it when `link` is given. One runs at a
-    /// time: a second caller waits for the first, and a caller that wanted a
-    /// read only if due then finds it made. Whether this call read.
+    /// One read of whom this node speaks for, from its own cell. One runs at
+    /// a time: a second caller waits for the first, and the time it is judged
+    /// at is taken when its turn comes, not when it arrived, so callers that
+    /// queued behind a slow read do not each read after it. With no cell
+    /// (the conductor is not reachable yet) the turn is spent as a read the
+    /// cell did not answer. Whether this call read.
     // bounded-work: one standing read, and one Human read when this node is a
-    // controller; on demand at most one answered read per SPEAKS_REFRESH_SECS
-    // and one unanswered per SPEAKS_RETRY_SECS, however many ask.
+    // controller. `Want::Request`: at most one attempt per SPEAKS_REFRESH_SECS
+    // however many callers. `Want::Ask`: at most one answered read per
+    // SPEAKS_REFRESH_SECS and one unanswered per SPEAKS_RETRY_SECS.
     pub async fn read_turn(
         &self,
-        cell: &dyn ControllerCell,
+        cell: Option<&dyn ControllerCell>,
         names: &dyn IdentifierSource,
-        link: Option<&dyn CarrierLink>,
         want: Want,
-        now_micros: i64,
         coordinator_updates: u64,
     ) -> bool {
-        self.set_self_key(cell.agent());
         let _one = self.reading.lock().await;
-        if want == Want::IfDue && !self.read_due(now_micros) {
+        let began = self.now();
+        if !self.read_due(want, began) {
             return false;
         }
-        self.reads_lock().last = Some((now_micros, false));
+        // Spent before the cell is asked: a caller that goes away while the
+        // read is out does not leave the next one free to follow at once.
+        self.reads_lock().last = Some((began, false));
+        let Some(cell) = cell else {
+            debug!("device carrier: no cell to read whom this node speaks for from yet");
+            return false;
+        };
+        self.set_self_key(cell.agent());
         let read = read_speaks(cell, names).await;
-        self.note_read(read, now_micros, coordinator_updates);
-        // bounded-work: one mandated signature per key and transport id for
-        // the process's life.
-        if let Some(link) = link {
-            self.ensure_listed_proof(cell, link, now_micros).await;
-        }
+        self.note_read(read, began, self.now(), coordinator_updates);
         true
     }
 
@@ -437,38 +495,44 @@ impl Carrier {
         &self,
         cell: &dyn ControllerCell,
         names: &dyn IdentifierSource,
-        link: Option<&dyn CarrierLink>,
-        now_micros: i64,
         coordinator_updates: u64,
     ) -> bool {
-        if self.resting(now_micros, coordinator_updates) {
+        if self.resting(coordinator_updates) {
             return false;
         }
-        self.read_turn(
-            cell,
-            names,
-            link,
-            Want::Now,
-            now_micros,
-            coordinator_updates,
-        )
-        .await
+        self.read_turn(Some(cell), names, Want::Now, coordinator_updates)
+            .await
+    }
+
+    /// Wait until the timer's next refresh is due: `SPEAKS_REFRESH_SECS`, or
+    /// sooner when this node's identity may have changed.
+    pub async fn until_refresh(&self) {
+        tokio::select! {
+            _ = tokio::time::sleep(std::time::Duration::from_secs(SPEAKS_REFRESH_SECS)) => {}
+            _ = self.speaks_changed.notified() => {}
+        }
+    }
+
+    /// Wait until a read says this node speaks for someone.
+    pub async fn proof_wanted(&self) {
+        self.proof_wanted.notified().await
     }
 
     /// Make this node's listing proof when it speaks for someone and holds
     /// none for its key at its transport id: one mandate grant, once per key
-    /// and transport id (adversarial review, high 3).
-    pub async fn ensure_listed_proof(
-        &self,
-        cell: &dyn ControllerCell,
-        link: &dyn CarrierLink,
-        now_micros: i64,
-    ) {
+    /// and transport id (adversarial review, high 3). One is made at a time,
+    /// and a caller that finds one being made leaves it to that one. The
+    /// signature waits on this node's chain with no deadline of its own, so
+    /// this is never called with a read out (`prover`).
+    pub async fn ensure_listed_proof(&self, cell: &dyn ControllerCell, link: &dyn CarrierLink) {
+        let Ok(_one) = self.proving.try_lock() else {
+            return;
+        };
         let Some(tid) = link.self_transport() else {
             return;
         };
         let key = cell.agent();
-        if self.speaks(now_micros).person().is_none() || self.has_listed_proof(&key, &tid) {
+        if self.speaks(self.now()).person().is_none() || self.has_listed_proof(&key, &tid) {
             return;
         }
         match cell.sign_carrier(CarrierKind::Listed, "", &tid, "").await {
@@ -642,7 +706,7 @@ impl Carrier {
 
     fn on_ask(&self, source: &str, ask: Ask) -> Option<CarryResponse> {
         let device = consent_grant::hash_shape::fingerprint(&ask.request.device_key);
-        let now = now_micros();
+        let now = self.now();
         let speaks = self.speaks_for_ask(source, &ask, now);
         match self.pending.admit(
             ask,
@@ -939,12 +1003,71 @@ async fn handback_proof(
     }
 }
 
-/// Wait until the timer's next refresh is due: `SPEAKS_REFRESH_SECS`, or
-/// sooner when this node's identity may have changed.
-pub async fn until_speaks_refresh() {
-    tokio::select! {
-        _ = tokio::time::sleep(std::time::Duration::from_secs(SPEAKS_REFRESH_SECS)) => {}
-        _ = carrier().speaks_changed.notified() => {}
+/// The demand reader: each time an ask wants whom this node speaks for, one
+/// turn. `cell` is this node's own cell when its conductor is reachable.
+// bounded-work: nothing while no ask wants a read; then `Carrier::read_turn`.
+pub async fn demand_reader<C, F>(
+    carrier: &Carrier,
+    cell: F,
+    names: &dyn IdentifierSource,
+    coordinator_updates: fn() -> u64,
+) where
+    C: ControllerCell,
+    F: Fn() -> Option<C> + Send + Sync,
+{
+    loop {
+        carrier.speaks_wanted().await;
+        let cell = cell();
+        carrier
+            .read_turn(
+                cell.as_ref().map(|c| c as &dyn ControllerCell),
+                names,
+                Want::Ask,
+                coordinator_updates(),
+            )
+            .await;
+    }
+}
+
+/// The timer: a turn every `SPEAKS_REFRESH_SECS`, or sooner when this node's
+/// identity may have changed, whether or not anyone asks.
+// bounded-work: one standing read (and one Human read when this node is a
+// controller) per SPEAKS_REFRESH_SECS; never per incoming ask, and none while
+// resting on a coordinator without the function.
+pub async fn timer_reader<C, F>(
+    carrier: &Carrier,
+    cell: F,
+    names: &dyn IdentifierSource,
+    coordinator_updates: fn() -> u64,
+) where
+    C: ControllerCell,
+    F: Fn() -> Option<C> + Send + Sync,
+{
+    loop {
+        if let Some(cell) = cell() {
+            carrier
+                .timer_turn(&cell, names, coordinator_updates())
+                .await;
+        }
+        carrier.until_refresh().await;
+    }
+}
+
+/// The listing proof's own worker, in either mode: woken by a read that says
+/// this node speaks for someone, apart from the reads so that a signature
+/// waiting on this node's chain holds up no read.
+// bounded-work: one mandated signature per key and transport id for the
+// process's life; tried at most once per answered read until it is made.
+pub async fn prover<C, F>(carrier: &Carrier, cell: F, link: &dyn CarrierLink)
+where
+    C: ControllerCell,
+    F: Fn() -> Option<C> + Send + Sync,
+{
+    loop {
+        carrier.proof_wanted().await;
+        if let Some(cell) = cell() {
+            carrier.ensure_listed_proof(&cell, link).await;
+        }
     }
 }
 
@@ -1421,20 +1544,7 @@ mod tests {
     }
 
     fn fresh() -> Carrier {
-        Carrier {
-            pending: PendingAsks::new(),
-            deliveries: Arc::new(MemoryStore::new()),
-            self_key: OnceLock::new(),
-            listed_proof: Mutex::new(None),
-            proven: Mutex::new(None),
-            announce: Mutex::new(None),
-            speaks: Mutex::new(None),
-            speaks_changed: tokio::sync::Notify::new(),
-            refresh: OnceLock::new(),
-            speaks_wanted: tokio::sync::Notify::new(),
-            reading: tokio::sync::Mutex::new(()),
-            reads: Mutex::new(SpeaksReads::default()),
-        }
+        Carrier::new()
     }
 
     /// A real key `n`, and its agent key text.
@@ -2047,41 +2157,101 @@ mod tests {
 
     // --- how whom this node speaks for is kept: on demand, or by timer ---
 
+    use crate::services::device_consent::CellFailure;
+    use std::sync::atomic::{AtomicBool, AtomicI64, AtomicUsize, Ordering::SeqCst};
+
     const SECOND: i64 = 1_000_000;
     const MISSING: &str = "Conductor error: Attempted to call a zome function that doesn't \
                            exist: Zome: mishpat Fn my_consent_standing";
 
-    /// A cell that counts its standing reads, and holds each one until it is
-    /// let go when `held` is set.
-    struct CountedCell {
-        standing: Mutex<Result<ConsentStanding, crate::services::device_consent::CellFailure>>,
-        reads: std::sync::atomic::AtomicUsize,
-        held: Option<tokio::sync::Semaphore>,
+    /// A clock a test moves by hand.
+    #[derive(Clone)]
+    struct Clock(Arc<AtomicI64>);
+
+    impl Clock {
+        fn new() -> Self {
+            Self(Arc::new(AtomicI64::new(1_000_000 * SECOND)))
+        }
+        fn at(&self) -> i64 {
+            self.0.load(SeqCst)
+        }
+        fn set(&self, micros: i64) {
+            self.0.store(micros, SeqCst)
+        }
+        fn pass(&self, micros: i64) {
+            self.0.fetch_add(micros, SeqCst);
+        }
     }
+
+    /// A carrier that reads its time from `clock`.
+    fn carrier_at(clock: &Clock) -> Carrier {
+        let clock = clock.clone();
+        Carrier {
+            clock: Box::new(move || clock.at()),
+            ..Carrier::new()
+        }
+    }
+
+    struct Counted {
+        standing: Mutex<Result<ConsentStanding, CellFailure>>,
+        reads: AtomicUsize,
+        out: AtomicUsize,
+        most_out: AtomicUsize,
+        hold_reads: AtomicBool,
+        read_gate: tokio::sync::Semaphore,
+        hold_proofs: AtomicBool,
+        proof_gate: tokio::sync::Semaphore,
+        proofs: AtomicUsize,
+    }
+
+    /// A cell that counts its standing reads and how many were out at once,
+    /// and holds each read, or each proof, until it is let go when told to.
+    #[derive(Clone)]
+    struct CountedCell(Arc<Counted>);
 
     impl CountedCell {
-        fn new(
-            standing: Result<ConsentStanding, crate::services::device_consent::CellFailure>,
-        ) -> Self {
-            Self {
+        fn new(standing: Result<ConsentStanding, CellFailure>) -> Self {
+            Self(Arc::new(Counted {
                 standing: Mutex::new(standing),
-                reads: std::sync::atomic::AtomicUsize::new(0),
-                held: None,
-            }
+                reads: AtomicUsize::new(0),
+                out: AtomicUsize::new(0),
+                most_out: AtomicUsize::new(0),
+                hold_reads: AtomicBool::new(false),
+                read_gate: tokio::sync::Semaphore::new(0),
+                hold_proofs: AtomicBool::new(false),
+                proof_gate: tokio::sync::Semaphore::new(0),
+                proofs: AtomicUsize::new(0),
+            }))
         }
         fn reads(&self) -> usize {
-            self.reads.load(std::sync::atomic::Ordering::SeqCst)
+            self.0.reads.load(SeqCst)
         }
-        fn answers(
-            &self,
-            standing: Result<ConsentStanding, crate::services::device_consent::CellFailure>,
-        ) {
-            *self.standing.lock().unwrap() = standing;
+        fn most_out(&self) -> usize {
+            self.0.most_out.load(SeqCst)
+        }
+        fn proofs(&self) -> usize {
+            self.0.proofs.load(SeqCst)
+        }
+        fn answers(&self, standing: Result<ConsentStanding, CellFailure>) {
+            *self.0.standing.lock().unwrap() = standing;
+        }
+        fn hold_reads(&self, hold: bool) {
+            self.0.hold_reads.store(hold, SeqCst);
+        }
+        fn let_reads_go(&self, n: usize) {
+            self.0.read_gate.add_permits(n);
+        }
+        fn hold_proofs(&self) {
+            self.0.hold_proofs.store(true, SeqCst);
         }
     }
 
-    fn without_the_function() -> crate::services::device_consent::CellFailure {
-        crate::services::device_consent::CellFailure::Unavailable(MISSING.into())
+    fn without_the_function() -> CellFailure {
+        CellFailure::Unavailable(MISSING.into())
+    }
+
+    fn down() -> CellFailure {
+        CellFailure::Unavailable("down".into())
     }
 
     #[async_trait]
@@ -2089,42 +2259,32 @@ mod tests {
         fn agent(&self) -> String {
             crate::services::device_consent::tests::CONTROLLER.into()
         }
-        async fn standing(
-            &self,
-        ) -> Result<ConsentStanding, crate::services::device_consent::CellFailure> {
-            self.reads.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
-            if let Some(held) = &self.held {
-                held.acquire().await.unwrap().forget();
+        async fn standing(&self) -> Result<ConsentStanding, CellFailure> {
+            self.0.reads.fetch_add(1, SeqCst);
+            let out = self.0.out.fetch_add(1, SeqCst) + 1;
+            self.0.most_out.fetch_max(out, SeqCst);
+            if self.0.hold_reads.load(SeqCst) {
+                self.0.read_gate.acquire().await.unwrap().forget();
             }
-            self.standing.lock().unwrap().clone()
+            self.0.out.fetch_sub(1, SeqCst);
+            self.0.standing.lock().unwrap().clone()
         }
         async fn sign(
             &self,
             _: &crate::services::device_consent::ApprovalRequest,
-        ) -> Result<
-            crate::services::device_consent::ApprovalProofs,
-            crate::services::device_consent::CellFailure,
-        > {
-            Err(without_the_function())
+        ) -> Result<crate::services::device_consent::ApprovalProofs, CellFailure> {
+            Err(down())
         }
-        async fn bootstrap(
-            &self,
-            _: &str,
-        ) -> Result<(), crate::services::device_consent::CellFailure> {
+        async fn bootstrap(&self, _: &str) -> Result<(), CellFailure> {
             Ok(())
         }
         async fn create_human(
             &self,
             _: &crate::services::device_consent::NewHuman,
-        ) -> Result<(), crate::services::device_consent::CellFailure> {
+        ) -> Result<(), CellFailure> {
             Ok(())
         }
-        async fn my_human(
-            &self,
-        ) -> Result<
-            Option<consent_grant::ExistingIdentity>,
-            crate::services::device_consent::CellFailure,
-        > {
+        async fn my_human(&self) -> Result<Option<consent_grant::ExistingIdentity>, CellFailure> {
             Ok(None)
         }
         async fn sign_carrier(
@@ -2133,7 +2293,11 @@ mod tests {
             state: &str,
             transport_id: &str,
             challenge: &str,
-        ) -> Result<CarrierProof, crate::services::device_consent::CellFailure> {
+        ) -> Result<CarrierProof, CellFailure> {
+            self.0.proofs.fetch_add(1, SeqCst);
+            if self.0.hold_proofs.load(SeqCst) {
+                self.0.proof_gate.acquire().await.unwrap().forget();
+            }
             Ok(proof_by(61, kind, state, transport_id, challenge))
         }
     }
@@ -2145,22 +2309,24 @@ mod tests {
         }
     }
 
-    /// Whether something has wanted a read since the last one was taken.
+    /// Whether an ask has wanted a read since the last want was taken.
     async fn wanted(c: &Carrier) -> bool {
         tokio::time::timeout(std::time::Duration::from_millis(20), c.speaks_wanted())
             .await
             .is_ok()
     }
 
-    /// Make the last read, and what it answered, `secs` old.
-    fn age(c: &Carrier, secs: i64) {
-        let at = now_micros() - secs * SECOND;
-        if let Some((_, stamp)) = c.speaks.lock().unwrap().as_mut() {
-            *stamp = at;
+    /// Let every spawned task run as far as it can.
+    async fn settle() {
+        for _ in 0..64 {
+            tokio::task::yield_now().await;
         }
-        if let Some((stamp, _)) = c.reads_lock().last.as_mut() {
-            *stamp = at;
-        }
+    }
+
+    /// One turn in a task of its own.
+    fn turn(c: &Arc<Carrier>, cell: &CountedCell, want: Want) -> tokio::task::JoinHandle<bool> {
+        let (c, cell) = (c.clone(), cell.clone());
+        tokio::spawn(async move { c.read_turn(Some(&cell), &Names, want, 0).await })
     }
 
     #[test]
@@ -2190,27 +2356,43 @@ mod tests {
         assert_eq!(c.refresh(), SpeaksRefresh::Timer);
     }
 
+    /// The production demand reader and prover, run as `HttpServer::serve`
+    /// runs them: an ask wakes the reader, the reader reads, the read wakes
+    /// the prover, and the device's re-offer is listed.
     #[tokio::test]
-    async fn on_demand_a_resting_node_reads_nothing_and_the_first_ask_is_listed_when_offered_again()
-    {
-        let c = fresh();
+    async fn on_demand_a_resting_node_reads_nothing_and_the_readers_own_loop_lists_the_re_offer() {
+        let clock = Clock::new();
+        let c = Arc::new(carrier_at(&clock));
         let cell = CountedCell::new(Ok(ready()));
-        // Nothing asks: nothing wants a read, and the cell is not read.
-        assert!(!wanted(&c).await);
+        let reader = {
+            let (c, cell) = (c.clone(), cell.clone());
+            tokio::spawn(async move {
+                demand_reader(&c, move || Some(cell.clone()), &Names, || 0).await
+            })
+        };
+        let proofs = {
+            let (c, cell) = (c.clone(), cell.clone());
+            tokio::spawn(async move {
+                let link = FakeLink(std::sync::Mutex::new(vec![]));
+                prover(&c, move || Some(cell.clone()), &link).await
+            })
+        };
+        // Nothing asks, for an hour: the cell is not read.
+        settle().await;
+        clock.pass(3600 * SECOND);
+        settle().await;
         assert_eq!(cell.reads(), 0);
-        // An ask cannot wait for the read: it wants one and is not answered.
+        assert_eq!(cell.proofs(), 0);
+        // An ask cannot wait for the read: it wakes the reader and is not
+        // answered.
         assert_eq!(c.on_request("peer-a", offer(31, "peer-a")), None);
         assert!(c.pending.is_empty());
-        assert!(wanted(&c).await);
-        assert_eq!(cell.reads(), 0);
-        // The reader it woke reads once, and makes the listing proof.
-        let link = FakeLink(std::sync::Mutex::new(vec![]));
-        assert!(
-            c.read_turn(&cell, &Names, Some(&link), Want::IfDue, now_micros(), 0)
-                .await
-        );
+        settle().await;
         assert_eq!(cell.reads(), 1);
-        // The device offers again and is listed, with this node's proof.
+        assert_eq!(cell.proofs(), 1);
+        // The device offers again five seconds on and is listed, with this
+        // node's proof.
+        clock.pass(5 * SECOND);
         let Some(CarryResponse::Listed { number, proof, .. }) =
             c.on_request("peer-a", offer(31, "peer-a"))
         else {
@@ -2218,118 +2400,275 @@ mod tests {
         };
         assert_eq!(number, 1);
         assert!(proof.is_some());
-        // Listed on a fresh read: no further read is wanted.
-        assert!(!wanted(&c).await);
-        assert_eq!(cell.reads(), 1);
-    }
-
-    #[tokio::test]
-    async fn on_demand_one_read_runs_at_a_time_and_those_who_waited_share_it() {
-        let c = fresh();
-        let mut cell = CountedCell::new(Ok(ready()));
-        cell.held = Some(tokio::sync::Semaphore::new(0));
-        let now = now_micros();
-        let turn = || c.read_turn(&cell, &Names, None, Want::IfDue, now, 0);
-        let release = async {
-            // Let every caller reach the read, or its wait for it, first.
-            for _ in 0..16 {
-                tokio::task::yield_now().await;
-            }
-            assert_eq!(cell.reads(), 1);
-            cell.held.as_ref().unwrap().add_permits(8);
-        };
-        let (a, b, d, e, ()) = tokio::join!(turn(), turn(), turn(), turn(), release);
-        assert_eq!([a, b, d, e].iter().filter(|read| **read).count(), 1);
-        assert_eq!(cell.reads(), 1);
-        assert!(c.speaks(now).person().is_some());
-        // An identity write reads whatever was read a moment ago.
-        assert!(c.read_turn(&cell, &Names, None, Want::Now, now, 0).await);
-        assert_eq!(cell.reads(), 2);
-    }
-
-    #[tokio::test]
-    async fn on_demand_a_burst_of_asks_is_one_read_in_thirty_seconds() {
-        let c = fresh();
-        let cell = CountedCell::new(Ok(ready()));
-        let start = now_micros();
-        // The first ask wakes the reader, which reads.
-        c.on_request("peer-a", offer(31, "peer-a"));
-        assert!(wanted(&c).await);
-        assert!(
-            c.read_turn(&cell, &Names, None, Want::IfDue, now_micros(), 0)
-                .await
-        );
-        // Two hundred more wake nobody, and a reader woken anyway reads
-        // nothing.
-        for n in 0..200u8 {
-            c.on_request("peer-a", offer(31 + n % 4, "peer-a"));
-            assert!(
-                !c.read_turn(&cell, &Names, None, Want::IfDue, now_micros(), 0)
-                    .await
-            );
+        // Its offers for the rest of the thirty seconds read nothing more.
+        for _ in 0..4 {
+            clock.pass(5 * SECOND);
+            assert!(c.on_request("peer-a", offer(31, "peer-a")).is_some());
+            settle().await;
         }
         assert_eq!(cell.reads(), 1);
-        assert!(!wanted(&c).await);
-        assert!(!c.read_due(start + 29 * SECOND));
-        assert!(c.read_due(now_micros() + 30 * SECOND));
-        // Thirty seconds on, the next ask wants the next read.
-        age(&c, 30);
-        c.on_request("peer-a", offer(31, "peer-a"));
-        assert!(wanted(&c).await);
-        assert!(
-            c.read_turn(&cell, &Names, None, Want::IfDue, now_micros(), 0)
-                .await
-        );
+        // Thirty seconds after the read, the next offer is listed on it and
+        // has the reader read again. The proof is made once.
+        clock.pass(5 * SECOND);
+        assert!(c.on_request("peer-a", offer(31, "peer-a")).is_some());
+        settle().await;
         assert_eq!(cell.reads(), 2);
+        assert_eq!(cell.proofs(), 1);
+        reader.abort();
+        proofs.abort();
     }
 
     #[tokio::test]
-    async fn on_demand_a_read_the_cell_did_not_answer_is_tried_again_after_one_re_offer() {
-        let c = fresh();
-        let cell = CountedCell::new(Err(
-            crate::services::device_consent::CellFailure::Unavailable("down".into()),
-        ));
-        let at = now_micros();
-        assert!(c.read_turn(&cell, &Names, None, Want::IfDue, at, 0).await);
-        assert_eq!(c.speaks(at), Speaks::Unknown);
-        assert!(!c.read_due(at + 4 * SECOND));
-        assert!(
-            !c.read_turn(&cell, &Names, None, Want::IfDue, at + 4 * SECOND, 0)
-                .await
-        );
-        assert!(c.read_due(at + SPEAKS_RETRY_SECS as i64 * SECOND));
-        // The conductor answers again: the next offer's read lists.
-        cell.answers(Ok(ready()));
-        assert!(
-            c.read_turn(&cell, &Names, None, Want::IfDue, at + 5 * SECOND, 0)
-                .await
-        );
-        assert!(c.speaks(at + 5 * SECOND).person().is_some());
-        assert_eq!(cell.reads(), 2);
+    async fn the_reader_with_no_cell_spends_the_wake_and_the_next_offer_tries_again() {
+        let clock = Clock::new();
+        let c = Arc::new(carrier_at(&clock));
+        let cell = CountedCell::new(Ok(ready()));
+        let reachable = Arc::new(AtomicBool::new(false));
+        let reader = {
+            let (c, cell, reachable) = (c.clone(), cell.clone(), reachable.clone());
+            tokio::spawn(async move {
+                let cell = move || reachable.load(SeqCst).then(|| cell.clone());
+                demand_reader(&c, cell, &Names, || 0).await
+            })
+        };
+        // The conductor is not reachable yet: the wake is spent as a read
+        // the cell did not answer.
+        assert_eq!(c.on_request("peer-a", offer(31, "peer-a")), None);
+        settle().await;
+        assert_eq!(cell.reads(), 0);
+        assert!(!c.read_due(Want::Ask, clock.at() + 5 * SECOND - 1));
+        assert!(c.read_due(Want::Ask, clock.at() + 5 * SECOND));
+        assert!(!c.read_due(Want::Request, clock.at() + 30 * SECOND - 1));
+        // The cell comes back, and nothing reads until something asks.
+        reachable.store(true, SeqCst);
+        settle().await;
+        assert_eq!(cell.reads(), 0);
+        // The device's next offer wakes the reader again; the one after is
+        // listed.
+        clock.pass(5 * SECOND);
+        assert_eq!(c.on_request("peer-a", offer(31, "peer-a")), None);
+        settle().await;
+        assert_eq!(cell.reads(), 1);
+        clock.pass(5 * SECOND);
+        assert!(c.on_request("peer-a", offer(31, "peer-a")).is_some());
+        reader.abort();
     }
 
     #[tokio::test]
-    async fn nothing_is_listed_on_a_read_older_than_the_bound_however_it_is_kept() {
+    async fn callers_that_queued_behind_a_slow_read_are_judged_when_their_turn_comes() {
+        let clock = Clock::new();
+        let c = Arc::new(carrier_at(&clock));
+        let cell = CountedCell::new(Ok(ready()));
+        cell.hold_reads(true);
+        let began = clock.at();
+        let first = turn(&c, &cell, Want::Request);
+        settle().await;
+        assert_eq!(cell.reads(), 1);
+        // Callers arrive at thirty, sixty and ninety seconds while it is out.
+        let mut queued = Vec::new();
+        for secs in [30, 60, 90] {
+            clock.set(began + secs * SECOND);
+            queued.push(turn(&c, &cell, Want::Request));
+            queued.push(turn(&c, &cell, Want::Ask));
+            settle().await;
+        }
+        assert_eq!(cell.reads(), 1);
+        // It lands at a hundred seconds.
+        clock.set(began + 100 * SECOND);
+        cell.hold_reads(false);
+        cell.let_reads_go(1);
+        assert!(first.await.unwrap());
+        for waited in queued {
+            assert!(!waited.await.unwrap());
+        }
+        assert_eq!(cell.reads(), 1);
+        assert_eq!(cell.most_out(), 1);
+        // Its evidence is as of when its turn came; the next read is paced
+        // from when it landed.
+        assert_eq!(c.speaks.lock().unwrap().as_ref().unwrap().1, began);
+        assert_eq!(c.reads_lock().last, Some((began + 100 * SECOND, true)));
+        clock.set(began + 130 * SECOND - 1);
+        assert!(!turn(&c, &cell, Want::Request).await.unwrap());
+        assert!(!turn(&c, &cell, Want::Ask).await.unwrap());
+        clock.set(began + 130 * SECOND);
+        assert!(turn(&c, &cell, Want::Request).await.unwrap());
+        assert_eq!(cell.reads(), 2);
+        // Identity writes always read, and still one at a time.
+        cell.hold_reads(true);
+        let writes = [
+            turn(&c, &cell, Want::Now),
+            turn(&c, &cell, Want::Now),
+            turn(&c, &cell, Want::Now),
+        ];
+        settle().await;
+        assert_eq!(cell.reads(), 3);
+        cell.let_reads_go(3);
+        for write in writes {
+            assert!(write.await.unwrap());
+        }
+        assert_eq!(cell.reads(), 5);
+        assert_eq!(cell.most_out(), 1);
+    }
+
+    #[tokio::test]
+    async fn a_burst_of_anonymous_requests_is_one_attempt_in_thirty_seconds_answered_or_not() {
+        let clock = Clock::new();
+        let c = Arc::new(carrier_at(&clock));
+        let cell = CountedCell::new(Err(down()));
+        cell.hold_reads(true);
+        let began = clock.at();
+        // Forty callers at once, and forty more over the seconds the slow
+        // read is out.
+        let mut callers: Vec<_> = (0..40).map(|_| turn(&c, &cell, Want::Request)).collect();
+        settle().await;
+        for _ in 0..40 {
+            clock.pass(SECOND / 2);
+            callers.push(turn(&c, &cell, Want::Request));
+            settle().await;
+        }
+        assert_eq!(cell.reads(), 1);
+        cell.hold_reads(false);
+        cell.let_reads_go(1);
+        let mut read = 0;
+        for caller in callers {
+            read += usize::from(caller.await.unwrap());
+        }
+        assert_eq!(read, 1);
+        assert_eq!(cell.reads(), 1);
+        assert_eq!(cell.most_out(), 1);
+        // The cell did not answer. No request has it tried again for thirty
+        // seconds from when that attempt ended...
+        let ended = began + 20 * SECOND;
+        assert_eq!(c.reads_lock().last, Some((ended, false)));
+        for secs in [1, 5, 6, 29] {
+            clock.set(ended + secs * SECOND);
+            for caller in (0..10).map(|_| turn(&c, &cell, Want::Request)) {
+                assert!(!caller.await.unwrap());
+            }
+        }
+        clock.set(ended + 30 * SECOND - 1);
+        assert!(!turn(&c, &cell, Want::Request).await.unwrap());
+        assert_eq!(cell.reads(), 1);
+        clock.set(ended + 30 * SECOND);
+        assert!(turn(&c, &cell, Want::Request).await.unwrap());
+        assert_eq!(cell.reads(), 2);
+        // ...and only a device's ask tries again after five.
+        let ended = clock.at();
+        clock.set(ended + 5 * SECOND - 1);
+        assert!(!turn(&c, &cell, Want::Ask).await.unwrap());
+        clock.set(ended + 5 * SECOND);
+        assert!(!turn(&c, &cell, Want::Request).await.unwrap());
+        assert!(turn(&c, &cell, Want::Ask).await.unwrap());
+        assert_eq!(cell.reads(), 3);
+        // An ask nobody signed wakes no reader.
+        let fresh_carrier = carrier_at(&clock);
+        let mut unsigned = signed_ask(31, request(), "peer-a");
+        unsigned.proof = None;
+        assert_eq!(
+            fresh_carrier.on_request("peer-a", CarryRequest::Ask { ask: unsigned }),
+            None
+        );
+        assert!(!wanted(&fresh_carrier).await);
+        assert_eq!(
+            fresh_carrier.on_request("peer-b", offer(31, "peer-a")),
+            None
+        );
+        assert!(!wanted(&fresh_carrier).await);
+        assert_eq!(
+            fresh_carrier.on_request("peer-a", offer(31, "peer-a")),
+            None
+        );
+        assert!(wanted(&fresh_carrier).await);
+    }
+
+    #[tokio::test]
+    async fn a_read_that_took_longer_than_the_bound_lists_nothing() {
         for refresh in [SpeaksRefresh::Demand, SpeaksRefresh::Timer] {
-            let c = fresh();
+            let clock = Clock::new();
+            let c = Arc::new(carrier_at(&clock));
             c.set_refresh(refresh);
             let cell = CountedCell::new(Ok(ready()));
-            c.read_turn(&cell, &Names, None, Want::Now, now_micros(), 0)
-                .await;
+            cell.hold_reads(true);
+            let slow = turn(&c, &cell, Want::Now);
+            settle().await;
+            clock.pass(SPEAKS_MAX_AGE_MICROS);
+            cell.let_reads_go(1);
+            assert!(slow.await.unwrap());
+            // It answered that the node speaks for someone, 120 s ago.
+            assert_eq!(c.speaks(clock.at()), Speaks::Unknown, "{refresh:?}");
+            assert_eq!(c.on_request("peer-a", offer(31, "peer-a")), None);
+            assert!(c.pending.is_empty());
+        }
+    }
+
+    #[tokio::test]
+    async fn a_proof_that_cannot_be_made_holds_up_no_read() {
+        let clock = Clock::new();
+        let c = Arc::new(carrier_at(&clock));
+        let cell = CountedCell::new(Ok(ready()));
+        cell.hold_proofs();
+        let proofs = {
+            let (c, cell) = (c.clone(), cell.clone());
+            tokio::spawn(async move {
+                let link = FakeLink(std::sync::Mutex::new(vec![]));
+                prover(&c, move || Some(cell.clone()), &link).await
+            })
+        };
+        // The first read wakes the prover, whose signature never comes back.
+        assert!(c.read_turn(Some(&cell), &Names, Want::Now, 0).await);
+        settle().await;
+        assert_eq!(cell.proofs(), 1);
+        assert!(!c.has_listed_proof(&cell.agent(), "peer-self"));
+        // Every kind of read still runs, and the ask is still listed.
+        let second = std::time::Duration::from_secs(1);
+        for want in [Want::Now, Want::Now] {
+            let read = tokio::time::timeout(second, c.read_turn(Some(&cell), &Names, want, 0));
+            assert!(read.await.expect("the read did not wait for the proof"));
+        }
+        clock.pass(30 * SECOND);
+        for want in [Want::Request, Want::Ask] {
+            let read = tokio::time::timeout(second, c.read_turn(Some(&cell), &Names, want, 0));
+            read.await.expect("the read did not wait for the proof");
+        }
+        assert_eq!(cell.reads(), 4);
+        assert!(matches!(
+            c.on_request("peer-a", offer(31, "peer-a")),
+            Some(CarryResponse::Listed { proof: None, .. })
+        ));
+        // A second proof is not started beside the first.
+        let link = FakeLink(std::sync::Mutex::new(vec![]));
+        tokio::time::timeout(second, c.ensure_listed_proof(&cell, &link))
+            .await
+            .expect("left to the one being made");
+        settle().await;
+        assert_eq!(cell.proofs(), 1);
+        proofs.abort();
+    }
+
+    #[tokio::test]
+    async fn nothing_is_listed_on_a_read_as_old_as_the_bound_however_it_is_kept() {
+        for refresh in [SpeaksRefresh::Demand, SpeaksRefresh::Timer] {
+            let clock = Clock::new();
+            let c = carrier_at(&clock);
+            c.set_refresh(refresh);
+            let cell = CountedCell::new(Ok(ready()));
+            let read_at = clock.at();
+            c.read_turn(Some(&cell), &Names, Want::Now, 0).await;
             assert!(matches!(
                 c.on_request("peer-a", offer(31, "peer-a")),
                 Some(CarryResponse::Listed { number: 1, .. })
             ));
-            // Inside the bound the device on the list keeps its place.
-            age(&c, 119);
+            // One microsecond inside the bound the same ceremony keeps its
+            // place.
+            clock.set(read_at + SPEAKS_MAX_AGE_MICROS - 1);
             assert!(matches!(
                 c.on_request("peer-a", offer(31, "peer-a")),
                 Some(CarryResponse::Listed { number: 1, .. })
             ));
-            // Past it nothing is listed: not the device on the list, not a
-            // new one.
-            age(&c, 121);
-            assert_eq!(c.speaks(now_micros()), Speaks::Unknown, "{refresh:?}");
+            // At the bound nothing is listed: not that ceremony, not a new
+            // device.
+            clock.set(read_at + SPEAKS_MAX_AGE_MICROS);
+            assert_eq!(c.speaks(clock.at()), Speaks::Unknown, "{refresh:?}");
             assert_eq!(c.on_request("peer-a", offer(31, "peer-a")), None);
             assert_eq!(c.on_request("peer-b", offer(32, "peer-b")), None);
             assert_eq!(c.pending.len(), 1, "{refresh:?}");
@@ -2337,170 +2676,244 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn on_demand_a_new_ask_is_listed_only_on_a_read_no_older_than_the_refresh() {
-        let c = fresh();
+    async fn on_demand_a_new_ask_is_listed_only_on_a_read_younger_than_the_refresh() {
+        let clock = Clock::new();
+        let c = carrier_at(&clock);
         let cell = CountedCell::new(Ok(ready()));
-        c.read_turn(&cell, &Names, None, Want::Now, now_micros(), 0)
-            .await;
+        let read_at = clock.at();
+        c.read_turn(Some(&cell), &Names, Want::Now, 0).await;
         assert!(c.on_request("peer-a", offer(31, "peer-a")).is_some());
-        age(&c, 29);
+        // One microsecond inside thirty seconds: listed, and no read wanted.
+        clock.set(read_at + 30 * SECOND - 1);
         assert!(matches!(
             c.on_request("peer-b", offer(32, "peer-b")),
             Some(CarryResponse::Listed { number: 2, .. })
         ));
         assert!(!wanted(&c).await);
-        // An older read lists no new device; it wants the next read. A
-        // device's key offered from another peer is new, too.
-        age(&c, 31);
+        // At thirty seconds a new device is not listed; it wants the read.
+        clock.set(read_at + 30 * SECOND);
         assert_eq!(c.on_request("peer-c", offer(33, "peer-c")), None);
-        assert_eq!(c.on_request("peer-c", offer(31, "peer-c")), None);
         assert!(wanted(&c).await);
         assert_eq!(c.pending.len(), 2);
+        // By timer the same new device is listed on that read.
+        let t = carrier_at(&clock);
+        t.set_refresh(SpeaksRefresh::Timer);
+        clock.set(read_at);
+        t.read_turn(Some(&cell), &Names, Want::Now, 0).await;
+        clock.set(read_at + 30 * SECOND);
+        assert!(t.on_request("peer-c", offer(33, "peer-c")).is_some());
+    }
+
+    #[tokio::test]
+    async fn on_demand_only_the_same_ceremony_keeps_its_place_on_an_older_read() {
+        let clock = Clock::new();
+        let c = carrier_at(&clock);
+        let cell = CountedCell::new(Ok(ready()));
+        c.read_turn(Some(&cell), &Names, Want::Now, 0).await;
+        assert!(c.on_request("peer-a", offer(31, "peer-a")).is_some());
+        clock.pass(60 * SECOND);
+        // The same ceremony, offered again from the same peer: its place.
+        assert!(matches!(
+            c.on_request("peer-a", offer(31, "peer-a")),
+            Some(CarryResponse::Listed { number: 1, .. })
+        ));
+        // The listed device begins another ceremony (a new state, or a new
+        // challenge), signed by it from the same peer: a new ask, not listed
+        // on the old read, and the first is not replaced.
+        let mut restated = request();
+        restated.state = "t".repeat(32);
+        let mut rechallenged = request();
+        rechallenged.code_challenge = pkce::challenge(&"w".repeat(43));
+        for other in [restated, rechallenged] {
+            let ask = signed_ask(31, other, "peer-a");
+            assert_eq!(c.on_request("peer-a", CarryRequest::Ask { ask }), None);
+        }
+        // The same ceremony from another peer is not the listed one either.
+        assert_eq!(c.on_request("peer-b", offer(31, "peer-b")), None);
+        let listed = c.pending.list(clock.at());
+        assert_eq!(listed.len(), 1);
+        assert_eq!(listed[0].ask.request, request_of(31));
+        // On a fresh read the new ceremony replaces the old, as before.
+        clock.pass(SECOND);
+        c.read_turn(Some(&cell), &Names, Want::Now, 0).await;
+        let mut restated = request();
+        restated.state = "t".repeat(32);
+        let ask = signed_ask(31, restated, "peer-a");
+        assert!(matches!(
+            c.on_request("peer-a", CarryRequest::Ask { ask }),
+            Some(CarryResponse::Listed { number: 1, .. })
+        ));
+    }
+
+    /// `request()` as device `n` asks it.
+    fn request_of(n: u8) -> GrantRequest {
+        signed_ask(n, request(), "peer-a").request
     }
 
     #[tokio::test]
     async fn on_demand_a_node_whose_record_stopped_standing_stops_listing_at_the_next_ask() {
-        let c = fresh();
+        let clock = Clock::new();
+        let c = carrier_at(&clock);
         let cell = CountedCell::new(Ok(ready()));
-        c.read_turn(&cell, &Names, None, Want::Now, now_micros(), 0)
-            .await;
+        c.read_turn(Some(&cell), &Names, Want::Now, 0).await;
         assert!(c.on_request("peer-a", offer(31, "peer-a")).is_some());
         // The record stops standing while the node rests.
         cell.answers(Ok(ConsentStanding::NoPerson));
-        age(&c, 60);
+        clock.pass(60 * SECOND);
         assert_eq!(cell.reads(), 1);
         // A new device is not listed on what was read before.
         assert_eq!(c.on_request("peer-b", offer(32, "peer-b")), None);
-        // The device already listed keeps its place for this one offer, and
-        // the offer wants the read.
+        // The ceremony already listed keeps its place for this offer, on a
+        // read sixty seconds old where a timer would have read again; the
+        // offer wants the read.
         assert!(matches!(
             c.on_request("peer-a", offer(31, "peer-a")),
             Some(CarryResponse::Listed { number: 1, .. })
         ));
         assert!(wanted(&c).await);
-        assert!(
-            c.read_turn(&cell, &Names, None, Want::IfDue, now_micros(), 0)
-                .await
-        );
-        assert_eq!(c.speaks(now_micros()), Speaks::Nobody);
+        assert!(c.read_turn(Some(&cell), &Names, Want::Ask, 0).await);
+        assert_eq!(c.speaks(clock.at()), Speaks::Nobody);
         // The next ask, from anyone, is dropped unanswered.
+        clock.pass(5 * SECOND);
         assert_eq!(c.on_request("peer-a", offer(31, "peer-a")), None);
         assert_eq!(c.on_request("peer-b", offer(32, "peer-b")), None);
     }
 
     #[tokio::test]
     async fn by_timer_every_turn_reads_and_an_ask_wants_nothing() {
-        let c = fresh();
+        let clock = Clock::new();
+        let c = carrier_at(&clock);
         c.set_refresh(SpeaksRefresh::Timer);
         let cell = CountedCell::new(Ok(ready()));
         // An ask before the first turn is dropped unanswered and wakes nobody.
         assert_eq!(c.on_request("peer-a", offer(31, "peer-a")), None);
         assert!(!wanted(&c).await);
         assert_eq!(cell.reads(), 0);
-        // Every turn reads, asked or not, and makes the listing proof.
-        let link = FakeLink(std::sync::Mutex::new(vec![]));
-        let at = now_micros();
-        assert!(c.timer_turn(&cell, &Names, Some(&link), at, 0).await);
-        assert!(c.timer_turn(&cell, &Names, Some(&link), at, 0).await);
+        // Every turn reads, asked or not, however lately it read.
+        assert!(c.timer_turn(&cell, &Names, 0).await);
+        assert!(c.timer_turn(&cell, &Names, 0).await);
         assert_eq!(cell.reads(), 2);
-        assert!(c.has_listed_proof(&cell.agent(), "peer-self"));
         // A new ask is listed on the last turn's read at any age inside the
         // bound, and wants nothing.
-        age(&c, 100);
+        clock.pass(100 * SECOND);
         assert!(matches!(
             c.on_request("peer-a", offer(31, "peer-a")),
             Some(CarryResponse::Listed { number: 1, .. })
         ));
         assert!(!wanted(&c).await);
         // A cell that stops answering leaves that read to age; the turns go on.
-        cell.answers(Err(
-            crate::services::device_consent::CellFailure::Unavailable("down".into()),
-        ));
-        assert!(c.timer_turn(&cell, &Names, None, now_micros(), 0).await);
-        assert!(c.timer_turn(&cell, &Names, None, now_micros(), 0).await);
+        cell.answers(Err(down()));
+        assert!(c.timer_turn(&cell, &Names, 0).await);
+        assert!(c.timer_turn(&cell, &Names, 0).await);
         assert_eq!(cell.reads(), 4);
-        assert!(c.speaks(now_micros()).person().is_some());
+        assert!(c.speaks(clock.at()).person().is_some());
         // The record stops standing: the next turn's read stops the listing.
         cell.answers(Ok(ConsentStanding::NoPerson));
-        assert!(c.timer_turn(&cell, &Names, None, now_micros(), 0).await);
+        assert!(c.timer_turn(&cell, &Names, 0).await);
         assert_eq!(c.on_request("peer-a", offer(31, "peer-a")), None);
+    }
+
+    /// The production timer loop, on tokio's own (paused) time.
+    #[tokio::test(start_paused = true)]
+    async fn the_timers_own_loop_reads_every_thirty_seconds_and_when_identity_changes() {
+        let c = Arc::new(fresh());
+        c.set_refresh(SpeaksRefresh::Timer);
+        let cell = CountedCell::new(Ok(ready()));
+        let timer = {
+            let (c, cell) = (c.clone(), cell.clone());
+            tokio::spawn(
+                async move { timer_reader(&c, move || Some(cell.clone()), &Names, || 0).await },
+            )
+        };
+        settle().await;
+        assert_eq!(cell.reads(), 1);
+        let secs = std::time::Duration::from_secs;
+        tokio::time::advance(secs(SPEAKS_REFRESH_SECS) - std::time::Duration::from_millis(1)).await;
+        settle().await;
+        assert_eq!(cell.reads(), 1);
+        tokio::time::advance(std::time::Duration::from_millis(1)).await;
+        settle().await;
+        assert_eq!(cell.reads(), 2);
+        for _ in 0..8 {
+            tokio::time::advance(secs(SPEAKS_REFRESH_SECS)).await;
+            settle().await;
+        }
+        assert_eq!(cell.reads(), 10);
+        c.identity_changed();
+        settle().await;
+        assert_eq!(cell.reads(), 11);
+        timer.abort();
     }
 
     #[tokio::test]
     async fn the_timer_rests_on_a_coordinator_without_the_function_until_it_is_updated() {
-        let c = fresh();
+        let clock = Clock::new();
+        let c = carrier_at(&clock);
         c.set_refresh(SpeaksRefresh::Timer);
         let cell = CountedCell::new(Err(without_the_function()));
-        let at = now_micros();
-        assert!(c.timer_turn(&cell, &Names, None, at, 7).await);
+        let at = clock.at();
+        assert!(c.timer_turn(&cell, &Names, 7).await);
         // The answer cannot change: no turn asks again while it rests.
         for turn in 1..=59 {
-            let now = at + turn * 30 * SECOND;
-            assert!(c.resting(now, 7));
-            assert!(!c.timer_turn(&cell, &Names, None, now, 7).await);
+            clock.set(at + turn * 30 * SECOND);
+            assert!(c.resting(7));
+            assert!(!c.timer_turn(&cell, &Names, 7).await);
         }
         assert_eq!(cell.reads(), 1);
         // With no update seen here, it asks again at the cap, and rests again.
         let cap = at + SPEAKS_REST_MAX_SECS as i64 * SECOND;
-        assert!(c.timer_turn(&cell, &Names, None, cap, 7).await);
-        assert!(
-            !c.timer_turn(&cell, &Names, None, cap + 30 * SECOND, 7)
-                .await
-        );
+        clock.set(cap - 1);
+        assert!(!c.timer_turn(&cell, &Names, 7).await);
+        clock.set(cap);
+        assert!(c.timer_turn(&cell, &Names, 7).await);
+        clock.set(cap + 30 * SECOND);
+        assert!(!c.timer_turn(&cell, &Names, 7).await);
         assert_eq!(cell.reads(), 2);
         // A coordinator update applied here ends the rest at the next turn.
-        assert!(
-            c.timer_turn(&cell, &Names, None, cap + 60 * SECOND, 8)
-                .await
-        );
-        assert!(
-            !c.timer_turn(&cell, &Names, None, cap + 90 * SECOND, 8)
-                .await
-        );
+        clock.set(cap + 60 * SECOND);
+        assert!(c.timer_turn(&cell, &Names, 8).await);
+        clock.set(cap + 90 * SECOND);
+        assert!(!c.timer_turn(&cell, &Names, 8).await);
         assert_eq!(cell.reads(), 3);
         // An identity write reads through the rest.
-        assert!(
-            c.read_turn(&cell, &Names, None, Want::Now, cap + 91 * SECOND, 8)
-                .await
-        );
+        assert!(c.read_turn(Some(&cell), &Names, Want::Now, 8).await);
         assert_eq!(cell.reads(), 4);
         // The updated coordinator answers: the rest is over.
         cell.answers(Ok(ready()));
-        assert!(
-            c.timer_turn(&cell, &Names, None, cap + 120 * SECOND, 9)
-                .await
-        );
-        assert!(!c.resting(cap + 150 * SECOND, 9));
-        assert!(
-            c.timer_turn(&cell, &Names, None, cap + 150 * SECOND, 9)
-                .await
-        );
-        assert!(c.speaks(cap + 150 * SECOND).person().is_some());
-        // A cell that is only unreachable is no reason to rest.
-        cell.answers(Err(
-            crate::services::device_consent::CellFailure::Unavailable("down".into()),
-        ));
-        assert!(
-            c.timer_turn(&cell, &Names, None, cap + 180 * SECOND, 9)
-                .await
-        );
-        assert!(!c.resting(cap + 210 * SECOND, 9));
+        clock.set(cap + 120 * SECOND);
+        assert!(c.timer_turn(&cell, &Names, 9).await);
+        assert!(!c.resting(9));
+        assert!(c.timer_turn(&cell, &Names, 9).await);
+        assert!(c.speaks(clock.at()).person().is_some());
+        // A cell that is only unreachable is no reason to rest, and neither
+        // is another function's absence.
+        for why in [
+            down(),
+            CellFailure::Unavailable(MISSING.replace("my_consent_standing", "get_my_human")),
+        ] {
+            cell.answers(Err(why));
+            assert!(c.timer_turn(&cell, &Names, 9).await);
+            assert!(!c.resting(9));
+        }
     }
 
     #[tokio::test]
     async fn on_demand_the_functions_absence_is_an_answer_not_asked_again_for_thirty_seconds() {
-        let c = fresh();
+        let clock = Clock::new();
+        let c = carrier_at(&clock);
         let cell = CountedCell::new(Err(without_the_function()));
-        let at = now_micros();
-        assert!(c.read_turn(&cell, &Names, None, Want::IfDue, at, 0).await);
-        // Not the five seconds of a cell that did not answer.
-        assert!(!c.read_due(at + 29 * SECOND));
-        assert!(
-            !c.read_turn(&cell, &Names, None, Want::IfDue, at + 29 * SECOND, 0)
-                .await
-        );
-        assert!(c.read_due(at + 30 * SECOND));
-        assert_eq!(cell.reads(), 1);
+        let at = clock.at();
+        assert!(c.read_turn(Some(&cell), &Names, Want::Ask, 0).await);
         assert_eq!(c.speaks(at), Speaks::Unknown);
+        // Not the five seconds of a cell that did not answer.
+        clock.set(at + 30 * SECOND - 1);
+        assert!(!c.read_turn(Some(&cell), &Names, Want::Ask, 0).await);
+        assert_eq!(cell.reads(), 1);
+        // And asked again then, on demand, without the timer's rest.
+        clock.set(at + 30 * SECOND);
+        assert!(c.read_turn(Some(&cell), &Names, Want::Ask, 0).await);
+        clock.set(at + 60 * SECOND);
+        assert!(c.read_turn(Some(&cell), &Names, Want::Ask, 0).await);
+        assert_eq!(cell.reads(), 3);
     }
 }

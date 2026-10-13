@@ -57,7 +57,8 @@ triggered by an incoming ask, a pending-list or decide request, or an identity w
 answered read is at least 30 s old, with the 120 s evidence bound unchanged. It would bring a resting peer's
 `my_consent_standing` from 10 calls per 300 s to 0.
 
-In the safety direction it is no weaker: a node whose record stopped standing stops listing at the next ask. In the
+In the safety direction it is no weaker (corrected 2026-10-13: it is weaker, see "what demand gives up" below): a node
+whose record stopped standing stops listing at the next ask. In the
 availability direction it is weaker than the 30 s timer. An idle node holds no evidence when a conductor outage
 begins, so it lists nothing until the conductor answers, where the timer would keep listing for 90 to 120 s into the
 outage. The asking device re-offers every 5 s, so an ask is listed within about 5 s of recovery, and an agreement
@@ -71,25 +72,47 @@ coordinator-zome change). Files a build would touch: `src/services/device_carrie
 ## 2026-10-13 — decided and built; not measured
 
 The operator restated the invariant: never list on evidence older than 120 s; list whenever the cell can be read. The
-demand-driven read is built in storage (`services/device_carrier.rs`, `http.rs`, a counter in `happ_manager.rs`) and is
-the default. `ELOHIM_CONSENT_SPEAKS_REFRESH=timer`, read once at start, keeps the 30 s refresher as it was; the mode in
-force is logged once at start.
+demand-driven read is built in storage (`services/device_carrier.rs`, `services/device_consent_cell.rs`, `http.rs`, a
+counter in `happ_manager.rs`) and is the default. `ELOHIM_CONSENT_SPEAKS_REFRESH=timer`, read once at start, keeps the
+30 s refresher; the mode in force is logged once at start.
 
-On demand a resting node makes no standing call. An ask, a pending-list or decide request, the signed-out standing and
-an identity write want a read; one runs at a time; an answered read is not repeated for 30 s, and a read the cell did
-not answer may be tried again after 5 s (one re-offer). An ask cannot wait in the transport's event loop, so the first
-ask after rest wakes the reader and is dropped unanswered, as by a node whose standing is unknown, and is listed on the
-device's re-offer about 5 s later. A device not yet on the list is listed only on a read no older than 30 s; a device
-already listed keeps its place on the last read (inside 120 s) while the next is made. The listing proof and the
-controller's Human read ride the same read.
+On demand a resting node makes no standing call. A device's signed ask, a pending-list, decide or signed-out standing
+request, and an identity write want a read. One read runs at a time, and a caller that queued behind one is judged when
+its turn comes. Reads wanted by requests (one of which needs no sign-in) are at most one attempt per 30 s, answered or
+not; only a device's ask may retry 5 s after a read the cell did not answer. An ask cannot wait in the transport's
+event loop, so the first ask after rest wakes the reader and is dropped unanswered, as by a node whose standing is
+unknown, and is listed on the device's re-offer about 5 s later. The controller's Human read rides the same read; the
+listing proof has its own worker, woken by a read, and no read waits on it.
+
+**What demand gives up against a healthy timer, in the safety direction.** The earlier planning note above said demand
+was no weaker for safety. That was wrong, and an independent review showed the schedules. All of them are inside the
+restated 120 s invariant:
+
+- A new ask is listed on evidence up to 30 s old. The timer's evidence is also up to 30 s old, but its reads fall every
+  30 s regardless; a demand read falls only when something asked. A record that stops standing just after a demand read
+  is listed on for up to 30 s more, where the timer's next read could have caught it sooner.
+- The same ceremony (same device, same peer, same request with its state and challenge) keeps its place on evidence up
+  to 120 s old while the next read is made, where a healthy timer would have re-read within 30 s. If that next read is
+  not answered, it stays listed until the evidence reaches 120 s. A new ceremony from a listed device is a new ask and
+  takes the 30 s rule.
+- Listing is not authority: a decision still runs the agree path, and the cell signs.
 
 Availability is weaker than the timer during a conductor outage, as planned: an idle node lists nothing until the cell
-answers. The timer now rests on "zome function doesn't exist" until this process applies a coordinator update, or 30
-minutes (a swap from another process is not seen), and a failing read warns once and then logs at debug.
+answers.
 
-Not built: a classed (background-lane) mishpat call. On demand the read has a person waiting, and the timer is kept as
-it was; the affirmation pass is the one remaining caller, two reads per 30 minutes, and the variant would touch three
+**One deliberate tightening of timer mode.** Evidence is now stamped when the read's turn came, before the cell was
+asked, not when the read finished. Timer evidence therefore expires up to one read-duration earlier than before, and a
+read that takes longer than 120 s is unknown when it lands. Two other timer differences: the timer rests on "zome
+function doesn't exist" (matched on the zome and function named) until this process applies a coordinator update or 30
+minutes pass, and a failing read warns once and then logs at debug. The listing proof moved off the timer's loop to
+its own worker in both modes.
+
+Not built: a classed (background-lane) mishpat call. On demand the read has a person waiting, and the timer is kept on
+its lane; the affirmation pass is the one remaining caller, two reads per 30 minutes, and the variant would touch three
 source-scanning rails in `hc_client.rs`, `chain_write_gate.rs` and `cell_probe.rs`.
+
+Not wired: a wake when the conductor's cell comes back. A reader woken with no cell spends the turn as an unanswered
+read; the asking device's next offer (5 s) is the retry. Nobody else is waiting, so nothing polls for the cell.
 
 Not verified: nothing here was run on a household. Both "done when" lines are still owed, and the second reads
 "listed without the person retrying": the first offer is unanswered by design. Status unchanged until measured.

@@ -2126,36 +2126,34 @@ impl HttpServer {
             let server = self.clone();
             tokio::spawn(async move {
                 let names = server.identifier_source();
+                let cell = {
+                    let server = server.clone();
+                    move || server.own_controller_cell()
+                };
+                let updates = crate::happ_manager::coordinator_updates;
+                // bounded-work: `demand_reader` reads nothing while no ask
+                // wants a read; `timer_reader` reads once per
+                // SPEAKS_REFRESH_SECS; neither reads per incoming ask.
                 match carrier::carrier().refresh() {
-                    // bounded-work: no read while nothing asks; when an ask
-                    // wants one, at most one answered read per
-                    // SPEAKS_REFRESH_SECS (`Carrier::read_turn`).
-                    carrier::SpeaksRefresh::Demand => loop {
-                        carrier::carrier().speaks_wanted().await;
-                        server.read_speaks(carrier::Want::IfDue).await;
-                    },
-                    // bounded-work: one standing read (and one Human read
-                    // when this node is a controller) per SPEAKS_REFRESH_SECS,
-                    // or sooner when this node's identity may have changed;
-                    // never per incoming ask, and none while resting on a
-                    // coordinator without the function.
-                    carrier::SpeaksRefresh::Timer => loop {
-                        if let Some(cell) = server.own_controller_cell() {
-                            let link = server.carrier_link();
-                            carrier::carrier()
-                                .timer_turn(
-                                    &cell,
-                                    &names,
-                                    link.as_deref(),
-                                    chrono::Utc::now().timestamp_micros(),
-                                    crate::happ_manager::coordinator_updates(),
-                                )
-                                .await;
-                        }
-                        carrier::until_speaks_refresh().await;
-                    },
+                    carrier::SpeaksRefresh::Demand => {
+                        carrier::demand_reader(carrier::carrier(), cell, &names, updates).await
+                    }
+                    carrier::SpeaksRefresh::Timer => {
+                        carrier::timer_reader(carrier::carrier(), cell, &names, updates).await
+                    }
                 }
             });
+            // The listing proof has a worker of its own: its signature waits
+            // on this node's chain with no deadline, and no read waits on it.
+            // bounded-work: one mandated signature per key and transport id
+            // for the process's life.
+            if let Some(link) = self.carrier_link() {
+                let server = self.clone();
+                tokio::spawn(async move {
+                    let cell = move || server.own_controller_cell();
+                    carrier::prover(carrier::carrier(), cell, link.as_ref()).await
+                });
+            }
         }
         // Each device of the person affirms the others it saw join.
         // bounded-work: one standing read and one devices read a pass, at most
@@ -14176,28 +14174,20 @@ impl HttpServer {
             .await;
     }
 
-    /// One read of whom this node speaks for into the carrier, when this node
-    /// runs a carrier and its cell is reachable. On demand the listing proof
-    /// rides the read; by timer it stays with the refresher.
+    /// One turn at reading whom this node speaks for into the carrier, when
+    /// this node runs a carrier. With no cell reachable the turn is spent as
+    /// a read the cell did not answer.
     async fn read_speaks(&self, want: crate::services::device_carrier::Want) {
-        use crate::services::device_carrier as carrier;
+        use crate::services::device_consent::ControllerCell;
         if self.p2p_handle.is_none() {
             return;
         }
-        let Some(cell) = self.own_controller_cell() else {
-            return;
-        };
-        let link = match carrier::carrier().refresh() {
-            carrier::SpeaksRefresh::Demand => self.carrier_link(),
-            carrier::SpeaksRefresh::Timer => None,
-        };
-        carrier::carrier()
+        let cell = self.own_controller_cell();
+        crate::services::device_carrier::carrier()
             .read_turn(
-                &cell,
+                cell.as_ref().map(|c| c as &dyn ControllerCell),
                 &self.identifier_source(),
-                link.as_deref(),
                 want,
-                chrono::Utc::now().timestamp_micros(),
                 crate::happ_manager::coordinator_updates(),
             )
             .await;
@@ -14205,12 +14195,14 @@ impl HttpServer {
 
     /// Whom this node speaks for, for a request that can wait for it (the
     /// pending list, a decision, the signed-out standing). On demand the
-    /// request wants a read and waits for it when one is due; by timer it is
+    /// request wants a read and waits for it when one is due: at most one
+    /// attempt per SPEAKS_REFRESH_SECS for all such requests together,
+    /// answered or not, since one of them needs no sign-in. By timer it is
     /// the refresher's last read.
     async fn speaks_on_demand(&self) -> consent_grant::Speaks {
         use crate::services::device_carrier as carrier;
         if carrier::carrier().refresh() == carrier::SpeaksRefresh::Demand {
-            self.read_speaks(carrier::Want::IfDue).await;
+            self.read_speaks(carrier::Want::Request).await;
         }
         carrier::carrier().speaks(chrono::Utc::now().timestamp_micros())
     }
@@ -14953,8 +14945,8 @@ impl HttpServer {
     /// set, so a portal can offer "sign in" or "begin". Nothing else: no keys,
     /// no identity root, no names. `speaks` is the carrier's read of whether
     /// this node speaks for a person (`speaks_on_demand`: on demand at most
-    /// one zome read per SPEAKS_REFRESH_SECS however many callers, by timer
-    /// none).
+    /// one attempt at a standing read per SPEAKS_REFRESH_SECS however many
+    /// callers and whether or not the cell answers; by timer none).
     fn signed_out_standing(&self, speaks: bool) -> Response<Full<Bytes>> {
         use crate::services::device_consent::ControllerCell;
         let account = self.db_pool.as_ref().and_then(|pool| {
