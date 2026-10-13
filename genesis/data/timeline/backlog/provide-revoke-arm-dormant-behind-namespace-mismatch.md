@@ -86,6 +86,18 @@ decide, per network.
 Recommended first step: (2). Whether to run (3) is the operator's call per network (the household fixture and alpha
 are different cases), after (2) has been measured.
 
+**2026-10-13: option 2 taken (operator-approved), option 3 still open.** The arm now reads this node's rows under
+the author's own agent keys, targets `row.cid`, revokes each row once per process lifetime (kept per row, because one
+scope can hold several rows), issues at most 4 revocations a tick, and waits until a row has been seen stranded on 3
+passes in a row. It runs only when the caller computed the whole desired set that pass, and
+`ELOHIM_PROVIDE_REVOKE_ARM=0` turns it off at startup. A node whose desired set is empty and known now revokes what
+it left behind. Stranded is decided per scope: every live row of a scope that is still desired is left standing, so
+the duplicates above are untouched and remain option 3's. A fourth way the old arm was wrong, found by the census:
+the commons capacity pledge is projected under the same action with an empty recipient (one such row on matthew and
+on jessica), and the old arm would have revoked it as stranded; the arm now acts on content provides only. Read-only
+census of the household the same day: 0 rows stranded on matthew, jessica and james (183 / 159 / 41 scopes, all
+desired), 574 / 477 / 164 duplicate rows of desired scopes. Not yet run on the household or the fleet.
+
 **Done when.** The operator has chosen among the options, and for the chosen one a test shows a revocation marks the
 row it targets (the entry hash case), is issued once per row, and is bounded per tick; or the choice is (1) and this
 entry records it as a decision.
