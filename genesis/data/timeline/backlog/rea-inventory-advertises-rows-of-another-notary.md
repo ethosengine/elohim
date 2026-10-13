@@ -71,3 +71,27 @@ that advertiser until the advertiser is upgraded.
 
 **Done when.** The post-restart 300 s window on the household shows `get_rea_commitment` at or near the residual
 count on every peer, and `idle-is-free`'s ledger carries the reading.
+
+## 2026-10-13: the residual, read on the household
+
+**Measured.** Production gossip cadence, storage at `d0b18e3f5`. At 40 minutes of uptime `get_rea_commitment` was 0
+on every peer in the at-rest lane (06:16Z); in the next 300 s window (06:24Z) it was 0 / 3 / 5 on matthew / jessica /
+james. The boot census stays at 14 / 24 / 46 reads.
+
+**What the residual is** (reconstructed from the three `content.db` files; the miss ledger is in memory and logs ids
+only at debug). Twelve distinct ids that are not a `mishpat_commitments.cid` and are held by one or two peers:
+
+- Seven genesis seed rows with `dht_anchor_hash` NULL (`hosting-agreement-…`, two `operate-doorway-…`,
+  `replicates-commons-…`, three unanchored `provide-` rows). They were never notarized, so the read cannot succeed
+  anywhere.
+- Five `provide-<agent>-content:{commons,public}` rows held only by their author, with an anchor. Why the other
+  conductors answer None for them was not determined; it needs a read on the authoring conductor.
+
+**Pacing.** Three reads, then a doubling dormancy from `MISS_DORMANCY_BASE_SECONDS` to its cap (household 360 s to
+8640 s, set in `hc-mesh.sh`; production 3600 s to 86400 s), one read per re-admission. At the cap the eleven ids on
+james cost about 0.4 reads per 300 s on the household and about 0.04 at production settings. No id ever becomes
+terminal, and a restart replays the ladder from its first rung because the ledger is not persisted.
+
+**Cure candidate, not built.** Omit rows with no anchor and no notarization claim from the advertised inventory, the
+same shape as `f37128643`. Check first that the heal leg for un-anchored rows does not depend on a peer advertising
+them. A terminal verdict for the five anchored rows waits on the undetermined cause above.

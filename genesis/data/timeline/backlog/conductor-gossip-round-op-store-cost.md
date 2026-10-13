@@ -85,3 +85,49 @@ cost is not.
 **Done-when.** On the household at production cadence (`gossip-cadence.sh prod`) and on alpha, a statement window
 shows query 1 below 10 ms with a plan that does not walk the loc index, one statement per call, and the peer's
 bookmark advancing between rounds; slice-hash reads per snapshot at 0 after the first; `idle-is-free` re-read.
+
+## 2026-10-13: three packets built on a fork branch and read on the household; no push, no pin move
+
+**Where it is.** Fork branch `perf/gossip-round-op-store`, head `530f32f76`, seven commits on pin `96bcd2bee`:
+slice-hash cache (`60d5d07a6`), peer-meta cache (`31f732b12`), and the since-scan change (`d902e5b47` to
+`530f32f76`: a time index on integrated ops, one statement on one snapshot, a keyset page boundary). Local only.
+Release build `hc-fork-530f32f767da-proof`. Evidence and tables:
+`genesis/a2o/reports/recovery/gossip-round-20261013/README.md`.
+
+**Measured on the household, same night, control on `96bcd2bee`.**
+
+- Production gossip cadence, 300 s window ten minutes after a restart: 769 to 374 statements a second per
+  conductor, database time 121 s to 48 s across the three, DB-busy 0.135 to 0.054. The since-scan's median per
+  call goes from 187 ms to 0.78 ms and the peer-meta point reads (179,200) are gone.
+- Dev cadence, 60 s window: 2,176 to 56 statements a second, DB-busy 0.64 to 0.18; since-scan median 200 ms to
+  0.58 ms. The control window carried a publish burst the last one did not, so the statement rate overstates it.
+- Conductor CPU did not move. `household-at-rest` at production cadence, 40 minutes after a restart: 21.09 CPU
+  s/min on the three packets (08:22Z) against 20.46 on control (06:16Z); the budget is 10. This entry's cost was
+  database time, and at production cadence database time is 5 to 13% of wall clock, so the CPU that keeps
+  `idle-is-free` red is somewhere else. It was not attributed: this workspace has no profiler.
+
+**What remains in the statement log at production cadence.** Publish traffic, about 140 re-publish stamps a
+second per conductor and the receivers' op-presence checks for them
+(`conductor-residual-cpu-full-chain-read-and-perpetual-republish`). Whether it is still running at 40 minutes
+of uptime was not read.
+
+**Seen once, not explained.** The dev-cadence window carried a DHT diff reading the same seven sector and
+time-slice pairs every round (`op_hashes_in_time_slice`), the calls into one populous sector at about 219 ms.
+It may have been restart settle. `genesis/local-dev/gossip-round/q1-bimodal-diagnosis.txt` has the plan and a
+proposed cure (carry the authored timestamp on `ChainOp` so the time filter runs before the `Action` probe).
+
+**Open before a roll (operator's call).**
+
+- An independent review (Codex, four rounds) ended FIX FIRST on one interleaving in the since-scan: an op
+  stamped below a page boundary that becomes visible after the reader has passed it. It was carried, not fixed:
+  it is the stamp-before-visibility race the pinned conductor already has, and closing it needs a commit-ordered
+  watermark for the gossip bookmark, which is not built. The claim that the DHT diff recovers such an op was
+  not verified.
+- The time index is built when a store is opened and blocks the open. Its build time on a fleet-sized store was
+  not measured. The household conductors now carry the index; the pinned binary ignores it.
+- The fork's own test targets were not re-run on the assembled branch (each packet's ran on its own branch),
+  and none ran under SQLCipher.
+
+**Done-when, restated.** The statement half is met on the household. The CPU half is not this entry's to meet;
+this entry closes when the branch is either rolled and read on alpha or dropped.
+
