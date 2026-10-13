@@ -89,3 +89,31 @@ are different cases), after (2) has been measured.
 **Done when.** The operator has chosen among the options, and for the chosen one a test shows a revocation marks the
 row it targets (the entry hash case), is issued once per row, and is bounded per tick; or the choice is (1) and this
 entry records it as a decision.
+
+## 2026-10-13: built on a branch twice, reviewed unsafe twice, parked
+
+The operator approved waking the arm. Two drafts are on the local branch `fix/provide-revoke-arm` (`a298a00b2`, then
+`ff02b01f2`); neither is on dev and neither has run against a conductor. The second draft revokes only a scope whose
+pin is `removed` with no other pin, is off unless `ELOHIM_PROVIDE_REVOKE_ARM` is `dry-run` or `apply`, and records
+each submission in a new table before the conductor call. A read-only census under that rule found nothing to revoke
+on any household peer (no pin there is `removed`); the duplicate rows (574, 477 and 164 on matthew, jessica and james)
+are a different case and the arm leaves them alone.
+
+Codex's second review (`genesis/local-dev/idle-call-floor-2/codex-review-revoke-arm-2.md`) resolved the first
+review's findings and found four new blockers:
+
+- The last pin check happens before the call waits in the conductor queue, so a scope re-pinned during the wait is
+  still revoked.
+- A crash between recording a submission and making it leaves the commitment standing with a record that stops any
+  retry, and nothing reports it.
+- The un-pin HTTP route submits without consulting that record, so the route and the arm can both revoke one row.
+- A commitment's identity is its content with validity bucketed to the day, so re-pinning a scope on the day it was
+  revoked re-authors the same cid, and once a replay can no longer clear `revoked_at` the new offer stays revoked.
+  This one is in the author path, not the arm.
+
+Also open: a revocation that arrives before its target marks the commitment row and leaves the coverage mirror
+active.
+
+Parked, because the fourth needs a decision about what makes a renewed commitment a new one, and the arm has nothing
+to revoke on the household today. The defect it also found stands on dev regardless of the arm: a replayed commitment
+signal clears `revoked_at` (`db/mishpat_commitments.rs`, `upsert_with_anchor`).
