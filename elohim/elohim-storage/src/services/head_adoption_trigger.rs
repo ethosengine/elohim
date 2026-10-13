@@ -1423,8 +1423,18 @@ async fn worker_loop(
                 continue;
             },
         };
+        let hc_io = conductor.hc().map(HcIo);
         process_trigger(
-            &trigger, conductor, pool, sync, ctx, gate, courier, memo, probe_memo, rest,
+            &trigger,
+            hc_io.as_ref().map(|i| i as &dyn TriggerIo),
+            pool,
+            sync,
+            ctx,
+            gate,
+            courier,
+            memo,
+            probe_memo,
+            rest,
         )
         .await;
     }
@@ -1452,12 +1462,118 @@ pub fn ordering_only_probe(row: Option<&LocalDeclaration>, doc_head: Option<&str
     matches!((row.and_then(|r| r.head.as_deref()), doc_head), (Some(r), Some(d)) if r == d)
 }
 
+/// The conductor-facing steps of one trigger, behind a seam so a test can supply
+/// the resolve answer, the courier outcome and the adoption result. Production
+/// is [`HcIo`], which calls exactly what `process_trigger` used to call inline.
+#[async_trait::async_trait]
+trait TriggerIo: Send + Sync {
+    /// The own-conductor head read, `Background` class.
+    async fn resolve(
+        &self,
+        id: &str,
+    ) -> Result<Option<ContentHeadWire>, crate::error::StorageError>;
+    /// The courier step; `None` when it did not run.
+    async fn courier(
+        &self,
+        trigger: &HeadAdoptionTrigger,
+        pool: &DbPool,
+        ctx: &AppContext,
+        courier: &CourierSlot,
+        memo: &crate::services::courier_obey::RefusalMemo,
+        doc_head: Option<&str>,
+    ) -> Option<crate::services::courier_obey::CourierOutcome>;
+    async fn finish_hosting(
+        &self,
+        trigger: &HeadAdoptionTrigger,
+        pool: &DbPool,
+        ctx: &AppContext,
+        gate: &Arc<TriggerGate>,
+        courier: &CourierSlot,
+    );
+    /// The one adoption implementation, handed the head just read.
+    async fn adopt(
+        &self,
+        pool: &DbPool,
+        ctx: &AppContext,
+        id: &str,
+        head: &ContentHeadWire,
+    ) -> AdoptOutcome;
+}
+
+/// The production [`TriggerIo`]: the own conductor's client.
+struct HcIo(Arc<HcClient>);
+
+#[async_trait::async_trait]
+impl TriggerIo for HcIo {
+    async fn resolve(
+        &self,
+        id: &str,
+    ) -> Result<Option<ContentHeadWire>, crate::error::StorageError> {
+        conductor_writes::call_resolve_content_head_classed(
+            &self.0,
+            id,
+            crate::conductor_admission::AdmissionClass::Background,
+        )
+        .await
+    }
+
+    async fn courier(
+        &self,
+        trigger: &HeadAdoptionTrigger,
+        pool: &DbPool,
+        ctx: &AppContext,
+        courier: &CourierSlot,
+        memo: &crate::services::courier_obey::RefusalMemo,
+        doc_head: Option<&str>,
+    ) -> Option<crate::services::courier_obey::CourierOutcome> {
+        try_courier(trigger, &self.0, pool, ctx, courier, memo, doc_head).await
+    }
+
+    async fn finish_hosting(
+        &self,
+        trigger: &HeadAdoptionTrigger,
+        pool: &DbPool,
+        ctx: &AppContext,
+        gate: &Arc<TriggerGate>,
+        courier: &CourierSlot,
+    ) {
+        finish_hosting_or_retry(trigger, &self.0, pool, ctx, gate, courier).await
+    }
+
+    async fn adopt(
+        &self,
+        pool: &DbPool,
+        ctx: &AppContext,
+        id: &str,
+        head: &ContentHeadWire,
+    ) -> AdoptOutcome {
+        // `observed(Some(head))` hands it the read just made, so it does not pay
+        // for a second one. `AdoptContext::none()` because no CRDT-derived hint
+        // may sit in the seat that selects a head; `inert()` because with no peer
+        // hints there is no provenance to price.
+        crate::chain_write_gate::as_writer(
+            crate::chain_write_gate::WriterKind::TriggerAdopt,
+            head_adoption::try_adopt_canonical_head(
+                &self.0,
+                pool,
+                ctx,
+                id,
+                LocalResolve::observed(Some(head)),
+                ElectionResolve::unresolved(),
+                &AdoptContext::none(),
+                PricedVerification::inert(),
+            ),
+        )
+        .await
+    }
+}
+
 /// One trigger, start to finish. Separated from the loop so the shutdown/select
 /// plumbing stays readable and the body is directly exercisable.
 #[allow(clippy::too_many_arguments)]
 async fn process_trigger(
     trigger: &HeadAdoptionTrigger,
-    conductor: &dyn ConductorSource,
+    io: Option<&dyn TriggerIo>,
     pool: &DbPool,
     sync: &SyncManager,
     ctx: &AppContext,
@@ -1468,7 +1584,7 @@ async fn process_trigger(
     rest: &RetainedRest,
 ) {
     let id = trigger.content_id.as_str();
-    let Some(hc) = conductor.hc() else {
+    let Some(io) = io else {
         // No lamad bridge yet. The sweep is the backstop, exactly as before.
         count_outcome(trigger, "no_bridge");
         return;
@@ -1549,7 +1665,7 @@ async fn process_trigger(
             TriggerAction::SkippedCurrent | TriggerAction::NoHintLeftToSweep
         ) {
             if hosting_retry_needed(action, trigger.attempt) {
-                finish_hosting_or_retry(trigger, &hc, pool, ctx, gate, courier).await;
+                io.finish_hosting(trigger, pool, ctx, gate, courier).await;
             } else {
                 gate.release(id);
             }
@@ -1581,18 +1697,14 @@ async fn process_trigger(
     // The existing verifier still requires locally held ancestry, authoring
     // standing, election ordering and all version bytes before any stamp.
     let (courier_outcome, probe) = courier_before_local_probe(
-        try_courier(trigger, &hc, pool, ctx, courier, memo, doc_head),
-        conductor_writes::call_resolve_content_head_classed(
-            &hc,
-            id,
-            crate::conductor_admission::AdmissionClass::Background,
-        ),
+        io.courier(trigger, pool, ctx, courier, memo, doc_head),
+        io.resolve(id),
     )
     .await;
     let Some(probe) = probe else {
         // A verified courier stamped or confirmed the head: settled.
         settle_rest(rest, id, RestEvent::Settled, Instant::now());
-        finish_hosting_or_retry(trigger, &hc, pool, ctx, gate, courier).await;
+        io.finish_hosting(trigger, pool, ctx, gate, courier).await;
         return;
     };
 
@@ -1637,6 +1749,14 @@ async fn process_trigger(
         // within one attempt; preserve its original refusal/retry decision.
         if let Some(outcome) = courier_outcome {
             if !outcome.retry_warranted() {
+                // StampRefused is a settled answer about this claim (the row
+                // already obeys an equal-or-newer election): forget. Memoised
+                // (a remembered refusal) and ChannelHeld (a release channel
+                // elects the head) say nothing about whether the head can be
+                // walked, so the rest is left as it stands.
+                if outcome == crate::services::courier_obey::CourierOutcome::StampRefused {
+                    settle_rest(rest, id, RestEvent::Settled, Instant::now());
+                }
                 return;
             }
         }
@@ -1699,27 +1819,14 @@ async fn process_trigger(
     // `AdoptContext::none()` because no CRDT-derived hint may sit in the seat that
     // selects a head; `inert()` because with no peer hints there is no provenance
     // to price.
-    let outcome = crate::chain_write_gate::as_writer(
-        crate::chain_write_gate::WriterKind::TriggerAdopt,
-        head_adoption::try_adopt_canonical_head(
-            &hc,
-            pool,
-            ctx,
-            id,
-            LocalResolve::observed(Some(head)),
-            ElectionResolve::unresolved(),
-            &AdoptContext::none(),
-            PricedVerification::inert(),
-        ),
-    )
-    .await;
+    let outcome = io.adopt(pool, ctx, id, head).await;
 
     let elapsed_ms = trigger.raised_at.elapsed().as_millis();
     match outcome {
         AdoptOutcome::Adopted => {
             count_outcome(trigger, "adopted");
             // The row now names the doc's head; the next change is a new event.
-            finish_hosting_or_retry(trigger, &hc, pool, ctx, gate, courier).await;
+            io.finish_hosting(trigger, pool, ctx, gate, courier).await;
             // THE confirming line. Pair it with the `Applying changes from peer
             // … node:<slug>` line for the same id: the delta between them is the
             // measurement the 2026-09-17 analysis asked for, and it is now
@@ -1753,7 +1860,7 @@ async fn process_trigger(
                     "head-adoption trigger: REFRESHED the election behind the head this row \
                      already declared - the own conductor confirmed the doc's carried ordering"
                 );
-                finish_hosting_or_retry(trigger, &hc, pool, ctx, gate, courier).await;
+                io.finish_hosting(trigger, pool, ctx, gate, courier).await;
                 return;
             }
             count_outcome(trigger, "held");
@@ -2470,102 +2577,245 @@ mod tests {
         assert_eq!(booking_for(final_rung, last), ReprobeBooking::LadderSpent);
     }
 
-    /// The decision `process_trigger` makes on a spent ladder, then the next
-    /// retained pass. (`process_trigger` itself needs a live `HcClient`, which
-    /// has no fake in this crate; `settle_rest` is the one call it makes.)
-    #[tokio::test]
-    async fn a_spent_ladder_rests_the_next_retained_pass_and_counts_it() {
-        let now = Instant::now();
-        let (pool, sync, _dir) = retained_hint_fixture().await;
-        retained_row(&pool, "stuck", "commons");
-        retained_doc(&sync, "stuck", "new head").await;
-        let rest = RetainedRest::new(8);
-        let claim = RestEvent::LadderSpent {
-            doc_head: "new head",
-            row_head: Some("old head"),
-        };
-        assert_eq!(offered(&pool, &sync, &rest, now).await, vec!["stuck"]);
-        let before = skipped_rested_count();
-        settle_rest(&rest, "stuck", claim, now);
-        assert!(offered(&pool, &sync, &rest, now).await.is_empty());
-        assert!(skipped_rested_count() > before);
+    use crate::services::courier_obey::CourierOutcome;
+    use std::sync::atomic::{AtomicUsize, Ordering as AtomicOrdering};
+
+    #[derive(Clone, Copy)]
+    enum Answer {
+        NotYetWalkable,
+        Walkable,
+        Fault,
     }
 
-    #[tokio::test]
-    async fn a_cut_short_or_faulted_attempt_records_nothing() {
-        let now = Instant::now();
-        let (pool, sync, _dir) = retained_hint_fixture().await;
-        retained_row(&pool, "late", "commons");
-        retained_doc(&sync, "late", "new head").await;
-        let rest = RetainedRest::new(8);
-        // process_trigger records only on ReprobeBooking::LadderSpent.
-        for booking in [
-            ReprobeBooking::CutShort,
-            ReprobeBooking::NotBooked,
-            ReprobeBooking::Scheduled,
-        ] {
-            assert_ne!(booking, ReprobeBooking::LadderSpent);
+    /// The test [`TriggerIo`]: supplies the resolve answer and the courier
+    /// outcome, and counts every call that would have reached a conductor.
+    struct FakeIo {
+        answer: Mutex<Answer>,
+        courier: Mutex<Option<CourierOutcome>>,
+        resolves: AtomicUsize,
+        adopts: AtomicUsize,
+    }
+
+    #[async_trait::async_trait]
+    impl TriggerIo for FakeIo {
+        async fn resolve(
+            &self,
+            _id: &str,
+        ) -> Result<Option<ContentHeadWire>, crate::error::StorageError> {
+            self.resolves.fetch_add(1, AtomicOrdering::SeqCst);
+            match *self.answer.lock().unwrap() {
+                Answer::NotYetWalkable => Ok(None),
+                Answer::Walkable => Ok(Some(head_wire("uhCkk-new", true))),
+                Answer::Fault => Err(crate::error::StorageError::Internal("shed".into())),
+            }
         }
-        assert!(rest.is_empty());
-        assert_eq!(offered(&pool, &sync, &rest, now).await, vec!["late"]);
+        async fn courier(
+            &self,
+            _trigger: &HeadAdoptionTrigger,
+            _pool: &DbPool,
+            _ctx: &AppContext,
+            _courier: &CourierSlot,
+            _memo: &crate::services::courier_obey::RefusalMemo,
+            _doc_head: Option<&str>,
+        ) -> Option<CourierOutcome> {
+            *self.courier.lock().unwrap()
+        }
+        async fn finish_hosting(
+            &self,
+            _trigger: &HeadAdoptionTrigger,
+            _pool: &DbPool,
+            _ctx: &AppContext,
+            _gate: &Arc<TriggerGate>,
+            _courier: &CourierSlot,
+        ) {
+        }
+        async fn adopt(
+            &self,
+            _pool: &DbPool,
+            _ctx: &AppContext,
+            _id: &str,
+            _head: &ContentHeadWire,
+        ) -> AdoptOutcome {
+            self.adopts.fetch_add(1, AtomicOrdering::SeqCst);
+            AdoptOutcome::Adopted
+        }
     }
 
-    #[tokio::test]
-    async fn every_settled_event_clears_a_recorded_rest() {
-        let now = Instant::now();
-        for event in [RestEvent::Settled, RestEvent::Walkable] {
-            let (pool, sync, _dir) = retained_hint_fixture().await;
+    /// One retained row `stuck` (declared head `"old head"`) whose doc names
+    /// `"uhCkk-new"`, driven through the real `process_trigger` and the real
+    /// retained pass.
+    struct Rig {
+        pool: DbPool,
+        sync: SyncManager,
+        _dir: tempfile::TempDir,
+        gate: Arc<TriggerGate>,
+        _rx: mpsc::Receiver<HeadAdoptionTrigger>,
+        courier: CourierSlot,
+        memo: crate::services::courier_obey::RefusalMemo,
+        probe_memo: crate::services::courier_obey::RefusalMemo,
+        rest: RetainedRest,
+        io: FakeIo,
+    }
+
+    impl Rig {
+        async fn new() -> Self {
+            let (pool, sync, dir) = retained_hint_fixture().await;
             retained_row(&pool, "stuck", "commons");
-            retained_doc(&sync, "stuck", "new head").await;
-            let rest = RetainedRest::new(8);
-            settle_rest(
-                &rest,
-                "stuck",
-                RestEvent::LadderSpent {
-                    doc_head: "new head",
-                    row_head: Some("old head"),
+            retained_doc(&sync, "stuck", "uhCkk-new").await;
+            let (gate, rx) = TriggerGate::new(DEFAULT_TRIGGER_COOLDOWN);
+            Rig {
+                pool,
+                sync,
+                _dir: dir,
+                gate,
+                _rx: rx,
+                courier: Arc::new(std::sync::OnceLock::new()),
+                memo: new_probe_memo(8),
+                probe_memo: new_probe_memo(8),
+                rest: RetainedRest::new(8),
+                io: FakeIo {
+                    answer: Mutex::new(Answer::NotYetWalkable),
+                    courier: Mutex::new(None),
+                    resolves: AtomicUsize::new(0),
+                    adopts: AtomicUsize::new(0),
                 },
-                now,
-            );
-            assert!(offered(&pool, &sync, &rest, now).await.is_empty());
-            settle_rest(&rest, "stuck", event, now);
-            assert_eq!(offered(&pool, &sync, &rest, now).await, vec!["stuck"]);
-            // The next exhaustion starts at the base window, not an old streak.
-            settle_rest(
-                &rest,
-                "stuck",
-                RestEvent::LadderSpent {
-                    doc_head: "new head",
-                    row_head: Some("old head"),
-                },
-                now,
-            );
-            assert!(!rest.is_resting(
-                "stuck",
-                "new head",
-                Some("old head"),
-                now + RETAINED_REST_BASE
-            ));
+            }
+        }
+
+        async fn run(&self, attempt: u32, raised_at: Instant) {
+            let trigger = HeadAdoptionTrigger {
+                content_id: "stuck".into(),
+                peer: String::new(),
+                raised_at,
+                attempt,
+                slow_retry_used: false,
+                hosting_cursor: HostingCursor::default(),
+            };
+            process_trigger(
+                &trigger,
+                Some(&self.io as &dyn TriggerIo),
+                &self.pool,
+                &self.sync,
+                &AppContext::default_lamad(),
+                &self.gate,
+                &self.courier,
+                &self.memo,
+                &self.probe_memo,
+                &self.rest,
+            )
+            .await;
+        }
+
+        /// The whole ladder, attempt 0 through the rung after the last delay.
+        async fn spend_the_ladder(&self) {
+            for attempt in 0..=RETRY_DELAYS.len() as u32 {
+                self.run(attempt, Instant::now()).await;
+            }
+        }
+
+        fn resolves(&self) -> usize {
+            self.io.resolves.load(AtomicOrdering::SeqCst)
+        }
+
+        /// One retained pass on a fresh claim ledger: who would be queued.
+        async fn retained_pass(&self) -> Vec<String> {
+            offered(&self.pool, &self.sync, &self.rest, Instant::now()).await
         }
     }
 
-    /// `process_trigger` needs a live `HcClient` and has no fake, so pin its
-    /// wiring by shape: every settled return path and the walkable and
-    /// spent-ladder arms must reach `settle_rest`.
-    #[test]
-    fn process_trigger_reaches_settle_rest_on_every_path_that_decides_the_rest() {
-        let src = include_str!("head_adoption_trigger.rs");
-        let body = src
-            .split("async fn process_trigger(")
-            .nth(1)
-            .unwrap()
-            .split("\n/// A verified courier may settle")
-            .next()
-            .unwrap();
-        assert_eq!(body.matches("RestEvent::Settled").count(), 2);
-        assert_eq!(body.matches("RestEvent::Walkable").count(), 1);
-        assert_eq!(body.matches("RestEvent::LadderSpent").count(), 1);
-        assert!(body.contains("ReprobeBooking::LadderSpent"));
+    #[tokio::test]
+    async fn an_unwalkable_head_across_the_whole_ladder_rests_the_retained_pass() {
+        let rig = Rig::new().await;
+        assert_eq!(rig.retained_pass().await, vec!["stuck"]);
+        rig.spend_the_ladder().await;
+        assert_eq!(rig.resolves(), RETRY_DELAYS.len() + 1);
+        let before = skipped_rested_count();
+        for _ in 0..4 {
+            assert!(rig.retained_pass().await.is_empty());
+        }
+        assert!(skipped_rested_count() >= before + 4);
+        // No retained pass reached the conductor: only the ladder did.
+        assert_eq!(rig.resolves(), RETRY_DELAYS.len() + 1);
+    }
+
+    #[tokio::test]
+    async fn a_ladder_cut_short_by_the_claim_window_records_no_rest() {
+        let rig = Rig::new().await;
+        let queued = Instant::now() - Duration::from_secs(59);
+        rig.run(0, queued).await;
+        assert_eq!(rig.resolves(), 1);
+        assert_eq!(rig.retained_pass().await, vec!["stuck"]);
+    }
+
+    #[tokio::test]
+    async fn a_walkable_answer_after_a_recorded_rest_ends_the_rest() {
+        let rig = Rig::new().await;
+        rig.spend_the_ladder().await;
+        assert!(rig.retained_pass().await.is_empty());
+        *rig.io.answer.lock().unwrap() = Answer::Walkable;
+        rig.run(0, Instant::now()).await;
+        assert_eq!(rig.io.adopts.load(AtomicOrdering::SeqCst), 1);
+        // The fake adopt moved nothing, so the same claim is offered again.
+        assert_eq!(rig.retained_pass().await, vec!["stuck"]);
+    }
+
+    #[tokio::test]
+    async fn courier_verdicts_settle_or_leave_a_recorded_rest() {
+        // (outcome, rest forgotten?)
+        for (outcome, forgotten) in [
+            (CourierOutcome::StampRefused, true),
+            (CourierOutcome::Stamped, true),
+            (CourierOutcome::Current, true),
+            (CourierOutcome::Memoised, false),
+            (CourierOutcome::ChannelHeld, false),
+        ] {
+            let rig = Rig::new().await;
+            rig.spend_the_ladder().await;
+            assert!(rig.retained_pass().await.is_empty());
+            *rig.io.courier.lock().unwrap() = Some(outcome);
+            rig.run(0, Instant::now()).await;
+            assert_eq!(
+                !rig.retained_pass().await.is_empty(),
+                forgotten,
+                "{outcome:?}"
+            );
+        }
+    }
+
+    #[tokio::test]
+    async fn a_conductor_fault_leaves_a_recorded_rest_untouched() {
+        let rig = Rig::new().await;
+        rig.spend_the_ladder().await;
+        *rig.io.answer.lock().unwrap() = Answer::Fault;
+        let calls = rig.resolves();
+        rig.run(0, Instant::now()).await;
+        assert_eq!(rig.resolves(), calls + 1);
+        assert!(rig.retained_pass().await.is_empty());
+    }
+
+    #[tokio::test]
+    async fn a_row_that_already_names_the_doc_head_ends_the_rest() {
+        use crate::db::diesel_schema::content::dsl as c;
+        use diesel::prelude::*;
+        let rig = Rig::new().await;
+        rig.spend_the_ladder().await;
+        assert!(!rig.rest.is_empty());
+        {
+            let mut conn = rig.pool.get().unwrap();
+            diesel::update(c::content.filter(c::id.eq("stuck")))
+                .set(c::declared_head_action_hash.eq(Some("uhCkk-new")))
+                .execute(&mut conn)
+                .unwrap();
+        }
+        let calls = rig.resolves();
+        rig.run(0, Instant::now()).await;
+        assert_eq!(
+            rig.resolves(),
+            calls,
+            "SkippedCurrent makes no conductor call"
+        );
+        // Read the rest itself: the retained pass would also clear it.
+        assert!(rig.rest.is_empty());
     }
 
     fn gate_with(cooldown: Duration) -> (Arc<TriggerGate>, mpsc::Receiver<HeadAdoptionTrigger>) {
