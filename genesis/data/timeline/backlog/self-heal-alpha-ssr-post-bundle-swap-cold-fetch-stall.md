@@ -6,11 +6,11 @@ contentFormat: "markdown"
 title: "alpha's SSR renders stall at the 1200ms fetch soft budget in bursts: first seen as a ~15min window after a bundle-head swap, then (2026-10-02) sporadically for hours on a days-old head — the stalled fetches are named, storage never saw a slow request, so the time is lost before the request reaches storage"
 slug: "self-heal-alpha-ssr-post-bundle-swap-cold-fetch-stall"
 written: "2026-09-12"
-updated: "2026-10-02"
+updated: "2026-10-13"
 author: "runtime-triage"
 status: "wip"
 priority: "medium"
-self_heal_status: in-progress
+self_heal_status: blocked
 severity: medium
 fingerprints: [da8bb3bdd7e1]
 nodes: [alpha, doorway-alpha, elohim-matthew-alpha]
@@ -564,3 +564,190 @@ storage answered fast. It is named because every consumer of `/head` (the doorwa
 reconciler, `doorway/doorway-service/src/render/bundle_heads.rs`, treats `unavailable` as "keep the
 last candidate") is currently paying 2 s for an answer of "unavailable". It has no backlog home yet.
 
+---
+
+# 2026-10-13: `da8bb3bdd7e1` fired a fourth time; both instruments read out, and the name lookup is not where the time goes
+
+## What is exhausted
+
+Ledger line (fp `da8bb3bdd7e1`, node **alpha**, filed poll 219, `2026-10-13T23:21:18+00:00`):
+
+```
+render degenerate 18/50 of NEW renders = 0.36 over 6 of the last 8 polls (SSR stalled/timedOut saturation)
+```
+
+Re-fetch at triage, `GET https://doorway-alpha.elohim.host/admin/render-stats` (23:26:48Z, HTTP 200):
+
+```json
+{"total": 52, "rendered": 34, "renderedEmpty": 0, "stalled": 18, "timedOut": 0,
+ "errored": 0, "avgWallMs": 516, "maxWallMs": 1270, "degenerateRate": 0.346}
+```
+
+`GET https://elohim.host/admin/render-stats` the same second: `total: 50, stalled: 0, maxWallMs: 1127`.
+Both doorways run the same image (`/version`: commit `85ad63f`, built 2026-10-12T11:23:08Z) and
+started together (`/health` uptime 127327 s on alpha, 127272 s on alpha-b: about 2026-10-12T12:04Z).
+`/admin/self-healing` on alpha: `admission.shedTotal: 0`, upstream `circuit: closed`, `errorStreak: 0`,
+`warmup.completed: true`, `conductor.connectedWorkers: 4/4`, `projector.caughtUp: true`.
+
+The stored window (`.claude/data/runtime-cursor.json`, poll 219) runs `total` 2 -> 52 and `stalled`
+0 -> 18 on alpha, and `total` 2 -> 50 with `stalled` 0 on alpha-b. The poller is hook-driven, so the
+8 samples are not evenly spaced: the oldest sample (`total: 2`) is from just after the 2026-10-12
+start. **The 18 stalls are the whole life of this process, about 35 hours, not a recent burst.**
+The base is honest (18 events, floor 3; 6 moving polls). The predicate is right again; leave it alone.
+
+## Every stall, from the 2026-09-28 instrument
+
+Loki, `{namespace="elohim-alpha"} |= "degenerate_fetches"`, 2026-10-12T12:00Z -> 2026-10-13T23:30Z:
+**18 lines, not truncated, all from pod `elohim-doorway-alpha-66cd864646-hxs7s`**, all `path: "/"`,
+`terminal: "stalled"`, `wall_ms` 1226-1270. The count equals the counter. Abbreviations: R x =
+`GET /api/v1/resilience/concept-path-forward-x`, E x = `GET /epr-head/concept-path-forward-x`,
+E manifesto = `GET /epr-head/manifesto`; every fetch reads `(stalled 1200ms)`.
+
+| # | time (UTC) | `wall_ms` | fetches named |
+|---|---|---|---|
+| 1 | 10-12 13:22:52 | 1270 | R policymakers |
+| 2 | 10-12 13:34:53 | 1257 | R developers, E communities, R communities, E manifesto |
+| 3 | 10-12 18:52:18 | 1239 | R developers, E communities, R communities, E manifesto |
+| 4 | 10-13 01:50:24 | 1261 | R developers, E communities, R communities, E manifesto |
+| 5 | 10-13 05:06:07 | 1265 | R policymakers, E developers, R developers, E communities, R communities, +1 more |
+| 6 | 10-13 05:45:33 | 1261 | R communities, E manifesto |
+| 7 | 10-13 06:08:37 | 1258 | R developers, E communities, R communities, E manifesto |
+| 8 | 10-13 07:40:32 | 1247 | R communities |
+| 9 | 10-13 09:47:40 | 1240 | E developers, R developers, E communities, R communities, E manifesto |
+| 10 | 10-13 12:08:57 | 1226 | R policymakers, E developers, R developers, E communities, R communities, +1 more |
+| 11 | 10-13 12:42:20 | 1243 | R policymakers, E developers, E communities, R communities, E manifesto |
+| 12 | 10-13 12:57:52 | 1251 | R developers, E communities, R communities, E manifesto |
+| 13 | 10-13 14:49:59 | 1248 | R developers, E communities, R communities, E manifesto |
+| 14 | 10-13 16:44:35 | 1238 | R developers, E communities, R communities, E manifesto |
+| 15 | 10-13 20:01:07 | 1263 | R policymakers, R developers, E communities, R communities, E manifesto |
+| 16 | 10-13 20:14:31 | 1227 | R policymakers, E developers, R developers, E communities, R communities, +1 more |
+| 17 | 10-13 21:22:58 | 1269 | R policymakers, E developers, R developers, E communities, R communities, +1 more |
+| 18 | 10-13 22:17:52 | 1256 | R communities, E manifesto |
+
+Same six fetches as on 2026-10-02, and the same tail-of-the-sequence shape. Three refinements:
+
+- **The tail is not always a clean suffix.** Rows 1 and 8 name one fetch that is not the last of the
+  sequence (the fetches issued after it arrived). Rows 11 and 15 skip one in the middle. So it is
+  "some of the last six", weighted to the end, not "everything after a point".
+- **About one cold render in three, steadily.** 18 of 52 over 35 h, in ones and twos, hours apart.
+  No burst, no trend.
+- **The 19:15Z pin removal is neither the cause nor a cure.** The operator removed 1,063 retired
+  `epr:e2e-*` pins from matthew at about 19:15Z on 10-13 (the doorway logged the `DELETE /api/v1/pins/<n>`
+  calls from 19:14:10Z). Rows 1-14 predate it by up to 30 hours; rows 15-18 follow it. No deploy rolled
+  the fleet on 10-13 either. The condition started with the process on 10-12 and continued through.
+
+## The 2026-10-02 instrument (`doorway::ssr::dns`) read out for the first time
+
+This is the first firing on an image that carries `TimedDnsResolver` (`7fe05122f` is an ancestor of
+the deployed `85ad63f`). Loki, `{namespace="elohim-alpha"} |= "ssr::dns"`, same range: **one line**.
+
+```json
+{"timestamp":"2026-10-12T22:49:41.360593Z","level":"WARN","fields":{"message":"SSR render fetch: slow name lookup",
+ "host":"elohim-matthew-alpha.elohim-alpha.svc.cluster.local","elapsed_ms":12552954,"addresses":1},"target":"doorway::ssr::dns"}
+```
+
+- **No stall has a `doorway::ssr::dns` line within 5 s of it.** The nearest stalls to this line are
+  3 h 57 min before and 3 h 1 min after. By the rule this record set on 2026-10-02, the lookup is
+  ruled out. That rule needs the qualification in the next section before it is believed.
+- **`elapsed_ms: 12552954` is 3 h 29 min.** The lookup succeeded (`addresses: 1`). No `getaddrinfo`
+  takes that long. The clock started at about 19:20:28Z on 10-12 and stopped at 22:49:41Z; in between
+  the future was simply not polled. That is the render thread: `elohim/elohim-render/src/angular.rs`
+  runs each render on a `current_thread` runtime that goes back to a blocking channel recv between
+  renders, so anything still pending when a render returns sits unpolled until the next render lands on
+  that thread. The line is the residue of one fetch that was still in flight when its render returned.
+  It measures how long a render thread sat idle (this node renders about 1.5 times an hour), not a slow lookup.
+
+## Storage is ruled out again, by the same histogram
+
+Prometheus, `elohim_http_request_duration_ms`, pod `elohim-matthew-alpha-0`, hourly from 10-12 12:00Z
+to 10-13 23:00Z: requests slower than 1 s (`_count` minus `_bucket{le="1000.0"}`) for
+`route_class="api"`: **0 in every hour**. Eleven or more `api`-class fetches a day are cut at 1200 ms by
+the doorway and storage never held one for a second. For `content`: 93 in the 12:00-13:00Z hour on 10-12
+(the start) and 0.04 in the 20:00-21:00Z hour on 10-13, 0 otherwise. `elohim_http_requests_in_flight`
+max over two days: 29 on one instance of the pod, which is the fetch count of one `/` render arriving at once.
+
+## Root-cause inventory (this pass)
+
+1. **Unchanged from 2026-10-02:** `init_ssr_render_client` (`doorway/doorway-service/src/server/http.rs`)
+   is pool-free on purpose, so one `/` render opens about 29 fresh connections with 29 fresh lookups,
+   all at once, on the render thread own runtime. The proxy client, pooled, on the main runtime, has never
+   shown this.
+2. **`doorway/doorway-service/src/ssr.rs`, `TimedDnsResolver::resolve` — the instrument has a blind
+   spot (read from code, not measured).** It logs only when the lookup future *completes*.
+   `TracingFetcher::fetch` (`elohim/elohim-render/src/traced_fetcher.rs`) wraps the whole inner fetch in
+   `tokio::time::timeout(soft, ...)`, and at the cut the inner future is dropped, the pending lookup with
+   it. A lookup that would have taken longer than the 1200 ms budget therefore logs nothing. So "no
+   `doorway::ssr::dns` line beside the stall" excludes a lookup of 250-1200 ms that then completed; it
+   does not, on its own, exclude a lookup that hung past the budget (for example a 5 s glibc resolver
+   retry after a dropped UDP query; the image is `debian:bookworm-slim`, the manifest sets no
+   `dnsConfig`, and the upstream name has four dots under the default `ndots:5`, so each lookup walks the
+   search list first).
+3. **What argues against the lookup anyway (inferred):** the stalled fetches are a subset of 29 lookups
+   of the *same name* issued in the same few milliseconds on the same blocking pool; 23 or more of them
+   resolve and complete in well under the budget every time. And the fetches that stall are always from
+   the same six, late in the issue order. A resolver fault would not pick by position.
+4. **What the 3.5 h line adds (measured for one fetch, inferred as a mechanism):** on this path, time
+   spent *not being polled* is indistinguishable from time spent waiting on the network. Every phase of a
+   render fetch (lookup wakeup, connect, request write, response read) advances only when the render
+   thread polls it, and that thread also runs the V8 isolate. The third candidate from 2026-10-02 ("the
+   render thread `current_thread` runtime not polling the tail fetches") is now the leading one: it is the
+   only candidate that explains why position in the issue order matters, why storage sees nothing slow,
+   and why the lookup instrument is quiet. **Not proven.** What it does not explain: why adam, on the same
+   image and bundle path, shows 0 of 50.
+5. **Unplaced observation:** in two of six +/-60 s windows around stalls, storage logged
+   `Connection error ... connection closed before message completed` from `10.1.58.42` (13:34:43Z on
+   10-12, ten seconds before row 2; 20:14:43Z on 10-13, twelve seconds after row 16; twelve seconds is
+   `STORAGE_PROXY_REQUEST_TIMEOUT_SECS`). If `10.1.58.42` is the doorway-alpha pod, storage accepted a
+   connection on which a complete request never arrived: the connect succeeded and the write did not
+   happen. Whose address that is was not established (it needs a cluster read).
+
+## Fix path
+
+No cure is chosen, because the phase is still not measured. The next move is one more instrument, and it
+must be one that reports at the cut instead of at completion:
+
+1. **A drop guard on the lookup.** In `TimedDnsResolver::resolve`, hold a small guard across the
+   `lookup_host` await that is disarmed on completion and, in `Drop`, emits
+   `warn!(target: "doorway::ssr::dns", host, elapsed_ms, "SSR render fetch: name lookup abandoned before it answered")`.
+   This closes the blind spot in item 2: after it, a stall with no `doorway::ssr::dns` line really does
+   rule the lookup out.
+2. **A phase guard on the fetch.** In `ResolverFetcher::fetch` (`doorway/doorway-service/src/ssr.rs`),
+   a guard that records the phase reached (`sending` -> `headers` -> `body`) and how many times the future
+   was polled, and on drop before completion emits one `warn!` on a new target `doorway::ssr::fetch` with
+   `path`, `phase`, `elapsed_ms`, `polls` and `max_poll_gap_ms`. Reading: `phase=sending` with a large
+   `max_poll_gap_ms` is the render thread not polling; `phase=sending` polled steadily with no dns line is
+   connect or write; `phase=headers` or `body` is storage or transit after all.
+3. **Then the cure, by that reading.** Render thread starving its own fetches: drive the render fetches
+   from a runtime that is not the isolate thread (a dedicated fetch runtime that the render thread awaits
+   through a channel keeps the pool-free containment and removes the starvation). Connect: a short-TTL
+   address cache plus a bounded connect retry inside the budget. Neither is designed here.
+4. Unchanged refusals: do not widen the soft budget, do not touch `_render_degenerate`, do not raise
+   `DEFAULT_SSR_RENDER_PERMITS`, do not re-pool the render client.
+
+## Current decision (supersedes 2026-10-02)
+
+**BLOCKED. The lookup instrument has been read and is quiet; the next instrument is specified and not
+built.** This pass ran under a no-cargo constraint (the storage build slot was held and the machine was
+loaded), and both guards are Rust in `doorway-service` that no gate has seen. Owed, in order:
+
+1. Implement items 1 and 2 above and run `just gate doorway` (`RUSTFLAGS=""`).
+2. An edge deploy that carries them (operator-initiated; this agent does not roll the fleet).
+3. One Loki read after the next few stalls: `{namespace="elohim-alpha"} |= "doorway::ssr::fetch"` beside
+   `|= "degenerate_fetches"`.
+4. Operator, optional and cheap: whether `10.1.58.42` is the doorway-alpha pod address (item 5).
+
+What the poller cites on re-encounter: this record. **This fingerprint is a standing condition of the
+alpha doorway, about one cold `/` render in three served as a degenerate HTTP 200, since at least
+2026-10-02.** It is not tied to a deploy, a head swap, or the 2026-10-13 pin removal. It will not close
+by disappearance while the process lives, because the delta window keeps collecting stalls. A re-file
+needs no new triage until the phase guard is deployed; the reading in step 3 is the next triage.
+
+## Verification
+
+- 2026-10-13 23:26:48Z: `/admin/render-stats`, `/admin/self-healing`, `/health`, `/version` re-fetched on
+  both doorways (HTTP 200, quoted above). The cursor window was read from disk. **The condition is live.**
+- Loki and Prometheus readings as quoted, taken about 23:30Z through the observability datasource.
+- No cache-busted render probes and no `/head` reads were made this pass (read-only status surfaces
+  only), so this triage added nothing to either node counters. The landing head age was therefore not
+  read; the process age (35 h) and the spread of the stalls carry the "not a cold window" reading.
+- Nothing was built, so nothing is claimed fixed. The ledger line is `blocked` and is not deleted.
