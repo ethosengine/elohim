@@ -37,7 +37,7 @@
 
 use std::collections::{HashMap, HashSet};
 use std::sync::Arc;
-use std::time::{Duration, Instant};
+use std::time::Duration;
 
 use tokio::sync::broadcast;
 use tokio::time::{interval, MissedTickBehavior};
@@ -54,18 +54,15 @@ pub const DEFAULT_FANOUT_SECS: u64 = 300;
 /// reconcile convention so the conductor + boot projections land first.
 pub const DEFAULT_SETTLE_SECS: u64 = 30;
 
-/// First rest (seconds) for an agent that answered `Ok(None)`, beyond the sweep
-/// cadence. Doubles on each consecutive `None`.
-pub const NONE_REST_BASE_SECS: u64 = 5 * 60;
-
-/// Longest rest (seconds) for an agent that keeps answering `Ok(None)`. Cost: a
-/// peer with no row is simply not counted by `peer_selection` or
-/// `household_resilience` (`PEER_STATUS_STALENESS_SECS` only dims rows that
-/// exist), so the cap is how long a newly publishing peer stays out of placement
-/// and resilience counts. 15 minutes keeps a device joining a household
-/// prompt, and still cuts an empty agent's calls to every third sweep at the
-/// default cadence.
-pub const NONE_REST_CAP_SECS: u64 = 15 * 60;
+/// Most sweeps skipped for an agent that keeps answering `Ok(None)`. After the
+/// n-th consecutive None an agent with no row is skipped for
+/// `min(n, MAX_SKIPPED_SWEEPS)` sweeps, so it is asked again at most
+/// `MAX_SKIPPED_SWEEPS + 1` sweeps after its last ask (15 minutes at the default
+/// cadence, proportionally at any other: sweeps are counted, not timed). Cost: a
+/// peer with no row is not counted by `peer_selection` or `household_resilience`
+/// (`PEER_STATUS_STALENESS_SECS` only dims rows that exist), so this is how many
+/// sweeps a newly publishing peer stays out of placement and resilience counts.
+pub const MAX_SKIPPED_SWEEPS: u32 = 2;
 
 /// A decoded, storage-ready PeerStatus snapshot for one agent, produced by a
 /// [`PeerStatusFetcher`]. This is the boundary type between the conductor-facing
@@ -104,45 +101,42 @@ pub struct FanoutStats {
     pub rested: usize,
 }
 
-/// Agents that answered a definite `Ok(None)`, kept in-process (a restart asks
-/// everyone once) and bounded by the roster: [`RestMemo::retain_roster`] drops
-/// agents that left it. A `None` rests the agent on a doubling window; `Some`
-/// clears it; an `Err` is not an answer and touches nothing.
-#[derive(Debug)]
+/// Agents with no `peer_statuses` row that answered `Ok(None)`, kept in-process
+/// (a restart asks everyone once) and bounded by the roster:
+/// [`RestMemo::retain_roster`] drops agents that left it. Only an agent with no
+/// row rests: the zome also answers None when the newest linked record cannot be
+/// retrieved, so a publishing peer is asked every sweep whatever it answers.
+/// `Some` clears the entry; an `Err` is not an answer and touches nothing.
+#[derive(Debug, Default)]
 pub struct RestMemo {
-    cadence: Duration,
-    /// agent -> (consecutive Nones, do not ask before)
-    resting: HashMap<String, (u32, Instant)>,
+    /// agent -> (consecutive Nones, sweeps still to skip)
+    resting: HashMap<String, (u32, u32)>,
 }
 
 impl RestMemo {
-    /// `cadence` is the sweep interval; the rest is counted beyond it.
-    pub fn new(cadence: Duration) -> Self {
-        Self {
-            cadence,
-            resting: HashMap::new(),
+    pub fn new() -> Self {
+        Self::default()
+    }
+
+    /// Skip this sweep for `agent`? Consumes one sweep of its rest.
+    fn take_rest(&mut self, agent: &str) -> bool {
+        match self.resting.get_mut(agent) {
+            Some((_, left)) if *left > 0 => {
+                *left -= 1;
+                true
+            }
+            _ => false,
         }
     }
 
-    fn is_resting(&self, agent: &str, now: Instant) -> bool {
-        self.resting
-            .get(agent)
-            .is_some_and(|(_, until)| now < *until)
-    }
-
-    fn remember_none(&mut self, agent: &str, now: Instant) {
+    fn remember_none(&mut self, agent: &str) {
         let n = self
             .resting
             .get(agent)
             .map_or(0, |(n, _)| *n)
             .saturating_add(1);
-        let window = NONE_REST_BASE_SECS
-            .saturating_mul(1u64 << (n - 1).min(16))
-            .min(NONE_REST_CAP_SECS);
-        // Half a cadence of slack so tick jitter cannot decide whether the
-        // sweep after the window lands just before or just after it.
-        let until = now + self.cadence + Duration::from_secs(window) - self.cadence / 2;
-        self.resting.insert(agent.to_string(), (n, until));
+        self.resting
+            .insert(agent.to_string(), (n, n.min(MAX_SKIPPED_SWEEPS)));
     }
 
     fn clear(&mut self, agent: &str) {
@@ -195,31 +189,41 @@ pub async fn run_once<F: PeerStatusFetcher + ?Sized>(
     fetcher: &F,
     self_cid: &str,
 ) -> Result<FanoutStats, StorageError> {
-    let mut memo = RestMemo::new(Duration::from_secs(DEFAULT_FANOUT_SECS));
-    run_once_resting(pool, fetcher, self_cid, &mut memo, Instant::now()).await
+    run_once_resting(pool, fetcher, self_cid, &mut RestMemo::new()).await
 }
 
 /// As [`run_once`], but agents resting on a remembered `Ok(None)` in `memo` are
-/// not asked. `now` is injected so tests do not sleep.
+/// not asked. An agent with a row in `peer_statuses` (one `list_by_peer_ids`
+/// query per sweep, no conductor call) is never rested.
 pub async fn run_once_resting<F: PeerStatusFetcher + ?Sized>(
     pool: &DbPool,
     fetcher: &F,
     self_cid: &str,
     memo: &mut RestMemo,
-    now: Instant,
 ) -> Result<FanoutStats, StorageError> {
-    let raw_keys = {
+    let (raw_keys, with_row) = {
         let mut conn = pool
             .get()
             .map_err(|e| StorageError::Internal(format!("peer_status_fanout: pool: {e}")))?;
-        crate::db::humans::list_agent_pub_keys(&mut conn, crate::db::HUMANS_HAPP_ID)?
+        let raw_keys =
+            crate::db::humans::list_agent_pub_keys(&mut conn, crate::db::HUMANS_HAPP_ID)?;
+        let roster = build_roster(raw_keys.clone(), self_cid);
+        let with_row: HashSet<String> =
+            crate::db::peer_statuses::list_by_peer_ids(&mut conn, &roster)
+                .map_err(|e| StorageError::Internal(format!("peer_status_fanout: rows: {e}")))?
+                .into_iter()
+                .map(|r| r.peer_id)
+                .collect();
+        (raw_keys, with_row)
     };
     let roster = build_roster(raw_keys, self_cid);
     memo.retain_roster(&roster);
 
     let mut stats = FanoutStats::default();
     for agent in &roster {
-        if memo.is_resting(agent, now) {
+        if with_row.contains(agent) {
+            memo.clear(agent);
+        } else if memo.take_rest(agent) {
             stats.missed += 1;
             stats.rested += 1;
             continue;
@@ -256,7 +260,9 @@ pub async fn run_once_resting<F: PeerStatusFetcher + ?Sized>(
                 }
             }
             Ok(None) => {
-                memo.remember_none(agent, now);
+                if !with_row.contains(agent) {
+                    memo.remember_none(agent);
+                }
                 stats.missed += 1;
             }
             Err(e) => {
@@ -291,11 +297,11 @@ pub async fn run_fanout_loop<F: PeerStatusFetcher + ?Sized>(
 
     let mut ticker = interval(Duration::from_secs(fanout_secs.max(1)));
     ticker.set_missed_tick_behavior(MissedTickBehavior::Skip);
-    let mut memo = RestMemo::new(Duration::from_secs(fanout_secs.max(1)));
+    let mut memo = RestMemo::new();
     loop {
         tokio::select! {
             _ = ticker.tick() => {
-                match run_once_resting(&pool, fetcher.as_ref(), &self_cid, &mut memo, Instant::now())
+                match run_once_resting(&pool, fetcher.as_ref(), &self_cid, &mut memo)
                     .await
                 {
                     Ok(stats) if stats.upserted > 0 => {
@@ -632,8 +638,9 @@ mod tests {
     }
 
     // ---- rest on a remembered None ----
-
-    const CADENCE: Duration = Duration::from_secs(DEFAULT_FANOUT_SECS);
+    //
+    // Rest is counted in sweeps, not time, so the bound (asked again at most
+    // MAX_SKIPPED_SWEEPS + 1 sweeps after the last ask) holds at any cadence.
 
     fn roster_pool(nones: &[&str], somes: &[&str]) -> (DbPool, FakeFetcher) {
         let pool = test_pool();
@@ -658,142 +665,155 @@ mod tests {
         )
     }
 
+    fn put_row(pool: &DbPool, peer: &str) {
+        let mut conn = pool.get().unwrap();
+        crate::db::peer_statuses::upsert(
+            &mut conn,
+            &PeerStatusRow {
+                peer_id: peer.into(),
+                status: "online".into(),
+                general_pool_member: 1,
+                accepting_stewardship_reserves: 1,
+                archetype_class: None,
+                timestamp: 1_700_000_000_000_000,
+                dht_anchor_hash: String::new(),
+                updated_at: 1_700_000_000_000_000,
+            },
+        )
+        .unwrap();
+    }
+
     fn take_calls(f: &FakeFetcher) -> Vec<String> {
         let mut c = std::mem::take(&mut *f.calls.lock().unwrap());
         c.sort();
         c
     }
 
+    /// One sweep; whether `agent` was asked.
+    async fn sweep(pool: &DbPool, f: &FakeFetcher, memo: &mut RestMemo, agent: &str) -> bool {
+        run_once_resting(pool, f, "uhCAkSELF", memo).await.unwrap();
+        take_calls(f).iter().any(|c| c == agent)
+    }
+
     #[tokio::test]
     async fn an_agent_that_answers_none_is_not_reasked_on_the_next_sweep() {
         let nones = ["uhCAkN1", "uhCAkN2", "uhCAkN3", "uhCAkN4"];
         let (pool, f) = roster_pool(&nones, &["uhCAkS1", "uhCAkS2"]);
-        let mut memo = RestMemo::new(CADENCE);
-        let t0 = Instant::now();
-        run_once_resting(&pool, &f, "uhCAkSELF", &mut memo, t0)
+        let mut memo = RestMemo::new();
+        run_once_resting(&pool, &f, "uhCAkSELF", &mut memo)
             .await
             .unwrap();
         assert_eq!(take_calls(&f).len(), 6);
-        run_once_resting(&pool, &f, "uhCAkSELF", &mut memo, t0 + CADENCE)
+        run_once_resting(&pool, &f, "uhCAkSELF", &mut memo)
             .await
             .unwrap();
         assert_eq!(take_calls(&f), vec!["uhCAkS1", "uhCAkS2"]);
     }
 
     #[tokio::test]
-    async fn a_rested_agent_is_reasked_when_its_window_lapses_and_the_window_doubles() {
+    async fn a_never_published_agent_is_asked_on_a_growing_then_capped_sequence() {
         let (pool, f) = roster_pool(&["uhCAkN1"], &[]);
-        let mut memo = RestMemo::new(CADENCE);
-        let mut t = Instant::now();
-        let mut gaps = vec![];
-        // Sweep every cadence; record how many sweeps pass between asks.
-        let mut since = 0u32;
-        for _ in 0..60 {
-            run_once_resting(&pool, &f, "uhCAkSELF", &mut memo, t)
-                .await
-                .unwrap();
-            if take_calls(&f).is_empty() {
-                since += 1;
+        let mut memo = RestMemo::new();
+        let mut seq = String::new();
+        for _ in 0..13 {
+            seq.push(if sweep(&pool, &f, &mut memo, "uhCAkN1").await {
+                'A'
             } else {
-                if since > 0 || gaps.is_empty() {
-                    gaps.push(since);
-                }
-                since = 0;
-            }
-            t += CADENCE;
+                '.'
+            });
         }
-        // Asked at once, then 1, 2 sweeps skipped (5, 10 min windows beyond the
-        // cadence), then the 15 min cap holds at 3.
-        assert_eq!(&gaps[..7], &[0, 1, 2, 3, 3, 3, 3], "gaps={gaps:?}");
+        // ask, skip 1, ask, skip 2, ask, skip 2 (the cap), ...
+        assert_eq!(seq, "A.A..A..A..A.");
+    }
+
+    #[tokio::test]
+    async fn an_agent_with_a_row_that_answers_none_is_asked_every_sweep() {
+        let (pool, f) = roster_pool(&["uhCAkP"], &[]);
+        put_row(&pool, "uhCAkP");
+        let mut memo = RestMemo::new();
+        for _ in 0..6 {
+            assert!(sweep(&pool, &f, &mut memo, "uhCAkP").await);
+        }
+        assert!(memo.resting.is_empty());
+    }
+
+    #[tokio::test]
+    async fn an_agent_that_gains_a_row_is_asked_every_sweep_from_then_on() {
+        let (pool, f) = roster_pool(&["uhCAkG"], &[]);
+        let mut memo = RestMemo::new();
+        assert!(sweep(&pool, &f, &mut memo, "uhCAkG").await);
+        assert!(!sweep(&pool, &f, &mut memo, "uhCAkG").await);
+        // A row arrives by another path (signal projection).
+        put_row(&pool, "uhCAkG");
+        for _ in 0..5 {
+            assert!(sweep(&pool, &f, &mut memo, "uhCAkG").await);
+        }
+        assert!(memo.resting.is_empty(), "its memo entry is dropped");
     }
 
     #[tokio::test]
     async fn an_answer_clears_the_rest() {
         let (pool, mut f) = roster_pool(&["uhCAkP"], &[]);
-        let mut memo = RestMemo::new(CADENCE);
-        let t0 = Instant::now();
-        run_once_resting(&pool, &f, "uhCAkSELF", &mut memo, t0)
-            .await
-            .unwrap();
-        take_calls(&f);
-        // It starts publishing; the window lapses.
+        let mut memo = RestMemo::new();
+        assert!(sweep(&pool, &f, &mut memo, "uhCAkP").await);
+        // It starts publishing; the rest lapses (one skipped sweep).
         f.by_agent.insert(
             "uhCAkP".into(),
             Ok(Some(fanned("uhCAkP", "online", 1_700_000_000_000_000))),
         );
-        let t1 = t0 + CADENCE * 3;
-        let s = run_once_resting(&pool, &f, "uhCAkSELF", &mut memo, t1)
+        assert!(!sweep(&pool, &f, &mut memo, "uhCAkP").await);
+        let s = run_once_resting(&pool, &f, "uhCAkSELF", &mut memo)
             .await
             .unwrap();
         assert_eq!(s.fetched, 1);
-        assert_eq!(take_calls(&f).len(), 1);
-        for i in 1..=3u32 {
-            run_once_resting(&pool, &f, "uhCAkSELF", &mut memo, t1 + CADENCE * i)
-                .await
-                .unwrap();
-            assert_eq!(take_calls(&f).len(), 1, "asked every sweep again");
+        assert!(memo.resting.is_empty());
+        for _ in 0..3 {
+            assert!(sweep(&pool, &f, &mut memo, "uhCAkP").await);
         }
     }
 
     #[tokio::test]
     async fn an_error_is_never_remembered() {
-        let (pool, mut f) = roster_pool(&[], &[]);
-        seed_human(&pool, "h-e", Some("uhCAkE"));
+        let (pool, mut f) = roster_pool(&["uhCAkE"], &[]);
         f.by_agent
             .insert("uhCAkE".into(), Err(anyhow::anyhow!("conductor down")));
-        let mut memo = RestMemo::new(CADENCE);
-        let t0 = Instant::now();
-        run_once_resting(&pool, &f, "uhCAkSELF", &mut memo, t0)
-            .await
-            .unwrap();
-        take_calls(&f);
-        let s = run_once_resting(&pool, &f, "uhCAkSELF", &mut memo, t0 + CADENCE)
-            .await
-            .unwrap();
-        assert_eq!(take_calls(&f).len(), 1, "asked again after an Err");
-        assert_eq!(s.rested, 0);
+        let mut memo = RestMemo::new();
+        for _ in 0..4 {
+            assert!(sweep(&pool, &f, &mut memo, "uhCAkE").await);
+        }
+        assert!(memo.resting.is_empty());
     }
 
     #[tokio::test]
     async fn an_error_does_not_clear_or_advance_a_window() {
         let (pool, mut f) = roster_pool(&["uhCAkX"], &[]);
-        let mut memo = RestMemo::new(CADENCE);
-        let t0 = Instant::now();
-        run_once_resting(&pool, &f, "uhCAkSELF", &mut memo, t0)
-            .await
-            .unwrap();
-        take_calls(&f);
-        let until = memo.resting["uhCAkX"];
+        let mut memo = RestMemo::new();
+        assert!(sweep(&pool, &f, &mut memo, "uhCAkX").await); // None: (1, 1)
         f.by_agent
             .insert("uhCAkX".into(), Err(anyhow::anyhow!("conductor down")));
-        // Window lapsed: the ask errs; the memo entry is untouched.
-        run_once_resting(&pool, &f, "uhCAkSELF", &mut memo, t0 + CADENCE * 3)
-            .await
-            .unwrap();
-        assert_eq!(take_calls(&f).len(), 1);
-        assert_eq!(memo.resting["uhCAkX"], until);
+        assert!(!sweep(&pool, &f, &mut memo, "uhCAkX").await); // rest consumed
+        assert!(sweep(&pool, &f, &mut memo, "uhCAkX").await); // asked, Err
+        assert_eq!(memo.resting["uhCAkX"], (1, 0), "count and rest unchanged");
     }
 
     #[tokio::test]
     async fn a_new_roster_agent_is_asked_at_once_and_a_departed_one_is_forgotten() {
         let (pool, f) = roster_pool(&["uhCAkOLD"], &[]);
-        let mut memo = RestMemo::new(CADENCE);
-        let t0 = Instant::now();
-        run_once_resting(&pool, &f, "uhCAkSELF", &mut memo, t0)
+        let mut memo = RestMemo::new();
+        run_once_resting(&pool, &f, "uhCAkSELF", &mut memo)
             .await
             .unwrap();
         take_calls(&f);
         assert!(memo.resting.contains_key("uhCAkOLD"));
-        // The old agent leaves the roster; a new one joins.
         {
-            let mut conn = pool.get().unwrap();
             use diesel::RunQueryDsl;
+            let mut conn = pool.get().unwrap();
             diesel::sql_query("DELETE FROM humans WHERE id = 'h-uhCAkOLD'")
                 .execute(&mut conn)
                 .unwrap();
         }
         seed_human(&pool, "h-new", Some("uhCAkNEW"));
-        run_once_resting(&pool, &f, "uhCAkSELF", &mut memo, t0 + CADENCE)
+        run_once_resting(&pool, &f, "uhCAkSELF", &mut memo)
             .await
             .unwrap();
         assert_eq!(take_calls(&f), vec!["uhCAkNEW"]);
@@ -804,13 +824,12 @@ mod tests {
     #[tokio::test]
     async fn a_rested_agent_still_counts_as_missed() {
         let (pool, f) = roster_pool(&["uhCAkN1", "uhCAkN2"], &["uhCAkS1"]);
-        let mut memo = RestMemo::new(CADENCE);
-        let t0 = Instant::now();
-        let s1 = run_once_resting(&pool, &f, "uhCAkSELF", &mut memo, t0)
+        let mut memo = RestMemo::new();
+        let s1 = run_once_resting(&pool, &f, "uhCAkSELF", &mut memo)
             .await
             .unwrap();
         assert_eq!((s1.missed, s1.rested), (2, 0));
-        let s2 = run_once_resting(&pool, &f, "uhCAkSELF", &mut memo, t0 + CADENCE)
+        let s2 = run_once_resting(&pool, &f, "uhCAkSELF", &mut memo)
             .await
             .unwrap();
         assert_eq!((s2.fetched, s2.missed, s2.rested), (1, 2, 2));
