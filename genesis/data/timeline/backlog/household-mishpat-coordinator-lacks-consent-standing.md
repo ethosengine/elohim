@@ -50,3 +50,31 @@ reading, which this workspace cannot take.
 
 **Done when.** A household call reading shows `my_consent_standing` answering, and `idle-is-free`'s ledger carries
 what the refresher costs when it does.
+
+## 2026-10-13: cause found, household brought up to date (operator-approved)
+
+**Cause (verified).** A household storage peer runs without `--embedded-conductor`, so it has no boot bundle. Its
+coordinator sweep measures against `<peer>/coordinators/last-applied.happ`, written 2026-10-05, before
+`my_consent_standing` existed. Rebuilding a DNA repacks `workdir/elohim.happ`, and nothing hands that bundle to a
+running household peer. The unpacked `last-applied.happ` and the built bundle carry different `mishpat.dna` bytes.
+
+**Applied.** `POST /admin/coordinators/sync?apply=true&appId=elohim` with the built bundle, on each of the three
+peers at 18:24Z. Mishpat hot-swapped on each (`appliedCount: 1`); nothing restarted. Receipts:
+`genesis/a2o/reports/recovery/idle-call-floor-20261013/coordinator-sync-{dryrun,apply}-{8090,8091,8092}.json`.
+
+**Result (measured).** `could not be read` failures per peer: 28 or 29 in the 14 minutes before, 0 in the five
+minutes after. Matthew's log at 18:24:46Z: `device carrier: whom this node speaks for … An approval here is for
+Matthew`, then `this node's key is proven over its transport id`.
+
+**Left as found.**
+
+- Only each peer's own app was swept. The hosted people's apps on the same conductors still run the older mishpat
+  coordinator.
+- The same dry run refuses the lamad role on every app: the built bundle's lamad DNA hash (`uhC0kT_R8…`) differs
+  from the installed one (`uhC0kUQPS…`), an integrity-zome difference. The household's lamad cells are on an older
+  DNA than the tree builds. That needs a reinstall or migration, not a hot-swap, and was not touched. Because of
+  that refusal the apply did not record a new `last-applied.happ`, so the standing sweep still compares against the
+  2026-10-05 bundle.
+- Nothing delivers a rebuilt coordinator to a running household peer on its own. `just mesh` has no arm for it.
+
+**Still owed for done-when.** A settled 300 s call reading with the read answering.

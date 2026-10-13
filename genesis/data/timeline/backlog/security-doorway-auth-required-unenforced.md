@@ -82,3 +82,11 @@ peers on the author's version. Same cure: only a steward of the atom may PATCH i
 `POST /db/relationships` route is equally unauthenticated; its caller-stated edge reach is being
 clamped to the source atom's reach (code review, FCT v2 recomposition), but the route still needs
 the same authorization.
+
+## 2026-10-13: confirmed live on alpha for `DELETE /api/v1/pins/{id}`
+
+During an operator-approved cleanup of test-residue pins, `DELETE https://doorway-alpha.elohim.host/api/v1/pins/<id>`
+with no credential answered `200 {"removed":<id>}` 1,063 times and each pin now lists as `removed`
+(`genesis/local-dev/alpha-pin-cleanup/removed-20261013T191535Z.log`). Anyone who can reach the doorway can remove
+any pin on the node it fronts, and a removal withdraws the pin's commons offer when it has one. `POST /api/v1/pins`
+was not tried. Status unchanged: open.
