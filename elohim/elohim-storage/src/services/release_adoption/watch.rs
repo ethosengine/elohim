@@ -67,7 +67,7 @@ mod lineage_windows;
 mod head_reader;
 
 /// The settled rest: a channel whose last check left nothing to do is asked
-/// again once in five sweeps instead of every sweep, until a head hint or a
+/// again every third sweep instead of every sweep, until a head hint or a
 /// local declaration pokes it. `sweep_once` and `check_channel` call into it.
 mod settled_rest;
 
@@ -949,25 +949,30 @@ impl AdoptionController {
     /// release, an unparseable manifest, or a controller without a database
     /// (nothing to compare, so nothing to re-apply). One DB read per slug,
     /// never a conductor call. See the idempotence exit for why.
-    fn applied_pointers_drifted(&self, head_metadata_json: &str) -> Vec<String> {
+    ///
+    /// `None` when the rows could not be READ at all (no connection), kept
+    /// apart from "nothing drifted": the idempotence exit still reads it as
+    /// nothing to re-apply on, but the settled rest must not, because an
+    /// unread pointer is not a verified one.
+    fn read_applied_pointer_drift(&self, head_metadata_json: &str) -> Option<Vec<String>> {
         let Some(db) = self.db.as_ref() else {
-            return Vec::new();
+            return Some(Vec::new());
         };
         let Ok(Some(body)) = extract_release_body(head_metadata_json) else {
-            return Vec::new();
+            return Some(Vec::new());
         };
         let Ok(manifest) = verify::verify_shape(&body) else {
-            return Vec::new();
+            return Some(Vec::new());
         };
         if !matches!(manifest.artifact_class, super::ArtifactClass::AppBundle) {
-            return Vec::new();
+            return Some(Vec::new());
         }
         let expected = super::apply::expected_browser_pointers(&manifest);
         if expected.is_empty() {
-            return Vec::new();
+            return Some(Vec::new());
         }
         let Ok(mut conn) = db.get() else {
-            return Vec::new();
+            return None;
         };
         let ctx = crate::db::AppContext::default_lamad();
         let mut actual = std::collections::BTreeMap::new();
@@ -977,7 +982,7 @@ impl AdoptionController {
                 .flatten();
             actual.insert(slug.clone(), pointer);
         }
-        super::apply::drifted_pointers(&expected, &actual)
+        Some(super::apply::drifted_pointers(&expected, &actual))
     }
 
     /// Resolve one channel's canonical head through THIS node's conductor —
@@ -1473,10 +1478,9 @@ impl AdoptionController {
             CandidateFollow::AlreadyApplied(candidate) => {
                 let applied = applied
                     .expect("AlreadyApplied is returned only when an applied release was read");
-                // Settled: the candidate is applied and the winner does not
-                // move until promotion. (No pointer check on this exit, so
-                // none is carried into the rest.)
-                *settled = Some(settled_rest::Settled::default());
+                // NOT a settled exit for the rest: it reads the winner's wire
+                // only, so it holds no candidate metadata to keep checking
+                // the applied pointers against while the channel rested.
                 return CheckOutcome::Checked {
                     head: Some(ResolvedHead {
                         cid: candidate.clone(),
@@ -1553,7 +1557,9 @@ impl AdoptionController {
                 // conductor call, so C6b's cost contract holds — and when a
                 // pointer has drifted the exit is NOT taken, so the sweep
                 // falls through to verify and re-apply.
-                let drifted = self.applied_pointers_drifted(&head.content.metadata_json);
+                let pointer_read = self.read_applied_pointer_drift(&head.content.metadata_json);
+                let pointers_read = pointer_read.is_some();
+                let drifted = pointer_read.unwrap_or_default();
                 if !drifted.is_empty() {
                     tracing::warn!(
                         channel = %channel.channel_id,
@@ -1580,10 +1586,11 @@ impl AdoptionController {
                              not report a reality it no longer has"
                         );
                     }
-                    // Settled: converged on this head. The rest carries the
-                    // head's metadata so the pointer check above keeps running
-                    // every sweep while the resolve does not.
-                    if !candidate_unread {
+                    // Settled: converged on this head, with its pointers READ
+                    // and found in place. The rest carries the head's metadata
+                    // so the pointer check above keeps running every sweep
+                    // while the resolve does not.
+                    if !candidate_unread && pointers_read {
                         *settled = Some(settled_rest::Settled {
                             applied_metadata_json: Some(head.content.metadata_json.clone()),
                         });
@@ -2314,7 +2321,7 @@ pub fn spawn(controller: AdoptionController) -> bool {
                 // tick `sweeps`/`lastSweepUnixSecs` on `/admin/adoption` for a
                 // tick that examined zero channels, which is not the same
                 // fact as a sweep that ran and found nothing to do.
-                state::reconcile_followed(&followed);
+                controller.unfollowed_tick(&followed);
                 0
             };
             tracing::debug!(

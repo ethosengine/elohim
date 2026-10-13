@@ -1374,8 +1374,13 @@ async fn offer_retained_head_hints(
             // Retained documents have no current supplier to attribute. The
             // worker uses its own conductor, not a fabricated transport peer.
             // `claim_and_send`, not `offer`: a re-offered old hint is not news,
-            // and must not keep a followed release channel off its rest.
-            let decision = gate.claim_and_send(&row.id, "", Instant::now());
+            // and must not keep a followed release channel off its rest. The
+            // id still passes through `offer`'s own validation first.
+            let decision =
+                match trigger_candidate_id(crate::sync::projector::PROJECTION_NAMESPACE, &doc_id) {
+                    Some(content_id) => gate.claim_and_send(content_id, "", Instant::now()),
+                    None => EnqueueDecision::NotContentDoc,
+                };
             crate::metrics::inc_head_adoption_trigger_from(decision.label(), "retained");
             match decision {
                 EnqueueDecision::Enqueued => {

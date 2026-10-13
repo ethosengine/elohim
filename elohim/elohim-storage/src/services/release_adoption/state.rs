@@ -858,8 +858,15 @@ pub fn channel_state(channel_id: &str) -> Option<ChannelAdoptionState> {
 
 /// Is `channel_id` in the follow set right now? A map lookup, no clone — the
 /// sync apply path asks this for every content id it offers.
+///
+/// A poisoned registry answers `false` rather than panicking: the callers are
+/// on the sync apply and signal paths, which must not inherit a panic from
+/// here.
 pub fn is_followed(channel_id: &str) -> bool {
-    REGISTRY.channels.lock().unwrap().contains_key(channel_id)
+    REGISTRY
+        .channels
+        .lock()
+        .is_ok_and(|channels| channels.contains_key(channel_id))
 }
 
 /// Clear a channel's refusal streak because its canonical election moved to a
