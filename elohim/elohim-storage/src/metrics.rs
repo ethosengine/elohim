@@ -1672,6 +1672,10 @@ lazy_static! {
     /// - `skipped_current` — the worker found the row already declaring exactly
     ///   the doc's head hint, so no conductor call was spent. On a converged
     ///   corpus this is the series that should dominate;
+    /// - `skipped_rested` — (source `retained` only) the retained pass withheld an
+    ///   offer because the last re-probe ladder for this exact `(doc head, row
+    ///   head)` claim ended without a walkable answer and its rest has not lapsed;
+    ///   no queue slot and no conductor call spent;
     /// - `adopted` — a canonical head landed FROM a sync apply rather than from
     ///   the heal leg's period. This is the series that says the 2026-09-17
     ///   130–450 s adoption lag is actually closed;
