@@ -54,14 +54,18 @@ pub const DEFAULT_FANOUT_SECS: u64 = 300;
 /// reconcile convention so the conductor + boot projections land first.
 pub const DEFAULT_SETTLE_SECS: u64 = 30;
 
-/// Most sweeps skipped for an agent that keeps answering `Ok(None)`. After the
-/// n-th consecutive None an agent with no row is skipped for
-/// `min(n, MAX_SKIPPED_SWEEPS)` sweeps, so it is asked again at most
+/// Most sweeps skipped for an agent that keeps answering `Ok(None)`. An agent
+/// with no row is skipped for at most this many sweeps after a None (this many
+/// exactly from its second consecutive None on), so it is asked again at most
 /// `MAX_SKIPPED_SWEEPS + 1` sweeps after its last ask (15 minutes at the default
 /// cadence, proportionally at any other: sweeps are counted, not timed). Cost: a
 /// peer with no row is not counted by `peer_selection` or `household_resilience`
 /// (`PEER_STATUS_STALENESS_SECS` only dims rows that exist), so this is how many
 /// sweeps a newly publishing peer stays out of placement and resilience counts.
+///
+/// The first None rests an agent for `(slot + 1) % (MAX_SKIPPED_SWEEPS + 1)`
+/// sweeps (`slot` = its position among the roster's no-row agents), so agents that
+/// all answered None on the same sweep come due on different sweeps, not together.
 pub const MAX_SKIPPED_SWEEPS: u32 = 2;
 
 /// A decoded, storage-ready PeerStatus snapshot for one agent, produced by a
@@ -129,14 +133,18 @@ impl RestMemo {
         }
     }
 
-    fn remember_none(&mut self, agent: &str) {
+    fn remember_none(&mut self, agent: &str, slot: u32) {
         let n = self
             .resting
             .get(agent)
             .map_or(0, |(n, _)| *n)
             .saturating_add(1);
-        self.resting
-            .insert(agent.to_string(), (n, n.min(MAX_SKIPPED_SWEEPS)));
+        let rest = if n == 1 {
+            (slot + 1) % (MAX_SKIPPED_SWEEPS + 1)
+        } else {
+            MAX_SKIPPED_SWEEPS
+        };
+        self.resting.insert(agent.to_string(), (n, rest));
     }
 
     fn clear(&mut self, agent: &str) {
@@ -220,13 +228,18 @@ pub async fn run_once_resting<F: PeerStatusFetcher + ?Sized>(
     memo.retain_roster(&roster);
 
     let mut stats = FanoutStats::default();
+    let mut no_row_slot = 0u32;
     for agent in &roster {
+        let slot = no_row_slot;
         if with_row.contains(agent) {
             memo.clear(agent);
-        } else if memo.take_rest(agent) {
-            stats.missed += 1;
-            stats.rested += 1;
-            continue;
+        } else {
+            no_row_slot += 1;
+            if memo.take_rest(agent) {
+                stats.missed += 1;
+                stats.rested += 1;
+                continue;
+            }
         }
         match fetcher.fetch_latest(agent).await {
             Ok(Some(fanned)) => {
@@ -261,7 +274,7 @@ pub async fn run_once_resting<F: PeerStatusFetcher + ?Sized>(
             }
             Ok(None) => {
                 if !with_row.contains(agent) {
-                    memo.remember_none(agent);
+                    memo.remember_none(agent, slot);
                 }
                 stats.missed += 1;
             }
@@ -696,18 +709,30 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn an_agent_that_answers_none_is_not_reasked_on_the_next_sweep() {
+    async fn agents_that_answer_none_together_come_due_on_different_sweeps() {
+        // The household shape on matthew: four hosted agents with no row, two
+        // publishing peers.
         let nones = ["uhCAkN1", "uhCAkN2", "uhCAkN3", "uhCAkN4"];
         let (pool, f) = roster_pool(&nones, &["uhCAkS1", "uhCAkS2"]);
         let mut memo = RestMemo::new();
-        run_once_resting(&pool, &f, "uhCAkSELF", &mut memo)
-            .await
-            .unwrap();
-        assert_eq!(take_calls(&f).len(), 6);
-        run_once_resting(&pool, &f, "uhCAkSELF", &mut memo)
-            .await
-            .unwrap();
-        assert_eq!(take_calls(&f), vec!["uhCAkS1", "uhCAkS2"]);
+        let mut asked_per_sweep = vec![];
+        let mut last_ask: HashMap<String, usize> = HashMap::new();
+        for i in 0..12 {
+            run_once_resting(&pool, &f, "uhCAkSELF", &mut memo)
+                .await
+                .unwrap();
+            let calls = take_calls(&f);
+            for a in nones {
+                if calls.iter().any(|c| c == a) {
+                    let gap = i - last_ask.insert(a.to_string(), i).unwrap_or(i);
+                    assert!(gap <= MAX_SKIPPED_SWEEPS as usize + 1, "{a} waited {gap}");
+                }
+            }
+            asked_per_sweep.push(calls.len());
+        }
+        // A restart asks everyone once; after that the no-row agents are spread
+        // 1/2/1 over the three sweeps of a rest period, never all four at once.
+        assert_eq!(asked_per_sweep, vec![6, 3, 4, 3, 3, 4, 3, 3, 4, 3, 3, 4]);
     }
 
     #[tokio::test]
@@ -722,7 +747,7 @@ mod tests {
                 '.'
             });
         }
-        // ask, skip 1, ask, skip 2, ask, skip 2 (the cap), ...
+        // ask, skip 1, ask, skip 2 (the cap), ask, skip 2, ...
         assert_eq!(seq, "A.A..A..A..A.");
     }
 
