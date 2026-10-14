@@ -14421,14 +14421,18 @@ impl HttpServer {
             };
             let marked = crate::services::device_consent::MarkedCell::new(&cell);
             let outcome = reconcile(&marked, &declaration).await;
-            // A reconcile that wrote and then failed changed standing too.
-            if marked.wrote() && !matches!(outcome, Reconciled::Applied(_)) {
+            // A reconcile that wrote, applied or failed after, owes one read,
+            // made here unless one that began after the write has landed. One
+            // applied with nothing written reads, as it always did.
+            if marked.wrote() {
+                self.read_speaks(crate::services::device_carrier::Want::Owed)
+                    .await;
+            } else if matches!(outcome, Reconciled::Applied(_)) {
                 self.refresh_speaks_now().await;
             }
             let mut detail = String::new();
             match &outcome {
                 Reconciled::Applied(begun) => {
-                    self.refresh_speaks_now().await;
                     let session = self
                         .db_pool
                         .as_ref()

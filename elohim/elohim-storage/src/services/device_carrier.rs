@@ -152,6 +152,8 @@ struct Waiting {
     source: String,
     ask: Ask,
     arrived: i64,
+    /// Its place in `Kept::seq`: what came before and after it.
+    order: u64,
 }
 
 /// What one read of whom this node speaks for answered, and when: on the
@@ -160,6 +162,8 @@ struct Evidence {
     speaks: Speaks,
     at: i64,
     wall_at: i64,
+    /// Its place in `Kept::seq` when the read began.
+    begun: u64,
 }
 
 /// What is kept against the carrier's clock, under one lock, so that finding
@@ -176,6 +180,11 @@ struct Kept {
     speaks: Option<Evidence>,
     /// Asks waiting for a read, by first arrival (module doc, "A slow cell").
     waiting: Vec<Waiting>,
+    /// Counts the steps taken under this lock that need ordering against
+    /// each other: a read beginning, an ask first arriving. A clock that
+    /// ticks every few milliseconds can give both the same time; this never
+    /// gives two the same place.
+    seq: u64,
 }
 
 impl Kept {
@@ -205,11 +214,12 @@ impl Kept {
     /// next arrives.
     // bounded-work: passes over at most MAX_WAITING asks, each kept for an
     // ask's life at most.
-    fn remember(&mut self, source: &str, ask: &Ask, now_micros: i64) -> i64 {
+    /// Returns when it arrived and its place in `seq`.
+    fn remember(&mut self, source: &str, ask: &Ask, now_micros: i64) -> (i64, u64) {
         let waiting = &mut self.waiting;
         waiting.retain(|w| now_micros < w.arrived.saturating_add(ASK_LIFE_MICROS));
         if let Some(w) = waiting.iter().find(|w| w.source == source && w.ask == *ask) {
-            return w.arrived;
+            return (w.arrived, w.order);
         }
         let list: &Vec<Waiting> = waiting;
         let held = |peer: &str| list.iter().filter(|w| w.source == peer).count();
@@ -235,12 +245,20 @@ impl Kept {
                 "device carrier: no room to remember another waiting ask; one gave way"
             );
         }
-        waiting.push(Waiting {
+        self.seq += 1;
+        self.waiting.push(Waiting {
             source: source.to_string(),
             ask: ask.clone(),
             arrived: now_micros,
+            order: self.seq,
         });
-        now_micros
+        (now_micros, self.seq)
+    }
+
+    /// The next place in `seq`.
+    fn next(&mut self) -> u64 {
+        self.seq += 1;
+        self.seq
     }
 
     /// This ask from `source` waits no longer.
@@ -717,8 +735,14 @@ impl Carrier {
         if !admissible {
             return Speaks::Unknown;
         }
-        let arrived = kept.remember(source, ask, now);
-        if kept.speaks.as_ref().is_none_or(|read| read.at < arrived) {
+        // Whether the read began after the ask arrived is told by their
+        // places in `seq`, never by their times, which can be equal.
+        let (_, arrived) = kept.remember(source, ask, now);
+        if kept
+            .speaks
+            .as_ref()
+            .is_none_or(|read| read.begun <= arrived)
+        {
             return Speaks::Unknown;
         }
         let speaks = kept.within(now, wall, SPEAKS_MAX_AGE_MICROS);
@@ -730,7 +754,7 @@ impl Carrier {
 
     #[cfg(test)]
     fn first_arrival(&self, source: &str, ask: &Ask, now_micros: i64) -> i64 {
-        self.kept_lock().remember(source, ask, now_micros)
+        self.kept_lock().remember(source, ask, now_micros).0
     }
 
     /// Take what one read answered: its evidence as of `at_micros` on the
@@ -746,6 +770,7 @@ impl Carrier {
         wall_at_micros: i64,
         done_micros: i64,
         epoch: u64,
+        begun: u64,
     ) -> bool {
         match read {
             Ok(speaks) => {
@@ -764,6 +789,7 @@ impl Carrier {
                         speaks,
                         at: at_micros,
                         wall_at: wall_at_micros,
+                        begun,
                     });
                 }
                 let mut reads = self.reads_lock();
@@ -838,6 +864,7 @@ impl Carrier {
             return false;
         };
         let wall_began = (self.wall)();
+        let begun = self.kept_lock().next();
         let writes = self.standing_writes.load(SeqCst);
         // A timer's turn that waited behind an identity write's read does
         // not read again on its heels.
@@ -854,10 +881,10 @@ impl Carrier {
             debug!("device carrier: no cell to read whom this node speaks for from yet");
             return false;
         };
-        // By timer this node's key is the timer's to say, as it always was:
-        // a read made for a request does not name this node before the
-        // timer's first turn has.
-        if self.refresh() == SpeaksRefresh::Demand || want == Want::Timer {
+        // By timer this node's key is the timer's to say (`timer_turn`), as
+        // it always was: a read made for a request does not name this node
+        // before the timer's turn has.
+        if self.refresh() == SpeaksRefresh::Demand {
             self.set_self_key(cell.agent());
         }
         let read = read_speaks(cell, names).await;
@@ -877,7 +904,7 @@ impl Carrier {
                     SpeaksRefresh::Demand => (began, wall_began),
                     SpeaksRefresh::Timer => (done, (self.wall)()),
                 };
-                self.note_read(read, at, wall_at, done, epoch)
+                self.note_read(read, at, wall_at, done, epoch, begun)
             }
             _ => false,
         };
@@ -893,12 +920,16 @@ impl Carrier {
         true
     }
 
-    /// The timer's turn: a read. Whether it read.
+    /// The timer's turn: this node's key, and a read. Whether it read.
     pub async fn timer_turn(
         &self,
         cell: &dyn ControllerCell,
         names: &dyn IdentifierSource,
     ) -> bool {
+        // As before this switch existed: the timer names this node when it
+        // has the cell, before and whatever its read, so a turn that waits
+        // behind another read and makes none still does.
+        self.set_self_key(cell.agent());
         self.read_turn(Some(cell), names, Want::Timer).await
     }
 
@@ -942,10 +973,13 @@ impl Carrier {
     /// carrier's clock and now on the wall clock.
     pub fn set_speaks(&self, speaks: Speaks, now_micros: i64) {
         let wall_at = (self.wall)();
-        self.kept_lock().speaks = Some(Evidence {
+        let mut kept = self.kept_lock();
+        let begun = kept.next();
+        kept.speaks = Some(Evidence {
             speaks,
             at: now_micros,
             wall_at,
+            begun,
         });
     }
 
@@ -4098,5 +4132,73 @@ mod tests {
         assert!(earlier.await.unwrap());
         assert!(writer.await.unwrap());
         assert_eq!(cell.reads(), 5);
+    }
+
+    // --- round seven: order by place, not time; the timer's key ---
+
+    #[tokio::test]
+    async fn an_ask_that_arrived_at_the_same_time_a_read_began_but_after_it_is_not_listed_on_it() {
+        let clock = Clock::new();
+        let c = Arc::new(carrier_at(&clock));
+        let cell = CountedCell::new(Ok(ready()));
+        cell.hold_reads(true);
+        // A read begins; an ask arrives after it with the clock not having
+        // moved (a coarse clock's tick), and is not listed.
+        let read = turn(&c, &cell, Want::Now);
+        settle().await;
+        assert_eq!(c.on_request("peer-a", offer(31, "peer-a")), None);
+        // The read lands 31 s later, dated when it began: the same time the
+        // ask arrived.
+        clock.pass(31 * SECOND);
+        cell.hold_reads(false);
+        cell.let_reads_go(1);
+        assert!(read.await.unwrap());
+        let kept = c.kept_lock();
+        assert_eq!(kept.speaks.as_ref().unwrap().at, kept.waiting[0].arrived);
+        drop(kept);
+        // Offered again at 35 s it is not listed: that read began before it.
+        clock.pass(4 * SECOND);
+        assert_eq!(c.on_request("peer-a", offer(31, "peer-a")), None);
+        // A read that begins after it lists it.
+        assert!(c.read_turn(Some(&cell), &Names, Want::Now).await);
+        assert!(c.on_request("peer-a", offer(31, "peer-a")).is_some());
+    }
+
+    #[tokio::test]
+    async fn by_timer_a_turn_that_waited_behind_another_read_still_names_this_node() {
+        let clock = Clock::new();
+        let c = Arc::new(carrier_at(&clock));
+        c.set_refresh(SpeaksRefresh::Timer);
+        let cell = CountedCell::new(Ok(ready()));
+        // The timer's first turn found no cell. An identity write's read
+        // begins at 29 s.
+        clock.set(29 * SECOND);
+        cell.hold_reads(true);
+        let refresh = turn(&c, &cell, Want::Now);
+        settle().await;
+        assert_eq!(c.self_key(), None);
+        // At 30 s the timer has the cell, and waits behind that read.
+        clock.set(30 * SECOND);
+        let timer = {
+            let (c, cell) = (c.clone(), cell.clone());
+            tokio::spawn(async move { c.timer_turn(&cell, &Names).await })
+        };
+        settle().await;
+        // The read lands at 31 s; the timer's turn makes none of its own.
+        clock.set(31 * SECOND);
+        cell.hold_reads(false);
+        cell.let_reads_go(1);
+        assert!(refresh.await.unwrap());
+        assert!(!timer.await.unwrap());
+        assert_eq!(cell.reads(), 1);
+        // At 32 s an ask naming this node is listed.
+        clock.set(32 * SECOND);
+        assert_eq!(c.self_key(), Some(cell.agent().as_str()));
+        let mut named = signed_ask(31, request(), "peer-a");
+        named.for_approver = Some(cell.agent());
+        assert!(matches!(
+            c.on_request("peer-a", CarryRequest::Ask { ask: named }),
+            Some(CarryResponse::Listed { number: 1, .. })
+        ));
     }
 }
