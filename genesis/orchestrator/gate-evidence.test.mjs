@@ -14,6 +14,7 @@ import {
   attestationStep,
   closureKey,
   describeEvidence,
+  dirtyPaths,
   findEvidence,
   gateEvidence,
   recordEvidence,
@@ -50,6 +51,7 @@ const fingerprintReply = (fp) => (_bin, args) => ({
 });
 const isFingerprint = (bin, args) => bin.endsWith('brit') && args[0] === 'build' && args[1] === 'fingerprint';
 const isRevParse = (bin, args) => bin === 'git' && args[0] === 'rev-parse';
+const isStatus = (bin, args) => bin === 'git' && args[0] === 'status';
 const isFind = (bin, args) => bin.endsWith('brit-build-ref') && args[2] === 'build' && args[3] === 'find';
 const isPut = (bin, args) => bin.endsWith('brit-build-ref') && args[2] === 'build' && args[3] === 'put';
 
@@ -111,6 +113,7 @@ test('gateEvidence resolves the closure, asks brit-build-ref once with the key, 
     const { spawn, calls } = fakeSpawn([
       [isFingerprint, fingerprintReply('bafy-a')],
       [isRevParse, { status: 0, stdout: 'blob1\n', stderr: '' }],
+      [isStatus, { status: 0, stdout: '', stderr: '' }],
       [isFind, (_bin, args) => {
         const key = args[args.indexOf('--inputs-hash') + 1];
         return { status: 0, stdout: JSON.stringify([{ commit: 'ffffffff1', attestation: { success: true, agentId: 'did:key:zSIGNER', builtAt: '2026-10-14T11:30:00Z', inputsHash: key } }]), stderr: '' };
@@ -121,6 +124,9 @@ test('gateEvidence resolves the closure, asks brit-build-ref once with the key, 
     const expectedKey = closureKey({ project, fingerprints: [{ step: 'cargo-build-storage', fingerprint: 'bafy-a' }], manifestBlob: 'blob1', cargoEnv });
     assert.equal(result.key, expectedKey);
     assert.equal(result.line, 'hit green (signer did:key:zSIG, 30m ago, commit ffffffff1)');
+    assert.equal(result.dirty, false);
+    const status = calls.find(c => isStatus(c.bin, c.args));
+    assert.deepEqual(status.args, ['status', '--porcelain', '--untracked-files=normal', '--', 'elohim/elohim-storage', 'elohim/holochain/build-manifest.json']);
     const find = calls.filter(c => isFind(c.bin, c.args));
     assert.equal(find.length, 1, 'one lookup per project');
     assert.deepEqual(find[0].args, ['--repo', '/repo', 'build', 'find', '--step', 'gate:elohim-storage', '--inputs-hash', expectedKey]);
@@ -131,11 +137,40 @@ test('gateEvidence resolves the closure, asks brit-build-ref once with the key, 
     const missing = fakeSpawn([
       [isFingerprint, fingerprintReply('bafy-a')],
       [isRevParse, { status: 0, stdout: 'blob1\n', stderr: '' }],
+      [isStatus, { status: 0, stdout: '', stderr: '' }],
       [isFind, { status: 0, stdout: '[]', stderr: '' }],
     ]);
     const miss = gateEvidence(project, { env, root: '/repo', commit: 'abc123', cargoEnv, spawn: missing.spawn, now });
     assert.equal(miss.line, 'miss');
     assert.equal(miss.key, expectedKey);
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test('a dirty working tree under the project is named on the line and blocks the record', () => {
+  const dir = mkdtempSync(join(tmpdir(), 'gate-evidence-'));
+  try {
+    for (const name of ['brit', 'brit-build-ref']) {
+      writeFileSync(join(dir, name), '#!/bin/sh\nexit 0\n');
+      chmodSync(join(dir, name), 0o755);
+    }
+    const env = { BRIT_BIN: join(dir, 'brit'), BRIT_BUILD_REF_BIN: join(dir, 'brit-build-ref'), PATH: '' };
+    const { spawn, calls } = fakeSpawn([
+      [isFingerprint, fingerprintReply('bafy-a')],
+      [isRevParse, { status: 0, stdout: 'blob1\n', stderr: '' }],
+      [isStatus, { status: 0, stdout: ' M elohim/elohim-storage/src/lib.rs\n?? elohim/elohim-storage/src/new.rs\n', stderr: '' }],
+      [isFind, { status: 0, stdout: '[]', stderr: '' }],
+      [isPut, { status: 0, stdout: 'bafy…', stderr: '' }],
+    ]);
+    const result = gateEvidence(project, { env, root: '/repo', commit: 'abc123', cargoEnv: {}, spawn, now: Date.now() });
+    assert.equal(result.dirty, true);
+    assert.match(result.line, /^miss; working tree dirty under elohim\/elohim-storage \(2 paths\): the evidence names the commit, not these bytes, and nothing will be recorded$/);
+    const put = recordEvidence(project, result.key, { success: true, seconds: 10, commit: 'abc123', buildRefBin: env.BRIT_BUILD_REF_BIN, root: '/repo', dirty: result.dirty, spawn });
+    assert.equal(put.status, 1);
+    assert.match(put.stderr, /working tree dirty/);
+    assert.equal(calls.filter(c => isPut(c.bin, c.args)).length, 0, 'no attestation is written for bytes that are not the commit\'s');
+    assert.equal(dirtyPaths(project, { root: '/repo', spawn: () => ({ status: 128, stdout: '', stderr: 'fatal' }) }), null);
   } finally {
     rmSync(dir, { recursive: true, force: true });
   }
@@ -150,7 +185,7 @@ test('gateEvidence is fail-open: no brit, an attested project, or a refused read
 
 test('recordEvidence puts the verdict against the closure with the manifest file and a stored verdict, red included', () => {
   const { spawn, calls } = fakeSpawn([[isPut, { status: 0, stdout: 'bafyrei…\n', stderr: '' }]]);
-  const r = recordEvidence(project, 'k'.repeat(64), { success: false, seconds: 1875.4, commit: 'abc123', buildRefBin: '/x/brit-build-ref', root: '/repo', jobs: 1, spawn });
+  const r = recordEvidence(project, 'k'.repeat(64), { success: false, seconds: 1875.4, commit: 'abc123', buildRefBin: '/x/brit-build-ref', root: '/repo', jobs: 1, dirty: false, spawn });
   assert.equal(r.status, 0);
   const args = calls[0].args;
   assert.deepEqual(args.slice(0, 6), ['--repo', '/repo', 'build', 'put', '--step', 'gate:elohim-storage']);
