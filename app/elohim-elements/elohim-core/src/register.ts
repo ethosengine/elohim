@@ -16,6 +16,7 @@ import { ElohimMentionBase } from './elohim-mention-base.js';
 import { ElohimNavigator } from './elohim-navigator.js';
 import { ElohimPageChrome } from './elohim-page-chrome.js';
 import { ElohimReactionBar } from './elohim-reaction-bar.js';
+import { ElohimResiliencyBadge } from './elohim-resiliency-badge.js';
 import { ElohimSkeleton } from './elohim-skeleton.js';
 import { ElohimThemeToggle } from './elohim-theme-toggle.js';
 
@@ -112,4 +113,8 @@ if (!customElements.get('elohim-hypercard-panel')) {
 
 if (!customElements.get('elohim-seam-map')) {
   customElements.define('elohim-seam-map', ElohimSeamMap);
+}
+
+if (!customElements.get('elohim-resiliency-badge')) {
+  customElements.define('elohim-resiliency-badge', ElohimResiliencyBadge);
 }

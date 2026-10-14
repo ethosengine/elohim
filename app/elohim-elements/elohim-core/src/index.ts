@@ -22,6 +22,8 @@ export type {
 export { ElohimSkeleton } from './elohim-skeleton.js';
 export { ElohimMentionBase } from './elohim-mention-base.js';
 export { ElohimPageChrome } from './elohim-page-chrome.js';
+export { ElohimResiliencyBadge } from './elohim-resiliency-badge.js';
+export type { ResiliencyBadgeState } from './elohim-resiliency-badge.js';
 export { ElohimDefaultOmnibar } from './elohim-default-omnibar.js';
 export { ElohimContextMenu } from './elohim-context-menu.js';
 export type { ContextMenuItem } from './elohim-context-menu.js';

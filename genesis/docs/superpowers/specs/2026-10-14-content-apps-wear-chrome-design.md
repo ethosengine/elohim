@@ -74,6 +74,35 @@ holds no policy of its own: whether an app is "content" or "chromed shell" is it
 `contentFormat`. Because the shell frames the bundle rather than rewriting it, the bytes a
 person runs are still exactly the bytes addressed by the node's `blobHash`.
 
+## Decisions taken while building (2026-10-14)
+
+Three points the design left open were settled when the shell was cut into work, each the
+narrowest reading that keeps the doorway's existing contracts:
+
+- **The shell's omnibar is the native EPR omni element the doorway already serves**
+  (`GET /chrome/omni-element.js`, injected with the same `inject_element` helper the SSR shell
+  uses), not the Lit `<elohim-page-chrome>`. The doorway serves no Lit bundle at runtime, and
+  the omni element is the chrome every doorway-painted surface already wears. The resiliency
+  badge in the shell is a server-rendered link; the reusable `<elohim-resiliency-badge>`
+  element in `elohim-core` carries the same wording for the surfaces that bundle Lit (the EPR
+  page), so the two never drift in what they say.
+- **The doorway learns a slug's content id, format and entry point from its own content
+  projection only** (the same Mongo documents its slug index is built from). When that
+  projection is cold or absent, the request is served raw, as today. No storage endpoint
+  changes, and `_capability` / `X-Deliverability` keep describing bundle readiness, never
+  shell success.
+- **The chrome branch fires only when the resolved file equals the node's declared
+  `entryPoint`** (`index.html` when none is declared). A trailing slash still maps to
+  `index.html`; a node whose entry is another file wears chrome at that file's address.
+
+Two consequences that are part of the shell, not afterthoughts: the shell is `no-store` and
+both representations of the entry address carry `Vary: Sec-Fetch-Dest, Sec-Fetch-Mode`, so no
+cache on the path (the doorway's file cache, the warm shell, a CDN) can hand a shell where
+bytes are expected or the reverse; and the client apps service worker, which intercepts every
+`/apps/` request under its scope, lets a top-level document navigation reach the network first
+and falls back to its cached raw entry only when the network is away, so a direct visit meets
+the shell online and the app still opens offline.
+
 ## Links
 
 Either address is a fine link once the shell exists: `/apps/<slug>/` opens the content itself
