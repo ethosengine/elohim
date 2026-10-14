@@ -58,6 +58,70 @@ pub fn retry_budget_for_peers(connected_peers: usize) -> u32 {
 /// node-level stream).
 pub const MAX_ACQUISITION_INFLIGHT: usize = 25;
 
+/// Cadence (seconds) of the acquisition dispatch tick in `P2PNode::run`: every
+/// tick the drain puts up to [`MAX_ACQUISITION_INFLIGHT`] wants in flight.
+pub const ACQUISITION_DISPATCH_SECS: u64 = 5;
+
+/// Most retired pins the hold pass re-admits in one reconcile tick: what the
+/// dispatcher can put in flight in the same time — [`MAX_ACQUISITION_INFLIGHT`]
+/// per [`ACQUISITION_DISPATCH_SECS`] over one [`DEFAULT_RECONCILE_SECS`] tick,
+/// 300.
+///
+/// Pins retired in the same hour come due in the same hour. The bound keeps a
+/// thousand of them from landing in `pull.total` in one tick, and it is sized
+/// to dispatch capacity so that it never makes the backlog take LONGER: the
+/// dispatcher is the bottleneck either way (1100 wants at a 3-attempt budget
+/// is 3300 fetches, eleven minutes at 300 a minute), and a tick's admissions
+/// never leave it idle. A smaller bound — it was 25 — admitted one drain's
+/// worth per minute and held `pull.caughtUp` false for about four times as
+/// long as re-admitting everything at once did.
+///
+/// Demand goes through this same door (a read-miss never flips a status
+/// itself). The inventory arm is NOT bounded by it: a peer naming a head is
+/// evidence, and it re-admits immediately.
+pub const MAX_PIN_READMITS_PER_TICK: usize =
+    MAX_ACQUISITION_INFLIGHT * (DEFAULT_RECONCILE_SECS / ACQUISITION_DISPATCH_SECS) as usize;
+
+/// Of [`MAX_PIN_READMITS_PER_TICK`], the slots that go to the longest-overdue
+/// pins whatever their demand, before demanded pins are preferred for the rest
+/// — two fifths, 120 of 300.
+///
+/// Without a reserve, a tick's worth of demanded pins coming due every tick
+/// would postpone an undemanded due pin for as long as the demand lasted. With
+/// it, a due pin behind `k` longer-overdue pins is re-admitted within
+/// `ceil((k + 1) / 120)` ticks under any demand — ten ticks for the whole
+/// alpha backlog (about 1100 due at once). Demand is a reader waiting now, so
+/// it keeps the majority (180, plus any reserve the oldest pins do not use).
+pub const PIN_READMITS_RESERVED_FOR_OLDEST: usize = MAX_PIN_READMITS_PER_TICK * 2 / 5;
+
+/// Round-robin start index for a want's provider choice, offset by a per-drain
+/// `rotation`.
+///
+/// `position` is the item's index within the drained batch. On its own this is
+/// NOT provider coverage: the rotation advances once per drain, so when a
+/// reconcile cycle spans a number of drains that is a multiple of the peer
+/// count (two peers, two batches of 25) a want at a stable position lands on
+/// the same peer every retry. [`AcquisitionState::assign_providers`] starts
+/// here and then walks to a peer the want has not asked.
+///
+/// Returns `0` for an empty peer set (callers peer-gate before dispatch).
+pub(crate) fn rotated_peer_index(rotation: usize, position: usize, peer_count: usize) -> usize {
+    if peer_count == 0 {
+        return 0;
+    }
+    rotation.wrapping_add(position) % peer_count
+}
+
+/// Has a want been asked of enough peers for its exhaustion to mean "no
+/// connected peer could supply the bytes"? Every provider the dispatcher
+/// currently plans for has been asked — or, when the provider set has been
+/// moving, as many DISTINCT peers as the budget ([`retry_budget_for_peers`]).
+/// A want nobody was asked for is never covered.
+fn covered(asked: Option<&HashSet<String>>, providers: &HashSet<String>, budget: u32) -> bool {
+    let Some(asked) = asked else { return false };
+    asked.len() >= budget as usize || (!providers.is_empty() && providers.is_subset(asked))
+}
+
 /// Longest the FIRST acquisition drain after boot waits for the iroh peer
 /// book to learn a peer. Measured 2026-08-29 (dual household mesh, warm
 /// recovery jessica<-matthew): the 5 s dispatch cadence drained all 11 pulls
@@ -208,8 +272,7 @@ pub const PIN_STATUS_RETIRED: &str = "retired";
 // stored on (`db::acquisition_pins`); re-exported so this module stays the one
 // place a reader of the acquisition stream looks.
 pub use crate::db::acquisition_pins::{
-    pin_hold, pin_readmit_at, MAX_PIN_READMITS_PER_TICK, PIN_READMITS_RESERVED_FOR_OLDEST,
-    PIN_READMIT_COOLDOWN, PIN_READMIT_MAX_HOLD,
+    pin_hold, pin_readmit_at, PIN_READMIT_COOLDOWN, PIN_READMIT_MAX_HOLD,
 };
 
 use crate::db::acquisition_pins::{HoldPass, NamedPass, ReadmitCause};
@@ -228,9 +291,9 @@ pub fn publish_retired_pin_gauge(conn: &mut diesel::SqliteConnection) {
 
 /// The per-tick pass over the retired set, shared by the libp2p node and the
 /// pure-iroh pull core (`db::acquisition_pins::retired_hold_pass`): settle pins
-/// whose content has become local, re-admit pins whose hold has ended (by its
-/// own ladder, or capped by demand) at most [`MAX_PIN_READMITS_PER_TICK`] a
-/// tick, and fail a pin with no readable retirement clock closed onto the
+/// whose content has become local, re-admit pins that are due (their own hold
+/// ended, or somebody read them) at most [`MAX_PIN_READMITS_PER_TICK`] a tick,
+/// and fail an unread pin with no readable retirement clock closed onto the
 /// first rung.
 ///
 /// Every count below is of rows the pass committed; the pass is one
@@ -666,12 +729,25 @@ pub struct PinPullStatus {
     pub pending: i32,
     pub failed: i32,
     pub caught_up: bool,
+    // The fields below were added after the first release of this view. A
+    // reader of an older node gets none of them, so they are optional on the
+    // wire (views CONVENTIONS: additive fields never become required).
     /// Fetch attempts the pin's most-tried want has failed in this round.
-    pub attempts_used: u32,
-    /// Attempts a want gets before the pin is retired
-    /// ([`retry_budget_for_peers`]); `attemptsUsed == retryBudget` with
-    /// `pending == 0` is a pin the next reconcile retires.
-    pub retry_budget: u32,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[ts(optional)]
+    pub attempts_used: Option<u32>,
+    /// Attempts a want gets before the pin can be retired
+    /// ([`retry_budget_for_peers`]; one more is granted while a current peer
+    /// has not been asked).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[ts(optional)]
+    pub retry_budget: Option<u32>,
+    /// Distinct peers the pin's least-covered unfetched want has been asked.
+    /// A pin retires only when its exhausted wants were asked of every peer
+    /// the dispatcher currently plans for.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[ts(optional)]
+    pub providers_asked: Option<u32>,
 }
 
 #[derive(Debug, Default)]
@@ -693,6 +769,22 @@ struct AcquisitionInner {
     /// inventory, explicit re-pin): its tracker — and the retry budget spent in
     /// it — belongs to the round before and is discarded.
     rounds: HashMap<i32, i32>,
+    /// content id → the peers it has been asked of in its pins' current round
+    /// (recorded by [`AcquisitionState::assign_providers`], the dispatcher's
+    /// provider choice).
+    asked: HashMap<String, HashSet<String>>,
+    /// The provider set the dispatcher planned for at its latest drain.
+    providers: HashSet<String>,
+    /// The base retry budget applied at the latest reconcile.
+    budget: u32,
+}
+
+/// True if any tracker still wants this id.
+fn wanted(inner: &AcquisitionInner, content_id: &str) -> bool {
+    inner.wanted_by.get(content_id).is_some_and(|pins| {
+        pins.iter()
+            .any(|p| inner.trackers.get(p).is_some_and(|t| t.wants(content_id)))
+    })
 }
 
 #[derive(Debug, Clone, Default)]
@@ -743,41 +835,66 @@ impl AcquisitionState {
         local_has: &std::collections::HashSet<String>,
         max_retries: u32,
     ) -> Vec<String> {
-        let mut inner = self.inner.write().await;
+        let mut guard = self.inner.write().await;
+        let AcquisitionInner {
+            initialized,
+            trackers,
+            totals,
+            wanted_by,
+            rounds,
+            asked,
+            providers,
+            budget,
+        } = &mut *guard;
         // Drop trackers for pins no longer active (un-pinned → queue drains)
-        let live: std::collections::HashSet<i32> = pin_wants.iter().map(|(id, _, _)| *id).collect();
-        inner.trackers.retain(|id, _| live.contains(id));
-        inner.totals.retain(|id, _| live.contains(id));
-        inner.rounds.retain(|id, _| live.contains(id));
-        inner.wanted_by.retain(|_, pins| {
+        let live: HashSet<i32> = pin_wants.iter().map(|(id, _, _)| *id).collect();
+        trackers.retain(|id, _| live.contains(id));
+        totals.retain(|id, _| live.contains(id));
+        rounds.retain(|id, _| live.contains(id));
+        wanted_by.retain(|_, pins| {
             pins.retain(|p| live.contains(p));
             !pins.is_empty()
         });
+        *budget = max_retries;
 
         let mut to_dispatch = Vec::new();
         for (pin_id, round, want_ids) in pin_wants {
-            if inner
-                .rounds
-                .insert(pin_id, round)
-                .is_some_and(|was| was != round)
-            {
-                inner.trackers.remove(&pin_id);
+            if rounds.insert(pin_id, round).is_some_and(|was| was != round) {
+                // A new round: the retry state, and the record of who was
+                // asked, belong to the round before.
+                trackers.remove(&pin_id);
+                for id in &want_ids {
+                    asked.remove(id);
+                }
             }
-            inner.totals.insert(pin_id, want_ids.len());
+            totals.insert(pin_id, want_ids.len());
             for id in &want_ids {
-                let entry = inner.wanted_by.entry(id.clone()).or_default();
+                let entry = wanted_by.entry(id.clone()).or_default();
                 if !entry.contains(&pin_id) {
                     entry.push(pin_id);
                 }
             }
-            let tracker = inner
-                .trackers
+            let tracker = trackers
                 .entry(pin_id)
                 .or_insert_with(|| GapTracker::new(max_retries));
             // Re-apply every cycle: the fabric's peer count moves, and a tracker
             // that outlives the cycle must not keep probing against a stale
             // (smaller) budget.
             tracker.set_max_retries(max_retries);
+            // The budget is only spent when it bought coverage. A want whose
+            // attempts are used up but which has not been asked of every
+            // current provider (the provider set moved; a failure was counted
+            // that no dispatch of ours stood behind) gets one more attempt —
+            // `assign_providers` sends it to a peer it has not asked — instead
+            // of being called unsatisfiable. Each such grant asks a new peer,
+            // so it ends when the providers are covered.
+            if tracker
+                .exhausted_ids()
+                .iter()
+                .any(|id| !covered(asked.get(id), providers, max_retries))
+            {
+                tracker.set_max_retries(tracker.attempts_used().saturating_add(1));
+            }
             // TODO(cluster-pins): clones local_has once per pin — fine for
             // Slice-1 item pins (tiny sets); revisit with a shared Arc or a
             // borrow variant when cluster closures bring large desired sets.
@@ -790,17 +907,59 @@ impl AcquisitionState {
             tracker.mark_local_wants_satisfied(&want_ids_for_local);
             to_dispatch.extend(gaps);
         }
+        asked.retain(|id, _| wanted_by.contains_key(id));
         // C4 honest absence: only a completed DB-backed reconcile earns an
         // observed pull rollup. Early returns before this method leave the state
         // uninitialized, so callers publish null rather than fabricated zeroes.
-        inner.initialized = true;
+        *initialized = true;
         to_dispatch
+    }
+
+    /// The dispatcher's provider choice — called by every drain, on either
+    /// transport, with the batch it is about to send and the labels of the
+    /// peers it can send to. Returns, per id, the index into `providers` to
+    /// ask, or `None` for an id no tracker wants any more.
+    ///
+    /// Each want is sent to a peer it has NOT been asked of in its current
+    /// round, starting from the round-robin slot ([`rotated_peer_index`]) and
+    /// walking on; only when every provider has been asked does it repeat one.
+    /// The choice is recorded, and that record is what lets retirement mean
+    /// what it says: [`Self::exhausted_pins`] lists a pin only when its
+    /// exhausted wants were asked of every provider seen here (or of as many
+    /// distinct peers as the budget).
+    pub async fn assign_providers(
+        &self,
+        ids: &[String],
+        providers: &[String],
+        rotation: usize,
+    ) -> Vec<Option<usize>> {
+        let mut guard = self.inner.write().await;
+        if !providers.is_empty() {
+            guard.providers = providers.iter().cloned().collect();
+        }
+        let mut slots = Vec::with_capacity(ids.len());
+        for (position, id) in ids.iter().enumerate() {
+            if providers.is_empty() || !wanted(&guard, id) {
+                slots.push(None);
+                continue;
+            }
+            let start = rotated_peer_index(rotation, position, providers.len());
+            let asked = guard.asked.entry(id.clone()).or_default();
+            let slot = (0..providers.len())
+                .map(|step| (start + step) % providers.len())
+                .find(|&slot| !asked.contains(&providers[slot]))
+                .unwrap_or(start);
+            asked.insert(providers[slot].clone());
+            slots.push(Some(slot));
+        }
+        slots
     }
 
     /// Byte-arrival done-signal (R-A): called from the ContentData completion
     /// path AFTER bulk_create_content succeeds — never on inventory receipt.
     pub async fn mark_completed(&self, content_id: &str) {
         let mut inner = self.inner.write().await;
+        inner.asked.remove(content_id);
         if let Some(pin_ids) = inner.wanted_by.get(content_id).cloned() {
             for pin_id in pin_ids {
                 if let Some(t) = inner.trackers.get_mut(&pin_id) {
@@ -829,26 +988,13 @@ impl AcquisitionState {
 
     /// True if any tracker still wants this id (dispatch filter).
     pub async fn wants(&self, content_id: &str) -> bool {
-        let inner = self.inner.read().await;
-        inner
-            .wanted_by
-            .get(content_id)
-            .map(|pins| {
-                pins.iter().any(|p| {
-                    inner
-                        .trackers
-                        .get(p)
-                        .map(|t| t.wants(content_id))
-                        .unwrap_or(false)
-                })
-            })
-            .unwrap_or(false)
+        wanted(&*self.inner.read().await, content_id)
     }
 
     /// Pins whose desired set is UNSATISFIABLE against the current fabric: every
-    /// remaining want spent its retry budget (`exhausted > 0`), nothing is still
-    /// in flight (`pending == 0`), and the pin never completed (`completed <
-    /// total`).
+    /// remaining want spent its retry budget (`exhausted > 0`) on attempts that
+    /// reached every current provider (`covered`), nothing is still in flight
+    /// (`pending == 0`), and the pin never completed (`completed < total`).
     ///
     /// The caller flips these to [`PIN_STATUS_RETIRED`]. All three conditions are
     /// load-bearing:
@@ -884,7 +1030,15 @@ impl AcquisitionState {
             .filter(|(pin_id, t)| {
                 let c = t.counts();
                 let total = *inner.totals.get(pin_id).unwrap_or(&0);
-                total > 0 && c.exhausted > 0 && c.pending == 0 && c.completed < total
+                total > 0
+                    && c.exhausted > 0
+                    && c.pending == 0
+                    && c.completed < total
+                    // A spent budget retires a pin only if it bought coverage:
+                    // every exhausted want was asked of every current provider.
+                    && t.exhausted_ids().iter().all(|id| {
+                        covered(inner.asked.get(id), &inner.providers, inner.budget)
+                    })
             })
             .map(|(pin_id, _)| (*pin_id, *inner.rounds.get(pin_id).unwrap_or(&0)))
             .collect();
@@ -946,8 +1100,16 @@ impl AcquisitionState {
                     pending: c.pending as i32,
                     failed: c.failed as i32,
                     caught_up: total > 0 && (c.completed as i32) == total,
-                    attempts_used: t.attempts_used(),
-                    retry_budget: t.max_retries(),
+                    attempts_used: Some(t.attempts_used()),
+                    retry_budget: Some(t.max_retries()),
+                    providers_asked: Some(
+                        t.pending_ids()
+                            .iter()
+                            .chain(&t.failed_ids())
+                            .map(|id| inner.asked.get(id).map_or(0, HashSet::len))
+                            .min()
+                            .unwrap_or(0) as u32,
+                    ),
                 }
             })
             .collect();
@@ -1221,13 +1383,27 @@ mod tests {
 
     /// Spend a pin's whole retry budget the way the live loop does: fail, then
     /// re-reconcile (retry-on-NEXT-cycle, R-E) until `enqueue_missing` refuses.
+    /// One dispatched fetch that failed: the want is assigned one of
+    /// `providers` peers the way a drain assigns it, and that peer does not
+    /// have the bytes.
+    async fn ask_and_fail(acq: &AcquisitionState, id: &str, providers: usize) {
+        let slots = acq
+            .assign_providers(&[id.to_string()], &peers(providers), 0)
+            .await;
+        assert!(
+            slots[0].is_some(),
+            "{id} must still be wanted to be asked for"
+        );
+        acq.mark_failed(id).await;
+    }
+
     async fn exhaust(acq: &AcquisitionState, pin_wants: Vec<(i32, Vec<String>)>, budget: u32) {
         let local = HashSet::new();
         for _ in 0..budget {
             acq.reconcile(pin_wants.clone(), &local, budget).await;
             for (_, ids) in &pin_wants {
                 for id in ids {
-                    acq.mark_failed(id).await;
+                    ask_and_fail(acq, id, budget as usize).await;
                 }
             }
         }
@@ -1253,7 +1429,7 @@ mod tests {
                 MIN_RETRIES,
             )
             .await;
-            acq.mark_failed("gone").await;
+            ask_and_fail(&acq, "gone", MIN_RETRIES as usize).await;
         }
         acq.reconcile(
             vec![(1, vec!["have-1".into()]), (2, vec!["gone".into()])],
@@ -1353,29 +1529,26 @@ mod tests {
     }
 
     #[test]
-    fn the_hold_is_timed_from_retired_at_and_demand_caps_it_at_the_first_rung() {
+    fn the_hold_is_timed_from_retired_at() {
         use chrono::TimeZone;
         let retired = chrono::Utc
             .with_ymd_and_hms(2026, 10, 13, 12, 0, 0)
             .unwrap();
         let at = Some("2026-10-13T12:00:00Z");
         let hours = |n| retired + chrono::Duration::hours(n);
-        assert_eq!(pin_readmit_at(at, 1, false), Some(hours(6)));
-        assert_eq!(pin_readmit_at(at, 2, false), Some(hours(12)));
-        assert_eq!(pin_readmit_at(at, 6, false), Some(hours(168)));
-        // Demanded: the first rung, whatever the pin's own.
-        assert_eq!(pin_readmit_at(at, 6, true), Some(hours(6)));
-        assert_eq!(pin_readmit_at(at, 1, true), Some(hours(6)));
+        assert_eq!(pin_readmit_at(at, 1), Some(hours(6)));
+        assert_eq!(pin_readmit_at(at, 2), Some(hours(12)));
+        assert_eq!(pin_readmit_at(at, 6), Some(hours(168)));
         // An offset is normalised to UTC.
         assert_eq!(
-            pin_readmit_at(Some("2026-10-13T14:00:00+02:00"), 1, false),
+            pin_readmit_at(Some("2026-10-13T14:00:00+02:00"), 1),
             Some(hours(6))
         );
         // No readable clock is NOT "due": the hold pass repairs the row and
         // holds it, it never re-admits on this answer.
-        assert_eq!(pin_readmit_at(None, 1, false), None);
-        assert_eq!(pin_readmit_at(Some("not-a-timestamp"), 1, true), None);
-        assert_eq!(pin_readmit_at(Some("2026-07-31 12:00:00"), 6, false), None);
+        assert_eq!(pin_readmit_at(None, 1), None);
+        assert_eq!(pin_readmit_at(Some("not-a-timestamp"), 1), None);
+        assert_eq!(pin_readmit_at(Some("2026-07-31 12:00:00"), 6), None);
     }
 
     #[test]
@@ -1394,9 +1567,19 @@ mod tests {
     }
 
     #[test]
-    fn readmit_bound_is_one_dispatch_round() {
-        assert_eq!(MAX_PIN_READMITS_PER_TICK, MAX_ACQUISITION_INFLIGHT);
-        assert!(PIN_READMITS_RESERVED_FOR_OLDEST < MAX_PIN_READMITS_PER_TICK);
+    fn readmit_bound_is_one_tick_of_dispatch_capacity() {
+        // 25 in flight per 5 s drain, over a 60 s reconcile tick.
+        assert_eq!(MAX_PIN_READMITS_PER_TICK, 300);
+        assert_eq!(
+            MAX_PIN_READMITS_PER_TICK as u64 * ACQUISITION_DISPATCH_SECS,
+            MAX_ACQUISITION_INFLIGHT as u64 * DEFAULT_RECONCILE_SECS
+        );
+        // The oldest-overdue reserve keeps its 10:25 proportion.
+        assert_eq!(PIN_READMITS_RESERVED_FOR_OLDEST, 120);
+        assert_eq!(
+            PIN_READMITS_RESERVED_FOR_OLDEST * 25,
+            MAX_PIN_READMITS_PER_TICK * 10
+        );
     }
 
     #[tokio::test]
@@ -1406,23 +1589,159 @@ mod tests {
         let wants = || vec![(1, vec!["often".to_string(), "once".to_string()])];
         acq.reconcile(wants(), &local, 4).await;
         let p = &acq.per_pin().await[0];
-        assert_eq!((p.attempts_used, p.retry_budget), (0, 4));
+        assert_eq!((p.attempts_used, p.retry_budget), (Some(0), Some(4)));
+        assert_eq!(p.providers_asked, Some(0));
 
-        acq.mark_failed("often").await;
-        acq.mark_failed("once").await;
+        ask_and_fail(&acq, "often", 4).await;
+        ask_and_fail(&acq, "once", 4).await;
         acq.reconcile(wants(), &local, 4).await;
-        acq.mark_failed("often").await;
+        ask_and_fail(&acq, "often", 4).await;
         let p = &acq.per_pin().await[0];
         // The MOST-tried want: that is the one closest to retiring the pin.
-        assert_eq!((p.attempts_used, p.retry_budget), (2, 4));
+        assert_eq!((p.attempts_used, p.retry_budget), (Some(2), Some(4)));
+        // …and the LEAST-covered want: that is the one still holding it open.
+        assert_eq!(p.providers_asked, Some(1));
         assert!(!p.caught_up);
+    }
+
+    // ── Provider coverage at the dispatcher boundary ────────────────────────
+    //
+    // `assign_providers` is the call both transports' drains make to choose the
+    // peer for each want. These tests drive it the way the drains do.
+
+    fn peers(n: usize) -> Vec<String> {
+        (0..n).map(|i| format!("peer-{i}")).collect()
+    }
+
+    /// THE DEFECT (two peers, two stable batches of 25): the drain's rotation
+    /// advances once per drain, so across a reconcile cycle it advances by
+    /// two — and `(rotation + position) % 2` lands every retry of a want on the
+    /// peer it asked last time. The budget was spent on one peer of two and
+    /// the pin was retired as "no connected peer could supply its bytes".
+    #[tokio::test]
+    async fn two_peers_two_batches_every_want_asks_both_peers() {
+        let acq = AcquisitionState::new();
+        let local = HashSet::new();
+        let providers = peers(2);
+        let wants: Vec<(i32, Vec<String>)> =
+            (0..50).map(|i| (i, vec![format!("want-{i:02}")])).collect();
+        let budget = retry_budget_for_peers(providers.len());
+        let mut rotation = 0usize;
+        let mut asked: HashMap<String, Vec<String>> = HashMap::new();
+
+        for round in 0..budget {
+            let queue = acq.reconcile(wants.clone(), &local, budget).await;
+            assert_eq!(queue.len(), 50, "round {round}: every want is re-queued");
+            // The drain: 25 per call, one rotation step per call.
+            for batch in queue.chunks(MAX_ACQUISITION_INFLIGHT) {
+                // The pre-fix choice, for contrast: the same peer every round.
+                for (position, id) in batch.iter().enumerate() {
+                    let aliased = rotated_peer_index(rotation, position, providers.len());
+                    if let Some(first) = asked.get(id).and_then(|a| a.first()) {
+                        assert_eq!(
+                            &providers[aliased], first,
+                            "the bare rotation aliases: this want would ask the same peer again"
+                        );
+                    }
+                }
+                let slots = acq.assign_providers(batch, &providers, rotation).await;
+                rotation += 1;
+                for (id, slot) in batch.iter().zip(slots) {
+                    let slot = slot.expect("a wanted id gets a peer");
+                    asked
+                        .entry(id.clone())
+                        .or_default()
+                        .push(providers[slot].clone());
+                    acq.mark_failed(id).await;
+                }
+            }
+            if round == 0 {
+                assert!(
+                    acq.exhausted_pins().await.is_empty(),
+                    "one peer of two asked: nothing is exhausted"
+                );
+            }
+        }
+        for (id, peers_asked) in &asked {
+            assert_eq!(
+                &peers_asked[..2].iter().collect::<HashSet<_>>().len(),
+                &2,
+                "{id}: its first two attempts reached both peers, got {peers_asked:?}"
+            );
+        }
+        acq.reconcile(wants, &local, budget).await;
+        assert_eq!(acq.exhausted_pins().await.len(), 50);
+    }
+
+    /// Failures alone do not retire. A want whose attempts did not reach every
+    /// current provider gets another attempt instead — at the provider it has
+    /// not asked.
+    #[tokio::test]
+    async fn a_spent_budget_without_coverage_asks_the_unasked_peer_instead_of_retiring() {
+        let acq = AcquisitionState::new();
+        let local = HashSet::new();
+        let wants = || vec![(1, vec!["want".to_string()])];
+        let budget = 3;
+
+        // Three failures, all of them asked of the one peer then connected.
+        let alone = peers(1);
+        for _ in 0..budget {
+            acq.reconcile(wants(), &local, budget).await;
+            assert_eq!(
+                acq.assign_providers(&["want".to_string()], &alone, 0).await,
+                vec![Some(0)]
+            );
+            acq.mark_failed("want").await;
+        }
+        // Covered: the only provider was asked. That is a real exhaustion.
+        acq.reconcile(wants(), &local, budget).await;
+        assert_eq!(acq.exhausted_pin_ids().await, vec![1]);
+
+        // A second peer connects before the retirement lands. The want has
+        // not asked it: no longer exhausted, re-queued, and sent to the new peer.
+        let both = peers(2);
+        assert_eq!(
+            acq.assign_providers(&[], &both, 0).await,
+            Vec::<Option<usize>>::new()
+        );
+        assert!(acq.exhausted_pin_ids().await.is_empty());
+        let queue = acq.reconcile(wants(), &local, budget).await;
+        assert_eq!(
+            queue,
+            vec!["want".to_string()],
+            "one more attempt is granted"
+        );
+        assert_eq!(
+            acq.assign_providers(&queue, &both, 0).await,
+            vec![Some(1)],
+            "and it goes to the peer not yet asked, whatever the rotation says"
+        );
+        acq.mark_failed("want").await;
+        acq.reconcile(wants(), &local, budget).await;
+        assert_eq!(
+            acq.exhausted_pin_ids().await,
+            vec![1],
+            "now every peer was asked"
+        );
+
+        // A failure that no dispatch of ours stood behind (the replication
+        // stream fetched the same id and failed) proves nothing about peers.
+        let other = AcquisitionState::new();
+        for _ in 0..budget {
+            other.reconcile(wants(), &local, budget).await;
+            other.mark_failed("want").await;
+        }
+        other.reconcile(wants(), &local, budget).await;
+        assert!(other.exhausted_pin_ids().await.is_empty());
+        assert_eq!(other.per_pin().await[0].providers_asked, Some(0));
     }
 
     // ── The reconcile tick, end to end ──────────────────────────────────────
     //
     // These drive `reconcile_tick` — the function both transports' loops call —
     // against a real migrated database, with a fake fetcher: every want the
-    // tick dispatches is reported failed, as if no peer had the bytes.
+    // tick dispatches is assigned a peer the way the drain does, then reported
+    // failed, as if that peer did not have the bytes.
 
     use crate::db::acquisition_pins as pin_db;
     use crate::db::models::{AcquisitionPin, NewAcquisitionPin};
@@ -1456,6 +1775,13 @@ mod tests {
             .expect("row")
     }
 
+    fn retire_now(pool: &crate::db::DbPool, id: i32, at: Now) {
+        let round = row(pool, id).round;
+        pin_db::retire_pin(&mut pool.get().expect("conn"), id, round, at)
+            .expect("retire")
+            .expect("retired");
+    }
+
     fn make_local(pool: &crate::db::DbPool, id: &str) {
         let result = crate::db::content_diesel::bulk_create_content(
             &mut pool.get().expect("conn"),
@@ -1487,10 +1813,17 @@ mod tests {
             .expect("tick")
     }
 
-    /// The fake fetcher: no peer has the bytes.
+    /// The fake dispatcher + fetcher: each dispatched want is assigned one of
+    /// `PEERS` peers exactly as the drain assigns it, and that peer does not
+    /// have the bytes.
     async fn fail_dispatched(acq: &AcquisitionState, tick: &ReconcileTick) {
-        for id in &tick.to_dispatch {
-            acq.mark_failed(id).await;
+        let slots = acq
+            .assign_providers(&tick.to_dispatch, &peers(PEERS), 0)
+            .await;
+        for (id, slot) in tick.to_dispatch.iter().zip(slots) {
+            if slot.is_some() {
+                acq.mark_failed(id).await;
+            }
         }
     }
 
@@ -1618,7 +1951,11 @@ mod tests {
         assert_eq!(next.to_dispatch, vec!["named-next".to_string()]);
         assert_eq!(next.retired, 0);
         assert_eq!(row(&pool, p.id).status, "active");
-        assert_eq!(acq.per_pin().await[0].attempts_used, 0);
+        let status = &acq.per_pin().await[0];
+        assert_eq!(
+            (status.attempts_used, status.providers_asked),
+            (Some(0), Some(0))
+        );
 
         // And it takes the whole budget again to retire it — onto the FIRST rung.
         let rounds = fail_until_retired(&pool, &acq, t0() + Duration::minutes(1), next).await;
@@ -1626,46 +1963,27 @@ mod tests {
         assert_eq!(row(&pool, p.id).consecutive_retirements, 1);
     }
 
-    /// A person re-pins while the pin's budget is spent but before the tick
-    /// that would retire it — and again just after a retirement. Neither a
-    /// stale exhaustion snapshot nor the stale tracker may retire the re-pin.
+    /// A person re-pins a RETIRED pin before any reconcile has run since the
+    /// retirement. The re-pin opens a new round: neither the exhaustion
+    /// snapshot taken before it nor the tracker still in memory retires it.
     #[tokio::test]
-    async fn an_explicit_repin_is_not_retired_by_the_exhaustion_that_preceded_it() {
+    async fn a_repin_of_a_retired_pin_is_not_retired_by_the_exhaustion_that_preceded_it() {
         let pool = crate::test_util::test_pool();
         let acq = AcquisitionState::new();
         let p = pin(&pool, "repinned");
-
-        // Spend the budget; do not run the tick that would retire.
-        let mut t = tick(&pool, &acq, t0()).await;
-        for round in 1..=retry_budget_for_peers(PEERS) {
-            fail_dispatched(&acq, &t).await;
-            if round < retry_budget_for_peers(PEERS) {
-                t = tick(&pool, &acq, t0()).await;
-            }
-        }
+        let first = tick(&pool, &acq, t0()).await;
+        fail_until_retired(&pool, &acq, t0(), first).await;
+        assert_eq!(row(&pool, p.id).status, "retired");
         let stale = acq.exhausted_pins().await;
         assert_eq!(stale, vec![(p.id, p.round)]);
 
-        // The re-pin lands; then the retirement computed before it runs.
         pin(&pool, "repinned");
         let retired = retire_exhausted_pins(&mut pool.get().expect("conn"), &stale, t0());
-        assert_eq!(retired, 0, "a stale snapshot cannot retire a re-pinned pin");
-        assert_eq!(row(&pool, p.id).status, "active");
-
-        // The tick does not retire it either: the round moved, the tracker is new.
-        let next = tick(&pool, &acq, t0()).await;
-        assert_eq!(next.retired, 0);
-        assert_eq!(next.to_dispatch, vec!["repinned".to_string()]);
-        let r = row(&pool, p.id);
         assert_eq!(
-            (r.status.as_str(), r.consecutive_retirements),
-            ("active", 0)
+            retired, 0,
+            "a stale snapshot cannot retire a re-activated pin"
         );
 
-        // Now let it retire, and re-pin immediately after — no reconcile between.
-        fail_until_retired(&pool, &acq, t0(), next).await;
-        assert_eq!(row(&pool, p.id).status, "retired");
-        pin(&pool, "repinned");
         let after = tick(&pool, &acq, t0() + Duration::minutes(1)).await;
         assert_eq!(after.retired, 0);
         assert_eq!(after.to_dispatch, vec!["repinned".to_string()]);
@@ -1674,32 +1992,57 @@ mod tests {
             (r.status.as_str(), r.consecutive_retirements),
             ("active", 1)
         );
+        assert_eq!(r.round, p.round + 1);
+    }
+
+    /// A client that re-asserts an ACTIVE, unfillable pin on every tick does
+    /// not hand it a fresh retry budget each time: it retires on schedule.
+    #[tokio::test]
+    async fn reasserting_an_active_pin_every_tick_does_not_stop_it_retiring() {
+        let pool = crate::test_util::test_pool();
+        let acq = AcquisitionState::new();
+        let p = pin(&pool, "reasserted");
+        let mut rounds = 0;
+        let mut t = tick(&pool, &acq, t0()).await;
+        while t.retired == 0 {
+            fail_dispatched(&acq, &t).await;
+            rounds += 1;
+            assert!(rounds <= 16, "the re-assertion kept the pin from retiring");
+            // The client POSTs the same pin again before every reconcile.
+            assert_eq!(pin(&pool, "reasserted").round, p.round);
+            t = tick(&pool, &acq, t0()).await;
+        }
+        assert_eq!(rounds, retry_budget_for_peers(PEERS));
+        let r = row(&pool, p.id);
+        assert_eq!(
+            (r.status.as_str(), r.consecutive_retirements),
+            ("retired", 1)
+        );
     }
 
     #[tokio::test]
-    async fn the_tick_readmits_at_most_its_bound_however_many_are_due() {
+    async fn the_tick_readmits_at_most_a_minute_of_dispatch_however_many_are_due() {
         let pool = crate::test_util::test_pool();
         let acq = AcquisitionState::new();
-        for i in 0..30 {
-            let p = pin(&pool, &format!("e2e-{i:02}"));
-            pin_db::retire_pin(&mut pool.get().expect("conn"), p.id, p.round, t0())
-                .expect("retire")
-                .expect("retired");
+        let due = MAX_PIN_READMITS_PER_TICK + 20;
+        for i in 0..due {
+            let p = pin(&pool, &format!("e2e-{i:03}"));
+            retire_now(&pool, p.id, t0());
         }
         let first = tick(&pool, &acq, t0() + Duration::hours(7)).await;
         assert_eq!(first.readmitted, MAX_PIN_READMITS_PER_TICK);
         assert_eq!(first.to_dispatch.len(), MAX_PIN_READMITS_PER_TICK);
         assert_eq!(acq.rollup().await.total as usize, MAX_PIN_READMITS_PER_TICK);
         let second = tick(&pool, &acq, t0() + Duration::hours(7)).await;
-        assert_eq!(second.readmitted, 5);
-        assert_eq!(acq.rollup().await.total, 30);
+        assert_eq!(second.readmitted, 20);
+        assert_eq!(acq.rollup().await.total as usize, due);
     }
 
-    /// A read caps the hold through the production demand writer and the tick:
-    /// a pin on the 24 h rung that is read is re-probed once 6 h have passed
-    /// since it retired, and stays on its rung.
+    /// A read through the production demand writer, then the tick: a pin one
+    /// minute into a 24 h hold is re-probed by the next tick and stays on its
+    /// rung; a pin nobody read serves its hold.
     #[tokio::test]
-    async fn a_read_miss_on_a_retired_pin_is_reprobed_at_six_hours_by_the_tick() {
+    async fn a_read_miss_on_a_retired_pin_is_reprobed_by_the_next_tick() {
         let pool = crate::test_util::test_pool();
         let acq = AcquisitionState::new();
         let read = pin(&pool, "read-while-held");
@@ -1707,12 +2050,8 @@ mod tests {
         // Three retirements each: the 24 h rung.
         for (i, at) in [0, 10, 30].into_iter().enumerate() {
             let at = t0() + Duration::hours(at);
-            for id in [read.id, unread.id] {
-                let round = row(&pool, id).round;
-                pin_db::retire_pin(&mut pool.get().expect("conn"), id, round, at)
-                    .expect("retire")
-                    .expect("retired");
-            }
+            retire_now(&pool, read.id, at);
+            retire_now(&pool, unread.id, at);
             if i < 2 {
                 run_hold_pass(&mut pool.get().expect("conn"), at + Duration::hours(13));
             }
@@ -1720,9 +2059,12 @@ mod tests {
         let retired_at = t0() + Duration::hours(30);
         assert_eq!(row(&pool, read.id).consecutive_retirements, 3);
 
+        let quiet = tick(&pool, &acq, retired_at + Duration::minutes(1)).await;
+        assert_eq!(quiet.readmitted, 0);
+
         let autopin = crate::services::demand_autopin::DemandAutoPin::new(
             true,
-            std::time::Duration::from_secs(0),
+            std::time::Duration::from_secs(300),
         );
         let demanded = autopin
             .record_demand(&mut pool.get().expect("conn"), "read-while-held")
@@ -1733,11 +2075,9 @@ mod tests {
         );
         assert_eq!(row(&pool, read.id).status, "retired");
 
-        let early = tick(&pool, &acq, retired_at + Duration::minutes(359)).await;
-        assert_eq!(early.readmitted, 0);
-        let capped = tick(&pool, &acq, retired_at + Duration::minutes(361)).await;
-        assert_eq!(capped.readmitted, 1);
-        assert_eq!(capped.to_dispatch, vec!["read-while-held".to_string()]);
+        let next = tick(&pool, &acq, retired_at + Duration::minutes(2)).await;
+        assert_eq!(next.readmitted, 1);
+        assert_eq!(next.to_dispatch, vec!["read-while-held".to_string()]);
         assert_eq!(
             row(&pool, read.id).consecutive_retirements,
             3,
@@ -1750,8 +2090,94 @@ mod tests {
         );
 
         // Unfillable still: the fourth rung, not the first.
-        fail_until_retired(&pool, &acq, retired_at + Duration::minutes(361), capped).await;
+        fail_until_retired(&pool, &acq, retired_at + Duration::minutes(2), next).await;
         assert_eq!(row(&pool, read.id).consecutive_retirements, 4);
+    }
+
+    /// The autopin's budgets guard the creation of NEW pins. With the active
+    /// set at its ceiling and the window of distinct ids full, a read for a
+    /// head whose pin already exists and is retired still records demand, and
+    /// the next tick re-admits it.
+    #[tokio::test]
+    async fn a_read_of_a_retired_head_is_recorded_at_the_ceiling_with_the_window_full() {
+        let pool = crate::test_util::test_pool();
+        let acq = AcquisitionState::new();
+        let p = pin(&pool, "retired-head");
+        retire_now(&pool, p.id, t0());
+        // One distinct id per window, one active row at most.
+        let autopin = crate::services::demand_autopin::DemandAutoPin::with_limits(
+            true,
+            std::time::Duration::from_secs(300),
+            1,
+            1,
+        );
+        let filler = autopin
+            .record_demand(&mut pool.get().expect("conn"), "fills-the-window")
+            .expect("demand");
+        assert!(
+            filler.is_some(),
+            "the one admission of the window, the one active row"
+        );
+        // Both budgets are now spent: a new head is refused…
+        let refused = autopin
+            .record_demand(&mut pool.get().expect("conn"), "another-new-head")
+            .expect("demand");
+        assert!(refused.is_none());
+        assert_eq!(
+            pin_db::list_all_pins(&mut pool.get().expect("conn"))
+                .expect("list")
+                .len(),
+            2,
+            "no pin was authored past the budgets"
+        );
+
+        // …but the read of the retired head is recorded, however often — once.
+        for _ in 0..3 {
+            let read = autopin
+                .record_demand(&mut pool.get().expect("conn"), "retired-head")
+                .expect("demand");
+            assert!(read.is_none());
+        }
+        let held = row(&pool, p.id);
+        assert_eq!(
+            (held.status.as_str(), held.held_demand_count),
+            ("retired", 1)
+        );
+
+        // The same at the ceiling alone: a window with room, but one active
+        // row is already the limit.
+        let q = pin(&pool, "second-retired-head");
+        retire_now(&pool, q.id, t0());
+        let at_ceiling = crate::services::demand_autopin::DemandAutoPin::with_limits(
+            true,
+            std::time::Duration::from_secs(300),
+            16,
+            1,
+        );
+        assert!(at_ceiling
+            .record_demand(&mut pool.get().expect("conn"), "yet-another-new-head")
+            .expect("demand")
+            .is_none());
+        assert!(at_ceiling
+            .record_demand(&mut pool.get().expect("conn"), "second-retired-head")
+            .expect("demand")
+            .is_none());
+        assert_eq!(row(&pool, q.id).held_demand_count, 1);
+        assert_eq!(
+            pin_db::list_all_pins(&mut pool.get().expect("conn"))
+                .expect("list")
+                .len(),
+            3
+        );
+
+        let next = tick(&pool, &acq, t0() + Duration::minutes(1)).await;
+        assert_eq!(next.readmitted, 2);
+        assert!(next.to_dispatch.contains(&"retired-head".to_string()));
+        assert!(next
+            .to_dispatch
+            .contains(&"second-retired-head".to_string()));
+        assert_eq!(row(&pool, p.id).status, "active");
+        assert_eq!(row(&pool, q.id).status, "active");
     }
 
     #[tokio::test]
@@ -1780,8 +2206,8 @@ mod tests {
         assert!(rollup.caught_up);
     }
 
-    /// A transport that cannot show its attempts reached distinct peers does
-    /// not retire: the pin stays active with its budget spent.
+    /// A transport that does not claim its exhaustion proves peer coverage
+    /// does not retire: the pin stays active with its budget spent.
     #[tokio::test]
     async fn a_transport_without_proven_peer_coverage_does_not_retire() {
         let pool = crate::test_util::test_pool();

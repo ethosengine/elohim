@@ -16,28 +16,29 @@ closureRule: JsonValue | null, priority: number, status: string, createdAt: stri
  * Retirements in a row with no fetch and no peer inventory naming the head
  * between them. Each one doubles the hold before the next re-probe.
  */
-consecutiveRetirements: number, 
+consecutiveRetirements?: number, 
 /**
  * When the pin was last retired (RFC 3339) — the clock its hold runs
- * from. Null if it never has been.
+ * from. Absent if it never has been.
  */
-retiredAt: string | null, 
+retiredAt?: string, 
 /**
  * Earliest time a `retired` pin is re-admitted for a re-probe (RFC 3339):
- * `retiredAt` plus the hold for its rung, or plus 6 h if it has been read
- * while held (`heldDemandCount > 0`). Null unless `status` is `retired`.
- * A peer inventory naming the head re-admits sooner; a busy tick can
- * defer it by minutes.
+ * `retiredAt` plus the hold for its rung — or `retiredAt` itself, already
+ * past, if it has been read while held (`heldDemandCount > 0`): demand
+ * makes it due on the next reconcile tick. Absent unless `status` is
+ * `retired`. A peer inventory naming the head re-admits sooner.
  */
-nextReadmitAt: string | null, 
+nextReadmitAt?: string, 
 /**
  * Read-misses recorded while the pin was `retired` or `removed`. On a
- * retired pin they cap the hold at 6 h; on a removed pin they are only
- * counted. Cleared on re-admission.
+ * retired pin they make it due at once; on a removed pin they are only
+ * counted (only an explicit re-pin restores a removed pin). Cleared on
+ * re-admission.
  */
-heldDemandCount: number, 
+heldDemandCount?: number, 
 /**
  * `exhausted` (every connected peer was asked and none supplied the
- * bytes), `fetched`, or null when no round has concluded.
+ * bytes), `fetched`, or absent when no round has concluded.
  */
-lastOutcome: string | null, };
+lastOutcome?: string, };

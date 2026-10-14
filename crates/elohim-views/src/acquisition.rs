@@ -22,24 +22,38 @@ pub struct PinView {
     pub status: String,
     pub created_at: String,
     pub updated_at: String,
+    // The fields below were added after the first release of this view. A
+    // reader of an older node gets none of them, so they are optional on the
+    // wire (CONVENTIONS: additive fields never become required).
     /// Retirements in a row with no fetch and no peer inventory naming the head
     /// between them. Each one doubles the hold before the next re-probe.
-    pub consecutive_retirements: i32,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[ts(optional)]
+    pub consecutive_retirements: Option<i32>,
     /// When the pin was last retired (RFC 3339) — the clock its hold runs
-    /// from. Null if it never has been.
+    /// from. Absent if it never has been.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[ts(optional)]
     pub retired_at: Option<String>,
     /// Earliest time a `retired` pin is re-admitted for a re-probe (RFC 3339):
-    /// `retiredAt` plus the hold for its rung, or plus 6 h if it has been read
-    /// while held (`heldDemandCount > 0`). Null unless `status` is `retired`.
-    /// A peer inventory naming the head re-admits sooner; a busy tick can
-    /// defer it by minutes.
+    /// `retiredAt` plus the hold for its rung — or `retiredAt` itself, already
+    /// past, if it has been read while held (`heldDemandCount > 0`): demand
+    /// makes it due on the next reconcile tick. Absent unless `status` is
+    /// `retired`. A peer inventory naming the head re-admits sooner.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[ts(optional)]
     pub next_readmit_at: Option<String>,
     /// Read-misses recorded while the pin was `retired` or `removed`. On a
-    /// retired pin they cap the hold at 6 h; on a removed pin they are only
-    /// counted. Cleared on re-admission.
-    pub held_demand_count: i32,
+    /// retired pin they make it due at once; on a removed pin they are only
+    /// counted (only an explicit re-pin restores a removed pin). Cleared on
+    /// re-admission.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[ts(optional)]
+    pub held_demand_count: Option<i32>,
     /// `exhausted` (every connected peer was asked and none supplied the
-    /// bytes), `fetched`, or null when no round has concluded.
+    /// bytes), `fetched`, or absent when no round has concluded.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[ts(optional)]
     pub last_outcome: Option<String>,
 }
 

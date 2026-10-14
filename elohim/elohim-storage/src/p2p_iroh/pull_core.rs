@@ -415,11 +415,17 @@ impl IrohPullCore {
             q.drain(..available.min(n)).collect()
         };
         let rotation = self.rotation.fetch_add(1, Ordering::Relaxed);
-        for (i, id) in to_dispatch.into_iter().enumerate() {
-            if !self.ctx.acquisition.wants(&id).await {
-                continue;
-            }
-            let (label, addr) = peers[(rotation.wrapping_add(i)) % peers.len()].clone();
+        // The shared per-want provider choice (see `reconcile_pins`): each
+        // want goes to a book peer it has not been asked of this round.
+        let labels: Vec<String> = peers.iter().map(|(label, _)| label.clone()).collect();
+        let slots = self
+            .ctx
+            .acquisition
+            .assign_providers(&to_dispatch, &labels, rotation)
+            .await;
+        for (id, slot) in to_dispatch.into_iter().zip(slots) {
+            let Some(slot) = slot else { continue };
+            let (label, addr) = peers[slot].clone();
             crate::metrics::inc_acquisition_dispatch("iroh");
             let ctx = self.ingest_ctx();
             let counter = self.pin_in_flight.clone();
@@ -435,17 +441,15 @@ impl IrohPullCore {
     /// (`acquisition::reconcile_tick`) — hold pass, active item pins → wants →
     /// queue — WITHOUT retirement.
     ///
-    /// This core does not retire exhausted pins, and must not until it can
-    /// prove per-want provider coverage. Retirement claims "no connected peer
-    /// could supply the bytes"; here a spent budget only proves a number of
-    /// attempts. `drain_pins` picks the peer from one rotation counter shared
-    /// with `drain_gaps` and advanced once per drain, not per want, so a
-    /// want's retries can all land on the same peer (two peers, fifty failing
-    /// pins in two batches of 25: the counter moves by two between a pin's
-    /// retries). The missing precondition is a per-want record of which
-    /// providers were asked, with the budget spent only on distinct ones.
-    /// Until then an exhausted pin stays active here and holds
-    /// `pull.caughtUp` false — honest, where a retirement would not be.
+    /// This core does not retire exhausted pins yet. Retirement claims "no
+    /// connected peer could supply the bytes", which needs per-want provider
+    /// coverage. `drain_pins` now makes the shared provider choice
+    /// (`AcquisitionState::assign_providers` — each want goes to a book peer
+    /// it has not asked, and the tracker records it), which is that
+    /// precondition; what is missing is a pure-iroh run that shows it holding
+    /// before this passes `RetirePolicy::EveryPeerProbed`. Until then an
+    /// exhausted pin stays active here and holds `pull.caughtUp` false —
+    /// honest, where an unproven retirement would not be.
     pub async fn reconcile_pins(&self) -> crate::metrics::AcquisitionReconcileOutcome {
         use crate::metrics::AcquisitionReconcileOutcome;
         let Some(pool) = self.ctx.db_pool.as_ref() else {

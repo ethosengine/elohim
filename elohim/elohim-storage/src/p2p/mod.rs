@@ -302,24 +302,6 @@ type PendingVerificationMap = Arc<
 type PendingReplicationFetchMap =
     Arc<tokio::sync::Mutex<std::collections::HashMap<request_response::OutboundRequestId, String>>>;
 
-/// Round-robin peer index for an acquisition dispatch, offset by a per-drain
-/// `rotation` so successive RETRIES of the same item walk different peers.
-///
-/// `position` is the item's index within the drained batch; because the acquisition
-/// queue is rebuilt each 60s reconcile from `list_active_pins` in stable DB order,
-/// that position is stable across retries. Without the rotation term an item is
-/// therefore asked of exactly one peer for its whole retry budget — provider
-/// resolution that never resolves past the first candidate.
-///
-/// Returns `0` for an empty peer set (callers peer-gate before dispatch; the guard
-/// keeps this total so it can be unit-tested without a swarm).
-fn rotated_peer_index(rotation: usize, position: usize, peer_count: usize) -> usize {
-    if peer_count == 0 {
-        return 0;
-    }
-    rotation.wrapping_add(position) % peer_count
-}
-
 /// Map of pending blob-pull requests (issued after a replication GetContent returns a
 /// non-empty blob_hash): outbound request ID → (content_id, blob_hash).
 ///
@@ -888,7 +870,7 @@ pub struct P2PNode {
     acquisition_queue: ReplicationGapQueue,
     /// Round-robin rotation offset for acquisition dispatch, bumped once per
     /// drain. Without it, `peers[position % peers.len()]` pins every RETRY of a
-    /// given item to the SAME peer — see [`rotated_peer_index`].
+    /// given item to the SAME peer — see [`acquisition::rotated_peer_index`].
     acquisition_rotation: Arc<std::sync::atomic::AtomicUsize>,
     /// GetContent fetches in flight on the iroh plane (the libp2p ones are the
     /// `pending_acquisition_fetches` map); both count against the dispatch budget.
@@ -3886,7 +3868,8 @@ impl P2PNode {
         let mut provide_reconcile_interval = tokio::time::interval(reconcile_cadence);
         provide_reconcile_interval.set_missed_tick_behavior(tokio::time::MissedTickBehavior::Skip);
         // Acquisition dispatch: drain the acquisition queue every 5 seconds.
-        let mut acquisition_dispatch_interval = tokio::time::interval(Duration::from_secs(5));
+        let mut acquisition_dispatch_interval =
+            tokio::time::interval(Duration::from_secs(acquisition::ACQUISITION_DISPATCH_SECS));
         // Paces inventory refresh pages into the publishers (see
         // `drain_inventory_backlog`); fires every second, does nothing when empty.
         let mut inventory_pacer_interval = tokio::time::interval(Duration::from_secs(1));
@@ -9992,7 +9975,12 @@ impl P2PNode {
     /// therefore asked of exactly ONE peer on all `MAX_RETRIES` attempts — on a
     /// 6-peer fabric, five of six possible providers are never asked, and the item
     /// exhausts its retry budget having probed 1/6 of the fabric. The rotation
-    /// offset advances once per drain so successive retries walk distinct peers.
+    /// offset advances once per drain so successive retries start at distinct
+    /// peers — but that alone still aliases when a cycle spans a multiple of
+    /// the peer count in drains (two peers, two batches of 25). The guarantee
+    /// is `AcquisitionState::assign_providers`: every want is sent to a peer
+    /// it has not been asked of this round, the choice is recorded, and
+    /// retirement requires that record to cover the current providers.
     async fn drain_acquisition_queue(&self) {
         use acquisition_dispatch::AcquisitionTarget;
         let budget = reconcile_rails::DispatchBudget::new(acquisition::MAX_ACQUISITION_INFLIGHT);
@@ -10043,19 +10031,28 @@ impl P2PNode {
             let len = queue.len();
             queue.drain(..available.min(len)).collect()
         };
-        // Advance once per drain so a retry at a stable batch position walks to a
-        // different peer than the attempt before it.
+        // The rotation spreads a batch across peers and is where each want's
+        // provider choice STARTS. It is not what guarantees coverage — it
+        // advances once per drain, so two peers and two stable batches of 25
+        // send every retry of a want to the same peer. `assign_providers`
+        // sends each want to a peer it has not been asked of this round and
+        // records the choice; retirement reads that record.
         let rotation = self
             .acquisition_rotation
             .fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+        let labels: Vec<String> = targets.iter().map(AcquisitionTarget::label).collect();
+        let slots = self
+            .acquisition
+            .assign_providers(&to_dispatch, &labels, rotation)
+            .await;
         let mut skipped = 0usize;
         let mut sent = 0usize;
-        for (i, id) in to_dispatch.iter().enumerate() {
-            if !self.acquisition.wants(id).await {
+        for (id, slot) in to_dispatch.iter().zip(slots) {
+            let Some(slot) = slot else {
                 skipped += 1;
                 continue;
-            }
-            let target = &targets[rotated_peer_index(rotation, i, targets.len())];
+            };
+            let target = &targets[slot];
             crate::metrics::inc_acquisition_dispatch(target.transport());
             match target {
                 AcquisitionTarget::Libp2p(peer) => {
@@ -10464,7 +10461,7 @@ mod replication_advertiser_tests {
 
 #[cfg(test)]
 mod acquisition_rotation_tests {
-    use super::rotated_peer_index;
+    use super::acquisition::rotated_peer_index;
 
     /// THE DEFECT: with a bare `position % peer_count`, an item at a stable batch
     /// position is asked of the SAME peer on every retry. The acquisition queue is

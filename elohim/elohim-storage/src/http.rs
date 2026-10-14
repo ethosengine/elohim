@@ -10701,6 +10701,17 @@ impl HttpServer {
                 // hot path); the DOWNSTREAM provide-eligibility gate decides
                 // whether anything is ever provided, so we do NOT reach-gate
                 // here. Non-fatal: the read path continues regardless.
+                //
+                // A head whose pin is RETIRED has the demand recorded and is
+                // re-admitted by the next reconcile tick. A head whose pin was
+                // REMOVED stays removed: only an explicit re-pin
+                // (`POST /api/v1/pins`) restores a removed pin — an operator
+                // decision of 2026-10-14. This read then has only the P2P
+                // fallback below, which asks a single peer.
+                //
+                // The write waits at most a tenth of a second for the database
+                // (`record_demand_pin_briefly`); a sample that loses that race
+                // is dropped and counted, never a 30 s stall of this request.
                 if self.demand_autopin.is_enabled() {
                     match self.demand_autopin.record_demand(&mut conn, content_id) {
                         Ok(Some(pin)) => {
@@ -17886,11 +17897,13 @@ fn pin_to_view(p: db::models::AcquisitionPin) -> elohim_views::acquisition::PinV
     // retirement time is unreadable; the next reconcile restarts it on the
     // first rung rather than re-admitting it.
     let readmit_at = if p.status == "retired" {
-        db::acquisition_pins::pin_readmit_at(
-            p.retired_at.as_deref(),
-            p.consecutive_retirements,
-            p.held_demand_count > 0,
-        )
+        if p.held_demand_count > 0 {
+            // Somebody has read it: due on the next reconcile tick, whatever
+            // its rung. Reported as the retirement time — already past.
+            db::acquisition_pins::parse_retired_at(p.retired_at.as_deref())
+        } else {
+            db::acquisition_pins::pin_readmit_at(p.retired_at.as_deref(), p.consecutive_retirements)
+        }
     } else {
         None
     };
@@ -17909,9 +17922,9 @@ fn pin_to_view(p: db::models::AcquisitionPin) -> elohim_views::acquisition::PinV
         status: p.status,
         created_at: p.created_at,
         updated_at: p.updated_at,
-        consecutive_retirements: p.consecutive_retirements,
+        consecutive_retirements: Some(p.consecutive_retirements),
         retired_at: p.retired_at,
-        held_demand_count: p.held_demand_count,
+        held_demand_count: Some(p.held_demand_count),
         last_outcome: p.last_outcome,
     }
 }
@@ -23439,7 +23452,7 @@ mod session_exchange_tests {
         assert_eq!(pin["lastOutcome"], "exhausted");
         assert_eq!(pin["heldDemandCount"], 0);
 
-        // Somebody reads it: the hold is capped at the first rung.
+        // Somebody reads it: due on the next tick, reported as already past.
         {
             let mut conn = server.get_diesel_conn().expect("conn");
             db::acquisition_pins::record_demand_pin(
@@ -23452,13 +23465,14 @@ mod session_exchange_tests {
                     priority: 1,
                 },
                 t0 + chrono::Duration::hours(21),
+                db::acquisition_pins::DemandAdmission::Full,
             )
             .expect("demand");
         }
         let pin = listed_pin(&server);
         assert_eq!(pin["heldDemandCount"], 1);
         assert_eq!(pin["retiredAt"], "2026-10-14T08:00:00Z");
-        assert_eq!(pin["nextReadmitAt"], "2026-10-14T14:00:00Z");
+        assert_eq!(pin["nextReadmitAt"], "2026-10-14T08:00:00Z");
     }
 
     // The write path strips `epr:` (the reconcile loop joins on the bare content

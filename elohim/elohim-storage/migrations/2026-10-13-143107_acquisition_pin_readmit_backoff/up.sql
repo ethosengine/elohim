@@ -16,8 +16,9 @@
 --                            unrelated bookkeeping, e.g. set_commitment_cid).
 --   held_demand_count        read-misses recorded against the pin while it sat
 --                            in `retired` or `removed`. On a retired pin demand
---                            caps the hold at its first rung; on a removed pin
---                            it is only counted. Cleared on re-admission.
+--                            makes it due on the next reconcile tick; on a
+--                            removed pin it is only counted. Cleared on
+--                            re-admission.
 --   last_outcome             'exhausted' | 'fetched' | NULL (no round concluded).
 --   round                    bumped every time the pin is (re-)activated. The
 --                            in-memory retry state is keyed on it, and a

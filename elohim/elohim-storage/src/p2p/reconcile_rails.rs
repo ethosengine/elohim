@@ -152,6 +152,15 @@ impl GapTracker {
         self.max_retries
     }
 
+    /// Ids whose retry budget is spent ([`Self::exhausted_count`], by id).
+    pub fn exhausted_ids(&self) -> Vec<String> {
+        self.failed
+            .iter()
+            .filter(|(_, &n)| n >= self.max_retries)
+            .map(|(id, _)| id.clone())
+            .collect()
+    }
+
     /// Failed attempts of the most-tried id — how far into the budget this
     /// tracker is. 0 when nothing has failed.
     pub fn attempts_used(&self) -> u32 {

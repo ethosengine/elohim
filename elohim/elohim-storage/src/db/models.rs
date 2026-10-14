@@ -3802,8 +3802,8 @@ pub struct AcquisitionPin {
     /// (`p2p::acquisition::pin_hold`). 0 = never retired, or reset.
     pub consecutive_retirements: i32,
     /// Read-misses recorded while the pin sat in `retired` or `removed`. On a
-    /// retired pin demand caps the hold at its first rung; on a removed pin it
-    /// is only counted. Cleared on re-admission.
+    /// retired pin demand makes it due on the next reconcile tick; on a
+    /// removed pin it is only counted. Cleared on re-admission.
     pub held_demand_count: i32,
     /// `exhausted` | `fetched` | NULL (no round has concluded yet).
     pub last_outcome: Option<String>,

@@ -2178,6 +2178,18 @@ lazy_static! {
     )
     .unwrap();
 
+    /// Read-miss demand samples that reached no pin row. label: reason — see
+    /// [`DemandDrop`]. Demand that DID land is on the row (`heldDemandCount`)
+    /// and, for a retired pin, in `…_pin_readmissions_total{cause="demand"}`.
+    pub static ref ACQUISITION_DEMAND_DROPPED: IntCounterVec = IntCounterVec::new(
+        Opts::new(
+            "elohim_acquisition_demand_dropped_total",
+            "Read-miss demand samples dropped before reaching a pin row, by reason.",
+        ),
+        &["reason"],
+    )
+    .unwrap();
+
     /// Decisions to leave a held acquisition pin held. label: reason — see
     /// [`PinHoldSkip`]. The per-tick reasons count pin-ticks (a pin held for
     /// three ticks counts three): "hold_not_elapsed" over ticks is the held
@@ -3763,6 +3775,12 @@ pub fn register_all() {
         for cause in PinReadmitCause::ALL {
             ACQUISITION_PIN_READMISSIONS
                 .with_label_values(&[cause.label()])
+                .inc_by(0);
+        }
+        let _ = REGISTRY.register(Box::new(ACQUISITION_DEMAND_DROPPED.clone()));
+        for reason in DemandDrop::ALL {
+            ACQUISITION_DEMAND_DROPPED
+                .with_label_values(&[reason.label()])
                 .inc_by(0);
         }
         let _ = REGISTRY.register(Box::new(ACQUISITION_PIN_HOLD_SKIPS.clone()));
@@ -6286,7 +6304,7 @@ impl PinBackoffReset {
 pub enum PinReadmitCause {
     /// Its own hold elapsed (the backoff ladder).
     Hold,
-    /// It was read while held and the first rung elapsed (demand caps the hold).
+    /// It was read while held: demand makes a retired pin due at once.
     Demand,
     /// A peer inventory named its head.
     Inventory,
@@ -6323,19 +6341,15 @@ pub enum PinHoldSkip {
     /// A retired pin with no readable retirement time: not re-admitted,
     /// restarted on the first rung (once per pin).
     ClockUnreadable,
-    /// A read-miss named a `retired` pin still inside its first rung: counted
-    /// on the row, held until that rung ends.
-    DemandRetired,
     /// A read-miss named a `removed` (or `paused`) pin: not revived.
     DemandRemoved,
 }
 
 impl PinHoldSkip {
-    pub const ALL: [PinHoldSkip; 5] = [
+    pub const ALL: [PinHoldSkip; 4] = [
         PinHoldSkip::HoldNotElapsed,
         PinHoldSkip::TickBound,
         PinHoldSkip::ClockUnreadable,
-        PinHoldSkip::DemandRetired,
         PinHoldSkip::DemandRemoved,
     ];
 
@@ -6344,10 +6358,48 @@ impl PinHoldSkip {
             PinHoldSkip::HoldNotElapsed => "hold_not_elapsed",
             PinHoldSkip::TickBound => "tick_bound",
             PinHoldSkip::ClockUnreadable => "clock_unreadable",
-            PinHoldSkip::DemandRetired => "demand_retired",
             PinHoldSkip::DemandRemoved => "demand_removed",
         }
     }
+}
+
+/// Why a read-miss's demand sample reached no pin row.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum DemandDrop {
+    /// The same head was sampled within the throttle window.
+    Throttled,
+    /// The window of distinct ids was full and the head has no pin.
+    WindowFull,
+    /// The active set was at its ceiling and the head has no pin.
+    ActiveCeiling,
+    /// Another writer held the database past the short wait the read path
+    /// allows; the next read of the head records it.
+    LockBusy,
+}
+
+impl DemandDrop {
+    pub const ALL: [DemandDrop; 4] = [
+        DemandDrop::Throttled,
+        DemandDrop::WindowFull,
+        DemandDrop::ActiveCeiling,
+        DemandDrop::LockBusy,
+    ];
+
+    pub fn label(self) -> &'static str {
+        match self {
+            DemandDrop::Throttled => "throttled",
+            DemandDrop::WindowFull => "window_full",
+            DemandDrop::ActiveCeiling => "active_ceiling",
+            DemandDrop::LockBusy => "lock_busy",
+        }
+    }
+}
+
+/// Record one read-miss demand sample dropped for `reason`.
+pub fn inc_acquisition_demand_dropped(reason: DemandDrop) {
+    ACQUISITION_DEMAND_DROPPED
+        .with_label_values(&[reason.label()])
+        .inc();
 }
 
 /// Record `n` retired pins re-activated for `cause`.
