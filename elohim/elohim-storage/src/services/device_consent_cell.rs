@@ -568,13 +568,19 @@ impl ControllerCell for ConductorControllerCell {
 pub struct ConductorDeviceCell {
     hc: Arc<HcClient>,
     cell: CellId,
+    /// A call that writes this node's standing came back successful.
+    wrote: std::sync::atomic::AtomicBool,
 }
 
 impl ConductorDeviceCell {
     /// This node's own mishpat cell, when the installed hApp has one.
     pub fn own(hc: Arc<HcClient>) -> Option<Self> {
         let cell = hc.cell_id_for_role(MISHPAT_ROLE)?.clone();
-        Some(Self { hc, cell })
+        Some(Self {
+            hc,
+            cell,
+            wrote: std::sync::atomic::AtomicBool::new(false),
+        })
     }
 }
 
@@ -597,6 +603,10 @@ impl DeviceCell for ConductorDeviceCell {
         challenge: &str,
     ) -> Result<consent_grant::CarrierProof, CellFailure> {
         sign_carrier_with(&self.hc, &self.cell, kind, state, transport_id, challenge).await
+    }
+
+    fn wrote_standing(&self) -> bool {
+        self.wrote.load(std::sync::atomic::Ordering::SeqCst)
     }
 
     async fn whoami(&self) -> Result<DeviceSelf, CellFailure> {
@@ -683,6 +693,9 @@ impl DeviceCell for ConductorDeviceCell {
             .call_zome_mishpat(MISHPAT_ZOME, ENROLL, payload)
             .await
             .map_err(failure)?;
+        // The binding is on this cell's chain from here, whatever fails
+        // after: reading its receipt, or registering whose this node is.
+        self.wrote.store(true, std::sync::atomic::Ordering::SeqCst);
         let receipt: CommitmentOutputWire = ExternIO::from(answer)
             .decode()
             .map_err(|e| CellFailure::Unavailable(format!("receipt decode: {e}")))?;

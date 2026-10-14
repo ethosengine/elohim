@@ -76,7 +76,8 @@ demand-driven read is built in storage (`services/device_carrier.rs`, `services/
 counter in `happ_manager.rs`) and is the default. `ELOHIM_CONSENT_SPEAKS_REFRESH=timer`, read once at start, keeps the
 30 s refresher; the mode in force is logged once at start.
 
-On demand a resting node makes no standing call. A device's signed ask, a pending-list, decide or signed-out standing
+On demand the carrier of a resting node makes no standing call (the affirmation worker, untouched here, still reads
+standing 60 s after start and then every 30 minutes, in either mode). A device's signed ask, a pending-list, decide or signed-out standing
 request, and an identity write that changed something (a 201 from bootstrap, begin or enroll) want a read. A refused
 write reads nothing; a write that succeeded without writing reads as a request does. One read runs at a time, and a caller that queued behind one is judged when
 its turn comes. Reads wanted by requests (one of which needs no sign-in) are at most one attempt per 30 s, answered or

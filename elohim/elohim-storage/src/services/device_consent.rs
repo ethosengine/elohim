@@ -1052,6 +1052,12 @@ pub trait DeviceCell: Send + Sync {
     /// Sign possession of the enrollment's intent and notarize the binding on
     /// this cell's chain.
     async fn enroll(&self, enrollment: &Enrollment) -> Result<BindingReceipt, CellFailure>;
+    /// Whether a call that writes this node's standing came back successful
+    /// through this cell, even when `enroll` as a whole then failed: its
+    /// binding can be notarized and a later step fail.
+    fn wrote_standing(&self) -> bool {
+        false
+    }
     /// Sign a carrier statement with this device's key: its ask.
     async fn sign_carrier(
         &self,
@@ -1081,9 +1087,10 @@ impl<'a> MarkedDevice<'a> {
         }
     }
 
-    /// Whether an enrollment succeeded through this cell.
+    /// Whether an enrollment succeeded through this cell, or the cell says
+    /// it wrote standing on the way to one that failed.
     pub fn wrote(&self) -> bool {
-        self.wrote.load(std::sync::atomic::Ordering::SeqCst)
+        self.wrote.load(std::sync::atomic::Ordering::SeqCst) || self.cell.wrote_standing()
     }
 }
 
@@ -1818,6 +1825,54 @@ pub(crate) mod tests {
 
     struct FakeDevice {
         enrolled: Mutex<Vec<Enrollment>>,
+    }
+
+    /// A device whose binding is notarized and whose enrollment then fails,
+    /// or which fails before writing anything.
+    struct HalfEnrolled {
+        notarized: bool,
+        wrote: std::sync::atomic::AtomicBool,
+    }
+
+    #[async_trait]
+    impl DeviceCell for HalfEnrolled {
+        async fn whoami(&self) -> Result<DeviceSelf, CellFailure> {
+            Ok(DeviceSelf {
+                device_key: AGENT.into(),
+                network_dna: NETWORK.into(),
+                content_dna: CONTENT.into(),
+            })
+        }
+        async fn enroll(&self, _: &Enrollment) -> Result<BindingReceipt, CellFailure> {
+            self.wrote
+                .store(self.notarized, std::sync::atomic::Ordering::SeqCst);
+            Err(CellFailure::Unavailable("receipt decode: truncated".into()))
+        }
+        fn wrote_standing(&self) -> bool {
+            self.wrote.load(std::sync::atomic::Ordering::SeqCst)
+        }
+    }
+
+    #[tokio::test]
+    async fn an_enrollment_that_fails_after_its_binding_was_notarized_says_standing_changed() {
+        let enrollment = honestly_delivered().enrollment.unwrap();
+        for notarized in [true, false] {
+            let cell = HalfEnrolled {
+                notarized,
+                wrote: std::sync::atomic::AtomicBool::new(false),
+            };
+            let marked = MarkedDevice::new(&cell);
+            assert!(!marked.wrote());
+            assert!(marked.enroll(&enrollment).await.is_err());
+            assert_eq!(marked.wrote(), notarized);
+        }
+        // One that succeeds says so whatever the cell says of its steps.
+        let cell = FakeDevice {
+            enrolled: Mutex::new(Vec::new()),
+        };
+        let marked = MarkedDevice::new(&cell);
+        assert!(marked.enroll(&enrollment).await.is_ok());
+        assert!(marked.wrote());
     }
 
     #[async_trait]

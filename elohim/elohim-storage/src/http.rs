@@ -2126,7 +2126,8 @@ impl HttpServer {
             // Each worker is started again if it panics (`supervised`).
             // bounded-work: `demand_reader` reads nothing while no ask wants
             // a read; `timer_reader` reads once per SPEAKS_REFRESH_SECS;
-            // neither reads per incoming ask.
+            // neither reads per incoming ask. (The affirmation worker below
+            // reads standing once per pass, in either mode.)
             let server = self.clone();
             tokio::spawn(carrier::supervised("speaks reader", move || {
                 let server = server.clone();
@@ -2136,13 +2137,12 @@ impl HttpServer {
                         let server = server.clone();
                         move || server.own_controller_cell()
                     };
-                    let updates = crate::happ_manager::coordinator_updates;
                     match carrier::carrier().refresh() {
                         carrier::SpeaksRefresh::Demand => {
-                            carrier::demand_reader(carrier::carrier(), cell, &names, updates).await
+                            carrier::demand_reader(carrier::carrier(), cell, &names).await
                         }
                         carrier::SpeaksRefresh::Timer => {
-                            carrier::timer_reader(carrier::carrier(), cell, &names, updates).await
+                            carrier::timer_reader(carrier::carrier(), cell, &names).await
                         }
                     }
                 }
@@ -3228,16 +3228,12 @@ impl HttpServer {
                 Box::pin(self.handle_identity(req, false)).await
             }
             (Method::POST, "/auth/identity/bootstrap") => {
-                let answer = Box::pin(self.handle_identity(req, true)).await;
-                self.read_speaks_after_write(&answer).await;
-                answer
+                Box::pin(self.handle_identity(req, true)).await
             }
             // Begin a person's identity on this node with no doorway: their
             // Human, its authority and a session. This machine only.
             (Method::POST, "/auth/identity/begin") => {
-                let answer = Box::pin(self.handle_identity_begin(req)).await;
-                self.read_speaks_after_write(&answer).await;
-                answer
+                Box::pin(self.handle_identity_begin(req)).await
             }
             (Method::GET, "/auth/identity/declaration") => {
                 Box::pin(self.handle_identity_declaration(req)).await
@@ -3257,12 +3253,7 @@ impl HttpServer {
             // is, and enrolling it with what the terminal collected. Answered
             // only to callers on this machine.
             (Method::GET, "/auth/device/self") | (Method::POST, "/auth/device/enroll") => {
-                let enrolling = req.method() == Method::POST;
-                let answer = Box::pin(self.handle_device_step(req)).await;
-                if enrolling {
-                    self.read_speaks_after_write(&answer).await;
-                }
-                answer
+                Box::pin(self.handle_device_step(req)).await
             }
 
             // The first carrier (`services::device_carrier`): asks that came
@@ -14173,29 +14164,28 @@ impl HttpServer {
         } else {
             identity_standing(cell, &names, signed_in).await
         };
-        self.note_identity_write(marked.as_ref().is_some_and(|m| m.wrote()));
+        if bootstrap {
+            let wrote = marked.as_ref().is_some_and(|m| m.wrote());
+            self.read_speaks_after_write(answer.status().as_u16(), wrote)
+                .await;
+        }
         Ok(answer)
     }
 
-    /// A write to this node's standing came back successful from its cell,
-    /// whatever the request as a whole goes on to answer: whom it speaks for
-    /// is read once the request is answered (`read_speaks_after_write`).
-    fn note_identity_write(&self, wrote: bool) {
-        if wrote {
-            crate::services::device_carrier::carrier().identity_changed();
-        }
-    }
-
     /// After a write to this node's identity over its routes, read whom it
-    /// speaks for as what happened warrants (`Want::after_write`): now when a
-    /// write to standing came back successful from the cell, whatever the
-    /// request then answered; no more than any request when it succeeded
-    /// without writing; and not at all when it was refused before writing,
-    /// so a refused write sent again and again reads nothing.
-    async fn read_speaks_after_write(&self, answer: &Result<Response<Full<Bytes>>, StorageError>) {
+    /// speaks for as what happened warrants (`Want::after_write`). `wrote`
+    /// is this request's own: whether a call that writes standing came back
+    /// successful from its cell, whatever the request then answers. Then the
+    /// carrier is told a read is owed and one is made now; if this request
+    /// goes away before it lands, the next read of any kind pays it. A
+    /// success that wrote nothing reads as any request does, and a request
+    /// refused before writing not at all, so a refused write sent again and
+    /// again reads nothing.
+    async fn read_speaks_after_write(&self, status: u16, wrote: bool) {
         use crate::services::device_carrier::{carrier, Want};
-        let status = answer.as_ref().map_or(500, |a| a.status().as_u16());
-        let wrote = carrier().take_identity_changed();
+        if wrote {
+            carrier().standing_written();
+        }
         if let Some(want) = Want::after_write(status, wrote) {
             self.read_speaks(want).await;
         }
@@ -14225,7 +14215,6 @@ impl HttpServer {
                 cell.as_ref().map(|c| c as &dyn ControllerCell),
                 &self.identifier_source(),
                 want,
-                crate::happ_manager::coordinator_updates(),
             )
             .await;
     }
@@ -14289,9 +14278,14 @@ impl HttpServer {
             .as_ref()
             .map(|c| crate::services::device_consent::MarkedCell::new(c));
         let begun = begin_identity(marked.as_ref().map(|c| c as &dyn ControllerCell), &body).await;
-        // Said before anything after it can fail: the session and the
-        // sign-in secret are this node's own, and standing is already written.
-        self.note_identity_write(marked.as_ref().is_some_and(|m| m.wrote()));
+        // Read before anything after it can fail: the session and the sign-in
+        // secret are this node's own, and standing is already written.
+        let status = match &begun {
+            Ok(_) => StatusCode::OK,
+            Err(refused) => refused.status(),
+        };
+        self.read_speaks_after_write(status.as_u16(), marked.as_ref().is_some_and(|m| m.wrote()))
+            .await;
         let begun = match begun {
             Ok(begun) => begun,
             Err(refused) => return Ok(*refused),
@@ -14430,6 +14424,9 @@ impl HttpServer {
             let marked = crate::services::device_consent::MarkedCell::new(&cell);
             let outcome = reconcile(&marked, &declaration).await;
             // A reconcile that wrote and then failed changed standing too.
+            if marked.wrote() {
+                crate::services::device_carrier::carrier().standing_written();
+            }
             if marked.wrote() && !matches!(outcome, Reconciled::Applied(_)) {
                 self.refresh_speaks_now().await;
             }
@@ -15292,7 +15289,11 @@ impl HttpServer {
             .to_bytes();
         let marked = cell.map(crate::services::device_consent::MarkedDevice::new);
         let answer = device_enroll(marked.as_ref().map(|c| c as &dyn DeviceCell), &body).await;
-        self.note_identity_write(marked.as_ref().is_some_and(|m| m.wrote()));
+        self.read_speaks_after_write(
+            answer.status().as_u16(),
+            marked.as_ref().is_some_and(|m| m.wrote()),
+        )
+        .await;
         Ok(answer)
     }
 
