@@ -11,7 +11,7 @@ status: "backlog"
 priority: "low"
 deprecation_status: blocked
 severity: low
-fingerprints: ["612e34199acb", "8a122f0ee621", "19d73e162a53"]
+fingerprints: ["612e34199acb", "8a122f0ee621", "19d73e162a53", "6e0477ffb653"]
 relatedNodeIds: []
 tags: [deprecation, vite, vite-8, rolldown, analogjs, vite-plugin-angular, vitest, lamad, elohim-app, elohim-library, peer-dependency]
 cites:
@@ -42,6 +42,9 @@ This warning has been captured three times so far:
 - `19d73e162a53` (2026-10-08), the same text again behind a logger prefix
   (`12:28:04 AM [vite] warning: …`), from a vitest run in `app/lamad`. This is
   the second Class 13 re-mint, not a new concern.
+- `6e0477ffb653` (2026-10-14), the third Class 13 re-mint
+  (`9:55:42 PM [vite] warning: …`), from a vitest run of
+  `src/app/renderers/iframe-renderer` in `app/lamad`.
 
 ## Usage inventory
 
@@ -117,6 +120,18 @@ declare `"vite": "^7.3.1"`. The blocker and the plan above still stand. Each
 new timestamped re-mint should be folded in here and set to `blocked` until
 Class 13 lands. The real fix for the re-mints is the `fingerprint()`
 normalization in the sentinel entry, and that is waiting on operator approval.
+
+**Re-checked 2026-10-14 (fingerprint `6e0477ffb653`).** Still unchanged:
+from `app/lamad`, `vitest` resolves `vite@8.1.5` and
+`@analogjs/vite-plugin-angular@2.6.4` resolves `vite@7.3.1`;
+`app/elohim-app` and `app/elohim-library` still declare `"vite": "^7.3.1"`,
+and `app/lamad` declares none. The `fingerprint()` normalization for Class 13
+has not landed in `.claude/hooks/deprecation-sentinel.py`, which is why this
+re-minted. The new ledger row is `blocked` and cites this entry. Note that
+the ledger rows for `8a122f0ee621` and `19d73e162a53` are no longer present
+(only `612e34199acb` and `6e0477ffb653` remain, both `blocked`); since every
+re-mint carries a unique time prefix, that absence costs nothing until Class
+13 lands.
 
 ## Verification
 
