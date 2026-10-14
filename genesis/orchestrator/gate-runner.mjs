@@ -11,6 +11,7 @@ import { loadGateRegistry } from './pipeline-registry.mjs';
 import { projectsFromStale, walkGraph } from './graph-walker.mjs';
 import { filterChanged } from './ci-ignore.mjs';
 import { recordCycle } from './gate-cycle.mjs';
+import { gateEvidence, recordEvidence } from './gate-evidence.mjs';
 import { rakiaAffected, resolveRakiaBin } from './gate-oracle.mjs';
 import { runAttested } from './gate-attest.mjs';
 
@@ -202,6 +203,19 @@ function runProject(project, printOnly, namesOnly) {
 
   process.stdout.write(`\n[gate] ${project.name} (${project.dir})\n`);
   const childEnv = gateChildEnv(project, process.env);
+  // Evidence by input closure (gate-evidence.mjs): has THIS closure — the step's declared
+  // input bytes at the pushed commit, the recipe, the resolved cargo env — already been
+  // gated, by whom, and when? REPORT-ONLY in this slice: the line is printed and the gate
+  // runs regardless. GATE_COMMIT is the commit being pushed (pre-push exports it); a human
+  // running `just gate` is asking about HEAD. Fail-open: an exception here is one line.
+  const gateCommit = (process.env.GATE_COMMIT || '').trim() || 'HEAD';
+  let evidence = { line: 'unavailable (evidence lookup threw)' };
+  try {
+    evidence = gateEvidence(project, { env: process.env, root: ROOT, commit: gateCommit, cargoEnv: cargoEnvOf(childEnv) });
+  } catch (error) {
+    evidence = { line: `unavailable (${String(error?.message || error).split('\n')[0]})` };
+  }
+  process.stdout.write(`[gate] ${project.name} evidence: ${evidence.line}\n`);
   const started = process.hrtime.bigint();
   const result = spawnSync('bash', [resolve(ROOT, 'genesis/orchestrator/run-local-gate.sh'), ...args], {
     cwd: ROOT,
@@ -210,6 +224,21 @@ function runProject(project, printOnly, namesOnly) {
   });
   const status = result.status ?? 1;
   const seconds = Number(process.hrtime.bigint() - started) / 1e9;
+  // The verdict is recorded against the closure — red too; a known-red closure is information.
+  if (evidence.key && evidence.buildRefBin) {
+    const put = recordEvidence(project, evidence.key, {
+      success: status === 0,
+      seconds,
+      commit: gateCommit,
+      buildRefBin: evidence.buildRefBin,
+      root: ROOT,
+      jobs: cargoEnvOf(childEnv).CARGO_BUILD_JOBS,
+    });
+    const note = put.status === 0
+      ? `recorded ${String(put.stdout || '').trim().slice(0, 16)}…`
+      : `not recorded (${String(put.stderr || '').trim().split('\n').pop() || `exit ${put.status}`})`;
+    process.stdout.write(`[gate] ${project.name} evidence: ${note}\n`);
+  }
   // Cycle time is observed here because this is the one place every gate runs.
   // The ceiling, the reviewer and its charter are declared in measures.yaml.
   recordCycle(project, seconds, status, { ...process.env, ...cargoEnvOf(childEnv) }, {
