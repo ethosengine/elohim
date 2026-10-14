@@ -422,6 +422,78 @@ pub trait ControllerCell: Send + Sync {
     }
 }
 
+/// A controller cell that remembers whether a call that writes this node's
+/// standing (its Human, the identity's authority) came back successful. A
+/// request can fail after such a call: its answer then says nothing about
+/// whether whom this node speaks for changed, and this does.
+pub struct MarkedCell<'a> {
+    cell: &'a dyn ControllerCell,
+    wrote: std::sync::atomic::AtomicBool,
+}
+
+impl<'a> MarkedCell<'a> {
+    pub fn new(cell: &'a dyn ControllerCell) -> Self {
+        Self {
+            cell,
+            wrote: std::sync::atomic::AtomicBool::new(false),
+        }
+    }
+
+    /// Whether a write to standing succeeded through this cell.
+    pub fn wrote(&self) -> bool {
+        self.wrote.load(std::sync::atomic::Ordering::SeqCst)
+    }
+
+    fn mark<T>(&self, done: Result<T, CellFailure>) -> Result<T, CellFailure> {
+        if done.is_ok() {
+            self.wrote.store(true, std::sync::atomic::Ordering::SeqCst);
+        }
+        done
+    }
+}
+
+#[async_trait]
+impl ControllerCell for MarkedCell<'_> {
+    fn agent(&self) -> String {
+        self.cell.agent()
+    }
+    async fn standing(&self) -> Result<CellStanding, CellFailure> {
+        self.cell.standing().await
+    }
+    async fn sign(&self, approval: &ApprovalRequest) -> Result<ApprovalProofs, CellFailure> {
+        self.cell.sign(approval).await
+    }
+    async fn bootstrap(&self, identity_root: &str) -> Result<(), CellFailure> {
+        self.mark(self.cell.bootstrap(identity_root).await)
+    }
+    async fn create_human(&self, human: &NewHuman) -> Result<(), CellFailure> {
+        self.mark(self.cell.create_human(human).await)
+    }
+    async fn my_human(&self) -> Result<Option<consent_grant::ExistingIdentity>, CellFailure> {
+        self.cell.my_human().await
+    }
+    async fn devices(
+        &self,
+        identity_root: &str,
+    ) -> Result<consent_grant::DevicesRead, CellFailure> {
+        self.cell.devices(identity_root).await
+    }
+    async fn affirm(&self, device: &consent_grant::StandingDevice) -> Result<(), CellFailure> {
+        self.cell.affirm(device).await
+    }
+    async fn sign_carrier(
+        &self,
+        kind: consent_grant::CarrierKind,
+        state: &str,
+        transport_id: &str,
+        challenge: &str,
+    ) -> Result<consent_grant::CarrierProof, CellFailure> {
+        self.cell
+            .sign_carrier(kind, state, transport_id, challenge)
+            .await
+    }
+}
+
 /// Where this node reads back the word its person signs in with, for
 /// [`consent_grant::identifier_claim`]. The word is not on the Human record
 /// (a sign-in word may be an address, and the record is public), so the node
@@ -994,6 +1066,52 @@ pub trait DeviceCell: Send + Sync {
     }
 }
 
+/// A device cell that remembers whether its enrollment was notarized
+/// (`MarkedCell`, for the asking device's side).
+pub struct MarkedDevice<'a> {
+    cell: &'a dyn DeviceCell,
+    wrote: std::sync::atomic::AtomicBool,
+}
+
+impl<'a> MarkedDevice<'a> {
+    pub fn new(cell: &'a dyn DeviceCell) -> Self {
+        Self {
+            cell,
+            wrote: std::sync::atomic::AtomicBool::new(false),
+        }
+    }
+
+    /// Whether an enrollment succeeded through this cell.
+    pub fn wrote(&self) -> bool {
+        self.wrote.load(std::sync::atomic::Ordering::SeqCst)
+    }
+}
+
+#[async_trait]
+impl DeviceCell for MarkedDevice<'_> {
+    async fn whoami(&self) -> Result<DeviceSelf, CellFailure> {
+        self.cell.whoami().await
+    }
+    async fn enroll(&self, enrollment: &Enrollment) -> Result<BindingReceipt, CellFailure> {
+        let done = self.cell.enroll(enrollment).await;
+        if done.is_ok() {
+            self.wrote.store(true, std::sync::atomic::Ordering::SeqCst);
+        }
+        done
+    }
+    async fn sign_carrier(
+        &self,
+        kind: consent_grant::CarrierKind,
+        state: &str,
+        transport_id: &str,
+        challenge: &str,
+    ) -> Result<consent_grant::CarrierProof, CellFailure> {
+        self.cell
+            .sign_carrier(kind, state, transport_id, challenge)
+            .await
+    }
+}
+
 /// What the terminal hands its own node to enroll: the request it made and what
 /// it collected for it.
 #[derive(Debug, Deserialize)]
@@ -1363,6 +1481,79 @@ pub(crate) mod tests {
         asked: Mutex<Vec<ApprovalRequest>>,
         pub(crate) bootstraps: Mutex<Vec<String>>,
         pub(crate) humans: Mutex<Vec<NewHuman>>,
+        /// When set, recording the authority fails.
+        pub(crate) bootstrap_fails: std::sync::atomic::AtomicBool,
+    }
+
+    fn beginning(name: &str) -> BeginInput {
+        serde_json::from_value(serde_json::json!({ "displayName": name })).unwrap()
+    }
+
+    #[tokio::test]
+    async fn a_write_that_fails_after_its_first_step_still_says_standing_changed() {
+        // The Human is created, then recording the authority fails: the
+        // request fails, and standing did change.
+        let cell = FakeCell::new(Ok(CellStanding::NoPerson));
+        cell.bootstrap_fails
+            .store(true, std::sync::atomic::Ordering::SeqCst);
+        let marked = MarkedCell::new(&cell);
+        assert!(begin_with(Some(&marked), beginning("Matthew"))
+            .await
+            .is_err());
+        assert_eq!(cell.humans.lock().unwrap().len(), 1);
+        assert!(marked.wrote());
+        // The whole of it succeeding says so too.
+        let cell = FakeCell::new(Ok(CellStanding::NoPerson));
+        let marked = MarkedCell::new(&cell);
+        assert!(begin_with(Some(&marked), beginning("Matthew"))
+            .await
+            .is_ok());
+        assert!(marked.wrote());
+        let cell = FakeCell::new(Ok(CellStanding::Unbootstrapped {
+            identity_root: IDENTITY.into(),
+        }));
+        let marked = MarkedCell::new(&cell);
+        let answer = bootstrap_identity(Some(&marked), &NoIdentifier, true).await;
+        assert_eq!(answer.status(), StatusCode::CREATED);
+        assert!(marked.wrote());
+    }
+
+    #[tokio::test]
+    async fn a_write_refused_before_it_wrote_says_nothing_changed() {
+        // A name that does not fit, an unreachable cell, an authority that
+        // could not be recorded, a caller not signed in, an identity already
+        // begun: nothing was written through the cell.
+        let cell = FakeCell::new(Ok(CellStanding::NoPerson));
+        let marked = MarkedCell::new(&cell);
+        assert!(begin_with(Some(&marked), beginning("")).await.is_err());
+        assert!(!marked.wrote());
+        let cell = FakeCell::new(Err(CellFailure::Unavailable("down".into())));
+        let marked = MarkedCell::new(&cell);
+        assert!(begin_with(Some(&marked), beginning("Matthew"))
+            .await
+            .is_err());
+        assert!(!marked.wrote());
+        let cell = FakeCell::new(Ok(CellStanding::Unbootstrapped {
+            identity_root: IDENTITY.into(),
+        }));
+        cell.bootstrap_fails
+            .store(true, std::sync::atomic::Ordering::SeqCst);
+        let marked = MarkedCell::new(&cell);
+        let answer = bootstrap_identity(Some(&marked), &NoIdentifier, true).await;
+        assert!(!answer.status().is_success());
+        assert!(!marked.wrote());
+        let marked = MarkedCell::new(&cell);
+        let answer = bootstrap_identity(Some(&marked), &NoIdentifier, false).await;
+        assert_eq!(answer.status(), StatusCode::UNAUTHORIZED);
+        assert!(!marked.wrote());
+        let cell = FakeCell::new(Ok(ready()));
+        let marked = MarkedCell::new(&cell);
+        assert!(begin_with(Some(&marked), beginning("Matthew"))
+            .await
+            .is_ok());
+        let answer = bootstrap_identity(Some(&marked), &NoIdentifier, true).await;
+        assert_eq!(answer.status(), StatusCode::OK);
+        assert!(!marked.wrote());
     }
 
     pub(crate) fn ready() -> CellStanding {
@@ -1385,6 +1576,7 @@ pub(crate) mod tests {
                 asked: Mutex::new(Vec::new()),
                 bootstraps: Mutex::new(Vec::new()),
                 humans: Mutex::new(Vec::new()),
+                bootstrap_fails: std::sync::atomic::AtomicBool::new(false),
             }
         }
     }
@@ -1398,6 +1590,14 @@ pub(crate) mod tests {
             self.standing.lock().unwrap().clone()
         }
         async fn bootstrap(&self, identity_root: &str) -> Result<(), CellFailure> {
+            if self
+                .bootstrap_fails
+                .load(std::sync::atomic::Ordering::SeqCst)
+            {
+                return Err(CellFailure::Unavailable(
+                    "the authority was not recorded".into(),
+                ));
+            }
             self.bootstraps.lock().unwrap().push(identity_root.into());
             *self.standing.lock().unwrap() = Ok(ready());
             Ok(())

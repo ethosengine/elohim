@@ -14163,23 +14163,40 @@ impl HttpServer {
             return Ok(self.signed_out_standing(speaks));
         }
         let cell = self.own_controller_cell();
-        let cell = cell.as_ref().map(|c| c as &dyn ControllerCell);
+        let marked = cell
+            .as_ref()
+            .map(|c| crate::services::device_consent::MarkedCell::new(c));
+        let cell = marked.as_ref().map(|c| c as &dyn ControllerCell);
         let names = self.identifier_source();
-        Ok(if bootstrap {
+        let answer = if bootstrap {
             bootstrap_identity(cell, &names, signed_in).await
         } else {
             identity_standing(cell, &names, signed_in).await
-        })
+        };
+        self.note_identity_write(marked.as_ref().is_some_and(|m| m.wrote()));
+        Ok(answer)
+    }
+
+    /// A write to this node's standing came back successful from its cell,
+    /// whatever the request as a whole goes on to answer: whom it speaks for
+    /// is read once the request is answered (`read_speaks_after_write`).
+    fn note_identity_write(&self, wrote: bool) {
+        if wrote {
+            crate::services::device_carrier::carrier().identity_changed();
+        }
     }
 
     /// After a write to this node's identity over its routes, read whom it
-    /// speaks for as the answer warrants (`Want::after_write`): now when the
-    /// write created something, no more than any request when it succeeded
-    /// without writing, and not at all when it was refused, so a refused
-    /// write sent again and again reads nothing.
+    /// speaks for as what happened warrants (`Want::after_write`): now when a
+    /// write to standing came back successful from the cell, whatever the
+    /// request then answered; no more than any request when it succeeded
+    /// without writing; and not at all when it was refused before writing,
+    /// so a refused write sent again and again reads nothing.
     async fn read_speaks_after_write(&self, answer: &Result<Response<Full<Bytes>>, StorageError>) {
+        use crate::services::device_carrier::{carrier, Want};
         let status = answer.as_ref().map_or(500, |a| a.status().as_u16());
-        if let Some(want) = crate::services::device_carrier::Want::after_write(status) {
+        let wrote = carrier().take_identity_changed();
+        if let Some(want) = Want::after_write(status, wrote) {
             self.read_speaks(want).await;
         }
     }
@@ -14268,11 +14285,17 @@ impl HttpServer {
             }
         }
         let cell = self.own_controller_cell();
-        let begun =
-            match begin_identity(cell.as_ref().map(|c| c as &dyn ControllerCell), &body).await {
-                Ok(begun) => begun,
-                Err(refused) => return Ok(*refused),
-            };
+        let marked = cell
+            .as_ref()
+            .map(|c| crate::services::device_consent::MarkedCell::new(c));
+        let begun = begin_identity(marked.as_ref().map(|c| c as &dyn ControllerCell), &body).await;
+        // Said before anything after it can fail: the session and the
+        // sign-in secret are this node's own, and standing is already written.
+        self.note_identity_write(marked.as_ref().is_some_and(|m| m.wrote()));
+        let begun = match begun {
+            Ok(begun) => begun,
+            Err(refused) => return Ok(*refused),
+        };
         let agent = cell
             .as_ref()
             .map(|c| c.agent())
@@ -14404,7 +14427,12 @@ impl HttpServer {
                 }));
                 continue;
             };
-            let outcome = reconcile(&cell, &declaration).await;
+            let marked = crate::services::device_consent::MarkedCell::new(&cell);
+            let outcome = reconcile(&marked, &declaration).await;
+            // A reconcile that wrote and then failed changed standing too.
+            if marked.wrote() && !matches!(outcome, Reconciled::Applied(_)) {
+                self.refresh_speaks_now().await;
+            }
             let mut detail = String::new();
             match &outcome {
                 Reconciled::Applied(begun) => {
@@ -15262,7 +15290,10 @@ impl HttpServer {
             .await
             .map_err(|e| StorageError::Internal(format!("Failed to read body: {e}")))?
             .to_bytes();
-        Ok(device_enroll(cell, &body).await)
+        let marked = cell.map(crate::services::device_consent::MarkedDevice::new);
+        let answer = device_enroll(marked.as_ref().map(|c| c as &dyn DeviceCell), &body).await;
+        self.note_identity_write(marked.as_ref().is_some_and(|m| m.wrote()));
+        Ok(answer)
     }
 
     /// POST /auth/consent/agree — the signed-in person agrees, and this node's

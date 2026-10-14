@@ -353,23 +353,19 @@ impl PendingAsks {
         self.inner.lock().unwrap_or_else(|e| e.into_inner())
     }
 
-    /// List `ask` from `source`, or say why not. `me` is this node's agent
-    /// key, when it is known; `speaks` is whom this node speaks for. A node
-    /// that speaks for nobody, or cannot yet say, lists nothing.
-    pub fn admit(
+    /// Whether `ask` from `source` could be listed here, by every check that
+    /// does not need to know whom this node speaks for and does not depend on
+    /// how full the list is: the request fits the policy, the device signed
+    /// the ask from `source`, its ceremony is not already decided, and it is
+    /// for this approver when it names one. Lists nothing.
+    pub fn admissible(
         &self,
-        ask: Ask,
+        ask: &Ask,
         source: &str,
         me: Option<&str>,
-        speaks: &Speaks,
         policy: &GrantPolicy,
         now_micros: i64,
-    ) -> Result<Listed, Dropped> {
-        match speaks {
-            Speaks::Person(_) => {}
-            Speaks::Nobody => return Err(Dropped::SpeaksForNobody),
-            Speaks::Unknown => return Err(Dropped::StandingUnknown),
-        }
+    ) -> Result<AdmittedRequest, Dropped> {
         let admitted = admit_request(&ask.request, policy).map_err(Dropped::Malformed)?;
         // Adversarial review, high 4: the ask is the device's own, from here.
         if !ask.signed_from(source) {
@@ -394,6 +390,27 @@ impl PendingAsks {
                 return Err(Dropped::NotForThisApprover);
             }
         }
+        Ok(admitted)
+    }
+
+    /// List `ask` from `source`, or say why not. `me` is this node's agent
+    /// key, when it is known; `speaks` is whom this node speaks for. A node
+    /// that speaks for nobody, or cannot yet say, lists nothing.
+    pub fn admit(
+        &self,
+        ask: Ask,
+        source: &str,
+        me: Option<&str>,
+        speaks: &Speaks,
+        policy: &GrantPolicy,
+        now_micros: i64,
+    ) -> Result<Listed, Dropped> {
+        match speaks {
+            Speaks::Person(_) => {}
+            Speaks::Nobody => return Err(Dropped::SpeaksForNobody),
+            Speaks::Unknown => return Err(Dropped::StandingUnknown),
+        }
+        let admitted = self.admissible(&ask, source, me, policy, now_micros)?;
         let mut inner = self.lock();
         // bounded-work: one pass over at most MAX_PENDING entries.
         inner.asks.retain(|_, p| now_micros < p.expires_at_micros());
