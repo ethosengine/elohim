@@ -317,35 +317,40 @@ def _raw_field_lines(raw: str) -> dict[str, list[str]]:
     return fields
 
 
-_DELTA_LINE = re.compile(r"^\s*DELTA (20\d{2}-\d{2}-\d{2})")
+# A DELTA line names its day and, when a day holds several, a letter after it (`2026-10-13c`):
+# 268 atoms entries carry one as of 2026-10-14. The letter is part of the ordering.
+_DELTA_LINE = re.compile(r"^\s*DELTA (20\d{2}-\d{2}-\d{2})([a-z]?)")
 
 
 def delta_entries(body: str) -> list[tuple[str, str]]:
-    """A ledger body as its dated DELTA entries, `[(date, text)]` in file order. Text before the
-    first DELTA line belongs to no entry (a declaration note, a preamble) and is not an entry."""
+    """A ledger body as its dated DELTA entries, `[(stamp, text)]` in file order, where `stamp`
+    is the date plus its optional letter. Text before the first DELTA line belongs to no entry
+    (a declaration note, a preamble) and is not an entry."""
     entries: list[tuple[str, str]] = []
-    cur_date: str | None = None
+    cur_stamp: str | None = None
     cur: list[str] = []
     for line in body.split("\n"):
         m = _DELTA_LINE.match(line)
         if m:
-            if cur_date is not None:
-                entries.append((cur_date, "\n".join(cur).strip("\n")))
-            cur_date, cur = m.group(1), [line]
-        elif cur_date is not None:
+            if cur_stamp is not None:
+                entries.append((cur_stamp, "\n".join(cur).strip("\n")))
+            cur_stamp, cur = m.group(1) + m.group(2), [line]
+        elif cur_stamp is not None:
             cur.append(line)
-    if cur_date is not None:
-        entries.append((cur_date, "\n".join(cur).strip("\n")))
+    if cur_stamp is not None:
+        entries.append((cur_stamp, "\n".join(cur).strip("\n")))
     return entries
 
 
 def newest_delta(body: str) -> str:
-    """The entry the register projects: the DELTA with the newest date, the later one in the
-    file on a tie. A body with no DELTA line is projected whole — it is short by construction."""
+    """The entry the register projects: the DELTA with the newest date, then the latest letter
+    on that day (`2026-10-13c` after `2026-10-13b` after `2026-10-13`), then the later one in
+    the file. Atoms are not reliably ordered either way, so position is only the last resort.
+    A body with no DELTA line is projected whole — it is short by construction."""
     entries = delta_entries(body)
     if not entries:
         return body
-    best = max(range(len(entries)), key=lambda i: (entries[i][0], i))
+    best = max(range(len(entries)), key=lambda i: (entries[i][0][:10], entries[i][0][10:], i))
     return entries[best][1]
 
 

@@ -122,6 +122,18 @@ def test_register_projects_the_newest_delta_by_date_with_a_fingerprint():
                                   "    evidence-entries:")) for ln in changed), changed
 
 
+def test_same_day_letters_order_deltas_before_file_position():
+    """`2026-10-13c` is newer than `2026-10-13b` is newer than `2026-10-13`, wherever each sits
+    in the atom — the idle-is-free atom carries 10-13 at its top, 10-13c second and 10-13b
+    last, and the register must name c (found by a peer session's Codex read, 2026-10-14)."""
+    body = ("DELTA 2026-10-13 (plain): first of the day.\n\n"
+            "DELTA 2026-10-13c (third): newest of the day.\n\n"
+            "DELTA 2026-10-12e (yesterday): older.\n\n"
+            "DELTA 2026-10-13b (second): middle of the day.\n")
+    assert eh.newest_delta(body) == "DELTA 2026-10-13c (third): newest of the day."
+    assert [d for d, _ in eh.delta_entries(body)] == ["2026-10-13", "2026-10-13c", "2026-10-12e", "2026-10-13b"]
+
+
 def test_a_body_without_deltas_projects_whole():
     assert eh.newest_delta("2026-08-27: declared.") == "2026-08-27: declared."
     assert eh.delta_entries("no ledger here") == []
