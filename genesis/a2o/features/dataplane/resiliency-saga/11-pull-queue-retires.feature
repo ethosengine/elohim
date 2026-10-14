@@ -85,10 +85,10 @@
 #      or after its hold (backstop — 6h, then 12h, then 24h per consecutive
 #      retirement, every due pin re-admitted by the next reconcile tick; a
 #      second, still-unscenario'd arm of the same guarantee;
-#      see the station below the re-admission scenario). A read-miss for the
-#      head shortens the hold without resetting the doubling: to the next tick
-#      when the demand auto-pin admits the read, to 6h otherwise. A pin its
-#      person removed is restored only by pinning it again.
+#      see the station below the re-admission scenario). A read-miss the
+#      demand auto-pin admits re-activates the pin at once, as it always did;
+#      one it does not admit caps the hold at 6h. Neither resets the doubling.
+#      A pin its person removed is restored only by pinning it again.
 #      Both directions are published as distinct series
 #      (`elohim_acquisition_pin_retirements_total` with `reason` = exhausted |
 #      readmitted), so an operator can always tell "the queue is caught up

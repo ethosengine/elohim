@@ -23,27 +23,18 @@ consecutiveRetirements?: number,
  */
 retiredAt?: string, 
 /**
- * Earliest time a `retired` pin is re-admitted for a re-probe (RFC 3339):
- * `retiredAt` plus the hold for its rung (6 h, 12 h, then 24 h). A read
- * shortens it: to `retiredAt` itself — already past, due on the next
- * reconcile tick — if `heldDemandCount > 0`, or to `retiredAt` + 6 h if
- * `readSinceRetired`. Every pin past it is re-admitted by the next
- * reconcile tick, so it is a maximum wait up to one tick. Absent unless
- * `status` is `retired`. A peer inventory naming the head re-admits
- * sooner.
+ * Earliest time a `retired` pin is re-admitted for a re-probe (RFC 3339,
+ * UTC): `retiredAt` plus the hold for its rung (6 h, 12 h, then 24 h), or
+ * `retiredAt` + 6 h if `readSinceRetired`. Every pin past it is
+ * re-admitted by the next reconcile tick, so it is a maximum wait up to
+ * one tick. Absent unless `status` is `retired`. A peer inventory naming
+ * the head, or a read the demand auto-pin admits, re-activates it sooner.
  */
 nextReadmitAt?: string, 
 /**
- * Read-misses the demand auto-pin admitted while the pin was `retired`
- * or `removed`. On a retired pin they make it due at once; on a removed
- * pin they are only counted (only an explicit re-pin restores a removed
- * pin). Cleared on re-admission.
- */
-heldDemandCount?: number, 
-/**
- * True when a read-miss the auto-pin did not admit (throttled, window
- * full, ceiling) named the pin while it was retired: its hold is capped
- * at 6 h. Cleared on re-admission.
+ * True when a read-miss the demand auto-pin did not admit (throttled,
+ * window full, ceiling) named the pin while it was retired: its hold is
+ * capped at 6 h. Cleared on re-activation.
  */
 readSinceRetired?: boolean, 
 /**

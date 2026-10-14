@@ -269,7 +269,6 @@ pub fn run_hold_pass(conn: &mut diesel::SqliteConnection, now: Now) -> HoldPass 
             head_ref = %pin.head_ref,
             consecutive_retirements = pin.consecutive_retirements,
             cause = readmit_cause(*cause).label(),
-            demanded_while_held = pin.held_demand_count,
             "acquisition pin RE-ADMITTED for a re-probe — retirement is a hold, never a delete"
         );
     }
@@ -285,16 +284,10 @@ pub fn run_hold_pass(conn: &mut diesel::SqliteConnection, now: Now) -> HoldPass 
         );
     }
     let count = |cause| pass.readmitted.iter().filter(|(_, c)| *c == cause).count() as u64;
-    let (by_hold, by_demand, by_read) = (
-        count(ReadmitCause::Hold),
-        count(ReadmitCause::Demand),
-        count(ReadmitCause::Read),
-    );
+    let (by_hold, by_read) = (count(ReadmitCause::Hold), count(ReadmitCause::Read));
     let settled = pass.settled.len() as u64;
-    let reprobed = by_hold + by_demand + by_read;
-    crate::metrics::inc_acquisition_pin_retirements("readmitted", reprobed + settled);
+    crate::metrics::inc_acquisition_pin_retirements("readmitted", by_hold + by_read + settled);
     crate::metrics::inc_acquisition_pin_readmissions(PinReadmitCause::Hold, by_hold);
-    crate::metrics::inc_acquisition_pin_readmissions(PinReadmitCause::Demand, by_demand);
     crate::metrics::inc_acquisition_pin_readmissions(PinReadmitCause::Read, by_read);
     crate::metrics::inc_acquisition_pin_readmissions(PinReadmitCause::Fetched, settled);
     crate::metrics::inc_acquisition_pin_backoff_resets(
@@ -312,16 +305,14 @@ pub fn run_hold_pass(conn: &mut diesel::SqliteConnection, now: Now) -> HoldPass 
         PinHoldSkip::ClockUnreadable,
         pass.clocks_repaired.len() as u64,
     );
-    if reprobed + settled > 0 {
-        publish_retired_pin_gauge(conn);
-    }
+    // The pass counted the retired set once; the gauge reads that count.
+    crate::metrics::set_acquisition_pins_retired(pass.held as u64);
     pass
 }
 
 fn readmit_cause(cause: ReadmitCause) -> PinReadmitCause {
     match cause {
         ReadmitCause::Hold => PinReadmitCause::Hold,
-        ReadmitCause::Demand => PinReadmitCause::Demand,
         ReadmitCause::Read => PinReadmitCause::Read,
     }
 }
@@ -431,7 +422,11 @@ pub fn retire_exhausted_pins(
     // "no pin has ever been re-admitted" is distinguishable from "the emitter
     // never ran".
     crate::metrics::inc_acquisition_pin_retirements("readmitted", 0);
-    publish_retired_pin_gauge(conn);
+    // The hold pass at the top of this tick published the retired count; it
+    // only moved if something retired.
+    if !retired.is_empty() {
+        publish_retired_pin_gauge(conn);
+    }
     retired.len()
 }
 
@@ -1580,11 +1575,13 @@ mod tests {
         assert_eq!(third.to_dispatch.len(), 1);
     }
 
-    /// The ordering the earlier test avoided: an inventory names the head
-    /// BEFORE any reconcile has run since the retirement, so the pin's
-    /// exhausted tracker is still in memory when it comes back.
+    /// An inventory names the head BEFORE any reconcile has run since the
+    /// retirement, so the pin's exhausted tracker is still in memory. As
+    /// before the ladder, the tracker is kept: the next reconcile fetches
+    /// nothing and retires the pin again. Named once that tracker is gone, it
+    /// gets a whole budget — again as before.
     #[tokio::test]
-    async fn an_inventory_right_after_retirement_gets_a_fresh_budget_not_a_second_retirement() {
+    async fn an_inventory_right_after_retirement_retires_it_again_without_a_fetch_as_before() {
         let pool = crate::test_util::test_pool();
         let acq = AcquisitionState::new();
         let p = pin(&pool, "named-next");
@@ -1592,11 +1589,7 @@ mod tests {
         fail_until_retired(&pool, &acq, t0(), first).await;
         let retired = row(&pool, p.id);
         assert_eq!(retired.status, "retired");
-        assert_eq!(
-            acq.exhausted_pins().await,
-            vec![(p.id, retired.round)],
-            "the exhausted tracker is still there — no reconcile has dropped it"
-        );
+        assert_eq!(acq.exhausted_pins().await, vec![(p.id, retired.round)]);
 
         // The inventory handler both transports call.
         let replication = crate::p2p::replication::ReplicationState::new();
@@ -1612,51 +1605,59 @@ mod tests {
             (named.status.as_str(), named.consecutive_retirements),
             ("active", 0)
         );
-        assert_eq!(named.round, retired.round + 1);
+        assert_eq!(named.round, retired.round, "no new round");
 
-        // The very next reconcile: dispatched with a fresh budget, not retired.
+        // The next reconcile: the exhausted tracker is kept, nothing is
+        // fetched, and the pin retires again — onto the first rung, the
+        // naming having reset the ladder.
         let next = tick(&pool, &acq, t0() + Duration::minutes(1)).await;
-        assert_eq!(next.to_dispatch, vec!["named-next".to_string()]);
-        assert_eq!(next.retired, 0);
-        assert_eq!(row(&pool, p.id).status, "active");
-        assert_eq!(acq.per_pin().await[0].attempts_used, Some(0));
+        assert!(next.to_dispatch.is_empty(), "not one extra fetch");
+        assert_eq!(next.retired, 1);
+        let again = row(&pool, p.id);
+        assert_eq!(
+            (again.status.as_str(), again.consecutive_retirements),
+            ("retired", 1)
+        );
 
-        // And it takes the whole budget again to retire it — onto the FIRST rung.
-        let rounds = fail_until_retired(&pool, &acq, t0() + Duration::minutes(1), next).await;
+        // A reconcile drops the tracker; named after that, the pin gets a
+        // whole budget.
+        tick(&pool, &acq, t0() + Duration::minutes(2)).await;
+        inventory_received(Some(&pool), &replication, vec!["named-next".to_string()]).await;
+        let fresh = tick(&pool, &acq, t0() + Duration::minutes(3)).await;
+        assert_eq!(fresh.to_dispatch, vec!["named-next".to_string()]);
+        let rounds = fail_until_retired(&pool, &acq, t0() + Duration::minutes(3), fresh).await;
         assert_eq!(rounds, retry_budget_for_peers(PEERS));
-        assert_eq!(row(&pool, p.id).consecutive_retirements, 1);
     }
 
     /// A person re-pins a RETIRED pin before any reconcile has run since the
-    /// retirement. The re-pin opens a new round: neither the exhaustion
-    /// snapshot taken before it nor the tracker still in memory retires it.
+    /// retirement. As before the ladder, the re-pin keeps the exhausted
+    /// tracker: the next reconcile fetches nothing and retires it again, one
+    /// rung up.
     #[tokio::test]
-    async fn a_repin_of_a_retired_pin_is_not_retired_by_the_exhaustion_that_preceded_it() {
+    async fn a_repin_before_the_next_reconcile_is_retired_again_without_a_fetch_as_before() {
         let pool = crate::test_util::test_pool();
         let acq = AcquisitionState::new();
         let p = pin(&pool, "repinned");
         let first = tick(&pool, &acq, t0()).await;
         fail_until_retired(&pool, &acq, t0(), first).await;
         assert_eq!(row(&pool, p.id).status, "retired");
-        let stale = acq.exhausted_pins().await;
-        assert_eq!(stale, vec![(p.id, p.round)]);
+        assert_eq!(acq.exhausted_pins().await, vec![(p.id, p.round)]);
 
         pin(&pool, "repinned");
-        let retired = retire_exhausted_pins(&mut pool.get().expect("conn"), &stale, t0());
+        let repinned = row(&pool, p.id);
         assert_eq!(
-            retired, 0,
-            "a stale snapshot cannot retire a re-activated pin"
+            (repinned.status.as_str(), repinned.round),
+            ("active", p.round)
         );
 
         let after = tick(&pool, &acq, t0() + Duration::minutes(1)).await;
-        assert_eq!(after.retired, 0);
-        assert_eq!(after.to_dispatch, vec!["repinned".to_string()]);
+        assert!(after.to_dispatch.is_empty(), "not one extra fetch");
+        assert_eq!(after.retired, 1);
         let r = row(&pool, p.id);
         assert_eq!(
             (r.status.as_str(), r.consecutive_retirements),
-            ("active", 1)
+            ("retired", 2)
         );
-        assert_eq!(r.round, p.round + 1);
     }
 
     /// A client that re-asserts an ACTIVE, unfillable pin on every tick does
@@ -1765,13 +1766,15 @@ mod tests {
             .record_demand(&mut pool.get().expect("conn"), "read-while-held")
             .expect("demand");
         assert!(
-            demanded.is_none(),
-            "the read does not re-activate the pin itself"
+            demanded.is_some(),
+            "re-activated in the read path, as before"
         );
-        assert_eq!(row(&pool, read.id).status, "retired");
+        assert_eq!(row(&pool, read.id).status, "active");
 
+        // The very next reconcile dispatches it; the hold pass has nothing
+        // left to do for it.
         let next = tick(&pool, &acq, retired_at + Duration::minutes(2)).await;
-        assert_eq!(next.readmitted, 1);
+        assert_eq!(next.readmitted, 0);
         assert_eq!(next.to_dispatch, vec!["read-while-held".to_string()]);
         assert_eq!(
             row(&pool, read.id).consecutive_retirements,
@@ -1842,10 +1845,7 @@ mod tests {
         }
         let marked = row(&pool, p.id);
         assert_eq!(marked.status, "retired");
-        assert_eq!(
-            marked.held_demand_count, 0,
-            "not admitted: no demand recorded"
-        );
+        assert_eq!(marked.status, "retired", "not admitted: not re-activated");
         assert_eq!(
             marked.read_since_retired, 1,
             "but the row knows it was read"
@@ -1915,7 +1915,7 @@ mod tests {
         }
         for id in &ids[..4] {
             let r = row(&pool, *id);
-            assert_eq!((r.held_demand_count, r.read_since_retired), (0, 1));
+            assert_eq!((r.status.as_str(), r.read_since_retired), ("retired", 1));
         }
         // A new head past the window is still refused outright.
         assert!(window_full
@@ -1930,36 +1930,36 @@ mod tests {
         );
 
         // The ceiling. A window with room, a ceiling of two active rows, one
-        // already active: the first read of a retired head is admitted (dev
-        // would re-activate it: 1 < 2); the second finds the ceiling reached
-        // by the first — counted before it is re-admitted — and is not.
+        // already active: the first read of a retired head is admitted and
+        // re-activates it at once (1 < 2), as it always did; the second finds
+        // the ceiling reached and only marks its row.
         let at_ceiling = crate::services::demand_autopin::DemandAutoPin::with_limits(
             true,
             std::time::Duration::from_secs(300),
             16,
             2,
         );
-        for head in &heads[4..] {
-            assert!(at_ceiling
-                .record_demand(&mut pool.get().expect("conn"), head)
-                .expect("demand")
-                .is_none());
-        }
+        assert!(at_ceiling
+            .record_demand(&mut pool.get().expect("conn"), &heads[4])
+            .expect("demand")
+            .is_some());
+        assert!(at_ceiling
+            .record_demand(&mut pool.get().expect("conn"), &heads[5])
+            .expect("demand")
+            .is_none());
         let (admitted, refused) = (row(&pool, ids[4]), row(&pool, ids[5]));
         assert_eq!(
-            (admitted.held_demand_count, admitted.read_since_retired),
-            (1, 0)
+            (admitted.status.as_str(), admitted.consecutive_retirements),
+            ("active", 3)
         );
         assert_eq!(
-            (refused.held_demand_count, refused.read_since_retired),
-            (0, 1)
+            (refused.status.as_str(), refused.read_since_retired),
+            ("retired", 1)
         );
-
-        // The next tick: only the admitted read is re-admitted. The active set
-        // is at the ceiling, not over it.
+        // The active set is at the ceiling, not over it.
+        assert_eq!(active(&pool), 2);
         let next = tick(&pool, &acq, t0() + Duration::minutes(1)).await;
-        assert_eq!(next.readmitted, 1);
-        assert_eq!(row(&pool, ids[4]).status, "active");
+        assert_eq!(next.readmitted, 0);
         assert_eq!(active(&pool), 2);
 
         // Nothing else before the 6 h mark…

@@ -238,12 +238,9 @@ impl DemandAutoPin {
         }
         // Accumulation ceiling: the window budget bounds the RATE of new pins;
         // this bounds the TOTAL active set (pins have no TTL, and both 60s
-        // reconcile loops scan every active row each tick). Demand recorded on
-        // a retired pin in the last few minutes is active as of the next
-        // tick, so it counts. One cheap COUNT on the ≤once-per-id-per-window admitted path
-        // only.
-        let active_rows =
-            acquisition_pins::count_active_or_demanded_pins(conn, chrono::Utc::now())?;
+        // reconcile loops scan every active row each tick). One cheap COUNT
+        // on the ≤once-per-id-per-window admitted path only.
+        let active_rows = acquisition_pins::count_active_pins(conn)?;
         if active_rows >= self.max_active_rows {
             tracing::warn!(
                 active_rows,
@@ -266,19 +263,21 @@ impl DemandAutoPin {
             chrono::Utc::now(),
         )?;
         Ok(match demand {
-            DemandPin::Authored(pin) | DemandPin::AlreadyActive(pin) => Some(pin),
-            // Recorded. The next reconcile tick re-admits it (and counts it,
-            // `readmissions_total{cause="demand"}`). Not this call — the tick
-            // is the one bounded door back to `active`.
-            DemandPin::Demanded(pin) => {
+            DemandPin::Authored(pin) | DemandPin::Refreshed(pin) => Some(pin),
+            // Re-activated here, in the read path, as it always was.
+            DemandPin::Reactivated(pin) => {
+                crate::metrics::inc_acquisition_pin_retirements("readmitted", 1);
+                crate::metrics::inc_acquisition_pin_readmissions(
+                    crate::metrics::PinReadmitCause::Demand,
+                    1,
+                );
                 tracing::debug!(
                     content_id,
                     pin_id = pin.id,
                     consecutive_retirements = pin.consecutive_retirements,
-                    held_demand_count = pin.held_demand_count,
-                    "demand on a retired pin recorded; the next reconcile re-admits it"
+                    "admitted read re-activated a retired pin; rung kept"
                 );
-                None
+                Some(pin)
             }
             // A person's removal: not revived. A read for this content is
             // served only by the read path's foreground fetch.
@@ -291,7 +290,7 @@ impl DemandAutoPin {
                     content_id,
                     pin_id = pin.id,
                     status = %pin.status,
-                    "demand on a removed pin counted; not revived"
+                    "read of a removed pin; not revived"
                 );
                 None
             }
@@ -525,19 +524,21 @@ mod tests {
     // missing id put a retired pin straight back into the pull queue. Now the
     // read is recorded; the reconcile tick re-admits the retired pin on its
     // next pass, and the removed pin never (only an explicit re-pin does).
+    // An admitted read re-activates a RETIRED pin at once, as the upsert it
+    // used to be did — keeping its rung. A pin its person REMOVED stays
+    // removed: only an explicit re-pin restores it (operator decision,
+    // 2026-10-14).
     #[test]
-    fn demand_does_not_itself_reactivate_a_retired_or_removed_pin() {
+    fn demand_reactivates_a_retired_pin_and_leaves_a_removed_one() {
         let pool = test_pool();
         let mut conn = pool.get().expect("conn");
         let autopin = DemandAutoPin::new(true, Duration::from_secs(0));
-        let app = crate::db::AppContext::default_lamad();
 
         let retired = autopin
             .record_demand(&mut conn, "epr:nobody-has-it")
             .unwrap()
             .expect("first miss authors the pin");
-        let long_ago = chrono::Utc::now() - chrono::Duration::days(3);
-        acquisition_pins::retire_pin(&mut conn, retired.id, retired.round, long_ago)
+        acquisition_pins::retire_pin(&mut conn, retired.id, retired.round, chrono::Utc::now())
             .unwrap()
             .expect("retired");
         let removed = autopin
@@ -546,42 +547,19 @@ mod tests {
             .expect("first miss authors the pin");
         acquisition_pins::set_pin_status(&mut conn, removed.id, "removed").unwrap();
 
-        for _ in 0..2 {
-            assert!(autopin
-                .record_demand(&mut conn, "epr:nobody-has-it")
-                .unwrap()
-                .is_none());
-            assert!(autopin
-                .record_demand(&mut conn, "epr:unpinned")
-                .unwrap()
-                .is_none());
-        }
-
-        assert!(acquisition_pins::list_active_pins(&mut conn)
+        let back = autopin
+            .record_demand(&mut conn, "epr:nobody-has-it")
             .unwrap()
-            .is_empty());
-        let mut row = |id| {
-            acquisition_pins::get_pin_by_id(&mut conn, id)
-                .unwrap()
-                .unwrap()
-        };
-        let (retired_row, removed_row) = (row(retired.id), row(removed.id));
+            .expect("re-activated");
+        assert_eq!(back.id, retired.id);
         assert_eq!(
-            (retired_row.status.as_str(), retired_row.held_demand_count),
-            ("retired", 2)
+            (back.status.as_str(), back.consecutive_retirements),
+            ("active", 1)
         );
-        assert_eq!(
-            (removed_row.status.as_str(), removed_row.held_demand_count),
-            ("removed", 2)
-        );
-
-        // The tick's hold pass is what acts on the counted demand: the read
-        // pin comes back, the removed one never does.
-        let pass =
-            acquisition_pins::retired_hold_pass(&mut conn, &app, chrono::Utc::now()).unwrap();
-        let back: Vec<i32> = pass.readmitted.iter().map(|(p, _)| p.id).collect();
-        assert!(back.contains(&retired.id));
-        assert!(!back.contains(&removed.id));
+        assert!(autopin
+            .record_demand(&mut conn, "epr:unpinned")
+            .unwrap()
+            .is_none());
         let removed_row = acquisition_pins::get_pin_by_id(&mut conn, removed.id)
             .unwrap()
             .unwrap();

@@ -10703,9 +10703,9 @@ impl HttpServer {
                 // here. Non-fatal: the read path continues regardless.
                 //
                 // A head whose pin is RETIRED: if the auto-pin admits this read
-                // the demand is recorded and the next reconcile tick re-admits
-                // the pin; if it does not (throttled, window full, ceiling)
-                // the row is only marked as read, which caps its hold at 6 h.
+                // the pin is re-activated here, as it always was (its rung is
+                // kept); if it does not (throttled, window full, ceiling) the
+                // row is only marked as read, which caps its hold at 6 h.
                 // A head whose pin was REMOVED stays removed: only an explicit
                 // re-pin (`POST /api/v1/pins`) restores a removed pin — an
                 // operator decision of 2026-10-14. This read then has only the
@@ -17914,7 +17914,6 @@ fn pin_to_view(p: db::models::AcquisitionPin) -> elohim_views::acquisition::PinV
         updated_at: p.updated_at,
         consecutive_retirements: Some(p.consecutive_retirements),
         retired_at: p.retired_at,
-        held_demand_count: Some(p.held_demand_count),
         read_since_retired: Some(p.read_since_retired != 0),
         last_outcome: p.last_outcome,
     }
@@ -23441,7 +23440,6 @@ mod session_exchange_tests {
         // 24 h on the third rung.
         assert_eq!(pin["nextReadmitAt"], "2026-10-15T08:00:00Z");
         assert_eq!(pin["lastOutcome"], "exhausted");
-        assert_eq!(pin["heldDemandCount"], 0);
         assert_eq!(pin["readSinceRetired"], false);
 
         // A read the auto-pin did not admit: the hold is capped at 6 h.
@@ -23459,7 +23457,7 @@ mod session_exchange_tests {
         assert_eq!(pin["readSinceRetired"], true);
         assert_eq!(pin["nextReadmitAt"], "2026-10-14T14:00:00Z");
 
-        // Somebody reads it: due on the next tick, reported as already past.
+        // An admitted read: re-activated at once, as before the ladder.
         {
             let mut conn = server.get_diesel_conn().expect("conn");
             db::acquisition_pins::record_demand_pin(
@@ -23476,9 +23474,11 @@ mod session_exchange_tests {
             .expect("demand");
         }
         let pin = listed_pin(&server);
-        assert_eq!(pin["heldDemandCount"], 1);
+        assert_eq!(pin["status"], "active");
+        assert_eq!(pin["consecutiveRetirements"], 3, "the rung is kept");
         assert_eq!(pin["retiredAt"], "2026-10-14T08:00:00Z");
-        assert_eq!(pin["nextReadmitAt"], "2026-10-14T08:00:00Z");
+        // Only a retired pin has a deadline.
+        assert!(pin["nextReadmitAt"].is_null());
     }
 
     // The write path strips `epr:` (the reconcile loop joins on the bare content

@@ -6305,7 +6305,7 @@ impl PinBackoffReset {
 pub enum PinReadmitCause {
     /// Its own hold elapsed (the backoff ladder).
     Hold,
-    /// A read the demand auto-pin admitted named it while it was held.
+    /// A read the demand auto-pin admitted re-activated it, in the read path.
     Demand,
     /// A read the auto-pin did not admit marked it, and the first rung passed.
     Read,

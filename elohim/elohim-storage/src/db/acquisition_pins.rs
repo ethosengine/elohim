@@ -106,13 +106,10 @@ fn stamp(now: chrono::DateTime<chrono::Utc>) -> String {
 /// that exhausts again steps the ladder from where it stood. A read-miss is not
 /// this path: see [`record_demand_pin`].
 ///
-/// A re-pin that RE-ACTIVATES the pin (it was `retired`, `removed` or
-/// `paused`) bumps `round`: the in-memory retry state is discarded at the next
-/// reconcile, and a retirement computed from an exhaustion that preceded the
-/// re-pin no longer matches the row. A re-pin of a pin that is already
-/// `active` does not — a client re-asserting the same want every minute must
-/// not hand an unfillable pin a fresh retry budget each time and keep it from
-/// ever retiring.
+/// A re-pin never opens a new `round`: as before the ladder, the pin keeps
+/// whatever retry state its tracker holds — a re-pin that lands before the
+/// reconcile which drops an exhausted tracker is retired again by it without a
+/// fetch, and a client re-asserting an active pin cannot renew its budget.
 ///
 /// Timestamps are always computed in Rust via `current_timestamp()` so every
 /// row in the table uses the same ISO 8601 `YYYY-MM-DDTHH:MM:SSZ` format.
@@ -141,13 +138,7 @@ pub fn upsert_pin(
             pins::closure_rule_json.eq(new.closure_rule_json.clone()),
             pins::priority.eq(new.priority),
             pins::status.eq("active"),
-            pins::held_demand_count.eq(0),
             pins::read_since_retired.eq(0),
-            // The row's status BEFORE this write: SQLite evaluates every SET
-            // expression against the existing row.
-            pins::round.eq(diesel::dsl::sql::<diesel::sql_types::Integer>(
-                "round + (status <> 'active')",
-            )),
             pins::updated_at.eq(&now),
         ))
         .execute(conn)?;
@@ -171,32 +162,6 @@ pub fn list_active_pins(conn: &mut SqliteConnection) -> QueryResult<Vec<Acquisit
 pub fn count_active_pins(conn: &mut SqliteConnection) -> QueryResult<i64> {
     pins::acquisition_pins
         .filter(pins::status.eq("active"))
-        .count()
-        .get_result(conn)
-}
-
-/// How long recorded demand on a retired pin counts toward the demand
-/// auto-pin's ceiling. The next reconcile pass re-admits it, so it only ever
-/// needs to cover one pass; five minutes is five default ticks. Past it the
-/// demand stops counting even if passes keep failing, so a broken pass cannot
-/// wedge the ceiling.
-pub const RECENT_DEMAND: chrono::Duration = chrono::Duration::minutes(5);
-
-/// Active pins plus retired pins with admitted demand recorded in the last
-/// [`RECENT_DEMAND`] — the latter are active as of the next reconcile pass.
-/// The demand auto-pin checks its ceiling against this, so reads cannot queue
-/// more re-activations than the ceiling has room for (before the ladder each
-/// admitted read re-activated at once and was counted by the next read's
-/// check).
-pub fn count_active_or_demanded_pins(conn: &mut SqliteConnection, now: Now) -> QueryResult<i64> {
-    let since = stamp(now - RECENT_DEMAND);
-    pins::acquisition_pins
-        .filter(
-            pins::status.eq("active").or(pins::status
-                .eq("retired")
-                .and(pins::held_demand_count.gt(0))
-                .and(pins::updated_at.ge(since))),
-        )
         .count()
         .get_result(conn)
 }
@@ -363,9 +328,6 @@ pub fn retire_pin(
 pub enum ReadmitCause {
     /// Its own hold ([`pin_hold`]) elapsed.
     Hold,
-    /// Its own hold had not elapsed, but a read the demand auto-pin admitted
-    /// named it since it retired.
-    Demand,
     /// Its own hold had not elapsed, but a read the auto-pin did not admit
     /// marked it, and the first rung has.
     Read,
@@ -391,12 +353,14 @@ pub struct HoldPass {
 ///
 /// A row is due when `now` is past its `readmit_after`, the deadline every
 /// writer of a retired row keeps current: retirement sets it to the end of the
-/// pin's own hold ([`pin_hold`]: 6 h, 12 h, then 24 h); an admitted read
-/// ([`record_demand_pin`]) sets it to the retirement time, so the next pass
-/// takes it; a read that was not admitted ([`mark_read_since_retired`]) caps
-/// it at `retired_at` + [`PIN_READMIT_COOLDOWN`]. Selecting due rows is one
-/// range read on `idx_acquisition_pins_status_readmit_after`; at rest it
-/// returns nothing and the pass writes nothing.
+/// pin's own hold ([`pin_hold`]: 6 h, 12 h, then 24 h), and a read that was
+/// not admitted ([`mark_read_since_retired`]) caps it at `retired_at` +
+/// [`PIN_READMIT_COOLDOWN`]. (An admitted read does not wait for this pass: it
+/// re-activates the pin in the read path, [`record_demand_pin`].) Every value
+/// is normalised UTC text in one format, so `readmit_after < now` compares as
+/// text. At rest two indexed existence checks on
+/// `idx_acquisition_pins_status_readmit_after` find nothing, and the pass
+/// opens no write transaction.
 ///
 /// EVERY due row is handled in this pass — there is no per-tick bound, as
 /// there was none before the hold ladder: a backlog that comes due together is
@@ -429,6 +393,21 @@ pub fn retired_hold_pass(
     now: Now,
 ) -> QueryResult<HoldPass> {
     let stamped = stamp(now);
+    let retired = || pins::acquisition_pins.filter(pins::status.eq("retired"));
+    let undated: bool = diesel::select(diesel::dsl::exists(
+        retired().filter(pins::readmit_after.is_null()),
+    ))
+    .get_result(conn)?;
+    let due: bool = diesel::select(diesel::dsl::exists(
+        retired().filter(pins::readmit_after.lt(&stamped)),
+    ))
+    .get_result(conn)?;
+    if !undated && !due {
+        return Ok(HoldPass {
+            held: usize::try_from(count_pins_by_status(conn, "retired")?).unwrap_or(0),
+            ..HoldPass::default()
+        });
+    }
     conn.immediate_transaction(|conn| {
         let mut pass = HoldPass::default();
         let retired_row = |id: i32| {
@@ -491,7 +470,6 @@ pub fn retired_hold_pass(
                     .set((
                         pins::status.eq("active"),
                         pins::consecutive_retirements.eq(0),
-                        pins::held_demand_count.eq(0),
                         pins::read_since_retired.eq(0),
                         pins::last_outcome.eq(PIN_OUTCOME_FETCHED),
                         pins::round.eq(pins::round + 1),
@@ -504,8 +482,6 @@ pub fn retired_hold_pass(
             let own = pin_readmit_at(pin.retired_at.as_deref(), pin.consecutive_retirements);
             let cause = if own.is_some_and(|own| now > own) {
                 ReadmitCause::Hold
-            } else if pin.held_demand_count > 0 {
-                ReadmitCause::Demand
             } else if pin.read_since_retired != 0 {
                 ReadmitCause::Read
             } else {
@@ -514,7 +490,6 @@ pub fn retired_hold_pass(
             diesel::update(retired_row(pin.id))
                 .set((
                     pins::status.eq("active"),
-                    pins::held_demand_count.eq(0),
                     pins::read_since_retired.eq(0),
                     pins::round.eq(pins::round + 1),
                     pins::updated_at.eq(&stamped),
@@ -543,10 +518,12 @@ pub struct NamedPass {
 ///
 /// - A `retired` pin for a named head goes back to `active` at once, whatever
 ///   its rung and without waiting for the next pass, with its ladder reset.
+///   Its `round` is NOT bumped: as before the ladder, the pin keeps whatever
+///   retry state its tracker holds, so an advertisement that lands before the
+///   reconcile which drops an exhausted tracker re-opens the ask without a
+///   single extra fetch, and the next reconcile retires it again.
 /// - An `active` pin for a named head that still carries a retirement count
-///   (re-admitted for a re-probe) has the count reset. Its `round` is NOT
-///   bumped: a peer that advertises a head on every inventory round but cannot
-///   serve it must not hand the pin a fresh retry budget each time.
+///   (re-admitted for a re-probe) has the count reset, nothing else.
 /// - `removed` pins are not touched.
 pub fn inventory_named_pins(
     conn: &mut SqliteConnection,
@@ -576,9 +553,7 @@ pub fn inventory_named_pins(
                     .set((
                         pins::status.eq("active"),
                         pins::consecutive_retirements.eq(0),
-                        pins::held_demand_count.eq(0),
                         pins::read_since_retired.eq(0),
-                        pins::round.eq(pins::round + 1),
                         pins::updated_at.eq(&stamped),
                     ))
                     .execute(conn)?;
@@ -651,58 +626,40 @@ pub fn settle_fetched_pins(
 pub enum DemandPin {
     /// No pin existed for the head; one was born `active`.
     Authored(AcquisitionPin),
-    /// An `active` pin already wants the head. Nothing written.
-    AlreadyActive(AcquisitionPin),
-    /// The pin is `retired`. The demand is on the row; the next hold pass
-    /// re-admits it.
-    Demanded(AcquisitionPin),
-    /// The pin is `removed` (or `paused`) — a person's decision. Demand
-    /// counted on the row; the pin is not revived.
+    /// The pin was `active`; it was refreshed as a re-pin refreshes it.
+    Refreshed(AcquisitionPin),
+    /// The pin was `retired` (or `paused`) and is `active` again.
+    Reactivated(AcquisitionPin),
+    /// The pin is `removed` — a person's decision. Nothing was written.
     NotRevived(AcquisitionPin),
 }
 
 /// Record demand for a head — the writer for a read-miss the demand auto-pin
 /// ADMITTED (`services::demand_autopin`: past its per-id throttle, inside its
 /// window of distinct ids, under its active-row ceiling — exactly the reads
-/// that reached `upsert_pin` before this function existed).
+/// that reached [`upsert_pin`] before the hold ladder).
 ///
-/// Unlike [`upsert_pin`] this never changes the status of a row that exists:
+/// It does what that `upsert_pin` did, with two exceptions. The write is the
+/// same — closure rule and priority set to the demand defaults, `active`,
+/// `updated_at` stamped, no new `round` — so a retired pin is re-activated in
+/// the read path and the very next reconcile's census includes it, with
+/// whatever retry state its tracker holds. The exceptions:
 ///
-/// - `retired`: the demand is recorded on the row and the pin is due
-///   (`readmit_after` = its retirement time); the next hold pass
-///   ([`retired_hold_pass`], every reconcile tick) re-admits it, rung kept.
-///   The read does not flip the row itself — the pass is the one door back to
-///   `active`.
+/// - the pin keeps its rung (`consecutive_retirements`): a read is not
+///   evidence the answer changed, so if it is still unfillable it serves a
+///   longer hold next time;
 /// - `removed` stays removed. ONLY AN EXPLICIT RE-PIN (`POST /api/v1/pins`)
 ///   RESTORES A REMOVED PIN — an operator decision of 2026-10-14: the person
-///   un-pinned it, and a read is not them pinning it again. (Before this
-///   function a read-miss went through [`upsert_pin`] and silently
-///   re-activated it.) A read for a removed pin's content is then served only
-///   by the read path's foreground fetch — nothing on a pure-iroh node, one
-///   peer otherwise — or by replication happening to carry it.
-/// - `active` is left alone, so a read-miss no longer overwrites an explicit
-///   pin's priority and closure rule with the demand defaults.
+///   un-pinned it, and a read is not them pinning it again. A read for a
+///   removed pin's content is then served only by the read path's foreground
+///   fetch — nothing on a pure-iroh node, one peer otherwise — or by
+///   replication happening to carry it.
 ///
-/// On an existing row only `updated_at` (the demand's time) and, for a retired
-/// pin, `readmit_after` move; `retired_at` never does.
-///
-/// # What a read can cause, against the build before the hold ladder ("dev")
-///
-/// - A read the auto-pin admits: dev re-activated the retired pin at once;
-///   this re-activates it on the next reconcile tick — **at most one tick
-///   later than dev**.
-/// - A read the auto-pin does not admit: dev did nothing, and the pin was
-///   re-probed by its flat 6 h cooldown. Here it is marked
-///   ([`mark_read_since_retired`]) and re-probed **no later than 6 h after it
-///   retired, and no sooner** — never the 12 h or 24 h of its rung.
-/// - Read-driven re-activations are only ever caused by admitted reads, and
-///   the auto-pin admits at most 256 distinct heads per 300 s window, each
-///   once: **no more than dev's 256 per 300 s**, and the active set is not
-///   taken past the ceiling (recent recorded demand is counted toward it,
-///   [`count_active_or_demanded_pins`]).
-/// - Every due pin is re-admitted in the pass that finds it due, as before the
-///   ladder; "one tick" and "6 h" above are therefore exact up to one
-///   reconcile tick.
+/// A read the auto-pin does NOT admit never reaches this function; it only
+/// marks a retired row ([`mark_read_since_retired`]), which caps its hold at
+/// 6 h — the flat cooldown it had before the ladder. Read-driven
+/// re-activations are therefore exactly the admitted reads: no more than
+/// 256 distinct heads per 300 s window, and never past the ceiling.
 pub fn record_demand_pin(
     conn: &mut SqliteConnection,
     new: NewAcquisitionPin,
@@ -730,35 +687,23 @@ pub fn record_demand_pin(
                 .execute(conn)?;
             return identity().first(conn).map(DemandPin::Authored);
         };
-        if existing.status == "active" {
-            return Ok(DemandPin::AlreadyActive(existing));
+        if existing.status == "removed" {
+            return Ok(DemandPin::NotRevived(existing));
         }
-        let row_of = || pins::acquisition_pins.filter(pins::id.eq(existing.id));
-        if existing.status == "retired" {
-            // Due on the next pass: it queues by its retirement time. The
-            // demand's own time goes in `updated_at` — it is what the ceiling
-            // counts as recent ([`count_active_or_demanded_pins`]).
-            let due = existing
-                .retired_at
-                .clone()
-                .unwrap_or_else(|| stamped.clone());
-            diesel::update(row_of())
-                .set((
-                    pins::held_demand_count.eq(pins::held_demand_count + 1),
-                    pins::readmit_after.eq(due),
-                    pins::updated_at.eq(&stamped),
-                ))
-                .execute(conn)?;
-        } else {
-            diesel::update(row_of())
-                .set(pins::held_demand_count.eq(pins::held_demand_count + 1))
-                .execute(conn)?;
-        }
+        diesel::update(pins::acquisition_pins.filter(pins::id.eq(existing.id)))
+            .set((
+                pins::closure_rule_json.eq(new.closure_rule_json.clone()),
+                pins::priority.eq(new.priority),
+                pins::status.eq("active"),
+                pins::read_since_retired.eq(0),
+                pins::updated_at.eq(&stamped),
+            ))
+            .execute(conn)?;
         let row: AcquisitionPin = identity().first(conn)?;
-        Ok(if row.status == "retired" {
-            DemandPin::Demanded(row)
+        Ok(if existing.status == "active" {
+            DemandPin::Refreshed(row)
         } else {
-            DemandPin::NotRevived(row)
+            DemandPin::Reactivated(row)
         })
     })
 }
@@ -771,8 +716,9 @@ pub fn record_demand_pin(
 /// than the flat 6 h it waited before the ladder.
 ///
 /// Idempotent, and cheap on the path that is not throttled by anything: one
-/// indexed read; a write only the first time a retired pin is read in a hold
-/// (and none if admitted demand is already recorded). The write repeats every
+/// indexed read; a write only the first time a retired pin is read in a hold.
+/// The deadline written is normalised UTC text, like every other. The write
+/// repeats every
 /// predicate of the read ([`mark_row_read`]), so callers racing on one row
 /// write it once. Returns whether this call marked a row. Nothing else — no
 /// pin, an active pin, a removed pin — is touched.
@@ -789,8 +735,8 @@ pub fn mark_read_since_retired(
 }
 
 /// The read half of [`mark_read_since_retired`]: the id of the head's pin if
-/// it is retired and neither marked nor demanded, with the deadline marking
-/// it should give it.
+/// it is retired and not yet marked, with the deadline marking it should give
+/// it.
 pub(crate) fn unmarked_retired_row(
     conn: &mut SqliteConnection,
     agent_pub_key: &str,
@@ -803,7 +749,6 @@ pub(crate) fn unmarked_retired_row(
         .filter(pins::kind.eq(kind))
         .filter(pins::status.eq("retired"))
         .filter(pins::read_since_retired.eq(0))
-        .filter(pins::held_demand_count.eq(0))
         .select((pins::id, pins::retired_at, pins::readmit_after))
         .first(conn)
         .optional()?;
@@ -829,8 +774,7 @@ pub(crate) fn mark_row_read(
     let row = pins::acquisition_pins
         .filter(pins::id.eq(pin_id))
         .filter(pins::status.eq("retired"))
-        .filter(pins::read_since_retired.eq(0))
-        .filter(pins::held_demand_count.eq(0));
+        .filter(pins::read_since_retired.eq(0));
     let marked = match deadline {
         Some(deadline) => diesel::update(row)
             .set((
@@ -1142,62 +1086,53 @@ mod tests {
     #[test]
     fn a_retirement_names_its_round_and_a_stale_one_is_refused() {
         let mut conn = test_conn();
-        let pin = pin_for(&mut conn, "reactivated-in-between");
+        let pin = pin_for(&mut conn, "reprobed-in-between");
         let measured = reread(&mut conn, pin.id).round;
         retire(&mut conn, pin.id, t0());
 
-        // An inventory names the head: a new round.
-        let advertised: HashSet<&str> = ["reactivated-in-between"].into_iter().collect();
-        inventory_named_pins(&mut conn, &advertised, t0()).expect("named");
+        // Its hold ends: re-admitted for a re-probe, in a new round.
+        hold_pass(&mut conn, t0() + Duration::hours(7));
         assert_eq!(reread(&mut conn, pin.id).round, measured + 1);
         assert!(
-            retire_pin(&mut conn, pin.id, measured, t0())
+            retire_pin(&mut conn, pin.id, measured, t0() + Duration::hours(7))
                 .expect("retire")
                 .is_none(),
             "an exhaustion measured in an earlier round cannot retire the pin"
         );
-        let row = reread(&mut conn, pin.id);
-        assert_eq!(row.status, "active");
-        assert_eq!(row.consecutive_retirements, 0);
+        assert_eq!(reread(&mut conn, pin.id).status, "active");
 
-        // The current round's exhaustion does.
+        // The current round's exhaustion does, and dates the next hold.
         assert_eq!(
             retire_pins(
                 &mut conn,
                 &[(pin.id, measured + 1), (9999, 0)],
-                t0() + Duration::hours(1)
+                t0() + Duration::hours(8)
             )
             .expect("retire"),
-            vec![(pin.id, 1)],
+            vec![(pin.id, 2)],
             "only what was retired is reported"
         );
-        assert_eq!(
-            reread(&mut conn, pin.id).retired_at.as_deref(),
-            Some("2026-10-13T13:00:00Z")
-        );
+        let row = reread(&mut conn, pin.id);
+        assert_eq!(row.retired_at.as_deref(), Some("2026-10-13T20:00:00Z"));
+        assert_eq!(row.readmit_after.as_deref(), Some("2026-10-14T08:00:00Z"));
     }
 
-    /// A re-pin opens a new round only when it re-activates. A client that
-    /// re-asserts an ACTIVE pin leaves its round — and so its retry state —
-    /// alone.
+    /// A re-pin never opens a new round, as before the ladder: a client
+    /// re-asserting an active pin cannot renew its budget, and a re-pin of a
+    /// retired pin keeps whatever retry state its tracker holds.
     #[test]
-    fn a_repin_of_an_active_pin_keeps_its_round() {
+    fn a_repin_never_opens_a_new_round() {
         let mut conn = test_conn();
         let pin = pin_for(&mut conn, "asserted-again");
         for _ in 0..3 {
             assert_eq!(pin_for(&mut conn, "asserted-again").round, pin.round);
         }
-        // The exhaustion measured before those re-pins still retires it.
         assert_eq!(
             retire_pin(&mut conn, pin.id, pin.round, t0()).expect("retire"),
             Some(1)
         );
-        // Re-pinning the RETIRED pin does open one.
         let back = pin_for(&mut conn, "asserted-again");
-        assert_eq!(
-            (back.status.as_str(), back.round),
-            ("active", pin.round + 1)
-        );
+        assert_eq!((back.status.as_str(), back.round), ("active", pin.round));
     }
 
     #[test]
@@ -1365,9 +1300,8 @@ mod tests {
         assert_eq!(row.status, "active");
         assert_eq!(row.consecutive_retirements, 0, "ladder reset");
         assert_eq!(
-            row.round,
-            before.round + 1,
-            "a new round: fresh retry budget"
+            row.round, before.round,
+            "the same round: the tracker is kept, as before the ladder"
         );
 
         // The pin already re-probing loses its count but keeps its round — an
@@ -1395,69 +1329,48 @@ mod tests {
         assert_eq!(retire(&mut conn, named.id, now + Duration::hours(1)), 1);
     }
 
-    /// An ADMITTED read (one dev's autopin would have acted on) is never made
-    /// to wait out a hold. A pin two minutes into the 24 h rung that is read is
-    /// re-admitted by the very next pass — and keeps its rung.
+    /// An ADMITTED read does what it did before the ladder: it re-activates the
+    /// retired pin at once, in the read path — keeping its rung.
     #[test]
-    fn an_admitted_read_makes_a_retired_pin_due_on_the_next_pass_and_keeps_its_rung() {
+    fn an_admitted_read_reactivates_a_retired_pin_at_once_and_keeps_its_rung() {
         let mut conn = test_conn();
         let read = pin_for(&mut conn, "e2e-read-again");
-        let unread = pin_for(&mut conn, "e2e-nobody-reads");
         let mut now = t0();
         for _ in 0..2 {
             retire(&mut conn, read.id, now);
-            retire(&mut conn, unread.id, now);
             now += Duration::days(2);
             hold_pass(&mut conn, now);
         }
         // Rung 3: the 24 h rung.
         assert_eq!(retire(&mut conn, read.id, now), 3);
-        assert_eq!(retire(&mut conn, unread.id, now), 3);
         let retired = reread(&mut conn, read.id);
 
-        // Nobody has asked: one minute in, both are held.
-        let quiet = hold_pass(&mut conn, now + Duration::minutes(1));
-        assert!(quiet.readmitted.is_empty());
-        assert_eq!(quiet.held, 2);
-
-        // A read. It records the demand and flips nothing itself.
         let demand = read_miss(&mut conn, "e2e-read-again", now + Duration::minutes(2));
-        assert!(matches!(demand, DemandPin::Demanded(_)), "{demand:?}");
-        let row = reread(&mut conn, read.id);
-        assert_eq!((row.status.as_str(), row.held_demand_count), ("retired", 1));
-        assert_eq!(row.retired_at, retired.retired_at, "demand moves no clock");
-        assert_eq!(
-            row.readmit_after, retired.retired_at,
-            "due: it queues by retirement"
-        );
-        assert_eq!(row.round, retired.round);
-
-        // The next pass: re-admitted, by demand, three minutes into 24 h.
-        let pass = hold_pass(&mut conn, now + Duration::minutes(3));
-        assert_eq!(pass.readmitted.len(), 1);
-        assert_eq!(pass.readmitted[0].0.id, read.id);
-        assert_eq!(pass.readmitted[0].1, ReadmitCause::Demand);
-        assert_eq!(pass.held, 1);
+        assert!(matches!(demand, DemandPin::Reactivated(_)), "{demand:?}");
         let row = reread(&mut conn, read.id);
         assert_eq!(row.status, "active");
+        assert_eq!(row.consecutive_retirements, 3, "the rung is kept");
         assert_eq!(
-            row.consecutive_retirements, 3,
-            "demand does not reset the ladder"
+            row.round, retired.round,
+            "no new round, as before the ladder"
         );
-        assert_eq!(row.held_demand_count, 0);
-        assert_eq!(row.round, retired.round + 1);
-        assert_eq!(reread(&mut conn, unread.id).status, "retired");
+        assert_eq!(row.retired_at, retired.retired_at);
+        assert_eq!(row.updated_at, "2026-10-17T12:02:00Z");
 
-        // Still unfillable and not read again: it serves its 24 h in full.
+        // Nothing is left for the hold pass.
+        let pass = hold_pass(&mut conn, now + Duration::minutes(3));
+        assert!(pass.readmitted.is_empty() && pass.settled.is_empty());
+
+        // Still unfillable: one rung up, and without another read it serves
+        // its 24 h in full.
         let again = now + Duration::minutes(10);
-        retire(&mut conn, read.id, again);
-        let late = hold_pass(&mut conn, again + Duration::hours(23));
-        assert!(late.readmitted.is_empty());
-        let own = hold_pass(&mut conn, again + Duration::hours(25));
-        assert!(own
+        assert_eq!(retire(&mut conn, read.id, again), 4);
+        assert!(hold_pass(&mut conn, again + Duration::hours(23))
             .readmitted
-            .iter()
-            .any(|(p, cause)| p.id == read.id && *cause == ReadmitCause::Hold));
+            .is_empty());
+        let own = hold_pass(&mut conn, again + Duration::hours(25));
+        assert_eq!(own.readmitted.len(), 1);
+        assert_eq!(own.readmitted[0].1, ReadmitCause::Hold);
     }
 
     /// A read dev's autopin would NOT have admitted (throttled, window full,
@@ -1495,7 +1408,7 @@ mod tests {
         }
         let row = reread(&mut conn, read.id);
         assert_eq!(row.status, "retired");
-        assert_eq!((row.read_since_retired, row.held_demand_count), (1, 0));
+        assert_eq!(row.read_since_retired, 1);
         assert_eq!(row.retired_at, retired.retired_at);
         assert_eq!(row.updated_at, retired.updated_at);
         assert_eq!(row.round, retired.round);
@@ -1535,36 +1448,6 @@ mod tests {
         assert_eq!(own.readmitted[0].1, ReadmitCause::Hold);
     }
 
-    /// The autopin's ceiling counts demand that is recorded but not yet
-    /// re-admitted — for [`RECENT_DEMAND`] only, so a pass that keeps failing
-    /// cannot leave it counted for good.
-    #[test]
-    fn recent_recorded_demand_counts_toward_the_active_ceiling() {
-        let mut conn = test_conn();
-        pin_for(&mut conn, "active");
-        let retired = pin_for(&mut conn, "retired-and-read");
-        let quiet = pin_for(&mut conn, "retired-and-quiet");
-        retire(&mut conn, retired.id, t0());
-        retire(&mut conn, quiet.id, t0());
-        let count = |conn: &mut SqliteConnection, at| {
-            count_active_or_demanded_pins(conn, at).expect("count")
-        };
-        assert_eq!(count(&mut conn, t0()), 1);
-        read_miss(&mut conn, "retired-and-read", t0());
-        read_miss(&mut conn, "retired-and-read", t0());
-        assert_eq!(count(&mut conn, t0()), 2);
-        mark_read_since_retired(&mut conn, "local-device", "retired-and-quiet", "item")
-            .expect("mark");
-        assert_eq!(
-            count(&mut conn, t0()),
-            2,
-            "a read mark re-admits nothing early, so it takes no room"
-        );
-        // No pass ran (say every pass is failing): the demand stops counting.
-        assert_eq!(count(&mut conn, t0() + Duration::minutes(4)), 2);
-        assert_eq!(count(&mut conn, t0() + Duration::minutes(6)), 1);
-    }
-
     /// Two callers that both read the row as unmarked before either writes:
     /// the guarded write marks it once.
     #[test]
@@ -1587,7 +1470,7 @@ mod tests {
             !mark_row_read(&mut b, seen_b.0, seen_b.1).expect("write b"),
             "the second write finds the row already marked"
         );
-        // Demand recorded first also stops a mark.
+        // An admitted read that re-activated it first also stops a mark.
         let other = pin_for(&mut a, "demanded-then-read");
         retire(&mut a, other.id, t0());
         let seen = unmarked_retired_row(&mut a, "local-device", "demanded-then-read", "item")
@@ -1692,10 +1575,10 @@ mod tests {
         assert!(matches!(demand, DemandPin::NotRevived(_)), "{demand:?}");
         let row = reread(&mut conn, pin.id);
         assert_eq!(row.status, "removed");
-        assert_eq!(row.held_demand_count, 1);
+        assert_eq!(row.updated_at, removed.updated_at, "nothing was written");
 
         // The substrate's own passes leave a removal alone too, however long
-        // it has been and whatever demand it has counted.
+        // it has been.
         assert!(retire_pin(&mut conn, pin.id, removed.round, t0())
             .expect("retire")
             .is_none());
@@ -1709,12 +1592,15 @@ mod tests {
         // The person pinning it again is the one thing that revives it.
         pin_for(&mut conn, "unpinned-by-its-person");
         let row = reread(&mut conn, pin.id);
-        assert_eq!((row.status.as_str(), row.held_demand_count), ("active", 0));
-        assert_eq!(row.round, removed.round + 1);
+        assert_eq!(row.status, "active");
+        assert_eq!(row.round, removed.round);
     }
 
+    /// An admitted read on a head with no pin authors one; on an active pin it
+    /// refreshes it exactly as the re-pin it used to be did — demand defaults
+    /// for priority and closure rule, `updated_at` stamped, no new round.
     #[test]
-    fn a_read_miss_authors_a_new_pin_and_leaves_an_active_one_as_it_is() {
+    fn a_read_miss_authors_a_new_pin_and_refreshes_an_existing_one_as_before() {
         let mut conn = test_conn();
         let first = read_miss(&mut conn, "fresh-head", t0());
         let DemandPin::Authored(pin) = first else {
@@ -1722,10 +1608,9 @@ mod tests {
         };
         assert_eq!(pin.status, "active");
         assert_eq!(pin.created_at, "2026-10-13T12:00:00Z");
-        assert_eq!((pin.consecutive_retirements, pin.held_demand_count), (0, 0));
+        assert_eq!(pin.consecutive_retirements, 0);
 
-        // An explicit pin with its own priority and closure rule…
-        let explicit = upsert_pin(
+        upsert_pin(
             &mut conn,
             NewAcquisitionPin {
                 closure_rule_json: Some(r#"{"depth":2}"#.into()),
@@ -1734,19 +1619,14 @@ mod tests {
             },
         )
         .expect("explicit re-pin");
-        // …is not touched at all by a later read-miss carrying the demand
-        // defaults: not its priority, not its rule, not its timestamps.
         let again = read_miss(&mut conn, "fresh-head", t0() + Duration::days(1));
-        assert!(matches!(again, DemandPin::AlreadyActive(_)), "{again:?}");
+        assert!(matches!(again, DemandPin::Refreshed(_)), "{again:?}");
         let row = reread(&mut conn, pin.id);
-        assert_eq!(row.priority, 7);
-        assert_eq!(row.closure_rule_json.as_deref(), Some(r#"{"depth":2}"#));
-        assert_eq!(row.held_demand_count, 0);
-        assert_eq!(row.updated_at, explicit.updated_at);
-        assert_eq!(
-            row.round, pin.round,
-            "neither the re-pin nor the read moved it"
-        );
+        assert_eq!(row.priority, 1);
+        assert!(row.closure_rule_json.is_none());
+        assert_eq!(row.status, "active");
+        assert_eq!(row.updated_at, "2026-10-14T12:00:00Z");
+        assert_eq!(row.round, pin.round);
     }
 
     #[test]
@@ -1762,7 +1642,10 @@ mod tests {
         let row = reread(&mut conn, pin.id);
         assert_eq!(row.status, "active", "a person's re-pin is not held");
         assert_eq!(row.consecutive_retirements, 2, "a re-pin is not evidence");
-        assert_eq!(row.round, retired.round + 1);
+        assert_eq!(
+            row.round, retired.round,
+            "no new round, as before the ladder"
+        );
         assert_eq!(retire(&mut conn, pin.id, t0() + Duration::hours(9)), 3);
     }
 
@@ -1860,6 +1743,7 @@ mod tests {
         conn.batch_execute(
             "INSERT INTO acquisition_pins (head_ref, status, updated_at) VALUES
                  ('old-retired', 'retired', '2026-10-13T06:30:00Z'),
+                 ('old-offset',  'retired', '2026-10-13T08:30:00+02:00'),
                  ('old-active',  'active',  '2026-10-13T06:30:00Z'),
                  ('old-removed', 'removed', '2026-10-13T06:30:00Z');",
         )
@@ -1883,8 +1767,18 @@ mod tests {
             Some("2026-10-13T12:30:00Z"),
             "its 6 h deadline, backfilled"
         );
+        // Written with an offset: normalised to UTC in the code's format, so
+        // its deadline orders correctly against every other stamp.
+        let old_offset = by_head("old-offset");
+        assert_eq!(
+            old_offset.retired_at.as_deref(),
+            Some("2026-10-13T06:30:00Z")
+        );
+        assert_eq!(
+            old_offset.readmit_after.as_deref(),
+            Some("2026-10-13T12:30:00Z")
+        );
         for head in ["old-retired", "old-active", "old-removed"] {
-            assert_eq!(by_head(head).held_demand_count, 0, "{head}");
             assert_eq!(by_head(head).round, 0, "{head}");
             assert_eq!(by_head(head).read_since_retired, 0, "{head}");
         }
@@ -1899,7 +1793,11 @@ mod tests {
         // serving, due a little later, exactly as on the old build.
         assert!(hold_pass(&mut conn, t0()).readmitted.is_empty());
         let due = hold_pass(&mut conn, t0() + Duration::hours(1));
-        assert_eq!(due.readmitted.len(), 1);
+        assert_eq!(
+            due.readmitted.len(),
+            2,
+            "both due at 12:30 UTC, whatever offset the clock was written with"
+        );
         // Its next failure steps to 12 h rather than repeating 6 h.
         assert_eq!(
             retire(&mut conn, old_retired.id, t0() + Duration::hours(2)),
