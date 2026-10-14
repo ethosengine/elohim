@@ -4153,9 +4153,10 @@ mod tests {
         cell.hold_reads(false);
         cell.let_reads_go(1);
         assert!(read.await.unwrap());
-        let kept = c.kept_lock();
-        assert_eq!(kept.speaks.as_ref().unwrap().at, kept.waiting[0].arrived);
-        drop(kept);
+        {
+            let kept = c.kept_lock();
+            assert_eq!(kept.speaks.as_ref().unwrap().at, kept.waiting[0].arrived);
+        }
         // Offered again at 35 s it is not listed: that read began before it.
         clock.pass(4 * SECOND);
         assert_eq!(c.on_request("peer-a", offer(31, "peer-a")), None);

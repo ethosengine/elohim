@@ -552,15 +552,18 @@ Then(
     const elapsedS = Math.round((Date.now() - startedAt) / 1000);
     const p2p = (lastBody?.p2p ?? undefined) as Record<string, unknown> | undefined;
     const show = (v: unknown): string => (v === undefined ? 'absent' : JSON.stringify(v));
-    const evidence =
-      lastBody === undefined
-        ? `no /health body was ever read (last error: ${lastError ?? 'none'})`
-        : p2p === undefined
-          ? 'p2p section absent — P2P may not be enabled'
-          : `p2p.caughtUp=${show(p2p.caughtUp)} p2p.converged=${show(p2p.converged)} ` +
-            `p2p.divergentAnchor=${show(p2p.divergentAnchor)} ` +
-            `p2p.observedAgeMs=${show(p2p.observedAgeMs)} ` +
-            `p2p.healedTotal=${show(p2p.healedTotal)} p2p.sweeps=${show(p2p.sweeps)}`;
+    let evidence: string;
+    if (lastBody === undefined) {
+      evidence = `no /health body was ever read (last error: ${lastError ?? 'none'})`;
+    } else if (p2p === undefined) {
+      evidence = 'p2p section absent — P2P may not be enabled';
+    } else {
+      evidence =
+        `p2p.caughtUp=${show(p2p.caughtUp)} p2p.converged=${show(p2p.converged)} ` +
+        `p2p.divergentAnchor=${show(p2p.divergentAnchor)} ` +
+        `p2p.observedAgeMs=${show(p2p.observedAgeMs)} ` +
+        `p2p.healedTotal=${show(p2p.healedTotal)} p2p.sweeps=${show(p2p.sweeps)}`;
+    }
     assert.fail(
       `${peerName} /health: p2p.caughtUp did not become true within ${seconds} s ` +
         `(${samples} samples over ${elapsedS} s; last body: ${evidence})`
