@@ -18,14 +18,22 @@ closureRule: JsonValue | null, priority: number, status: string, createdAt: stri
  */
 consecutiveRetirements: number, 
 /**
- * Earliest time a `retired` pin is re-admitted for a re-probe (RFC 3339).
- * Null unless `status` is `retired`. A peer inventory naming the head
- * re-admits sooner; a busy tick can defer it by minutes.
+ * When the pin was last retired (RFC 3339) — the clock its hold runs
+ * from. Null if it never has been.
+ */
+retiredAt: string | null, 
+/**
+ * Earliest time a `retired` pin is re-admitted for a re-probe (RFC 3339):
+ * `retiredAt` plus the hold for its rung, or plus 6 h if it has been read
+ * while held (`heldDemandCount > 0`). Null unless `status` is `retired`.
+ * A peer inventory naming the head re-admits sooner; a busy tick can
+ * defer it by minutes.
  */
 nextReadmitAt: string | null, 
 /**
- * Read-misses recorded while the pin was `retired` or `removed`. Demand
- * undoes neither; it is counted. Cleared on re-admission.
+ * Read-misses recorded while the pin was `retired` or `removed`. On a
+ * retired pin they cap the hold at 6 h; on a removed pin they are only
+ * counted. Cleared on re-admission.
  */
 heldDemandCount: number, 
 /**

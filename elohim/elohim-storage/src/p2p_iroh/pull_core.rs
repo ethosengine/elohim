@@ -17,7 +17,7 @@
 //! What it mirrors, step by step (libp2p original in `p2p/mod.rs`):
 //! - `hydrate_replication_state` → [`IrohPullCore::hydrate_local_ids`]
 //! - `run_replication_cycle` + the `ContentList` arm → [`IrohPullCore::discover_from_peers`]
-//!   (ListContent pages per book peer → `readmit_pins_named_by_inventory` →
+//!   (ListContent pages per book peer → `acquisition::inventory_received` →
 //!   `ReplicationState::discover` → gap queue)
 //! - `drain_gap_queue` → [`IrohPullCore::drain_gaps`] (`GetContent` over iroh, `PullKind::Gap`)
 //! - `run_acquisition_reconcile` → [`IrohPullCore::reconcile_pins`]
@@ -306,8 +306,12 @@ impl IrohPullCore {
                         pages += 1;
                         let page_len = items.len();
                         let remote_ids: Vec<String> = items.into_iter().map(|i| i.id).collect();
-                        self.readmit_pins_named_by_inventory(&remote_ids);
-                        let new_gaps = self.ctx.replication_state.discover(remote_ids).await;
+                        let new_gaps = acquisition::inventory_received(
+                            self.ctx.db_pool.as_ref(),
+                            &self.ctx.replication_state,
+                            remote_ids,
+                        )
+                        .await;
                         if new_gaps.is_empty() {
                             self.ctx.replication_state.update_caught_up().await;
                         } else {
@@ -427,74 +431,49 @@ impl IrohPullCore {
         }
     }
 
-    /// Mirror of `run_acquisition_reconcile`: active item pins → wants → queue.
+    /// Mirror of `run_acquisition_reconcile`: the same shared tick
+    /// (`acquisition::reconcile_tick`) — hold pass, active item pins → wants →
+    /// queue — WITHOUT retirement.
+    ///
+    /// This core does not retire exhausted pins, and must not until it can
+    /// prove per-want provider coverage. Retirement claims "no connected peer
+    /// could supply the bytes"; here a spent budget only proves a number of
+    /// attempts. `drain_pins` picks the peer from one rotation counter shared
+    /// with `drain_gaps` and advanced once per drain, not per want, so a
+    /// want's retries can all land on the same peer (two peers, fifty failing
+    /// pins in two batches of 25: the counter moves by two between a pin's
+    /// retries). The missing precondition is a per-want record of which
+    /// providers were asked, with the budget spent only on distinct ones.
+    /// Until then an exhausted pin stays active here and holds
+    /// `pull.caughtUp` false — honest, where a retirement would not be.
     pub async fn reconcile_pins(&self) -> crate::metrics::AcquisitionReconcileOutcome {
         use crate::metrics::AcquisitionReconcileOutcome;
-        let first_pass = self.ctx.acquisition.rollup_if_initialized().await.is_none();
         let Some(pool) = self.ctx.db_pool.as_ref() else {
             return AcquisitionReconcileOutcome::DbPoolMissing;
         };
-        let Ok(mut conn) = pool.get() else {
-            return AcquisitionReconcileOutcome::DbPoolUnavailable;
+        let tick = match acquisition::reconcile_tick(
+            pool,
+            &self.ctx.acquisition,
+            self.book_peers().len(),
+            acquisition::RetirePolicy::CoverageUnproven,
+            chrono::Utc::now(),
+        )
+        .await
+        {
+            Ok(tick) => tick,
+            Err(outcome) => return outcome,
         };
-        acquisition::readmit_due_pins(&mut conn);
-        let pins = match crate::db::acquisition_pins::list_active_pins(&mut conn) {
-            Ok(p) => p,
-            Err(e) => {
-                warn!(target: "elohim_storage::iroh_pull", error = %e, "pin census failed");
-                return AcquisitionReconcileOutcome::PinLoadFailed;
-            }
-        };
-        let active_pin_count = pins.len();
-        let pin_wants: Vec<(i32, Vec<String>)> = pins
-            .iter()
-            .filter(|p| p.kind == "item")
-            .map(|p| (p.id, vec![p.head_ref.clone()]))
-            .collect();
-        let want_ids: Vec<String> = pin_wants
-            .iter()
-            .flat_map(|(_, ids)| ids.iter().cloned())
-            .collect();
-        let app_ctx = crate::db::AppContext::default_lamad();
-        let local_has = match crate::db::content_diesel::content_ids_present(
-            &mut conn, &app_ctx, &want_ids,
-        ) {
-            Ok(set) => set,
-            Err(e) => {
-                warn!(target: "elohim_storage::iroh_pull", error = %e, "local-presence query failed");
-                return AcquisitionReconcileOutcome::PresenceQueryFailed;
-            }
-        };
-        acquisition::settle_fetched_pins(&mut conn, &pins, &local_has);
-        drop(conn);
-        let peer_count = self.book_peers().len();
-        let to_dispatch = self
-            .ctx
-            .acquisition
-            .reconcile(
-                pin_wants,
-                &local_has,
-                acquisition::retry_budget_for_peers(peer_count),
-            )
-            .await;
-        if !to_dispatch.is_empty() {
+        if !tick.to_dispatch.is_empty() {
             let mut q = self.acquisition_queue.lock().await;
-            for id in to_dispatch {
+            for id in tick.to_dispatch {
                 if !q.contains(&id) {
                     q.push_back(id);
                 }
             }
         }
-        crate::metrics::set_acquisition_reconcile_completed(active_pin_count);
-        if first_pass {
-            info!(target: "elohim_storage::iroh_pull", active_pins = active_pin_count, desired = want_ids.len(), local = local_has.len(), "acquisition reconcile first pass completed (iroh)");
-        }
-        // Retire pins the book's peers could not satisfy — the same pass the
-        // libp2p node runs. Without it a pin this core re-admits (or a want it
-        // exhausts) stays `active` and holds `pull.caughtUp` false for good.
-        let exhausted = self.ctx.acquisition.exhausted_pin_ids().await;
-        if let Ok(mut conn) = pool.get() {
-            acquisition::retire_exhausted_pins(&mut conn, &exhausted);
+        crate::metrics::set_acquisition_reconcile_completed(tick.active_pins);
+        if tick.first_pass {
+            info!(target: "elohim_storage::iroh_pull", active_pins = tick.active_pins, desired = tick.desired_items, local = tick.local_items, "acquisition reconcile first pass completed (iroh)");
         }
         self.refresh_status().await;
         AcquisitionReconcileOutcome::Completed
@@ -511,17 +490,6 @@ impl IrohPullCore {
             acquisition_queue: self.acquisition_queue.lock().await.len(),
         };
         self.status_tx.send_replace(status);
-    }
-
-    fn readmit_pins_named_by_inventory(&self, remote_ids: &[String]) {
-        if remote_ids.is_empty() {
-            return;
-        }
-        let Some(pool) = self.ctx.db_pool.as_ref() else {
-            return;
-        };
-        let Ok(mut conn) = pool.get() else { return };
-        acquisition::readmit_pins_named_by_inventory(&mut conn, remote_ids);
     }
 }
 

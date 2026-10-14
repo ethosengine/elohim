@@ -2166,10 +2166,22 @@ lazy_static! {
     )
     .unwrap();
 
-    /// Times a held acquisition pin was NOT re-activated when something asked.
-    /// label: reason — see [`PinHoldSkip`]. "tick_bound" counts pin-ticks (a due
-    /// pin deferred for three ticks counts three), so its rate is the standing
-    /// re-admission backlog.
+    /// Retired acquisition pins put back to `active`, by what ended the hold.
+    /// label: cause — see [`PinReadmitCause`]. The same events as
+    /// `elohim_acquisition_pin_retirements_total{reason="readmitted"}`, split.
+    pub static ref ACQUISITION_PIN_READMISSIONS: IntCounterVec = IntCounterVec::new(
+        Opts::new(
+            "elohim_acquisition_pin_readmissions_total",
+            "Retired acquisition pins re-activated, by cause.",
+        ),
+        &["cause"],
+    )
+    .unwrap();
+
+    /// Decisions to leave a held acquisition pin held. label: reason — see
+    /// [`PinHoldSkip`]. The per-tick reasons count pin-ticks (a pin held for
+    /// three ticks counts three): "hold_not_elapsed" over ticks is the held
+    /// population, "tick_bound" the standing re-admission backlog.
     pub static ref ACQUISITION_PIN_HOLD_SKIPS: IntCounterVec = IntCounterVec::new(
         Opts::new(
             "elohim_acquisition_pin_hold_skips_total",
@@ -3745,6 +3757,12 @@ pub fn register_all() {
         for reason in PinBackoffReset::ALL {
             ACQUISITION_PIN_BACKOFF_RESETS
                 .with_label_values(&[reason.label()])
+                .inc_by(0);
+        }
+        let _ = REGISTRY.register(Box::new(ACQUISITION_PIN_READMISSIONS.clone()));
+        for cause in PinReadmitCause::ALL {
+            ACQUISITION_PIN_READMISSIONS
+                .with_label_values(&[cause.label()])
                 .inc_by(0);
         }
         let _ = REGISTRY.register(Box::new(ACQUISITION_PIN_HOLD_SKIPS.clone()));
@@ -6263,31 +6281,80 @@ impl PinBackoffReset {
     }
 }
 
-/// Why a held pin was left held.
+/// What ended a retired pin's hold.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum PinHoldSkip {
-    /// A read-miss named a `retired` pin: counted on the row, hold unchanged.
-    DemandRetired,
-    /// A read-miss named a `removed` (or `paused`) pin: not revived.
-    DemandRemoved,
-    /// The pin's hold has elapsed but this tick's re-admission bound was spent.
-    TickBound,
+pub enum PinReadmitCause {
+    /// Its own hold elapsed (the backoff ladder).
+    Hold,
+    /// It was read while held and the first rung elapsed (demand caps the hold).
+    Demand,
+    /// A peer inventory named its head.
+    Inventory,
+    /// Its content became local while it was retired.
+    Fetched,
 }
 
-impl PinHoldSkip {
-    pub const ALL: [PinHoldSkip; 3] = [
-        PinHoldSkip::DemandRetired,
-        PinHoldSkip::DemandRemoved,
-        PinHoldSkip::TickBound,
+impl PinReadmitCause {
+    pub const ALL: [PinReadmitCause; 4] = [
+        PinReadmitCause::Hold,
+        PinReadmitCause::Demand,
+        PinReadmitCause::Inventory,
+        PinReadmitCause::Fetched,
     ];
 
     pub fn label(self) -> &'static str {
         match self {
-            PinHoldSkip::DemandRetired => "demand_retired",
-            PinHoldSkip::DemandRemoved => "demand_removed",
-            PinHoldSkip::TickBound => "tick_bound",
+            PinReadmitCause::Hold => "hold",
+            PinReadmitCause::Demand => "demand",
+            PinReadmitCause::Inventory => "inventory",
+            PinReadmitCause::Fetched => "fetched",
         }
     }
+}
+
+/// Why a held pin was left held.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum PinHoldSkip {
+    /// Per tick: a retired pin whose hold has not ended.
+    HoldNotElapsed,
+    /// Per tick: the pin's hold has ended but this tick's re-admission bound
+    /// was spent.
+    TickBound,
+    /// A retired pin with no readable retirement time: not re-admitted,
+    /// restarted on the first rung (once per pin).
+    ClockUnreadable,
+    /// A read-miss named a `retired` pin still inside its first rung: counted
+    /// on the row, held until that rung ends.
+    DemandRetired,
+    /// A read-miss named a `removed` (or `paused`) pin: not revived.
+    DemandRemoved,
+}
+
+impl PinHoldSkip {
+    pub const ALL: [PinHoldSkip; 5] = [
+        PinHoldSkip::HoldNotElapsed,
+        PinHoldSkip::TickBound,
+        PinHoldSkip::ClockUnreadable,
+        PinHoldSkip::DemandRetired,
+        PinHoldSkip::DemandRemoved,
+    ];
+
+    pub fn label(self) -> &'static str {
+        match self {
+            PinHoldSkip::HoldNotElapsed => "hold_not_elapsed",
+            PinHoldSkip::TickBound => "tick_bound",
+            PinHoldSkip::ClockUnreadable => "clock_unreadable",
+            PinHoldSkip::DemandRetired => "demand_retired",
+            PinHoldSkip::DemandRemoved => "demand_removed",
+        }
+    }
+}
+
+/// Record `n` retired pins re-activated for `cause`.
+pub fn inc_acquisition_pin_readmissions(cause: PinReadmitCause, n: u64) {
+    ACQUISITION_PIN_READMISSIONS
+        .with_label_values(&[cause.label()])
+        .inc_by(n);
 }
 
 /// Record one retirement's backoff step; `hold` is

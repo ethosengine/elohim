@@ -2049,6 +2049,8 @@ diesel::table! {
         consecutive_retirements -> Integer,
         held_demand_count -> Integer,
         last_outcome -> Nullable<Text>,
+        retired_at -> Nullable<Text>,
+        round -> Integer,
     }
 }
 

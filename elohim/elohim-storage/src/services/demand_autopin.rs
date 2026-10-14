@@ -174,13 +174,15 @@ impl DemandAutoPin {
     /// Authors an `item` DevicePin via the shared idempotent upsert when the
     /// controller is enabled and the id is not throttled; otherwise a no-op.
     ///
-    /// A head whose pin is `retired` or `removed` is NOT re-activated — the
-    /// demand is counted and the pin stays as it is (see
-    /// [`acquisition_pins::record_demand_pin`] for why).
+    /// A head whose pin is `retired` is not re-activated by this call: the
+    /// demand is counted on the row, which caps the pin's hold at 6 h from its
+    /// retirement, and the reconcile tick re-admits it when that has passed. A
+    /// `removed` pin is counted and left removed. See
+    /// [`acquisition_pins::record_demand_pin`] for why.
     ///
     /// Returns `Ok(Some(pin))` when an active pin now wants the head (authored
     /// here, or already active), `Ok(None)` when skipped (disabled, throttled,
-    /// or the pin is held). Only DB errors surface as `Err`; the caller
+    /// or the pin is retired or removed). Only DB errors surface as `Err`; the caller
     /// treats those as non-fatal (the read path continues regardless).
     pub fn record_demand(
         &self,
@@ -218,8 +220,8 @@ impl DemandAutoPin {
         )?;
         Ok(match demand {
             DemandPin::Authored(pin) | DemandPin::AlreadyActive(pin) => Some(pin),
-            // Demand does not undo a hold the node just concluded, nor a
-            // person's removal — it is counted, on the row and here.
+            // Inside the first rung of its hold: counted, and held until that
+            // rung ends.
             DemandPin::HeldRetired(pin) => {
                 crate::metrics::inc_acquisition_pin_hold_skips(
                     crate::metrics::PinHoldSkip::DemandRetired,
@@ -230,10 +232,24 @@ impl DemandAutoPin {
                     pin_id = pin.id,
                     consecutive_retirements = pin.consecutive_retirements,
                     held_demand_count = pin.held_demand_count,
-                    "demand on a retired pin counted; its hold stands"
+                    "demand on a retired pin counted; held until its first rung ends"
                 );
                 None
             }
+            // Past the first rung: the next reconcile tick re-admits it (and
+            // counts it, `readmissions_total{cause="demand"}`). Not this call —
+            // the tick is the one bounded door back to `active`.
+            DemandPin::DueOnDemand(pin) => {
+                tracing::debug!(
+                    content_id,
+                    pin_id = pin.id,
+                    consecutive_retirements = pin.consecutive_retirements,
+                    "demand on a retired pin past its first rung; the next reconcile re-admits it"
+                );
+                None
+            }
+            // A person's removal: not revived. A read for this content is
+            // served only by the read path's foreground fetch.
             DemandPin::NotRevived(pin) => {
                 crate::metrics::inc_acquisition_pin_hold_skips(
                     crate::metrics::PinHoldSkip::DemandRemoved,
@@ -461,20 +477,24 @@ mod tests {
     }
 
     // A read-miss for a head whose pin the substrate RETIRED (no peer could
-    // supply it) or its person REMOVED must not re-activate the pin. Before
+    // supply it) or its person REMOVED does not re-activate the pin. Before
     // this, the demand went through `upsert_pin` and did both: one GET for a
-    // missing id put a retired pin straight back into the pull queue.
+    // missing id put a retired pin straight back into the pull queue. Now the
+    // read is counted; on the retired pin that caps its hold (the reconcile
+    // tick re-admits it once 6 h have passed), on the removed pin it does not.
     #[test]
-    fn demand_does_not_reactivate_a_retired_or_removed_pin() {
+    fn demand_does_not_itself_reactivate_a_retired_or_removed_pin() {
         let pool = test_pool();
         let mut conn = pool.get().expect("conn");
         let autopin = DemandAutoPin::new(true, Duration::from_secs(0));
+        let app = crate::db::AppContext::default_lamad();
 
         let retired = autopin
             .record_demand(&mut conn, "epr:nobody-has-it")
             .unwrap()
             .expect("first miss authors the pin");
-        acquisition_pins::retire_pin(&mut conn, retired.id, chrono::Utc::now())
+        let long_ago = chrono::Utc::now() - chrono::Duration::days(3);
+        acquisition_pins::retire_pin(&mut conn, retired.id, retired.round, long_ago)
             .unwrap()
             .expect("retired");
         let removed = autopin
@@ -502,14 +522,26 @@ mod tests {
                 .unwrap()
                 .unwrap()
         };
-        let (retired, removed) = (row(retired.id), row(removed.id));
+        let (retired_row, removed_row) = (row(retired.id), row(removed.id));
         assert_eq!(
-            (retired.status.as_str(), retired.held_demand_count),
+            (retired_row.status.as_str(), retired_row.held_demand_count),
             ("retired", 2)
         );
         assert_eq!(
-            (removed.status.as_str(), removed.held_demand_count),
+            (removed_row.status.as_str(), removed_row.held_demand_count),
             ("removed", 2)
         );
+
+        // The tick's hold pass is what acts on the counted demand: the read
+        // pin comes back, the removed one never does.
+        let pass = acquisition_pins::retired_hold_pass(&mut conn, &app, chrono::Utc::now(), 25, 10)
+            .unwrap();
+        let back: Vec<i32> = pass.readmitted.iter().map(|(p, _)| p.id).collect();
+        assert!(back.contains(&retired.id));
+        assert!(!back.contains(&removed.id));
+        let removed_row = acquisition_pins::get_pin_by_id(&mut conn, removed.id)
+            .unwrap()
+            .unwrap();
+        assert_eq!(removed_row.status, "removed");
     }
 }

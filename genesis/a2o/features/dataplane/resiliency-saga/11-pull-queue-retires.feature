@@ -85,7 +85,8 @@
 #      or after its hold (backstop — 6h, doubling per consecutive retirement
 #      to a 7-day ceiling, at most 25 pins per reconcile tick; a second,
 #      still-unscenario'd arm of the same guarantee; see the station below the
-#      re-admission scenario). A read-miss does not end the hold; it is counted.
+#      re-admission scenario). A read-miss for the head caps that hold at 6h
+#      from the retirement without resetting the doubling.
 #      Both directions are published as distinct series
 #      (`elohim_acquisition_pin_retirements_total` with `reason` = exhausted |
 #      readmitted), so an operator can always tell "the queue is caught up

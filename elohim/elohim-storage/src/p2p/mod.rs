@@ -6057,9 +6057,12 @@ impl P2PNode {
                                         // the cooldown. Inventory is metadata, not
                                         // bytes — this re-opens the ASK, it never
                                         // marks anything fetched.
-                                        self.readmit_pins_named_by_inventory(&remote_ids);
-                                        let new_gaps =
-                                            self.replication_state.discover(remote_ids).await;
+                                        let new_gaps = acquisition::inventory_received(
+                                            self.db_pool.as_ref(),
+                                            &self.replication_state,
+                                            remote_ids,
+                                        )
+                                        .await;
 
                                         if new_gaps.is_empty() {
                                             debug!("No new content to replicate");
@@ -9819,165 +9822,63 @@ impl P2PNode {
     async fn run_acquisition_reconcile(&self) -> crate::metrics::AcquisitionReconcileOutcome {
         use crate::metrics::AcquisitionReconcileOutcome;
 
-        let first_pass = self.acquisition.rollup_if_initialized().await.is_none();
         let Some(ref pool) = self.db_pool else {
             warn!(
                 target: "elohim_storage::acquisition",
-                first_pass,
+                first_pass = self.acquisition.rollup_if_initialized().await.is_none(),
                 "acquisition reconcile stopped before pin census: DB pool is not configured"
             );
             return AcquisitionReconcileOutcome::DbPoolMissing;
         };
-        let mut conn = match pool.get() {
-            Ok(conn) => conn,
-            Err(e) => {
-                warn!(
-                    target: "elohim_storage::acquisition",
-                    error = %e,
-                    first_pass,
-                    "acquisition reconcile stopped before pin census: DB connection unavailable"
-                );
-                return AcquisitionReconcileOutcome::DbPoolUnavailable;
-            }
-        };
-
-        // (0) Cooldown re-admission — the BACKSTOP arm of pin retirement. The
-        // primary arm is inventory-driven (a peer advertising a retired pin's
-        // head_ref revives it immediately, in the ContentList receive path); this
-        // only bounds the worst case where nobody ever advertises the content
-        // again, so the substrate re-checks rather than never — on a hold that
-        // doubles per consecutive retirement, and a bounded number per tick.
-        // Retirement is a HOLD, not a delete.
-        acquisition::readmit_due_pins(&mut conn);
-
-        let pins = match crate::db::acquisition_pins::list_active_pins(&mut conn) {
-            Ok(p) => p,
-            Err(e) => {
-                warn!(
-                    target: "elohim_storage::acquisition",
-                    error = %e,
-                    first_pass,
-                    "acquisition reconcile stopped: active-pin census failed"
-                );
-                return AcquisitionReconcileOutcome::PinLoadFailed;
-            }
-        };
-        let active_pin_count = pins.len();
-        let pin_wants: Vec<(i32, Vec<String>)> = pins
-            .iter()
-            .filter(|p| p.kind == "item")
-            .map(|p| (p.id, vec![p.head_ref.clone()]))
-            .collect();
-
-        let want_ids: Vec<String> = pin_wants
-            .iter()
-            .flat_map(|(_, ids)| ids.iter().cloned())
-            .collect();
-        // Slice 1: all pinned content lives in the lamad app — revisit the
-        // app-scope here if cross-app pins land.
-        let app_ctx = crate::db::AppContext::default_lamad();
-        let local_has =
-            match crate::db::content_diesel::content_ids_present(&mut conn, &app_ctx, &want_ids) {
-                Ok(set) => set,
-                Err(e) => {
-                    warn!(
-                        target: "elohim_storage::acquisition",
-                        error = %e,
-                        first_pass,
-                        active_pins = active_pin_count,
-                        "acquisition reconcile stopped: local-presence query failed"
-                    );
-                    return AcquisitionReconcileOutcome::PresenceQueryFailed;
-                }
-            };
-        // A pin whose bytes are local has its answer: reset its backoff ladder
-        // on the row. Writes nothing once every fetched pin is settled.
-        acquisition::settle_fetched_pins(&mut conn, &pins, &local_has);
-        // DB work is done; drop the connection before the reconcile await so
-        // it isn't held across the acquisition write-lock.
-        drop(conn);
-
-        // Peer-breadth budget: the dispatch rotation walks a different provider
-        // per retry, so the budget IS the number of providers probed before an
-        // item is called unsatisfiable. Sizing it from the live peer count is
-        // what makes "exhausted" mean actually-unsatisfiable rather than
-        // "we asked 3 of the 6 peers".
+        // Peer-breadth budget: `drain_acquisition_queue` walks a different
+        // provider per retry of a want, so the budget IS the number of
+        // providers probed before an item is called unsatisfiable. Sizing it
+        // from the live peer count is what makes "exhausted" mean
+        // actually-unsatisfiable rather than "we asked 3 of the 6 peers" — and
+        // what lets this transport retire on it.
         let connected_peers = self.swarm.read().await.connected_peers().count();
-        let to_dispatch = self
-            .acquisition
-            .reconcile(
-                pin_wants,
-                &local_has,
-                acquisition::retry_budget_for_peers(connected_peers),
-            )
-            .await;
-        if !to_dispatch.is_empty() {
+        let tick = match acquisition::reconcile_tick(
+            pool,
+            &self.acquisition,
+            connected_peers,
+            acquisition::RetirePolicy::EveryPeerProbed,
+            chrono::Utc::now(),
+        )
+        .await
+        {
+            Ok(tick) => tick,
+            Err(outcome) => return outcome,
+        };
+        if !tick.to_dispatch.is_empty() {
             let mut q = self.acquisition_queue.lock().await;
-            for id in to_dispatch {
+            for id in tick.to_dispatch {
                 if !q.contains(&id) {
                     q.push_back(id);
                 }
             }
         }
 
-        crate::metrics::set_acquisition_reconcile_completed(active_pin_count);
-        if first_pass {
+        crate::metrics::set_acquisition_reconcile_completed(tick.active_pins);
+        if tick.first_pass {
             info!(
                 target: "elohim_storage::acquisition",
-                active_pins = active_pin_count,
-                desired_items = want_ids.len(),
-                local_items = local_has.len(),
+                active_pins = tick.active_pins,
+                desired_items = tick.desired_items,
+                local_items = tick.local_items,
                 "acquisition reconcile first pass completed"
             );
         } else {
             debug!(
                 target: "elohim_storage::acquisition",
-                active_pins = active_pin_count,
-                desired_items = want_ids.len(),
-                local_items = local_has.len(),
+                active_pins = tick.active_pins,
+                desired_items = tick.desired_items,
+                local_items = tick.local_items,
+                readmitted = tick.readmitted,
+                retired = tick.retired,
                 "acquisition reconcile completed"
             );
         }
-
-        // Retire pins the fabric cannot satisfy. Held BACK, not deleted: the pin
-        // row survives (a person still wants it) and is re-admitted the moment a
-        // peer advertises the content or its hold elapses. Without this an
-        // exhausted pin's tracker keeps `fetched < total` forever and
-        // `pull.caughtUp` can never go true (alpha-A: 73 total / 3 fetched / 70
-        // failed, caughtUp false for 12h+ with no runtime path to retirement —
-        // the only status-flip caller was the HTTP DELETE route).
-        self.retire_exhausted_pins().await;
         AcquisitionReconcileOutcome::Completed
-    }
-
-    /// Flip pins whose every want exhausted its retry budget to
-    /// [`acquisition::PIN_STATUS_RETIRED`], and republish the retired gauge.
-    ///
-    /// No tracker eviction is written here: once a pin leaves `list_active_pins`
-    /// the `trackers.retain` at the top of `AcquisitionState::reconcile` drops it
-    /// on the next cycle, removing it from BOTH `total` and `fetched` in the
-    /// rollup — which is exactly what lets `caught_up` become reachable again.
-    async fn retire_exhausted_pins(&self) {
-        let Some(ref pool) = self.db_pool else { return };
-        let exhausted = self.acquisition.exhausted_pin_ids().await;
-        let Ok(mut conn) = pool.get() else { return };
-        acquisition::retire_exhausted_pins(&mut conn, &exhausted);
-    }
-
-    /// Primary re-admission arm: a peer's content inventory naming a RETIRED
-    /// pin's `head_ref` is fresh evidence that the bytes exist somewhere, so the
-    /// pin goes straight back to `active` and re-enters the pull queue on the
-    /// next reconcile.
-    ///
-    /// Called from the inventory receive path, where the advertised id set is
-    /// already in hand — no extra network, and no polling loop.
-    fn readmit_pins_named_by_inventory(&self, remote_ids: &[String]) {
-        if remote_ids.is_empty() {
-            return;
-        }
-        let Some(ref pool) = self.db_pool else { return };
-        let Ok(mut conn) = pool.get() else { return };
-        acquisition::readmit_pins_named_by_inventory(&mut conn, remote_ids);
     }
 
     /// Provide-loop tick: derive the caught-up commons desired set and run the
