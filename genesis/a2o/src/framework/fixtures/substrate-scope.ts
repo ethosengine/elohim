@@ -354,7 +354,8 @@ const TOOL_CAP_BINARIES: Record<string, () => string> = {
   // The native developer tool and its attestation-ref sibling (devflow/native-gate-evidence):
   // the same env names gate-evidence.mjs and a2o's household attestation resolve them by.
   'brit-cli': () => process.env.BRIT_BIN ?? 'brit',
-  'brit-build-ref-cli': () => process.env.BRIT_BUILD_REF_BIN ?? process.env.BRIT_BUILD_REF ?? 'brit-build-ref',
+  'brit-build-ref-cli': () =>
+    process.env.BRIT_BUILD_REF_BIN ?? process.env.BRIT_BUILD_REF ?? 'brit-build-ref',
 };
 
 function binaryOnPath(bin: string): boolean {
