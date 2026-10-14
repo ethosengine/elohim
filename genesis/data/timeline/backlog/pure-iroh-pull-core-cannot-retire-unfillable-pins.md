@@ -38,5 +38,15 @@ pin.
 **Fix shape, not built.** Record which providers were asked for each want and spend the budget only on distinct
 ones, or rotate per want. Then switch the core to `EveryPeerProbed`.
 
+**The libp2p drain has the same gap (added 2026-10-14).** `P2PNode::drain_acquisition_queue` picks each want's
+peer with `rotated_peer_index(rotation, position, peers)`, and the rotation also advances once per drain, not per
+want. With two peers and two stable batches of 25, every retry of a want goes to the peer it asked before. So on
+libp2p a spent budget of `max(3, connected peers)` means "asked that many times", and a peer holding the bytes may
+never have been asked before the pin is retired. On dev this retires a pin for 6 h and re-probes it; on the backoff
+branch it is the reason the hold ladder stops at 24 h instead of a week (`PIN_READMIT_MAX_HOLD`). A round-3 attempt
+to track the providers asked per want was reverted after Codex's review (`codex-review-pin-readmit-3.md`) showed
+its extra-attempt rule could keep an exhausted pin pending forever while peers came and went. Any fix must keep
+retirement live when the provider set churns or drops to zero.
+
 **Done when.** A pure-iroh peer with one unfillable pin and two book peers reaches `caughtUp` with
 `elohim_acquisition_pins_retired = 1` after both peers were asked.
