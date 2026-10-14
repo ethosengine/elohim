@@ -116,6 +116,21 @@ export function closureKey({ project, fingerprints, manifestBlob: blob, cargoEnv
   return createHash('sha256').update(JSON.stringify(material)).digest('hex');
 }
 
+/**
+ * Paths under the project's dir (and its manifest) that differ from the commit's tree —
+ * modified, staged, or untracked. The closure key names the COMMIT's bytes; the recipe runs
+ * against the WORKING TREE. When these differ, a verdict must not be recorded against the
+ * commit, and a hit for the commit says nothing about the bytes about to be gated.
+ */
+export function dirtyPaths(project, { root, spawn = spawnSync }) {
+  const r = spawn('git', ['status', '--porcelain', '--untracked-files=normal', '--', project.dir, project.manifestPath], {
+    cwd: root,
+    encoding: 'utf8',
+  });
+  if (r.status !== 0) return null;
+  return r.stdout.split('\n').map(line => line.slice(3).trim()).filter(Boolean);
+}
+
 /** `brit-build-ref build find` rows for this project's closure, or `{ error }`. */
 export function findEvidence(project, key, { buildRefBin, root, spawn = spawnSync }) {
   // `--repo` is a top-level option of brit-build-ref: it precedes the subcommand.
@@ -179,7 +194,11 @@ export function gateEvidence(project, { env = process.env, root, commit, cargoEn
   const key = closureKey({ project, fingerprints: fp.fingerprints, manifestBlob: blob, cargoEnv });
   const found = findEvidence(project, key, { buildRefBin, root, spawn });
   if (found.error) return { key, line: `unavailable (${found.error})` };
-  return { key, rows: found.rows, line: describeEvidence(found.rows, now), buildRefBin };
+  const dirty = dirtyPaths(project, { root, spawn });
+  let line = describeEvidence(found.rows, now);
+  if (dirty === null) line += '; working tree state unknown, nothing will be recorded';
+  else if (dirty.length > 0) line += `; working tree dirty under ${project.dir} (${dirty.length} path${dirty.length === 1 ? '' : 's'}): the evidence names the commit, not these bytes, and nothing will be recorded`;
+  return { key, rows: found.rows, line, buildRefBin, dirty: dirty === null ? null : dirty.length > 0 };
 }
 
 /**
@@ -187,7 +206,10 @@ export function gateEvidence(project, { env = process.env, root, commit, cargoEn
  * CID, a stored verdict node as the output, and `--success` as observed (red is stored too —
  * a known-red closure is information). Returns the spawn result; never throws.
  */
-export function recordEvidence(project, key, { success, seconds, commit, buildRefBin, root, jobs, spawn = spawnSync }) {
+export function recordEvidence(project, key, { success, seconds, commit, buildRefBin, root, jobs, dirty, spawn = spawnSync }) {
+  if (dirty !== false) {
+    return { status: 1, stdout: '', stderr: dirty === null ? 'working tree state unknown' : `working tree dirty under ${project.dir}` };
+  }
   const verdict = { exit: success ? 0 : 1, seconds: Math.round(seconds), ...(jobs ? { jobs } : {}) };
   const args = [
     '--repo', root,

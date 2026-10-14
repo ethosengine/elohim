@@ -233,6 +233,7 @@ function runProject(project, printOnly, namesOnly) {
       buildRefBin: evidence.buildRefBin,
       root: ROOT,
       jobs: cargoEnvOf(childEnv).CARGO_BUILD_JOBS,
+      dirty: evidence.dirty,
     });
     const note = put.status === 0
       ? `recorded ${String(put.stdout || '').trim().slice(0, 16)}…`
