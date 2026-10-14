@@ -197,6 +197,16 @@
             "timeout": 3
           }
         ]
+      },
+      {
+        "matcher": ".*",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "f=\"$CLAUDE_PROJECT_DIR/.claude/hooks/native-seam-guidance.py\"; [ -f \"$f\" ] && python3 \"$f\" claude || exit 0",
+            "timeout": 2
+          }
+        ]
       }
     ],
     "PostToolUse": [
