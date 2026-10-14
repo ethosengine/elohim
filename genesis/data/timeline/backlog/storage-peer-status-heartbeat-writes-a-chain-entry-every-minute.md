@@ -18,6 +18,7 @@ cites:
   - elohim/elohim-storage/src/heartbeat.rs
   - elohim/holochain/dna/infrastructure/zomes/infrastructure/src/peer_status.rs
   - genesis/data/timeline/backlog/arch-dataplane-borrows-backlog.md
+  - genesis/docs/superpowers/specs/2026-10-03-plane-separation-design.md
   - elohim/elohim-storage/.epr-meta/idle-is-free.habit.md
 ---
 
@@ -47,16 +48,27 @@ authorisation lookup on that chain slower (`conductor-cap-grant-scan-per-zome-ca
 window (`HEARTBEAT_VOUCH_WINDOW`, `heartbeat.rs:28`). A tick that writes nothing must still vouch, or fall through
 to the ping the supervisor already has.
 
-**Cure candidates, none built, none chosen.**
+**Already ruled, and the order is binding (corrected 2026-10-14).** This entry first listed "write only on change"
+as a cure to take first. That is wrong. `genesis/docs/superpowers/specs/2026-10-03-plane-separation-design.md` §5
+ruled on this on 2026-10-03:
 
-- Write only when the snapshot differs from the last one written, plus a slow keep-alive (hourly, say) so a reader
-  can bound staleness. Coordinator-or-storage-only; no DNA hash move. Readers treat "no newer snapshot" as
-  unchanged within the keep-alive bound.
-- Carry liveness on the substrate connection the peers already hold and notarise only transitions (came up,
-  degraded, leaving).
-- Independently: have the read ask for the newest link only, or keep one link and replace it, so read cost stops
-  growing with history. Old links already written stay on the chain either way.
+- Ruling 5: the heartbeat splits in two. Posture (lifecycle, pool flags, archetype) is a standing declaration
+  written on change. Liveness moves to the substrate presence that already exists (`peer_liveness`, 35 s). The
+  order: arm that presence on iroh and define the unarmed fallback; move shard placement, the resilience card and
+  network posture to read posture and substrate liveness; only then change the writer. Changing the writer first
+  drops every healthy peer out of placement after 900 s.
+- Ruling 6: the latest-status read is bounded regardless of the above. Coordinator-only.
 
-**Done when.** A resting peer's infrastructure chain grows by a declared number of actions a day that is not a
-multiple of its uptime in minutes, measured on the household, and the latest-status read's cost is shown not to
-grow with history.
+Its fleet reading (§14, 2026-10-04) puts the cost in validating and reading back, not in writing:
+`get_latest_peer_status_for_agent` was the top zome function by time fleet-wide (3.3 calls a minute at a mean of
+2.6 s), and `record_peer_status` itself was 25 ms.
+
+**State on 2026-10-14.** Neither ruling is built. The read still fetches and sorts every link
+(`peer_status.rs:47-58`); the writer still ticks every 60 s.
+
+**Next slice, chosen by the operator 2026-10-14 as the sprint's next story:** ruling 6, the bounded read. It is a
+coordinator hot-swap with no DNA hash move. The writer waits for ruling 5's first two steps.
+
+**Done when.** The latest-status read's cost is shown on the household not to grow with the peer's history
+(ruling 6); and, later, a resting peer's infrastructure chain grows by a declared number of actions a day that is
+not a multiple of its uptime in minutes (ruling 5).
