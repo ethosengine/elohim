@@ -8,8 +8,12 @@ This directory is for anyone editing the letter or its labels, or rebuilding the
 
 **Read it through a doorway** (the protocol's web gateways; there are several, so no single server is the only way in):
 
-- https://alpha.elohim.host/apps/letter-to-dtpr/index.html
-- https://doorway-alpha.elohim.host/apps/letter-to-dtpr/index.html
+- https://alpha.elohim.host/epr/letter-to-dtpr
+- https://doorway-alpha.elohim.host/epr/letter-to-dtpr
+
+That address shows the letter inside the protocol's chrome: its reach, who holds it, who
+stewards it and how it is governed. Link there, not to the raw bundle under `/apps/`, which
+exists for embedding.
 
 Both addresses serve the same bundle from the alpha test network (the project's staging
 network; production is paused). The bundle is content-addressed: its address is its

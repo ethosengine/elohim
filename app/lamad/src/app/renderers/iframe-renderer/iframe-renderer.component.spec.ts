@@ -1,5 +1,5 @@
 import { ComponentFixture, TestBed, fakeAsync, tick } from '@angular/core/testing';
-import { SimpleChange, ChangeDetectorRef } from '@angular/core';
+import { SimpleChange, ChangeDetectorRef, SecurityContext } from '@angular/core';
 import { IframeRendererComponent, Html5AppContent } from './iframe-renderer.component';
 import { ContentNode } from '../../models/content-node.model';
 import { DomSanitizer } from '@angular/platform-browser';
@@ -229,6 +229,24 @@ describe('IframeRendererComponent', () => {
       });
 
       expect(component.fallbackUrl).toBe('https://ncase.me/trust/');
+    });
+
+    it('frames the doorway-served bundle even when a fallback URL is present', () => {
+      component.node = createHtml5AppNode({
+        slug: 'letter-to-dtpr',
+        entryPoint: 'index.html',
+        fallbackUrl: 'https://claude.ai/artifact/example',
+      });
+      component.ngOnChanges({
+        node: new SimpleChange(null, component.node, true),
+      });
+
+      const framed = TestBed.inject(DomSanitizer).sanitize(
+        SecurityContext.RESOURCE_URL,
+        component.safeUrl
+      );
+      expect(framed).toBe('/apps/letter-to-dtpr/index.html');
+      expect(component.fallbackUrl).toBe('https://claude.ai/artifact/example');
     });
 
     it('should use static sandbox policy (Angular security restriction)', fakeAsync(() => {
