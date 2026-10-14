@@ -36,25 +36,27 @@
 //! `ELOHIM_CONSENT_SPEAKS_REFRESH`):
 //! - `demand` (the default). The carrier of a resting node reads nothing.
 //!   (Not the whole node: the affirmation worker, `device_affirmation`, reads
-//!   standing once a minute after start and then once every thirty minutes,
-//!   in either mode.) A read is wanted
+//!   standing once, 60 s after start, and then once every thirty minutes, in
+//!   either mode.) A read is wanted
 //!   by a device's signed ask, by a pending-list, decide or signed-out
 //!   standing request, and by an identity write. One read runs at a time, and
 //!   a caller that waited behind one is judged against it when its turn
 //!   comes. A read wanted by a request is not made within
 //!   `SPEAKS_REFRESH_SECS` of the last attempt, answered or not; only a
 //!   device's ask may try again `SPEAKS_RETRY_SECS` after a read the cell did
-//!   not answer (the re-offer that retry exists for). An identity write
-//!   that changed something always reads. An ask cannot wait for a read (the
+//!   not answer (the re-offer that retry exists for). A write to this node's
+//!   standing that the cell took is owed one read, made by the writer or by
+//!   whichever read begins after it. An ask cannot wait for a read (the
 //!   transport's event loop answers it), so an ask that finds no fresh read
 //!   wants one and is dropped unanswered, exactly as by a node whose standing
 //!   is unknown; the asking device offers again every `ROUND_SECS` and is
 //!   listed then.
 //! - `timer`. One refresher reads every `SPEAKS_REFRESH_SECS`, whether or
 //!   not anyone asks, as before this switch existed: it asks again every
-//!   turn whatever the cell last answered, and dates what it read when the
-//!   read landed. (On demand a read is dated when its turn came, before the
-//!   cell was asked: the two differ by one read's duration.)
+//!   turn whatever the cell last answered, dates what it read when the read
+//!   landed, and alone says what this node's own key is. (On demand a read
+//!   is dated when its turn came, before the cell was asked: the two differ
+//!   by one read's duration; and any read names the node.)
 //!
 //! What demand gives up against a healthy timer. This is a difference in the
 //! safety direction, not only in availability, and it is inside the bound
@@ -97,17 +99,17 @@
 //! anyone. A peer therefore never loses its place to one that holds more.
 //!
 //! What time is. Every pace here (the refresh, the retry) is counted on a
-//! clock nobody can set, from one origin for the life of the process: time
-//! since boot, suspend included, on Linux (`CLOCK_BOOTTIME`), and the
-//! process's monotonic clock elsewhere, which may not count a suspend. So a
-//! read's age is the larger of what that clock and the wall clock each say
-//! has passed since it: a wall clock set back adds nothing, one set ahead
-//! (or one that ran through a suspend the other clock slept through) only
-//! makes the read older. When the steady clock cannot be read, or reads
-//! earlier than it has before, nothing is known to be fresh: what was read
-//! is dropped, a read that was out at that moment is not kept when it
-//! lands, nothing is listed and nothing is read until the clock answers,
-//! and listing waits for a new read (`Carrier::now`).
+//! clock nobody can set, from one origin for the life of the process, that
+//! counts the time the machine is suspended where the platform has one
+//! (`steady_micros`: Linux, Android, Apple, Windows; elsewhere the process's
+//! monotonic clock, which may not). A read's age is the larger of what that
+//! clock and the wall clock each say has passed since it: a wall clock set
+//! back adds nothing, one set ahead only makes the read older. When the
+//! steady clock cannot be read, or reads earlier than it has before,
+//! nothing is known to be fresh: in one step under one lock what was read
+//! and the waiting asks are dropped, so a read that was out at that moment
+//! is not kept when it lands; nothing is listed and nothing is read until
+//! the clock answers, and listing waits for a new read (`Carrier::tick`).
 //!
 //! This node's listing proof is made by its own worker (`prover`), woken by a
 //! read that says the node speaks for someone. A read never waits for it.
@@ -152,22 +154,130 @@ struct Waiting {
     arrived: i64,
 }
 
+/// What one read of whom this node speaks for answered, and when: on the
+/// carrier's clock, and on the wall clock.
+struct Evidence {
+    speaks: Speaks,
+    at: i64,
+    wall_at: i64,
+}
+
+/// What is kept against the carrier's clock, under one lock, so that finding
+/// the clock wrong and keeping a read are each one step and never interleave:
+/// a read is kept only in the epoch it began in, and an ask waits only in
+/// the epoch it arrived in.
+#[derive(Default)]
+struct Kept {
+    /// The latest the clock has read: a reading before it is not trusted.
+    high: Option<i64>,
+    /// How many times the clock has been found untrustworthy.
+    epoch: u64,
+    /// Whom this node speaks for, as last read from its own cell.
+    speaks: Option<Evidence>,
+    /// Asks waiting for a read, by first arrival (module doc, "A slow cell").
+    waiting: Vec<Waiting>,
+}
+
+impl Kept {
+    /// The last read when it is younger than `max_age_micros`, or unknown.
+    /// Its age is the larger of what the carrier's clock (`now_micros`) and
+    /// the wall clock (`wall_micros`) say has passed: a wall clock set back
+    /// says less than nothing and adds nothing, and one that ran on while
+    /// the carrier's clock stood still makes the read as old as it is.
+    fn within(&self, now_micros: i64, wall_micros: i64, max_age_micros: i64) -> Speaks {
+        match &self.speaks {
+            Some(read)
+                if now_micros < read.at.saturating_add(max_age_micros)
+                    && wall_micros < read.wall_at.saturating_add(max_age_micros) =>
+            {
+                read.speaks.clone()
+            }
+            _ => Speaks::Unknown,
+        }
+    }
+
+    /// When this ask from `source` first arrived and was not listed,
+    /// remembering now if it is not remembered. Room is made when there is
+    /// none: a peer at its share gives up its own oldest; a full table gives
+    /// up the oldest of the peer holding the most, the arriving peer's own
+    /// when it holds as many as anyone. A forgotten ask falls back to a read
+    /// younger than `SPEAKS_REFRESH_SECS`, and is remembered again when it
+    /// next arrives.
+    // bounded-work: passes over at most MAX_WAITING asks, each kept for an
+    // ask's life at most.
+    fn remember(&mut self, source: &str, ask: &Ask, now_micros: i64) -> i64 {
+        let waiting = &mut self.waiting;
+        waiting.retain(|w| now_micros < w.arrived.saturating_add(ASK_LIFE_MICROS));
+        if let Some(w) = waiting.iter().find(|w| w.source == source && w.ask == *ask) {
+            return w.arrived;
+        }
+        let list: &Vec<Waiting> = waiting;
+        let held = |peer: &str| list.iter().filter(|w| w.source == peer).count();
+        let mine = held(source);
+        // Kept in order of arrival, so a peer's first is its oldest.
+        let gives_way = if mine >= MAX_WAITING_PER_SOURCE {
+            list.iter().position(|w| w.source == source)
+        } else if list.len() >= MAX_WAITING {
+            let most = list.iter().map(|w| held(&w.source)).max().unwrap_or(0);
+            if mine >= most {
+                list.iter().position(|w| w.source == source)
+            } else {
+                list.iter().position(|w| held(&w.source) == most)
+            }
+        } else {
+            None
+        };
+        if let Some(index) = gives_way {
+            let gone = waiting.remove(index);
+            debug!(
+                source,
+                gave_way = %gone.source,
+                "device carrier: no room to remember another waiting ask; one gave way"
+            );
+        }
+        waiting.push(Waiting {
+            source: source.to_string(),
+            ask: ask.clone(),
+            arrived: now_micros,
+        });
+        now_micros
+    }
+
+    /// This ask from `source` waits no longer.
+    fn forget(&mut self, source: &str, ask: &Ask) {
+        self.waiting
+            .retain(|w| !(w.source == source && w.ask == *ask));
+    }
+}
+
 /// Microseconds on a clock nobody can set, from one origin for the life of
-/// the process, or `None` when it cannot be read. On Linux, time since boot
-/// with suspend counted (`CLOCK_BOOTTIME`), so what was read before a suspend
-/// is as old afterwards as it is; a failed reading is `None`, never a
-/// reading from another clock. Elsewhere, the process's monotonic clock,
-/// which may not count a suspend: on such a platform a read made before a
-/// long suspend can be counted younger than it is.
+/// the process, or `None` when it cannot be read; a failed reading is never
+/// a reading from another clock. It should count the time the machine is
+/// suspended, so that what was read before a suspend is as old afterwards as
+/// it is:
+/// - Linux, Android: `CLOCK_BOOTTIME`, which counts it.
+/// - Apple: `CLOCK_MONOTONIC`, which counts it there (clock_gettime(3) on
+///   macOS: it "will continue to increment while the system is asleep";
+///   `CLOCK_UPTIME_RAW` is the one that does not).
+/// - Windows: `GetTickCount64`, which counts time spent in sleep or
+///   hibernation, in milliseconds.
+/// - Anywhere else: the process's monotonic clock, which may not count a
+///   suspend. There a read made before a suspend can be counted younger
+///   than it is, unless the wall clock ran through the suspend
+///   (`Kept::within` takes the larger of the two).
 fn steady_micros() -> Option<i64> {
-    #[cfg(any(target_os = "linux", target_os = "android"))]
+    #[cfg(any(target_os = "linux", target_os = "android", target_vendor = "apple"))]
     {
+        #[cfg(any(target_os = "linux", target_os = "android"))]
+        const COUNTS_SUSPEND: libc::clockid_t = libc::CLOCK_BOOTTIME;
+        #[cfg(target_vendor = "apple")]
+        const COUNTS_SUSPEND: libc::clockid_t = libc::CLOCK_MONOTONIC;
         let mut at = libc::timespec {
             tv_sec: 0,
             tv_nsec: 0,
         };
         // SAFETY: `at` is a valid, writable timespec for the call's duration.
-        if unsafe { libc::clock_gettime(libc::CLOCK_BOOTTIME, &mut at) } != 0 {
+        if unsafe { libc::clock_gettime(COUNTS_SUSPEND, &mut at) } != 0 {
             return None;
         }
         // The field types differ by platform.
@@ -178,7 +288,22 @@ fn steady_micros() -> Option<i64> {
                 .saturating_add(at.tv_nsec as i64 / 1_000),
         )
     }
-    #[cfg(not(any(target_os = "linux", target_os = "android")))]
+    #[cfg(windows)]
+    {
+        #[link(name = "kernel32")]
+        extern "system" {
+            fn GetTickCount64() -> u64;
+        }
+        // SAFETY: takes no arguments and cannot fail.
+        let millis = unsafe { GetTickCount64() };
+        i64::try_from(millis).ok()?.checked_mul(1_000)
+    }
+    #[cfg(not(any(
+        target_os = "linux",
+        target_os = "android",
+        target_vendor = "apple",
+        windows
+    )))]
     {
         static STARTED: OnceLock<std::time::Instant> = OnceLock::new();
         let since = STARTED.get_or_init(std::time::Instant::now).elapsed();
@@ -246,20 +371,23 @@ pub enum Want {
     /// The timer's turn: read, unless a read landed while this turn waited
     /// for its own.
     Timer,
-    /// A write to this node's standing just succeeded: read.
+    /// A write to this node's standing succeeded: read, unless a read that
+    /// began after the write has landed already.
+    Owed,
+    /// Read, whatever was read before.
     Now,
 }
 
 impl Want {
     /// What a write to this node's identity over its routes wants. `wrote`
     /// is whether a call that writes standing came back successful from the
-    /// cell (`device_consent::MarkedCell`): then read now, whatever status
-    /// the request went on to answer with. Otherwise a success (it was
+    /// cell (`device_consent::MarkedCell`): then the read it owes is made,
+    /// whatever status the request went on to answer with. Otherwise a success (it was
     /// already so) wants no more than any request, and a refusal nothing,
     /// however often it is sent.
     pub fn after_write(status: u16, wrote: bool) -> Option<Self> {
         match (wrote, status) {
-            (true, _) => Some(Self::Now),
+            (true, _) => Some(Self::Owed),
             (false, 200..=299) => Some(Self::Request),
             (false, _) => None,
         }
@@ -296,9 +424,9 @@ pub struct Carrier {
     proven: Mutex<Option<(String, String)>>,
     /// This node's own announce, when it is the asking device.
     announce: Mutex<Option<Announce>>,
-    /// Whom this node speaks for, as last read from its own cell, and when:
-    /// on the carrier's clock, and on the wall clock.
-    speaks: Mutex<Option<(Speaks, i64, i64)>>,
+    /// Whom this node speaks for as last read, the asks waiting for a read,
+    /// and how far the clock they are dated by can be trusted.
+    kept: Mutex<Kept>,
     /// How that read is kept; on demand until `set_refresh` says otherwise.
     refresh: OnceLock<SpeaksRefresh>,
     /// Woken when something wants that read and one is due.
@@ -311,18 +439,15 @@ pub struct Carrier {
     proof_wanted: tokio::sync::Notify,
     /// Held while the listing proof is made, so one is made at a time.
     proving: tokio::sync::Mutex<()>,
-    /// Asks waiting for a read, by first arrival (module doc, "A slow cell").
-    waiting: Mutex<Vec<Waiting>>,
     /// The time every age and pace is counted on, in microseconds, or `None`
     /// when it cannot be read: `steady_micros`, or a test's own clock.
     clock: Box<dyn Fn() -> Option<i64> + Send + Sync>,
-    /// The latest that clock has read: a reading before it is not trusted.
-    clock_high: Mutex<Option<i64>>,
     /// The clock is failing and has said so once.
     clock_failing: std::sync::atomic::AtomicBool,
-    /// How many times that clock has been found untrustworthy. A read that
-    /// was out across one is not kept.
-    clock_epoch: std::sync::atomic::AtomicU64,
+    /// In tests, run by a read after its last look at the clock and before
+    /// it is kept.
+    #[cfg(test)]
+    before_keeping: Mutex<Option<Box<dyn Fn() + Send + Sync>>>,
     /// Writes to this node's standing that succeeded, and how many of them
     /// a read that began after them has landed for. While they differ a
     /// read is owed, whatever the pace.
@@ -385,64 +510,66 @@ impl Carrier {
             listed_proof: Mutex::new(None),
             proven: Mutex::new(None),
             announce: Mutex::new(None),
-            speaks: Mutex::new(None),
+            kept: Mutex::new(Kept::default()),
             refresh: OnceLock::new(),
             speaks_wanted: tokio::sync::Notify::new(),
             reading: tokio::sync::Mutex::new(()),
             reads: Mutex::new(SpeaksReads::default()),
             proof_wanted: tokio::sync::Notify::new(),
             proving: tokio::sync::Mutex::new(()),
-            waiting: Mutex::new(Vec::new()),
             clock: Box::new(steady_micros),
-            clock_high: Mutex::new(None),
             clock_failing: std::sync::atomic::AtomicBool::new(false),
-            clock_epoch: std::sync::atomic::AtomicU64::new(0),
+            #[cfg(test)]
+            before_keeping: Mutex::new(None),
             standing_writes: std::sync::atomic::AtomicU64::new(0),
             standing_writes_read: std::sync::atomic::AtomicU64::new(0),
             wall: Box::new(now_micros),
         }
     }
 
-    /// The time, or `None` when nothing may be taken for fresh: the clock
-    /// could not be read, or read earlier than it has before. Either way
-    /// what was read from the cell is dropped and the waiting asks with it,
-    /// and a read that is out is not kept when it lands (`clock_epoch`), so
-    /// nothing is listed until a new read is made on a clock that
-    /// answers. A clock that only failed keeps its pacing, since its origin
-    /// is unchanged, and lets a device's ask read at the retry pace; one
-    /// that went backwards starts its pacing over from that reading.
-    fn now(&self) -> Option<i64> {
+    fn kept_lock(&self) -> std::sync::MutexGuard<'_, Kept> {
+        self.kept.lock().unwrap_or_else(|e| e.into_inner())
+    }
+
+    /// The time and the clock's epoch, or `None` when nothing may be taken
+    /// for fresh: the clock could not be read, or read earlier than it has
+    /// before. The clock is read with the lock held, so readings are taken
+    /// in the order they are compared and a healthy clock never looks
+    /// backwards to two callers at once. When it is found wrong, in that
+    /// same step what was read from the cell and the waiting asks are
+    /// dropped and the epoch moves on, so a read that is out is not kept
+    /// when it lands and nothing is listed until a new read is made on a
+    /// clock that answers. A clock that only failed keeps its pacing, since
+    /// its origin is unchanged, and lets a device's ask read at the retry
+    /// pace; one that went backwards starts its pacing over.
+    fn tick(&self) -> Option<(i64, u64)> {
         use std::sync::atomic::Ordering::SeqCst;
+        let mut kept = self.kept_lock();
         let read = (self.clock)();
-        let backwards = {
-            let mut high = self.clock_high.lock().unwrap_or_else(|e| e.into_inner());
-            match (read, *high) {
-                (Some(at), Some(before)) if at < before => {
-                    *high = Some(at);
-                    true
+        let backwards = match (read, kept.high) {
+            (Some(at), Some(before)) if at < before => true,
+            (Some(at), _) => {
+                kept.high = Some(at);
+                if self.clock_failing.swap(false, SeqCst) {
+                    info!("device carrier: its clock answers again");
                 }
-                (Some(at), _) => {
-                    *high = Some(at);
-                    if self.clock_failing.swap(false, SeqCst) {
-                        info!("device carrier: its clock answers again");
-                    }
-                    return Some(at);
-                }
-                (None, _) => false,
+                return Some((at, kept.epoch));
             }
+            (None, _) => false,
         };
-        self.clock_epoch.fetch_add(1, SeqCst);
+        if backwards {
+            kept.high = read;
+        }
+        kept.epoch += 1;
+        kept.speaks = None;
+        kept.waiting.clear();
+        drop(kept);
         if !self.clock_failing.swap(true, SeqCst) {
             warn!(
                 backwards,
                 "device carrier: its clock cannot be trusted, so it lists nothing until a new read"
             );
         }
-        *self.speaks.lock().unwrap_or_else(|e| e.into_inner()) = None;
-        self.waiting
-            .lock()
-            .unwrap_or_else(|e| e.into_inner())
-            .clear();
         let mut reads = self.reads_lock();
         if backwards {
             reads.last = None;
@@ -450,6 +577,12 @@ impl Carrier {
             *answered = false;
         }
         None
+    }
+
+    /// The time on the carrier's clock (`tick`).
+    #[cfg(test)]
+    fn now(&self) -> Option<i64> {
+        self.tick().map(|(at, _)| at)
     }
 
     pub fn set_self_key(&self, key: String) {
@@ -463,29 +596,15 @@ impl Carrier {
     /// Whom this node speaks for: the last read, or unknown when there is none
     /// or it is `SPEAKS_MAX_AGE_MICROS` old.
     pub fn speaks(&self) -> Speaks {
-        match self.now() {
-            Some(now) => self.speaks_within(now, SPEAKS_MAX_AGE_MICROS),
-            None => Speaks::Unknown,
-        }
-    }
-
-    /// The last read when it is younger than `max_age_micros`, or unknown.
-    /// Its age is the larger of what the carrier's clock (`now_micros`) and
-    /// the wall clock say has passed: a wall clock set back says less than
-    /// nothing and adds nothing, and one that ran on while the carrier's
-    /// clock stood still (a suspend, where that clock does not count one)
-    /// makes the read as old as it is.
-    fn speaks_within(&self, now_micros: i64, max_age_micros: i64) -> Speaks {
+        let Some((now, epoch)) = self.tick() else {
+            return Speaks::Unknown;
+        };
         let wall = (self.wall)();
-        match &*self.speaks.lock().unwrap_or_else(|e| e.into_inner()) {
-            Some((speaks, at, wall_at))
-                if now_micros < at.saturating_add(max_age_micros)
-                    && wall < wall_at.saturating_add(max_age_micros) =>
-            {
-                speaks.clone()
-            }
-            _ => Speaks::Unknown,
+        let kept = self.kept_lock();
+        if kept.epoch != epoch {
+            return Speaks::Unknown;
         }
+        kept.within(now, wall, SPEAKS_MAX_AGE_MICROS)
     }
 
     /// Say how the read is kept. Once, at start; whether it was taken.
@@ -509,13 +628,15 @@ impl Carrier {
     }
 
     /// Whether a read wanted for `want` may be made at `now_micros` (`Want`).
-    /// A read owed to a write to standing may be made by any of them.
+    /// A read owed to a write to standing may be made by any of them, and
+    /// `Want::Owed` reads for nothing else.
     pub fn read_due(&self, want: Want, now_micros: i64) -> bool {
         if self.read_owed() {
             return true;
         }
         let last = self.reads_lock().last;
         match (want, last) {
+            (Want::Owed, _) => false,
             (Want::Now | Want::Timer, _) | (_, None) => true,
             (Want::Ask, Some((at, false))) => now_micros >= at.saturating_add(SPEAKS_RETRY_MICROS),
             (Want::Ask | Want::Request, Some((at, _))) => {
@@ -545,13 +666,15 @@ impl Carrier {
     /// ask already on this node's list from the same peer (the request, what
     /// the device says of itself, its declared approver and its proof all
     /// equal), which keeps its place while the next read is made; and an ask
-    /// that was waiting before that read began (`Waiting`). Anything else
-    /// from a listed device is a new ask.
+    /// that arrived before that read began (`Waiting`): the read is dated
+    /// when it began, and both are dated on the same clock in the same
+    /// epoch, since finding the clock wrong drops both in one step.
+    /// Anything else from a listed device is a new ask.
     fn speaks_for_ask(&self, source: &str, ask: &Ask, wall_micros: i64) -> Speaks {
         if self.refresh() == SpeaksRefresh::Timer {
             return self.speaks();
         }
-        let Some(now) = self.now() else {
+        let Some((now, epoch)) = self.tick() else {
             return Speaks::Unknown;
         };
         // Everything that needs no read is checked before the ask may wake
@@ -572,119 +695,77 @@ impl Carrier {
         if admissible {
             self.want_speaks(now);
         }
-        match self.speaks_within(now, SPEAKS_REFRESH_MICROS) {
-            Speaks::Unknown => {}
-            fresh => {
-                self.waited(source, ask);
-                return fresh;
-            }
-        }
         let listed = self
             .pending
             .pick(&ask.request.device_key, wall_micros)
             .is_some_and(|p| p.source == source && p.ask == *ask);
+        let wall = (self.wall)();
+        let mut kept = self.kept_lock();
+        if kept.epoch != epoch {
+            return Speaks::Unknown;
+        }
+        match kept.within(now, wall, SPEAKS_REFRESH_MICROS) {
+            Speaks::Unknown => {}
+            fresh => {
+                kept.forget(source, ask);
+                return fresh;
+            }
+        }
         if listed {
-            return self.speaks_within(now, SPEAKS_MAX_AGE_MICROS);
+            return kept.within(now, wall, SPEAKS_MAX_AGE_MICROS);
         }
         if !admissible {
             return Speaks::Unknown;
         }
-        let read_at = self
-            .speaks
-            .lock()
-            .unwrap_or_else(|e| e.into_inner())
-            .as_ref()
-            .map(|(_, at, _)| *at);
-        match (self.first_arrival(source, ask, now), read_at) {
-            (arrived, Some(at)) if at >= arrived => {
-                let speaks = self.speaks_within(now, SPEAKS_MAX_AGE_MICROS);
-                if speaks != Speaks::Unknown {
-                    self.waited(source, ask);
-                }
-                speaks
-            }
-            _ => Speaks::Unknown,
+        let arrived = kept.remember(source, ask, now);
+        if kept.speaks.as_ref().is_none_or(|read| read.at < arrived) {
+            return Speaks::Unknown;
         }
+        let speaks = kept.within(now, wall, SPEAKS_MAX_AGE_MICROS);
+        if speaks != Speaks::Unknown {
+            kept.forget(source, ask);
+        }
+        speaks
     }
 
-    /// When this ask from `source` first arrived and was not listed,
-    /// remembering now if it is not remembered. Room is made when there is
-    /// none: a peer at its share gives up its own oldest; a full table gives
-    /// up the oldest of the peer holding the most, the arriving peer's own
-    /// when it holds as many as anyone. A forgotten ask falls back to a read
-    /// younger than `SPEAKS_REFRESH_SECS`, and is remembered again when it
-    /// next arrives.
-    // bounded-work: passes over at most MAX_WAITING asks, each kept for an
-    // ask's life at most.
+    #[cfg(test)]
     fn first_arrival(&self, source: &str, ask: &Ask, now_micros: i64) -> i64 {
-        let mut waiting = self.waiting.lock().unwrap_or_else(|e| e.into_inner());
-        waiting.retain(|w| now_micros < w.arrived.saturating_add(ASK_LIFE_MICROS));
-        if let Some(w) = waiting.iter().find(|w| w.source == source && w.ask == *ask) {
-            return w.arrived;
-        }
-        let held = |waiting: &Vec<Waiting>, peer: &str| {
-            waiting.iter().filter(|w| w.source == peer).count()
-        };
-        let mine = held(&waiting, source);
-        // Kept in order of arrival, so a peer's first is its oldest.
-        let gives_way = if mine >= MAX_WAITING_PER_SOURCE {
-            waiting.iter().position(|w| w.source == source)
-        } else if waiting.len() >= MAX_WAITING {
-            let most = waiting
-                .iter()
-                .map(|w| held(&waiting, &w.source))
-                .max()
-                .unwrap_or(0);
-            if mine >= most {
-                waiting.iter().position(|w| w.source == source)
-            } else {
-                waiting
-                    .iter()
-                    .position(|w| held(&waiting, &w.source) == most)
-            }
-        } else {
-            None
-        };
-        if let Some(index) = gives_way {
-            let gone = waiting.remove(index);
-            debug!(
-                source,
-                gave_way = %gone.source,
-                "device carrier: no room to remember another waiting ask; one gave way"
-            );
-        }
-        waiting.push(Waiting {
-            source: source.to_string(),
-            ask: ask.clone(),
-            arrived: now_micros,
-        });
-        now_micros
-    }
-
-    /// This ask from `source` waits no longer.
-    fn waited(&self, source: &str, ask: &Ask) {
-        self.waiting
-            .lock()
-            .unwrap_or_else(|e| e.into_inner())
-            .retain(|w| !(w.source == source && w.ask == *ask));
+        self.kept_lock().remember(source, ask, now_micros)
     }
 
     /// Take what one read answered: its evidence as of `at_micros` on the
-    /// carrier's clock and `wall_at_micros` on the wall clock, and the next
-    /// read paced from `done_micros`. A read the cell could not answer
-    /// leaves the last one to age into unknown. A failing read says so once
-    /// at warn and then at debug until it answers.
+    /// carrier's clock and `wall_at_micros` on the wall clock, kept only if
+    /// the clock's epoch is still `epoch`, and the next read paced from
+    /// `done_micros`. A read the cell could not answer leaves the last one
+    /// to age into unknown. A failing read says so once at warn and then at
+    /// debug until it answers. Whether the clock still stood.
     fn note_read(
         &self,
         read: Result<Speaks, super::device_consent::CellFailure>,
         at_micros: i64,
         wall_at_micros: i64,
         done_micros: i64,
-    ) {
+        epoch: u64,
+    ) -> bool {
         match read {
             Ok(speaks) => {
                 let person = speaks.person().is_some();
-                self.set_speaks_at(speaks, at_micros, wall_at_micros);
+                {
+                    // One step with `tick` finding the clock wrong: the
+                    // epoch is compared and the read kept under its lock.
+                    let mut kept = self.kept_lock();
+                    if kept.epoch != epoch {
+                        return false;
+                    }
+                    if kept.speaks.as_ref().map(|read| &read.speaks) != Some(&speaks) {
+                        info!(speaks = %speaks.words(), "device carrier: whom this node speaks for");
+                    }
+                    kept.speaks = Some(Evidence {
+                        speaks,
+                        at: at_micros,
+                        wall_at: wall_at_micros,
+                    });
+                }
                 let mut reads = self.reads_lock();
                 reads.last = Some((done_micros, true));
                 reads.landed += 1;
@@ -697,6 +778,9 @@ impl Carrier {
                 }
             }
             Err(why) => {
+                if self.kept_lock().epoch != epoch {
+                    return false;
+                }
                 let missing = super::device_consent_cell::standing_function_missing(&why);
                 let mut reads = self.reads_lock();
                 // The function's absence is an answer, and a lasting one: on
@@ -723,6 +807,7 @@ impl Carrier {
                 }
             }
         }
+        true
     }
 
     /// One read of whom this node speaks for, from its own cell. One runs at
@@ -730,12 +815,12 @@ impl Carrier {
     /// at is taken when its turn comes, not when it arrived, so callers that
     /// queued behind a slow read do not each read after it. With no cell
     /// (the conductor is not reachable yet) the turn is spent as a read the
-    /// cell did not answer. A read whose clock was found untrustworthy while
-    /// it was out, or that lands before it began, is not kept. Whether this
-    /// call read.
+    /// cell did not answer, and a read owed to a write stays owed. A read
+    /// whose clock was found untrustworthy while it was out, or that lands
+    /// before it began, is not kept. Whether this call read.
     // bounded-work: one standing read, and one Human read when this node is a
-    // controller. `Want::Now` is wanted only by a write that changed this
-    // node's identity, and a read is owed once per such write.
+    // controller. `Want::Owed`: one read per write to this node's standing,
+    // none when a read that began after the write has landed.
     // `Want::Request`: at most one attempt per SPEAKS_REFRESH_SECS however
     // many callers. `Want::Ask`: at most one answered read per
     // SPEAKS_REFRESH_SECS and one unanswered per SPEAKS_RETRY_SECS.
@@ -748,9 +833,8 @@ impl Carrier {
         use std::sync::atomic::Ordering::SeqCst;
         let landed = self.reads_lock().landed;
         let _one = self.reading.lock().await;
-        let epoch = self.clock_epoch.load(SeqCst);
         // With no clock a read could not be dated, so none is made.
-        let Some(began) = self.now() else {
+        let Some((began, epoch)) = self.tick() else {
             return false;
         };
         let wall_began = (self.wall)();
@@ -768,31 +852,43 @@ impl Carrier {
         self.reads_lock().last = Some((began, false));
         let Some(cell) = cell else {
             debug!("device carrier: no cell to read whom this node speaks for from yet");
-            self.standing_writes_read.fetch_max(writes, SeqCst);
             return false;
         };
-        self.set_self_key(cell.agent());
+        // By timer this node's key is the timer's to say, as it always was:
+        // a read made for a request does not name this node before the
+        // timer's first turn has.
+        if self.refresh() == SpeaksRefresh::Demand || want == Want::Timer {
+            self.set_self_key(cell.agent());
+        }
         let read = read_speaks(cell, names).await;
         // What was owed when this read began is paid now that it has landed,
         // not before: a caller that went away mid-read leaves it owed.
         self.standing_writes_read.fetch_max(writes, SeqCst);
-        match self.now() {
-            Some(done) if done >= began && self.clock_epoch.load(SeqCst) == epoch => {
+        let done = self.tick();
+        #[cfg(test)]
+        {
+            if let Some(pause) = &*self.before_keeping.lock().unwrap() {
+                pause();
+            }
+        }
+        let kept = match done {
+            Some((done, still)) if still == epoch && done >= began => {
                 let (at, wall_at) = match self.refresh() {
                     SpeaksRefresh::Demand => (began, wall_began),
                     SpeaksRefresh::Timer => (done, (self.wall)()),
                 };
-                self.note_read(read, at, wall_at, done);
+                self.note_read(read, at, wall_at, done, epoch)
             }
+            _ => false,
+        };
+        if !kept {
             // The clock failed or went backwards while the read was out:
             // what it read cannot be dated, and the next read is not paced
             // against a time from before.
-            _ => {
-                debug!("device carrier: a read landed across a clock it cannot be dated by");
-                let mut reads = self.reads_lock();
-                reads.last = None;
-                reads.landed += 1;
-            }
+            debug!("device carrier: a read landed across a clock it cannot be dated by");
+            let mut reads = self.reads_lock();
+            reads.last = None;
+            reads.landed += 1;
         }
         true
     }
@@ -845,21 +941,19 @@ impl Carrier {
     /// Record a read of whom this node speaks for, as of `now_micros` on the
     /// carrier's clock and now on the wall clock.
     pub fn set_speaks(&self, speaks: Speaks, now_micros: i64) {
-        self.set_speaks_at(speaks, now_micros, (self.wall)());
-    }
-
-    fn set_speaks_at(&self, speaks: Speaks, at_micros: i64, wall_at_micros: i64) {
-        let mut slot = self.speaks.lock().unwrap_or_else(|e| e.into_inner());
-        if slot.as_ref().map(|(s, _, _)| s) != Some(&speaks) {
-            info!(speaks = %speaks.words(), "device carrier: whom this node speaks for");
-        }
-        *slot = Some((speaks, at_micros, wall_at_micros));
+        let wall_at = (self.wall)();
+        self.kept_lock().speaks = Some(Evidence {
+            speaks,
+            at: now_micros,
+            wall_at,
+        });
     }
 
     /// A write to this node's standing came back successful from its cell
-    /// (begun, bootstrapped, enrolled, declared): a read is owed, and is
-    /// paid when one that began after this lands. Whoever wrote reads now;
-    /// if it goes away first, the next read of any kind is let through.
+    /// (begun, bootstrapped, enrolled, declared), said where the call
+    /// returns: a read is owed, and is paid when one that began after this
+    /// lands. Whoever wrote makes it; if it goes away first, or no cell can
+    /// be read, the next read of any kind is let through.
     pub fn standing_written(&self) {
         self.standing_writes
             .fetch_add(1, std::sync::atomic::Ordering::SeqCst);
@@ -2815,7 +2909,7 @@ mod tests {
         assert_eq!(cell.most_out(), 1);
         // Its evidence is as of when its turn came; the next read is paced
         // from when it landed.
-        assert_eq!(c.speaks.lock().unwrap().as_ref().unwrap().1, began);
+        assert_eq!(c.kept_lock().speaks.as_ref().unwrap().at, began);
         assert_eq!(c.reads_lock().last, Some((began + 100 * SECOND, true)));
         clock.set(began + 130 * SECOND - 1);
         assert!(!turn(&c, &cell, Want::Request).await.unwrap());
@@ -3209,7 +3303,7 @@ mod tests {
         // A read that took ten seconds is dated when it landed, so it is
         // listed on for 120 s from then.
         assert_eq!(
-            c.speaks.lock().unwrap().as_ref().unwrap().1,
+            c.kept_lock().speaks.as_ref().unwrap().at,
             began + 10 * SECOND
         );
         clock.set(began + 10 * SECOND + SPEAKS_MAX_AGE_MICROS - 1);
@@ -3224,7 +3318,7 @@ mod tests {
         clock.pass(10 * SECOND);
         cell.let_reads_go(1);
         assert!(read.await.unwrap());
-        assert_eq!(d.speaks.lock().unwrap().as_ref().unwrap().1, began);
+        assert_eq!(d.kept_lock().speaks.as_ref().unwrap().at, began);
     }
 
     #[tokio::test]
@@ -3264,11 +3358,11 @@ mod tests {
         for refused in [400, 401, 403, 404, 409, 500, 503] {
             assert_eq!(Want::after_write(refused, false), None);
             // A request that failed after its write to standing succeeded.
-            assert_eq!(Want::after_write(refused, true), Some(Want::Now));
+            assert_eq!(Want::after_write(refused, true), Some(Want::Owed));
         }
         for succeeded in [200, 201] {
             assert_eq!(Want::after_write(succeeded, false), Some(Want::Request));
-            assert_eq!(Want::after_write(succeeded, true), Some(Want::Now));
+            assert_eq!(Want::after_write(succeeded, true), Some(Want::Owed));
         }
         let clock = Clock::new();
         let c = Arc::new(carrier_at(&clock));
@@ -3418,12 +3512,7 @@ mod tests {
             assert_eq!(late.is_some(), took < 30, "a read of {took} s");
             // Once listed, the wait is forgotten.
             if listed {
-                assert!(c
-                    .waiting
-                    .lock()
-                    .unwrap()
-                    .iter()
-                    .all(|w| w.source != "peer-a"));
+                assert!(c.kept_lock().waiting.iter().all(|w| w.source != "peer-a"));
             }
         }
     }
@@ -3440,8 +3529,8 @@ mod tests {
     }
 
     fn waiting_from(c: &Carrier, peer: &str) -> usize {
-        let waiting = c.waiting.lock().unwrap();
-        waiting.iter().filter(|w| w.source == peer).count()
+        let kept = c.kept_lock();
+        kept.waiting.iter().filter(|w| w.source == peer).count()
     }
 
     #[tokio::test]
@@ -3476,7 +3565,7 @@ mod tests {
                 .admissible(never, "peer-a", c.self_key(), &policy, now_micros())
                 .is_err());
             c.on_request("peer-a", ask(never));
-            assert!(c.waiting.lock().unwrap().is_empty());
+            assert!(c.kept_lock().waiting.is_empty());
             assert!(!wanted(&c).await);
         }
         // One that could be is remembered, and wakes the reader.
@@ -3504,14 +3593,14 @@ mod tests {
             4,
             clock.at(),
         );
-        assert_eq!(c.waiting.lock().unwrap().len(), MAX_WAITING);
+        assert_eq!(c.kept_lock().waiting.len(), MAX_WAITING);
         // An honest device asks from a peer of its own, on a cell that
         // takes thirty-one seconds to answer.
         clock.pass(SECOND);
         cell.hold_reads(true);
         assert_eq!(c.on_request("honest", offer(31, "honest")), None);
         assert_eq!(waiting_from(&c, "honest"), 1);
-        assert_eq!(c.waiting.lock().unwrap().len(), MAX_WAITING);
+        assert_eq!(c.kept_lock().waiting.len(), MAX_WAITING);
         // The peer that held the most gave up its oldest; no one else did.
         assert_eq!(waiting_from(&c, "crowd-0"), 3);
         let read = turn(&c, &cell, Want::Ask);
@@ -3543,7 +3632,7 @@ mod tests {
         assert_eq!(c.first_arrival("honest", &ask(31, "honest"), at), at);
         fill(&c, "big", 15, 4, at + 1);
         fill(&c, "small", 3, 1, at + 2);
-        assert_eq!(c.waiting.lock().unwrap().len(), MAX_WAITING);
+        assert_eq!(c.kept_lock().waiting.len(), MAX_WAITING);
         // A peer at its share makes room among its own.
         c.first_arrival("big-3", &ask(50, "big-3"), at + 3);
         assert_eq!(waiting_from(&c, "big-3"), MAX_WAITING_PER_SOURCE);
@@ -3557,7 +3646,7 @@ mod tests {
         assert_eq!(waiting_from(&c, "honest"), 1);
         assert_eq!(waiting_from(&c, "big-0"), 3);
         assert_eq!(waiting_from(&c, "big-1"), 3);
-        assert_eq!(c.waiting.lock().unwrap().len(), MAX_WAITING);
+        assert_eq!(c.kept_lock().waiting.len(), MAX_WAITING);
         // Sixty arrivals from peers that never hold as much as the biggest
         // do not move it either, and its arrival is as it first was.
         for n in 0..60u8 {
@@ -3565,10 +3654,10 @@ mod tests {
             c.first_arrival(&peer, &ask(60 + n, &peer), at + 6);
         }
         assert_eq!(c.first_arrival("honest", &ask(31, "honest"), at + 7), at);
-        assert_eq!(c.waiting.lock().unwrap().len(), MAX_WAITING);
+        assert_eq!(c.kept_lock().waiting.len(), MAX_WAITING);
         // Each is forgotten after an ask's life.
         c.first_arrival("after", &ask(53, "after"), at + 7 + ASK_LIFE_MICROS);
-        assert_eq!(c.waiting.lock().unwrap().len(), 1);
+        assert_eq!(c.kept_lock().waiting.len(), 1);
     }
 
     #[tokio::test]
@@ -3786,7 +3875,7 @@ mod tests {
             cell.let_reads_go(1);
             assert!(read.await.unwrap());
             // What it read is not kept, at its old date or any other.
-            assert!(c.speaks.lock().unwrap().is_none(), "{how}");
+            assert!(c.kept_lock().speaks.is_none(), "{how}");
             // 180 s on, nothing is listed without a new read: not a new ask,
             // not the one that was waiting.
             clock.pass(180 * SECOND);
@@ -3852,8 +3941,162 @@ mod tests {
             c.on_request("peer-b", CarryRequest::Ask { ask: elsewhere }),
             None
         );
-        assert!(c.waiting.lock().unwrap().is_empty());
+        assert!(c.kept_lock().waiting.is_empty());
         assert!(!wanted(&c).await);
         assert_eq!(c.pending.list(now_micros())[0].source, "peer-a");
+    }
+
+    // --- round six: one step under one lock, this node's key, a read owed ---
+
+    #[tokio::test]
+    async fn a_read_is_not_kept_when_the_clock_is_found_wrong_after_its_last_look_at_it() {
+        let clock = Clock::new();
+        let c = Arc::new(carrier_at(&clock));
+        let cell = CountedCell::new(Ok(ready()));
+        clock.set(1000 * SECOND);
+        // The read begins at 1000 s, lands, and has looked at the clock for
+        // the last time when another caller sees the clock read 10 s.
+        *c.before_keeping.lock().unwrap() = Some(Box::new({
+            let (other, clock) = (Arc::downgrade(&c), clock.clone());
+            move || {
+                clock.set(10 * SECOND);
+                assert_eq!(other.upgrade().unwrap().speaks(), Speaks::Unknown);
+            }
+        }));
+        assert!(c.read_turn(Some(&cell), &Names, Want::Now).await);
+        *c.before_keeping.lock().unwrap() = None;
+        // It is not kept: nothing dated 1000 s is there to list on.
+        assert!(c.kept_lock().speaks.is_none());
+        assert_eq!(c.kept_lock().epoch, 1);
+        // Forty seconds on a new ask arrives. It waits, from now, and is not
+        // listed on anything read before it came.
+        clock.set(49 * SECOND);
+        assert_eq!(c.speaks(), Speaks::Unknown);
+        assert_eq!(c.on_request("peer-a", offer(31, "peer-a")), None);
+        assert!(c.pending.is_empty());
+        assert_eq!(c.kept_lock().waiting[0].arrived, 49 * SECOND);
+        // The read it wakes begins after it, and lists it.
+        assert!(c.read_turn(Some(&cell), &Names, Want::Ask).await);
+        assert_eq!(cell.reads(), 2);
+        assert!(c.on_request("peer-a", offer(31, "peer-a")).is_some());
+    }
+
+    #[test]
+    fn a_healthy_clock_read_by_many_at_once_is_never_found_wrong() {
+        // The production clock, read from eight threads at once: a reading
+        // taken before another's and compared after it would look backwards.
+        let c = Arc::new(fresh());
+        c.set_speaks(speaking(), c.now().unwrap());
+        let readers: Vec<_> = (0..8)
+            .map(|_| {
+                let c = c.clone();
+                std::thread::spawn(move || {
+                    for _ in 0..20_000 {
+                        assert!(c.now().is_some());
+                        assert!(c.speaks().person().is_some());
+                    }
+                })
+            })
+            .collect();
+        for reader in readers {
+            reader.join().unwrap();
+        }
+        assert_eq!(c.kept_lock().epoch, 0);
+        assert!(c.kept_lock().speaks.is_some());
+    }
+
+    #[tokio::test]
+    async fn by_timer_this_nodes_key_is_the_timers_to_say_and_on_demand_any_reads() {
+        for refresh in [SpeaksRefresh::Timer, SpeaksRefresh::Demand] {
+            let clock = Clock::new();
+            let c = carrier_at(&clock);
+            c.set_refresh(refresh);
+            let cell = CountedCell::new(Ok(ready()));
+            // The cell became reachable after the timer's first turn found
+            // none, and an identity write's read lands before its next.
+            assert!(c.read_turn(Some(&cell), &Names, Want::Now).await);
+            assert!(c.speaks().person().is_some());
+            // A device asks, naming this node as its approver.
+            let mut named = signed_ask(31, request(), "peer-a");
+            named.for_approver = Some(cell.agent());
+            let ask = || CarryRequest::Ask { ask: named.clone() };
+            let answered = c.on_request("peer-a", ask());
+            match refresh {
+                // By timer the node does not yet know its own key, as before
+                // the switch: the ask is refused until the timer's turn.
+                SpeaksRefresh::Timer => {
+                    assert_eq!(c.self_key(), None);
+                    assert_eq!(
+                        answered,
+                        Some(CarryResponse::Refused {
+                            code: "ask_for_another_approver".into()
+                        })
+                    );
+                    assert!(c.timer_turn(&cell, &Names).await);
+                    assert_eq!(c.self_key(), Some(cell.agent().as_str()));
+                    assert!(matches!(
+                        c.on_request("peer-a", ask()),
+                        Some(CarryResponse::Listed { number: 1, .. })
+                    ));
+                }
+                SpeaksRefresh::Demand => {
+                    assert_eq!(c.self_key(), Some(cell.agent().as_str()));
+                    assert!(matches!(
+                        answered,
+                        Some(CarryResponse::Listed { number: 1, .. })
+                    ));
+                }
+            }
+        }
+    }
+
+    #[tokio::test]
+    async fn a_read_owed_to_a_write_is_made_once_and_stays_owed_while_no_cell_can_be_read() {
+        let clock = Clock::new();
+        let c = Arc::new(carrier_at(&clock));
+        let cell = CountedCell::new(Ok(ready()));
+        // Nothing written: the writer's read has nothing to make.
+        assert!(!c.read_turn(Some(&cell), &Names, Want::Owed).await);
+        // Standing is written, and no cell can be read: no read was made,
+        // so it stays owed.
+        c.standing_written();
+        assert!(!c.read_turn(None, &Names, Want::Owed).await);
+        assert!(!c.read_turn(None, &Names, Want::Request).await);
+        assert!(c.read_owed());
+        assert_eq!(cell.reads(), 0);
+        // The cell is back: the next read of any kind pays it, at any pace.
+        assert!(c.read_turn(Some(&cell), &Names, Want::Request).await);
+        assert!(!c.read_owed());
+        assert_eq!(cell.reads(), 1);
+        // A write whose read is made by an ask's read that began after it:
+        // the writer, waiting its turn behind that read, does not read again.
+        c.standing_written();
+        cell.hold_reads(true);
+        let asked = turn(&c, &cell, Want::Ask);
+        settle().await;
+        let writer = turn(&c, &cell, Want::Owed);
+        settle().await;
+        cell.hold_reads(false);
+        cell.let_reads_go(1);
+        assert!(asked.await.unwrap());
+        assert!(!writer.await.unwrap());
+        assert_eq!(cell.reads(), 2);
+        // Paid before the writer even arrives: none either.
+        c.standing_written();
+        assert!(c.read_turn(Some(&cell), &Names, Want::Ask).await);
+        assert!(!c.read_turn(Some(&cell), &Names, Want::Owed).await);
+        assert_eq!(cell.reads(), 3);
+        // Not paid by a read that began before the write.
+        cell.hold_reads(true);
+        let earlier = turn(&c, &cell, Want::Now);
+        settle().await;
+        c.standing_written();
+        let writer = turn(&c, &cell, Want::Owed);
+        settle().await;
+        cell.hold_reads(false);
+        cell.let_reads_go(2);
+        assert!(earlier.await.unwrap());
+        assert!(writer.await.unwrap());
+        assert_eq!(cell.reads(), 5);
     }
 }

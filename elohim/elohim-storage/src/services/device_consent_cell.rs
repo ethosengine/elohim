@@ -695,7 +695,10 @@ impl DeviceCell for ConductorDeviceCell {
             .map_err(failure)?;
         // The binding is on this cell's chain from here, whatever fails
         // after: reading its receipt, or registering whose this node is.
+        // Said here, to this request and to the carrier: a request that goes
+        // away during what follows still leaves the read owed.
         self.wrote.store(true, std::sync::atomic::Ordering::SeqCst);
+        super::device_carrier::carrier().standing_written();
         let receipt: CommitmentOutputWire = ExternIO::from(answer)
             .decode()
             .map_err(|e| CellFailure::Unavailable(format!("receipt decode: {e}")))?;

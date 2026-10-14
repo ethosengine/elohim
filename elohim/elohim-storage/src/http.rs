@@ -14175,17 +14175,15 @@ impl HttpServer {
     /// After a write to this node's identity over its routes, read whom it
     /// speaks for as what happened warrants (`Want::after_write`). `wrote`
     /// is this request's own: whether a call that writes standing came back
-    /// successful from its cell, whatever the request then answers. Then the
-    /// carrier is told a read is owed and one is made now; if this request
-    /// goes away before it lands, the next read of any kind pays it. A
+    /// successful from its cell, whatever the request then answers. The cell
+    /// told the carrier a read is owed when that call returned; this makes
+    /// it, unless a read that began after the write has landed already. If
+    /// this request goes away first, the next read of any kind pays it. A
     /// success that wrote nothing reads as any request does, and a request
     /// refused before writing not at all, so a refused write sent again and
     /// again reads nothing.
     async fn read_speaks_after_write(&self, status: u16, wrote: bool) {
-        use crate::services::device_carrier::{carrier, Want};
-        if wrote {
-            carrier().standing_written();
-        }
+        use crate::services::device_carrier::Want;
         if let Some(want) = Want::after_write(status, wrote) {
             self.read_speaks(want).await;
         }
@@ -14424,9 +14422,6 @@ impl HttpServer {
             let marked = crate::services::device_consent::MarkedCell::new(&cell);
             let outcome = reconcile(&marked, &declaration).await;
             // A reconcile that wrote and then failed changed standing too.
-            if marked.wrote() {
-                crate::services::device_carrier::carrier().standing_written();
-            }
             if marked.wrote() && !matches!(outcome, Reconciled::Applied(_)) {
                 self.refresh_speaks_now().await;
             }

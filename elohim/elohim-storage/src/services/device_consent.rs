@@ -444,9 +444,12 @@ impl<'a> MarkedCell<'a> {
         self.wrote.load(std::sync::atomic::Ordering::SeqCst)
     }
 
+    /// Said where the call returns, to this request and to the carrier: a
+    /// request that goes away after this still leaves the read owed.
     fn mark<T>(&self, done: Result<T, CellFailure>) -> Result<T, CellFailure> {
         if done.is_ok() {
             self.wrote.store(true, std::sync::atomic::Ordering::SeqCst);
+            super::device_carrier::carrier().standing_written();
         }
         done
     }
