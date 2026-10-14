@@ -17891,28 +17891,6 @@ fn pin_to_view(p: db::models::AcquisitionPin) -> elohim_views::acquisition::PinV
     } else {
         format!("epr:{}", p.head_ref)
     };
-    // Only a retired pin has a hold to end. `None` on a retired pin means its
-    // retirement time is unreadable; the next reconcile restarts it on the
-    // first rung rather than re-admitting it.
-    let readmit_at = if p.status == "retired" {
-        let retired_at = db::acquisition_pins::parse_retired_at(p.retired_at.as_deref());
-        let own = db::acquisition_pins::pin_readmit_at(
-            p.retired_at.as_deref(),
-            p.consecutive_retirements,
-        );
-        if p.held_demand_count > 0 {
-            // An admitted read: due on the next reconcile tick, whatever its
-            // rung. Reported as the retirement time — already past.
-            retired_at
-        } else if p.read_since_retired != 0 {
-            // A read that was not admitted: the first rung at most.
-            own.min(retired_at.map(|t| t + db::acquisition_pins::PIN_READMIT_COOLDOWN))
-        } else {
-            own
-        }
-    } else {
-        None
-    };
     elohim_views::acquisition::PinView {
         id: p.id,
         agent_pub_key: p.agent_pub_key,
@@ -17924,7 +17902,13 @@ fn pin_to_view(p: db::models::AcquisitionPin) -> elohim_views::acquisition::PinV
             .and_then(|s| serde_json::from_str::<serde_json::Value>(s).ok())
             .map(elohim_views::shared::JsonVal),
         priority: p.priority,
-        next_readmit_at: readmit_at.map(|t| t.format("%Y-%m-%dT%H:%M:%SZ").to_string()),
+        // Only a retired pin has a hold to end; its deadline is kept on the
+        // row (absent if an older build retired it and no pass has dated it).
+        next_readmit_at: if p.status == "retired" {
+            p.readmit_after.clone()
+        } else {
+            None
+        },
         status: p.status,
         created_at: p.created_at,
         updated_at: p.updated_at,

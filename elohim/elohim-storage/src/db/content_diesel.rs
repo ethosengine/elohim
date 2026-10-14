@@ -3094,16 +3094,23 @@ pub fn content_ids_present(
     ctx: &AppContext,
     ids: &[String],
 ) -> QueryResult<std::collections::HashSet<String>> {
-    if ids.is_empty() {
-        return Ok(Default::default());
+    let mut found = std::collections::HashSet::new();
+    // Chunked: one `IN (…)` per PRESENCE_CHUNK ids, so no caller's list can
+    // reach SQLite's bound-variable limit.
+    for chunk in ids.chunks(PRESENCE_CHUNK) {
+        let present: Vec<String> = content::table
+            .filter(content::h_app_id.eq(&ctx.h_app_id))
+            .filter(content::id.eq_any(chunk))
+            .select(content::id)
+            .load(conn)?;
+        found.extend(present);
     }
-    let found: Vec<String> = content::table
-        .filter(content::h_app_id.eq(&ctx.h_app_id))
-        .filter(content::id.eq_any(ids))
-        .select(content::id)
-        .load(conn)?;
-    Ok(found.into_iter().collect())
+    Ok(found)
 }
+
+/// Most ids [`content_ids_present`] puts in one `IN (…)` list — far under
+/// SQLite's bound-variable limit (32766 on current builds, 999 on old ones).
+const PRESENCE_CHUNK: usize = 500;
 
 /// Ids of HALF rows — a declared blob (`blob_cid`) with no locally derived
 /// `blob_hash` — in id order after `after`, at most `limit`. The level-triggered

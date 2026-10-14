@@ -2194,7 +2194,7 @@ lazy_static! {
     /// Decisions to leave a held acquisition pin held. label: reason — see
     /// [`PinHoldSkip`]. The per-tick reasons count pin-ticks (a pin held for
     /// three ticks counts three): "hold_not_elapsed" over ticks is the held
-    /// population, "tick_bound" the standing re-admission backlog.
+    /// population.
     pub static ref ACQUISITION_PIN_HOLD_SKIPS: IntCounterVec = IntCounterVec::new(
         Opts::new(
             "elohim_acquisition_pin_hold_skips_total",
@@ -6340,9 +6340,6 @@ impl PinReadmitCause {
 pub enum PinHoldSkip {
     /// Per tick: a retired pin whose hold has not ended.
     HoldNotElapsed,
-    /// Per tick: the pin's hold has ended but this tick's re-admission bound
-    /// was spent.
-    TickBound,
     /// A retired pin with no readable retirement time: not re-admitted,
     /// restarted on the first rung (once per pin).
     ClockUnreadable,
@@ -6354,9 +6351,8 @@ pub enum PinHoldSkip {
 }
 
 impl PinHoldSkip {
-    pub const ALL: [PinHoldSkip; 5] = [
+    pub const ALL: [PinHoldSkip; 4] = [
         PinHoldSkip::HoldNotElapsed,
-        PinHoldSkip::TickBound,
         PinHoldSkip::ClockUnreadable,
         PinHoldSkip::DemandRemoved,
         PinHoldSkip::ReadMarked,
@@ -6365,7 +6361,6 @@ impl PinHoldSkip {
     pub fn label(self) -> &'static str {
         match self {
             PinHoldSkip::HoldNotElapsed => "hold_not_elapsed",
-            PinHoldSkip::TickBound => "tick_bound",
             PinHoldSkip::ClockUnreadable => "clock_unreadable",
             PinHoldSkip::DemandRemoved => "demand_removed",
             PinHoldSkip::ReadMarked => "read_marked",

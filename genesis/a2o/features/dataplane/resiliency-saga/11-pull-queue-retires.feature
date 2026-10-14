@@ -83,8 +83,8 @@
 #   2. Retirement is REVERSIBLE — the pin row survives, and it is re-admitted
 #      the moment a peer's inventory names its head_ref again (primary arm),
 #      or after its hold (backstop — 6h, then 12h, then 24h per consecutive
-#      retirement, at most a minute of dispatch capacity (300 pins) per
-#      reconcile tick; a second, still-unscenario'd arm of the same guarantee;
+#      retirement, every due pin re-admitted by the next reconcile tick; a
+#      second, still-unscenario'd arm of the same guarantee;
 #      see the station below the re-admission scenario). A read-miss for the
 #      head shortens the hold without resetting the doubling: to the next tick
 #      when the demand auto-pin admits the read, to 6h otherwise. A pin its

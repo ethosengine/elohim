@@ -24,6 +24,12 @@
 --                            (throttled, window full, ceiling) named the pin
 --                            while it was retired. Caps its hold at the first
 --                            rung (6 h from retired_at). Cleared on re-admission.
+--   readmit_after            when a retired pin is due back: the end of its own
+--                            hold, pulled in by a read (to retired_at for an
+--                            admitted read, retired_at + 6 h otherwise). The
+--                            reconcile tick selects due rows by it, through
+--                            idx_acquisition_pins_status_readmit_after, so a
+--                            pass at rest reads nothing.
 --   last_outcome             'exhausted' | 'fetched' | NULL (no round concluded).
 --   round                    bumped every time the pin is (re-)activated. The
 --                            in-memory retry state is keyed on it, and a
@@ -35,11 +41,15 @@ ALTER TABLE acquisition_pins ADD COLUMN last_outcome TEXT;
 ALTER TABLE acquisition_pins ADD COLUMN retired_at TEXT;
 ALTER TABLE acquisition_pins ADD COLUMN round INTEGER NOT NULL DEFAULT 0;
 ALTER TABLE acquisition_pins ADD COLUMN read_since_retired INTEGER NOT NULL DEFAULT 0;
+ALTER TABLE acquisition_pins ADD COLUMN readmit_after TEXT;
+CREATE INDEX idx_acquisition_pins_status_readmit_after
+    ON acquisition_pins(status, readmit_after);
 
 -- A row already `retired` has been retired at least once: start it on the first
 -- rung, with the retirement time it has been serving (`updated_at`, which the
 -- retirement write stamped), so its next failed re-probe steps to 12 h instead
 -- of repeating 6 h.
 UPDATE acquisition_pins
-   SET consecutive_retirements = 1, last_outcome = 'exhausted', retired_at = updated_at
+   SET consecutive_retirements = 1, last_outcome = 'exhausted', retired_at = updated_at,
+       readmit_after = strftime('%Y-%m-%dT%H:%M:%SZ', updated_at, '+6 hours')
  WHERE status = 'retired';

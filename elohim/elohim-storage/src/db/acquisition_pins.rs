@@ -175,17 +175,27 @@ pub fn count_active_pins(conn: &mut SqliteConnection) -> QueryResult<i64> {
         .get_result(conn)
 }
 
-/// Active pins plus retired pins with admitted demand recorded — the latter
-/// are active as of the next reconcile tick. The demand auto-pin checks its
-/// ceiling against this, so reads cannot queue more re-activations than the
-/// ceiling has room for (on dev each admitted read re-activated at once and
-/// was counted by the next read's check).
-pub fn count_active_or_demanded_pins(conn: &mut SqliteConnection) -> QueryResult<i64> {
+/// How long recorded demand on a retired pin counts toward the demand
+/// auto-pin's ceiling. The next reconcile pass re-admits it, so it only ever
+/// needs to cover one pass; five minutes is five default ticks. Past it the
+/// demand stops counting even if passes keep failing, so a broken pass cannot
+/// wedge the ceiling.
+pub const RECENT_DEMAND: chrono::Duration = chrono::Duration::minutes(5);
+
+/// Active pins plus retired pins with admitted demand recorded in the last
+/// [`RECENT_DEMAND`] — the latter are active as of the next reconcile pass.
+/// The demand auto-pin checks its ceiling against this, so reads cannot queue
+/// more re-activations than the ceiling has room for (before the ladder each
+/// admitted read re-activated at once and was counted by the next read's
+/// check).
+pub fn count_active_or_demanded_pins(conn: &mut SqliteConnection, now: Now) -> QueryResult<i64> {
+    let since = stamp(now - RECENT_DEMAND);
     pins::acquisition_pins
         .filter(
             pins::status.eq("active").or(pins::status
                 .eq("retired")
-                .and(pins::held_demand_count.gt(0))),
+                .and(pins::held_demand_count.gt(0))
+                .and(pins::updated_at.ge(since))),
         )
         .count()
         .get_result(conn)
@@ -286,7 +296,7 @@ pub fn set_commitment_cid(
 type Now = chrono::DateTime<chrono::Utc>;
 
 /// Retire exhausted pins: `active` → `retired`, one rung up the ladder each,
-/// `retired_at` stamped.
+/// `retired_at` stamped, `readmit_after` set to the end of the new rung.
 ///
 /// `exhausted` pairs each pin id with the `round` whose retry budget was spent
 /// (`AcquisitionState::exhausted_pins`). A pin whose row is no longer `active`
@@ -326,6 +336,9 @@ pub fn retire_pins(
                     .filter(pins::id.eq(pin_id))
                     .select(pins::consecutive_retirements)
                     .first(conn)?;
+                diesel::update(pins::acquisition_pins.filter(pins::id.eq(pin_id)))
+                    .set(pins::readmit_after.eq(stamp(now + pin_hold(rung))))
+                    .execute(conn)?;
                 retired.push((pin_id, rung));
             }
         }
@@ -361,70 +374,118 @@ pub enum ReadmitCause {
 /// What one [`retired_hold_pass`] committed.
 #[derive(Debug, Default)]
 pub struct HoldPass {
-    /// Retired pins whose head turned out to be local: re-activated, ladder
-    /// reset, `last_outcome = fetched`. Rows as read before the write.
+    /// Due pins whose head turned out to be local: re-activated, ladder reset,
+    /// `last_outcome = fetched`. Rows as read before the write.
     pub settled: Vec<AcquisitionPin>,
-    /// Pins re-admitted for a re-probe, with why. Rows as read before the
+    /// Due pins re-admitted for a re-probe, with why. Rows as read before the
     /// write, so `consecutive_retirements` is the rung each one served.
     pub readmitted: Vec<(AcquisitionPin, ReadmitCause)>,
-    /// Pins that are due but that this tick's bound left for a later one.
-    pub deferred: usize,
-    /// Pins still inside their hold (including any just repaired).
+    /// Retired pins still held after the pass (including any just repaired).
     pub held: usize,
     /// Retired pins whose `retired_at` was missing or unreadable, now holding
     /// on the first rung from `now`. Rows as read before the repair.
     pub clocks_repaired: Vec<AcquisitionPin>,
 }
 
-/// The per-tick pass over the retired set. In order:
+/// The per-tick pass over the retired set — only over the rows that are DUE.
 ///
-/// 1. **Settle.** A retired pin whose head is local — a foreground fetch,
-///    replication, or any other ingestion supplied it while the pin was held —
-///    has its answer: `active`, ladder reset, `last_outcome = fetched`. Not
-///    bounded by `limit`; nothing is fetched for it.
-/// 2. **Repair.** A retired pin nobody has read and with no readable
-///    `retired_at` cannot be timed. It is NOT re-admitted: `retired_at` becomes
-///    `now` and the pin drops to the first rung, so it holds
-///    [`PIN_READMIT_COOLDOWN`] from here — fail closed, once (the repaired row
-///    is readable from then on).
-/// 3. **Re-admit.** A pin is due when its own hold has ended
-///    ([`pin_readmit_at`]); or at once, if a read the demand auto-pin
-///    admitted named it since it retired (`held_demand_count > 0`); or once
-///    the first rung has passed, if a read the auto-pin did not admit marked
-///    it (`read_since_retired`). Due pins go back to `active`, at most `limit`
-///    of them: the `reserved` longest overdue first whatever their demand,
-///    then demanded pins, then the rest by how long overdue.
+/// A row is due when `now` is past its `readmit_after`, the deadline every
+/// writer of a retired row keeps current: retirement sets it to the end of the
+/// pin's own hold ([`pin_hold`]: 6 h, 12 h, then 24 h); an admitted read
+/// ([`record_demand_pin`]) sets it to the retirement time, so the next pass
+/// takes it; a read that was not admitted ([`mark_read_since_retired`]) caps
+/// it at `retired_at` + [`PIN_READMIT_COOLDOWN`]. Selecting due rows is one
+/// range read on `idx_acquisition_pins_status_readmit_after`; at rest it
+/// returns nothing and the pass writes nothing.
 ///
-/// A re-admission keeps `consecutive_retirements` — it is a re-probe, not
-/// evidence — so a pin that is read and still unfillable goes up a rung each
-/// time, and without another read it serves that rung. Only a fetch or an
-/// inventory naming the head resets the ladder.
+/// EVERY due row is handled in this pass — there is no per-tick bound, as
+/// there was none before the hold ladder: a backlog that comes due together is
+/// re-activated together, and pin priority then orders it in the dispatcher.
+/// So "6 h for a read pin" and "24 h at most" are maximum waits up to one
+/// reconcile tick.
 ///
-/// bounded-work: one read of the retired set, one presence query over its
-/// heads, and at most `limit` + settled + repaired row writes.
+/// For each due row:
+///
+/// 1. **Settle.** If its head is local — a foreground fetch, replication, or
+///    any other ingestion supplied it while the pin was held — it has its
+///    answer: `active`, ladder reset, `last_outcome = fetched`. A retired pin
+///    whose content arrives EARLIER than its deadline is settled here when it
+///    comes due, or sooner by the inventory and fetch paths; the pass does not
+///    look at heads that are not due. If presence cannot be read at all, the
+///    due rows are re-admitted as before the ladder, and the fetch settles
+///    them.
+/// 2. **Re-admit.** Otherwise `active` again, for a re-probe. The rung is kept
+///    — a re-admission is not evidence — so a pin that is read and still
+///    unfillable goes up a rung each time, and without another read it serves
+///    that rung. Only a fetch or an inventory naming the head resets it.
+///
+/// A retired row with no `readmit_after` (one an older build retired) gets one
+/// from its `retired_at` here; if `retired_at` is missing or unreadable too it
+/// is NOT re-admitted: `retired_at` becomes `now` and it drops to the first
+/// rung, holding [`PIN_READMIT_COOLDOWN`] from here — fail closed, once.
 pub fn retired_hold_pass(
     conn: &mut SqliteConnection,
     app_ctx: &crate::db::AppContext,
     now: Now,
-    limit: usize,
-    reserved: usize,
 ) -> QueryResult<HoldPass> {
     let stamped = stamp(now);
     conn.immediate_transaction(|conn| {
-        let retired = list_pins_by_status(conn, "retired")?;
-        if retired.is_empty() {
-            return Ok(HoldPass::default());
-        }
-        let heads: Vec<String> = retired.iter().map(|p| p.head_ref.clone()).collect();
-        let local = crate::db::content_diesel::content_ids_present(conn, app_ctx, &heads)?;
         let mut pass = HoldPass::default();
-        let mut due: Vec<(Now, ReadmitCause, AcquisitionPin)> = Vec::new();
         let retired_row = |id: i32| {
             pins::acquisition_pins
                 .filter(pins::id.eq(id))
                 .filter(pins::status.eq("retired"))
         };
-        for pin in retired {
+
+        // Rows retired without a deadline: give them one.
+        let undated: Vec<AcquisitionPin> = pins::acquisition_pins
+            .filter(pins::status.eq("retired"))
+            .filter(pins::readmit_after.is_null())
+            .load(conn)?;
+        for pin in undated {
+            match pin_readmit_at(pin.retired_at.as_deref(), pin.consecutive_retirements) {
+                Some(deadline) => {
+                    diesel::update(retired_row(pin.id))
+                        .set(pins::readmit_after.eq(stamp(deadline)))
+                        .execute(conn)?;
+                }
+                None => {
+                    diesel::update(retired_row(pin.id))
+                        .set((
+                            pins::retired_at.eq(&stamped),
+                            pins::consecutive_retirements.eq(1),
+                            pins::readmit_after.eq(stamp(now + PIN_READMIT_COOLDOWN)),
+                        ))
+                        .execute(conn)?;
+                    pass.clocks_repaired.push(pin);
+                }
+            }
+        }
+
+        let due: Vec<AcquisitionPin> = pins::acquisition_pins
+            .filter(pins::status.eq("retired"))
+            .filter(pins::readmit_after.lt(&stamped))
+            .order(pins::readmit_after.asc())
+            .load(conn)?;
+        let local = if due.is_empty() {
+            std::collections::HashSet::new()
+        } else {
+            let heads: Vec<String> = due.iter().map(|p| p.head_ref.clone()).collect();
+            match crate::db::content_diesel::content_ids_present(conn, app_ctx, &heads) {
+                Ok(local) => local,
+                // A read failure here must not stop re-admission: re-admit
+                // as before the ladder and let the fetch find the bytes.
+                Err(e) => {
+                    tracing::warn!(
+                        error = %e,
+                        due = due.len(),
+                        "acquisition hold pass: local-presence check failed; re-admitting due pins"
+                    );
+                    std::collections::HashSet::new()
+                }
+            }
+        };
+        for pin in due {
             if local.contains(&pin.head_ref) {
                 diesel::update(retired_row(pin.id))
                     .set((
@@ -440,42 +501,16 @@ pub fn retired_hold_pass(
                 pass.settled.push(pin);
                 continue;
             }
-            let demanded = pin.held_demand_count > 0;
-            let retired_at = parse_retired_at(pin.retired_at.as_deref());
-            let own = retired_at.map(|t| t + pin_hold(pin.consecutive_retirements));
-            let read_cap = retired_at
-                .filter(|_| pin.read_since_retired != 0)
-                .map(|t| t + PIN_READMIT_COOLDOWN);
-            match (own, read_cap) {
-                // Its own hold has ended, read or not.
-                (Some(own), _) if now > own => due.push((own, ReadmitCause::Hold, pin)),
-                // An admitted read: due as of this pass. It queues by its
-                // retirement time, so a pin the bound defers keeps its place.
-                _ if demanded => due.push((retired_at.unwrap_or(now), ReadmitCause::Demand, pin)),
-                // A read that was not admitted: due once the first rung is over.
-                (_, Some(cap)) if now > cap => due.push((cap, ReadmitCause::Read, pin)),
-                (Some(_), _) => pass.held += 1,
-                (None, _) => {
-                    diesel::update(retired_row(pin.id))
-                        .set((
-                            pins::retired_at.eq(&stamped),
-                            pins::consecutive_retirements.eq(1),
-                        ))
-                        .execute(conn)?;
-                    pass.clocks_repaired.push(pin);
-                    pass.held += 1;
-                }
-            }
-        }
-
-        // Longest overdue first; the first `reserved` are taken as they come.
-        due.sort_by(|(a_at, _, a), (b_at, _, b)| a_at.cmp(b_at).then(a.id.cmp(&b.id)));
-        let mut rest = due.split_off(reserved.min(limit).min(due.len()));
-        // Stable: within each demand class the overdue order is kept.
-        rest.sort_by_key(|(_, _, p)| p.held_demand_count == 0);
-        due.extend(rest);
-        pass.deferred = due.len().saturating_sub(limit);
-        for (_, cause, pin) in due.into_iter().take(limit) {
+            let own = pin_readmit_at(pin.retired_at.as_deref(), pin.consecutive_retirements);
+            let cause = if own.is_some_and(|own| now > own) {
+                ReadmitCause::Hold
+            } else if pin.held_demand_count > 0 {
+                ReadmitCause::Demand
+            } else if pin.read_since_retired != 0 {
+                ReadmitCause::Read
+            } else {
+                ReadmitCause::Hold
+            };
             diesel::update(retired_row(pin.id))
                 .set((
                     pins::status.eq("active"),
@@ -487,6 +522,7 @@ pub fn retired_hold_pass(
                 .execute(conn)?;
             pass.readmitted.push((pin, cause));
         }
+        pass.held = usize::try_from(count_pins_by_status(conn, "retired")?).unwrap_or(0);
         Ok(pass)
     })
 }
@@ -506,7 +542,7 @@ pub struct NamedPass {
 /// have changed.
 ///
 /// - A `retired` pin for a named head goes back to `active` at once, whatever
-///   its rung and outside the per-tick bound, with its ladder reset.
+///   its rung and without waiting for the next pass, with its ladder reset.
 /// - An `active` pin for a named head that still carries a retirement count
 ///   (re-admitted for a re-probe) has the count reset. Its `round` is NOT
 ///   bumped: a peer that advertises a head on every inventory round but cannot
@@ -632,10 +668,11 @@ pub enum DemandPin {
 ///
 /// Unlike [`upsert_pin`] this never changes the status of a row that exists:
 ///
-/// - `retired`: the demand is recorded on the row, and the next hold pass
-///   ([`retired_hold_pass`], every reconcile tick) re-admits the pin, rung
-///   kept. The read does not flip the row itself, so the pass's bound is the
-///   one door back to `active`.
+/// - `retired`: the demand is recorded on the row and the pin is due
+///   (`readmit_after` = its retirement time); the next hold pass
+///   ([`retired_hold_pass`], every reconcile tick) re-admits it, rung kept.
+///   The read does not flip the row itself — the pass is the one door back to
+///   `active`.
 /// - `removed` stays removed. ONLY AN EXPLICIT RE-PIN (`POST /api/v1/pins`)
 ///   RESTORES A REMOVED PIN — an operator decision of 2026-10-14: the person
 ///   un-pinned it, and a read is not them pinning it again. (Before this
@@ -646,7 +683,8 @@ pub enum DemandPin {
 /// - `active` is left alone, so a read-miss no longer overwrites an explicit
 ///   pin's priority and closure rule with the demand defaults.
 ///
-/// No timestamp on an existing row is touched.
+/// On an existing row only `updated_at` (the demand's time) and, for a retired
+/// pin, `readmit_after` move; `retired_at` never does.
 ///
 /// # What a read can cause, against the build before the hold ladder ("dev")
 ///
@@ -660,8 +698,11 @@ pub enum DemandPin {
 /// - Read-driven re-activations are only ever caused by admitted reads, and
 ///   the auto-pin admits at most 256 distinct heads per 300 s window, each
 ///   once: **no more than dev's 256 per 300 s**, and the active set is not
-///   taken past the ceiling (recorded demand is counted toward it,
+///   taken past the ceiling (recent recorded demand is counted toward it,
 ///   [`count_active_or_demanded_pins`]).
+/// - Every due pin is re-admitted in the pass that finds it due, as before the
+///   ladder; "one tick" and "6 h" above are therefore exact up to one
+///   reconcile tick.
 pub fn record_demand_pin(
     conn: &mut SqliteConnection,
     new: NewAcquisitionPin,
@@ -674,8 +715,8 @@ pub fn record_demand_pin(
                 .filter(pins::head_ref.eq(new.head_ref.clone()))
                 .filter(pins::kind.eq(new.kind.clone()))
         };
+        let stamped = stamp(now);
         let Some(existing) = identity().first::<AcquisitionPin>(conn).optional()? else {
-            let stamped = stamp(now);
             diesel::insert_into(pins::acquisition_pins)
                 .values((
                     pins::agent_pub_key.eq(&new.agent_pub_key),
@@ -692,9 +733,27 @@ pub fn record_demand_pin(
         if existing.status == "active" {
             return Ok(DemandPin::AlreadyActive(existing));
         }
-        diesel::update(pins::acquisition_pins.filter(pins::id.eq(existing.id)))
-            .set(pins::held_demand_count.eq(pins::held_demand_count + 1))
-            .execute(conn)?;
+        let row_of = || pins::acquisition_pins.filter(pins::id.eq(existing.id));
+        if existing.status == "retired" {
+            // Due on the next pass: it queues by its retirement time. The
+            // demand's own time goes in `updated_at` — it is what the ceiling
+            // counts as recent ([`count_active_or_demanded_pins`]).
+            let due = existing
+                .retired_at
+                .clone()
+                .unwrap_or_else(|| stamped.clone());
+            diesel::update(row_of())
+                .set((
+                    pins::held_demand_count.eq(pins::held_demand_count + 1),
+                    pins::readmit_after.eq(due),
+                    pins::updated_at.eq(&stamped),
+                ))
+                .execute(conn)?;
+        } else {
+            diesel::update(row_of())
+                .set(pins::held_demand_count.eq(pins::held_demand_count + 1))
+                .execute(conn)?;
+        }
         let row: AcquisitionPin = identity().first(conn)?;
         Ok(if row.status == "retired" {
             DemandPin::Demanded(row)
@@ -706,42 +765,83 @@ pub fn record_demand_pin(
 
 /// A read-miss the demand auto-pin did NOT admit (throttled, window full, at
 /// the ceiling) named this head: if its pin is `retired`, mark the row as read
-/// since it retired. A marked row's hold is capped at the first rung
-/// ([`PIN_READMIT_COOLDOWN`] from `retired_at`) — the read re-admits nothing
-/// early, and it cannot leave the pin waiting longer than the flat 6 h it
-/// waited before the ladder.
+/// since it retired. A marked row's hold is capped at the first rung — its
+/// `readmit_after` is pulled in to `retired_at` + [`PIN_READMIT_COOLDOWN`] —
+/// so the read re-admits nothing early and cannot leave the pin waiting longer
+/// than the flat 6 h it waited before the ladder.
 ///
 /// Idempotent, and cheap on the path that is not throttled by anything: one
 /// indexed read; a write only the first time a retired pin is read in a hold
-/// (and none if admitted demand is already recorded). Returns whether a row
-/// was marked. Nothing else — no pin, an active pin, a removed pin — is
-/// touched.
+/// (and none if admitted demand is already recorded). The write repeats every
+/// predicate of the read ([`mark_row_read`]), so callers racing on one row
+/// write it once. Returns whether this call marked a row. Nothing else — no
+/// pin, an active pin, a removed pin — is touched.
 pub fn mark_read_since_retired(
     conn: &mut SqliteConnection,
     agent_pub_key: &str,
     head_ref: &str,
     kind: &str,
 ) -> QueryResult<bool> {
-    let unmarked: Option<i32> = pins::acquisition_pins
+    match unmarked_retired_row(conn, agent_pub_key, head_ref, kind)? {
+        Some((pin_id, deadline)) => mark_row_read(conn, pin_id, deadline),
+        None => Ok(false),
+    }
+}
+
+/// The read half of [`mark_read_since_retired`]: the id of the head's pin if
+/// it is retired and neither marked nor demanded, with the deadline marking
+/// it should give it.
+pub(crate) fn unmarked_retired_row(
+    conn: &mut SqliteConnection,
+    agent_pub_key: &str,
+    head_ref: &str,
+    kind: &str,
+) -> QueryResult<Option<(i32, Option<String>)>> {
+    let row: Option<(i32, Option<String>, Option<String>)> = pins::acquisition_pins
         .filter(pins::agent_pub_key.eq(agent_pub_key))
         .filter(pins::head_ref.eq(head_ref))
         .filter(pins::kind.eq(kind))
         .filter(pins::status.eq("retired"))
         .filter(pins::read_since_retired.eq(0))
         .filter(pins::held_demand_count.eq(0))
-        .select(pins::id)
+        .select((pins::id, pins::retired_at, pins::readmit_after))
         .first(conn)
         .optional()?;
-    let Some(pin_id) = unmarked else {
-        return Ok(false);
+    Ok(row.map(|(id, retired_at, readmit_after)| {
+        let cap = parse_retired_at(retired_at.as_deref()).map(|t| stamp(t + PIN_READMIT_COOLDOWN));
+        // The earlier of its own deadline and the cap. Both are
+        // `current_timestamp()` stamps, so they order as strings.
+        let deadline = match (readmit_after, cap) {
+            (Some(own), Some(cap)) => Some(own.min(cap)),
+            (own, cap) => cap.or(own),
+        };
+        (id, deadline)
+    }))
+}
+
+/// The write half of [`mark_read_since_retired`], guarded on every predicate
+/// the read checked, so it marks a row at most once per hold whoever races.
+pub(crate) fn mark_row_read(
+    conn: &mut SqliteConnection,
+    pin_id: i32,
+    deadline: Option<String>,
+) -> QueryResult<bool> {
+    let row = pins::acquisition_pins
+        .filter(pins::id.eq(pin_id))
+        .filter(pins::status.eq("retired"))
+        .filter(pins::read_since_retired.eq(0))
+        .filter(pins::held_demand_count.eq(0));
+    let marked = match deadline {
+        Some(deadline) => diesel::update(row)
+            .set((
+                pins::read_since_retired.eq(1),
+                pins::readmit_after.eq(deadline),
+            ))
+            .execute(conn)?,
+        None => diesel::update(row)
+            .set(pins::read_since_retired.eq(1))
+            .execute(conn)?,
     };
-    let marked = diesel::update(
-        pins::acquisition_pins
-            .filter(pins::id.eq(pin_id))
-            .filter(pins::status.eq("retired")),
-    )
-    .set(pins::read_since_retired.eq(1))
-    .execute(conn)?;
     Ok(marked > 0)
 }
 
@@ -967,20 +1067,8 @@ mod tests {
             .expect("an active pin retires")
     }
 
-    /// A small bound and reserve, in the production proportion (the live
-    /// values derive from dispatch capacity — `p2p::acquisition`).
-    const LIMIT: usize = 25;
-    const RESERVED: usize = 10;
-
     fn hold_pass(conn: &mut SqliteConnection, now: chrono::DateTime<Utc>) -> HoldPass {
-        retired_hold_pass(
-            conn,
-            &crate::db::AppContext::default_lamad(),
-            now,
-            LIMIT,
-            RESERVED,
-        )
-        .expect("hold pass")
+        retired_hold_pass(conn, &crate::db::AppContext::default_lamad(), now).expect("hold pass")
     }
 
     /// An admitted read-miss for `head` at `at`.
@@ -1027,7 +1115,7 @@ mod tests {
             // One minute short of the hold: still held, nothing re-admitted.
             let early = hold_pass(&mut conn, now + hold - Duration::minutes(1));
             assert!(early.readmitted.is_empty(), "rung {rung}: inside its hold");
-            assert_eq!((early.held, early.deferred), (1, 0));
+            assert_eq!(early.held, 1);
             assert_eq!(reread(&mut conn, pin.id).status, "retired");
 
             // One minute past it: re-admitted, and the rung is KEPT — a cooldown
@@ -1201,18 +1289,27 @@ mod tests {
         // Something other than the pull queue supplies the bytes.
         make_local(&mut conn, "fetched-in-the-foreground");
 
-        // One minute into a 24 h hold.
-        let pass = hold_pass(&mut conn, now + Duration::minutes(1));
+        // One minute into a 24 h hold: the pass looks only at due rows, so the
+        // pin is not settled yet (the inventory and fetch paths may get there
+        // first).
+        let early = hold_pass(&mut conn, now + Duration::minutes(1));
+        assert!(early.settled.is_empty() && early.readmitted.is_empty());
+        assert_eq!(early.held, 2);
+        assert_eq!(reread(&mut conn, pin.id).status, "retired");
+
+        // When it comes due it is settled, not re-probed; the pin whose head
+        // is still missing is re-probed.
+        let pass = hold_pass(&mut conn, now + Duration::hours(24) + Duration::minutes(1));
         assert_eq!(pass.settled.len(), 1);
         assert_eq!(pass.settled[0].id, pin.id);
-        assert!(pass.readmitted.is_empty());
-        assert_eq!(pass.held, 1, "the pin whose head is still missing holds");
+        assert_eq!(pass.readmitted.len(), 1);
+        assert_eq!(pass.readmitted[0].0.id, other.id);
         let row = reread(&mut conn, pin.id);
         assert_eq!(row.status, "active");
         assert_eq!(row.consecutive_retirements, 0);
         assert_eq!(row.last_outcome.as_deref(), Some(PIN_OUTCOME_FETCHED));
         assert_eq!(row.round, before.round + 1);
-        assert_eq!(reread(&mut conn, other.id).status, "retired");
+        assert_eq!(reread(&mut conn, other.id).consecutive_retirements, 4);
     }
 
     #[test]
@@ -1329,7 +1426,10 @@ mod tests {
         let row = reread(&mut conn, read.id);
         assert_eq!((row.status.as_str(), row.held_demand_count), ("retired", 1));
         assert_eq!(row.retired_at, retired.retired_at, "demand moves no clock");
-        assert_eq!(row.updated_at, retired.updated_at);
+        assert_eq!(
+            row.readmit_after, retired.retired_at,
+            "due: it queues by retirement"
+        );
         assert_eq!(row.round, retired.round);
 
         // The next pass: re-admitted, by demand, three minutes into 24 h.
@@ -1436,27 +1536,149 @@ mod tests {
     }
 
     /// The autopin's ceiling counts demand that is recorded but not yet
-    /// re-admitted, so reads cannot queue more re-activations than the ceiling
-    /// has room for.
+    /// re-admitted — for [`RECENT_DEMAND`] only, so a pass that keeps failing
+    /// cannot leave it counted for good.
     #[test]
-    fn recorded_demand_counts_toward_the_active_ceiling() {
+    fn recent_recorded_demand_counts_toward_the_active_ceiling() {
         let mut conn = test_conn();
         pin_for(&mut conn, "active");
         let retired = pin_for(&mut conn, "retired-and-read");
         let quiet = pin_for(&mut conn, "retired-and-quiet");
         retire(&mut conn, retired.id, t0());
         retire(&mut conn, quiet.id, t0());
-        assert_eq!(count_active_or_demanded_pins(&mut conn).expect("count"), 1);
+        let count = |conn: &mut SqliteConnection, at| {
+            count_active_or_demanded_pins(conn, at).expect("count")
+        };
+        assert_eq!(count(&mut conn, t0()), 1);
         read_miss(&mut conn, "retired-and-read", t0());
         read_miss(&mut conn, "retired-and-read", t0());
-        assert_eq!(count_active_or_demanded_pins(&mut conn).expect("count"), 2);
+        assert_eq!(count(&mut conn, t0()), 2);
         mark_read_since_retired(&mut conn, "local-device", "retired-and-quiet", "item")
             .expect("mark");
         assert_eq!(
-            count_active_or_demanded_pins(&mut conn).expect("count"),
+            count(&mut conn, t0()),
             2,
             "a read mark re-admits nothing early, so it takes no room"
         );
+        // No pass ran (say every pass is failing): the demand stops counting.
+        assert_eq!(count(&mut conn, t0() + Duration::minutes(4)), 2);
+        assert_eq!(count(&mut conn, t0() + Duration::minutes(6)), 1);
+    }
+
+    /// Two callers that both read the row as unmarked before either writes:
+    /// the guarded write marks it once.
+    #[test]
+    fn racing_read_marks_write_the_row_once() {
+        let pool = crate::test_util::test_pool();
+        let mut a = pool.get().expect("conn a");
+        let mut b = pool.get().expect("conn b");
+        let pin = pin_for(&mut a, "read-twice-at-once");
+        retire(&mut a, pin.id, t0());
+        let seen_a = unmarked_retired_row(&mut a, "local-device", "read-twice-at-once", "item")
+            .expect("read a")
+            .expect("unmarked");
+        let seen_b = unmarked_retired_row(&mut b, "local-device", "read-twice-at-once", "item")
+            .expect("read b")
+            .expect("unmarked");
+        assert_eq!(seen_a, seen_b);
+        assert_eq!(seen_a.1.as_deref(), Some("2026-10-13T18:00:00Z"));
+        assert!(mark_row_read(&mut a, seen_a.0, seen_a.1).expect("write a"));
+        assert!(
+            !mark_row_read(&mut b, seen_b.0, seen_b.1).expect("write b"),
+            "the second write finds the row already marked"
+        );
+        // Demand recorded first also stops a mark.
+        let other = pin_for(&mut a, "demanded-then-read");
+        retire(&mut a, other.id, t0());
+        let seen = unmarked_retired_row(&mut a, "local-device", "demanded-then-read", "item")
+            .expect("read")
+            .expect("unmarked");
+        read_miss(&mut b, "demanded-then-read", t0());
+        assert!(!mark_row_read(&mut a, seen.0, seen.1).expect("write"));
+    }
+
+    /// The pass touches only due rows, checks their presence in chunks far
+    /// under SQLite's variable limit, and handles every due row in one pass.
+    #[test]
+    fn a_large_due_backlog_is_handled_in_one_pass_with_chunked_presence() {
+        let mut conn = test_conn();
+        let n = 1_201;
+        for i in 0..n {
+            let p = pin_for(&mut conn, &format!("backlog-{i:04}"));
+            retire(&mut conn, p.id, t0());
+        }
+        // Not due yet: nothing at all.
+        let quiet = hold_pass(&mut conn, t0() + Duration::hours(5));
+        assert!(quiet.readmitted.is_empty() && quiet.settled.is_empty());
+        assert_eq!(quiet.held, n);
+
+        // Every other head turned up locally meanwhile.
+        let local: Vec<String> = (0..n)
+            .step_by(2)
+            .map(|i| format!("backlog-{i:04}"))
+            .collect();
+        let result = crate::db::content_diesel::bulk_create_content(
+            &mut conn,
+            &crate::db::AppContext::default_lamad(),
+            local
+                .iter()
+                .map(|id| crate::db::content_diesel::CreateContentInput {
+                    id: id.clone(),
+                    title: id.clone(),
+                    description: None,
+                    content_type: "concept".to_string(),
+                    content_format: "markdown".to_string(),
+                    blob_hash: None,
+                    blob_cid: None,
+                    content_size_bytes: None,
+                    metadata_json: None,
+                    reach: "public".to_string(),
+                    created_by: None,
+                    tags: vec![],
+                    dht_anchor_hash: None,
+                    content_body: Some("body".to_string()),
+                })
+                .collect(),
+        )
+        .expect("bulk_create_content");
+        assert_eq!(result.inserted as usize, local.len());
+        let all: Vec<String> = (0..n).map(|i| format!("backlog-{i:04}")).collect();
+        assert_eq!(
+            crate::db::content_diesel::content_ids_present(
+                &mut conn,
+                &crate::db::AppContext::default_lamad(),
+                &all
+            )
+            .expect("presence")
+            .len(),
+            local.len(),
+            "more ids than one chunk"
+        );
+
+        let pass = hold_pass(&mut conn, t0() + Duration::hours(7));
+        assert_eq!(pass.settled.len(), local.len());
+        assert_eq!(pass.readmitted.len(), n - local.len());
+        assert_eq!(pass.held, 0);
+        assert_eq!(count_active_pins(&mut conn).expect("count"), n as i64);
+    }
+
+    /// If presence cannot be read, the due rows are re-admitted as before the
+    /// ladder; the pass is not rolled back.
+    #[test]
+    fn a_failing_presence_check_still_readmits_the_due_rows() {
+        use diesel::connection::SimpleConnection;
+
+        let mut conn = test_conn();
+        for i in 0..3 {
+            let p = pin_for(&mut conn, &format!("due-{i}"));
+            retire(&mut conn, p.id, t0());
+        }
+        conn.batch_execute("ALTER TABLE content RENAME TO content_unreachable")
+            .expect("break the presence query");
+        let pass = hold_pass(&mut conn, t0() + Duration::hours(7));
+        assert!(pass.settled.is_empty());
+        assert_eq!(pass.readmitted.len(), 3);
+        assert_eq!(count_active_pins(&mut conn).expect("count"), 3);
     }
 
     #[test]
@@ -1573,101 +1795,6 @@ mod tests {
         );
     }
 
-    #[test]
-    fn readmission_is_bounded_per_tick() {
-        let mut conn = test_conn();
-        // Sixty pins retired in the same minute — they all come due together.
-        let ids: Vec<i32> = (0..60)
-            .map(|i| {
-                let pin = pin_for(&mut conn, &format!("e2e-{i:03}"));
-                retire(&mut conn, pin.id, t0() + Duration::seconds(i));
-                pin.id
-            })
-            .collect();
-
-        let tick = t0() + Duration::hours(7);
-        let first = hold_pass(&mut conn, tick);
-        assert_eq!(
-            (first.readmitted.len(), first.deferred, first.held),
-            (25, 35, 0)
-        );
-        assert_eq!(
-            first
-                .readmitted
-                .iter()
-                .map(|(p, _)| p.id)
-                .collect::<Vec<_>>(),
-            ids[..25].to_vec(),
-            "longest overdue first"
-        );
-        assert_eq!(count_active_pins(&mut conn).expect("count"), 25);
-        assert_eq!(
-            count_pins_by_status(&mut conn, "retired").expect("count"),
-            35
-        );
-
-        let second = hold_pass(&mut conn, tick + Duration::minutes(1));
-        assert_eq!((second.readmitted.len(), second.deferred), (25, 10));
-        let third = hold_pass(&mut conn, tick + Duration::minutes(2));
-        assert_eq!((third.readmitted.len(), third.deferred), (10, 0));
-        let fourth = hold_pass(&mut conn, tick + Duration::minutes(3));
-        assert_eq!(
-            (fourth.readmitted.len(), fourth.deferred, fourth.held),
-            (0, 0, 0)
-        );
-        assert_eq!(count_active_pins(&mut conn).expect("count"), 60);
-    }
-
-    /// Demanded pins are preferred, but ten slots a tick go to the longest
-    /// overdue whatever their demand — so demand cannot postpone an undemanded
-    /// due pin for as long as it lasts.
-    #[test]
-    fn the_oldest_due_pins_keep_a_reserve_under_sustained_demand() {
-        let mut conn = test_conn();
-        // Twelve pins nobody reads, retired first (so: longest overdue)…
-        let quiet: Vec<i32> = (0..12)
-            .map(|i| {
-                let pin = pin_for(&mut conn, &format!("quiet-{i:02}"));
-                retire(&mut conn, pin.id, t0() + Duration::seconds(i));
-                pin.id
-            })
-            .collect();
-        // …and forty that are read, retired an hour later.
-        let read: Vec<i32> = (0..40)
-            .map(|i| {
-                let head = format!("read-{i:02}");
-                let pin = pin_for(&mut conn, &head);
-                let at = t0() + Duration::hours(1) + Duration::seconds(i);
-                retire(&mut conn, pin.id, at);
-                read_miss(&mut conn, &head, at + Duration::minutes(5));
-                pin.id
-            })
-            .collect();
-
-        let tick = t0() + Duration::hours(8);
-        let first = hold_pass(&mut conn, tick);
-        let first_ids: Vec<i32> = first.readmitted.iter().map(|(p, _)| p.id).collect();
-        assert_eq!(first_ids.len(), 25);
-        assert_eq!(
-            first_ids[..10],
-            quiet[..10],
-            "the reserve: ten longest overdue"
-        );
-        assert_eq!(
-            first_ids[10..],
-            read[..15],
-            "then demand, longest overdue first"
-        );
-        assert_eq!(first.deferred, 27);
-
-        // The last two quiet pins are now the longest overdue: next tick's reserve.
-        let second = hold_pass(&mut conn, tick + Duration::minutes(1));
-        let second_ids: Vec<i32> = second.readmitted.iter().map(|(p, _)| p.id).collect();
-        assert_eq!(second_ids[..2], quiet[10..]);
-        assert_eq!(second_ids[2..], read[15..38]);
-        assert_eq!(second.deferred, 2);
-    }
-
     /// A retired row whose `retired_at` is missing or unreadable is not
     /// re-admitted early: it is repaired to a first-rung hold measured from the
     /// pass that noticed, once.
@@ -1751,6 +1878,11 @@ mod tests {
             old_retired.retired_at.as_deref(),
             Some("2026-10-13T06:30:00Z")
         );
+        assert_eq!(
+            old_retired.readmit_after.as_deref(),
+            Some("2026-10-13T12:30:00Z"),
+            "its 6 h deadline, backfilled"
+        );
         for head in ["old-retired", "old-active", "old-removed"] {
             assert_eq!(by_head(head).held_demand_count, 0, "{head}");
             assert_eq!(by_head(head).round, 0, "{head}");
@@ -1760,6 +1892,7 @@ mod tests {
             assert_eq!(by_head(head).consecutive_retirements, 0, "{head}");
             assert!(by_head(head).last_outcome.is_none(), "{head}");
             assert!(by_head(head).retired_at.is_none(), "{head}");
+            assert!(by_head(head).readmit_after.is_none(), "{head}");
         }
 
         // Retired 5.5 h before t0: still inside the 6 h hold it was already

@@ -238,11 +238,12 @@ impl DemandAutoPin {
         }
         // Accumulation ceiling: the window budget bounds the RATE of new pins;
         // this bounds the TOTAL active set (pins have no TTL, and both 60s
-        // reconcile loops scan every active row each tick). Demand already
-        // recorded on a retired pin is active as of the next tick, so it
-        // counts. One cheap COUNT on the ≤once-per-id-per-window admitted path
+        // reconcile loops scan every active row each tick). Demand recorded on
+        // a retired pin in the last few minutes is active as of the next
+        // tick, so it counts. One cheap COUNT on the ≤once-per-id-per-window admitted path
         // only.
-        let active_rows = acquisition_pins::count_active_or_demanded_pins(conn)?;
+        let active_rows =
+            acquisition_pins::count_active_or_demanded_pins(conn, chrono::Utc::now())?;
         if active_rows >= self.max_active_rows {
             tracing::warn!(
                 active_rows,
@@ -576,8 +577,8 @@ mod tests {
 
         // The tick's hold pass is what acts on the counted demand: the read
         // pin comes back, the removed one never does.
-        let pass = acquisition_pins::retired_hold_pass(&mut conn, &app, chrono::Utc::now(), 25, 10)
-            .unwrap();
+        let pass =
+            acquisition_pins::retired_hold_pass(&mut conn, &app, chrono::Utc::now()).unwrap();
         let back: Vec<i32> = pass.readmitted.iter().map(|(p, _)| p.id).collect();
         assert!(back.contains(&retired.id));
         assert!(!back.contains(&removed.id));

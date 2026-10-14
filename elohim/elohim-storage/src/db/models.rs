@@ -3817,6 +3817,9 @@ pub struct AcquisitionPin {
     /// was retired: its hold is capped at the first rung. Cleared on
     /// re-admission.
     pub read_since_retired: i32,
+    /// When a retired pin is due back (RFC 3339): the end of its own hold,
+    /// pulled in by a read. The reconcile tick selects due rows by it.
+    pub readmit_after: Option<String>,
 }
 
 /// Insertable row for `acquisition_pins` (omits `id` — AUTOINCREMENT, and

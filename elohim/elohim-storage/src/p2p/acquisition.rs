@@ -58,42 +58,6 @@ pub fn retry_budget_for_peers(connected_peers: usize) -> u32 {
 /// node-level stream).
 pub const MAX_ACQUISITION_INFLIGHT: usize = 25;
 
-/// Cadence (seconds) of the acquisition dispatch tick in `P2PNode::run`: every
-/// tick the drain puts up to [`MAX_ACQUISITION_INFLIGHT`] wants in flight.
-pub const ACQUISITION_DISPATCH_SECS: u64 = 5;
-
-/// Most retired pins the hold pass re-admits in one reconcile tick: what the
-/// dispatcher can put in flight in the same time — [`MAX_ACQUISITION_INFLIGHT`]
-/// per [`ACQUISITION_DISPATCH_SECS`] over one [`DEFAULT_RECONCILE_SECS`] tick,
-/// 300.
-///
-/// Pins retired in the same hour come due in the same hour. The bound keeps a
-/// thousand of them from landing in `pull.total` in one tick, and it is sized
-/// to dispatch capacity so that it never makes the backlog take LONGER: the
-/// dispatcher is the bottleneck either way (1100 wants at a 3-attempt budget
-/// is 3300 fetches, eleven minutes at 300 a minute), and a tick's admissions
-/// never leave it idle. A bound of one drain's worth per minute would hold
-/// `pull.caughtUp` false for about four times as long as re-admitting
-/// everything at once does.
-///
-/// Demand goes through this same door (a read-miss never flips a status
-/// itself). The inventory arm is NOT bounded by it: a peer naming a head is
-/// evidence, and it re-admits immediately.
-pub const MAX_PIN_READMITS_PER_TICK: usize =
-    MAX_ACQUISITION_INFLIGHT * (DEFAULT_RECONCILE_SECS / ACQUISITION_DISPATCH_SECS) as usize;
-
-/// Of [`MAX_PIN_READMITS_PER_TICK`], the slots that go to the longest-overdue
-/// pins whatever their demand, before demanded pins are preferred for the rest
-/// — two fifths, 120 of 300.
-///
-/// Without a reserve, a tick's worth of demanded pins coming due every tick
-/// would postpone an undemanded due pin for as long as the demand lasted. With
-/// it, a due pin behind `k` longer-overdue pins is re-admitted within
-/// `ceil((k + 1) / 120)` ticks under any demand — ten ticks for the whole
-/// alpha backlog (about 1100 due at once). Demand is a reader waiting now, so
-/// it keeps the majority (180, plus any reserve the oldest pins do not use).
-pub const PIN_READMITS_RESERVED_FOR_OLDEST: usize = MAX_PIN_READMITS_PER_TICK * 2 / 5;
-
 /// Longest the FIRST acquisition drain after boot waits for the iroh peer
 /// book to learn a peer. Measured 2026-08-29 (dual household mesh, warm
 /// recovery jessica<-matthew): the 5 s dispatch cadence drained all 11 pulls
@@ -240,7 +204,7 @@ mod first_drain_tests {
 /// retirement, capped at [`PIN_READMIT_MAX_HOLD`] (6 h, 12 h, then 24 h).
 pub const PIN_STATUS_RETIRED: &str = "retired";
 
-// The hold, its ladder and the per-tick bound live beside the row they are
+// The hold and its ladder live beside the row they are
 // stored on (`db::acquisition_pins`); re-exported so this module stays the one
 // place a reader of the acquisition stream looks.
 pub use crate::db::acquisition_pins::{
@@ -263,24 +227,22 @@ pub fn publish_retired_pin_gauge(conn: &mut diesel::SqliteConnection) {
 
 /// The per-tick pass over the retired set, shared by the libp2p node and the
 /// pure-iroh pull core (`db::acquisition_pins::retired_hold_pass`): settle pins
-/// whose content has become local, re-admit pins that are due (their own hold
-/// ended, or a read shortened it) at most [`MAX_PIN_READMITS_PER_TICK`] a tick,
-/// and fail a pin with no readable retirement clock closed onto the first
-/// rung.
+/// whose content has become local and re-admit EVERY pin that is due (its own
+/// hold ended, or a read shortened it) — as before the hold ladder, there is
+/// no per-tick bound — and fail a pin with no readable retirement clock closed
+/// onto the first rung.
 ///
 /// Every count below is of rows the pass committed; the pass is one
 /// transaction, so an error means nothing changed and nothing is counted.
 ///
-/// bounded-work: see `retired_hold_pass`. A due pin the bound leaves behind is
-/// counted (`hold_skips_total{reason="tick_bound"}`) and taken by a later tick.
+/// bounded-work: one indexed read of the due rows (none at rest), one chunked
+/// presence query over them, one write per due row.
 pub fn run_hold_pass(conn: &mut diesel::SqliteConnection, now: Now) -> HoldPass {
     let pass = match crate::db::acquisition_pins::retired_hold_pass(
         conn,
         // Slice 1: all pinned content lives in the lamad app.
         &crate::db::AppContext::default_lamad(),
         now,
-        MAX_PIN_READMITS_PER_TICK,
-        PIN_READMITS_RESERVED_FOR_OLDEST,
     ) {
         Ok(pass) => pass,
         // A failed pass leaves every retired pin exactly where it was — never
@@ -342,7 +304,6 @@ pub fn run_hold_pass(conn: &mut diesel::SqliteConnection, now: Now) -> HoldPass 
             .filter(|p| p.consecutive_retirements > 0)
             .count() as u64,
     );
-    crate::metrics::inc_acquisition_pin_hold_skips(PinHoldSkip::TickBound, pass.deferred as u64);
     crate::metrics::inc_acquisition_pin_hold_skips(
         PinHoldSkip::HoldNotElapsed,
         (pass.held - pass.clocks_repaired.len()) as u64,
@@ -560,7 +521,7 @@ pub async fn reconcile_tick(
 
     // (0) The retired set. Retirement is a HOLD, not a delete: a pin whose
     // content turned up some other way is settled, and a pin whose hold has
-    // ended is re-admitted for a re-probe — a bounded number per tick. The
+    // ended is re-admitted for a re-probe — every due pin, in this pass. The
     // primary re-admission arm is inventory-driven (`inventory_received`).
     let hold = run_hold_pass(&mut conn, now);
 
@@ -1432,22 +1393,6 @@ mod tests {
         assert_eq!(PIN_READMIT_MAX_HOLD, chrono::Duration::hours(24));
     }
 
-    #[test]
-    fn readmit_bound_is_one_tick_of_dispatch_capacity() {
-        // 25 in flight per 5 s drain, over a 60 s reconcile tick.
-        assert_eq!(MAX_PIN_READMITS_PER_TICK, 300);
-        assert_eq!(
-            MAX_PIN_READMITS_PER_TICK as u64 * ACQUISITION_DISPATCH_SECS,
-            MAX_ACQUISITION_INFLIGHT as u64 * DEFAULT_RECONCILE_SECS
-        );
-        // The oldest-overdue reserve keeps its 10:25 proportion.
-        assert_eq!(PIN_READMITS_RESERVED_FOR_OLDEST, 120);
-        assert_eq!(
-            PIN_READMITS_RESERVED_FOR_OLDEST * 25,
-            MAX_PIN_READMITS_PER_TICK * 10
-        );
-    }
-
     #[tokio::test]
     async fn per_pin_reports_attempts_used_against_the_budget() {
         let acq = AcquisitionState::new();
@@ -1739,22 +1684,53 @@ mod tests {
         );
     }
 
+    /// Review round 4, blocker 2: 301 pins come due at once, and X — the
+    /// highest-priority pin, read while held but not admitted — would have
+    /// sorted last behind a 300-row bound. Every due pin is re-admitted in the
+    /// same pass, and priority orders the dispatch, as before the ladder.
     #[tokio::test]
-    async fn the_tick_readmits_at_most_a_minute_of_dispatch_however_many_are_due() {
+    async fn every_due_pin_is_readmitted_in_one_pass_and_priority_orders_the_dispatch() {
         let pool = crate::test_util::test_pool();
         let acq = AcquisitionState::new();
-        let due = MAX_PIN_READMITS_PER_TICK + 20;
-        for i in 0..due {
+        for i in 0..300 {
             let p = pin(&pool, &format!("e2e-{i:03}"));
             retire_now(&pool, p.id, t0());
         }
-        let first = tick(&pool, &acq, t0() + Duration::hours(7)).await;
-        assert_eq!(first.readmitted, MAX_PIN_READMITS_PER_TICK);
-        assert_eq!(first.to_dispatch.len(), MAX_PIN_READMITS_PER_TICK);
-        assert_eq!(acq.rollup().await.total as usize, MAX_PIN_READMITS_PER_TICK);
-        let second = tick(&pool, &acq, t0() + Duration::hours(7)).await;
-        assert_eq!(second.readmitted, 20);
-        assert_eq!(acq.rollup().await.total as usize, due);
+        let x = pin_db::upsert_pin(
+            &mut pool.get().expect("conn"),
+            NewAcquisitionPin {
+                agent_pub_key: "local-device".into(),
+                head_ref: "x-highest-priority".into(),
+                kind: "item".into(),
+                closure_rule_json: None,
+                priority: 9,
+            },
+        )
+        .expect("upsert");
+        retire_now(&pool, x.id, t0());
+        // A window with no room: X's read is not admitted, only marked.
+        let window_full = crate::services::demand_autopin::DemandAutoPin::with_limits(
+            true,
+            std::time::Duration::from_secs(300),
+            0,
+            2048,
+        );
+        assert!(window_full
+            .record_demand(&mut pool.get().expect("conn"), "x-highest-priority")
+            .expect("demand")
+            .is_none());
+        assert_eq!(row(&pool, x.id).read_since_retired, 1);
+
+        let early = tick(&pool, &acq, t0() + Duration::minutes(359)).await;
+        assert_eq!(early.readmitted, 0);
+        let due = tick(&pool, &acq, t0() + Duration::minutes(361)).await;
+        assert_eq!(due.readmitted, 301, "all of them, in one pass");
+        assert_eq!(due.to_dispatch.len(), 301);
+        assert_eq!(
+            due.to_dispatch[0], "x-highest-priority",
+            "and the highest-priority pin is dispatched first"
+        );
+        assert_eq!(acq.rollup().await.total, 301);
     }
 
     /// A read through the production demand writer, then the tick: a pin one
@@ -2003,7 +1979,7 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn content_that_arrives_some_other_way_settles_a_retired_pin_on_the_next_tick() {
+    async fn content_that_arrives_some_other_way_settles_a_retired_pin_when_it_comes_due() {
         let pool = crate::test_util::test_pool();
         let acq = AcquisitionState::new();
         let p = pin(&pool, "fetched-in-the-foreground");
@@ -2013,8 +1989,13 @@ mod tests {
 
         make_local(&pool, "fetched-in-the-foreground");
 
-        // One minute into the hold.
-        let t = tick(&pool, &acq, t0() + Duration::minutes(1)).await;
+        // One minute into the hold: not due, not looked at.
+        let early = tick(&pool, &acq, t0() + Duration::minutes(1)).await;
+        assert_eq!(early.readmitted, 0);
+        assert_eq!(row(&pool, p.id).status, "retired");
+
+        // Due: settled, not re-probed.
+        let t = tick(&pool, &acq, t0() + Duration::minutes(361)).await;
         assert_eq!(t.readmitted, 1);
         assert!(t.to_dispatch.is_empty(), "nothing to fetch — it is here");
         let r = row(&pool, p.id);

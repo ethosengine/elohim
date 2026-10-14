@@ -39,8 +39,10 @@ pub struct PinView {
     /// `retiredAt` plus the hold for its rung (6 h, 12 h, then 24 h). A read
     /// shortens it: to `retiredAt` itself — already past, due on the next
     /// reconcile tick — if `heldDemandCount > 0`, or to `retiredAt` + 6 h if
-    /// `readSinceRetired`. Absent unless `status` is `retired`. A peer
-    /// inventory naming the head re-admits sooner.
+    /// `readSinceRetired`. Every pin past it is re-admitted by the next
+    /// reconcile tick, so it is a maximum wait up to one tick. Absent unless
+    /// `status` is `retired`. A peer inventory naming the head re-admits
+    /// sooner.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     #[ts(optional)]
     pub next_readmit_at: Option<String>,

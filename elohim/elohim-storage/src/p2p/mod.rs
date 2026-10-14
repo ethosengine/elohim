@@ -3886,8 +3886,7 @@ impl P2PNode {
         let mut provide_reconcile_interval = tokio::time::interval(reconcile_cadence);
         provide_reconcile_interval.set_missed_tick_behavior(tokio::time::MissedTickBehavior::Skip);
         // Acquisition dispatch: drain the acquisition queue every 5 seconds.
-        let mut acquisition_dispatch_interval =
-            tokio::time::interval(Duration::from_secs(acquisition::ACQUISITION_DISPATCH_SECS));
+        let mut acquisition_dispatch_interval = tokio::time::interval(Duration::from_secs(5));
         // Paces inventory refresh pages into the publishers (see
         // `drain_inventory_backlog`); fires every second, does nothing when empty.
         let mut inventory_pacer_interval = tokio::time::interval(Duration::from_secs(1));
