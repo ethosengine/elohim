@@ -11,7 +11,9 @@ This directory is for anyone editing the letter or its labels, or rebuilding the
 - https://alpha.elohim.host/apps/letter-to-dtpr/index.html
 - https://doorway-alpha.elohim.host/apps/letter-to-dtpr/index.html
 
-Both addresses serve the same content-addressed bundle from the alpha test network.
+Both addresses serve the same bundle from the alpha test network (the project's staging
+network; production is paused). The bundle is content-addressed: its address is its
+sha256, and peers and doorways verify the bytes against that address before serving.
 
 ## Prerequisites
 
@@ -26,7 +28,7 @@ The built page is **not** checked in. Build it, then open it:
     python3 -I build.py     # exits 0 and prints "built site/ and dtpr.zip: sha256-…"
 
 then open `site/index.html` in a browser. The page loads only its own files. (`-I` runs
-Python isolated from the current directory and user site-packages; it is a habit, not a requirement.)
+Python isolated from the current directory and user site-packages; it is a safety habit, not a requirement.)
 
 ## What's here (checked in)
 
@@ -49,8 +51,9 @@ Python isolated from the current directory and user site-packages; it is a habit
     fonts/                    the four typefaces as local files, with their @font-face rules
     build.py                  builds site/ and packs ../dtpr.zip
 
-    ../dtpr.zip               one level up, beside this directory: the built site packed as
-                              an html5-app blob (index.html at the zip root)
+    ../dtpr.zip               one level up, beside this directory (where the content record's
+                              localZipPath points): the built site as one zip, the protocol's
+                              "html5-app" format for a self-contained web page
 
 Build outputs (not checked in): `site/`, and `source/datachain-*.final.json`, the three
 labels with their trust marks attached as DTPR authoring provenance.
@@ -59,10 +62,22 @@ The content node is `genesis/data/lamad/content/letter-to-dtpr.json`: the protoc
 record of this artifact, which the seeder publishes and doorways serve from. Its
 `blobHash` must equal the zip's sha256, because peers fetch and verify the bundle by that
 hash; a mismatch means the doorway serves a stale page or none. Its reach is `commons`
-(meant for anyone). After any change: run `build.py`, put the printed
+(the widest of the protocol's visibility levels: meant for anyone). After any change: run `build.py`, put the printed
 hash into that file's `blobHash`, and commit the source, the zip and the record together.
 `build.py` writes the zip with fixed timestamps and sorted names, so the same source
 always gives the same hash.
+
+How a change reaches the doorways: once the commit lands on `dev`, the Genesis pipeline's
+seeder uploads the zip and the record to the network's storage, and doorways fetch the
+zip by its hash and serve it. No other step is manual.
+
+### After any change
+
+1. Edit the source (see Editing).
+2. Run `python3 -I build.py` and note the printed hash.
+3. Check the labels (see Checking the labels).
+4. Put the hash into `blobHash` in `genesis/data/lamad/content/letter-to-dtpr.json`.
+5. Commit the source, `../dtpr.zip` and the record together.
 
 ## Editing
 
@@ -71,7 +86,7 @@ always gives the same hash.
   pricing label inside "When prices move", and the proposals inside "Five elements".
 - **A label claim** lives in `source/datachain-*.json`; its marks in the matching
   `marks-*.json`, keyed by the placement's `element_instance_id` (or its `element_id`
-  when it appears once).
+  when it appears once). Both are fields of DTPR's DatachainInstance schema (dtpr.ai).
 - **A new DTPR element** needs its icons in `source/icons/`: fetch
   `https://api.dtpr.io/api/v2/schemas/dtpr@2026-09-01-beta/elements/<id>/icon.<variant>.svg`
   for the light variant and `.dark` for the dark one.
