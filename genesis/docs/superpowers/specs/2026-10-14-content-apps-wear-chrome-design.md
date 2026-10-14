@@ -12,7 +12,7 @@ graduation-trigger: >
   top-level page in Chromium shows the app itself under a thin protocol chrome whose resiliency
   badge links to `/epr/<id>`; the same address requested as an iframe (the lamad renderer, the EPR
   focal) returns the bundle's bytes unchanged, with no chrome added; and an app bundle that is
-  itself a chromed EPR app (spa-bundle, e.g. elohim-host-landing, lamad-spa) is served unchanged.
+  itself a chromed EPR app (spa-bundle, e.g. lamad-spa, imagodei-portal) is served unchanged.
 cites:
   - "elohim-seam-map-concern-routing | places app-serving and render runtimes peer-side and keeps the doorway to web2 delivery; this spec's navigation shell is delivery behaviour in that seam | sha256:3ce0f9bd564ca1bf | path: genesis/docs/content/elohim-protocol/architecture/2026-06-21-elohim-seam-map-concern-routing.md"
 ---
@@ -62,8 +62,8 @@ every request (Fetch Metadata), and never changes the content's bytes:
    doorway never adds chrome to an embedded response: a surface that embeds content (lamad, the
    EPR page) already implements the chrome's primitives and links itself, and a second frame of
    chrome inside it would be noise.
-3. An app bundle that carries its own chrome (`spa-bundle` content such as elohim-host-landing
-   and lamad-spa, whose root renders `<elohim-page-chrome>`) is served unchanged: it is already
+3. An app bundle that carries its own chrome (`spa-bundle` content such as lamad-spa and
+   imagodei-portal, whose root renders `<elohim-page-chrome>`) is served unchanged: it is already
    a chromed surface.
 4. A request without Fetch Metadata (older clients, tools) is served as today. The rule
    qualifies what people see; it is not an access control, and the reach check stays the gate.
@@ -115,5 +115,10 @@ letters link to `/epr/<id>`, as the DTPR letter's README does.
   document), a resiliency-badge element in `app/elohim-elements/elohim-core` that renders a
   holders figure and an `href` (today the badge exists only inside the EPR page), and the a2o
   station named in the graduation trigger in `features/dataplane/epr-app-deliverability.feature`.
+- `elohim-host-landing` is seeded as `html5-app` (genesis/data/lamad/content/elohim-host-landing.json;
+  landing-page-dogfood.feature asserts it) although its root is a chromed shell. People meet it at
+  `/`, which the doorway renders itself, never at its raw `/apps/` address, so the rule above only
+  double-chromes a visit nobody is pointed to; still, the honest declaration is `spa-bundle`, and
+  reseeding it with the dogfood story updated is open.
 - `fallbackUrl` remains a field on html5-app content; whether a protocol-served node should
   carry an outside fallback at all is open.
