@@ -49,7 +49,7 @@ use std::time::{Duration, Instant};
 use diesel::sqlite::SqliteConnection;
 use diesel::QueryResult;
 
-use crate::db::acquisition_pins::{self, DemandAdmission, DemandPin};
+use crate::db::acquisition_pins::{self, DemandPin};
 use crate::db::models::{AcquisitionPin, NewAcquisitionPin};
 use crate::metrics::DemandDrop;
 
@@ -155,9 +155,8 @@ impl DemandAutoPin {
             _ => {
                 // Never-seen id: enforce the per-window admission budget so a
                 // distinct-id scan cannot mint unbounded pins (each admitted id
-                // costs a permanent row + P2P fetch fan-out). Past it, no NEW
-                // pin is authored — but demand for a pin that already exists
-                // is still recorded (`DemandAdmission::ExistingOnly`).
+                // costs a permanent row + P2P fetch fan-out). Fail toward
+                // not-pinning, mirroring the poisoned-mutex branch.
                 if seen.len() >= self.max_new_per_window {
                     return Admission::WindowFull;
                 }
@@ -167,38 +166,59 @@ impl DemandAutoPin {
         }
     }
 
-    /// Forget an admitted id whose sample was not written, so the next read of
-    /// it is not throttled away.
-    fn forget(&self, content_id: &str) {
-        if let Ok(mut seen) = self.seen.lock() {
-            seen.remove(content_id);
+    /// A read-miss the budgets did not admit: count it, and if the head's pin
+    /// is retired, mark the row as read (which caps its hold at 6 h — see
+    /// [`acquisition_pins::mark_read_since_retired`]). It authors nothing and
+    /// re-admits nothing.
+    fn not_admitted(
+        &self,
+        conn: &mut SqliteConnection,
+        content_id: &str,
+        reason: DemandDrop,
+    ) -> QueryResult<Option<AcquisitionPin>> {
+        crate::metrics::inc_acquisition_demand_dropped(reason);
+        if acquisition_pins::mark_read_since_retired(conn, AUTOPIN_AGENT, content_id, AUTOPIN_KIND)?
+        {
+            crate::metrics::inc_acquisition_pin_hold_skips(
+                crate::metrics::PinHoldSkip::ReadMarked,
+                1,
+            );
+            tracing::debug!(
+                content_id,
+                reason = reason.label(),
+                "read of a retired head not admitted; its hold is capped at the first rung"
+            );
         }
+        Ok(None)
     }
 
     /// Record a demand signal for `content_id` (a confirmed local read-miss).
     ///
-    /// Authors an `item` DevicePin when the controller is enabled, the id is
-    /// not throttled and the budgets for new pins have room. Those budgets —
-    /// the window of distinct ids and the active-row ceiling — guard the
-    /// CREATION of pins; demand for a head whose pin already exists is recorded
-    /// whether or not they are spent.
+    /// Two cases, and nothing else:
     ///
-    /// A head whose pin is `retired` is not re-activated by this call: the
-    /// demand is recorded on the row and the next reconcile tick re-admits the
-    /// pin. A `removed` pin is counted and left removed — only an explicit
-    /// re-pin restores it (operator decision, 2026-10-14). See
-    /// [`acquisition_pins::record_demand_pin`].
+    /// - **Admitted** — the id is past its throttle, the window of distinct ids
+    ///   has room, and the active set is under its ceiling: exactly the reads
+    ///   that authored or re-activated a pin before retirement had a ladder.
+    ///   A head with no pin gets one. A head whose pin is `retired` has the
+    ///   demand recorded and is re-admitted by the next reconcile tick — at
+    ///   most one tick later than re-activating it here would be. A `removed`
+    ///   pin is counted and left removed: only an explicit re-pin restores it
+    ///   (operator decision, 2026-10-14).
+    /// - **Not admitted** — throttled, window full, or at the ceiling: counted
+    ///   (`elohim_acquisition_demand_dropped_total{reason}`), and if the head's
+    ///   pin is `retired` the row is marked as read. A marked pin is re-probed
+    ///   no later than 6 h after it retired — what the flat cooldown gave every
+    ///   pin before the ladder — and no sooner, so a read that is not admitted
+    ///   causes no acquisition work that the flat cooldown did not.
     ///
-    /// The write does not make the read wait on a busy database: it gives up
-    /// after a tenth of a second and the sample is dropped (counted, and the
-    /// id forgotten so the next read records it).
+    /// Read-driven re-activations therefore stay inside this controller's own
+    /// budget: at most `max_new_per_window` distinct heads per throttle window
+    /// (256 per 300 s by default), and never past the ceiling.
     ///
     /// Returns `Ok(Some(pin))` when an active pin now wants the head (authored
-    /// here, or already active), `Ok(None)` otherwise. Every `Ok(None)` that
-    /// reached no pin row is counted in
-    /// `elohim_acquisition_demand_dropped_total{reason}`. Only DB errors other
-    /// than lock contention surface as `Err`; the caller treats those as
-    /// non-fatal (the read path continues regardless).
+    /// here, or already active), `Ok(None)` otherwise. Only DB errors surface
+    /// as `Err`; the caller treats those as non-fatal (the read path continues
+    /// regardless).
     pub fn record_demand(
         &self,
         conn: &mut SqliteConnection,
@@ -207,34 +227,33 @@ impl DemandAutoPin {
         if !self.enabled {
             return Ok(None);
         }
-        let (admission, if_no_row) = match self.admit(content_id) {
+        match self.admit(content_id) {
+            Admission::Admitted => {}
             Admission::Throttled => {
-                crate::metrics::inc_acquisition_demand_dropped(DemandDrop::Throttled);
-                return Ok(None);
+                return self.not_admitted(conn, content_id, DemandDrop::Throttled)
             }
-            Admission::WindowFull => (DemandAdmission::ExistingOnly, DemandDrop::WindowFull),
-            Admission::Admitted => {
-                // Accumulation ceiling: the window budget bounds the RATE of
-                // new pins; this bounds the TOTAL active set (pins have no
-                // TTL, and both 60s reconcile loops scan every active row each
-                // tick). One cheap COUNT on the ≤once-per-id-per-window
-                // admitted path only.
-                let active_rows = acquisition_pins::count_active_pins(conn)?;
-                if active_rows >= self.max_active_rows {
-                    tracing::warn!(
-                        active_rows,
-                        ceiling = self.max_active_rows,
-                        content_id,
-                        "demand auto-pin paused for new heads: active pin rows at ceiling \
-                         (DoS guard; resumes as pins complete or are removed)"
-                    );
-                    (DemandAdmission::ExistingOnly, DemandDrop::ActiveCeiling)
-                } else {
-                    (DemandAdmission::Full, DemandDrop::ActiveCeiling)
-                }
+            Admission::WindowFull => {
+                return self.not_admitted(conn, content_id, DemandDrop::WindowFull)
             }
-        };
-        let demand = match acquisition_pins::record_demand_pin_briefly(
+        }
+        // Accumulation ceiling: the window budget bounds the RATE of new pins;
+        // this bounds the TOTAL active set (pins have no TTL, and both 60s
+        // reconcile loops scan every active row each tick). Demand already
+        // recorded on a retired pin is active as of the next tick, so it
+        // counts. One cheap COUNT on the ≤once-per-id-per-window admitted path
+        // only.
+        let active_rows = acquisition_pins::count_active_or_demanded_pins(conn)?;
+        if active_rows >= self.max_active_rows {
+            tracing::warn!(
+                active_rows,
+                ceiling = self.max_active_rows,
+                content_id,
+                "demand auto-pin paused: active pin rows at ceiling (DoS guard; \
+                 resumes as pins complete or are removed)"
+            );
+            return self.not_admitted(conn, content_id, DemandDrop::ActiveCeiling);
+        }
+        let demand = acquisition_pins::record_demand_pin(
             conn,
             NewAcquisitionPin {
                 agent_pub_key: AUTOPIN_AGENT.to_string(),
@@ -244,28 +263,13 @@ impl DemandAutoPin {
                 priority: AUTOPIN_PRIORITY,
             },
             chrono::Utc::now(),
-            admission,
-        ) {
-            Ok(demand) => demand,
-            Err(e) if acquisition_pins::is_lock_contention(&e) => {
-                self.forget(content_id);
-                crate::metrics::inc_acquisition_demand_dropped(DemandDrop::LockBusy);
-                tracing::debug!(content_id, "demand sample dropped: database busy");
-                return Ok(None);
-            }
-            Err(e) => return Err(e),
-        };
+        )?;
         Ok(match demand {
-            // The head has no pin and the budgets for new ones are spent.
-            None => {
-                crate::metrics::inc_acquisition_demand_dropped(if_no_row);
-                None
-            }
-            Some(DemandPin::Authored(pin) | DemandPin::AlreadyActive(pin)) => Some(pin),
+            DemandPin::Authored(pin) | DemandPin::AlreadyActive(pin) => Some(pin),
             // Recorded. The next reconcile tick re-admits it (and counts it,
             // `readmissions_total{cause="demand"}`). Not this call — the tick
             // is the one bounded door back to `active`.
-            Some(DemandPin::Demanded(pin)) => {
+            DemandPin::Demanded(pin) => {
                 tracing::debug!(
                     content_id,
                     pin_id = pin.id,
@@ -277,7 +281,7 @@ impl DemandAutoPin {
             }
             // A person's removal: not revived. A read for this content is
             // served only by the read path's foreground fetch.
-            Some(DemandPin::NotRevived(pin)) => {
+            DemandPin::NotRevived(pin) => {
                 crate::metrics::inc_acquisition_pin_hold_skips(
                     crate::metrics::PinHoldSkip::DemandRemoved,
                     1,

@@ -37,16 +37,6 @@ pub enum AcquisitionTarget {
 }
 
 impl AcquisitionTarget {
-    /// The peer this target reaches, as the acquisition tracker records it
-    /// ("which providers has this want been asked of").
-    pub fn label(&self) -> String {
-        match self {
-            AcquisitionTarget::Libp2p(peer) => peer.to_string(),
-            #[cfg(feature = "p2p-iroh")]
-            AcquisitionTarget::Iroh { label, .. } => label.clone(),
-        }
-    }
-
     pub fn transport(&self) -> &'static str {
         match self {
             AcquisitionTarget::Libp2p(_) => "libp2p",

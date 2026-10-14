@@ -9,14 +9,8 @@ export type PinPullStatus = { pinId: number, total: number, fetched: number, pen
  */
 attemptsUsed?: number, 
 /**
- * Attempts a want gets before the pin can be retired
- * ([`retry_budget_for_peers`]; one more is granted while a current peer
- * has not been asked).
+ * Attempts a want gets before the pin is retired
+ * ([`retry_budget_for_peers`]); `attemptsUsed == retryBudget` with
+ * `pending == 0` is a pin the next reconcile retires.
  */
-retryBudget?: number, 
-/**
- * Distinct peers the pin's least-covered unfetched want has been asked.
- * A pin retires only when its exhausted wants were asked of every peer
- * the dispatcher currently plans for.
- */
-providersAsked?: number, };
+retryBudget?: number, };

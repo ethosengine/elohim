@@ -24,21 +24,28 @@ consecutiveRetirements?: number,
 retiredAt?: string, 
 /**
  * Earliest time a `retired` pin is re-admitted for a re-probe (RFC 3339):
- * `retiredAt` plus the hold for its rung — or `retiredAt` itself, already
- * past, if it has been read while held (`heldDemandCount > 0`): demand
- * makes it due on the next reconcile tick. Absent unless `status` is
- * `retired`. A peer inventory naming the head re-admits sooner.
+ * `retiredAt` plus the hold for its rung (6 h, 12 h, then 24 h). A read
+ * shortens it: to `retiredAt` itself — already past, due on the next
+ * reconcile tick — if `heldDemandCount > 0`, or to `retiredAt` + 6 h if
+ * `readSinceRetired`. Absent unless `status` is `retired`. A peer
+ * inventory naming the head re-admits sooner.
  */
 nextReadmitAt?: string, 
 /**
- * Read-misses recorded while the pin was `retired` or `removed`. On a
- * retired pin they make it due at once; on a removed pin they are only
- * counted (only an explicit re-pin restores a removed pin). Cleared on
- * re-admission.
+ * Read-misses the demand auto-pin admitted while the pin was `retired`
+ * or `removed`. On a retired pin they make it due at once; on a removed
+ * pin they are only counted (only an explicit re-pin restores a removed
+ * pin). Cleared on re-admission.
  */
 heldDemandCount?: number, 
 /**
- * `exhausted` (every connected peer was asked and none supplied the
+ * True when a read-miss the auto-pin did not admit (throttled, window
+ * full, ceiling) named the pin while it was retired: its hold is capped
+ * at 6 h. Cleared on re-admission.
+ */
+readSinceRetired?: boolean, 
+/**
+ * `exhausted` (the retry budget was spent and no peer asked supplied the
  * bytes), `fetched`, or absent when no round has concluded.
  */
 lastOutcome?: string, };

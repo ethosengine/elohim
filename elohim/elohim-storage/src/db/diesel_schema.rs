@@ -2051,6 +2051,7 @@ diesel::table! {
         last_outcome -> Nullable<Text>,
         retired_at -> Nullable<Text>,
         round -> Integer,
+        read_since_retired -> Integer,
     }
 }
 

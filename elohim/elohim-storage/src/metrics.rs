@@ -2139,10 +2139,10 @@ lazy_static! {
 // the crate's macro recursion limit.
 lazy_static! {
     /// Backoff steps taken by retired acquisition pins. label: hold = the hold
-    /// the pin now serves, "6h" | "12h" | "24h" | "48h" | "96h" | "168h"
+    /// the pin now serves, "6h" | "12h" | "24h"
     /// (`db::acquisition_pins::pin_hold_label`). One per retirement.
     ///
-    /// Mass on "168h" is the population of wants nobody can fill; mass that
+    /// Mass on "24h" is the population of wants nobody can fill; mass that
     /// stays on "6h" while `…_backoff_resets_total` rises is pins flapping
     /// between a peer's advertisement and that peer's failure to serve.
     pub static ref ACQUISITION_PIN_BACKOFF_STEPS: IntCounterVec = IntCounterVec::new(
@@ -2178,13 +2178,14 @@ lazy_static! {
     )
     .unwrap();
 
-    /// Read-miss demand samples that reached no pin row. label: reason — see
-    /// [`DemandDrop`]. Demand that DID land is on the row (`heldDemandCount`)
-    /// and, for a retired pin, in `…_pin_readmissions_total{cause="demand"}`.
+    /// Read-misses the demand auto-pin did not admit. label: reason — see
+    /// [`DemandDrop`]. Such a read authors nothing and re-admits nothing; if it
+    /// named a retired pin the row is marked
+    /// (`…_pin_hold_skips_total{reason="read_marked"}`).
     pub static ref ACQUISITION_DEMAND_DROPPED: IntCounterVec = IntCounterVec::new(
         Opts::new(
             "elohim_acquisition_demand_dropped_total",
-            "Read-miss demand samples dropped before reaching a pin row, by reason.",
+            "Read-misses the demand auto-pin did not admit, by reason.",
         ),
         &["reason"],
     )
@@ -6304,8 +6305,10 @@ impl PinBackoffReset {
 pub enum PinReadmitCause {
     /// Its own hold elapsed (the backoff ladder).
     Hold,
-    /// It was read while held: demand makes a retired pin due at once.
+    /// A read the demand auto-pin admitted named it while it was held.
     Demand,
+    /// A read the auto-pin did not admit marked it, and the first rung passed.
+    Read,
     /// A peer inventory named its head.
     Inventory,
     /// Its content became local while it was retired.
@@ -6313,9 +6316,10 @@ pub enum PinReadmitCause {
 }
 
 impl PinReadmitCause {
-    pub const ALL: [PinReadmitCause; 4] = [
+    pub const ALL: [PinReadmitCause; 5] = [
         PinReadmitCause::Hold,
         PinReadmitCause::Demand,
+        PinReadmitCause::Read,
         PinReadmitCause::Inventory,
         PinReadmitCause::Fetched,
     ];
@@ -6324,6 +6328,7 @@ impl PinReadmitCause {
         match self {
             PinReadmitCause::Hold => "hold",
             PinReadmitCause::Demand => "demand",
+            PinReadmitCause::Read => "read",
             PinReadmitCause::Inventory => "inventory",
             PinReadmitCause::Fetched => "fetched",
         }
@@ -6343,14 +6348,18 @@ pub enum PinHoldSkip {
     ClockUnreadable,
     /// A read-miss named a `removed` (or `paused`) pin: not revived.
     DemandRemoved,
+    /// A read-miss the demand auto-pin did not admit named a `retired` pin:
+    /// left held, its hold capped at the first rung (once per pin per hold).
+    ReadMarked,
 }
 
 impl PinHoldSkip {
-    pub const ALL: [PinHoldSkip; 4] = [
+    pub const ALL: [PinHoldSkip; 5] = [
         PinHoldSkip::HoldNotElapsed,
         PinHoldSkip::TickBound,
         PinHoldSkip::ClockUnreadable,
         PinHoldSkip::DemandRemoved,
+        PinHoldSkip::ReadMarked,
     ];
 
     pub fn label(self) -> &'static str {
@@ -6359,30 +6368,27 @@ impl PinHoldSkip {
             PinHoldSkip::TickBound => "tick_bound",
             PinHoldSkip::ClockUnreadable => "clock_unreadable",
             PinHoldSkip::DemandRemoved => "demand_removed",
+            PinHoldSkip::ReadMarked => "read_marked",
         }
     }
 }
 
-/// Why a read-miss's demand sample reached no pin row.
+/// Why the demand auto-pin did not admit a read-miss.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum DemandDrop {
     /// The same head was sampled within the throttle window.
     Throttled,
-    /// The window of distinct ids was full and the head has no pin.
+    /// The window of distinct ids was full.
     WindowFull,
-    /// The active set was at its ceiling and the head has no pin.
+    /// The active set (with demand already recorded) was at its ceiling.
     ActiveCeiling,
-    /// Another writer held the database past the short wait the read path
-    /// allows; the next read of the head records it.
-    LockBusy,
 }
 
 impl DemandDrop {
-    pub const ALL: [DemandDrop; 4] = [
+    pub const ALL: [DemandDrop; 3] = [
         DemandDrop::Throttled,
         DemandDrop::WindowFull,
         DemandDrop::ActiveCeiling,
-        DemandDrop::LockBusy,
     ];
 
     pub fn label(self) -> &'static str {
@@ -6390,12 +6396,11 @@ impl DemandDrop {
             DemandDrop::Throttled => "throttled",
             DemandDrop::WindowFull => "window_full",
             DemandDrop::ActiveCeiling => "active_ceiling",
-            DemandDrop::LockBusy => "lock_busy",
         }
     }
 }
 
-/// Record one read-miss demand sample dropped for `reason`.
+/// Record one read-miss the demand auto-pin did not admit, for `reason`.
 pub fn inc_acquisition_demand_dropped(reason: DemandDrop) {
     ACQUISITION_DEMAND_DROPPED
         .with_label_values(&[reason.label()])

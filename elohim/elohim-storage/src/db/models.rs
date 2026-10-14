@@ -3801,9 +3801,9 @@ pub struct AcquisitionPin {
     /// between them — the rung of the re-admission backoff ladder
     /// (`p2p::acquisition::pin_hold`). 0 = never retired, or reset.
     pub consecutive_retirements: i32,
-    /// Read-misses recorded while the pin sat in `retired` or `removed`. On a
-    /// retired pin demand makes it due on the next reconcile tick; on a
-    /// removed pin it is only counted. Cleared on re-admission.
+    /// Read-misses the demand auto-pin ADMITTED while the pin sat in `retired`
+    /// or `removed`. On a retired pin that makes it due on the next reconcile
+    /// tick; on a removed pin it is only counted. Cleared on re-admission.
     pub held_demand_count: i32,
     /// `exhausted` | `fetched` | NULL (no round has concluded yet).
     pub last_outcome: Option<String>,
@@ -3813,6 +3813,10 @@ pub struct AcquisitionPin {
     /// Bumped at every (re-)activation; keys the in-memory retry state and
     /// guards retirement against a stale exhaustion snapshot.
     pub round: i32,
+    /// 1 when a read-miss the auto-pin did NOT admit named the pin while it
+    /// was retired: its hold is capped at the first rung. Cleared on
+    /// re-admission.
+    pub read_since_retired: i32,
 }
 
 /// Insertable row for `acquisition_pins` (omits `id` — AUTOINCREMENT, and
