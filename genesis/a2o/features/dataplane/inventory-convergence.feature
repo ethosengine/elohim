@@ -42,8 +42,13 @@ Feature: Inventory-gossip apply plane converges under WAN-adversarial gossip
   Scenario: the seed-facing doorway peer catches its projection up under sustained gossip
     # Under the storm the seed peer (adam) cannot drain inventory, so the projection it
     # feeds never reaches caughtUp on the doorway host. Convergence restores it.
-    Then peer "alpha-A" /health p2p.caughtUp is true
-    And peer "elohim.host" /health p2p.caughtUp is true
+    #
+    # Bounded wait, not one sample: on the fleet caughtUp goes false for a few minutes
+    # while a 300 s projection-reconcile sweep is in flight. Each peer is polled every
+    # 15 s for up to 600 s (two sweep cadences); a peer still behind after that fails
+    # with the last /health evidence.
+    Then peer "alpha-A" /health p2p.caughtUp becomes true within 600 seconds
+    And peer "elohim.host" /health p2p.caughtUp becomes true within 600 seconds
 
   # HELD (2026-08-21): 2 undefined step(s) — story-first placeholder; remove @wip when steps land.
   @wip
