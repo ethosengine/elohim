@@ -1,0 +1,224 @@
+<title>Elohim, Read Through DTPR</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,600&family=Source+Serif+4:ital,opsz,wght@0,8..60,400;0,8..60,600;1,8..60,400&family=DM+Sans:wght@400;500;600&family=Red+Hat+Text:wght@400;500;600;700&display=swap">
+<style>
+/* Layout: a letter column in the sender's voice (serif, linen), opening at its centre into
+   full-width DTPR labels set in the recipient's own visual language (Red Hat Text, teal, white
+   cards). Elohim's annotations on those labels keep the sender's palette, so the two layers read apart. */
+:root {
+  /* the letter: Elohim brand */
+  --paper: #F5F0E8;          /* Linen */
+  --ink: #2E2924;            /* warm near-black */
+  --ink-soft: #6B6157;       /* Hearthstone */
+  --vine: #2D5F3B;           /* Vineyard */
+  --gold: #D4A03E;           /* Harvest Gold */
+  --growth: #5E8F48;         /* New Growth, deepened for text contrast */
+  --rule: rgba(107, 97, 87, 0.25);
+  /* the labels: DTPR's own tokens */
+  --dtpr-accent: #0f5153;
+  --dtpr-accent-soft: rgba(15, 81, 83, 0.08);
+  --dtpr-surface: #ffffff;
+  --dtpr-zone: #EEF2F1;
+  --dtpr-text: #111111;
+  --dtpr-muted: #555555;
+  --dtpr-border: rgba(0, 0, 0, 0.1);
+  /* trust marks (Elohim's layer on the label) */
+  --m-peer-bg: #2D5F3B; --m-peer-fg: #F5F0E8;
+  --m-signed-fg: #2D5F3B;
+  --m-people-bg: rgba(212, 160, 62, 0.22); --m-people-fg: #6A4C12;
+  --m-promise-fg: #6B6157;
+  --under-bg: #F7EFDD; --under-fg: #4A3F33; --under-rule: #D4A03E;
+
+  --f-display: 'Fraunces', Georgia, serif;
+  --f-body: 'Source Serif 4', Georgia, serif;
+  --f-ui: 'DM Sans', system-ui, sans-serif;
+  --f-dtpr: 'Red Hat Text', system-ui, sans-serif;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --paper: #0F1A12; --ink: #ECE6DA; --ink-soft: #B6AC9F; --vine: #8FC38A; --gold: #E2B65C; --growth: #9CCB84;
+    --rule: rgba(232, 228, 217, 0.18);
+    --dtpr-accent: #5fb6b8; --dtpr-accent-soft: rgba(95, 182, 184, 0.16); --dtpr-surface: #1a1a1a; --dtpr-zone: #121816;
+    --dtpr-text: #f5f5f5; --dtpr-muted: #a3a3a3; --dtpr-border: rgba(255, 255, 255, 0.12);
+    --m-peer-bg: #8FC38A; --m-peer-fg: #0F1A12; --m-signed-fg: #8FC38A;
+    --m-people-bg: rgba(226, 182, 92, 0.2); --m-people-fg: #EBC77E; --m-promise-fg: #B6AC9F;
+    --under-bg: #1E2219; --under-fg: #E3D9C6; --under-rule: #E2B65C;
+    color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --paper: #0F1A12; --ink: #ECE6DA; --ink-soft: #B6AC9F; --vine: #8FC38A; --gold: #E2B65C; --growth: #9CCB84;
+  --rule: rgba(232, 228, 217, 0.18);
+  --dtpr-accent: #5fb6b8; --dtpr-accent-soft: rgba(95, 182, 184, 0.16); --dtpr-surface: #1a1a1a; --dtpr-zone: #121816;
+  --dtpr-text: #f5f5f5; --dtpr-muted: #a3a3a3; --dtpr-border: rgba(255, 255, 255, 0.12);
+  --m-peer-bg: #8FC38A; --m-peer-fg: #0F1A12; --m-signed-fg: #8FC38A;
+  --m-people-bg: rgba(226, 182, 92, 0.2); --m-people-fg: #EBC77E; --m-promise-fg: #B6AC9F;
+  --under-bg: #1E2219; --under-fg: #E3D9C6; --under-rule: #E2B65C;
+  color-scheme: dark;
+}
+
+* { box-sizing: border-box; }
+body { background: var(--paper); color: var(--ink); font-family: var(--f-body); font-size: 1.0625rem; line-height: 1.6; }
+.wrap { padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); padding-block: 0 4rem; }
+.col { max-width: 41rem; margin-inline: auto; }
+a { color: var(--vine); text-underline-offset: 2px; }
+a:focus-visible, button:focus-visible, summary:focus-visible, textarea:focus-visible { outline: 2px solid var(--gold); outline-offset: 2px; }
+code { font-family: ui-monospace, 'SF Mono', Menlo, monospace; font-size: 0.85em; background: var(--rule); padding: 0.05em 0.3em; border-radius: 3px; overflow-wrap: anywhere; }
+
+/* masthead */
+.mast { padding-block: 3.5rem 1.5rem; border-bottom: 1px solid var(--rule); margin-bottom: 2rem; }
+.mast .kicker { font-family: var(--f-ui); font-size: 0.78rem; letter-spacing: 0.08em; text-transform: uppercase; color: var(--ink-soft); margin: 0 0 1rem; }
+.mast h1 { font-family: var(--f-display); font-weight: 600; font-size: clamp(2rem, 6vw, 3.1rem); line-height: 1.08; margin: 0 0 1.25rem; text-wrap: balance; letter-spacing: -0.01em; }
+.mast .lede { font-family: var(--f-display); font-size: clamp(1.15rem, 3vw, 1.4rem); line-height: 1.35; color: var(--vine); margin: 0 0 1.25rem; max-width: 36rem; text-wrap: balance; }
+.mast .to { font-family: var(--f-ui); font-size: 0.92rem; color: var(--ink-soft); margin: 0; }
+.mast .to b { color: var(--ink); font-weight: 600; }
+.constellation { display: block; width: 120px; height: 40px; margin-bottom: 1.25rem; }
+.constellation circle { fill: var(--gold); }
+.constellation line { stroke: var(--ink-soft); stroke-width: 1; opacity: 0.6; }
+
+.letter-sec h2 { font-family: var(--f-display); font-weight: 600; font-size: 1.55rem; line-height: 1.2; margin: 2.75rem 0 0.75rem; text-wrap: balance; }
+.letter-sec p, .opening p { margin: 0 0 1rem; }
+.letter-sec ul, .letter-sec ol { padding-left: 1.25rem; margin: 0 0 1rem; display: grid; gap: 0.6rem; }
+.letter-sec li::marker { color: var(--gold); }
+#one-piece-of-advice { margin-top: 2.75rem; padding: 0.25rem 1.25rem 0.5rem; background: var(--under-bg); border-left: 4px solid var(--gold); border-radius: 0 10px 10px 0; }
+#one-piece-of-advice h2 { margin-top: 1.25rem; }
+#one-piece-of-advice strong { color: var(--vine); }
+.sig { margin-top: 2rem; padding-top: 1.25rem; border-top: 1px solid var(--rule); }
+.sig p:last-child { font-size: 0.9rem; color: var(--ink-soft); font-style: italic; }
+
+/* ---- the DTPR zone (full width) ---- */
+.labels { margin: 2rem calc(50% - 50vw) 1rem; padding: 2rem max(16px, env(safe-area-inset-left, 0px)) 2.5rem; padding-right: max(16px, env(safe-area-inset-right, 0px)); background: var(--dtpr-zone); border-block: 1px solid var(--dtpr-border); font-family: var(--f-dtpr); color: var(--dtpr-text); }
+.labels > * { max-width: 72rem; margin-inline: auto; }
+.seat-tabs { display: flex; flex-wrap: wrap; gap: 0.5rem; margin-bottom: 1.5rem; }
+.seat-tabs button { font-family: var(--f-dtpr); font-size: 0.95rem; font-weight: 600; padding: 0.6rem 1rem; border-radius: 999px; border: 1px solid var(--dtpr-border); background: var(--dtpr-surface); color: var(--dtpr-text); cursor: pointer; }
+.seat-tabs button[aria-selected="true"] { background: var(--dtpr-accent); border-color: var(--dtpr-accent); color: var(--dtpr-surface); }
+.chain-head { max-width: 46rem; margin-bottom: 1.5rem; }
+.chain-head h3 { font-size: 1.6rem; font-weight: 700; margin: 0.2rem 0 0.5rem; line-height: 1.2; }
+.chain-head p { margin: 0; color: var(--dtpr-muted); font-size: 0.98rem; line-height: 1.5; }
+.kicker { font-family: var(--f-dtpr); font-size: 0.75rem; letter-spacing: 0.06em; text-transform: uppercase; color: var(--dtpr-accent); font-weight: 600; margin: 0; }
+.dtpr-cat { padding-block: 1.25rem; border-top: 1px solid var(--dtpr-border); }
+.cat-head { display: flex; flex-wrap: wrap; align-items: baseline; gap: 0.25rem 0.75rem; margin-bottom: 0.75rem; }
+.cat-head h4 { margin: 0; font-size: 1.05rem; font-weight: 700; }
+.cat-head p { margin: 0; color: var(--dtpr-muted); font-size: 0.9rem; }
+.flow { margin-block: 0.5rem; padding: 0 1rem; border: 1px dashed var(--dtpr-border); border-radius: 12px; }
+.flow-label { font-size: 0.75rem; letter-spacing: 0.06em; text-transform: uppercase; color: var(--dtpr-muted); font-weight: 600; margin: 0.9rem 0 0; }
+.flow .dtpr-cat:first-of-type { border-top: 0; }
+.under { font-family: var(--f-body); font-size: 0.95rem; line-height: 1.5; color: var(--under-fg); background: var(--under-bg); border-left: 3px solid var(--under-rule); padding: 0.55rem 0.85rem; margin: 0 0 0.9rem; max-width: 46rem; border-radius: 0 6px 6px 0; }
+.under b { font-family: var(--f-ui); font-weight: 600; }
+.grid { display: grid; gap: 1rem; grid-template-columns: repeat(auto-fill, minmax(min(100%, 19rem), 1fr)); }
+.dtpr-el { display: flex; flex-direction: column; gap: 0.55rem; padding: 1rem; background: var(--dtpr-surface); border: 1px solid var(--dtpr-border); border-radius: 8px; min-width: 0; }
+.dtpr-el header { display: flex; gap: 0.85rem; align-items: center; min-width: 0; }
+.dtpr-el h4 { margin: 0; font-size: 1rem; font-weight: 600; line-height: 1.3; }
+.tb { min-width: 0; display: grid; gap: 0.3rem; }
+.chips { display: flex; flex-wrap: wrap; gap: 0.3rem; }
+.ctx { font-size: 0.72rem; font-weight: 600; color: var(--dtpr-accent); background: var(--dtpr-accent-soft); padding: 0.1rem 0.45rem; border-radius: 4px; }
+.ico { flex: none; width: 44px; height: 44px; display: block; }
+.ico svg { width: 44px; height: 44px; display: block; }
+.ico-d { display: none; }
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) .ico-l { display: none; } :root:not([data-theme="light"]) .ico-d { display: block; } }
+:root[data-theme="dark"] .ico-l { display: none; }
+:root[data-theme="dark"] .ico-d { display: block; }
+.desc { margin: 0; font-size: 0.9rem; line-height: 1.45; color: var(--dtpr-muted); }
+.mit { margin: 0; font-size: 0.86rem; line-height: 1.45; color: var(--dtpr-muted); }
+.mit span { font-weight: 600; color: var(--dtpr-text); margin-right: 0.25rem; }
+.marks { display: flex; flex-wrap: wrap; align-items: center; gap: 0.35rem; margin-top: 0.15rem; padding-top: 0.6rem; border-top: 1px solid var(--dtpr-border); }
+.mark { font-family: var(--f-ui); font-size: 0.74rem; font-weight: 600; padding: 0.12rem 0.5rem; border-radius: 999px; display: inline-flex; align-items: center; gap: 0.35rem; white-space: nowrap; }
+.mark i { width: 7px; height: 7px; border-radius: 50%; display: inline-block; }
+.b-peer { background: var(--m-peer-bg); color: var(--m-peer-fg); } .b-peer i { background: var(--m-peer-fg); }
+.b-signed { border: 1.5px solid var(--m-signed-fg); color: var(--m-signed-fg); } .b-signed i { background: var(--m-signed-fg); }
+.b-people { background: var(--m-people-bg); color: var(--m-people-fg); } .b-people i { background: var(--m-people-fg); }
+.b-promise { border: 1.5px dashed var(--m-promise-fg); color: var(--m-promise-fg); } .b-promise i { border: 1.5px solid var(--m-promise-fg); }
+.t-live, .t-building, .t-designed { color: var(--ink-soft); background: transparent; padding-inline: 0.2rem; }
+.t-live i { background: var(--growth); } .t-building i { background: var(--gold); } .t-designed i { border: 1.5px solid var(--ink-soft); }
+.tnote { font-family: var(--f-ui); font-size: 0.74rem; color: var(--ink-soft); flex-basis: 100%; line-height: 1.35; }
+details { font-size: 0.84rem; color: var(--dtpr-muted); }
+summary { cursor: pointer; font-weight: 600; color: var(--dtpr-accent); font-size: 0.82rem; }
+details p { margin: 0.5rem 0; line-height: 1.45; }
+blockquote { margin: 0.4rem 0 0; padding: 0.4rem 0.6rem; border-left: 2px solid var(--dtpr-border); }
+blockquote p { margin: 0; font-style: italic; color: var(--dtpr-text); overflow-wrap: anywhere; }
+blockquote cite { display: block; font-style: normal; font-size: 0.75rem; margin-top: 0.2rem; overflow-wrap: anywhere; }
+.dtpr-el.proposed { border: 1.5px dashed var(--dtpr-accent); }
+.proposed-chip { color: var(--dtpr-surface); background: var(--dtpr-accent); }
+.proposals { margin: 1.5rem calc(50% - min(50vw, 36rem)) 1.5rem; font-family: var(--f-dtpr); color: var(--dtpr-text); }
+
+/* trust tally + verify */
+.trust-box, .verify { font-family: var(--f-ui); font-size: 0.95rem; border: 1px solid var(--rule); border-radius: 10px; padding: 1.1rem 1.2rem; margin: 1.25rem 0; }
+.trust-box .kicker { color: var(--vine); }
+.trust-box p { margin: 0.4rem 0 0.8rem; }
+.tally { list-style: none; padding: 0; margin: 0; display: grid; gap: 0.5rem; }
+.tally li { display: grid; grid-template-columns: auto 2.5rem 1fr; align-items: baseline; gap: 0.6rem; }
+.tally li b { font-variant-numeric: tabular-nums; font-size: 1.15rem; text-align: right; }
+.tally small { color: var(--ink-soft); font-size: 0.82rem; line-height: 1.35; }
+.tally-today { color: var(--ink-soft); font-size: 0.88rem; margin: 0.8rem 0 0 !important; }
+.verify h3 { font-family: var(--f-display); font-weight: 600; font-size: 1.2rem; margin: 0 0 0.4rem; }
+.verify p { margin: 0 0 0.75rem; }
+.copy-row { display: flex; flex-wrap: wrap; gap: 0.5rem; align-items: center; }
+.copy { font-family: var(--f-ui); font-size: 0.88rem; font-weight: 600; padding: 0.5rem 0.85rem; border-radius: 8px; border: 1px solid var(--vine); background: transparent; color: var(--vine); cursor: pointer; }
+.copy:hover { background: var(--vine); color: var(--paper); }
+.copied { font-size: 0.85rem; color: var(--growth); }
+.hash { font-size: 0.8rem; color: var(--ink-soft); }
+.json { position: absolute; left: -9999px; width: 1px; height: 1px; }
+.foot { margin-top: 3rem; padding-top: 1rem; border-top: 1px solid var(--rule); font-family: var(--f-ui); font-size: 0.8rem; color: var(--ink-soft); }
+@media (max-width: 480px) { .tally li { grid-template-columns: 1fr auto; } .tally small { grid-column: 1 / -1; } }
+@media (prefers-reduced-motion: no-preference) { .seat-tabs button { transition: background 0.15s, color 0.15s; } }
+</style>
+
+<div class="wrap">
+  <header class="mast col">
+    <svg class="constellation" viewBox="0 0 120 40" aria-hidden="true">
+      <line x1="8" y1="28" x2="38" y2="12"/><line x1="38" y1="12" x2="70" y2="22"/><line x1="70" y1="22" x2="104" y2="8"/><line x1="70" y1="22" x2="88" y2="34"/>
+      <circle cx="8" cy="28" r="3.5"/><circle cx="38" cy="12" r="3"/><circle cx="70" cy="22" r="4.5"/><circle cx="104" cy="8" r="2.5"/><circle cx="88" cy="34" r="2.5"/>
+    </svg>
+    <p class="kicker">A letter from the Elohim Protocol &middot; 14 October 2026</p>
+    <h1>{{TITLE}}</h1>
+    <p class="lede">{{LEDE}}</p>
+    <p class="to"><b>To</b> {{TO}}</p>
+  </header>
+  <main class="col">
+    <div class="opening">{{OPENING}}</div>
+    {{SECTIONS}}
+    <p class="foot">Icons, taxonomy and datachain structure: Digital Trust for Places and Routines (DTPR), by the Digital Transparency in the Public Realm contributors, used under CC BY 4.0; portions of the icons derive from Material Symbols (Apache 2.0). Datachains authored by the Elohim Protocol against dtpr@2026-09-01-beta. This page is a letter from the Elohim Protocol and is not published by DTPR or Helpful Places.</p>
+  </main>
+</div>
+
+<script>
+(function () {
+  var tabs = Array.prototype.slice.call(document.querySelectorAll('.seat-tabs [role="tab"]'));
+  function select(tab) {
+    tabs.forEach(function (t) {
+      var on = t === tab;
+      t.setAttribute('aria-selected', on ? 'true' : 'false');
+      t.tabIndex = on ? 0 : -1;
+      document.getElementById(t.getAttribute('aria-controls')).hidden = !on;
+    });
+  }
+  tabs.forEach(function (t, i) {
+    t.tabIndex = i === 0 ? 0 : -1;
+    t.addEventListener('click', function () { select(t); });
+    t.addEventListener('keydown', function (e) {
+      if (e.key !== 'ArrowRight' && e.key !== 'ArrowLeft') return;
+      var n = tabs[(i + (e.key === 'ArrowRight' ? 1 : tabs.length - 1)) % tabs.length];
+      select(n); n.focus(); e.preventDefault();
+    });
+  });
+  var status = document.querySelector('.copied');
+  document.querySelectorAll('.copy').forEach(function (b) {
+    b.addEventListener('click', function () {
+      var ta = document.getElementById(b.getAttribute('data-src'));
+      var text = ta.value;
+      function fallback() {
+        ta.style.position = 'static'; ta.style.width = '100%'; ta.style.height = '6rem';
+        ta.focus(); ta.select();
+        status.textContent = 'Selected. Press Ctrl+C or Cmd+C to copy.';
+      }
+      if (navigator.clipboard && navigator.clipboard.writeText) {
+        navigator.clipboard.writeText(text).then(function () {
+          status.textContent = 'Copied. Paste it into the DTPR visualizer.';
+        }, fallback);
+      } else { fallback(); }
+    });
+  });
+})();
+</script>

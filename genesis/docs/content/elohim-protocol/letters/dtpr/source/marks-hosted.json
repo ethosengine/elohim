@@ -1,0 +1,25 @@
+{
+  "accountable-doorway": {
+    "backed": "signed", "today": "building", "today_note": "custody and key export are live; governance by the people who come through a doorway is designed",
+    "confidence": "high",
+    "rationale": "The operator's authority is a signed commitment carried into every session; canon makes the doorway answerable to those who ingress through it, never a party that governs its users."
+  },
+  "security_breach": {
+    "backed": "signed", "today": "building", "today_note": "encryption and export are live; today the doorway still keeps an encrypted copy after you leave",
+    "confidence": "high",
+    "rationale": "Hosted keys are encrypted at rest with the person's password, and graduation to one's own device is a running flow. Hosting is a stage and not a destination."
+  },
+  "right_object": {
+    "backed": "signed", "today": "live", "confidence": "high",
+    "rationale": "Closing an account and exporting a key are running flows; what you signed stays signed by your key wherever you go."
+  },
+  "available_to_the_accountable_organization": {
+    "backed": "promise", "today": "live", "confidence": "high",
+    "rationale": "This is the honest exception: at the hosted stage the middle-out reading is the accurate one, and the label says so."
+  },
+  "data_retained": {
+    "backed": "promise", "today": "building", "today_note": "accounts are closed by marking them closed; log limits and full erasure are being built",
+    "confidence": "high",
+    "rationale": "The canon bounds doorway logs by the same retention floor as every other projection."
+  }
+}

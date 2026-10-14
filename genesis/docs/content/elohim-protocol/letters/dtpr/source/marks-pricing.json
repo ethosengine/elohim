@@ -1,0 +1,104 @@
+{
+  "accountable-seller": {
+    "backed": "signed",
+    "today": "designed",
+    "confidence": "medium",
+    "rationale": "The seller is an arriving party carrying a signed offer; it is paid its ordinary price by the network, and external settlement is a bridge to the economy outside.",
+    "sources": [
+      {
+        "quote": "External settlement remains a bridge.",
+        "context": "genesis/docs/content/elohim-protocol/hardware-providence-commons.md"
+      }
+    ]
+  },
+  "understands": {
+    "backed": "people",
+    "today": "designed",
+    "confidence": "medium",
+    "rationale": "The value scanner is a household instrument: the phone reads the shelf, the family's elohim interprets it. The observer discloses to earn disclosure.",
+    "sources": [
+      {
+        "quote": "This isn't another payment app charging families monthly fees. It's economic infrastructure that makes care primary value.",
+        "context": "genesis/docs/content/elohim-protocol/value_scanner/epic.md"
+      }
+    ]
+  },
+  "privacy_loss": {
+    "backed": "people",
+    "today": "designed",
+    "confidence": "medium",
+    "rationale": "The floor is internal to the network and negotiated in solidarity among members; legibility runs from the household outward, so a seller has nothing to learn about need."
+  },
+  "political_economic_harm": {
+    "backed": "peer",
+    "today": "designed",
+    "confidence": "medium",
+    "rationale": "Stance I.4 places the unearned increment (the toll of a network) in the commons and makes capturing it the one thing the protocol is designed to refuse; friction-gradient limitarianism is meant to be a deterministic floor.",
+    "sources": [
+      {
+        "quote": "If your plan depends on capturing that increment for yourself in perpetuity, this protocol is designed, at its foundations, to make that the one thing you cannot do.",
+        "context": "genesis/docs/content/elohim-protocol/values-forward.md, Stance I.4"
+      }
+    ]
+  },
+  "dynamic_price": {
+    "backed": "people",
+    "today": "designed",
+    "confidence": "medium",
+    "rationale": "The value scanner abstracts the legacy price; the network surfaces human values instead, and a felt limit belongs only to ceiling choices, weighed against what the commons can carry.",
+    "sources": [
+      {
+        "quote": "Current markets force a cruel choice: afford ethical products or afford survival.",
+        "context": "genesis/docs/content/elohim-protocol/manifesto.md, Beyond the High Costs of Low Price"
+      }
+    ]
+  },
+  "automatic_transaction": {
+    "backed": "signed",
+    "today": "designed",
+    "confidence": "medium",
+    "rationale": "Exchanges are economic events in the REA (resource, event, agent) accounting; external settlement is a bridge, and over time more value settles inside reciprocal flows.",
+    "sources": [
+      {
+        "quote": "Events settle commitments without a platform taking an unaccountable residual",
+        "context": "genesis/docs/content/elohim-protocol/hardware-providence-commons.md"
+      }
+    ]
+  },
+  "not_available_to_the_accountable_organization": {
+    "backed": "promise",
+    "today": "designed",
+    "confidence": "medium",
+    "rationale": "The floor is a matter internal to the network; the seller sees a paid order and nothing about the household."
+  },
+  "connected_device_telemetry": {
+    "backed": "promise",
+    "today": "designed",
+    "confidence": "medium",
+    "rationale": "Spoke devices join through a nearby peer the household runs; the readings are the household's, and their reach is the household's choice."
+  },
+  "language_models": {
+    "backed": "promise",
+    "today": "designed",
+    "confidence": "medium",
+    "rationale": "Private inference keeps the reading on the household's own hardware; the model itself is a participant in the identity layer whose capabilities are attested, as a person's are."
+  },
+  "accountable-pool": {
+    "backed": "people",
+    "today": "designed",
+    "confidence": "medium",
+    "rationale": "Sliding-scale access with no family turned away appears in the value scanner's municipal scenarios; the pool is the network's commons, governed by its members.",
+    "sources": [
+      {
+        "quote": "Current markets force a cruel choice: afford ethical products or afford survival.",
+        "context": "genesis/docs/content/elohim-protocol/manifesto.md, Beyond the High Costs of Low Price"
+      }
+    ]
+  },
+  "available_to_3rd_parties": {
+    "backed": "promise",
+    "today": "designed",
+    "confidence": "medium",
+    "rationale": "Privacy is the default and the commons is open at every level: device, exchange, replication and aggregation. Shared data earns for the people who shared it, not for a platform that sells them; aggregates are published only when enough households contribute."
+  }
+}
