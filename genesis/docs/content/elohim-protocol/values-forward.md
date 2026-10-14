@@ -198,7 +198,7 @@ A system reshapes the world to produce whatever it measures. So the measurements
 
 **How we reached it.** If what a system measures is what it will reshape the world to produce, then the single highest-leverage act of design is choosing the number. A system built to count care will, by default, go looking for care to reward — on the days no one is feeling generous, which is exactly when a value must not depend on virtue. Money was always a technology for *remembering obligation*; we are returning it to that purpose rather than bolting kindness onto an attention machine.
 
-**Refusable in advance.** Your attention is not the product here, and there is no algorithm being paid to capture it. What the system will notice and reward is what you *contribute*, not how long it can hold your eyes.
+**Refusable in advance.** Your attention is not the product here, and there is no algorithm being paid to capture it. What the system will notice and reward is what you *contribute*, not how long it can hold your eyes. Your data is not the product either. Privacy is the default and stays a defense against forces outside the network, but the commons is open at every level (on the device, in each exchange, in replication and in aggregation), and what a household chooses to share earns for it and for the commons in ways it can feel, ask about, and have its own elohim explain. Cooperation is usually the better choice here because it makes sense, not because anyone is being harvested.
 
 ### Stance III.2 — Reach is earned before it spreads, not granted after by algorithm.
 
