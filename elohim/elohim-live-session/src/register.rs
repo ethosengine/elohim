@@ -20,6 +20,9 @@ use std::collections::BTreeMap;
 pub const EXPIRY_MS: u64 = 30_000;
 /// A sender renews at half the expiry.
 pub const RENEW_INTERVAL_MS: u64 = EXPIRY_MS / 2;
+/// The adapter polls an `Outbox` at least this often, so a coalesced final update lands well
+/// inside the story's 5 second bound.
+pub const POLL_INTERVAL_MS: u64 = 250;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct Limits {
@@ -67,6 +70,8 @@ pub enum Dropped {
     Stale,
     TooManySenders,
     RateCapped,
+    /// A Leave from a sender already shown as Left: a no-op.
+    AlreadyLeft,
 }
 
 /// What an accepted frame did.
@@ -165,22 +170,15 @@ impl Register {
             return Err(Dropped::Stale);
         }
         let existing = self.peers.get(&frame.sender);
-        let mut evict: Option<String> = None;
         if let Some(e) = existing {
             if frame.count <= e.last_count {
                 return Err(Dropped::Stale);
             }
-        } else if self.peers.len() >= l.max_senders {
-            // A sender that has Left may give up its slot; the oldest goes first.
-            evict = self
-                .peers
-                .iter()
-                .filter(|(_, e)| matches!(e.slot, Slot::Left))
-                .min_by_key(|(_, e)| e.last_seen)
-                .map(|(s, _)| s.clone());
-            if evict.is_none() {
-                return Err(Dropped::TooManySenders);
+            if matches!(frame.body, Body::Leave) && matches!(e.slot, Slot::Left) {
+                return Err(Dropped::AlreadyLeft);
             }
+        } else if self.peers.len() >= l.max_senders {
+            return Err(Dropped::TooManySenders);
         }
         // Rate window for this sender, computed without mutating.
         let (window_start, window_n) = match existing {
@@ -189,9 +187,11 @@ impl Register {
             }
             _ => (now, 0),
         };
-        // A newer-count Leave is never held back by the cap: a clean close must read as Left.
-        let is_leave = matches!(frame.body, Body::Leave);
-        if window_n >= l.max_frames_per_window && !is_leave {
+        // Only the transition into Left is exempt from the cap, so a clean close reads as Left
+        // even after a burst of presence; further Leaves from a Left sender are dropped above.
+        let is_leave_transition = matches!(frame.body, Body::Leave)
+            && existing.is_some_and(|e| !matches!(e.slot, Slot::Left));
+        if window_n >= l.max_frames_per_window && !is_leave_transition {
             return Err(Dropped::RateCapped);
         }
 
@@ -216,9 +216,6 @@ impl Register {
             }
             Body::Leave => (Slot::Left, Applied::Left),
         };
-        if let Some(gone) = evict {
-            self.peers.remove(&gone);
-        }
         self.peers.insert(
             frame.sender.clone(),
             Entry {
@@ -405,11 +402,15 @@ impl Outbox {
         Ok(None)
     }
 
-    /// Clean exit. Never held back by the send cap. After this nothing is sent.
-    pub fn leave(&mut self, now: u64) -> Result<Frame, OutboxError> {
+    /// Clean exit. Never held back by the send cap. Emits at most once per open period:
+    /// `None` when not open. After this nothing is sent until the next `present`.
+    pub fn leave(&mut self, now: u64) -> Result<Option<Frame>, OutboxError> {
+        if !self.open {
+            return Ok(None);
+        }
         self.open = false;
         self.pending = false;
-        self.next(Body::Leave, now)
+        self.next(Body::Leave, now).map(Some)
     }
 }
 
@@ -602,7 +603,8 @@ mod tests {
                 values: vals(&[("sel", "A1")])
             }
         );
-        let f3 = o.leave(RENEW_INTERVAL_MS + 1).unwrap();
+        let f3 = o.leave(RENEW_INTERVAL_MS + 1).unwrap().unwrap();
+        assert!(o.leave(RENEW_INTERVAL_MS + 2).unwrap().is_none());
         assert_eq!(f3.body, Body::Leave);
         assert!(o.poll(RENEW_INTERVAL_MS * 10).unwrap().is_none());
     }
@@ -650,7 +652,7 @@ mod tests {
         for i in 0..12 {
             let _ = o.present(vals(&[("sel", &format!("d{i}"))]), 1_200);
         }
-        assert_eq!(o.leave(1_201).unwrap().body, Body::Leave);
+        assert_eq!(o.leave(1_201).unwrap().unwrap().body, Body::Leave);
     }
 
     #[test]
@@ -682,7 +684,7 @@ mod tests {
     }
 
     #[test]
-    fn slots_are_reclaimed_on_close_and_from_left_senders() {
+    fn slots_are_reclaimed_only_by_connection_closed() {
         let mut r = Register::new(sid());
         for i in 0..16 {
             r.apply(&present(&format!("s{i}"), 1, &[]), 10, i).unwrap();
@@ -691,17 +693,62 @@ mod tests {
             r.apply(&present("n1", 1, &[]), 10, 20),
             Err(Dropped::TooManySenders)
         );
-        r.connection_closed("s3");
-        assert!(r.apply(&present("n1", 1, &[]), 10, 21).is_ok());
+        // a Left sender does not give up its slot
         r.apply(&Frame::new("s5", sid(), 2, Body::Leave), 10, 22)
             .unwrap();
-        r.apply(&Frame::new("s2", sid(), 2, Body::Leave), 10, 23)
-            .unwrap();
-        // s5 left at 22, s2 at 23: the older Left entry (s5) yields first
-        assert!(r.apply(&present("n2", 1, &[]), 10, 24).is_ok());
-        assert_eq!(r.peer("s5", 24), None);
-        assert_eq!(r.peer("s2", 24), Some(PeerState::Left));
+        assert_eq!(
+            r.apply(&present("n1", 1, &[]), 10, 23),
+            Err(Dropped::TooManySenders)
+        );
+        r.connection_closed("s3");
+        assert!(r.apply(&present("n1", 1, &[]), 10, 24).is_ok());
         assert_eq!(r.view(24).len(), 16);
+    }
+
+    #[test]
+    fn full_register_with_a_left_sender_does_not_resurrect_stale_presence() {
+        let limits = Limits {
+            max_senders: 1,
+            ..Limits::default()
+        };
+        let mut r = Register::with_limits(sid(), limits);
+        r.apply(&present("A", 1, &[]), 10, 0).unwrap();
+        r.apply(&Frame::new("A", sid(), 2, Body::Leave), 10, 1)
+            .unwrap();
+        assert_eq!(
+            r.apply(&Frame::new("B", sid(), 1, Body::Leave), 10, 2),
+            Err(Dropped::TooManySenders)
+        );
+        assert!(r.apply(&present("A", 1, &[]), 10, 3).is_err());
+        assert_eq!(r.peer("A", 3), Some(PeerState::Left));
+        assert_eq!(r.peer("B", 3), None);
+    }
+
+    #[test]
+    fn leave_burst_after_the_first_is_a_no_op() {
+        let mut r = Register::new(sid());
+        r.apply(&present("a", 1, &[]), 10, 0).unwrap();
+        assert_eq!(
+            r.apply(&Frame::new("a", sid(), 2, Body::Leave), 10, 0),
+            Ok(Applied::Left)
+        );
+        for n in 3..60 {
+            assert_eq!(
+                r.apply(&Frame::new("a", sid(), n, Body::Leave), 10, 0),
+                Err(Dropped::AlreadyLeft)
+            );
+        }
+        // a Leave from a never-present sender goes through the normal cap
+        let mut q = Register::new(sid());
+        let mut accepted = 0;
+        for n in 1..40 {
+            if q.apply(&Frame::new("z", sid(), n, Body::Leave), 10, 0)
+                .is_ok()
+            {
+                accepted += 1;
+            }
+        }
+        assert_eq!(accepted, 1);
     }
 
     #[test]

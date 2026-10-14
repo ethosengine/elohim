@@ -16,6 +16,13 @@
 //!   renewals go out.
 //! - Pass a monotonic millisecond clock; a clock that runs backwards is outside the contract.
 
+//! - Timing: poll an `Outbox` at least every `POLL_INTERVAL_MS`, so the final coalesced update
+//!   lands well inside the story's 5 second bound rather than at the 15 second renewal.
+//! - Fencing: stop delivering callbacks from a retired connection before calling
+//!   `connection_closed` for it. The crate cannot tell frames from an old connection apart from
+//!   a new one's, so a late frame from the old connection would be heard as the new sender's.
+//! - Capacity is reclaimed only by `connection_closed`; a full register refuses new senders.
+
 pub mod frame;
 pub mod register;
 pub mod session_id;
