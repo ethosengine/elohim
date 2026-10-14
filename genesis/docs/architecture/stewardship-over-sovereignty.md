@@ -190,7 +190,7 @@ Every human has an elohim-agent. That agent has first-class standing to defend t
 
 This is `project_elohim_as_counsel` made canonical. The role is non-optional, non-firable during attack scenarios, and able to author entries on behalf of the human at machine speed.
 
-The substrate must always permit the elohim-counsel to act, even when the human's session is compromised. The elohim-counsel is the substrate's defense-of-last-resort against weaponized-feature inversion.
+The substrate must always permit the elohim-counsel to act, even when the human's session is compromised. The elohim-counsel is the substrate's defense-of-last-resort against weaponized-feature inversion. Counsel's standing is to hold and to speak, never to rule. Every entry it authors under duress is witnessed and names the layers that made it, and the person, once safe, or a human floor can reverse it.
 
 ### Specialist subagents (ephemeral)
 

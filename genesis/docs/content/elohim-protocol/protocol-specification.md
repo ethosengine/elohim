@@ -615,7 +615,7 @@ Tier 3 (Content Bytes):
 > "Free speech does not mean free reach. There is no right to algorithmic amplification."
 > (A formulation associated with Renée DiResta and Aza Raskin, quoted in the [manifesto](manifesto.md).)
 
-Feeds in the Elohim Protocol are curated, not algorithmic. Content reaches a reader through channels that communities and stewards maintain, and no ranking optimizes for engagement.
+Feeds in the Elohim Protocol are curated, not ranked for engagement. Content reaches a reader through channels that communities and stewards maintain, and no ranking optimizes for engagement.
 
 ### Protocol Definition
 

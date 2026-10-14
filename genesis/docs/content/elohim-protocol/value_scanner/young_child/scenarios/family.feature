@@ -61,7 +61,7 @@ Feature: Family Layer Value Recognition for Young Child
     And his care work should not be dismissed as "just helping"
     And tokens should accumulate to the family account
     And Tommy should have age-appropriate awareness of his contributions
-    And the family should receive care token supplements for low income
+    And the family should receive care token support through the network's floor
     And the scanner should be accessible regardless of economic status
 
   Scenario: Parental oversight protects young child while honoring agency

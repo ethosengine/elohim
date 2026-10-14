@@ -6,7 +6,7 @@ status: in-flight
 author: "claude-fable-5-1 (orchestrator), plans by three claude-opus-5-5 planners, at the operator's direction"
 habits: [dataplane-convergence, notary-authority, doorway-failover, reach-enforced-everywhere, served-under-standing, authority-in-integrity]
 cites:
-  - "elohim-protocol-specification | protocol-specification | sha256:d0975dc0f31fab70 | path: genesis/docs/content/elohim-protocol/protocol-specification.md"
+  - "elohim-protocol-specification | protocol-specification | sha256:ea747adadb52347b | path: genesis/docs/content/elohim-protocol/protocol-specification.md"
   - genesis/data/timeline/backlog/arch-authority-in-integrity-backlog.md
   - genesis/data/timeline/backlog/measure-family-borrows-backlog.md
   - genesis/data/timeline/backlog/epr-head-envelope-differs-per-peer.md

@@ -23,7 +23,7 @@ cites:
   - "trust-compute-gradient-brainstorm | The substrate-thin, manifest-medium, agent-thick model this credential contract applies to publishing authority | sha256:89c493c73ff6b06b | path: genesis/docs/superpowers/specs/2026-04-30-trust-compute-gradient-brainstorm.md"
   - "wisdom-layer-floor-ceiling-judgment-culminating-design | The deterministic floor, contextual judgment, and accountable human recognition this contract preserves | sha256:f5d694c382a76c1f | path: genesis/docs/superpowers/specs/2026-06-09-wisdom-layer-floor-ceiling-judgment-culminating-design.md"
   - genesis/data/timeline/backlog/commons-holonic-stewardship-backlog.md
-  - "stewardship-over-sovereignty | Community-grounded identity and recovery prevent credential withdrawal from becoming loss of personhood | sha256:995eb2079924ea2e | path: genesis/docs/architecture/stewardship-over-sovereignty.md"
+  - "stewardship-over-sovereignty | Community-grounded identity and recovery prevent credential withdrawal from becoming loss of personhood | sha256:5186f53fbeb95a65 | path: genesis/docs/architecture/stewardship-over-sovereignty.md"
   - "substrate-trust-contract-runbook | Receiver-local validation and canonical head invariants remain mandatory beneath contextual trust | sha256:eb5f8342e17c361f | path: genesis/docs/content/elohim-protocol/architecture/2026-07-12-substrate-trust-contract-runbook.md"
 ---
 

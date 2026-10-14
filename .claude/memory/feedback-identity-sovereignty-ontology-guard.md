@@ -10,7 +10,7 @@ metadata:
   originSessionId: 7e1a3c79-5f90-4dd9-9ee0-402703bd0a42
   sovereignty-frame: descriptive-adversary  # this entry IS the ontology-guard discipline — it quotes the rejected apex terms as the frame being resisted, never asserts them; suppresses sovereignty-guard-signal
 cites:
-  - "stewardship-over-sovereignty | stewardship-over-sovereignty | sha256:995eb2079924ea2e | path: genesis/docs/architecture/stewardship-over-sovereignty.md"
+  - "stewardship-over-sovereignty | stewardship-over-sovereignty | sha256:5186f53fbeb95a65 | path: genesis/docs/architecture/stewardship-over-sovereignty.md"
   - "cradle-to-grave-capability-gradient | cradle-to-grave-capability-gradient | sha256:5aa31bed9f44db8c | path: genesis/docs/architecture/cradle-to-grave-capability-gradient.md"
 ---
 

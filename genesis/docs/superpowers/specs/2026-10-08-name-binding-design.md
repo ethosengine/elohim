@@ -9,7 +9,7 @@ context-tier: disclosed
 steward: agent:integrator@claude-fable-5-1
 graduation-trigger: retires to history once a coordinator read answers any name with its elector, clock, head and standing reference beside the CID, two doorways that answer one name differently can be told apart by those fields alone, and row 17's two integrity rules have landed in the authority cluster's DNA crossing
 cites:
-  - "elohim-protocol-specification | Open Issues: \"Names are bindings\" (the ruling designed for) and \"Reach is a per-plane declaration\" (the scope component) | sha256:d0975dc0f31fab70 | path: genesis/docs/content/elohim-protocol/protocol-specification.md"
+  - "elohim-protocol-specification | Open Issues: \"Names are bindings\" (the ruling designed for) and \"Reach is a per-plane declaration\" (the scope component) | sha256:ea747adadb52347b | path: genesis/docs/content/elohim-protocol/protocol-specification.md"
   - genesis/data/timeline/backlog/arch-authority-in-integrity-backlog.md
   - genesis/data/timeline/backlog/measure-family-borrows-backlog.md
   - elohim/holochain/dna/elohim/zomes/content_store/src/lib.rs

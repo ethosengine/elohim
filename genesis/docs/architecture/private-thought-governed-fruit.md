@@ -2,7 +2,7 @@
 id: private-thought-governed-fruit
 status: foundational
 cites:
-  - "stewardship-over-sovereignty | stewardship-over-sovereignty | sha256:995eb2079924ea2e | path: genesis/docs/architecture/stewardship-over-sovereignty.md"
+  - "stewardship-over-sovereignty | stewardship-over-sovereignty | sha256:5186f53fbeb95a65 | path: genesis/docs/architecture/stewardship-over-sovereignty.md"
 ---
 
 # Private Thought, Governed Fruit

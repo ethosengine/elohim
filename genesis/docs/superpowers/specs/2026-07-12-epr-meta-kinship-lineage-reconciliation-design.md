@@ -14,9 +14,9 @@ graduation-trigger: decompose-complete OR lineage-edges-and-remote-verdict-shipp
 refines:
   - genesis/docs/superpowers/specs/2026-07-12-cite-fingerprint-cid-convergence-design.md
 cites:
-  - cite-fingerprint-cid-convergence | the convergence this design REFINES — one body digest, two renderings (full CID / sha256:hex16); supplies the full-CID-only-at-global-scale rule kinship matching inherits | sha256:0a657c9c1b0c43e7 | path: genesis/docs/superpowers/specs/2026-07-12-cite-fingerprint-cid-convergence-design.md
-  - epr-meta-native-capability-dogfood-and-graph | names the elohim behavioral-ceiling judge + EprRef accountability anchor this design reuses as the reconciliation ceiling and authority anchor | sha256:99f0bf58985ff85b | path: genesis/docs/superpowers/specs/2026-07-10-epr-meta-native-capability-dogfood-and-graph-design.md
-  - stewardship-over-sovereignty | the canon grounding authority in community-backstopped standing, not key possession — why the reconciliation anchor is socially-trusted, never self-sovereign apex | sha256:995eb2079924ea2e | path: genesis/docs/architecture/stewardship-over-sovereignty.md
+  - "cite-fingerprint-cid-convergence | the convergence this design REFINES — one body digest, two renderings (full CID / sha256:hex16); supplies the full-CID-only-at-global-scale rule kinship matching inherits | sha256:0a657c9c1b0c43e7 | path: genesis/docs/superpowers/specs/2026-07-12-cite-fingerprint-cid-convergence-design.md"
+  - "epr-meta-native-capability-dogfood-and-graph | names the elohim behavioral-ceiling judge + EprRef accountability anchor this design reuses as the reconciliation ceiling and authority anchor | sha256:99f0bf58985ff85b | path: genesis/docs/superpowers/specs/2026-07-10-epr-meta-native-capability-dogfood-and-graph-design.md"
+  - "stewardship-over-sovereignty | the canon grounding authority in community-backstopped standing, not key possession — why the reconciliation anchor is socially-trusted, never self-sovereign apex | sha256:5186f53fbeb95a65 | path: genesis/docs/architecture/stewardship-over-sovereignty.md"
 ---
 
 # EPR-Meta Kinship, Lineage & Authority-Anchored Reconciliation

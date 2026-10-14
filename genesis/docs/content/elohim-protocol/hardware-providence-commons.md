@@ -18,7 +18,7 @@ cites:
   - "factory-application-design | the horizon composition for industrial sensor, maintenance, material transformation, quality, and supply-chain events | sha256:d7fb321c5949ff74 | path: genesis/docs/content/elohim-protocol/architecture/horizons/factory-application-design.md"
   - "epr-rea-valueflow-fabric | the process, intent, commitment, event, fulfillment, and resource-fold grammar used to close every physical and economic loop | sha256:1cec32527dbff6d7 | path: genesis/docs/superpowers/specs/2026-07-18-epr-rea-valueflow-fabric-design.md"
   - "elohim-seam-map-concern-routing | the placement atlas separating hardware capability, operator resource governance, temporal work, bridges, confidentiality, and dataplane responsibility | sha256:7ea7563016174974 | path: genesis/docs/content/elohim-protocol/architecture/2026-06-21-elohim-seam-map-concern-routing.md"
-  - "stewardship-over-sovereignty | the authority canon that makes the elohim-operator a bounded community-grounded steward rather than owner or sovereign | sha256:995eb2079924ea2e | path: genesis/docs/architecture/stewardship-over-sovereignty.md"
+  - "stewardship-over-sovereignty | the authority canon that makes the elohim-operator a bounded community-grounded steward rather than owner or sovereign | sha256:5186f53fbeb95a65 | path: genesis/docs/architecture/stewardship-over-sovereignty.md"
   - "justice-manifesto | the human-floor, witnessed-act, appeal, privacy, and existential-limit constraints that bound automated hardware care | sha256:6080173b0d21848c | path: genesis/docs/architecture/justice-manifesto.md"
 ---
 

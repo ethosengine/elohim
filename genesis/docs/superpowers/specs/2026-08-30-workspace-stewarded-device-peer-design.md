@@ -18,7 +18,7 @@ cites:
   - genesis/a2o/features/auth/stewarded-device-sync.feature
   - genesis/a2o/features/dataplane/resiliency-saga/06-heads-converge.feature
   - "identity-head-key-lineage | the binds-identity controller-set primitive this device binding is the first consumer of — W joins matthew controllers, attribution resolves through the chain-root | sha256:95950b918c8803bc | path: genesis/docs/superpowers/specs/2026-07-17-identity-head-key-lineage-design.md"
-  - "stewardship-over-sovereignty | the canon that makes the binding a Commitment (§6 Rule 2 bounded_by) and forbids a self-sovereign apex — W is a device, never a sole controller | sha256:995eb2079924ea2e | path: genesis/docs/architecture/stewardship-over-sovereignty.md"
+  - "stewardship-over-sovereignty | the canon that makes the binding a Commitment (§6 Rule 2 bounded_by) and forbids a self-sovereign apex — W is a device, never a sole controller | sha256:5186f53fbeb95a65 | path: genesis/docs/architecture/stewardship-over-sovereignty.md"
   - genesis/data/timeline/backlog/sovereign-peer-network-read-no-authorities.md
   - genesis/data/timeline/backlog/agent-peer-binding-signing.md
   - genesis/data/timeline/backlog/agent-peer-binding-cross-signed-proof.md

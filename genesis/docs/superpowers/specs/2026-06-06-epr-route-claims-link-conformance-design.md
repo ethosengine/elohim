@@ -19,7 +19,7 @@ cites:
   - genesis/docs/superpowers/specs/2026-05-25-stagespablob-substrate-correct-deploy.md
   - "records-lifecycle-design | link lifecycle precedent: intentionally-degraded vs maintained, closure rejection, redaction markers — the alias retirement lens | sha256:cbf6fb8b0df178c7 | path: genesis/docs/content/elohim-protocol/architecture/2026-05-24-records-lifecycle-design.md"
   - "rea-compute-commitment-primitive | rea-compute-commitment-primitive | sha256:3ea123e3a9796449 | path: genesis/docs/architecture/rea-compute-commitment-primitive.md"
-  - "stewardship-over-sovereignty | stewardship-over-sovereignty | sha256:995eb2079924ea2e | path: genesis/docs/architecture/stewardship-over-sovereignty.md"
+  - "stewardship-over-sovereignty | stewardship-over-sovereignty | sha256:5186f53fbeb95a65 | path: genesis/docs/architecture/stewardship-over-sovereignty.md"
   - genesis/docs/architecture/pillar-bundle-split-runbook.md
 ---
 

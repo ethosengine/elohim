@@ -51,7 +51,7 @@ The system operates on a **gradient of immutability** from most flexible (indivi
 - **NATION-STATE LAYER** - Requires National Elohim + citizen consensus
   - Constitutional interpretations of global principles
   - Cultural expressions of universal values
-  - Sovereign within global bounds
+  - Self-governing within global bounds
 
 - **PROVINCIAL/MUNICIPAL LAYER** - Requires Local Elohim + community consensus
   - Local policy implementations

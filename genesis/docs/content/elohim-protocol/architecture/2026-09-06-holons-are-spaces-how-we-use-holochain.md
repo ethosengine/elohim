@@ -8,7 +8,7 @@ tier: architecture
 stewardship-frame: adversary
 cites:
   - "elohim-protocol-manifesto | The purpose governing this reassessment: intelligence and coordination that scale to human complexity while restoring dignity and resisting capture. | sha256:c1b65508df47bcaa | path: genesis/docs/content/elohim-protocol/manifesto.md"
-  - "values-forward | The declared constraints on commons enclosure, accountable trust, concentrated power, and phased AI authority that the technical design must honor. | sha256:f4e7524522d3b811 | path: genesis/docs/content/elohim-protocol/values-forward.md"
+  - "values-forward | The declared constraints on commons enclosure, accountable trust, concentrated power, and phased AI authority that the technical design must honor. | sha256:3dd9433b37f0cf39 | path: genesis/docs/content/elohim-protocol/values-forward.md"
   - "hardware-spec | The physical participation and inclusion vision connecting everyday devices and household capacity to the protocol promise. | sha256:230d54b7e8ad2df2 | path: genesis/docs/content/elohim-protocol/hardware-spec.md"
   - "hardware-providence-commons | The existing proof obligations for dependable household operation, bounded automated care, practical substitution, and resistance to rent extraction. | sha256:17e52609abf5f92a | path: genesis/docs/content/elohim-protocol/hardware-providence-commons.md"
   - "resilience-protocol-spec | The convenience requirement: ordinary people must receive dependable services through reciprocal infrastructure without becoming system administrators or captive tenants. | sha256:396d7d7a2b8b354c | path: genesis/docs/content/elohim-protocol/resilience/README.md"

@@ -43,11 +43,10 @@ Feature: Community Layer Value Recognition for Single Parent
   Scenario: Food security support accessed with dignity through care economy
     Given Maria's $175/week grocery budget for four people is severely constrained
     And food security is essential for family well-being
-    When Maria's economic status qualifies her for food support
-    Then the community_elohim should connect her to food assistance programs
+    When Maria's household meets the floor inside the network
+    Then the community_elohim works out her share privately, among members in solidarity
+    And no store, program or neighbor learns that she stands at the floor
     And support should be framed as care economy reciprocity, not charity
-    And Maria should access help without stigmatizing means-testing processes
-    And her massive care contributions should be recognized as qualifying her for support
     And food assistance should be dignified and adequate for family needs
 
   Scenario: Emergency financial assistance during crisis without bureaucratic humiliation

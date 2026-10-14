@@ -19,7 +19,7 @@ cites:
   - genesis/research/witnessed-harm-limit-research-2026-08-09.md
   - "elohim-seam-map-concern-routing | routes confidentiality to 3.13 (encryption ≠ permission) — the warrant for a custody verdict distinct from reach and the serve-path answer | sha256:7ea7563016174974 | path: genesis/docs/content/elohim-protocol/architecture/2026-06-21-elohim-seam-map-concern-routing.md"
   - "weave-epic-arc-design | Wave C HELD items resolved: ShardManifest field-add retired (manifest is derived), KeyEnvelope becomes the bound signed ring with epoch supersession | sha256:69966fdcc15dd7ba | path: genesis/docs/superpowers/specs/2026-06-20-weave-epic-arc-design.md"
-  - "stewardship-over-sovereignty | the no-absolute-lockout rule that makes the floor envelope mandatory and keeps cryptography an accelerator of recovery, never its gate | sha256:995eb2079924ea2e | path: genesis/docs/architecture/stewardship-over-sovereignty.md"
+  - "stewardship-over-sovereignty | the no-absolute-lockout rule that makes the floor envelope mandatory and keeps cryptography an accelerator of recovery, never its gate | sha256:5186f53fbeb95a65 | path: genesis/docs/architecture/stewardship-over-sovereignty.md"
   - genesis/data/timeline/backlog/arch-confidentiality-plane-backlog.md
   - elohim/elohim-storage/src/p2p/blob_swarm.rs
   - elohim/elohim-storage/src/sharding.rs
