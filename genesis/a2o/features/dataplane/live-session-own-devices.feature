@@ -6,9 +6,18 @@
 @e2e @dataplane @wip @requires:household-nodes @requires:owned-substrate @requires:device-node @concern:live-session-direct @act:i
 Feature: Two of Matthew's machines show each other who is here, and keep no record of it
 
-  Matthew is working on a shared sheet. He has it open on two machines he looks after: the small
-  always-on node in the hallway cupboard, called "matthew" below, and the laptop he works at,
-  called "workspace". Each machine runs its own node.
+  This is the smallest case of people seeing each other while they work on the same thing. The
+  larger story, local-first-shared-sheet, has several people, a hub and a doorway; this one has one
+  person and two machines, which is the least that still proves the channel works.
+
+  Matthew is working on a shared sheet: a spreadsheet that several of his machines keep a copy of
+  and edit together. He has it open on two machines he looks after: the small always-on node in the
+  hallway cupboard, called "matthew" below, and the laptop he works at, called "workspace". Each
+  machine runs its own node, so "node" and "machine" mean the same thing here.
+
+  These machines belong to the household mesh: the few nodes in one home, here Matthew's two and a
+  third belonging to another member of the household, each holding its own copy of what the
+  household shares.
 
   While the sheet is open on both, each machine shows that the other is here, and a small value
   Matthew sets on one (which cell he has selected) appears on the other. This is "presence". It is
@@ -63,7 +72,7 @@ Feature: Two of Matthew's machines show each other who is here, and keep no reco
     Given "Winter budget" is open on nodes "matthew" and "workspace"
     When node "workspace" is stopped without warning
     Then within 45 seconds node "matthew" shows node "workspace" as "unknown" in "Winter budget"
-    And node "matthew" never shows node "workspace" as having left "Winter budget"
+    And at no point in those 45 seconds did node "matthew" show node "workspace" as having left "Winter budget"
 
   Scenario: A node Matthew has not granted leave to is refused and told why
     Given "Winter budget" is open on node "matthew"
@@ -79,7 +88,7 @@ Feature: Two of Matthew's machines show each other who is here, and keep no reco
     When the household is left alone for 5 minutes
     Then node "matthew" sent no live-session message
     And node "workspace" sent no live-session message
-    And each node made the same number of conductor requests as it does with live sessions switched off
+    And each node made the same number of requests to its conductor, the process that signs and records its acts, as it does with live sessions switched off
 
   Scenario: A session leaves nothing behind
     Given "Winter budget" was open on nodes "matthew" and "workspace" for 1 minute and is now closed on both

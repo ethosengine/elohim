@@ -151,14 +151,26 @@ the plan now proposes. Four rows changed.
     review makes it on demand.
   - The carrier already makes, once per process, a proof of the node's agent key over its
     transport id (`CarrierProof`, `crates/consent-grant/src/carrier.rs:74`).
-- **Now:** a join is admitted when all three hold:
-  1. the joining node holds an active grant with scope `live-session` (the operation gate);
+- **Now (corrected by task 0, see "Task 0 findings"):** a join carries the id of the joining
+  node's grant, and is admitted when all three hold:
+  1. that grant is active, anchored, has scope `live-session` and names the joining node as its
+     recipient. The receiving node checks this by fetching the grant from the notary by its id and
+     running the same seven bounds checks the operation gate runs (`bounds_validator::validate`
+     with the conductor fetcher), not by the gate's local table lookup, because that table holds
+     only grants authored on the node itself;
   2. that grant was issued by the same agent who issued the receiving node's own `live-session`
      grant (a check this slice adds, because the gate does not make it);
   3. the join carries a proof of the joining node's agent key over the transport id of the
      connection it arrived on, made once per process and checked locally.
 
-  A refusal names which of the three failed.
+  A refusal names which of the three failed. Checking costs conductor requests at the receiving
+  node, once per join and never at rest: one to fetch the grant and one to read its state links.
+  A grant once verified is held in memory for the session and dropped with it.
+
+  Each node is told the id of its own grant when the grant is made: the issuing node returns it
+  (`api/compute_grants.rs:325`) and the fixture hands it to the recipient's configuration. How a
+  recipient finds its grants without being told is not designed here; it is a missing node for
+  production.
 - **Who issues the grants.** One agent, the issuing agent: the agent key of the node Matthew
   issues from, which on the household is node `matthew`. It issues a grant to each other machine,
   and holds one to itself. A grant whose issuer and holder are the same agent is the existing
@@ -169,9 +181,10 @@ the plan now proposes. Four rows changed.
 - **Limit of this slice:** one issuing agent per set of machines. Each of a person's devices
   writes under its own agent key, so a grant issued from a second device would not match. The
   circle record is what removes this limit.
-- **Not yet verified, and the checks depend on it:** that a node's local projection holds another
-  node's grant, and that the grant route issues both a grant to another agent and a self-contract
-  under the new scope. Task 0 answers both before task 3 starts.
+- **Verified by task 0:** a node's local table does not hold another node's grant, which is why
+  check 1 fetches by id. The grant route names its own node as issuer and any agent key as
+  recipient, and does not refuse a grant to itself; a self-contract under the new scope has not
+  been tried.
 - **Why it changed:** the operator asked that the slice lay down the authorisation and
   resource-accounting seams so that production is easy later, and noted that the household's
   machines are ones he stewards. A grant per machine says exactly that, is one act of trust per
@@ -328,7 +341,7 @@ storage's seam registry with a contract test. The canon's own wording was read f
 |---|---|
 | C0 plane location | attention plane; never the notary |
 | C1 anti-self-election | a node is never admitted on its own word: its grant must name the same issuing agent as the receiving node's grant. Only the issuing agent's own node holds a self-issued grant |
-| C2 monotonic authority | a revoked grant refuses the next join; an open stream is closed at its next renewal |
+| C2 monotonic authority | a revoked grant refuses the next join. In this slice an open session is not re-checked, because re-checking would cost a conductor request per renewal; it ends when either side closes it. Stated as a limit |
 | C3 liveness | renewal at half the expiry; expiry drops the state |
 | C4 honest absence | refused, left, unknown and here are four different answers |
 | C5 evidence, not authority | presence is never read as proof of anything |
@@ -359,10 +372,10 @@ question and the file and line it was read from. Task 3 does not start without i
 | 0 | Verify, read-only: a node's projection holds another node's grant; the grant route issues a grant to another agent and a self-contract under a new scope; how the carrier obtains its key proof and what it costs; that `join-peer workspace` followed by the device-joining story yields an enrolled fourth node today | this plan ("Task 0 findings" section) | none | none | none |
 | 1 | The pure crate: register, dedup, renewal and expiry, cap, size limit, session id, frame type | `elohim/elohim-live-session/` (new: `Cargo.toml`, `src/lib.rs`, `src/register.rs`, `src/frame.rs`, `src/session_id.rs`, `build-manifest.json`); `elohim/Cargo.toml` (member) | unit tests in the crate, including a property test that a repeated or older count never changes the register | `just gate elohim/elohim-live-session` | none |
 | 2 | Accept the `live-session` scope | `elohim/elohim-storage/src/api/compute_grants.rs` | existing grant tests plus one for the new scope | `just gate elohim-storage` | the three storage changes in flight have landed |
-| 3 | Admission function and protocol handler; register the protocol | `elohim/elohim-storage/src/services/live_session_admission.rs` (new), `src/p2p_iroh/live_session.rs` (new), `src/p2p_iroh/mod.rs`, `src/main.rs`, `seam-registry.yaml` | two in-process iroh nodes through the existing parity harness: admitted join, each of the three refusals, expiry, clean leave | `just gate elohim-storage` | task 2; task 0's answer on the projection |
+| 3 | Admission function and protocol handler; register the protocol. Admission uses `bounds_validator::validate` with `ConductorCommitmentFetcher` (`services/commitment_fetcher.rs:101`), not the operation gate's table lookup | `elohim/elohim-storage/src/services/live_session_admission.rs` (new), `src/p2p_iroh/live_session.rs` (new), `src/p2p_iroh/mod.rs`, `src/main.rs`, `seam-registry.yaml` | two in-process iroh nodes through the existing parity harness, with a mock commitment fetcher: admitted join, each of the three refusals, a grant fetched once per join and not again on renewal, expiry, clean leave | `just gate elohim-storage` | task 2; **the consent-read-on-demand change has landed**, because the key proof needs a new statement kind in the files that change edits |
 | 4 | The two local routes | `elohim/elohim-storage/src/api/live_session.rs` (new), `src/http.rs` (route manifest and dispatch) | a non-local caller is refused; a local caller sets and streams | `just gate elohim-storage` | task 3; **the consent-read-on-demand change has landed**, because it edits `http.rs` and `device_carrier.rs` and is at review round 5 |
 | 5 | SDK session object and seam file | `crates/elohim-sdk/src/live_session.rs` (new), `crates/elohim-sdk/src/lib.rs`, `elohim/sdk/storage-client-ts/src/live-session.ts` (new) and its index, `elohim/sdk/live-session.seam.json` (new) | unit tests against a stub of the two routes | `just gate crates/elohim-sdk` and `just gate elohim/sdk/storage-client-ts` | the two route shapes of task 4 agreed in writing |
-| 6 | Story steps and fixture | `genesis/a2o/steps/dataplane.steps.ts`, the feature file (remove `@wip`) | `just test mesh features/dataplane/live-session-own-devices.feature` | the same | tasks 3 to 5 on the household; **the device-joining ceremony is stable**, because it is being changed this sprint and the fixture depends on it |
+| 6 | Story steps and fixture. First step: stage `workspace` with `join-peer` and run the device-joining story's same-machine scenario against it, since no receipt shows the two working together (task 0, question 3). Then issue the three grants and hand each recipient its grant id | `genesis/a2o/steps/dataplane.steps.ts`, the feature file (remove `@wip`) | `just test mesh features/auth/device-consent-grant.feature` with `E2E_DEVICE_NODE_URL` set, then `just test mesh features/dataplane/live-session-own-devices.feature` | the same | tasks 3 to 5 on the household; **the device-joining ceremony is stable**, because it is being changed this sprint and the fixture depends on it |
 | 7 | Independent review of tasks 2 to 4, then the measurements in §6 | none | none | none | task 6 |
 | 8 | Record: hub README debt row; the design's §10 rows that moved; the backlog cluster row; a one-line delta in the habit atom the concern is listed under | docs | none | none | task 7 |
 
@@ -386,9 +399,11 @@ Named only: two hosts on the household and the kill-one-host scenario; the host 
 signatures; the ranking function; relay mode in the handler; whether hosting takes its own grant
 scope; libp2p parity.
 
-## Decisions the operator has not ruled on
+## Decisions, and the operator's ruling
 
-Each is written into this plan as a proposal. None has been ruled.
+These were written into the plan as proposals. On 2026-10-14 the operator wrote: "proposals in the
+plan look good to me." All six are taken as ruled in the form below. The alternatives are kept so
+the choice can be revisited.
 
 | # | Proposal in this plan | Alternative |
 |---|---|---|
@@ -410,6 +425,79 @@ Each is written into this plan as a proposal. None has been ruled.
   local status was read once for its transport paths.
 - Not verified, and listed as task 0: whether one node's projection holds another node's grant;
   what the carrier's key proof costs to make; whether the fourth-node fixture enrols cleanly today.
-- Not read: the grant route's handler below line 50, the Rust SDK's modules beyond their names,
-  the storage route manifest's declaration format.
+- Not read: the Rust SDK's modules beyond their names, the storage route manifest's declaration
+  format.
 - Nothing is measured.
+
+## Task 0 findings (2026-10-14, read-only)
+
+Answered from code and from receipts already on disk. Nothing was run, and the running household
+was not touched. Paths are under `elohim/elohim-storage/src/` unless given in full.
+
+**1. Does one node's local table hold another node's grant? No.**
+
+- The table is filled from this node's own commitment signals: "populated from the
+  create_commitment post-commit signal" (`db/mishpat_commitments.rs:1-6`), written by
+  `handle_mishpat_signal` (`signals.rs:788`, write at `:958`).
+- The grant route also writes the grant it just issued into its own table
+  (`api/compute_grants.rs:373-389`).
+- Other writers are fixtures, seeding routes and repair sweeps (`api/seed_delegates_compute.rs:146`,
+  `api/compute_tasks.rs:498`, `services/mishpat_mirror_backfill.rs:250`). None reads another
+  agent's commitments from the notary.
+- So the issuing node holds every grant it issued, including the recipients', and a recipient node
+  holds none, not even its own. That a post-commit signal reaches only the authoring node's own
+  storage is general Holochain behaviour, not read here.
+- What does exist: `get_commitment` in the mishpat coordinator reads a commitment from the notary
+  by id (`elohim/holochain/dna/mishpat/zomes/mishpat/src/lib.rs:492`), reached through
+  `conductor_writes::get_commitment` (`services/conductor_writes.rs:1946`) and wrapped by
+  `ConductorCommitmentFetcher` (`services/commitment_fetcher.rs:101-110`). The bounds checks accept
+  any fetcher (`services/bounds_validator.rs:107`). That file's header still calls the conductor
+  fetcher "a stub" (`commitment_fetcher.rs:6-8`); the code below it is not.
+- **Changed in this plan:** seam 4's check 1 fetches the joiner's grant by id; task 3 uses the
+  conductor fetcher; each node is told its own grant id at issue; concern C2 states that an open
+  session is not re-checked.
+
+**2. Can the grant route issue under a new `live-session` scope, to another agent and to
+itself? Yes to another agent; to itself, not refused but not tried; the scope needs task 2.**
+
+- The scope list is closed at three names (`api/compute_grants.rs:46`) and an unknown scope is
+  refused (`:62-72`). Task 2 adds the name.
+- The issuer is always the issuing node's own agent key (`:271`); the caller cannot set it
+  (`:83-91`).
+- The recipient is any Holochain agent key (`:94-98`). Nothing in the request checks
+  (`grant_input`, `:75-160`) refuses a recipient equal to the issuer.
+- The bounds must name `epr_scope` as 1 to 64 task ids or an explicit `*` (`:120-136`). This slice
+  issues with `*`; narrowing a grant to one sheet is not designed.
+- The route answers with the grant's id (`:325`), which is how a recipient is told it.
+- **Changed in this plan:** none beyond question 1; task 2 already covered the scope.
+
+**3. Do `join-peer workspace` and the device-joining story enrol a fourth node cleanly today? Not
+shown by any receipt.**
+
+- `join-peer` stages a new conductor and storage peer beside a running household without
+  restarting the others, and refuses a reused name (`app/elohim-app/scripts/hc-mesh.sh:55-57`,
+  `:3985-4047`).
+- The device-joining steps need the fourth node's address in `E2E_DEVICE_NODE_URL` and say to stage
+  it with `join-peer workspace` (`genesis/a2o/steps/auth/device-consent.steps.ts:27,84,95`).
+- The newest mesh report (`genesis/a2o/reports/cucumber-report.json`, written
+  2026-10-14T01:40) shows every one of that story's 13 scenarios skipped, and 7 of them also have
+  undefined steps. The same-machine approval scenario, which this slice's fixture would use, has
+  no undefined steps.
+- A ceremony receipt from 2026-10-08 exists (`genesis/local-dev/household-dowell/device-ceremony/`):
+  an authority and binding for a device key under Matthew's identity. Its two lane logs ran other
+  stories, so it does not show which path enrolled that device. No `workspace` peer exists in the
+  household directory today.
+- **Changed in this plan:** task 6 now starts by staging `workspace` and running the same-machine
+  scenario against it before anything of this slice runs.
+
+**Also asked in task 0: what the carrier's key proof costs.**
+
+- It is made by the node's conductor through a mandate grant, once per agent key and transport id,
+  and only when the node speaks for a person (`services/device_carrier.rs:600-617`;
+  `services/device_consent_cell.rs:196`, `:443`).
+- The statement it signs names one of four fixed kinds (`crates/consent-grant/src/carrier.rs`,
+  `CarrierKind`). A live-session proof needs a kind of its own so that it cannot be replayed as a
+  device-joining statement. Whether the signing function in the zome fixes the kind was not read.
+- **Changed in this plan:** task 3 carries a dependency on adding that kind, and it shares files
+  with the consent change under review. The task 4 precondition (that change lands first)
+  therefore applies to task 3 as well.
