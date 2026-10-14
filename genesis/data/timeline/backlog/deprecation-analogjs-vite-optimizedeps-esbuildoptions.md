@@ -11,7 +11,7 @@ status: "backlog"
 priority: "low"
 deprecation_status: blocked
 severity: low
-fingerprints: ["612e34199acb", "8a122f0ee621", "19d73e162a53", "6e0477ffb653"]
+fingerprints: ["612e34199acb", "8a122f0ee621", "19d73e162a53", "6e0477ffb653", "8313995dfeea"]
 relatedNodeIds: []
 tags: [deprecation, vite, vite-8, rolldown, analogjs, vite-plugin-angular, vitest, lamad, elohim-app, elohim-library, peer-dependency]
 cites:
@@ -132,6 +132,14 @@ the ledger rows for `8a122f0ee621` and `19d73e162a53` are no longer present
 (only `612e34199acb` and `6e0477ffb653` remain, both `blocked`); since every
 re-mint carries a unique time prefix, that absence costs nothing until Class
 13 lands.
+
+**Class 13 landed 2026-10-14 (fingerprint `8313995dfeea`).** `fingerprint()` in
+`.claude/hooks/deprecation-sentinel.py` now strips a leading wall-clock time of
+day (`11:07:38 PM `, `9:55:42 PM `) before hashing, so every timestamped
+emission of this warning collapses to `8313995dfeea`; that fingerprint is
+pre-registered `blocked` in the ledger against this entry so the first
+post-fix emission does not dispatch. The concern itself is unchanged: the
+Vite 8 devDependency alignment below is still the fix.
 
 ## Verification
 

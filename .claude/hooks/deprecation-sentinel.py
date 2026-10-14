@@ -110,6 +110,9 @@ SECURITY_SUMMARY = re.compile(
 # Deliberately narrow: only the literal `(node:<digits>)` wrapper is touched,
 # so DEP-codes, package versions and message text all stay concern-bearing.
 NODE_PID_PREFIX = re.compile(r"\(node:\d+\)")
+# Vite stamps the wall-clock time of day on each warning line ("11:07:38 PM
+# [vite] warning: ..."); the time is run identity, not the concern.
+TIME_OF_DAY_PREFIX = re.compile(r"^\d{1,2}:\d{2}:\d{2}(?: ?[ap]m)? ")
 
 # Commands that themselves talk about these signals (greps, ledger edits,
 # this tooling) are not new in-flight findings.
@@ -1139,6 +1142,7 @@ def fingerprint(line: str, cls: str) -> str:
     norm = re.sub(r"\s+", " ", line).strip().lower()
     # Run-identity stripping: the emitting pid is not part of the concern.
     norm = NODE_PID_PREFIX.sub("(node:#)", norm)
+    norm = TIME_OF_DAY_PREFIX.sub("", norm)
     if cls == "security" and SECURITY_SUMMARY.search(line):
         # Count-churn stability: digit runs collapse so "191 vulnerabilities
         # (1 critical, 113 high)" and next week's counts share one concern.
