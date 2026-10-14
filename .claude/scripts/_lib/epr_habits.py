@@ -24,8 +24,16 @@ and they are different questions:
 
 WHY THE EVIDENCE IS THE BODY. 97% of the old register was evidence prose and 3% was declaration.
 Folded into a YAML scalar it could only ever be a wall; as a markdown body it is the same bytes,
-diffable and readable, and the declaration above it fits on a screen. The projector re-indents
-the body verbatim under `evidence: >`, so the round-trip is exact rather than approximate.
+diffable and readable, and the declaration above it fits on a screen.
+
+WHY THE REGISTER CARRIES ONLY THE NEWEST ENTRY (2026-10-14). Projecting every ledger verbatim
+made the register a 1 MB file that crossed the recall contract's `habit_register_bytes` budget,
+so every session's bootstrap refused — a projection nobody reads whole was charging the commit
+plane and the recall plane for bytes only the atom needs to hold. The projector now emits, under
+`evidence: >`, the newest DELTA entry BY DATE (atoms are not reliably newest-first), and beside
+it `evidence-fingerprint:` (the body's `sha256:hex16` cite fingerprint — Python never encodes a
+CID), `evidence-bytes:` and `evidence-entries:`. The ledger stays whole in the atom; the register
+says how to reach it. A body with no DELTA line projects whole, as before.
 
 THE COVENANT, as amended 2026-08-27 (`.epr-meta/habits-covenant.md` carries the prose):
   * `max 2 active` stays GLOBAL — it bounds ATTENTION (one operator, one day job), and survives
@@ -40,6 +48,7 @@ THE COVENANT, as amended 2026-08-27 (`.epr-meta/habits-covenant.md` carries the 
 """
 from __future__ import annotations
 
+import re
 import subprocess
 from pathlib import Path
 
@@ -308,6 +317,45 @@ def _raw_field_lines(raw: str) -> dict[str, list[str]]:
     return fields
 
 
+_DELTA_LINE = re.compile(r"^\s*DELTA (20\d{2}-\d{2}-\d{2})")
+
+
+def delta_entries(body: str) -> list[tuple[str, str]]:
+    """A ledger body as its dated DELTA entries, `[(date, text)]` in file order. Text before the
+    first DELTA line belongs to no entry (a declaration note, a preamble) and is not an entry."""
+    entries: list[tuple[str, str]] = []
+    cur_date: str | None = None
+    cur: list[str] = []
+    for line in body.split("\n"):
+        m = _DELTA_LINE.match(line)
+        if m:
+            if cur_date is not None:
+                entries.append((cur_date, "\n".join(cur).strip("\n")))
+            cur_date, cur = m.group(1), [line]
+        elif cur_date is not None:
+            cur.append(line)
+    if cur_date is not None:
+        entries.append((cur_date, "\n".join(cur).strip("\n")))
+    return entries
+
+
+def newest_delta(body: str) -> str:
+    """The entry the register projects: the DELTA with the newest date, the later one in the
+    file on a tie. A body with no DELTA line is projected whole — it is short by construction."""
+    entries = delta_entries(body)
+    if not entries:
+        return body
+    best = max(range(len(entries)), key=lambda i: (entries[i][0], i))
+    return entries[best][1]
+
+
+def evidence_fingerprint(body: str) -> str:
+    """The body's cite fingerprint (`sha256:hex16`), the one short form the repo already reads;
+    the full CID is the `eprfs cid` CLI's to encode, never Python's."""
+    from _lib import cite_graph  # noqa: PLC0415 — sibling import kept local to avoid a cycle
+    return cite_graph.fingerprint_text(body)
+
+
 def project_habit(habit: dict) -> list[str]:
     """One habit as the register's list-item source lines (4-space body indent under `  - `)."""
     fields = _raw_field_lines(habit.get("_raw", ""))
@@ -322,8 +370,12 @@ def project_habit(habit: dict) -> list[str]:
             body = habit.get("evidence", "")
             if not isinstance(body, str) or not body.strip():
                 continue
+            entry = newest_delta(body)
             out.append("    evidence: >")
-            out.extend(f"      {ln}" if ln.strip() else "" for ln in body.split("\n"))
+            out.extend(f"      {ln}" if ln.strip() else "" for ln in entry.split("\n"))
+            out.append(f"    evidence-fingerprint: {evidence_fingerprint(body)}")
+            out.append(f"    evidence-bytes: {len(body.encode('utf-8'))}")
+            out.append(f"    evidence-entries: {len(delta_entries(body))}")
             continue
         if key not in fields:
             continue
