@@ -69,6 +69,30 @@ Its fleet reading (§14, 2026-10-04) puts the cost in validating and reading bac
 **Next slice, chosen by the operator 2026-10-14 as the sprint's next story:** ruling 6, the bounded read. It is a
 coordinator hot-swap with no DNA hash move. The writer waits for ruling 5's first two steps.
 
+**Ruling 6 cannot be met coordinator-only on the current fork (Codex design read, 2026-10-14, code only, nothing
+measured; `genesis/local-dev/idle-call-floor-2/codex-design-bounded-latest-status-read.md`).**
+
+- HDK 0.7.0's `LinkQuery` has tag-prefix, `after`/`before` and author filters but no limit or "latest one".
+- On the checked-in conductor fork those filters are applied in Rust after the conductor has selected and decoded
+  every live link action under the base (`holochain_data/src/dht/inner/action.rs:663`,
+  `holochain_state/src/dht_store/reads.rs:1185`); the authority path likewise loads all creates by base first
+  (`holochain_cascade/src/authority.rs:152`). `count_links` uses the same machinery. So a timestamp window or a
+  bucket tag shrinks what the zome receives, not what the conductor reads: the work stays proportional to history.
+- A bucket-specific base (a different base hash per hour or day) does bound the conductor's work, since the query
+  constrains `base_hash` on an index, but a new reader then cannot see an old writer's links without falling back
+  to the agent base, which brings the unbounded scan back.
+- A window also changes the meaning of `None` from "never published" to "nothing in the window". Fan-in keeps
+  last-known snapshots regardless of age, and the 900 s staleness rule lives in the consumers and is configurable
+  (`p2p/mod.rs:2280`, `api/resilience.rs:76`), so a fixed window in the coordinator would change their behaviour.
+- The DNA's peer-status conductor test is an ignored placeholder that panics; there is no executable round trip.
+
+So the three requirements (bounded work, old writers readable during rollout, an arbitrarily old last status still
+returned) cannot all hold with a coordinator-only change. The missing primitive is an indexed latest-live-link
+lookup, or a maintained latest-state index, inside the conductor: a fork change, not a coordinator hot-swap. That is
+a decision for the operator, and this story is not buildable as "coordinator-only" until it is made. A narrower
+timestamp-window read is specified in the design file as an option if a "recent status" meaning is chosen
+explicitly; it would not complete ruling 6.
+
 **Done when.** The latest-status read's cost is shown on the household not to grow with the peer's history
 (ruling 6); and, later, a resting peer's infrastructure chain grows by a declared number of actions a day that is
 not a multiple of its uptime in minutes (ruling 5).
