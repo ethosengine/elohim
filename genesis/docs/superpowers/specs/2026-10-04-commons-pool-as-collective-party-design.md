@@ -15,7 +15,7 @@ cites:
   - "hardware-providence-commons | Hardware Providence | sha256:17e52609abf5f92a | path: genesis/docs/content/elohim-protocol/hardware-providence-commons.md"
   - "elohim-protocol-manifesto | manifesto | sha256:bdfd593210e7fea0 | path: genesis/docs/content/elohim-protocol/manifesto.md"
   - "values-forward | values-forward | sha256:0bfa006fd772f7d9 | path: genesis/docs/content/elohim-protocol/values-forward.md"
-  - "private-thought-governed-fruit | private-thought-governed-fruit | sha256:e2d603f9ca52417c | path: genesis/docs/architecture/private-thought-governed-fruit.md"
+  - "private-thought-governed-fruit | private-thought-governed-fruit | sha256:2945eb608257be1e | path: genesis/docs/architecture/private-thought-governed-fruit.md"
   - "swarm-curve-and-blind-custody-design | The swarm curve and blind custody | sha256:ef23b30ec9b8145c | path: genesis/docs/superpowers/specs/2026-08-23-swarm-curve-and-blind-custody-design.md"
   - "compute-envelope-tevah | Tevah | sha256:d427a367f3b01a6e | path: genesis/docs/superpowers/specs/2026-09-02-compute-envelope-tevah-design.md"
   - "eprfs-witnessed-interaction-primitive | The eprfs Witnessed-Interaction Primitive | sha256:6a24773ffd7b83f4 | path: genesis/docs/superpowers/specs/2026-07-15-eprfs-witnessed-interaction-primitive-design.md"

@@ -16,7 +16,7 @@ cites:
   - "cell-qualified-projection-and-sync-contract | Cell-qualified projection and sync | sha256:54ff98e31c7f793a | path: genesis/docs/superpowers/specs/2026-09-08-cell-qualified-projection-and-sync-contract.md"
   - "platform-one-sdk-many-apis-design | THE ELOHIM PLATFORM MODEL | sha256:a15b10c68787a460 | path: genesis/docs/superpowers/specs/2026-06-14-platform-one-sdk-many-apis-design.md"
   - "swarm-curve-and-blind-custody-design | The swarm curve and blind custody | sha256:ef23b30ec9b8145c | path: genesis/docs/superpowers/specs/2026-08-23-swarm-curve-and-blind-custody-design.md"
-  - "private-thought-governed-fruit | private-thought-governed-fruit | sha256:e2d603f9ca52417c | path: genesis/docs/architecture/private-thought-governed-fruit.md"
+  - "private-thought-governed-fruit | private-thought-governed-fruit | sha256:2945eb608257be1e | path: genesis/docs/architecture/private-thought-governed-fruit.md"
   - genesis/data/timeline/backlog/http-reach-enforcement-gap.md
   - elohim/sdk/schemas/v1/manifest/app-manifest.schema.json
   - elohim/sdk/storage-client-ts/src/sync.ts

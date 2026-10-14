@@ -25,7 +25,7 @@ cites:
   - "iroh-libp2p-complementarity | describes the thin-client connection to a hub whose wire format is unsettled and the undesigned browser-direct path, both listed here as missing nodes | sha256:da518f4d0861aff8 | path: genesis/docs/content/elohim-protocol/architecture/2026-05-08-iroh-libp2p-complementarity.md"
   - "observation-event-layer-design | the only path by which a count from a session could ever become a record, and only with a reader | sha256:002fc7ec733dd10a | path: genesis/docs/content/elohim-protocol/architecture/2026-05-11-observation-event-layer-design.md"
   - "rea-compute-commitment-primitive | the delegates-compute commitment a host works under; this spec asks for one new scope name on it | sha256:3ea123e3a9796449 | path: genesis/docs/architecture/rea-compute-commitment-primitive.md"
-  - "private-thought-governed-fruit | the six hard boundaries; boundary 6, that taking part is itself sensitive, bounds what a host may learn | sha256:e2d603f9ca52417c | path: genesis/docs/architecture/private-thought-governed-fruit.md"
+  - "private-thought-governed-fruit | the six hard boundaries; boundary 6, that taking part is itself sensitive, bounds what a host may learn | sha256:2945eb608257be1e | path: genesis/docs/architecture/private-thought-governed-fruit.md"
   - genesis/data/timeline/CONVENTIONS.md
   - elohim/elohim-hub/README.md
   - elohim/sdk/working-version.seam.json
