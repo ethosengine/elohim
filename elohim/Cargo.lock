@@ -1234,6 +1234,14 @@ dependencies = [
 ]
 
 [[package]]
+name = "elohim-live-session"
+version = "0.1.0"
+dependencies = [
+ "serde",
+ "sha2 0.10.9",
+]
+
+[[package]]
 name = "elohim-peer-fabric"
 version = "0.1.0"
 

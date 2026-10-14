@@ -1,0 +1,564 @@
+//! The per-session register of who is here, and the sender-side outbox that feeds it.
+//!
+//! Rules (plan section 2 seam 1, concern canon C3, C4, C6a, C6b, C11):
+//! - a frame whose count is not greater than the last count seen from its sender is dropped and
+//!   changes nothing (idempotent effect, C6b);
+//! - a drop of any kind changes nothing at all, including the rate window;
+//! - presence expires `EXPIRY_MS` after the last accepted frame and then reads `Unknown`, never
+//!   `Left`; only a signalled `Leave` reads `Left` (honest absence, C4);
+//! - the sender renews at half the expiry (C3);
+//! - size, value-shape, per-sender rate and sender-count limits are enforced on receipt (C6a);
+//! - a slow receiver gets the latest values, not a queue: each sender holds one slot (C11).
+//!
+//! Time is milliseconds passed in by the caller; this module never reads a clock.
+
+use crate::frame::{Body, Frame, FrameError};
+use crate::session_id::SessionId;
+use std::collections::BTreeMap;
+
+/// Silence for this long reads as unknown. The story's 30 seconds.
+pub const EXPIRY_MS: u64 = 30_000;
+/// A sender renews at half the expiry.
+pub const RENEW_INTERVAL_MS: u64 = EXPIRY_MS / 2;
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct Limits {
+    /// Largest accepted frame on the wire, in bytes (the caller passes the wire length).
+    pub max_frame_bytes: usize,
+    pub max_values: usize,
+    pub max_name_bytes: usize,
+    pub max_value_bytes: usize,
+    pub max_sender_bytes: usize,
+    /// Accepted frames per sender per window; more are dropped.
+    pub max_frames_per_window: u32,
+    pub window_ms: u64,
+    /// Distinct senders held in one register.
+    pub max_senders: usize,
+}
+
+impl Default for Limits {
+    fn default() -> Self {
+        Limits {
+            max_frame_bytes: 4096,
+            max_values: 16,
+            max_name_bytes: 64,
+            max_value_bytes: 512,
+            max_sender_bytes: 128,
+            max_frames_per_window: 20,
+            window_ms: 1_000,
+            max_senders: 16,
+        }
+    }
+}
+
+/// Why a frame was dropped. A drop never changes the register.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum Dropped {
+    UnknownVersion(u8),
+    TooLarge,
+    WrongSession,
+    BadSender,
+    BadValues,
+    /// Count not greater than the last seen from this sender (repeat or older).
+    Stale,
+    TooManySenders,
+    RateCapped,
+}
+
+/// What an accepted frame did.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum Applied {
+    /// New sender, or one that was left or unknown is here again.
+    Arrived,
+    /// Here, with different values than before.
+    Updated,
+    /// Here, nothing new to show.
+    Renewed,
+    /// Signalled clean exit.
+    Left,
+}
+
+/// What this machine shows for another one.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub enum PeerState {
+    Here(BTreeMap<String, String>),
+    Left,
+    Unknown,
+}
+
+#[derive(Clone, Debug, PartialEq, Eq)]
+enum Slot {
+    Here(BTreeMap<String, String>),
+    Left,
+    Unknown,
+}
+
+#[derive(Clone, Debug, PartialEq, Eq)]
+struct Entry {
+    last_count: u64,
+    last_seen: u64,
+    slot: Slot,
+    window_start: u64,
+    window_n: u32,
+}
+
+impl Entry {
+    fn expired(&self, now: u64) -> bool {
+        matches!(self.slot, Slot::Here(_)) && now.saturating_sub(self.last_seen) >= EXPIRY_MS
+    }
+}
+
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct Register {
+    session: SessionId,
+    limits: Limits,
+    peers: BTreeMap<String, Entry>,
+}
+
+impl Register {
+    pub fn new(session: SessionId) -> Self {
+        Self::with_limits(session, Limits::default())
+    }
+
+    pub fn with_limits(session: SessionId, limits: Limits) -> Self {
+        Register {
+            session,
+            limits,
+            peers: BTreeMap::new(),
+        }
+    }
+
+    pub fn session(&self) -> SessionId {
+        self.session
+    }
+
+    /// Apply a received frame. `wire_len` is the encoded length as received. Every check runs
+    /// before any mutation, so an `Err` leaves the register exactly as it was.
+    pub fn apply(&mut self, frame: &Frame, wire_len: usize, now: u64) -> Result<Applied, Dropped> {
+        let l = self.limits;
+        frame
+            .check_version()
+            .map_err(|FrameError::UnknownVersion(v)| Dropped::UnknownVersion(v))?;
+        if wire_len > l.max_frame_bytes {
+            return Err(Dropped::TooLarge);
+        }
+        if frame.session != self.session {
+            return Err(Dropped::WrongSession);
+        }
+        if frame.sender.is_empty() || frame.sender.len() > l.max_sender_bytes {
+            return Err(Dropped::BadSender);
+        }
+        if let Body::Present { values } = &frame.body {
+            let ok = values.len() <= l.max_values
+                && values
+                    .iter()
+                    .all(|(k, v)| k.len() <= l.max_name_bytes && v.len() <= l.max_value_bytes);
+            if !ok {
+                return Err(Dropped::BadValues);
+            }
+        }
+        if frame.count == 0 {
+            return Err(Dropped::Stale);
+        }
+        let existing = self.peers.get(&frame.sender);
+        if let Some(e) = existing {
+            if frame.count <= e.last_count {
+                return Err(Dropped::Stale);
+            }
+        } else if self.peers.len() >= l.max_senders {
+            return Err(Dropped::TooManySenders);
+        }
+        // Rate window for this sender, computed without mutating.
+        let (window_start, window_n) = match existing {
+            Some(e) if now.saturating_sub(e.window_start) < l.window_ms => {
+                (e.window_start, e.window_n)
+            }
+            _ => (now, 0),
+        };
+        if window_n >= l.max_frames_per_window {
+            return Err(Dropped::RateCapped);
+        }
+
+        // Accepted: mutate.
+        let was_here =
+            matches!(existing, Some(e) if matches!(e.slot, Slot::Here(_)) && !e.expired(now));
+        let prev_values = match existing {
+            Some(Entry {
+                slot: Slot::Here(v),
+                ..
+            }) if was_here => Some(v.clone()),
+            _ => None,
+        };
+        let (slot, applied) = match &frame.body {
+            Body::Present { values } => {
+                let applied = match prev_values {
+                    None => Applied::Arrived,
+                    Some(p) if &p == values => Applied::Renewed,
+                    Some(_) => Applied::Updated,
+                };
+                (Slot::Here(values.clone()), applied)
+            }
+            Body::Leave => (Slot::Left, Applied::Left),
+        };
+        self.peers.insert(
+            frame.sender.clone(),
+            Entry {
+                last_count: frame.count,
+                last_seen: now,
+                slot,
+                window_start,
+                window_n: window_n + 1,
+            },
+        );
+        Ok(applied)
+    }
+
+    /// Turn every presence that has gone quiet for `EXPIRY_MS` into `Unknown`, dropping its
+    /// values. Returns the senders that changed. `view` and `peer` already read expired
+    /// presence as unknown; this makes the memory match and tells the caller what to announce.
+    pub fn expire(&mut self, now: u64) -> Vec<String> {
+        let mut changed = Vec::new();
+        for (sender, e) in self.peers.iter_mut() {
+            if e.expired(now) {
+                e.slot = Slot::Unknown;
+                changed.push(sender.clone());
+            }
+        }
+        changed
+    }
+
+    /// What this machine shows for `sender` at `now`; `None` if never heard from.
+    pub fn peer(&self, sender: &str, now: u64) -> Option<PeerState> {
+        self.peers.get(sender).map(|e| Self::state_of(e, now))
+    }
+
+    /// Everyone heard from, in sender order.
+    pub fn view(&self, now: u64) -> Vec<(String, PeerState)> {
+        self.peers
+            .iter()
+            .map(|(s, e)| (s.clone(), Self::state_of(e, now)))
+            .collect()
+    }
+
+    fn state_of(e: &Entry, now: u64) -> PeerState {
+        match &e.slot {
+            Slot::Here(_) if e.expired(now) => PeerState::Unknown,
+            Slot::Here(v) => PeerState::Here(v.clone()),
+            Slot::Left => PeerState::Left,
+            Slot::Unknown => PeerState::Unknown,
+        }
+    }
+}
+
+/// Sender side: numbers frames, remembers the latest values, says when a renewal is due.
+#[derive(Clone, Debug)]
+pub struct Outbox {
+    sender: String,
+    session: SessionId,
+    count: u64,
+    values: BTreeMap<String, String>,
+    last_sent: Option<u64>,
+    open: bool,
+}
+
+impl Outbox {
+    pub fn new(sender: impl Into<String>, session: SessionId) -> Self {
+        Outbox {
+            sender: sender.into(),
+            session,
+            count: 0,
+            values: BTreeMap::new(),
+            last_sent: None,
+            open: false,
+        }
+    }
+
+    fn next(&mut self, body: Body, now: u64) -> Frame {
+        self.count += 1;
+        self.last_sent = Some(now);
+        Frame::new(self.sender.clone(), self.session, self.count, body)
+    }
+
+    /// Announce presence with the current values (also the first frame after opening).
+    pub fn present(&mut self, values: BTreeMap<String, String>, now: u64) -> Frame {
+        self.values = values.clone();
+        self.open = true;
+        self.next(Body::Present { values }, now)
+    }
+
+    /// True when the session is open and half the expiry has passed since the last send.
+    pub fn renewal_due(&self, now: u64) -> bool {
+        self.open
+            && self
+                .last_sent
+                .is_some_and(|t| now.saturating_sub(t) >= RENEW_INTERVAL_MS)
+    }
+
+    /// The renewal frame, with the latest values, if one is due.
+    pub fn renew(&mut self, now: u64) -> Option<Frame> {
+        if !self.renewal_due(now) {
+            return None;
+        }
+        let values = self.values.clone();
+        Some(self.next(Body::Present { values }, now))
+    }
+
+    /// Clean exit. After this nothing is renewed.
+    pub fn leave(&mut self, now: u64) -> Frame {
+        self.open = false;
+        self.next(Body::Leave, now)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn sid() -> SessionId {
+        SessionId::for_document(b"sheet-1")
+    }
+
+    fn vals(pairs: &[(&str, &str)]) -> BTreeMap<String, String> {
+        pairs
+            .iter()
+            .map(|(k, v)| (k.to_string(), v.to_string()))
+            .collect()
+    }
+
+    fn present(sender: &str, count: u64, v: &[(&str, &str)]) -> Frame {
+        Frame::new(sender, sid(), count, Body::Present { values: vals(v) })
+    }
+
+    #[test]
+    fn arrival_update_renew() {
+        let mut r = Register::new(sid());
+        assert_eq!(
+            r.apply(&present("a", 1, &[("sel", "A1")]), 50, 0),
+            Ok(Applied::Arrived)
+        );
+        assert_eq!(
+            r.apply(&present("a", 2, &[("sel", "A1")]), 50, 100),
+            Ok(Applied::Renewed)
+        );
+        assert_eq!(
+            r.apply(&present("a", 3, &[("sel", "B2")]), 50, 200),
+            Ok(Applied::Updated)
+        );
+        assert_eq!(
+            r.peer("a", 200),
+            Some(PeerState::Here(vals(&[("sel", "B2")])))
+        );
+        assert_eq!(r.peer("nobody", 200), None);
+    }
+
+    #[test]
+    fn repeated_and_older_counts_are_dropped() {
+        let mut r = Register::new(sid());
+        r.apply(&present("a", 5, &[("x", "1")]), 10, 0).unwrap();
+        assert_eq!(
+            r.apply(&present("a", 5, &[("x", "2")]), 10, 1),
+            Err(Dropped::Stale)
+        );
+        assert_eq!(
+            r.apply(&present("a", 4, &[("x", "3")]), 10, 2),
+            Err(Dropped::Stale)
+        );
+        assert_eq!(r.peer("a", 3), Some(PeerState::Here(vals(&[("x", "1")]))));
+    }
+
+    #[test]
+    fn silence_is_unknown_never_left() {
+        let mut r = Register::new(sid());
+        r.apply(&present("a", 1, &[("x", "1")]), 10, 0).unwrap();
+        assert!(matches!(
+            r.peer("a", EXPIRY_MS - 1),
+            Some(PeerState::Here(_))
+        ));
+        assert_eq!(r.peer("a", EXPIRY_MS), Some(PeerState::Unknown));
+        assert_eq!(r.expire(EXPIRY_MS), vec!["a".to_string()]);
+        assert_eq!(
+            r.peer("a", EXPIRY_MS + 10_000_000),
+            Some(PeerState::Unknown)
+        );
+        assert!(r.expire(EXPIRY_MS * 3).is_empty());
+    }
+
+    #[test]
+    fn renewal_keeps_presence_alive() {
+        let mut r = Register::new(sid());
+        let mut t = 0;
+        r.apply(&present("a", 1, &[]), 10, t).unwrap();
+        for n in 2..10 {
+            t += RENEW_INTERVAL_MS;
+            r.apply(&present("a", n, &[]), 10, t).unwrap();
+            assert!(matches!(r.peer("a", t), Some(PeerState::Here(_))));
+        }
+    }
+
+    #[test]
+    fn leave_reads_left_and_clears_values_then_rejoin() {
+        let mut r = Register::new(sid());
+        r.apply(&present("a", 1, &[("x", "1")]), 10, 0).unwrap();
+        let leave = Frame::new("a", sid(), 2, Body::Leave);
+        assert_eq!(r.apply(&leave, 10, 5), Ok(Applied::Left));
+        assert_eq!(r.peer("a", 5), Some(PeerState::Left));
+        assert_eq!(r.peer("a", 5 + EXPIRY_MS * 10), Some(PeerState::Left));
+        assert_eq!(r.apply(&present("a", 3, &[]), 10, 6), Ok(Applied::Arrived));
+    }
+
+    #[test]
+    fn revival_after_expiry_is_an_arrival() {
+        let mut r = Register::new(sid());
+        r.apply(&present("a", 1, &[]), 10, 0).unwrap();
+        assert_eq!(
+            r.apply(&present("a", 2, &[]), 10, EXPIRY_MS + 1),
+            Ok(Applied::Arrived)
+        );
+    }
+
+    #[test]
+    fn size_and_shape_limits() {
+        let mut r = Register::new(sid());
+        assert_eq!(
+            r.apply(&present("a", 1, &[]), 4097, 0),
+            Err(Dropped::TooLarge)
+        );
+        assert_eq!(
+            r.apply(&present("a", 1, &[]), 4096, 0),
+            Ok(Applied::Arrived)
+        );
+        let big = "x".repeat(513);
+        assert_eq!(
+            r.apply(&present("a", 2, &[("k", &big)]), 10, 1),
+            Err(Dropped::BadValues)
+        );
+        let many: Vec<(String, String)> = (0..17).map(|i| (format!("k{i}"), "v".into())).collect();
+        let mut f = present("a", 2, &[]);
+        f.body = Body::Present {
+            values: many.into_iter().collect(),
+        };
+        assert_eq!(r.apply(&f, 10, 1), Err(Dropped::BadValues));
+        assert_eq!(
+            r.apply(&present("", 1, &[]), 10, 1),
+            Err(Dropped::BadSender)
+        );
+    }
+
+    #[test]
+    fn wrong_session_and_unknown_version() {
+        let mut r = Register::new(sid());
+        let other = Frame::new("a", SessionId::for_document(b"other"), 1, Body::Leave);
+        assert_eq!(r.apply(&other, 10, 0), Err(Dropped::WrongSession));
+        let mut f = present("a", 1, &[]);
+        f.version = 9;
+        assert_eq!(r.apply(&f, 10, 0), Err(Dropped::UnknownVersion(9)));
+        assert!(r.view(0).is_empty());
+    }
+
+    #[test]
+    fn rate_cap_per_sender_and_window_reopens() {
+        let mut r = Register::new(sid());
+        for n in 1..=20 {
+            assert!(r.apply(&present("a", n, &[]), 10, 0).is_ok());
+        }
+        assert_eq!(
+            r.apply(&present("a", 21, &[]), 10, 999),
+            Err(Dropped::RateCapped)
+        );
+        // another sender is unaffected
+        assert!(r.apply(&present("b", 1, &[]), 10, 999).is_ok());
+        // the window reopens
+        assert!(r.apply(&present("a", 21, &[]), 10, 1_000).is_ok());
+    }
+
+    #[test]
+    fn sender_count_cap() {
+        let mut r = Register::new(sid());
+        for i in 0..16 {
+            r.apply(&present(&format!("s{i}"), 1, &[]), 10, 0).unwrap();
+        }
+        assert_eq!(
+            r.apply(&present("late", 1, &[]), 10, 0),
+            Err(Dropped::TooManySenders)
+        );
+        assert!(r.apply(&present("s0", 2, &[]), 10, 1).is_ok());
+    }
+
+    #[test]
+    fn outbox_numbers_renews_at_half_and_leaves() {
+        let mut o = Outbox::new("a", sid());
+        assert!(!o.renewal_due(0));
+        let f1 = o.present(vals(&[("sel", "A1")]), 0);
+        assert_eq!(f1.count, 1);
+        assert!(o.renew(RENEW_INTERVAL_MS - 1).is_none());
+        let f2 = o.renew(RENEW_INTERVAL_MS).unwrap();
+        assert_eq!(f2.count, 2);
+        assert_eq!(
+            f2.body,
+            Body::Present {
+                values: vals(&[("sel", "A1")])
+            }
+        );
+        let f3 = o.leave(RENEW_INTERVAL_MS + 1);
+        assert_eq!(f3.body, Body::Leave);
+        assert!(o.renew(RENEW_INTERVAL_MS * 10).is_none());
+    }
+
+    /// Fixed-seed xorshift; proptest is not in the workspace lock.
+    struct Rng(u64);
+    impl Rng {
+        fn next(&mut self) -> u64 {
+            self.0 ^= self.0 << 13;
+            self.0 ^= self.0 >> 7;
+            self.0 ^= self.0 << 17;
+            self.0
+        }
+        fn below(&mut self, n: u64) -> u64 {
+            self.next() % n
+        }
+    }
+
+    /// A repeated or older count never changes the register, whatever else the frame holds.
+    /// More strongly: any dropped frame leaves the register exactly as it was.
+    #[test]
+    fn property_stale_count_and_any_drop_never_change_register() {
+        let senders = ["a", "b", "c"];
+        for seed in 1..=200u64 {
+            let mut rng = Rng(seed.wrapping_mul(0x9E37_79B9_7F4A_7C15) | 1);
+            let mut r = Register::new(sid());
+            let mut last: BTreeMap<&str, u64> = BTreeMap::new();
+            let mut now = 0u64;
+            for _ in 0..300 {
+                now += rng.below(3_000);
+                let s = senders[rng.below(3) as usize];
+                let known = last.get(s).copied();
+                // bias toward repeats and older counts
+                let count = match (known, rng.below(4)) {
+                    (Some(k), 0) => k,
+                    (Some(k), 1) => rng.below(k + 1),
+                    (Some(k), _) => k + 1 + rng.below(3),
+                    (None, _) => rng.below(5),
+                };
+                let body = if rng.below(8) == 0 {
+                    Body::Leave
+                } else {
+                    let mut v = BTreeMap::new();
+                    v.insert("sel".to_string(), format!("c{}", rng.below(5)));
+                    Body::Present { values: v }
+                };
+                let frame = Frame::new(s, sid(), count, body);
+                let before = r.clone();
+                let stale = known.is_some_and(|k| count <= k);
+                let res = r.apply(&frame, 64, now);
+                if stale {
+                    assert_eq!(res, Err(Dropped::Stale), "seed {seed}");
+                }
+                if res.is_err() {
+                    assert_eq!(r, before, "a drop changed the register (seed {seed})");
+                } else {
+                    last.insert(s, count);
+                }
+            }
+        }
+    }
+}

@@ -1,0 +1,41 @@
+{
+  "manifestVersion": "1.0",
+  "pipeline": "elohim-live-session",
+  "description": "Elohim live session — pure session logic (register, dedup, expiry, caps, frame, session id)",
+  "steps": {
+    "gate-live-session": {
+      "description": "Format, lint and test the pure live-session crate",
+      "inputs": {
+        "sources": [
+          "elohim/elohim-live-session/**",
+          "elohim/Cargo.toml",
+          "elohim/Cargo.lock"
+        ],
+        "buildProcess": []
+      },
+      "outputs": {
+        "artifacts": [],
+        "verify": null
+      },
+      "depends": [],
+      "executor": {
+        "stage": "Gate Live Session",
+        "function": null
+      }
+    }
+  },
+  "gate": {
+    "projects": {
+      "elohim-live-session": {
+        "dir": "elohim/elohim-live-session",
+        "steps": ["gate-live-session"],
+        "run": {
+          "kind": "root-just",
+          "recipe": "_gate-elohim-live-session",
+          "cargo": { "workspace": "elohim", "profile": "dev", "rustflags": "" }
+        }
+      }
+    }
+  },
+  "deployment": {}
+}
