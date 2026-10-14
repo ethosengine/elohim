@@ -78,3 +78,11 @@ Matthew`, then `this node's key is proven over its transport id`.
 - Nothing delivers a rebuilt coordinator to a running household peer on its own. `just mesh` has no arm for it.
 
 **Still owed for done-when.** A settled 300 s call reading with the read answering.
+
+## 2026-10-14 — the storage half is built
+
+`consent-speaks-refresh-is-a-timer-not-a-demand` now reads on demand by default, so a resting peer's carrier makes no
+`my_consent_standing` call. The affirmation worker, which this change does not touch, still reads standing 60 s after
+start and then every 30 minutes. While something asks, the carrier reads at most once per 30 s.
+`ELOHIM_CONSENT_SPEAKS_REFRESH=timer` restores the 30 s timer. The household's mishpat coordinator was brought up to
+the built one on 2026-10-13 (above), so the read answers in either mode.
