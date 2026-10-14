@@ -70,8 +70,6 @@ pub enum Dropped {
     Stale,
     TooManySenders,
     RateCapped,
-    /// A Leave from a sender already shown as Left: a no-op.
-    AlreadyLeft,
 }
 
 /// What an accepted frame did.
@@ -85,6 +83,9 @@ pub enum Applied {
     Renewed,
     /// Signalled clean exit.
     Left,
+    /// A newer Leave from a sender already Left: nothing shown changes, but the sender's
+    /// count watermark advances so a delayed older Present stays stale.
+    StillLeft,
 }
 
 /// What this machine shows for another one.
@@ -174,9 +175,6 @@ impl Register {
             if frame.count <= e.last_count {
                 return Err(Dropped::Stale);
             }
-            if matches!(frame.body, Body::Leave) && matches!(e.slot, Slot::Left) {
-                return Err(Dropped::AlreadyLeft);
-            }
         } else if self.peers.len() >= l.max_senders {
             return Err(Dropped::TooManySenders);
         }
@@ -188,7 +186,7 @@ impl Register {
             _ => (now, 0),
         };
         // Only the transition into Left is exempt from the cap, so a clean close reads as Left
-        // even after a burst of presence; further Leaves from a Left sender are dropped above.
+        // even after a burst of presence; further Leaves from a Left sender go through the normal cap.
         let is_leave_transition = matches!(frame.body, Body::Leave)
             && existing.is_some_and(|e| !matches!(e.slot, Slot::Left));
         if window_n >= l.max_frames_per_window && !is_leave_transition {
@@ -213,6 +211,9 @@ impl Register {
                     Some(_) => Applied::Updated,
                 };
                 (Slot::Here(values.clone()), applied)
+            }
+            Body::Leave if matches!(existing, Some(e) if matches!(e.slot, Slot::Left)) => {
+                (Slot::Left, Applied::StillLeft)
             }
             Body::Leave => (Slot::Left, Applied::Left),
         };
@@ -297,6 +298,8 @@ pub struct Outbox {
     count: u64,
     values: BTreeMap<String, String>,
     pending: bool,
+    /// A Present frame has been emitted since the last Leave.
+    announced: bool,
     last_sent: Option<u64>,
     window_start: u64,
     window_n: u32,
@@ -316,6 +319,7 @@ impl Outbox {
             count: 0,
             values: BTreeMap::new(),
             pending: false,
+            announced: false,
             last_sent: None,
             window_start: 0,
             window_n: 0,
@@ -354,6 +358,7 @@ impl Outbox {
         let values = self.values.clone();
         let f = self.next(Body::Present { values }, now)?;
         self.pending = false;
+        self.announced = true;
         Ok(f)
     }
 
@@ -402,15 +407,18 @@ impl Outbox {
         Ok(None)
     }
 
-    /// Clean exit. Never held back by the send cap. Emits at most once per open period:
-    /// `None` when not open. After this nothing is sent until the next `present`.
+    /// Clean exit. Never held back by the send cap. Emits at most once per announced period:
+    /// `None` when no Present was emitted since the last Leave. After this nothing is sent until the next `present`.
     pub fn leave(&mut self, now: u64) -> Result<Option<Frame>, OutboxError> {
-        if !self.open {
-            return Ok(None);
-        }
         self.open = false;
         self.pending = false;
-        self.next(Body::Leave, now).map(Some)
+        if !self.announced {
+            // The receiver never saw this period's presence; its state is already right.
+            return Ok(None);
+        }
+        let f = self.next(Body::Leave, now)?;
+        self.announced = false;
+        Ok(Some(f))
     }
 }
 
@@ -725,20 +733,24 @@ mod tests {
     }
 
     #[test]
-    fn leave_burst_after_the_first_is_a_no_op() {
+    fn leave_burst_after_the_first_is_not_exempt_and_never_reports_left_again() {
         let mut r = Register::new(sid());
         r.apply(&present("a", 1, &[]), 10, 0).unwrap();
         assert_eq!(
             r.apply(&Frame::new("a", sid(), 2, Body::Leave), 10, 0),
             Ok(Applied::Left)
         );
+        let mut still = 0;
+        let mut capped = 0;
         for n in 3..60 {
-            assert_eq!(
-                r.apply(&Frame::new("a", sid(), n, Body::Leave), 10, 0),
-                Err(Dropped::AlreadyLeft)
-            );
+            match r.apply(&Frame::new("a", sid(), n, Body::Leave), 10, 0) {
+                Ok(Applied::StillLeft) => still += 1,
+                Err(Dropped::RateCapped) => capped += 1,
+                other => panic!("unexpected {other:?}"),
+            }
         }
-        // a Leave from a never-present sender goes through the normal cap
+        assert!(still > 0 && capped > 0);
+        // a never-present sender's Leaves go through the normal cap
         let mut q = Register::new(sid());
         let mut accepted = 0;
         for n in 1..40 {
@@ -748,7 +760,38 @@ mod tests {
                 accepted += 1;
             }
         }
-        assert_eq!(accepted, 1);
+        assert_eq!(accepted, 20);
+    }
+
+    #[test]
+    fn later_leave_advances_the_watermark_so_a_delayed_present_stays_stale() {
+        let mut r = Register::new(sid());
+        r.apply(&present("a", 1, &[]), 10, 0).unwrap();
+        assert_eq!(
+            r.apply(&Frame::new("a", sid(), 2, Body::Leave), 10, 1),
+            Ok(Applied::Left)
+        );
+        assert_eq!(
+            r.apply(&Frame::new("a", sid(), 4, Body::Leave), 10, 2),
+            Ok(Applied::StillLeft)
+        );
+        assert_eq!(r.apply(&present("a", 3, &[]), 10, 3), Err(Dropped::Stale));
+        assert_eq!(r.peer("a", 3), Some(PeerState::Left));
+    }
+
+    #[test]
+    fn present_leave_loop_under_an_exhausted_send_window_emits_no_leave() {
+        let mut o = Outbox::new("a", sid());
+        for _ in 0..10 {
+            assert!(o.present(vals(&[]), 0).unwrap().is_some());
+        }
+        // announced: the first leave goes out
+        assert!(o.leave(0).unwrap().is_some());
+        // window now exhausted; reopen attempts are capped and never announced
+        for _ in 0..50 {
+            assert!(o.present(vals(&[]), 0).unwrap().is_none());
+            assert!(o.leave(0).unwrap().is_none());
+        }
     }
 
     #[test]
@@ -765,7 +808,7 @@ mod tests {
         assert!(o.poll(0).unwrap().is_none());
         o.count = u64::MAX;
         assert_eq!(o.present(vals(&[]), 0), Err(OutboxError::CountExhausted));
-        assert_eq!(o.leave(0), Err(OutboxError::CountExhausted));
+        assert_eq!(o.leave(0), Ok(None));
     }
 
     /// Fixed-seed xorshift; proptest is not in the workspace lock.
