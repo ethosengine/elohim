@@ -3,6 +3,8 @@
 # takes the smallest case that still proves the channel: two machines one person looks after, talking
 # to each other directly. Every step is undefined; the feature stays @wip until the slice in
 # genesis/docs/superpowers/plans/2026-10-14-live-session-slice-1-own-devices-direct.md is built.
+# Preconditions the tags name: household-nodes, the household's own nodes are running; owned-substrate,
+# the test may stop and restart those nodes; device-node, a fourth node is staged as Matthew's laptop.
 @e2e @dataplane @wip @requires:household-nodes @requires:owned-substrate @requires:device-node @concern:live-session-direct @act:i
 Feature: Two of Matthew's machines show each other who is here, and keep no record of it
 
@@ -10,8 +12,9 @@ Feature: Two of Matthew's machines show each other who is here, and keep no reco
   larger story, local-first-shared-sheet, has several people, a hub and a doorway; this one has one
   person and two machines, which is the least that still proves the channel works.
 
-  Matthew is working on a shared sheet: a spreadsheet that several of his machines keep a copy of
-  and edit together. He has it open on two machines he looks after: the small always-on node in the
+  Matthew is working on a shared sheet. A shared document is any document that several machines
+  each keep a copy of and edit together; here it is a spreadsheet, which is why it is called a
+  sheet. He has it open on two machines he looks after: the small always-on node in the
   hallway cupboard, called "matthew" below, and the laptop he works at, called "workspace". Each
   machine runs its own node, so "node" and "machine" mean the same thing here.
 
@@ -75,7 +78,8 @@ Feature: Two of Matthew's machines show each other who is here, and keep no reco
     And at no point in those 45 seconds did node "matthew" show node "workspace" as having left "Winter budget"
 
   Scenario: A node Matthew has not granted leave to is refused and told why
-    Given "Winter budget" is open on node "matthew"
+    Given node "james" is a household node that belongs to another member of the household, not to Matthew
+    And "Winter budget" is open on node "matthew"
     And "Winter budget" is also held by node "james"
     And Matthew has not granted node "james" leave to take part in live sessions
     When "Winter budget" is opened on node "james"
@@ -84,11 +88,13 @@ Feature: Two of Matthew's machines show each other who is here, and keep no reco
     And node "matthew" does not show node "james" as here in "Winter budget"
 
   Scenario: With no sheet open, a node that could take part does nothing for it
-    Given no sheet is open on any node
+    Given each node's requests to its conductor, the process that signs and records its acts, were counted over 5 quiet minutes with the live-session channel not started
+    And the nodes were restarted with the live-session channel started
+    And no sheet is open on any node
     When the household is left alone for 5 minutes
     Then node "matthew" sent no live-session message
     And node "workspace" sent no live-session message
-    And each node made the same number of requests to its conductor, the process that signs and records its acts, as it does with live sessions switched off
+    And each node made no more requests to its conductor than it made in the 5 minutes counted without the channel
 
   Scenario: A session leaves nothing behind
     Given "Winter budget" was open on nodes "matthew" and "workspace" for 1 minute and is now closed on both

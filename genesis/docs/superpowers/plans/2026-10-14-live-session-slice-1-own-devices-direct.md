@@ -429,6 +429,22 @@ the choice can be revisited.
   format.
 - Nothing is measured.
 
+## Story review record
+
+Each round used a fresh blind reader given only the feature file and the `a2o-story` profile.
+
+| Round | Verdict | Correctness | Interpretability | Preference | Resolved |
+|---|---|---|---|---|---|
+| 1 | READY | 0 | 3 | 1 | the 3 interpretability findings |
+| 2 | READY | 1 | 3 | 1 | all 4 non-preference findings |
+| 3 | READY | 1 | 4 | 0 | all 5 |
+
+Round 3's correctness finding was that the rest scenario compared against a count no step took.
+The scenario now counts conductor requests over 5 quiet minutes with the channel not started,
+restarts the nodes with it started, and compares. Round 3's revision has not been re-read: the
+directory's rule closes the loop only on a round with no correctness or interpretability finding,
+so a fourth fresh read is owed before the story is called finished.
+
 ## Task 0 findings (2026-10-14, read-only)
 
 Answered from code and from receipts already on disk. Nothing was run, and the running household
