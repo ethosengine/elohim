@@ -80,6 +80,31 @@ self.addEventListener('fetch', (event: FetchEvent) => {
     return;
   }
 
+  // Top-level navigation (destination 'document'): network-first, so a direct
+  // visit sees whatever the doorway answers (e.g. the no-store chrome shell)
+  // instead of the CID-cached raw bundle. The response is never cached here;
+  // the raw entry is already cached under its CID path by the iframe's own
+  // load. An iframe's request has destination 'iframe' and keeps the cached
+  // path below. Offline, fall back to the cached bytes.
+  if (event.request.destination === 'document') {
+    event.respondWith(
+      (async () => {
+        console.log(`[apps-sw] document-navigation: network-first ${url.pathname}`);
+        try {
+          const answered = await fetch(event.request);
+          // A doorway that is up but cannot serve (5xx) is as good as away for
+          // the person; a 4xx is the doorway's own answer and stands.
+          if (answered.status < 500) return answered;
+          console.log(`[apps-sw] document-navigation: doorway ${answered.status} → cached bytes`);
+        } catch {
+          console.log('[apps-sw] document-navigation: offline → cached bytes');
+        }
+        return handleAppFetch(event);
+      })()
+    );
+    return;
+  }
+
   event.respondWith(handleAppFetch(event));
 });
 
