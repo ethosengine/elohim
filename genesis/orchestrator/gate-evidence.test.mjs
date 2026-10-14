@@ -50,8 +50,8 @@ const fingerprintReply = (fp) => (_bin, args) => ({
 });
 const isFingerprint = (bin, args) => bin.endsWith('brit') && args[0] === 'build' && args[1] === 'fingerprint';
 const isRevParse = (bin, args) => bin === 'git' && args[0] === 'rev-parse';
-const isFind = (bin, args) => bin.endsWith('brit-build-ref') && args[1] === 'find';
-const isPut = (bin, args) => bin.endsWith('brit-build-ref') && args[1] === 'put';
+const isFind = (bin, args) => bin.endsWith('brit-build-ref') && args[2] === 'build' && args[3] === 'find';
+const isPut = (bin, args) => bin.endsWith('brit-build-ref') && args[2] === 'build' && args[3] === 'put';
 
 test('the attestation step is the gate project, not a manifest step', () => {
   assert.equal(attestationStep(project), 'gate:elohim-storage');
@@ -123,7 +123,7 @@ test('gateEvidence resolves the closure, asks brit-build-ref once with the key, 
     assert.equal(result.line, 'hit green (signer did:key:zSIG, 30m ago, commit ffffffff1)');
     const find = calls.filter(c => isFind(c.bin, c.args));
     assert.equal(find.length, 1, 'one lookup per project');
-    assert.deepEqual(find[0].args, ['build', 'find', '--step', 'gate:elohim-storage', '--inputs-hash', expectedKey, '--repo', '/repo']);
+    assert.deepEqual(find[0].args, ['--repo', '/repo', 'build', 'find', '--step', 'gate:elohim-storage', '--inputs-hash', expectedKey]);
     const rev = calls.find(c => isRevParse(c.bin, c.args));
     assert.deepEqual(rev.args, ['rev-parse', 'abc123:elohim/holochain/build-manifest.json']);
 
@@ -153,13 +153,12 @@ test('recordEvidence puts the verdict against the closure with the manifest file
   const r = recordEvidence(project, 'k'.repeat(64), { success: false, seconds: 1875.4, commit: 'abc123', buildRefBin: '/x/brit-build-ref', root: '/repo', jobs: 1, spawn });
   assert.equal(r.status, 0);
   const args = calls[0].args;
-  assert.deepEqual(args.slice(0, 4), ['build', 'put', '--step', 'gate:elohim-storage']);
+  assert.deepEqual(args.slice(0, 6), ['--repo', '/repo', 'build', 'put', '--step', 'gate:elohim-storage']);
   assert.equal(args[args.indexOf('--manifest-path') + 1], '/repo/elohim/holochain/build-manifest.json');
   assert.deepEqual(JSON.parse(args[args.indexOf('--output-json') + 1]), { exit: 1, seconds: 1875, jobs: 1 });
   assert.equal(args[args.indexOf('--inputs-hash') + 1], 'k'.repeat(64));
   assert.equal(args[args.indexOf('--success') + 1], 'false');
   assert.equal(args[args.indexOf('--duration-ms') + 1], '1875400');
   assert.equal(args[args.indexOf('--commit') + 1], 'abc123');
-  assert.equal(args[args.indexOf('--repo') + 1], '/repo');
   assert.equal(findEvidence(project, 'k', { buildRefBin: '/x/brit-build-ref', root: '/repo', spawn: () => ({ status: 0, stdout: 'nope', stderr: '' }) }).error, 'build find: not JSON');
 });

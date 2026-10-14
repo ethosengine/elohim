@@ -118,9 +118,10 @@ export function closureKey({ project, fingerprints, manifestBlob: blob, cargoEnv
 
 /** `brit-build-ref build find` rows for this project's closure, or `{ error }`. */
 export function findEvidence(project, key, { buildRefBin, root, spawn = spawnSync }) {
+  // `--repo` is a top-level option of brit-build-ref: it precedes the subcommand.
   const r = spawn(
     buildRefBin,
-    ['build', 'find', '--step', attestationStep(project), '--inputs-hash', key, '--repo', root],
+    ['--repo', root, 'build', 'find', '--step', attestationStep(project), '--inputs-hash', key],
     { cwd: root, encoding: 'utf8', timeout: 60_000 }
   );
   if (r.status !== 0) return { error: `build find failed: ${(r.stderr || '').trim().split('\n').pop() || `exit ${r.status}`}` };
@@ -189,6 +190,7 @@ export function gateEvidence(project, { env = process.env, root, commit, cargoEn
 export function recordEvidence(project, key, { success, seconds, commit, buildRefBin, root, jobs, spawn = spawnSync }) {
   const verdict = { exit: success ? 0 : 1, seconds: Math.round(seconds), ...(jobs ? { jobs } : {}) };
   const args = [
+    '--repo', root,
     'build', 'put',
     '--step', attestationStep(project),
     '--manifest-path', resolve(root, project.manifestPath),
@@ -197,7 +199,6 @@ export function recordEvidence(project, key, { success, seconds, commit, buildRe
     '--success', success ? 'true' : 'false',
     '--duration-ms', String(Math.round(seconds * 1000)),
     '--commit', commit,
-    '--repo', root,
   ];
   try {
     return spawn(buildRefBin, args, { cwd: root, encoding: 'utf8', timeout: 60_000 });
