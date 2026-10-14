@@ -388,10 +388,10 @@ habits:
       - "epr flow stocks --window <START..END> --per week --stock commitments --check --root /projects/elohim (exit 0 = every declared stock draining; fail-closed: refusals exit non-zero, never green-on-nothing)"
       - "a2o @concern:dev-system-equilibrium (genesis/a2o/features/devflow/run-plane.feature — 4 scenarios: filling exits non-zero, drain>=inflow exits zero, an unmeasurable window refuses rather than reporting equilibrium, and the @regression guard that a discharge counts as outflow and never as inflow. WIRED 2026-09-11: steps/devflow/run-plane.steps.ts drives them through the real `epr flow` CLI over a throwaway git fixture repo (mint instant = artifact commit date, discharge instant = HEAD commit provenance); runs in the mesh and default profiles, and scoped: `cd genesis/a2o && npx cucumber-js --config '' --require-module tsx --require steps/devflow/epr-cli.guard.ts --require steps/devflow/run-plane.steps.ts features/devflow/run-plane.feature --tags 'not @wip'` → 8 scenarios passed (these 4 + the 4 @concern:run-plane-note write-leg scenarios). The 4 @concern:run-plane-projection emitter scenarios stay @wip (they need scratch registers the run-projection.py emitter cannot yet be pointed at). Where `epr` is absent (the genesis CI image) the @requires:epr-cli guard reports SKIPPED, never a false red — not measured, not green.)"
     evidence: >
-      DELTA 2026-09-28 (Brit delivery matrix and parent pin; RED preserved): pin Brit e3de7c0c046049c4e625b38d28c9e1b634f82dcf after GitHub run 36514749389 completed all 29 jobs successfully, including both Windows architectures, Tests pass and Nexus publication. The inherited-ci qualifier captured 29/29 jobs, qualified all 18 required legs with zero issues; CodeQL and Actions security also passed. Windows hook forwarding now preserves positional arguments through the shell shim. Immutable releases gitoxide-core 0.61.2, gitoxide 0.58.2 and brit-cli 0.1.4 passed the registry-only locked max-pure single-binary consumer audit. Parent pre-push passed Jenkins bridge, EPRFS, storage and Genesis; storage's cold gate took 2,849 seconds, above its existing budget, so functional success does not close the timing concern. The remaining memory story fixtures now declare repository attribution explicitly (11 scenarios/57 steps passed); the full memory and A2O gates are being verified before push. Runtime parity remains measurement, not acceptance: the final CI artifact reports 10/159 commands with a fresh passing exit comparison and no certified-complete command. Parent Jenkins delivery remains pending; neither daily-driver readiness nor live-memory parity is accepted.
-    evidence-fingerprint: sha256:59f4cd94ebcf3602
-    evidence-bytes: 40543
-    evidence-entries: 48
+      DELTA 2026-10-13 (shared working versions and social-coding contracts reconciled; RED preserved): joined the local-first source/work projection plan with its commons enrichment in the shared-working-versions-social-coding design; updated SDK, Brit, LVI, valueflow and existing commons rows 32–38 without new runtime authority or another work register. Source inspection distinguishes the implemented committed-tree bridge from missing live editor/filesystem adapters, qualified private sync and ceremony projections. Genesis gate passed seed validation/typecheck and 722 tests (9 skipped); genesis-a2o lint/format/typecheck passed (0 lint errors, 441 existing warnings); Gherkin gate parsed 247 feature files. Fresh isolated story-reader rounds: R1 correctness=1/interpretability=3/preference=0, R2=2/2/0, R3=0/0/2 READY; all eight required findings resolved (follow edit refusal, stale-copy baseline, resource-rule/size criteria, human escalation transition, parent-body bound, rights-title scope, allocation outcome and amendment effect); two preferences remain non-blocking. Independent integration review found no material contradictions; its broadcast-allowlist wording refinement was applied. New shared-working-versions.feature remains @wip with step adapters and runtime proof owed; no charter ratification, deployment, measured stock-drain improvement or habit-status change is claimed.
+    evidence-fingerprint: sha256:9a9d76d422b8e224
+    evidence-bytes: 41942
+    evidence-entries: 49
     guard: >
       Regression risks: (1) the outflow classifier keys on `fulfills` — a new
       discharge path that forgets the field silently under-drains (the level
@@ -401,6 +401,8 @@ habits:
       (3) greening this habit by widening the outflow arm instead of by
       actually draining commitments is the over-claim the invariant names.
     refs:
+      - "genesis/a2o/features/devflow/shared-working-versions.feature — @concern:dev-system-equilibrium acceptance contract; @wip, adapters and runtime proof owed"
+      - "genesis/docs/superpowers/specs/2026-10-13-shared-working-versions-social-coding-design.md — design and acceptance frontier; no runtime or stock-drain claim"
       - "genesis/docs/superpowers/specs/2026-08-13-dev-system-equilibrium-stocks-design.md"
       - "genesis/docs/superpowers/plans/2026-08-13-agentic-harness-borrows-implementation-plan.md"
       - "genesis/data/timeline/backlog/agentic-harness-borrows-backlog.md — row 7"
@@ -637,26 +639,16 @@ habits:
     status: green
     active: false
     checks:
+      - "Native seam guidance: just gate eprfs; cargo test -p elohim-epr-cli --test seam_guidance (use the manifest cargo target). Eight acceptance tests include a 28-case labeled corpus, Claude/Codex equivalence, source/algorithm/application freshness, review validation, boundaries and privacy. GREEN 2026-10-12."
+      - "node --test elohim/sdk/domains/elohim-agent/scripts/seam-guidance.test.mjs; python3 elohim/sdk/domains/elohim-agent/tests/seam_hook_test.py; pnpm run elohim-agent:packages:verify — schema, registration preservation, adapter privacy/degradation and projection fidelity. GREEN 2026-10-12."
       - "python3 .claude/scripts/_lib/__tests__/validator_registry_parity_test.py — 11 assertions, GREEN 2026-08-12. Validator ACCOUNTING against the shared scope registry (no implemented validator undeclared; each host implements exactly its declared share), WIRING (both live decision surfaces call the native evaluator), and ATTRIBUTION (both hosts name themselves by content address; the ledger stamps an evaluator on every decision; a dispute record names both builds)."
       - "cargo test -p elohim-epr-cli --test governance_parity_vectors — the Rust half of the correspondence theorem over governance-parity-vectors.json, run against the COMPOSED evaluator (library + ElohimRepositoryValidators). GREEN at 12/12, 0 skips. The Python half (python3 .claude/scripts/_lib/__tests__/test_governance_parity.py) is GREEN at 12/12 / 52 assertions. Both hosts now derive the same verdict from the same corpus — correspondence, which is necessary and NOT sufficient for this habit."
       - "cargo test -p elohim-epr-cli --test live_manifest_integrity — the native integrity layer over the LIVE corpus (43 manifests), guarding against an over-strict check that would false-block every write under a subtree. GREEN."
     evidence: >
-      DELTA 2026-08-15 — the ledger row gained WHO-ACTED beside
-      which-evaluator-decided: `epr govern --session` stamps the session's
-      registered ActorClaim ({claimed, definitionCid, source: claim|unclaimed});
-      every identity-sidecar failure reads `unclaimed` — the identity plane
-      never breaks the decision authority, and a tampered claim reads as
-      unclaimed, never as the identity the tamperer wrote. Threaded end to end
-      (resolver stdin session_id / git-gate env → --session → witness(actor=…),
-      key present only when the plane was consulted). First witnessed exhibit:
-      the 15:15:50Z refuse row naming agent:scribe@claude-opus-4-6 by package
-      build (definitionCid sha256:e117a5a9…) during the actor-plane spec's own
-      authoring. Spec: 2026-08-15-actor-plane-inflight-identity-claims-design.md;
-      a2o @concern:agent-identity-claim-and-acceptance
-      (genesis/a2o/features/devflow/, @wip — authored, unstepped).
-    evidence-fingerprint: sha256:a1f6ca04feceb8c5
-    evidence-bytes: 8150
-    evidence-entries: 2
+      DELTA 2026-10-12 — Installed seam evaluator into the existing PATH epr target after a successful locked native build refresh. Both registered Claude/Codex commands passed duplicate and composition smoke checks without EPR_SEAM_BIN; reports match, four invocations took 127–181 ms, and epr doctor reports READY. Local installed-integration.json pins binary SHA-256 and method identities. Codex native hooks/list recognizes the hook without errors and reports enabled=true, trustStatus=untrusted: normal /hooks review is the remaining activation step. Claude live lifecycle invocation remains unobserved. Evidence: genesis/a2o/reports/recovery/native-seam-guidance-2026-10-12/.
+    evidence-fingerprint: sha256:7995198ef580b425
+    evidence-bytes: 10524
+    evidence-entries: 4
     guard: >
       Risk 1 — "parity" achieved by deleting the divergent validators rather
       than by unifying the evaluators. That would make the check green and the
@@ -1248,9 +1240,9 @@ habits:
       - "store growth, per DNA, read from a STOPPED conductor (`app/elohim-app/scripts/conductor-store-sniff.py <data-root> --json`, folded as `dna-actions-per-day@1`, `wal-main-ratio@1`, `subject-anchor-links@1`) and rendered by `epr flow report --bound <id>` for each of `dna-actions-per-day-ceiling@1`, `wal-main-ratio-ceiling@1` and `subject-anchor-links-ceiling@1`: lamad at most 5,000 actions a day per peer at idle, WAL no larger than its database, at most 100 attestation links on one subject anchor. Fleet: the conductor's integrated-ops series is a proxy for the first; nothing on the fleet reports WAL or anchor size."
     evidence: >
       DELTA 2026-10-14 (RED preserved; a resting node's carrier no longer reads its consent standing, and the call floor fell by about a third — shift `2026-10-14T03-25-consent-demand-and-pin-backoff-landing`, storage branch `perf/consent-read-on-demand` at `5742bfca7`, seven Codex rounds, the seventh SAFE, `genesis/local-dev/idle-call-floor-2/codex-review-consent-demand-7.md`). The device carrier reads whom this node speaks for on demand (`ELOHIM_CONSENT_SPEAKS_REFRESH=demand`, the default; `timer` restores the 30 s read, with seven stated differences from before). The operator's invariant holds: an ask is never listed on evidence older than 120 s in its own ceremony or 30 s for a new ask, unless it is listed on a read that began after it arrived. The affirmation worker, untouched, still reads standing 60 s after start and every 30 min. MEASURED on the household (dev gossip cadence, storage binary sha256 `0b48832b…` built from the landing branch, 45 min settled): two 300 s windows read matthew/jessica/james 16/15/16 and 16/19/21 calls against a budget of 30, with no `my_consent_standing` call; before, 27/23/27 with ten each (`idle-call-floor-20261013/shift-measure-consent-demand-{1,2}.txt`). The declared check `household-at-rest.feature` passed its call leg and failed on CPU, 204.9 s/min for the three conductors at the dev 1 s gossip cadence, which is not comparable with the production-cadence reading of 21 s/min; CPU was not re-read at production cadence. Serving receipt `epr-app-deliverability` 5/5 (`sprint-report-household-20261014T051903Z-a6eb05d8.json`). NOT RUN: a live device-consent ceremony (the feature needs a staged `workspace` device node, which would add a standing peer to the fixture); the listing path is covered by unit tests only. NOT LANDED: the retired-pin backoff, parked after six reviews (`retired-pin-readmit-backoff-parked-after-six-reviews`). Nothing is on the fleet until a deploy carries it.
-    evidence-fingerprint: sha256:e8c5f5f1cc4b0f15
-    evidence-bytes: 54111
-    evidence-entries: 25
+    evidence-fingerprint: sha256:8a7c180daed42010
+    evidence-bytes: 59316
+    evidence-entries: 30
     refs:
       - "genesis/data/timeline/backlog/conductor-cap-grant-scan-per-zome-call.md — what unbounded per-call cost did to the fleet"
       - "genesis/data/timeline/backlog/conductor-admission-saturated-for-hours-after-restart.md"
