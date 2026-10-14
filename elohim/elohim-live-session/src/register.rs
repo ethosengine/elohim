@@ -31,6 +31,9 @@ pub struct Limits {
     pub max_sender_bytes: usize,
     /// Accepted frames per sender per window; more are dropped.
     pub max_frames_per_window: u32,
+    /// Frames an `Outbox` may emit per window. Lower than the receive cap so that two sender
+    /// windows straddling one receiver window still fit under it.
+    pub send_frames_per_window: u32,
     pub window_ms: u64,
     /// Distinct senders held in one register.
     pub max_senders: usize,
@@ -45,6 +48,7 @@ impl Default for Limits {
             max_value_bytes: 512,
             max_sender_bytes: 128,
             max_frames_per_window: 20,
+            send_frames_per_window: 10,
             window_ms: 1_000,
             max_senders: 16,
         }
@@ -161,12 +165,22 @@ impl Register {
             return Err(Dropped::Stale);
         }
         let existing = self.peers.get(&frame.sender);
+        let mut evict: Option<String> = None;
         if let Some(e) = existing {
             if frame.count <= e.last_count {
                 return Err(Dropped::Stale);
             }
         } else if self.peers.len() >= l.max_senders {
-            return Err(Dropped::TooManySenders);
+            // A sender that has Left may give up its slot; the oldest goes first.
+            evict = self
+                .peers
+                .iter()
+                .filter(|(_, e)| matches!(e.slot, Slot::Left))
+                .min_by_key(|(_, e)| e.last_seen)
+                .map(|(s, _)| s.clone());
+            if evict.is_none() {
+                return Err(Dropped::TooManySenders);
+            }
         }
         // Rate window for this sender, computed without mutating.
         let (window_start, window_n) = match existing {
@@ -175,7 +189,9 @@ impl Register {
             }
             _ => (now, 0),
         };
-        if window_n >= l.max_frames_per_window {
+        // A newer-count Leave is never held back by the cap: a clean close must read as Left.
+        let is_leave = matches!(frame.body, Body::Leave);
+        if window_n >= l.max_frames_per_window && !is_leave {
             return Err(Dropped::RateCapped);
         }
 
@@ -200,6 +216,9 @@ impl Register {
             }
             Body::Leave => (Slot::Left, Applied::Left),
         };
+        if let Some(gone) = evict {
+            self.peers.remove(&gone);
+        }
         self.peers.insert(
             frame.sender.clone(),
             Entry {
@@ -207,7 +226,7 @@ impl Register {
                 last_seen: now,
                 slot,
                 window_start,
-                window_n: window_n + 1,
+                window_n: window_n.saturating_add(1),
             },
         );
         Ok(applied)
@@ -225,6 +244,14 @@ impl Register {
             }
         }
         changed
+    }
+
+    /// The transport calls this when an authenticated connection from `sender` ends. It forgets
+    /// that sender's dedup state and presence and frees its slot, so a reconnecting outbox
+    /// (which restarts at count 1) is heard. Silence or expiry must NOT call this: forgetting
+    /// counts on mere silence would let a stale frame be replayed. Returns whether it was held.
+    pub fn connection_closed(&mut self, sender: &str) -> bool {
+        self.peers.remove(sender).is_some()
     }
 
     /// What this machine shows for `sender` at `now`; `None` if never heard from.
@@ -250,40 +277,112 @@ impl Register {
     }
 }
 
-/// Sender side: numbers frames, remembers the latest values, says when a renewal is due.
+/// Why an `Outbox` refused to send.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum OutboxError {
+    /// Values exceed the shape limits (count, name length, value length).
+    BadValues,
+    /// The frame counter is exhausted; the connection must be restarted.
+    CountExhausted,
+}
+
+/// Sender side: numbers frames, remembers the latest values, says when a renewal is due, and
+/// caps its own send rate. Over the cap, `present` keeps only the latest values (no queue,
+/// C11) and `poll` emits them as soon as the cap allows. A `leave` is never held back.
+///
+/// Time is a caller-supplied monotonic millisecond clock; a clock that runs backwards is
+/// outside this contract.
 #[derive(Clone, Debug)]
 pub struct Outbox {
     sender: String,
     session: SessionId,
+    limits: Limits,
     count: u64,
     values: BTreeMap<String, String>,
+    pending: bool,
     last_sent: Option<u64>,
+    window_start: u64,
+    window_n: u32,
     open: bool,
 }
 
 impl Outbox {
     pub fn new(sender: impl Into<String>, session: SessionId) -> Self {
+        Self::with_limits(sender, session, Limits::default())
+    }
+
+    pub fn with_limits(sender: impl Into<String>, session: SessionId, limits: Limits) -> Self {
         Outbox {
             sender: sender.into(),
             session,
+            limits,
             count: 0,
             values: BTreeMap::new(),
+            pending: false,
             last_sent: None,
+            window_start: 0,
+            window_n: 0,
             open: false,
         }
     }
 
-    fn next(&mut self, body: Body, now: u64) -> Frame {
-        self.count += 1;
-        self.last_sent = Some(now);
-        Frame::new(self.sender.clone(), self.session, self.count, body)
+    fn slot_free(&self, now: u64) -> bool {
+        self.last_sent.is_none()
+            || now.saturating_sub(self.window_start) >= self.limits.window_ms
+            || self.window_n < self.limits.send_frames_per_window
     }
 
-    /// Announce presence with the current values (also the first frame after opening).
-    pub fn present(&mut self, values: BTreeMap<String, String>, now: u64) -> Frame {
-        self.values = values.clone();
+    fn take_slot(&mut self, now: u64) {
+        if self.last_sent.is_none()
+            || now.saturating_sub(self.window_start) >= self.limits.window_ms
+        {
+            self.window_start = now;
+            self.window_n = 0;
+        }
+        self.window_n = self.window_n.saturating_add(1);
+    }
+
+    fn next(&mut self, body: Body, now: u64) -> Result<Frame, OutboxError> {
+        let count = self
+            .count
+            .checked_add(1)
+            .ok_or(OutboxError::CountExhausted)?;
+        self.count = count;
+        self.take_slot(now);
+        self.last_sent = Some(now);
+        Ok(Frame::new(self.sender.clone(), self.session, count, body))
+    }
+
+    fn emit_values(&mut self, now: u64) -> Result<Frame, OutboxError> {
+        let values = self.values.clone();
+        let f = self.next(Body::Present { values }, now)?;
+        self.pending = false;
+        Ok(f)
+    }
+
+    /// Set the current values (also opens the session). Returns the frame to send now, or
+    /// `None` when the send cap holds it back; the latest values are kept and `poll` sends them.
+    pub fn present(
+        &mut self,
+        values: BTreeMap<String, String>,
+        now: u64,
+    ) -> Result<Option<Frame>, OutboxError> {
+        let l = self.limits;
+        let ok = values.len() <= l.max_values
+            && values
+                .iter()
+                .all(|(k, v)| k.len() <= l.max_name_bytes && v.len() <= l.max_value_bytes);
+        if !ok {
+            return Err(OutboxError::BadValues);
+        }
+        self.values = values;
         self.open = true;
-        self.next(Body::Present { values }, now)
+        self.pending = true;
+        if self.slot_free(now) {
+            self.emit_values(now).map(Some)
+        } else {
+            Ok(None)
+        }
     }
 
     /// True when the session is open and half the expiry has passed since the last send.
@@ -294,18 +393,22 @@ impl Outbox {
                 .is_some_and(|t| now.saturating_sub(t) >= RENEW_INTERVAL_MS)
     }
 
-    /// The renewal frame, with the latest values, if one is due.
-    pub fn renew(&mut self, now: u64) -> Option<Frame> {
-        if !self.renewal_due(now) {
-            return None;
+    /// The next frame owed, if any: held-back latest values as soon as the cap allows, else a
+    /// renewal when due. Call on a timer and after each `present`.
+    pub fn poll(&mut self, now: u64) -> Result<Option<Frame>, OutboxError> {
+        if !self.open || !self.slot_free(now) {
+            return Ok(None);
         }
-        let values = self.values.clone();
-        Some(self.next(Body::Present { values }, now))
+        if self.pending || self.renewal_due(now) {
+            return self.emit_values(now).map(Some);
+        }
+        Ok(None)
     }
 
-    /// Clean exit. After this nothing is renewed.
-    pub fn leave(&mut self, now: u64) -> Frame {
+    /// Clean exit. Never held back by the send cap. After this nothing is sent.
+    pub fn leave(&mut self, now: u64) -> Result<Frame, OutboxError> {
         self.open = false;
+        self.pending = false;
         self.next(Body::Leave, now)
     }
 }
@@ -488,10 +591,10 @@ mod tests {
     fn outbox_numbers_renews_at_half_and_leaves() {
         let mut o = Outbox::new("a", sid());
         assert!(!o.renewal_due(0));
-        let f1 = o.present(vals(&[("sel", "A1")]), 0);
+        let f1 = o.present(vals(&[("sel", "A1")]), 0).unwrap().unwrap();
         assert_eq!(f1.count, 1);
-        assert!(o.renew(RENEW_INTERVAL_MS - 1).is_none());
-        let f2 = o.renew(RENEW_INTERVAL_MS).unwrap();
+        assert!(o.poll(RENEW_INTERVAL_MS - 1).unwrap().is_none());
+        let f2 = o.poll(RENEW_INTERVAL_MS).unwrap().unwrap();
         assert_eq!(f2.count, 2);
         assert_eq!(
             f2.body,
@@ -499,9 +602,123 @@ mod tests {
                 values: vals(&[("sel", "A1")])
             }
         );
-        let f3 = o.leave(RENEW_INTERVAL_MS + 1);
+        let f3 = o.leave(RENEW_INTERVAL_MS + 1).unwrap();
         assert_eq!(f3.body, Body::Leave);
-        assert!(o.renew(RENEW_INTERVAL_MS * 10).is_none());
+        assert!(o.poll(RENEW_INTERVAL_MS * 10).unwrap().is_none());
+    }
+
+    #[test]
+    fn leave_passes_the_receive_rate_cap() {
+        let mut r = Register::new(sid());
+        for n in 1..=20 {
+            r.apply(&present("a", n, &[]), 10, 0).unwrap();
+        }
+        assert_eq!(
+            r.apply(&present("a", 21, &[]), 10, 1),
+            Err(Dropped::RateCapped)
+        );
+        let leave = Frame::new("a", sid(), 22, Body::Leave);
+        assert_eq!(r.apply(&leave, 10, 2), Ok(Applied::Left));
+        assert_eq!(r.peer("a", 2), Some(PeerState::Left));
+        let stale = Frame::new("a", sid(), 22, Body::Leave);
+        assert_eq!(r.apply(&stale, 10, 3), Err(Dropped::Stale));
+        let big = Frame::new("a", sid(), 23, Body::Leave);
+        assert_eq!(r.apply(&big, 99_999, 3), Err(Dropped::TooLarge));
+    }
+
+    #[test]
+    fn outbox_send_cap_coalesces_to_latest_and_flushes_within_window() {
+        let mut o = Outbox::new("a", sid());
+        let mut sent = 0;
+        for i in 0..25 {
+            let v = vals(&[("sel", &format!("c{i}"))]);
+            if o.present(v, 100).unwrap().is_some() {
+                sent += 1;
+            }
+        }
+        assert_eq!(sent, 10);
+        assert!(o.poll(500).unwrap().is_none());
+        let f = o.poll(1_100).unwrap().expect("pending latest flushes");
+        assert_eq!(
+            f.body,
+            Body::Present {
+                values: vals(&[("sel", "c24")])
+            }
+        );
+        assert_eq!(f.count, 11);
+        assert!(o.poll(1_101).unwrap().is_none());
+        for i in 0..12 {
+            let _ = o.present(vals(&[("sel", &format!("d{i}"))]), 1_200);
+        }
+        assert_eq!(o.leave(1_201).unwrap().body, Body::Leave);
+    }
+
+    #[test]
+    fn connection_closed_lets_a_reconnecting_outbox_be_heard() {
+        let mut r = Register::new(sid());
+        let mut o = Outbox::new("a", sid());
+        let f = o.present(vals(&[]), 0).unwrap().unwrap();
+        r.apply(&f, 10, 0).unwrap();
+        let again = Outbox::new("a", sid())
+            .present(vals(&[]), 1)
+            .unwrap()
+            .unwrap();
+        assert_eq!(r.apply(&again, 10, 1), Err(Dropped::Stale));
+        assert!(r.connection_closed("a"));
+        assert_eq!(r.peer("a", 1), None);
+        assert_eq!(r.apply(&again, 10, 1), Ok(Applied::Arrived));
+        assert!(!r.connection_closed("nobody"));
+    }
+
+    #[test]
+    fn expiry_does_not_forget_counts() {
+        let mut r = Register::new(sid());
+        r.apply(&present("a", 5, &[]), 10, 0).unwrap();
+        r.expire(EXPIRY_MS * 2);
+        assert_eq!(
+            r.apply(&present("a", 5, &[]), 10, EXPIRY_MS * 2),
+            Err(Dropped::Stale)
+        );
+    }
+
+    #[test]
+    fn slots_are_reclaimed_on_close_and_from_left_senders() {
+        let mut r = Register::new(sid());
+        for i in 0..16 {
+            r.apply(&present(&format!("s{i}"), 1, &[]), 10, i).unwrap();
+        }
+        assert_eq!(
+            r.apply(&present("n1", 1, &[]), 10, 20),
+            Err(Dropped::TooManySenders)
+        );
+        r.connection_closed("s3");
+        assert!(r.apply(&present("n1", 1, &[]), 10, 21).is_ok());
+        r.apply(&Frame::new("s5", sid(), 2, Body::Leave), 10, 22)
+            .unwrap();
+        r.apply(&Frame::new("s2", sid(), 2, Body::Leave), 10, 23)
+            .unwrap();
+        // s5 left at 22, s2 at 23: the older Left entry (s5) yields first
+        assert!(r.apply(&present("n2", 1, &[]), 10, 24).is_ok());
+        assert_eq!(r.peer("s5", 24), None);
+        assert_eq!(r.peer("s2", 24), Some(PeerState::Left));
+        assert_eq!(r.view(24).len(), 16);
+    }
+
+    #[test]
+    fn outbox_refuses_oversized_values_and_exhausted_counter() {
+        let mut o = Outbox::new("a", sid());
+        let big = "x".repeat(513);
+        assert_eq!(
+            o.present(vals(&[("k", &big)]), 0),
+            Err(OutboxError::BadValues)
+        );
+        let many: BTreeMap<String, String> =
+            (0..17).map(|i| (format!("k{i}"), "v".into())).collect();
+        assert_eq!(o.present(many, 0), Err(OutboxError::BadValues));
+        assert!(o.poll(0).unwrap().is_none());
+        o.count = u64::MAX;
+        assert_eq!(o.present(vals(&[]), 0), Err(OutboxError::CountExhausted));
+        assert_eq!(o.leave(0), Err(OutboxError::CountExhausted));
     }
 
     /// Fixed-seed xorshift; proptest is not in the workspace lock.
