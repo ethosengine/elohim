@@ -34,6 +34,19 @@ const CACHE_DIR = resolve(__dirname, '../generated-ts');
 await mkdir(CACHE_DIR, { recursive: true });
 const OUTPUT_DIR = VERIFY ? await mkdtemp(join(CACHE_DIR, '.verify-')) : CACHE_DIR;
 
+// A distributed copy that git ignores is a local cache (genesis/seeder/src/generated/ is
+// gitignored apart from three early tracked files). A fresh worktree has never materialised
+// it, so its absence says nothing about drift: nothing stale can be committed from it.
+// Tracked outputs stay strict, and an ignored file that exists is still compared.
+function isGitIgnored(path) {
+  try {
+    execSync(`git check-ignore -q -- "${path}"`, { cwd: REPO_ROOT, stdio: 'ignore' });
+    return true;
+  } catch {
+    return false;
+  }
+}
+
 // All locations get identical copies of generated files
 const GENERATED_OUTPUT_DIRS = [
   resolve(REPO_ROOT, 'genesis/seeder/src/generated'),
@@ -687,6 +700,7 @@ async function main() {
 
   if (VERIFY) {
     let hasFailure = false;
+    let skippedCache = 0;
 
     // Verify enum files
     for (const outPath of ENUM_OUTPUT_PATHS) {
@@ -694,6 +708,10 @@ async function main() {
       try {
         existing = await readFile(outPath, 'utf8');
       } catch {
+        if (isGitIgnored(outPath)) {
+          skippedCache += 1;
+          continue;
+        }
         console.error(`FAIL: Generated file does not exist: ${outPath}`);
         hasFailure = true;
         continue;
@@ -712,6 +730,10 @@ async function main() {
         try {
           existing = await readFile(outPath, 'utf8');
         } catch {
+          if (isGitIgnored(outPath)) {
+            skippedCache += 1;
+            continue;
+          }
           console.error(`FAIL: Generated file does not exist: ${outPath}`);
           hasFailure = true;
           continue;
@@ -724,6 +746,11 @@ async function main() {
     }
 
     await rm(OUTPUT_DIR, { recursive: true, force: true });
+    if (skippedCache) {
+      console.log(
+        `note: ${skippedCache} gitignored generated file(s) not materialised here (local cache); run pnpm run schema:codegen:ts to create them`
+      );
+    }
     if (hasFailure) {
       process.exit(1);
     }
