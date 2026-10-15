@@ -78,18 +78,18 @@ def fire(write: dict):
 
 # ── unified-diff applier (the fixture is a plain git diff) ────────────────────────────────────
 def _locate(src: list, pre: list, hint: int) -> int | None:
-    """Where a hunk's pre-image (context and removed lines) sits in src, nearest to the hunk's
-    stated line first, as `patch` does. The live files gain unrelated lines over time (the adam
-    record grew two fields by 2026-10-15), so the stated line number drifts while the raised
-    lines themselves stay exact. None when the pre-image is gone: the fixture no longer applies."""
+    """Where a hunk's pre-image (context and removed lines) sits in src. The live files gain
+    unrelated lines over time (the adam record grew two fields by 2026-10-15), so the hunk's
+    stated line drifts while the raised lines themselves stay exact; the pre-image is matched by
+    content, as `patch` does. It must match exactly once: a pre-image that has vanished returns
+    None (the fixture no longer applies), and one that matches twice refuses, because the test
+    would no longer know which human's record it is raising. `hint` is kept for the message."""
     want = [h.rstrip("\n") for h in pre]
     have = [s.rstrip("\n") for s in src]
     n = len(want)
-    for delta in range(len(have) + 1):
-        for at in (hint - delta, hint + delta) if delta else (hint,):
-            if 0 <= at <= len(have) - n and have[at:at + n] == want:
-                return at
-    return None
+    hits = [at for at in range(len(have) - n + 1) if have[at:at + n] == want]
+    assert len(hits) <= 1, f"hunk pre-image near line {hint + 1} matches {len(hits)} places: {hits}"
+    return hits[0] if hits else None
 
 
 def apply_diff(diff_text: str) -> dict:
