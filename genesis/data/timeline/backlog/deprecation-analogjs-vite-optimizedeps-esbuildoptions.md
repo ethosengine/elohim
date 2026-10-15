@@ -9,7 +9,7 @@ written: "2026-09-24"
 author: "deprecation-triage"
 status: "backlog"
 priority: "low"
-deprecation_status: blocked
+deprecation_status: fixed
 severity: low
 fingerprints: ["612e34199acb", "8a122f0ee621", "19d73e162a53", "6e0477ffb653", "8313995dfeea"]
 relatedNodeIds: []
@@ -143,4 +143,18 @@ Vite 8 devDependency alignment below is still the fix.
 
 ## Verification
 
-N/A. Not fixed; blocked on the Vite 8 devDependency alignment above.
+2026-10-15, branch `chore/vite-8-alignment`. `"vite": "^8.1.5"` now declared in
+`app/elohim-app`, `app/elohim-library`, `doorway/doorway-app`, the three
+`app/elohim-elements/*` packages (were `^6.0.0`), and added to `app/lamad`
+devDependencies. `pnpm install --frozen-lockfile` passes on the regenerated
+`pnpm-lock.yaml`.
+
+- `pnpm exec vitest run --config vite.config.ts src/app/renderers/iframe-renderer`
+  in `app/lamad`: 23/23 passed, EXIT=0, no `optimizeDeps.esbuildOptions` line
+  (the only banner left is the unrelated `vite-tsconfig-paths` hint).
+- `just gate elohim-app` EXIT=0 (lint, `ng build`, 228 files / 4641 tests);
+  the full log contains zero `optimizeDeps.esbuildOptions` lines.
+- `just gate elohim-library` EXIT=0 (864 tests); `just gate elohim-storybook`
+  EXIT=0 (452 tests, Storybook build on Vite 8); `just gate doorway-app`
+  EXIT=0 (115 tests); `pnpm --filter elohim-core|elohim-imagodei|elohim-qahal build`
+  EXIT=0 each.
