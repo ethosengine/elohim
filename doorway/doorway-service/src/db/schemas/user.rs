@@ -261,6 +261,13 @@ pub struct UserDoc {
     /// Absent on rows that were never closed, and on rows closed before 17c.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub closed_identifier: Option<String>,
+
+    /// The agency phase this account registered under: `hosted`, `doorway`,
+    /// `node` or `device`. Only a `hosted` account may be given a cell by this
+    /// doorway; the others run their own. Absent on rows written before
+    /// 2026-10-15, which keep the old behaviour (treated as hosted).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub agency_phase: Option<String>,
 }
 
 fn default_identifier_type() -> String {
@@ -311,7 +318,15 @@ impl UserDoc {
             hosted_cell_provider: None,
             closed_at: None,
             closed_identifier: None,
+            agency_phase: None,
         }
+    }
+
+    /// Whether this doorway may give the account a cell of its own: only a
+    /// hosted account, or a legacy row that recorded no phase. A doorway,
+    /// node or device account runs its own cell and is never hosted here.
+    pub fn may_be_hosted(&self) -> bool {
+        matches!(self.agency_phase.as_deref(), None | Some("hosted"))
     }
 
     /// Create a new user document with custodial key (convenience method).
@@ -474,5 +489,37 @@ impl IntoIndexes for UserDoc {
 impl MutMetadata for UserDoc {
     fn mut_metadata(&mut self) -> &mut Metadata {
         &mut self.metadata
+    }
+}
+
+#[cfg(test)]
+mod may_be_hosted_tests {
+    use super::*;
+
+    fn row(phase: Option<&str>) -> UserDoc {
+        let mut u = UserDoc::new(
+            "x@localhost".into(),
+            "email".into(),
+            "hash".into(),
+            "human-x".into(),
+            "uhCAkx".into(),
+            None,
+        );
+        u.agency_phase = phase.map(str::to_string);
+        u
+    }
+
+    /// Only a hosted account (or a legacy row with no recorded phase) may be
+    /// given a cell by this doorway; doorway/node/device accounts run their own.
+    #[test]
+    fn only_hosted_or_legacy_accounts_may_be_hosted() {
+        assert!(row(Some("hosted")).may_be_hosted());
+        assert!(row(None).may_be_hosted());
+        for own in ["doorway", "node", "device"] {
+            assert!(
+                !row(Some(own)).may_be_hosted(),
+                "{own} must never be hosted"
+            );
+        }
     }
 }
