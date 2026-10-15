@@ -2197,23 +2197,37 @@ Then(
   }
 );
 
-// A regular expression, not a cucumber expression: the quoted phrase would be read as a {string}.
 Then(
-  /^the shell's resiliency badge from doorway "([^"]*)" reads "Held by N of M households" with N at least one and no more than M$/,
-  function (this: E2EWorld, peerName: string) {
+  "the shell's resiliency badge from doorway {string} states the holders figure that doorway's own resilience reading gives for this app",
+  async function (this: E2EWorld, peerName: string) {
     const visit = requireShellVisit(this, peerName);
-    assert.notEqual(visit.badgeText, null, `${peerName}: the shell has no resiliency badge`);
-    const match = /Held by (\d+) of (\d+) households/.exec(visit.badgeText ?? '');
-    assert.ok(
-      match,
-      `${peerName}: the badge reads "${visit.badgeText}", not "Held by N of M households"`
-    );
-    const held = Number(match[1]);
-    const target = Number(match[2]);
-    assert.ok(
-      held >= 1 && held <= target,
-      `${peerName}: the badge reads "${visit.badgeText}" — N must be at least one and no more than M`
-    );
+    const url = `${resolvePeerUrl(peerName)}/api/v1/resilience/${encodeURIComponent(app(this).slug)}/household`;
+    let floor: { hasHouseholds: number; wantsHouseholds: number } | undefined;
+    let reading: string;
+    try {
+      const response = await getRaw(url, { timeoutMs: 5000 });
+      reading = `HTTP ${response.status}: ${response.text}`;
+      if (response.status === 200) {
+        floor = (
+          JSON.parse(response.text) as {
+            feltStatus?: { floor?: { hasHouseholds: number; wantsHouseholds: number } };
+          }
+        ).feltStatus?.floor;
+      }
+    } catch (error) {
+      reading = `failed: ${String(error)}`;
+    }
+    const context = `${peerName}: resilience reading GET ${url} ${reading}; badge text "${visit.badgeText}"`;
+    assert.equal(visit.badgeHolders, floor ? String(floor.hasHouseholds) : null, context);
+    assert.equal(visit.badgeTarget, floor ? String(floor.wantsHouseholds) : null, context);
+    let expectedText = 'Held by households · see where it lives';
+    if (floor) {
+      expectedText =
+        floor.hasHouseholds === 0
+          ? 'Not yet held by any household'
+          : `Held by ${floor.hasHouseholds} of ${floor.wantsHouseholds} households`;
+    }
+    assert.equal(visit.badgeText, expectedText, context);
   }
 );
 
