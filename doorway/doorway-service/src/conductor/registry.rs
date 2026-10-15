@@ -397,11 +397,12 @@ impl ConductorRegistry {
         };
 
         let mut touched: HashSet<String> = HashSet::new();
-        for alias in aliases {
-            if let Some((_, entry)) = self.agents.remove(&alias) {
+        for alias in &aliases {
+            if let Some((_, entry)) = self.agents.remove(alias) {
                 touched.insert(entry.conductor_id);
             }
         }
+        self.forget_persisted(aliases);
 
         // Recount rather than decrement, for the same reason register_agent
         // does: the removed aliases were one install, not one each.
@@ -413,6 +414,72 @@ impl ConductorRegistry {
                 "Removed agent from registry"
             );
         }
+    }
+
+    /// Delete the persisted rows for these keys, in the background.
+    ///
+    /// Removing a mapping from memory alone is undone by the next restart:
+    /// `load_from_db` reads every row ever written back in, so a closed human
+    /// routes again and `seed_capacity_from_agents` counts them again. On the
+    /// household (2026-10-15) a restarted doorway read 19 agents on a conductor
+    /// holding 6 and refused every new registration at its ceiling of 14.
+    fn forget_persisted(&self, keys: Vec<String>) {
+        let (Some(collection), false) = (self.db.clone(), keys.is_empty()) else {
+            return;
+        };
+        let Ok(runtime) = tokio::runtime::Handle::try_current() else {
+            warn!(?keys, "No runtime to delete persisted agent mappings on");
+            return;
+        };
+        runtime.spawn(async move {
+            if let Err(e) = collection
+                .delete_many(bson::doc! { "agent_pub_key": { "$in": &keys } })
+                .await
+            {
+                warn!(?keys, error = %e, "Failed to delete persisted agent mappings");
+            }
+        });
+    }
+
+    /// Drop every mapping on `conductor_id` whose app the conductor no longer
+    /// has installed, in memory and in Mongo, and recount its capacity.
+    /// Returns the keys dropped.
+    ///
+    /// The conductor's own `list_apps` is the authority on who it hosts; a
+    /// persisted row is only a record of an assignment. Rows outlive their
+    /// cells whenever a cell is uninstalled by something other than
+    /// [`Self::unregister_agent`] (an admin call, a reset conductor, a doorway
+    /// that wrote rows before mappings were ever deleted), and each one keeps
+    /// counting against the ceiling. Call only with the app list of a conductor
+    /// that answered; an unreachable conductor proves nothing about its rows.
+    pub fn prune_absent(
+        &self,
+        conductor_id: &str,
+        installed_app_ids: &HashSet<String>,
+    ) -> Vec<String> {
+        let absent: Vec<String> = self
+            .agents
+            .iter()
+            .filter(|e| {
+                e.value().conductor_id == conductor_id
+                    && !installed_app_ids.contains(&e.value().app_id)
+            })
+            .map(|e| e.key().clone())
+            .collect();
+        if absent.is_empty() {
+            return absent;
+        }
+        for key in &absent {
+            self.agents.remove(key);
+        }
+        self.recount_capacity(conductor_id);
+        self.forget_persisted(absent.clone());
+        info!(
+            conductor = %conductor_id,
+            pruned = absent.len(),
+            "Dropped agent mappings whose app is no longer installed"
+        );
+        absent
     }
 
     /// Get the number of registered conductors
@@ -883,6 +950,75 @@ mod tests {
                 .unwrap()
                 .capacity_used,
             0
+        );
+    }
+
+    #[tokio::test]
+    async fn mappings_whose_app_is_gone_stop_counting_against_the_ceiling() {
+        let registry = ConductorRegistry::new(None).await;
+        registry.register_conductor(ConductorInfo {
+            conductor_id: "conductor-0".to_string(),
+            conductor_url: "ws://c0:4445".to_string(),
+            admin_url: "ws://c0:4444".to_string(),
+            capacity_used: 0,
+            capacity_max: 14,
+        });
+        registry.register_conductor(ConductorInfo {
+            conductor_id: "conductor-1".to_string(),
+            conductor_url: "ws://c1:4445".to_string(),
+            admin_url: "ws://c1:4444".to_string(),
+            capacity_used: 0,
+            capacity_max: 0,
+        });
+        // Rows as a restart loads them: two cells still installed, two closed
+        // long ago, and a member's own agent on another conductor.
+        for (key, conductor, app) in [
+            ("uhCAk_maria", "conductor-0", "elohim-conductor-0-maria"),
+            ("uhCAk_ezra", "conductor-0", "elohim-conductor-0-ezra"),
+            ("uhCAk_susan", "conductor-0", "elohim-conductor-0-susan"),
+            ("uhCAk_levi", "conductor-0", "elohim-conductor-0-levi"),
+            ("uhCAk_jessica", "conductor-1", "elohim"),
+        ] {
+            registry.register_agent(key, conductor, app).await.unwrap();
+        }
+        assert_eq!(
+            registry
+                .get_conductor_info("conductor-0")
+                .unwrap()
+                .capacity_used,
+            4
+        );
+
+        let installed: HashSet<String> = [
+            "elohim-conductor-0-maria",
+            "elohim-conductor-0-ezra",
+            "elohim",
+        ]
+        .into_iter()
+        .map(String::from)
+        .collect();
+        let mut pruned = registry.prune_absent("conductor-0", &installed);
+        pruned.sort();
+
+        assert_eq!(
+            pruned,
+            vec!["uhCAk_levi".to_string(), "uhCAk_susan".to_string()]
+        );
+        assert_eq!(
+            registry
+                .get_conductor_info("conductor-0")
+                .unwrap()
+                .capacity_used,
+            2,
+            "only the cells the conductor still has count against its ceiling"
+        );
+        assert!(
+            registry.get_conductor_for_agent("uhCAk_susan").is_none(),
+            "a closed human no longer routes"
+        );
+        assert!(
+            registry.get_conductor_for_agent("uhCAk_jessica").is_some(),
+            "another conductor's rows are not judged by this conductor's apps"
         );
     }
 
