@@ -93,7 +93,7 @@ impl AppDescriptor {
             blob_hash: blob_hash.to_string(),
             content_id: non_empty("id").unwrap_or_default(),
             content_format: non_empty("contentFormat").unwrap_or_default(),
-            entry_point: non_empty("entryPoint"),
+            entry_point: content_body_field(data, "entryPoint"),
             title: non_empty("title"),
         })
     }
@@ -103,7 +103,7 @@ impl AppDescriptor {
     pub fn entry_file(&self) -> &str {
         self.entry_point
             .as_deref()
-            .map(|e| e.trim_start_matches("./").trim_start_matches('/'))
+            .map(|e| e.trim_start_matches("./"))
             .filter(|e| !e.is_empty())
             .unwrap_or("index.html")
     }
@@ -596,6 +596,8 @@ impl AppFileCacheService {
     pub async fn refresh_app(&self, slug: &str) {
         let mut index = self.slug_index.write().await;
         index.remove(slug);
+        drop(index);
+        self.descriptor_index.write().await.remove(slug);
         debug!(slug = %slug, "Removed app from index (will re-resolve on next request)");
     }
 
@@ -756,28 +758,32 @@ fn extract_app_slug(doc: &crate::projection::document::ProjectedDocument) -> Opt
 /// Same logic as `extract_app_slug` but for raw MongoDB documents
 /// used in the slug index load and resolve paths.
 fn extract_app_slug_from_data(data: &bson::Document) -> Option<String> {
-    // Parse contentBody (JSON string or BSON object) for the HTML5 slug
+    // contentBody (JSON string or BSON object) carries the HTML5 slug
+    content_body_field(data, "slug")
+        // Last resort: content id
+        .or_else(|| data.get_str("id").ok().map(|s| s.to_string()))
+}
+
+/// Read a non-empty string field of the app metadata under `contentBody`,
+/// which the projection stores either as a JSON string or as a BSON document.
+fn content_body_field(data: &bson::Document, key: &str) -> Option<String> {
     if let Ok(content_body) = data.get_str("contentBody") {
         if let Ok(body) = serde_json::from_str::<serde_json::Value>(content_body) {
-            if let Some(slug) = body.get("slug").and_then(|v| v.as_str()) {
-                if !slug.is_empty() {
-                    return Some(slug.to_string());
+            if let Some(v) = body.get(key).and_then(|v| v.as_str()) {
+                if !v.is_empty() {
+                    return Some(v.to_string());
                 }
             }
         }
     }
-
-    // Try contentBody as BSON document (not string)
     if let Ok(body) = data.get_document("contentBody") {
-        if let Ok(slug) = body.get_str("slug") {
-            if !slug.is_empty() {
-                return Some(slug.to_string());
+        if let Ok(v) = body.get_str(key) {
+            if !v.is_empty() {
+                return Some(v.to_string());
             }
         }
     }
-
-    // Last resort: content id
-    data.get_str("id").ok().map(|s| s.to_string())
+    None
 }
 
 /// The doorway's own projection IS the write-through target for a reconciled
@@ -863,14 +869,39 @@ pub fn spawn_app_cache_invalidation_task(
 
 #[cfg(test)]
 mod tests {
+    #[tokio::test]
+    async fn refresh_app_drops_the_descriptor_with_the_slug_head() {
+        let svc = super::AppFileCacheService::new(
+            &crate::db::mongo::MongoClient::unconnected_for_test(),
+            "t".to_string(),
+        );
+        let d = super::AppDescriptor {
+            blob_hash: "sha256-old-head".into(),
+            content_id: "quiz-1".into(),
+            content_format: "html5-app".into(),
+            entry_point: Some("old.html".into()),
+            title: Some("Old".into()),
+        };
+        svc.descriptor_index
+            .write()
+            .await
+            .insert("quiz-1".into(), d.clone());
+        assert_eq!(svc.resolve_app_descriptor("quiz-1").await, Some(d));
+        svc.refresh_app("quiz-1").await;
+        // The store is unreachable here, so a fresh read yields None; the
+        // point is that the stale descriptor is not returned.
+        assert_eq!(svc.resolve_app_descriptor("quiz-1").await, None);
+    }
+
     #[test]
     fn descriptor_parses_from_a_projected_document() {
+        // contentBody as a JSON string
         let data = bson::doc! {
             "id": "quiz-1",
             "contentFormat": "html5-app",
             "blobHash": "sha256-abcdef123456",
-            "entryPoint": "./game.html",
             "title": "A quiz",
+            "contentBody": r#"{"slug":"quiz-1","entryPoint":"./game.html"}"#,
         };
         let d = super::AppDescriptor::from_data(&data).unwrap();
         assert_eq!(d.content_id, "quiz-1");
@@ -878,6 +909,23 @@ mod tests {
         assert_eq!(d.blob_hash, "sha256-abcdef123456");
         assert_eq!(d.title.as_deref(), Some("A quiz"));
         assert_eq!(d.entry_file(), "game.html");
+
+        // contentBody as a BSON document
+        let data = bson::doc! {
+            "id": "quiz-1", "contentFormat": "html5-app", "blobHash": "sha256-x",
+            "contentBody": { "slug": "quiz-1", "entryPoint": "game.html" },
+        };
+        assert_eq!(
+            super::AppDescriptor::from_data(&data).unwrap().entry_file(),
+            "game.html"
+        );
+
+        // a top-level entryPoint is not where the wire carries it
+        let top = bson::doc! { "blobHash": "sha256-x", "entryPoint": "game.html" };
+        assert_eq!(
+            super::AppDescriptor::from_data(&top).unwrap().entry_file(),
+            "index.html"
+        );
 
         let bare = bson::doc! { "blobHash": "sha256-x", "contentFormat": "spa-bundle" };
         let d = super::AppDescriptor::from_data(&bare).unwrap();

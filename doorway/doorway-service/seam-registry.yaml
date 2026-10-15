@@ -5327,10 +5327,10 @@ decisionPoints:
       Decides, for an addressed /apps/<slug>/<file> request that reach has already admitted,
       whether the doorway answers the raw bundle bytes or a no-store content shell: the shell
       only when the browser's own Fetch Metadata says a person is opening a page
-      (is_document_navigation, line 371: Sec-Fetch-Dest document and Sec-Fetch-Mode navigate),
+      (is_document_navigation, line 370: Sec-Fetch-Dest document and Sec-Fetch-Mode navigate),
       the doorway's own content projection resolves an html5-app descriptor
       (cache::app_file_cache::resolve_app_descriptor, line 475), and the file is the node's
-      declared entry (is_html5_entry, line 387). Every other request — frame, subresource,
+      declared entry (is_html5_entry, line 386). Every other request — frame, subresource,
       no Fetch Metadata, spa-bundle, non-entry, no descriptor — takes serve_raw_app_file
       unchanged. The shell frames the same address, so the bytes a person runs are still the
       bytes the blobHash names; the shell never enters the file cache, and both
@@ -5381,4 +5381,10 @@ decisionPoints:
         kind: unit
       - path: doorway/doorway-service/src/routes/apps.rs
         testName: fetch_metadata_must_say_document_and_navigate
+        kind: unit
+      - path: doorway/doorway-service/src/routes/apps.rs
+        testName: entry_paths_are_encoded_per_segment_and_hostile_ones_get_no_shell
+        kind: unit
+      - path: doorway/doorway-service/src/cache/app_file_cache.rs
+        testName: refresh_app_drops_the_descriptor_with_the_slug_head
         kind: unit

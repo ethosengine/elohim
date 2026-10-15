@@ -229,7 +229,7 @@ async fn serve_app_file(
     let entry_page = descriptor.filter(|d| is_html5_entry(d, file_path));
 
     if let Some(desc) = entry_page {
-        if is_document_navigation(headers) {
+        if is_document_navigation(headers) && safe_entry_path(desc.entry_file()) {
             // Reach before any shell output: the shell names the content
             // (title, address), so a refused app gets the refusal.
             if let Some(refused) = cached_app_reach_refusal(storage_url, slug).await {
@@ -245,13 +245,12 @@ async fn serve_app_file(
         serve_raw_app_file(state, storage_url, slug, file_path).await
     };
 
-    // The same URL now answers with two representations; shared caches must
-    // keep them apart.
-    if entry_page.is_some() {
-        response
-            .headers_mut()
-            .insert(hyper::header::VARY, HeaderValue::from_static(CHROME_VARY));
-    }
+    // The same URL can answer with two representations; shared caches must
+    // keep them apart even when the projection (and so the descriptor) is
+    // unavailable right now and a later request would be answered otherwise.
+    response
+        .headers_mut()
+        .insert(hyper::header::VARY, HeaderValue::from_static(CHROME_VARY));
     response
 }
 
@@ -357,7 +356,7 @@ async fn serve_raw_app_file(
     forward_app_request_with_header(&storage_url, &parsed_path, "BYPASS").await
 }
 
-/// `Vary` carried by html5-app entry responses (bytes and shell alike): the
+/// `Vary` carried by every app response (bytes and shell alike): the
 /// same URL answers differently for a page navigation and for a frame load.
 const CHROME_VARY: &str = "Sec-Fetch-Dest, Sec-Fetch-Mode";
 
@@ -402,6 +401,16 @@ fn html_escape(raw: &str) -> String {
         }
     }
     out
+}
+
+/// A relative entry path the shell may frame: no absolute path, no `..`/empty
+/// segments, no backslashes or control characters. Anything else is served raw.
+fn safe_entry_path(entry: &str) -> bool {
+    !entry.is_empty()
+        && !entry.starts_with('/')
+        && !entry.contains('\\')
+        && !entry.chars().any(char::is_control)
+        && entry.split('/').all(|seg| !seg.is_empty() && seg != "..")
 }
 
 /// Percent-encode a path segment (unreserved characters pass through).
@@ -455,7 +464,8 @@ fn render_chrome_shell(slug: &str, desc: &AppDescriptor, holders: Option<(i64, i
     };
     let title = desc.title.as_deref().unwrap_or(address);
     let epr_href = format!("/epr/{}", encode_segment(address));
-    let frame_src = format!("/apps/{}/{}", encode_segment(slug), desc.entry_file());
+    let entry_path: Vec<String> = desc.entry_file().split('/').map(encode_segment).collect();
+    let frame_src = format!("/apps/{}/{}", encode_segment(slug), entry_path.join("/"));
 
     let (badge_attrs, badge_text) = match holders {
         Some((n, m)) => (
@@ -1464,6 +1474,11 @@ mod tests {
             );
             assert!(r.headers().get("x-elohim-chrome").is_none());
         }
+        let cold = serve(&state, &storage, "index.html", &HeaderMap::new(), None).await;
+        assert_eq!(
+            cold.headers().get("vary").unwrap(),
+            "Sec-Fetch-Dest, Sec-Fetch-Mode"
+        );
         let (a, b) = (body_of(plain).await, body_of(framed).await);
         assert_eq!(a, "<h1>raw bundle</h1>");
         assert_eq!(a, b);
@@ -1485,22 +1500,36 @@ mod tests {
 
         let sub = serve(&state, &storage, "js/app.js", &nav_headers(), Some(&html5)).await;
         assert!(sub.headers().get("x-elohim-chrome").is_none());
-        assert!(sub.headers().get("vary").is_none());
+        assert_eq!(
+            sub.headers().get("vary").unwrap(),
+            "Sec-Fetch-Dest, Sec-Fetch-Mode"
+        );
         assert_eq!(body_of(sub).await, "js");
 
         let other = serve(&state, &storage, "index.html", &nav_headers(), Some(&spa)).await;
         assert!(other.headers().get("x-elohim-chrome").is_none());
-        assert!(other.headers().get("vary").is_none());
+        assert_eq!(
+            other.headers().get("vary").unwrap(),
+            "Sec-Fetch-Dest, Sec-Fetch-Mode"
+        );
         assert_eq!(body_of(other).await, "<h1>raw bundle</h1>");
 
         let none = serve(&state, &storage, "index.html", &nav_headers(), None).await;
         assert!(none.headers().get("x-elohim-chrome").is_none());
+        assert_eq!(
+            none.headers().get("vary").unwrap(),
+            "Sec-Fetch-Dest, Sec-Fetch-Mode"
+        );
         assert_eq!(body_of(none).await, "<h1>raw bundle</h1>");
 
         // Through the public entry with no projection cache: no descriptor, raw.
         let via =
             handle_app_request(state.clone(), "/apps/quiz-1/index.html", &nav_headers()).await;
         assert!(via.headers().get("x-elohim-chrome").is_none());
+        assert_eq!(
+            via.headers().get("vary").unwrap(),
+            "Sec-Fetch-Dest, Sec-Fetch-Mode"
+        );
         assert_eq!(body_of(via).await, "<h1>raw bundle</h1>");
     }
 
@@ -1508,8 +1537,16 @@ mod tests {
     async fn a_declared_entry_point_is_the_chrome_target_not_index_html() {
         let storage = storage_with_entry().await;
         let state = state_for(&storage.uri()).await;
-        let mut desc = descriptor("html5-app", "A quiz");
-        desc.entry_point = Some("game.html".into());
+        // The projection document in its real wire shape: app metadata under
+        // contentBody (a JSON string here), identity fields top-level.
+        let desc = AppDescriptor::from_data(&bson::doc! {
+            "id": "quiz-1",
+            "contentFormat": "html5-app",
+            "blobHash": "sha256-abcdef123456",
+            "title": "A quiz",
+            "contentBody": r#"{"slug":"quiz-1","entryPoint":"game.html"}"#,
+        })
+        .unwrap();
         let index = serve(&state, &storage, "index.html", &nav_headers(), Some(&desc)).await;
         assert!(index.headers().get("x-elohim-chrome").is_none());
         let game = serve(&state, &storage, "game.html", &nav_headers(), Some(&desc)).await;
@@ -1605,6 +1642,49 @@ mod tests {
             "<title>&lt;/title&gt;&lt;script&gt;alert(1)&lt;/script&gt;&quot;&#39;&amp;</title>"
         ));
         assert!(html.contains("title=\"&lt;/title&gt;"));
+    }
+
+    #[tokio::test]
+    async fn entry_paths_are_encoded_per_segment_and_hostile_ones_get_no_shell() {
+        use wiremock::matchers::{method, path};
+        use wiremock::{Mock, ResponseTemplate};
+        let storage = storage_with_entry().await;
+        Mock::given(method("GET"))
+            .and(path("/apps/quiz-1/../x.html"))
+            .respond_with(ResponseTemplate::new(404))
+            .mount(&storage)
+            .await;
+        let state = state_for(&storage.uri()).await;
+
+        let mut spaced = descriptor("html5-app", "A quiz");
+        spaced.entry_point = Some("dir/a b.html".into());
+        let resp = serve(
+            &state,
+            &storage,
+            "dir/a b.html",
+            &nav_headers(),
+            Some(&spaced),
+        )
+        .await;
+        assert_eq!(
+            resp.headers().get("x-elohim-chrome").unwrap(),
+            "content-shell"
+        );
+        assert!(body_of(resp)
+            .await
+            .contains("src=\"/apps/quiz-1/dir/a%20b.html\""));
+
+        for hostile in ["../x.html", "/abs.html", "a\\b.html", "a/../b.html"] {
+            let mut d = descriptor("html5-app", "A quiz");
+            d.entry_point = Some(hostile.into());
+            // entry_file trims a leading slash, so hand the raw served path through
+            let file = d.entry_file().to_string();
+            let resp = serve(&state, &storage, &file, &nav_headers(), Some(&d)).await;
+            assert!(
+                resp.headers().get("x-elohim-chrome").is_none(),
+                "{hostile} must not get a shell"
+            );
+        }
     }
 
     #[test]
