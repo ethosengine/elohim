@@ -1,6 +1,7 @@
 ---
 id: "human-mary-migrant"
 displayName: "Maria"
+agencyPhase: "hosted"
 category: "newcomer"
 profileReach: "community"
 bio: "Came here for a better life. Working hard, learning the language, trying to build a future for my family."

@@ -387,6 +387,17 @@ impl AgentProvisioner {
     ///
     /// Since `generate_app_id` includes the conductor_id, we check each conductor
     /// with its own deterministic app ID. Returns the first match found.
+    /// Look up an agent already installed for `user_identifier`; never installs.
+    ///
+    /// The `node`/`device` register arms use this instead of `provision_agent`:
+    /// a human whose identity lives on their own node or device is not hosted
+    /// here, and installing an app for them would mint a second agent on this
+    /// operator's conductor (measured on the household 2026-10-14: James and
+    /// Jessica each held a second 5-cell app on matthew's conductor).
+    pub async fn find_agent(&self, user_identifier: &str) -> Option<ProvisionedAgent> {
+        self.find_existing_app(user_identifier).await
+    }
+
     async fn find_existing_app(&self, user_identifier: &str) -> Option<ProvisionedAgent> {
         let conductors = self.registry.list_conductors();
         if conductors.is_empty() {

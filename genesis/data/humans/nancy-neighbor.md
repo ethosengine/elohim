@@ -1,7 +1,7 @@
 ---
 id: "human-nancy-neighbor"
 displayName: "Nancy"
-agencyPhase: "hosted"
+agencyPhase: "device"
 category: "community"
 profileReach: "community"
 bio: "Long-time resident of Tech Valley. Community organizer, block captain, and believer in the power of neighbors helping neighbors."

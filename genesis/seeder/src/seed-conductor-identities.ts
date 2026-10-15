@@ -207,7 +207,7 @@ async function withTimeout<T>(
  * Convention (socat in K8s): admin port = app port - 1
  *   4445 (app) → 4444 (admin)
  */
-function toAdminUrl(appUrl: string): string {
+export function toAdminUrl(appUrl: string): string {
   const u = new URL(appUrl);
   const appPort = parseInt(u.port, 10);
   if (isNaN(appPort)) {

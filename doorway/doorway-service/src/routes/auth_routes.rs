@@ -1762,28 +1762,23 @@ async fn handle_register(
         // We only create a DB record so doorway can issue JWTs and route traffic.
         // No create_human zome call — their conductor already has it.
         "node" | "device" => {
-            // Find (or create) the existing app via provisioner — idempotent.
+            // Look up an existing app only — never install one. A node/device
+            // human's identity lives on their own conductor; this operator's
+            // pool does not host them, so finding nothing is the normal case.
             let provisioner_result = if let Some(registry) = &state.conductor_registry {
                 if should_provision(true, state.args.dev_mode) {
                     let provisioner = AgentProvisioner::new(Arc::clone(registry))
-                        .with_app_id(state.args.installed_app_id.clone())
-                        .with_bundle_path(state.args.happ_bundle_path.clone());
-                    match provisioner.provision_agent(&body.identifier).await {
-                        Ok(p) => {
-                            info!(
-                                conductor = %p.conductor_id,
-                                agent = %p.agent_pub_key,
-                                agency_phase = %agency_phase,
-                                "Node/device: found existing agent on conductor"
-                            );
-                            Some(p)
-                        }
-                        Err(e) => {
-                            // Non-fatal for node/device — they may not be on this operator's conductor
-                            warn!("Node/device: conductor lookup failed (non-fatal): {}", e);
-                            None
-                        }
+                        .with_app_id(state.args.installed_app_id.clone());
+                    let found = provisioner.find_agent(&body.identifier).await;
+                    if let Some(p) = &found {
+                        info!(
+                            conductor = %p.conductor_id,
+                            agent = %p.agent_pub_key,
+                            agency_phase = %agency_phase,
+                            "Node/device: found existing agent on conductor"
+                        );
                     }
+                    found
                 } else {
                     None
                 }

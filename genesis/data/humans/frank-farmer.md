@@ -1,6 +1,7 @@
 ---
 id: "human-frank-farmer"
 displayName: "Frank"
+agencyPhase: "device"
 category: "local-economy"
 profileReach: "community"
 bio: "Third-generation farmer working the land. Exploring regenerative agriculture and local food systems. Skeptical of tech, but curious."

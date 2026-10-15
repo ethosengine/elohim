@@ -14,8 +14,8 @@ Feature: Know Thyself Discovery Path
   # ci-genesis-discovery-result-testid-drift. Held from CI until reconciled/consolidated.
   # HELD (2026-08-21): Superseded: the file's own comment says canonical coverage now lives in assessment-completion-feedback.feature; dead testids (backlog ci-genesis-discovery-result-testid-drift).
   @values-hierarchy @wip @act:iii
-  Scenario: Terrance completes the Values Hierarchy assessment
-    Given human "Terrance" is logged in on doorway "alpha" with device
+  Scenario: Ezra completes the Values Hierarchy assessment
+    Given human "Ezra" is logged in on doorway "alpha" with device
     When I navigate to the "Know Thyself" path
     And I advance to the "Values Hierarchy" assessment step
     And I start the assessment
@@ -44,8 +44,8 @@ Feature: Know Thyself Discovery Path
   # HELD (2026-08-21): Superseded by assessment-completion-feedback.feature (duplicate coverage).
   @attestation @wip @act:iii
   Scenario: First discovery assessment earns a milestone attestation
-    Given human "Terrance" is logged in on doorway "alpha" with device
-    And Terrance has not completed any discovery assessments
+    Given human "Ezra" is logged in on doorway "alpha" with device
+    And Ezra has not completed any discovery assessments
     When I navigate to the "Know Thyself" path
     And I advance to the "Values Hierarchy" assessment step
     And I start the assessment
@@ -57,7 +57,7 @@ Feature: Know Thyself Discovery Path
 
   @regression
   Scenario: Single radio/likert selection does not select all options
-    Given human "Terrance" is logged in on doorway "alpha" with device
+    Given human "Ezra" is logged in on doorway "alpha" with device
     When I navigate to the "Know Thyself" path
     And I advance to the "Values Hierarchy" assessment step
     And I start the assessment
@@ -67,7 +67,7 @@ Feature: Know Thyself Discovery Path
 
   @regression
   Scenario: No console errors during assessment navigation
-    Given human "Terrance" is logged in on doorway "alpha" with device
+    Given human "Ezra" is logged in on doorway "alpha" with device
     When I navigate to the "Know Thyself" path
     And I advance through each chapter
     Then no JavaScript errors should be captured
