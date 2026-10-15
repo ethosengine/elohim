@@ -5316,3 +5316,69 @@ decisionPoints:
       - path: doorway/doorway-service/src/services/federation.rs
         testName: attest_on_transition_env_off_restores_every_probe
         kind: unit
+
+  - name: serve_app_file
+    kind: pure-decision-predicate
+    sourceLocation:
+      file: src/routes/apps.rs
+      modulePath: routes::apps::serve_app_file
+      line: 219
+    summary: >
+      Decides, for an addressed /apps/<slug>/<file> request that reach has already admitted,
+      whether the doorway answers the raw bundle bytes or a no-store content shell: the shell
+      only when the browser's own Fetch Metadata says a person is opening a page
+      (is_document_navigation, line 371: Sec-Fetch-Dest document and Sec-Fetch-Mode navigate),
+      the doorway's own content projection resolves an html5-app descriptor
+      (cache::app_file_cache::resolve_app_descriptor, line 475), and the file is the node's
+      declared entry (is_html5_entry, line 387). Every other request — frame, subresource,
+      no Fetch Metadata, spa-bundle, non-entry, no descriptor — takes serve_raw_app_file
+      unchanged. The shell frames the same address, so the bytes a person runs are still the
+      bytes the blobHash names; the shell never enters the file cache, and both
+      representations carry Vary on the two Fetch Metadata headers. The holders figure is a
+      bounded 1.5 s read of the resilience view with an unknown state on failure.
+      Spec: genesis/docs/superpowers/specs/2026-10-14-content-apps-wear-chrome-design.md.
+    concernIds:
+      - { id: C0, status: answered, justification: "A delivery-representation choice at the doorway's web2 seam; the content's identity, bytes and authority are untouched (the shell frames the addressed bytes)." }
+      - { id: C1, status: n-a, justification: "No head is elected or changed; the descriptor is read from the projection the slug index already derives from." }
+      - { id: C2, status: n-a, justification: "No ordering or authority clock; the predicate reads request headers and a projected record." }
+      - { id: C3, status: answered, justification: "A cold or absent projection yields no descriptor and the raw path, never an error; the holders read times out to an unknown badge." }
+      - { id: C4, status: answered, justification: "Reach refusal precedes any shell output (a_reach_refusal_comes_before_any_shell_output); the shell carries no address claim (no ETag, X-Content-Address, X-Cache)." }
+      - { id: C5, status: n-a, justification: "No acceptance evidence is produced; the shell is presentation, not a record." }
+      - { id: C6a, status: answered, justification: "One holders fetch under a 1500 ms timeout; the shell is no-store with Vary so no cache serves one representation for the other." }
+      - { id: C6b, status: n-a, justification: "Idempotent read; nothing is written." }
+      - { id: C7, status: answered, justification: "Serving selection changes only the representation of the entry file for a page navigation; _capability and X-Deliverability still describe bundle readiness, never shell success." }
+      - { id: C8, status: partial, justification: "The shell path logs through the existing apps arm; no distinct counter for shell-vs-raw answers yet." }
+      - { id: C9, status: n-a, justification: "No identity or key transition." }
+      - { id: C10, status: answered, justification: "New response headers X-Elohim-Chrome and Vary are additive; raw bytes and existing headers are unchanged (a_frame_load_gets_the_same_bytes_as_no_headers_plus_vary)." }
+      - { id: C11, status: answered, justification: "The branch sits after admission and reach; the admin cache bypass does not bypass chrome selection." }
+      - { id: C12, status: answered, justification: "Grants nothing: the reach check stays the gate, and a request without Fetch Metadata is served as before (the rule qualifies what people see, not who may see it)." }
+      - { id: C13, status: n-a, justification: "No authority scaffold or tier." }
+      - { id: C14, status: partial, justification: "A failing holders read is explicit in the badge's unknown state but not yet surfaced as a metric." }
+    contractTests:
+      - path: doorway/doorway-service/src/routes/apps.rs
+        testName: a_page_navigation_to_an_html5_entry_gets_the_shell
+        kind: unit
+      - path: doorway/doorway-service/src/routes/apps.rs
+        testName: a_frame_load_gets_the_same_bytes_as_no_headers_plus_vary
+        kind: unit
+      - path: doorway/doorway-service/src/routes/apps.rs
+        testName: non_entry_other_format_and_missing_descriptor_are_served_raw
+        kind: unit
+      - path: doorway/doorway-service/src/routes/apps.rs
+        testName: a_declared_entry_point_is_the_chrome_target_not_index_html
+        kind: unit
+      - path: doorway/doorway-service/src/routes/apps.rs
+        testName: a_reach_refusal_comes_before_any_shell_output
+        kind: unit
+      - path: doorway/doorway-service/src/routes/apps.rs
+        testName: the_admin_cache_bypass_does_not_bypass_chrome_selection
+        kind: unit
+      - path: doorway/doorway-service/src/routes/apps.rs
+        testName: a_failing_holders_fetch_still_yields_a_shell_with_the_unknown_badge
+        kind: unit
+      - path: doorway/doorway-service/src/routes/apps.rs
+        testName: a_hostile_title_is_escaped_everywhere_it_lands
+        kind: unit
+      - path: doorway/doorway-service/src/routes/apps.rs
+        testName: fetch_metadata_must_say_document_and_navigate
+        kind: unit
