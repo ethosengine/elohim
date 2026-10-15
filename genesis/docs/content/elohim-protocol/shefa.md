@@ -52,9 +52,11 @@ A **token reading** is a view taken over that record along one dimension: care g
 
 Shefa encodes a fundamental shift from ownership to stewardship. Value is attributed to the people who created it and held in trust until they claim it, within limits negotiated and declared in advance (§4). Accumulation requires demonstrated capacity for responsibility, and no agent, human or AI, can extract more than their attributed share.
 
-A council holds that value in trust for one community. In this protocol a council is the deliberative body that decides: people the community seats, with the community's elohim as witnesses and counsel ([Succession Without Conquest](succession.md), Orientation). It sits at arm's length from what it holds, owning none of it and having nothing to extract with ([Values Forward](values-forward.md), Stance I.4), and it cannot deliberate its way beneath the dignity floor or past the other limits in §4. How a community seats its commons council is one of the open questions at the end of this paper.
+Each pool's elohim council holds its commons share and held value in trust: plural and representative, sized to what the holon can seat. No single elohim is the pool. The goal is to keep the commons one degree removed from the human hand. In the network's infancy, people the community seats perform this council's role, with the community's elohim as witnesses and counsel; this is a stage, not the destination. Human sortition councils remain authoritative over any contestable result: they audit and govern it. The council owns none of what it holds and has nothing to extract with ([Values Forward](values-forward.md), Stance I.4); it cannot deliberate its way beneath the dignity floor or past the other limits in §4.
 
-An elohim (lowercase; the plural is the same word) is one of the protocol's AI agents, running locally on participants' own hardware and acting for a person and their community under the constitution's values ([glossary](glossary.md)). The elohim keep the accounts, help people gather attestations and give counsel. None of the value is theirs to hold, and the protocol's human councils can audit, correct or shut off any of them (Stance II.2).
+The facility — members' bytes, compute and labor — remains members' produce. Its rule-making, vote, admission and ladder of consequences are human acts. The commons share and held artifacts are in the custody of the pool's elohim council, with humans holding that custody during infancy and a separate human sortition council auditing it.
+
+An elohim (lowercase; the plural is the same word) is one of the protocol's AI agents, running locally on participants' own hardware and acting for a person and their community under the constitution's values ([glossary](glossary.md)). A member's own elohim keeps accounts, helps gather attestations and gives counsel; it does not hold its person's value. That role is distinct from the pool's elohim council's custody of the commons. Human councils can audit, correct or shut off any of these agents (Stance II.2).
 
 Stewardship is a relation a person earns through sustained care of a resource or a body of content. Standing, a person's relational track record as the network has witnessed it, decays when it goes untended, so no one becomes a dormant landlord.
 
@@ -73,7 +75,7 @@ Shefa keeps Beer's principle and drops the dependency. Value the old system hide
 | Witness | The people present, or the [Observer](observer-protocol.md), a consent-bound witnessing protocol (below) | Sees an act, with consent, and turns it into an REA event the witnesses attest | The device |
 | Ledger | REA events on Holochain, in the ValueFlows vocabulary | Agent-centric accounting: each person's own signed record, with shared commitments notarized on the DHT | The network, with no global consensus |
 | Settlement | A settlement bridge to external rails | Exchanges value held in the network for money outside it (§3.5) | The boundary with the outside economy |
-| Stewardship | A council the community seats, advised by its elohim | Holds network value in trust for attributed contributors (§2.2) | The community |
+| Stewardship | The pool's elohim council; humans perform its role during infancy, audited by a separate human sortition council | Holds the commons share and held value in trust (§2.2); sortition councils govern contestable results | The community |
 
 ValueFlows is an open vocabulary for REA. hREA, its Holochain implementation, is a protocol this one interoperates with through its ValueFlows bridge.
 
@@ -311,7 +313,7 @@ The network holds your value in trust. When you show up—embodied, witnessed, a
 
 ### Open questions
 
-- Who seats the commons council, and how, is not settled.
+- How the elohim council represents the holon, which strata can be determined without violating consent, and what test ends human infancy service remain open. So does what an infant holon does when it cannot seat separate acting and auditing councils.
 - How a large claim is checked is not specified.
 - The unit a reading is measured in is left to each community and not yet named.
 - Who operates a settlement bridge is not decided.

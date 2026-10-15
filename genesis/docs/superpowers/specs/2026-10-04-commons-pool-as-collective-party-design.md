@@ -73,8 +73,16 @@ Taking the capture's recommendation (its §8 question 3):
 - **A pool is a `Collective`** with a charter that says what the pool is for.
 - **It holds a resource** classified `commons-pool:<kind>`. The kind is an open label that says
   what the pool is for (storage, index, inference, serving and compute are the ones §4 uses); it
-  is not a closed list. The resource is the thing governed. Any treasury that funds its care is a separate
-  resource; the two are never confused (`hardware-providence-commons.md` §8).
+  is not a closed list. The resource is the thing governed. Funding its care is distinct from
+  the facility, but there is no accumulating treasury: money passes through a settlement window,
+  weighted by the payer's chosen lens. Unclaimed money stays with the payer as a standing
+  commitment; recognition stays held in trust. Any fiat leg sits with a licensed, swappable
+  bridge institution, a member and never an authority (working memorandum §A4–A5;
+  `succession.md` §5.3). The commitment horizon, lapse and Jubilee timing remain open.
+- **The commons share is held in custody by the pool's elohim council**: plural, representative,
+  sized to what the holon can seat, with people the holon seats performing that role during the
+  network's infancy. Human sortition councils audit it and can overturn any contestable result.
+  The facility stays the members' produce, governed by their own acts (working memorandum §D3).
 - **A member contributes by a commitment that names the collective**, using the actions that
   exist: `replicates-content` for storage, `delegates-compute` for compute. The collective's
   address goes in the commitment's `recipient` field. The bounds (`epr_scope`, `reach_ceiling`, a

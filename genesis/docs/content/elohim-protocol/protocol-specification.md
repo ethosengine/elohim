@@ -861,14 +861,16 @@ These name hardware tiers, not participation stages (Visitor, Hosted, App Stewar
 
 ### Relationship
 
-The lamad domain manifest is the source for relationship types, and it gives each type a description. Its relationship vocabulary:
+The SDK protocol schema (`elohim/sdk/schemas/v1/`) owns DNA-notarized relationship kinds, including lowercase `derived_from`. Its `enums/relationship-type.schema.json` is the generative source for those kinds; mirrors must be generated and contract-tested. The lamad domain manifest owns the teaching vocabulary and its descriptions, not the DNA-notarized kinds. Its app relationship vocabulary:
 
 ```
 CONTAINS | BELONGS_TO | DESCRIBES | IMPLEMENTS | VALIDATES | RELATES_TO |
 REFERENCES | DEPENDS_ON | REQUIRES | FOLLOWS | ATTACHED_TO | STEP
 ```
 
-The protocol schema's relationship enum (`elohim/sdk/schemas/v1/enums/relationship-type.schema.json`) declares the same core types in lowercase and adds `derived_from` and `source_of`. The manifest's content-graph edges add `PREREQUISITE`, `TEACHES` and `SUPERSEDES`. elohim-storage also reads `FOLLOWUP`, `SIBLING`, `PARENT`, `CHILD`, `SIMILAR_TO`, `CONTRASTS_WITH`, `ELABORATES`, `SUMMARIZES`, `EXAMPLE_OF` and `DEFINITION_OF` on stored relationships.
+The protocol schema's relationship enum declares ten of the app types above in lowercase, plus `derived_from` and `source_of`; it does not include `ATTACHED_TO` or `STEP`. The manifest's content-graph edges add `PREREQUISITE`, `TEACHES` and `SUPERSEDES`. elohim-storage also reads `FOLLOWUP`, `SIBLING`, `PARENT`, `CHILD`, `SIMILAR_TO`, `CONTRASTS_WITH`, `ELABORATES`, `SUMMARIZES`, `EXAMPLE_OF` and `DEFINITION_OF` on stored relationships.
+
+**Implementation debt (working memorandum §F3):** the relationship schema still lacks the `_dna` mirror declared by `enums/reach.schema.json`, and storage's `VALID_RELATIONSHIP_TYPES` in `src/services/relationship_service.rs` still follows an uppercase app/legacy allowlist that rejects `derived_from`. These must follow the SDK source; their current placement does not confer schema authority.
 
 The types this specification relies on, in the manifest's terms:
 
