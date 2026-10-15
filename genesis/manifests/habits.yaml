@@ -2004,10 +2004,10 @@ habits:
       - "ledger: `.claude/scripts/ci-harvest.py` files a BUDGET_EXHAUSTED finding for any build its own timeout killed (`python3 .claude/scripts/_lib/__tests__/ci_harvest_budget_exhausted_test.py`)."
       - "a2o @concern:push-delivers-within-budget (genesis/a2o/features/dataplane/app-delivery-refuses-fast.feature — @act:i, four household stations: the not-ready window is answered in seconds; `just test mesh features/dataplane/app-delivery-refuses-fast.feature`)"
     evidence: >
-      DELTA 2026-09-30 (Edge #1511 deploy-only prerequisite; status remains RED): Adam rendering failed with ERR_MODULE_NOT_FOUND for yaml because deploy-only skipped incidental frontend dependency installs. The renderer owner now declares existing yaml 2.8.3 and the shared human deployment entry provisions its frozen workspace before parallel storage rolls. Offline frozen provisioning and eight renderer tests pass, including CLI fixture bytes and deploy-only ordering. This is local repair evidence, not a successful fleet rollout; #1511 also used floating dev-latest storage tags and restarted six storage peers, while Adam did not apply.
-    evidence-fingerprint: sha256:0201b97b75f6ca24
-    evidence-bytes: 23906
-    evidence-entries: 24
+      DELTA 2026-10-15 (RED preserved; the live series is within bounds, other checks not re-run): orchestrator #2063 carried the integration push db4f7634a (four branches; plan storybook, epr, eprfs, edge and holochain, then elohim, then genesis) and delivered UNSTABLE in 179.6 min. #2064, the follow-up 2c0412d9f, delivered edge and genesis. `delivery-series.mjs --window 10` reads 9/10 delivered, p90 179.6 m within the 240 bound, 0 timeouts: WITHIN BOUNDS. One cost sits outside the series. The local pre-push for that push took 5 attempts and about 5 h in a fresh worktree: missing node_modules, dists and submodules, plus a receipt-identity gap. Filed as workspace-discipline backlog row 45.
+    evidence-fingerprint: sha256:31ad9fe374d29271
+    evidence-bytes: 24599
+    evidence-entries: 25
     refs:
       - "genesis/data/timeline/backlog/edge-quiesce-gate-timeout-aborts.md (the budget arithmetic, one layer down then up)"
       - "genesis/data/timeline/backlog/ci-edge-a2o-steps-glob-redeploys-fleet.md (no-op fleet rolls)"
