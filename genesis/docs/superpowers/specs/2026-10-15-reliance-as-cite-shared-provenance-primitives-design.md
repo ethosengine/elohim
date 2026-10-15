@@ -180,16 +180,40 @@ resolve. Current state: `translate.rs:405` mints `inputs: Vec::new()`.
 **2. Identity for an outside package.** Chain: lockfile entry to resource. Missing node: external
 resource identity. Assertion: a package version is addressed by the CID that wraps the lockfile's
 own checksum: `bafkrei…` (raw codec) over sha256 for crates.io; a sha2-512 multihash for npm
-`integrity`. Probe: recompute from the `.crate` bytes and get the same CID. Current state:
-`DepEdge.to` is a path; "slug identity for code artifacts is an open question" (`model.rs:480`).
+`integrity`. Probe: recompute from the `.crate` bytes and get the same CID. Home: `epr::cid`
+(`raw_cid_from_sha256_hex`, `raw_cid_from_sri`, `compute_raw_cid`), not epr-rea: `epr` is the
+crate that already mints CIDs, and epr-rea, elohim-storage and the bridges all depend on it.
+epr-rea takes its addressing from `epr` alone, so a second home would mean a second address
+format. Its tests pin the same raw-codec vector that
+`eprfs-core::BlobCid` and brit pin. Sha1 integrity strings are refused, not wrapped. `DepEdge`
+names an outside package through an additive `to_resource: Option<Cid>`, with `to` keeping a
+readable coordinate such as `crates.io:serde@1.0.228`. Before this, `DepEdge.to` was a path
+only; "slug identity for code artifacts is an open question" (`model.rs:480`).
 
 **3. One action vocabulary.** Chain: action vocabularies, between the epr-rea verbs, the DNA's
 actions and the SDK. Missing node: one generated action enum. Assertion: `cite`, `use`, `consume`,
 `produce`, `transfer`, `transfer-custody`, `modify` and the rest come from one
-`elohim/sdk/schemas/v1/enums/rea-action.schema.json`, codegenned to Rust and TypeScript. The
-implemented list and its parity rule are recorded from the step-3 implementation; see
-[follow-up]. Probe: a codegen verify gate. Current state: `ReaVerb` has 6, DNA `REA_ACTIONS` has
-25, the SDK has no enum. The fabric spec,
+`elohim/sdk/schemas/v1/enums/rea-action.schema.json`, codegenned to Rust and TypeScript.
+
+As built, the enum has 27 values. Its core tier is exactly the DNA's 25 `REA_ACTIONS`; the other
+two are `affirm` and `dismiss`, the review verbs `ReaVerb` carries, so every `ReaVerb` maps onto a
+generated word (`ReaVerb::as_action`). The parity rule has two schema keys, because the usual
+`_dna` key would generate constants into the integrity zome and move the DNA hash. `_codegen`
+generates the list into TypeScript and into the `epr` crate only. `_dnaMirror` makes
+`pnpm run schema:check-dna` read the hand-written `REA_ACTIONS` from the integrity source as text
+and hold it equal to the core tier; changing the DNA list stays a deliberate DNA move, made in the
+same change as the tier. One honest limit: `REA_ACTIONS` is declared but no integrity rule
+validates an action against it, so membership is a shared name, not an enforced gate.
+
+Two follow-ons are named and not built. `ReaVerb` is not widened: adding `Transfer` for rival goods
+touches the exhaustive matches in `witness.rs` and `epr-rea/src/epistemic.rs` and needs kebab-case
+serde for multi-word verbs. And the enum still lacks action strings used outside the DNA list:
+`respond-to-challenge`, `custody-spool`, `hosting-agreement`, `sunsets-lineage` and
+`correction-action` in elohim-storage and doorway, and the mishpat commitment actions
+`delegates-compute` and `replicates-dwelling`.
+
+Probe: the codegen verify gate and `schema:check-dna`. Before this, `ReaVerb` had 6, DNA
+`REA_ACTIONS` had 25 and the SDK had no enum. The fabric spec,
 `genesis/docs/superpowers/specs/2026-07-18-epr-rea-valueflow-fabric-design.md`, tracks this
 three-way drift in §2.6 and §8.
 
@@ -399,7 +423,7 @@ read by our own habit.
    checks it) and a "Promised" part; a "Where we stand today" section; and a closing "A covenant,
    not a treaty".
 3. **Shared primitives:** node 3 (action enum, codegen, verify gate), node 2 (external CID identity
-   in epr-rea and `epr::cid`), node 4 (external-artifact manifest schema, validated against the
+   in `epr::cid`, reached from epr-rea through `DepEdge.to_resource`), node 4 (external-artifact manifest schema, validated against the
    model manifest).
 4. **`bridges/cargo`** as in §3. Also fill node 1 for the Jenkins edge Process, which gains its
    source and image inputs.
