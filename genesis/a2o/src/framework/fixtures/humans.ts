@@ -471,9 +471,10 @@ export function signInStanding(displayName: string): SignInStanding {
     return { allowed: true, reason: 'declared hosted' };
   }
   if (phase === undefined || !PEER_RUNTIME_PHASES.has(phase)) {
+    const declaredPhase = phase === undefined ? 'no agencyPhase' : `agencyPhase "${phase}"`;
     return {
       allowed: false,
-      reason: `declares ${phase === undefined ? 'no agencyPhase' : `agencyPhase "${phase}"`}: no peer runtime and not hosted`,
+      reason: `declares ${declaredPhase}: no peer runtime and not hosted`,
     };
   }
   const suspended = ensureDeploymentsLoaded().byName.get(displayName.toLowerCase());
@@ -528,9 +529,13 @@ export function declaredStanding(displayName: string): DeclaredStanding {
   const fixture = ensureLoaded().fixtures.get(displayName);
   if (!fixture) throw new Error(`${displayName} is not a fixture human in humans.json`);
   const suspended = ensureDeploymentsLoaded().byName.get(displayName.toLowerCase());
+  let ownRuntime = 'none';
+  if (suspended !== undefined) {
+    ownRuntime = suspended ? 'switched off' : 'running';
+  }
   return {
     stage: fixture.raw.agencyPhase ?? 'none',
     household: fixture.raw.householdId ?? 'none',
-    ownRuntime: suspended === undefined ? 'none' : suspended ? 'switched off' : 'running',
+    ownRuntime,
   };
 }

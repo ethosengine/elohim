@@ -52,12 +52,12 @@ function uses(pattern: RegExp): Use[] {
   return found;
 }
 
-describe('a2o sign-in standing', () => {
-  it('finds the sign-in steps it is meant to police', () => {
+void describe('a2o sign-in standing', () => {
+  void it('finds the sign-in steps it is meant to police', () => {
     assert.ok(uses(SIGN_IN).length > 0, 'no named sign-in steps found; the pattern drifted');
   });
 
-  it('signs in only as humans with their own peer runtime or a hosted stage', () => {
+  void it('signs in only as humans with their own peer runtime or a hosted stage', () => {
     const violations = uses(SIGN_IN)
       .map(u => ({ ...u, standing: signInStanding(u.human) }))
       .filter(u => !u.standing.allowed)
@@ -66,12 +66,12 @@ describe('a2o sign-in standing', () => {
       violations,
       [],
       'scenarios sign in as humans with no standing; rehome them or assert ' +
-        "'human \"<Name>\" is refused sign-in on doorway \"<id>\"':\n  " +
+        '\'human "<Name>" is refused sign-in on doorway "<id>"\':\n  ' +
         violations.join('\n  ')
     );
   });
 
-  it('asserts refusal only for humans who really lack standing', () => {
+  void it('asserts refusal only for humans who really lack standing', () => {
     const wrong = uses(REFUSAL)
       .filter(u => signInStanding(u.human).allowed)
       .map(u => `${u.where}: "${u.human}" has standing (${signInStanding(u.human).reason})`);

@@ -319,7 +319,11 @@ Then(
   'doorway {string} runs no cell for {string}',
   async function (this: E2EWorld, doorwayId: string, humanName: string) {
     const conductor = await doorwayRunsCellFor(this, doorwayId, humanName);
-    assert.equal(conductor, null, `doorway "${doorwayId}" runs a cell for ${humanName} on ${conductor}`);
+    assert.equal(
+      conductor,
+      null,
+      `doorway "${doorwayId}" runs a cell for ${humanName} on ${conductor}`
+    );
   }
 );
 
@@ -334,12 +338,13 @@ Given('these fixture humans declare:', function (table: DataTable) {
   const wrong: string[] = [];
   for (const row of table.hashes()) {
     const actual = declaredStanding(row['human']);
+    const declared: Partial<Record<string, string>> = row;
     for (const [column, key] of [
       ['stage', 'stage'],
       ['household', 'household'],
       ['own runtime', 'ownRuntime'],
     ] as const) {
-      if (row[column] !== undefined && row[column] !== actual[key]) {
+      if (declared[column] !== undefined && declared[column] !== actual[key]) {
         wrong.push(`${row['human']}: ${column} is "${actual[key]}", not "${row[column]}"`);
       }
     }
