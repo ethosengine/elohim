@@ -110,13 +110,18 @@ Feature: An app a doorway serves reaches a visitor able to run
   this run owns, so on the shared fleet these stations are held rather than run. Every
   station here publishes a site and declares a head, so every station carries it.
 
-  TWO KINDS OF APP, used only by Station 5. A record declares its app's FORMAT. A
+  TWO KINDS OF APP, used only by Station 5. A record declares its app's FORMAT, a field
+  its steward sets from a fixed list of content formats; two of them matter here. A
   CONTENT APP (format html5-app) is a piece of content packaged as a site, and the sites
   this run publishes are declared that way unless a step says otherwise. A CHROMED APP
   (format spa-bundle) is an app that draws the protocol's own qualifying bar itself (the
   thin bar that tells a person what they are looking at and who holds it). A
   CONTENT SHELL is what a doorway wraps around a content app when a person opens it as a
-  page; Station 5 describes it in full.
+  page; Station 5 describes it in full. The shell's bar carries a RESILIENCY BADGE, a link
+  that says how many households hold the app, read from the doorway's HOUSEHOLD RESILIENCE
+  READING for it, and leads to its EPR page. An app's EPR PAGE is the page every doorway serves
+  at /epr/<record id>: the full account of the record, its reach, its holders, its steward
+  and its governance.
 
   Background:
     Given peer "alpha-A" at "alpha-A"
@@ -367,19 +372,25 @@ Feature: An app a doorway serves reaches a visitor able to run
   # holders, its steward, its governance. The person stays on the app; the qualification is
   # one glance and the full account is one click away.
   #
-  # THE BADGE'S FIGURES come from the record's DISTRIBUTION SUMMARY: the count storage keeps,
-  # for each content record, of the households that hold its bytes (N) out of the households
-  # it knows of (M). The EPR page reads the same summary, so the badge and the page can never
-  # disagree. On this mesh, one household of three peers, the figures are small. This station
-  # asserts the wording, that N is at least one and no more than M (this run handed the bytes
-  # to the peers behind both doorways, so the app is held), and nothing about the exact
-  # values: how holders are counted is the distribution summary's own story, not this one.
+  # THE BADGE'S FIGURES come from that doorway's HOUSEHOLD RESILIENCE READING for this app.
+  # N is how many distinct households appear among the content's RECORDED HOLDERS. A peer
+  # that has the bytes counts only once its holding is recorded under the household it
+  # belongs to, so N is not how many peers happen to have the bytes right now. M is a
+  # target: how many households the content should live in, set by its RESILIENCE TIER, a
+  # value class the content's owner may declare (a keepsake wants more homes than an
+  # ephemeral note). A record that declares no tier gets the standard tier, whose target is
+  # three. A record this run has just published usually has no recorded household holder
+  # yet, so zero is an honest reading. This station asserts faithfulness, not a number: the badge says
+  # exactly what the reading says. The badge has three wordings, literally:
+  #   "Held by N of M households" when at least one household holds the app;
+  #   "Not yet held by any household" when N is zero;
+  #   "Held by households · see where it lives" when the doorway could not get a reading.
   #
   # HOW THE DOORWAY TELLS A PERSON FROM A FRAME. A browser declares, on every request, what
   # the request is for: opening a page, filling a frame, fetching a script. A person typing
   # or following the address is opening a page. The protocol's own surfaces that show
-  # content — the content viewer of the learning app (where a person studies the protocol's
-  # material) and the EPR page — show the app in a frame
+  # content — the protocol's own learning app, whose content viewer is where a person
+  # studies the protocol's material, and the EPR page — show the app in a frame
   # at that same entry address, and they already draw their own qualifying chrome around
   # it. A second bar inside their frame would be noise. Worse, if the shell ever answered a
   # frame, the shell's own frame would load another shell, endlessly. So a frame always
@@ -390,11 +401,14 @@ Feature: An app a doorway serves reaches a visitor able to run
   # CACHES MUST NOT MIX THE TWO ANSWERS. One address now has two answers. If any cache on
   # the path (the doorway's own, a CDN's, the browser's) handed a frame the shell, every
   # embedding surface would show a bar inside a bar; if it handed a person the bare file,
-  # the qualification would silently vanish. The shell is therefore never stored, and both
-  # answers declare that they depend on how the request was made. On the wire that is the
-  # shell's `X-Elohim-Chrome: content-shell` and `Cache-Control: no-store`, and, on both
-  # answers, `Vary: Sec-Fetch-Dest, Sec-Fetch-Mode` (the two request headers in which a
-  # browser declares what a request is for).
+  # the qualification would silently vanish. The shell is therefore never stored, and the
+  # bare file declares that it depends on how the request was made, so no cache hands it to
+  # a person opening a page. On the wire that is the shell's `X-Elohim-Chrome: content-shell`
+  # and `Cache-Control: no-store`, and the bare file's `Vary: Sec-Fetch-Dest, Sec-Fetch-Mode`
+  # (the two request headers in which a browser declares what a request is for). The doorway
+  # sends the same Vary on the shell too, but a cache that never stores the shell cannot mix
+  # it up, so the scenario checks no-store on the shell and Vary on the bare file, which is
+  # where each one does the work.
   #
   # THE DOORWAY MUST KNOW THE RECORD FIRST. The doorway reads a slug's record id, format and
   # entry file from its own copy of the content records, and when it has no copy it serves
@@ -414,8 +428,11 @@ Feature: An app a doorway serves reaches a visitor able to run
   #
   # NOT PROVEN HERE, named so each gap is a decision: a request that declares nothing about
   # its purpose (an older client, a command-line tool) is served the bare file as before;
-  # and this station asserts where the badge leads, not that the EPR page there renders,
-  # which is that page's own story.
+  # this station asserts where the badge leads, not that the EPR page there renders,
+  # which is that page's own story; and the badge's third wording, for a doorway that
+  # could not get a reading, is checked by the doorway's own unit tests rather than here,
+  # because a household run cannot make the reading fail on purpose without breaking the
+  # peer it reads from.
   @requires:owned-substrate
   @deliverability-browser
   Scenario: a person opening a content app's own address sees it under a thin bar that says who holds it, while a frame gets the app's bytes untouched
@@ -428,7 +445,7 @@ Feature: An app a doorway serves reaches a visitor able to run
     # The person: open the entry address as a page, in a real browser.
     When a visitor opens this app's entry address on peer "alpha-A" as a page in a browser
     Then doorway "alpha-A" answered the visitor with a content shell that no cache may keep
-    And the shell's resiliency badge from doorway "alpha-A" reads "Held by N of M households" with N at least one and no more than M
+    And the shell's resiliency badge from doorway "alpha-A" states the holder count from that doorway's own resilience reading for this app
     And the shell's resiliency badge from doorway "alpha-A" links to this app's EPR page
     And the shell from doorway "alpha-A" shows the app in a frame whose address is this app's entry address
     # The app inside the frame starts exactly as it would bare: the frame's requests are
@@ -438,6 +455,8 @@ Feature: An app a doorway serves reaches a visitor able to run
     And the app inside the shell's frame from doorway "alpha-A" completed client bootstrap in the frame's own document
     And the app root in the frame's own document from doorway "alpha-A" has content
     # The frame: the same address, asked for the way a frame asks for it.
+    # "Depends on how it was requested" is the bare file's Vary on the two headers in which a
+    # browser says what a request is for; see CACHES MUST NOT MIX THE TWO ANSWERS above.
     When this app's entry address is requested from doorway "alpha-A" the way a frame requests it
     Then doorway "alpha-A" answers with the index page's bytes exactly as the bundle this run built holds them
     And that answer carries no content-shell marker and declares that it depends on how it was requested

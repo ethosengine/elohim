@@ -2198,7 +2198,7 @@ Then(
 );
 
 Then(
-  "the shell's resiliency badge from doorway {string} states the holders figure that doorway's own resilience reading gives for this app",
+  "the shell's resiliency badge from doorway {string} states the holder count from that doorway's own resilience reading for this app",
   async function (this: E2EWorld, peerName: string) {
     const visit = requireShellVisit(this, peerName);
     const url = `${resolvePeerUrl(peerName)}/api/v1/resilience/${encodeURIComponent(app(this).slug)}/household`;
