@@ -1,0 +1,52 @@
+{
+  "lens": "illustrative/commons-flow/v0",
+  "status": "ILLUSTRATIVE LENS, NOT A DEFAULT ALLOCATION. One probe's weights, chosen to make the flow visible. Nobody has adopted it; every number below is a claim a person would author, contest and replace.",
+  "method": "Each node splits only its own inbox, once per settlement window, under this lens. Positional share (the land-like part) goes to the node's tier commons; the node's makers keep their labour share; the rest splits equally across the node's direct reliances. A split smaller than the precision floor is not sent: it pools, with its descent recorded, at the tier commons of the node that would have sent it. Each tier keeps a share for its own care and passes the rest to its parent tier. Every split's ratios sum to exactly 1 and each ratio names its reason; a node with no recorded reliance sends its 'rests on' share to its tier commons as unexplained, with descent.",
+  "inflow": {
+    "amount": "1000",
+    "unit": "USD"
+  },
+  "entry": {
+    "keep_for_own_labour": "1/2",
+    "why": "The work the money was given for keeps half for the people who made it; half honours what it rests on."
+  },
+  "upstream": {
+    "keep_for_own_labour": "3/4",
+    "why": "Each upstream keeps most of what reaches it for its own makers and passes a quarter to what it rests on, so the flow thins geometrically with depth. A leaf (no recorded reliance) keeps the same labour share; its quarter is unexplained and pools at the tier commons."
+  },
+  "split_rule": {
+    "rule": "equal",
+    "why": "Equal across direct reliances makes the fewest valuation claims: the lockfile records that a crate is relied on, not how much. The honest weight is 'how the work relies on it', which no record carries yet. Equal invites splitting one project into many crates; grouping by presence (upstream project) is the fix, and the lockfile does not name projects."
+  },
+  "positional_share": {
+    "rule": "cap * fan_in / (fan_in + half_point)",
+    "cap": "1/5",
+    "half_point": 20,
+    "why": "A stand-in for the land-like part of what reaches a node: value it receives because many works clustered around it (a standard everyone relies on), not because of more labour. Fan-in is read from the reverse-index rollup of this one lockfile, a local and partial reading of a community-wide fact. At most a fifth; half of that cap at 20 dependents."
+  },
+  "precision_floor": {
+    "amount": "0.01",
+    "why": "One cent: below it a money split cannot be settled, and the record cannot honestly say whose labour it is. Sub-floor shares are not land; they are labour that costs more to attribute than it is worth, held at the tier commons with descent so a finer lens can re-attribute them later."
+  },
+  "tiers": [
+    {
+      "id": "rust-ecosystem-commons",
+      "keep": "2/3",
+      "parent": "software-commons"
+    },
+    {
+      "id": "software-commons",
+      "keep": "2/3",
+      "parent": "planetary-commons"
+    },
+    {
+      "id": "planetary-commons",
+      "keep": "1",
+      "parent": null
+    }
+  ],
+  "tier_of": {
+    "entry": "rust-ecosystem-commons",
+    "registry": "rust-ecosystem-commons"
+  }
+}

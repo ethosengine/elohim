@@ -1078,21 +1078,22 @@ habits:
       was found. Hosted is a declared stage, never a default: only a human whose fixture declares
       agencyPhase hosted gets a cell, only on a doorway operator's conductor (matthew, adam), and a
       member's own conductor carries its member and nobody else.
-    status: red
+    status: green
     active: false
     checks:
       - "just mesh status — every `hosted` row is free of REFUSED: the operator within its ceiling, each member conductor at 0"
       - "a2o @concern:hosted-human-lifecycle (genesis/a2o/features/auth/hosted-human/05-leaving.feature — @browser-only @act:i; authority is the household lane: `just test mesh features/auth/hosted-human/05-leaving.feature`; on a deployed doorway run with ELOHIM_CLUSTER_STATE_PATH_OVERRIDE=genesis/manifests/cluster-state.act1-household.yaml A2O_ALLOW_DESTRUCTIVE=0 — the story creates and removes its own human, so it is safe on a shared fleet)"
     evidence: >
-      DELTA 2026-10-15 (GREEN -> RED on measured evidence): `just mesh status` hosted rows at a18cf0c41 read
-      `matthew: REFUSED 19 agent(s), over the operator ceiling 14` and `jessica: REFUSED 1 agent(s) on a member's
-      conductor: elohim-conductor-0-12add0`. Cause: undeclared fixtures defaulted to hosted, the device register arm
-      installed a second James and Jessica, doorways B/C hosted on member conductors. Cured in code (lookup-only device
-      arm, DOORWAY_HOSTING_CONDUCTORS, declared-phase cast, agency-phase-coherence test); green waits on
-      genesis/local-dev/hosted-cast-cleanup/close.py run against the household and the probe reading clean.
-    evidence-fingerprint: sha256:f18fe5feafa8def5
-    evidence-bytes: 13940
-    evidence-entries: 11
+      DELTA 2026-10-15b (RED -> GREEN on measured evidence): household doorway A on 22b5ba1f9 — 05-leaving.feature
+      6/6 scenarios, 70/70 steps (sprint-report-household-20261015T175729Z), and `just mesh status` hosted rows free of
+      REFUSED (matthew 6/14, jessica 0, james 0). Three more causes found on the way: closed agents' Mongo mappings
+      survived and re-counted at every restart (A read 21/14 on 6 cells; alpha 94/50) — a33593660; a row with no
+      recorded phase was hosted at sign-in — 9b98ac904; a one-conductor doorway never ran the prune — 22b5ba1f9.
+      Household and alpha cleaned through the doorways' own close route (genesis/local-dev/hosted-cast-cleanup/:
+      close.py, alpha-close.py — 7 doorway-minted cells for device/node humans returned on alpha).
+    evidence-fingerprint: sha256:20c147947d298687
+    evidence-bytes: 14697
+    evidence-entries: 12
     first_move: >
       Land the step definitions and the close-account route so the @wip scenarios execute and
       this habit measures red on a real run, then move the register/login provisioning

@@ -1,0 +1,50 @@
+# Hand-made fixture. Workspace crates `app` and `app-cli` (no source) are the entry work.
+# app -> a, b ; app-cli -> app (internal, collapses) and b ; a -> c ; b -> c 1.0.0 (versioned form)
+# c 2.0.0 exists but nothing the entry work rests on reaches it, so it is pruned.
+version = 4
+
+[[package]]
+name = "a"
+version = "0.1.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "00"
+dependencies = [
+ "c 1.0.0",
+]
+
+[[package]]
+name = "app"
+version = "0.0.1"
+dependencies = [
+ "a",
+ "b",
+]
+
+[[package]]
+name = "app-cli"
+version = "0.0.1"
+dependencies = [
+ "app",
+ "b",
+]
+
+[[package]]
+name = "b"
+version = "0.2.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "00"
+dependencies = [
+ "c 1.0.0 (registry+https://github.com/rust-lang/crates.io-index)",
+]
+
+[[package]]
+name = "c"
+version = "1.0.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "00"
+
+[[package]]
+name = "c"
+version = "2.0.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "00"

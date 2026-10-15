@@ -74,6 +74,8 @@ enough to flip their status when a document moves.
 10. **Source types that are not publications.** First-hand witness, and unsourced model knowledge,
     each graded on its own terms, so a person reporting what happened to them does not read as
     "uncited".
+11. **Implement rule 7 for dependents.** Retraction is pulled by default and pushed at degree 1 over `relies-on` edges. Probe: the unicode-ident retraction reaches all 202 dependents within 8 windows when pulled, at once when pushed. The rule is stated here and nothing implements it. Minted from [commons composition at scale](epr:commons-composition-at-scale-2026-10-15) §15 MN-11.
+12. **A vector proposal never mints a cite on similarity alone.** A proposal record names two or more manifest CIDs and carries the elohim's source-read confirmation; private-reach vectors never leave their holon. Minted from [the commons facility at scale](epr:commons-facility-at-scale-2026-10-15) §11 F9.
 
 ## Agents re-citing what training absorbed
 
