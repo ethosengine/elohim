@@ -374,33 +374,35 @@
     </div>
     @if (isOpen('from')) {
       <div class="fold" id="epr-home-fold-from" data-testid="epr-home-fold-from">
-        @if (attestations() === undefined) {
-          <p class="leg__line leg__line--quiet">Checking…</p>
-        } @else if (attestations() === null) {
-          <p class="leg__line leg__line--quiet">Couldn't read this from here.</p>
-        } @else if (attestations()?.length === 0) {
-          <p class="leg__line leg__line--quiet">No one has attested to this yet.</p>
-        } @else {
-          <div class="rows" data-testid="epr-home-attestations">
-            @for (a of attestations(); track a.id) {
-              <div
-                class="leg__row leg__row--stack"
-                [class.leg__row--revoked]="!!a.revokedAt"
-                data-testid="epr-home-attestation"
-              >
-                <span class="attestation__title">{{ a.title }}</span>
-                <span class="leg__ui leg__ui--muted">
-                  by {{ issuerShort(a) }} · {{ proofWords(a) }} · {{ attestedOn(a) }}
-                </span>
-                @if (a.revokedAt) {
-                  <span class="leg__ui leg__ui--warm">
-                    Revoked{{ a.revocationReason ? ': ' + a.revocationReason : '' }}
+        <div data-testid="epr-home-attestations">
+          @if (attestations() === undefined) {
+            <p class="leg__line leg__line--quiet">Checking…</p>
+          } @else if (attestations() === null) {
+            <p class="leg__line leg__line--quiet">Couldn't read this from here.</p>
+          } @else if (attestations()?.length === 0) {
+            <p class="leg__line leg__line--quiet">No one has attested to this yet.</p>
+          } @else {
+            <div class="rows">
+              @for (a of attestations(); track a.id) {
+                <div
+                  class="leg__row leg__row--stack"
+                  [class.leg__row--revoked]="!!a.revokedAt"
+                  data-testid="epr-home-attestation"
+                >
+                  <span class="attestation__title">{{ a.title }}</span>
+                  <span class="leg__ui leg__ui--muted">
+                    by {{ issuerShort(a) }} · {{ proofWords(a) }} · {{ attestedOn(a) }}
                   </span>
-                }
-              </div>
-            }
-          </div>
-        }
+                  @if (a.revokedAt) {
+                    <span class="leg__ui leg__ui--warm">
+                      Revoked{{ a.revocationReason ? ': ' + a.revocationReason : '' }}
+                    </span>
+                  }
+                </div>
+              }
+            </div>
+          }
+        </div>
       </div>
     }
   </section>

@@ -1,3 +1,4 @@
+import { HttpClient } from '@angular/common/http';
 import { Component, EventEmitter, Input, Output, signal } from '@angular/core';
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { ActivatedRoute, ParamMap, convertToParamMap, provideRouter } from '@angular/router';
@@ -290,6 +291,7 @@ describe('EprHomeComponent', () => {
   let storage: {
     getContent: ReturnType<typeof vi.fn>;
     getContentEngagement: ReturnType<typeof vi.fn>;
+    getStorageBaseUrl: ReturnType<typeof vi.fn>;
     getBlobUrl: ReturnType<typeof vi.fn>;
   };
   let storageApi: {
@@ -332,6 +334,7 @@ describe('EprHomeComponent', () => {
       imports: [EprHomeComponent],
       providers: [
         provideRouter([]),
+        { provide: HttpClient, useValue: { get: vi.fn().mockReturnValue(of({ related: [] })) } },
         { provide: StorageClientService, useValue: storage },
         {
           provide: ActivatedRoute,
@@ -391,6 +394,7 @@ describe('EprHomeComponent', () => {
 
   beforeEach(() => {
     storage = {
+      getStorageBaseUrl: vi.fn().mockReturnValue('https://doorway.test'),
       getContent: vi.fn().mockReturnValue(of(rawSimulation)),
       getContentEngagement: vi
         .fn()
@@ -641,6 +645,50 @@ describe('EprHomeComponent', () => {
 
     fixture.destroy();
     expect(observations.end).toHaveBeenCalledWith('succession');
+  });
+
+  it.each(['challenge', 'feedback'] as const)(
+    'ignores a late %s after navigation and clears focus and notes',
+    async type => {
+      auth.isAuthenticated.set(true);
+      auth.humanId.set('human-jessica');
+      let resolve!: (value: unknown) => void;
+      const pending = new Promise(done => {
+        resolve = done;
+      });
+      governance[type === 'challenge' ? 'fileChallenge' : 'recordSignal'].mockReturnValue(pending);
+      const params = new BehaviorSubject(convertToParamMap({ resourceId: 'evolution-of-trust' }));
+      storage.getContent.mockImplementation((id: string) => of({ ...rawSimulation, id }));
+      await configure(params);
+      fixture.componentInstance.onConcern({ type, text: 'Please check' });
+      fixture.componentInstance.concernNote.set('Earlier note');
+      fixture.componentInstance.toggleFocus();
+      await settle();
+      const exit = q(fixture, 'epr-home-focus-exit')!;
+      expect(exit.textContent).toContain('Leave focus');
+      expect(fixture.nativeElement.querySelector('button')).toBe(exit);
+      params.next(convertToParamMap({ resourceId: 'next-atom' }));
+      await settle();
+      expect(fixture.componentInstance.concernNote()).toBeNull();
+      expect(fixture.componentInstance.focused()).toBe(false);
+      expect(document.body.classList.contains('focused-view-mode')).toBe(false);
+      const refresh =
+        governance[type === 'challenge' ? 'getChallengesForEntity' : 'getSignalAggregate'];
+      const calls = refresh.mock.calls.length;
+      resolve({});
+      await settle();
+      expect(fixture.componentInstance.concernNote()).toBeNull();
+      expect(refresh).toHaveBeenCalledTimes(calls);
+    }
+  );
+
+  it('leaves focus through the button outside the focal frame', async () => {
+    await mount('evolution-of-trust');
+    fixture.componentInstance.toggleFocus();
+    await settle();
+    q(fixture, 'epr-home-focus-exit')!.click();
+    await settle();
+    expect(fixture.componentInstance.focused()).toBe(false);
   });
 
   it('reports scroll depth from the window while the atom is open', async () => {

@@ -39,6 +39,7 @@ import {
   verifyLine,
 } from './epr-home.model';
 
+import type { SeeAlsoRow } from './epr-home-see-also';
 import type { AttestationView } from '@app/generated/attestation-view';
 import type { ResilienceSnapshotView } from '@app/generated/resilience-snapshot-view';
 import type {
@@ -46,7 +47,6 @@ import type {
   ContentEngagementStatsView,
   ContributorPresenceView,
   GovernanceStateView,
-  RelationshipWithContentView,
   VerificationResultView,
 } from '@elohim/storage-client/generated';
 import type { ResilienceView } from '@elohim/storage-client/generated/ResilienceView';
@@ -119,7 +119,7 @@ export class EprHomeLegsComponent {
   readonly verification = input<VerifyState>({ state: 'idle' });
   readonly attestations = input<AttestationView[] | null | undefined>(undefined);
   readonly governanceState = input<GovernanceStateView | null>(null);
-  readonly seeAlso = input<RelationshipWithContentView[] | null | undefined>(undefined);
+  readonly seeAlso = input<SeeAlsoRow[] | null | undefined>(undefined);
   readonly contributors = input<ContributorPresenceView[]>([]);
   readonly engagement = input<ContentEngagementStatsView | null | undefined>(undefined);
   /** True when a write can be made as the signed-in person (a session with a human id). */
@@ -133,10 +133,10 @@ export class EprHomeLegsComponent {
   readonly concern = output<ConcernSubmit>();
 
   /** Which folds are open. A new request adds its leg; toggles flip one leg. */
-  readonly open = linkedSignal<FoldRequest | null, ReadonlySet<string>>({
-    source: this.openFold,
-    computation: (req, previous) => {
-      const next = new Set(previous?.value ?? []);
+  readonly open = linkedSignal<{ id: string; req: FoldRequest | null }, ReadonlySet<string>>({
+    source: () => ({ id: this.atom().id, req: this.openFold() }),
+    computation: ({ id, req }, previous) => {
+      const next = new Set(previous?.source.id === id ? previous.value : []);
       if (req && req.leg !== 'here') next.add(req.leg);
       return next;
     },

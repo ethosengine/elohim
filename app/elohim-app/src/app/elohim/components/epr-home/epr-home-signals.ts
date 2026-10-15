@@ -85,7 +85,7 @@ export function consensusWords(strength: number): string {
 /** "4 reactions from 3 people · consensus strong"; null when nobody has reacted. */
 export function landedSummary(agg: SignalAggregateView | null | undefined): string | null {
   if (!agg) return null;
-  const total = wireCount(agg.totalSignals);
+  const total = reactionCounts(agg).reduce((sum, reaction) => sum + reaction.count, 0);
   if (total === 0) return null;
   const people = wireCount(agg.uniqueParticipants);
   const reactions = total === 1 ? '1 reaction' : `${total} reactions`;

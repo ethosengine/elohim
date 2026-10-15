@@ -397,7 +397,9 @@
   background: var(--el-ground);
 }
 
-:host(.epr-home--focused) .epr-home > :not(.epr-home__focal):not(.epr-home__body),
+:host(.epr-home--focused)
+  .epr-home
+  > :not(.epr-home__focal):not(.epr-home__body):not(.epr-home__focus-exit),
 :host(.epr-home--focused) .epr-home__body > :not(.epr-home__main),
 :host(.epr-home--focused) .epr-home__main > :not(.epr-home__focal) {
   display: none;

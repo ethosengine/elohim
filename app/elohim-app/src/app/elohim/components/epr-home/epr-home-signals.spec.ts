@@ -47,15 +47,33 @@ describe('epr-home-signals', () => {
 
   it('says how it landed in words, never a percentage', () => {
     expect(landedSummary(aggregate({ totalSignals: 0 }))).toBeNull();
-    expect(landedSummary(aggregate({ totalSignals: 1, uniqueParticipants: 1 }))).toBe(
-      '1 reaction from 1 person'
-    );
+    expect(
+      landedSummary(aggregate({ totalSignals: 1, byValue: { moved: 1 }, uniqueParticipants: 1 }))
+    ).toBe('1 reaction from 1 person');
     const many = landedSummary(
-      aggregate({ totalSignals: 4, uniqueParticipants: 3, consensusStrength: 0.8 })
+      aggregate({
+        totalSignals: 4,
+        byValue: { moved: 4 },
+        uniqueParticipants: 3,
+        consensusStrength: 0.8,
+      })
     );
     expect(many).toBe('4 reactions from 3 people · consensus strong');
     expect(many).not.toMatch(/%/);
     expect(consensusWords(0.2)).toBe('divided');
+  });
+
+  it('excludes flags, reports and feedback from the reaction total', () => {
+    expect(
+      landedSummary(
+        aggregate({
+          totalSignals: 7,
+          byValue: { moved: 2, flag: 3, report: 1, feedback: 1 },
+          uniqueParticipants: 1,
+        })
+      )
+    ).toBe('2 reactions from 1 person');
+    expect(landedSummary(aggregate({ totalSignals: 2, byValue: { flag: 2 } }))).toBeNull();
   });
 
   it('fills every RecordSignalInputView field for a reaction from the session', () => {

@@ -620,9 +620,19 @@ Then(
   async function (this: E2EWorld, id: string, emptyLine: string) {
     const { page } = home(this, 'Matthew');
     const doorway = this.getDoorway('alpha');
-    const reported = await readJson<unknown[]>(
-      `${doorway.url}/api/v1/attestations/unified?subjectCid=${encodeURIComponent(id)}`
+    const content = await readJson<{ blobCid?: string; blobHash?: string }>(
+      `${doorway.url}/db/content/${encodeURIComponent(id)}`
     );
+    const cid = content?.blobCid ?? content?.blobHash;
+    const subjects = [...new Set([id, ...(cid ? [cid] : [])])];
+    const lists = await Promise.all(subjects.map(subject =>
+      readJson<{ id: string }[]>(
+        `${doorway.url}/api/v1/attestations/unified?subjectCid=${encodeURIComponent(subject)}`
+      )
+    ));
+    const reported = content === null || lists.some(list => list === null)
+      ? null
+      : [...new Map(lists.flatMap(list => list ?? []).map(row => [row.id, row])).values()];
     const shown = await page.attestationCount();
     const text = await page.visibleText(EPR_HOME.ATTESTATIONS);
     if (reported === null) {

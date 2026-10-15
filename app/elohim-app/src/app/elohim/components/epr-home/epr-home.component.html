@@ -61,6 +61,17 @@
   @case ('loaded') {
     @if (atom(); as a) {
       <main class="epr-home" data-testid="epr-home">
+        @if (focused()) {
+          <button
+            type="button"
+            class="epr-home__btn epr-home__focus-exit"
+            data-testid="epr-home-focus-exit"
+            (click)="exitFocus()"
+          >
+            Leave focus
+          </button>
+        }
+
         @if (arrival(); as from) {
           <a
             class="epr-home__arrival"

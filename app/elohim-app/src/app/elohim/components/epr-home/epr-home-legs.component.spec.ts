@@ -283,6 +283,27 @@ describe('EprHomeLegsComponent', () => {
     );
   });
 
+  it('resets manually opened folds when the atom changes, retaining the requested fragment', () => {
+    fixture.componentRef.setInput('openFold', { leg: 'from' });
+    fixture.detectChanges();
+    fixture.componentInstance.toggle('lives');
+    fixture.componentRef.setInput('atom', { ...atom, id: 'next-atom' });
+    fixture.detectChanges();
+    expect(fixture.componentInstance.isOpen('lives')).toBe(false);
+    expect(fixture.componentInstance.isOpen('from')).toBe(true);
+  });
+
+  it.each([
+    [undefined, 'Checking…'],
+    [null, "Couldn't read this from here."],
+    [[], 'No one has attested to this yet.'],
+  ])('keeps the attestation wrapper for %s', (rows, line) => {
+    fixture.componentRef.setInput('openFold', { leg: 'from' });
+    fixture.componentRef.setInput('attestations', rows);
+    fixture.detectChanges();
+    expect(q(fixture, 'epr-home-attestations')?.textContent).toContain(line);
+  });
+
   it('folds are closed by default and open by their toggle, with aria-expanded', () => {
     fixture.detectChanges();
     for (const leg of ['holds', 'lives', 'governed', 'from']) {

@@ -1,4 +1,5 @@
 import { CommonModule, DOCUMENT } from '@angular/common';
+import { HttpClient } from '@angular/common/http';
 import {
   CUSTOM_ELEMENTS_SCHEMA,
   ChangeDetectionStrategy,
@@ -11,9 +12,10 @@ import {
   effect,
   inject,
   signal,
+  untracked,
 } from '@angular/core';
 import { takeUntilDestroyed, toObservable, toSignal } from '@angular/core/rxjs-interop';
-import { ActivatedRoute, RouterModule } from '@angular/router';
+import { ActivatedRoute, Router, RouterModule } from '@angular/router';
 
 import {
   Subject,
@@ -59,6 +61,7 @@ import {
   VerifyState,
   humanizeSlug,
 } from './epr-home-legs.component';
+import { SeeAlsoRow, mergeSeeAlso } from './epr-home-see-also';
 import {
   SignalConcernKind,
   challengeInput,
@@ -85,11 +88,11 @@ import type { AttestationView } from '@app/generated/attestation-view';
 import type { ResilienceSnapshotView } from '@app/generated/resilience-snapshot-view';
 import type {
   ChallengeView,
+  ContentGraphView,
   ContentEngagementStatsView,
   ContributorPresenceView,
   DiscussionView,
   GovernanceStateView,
-  RelationshipWithContentView,
   SignalAggregateView,
 } from '@elohim/storage-client/generated';
 import type { ResilienceView } from '@elohim/storage-client/generated/ResilienceView';
@@ -143,6 +146,8 @@ const FOCUS_SCROLLER_CLASS = 'epr-home';
 })
 export class EprHomeComponent {
   private readonly route = inject(ActivatedRoute);
+  private readonly router = inject(Router);
+  private readonly http = inject(HttpClient);
   private readonly storage = inject(StorageClientService);
   private readonly resilience = inject(ResilienceService);
   private readonly resilienceDetail = inject(ResilienceDetailService);
@@ -203,9 +208,10 @@ export class EprHomeComponent {
 
   /** A new object per request, so arriving at the same leg twice re-opens it. */
   readonly openFold = toSignal<FoldRequest | null>(
-    merge(this.fragment$.pipe(map(f => legFromFragment(f))), this.legClicks).pipe(
-      map(leg => (leg ? { leg } : null))
-    ),
+    merge(
+      combineLatest([this.route.paramMap, this.fragment$]).pipe(map(([, f]) => legFromFragment(f))),
+      this.legClicks
+    ).pipe(map(leg => (leg ? { leg } : null))),
     { initialValue: null }
   );
 
@@ -369,14 +375,23 @@ export class EprHomeComponent {
     { initialValue: undefined }
   );
 
-  readonly seeAlso = toSignal<RelationshipWithContentView[] | null | undefined>(
+  readonly seeAlso = toSignal<SeeAlsoRow[] | null | undefined>(
     this.atomId$.pipe(
       switchMap(id =>
         id
-          ? this.storageApi.getRelatedContent(id).pipe(
-              catchError(() => of(null)),
-              startWith(undefined)
-            )
+          ? // The computed graph carries both kinds: authored edges arrive marked
+            // `explicit`, discovered ones by how they were found (`tag`, …). The
+            // persisted /db/relationships list is not read here: on the live
+            // doorway it ignores `sourceId` and answers a paged envelope.
+            this.http
+              .get<ContentGraphView>(
+                `${this.storage.getStorageBaseUrl()}/db/relationships/graph/${encodeURIComponent(id)}?computed=true`
+              )
+              .pipe(
+                map(graph => mergeSeeAlso([], graph)),
+                catchError(() => of(null)),
+                startWith(undefined)
+              )
           : of(undefined)
       )
     ),
@@ -576,6 +591,32 @@ export class EprHomeComponent {
   private witnessed: string | null = null;
 
   constructor() {
+    // A legacy viewer fragment (#network, #governance, #trust) can arrive here
+    // without passing the client-side redirect: the server answers
+    // /resource/{id} with a 302 to /epr/{id}, and the browser carries the old
+    // fragment across it. Rename it in place to the leg it opens.
+    this.fragment$.pipe(takeUntilDestroyed(this.destroyRef)).subscribe(fragment => {
+      const leg = legFromFragment(fragment);
+      if (fragment && leg && leg !== fragment) {
+        void this.router.navigate([], {
+          relativeTo: this.route,
+          fragment: leg,
+          queryParamsHandling: 'preserve',
+          replaceUrl: true,
+        });
+      }
+    });
+
+    effect(() => {
+      this.resourceId();
+      untracked(() => {
+        this.concernNote.set(null);
+        this.verifyState.set(null);
+        this.resilienceWantedFor.set(null);
+        this.exitFocus();
+      });
+    });
+
     effect(() => {
       const a = this.atom();
       if (a) this.affinityService.trackView(a.id);
@@ -675,8 +716,13 @@ export class EprHomeComponent {
       .verifyResilience(id)
       .pipe(take(1), takeUntilDestroyed(this.destroyRef))
       .subscribe({
-        next: result => this.verifyState.set({ id, state: { state: 'done', result } }),
-        error: () => this.verifyState.set({ id, state: { state: 'failed' } }),
+        next: result => {
+          if (this.resourceId() === id)
+            this.verifyState.set({ id, state: { state: 'done', result } });
+        },
+        error: () => {
+          if (this.resourceId() === id) this.verifyState.set({ id, state: { state: 'failed' } });
+        },
       });
   }
 
@@ -689,19 +735,25 @@ export class EprHomeComponent {
       this.governance
         .fileChallenge(challengeInput(id, concern.text, humanId))
         .then(() => {
+          if (this.resourceId() !== id) return;
           this.concernNote.set('Your challenge was filed. Its steward is asked to respond.');
           this.challengesRefresh.update(n => n + 1);
         })
-        .catch(() => this.concernNote.set("Couldn't file this from here."));
+        .catch(() => {
+          if (this.resourceId() === id) this.concernNote.set("Couldn't file this from here.");
+        });
     } else {
       const kind: SignalConcernKind = concern.type;
       this.governance
         .recordSignal(concernSignal(kind, id, concern.text, humanId))
         .then(() => {
+          if (this.resourceId() !== id) return;
           this.concernNote.set(CONCERN_RECORDED[kind]);
           this.signalsRefresh.update(n => n + 1);
         })
-        .catch(() => this.concernNote.set("Couldn't send this from here."));
+        .catch(() => {
+          if (this.resourceId() === id) this.concernNote.set("Couldn't send this from here.");
+        });
     }
   }
 
