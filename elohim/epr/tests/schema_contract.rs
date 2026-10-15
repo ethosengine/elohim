@@ -430,3 +430,59 @@ fn epr_all_kinds_envelope_conform() {
         );
     }
 }
+
+// ── External-artifact manifest (node 4) ─────────────────────────
+
+/// The external-artifact manifest generalizes the embedding-model manifest; the probe is that
+/// the existing model manifest validates against it UNCHANGED (read from disk, never copied).
+/// Its bytes fields are the same address format node 2 wraps a lockfile checksum into: CIDv1,
+/// raw codec, sha2-256.
+#[test]
+fn model_manifest_validates_unchanged_against_external_artifact_manifest() {
+    // CARGO_MANIFEST_DIR = elohim/epr/ → ../../ = the repository root.
+    let path = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+        .join("../../.epr-meta/elohim/algorithms/embedding-models/all-minilm-l6-v2.json");
+    let content = fs::read_to_string(&path)
+        .unwrap_or_else(|e| panic!("Failed to read {}: {}", path.display(), e));
+    let manifest: Value = serde_json::from_str(&content).expect("model manifest parses");
+
+    validate("objects/external-artifact-manifest.schema.json", &manifest);
+
+    for field in ["model_bytes", "tokenizer_bytes", "procedure"] {
+        let cid: cid::Cid = manifest[field]
+            .as_str()
+            .unwrap_or_else(|| panic!("{field} is a string"))
+            .parse()
+            .unwrap_or_else(|e| panic!("{field} parses as a CID: {e}"));
+        assert_eq!(
+            cid.codec(),
+            elohim_epr::cid::RAW_CODEC,
+            "{field} is raw codec"
+        );
+        assert_eq!(cid.hash().code(), 0x12, "{field} is sha2-256");
+    }
+}
+
+#[test]
+fn external_artifact_manifest_refuses_an_amount_on_a_funding_fact() {
+    let schema = load_schema("objects/external-artifact-manifest.schema.json");
+    let validator = jsonschema::validator_for(&schema).expect("schema compiles");
+    let mut crate_manifest = serde_json::json!({
+        "artifact_type": "package-manifest",
+        "bytes": elohim_epr::cid::raw_cid_from_sha256_hex(
+            "d82a8b4f1f75b6422de6545986df3943d10fe75690461d441e98bc4d3fcb9419"
+        )
+        .unwrap()
+        .to_string(),
+        "license": "MIT OR Apache-2.0",
+        "source": "crates.io:example@0.1.0",
+        "funding": [{
+            "channel": "drips",
+            "url": "https://www.drips.network/app/projects/github/example",
+            "declared_in": "FUNDING.json"
+        }]
+    });
+    assert!(validator.is_valid(&crate_manifest));
+    crate_manifest["funding"][0]["amount"] = serde_json::json!(100);
+    assert!(!validator.is_valid(&crate_manifest));
+}

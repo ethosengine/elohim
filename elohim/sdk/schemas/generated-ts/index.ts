@@ -51,6 +51,7 @@ export * from './objects/coupling';
 export * from './objects/envelope';
 export * from './objects/epr-meta';
 export * from './objects/epr';
+export * from './objects/external-artifact-manifest';
 export * from './objects/geo-point';
 export * from './objects/h3-cell';
 export * from './objects/operator-classification';
