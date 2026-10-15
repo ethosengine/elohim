@@ -1969,6 +1969,13 @@ async fn handle_register(
         custodial_key,
     );
     user.display_name = Some(display_name.clone());
+    user.agency_phase = Some(agency_phase.to_string());
+    // A node/device human's identity lives on their own conductor: the account
+    // carries THAT key (looked up, or supplied by the caller), never the
+    // doorway-minted custodial one.
+    if matches!(agency_phase, "node" | "device") {
+        user.agent_pub_key = agent_pub_key.clone();
+    }
     if let Some(ref grant) = hosted_cell {
         user.hosted_cell_grant_cid = Some(grant.grant_cid.clone());
         user.hosted_cell_valid_until = Some(grant.valid_until.clone());
@@ -2429,56 +2436,59 @@ async fn handle_login(
     }
 
     // Auto-provision on conductor if user has no conductor assignment
-    let (final_agent_pub_key, installed_app_id, login_conductor_id) = if user.conductor_id.is_none()
-    {
-        if let Some(ref registry) = state.conductor_registry {
-            if should_provision(true, state.args.dev_mode) {
-                let provisioner = AgentProvisioner::new(Arc::clone(registry))
-                    .with_app_id(state.args.installed_app_id.clone())
-                    .with_bundle_path(state.args.happ_bundle_path.clone());
-                match provisioner.provision_agent(&body.identifier).await {
-                    Ok(p) => {
-                        info!(
-                            "Auto-provisioned {} on {} (app: {})",
-                            body.identifier, p.conductor_id, p.installed_app_id
-                        );
-                        // Update UserDoc with conductor assignment
-                        let update = doc! {
-                            "$set": {
-                                "conductor_id": &p.conductor_id,
-                                "agent_pub_key": &p.agent_pub_key,
+    // Only an account that may be hosted here gets a cell at login; a doorway,
+    // node or device account runs its own (2026-10-15: a device human's login
+    // installed a second agent for them on the operator's conductor).
+    let (final_agent_pub_key, installed_app_id, login_conductor_id) =
+        if user.conductor_id.is_none() && user.may_be_hosted() {
+            if let Some(ref registry) = state.conductor_registry {
+                if should_provision(true, state.args.dev_mode) {
+                    let provisioner = AgentProvisioner::new(Arc::clone(registry))
+                        .with_app_id(state.args.installed_app_id.clone())
+                        .with_bundle_path(state.args.happ_bundle_path.clone());
+                    match provisioner.provision_agent(&body.identifier).await {
+                        Ok(p) => {
+                            info!(
+                                "Auto-provisioned {} on {} (app: {})",
+                                body.identifier, p.conductor_id, p.installed_app_id
+                            );
+                            // Update UserDoc with conductor assignment
+                            let update = doc! {
+                                "$set": {
+                                    "conductor_id": &p.conductor_id,
+                                    "agent_pub_key": &p.agent_pub_key,
+                                }
+                            };
+                            if let Err(e) = collection
+                                .update_one(doc! { "identifier": &body.identifier }, update)
+                                .await
+                            {
+                                warn!("Failed to update user doc after provisioning: {}", e);
                             }
-                        };
-                        if let Err(e) = collection
-                            .update_one(doc! { "identifier": &body.identifier }, update)
-                            .await
-                        {
-                            warn!("Failed to update user doc after provisioning: {}", e);
+                            let cid = p.conductor_id.clone();
+                            (p.agent_pub_key, Some(p.installed_app_id), Some(cid))
                         }
-                        let cid = p.conductor_id.clone();
-                        (p.agent_pub_key, Some(p.installed_app_id), Some(cid))
+                        Err(e) => {
+                            warn!("Auto-provisioning failed for {}: {}", body.identifier, e);
+                            (user.agent_pub_key.clone(), None, None)
+                        }
                     }
-                    Err(e) => {
-                        warn!("Auto-provisioning failed for {}: {}", body.identifier, e);
-                        (user.agent_pub_key.clone(), None, None)
-                    }
+                } else {
+                    (user.agent_pub_key.clone(), None, None)
                 }
             } else {
                 (user.agent_pub_key.clone(), None, None)
             }
         } else {
-            (user.agent_pub_key.clone(), None, None)
-        }
-    } else {
-        // Already provisioned — look up installed_app_id from registry
-        let (app_id, cid) = state
-            .conductor_registry
-            .as_ref()
-            .and_then(|r| r.get_conductor_for_agent(&user.agent_pub_key))
-            .map(|e| (Some(e.app_id), Some(e.conductor_id)))
-            .unwrap_or((None, user.conductor_id.clone()));
-        (user.agent_pub_key.clone(), app_id, cid)
-    };
+            // Already provisioned — look up installed_app_id from registry
+            let (app_id, cid) = state
+                .conductor_registry
+                .as_ref()
+                .and_then(|r| r.get_conductor_for_agent(&user.agent_pub_key))
+                .map(|e| (Some(e.app_id), Some(e.conductor_id)))
+                .unwrap_or((None, user.conductor_id.clone()));
+            (user.agent_pub_key.clone(), app_id, cid)
+        };
 
     info!(
         "Login successful: {} (permission: {:?})",
