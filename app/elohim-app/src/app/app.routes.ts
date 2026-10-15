@@ -1,4 +1,7 @@
-import { Routes } from '@angular/router';
+import { inject } from '@angular/core';
+import { Router, Routes } from '@angular/router';
+
+import { legacyResourceRedirect } from './elohim/components/epr-home/legacy-resource-redirect';
 
 // @coverage: 8.3% (2026-03-03)
 
@@ -53,16 +56,18 @@ export const routes: Routes = [
       title: 'Content',
     },
   },
-  // Cross-pillar resource viewer (ContentNodes are protocol primitives, not pillar-scoped).
-  // Legacy surface — durable /resource URLs exist in the wild; new minting targets the
-  // /epr/:resourceId universal address below (same component, §12.3).
+  // Legacy resource URL. Durable /resource/{id} links exist in the wild; the atom
+  // home at the universal address below subsumed the resource viewer (spec
+  // 2026-09-02 §11), so this redirects there — minted, query params kept, and the
+  // viewer's old tab fragment mapped onto the leg that now carries it
+  // (network→holds, governance→governed, trust→from). `pathMatch: 'full'` keeps
+  // deeper paths (e.g. an editor under /resource/{id}/edit) from being captured.
+  // SSR never sees a fragment (browsers do not send it); the hydrated client router
+  // re-runs this redirect with the fragment on bootstrap, which is where it matters.
   {
     path: 'resource/:resourceId',
-    loadComponent: async () =>
-      import('@app/lamad/components/content-viewer/content-viewer.component').then(
-        m => m.ContentViewerComponent
-      ),
-    data: { protocolContent: true },
+    pathMatch: 'full',
+    redirectTo: redirect => inject(Router).parseUrl(legacyResourceRedirect(redirect)),
   },
   // Universal EPR address (§12.1) — the atom's own home, shell-owned (spec
   // 2026-09-02-epr-atom-home-shell-component-design). Reachable-but-unclaimed

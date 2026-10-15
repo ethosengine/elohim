@@ -275,3 +275,139 @@
 .epr-home__ui--muted {
   color: var(--el-text-muted);
 }
+
+/* Identity: tags under the lede, Edit beside the chips */
+
+.epr-home__tags {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.epr-home__tag {
+  display: inline-flex;
+  align-items: center;
+  height: 26px;
+  padding: 0 10px;
+  border-radius: 999px;
+  background: var(--el-surface-2);
+  font-family: var(--el-font-ui);
+  font-size: 12px;
+  color: var(--el-text-muted);
+}
+
+.epr-home__edit {
+  height: 34px;
+}
+
+.epr-home__btn--quiet {
+  height: 32px;
+  padding: 0 12px;
+  font-size: 13px;
+  color: var(--el-text-muted);
+}
+
+.epr-home__btn:focus-visible,
+.epr-home__chip:focus-visible,
+.epr-home__link:focus-visible {
+  outline: 2px solid var(--el-action);
+  outline-offset: 2px;
+}
+
+/* Focal slot: the Focus toggle sits above the render */
+
+.epr-home__focal-bar {
+  display: flex;
+  justify-content: flex-end;
+  padding: 8px;
+}
+
+/* Your mark → How it landed */
+
+.epr-home__landed {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding-top: 14px;
+  border-top: 1px solid var(--el-border);
+}
+
+.epr-home__subhead {
+  margin: 0;
+  font-family: var(--el-font-ui);
+  font-weight: 500;
+  font-size: 14px;
+  color: var(--el-text-strong);
+}
+
+/* Conversation (first cut, spec §11.2) */
+
+.epr-home__conversation {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.epr-home__section-title {
+  margin: 0;
+  font-family: var(--el-font-display);
+  font-weight: 500;
+  font-size: 19px;
+  color: var(--el-text-strong);
+}
+
+.epr-home__discussions {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.epr-home__discussion {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 12px 14px;
+  border: 1px solid var(--el-border);
+  border-radius: 10px;
+  background: var(--el-surface);
+}
+
+.epr-home__discussion-title {
+  font-family: var(--el-font-body);
+  font-size: 16px;
+  color: var(--el-text-strong);
+}
+
+/* Focus: the focal alone; the frame becomes the scroller; Escape leaves */
+
+:host(.epr-home--focused) .epr-home {
+  position: fixed;
+  inset: 0;
+  z-index: 1000;
+  max-width: none;
+  margin: 0;
+  padding: 16px;
+  overflow: auto;
+  background: var(--el-ground);
+}
+
+:host(.epr-home--focused) .epr-home > :not(.epr-home__focal):not(.epr-home__body),
+:host(.epr-home--focused) .epr-home__body > :not(.epr-home__main),
+:host(.epr-home--focused) .epr-home__main > :not(.epr-home__focal) {
+  display: none;
+}
+
+:host(.epr-home--focused) .epr-home__body {
+  display: block;
+}
+
+:host(.epr-home--focused) .epr-home__focal--reading {
+  max-width: 72ch;
+  margin: 0 auto;
+}

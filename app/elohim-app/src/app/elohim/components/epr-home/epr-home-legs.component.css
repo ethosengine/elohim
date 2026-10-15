@@ -120,3 +120,164 @@
   font-weight: 500;
   color: var(--el-text-muted);
 }
+
+.pill--warm {
+  background: color-mix(in srgb, var(--el-clay) 14%, transparent);
+  color: var(--el-warm);
+}
+
+.pill--plum {
+  background: color-mix(in srgb, var(--el-plum) 14%, transparent);
+  color: var(--el-plum);
+}
+
+/* ── Folds (spec §11.1): closed by default, opened by toggle or fragment ── */
+
+.leg__head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.fold-toggle {
+  border: 0;
+  background: transparent;
+  padding: 0;
+  font-family: var(--el-font-ui);
+  font-size: 13px;
+  color: var(--el-action);
+  cursor: pointer;
+}
+
+.fold-toggle::after {
+  content: ' ›';
+}
+
+.fold-toggle[aria-expanded='true']::after {
+  content: ' ‹';
+}
+
+.fold-toggle:focus-visible,
+.leg__button:focus-visible {
+  outline: 2px solid var(--el-action);
+  outline-offset: 2px;
+}
+
+.fold {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 14px 16px;
+  border: 1px solid var(--el-border);
+  border-radius: 10px;
+  background: var(--el-surface);
+}
+
+.rows {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.leg__row-tags {
+  display: inline-flex;
+  gap: 6px;
+}
+
+.leg__row--revoked .attestation__title {
+  text-decoration: line-through;
+  color: var(--el-text-muted);
+}
+
+.leg__button {
+  display: inline-flex;
+  align-items: center;
+  height: 34px;
+  padding: 0 14px;
+  border-radius: 8px;
+  border: 1px solid var(--el-border);
+  background: transparent;
+  color: var(--el-text-strong);
+  font-family: var(--el-font-ui);
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+}
+
+.leg__button:disabled {
+  color: var(--el-text-muted);
+  cursor: default;
+}
+
+/* Network detail facts */
+
+.facts {
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  font-family: var(--el-font-ui);
+  font-size: 13px;
+}
+
+.facts__row {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.facts dt {
+  color: var(--el-text-muted);
+}
+
+.facts dd {
+  margin: 0;
+  color: var(--el-text-strong);
+}
+
+/* Where the pieces are: one cell per piece; parity paler; a missing piece Terracotta */
+
+.pieces {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(28px, 1fr));
+  gap: 4px;
+}
+
+.piece {
+  display: grid;
+  place-items: center;
+  height: 28px;
+  border-radius: 4px;
+  background: color-mix(in srgb, var(--el-green-light) 28%, transparent);
+  font-family: var(--el-font-mono);
+  font-size: 11px;
+  color: var(--el-text-strong);
+}
+
+.piece--parity {
+  background: color-mix(in srgb, var(--el-sky) 22%, transparent);
+}
+
+.piece--missing {
+  background: color-mix(in srgb, var(--el-clay) 18%, transparent);
+  border: 1px dashed var(--el-warm);
+  color: var(--el-warm);
+}
+
+/* Contributors stay visible in the leg body, never folded away */
+
+.contributors {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.contributors__list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}

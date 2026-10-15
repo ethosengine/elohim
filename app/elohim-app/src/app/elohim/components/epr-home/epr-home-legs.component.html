@@ -1,7 +1,19 @@
 <aside class="legs">
   <!-- Who holds it (value) -->
   <section class="leg" id="holds" data-testid="epr-home-leg-holds">
-    <h3 class="leg__title">Who holds it</h3>
+    <div class="leg__head">
+      <h3 class="leg__title">Who holds it</h3>
+      <button
+        type="button"
+        class="fold-toggle"
+        [attr.aria-expanded]="isOpen('holds')"
+        aria-controls="epr-home-fold-holds"
+        (click)="toggle('holds')"
+        data-testid="epr-home-fold-toggle-holds"
+      >
+        Network detail
+      </button>
+    </div>
     @if (holding().households.length > 0) {
       @for (h of holding().households; track h) {
         <div class="leg__row">{{ h }}</div>
@@ -30,11 +42,121 @@
     @if (holding().state === 'known' && holding().action) {
       <p class="leg__line" data-testid="epr-home-invite-household">{{ holding().action }}</p>
     }
+    @if (isOpen('holds')) {
+      <div class="fold" id="epr-home-fold-holds" data-testid="epr-home-fold-holds">
+        @if (resilience() === undefined) {
+          <p class="leg__line leg__line--quiet">Checking…</p>
+        }
+        @if (resilience() === null) {
+          <p class="leg__line leg__line--quiet">Couldn't read this from here.</p>
+        }
+        @if (resilience(); as r) {
+          @if (health(); as h) {
+            <p class="leg__line" [class.leg__ui--warm]="h.warm" data-testid="epr-home-health">
+              {{ h.line }}
+            </p>
+          }
+          <dl class="facts">
+            <div class="facts__row">
+              <dt>Encoding</dt>
+              <dd>{{ r.encoding.strategy }}</dd>
+            </div>
+            <div class="facts__row">
+              <dt>Pieces placed</dt>
+              <dd>{{ r.distribution.shardsWithLocations }} of {{ r.distribution.totalShards }}</dd>
+            </div>
+            <div class="facts__row">
+              <dt>Peers holding pieces</dt>
+              <dd>{{ r.distribution.distinctPeers }}</dd>
+            </div>
+            @if (storageCommitted(); as committed) {
+              <div class="facts__row">
+                <dt>Storage committed</dt>
+                <dd>{{ committed }}</dd>
+              </div>
+            }
+            @if (copies(); as c) {
+              <div class="facts__row">
+                <dt>Copies</dt>
+                <dd>{{ c.has }} of {{ c.wants }} wanted · {{ replicaHealthWords(c.health) }}</dd>
+              </div>
+            }
+          </dl>
+          @if (r.distribution.shards.length > 0) {
+            <p class="leg__ui leg__ui--muted">Where the pieces are</p>
+            <ul class="pieces" data-testid="epr-home-pieces">
+              @for (shard of r.distribution.shards; track shard.hash; let i = $index) {
+                <li
+                  class="piece"
+                  [class.piece--parity]="shard.shardType === 'parity'"
+                  [class.piece--missing]="shard.peerIds.length === 0"
+                  [attr.aria-label]="
+                    'Piece ' +
+                    (i + 1) +
+                    ', ' +
+                    shard.shardType +
+                    ': ' +
+                    (shard.peerIds.length === 0
+                      ? 'no peer holds it'
+                      : shard.peerIds.length + ' peers hold it')
+                  "
+                >
+                  {{ shard.peerIds.length > 0 ? shard.peerIds.length : '?' }}
+                </li>
+              }
+            </ul>
+          }
+        }
+        <div class="leg__actions">
+          <button
+            type="button"
+            class="leg__button"
+            [disabled]="verification().state === 'checking'"
+            (click)="verify.emit()"
+            data-testid="epr-home-verify"
+          >
+            {{ verification().state === 'checking' ? 'Checking…' : "Check it's still whole" }}
+          </button>
+        </div>
+        @if (verifyWords(); as line) {
+          <p class="leg__line" data-testid="epr-home-verify-result">{{ line }}</p>
+        }
+      </div>
+    }
+  </section>
+
+  <!-- Who's here (attention, counted as protocol events) -->
+  <section class="leg" id="here" data-testid="epr-home-leg-here">
+    <h3 class="leg__title">Who's here</h3>
+    @if (engagement() === undefined) {
+      <p class="leg__line leg__line--quiet" data-testid="epr-home-attention">Checking…</p>
+    } @else if (engagement() === null) {
+      <p class="leg__line leg__line--quiet" data-testid="epr-home-attention">
+        Couldn't read this from here.
+      </p>
+    } @else {
+      <p class="leg__line" data-testid="epr-home-attention">{{ attention() }}</p>
+    }
+    <p class="leg__line leg__line--quiet">
+      Counted as protocol events on this doorway, never as analytics.
+    </p>
   </section>
 
   <!-- Where this lives (knowledge) -->
   <section class="leg" id="lives" data-testid="epr-home-leg-lives">
-    <h3 class="leg__title">Where this lives</h3>
+    <div class="leg__head">
+      <h3 class="leg__title">Where this lives</h3>
+      <button
+        type="button"
+        class="fold-toggle"
+        [attr.aria-expanded]="isOpen('lives')"
+        aria-controls="epr-home-fold-lives"
+        (click)="toggle('lives')"
+        data-testid="epr-home-fold-toggle-lives"
+      >
+        See also
+      </button>
+    </div>
     @if (relationships().length === 0 && related().length === 0) {
       <p class="leg__line">Not on a learning path yet.</p>
     }
@@ -54,41 +176,168 @@
         </a>
       }
     }
+    @if (isOpen('lives')) {
+      <div class="fold" id="epr-home-fold-lives" data-testid="epr-home-fold-lives">
+        @if (seeAlso() === undefined) {
+          <p class="leg__line leg__line--quiet">Checking…</p>
+        } @else if (seeAlso() === null) {
+          <p class="leg__line leg__line--quiet">Couldn't read this from here.</p>
+        } @else if (seeAlsoRows().length === 0) {
+          <p class="leg__line leg__line--quiet">Nothing else is named alongside this yet.</p>
+        } @else {
+          <div class="rows" data-testid="epr-home-see-also">
+            @for (s of seeAlsoRows(); track s.id) {
+              <a
+                class="leg__row leg__row--link"
+                [routerLink]="s.href"
+                [attr.data-inference]="s.inference"
+                data-testid="epr-home-see-also-card"
+              >
+                <span>{{ s.title }}</span>
+                <span class="leg__row-tags">
+                  <span class="pill">{{ s.kind }}</span>
+                  @if (s.inference === 'discovered') {
+                    <span class="pill pill--plum">discovered</span>
+                  }
+                </span>
+              </a>
+            }
+          </div>
+        }
+      </div>
+    }
   </section>
 
   <!-- How it's governed (governance) -->
   <section class="leg" id="governed" data-testid="epr-home-leg-governed">
-    <h3 class="leg__title">How it's governed</h3>
-    @if (openChallenges().length === 0) {
-      <p class="leg__line">No challenges, no labels. Nothing is in question.</p>
-    } @else {
-      @for (c of openChallenges(); track c.id) {
-        <div class="leg__row">
-          <span>{{ c.groundsPrimary }}</span>
-          <span class="pill">{{ c.state }}</span>
-        </div>
-      }
-    }
-    <div class="leg__actions">
-      <a
-        class="leg__link"
-        [routerLink]="['/resource', atom().id]"
-        fragment="governance"
-        data-testid="epr-home-raise-concern"
+    <div class="leg__head">
+      <h3 class="leg__title">How it's governed</h3>
+      <button
+        type="button"
+        class="fold-toggle"
+        [attr.aria-expanded]="isOpen('governed')"
+        aria-controls="epr-home-fold-governed"
+        (click)="toggle('governed')"
+        data-testid="epr-home-fold-toggle-governed"
       >
-        Raise a concern
-      </a>
+        Details
+      </button>
     </div>
+    @if (labels().length > 0) {
+      <div class="leg__row" data-testid="epr-home-labels">
+        @for (l of labels(); track l) {
+          <span class="pill pill--warm">{{ l }}</span>
+        }
+      </div>
+    }
+    @if (openChallenges().length === 0 && labels().length === 0) {
+      <p class="leg__line">No challenges, no labels. Nothing is in question.</p>
+    }
+    @for (c of openChallenges(); track c.id) {
+      <div class="leg__row">
+        <span>{{ c.groundsPrimary }}</span>
+        <span class="pill">{{ c.state }}</span>
+      </div>
+    }
+    @if (canWrite()) {
+      <div class="leg__actions">
+        <span class="leg__ui leg__ui--muted">Raise a concern</span>
+        <elohim-gate-feedback-trigger
+          [attr.content-id]="atom().id"
+          (feedback-submit)="onConcern($event)"
+          data-testid="epr-home-raise-concern"
+        ></elohim-gate-feedback-trigger>
+      </div>
+      @if (concernNote(); as note) {
+        <p class="leg__line leg__line--quiet" role="status">{{ note }}</p>
+      }
+    } @else {
+      <p class="leg__line leg__line--quiet" data-testid="epr-home-raise-concern-signed-out">
+        Sign in to raise a concern.
+      </p>
+    }
+    @if (isOpen('governed')) {
+      <div class="fold" id="epr-home-fold-governed" data-testid="epr-home-fold-governed">
+        @if (labelsReviewed(); as reviewed) {
+          <p class="leg__line leg__line--quiet">Labels last reviewed {{ reviewed }}</p>
+        }
+        @if (challenges().length === 0) {
+          <p class="leg__line leg__line--quiet">No challenge has been filed here.</p>
+        }
+        @for (c of challenges(); track c.id) {
+          <div class="leg__row leg__row--stack" data-testid="epr-home-challenge">
+            <span>
+              {{ grounds(c) }}
+              <span class="pill">{{ c.state }}</span>
+            </span>
+            @if (c.evidence) {
+              <span class="leg__line leg__line--quiet">{{ c.evidence }}</span>
+            }
+            <span class="leg__ui leg__ui--muted">
+              filed {{ filedOn(c) }}
+              @if (challengeDays(c); as days) {
+                · {{ days }}
+              }
+            </span>
+          </div>
+        }
+      </div>
+    }
   </section>
 
   <!-- Where it came from (process) -->
   <section class="leg" id="from" data-testid="epr-home-leg-from">
-    <h3 class="leg__title">Where it came from</h3>
+    <div class="leg__head">
+      <h3 class="leg__title">Where it came from</h3>
+      <button
+        type="button"
+        class="fold-toggle"
+        [attr.aria-expanded]="isOpen('from')"
+        aria-controls="epr-home-fold-from"
+        (click)="toggle('from')"
+        data-testid="epr-home-fold-toggle-from"
+      >
+        Attestations
+      </button>
+    </div>
     @for (s of stewards(); track s.stewardPresenceId) {
-      <div class="leg__row">
-        <span class="leg__ui leg__ui--muted">Steward</span>
-        <span>{{ s.stewardPresenceId }}</span>
-        <span class="pill">{{ contribution(s) }} · since {{ since(s) }}</span>
+      <div class="leg__row leg__row--stack" data-testid="epr-home-steward">
+        <span class="leg__row">
+          <span class="leg__ui leg__ui--muted">Steward</span>
+          <span>{{ s.displayName ?? s.stewardPresenceId }}</span>
+          <span class="pill">{{ contribution(s) }} · since {{ since(s) }}</span>
+        </span>
+        @if (share(s); as sh) {
+          <span class="leg__ui leg__ui--muted">
+            {{ sh }}
+            @if (recognition(s); as rec) {
+              · {{ rec }}
+            }
+          </span>
+        }
+        @if (s.disputed) {
+          <span class="leg__ui leg__ui--warm">
+            Disputed: {{ s.disputeReason ?? 'reason not given' }}
+          </span>
+        }
+      </div>
+    }
+    @if (contributors().length > 0) {
+      <div
+        class="contributors"
+        data-testid="viewer-contributors-section"
+        aria-label="Contributors and inspirations"
+      >
+        <p class="leg__ui leg__ui--muted">Inspired by / contributed to by</p>
+        <div class="contributors__list" data-testid="viewer-contributors-list">
+          @for (p of contributors(); track p.id) {
+            <elohim-contributor-card
+              compact
+              [presence]="p"
+              [attr.data-testid]="'viewer-contributor-card-' + p.id"
+            ></elohim-contributor-card>
+          }
+        </div>
       </div>
     }
     @if (sourceLabel(); as src) {
@@ -115,6 +364,44 @@
         </span>
       }
     </div>
-    <a class="leg__link leg__ui" [href]="rawHref()">Raw node ›</a>
+    <div class="leg__actions">
+      @if (downloadHref(); as dl) {
+        <a class="leg__link leg__ui" [href]="dl" download data-testid="epr-home-download">
+          Download ({{ atom().contentFormat }})
+        </a>
+      }
+      <a class="leg__link leg__ui" [href]="rawHref()">Raw node ›</a>
+    </div>
+    @if (isOpen('from')) {
+      <div class="fold" id="epr-home-fold-from" data-testid="epr-home-fold-from">
+        @if (attestations() === undefined) {
+          <p class="leg__line leg__line--quiet">Checking…</p>
+        } @else if (attestations() === null) {
+          <p class="leg__line leg__line--quiet">Couldn't read this from here.</p>
+        } @else if (attestations()?.length === 0) {
+          <p class="leg__line leg__line--quiet">No one has attested to this yet.</p>
+        } @else {
+          <div class="rows" data-testid="epr-home-attestations">
+            @for (a of attestations(); track a.id) {
+              <div
+                class="leg__row leg__row--stack"
+                [class.leg__row--revoked]="!!a.revokedAt"
+                data-testid="epr-home-attestation"
+              >
+                <span class="attestation__title">{{ a.title }}</span>
+                <span class="leg__ui leg__ui--muted">
+                  by {{ issuerShort(a) }} · {{ proofWords(a) }} · {{ attestedOn(a) }}
+                </span>
+                @if (a.revokedAt) {
+                  <span class="leg__ui leg__ui--warm">
+                    Revoked{{ a.revocationReason ? ': ' + a.revocationReason : '' }}
+                  </span>
+                }
+              </div>
+            }
+          </div>
+        }
+      </div>
+    }
   </section>
 </aside>

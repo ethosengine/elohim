@@ -81,6 +81,13 @@
           @if (a.description) {
             <p class="epr-home__lede">{{ a.description }}</p>
           }
+          @if (a.tags.length > 0) {
+            <ul class="epr-home__tags" data-testid="epr-home-tags" aria-label="Tags">
+              @for (tag of a.tags; track tag) {
+                <li class="epr-home__tag" data-testid="epr-home-tag">{{ tag }}</li>
+              }
+            </ul>
+          }
           <div class="epr-home__chips">
             <span class="epr-home__chip epr-home__chip--reach" data-testid="epr-home-chip-reach">
               {{ reachLabel() }}
@@ -93,11 +100,17 @@
             <a
               class="epr-home__chip"
               [class.epr-home__chip--warm]="heldWarm()"
-              href="#holds"
+              [href]="holdsHref()"
+              (click)="openLeg($event, 'holds')"
               data-testid="epr-home-chip-held"
             >
               {{ heldChipLabel() }}
             </a>
+            @if (editLens(); as e) {
+              <a class="epr-home__btn epr-home__edit" [href]="e.href" data-testid="epr-home-edit">
+                Edit in {{ e.bundleName }}
+              </a>
+            }
             @if (lens(); as l) {
               <a
                 class="epr-home__btn epr-home__btn--primary epr-home__open"
@@ -126,7 +139,22 @@
                 </a>
               </div>
             } @else {
-              <app-epr-focal [slug]="a.id" [anonymousPublicRead]="!signedIn()"></app-epr-focal>
+              <div class="epr-home__focal-bar">
+                <button
+                  type="button"
+                  class="epr-home__btn epr-home__btn--quiet"
+                  [attr.aria-pressed]="focused()"
+                  (click)="toggleFocus()"
+                  data-testid="epr-home-focus"
+                >
+                  {{ focused() ? 'Leave focus' : 'Focus' }}
+                </button>
+              </div>
+              <app-epr-focal
+                [slug]="a.id"
+                [anonymousPublicRead]="!signedIn()"
+                (nodeLoaded)="onFocalLoaded()"
+              ></app-epr-focal>
             }
           </section>
         }
@@ -165,6 +193,19 @@
                     Kept on your device, shared only when you say so
                   </span>
                 </div>
+                <div class="epr-home__landed" data-testid="epr-home-reactions">
+                  <h4 class="epr-home__subhead">How it landed</h4>
+                  @if (canWrite()) {
+                    <elohim-reaction-bar
+                      entity-type="content"
+                      [attr.entity-id]="a.id"
+                      [counts]="reactionCounts()"
+                      [showCounts]="true"
+                      (reaction-submit)="onReaction($event)"
+                    ></elohim-reaction-bar>
+                  }
+                  <p class="epr-home__ui epr-home__ui--muted">{{ landedLine() }}</p>
+                </div>
               </section>
             }
             @if (a.shape === 'reading') {
@@ -186,19 +227,80 @@
                     </a>
                   </div>
                 } @else {
-                  <app-epr-focal [slug]="a.id" [anonymousPublicRead]="!signedIn()"></app-epr-focal>
+                  <div class="epr-home__focal-bar">
+                    <button
+                      type="button"
+                      class="epr-home__btn epr-home__btn--quiet"
+                      [attr.aria-pressed]="focused()"
+                      (click)="toggleFocus()"
+                      data-testid="epr-home-focus"
+                    >
+                      {{ focused() ? 'Leave focus' : 'Focus' }}
+                    </button>
+                  </div>
+                  <app-epr-focal
+                    [slug]="a.id"
+                    [anonymousPublicRead]="!signedIn()"
+                    (nodeLoaded)="onFocalLoaded()"
+                  ></app-epr-focal>
                 }
               </section>
             }
+            <section class="epr-home__conversation" data-testid="epr-home-conversation">
+              <h3 class="epr-home__section-title">Conversation</h3>
+              @if (discussions().length === 0) {
+                <p class="epr-home__ui epr-home__ui--muted">
+                  No one has spoken about this here yet.
+                </p>
+              } @else {
+                <ul class="epr-home__discussions">
+                  @for (d of discussions(); track d.id) {
+                    <li class="epr-home__discussion" data-testid="epr-home-discussion">
+                      <span class="epr-home__discussion-title">{{ d.title }}</span>
+                      <span class="epr-home__ui epr-home__ui--muted">
+                        {{ d.messages }} {{ d.messages === 1 ? 'message' : 'messages' }}
+                        @if (d.status) {
+                          · {{ d.status }}
+                        }
+                        @if (d.category) {
+                          · {{ d.category }}
+                        }
+                      </span>
+                    </li>
+                  }
+                </ul>
+              }
+              <!--
+                "Start a conversation" is not offered yet: CreateDiscussionInputView
+                requires the client to supply the discussion's id, and the shell does
+                not mint entity identity. TODO(rust-migration): the discussions route
+                should assign the id (elohim-storage api/governance.rs POST /discussions).
+              -->
+            </section>
           </div>
           <app-epr-home-legs
             class="epr-home__rail"
             [atom]="a"
             [snapshot]="snapshot()"
             [peersHolding]="peersHolding()"
+            [copies]="copies()"
             [stewards]="stewards()"
             [relationships]="relationships()"
             [challenges]="challenges()"
+            [resilience]="resilienceDetailView()"
+            [verification]="verification()"
+            [attestations]="attestations()"
+            [governanceState]="governanceState()"
+            [seeAlso]="seeAlso()"
+            [contributors]="contributors()"
+            [engagement]="engagement()"
+            [canWrite]="canWrite()"
+            [concernNote]="concernNote()"
+            [downloadHref]="downloadHref()"
+            [openFold]="openFold()"
+            (foldOpened)="onFoldOpened($event)"
+            (verify)="onVerify()"
+            (concern)="onConcern($event)"
           ></app-epr-home-legs>
         </div>
 
@@ -207,8 +309,8 @@
           <code class="epr-home__mono">{{ address() }}</code>
           <a
             class="epr-home__link"
-            [routerLink]="['/resource', a.id]"
-            fragment="network"
+            [href]="holdsHref()"
+            (click)="openLeg($event, 'holds')"
             data-testid="epr-home-network-detail"
           >
             Network detail

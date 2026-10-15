@@ -63,8 +63,10 @@ describe('ProfileDiscoverySectionComponent', () => {
 
     mockRouter = {
       navigate: vi.fn(),
+      navigateByUrl: vi.fn(),
     };
     mockRouter.navigate.mockReturnValue(Promise.resolve(true));
+    mockRouter.navigateByUrl.mockReturnValue(Promise.resolve(true));
 
     await TestBed.configureTestingModule({
       imports: [TestHostComponent, ProfileDiscoverySectionComponent],
@@ -178,10 +180,10 @@ describe('ProfileDiscoverySectionComponent', () => {
   });
 
   describe('navigateToResult()', () => {
-    it('should navigate to resource when contentNodeId is present', () => {
+    it("should navigate to the atom's universal address when contentNodeId is present", () => {
       component.navigateToResult(buildResult({ contentNodeId: 'content-enneagram-001' }));
 
-      expect(mockRouter.navigate).toHaveBeenCalledWith(['/resource', 'content-enneagram-001']);
+      expect(mockRouter.navigateByUrl).toHaveBeenCalledWith('/epr/content-enneagram-001');
     });
 
     it('should emit navigateToDiscovery when contentNodeId is absent', () => {

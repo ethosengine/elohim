@@ -11,6 +11,8 @@ import { StewardshipAllocationService } from '@app/lamad/services/stewardship-al
 import { HouseholdDevicesService } from '@app/shefa/services/household-devices.service';
 import { ResourceExplorerService } from '@app/shefa/services/resource-explorer.service';
 
+import { eprToUniversalHref } from '@elohim/service';
+
 import { ExplorerBreadcrumbComponent } from './explorer-breadcrumb.component';
 import { ExplorerGridComponent } from './explorer-grid.component';
 import { ExplorerSidebarComponent } from './explorer-sidebar.component';
@@ -275,7 +277,8 @@ export class ResourceExplorerComponent implements OnInit {
   }
 
   openFile(resourceId: string): void {
-    void this.router.navigate(['/resource', resourceId]);
+    // The shell owns the universal address, so an in-bundle navigation is right.
+    void this.router.navigateByUrl(eprToUniversalHref({ id: resourceId, tier: 'head' }));
   }
 
   private loadTree(): void {

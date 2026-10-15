@@ -123,7 +123,10 @@ describe('ResourceExplorerComponent — category:content lens', () => {
       getProvider: vi.fn().mockReturnValue(null),
     };
 
-    mockRouter = { navigate: vi.fn().mockResolvedValue(true) };
+    mockRouter = {
+      navigate: vi.fn().mockResolvedValue(true),
+      navigateByUrl: vi.fn().mockResolvedValue(true),
+    };
   });
 
   async function setup(lensType: string | null = 'category:content'): Promise<void> {
@@ -144,6 +147,13 @@ describe('ResourceExplorerComponent — category:content lens', () => {
     fixture = TestBed.createComponent(ResourceExplorerComponent);
     component = fixture.componentInstance;
   }
+
+  it("opens a file at the atom's universal address, never the legacy resource URL", async () => {
+    await setup();
+    component.openFile('content-abc');
+    expect(mockRouter.navigateByUrl).toHaveBeenCalledWith('/epr/content-abc');
+    expect(mockRouter.navigate).not.toHaveBeenCalledWith(['/resource', 'content-abc']);
+  });
 
   // ---------------------------------------------------------------------------
   // category:content — items rendered
