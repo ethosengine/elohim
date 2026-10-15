@@ -31,6 +31,7 @@ export * from './enums/osm-element-type';
 export * from './enums/path-visibility';
 export * from './enums/place-status';
 export * from './enums/place-type';
+export * from './enums/rea-action';
 export * from './enums/reach';
 export * from './enums/relationship-type';
 export * from './enums/relay-mode';

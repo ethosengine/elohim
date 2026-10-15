@@ -298,12 +298,17 @@ pub enum Hop {
     H3,
 }
 
-/// REA verb for a witnessed interaction. **ts-rs-rooted here** — no authoritative closed verb
-/// enum exists to reuse: the economic-event schemas define `action` as a free-form string (no
-/// enum), and `elohim_storage::services::economic_event_service::EconomicAction`
-/// (`Produce|Consume|Transfer|Use`) is a downstream leaf's private, non-exported enum whose crate
-/// depends on `elohim-epr` (reusing it would be a Cargo cycle). Rooting here is therefore not
-/// dual-sourcing (spec must-fix #3). Serializes lowercase to match the spec §2.2 canonical forms.
+/// REA verb for a witnessed interaction. **ts-rs-rooted here.** The protocol's one action
+/// vocabulary is `elohim/sdk/schemas/v1/enums/rea-action.schema.json`, generated into
+/// [`crate::generated::ALL_REA_ACTIONS`]; `ReaVerb` is the subset of it the witness and flow
+/// layers record today, and every variant maps onto a generated value ([`ReaVerb::as_action`],
+/// pinned by `rea_verb_maps_onto_the_generated_action_enum`). It is a closed Rust enum rather
+/// than a re-export because its variants are hashed into atoms (`reaverb_canonical`) and folded
+/// by exhaustive matches (`epr-rea::epistemic`); widening it (e.g. `Transfer` for rival goods) is
+/// a deliberate act per variant, not a codegen side effect. `EconomicAction` in elohim-storage
+/// (`Produce|Consume|Transfer|Use`) is a downstream leaf's private enum whose crate depends on
+/// `elohim-epr` (reusing it would be a Cargo cycle). Serializes lowercase to match the spec §2.2
+/// canonical forms, which for these single-word verbs equal the schema's kebab-case values.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize, TS)]
 #[serde(rename_all = "lowercase")]
 #[ts(export, export_to = "../../sdk/epr-ts/src/generated/")]
@@ -314,6 +319,38 @@ pub enum ReaVerb {
     Cite,
     Affirm,
     Dismiss,
+}
+
+impl ReaVerb {
+    /// Every variant, in declaration order.
+    pub const ALL: [ReaVerb; 6] = [
+        ReaVerb::Use,
+        ReaVerb::Consume,
+        ReaVerb::Produce,
+        ReaVerb::Cite,
+        ReaVerb::Affirm,
+        ReaVerb::Dismiss,
+    ];
+
+    /// This verb's word in the generated action vocabulary
+    /// ([`crate::generated::ALL_REA_ACTIONS`]). It is also the serde form and the canonical
+    /// IPLD string hashed into atoms, so it can never change for an existing variant.
+    pub const fn as_action(self) -> &'static str {
+        match self {
+            ReaVerb::Use => "use",
+            ReaVerb::Consume => "consume",
+            ReaVerb::Produce => "produce",
+            ReaVerb::Cite => "cite",
+            ReaVerb::Affirm => "affirm",
+            ReaVerb::Dismiss => "dismiss",
+        }
+    }
+
+    /// The verb for an action word. `None` for a word the vocabulary has but `ReaVerb` does not
+    /// record yet (e.g. `transfer`, `transfer-custody`), and for a word outside the vocabulary.
+    pub fn from_action(action: &str) -> Option<Self> {
+        Self::ALL.into_iter().find(|v| v.as_action() == action)
+    }
 }
 
 /// v1 self-reported witness identity `{claude|codex|gemini|human}`. Graduates to a signed
@@ -387,15 +424,7 @@ fn evidence_ipld(e: &FrameEvidence) -> Ipld {
 }
 
 fn reaverb_canonical(v: ReaVerb) -> String {
-    match v {
-        ReaVerb::Use => "use",
-        ReaVerb::Consume => "consume",
-        ReaVerb::Produce => "produce",
-        ReaVerb::Cite => "cite",
-        ReaVerb::Affirm => "affirm",
-        ReaVerb::Dismiss => "dismiss",
-    }
-    .into()
+    v.as_action().into()
 }
 
 fn witnessid_canonical(w: WitnessId) -> String {
@@ -541,5 +570,60 @@ mod tests {
         let j = serde_json::to_string(&f).unwrap();
         let back: FrameClassification = serde_json::from_str(&j).unwrap();
         assert_eq!(f, back);
+    }
+
+    // ── One action vocabulary (rea-action.schema.json) ─────────────────
+
+    /// Every `ReaVerb` is a word in the generated action vocabulary, and its serde form, its
+    /// canonical IPLD string and its generated word are one string. The exhaustive match is the
+    /// compile-time pin: a new variant breaks it, forcing `ALL` and this test to move with it.
+    #[test]
+    fn rea_verb_maps_onto_the_generated_action_enum() {
+        use crate::generated::ALL_REA_ACTIONS;
+        for v in ReaVerb::ALL {
+            match v {
+                ReaVerb::Use
+                | ReaVerb::Consume
+                | ReaVerb::Produce
+                | ReaVerb::Cite
+                | ReaVerb::Affirm
+                | ReaVerb::Dismiss => {}
+            }
+            let word = v.as_action();
+            assert!(
+                ALL_REA_ACTIONS.contains(&word),
+                "ReaVerb::{v:?} -> {word:?} is not in rea-action.schema.json"
+            );
+            assert_eq!(serde_json::to_value(v).unwrap(), serde_json::json!(word));
+            assert_eq!(reaverb_canonical(v), word);
+            assert_eq!(ReaVerb::from_action(word), Some(v));
+        }
+        // A vocabulary word ReaVerb does not record yet maps to None, never to a near neighbour.
+        assert!(ALL_REA_ACTIONS.contains(&"transfer"));
+        assert_eq!(ReaVerb::from_action("transfer"), None);
+        assert_eq!(ReaVerb::from_action("not-an-action"), None);
+    }
+
+    /// The generated slices are the schema's lists, in order. (`pnpm run schema:codegen:rs --
+    /// --verify` holds the file to the schema; this holds the re-export to the file.)
+    #[test]
+    fn generated_action_enum_matches_schema() {
+        use crate::generated::{ALL_REA_ACTIONS, CORE_REA_ACTIONS};
+        let schema: serde_json::Value = serde_json::from_str(include_str!(
+            "../../sdk/schemas/v1/enums/rea-action.schema.json"
+        ))
+        .expect("rea-action.schema.json parses");
+        let strings = |v: &serde_json::Value| -> Vec<String> {
+            v.as_array()
+                .expect("array")
+                .iter()
+                .map(|s| s.as_str().expect("string").to_string())
+                .collect()
+        };
+        assert_eq!(strings(&schema["enum"]), ALL_REA_ACTIONS);
+        assert_eq!(
+            strings(&schema["_tiers"]["core"]["values"]),
+            CORE_REA_ACTIONS
+        );
     }
 }

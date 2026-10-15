@@ -8,6 +8,8 @@
  *
  * Source: elohim/sdk/schemas/v1/enums/*.schema.json (schemas with _dna metadata)
  * Output: elohim/holochain/dna/elohim/zomes/content_store_integrity/src/generated_enums.rs
+ *         (+ elohim-storage copy) for `_dna` enums; elohim/epr/src/generated/enums.rs for
+ *         `_codegen.rust: ["epr"]` enums; elohim/epr/src/generated/ordinals.rs for `_ordinal`.
  */
 import { readdir, readFile, writeFile, mkdtemp, mkdir, rm } from 'node:fs/promises';
 import { join, resolve, dirname } from 'node:path';
@@ -38,6 +40,15 @@ const OUTPUT_EPR_ORDINALS = resolve(
   REPO_ROOT,
   'elohim/epr/src/generated/ordinals.rs',
 );
+// Enums whose schema declares `_codegen.rust: ["epr", ...]` — vocabularies every Rust
+// consumer reads from epr, and which must NEVER be written into an integrity zome's
+// generated_enums.rs (that file is compiled into the DNA, so a new const there is a
+// DNA-hash move). rea-action is the first: its DNA const is hand-written and only
+// checked (check-dna.mjs `_dnaMirror`).
+const OUTPUT_EPR_ENUMS = resolve(
+  REPO_ROOT,
+  'elohim/epr/src/generated/enums.rs',
+);
 
 const VERIFY = process.argv.includes('--verify');
 
@@ -52,9 +63,11 @@ function toRustDoc(schema) {
 }
 
 /**
- * Generate Rust source from all enum schemas with _dna metadata.
+ * CORE_* / ALL_* slice blocks for every enum schema whose `specOf(schema)` returns a
+ * `{ constant }` spec. Shared by the DNA/storage file (`_dna`) and the epr file
+ * (`_codegen.rust` includes "epr") so the two cannot format differently.
  */
-async function generate() {
+async function generateConstBlocks(specOf) {
   const files = (await readdir(ENUM_DIR))
     .filter((f) => f.endsWith('.schema.json'))
     .sort();
@@ -65,9 +78,10 @@ async function generate() {
     const raw = await readFile(join(ENUM_DIR, file), 'utf8');
     const schema = JSON.parse(raw);
 
-    if (!schema._dna) continue;
+    const spec = specOf(schema);
+    if (!spec) continue;
 
-    const { constant } = schema._dna;
+    const { constant } = spec;
     const { title } = toRustDoc(schema);
     const allValues = schema.enum;
     const coreValues = schema._tiers?.core?.values || allValues;
@@ -88,10 +102,42 @@ async function generate() {
     ));
   }
 
+  return blocks;
+}
+
+/**
+ * Generate Rust source from all enum schemas with _dna metadata (DNA + storage copies).
+ */
+async function generateDnaEnums() {
+  const blocks = await generateConstBlocks((schema) => schema._dna);
   const header = `//! AUTO-GENERATED from protocol JSON schemas.
 //! DO NOT EDIT \u2014 regenerate with: pnpm run schema:codegen:rs
 //!
 //! Source: elohim/sdk/schemas/v1/enums/*.schema.json
+`;
+
+  return header + '\n' + blocks.join('\n');
+}
+
+/**
+ * Generate Rust source for enums routed to the epr crate (`_codegen.rust` includes "epr").
+ * Returns null when no schema asks for it (nothing to write).
+ */
+async function generateEprEnums() {
+  const blocks = await generateConstBlocks((schema) =>
+    Array.isArray(schema._codegen?.rust) && schema._codegen.rust.includes('epr')
+      ? schema._codegen
+      : null,
+  );
+  if (blocks.length === 0) return null;
+
+  const header = `//! AUTO-GENERATED from protocol JSON schemas whose \`_codegen.rust\` names "epr".
+//! DO NOT EDIT \u2014 regenerate with: pnpm run schema:codegen:rs
+//!
+//! Source: elohim/sdk/schemas/v1/enums/*.schema.json
+//!
+//! Lives in epr because epr is upstream of epr-rea and elohim-storage, and because these
+//! vocabularies must never be generated into an integrity zome (that moves the DNA hash).
 `;
 
   return header + '\n' + blocks.join('\n');
@@ -255,9 +301,10 @@ ${govActionMatchArms}
 }
 
 async function main() {
-  const generated = await generate();
+  const generated = await generateDnaEnums();
   const generatedKinds = await generateAttestationKinds();
   const generatedEprOrdinals = await generateEprOrdinals();
+  const generatedEprEnums = await generateEprEnums();
 
   const enumTargets = [
     { label: 'DNA', path: OUTPUT_DNA },
@@ -337,6 +384,29 @@ async function main() {
       }
     }
 
+    // Verify epr enum file (REA_ACTIONS, etc.)
+    if (generatedEprEnums !== null) {
+      const tmpEprEnums = join(tmpDir, 'enums.rs');
+      await writeFile(tmpEprEnums, generatedEprEnums);
+      try {
+        execFileSync('rustfmt', [tmpEprEnums], { stdio: 'pipe' });
+      } catch {
+        // rustfmt not available — compare raw
+      }
+      const expectedEprEnums = await readFile(tmpEprEnums, 'utf8');
+      let existingEprEnums;
+      try {
+        existingEprEnums = await readFile(OUTPUT_EPR_ENUMS, 'utf8');
+      } catch {
+        console.error(`FAIL: Generated file does not exist (epr-enums): ${OUTPUT_EPR_ENUMS}`);
+        stale = true;
+      }
+      if (existingEprEnums !== undefined && existingEprEnums !== expectedEprEnums) {
+        console.error('FAIL: Rust epr-enums codegen is stale. Run: pnpm run schema:codegen:rs');
+        stale = true;
+      }
+    }
+
     await rm(tmpDir, { recursive: true });
     if (stale) process.exit(1);
     console.log('Rust codegen is up to date.');
@@ -374,6 +444,18 @@ async function main() {
       // rustfmt not available
     }
     console.log(`Generated (epr-ordinal): ${OUTPUT_EPR_ORDINALS}`);
+  }
+
+  // Write epr enum file (REA_ACTIONS, etc. — never into an integrity zome)
+  if (generatedEprEnums !== null) {
+    await mkdir(dirname(OUTPUT_EPR_ENUMS), { recursive: true });
+    await writeFile(OUTPUT_EPR_ENUMS, generatedEprEnums);
+    try {
+      execFileSync('rustfmt', [OUTPUT_EPR_ENUMS], { stdio: 'pipe' });
+    } catch {
+      // rustfmt not available
+    }
+    console.log(`Generated (epr-enums): ${OUTPUT_EPR_ENUMS}`);
   }
 }
 

@@ -2,7 +2,7 @@
 /**
  * Generates TypeScript from protocol schemas:
  * 1. Interfaces from input/view schemas (json-schema-to-typescript)
- * 2. Enum constants from _dna schemas (tier-aware CORE_* and ALL_*)
+ * 2. Enum constants from _dna and _codegen schemas (tier-aware CORE_* and ALL_*)
  *
  * Usage:
  *   node codegen-ts.mjs           # Generate all
@@ -522,10 +522,15 @@ async function generateEnumConstants() {
     const raw = await readFile(join(ENUM_DIR, file), 'utf8');
     const schema = JSON.parse(raw);
 
-    if (!schema._dna) continue;
+    // `_dna` enums are mirrored as generated DNA constants; `_codegen` enums are
+    // generated everywhere EXCEPT a DNA (e.g. rea-action, whose DNA const is
+    // hand-written in an integrity zome and only checked, see check-dna.mjs).
+    // Both carry the same `constant` base name.
+    const spec = schema._dna ?? schema._codegen;
+    if (!spec) continue;
 
     const title = schema.title;
-    const baseName = schema._dna.constant; // e.g. "CONTENT_TYPES", "REACH_LEVELS"
+    const baseName = spec.constant; // e.g. "CONTENT_TYPES", "REACH_LEVELS"
     const allValues = schema.enum;
     const coreValues = schema._tiers?.core?.values || allValues;
 

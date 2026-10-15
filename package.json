@@ -68,7 +68,7 @@
     "schema:codegen:ttl:verify": "node elohim/sdk/schemas/scripts/codegen-ttl.mjs --verify",
     "route-claims:codegen": "node elohim/sdk/schemas/scripts/codegen-route-claims.mjs",
     "route-claims:codegen:verify": "node elohim/sdk/schemas/scripts/codegen-route-claims.mjs --verify",
-    "schema:unit": "node --test elohim/sdk/schemas/scripts/__tests__/codegen-ordinal.test.mjs elohim/sdk/schemas/scripts/__tests__/codegen-ttl.test.mjs",
+    "schema:unit": "node --test elohim/sdk/schemas/scripts/__tests__/codegen-ordinal.test.mjs elohim/sdk/schemas/scripts/__tests__/codegen-ttl.test.mjs elohim/sdk/schemas/scripts/__tests__/codegen-rea-action.test.mjs",
     "agentic:test": "node --test genesis/agentic/*.test.mjs",
     "agentic:readiness": "node genesis/agentic/readiness.mjs",
     "manifest:codegen:verify": "node elohim/sdk/schemas/scripts/codegen-manifest.mjs --gate elohim/sdk/domains/lamad/manifest.json && node elohim/sdk/schemas/scripts/codegen-manifest.mjs --gate elohim/sdk/domains/qahal/manifest.json",
