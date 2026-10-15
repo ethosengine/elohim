@@ -93,20 +93,24 @@ fn metadata_text(a: &Args) -> Result<String, BridgeError> {
     }
 }
 
-/// The lockfile's last commit time: unchanged lockfile, unchanged records.
+/// The lockfile's last commit time, used only to date a lockfile the store has never seen (a
+/// lockfile already observed keeps its first observation's time, see `cargo_bridge::observe`).
+/// `lockfile` is canonical; git runs in its directory and is handed its file name, so a relative
+/// `--lockfile` resolves the same way.
 fn lockfile_commit_time(lockfile: &Path) -> Result<String, BridgeError> {
     let dir = lockfile.parent().unwrap_or(Path::new("."));
+    let name = lockfile.file_name().unwrap_or(lockfile.as_os_str());
     let out = Command::new("git")
         .arg("-C")
         .arg(dir)
         .args(["log", "-1", "--format=%cI", "--"])
-        .arg(lockfile)
+        .arg(name)
         .output()
         .map_err(|e| BridgeError::Malformed(format!("cannot read the lockfile's history: {e}")))?;
     let time = String::from_utf8_lossy(&out.stdout).trim().to_string();
     if !out.status.success() || time.is_empty() {
         return Err(BridgeError::Malformed(format!(
-            "{} has no commit to date the observation by — pass --occurred-at",
+            "{} has no commit to date its first observation by — pass --occurred-at",
             lockfile.display()
         )));
     }
@@ -117,7 +121,11 @@ fn run(command: &str, a: &Args) -> Result<u8, BridgeError> {
     let root = absolute(a.root.as_deref().unwrap_or(Path::new(".")))?;
     // Where the records go (default: the repository root's own `.eprfs/status`). Paths in the
     // records are always relative to `--root`, so a scratch store holds the same records.
+    // `verify` never writes, so it never creates a missing store: a missing store reads as empty.
     let store = match &a.store {
+        Some(dir) if command == "verify" && !dir.exists() => std::env::current_dir()
+            .map_err(|e| BridgeError::Io(e.to_string()))?
+            .join(dir),
         Some(dir) => {
             std::fs::create_dir_all(dir).map_err(|e| BridgeError::Io(e.to_string()))?;
             absolute(dir)?
@@ -126,10 +134,10 @@ fn run(command: &str, a: &Args) -> Result<u8, BridgeError> {
     };
     let metadata = metadata_text(a)?;
     let parsed = cargo_bridge::metadata::parse_metadata(&metadata)?;
-    let lockfile = match &a.lockfile {
+    let lockfile = absolute(&match &a.lockfile {
         Some(path) => path.clone(),
         None => Path::new(&parsed.workspace_root).join("Cargo.lock"),
-    };
+    })?;
     let lock_bytes = std::fs::read(&lockfile)
         .map_err(|e| BridgeError::Malformed(format!("cannot read {}: {e}", lockfile.display())))?;
     let workspace = a.workspace.clone().unwrap_or_else(|| {
@@ -137,9 +145,18 @@ fn run(command: &str, a: &Args) -> Result<u8, BridgeError> {
             .file_name()
             .map_or_else(|| "workspace".into(), |n| n.to_string_lossy().into_owned())
     });
+    // Only a lockfile the store has never seen needs a time; a seen one reuses its first.
     let occurred_at = match &a.occurred_at {
         Some(t) => t.clone(),
-        None => lockfile_commit_time(&lockfile)?,
+        None => match lockfile_commit_time(&lockfile) {
+            Ok(t) => t,
+            Err(e) => cargo_bridge::observe::first_observed_at(
+                &cargo_bridge::observe::stored_records(&store)?,
+                &workspace,
+                &lock_bytes,
+            )
+            .ok_or(e)?,
+        },
     };
     let mut config = Config::for_repository(&workspace, &root.to_string_lossy(), &occurred_at);
     if let Some(author) = &a.author {
@@ -168,13 +185,12 @@ fn run(command: &str, a: &Args) -> Result<u8, BridgeError> {
                     outcome.offer
                 );
                 println!(
-                    "  {} resolved, {} members, {} cited: {} registry with checksum, {} registry \
-                     without, {} git, {} path (coordinate-only)",
+                    "  {} resolved, {} members, {} cited: {} registry with checksum, {} git, {} \
+                     path (coordinate-only)",
                     r.packages_resolved,
                     r.workspace_members,
                     r.cited,
                     r.registry_with_checksum,
-                    r.registry_without_checksum,
                     r.git,
                     r.path
                 );

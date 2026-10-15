@@ -61,7 +61,6 @@ fn one_cite_input_per_resolved_package_and_a_deterministic_process() {
         (r.report.registry_with_checksum, r.report.git, r.report.path),
         (3, 1, 1)
     );
-    assert_eq!(r.report.registry_without_checksum, 0);
 
     // Deterministic: a second translation is the same records, address for address.
     let again = reliance(&inputs(), &config()).unwrap();

@@ -73,6 +73,8 @@ pub fn parse_metadata(text: &str) -> Result<Metadata, Refusal> {
 
 #[derive(Debug, Deserialize)]
 struct Lockfile {
+    /// Absent in format v1 and v2, which keep checksums in a `[metadata]` table instead.
+    version: Option<u32>,
     #[serde(default)]
     package: Vec<LockPackage>,
 }
@@ -89,10 +91,27 @@ struct LockPackage {
 pub type Checksums = BTreeMap<(String, String, String), String>;
 
 /// Read the checksums out of a `Cargo.lock` (format v3 or v4, where each `[[package]]` carries
-/// its own `checksum`). A package without one (path and git sources) is simply absent.
+/// its own `checksum`). A package without one (path and git sources) is simply absent. An older
+/// format is refused, naming its version: read here it would silently lose every checksum.
 pub fn parse_lockfile(text: &str) -> Result<Checksums, Refusal> {
     let lock: Lockfile =
         toml::from_str(text).map_err(|e| Refusal(format!("Cargo.lock is malformed: {e}")))?;
+    match lock.version {
+        Some(v) if v >= 3 => {}
+        Some(v) => {
+            return Err(Refusal(format!(
+                "Cargo.lock format v{v} keeps checksums outside its packages — regenerate it \
+                 with a current cargo (v3 or later)"
+            )))
+        }
+        None => {
+            return Err(Refusal(
+                "Cargo.lock has no `version` key (format v1 or v2) — regenerate it with a \
+                 current cargo (v3 or later)"
+                    .into(),
+            ))
+        }
+    }
     Ok(lock
         .package
         .into_iter()

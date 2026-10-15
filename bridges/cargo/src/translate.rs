@@ -4,8 +4,9 @@
 //!
 //! 1. **The offer** — the collective's governed offer to `service:cargo`, a two-sided disclosure
 //!    whose `disclosure.inflows` names ONE unclaimed presence per upstream *project* (identity:
-//!    the package's declared repository URL, falling back to the crate name). Rendered as an
-//!    offer document and minted as its Intent, exactly the Jenkins offer's shape; it starts
+//!    the package's declared repository, normalized, falling back to the crate name). Rendered
+//!    as an offer document whose BODY restates every disclosure canonically, so the offer's
+//!    address (the body CID inside its Intent) changes whenever a disclosure does. It starts
 //!    Proposed and only a Steward who is not its author makes it Active.
 //! 2. **One `Cite` event per resolved package** (node 1): provider the upstream presence (or the
 //!    repository itself for in-repo path packages), receiver the collective, resource the CID
@@ -13,10 +14,15 @@
 //!    [`elohim_epr::cid::raw_cid_from_sha256_hex`]). A path or git package has no checksum: its
 //!    resource is the dag-cbor CID of its *coordinate* and the event says
 //!    `identity:coordinate-only` — no CID is ever invented for bytes the lockfile does not pin.
-//!    Each event carries the package's declared `license:` SPDX string.
+//!    Each event carries the package's declared licence, sanitized to SPDX characters.
 //! 3. **One `Process`** whose `inputs` are those events' CIDs — the build rests on them.
 //! 4. **One `DepEdge{Compiler(<workspace>)}`** per direct edge from a workspace member to a
 //!    registry package, naming the package's bytes through `to_resource`.
+//!
+//! **Nothing personal leaves cargo's files.** `authors` is never parsed; every URL is reduced to
+//! host and path (no userinfo, token, port, query or fragment) before it reaches any record; a
+//! path outside the repository is named by a hash of the path, never the path, which can carry
+//! a home directory or an email-shaped user name.
 //!
 //! Every event and the Process carry the shared external-claim envelope (`service:cargo`, the
 //! lockfile as provenance, unattested, the lowest reach, `in-scope-of` the offer), so the records
@@ -43,6 +49,8 @@ pub const RECIPE_ID: &str = "cargo-workspace-build";
 pub const RECIPE_VERSION: u32 = 1;
 /// One package drawn on, counted.
 pub const PACKAGE_UNIT: &str = "package";
+/// The licence slot when a package declares none, or declares something that is not SPDX-shaped.
+pub const UNDECLARED: &str = "undeclared";
 const CRATES_IO_INDEXES: [&str; 2] = [
     "registry+https://github.com/rust-lang/crates.io-index",
     "sparse+https://index.crates.io/",
@@ -77,10 +85,13 @@ pub struct Config {
     /// This repository's own location (`github.com/ethosengine/elohim`): a package declaring it
     /// is the network's own work and gets no presence held in trust.
     pub self_repository: String,
-    /// RFC3339 time of the observation: by default the lockfile's last commit, so unchanged
-    /// metadata always yields the same records.
+    /// RFC3339 time of the observation. [`crate::observe`] replaces it with the time this
+    /// lockfile was FIRST observed in the store, so a rerun after a rebase or squash (which moves
+    /// commit times) re-derives the same records.
     pub occurred_at: String,
-    /// Who drafted the offer; the approving Steward must be someone else.
+    /// Who drafted the offer; the approving Steward must be someone else. It sits in the
+    /// frontmatter only and is NOT part of the offer's address, so a different runner (or a
+    /// model-name bump) never re-mints the offer or the records scoped to it.
     pub author: String,
     /// The governing collective (`collective:<id>`) and its declaration path.
     pub collective: String,
@@ -145,7 +156,6 @@ pub struct Report {
     pub workspace_members: usize,
     pub cited: usize,
     pub registry_with_checksum: usize,
-    pub registry_without_checksum: usize,
     pub git: usize,
     pub path: usize,
     pub presences: usize,
@@ -184,6 +194,14 @@ pub fn offer_path(workspace: &str) -> String {
     )
 }
 
+/// The lockfile slot a Process carries (`lockfile:<raw CID of the Cargo.lock bytes>`).
+pub fn lockfile_slot(lockfile_bytes: &[u8]) -> String {
+    format!(
+        "lockfile:{}",
+        elohim_epr::cid::compute_raw_cid(lockfile_bytes)
+    )
+}
+
 /// Lowercase and keep only `[a-z0-9/-]`, every other run becoming one `-`; trims `-` and `/`.
 fn slugify(text: &str) -> String {
     let mut out = String::with_capacity(text.len());
@@ -198,44 +216,73 @@ fn slugify(text: &str) -> String {
     out.trim_matches(|c| c == '-' || c == '/').to_string()
 }
 
-/// A repository URL's location, scheme and noise removed: `https://github.com/serde-rs/serde.git`
-/// and `git+ssh://git@github.com/serde-rs/serde/tree/main/serde_derive` are both
-/// `github.com/serde-rs/serde` (a forge URL keeps only owner/repo, so the crates of one project
-/// share one presence).
-pub fn repository_location(url: &str) -> String {
-    let mut s = url.trim().to_lowercase();
-    for prefix in ["git+", "https://", "http://", "ssh://", "git://", "git@"] {
-        if let Some(rest) = s.strip_prefix(prefix) {
-            s = rest.to_string();
-        }
+/// A URL reduced to its location: lowercase host and path, nothing else. Userinfo
+/// (`user:token@`), port, query and fragment never survive, and neither does a path segment
+/// carrying `@` or a percent-escape. Accepts scheme URLs (`https://`, `git+ssh://`) and scp-style
+/// `git@host:owner/repo`. A forge URL keeps only owner/repo, so the crates of one project share
+/// one location. `None` when no plausible host survives (`https://`, `git@`, a bare word).
+pub fn repository_location(url: &str) -> Option<String> {
+    let s = url.trim();
+    let s = s.strip_prefix("git+").unwrap_or(s);
+    let (has_scheme, rest) = match s.find("://") {
+        Some(i) => (true, &s[i + 3..]),
+        None => (false, s),
+    };
+    let rest = rest.split(['?', '#']).next().unwrap_or("");
+    let (authority, path) = rest.split_once('/').unwrap_or((rest, ""));
+    // Userinfo is everything up to the LAST `@` of the authority.
+    let authority = authority.rsplit('@').next().unwrap_or("");
+    let (host, path) = match authority.split_once(':') {
+        Some((host, port)) if port.chars().all(|c| c.is_ascii_digit()) => (host, path.to_string()),
+        Some((host, scp_path)) if !has_scheme => (host, format!("{scp_path}/{path}")),
+        Some((host, _)) => (host, path.to_string()),
+        None => (authority, path.to_string()),
+    };
+    let host = host.to_ascii_lowercase();
+    let host = host.trim_start_matches("www.");
+    let plausible = host.contains('.')
+        && !host.starts_with('.')
+        && host
+            .chars()
+            .all(|c| c.is_ascii_alphanumeric() || c == '.' || c == '-');
+    if !plausible {
+        return None;
     }
-    if let Some(rest) = s.strip_prefix("git@") {
-        s = rest.to_string();
+    let mut segments: Vec<String> = path
+        .split('/')
+        .filter(|p| !p.is_empty() && !p.contains('@') && !p.contains('%'))
+        .map(|p| {
+            p.to_ascii_lowercase()
+                .trim_end_matches(".git")
+                .chars()
+                .map(|c| {
+                    if c.is_ascii_alphanumeric() || "-._~".contains(c) {
+                        c
+                    } else {
+                        '-'
+                    }
+                })
+                .collect::<String>()
+        })
+        .filter(|p| !p.is_empty())
+        .collect();
+    if FORGES.contains(&host) {
+        segments.truncate(2);
     }
-    s = s.replacen(':', "/", 1);
-    let s = s.split(['?', '#']).next().unwrap_or("").to_string();
-    let s = s.trim_end_matches('/').trim_end_matches(".git").to_string();
-    let mut segments: Vec<&str> = s.split('/').filter(|p| !p.is_empty()).collect();
-    if let Some(host) = segments.first() {
-        let host = host.trim_start_matches("www.");
-        if FORGES.contains(&host) && segments.len() > 3 {
-            segments.truncate(3);
-        }
-        let mut rebuilt = vec![host.to_string()];
-        rebuilt.extend(
-            segments
-                .iter()
-                .skip(1)
-                .map(|p| p.trim_end_matches(".git").to_string()),
-        );
-        return rebuilt.join("/");
-    }
-    s
+    Some(
+        std::iter::once(host.to_string())
+            .chain(segments)
+            .collect::<Vec<_>>()
+            .join("/"),
+    )
 }
 
 /// The presence slug for a repository URL: its location, slugged (`github-com/serde-rs/serde`).
-pub fn presence_slug(url: &str) -> String {
-    slugify(&repository_location(url))
+/// `None` when the URL has no usable location, so the caller falls back to the crate name.
+pub fn presence_slug(url: &str) -> Option<String> {
+    repository_location(url)
+        .map(|l| slugify(&l))
+        .filter(|s| !s.is_empty())
 }
 
 /// Lexical relative path from `root` to `path` (both absolute, `/`-separated).
@@ -256,6 +303,45 @@ fn relative(root: &str, path: &str) -> String {
     }
 }
 
+/// How an absolute path is recorded: repository-relative inside the repository; outside it,
+/// `external/<16 hex of sha2-256 over the path>` — never the raw path.
+fn repo_path(repo_root: &str, abs: &str) -> (String, bool) {
+    let rel = relative(repo_root, abs);
+    if rel == ".." || rel.starts_with("../") {
+        let cid = elohim_epr::cid::compute_raw_cid(abs.as_bytes());
+        let hex: String = cid
+            .hash()
+            .digest()
+            .iter()
+            .take(8)
+            .map(|b| format!("{b:02x}"))
+            .collect();
+        (format!("external/{hex}"), false)
+    } else {
+        (rel, true)
+    }
+}
+
+/// A declared licence, reduced to SPDX-expression characters. Cargo's legacy `/` separator means
+/// OR; anything else outside the SPDX alphabet makes the slot `undeclared` rather than carrying
+/// unvetted text into a record.
+pub fn spdx_or_undeclared(license: Option<&str>) -> String {
+    let Some(raw) = license else {
+        return UNDECLARED.into();
+    };
+    let spaced = raw.replace('/', " OR ");
+    let normalized = spaced.split_whitespace().collect::<Vec<_>>().join(" ");
+    let spdx = !normalized.is_empty()
+        && normalized
+            .chars()
+            .all(|c| c.is_ascii_alphanumeric() || " .+-:()".contains(c));
+    if spdx {
+        normalized
+    } else {
+        UNDECLARED.into()
+    }
+}
+
 fn manifest_dir(package: &Package) -> &str {
     package
         .manifest_path
@@ -273,12 +359,12 @@ fn origin_of(package: &Package) -> Origin {
 
 fn registry_name(source: &str) -> String {
     if CRATES_IO_INDEXES.contains(&source) {
-        "crates.io".into()
-    } else {
-        format!(
-            "registry:{}",
-            repository_location(source.split_once('+').map_or(source, |(_, u)| u))
-        )
+        return "crates.io".into();
+    }
+    let url = source.split_once('+').map_or(source, |(_, u)| u);
+    match repository_location(url) {
+        Some(location) => format!("registry:{location}"),
+        None => "registry:unknown".into(),
     }
 }
 
@@ -308,14 +394,18 @@ fn epoch_seconds(rfc3339: &str) -> Result<i64, Refusal> {
 }
 
 struct Upstream {
-    /// The URL as the first package (in coordinate order) declares it, for the inflow's text.
-    url: Option<String>,
+    /// Every normalized URL its packages declare; the inflow text names the least, so the
+    /// choice is deterministic whatever order the packages are read in.
+    urls: BTreeSet<String>,
     packages: BTreeSet<String>,
 }
 
 /// Translate one workspace. `lockfile_checksums` is [`crate::metadata::parse_lockfile`] over the
 /// workspace's `Cargo.lock`; `lockfile_bytes` are that file's bytes (their raw CID names what was
 /// read).
+///
+/// Refuses when the metadata and the lockfile disagree: a resolved registry package the lockfile
+/// pins no checksum for means the two were not taken from the same resolve.
 pub fn translate(
     metadata: &Metadata,
     lockfile_checksums: &Checksums,
@@ -341,9 +431,8 @@ pub fn translate(
     let self_location = slugify(&config.self_repository);
     let lockfile_rel = format!(
         "{}/Cargo.lock",
-        relative(&config.repo_root, &metadata.workspace_root)
+        repo_path(&config.repo_root, &metadata.workspace_root).0
     );
-    let lockfile_cid = elohim_epr::cid::compute_raw_cid(lockfile_bytes);
 
     let mut report = Report {
         workspace: config.workspace.clone(),
@@ -356,6 +445,7 @@ pub fn translate(
     let mut cited: Vec<Cited> = Vec::new();
     let mut upstreams: BTreeMap<String, Upstream> = BTreeMap::new();
     let mut registry_resource: BTreeMap<&str, (String, Cid)> = BTreeMap::new();
+    let mut mismatched: Vec<String> = Vec::new();
     for id in &resolved {
         if members.contains(id) {
             continue;
@@ -375,20 +465,24 @@ pub fn translate(
                     package.version.clone(),
                     source.to_string(),
                 );
-                (
-                    format!("{}:{versioned}", registry_name(source)),
-                    lockfile_checksums.get(&key).cloned(),
-                )
+                let coordinate = format!("{}:{versioned}", registry_name(source));
+                let checksum = lockfile_checksums.get(&key).cloned();
+                if checksum.is_none() {
+                    mismatched.push(coordinate.clone());
+                    continue;
+                }
+                (coordinate, checksum)
             }
             Origin::Git => {
                 let source = package.source.as_deref().unwrap_or_default();
                 let rev = source.rsplit_once('#').map_or("", |(_, r)| r);
+                let rev: String = rev.chars().filter(|c| c.is_ascii_hexdigit()).collect();
                 (format!("git:{versioned}#{rev}"), None)
             }
             Origin::Path => (
                 format!(
                     "path:{}",
-                    relative(&config.repo_root, manifest_dir(package))
+                    repo_path(&config.repo_root, manifest_dir(package)).0
                 ),
                 None,
             ),
@@ -401,57 +495,47 @@ pub fn translate(
             ),
             None => ("coordinate-only", coordinate_cid(origin, &coordinate)?),
         };
-        match (origin, checksum.is_some()) {
-            (Origin::Registry, true) => report.registry_with_checksum += 1,
-            (Origin::Registry, false) => report.registry_without_checksum += 1,
-            (Origin::Git, _) => report.git += 1,
-            (Origin::Path, _) => report.path += 1,
+        match origin {
+            Origin::Registry => report.registry_with_checksum += 1,
+            Origin::Git => report.git += 1,
+            Origin::Path => report.path += 1,
         }
-        if origin == Origin::Registry && checksum.is_some() {
+        if origin == Origin::Registry {
             registry_resource.insert(id, (coordinate.clone(), resource));
         }
 
-        // The upstream project: the declared repository, else the crate (registry), the git URL
-        // (git), or — for a path package with no repository — this repository when it lives
-        // inside it.
-        let declared = package
-            .repository
-            .as_deref()
-            .filter(|u| !u.trim().is_empty());
-        let location = match (declared, origin) {
-            (Some(url), _) => Some((presence_slug(url), Some(url.to_string()))),
-            (None, Origin::Registry) => {
+        // The upstream project: the declared repository, else the git URL (git), else the crate
+        // (registry and git), or — for a path package with no repository — this repository when
+        // it lives inside it. A URL with no usable location falls through to the crate name.
+        let declared = package.repository.as_deref().and_then(|url| {
+            presence_slug(url).map(|slug| (slug, repository_location(url).unwrap_or_default()))
+        });
+        let git_url = (origin == Origin::Git)
+            .then(|| package.source.as_deref().unwrap_or_default())
+            .and_then(|source| {
+                presence_slug(source)
+                    .map(|slug| (slug, repository_location(source).unwrap_or_default()))
+            });
+        let location = match (declared.or(git_url), origin) {
+            (Some((slug, location)), _) => Some((slug, Some(location))),
+            (None, Origin::Registry | Origin::Git) => {
                 Some((slugify(&format!("crates-io/{}", package.name)), None))
             }
-            (None, Origin::Git) => {
-                let source = package.source.as_deref().unwrap_or_default();
-                let url = source.trim_start_matches("git+");
-                Some((
-                    presence_slug(url),
-                    Some(url.split(['?', '#']).next().unwrap_or(url).to_string()),
-                ))
-            }
             (None, Origin::Path) => {
-                let rel = relative(&config.repo_root, manifest_dir(package));
-                if rel.starts_with("..") {
-                    Some((slugify(&format!("path/{}", package.name)), None))
-                } else {
-                    None
-                }
+                let (_, inside) = repo_path(&config.repo_root, manifest_dir(package));
+                (!inside).then(|| (slugify(&format!("path/{}", package.name)), None))
             }
         };
         let provider = match location {
             Some((slug, _)) if slug == self_location => config.repo_agent.clone(),
             None => config.repo_agent.clone(),
-            Some((slug, url)) => {
+            Some((slug, location)) => {
                 let upstream = upstreams.entry(slug.clone()).or_insert(Upstream {
-                    url: None,
+                    urls: BTreeSet::new(),
                     packages: BTreeSet::new(),
                 });
                 upstream.packages.insert(versioned.clone());
-                if upstream.url.is_none() {
-                    upstream.url = url;
-                }
+                upstream.urls.extend(location);
                 format!("presence:{slug}")
             }
         };
@@ -461,12 +545,17 @@ pub fn translate(
             identity,
             resource: resource.to_string(),
             provider,
-            license: package
-                .license
-                .clone()
-                .filter(|l| !l.trim().is_empty())
-                .unwrap_or_else(|| "undeclared".into()),
+            license: spdx_or_undeclared(package.license.as_deref()),
         });
+    }
+    if !mismatched.is_empty() {
+        mismatched.sort();
+        return Err(Refusal(format!(
+            "cargo metadata and Cargo.lock disagree: {} resolved registry package(s) have no \
+             checksum in the lockfile (first: {}) — take both from the same resolve",
+            mismatched.len(),
+            mismatched[0]
+        )));
     }
     cited.sort_by(|a, b| a.coordinate.cmp(&b.coordinate));
     report.cited = cited.len();
@@ -531,7 +620,7 @@ pub fn translate(
         classified_as: claim.classify(
             "reliance:resolve",
             format!("cargo:{}", config.workspace),
-            [format!("lockfile:{lockfile_cid}"), workspace_slot],
+            [lockfile_slot(lockfile_bytes), workspace_slot],
         ),
     };
     let process_cid = FlowRecord::Process(process.clone())
@@ -547,7 +636,7 @@ pub fn translate(
         let member = packages
             .get(node.id.as_str())
             .ok_or_else(|| Refusal(format!("member `{}` is not in packages", node.id)))?;
-        let from = relative(&config.repo_root, manifest_dir(member));
+        let from = repo_path(&config.repo_root, manifest_dir(member)).0;
         for dep in &node.deps {
             if let Some((coordinate, resource)) = registry_resource.get(dep.pkg.as_str()) {
                 slots.insert((from.clone(), coordinate.clone()), *resource);
@@ -584,6 +673,69 @@ pub fn translate(
     })
 }
 
+/// The offer's body: everything the collective discloses, canonically, so the body CID (the
+/// address an approval is of) binds the disclosures. The frontmatter repeats them for the reader
+/// that parses it; `author` appears ONLY in the frontmatter, outside the address.
+fn offer_body(declaration: &OfferDeclaration, workspace: &str) -> String {
+    let mut body = format!(
+        "# Offer: the {workspace} workspace's reliance records, given to cargo\n\n\
+         Generated by `cargo-bridge` from `cargo metadata` and Cargo.lock; regenerating it from \
+         unchanged inputs yields the same bytes and so the same offer address.\n\n\
+         The collective `{provider}` records what the `{workspace}` Rust workspace relies on: one \
+         `cite` input per resolved package on the build's Process, and one presence held in trust \
+         for each upstream project, named by its repository. The record states the facts of \
+         reliance and defers valuation. The inflows name unclaimed presences, never payees; \
+         nothing here creates a claim or a settlement.\n\n\
+         ## Disclosure\n\n\
+         This section restates the declaration canonically. The offer's address is the CID of \
+         this body, so changing any line below re-addresses the offer and needs a fresh \
+         approval.\n\n",
+        provider = declaration.provider,
+    );
+    let d = declaration;
+    body.push_str(&format!(
+        "- id: {}\n- provider: {}\n- receiver: {}\n- collective: {}\n- recipe: {}@{}\n\
+         - crossesNetwork: {}\n- terms: optional={}, exclusive={}, withdrawable={}, claims={}, \
+         settlement={}\n",
+        d.id,
+        d.provider,
+        d.receiver,
+        d.collective,
+        d.recipe.id,
+        d.recipe.version,
+        d.crosses_network,
+        d.terms.optional,
+        d.terms.exclusive,
+        d.terms.withdrawable,
+        d.terms.claims,
+        d.terms.settlement,
+    ));
+    body.push_str("\n### Offered\n\n");
+    for offered in &d.offered {
+        body.push_str(&format!("- {offered}\n"));
+    }
+    body.push_str("\n### Inflows\n\n");
+    let mut inflows: Vec<&Inflow> = d.disclosure.inflows.iter().collect();
+    inflows.sort_by(|a, b| a.presence.cmp(&b.presence));
+    for inflow in inflows {
+        body.push_str(&format!("- {}: {}\n", inflow.presence, inflow.brings));
+    }
+    body.push_str("\n### Held capabilities\n\n");
+    let mut held: Vec<&HeldCapability> = d.disclosure.held_capabilities.iter().collect();
+    held.sort_by(|a, b| a.id.cmp(&b.id));
+    for cap in held {
+        body.push_str(&format!("- {}: {}\n", cap.id, cap.what));
+    }
+    body.push_str("\n### Externalities\n\n");
+    for positive in &d.disclosure.externalities.positive {
+        body.push_str(&format!("- positive: {positive}\n"));
+    }
+    for negative in &d.disclosure.externalities.negative {
+        body.push_str(&format!("- negative: {negative}\n"));
+    }
+    body
+}
+
 /// Render the workspace's offer document deterministically and parse it back through the one
 /// offer reader, so the document is validated exactly as a hand-authored one would be.
 fn render_offer(
@@ -604,10 +756,10 @@ fn render_offer(
                     .collect::<Vec<_>>()
                     .join(", "),
                 config.workspace,
-                upstream
-                    .url
-                    .as_deref()
-                    .unwrap_or("its registry listing (no repository declared)"),
+                upstream.urls.first().map_or_else(
+                    || "its registry listing (no repository declared)".to_string(),
+                    |location| format!("https://{location}")
+                ),
             ),
         })
         .collect();
@@ -639,16 +791,15 @@ fn render_offer(
             inflows,
             held_capabilities: vec![
                 HeldCapability {
-                    id: "registry:package-fetch".into(),
-                    what:
-                        "downloads the source of every package Cargo.lock names from its registry \
-                           or git remote"
-                            .into(),
-                },
-                HeldCapability {
                     id: "build:run-dependency-code".into(),
                     what: "runs each dependency's build script and procedural macros with the \
                            builder's own privileges"
+                        .into(),
+                },
+                HeldCapability {
+                    id: "registry:package-fetch".into(),
+                    what: "downloads the source of every package Cargo.lock names from its \
+                           registry or git remote"
                         .into(),
                 },
             ],
@@ -669,16 +820,73 @@ fn render_offer(
     let yaml = serde_yaml::to_string(&declaration).map_err(|e| Refusal(e.to_string()))?;
     let path = offer_path(&config.workspace);
     let text = format!(
-        "---\n{yaml}---\n# Offer: the {ws} workspace's reliance records, given to cargo\n\n\
-         Generated by `cargo-bridge` from `cargo metadata` and Cargo.lock; regenerating it from \
-         unchanged inputs yields the same bytes and so the same offer address.\n\n\
-         The collective `{collective}` records what the `{ws}` Rust workspace relies on: one \
-         `cite` input per resolved package on the build's Process, and one presence held in trust \
-         for each upstream project, named by its repository. The record states the facts of \
-         reliance and defers valuation. The inflows name unclaimed presences, never payees; \
-         nothing here creates a claim or a settlement.\n",
-        ws = config.workspace,
-        collective = config.collective,
+        "---\n{yaml}---\n{}",
+        offer_body(&declaration, &config.workspace)
     );
     parse_offer(&path, &text).map_err(|e| Refusal(e.to_string()))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn locations_keep_host_and_path_only() {
+        for (url, expect) in [
+            (
+                "https://github.com/serde-rs/serde.git",
+                Some("github.com/serde-rs/serde"),
+            ),
+            (
+                "https://user:s3cr3t@github.com/a/b?x=1#frag",
+                Some("github.com/a/b"),
+            ),
+            (
+                "git+ssh://git@github.com/serde-rs/serde/tree/main/x",
+                Some("github.com/serde-rs/serde"),
+            ),
+            (
+                "git@github.com:owner/repo.git",
+                Some("github.com/owner/repo"),
+            ),
+            (
+                "https://git.example.org:8443/team/repo",
+                Some("git.example.org/team/repo"),
+            ),
+            (
+                "https://deploy:tok@git.example.org:8443/team/~alice@home/repo",
+                Some("git.example.org/team/repo"),
+            ),
+            ("https://", None),
+            ("git@", None),
+            ("not a url", None),
+        ] {
+            assert_eq!(repository_location(url).as_deref(), expect, "{url}");
+        }
+    }
+
+    #[test]
+    fn paths_outside_the_repository_are_hashed() {
+        let (inside, yes) = repo_path("/r", "/r/libs/x");
+        assert_eq!((inside.as_str(), yes), ("libs/x", true));
+        let (outside, no) = repo_path("/r", "/home/alice@example.com/lib");
+        assert!(!no);
+        assert!(outside.starts_with("external/") && outside.len() == "external/".len() + 16);
+        assert!(!outside.contains("alice"));
+    }
+
+    #[test]
+    fn licences_are_reduced_to_spdx_characters() {
+        assert_eq!(
+            spdx_or_undeclared(Some("MIT  OR\tApache-2.0")),
+            "MIT OR Apache-2.0"
+        );
+        assert_eq!(
+            spdx_or_undeclared(Some("MIT/Apache-2.0")),
+            "MIT OR Apache-2.0"
+        );
+        assert_eq!(spdx_or_undeclared(Some("see <a@b.c>")), UNDECLARED);
+        assert_eq!(spdx_or_undeclared(Some("  ")), UNDECLARED);
+        assert_eq!(spdx_or_undeclared(None), UNDECLARED);
+    }
 }
