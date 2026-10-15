@@ -491,6 +491,11 @@ pub struct DepEdge {
     /// `checksum`). Additive and skipped when absent, so every record written before this field
     /// existed serializes, and hashes, to the same bytes (pinned by
     /// `store::tests::pre_to_resource_sidecar_lines_round_trip_byte_identical`).
+    ///
+    /// Forward compatibility is one-way: a binary built before this field, reading a line that
+    /// carries it, drops the field on decode and recomputes a different CID, so its store read
+    /// fails the stored-CID check (an integrity error, not silent drift). Upgrade every reader
+    /// of a sidecar before any writer emits `toResource` into it.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub to_resource: Option<Cid>,
     /// The announcement — why this edge exists.
