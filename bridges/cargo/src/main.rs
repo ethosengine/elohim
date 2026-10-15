@@ -160,7 +160,7 @@ fn run(command: &str, a: &Args) -> Result<u8, BridgeError> {
     };
     let mut config = Config::for_repository(&workspace, &root.to_string_lossy(), &occurred_at);
     if let Some(author) = &a.author {
-        config.author = author.clone();
+        config.author.clone_from(author);
     }
     let inputs = Inputs {
         metadata,
@@ -216,7 +216,7 @@ fn run(command: &str, a: &Args) -> Result<u8, BridgeError> {
                 println!("{}", outcome.notice());
             }
             let strict = std::env::var("RELIANCE").is_ok_and(|v| v == "strict");
-            Ok(if outcome.is_fresh() || !strict { 0 } else { 1 })
+            Ok(u8::from(strict && !outcome.is_fresh()))
         }
         "offer" => {
             let reliance = reliance(&inputs, &config)?;

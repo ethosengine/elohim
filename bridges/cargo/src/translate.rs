@@ -29,13 +29,14 @@
 //! read as cargo's claim, evaluated on entry. Nothing here values a dependency or names a payee.
 
 use std::collections::{BTreeMap, BTreeSet};
+use std::fmt::Write as _;
 
 use cid::Cid;
-use elohim_epr_cli::flow::memory::offer::{offer_cid, offer_intent, parse_offer};
+use elohim_epr_cli::flow::memory::offer::{offer_intent, parse_offer};
 use elohim_epr_rea::{
-    AgentRef, DepEdge, Disclosure, ExternalClaim, Externalities, FlowEvent, FlowRecord, Governor,
-    HeldCapability, Inflow, Magnitude, OfferDeclaration, OfferDocument, PinnedRef, Process,
-    ReaVerb, RecipePin, SignatureStatus, Terms,
+    atom_cid, AgentRef, DepEdge, Disclosure, ExternalClaim, Externalities, FlowEvent, FlowRecord,
+    Governor, HeldCapability, Inflow, Intent, Magnitude, OfferDeclaration, OfferDocument,
+    PinnedRef, Process, ReaVerb, RecipePin, SignatureStatus, Terms,
 };
 use serde::Serialize;
 
@@ -166,6 +167,8 @@ pub struct Report {
 #[derive(Debug, Clone)]
 pub struct Reliance {
     pub offer: OfferDocument,
+    /// The offer's Intent (its address binds the body and the whole declaration).
+    pub offer_intent: Intent,
     pub offer_cid: Cid,
     pub events: Vec<FlowEvent>,
     pub process: Process,
@@ -178,7 +181,7 @@ pub struct Reliance {
 impl Reliance {
     /// Every record, in append order: the offer's Intent, the cite events, the Process, the edges.
     pub fn records(&self) -> Vec<FlowRecord> {
-        let mut records = vec![FlowRecord::Intent(offer_intent(&self.offer))];
+        let mut records = vec![FlowRecord::Intent(self.offer_intent.clone())];
         records.extend(self.events.iter().cloned().map(FlowRecord::Event));
         records.push(FlowRecord::Process(self.process.clone()));
         records.extend(self.edges.iter().cloned().map(FlowRecord::Edge));
@@ -309,13 +312,15 @@ fn repo_path(repo_root: &str, abs: &str) -> (String, bool) {
     let rel = relative(repo_root, abs);
     if rel == ".." || rel.starts_with("../") {
         let cid = elohim_epr::cid::compute_raw_cid(abs.as_bytes());
-        let hex: String = cid
-            .hash()
-            .digest()
-            .iter()
-            .take(8)
-            .map(|b| format!("{b:02x}"))
-            .collect();
+        let hex =
+            cid.hash()
+                .digest()
+                .iter()
+                .take(8)
+                .fold(String::with_capacity(16), |mut hex, b| {
+                    let _ = write!(hex, "{b:02x}");
+                    hex
+                });
         (format!("external/{hex}"), false)
     } else {
         (rel, true)
@@ -563,7 +568,8 @@ pub fn translate(
 
     // 2. The offer: a two-sided disclosure naming every upstream project.
     let offer = render_offer(config, &upstreams)?;
-    let offer_cid = offer_cid(&offer).map_err(|e| Refusal(e.to_string()))?;
+    let offer_intent = offer_intent(&offer).map_err(|e| Refusal(e.to_string()))?;
+    let offer_cid = atom_cid(&offer_intent).map_err(|e| Refusal(e.to_string()))?;
     let claim = ExternalClaim::new(
         SOURCE,
         &lockfile_rel,
@@ -663,6 +669,7 @@ pub fn translate(
 
     Ok(Reliance {
         offer,
+        offer_intent,
         offer_cid,
         events,
         process,
@@ -673,9 +680,10 @@ pub fn translate(
     })
 }
 
-/// The offer's body: everything the collective discloses, canonically, so the body CID (the
-/// address an approval is of) binds the disclosures. The frontmatter repeats them for the reader
-/// that parses it; `author` appears ONLY in the frontmatter, outside the address.
+/// The offer's body: everything the collective discloses, restated canonically for a human
+/// reader of the document. The address binds the frontmatter declaration too (the shared
+/// `OfferDeclaration::intent` carries its `declaration:` identity), so the restatement is for
+/// legibility, not the only binding; `author` appears ONLY in the frontmatter and is in neither.
 fn offer_body(declaration: &OfferDeclaration, workspace: &str) -> String {
     let mut body = format!(
         "# Offer: the {workspace} workspace's reliance records, given to cargo\n\n\
@@ -687,16 +695,17 @@ fn offer_body(declaration: &OfferDeclaration, workspace: &str) -> String {
          reliance and defers valuation. The inflows name unclaimed presences, never payees; \
          nothing here creates a claim or a settlement.\n\n\
          ## Disclosure\n\n\
-         This section restates the declaration canonically. The offer's address is the CID of \
-         this body, so changing any line below re-addresses the offer and needs a fresh \
-         approval.\n\n",
+         This section restates the declaration canonically. The offer's address binds this body \
+         and the declaration above, so changing any line re-addresses the offer and needs a \
+         fresh approval.\n\n",
         provider = declaration.provider,
     );
     let d = declaration;
-    body.push_str(&format!(
+    let _ = writeln!(
+        body,
         "- id: {}\n- provider: {}\n- receiver: {}\n- collective: {}\n- recipe: {}@{}\n\
          - crossesNetwork: {}\n- terms: optional={}, exclusive={}, withdrawable={}, claims={}, \
-         settlement={}\n",
+         settlement={}",
         d.id,
         d.provider,
         d.receiver,
@@ -709,29 +718,29 @@ fn offer_body(declaration: &OfferDeclaration, workspace: &str) -> String {
         d.terms.withdrawable,
         d.terms.claims,
         d.terms.settlement,
-    ));
+    );
     body.push_str("\n### Offered\n\n");
     for offered in &d.offered {
-        body.push_str(&format!("- {offered}\n"));
+        let _ = writeln!(body, "- {offered}");
     }
     body.push_str("\n### Inflows\n\n");
     let mut inflows: Vec<&Inflow> = d.disclosure.inflows.iter().collect();
     inflows.sort_by(|a, b| a.presence.cmp(&b.presence));
     for inflow in inflows {
-        body.push_str(&format!("- {}: {}\n", inflow.presence, inflow.brings));
+        let _ = writeln!(body, "- {}: {}", inflow.presence, inflow.brings);
     }
     body.push_str("\n### Held capabilities\n\n");
     let mut held: Vec<&HeldCapability> = d.disclosure.held_capabilities.iter().collect();
     held.sort_by(|a, b| a.id.cmp(&b.id));
     for cap in held {
-        body.push_str(&format!("- {}: {}\n", cap.id, cap.what));
+        let _ = writeln!(body, "- {}: {}", cap.id, cap.what);
     }
     body.push_str("\n### Externalities\n\n");
     for positive in &d.disclosure.externalities.positive {
-        body.push_str(&format!("- positive: {positive}\n"));
+        let _ = writeln!(body, "- positive: {positive}");
     }
     for negative in &d.disclosure.externalities.negative {
-        body.push_str(&format!("- negative: {negative}\n"));
+        let _ = writeln!(body, "- negative: {negative}");
     }
     body
 }

@@ -284,7 +284,7 @@ pub fn observe(ctx: &Context, inputs: &BuildInputs) -> Result<ObserveOutcome> {
 
 /// Mint (propose) the offer's Intent. Idempotent; activation is a Steward's verdict, never this.
 pub fn mint_offer(ctx: &Context) -> Result<(Cid, bool)> {
-    let intent = offer_intent(&ctx.offer);
+    let intent = offer_intent(&ctx.offer).map_err(|e| BridgeError::Malformed(e.to_string()))?;
     let cid = ctx.offer_cid()?;
     let store = SidecarFlowStore::open(&ctx.root).map_err(|e| BridgeError::Io(e.to_string()))?;
     let mut tx = store
