@@ -27,7 +27,7 @@
 import { strict as assert } from 'node:assert';
 import { randomUUID } from 'node:crypto';
 
-import { Given, When, Then } from '@cucumber/cucumber';
+import { After, Given, When, Then } from '@cucumber/cucumber';
 
 import { request } from 'undici';
 
@@ -36,6 +36,8 @@ import type { E2EWorld } from '../../src/framework/world.js';
 /** Per-scenario OAuth state. The cucumber World is constructed per scenario, so
  *  hanging this off it keeps parallel workers from sharing a code. */
 interface OAuthState {
+  /** The doorway this human registered at, so the scenario can close the account. */
+  base: string;
   /** What the DOORWAY calls this human, read back from its own login answer. */
   identifier: string;
   humanId: string;
@@ -137,7 +139,15 @@ Given(
     const reg = await request(`${base}/auth/register`, {
       method: 'POST',
       headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({ identifier, password, displayName: 'OAuth A2O' }),
+      // A stranger arriving through the doorway IS the hosted stage, declared
+      // rather than defaulted; the After hook below closes the account so no run
+      // leaves a cell behind on the operator's conductor.
+      body: JSON.stringify({
+        identifier,
+        password,
+        displayName: 'OAuth A2O',
+        agencyPhase: 'hosted',
+      }),
     });
     const regBody = await reg.body.text();
     assert.ok(
@@ -172,6 +182,7 @@ Given(
     );
 
     (this as unknown as { __oauth: OAuthState }).__oauth = {
+      base,
       identifier: parsed.identifier,
       humanId: parsed.humanId ?? '',
       token: parsed.token,
@@ -186,6 +197,22 @@ Given(
     };
   }
 );
+
+// Close the scenario's throwaway hosted human: revoke its sessions, return its
+// cell, end its row. Best effort — a failed close is reported, never a red.
+After(async function (this: E2EWorld) {
+  const st = (this as unknown as { __oauth?: OAuthState }).__oauth;
+  if (!st?.token) return;
+  const res = await request(`${st.base}/auth/close-account`, {
+    method: 'POST',
+    headers: { 'content-type': 'application/json', authorization: `Bearer ${st.token}` },
+    body: JSON.stringify({ confirmIdentifier: st.identifier }),
+  });
+  const text = await res.body.text();
+  if (res.statusCode >= 300) {
+    console.warn(`[oauth] could not close ${st.identifier}: ${res.statusCode} ${text}`);
+  }
+});
 
 interface AuthorizeOptions {
   /** Send the world's bearer token — the authenticated branch answers 200 with the target in the body. */

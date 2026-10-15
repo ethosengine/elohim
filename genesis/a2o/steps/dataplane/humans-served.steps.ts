@@ -36,7 +36,7 @@
  * lane's Prologue casts TWO populations at doorway A: the 3
  * `prologue-hosted-*` registrants this file's roster tracks, AND the
  * standing household cast (`HOUSEHOLD_HOSTED_CAST` in
- * `genesis/seeder/src/seed-humans.ts`, 14 names as of 2026-09-11) that
+ * `genesis/seeder/src/seed-humans.ts`, 6 names as of 2026-10-14) that
  * `just mesh prologue` also registers there. A doorway's `humansServed`
  * legitimately counts both — the earlier `== 3` / `== live.length` (roster
  * only) equalities assumed a world where only the roster caster provisioned
@@ -167,7 +167,7 @@ function grantCidOf(entry: HostedRosterEntry): string | undefined {
 // ---------------------------------------------------------------------------
 // Household cast — the OTHER population doorway A's Prologue casts (see the
 // module doc's CORRECTION note). Mirrored from `HOUSEHOLD_HOSTED_CAST` in
-// `genesis/seeder/src/seed-humans.ts` (14 names as of 2026-09-11) — the only
+// `genesis/seeder/src/seed-humans.ts` (6 names as of 2026-10-14) — the only
 // source on disk naming this cast after a Prologue run (neither
 // `seed-humans.ts` nor `${MESH_DIR}/household-fixture.json` write a
 // humans/roster record of it). Cast only at doorway A, same as the roster.
@@ -175,19 +175,11 @@ function grantCidOf(entry: HostedRosterEntry): string | undefined {
 
 const HOUSEHOLD_HOSTED_CAST: readonly string[] = [
   'Matthew',
-  'Susan',
   'James',
-  'Gertrude',
+  'Jessica',
   'Maria',
   'Ronald',
-  'Charlie',
-  'Sam',
-  'Dr. Dolittle',
-  'Jessica',
-  'Terrance',
-  'Miriam',
   'Ezra',
-  'Levi',
 ];
 
 /**

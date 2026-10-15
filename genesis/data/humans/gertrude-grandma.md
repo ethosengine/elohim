@@ -2,6 +2,7 @@
 id: "human-gertrude-grandma"
 householdId: "household-gertrude"
 displayName: "Gertrude"
+agencyPhase: "device"
 category: "core-family"
 profileReach: "community"
 bio: "Grandmother, gardener, keeper of family stories. Learning to navigate this digital world with help from family."

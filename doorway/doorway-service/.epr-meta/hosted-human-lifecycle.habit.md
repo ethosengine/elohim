@@ -7,10 +7,13 @@ invariant: >
   cell of their own on a pool conductor (never a shared one), and closing through the portal
   leaves no session, no cell on any pool conductor, and no active account row — so the
   whole hosted stage can be walked end to end from the UI and leave the deployment as it
-  was found.
-status: green
+  was found. Hosted is a declared stage, never a default: only a human whose fixture declares
+  agencyPhase hosted gets a cell, only on a doorway operator's conductor (matthew, adam), and a
+  member's own conductor carries its member and nobody else.
+status: red
 active: false
 checks:
+  - "just mesh status — every `hosted` row is free of REFUSED: the operator within its ceiling, each member conductor at 0"
   - "a2o @concern:hosted-human-lifecycle (genesis/a2o/features/auth/hosted-human/05-leaving.feature — @browser-only @act:i; authority is the household lane: `just test mesh features/auth/hosted-human/05-leaving.feature`; on a deployed doorway run with ELOHIM_CLUSTER_STATE_PATH_OVERRIDE=genesis/manifests/cluster-state.act1-household.yaml A2O_ALLOW_DESTRUCTIVE=0 — the story creates and removes its own human, so it is safe on a shared fleet)"
 first_move: >
   Land the step definitions and the close-account route so the @wip scenarios execute and
@@ -29,6 +32,12 @@ retire-when: >
   reclaims by construction) — at that point the doorway cannot keep hosting a closed human,
   and the practice under watch has become a property of the substrate.
 ---
+DELTA 2026-10-15 (GREEN -> RED on measured evidence): `just mesh status` hosted rows at a18cf0c41 read
+`matthew: REFUSED 19 agent(s), over the operator ceiling 14` and `jessica: REFUSED 1 agent(s) on a member's
+conductor: elohim-conductor-0-12add0`. Cause: undeclared fixtures defaulted to hosted, the device register arm
+installed a second James and Jessica, doorways B/C hosted on member conductors. Cured in code (lookup-only device
+arm, DOORWAY_HOSTING_CONDUCTORS, declared-phase cast, agency-phase-coherence test); green waits on
+genesis/local-dev/hosted-cast-cleanup/close.py run against the household and the probe reading clean.
 DELTA 2026-09-11d (RED -> GREEN on measured evidence): run 20260911T065537Z-d48f3b69 — 05-leaving.feature under
 `just test mesh-browser`, **6/6 scenarios, 70/70 steps, EXIT=0**, on the household mesh at d48f3b690 (doorway
 eff30a245 build, storage fb4d10c7d build, REAL hosted provisioning: HAPP_BUNDLE_PATH + POOL_COMPUTE_* wired,

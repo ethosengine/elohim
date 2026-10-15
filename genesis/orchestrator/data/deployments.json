@@ -11,6 +11,8 @@
   "humans": [
     {
       "name": "adam",
+      "hostsAgents": true,
+      "$hostsAgentsComment": "2026-10-14: a doorway OPERATOR's conductor (matthew, adam) is the only one that hosts agents. The doorway pools every conductor for projection and discovery, but DOORWAY_HOSTING_CONDUCTORS (rendered from this flag) gives every other conductor a hosted-agent ceiling of 0, so a hosted human never lands on a member's own device. Hosted is a declared stage on the fixture (agencyPhase), never a default.",
       "conductorStorage": "20Gi",
       "runtimeManifest": {"cid": "bafyreiapd5vu2vnk3tontaccwwvrtgziljpgfwmmudypi3pp2x76guzrta", "path": "genesis/orchestrator/manifests/runtime/adam.manifest.json"},
       "resourceOverride": {
@@ -45,6 +47,8 @@
     },
     {
       "name": "matthew",
+      "hostsAgents": true,
+      "$hostsAgentsComment": "2026-10-14: a doorway OPERATOR's conductor (matthew, adam) is the only one that hosts agents. The doorway pools every conductor for projection and discovery, but DOORWAY_HOSTING_CONDUCTORS (rendered from this flag) gives every other conductor a hosted-agent ceiling of 0, so a hosted human never lands on a member's own device. Hosted is a declared stage on the fixture (agencyPhase), never a default.",
       "runtimeManifest": {"cid": "bafyreiaaebz37gnblcarqiwmr7a7znlwom2cc24whm7z327ivx4ze7w7vu", "path": "genesis/orchestrator/manifests/runtime/family-node-base.manifest.json"},
       "role": "manager",
       "humanLabel": "matthew-manager",

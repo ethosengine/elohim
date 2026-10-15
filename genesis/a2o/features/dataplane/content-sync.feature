@@ -85,6 +85,6 @@ Feature: Content-sync plane convergence
     # cluster-state substrate gate; the scope reconciler will hold this scenario if shem
     # becomes unavailable. The @wip guard prevents it from failing the live suite now.
     Given human "Matthew" is logged in on doorway "alpha" with device
-    And human "Pete" is logged in on doorway "shem" with device
+    And human "Eve" is logged in on doorway "shem" with device
     When Matthew creates content titled "Cross-tenant sync probe" with tags "e2e,shem"
     Then /sync doc matching the created content id is present on peer "shem" within 60 s

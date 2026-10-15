@@ -2,6 +2,7 @@
 id: "human-susan-household"
 householdId: "household-susan"
 displayName: "Susan"
+agencyPhase: "device"
 category: "core-family"
 profileReach: "community"
 bio: "Matthew's sister. Household member exploring how families can steward digital resources together."

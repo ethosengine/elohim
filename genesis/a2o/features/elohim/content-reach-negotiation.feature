@@ -17,9 +17,9 @@ Feature: Content Reach Negotiation
 
   @trust-adaptive
   Scenario: High-trust author gets lightweight pipeline
-    Given human "Miriam" is logged in on doorway "alpha" with device
-    And "Miriam" has a trust score of 0.87 with 47 contributions in the last 30 days
-    When "Miriam" creates a content post requesting "community" reach
+    Given human "Jessica" is logged in on doorway "alpha" with device
+    And "Jessica" has a trust score of 0.87 with 47 contributions in the last 30 days
+    When "Jessica" creates a content post requesting "community" reach
     Then the context assembly pipeline uses depth "light"
     And only layers "constitutional, author-profile, payload" are assembled
     And the assembly completes in under 100 milliseconds
@@ -36,9 +36,9 @@ Feature: Content Reach Negotiation
 
   @trust-adaptive
   Scenario: Moderate-trust author gets standard pipeline
-    Given human "Levi" is logged in on doorway "alpha" with device
-    And "Levi" has a trust score of 0.55 with 8 contributions in the last 30 days
-    When "Levi" creates a content post requesting "municipal" reach
+    Given human "James" is logged in on doorway "alpha" with device
+    And "James" has a trust score of 0.55 with 8 contributions in the last 30 days
+    When "James" creates a content post requesting "municipal" reach
     Then the context assembly pipeline uses depth "standard"
     And layers "constitutional, author-profile, graph-neighborhood, payload" are assembled
     And the safety scan level is "standard"
@@ -49,13 +49,13 @@ Feature: Content Reach Negotiation
 
   @negotiation
   Scenario: Trusted author receives recommended reach matching request
-    Given human "Miriam" is logged in on doorway "alpha" with device
-    And "Miriam" has a trust score of 0.87 with 47 contributions in the last 30 days
-    When "Miriam" creates a content post requesting "community" reach
+    Given human "Jessica" is logged in on doorway "alpha" with device
+    And "Jessica" has a trust score of 0.87 with 47 contributions in the last 30 days
+    When "Jessica" creates a content post requesting "community" reach
     Then the Elohim recommends "community" reach
     And the safety review is cleared
     And the transparency report shows the decision factors
-    And "Miriam" sees the reach recommendation before the content leaves her device
+    And "Jessica" sees the reach recommendation before the content leaves her device
 
   @negotiation
   Scenario: Untrusted author has reach reduced with explanation
@@ -77,9 +77,9 @@ Feature: Content Reach Negotiation
 
   @negotiation
   Scenario: Author re-negotiates reach with explanation
-    Given human "Levi" is logged in on doorway "alpha" with device
-    And the Elohim has recommended "local" reach for Levi's post
-    When "Levi" requests re-negotiation with reason "This is relevant to the whole municipality"
+    Given human "James" is logged in on doorway "alpha" with device
+    And the Elohim has recommended "local" reach for James's post
+    When "James" requests re-negotiation with reason "This is relevant to the whole municipality"
     Then the Elohim re-evaluates with the additional context
     And either upgrades the recommendation or maintains it with reasoning
 
@@ -89,8 +89,8 @@ Feature: Content Reach Negotiation
 
   @birth-context
   Scenario: Content carries birth context after creation
-    Given human "Miriam" is logged in on doorway "alpha" with device
-    And "Miriam" creates a post with negotiated "community" reach
+    Given human "Jessica" is logged in on doorway "alpha" with device
+    And "Jessica" creates a post with negotiated "community" reach
     When the content is committed to the source chain
     Then the content node includes a birth context
     And the birth context contains the constitutional stack hash
@@ -99,16 +99,16 @@ Feature: Content Reach Negotiation
 
   @birth-context @privacy-gradient
   Scenario: Private content gets minimal birth context
-    Given human "Levi" is logged in on doorway "alpha" with device
-    And "Levi" creates a post with negotiated "private" reach
+    Given human "James" is logged in on doorway "alpha" with device
+    And "James" creates a post with negotiated "private" reach
     When the content is committed to the source chain
     Then the birth context contains only "createdAt" and "constitutionalStackHash"
     And no community mood or governance markers are included
 
   @birth-context @privacy-gradient
   Scenario: Commons content gets full birth context
-    Given human "Miriam" is logged in on doorway "alpha" with device
-    And "Miriam" creates a post with negotiated "commons" reach
+    Given human "Jessica" is logged in on doorway "alpha" with device
+    And "Jessica" creates a post with negotiated "commons" reach
     When the content is committed to the source chain
     Then the birth context includes community mood
     And the birth context includes governance markers
@@ -117,9 +117,9 @@ Feature: Content Reach Negotiation
 
   @birth-context
   Scenario: Reply carries chain of provenance
-    Given human "Levi" is logged in on doorway "alpha" with device
+    Given human "James" is logged in on doorway "alpha" with device
     And content "post-123" exists with a birth context
-    When "Levi" creates a comment on "post-123"
+    When "James" creates a comment on "post-123"
     Then the comment's birth context includes "parentBirthContextHash"
     And the hash references "post-123"'s birth context
 
@@ -129,8 +129,8 @@ Feature: Content Reach Negotiation
 
   @transparency
   Scenario: User can inspect full transparency report
-    Given human "Miriam" is logged in on doorway "alpha" with device
-    When "Miriam" creates a content post and receives a reach recommendation
+    Given human "Jessica" is logged in on doorway "alpha" with device
+    When "Jessica" creates a content post and receives a reach recommendation
     Then the transparency report lists all context layers considered
     And each decision factor shows influence, weight, and evidence
     And the report shows author standing summary
@@ -139,7 +139,7 @@ Feature: Content Reach Negotiation
   @transparency
   Scenario: Content without birth context is flagged
     Given content "stripped-post" exists without a birth context
-    When human "Levi" views "stripped-post" on doorway "alpha"
+    When human "James" views "stripped-post" on doorway "alpha"
     Then a provenance warning is displayed
     And the trust score for "stripped-post" is reduced
 
