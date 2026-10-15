@@ -1,5 +1,31 @@
 #!/usr/bin/env node
 // Bounded experiment only. Never starts/stops a conductor or alters a deployed bundle.
+// Run against ALREADY RUNNING, empty test conductors; keep storage disconnected.
+// Direct calls avoid the seeder, but an attached storage can still project/re-author content.
+// Example (F=genesis/a2o/scripts/fixtures-clone.mjs; R=genesis/a2o/reports/clone-probe):
+// node $F prepare --out $R/bundle --hc /path/to/hc --bundle /path/to/elohim.happ
+// S=$(node -p "require('./$R/bundle/prepare.json').seed")
+// for P in 4444 4454 4464 4474; do
+//   SEED=$S; [ "$P" = 4474 ] && SEED=$S-outsider
+//   node $F install --admin ws://localhost:$P --app probe --seed $SEED --cells 6 \
+//     --bundle $R/bundle/workdir/elohim.happ --out $R/peer-$P
+// done
+// node $F authorize --admin ws://localhost:4444 --app probe --out $R/auth \
+//   --credentials $R/credentials.json  # before the baseline; writes CapGrants
+// node $F measure --admin ws://localhost:4444 --app probe --cells 6 --pid $PID \
+//   --data $DATA --out $R/cost
+// node $F write --admin ws://localhost:4444 --app probe --clone fixtures \
+//   --credentials $R/credentials.json --out $R/probe
+// node $F poll --admin 4444,4454,4464 --expect-absent 4474 --app probe \
+//   --write $R/probe/write.json --timeout 600 --out $R/probe
+// for P in 4444 4454 4464 4474; do
+//   SEED=$S; [ "$P" = 4474 ] && SEED=$S-outsider
+//   node $F grow --admin ws://localhost:$P --app probe --seed $SEED --cells 10 \
+//     --out $R/peer-$P
+// done
+// node $F measure --admin ws://localhost:4444 --app probe --cells 10 --pid $PID \
+//   --data $DATA --out $R/cost
+// Repeat grow/measure at 20; measure each peer with its own PID/data/output if desired.
 import {
   AdminWebsocket,
   AppWebsocket,
@@ -35,6 +61,10 @@ const {
       'storage',
       'db',
       'credentials',
+      'clone',
+      'write',
+      'timeout',
+      'expect-absent',
     ].map(key => [key, { type: 'string' }])
   ),
 });
@@ -84,6 +114,162 @@ if (mode === 'prepare') {
   process.exit(0);
 }
 fs.mkdirSync(out, { recursive: true });
+// New modes share the same exact-name, enabled experiment-clone guard.
+function experimentClone(info, name) {
+  if (!/^fixtures(?:-[1-9]\d*)?$/.test(name)) throw Error('Expected a fixtures clone name');
+  const matches = (info.cell_info.lamad ?? []).filter(
+    c => c.type === 'cloned' && c.value.name === name && c.value.enabled
+  );
+  if (matches.length !== 1) throw Error(`Expected one enabled clone named ${name}`);
+  return matches[0].value;
+}
+if (mode === 'poll') {
+  await poll();
+  process.exit(0);
+}
+async function poll() {
+  const receipt = JSON.parse(fs.readFileSync(required('write'), 'utf8'));
+  const timeout = Number(o.timeout ?? 600);
+  if (!Number.isFinite(timeout) || timeout <= 0) throw Error('Invalid --timeout');
+  if (!receipt.action_hash || !receipt.signature || !receipt.cell_id?.[0])
+    throw Error('Expected write.json with action hash, signature and cell id');
+  const peers = [];
+  for (const [list, absent] of [
+    [required('admin'), false],
+    [o['expect-absent'] ?? '', true],
+  ]) {
+    for (const address of list.split(',').filter(Boolean)) {
+      const url = new URL(/^\d+$/.test(address) ? `ws://localhost:${address}` : address);
+      if (!['127.0.0.1', 'localhost', '[::1]'].includes(url.hostname))
+        throw Error('Harness requires loopback admin');
+      if (peers.some(p => p.url === url.href)) throw Error('Duplicate peer');
+      peers.push({ url: url.href, expect_absent: absent, first_seen: 'never', samples: 0 });
+    }
+  }
+  if (!peers.some(p => !p.expect_absent)) throw Error('--admin needs at least one member');
+  const started = performance.now();
+  const deadline = started + timeout * 1000;
+  const result = { action_hash: receipt.action_hash, started_at: new Date().toISOString(), peers };
+  const connections = [];
+  const save = () =>
+    fs.writeFileSync(
+      path.join(out, 'poll.json'),
+      JSON.stringify(result, (key, value) => (key === 'id' ? undefined : value), 2) + '\n'
+    );
+  // Bound each request by the remaining observation window, including connection setup.
+  async function bounded(operation) {
+    let timer;
+    try {
+      return await Promise.race([
+        operation(),
+        new Promise((_, reject) => {
+          timer = setTimeout(
+            () => reject(Error('Observation deadline elapsed')),
+            Math.max(1, deadline - performance.now())
+          );
+        }),
+      ]);
+    } finally {
+      clearTimeout(timer);
+    }
+  }
+  try {
+    for (const peer of peers) {
+      const connection = await bounded(() =>
+        AdminWebsocket.connect({
+          url: new URL(peer.url),
+          defaultTimeout: Math.max(1, deadline - performance.now()),
+          wsClientOptions: {
+            origin: 'http://localhost',
+            handshakeTimeout: Math.max(1, deadline - performance.now()),
+          },
+        }).then(connection => {
+          if (performance.now() >= deadline) {
+            connection.client.close();
+            throw Error('Observation deadline elapsed during connection');
+          }
+          return connection;
+        })
+      );
+      connections.push(connection);
+      const apps = await bounded(() => connection.listApps({}));
+      if (apps.length !== 1 || apps[0].installed_app_id !== required('app'))
+        throw Error('Poll requires exactly one matching test app per peer');
+      const clone = experimentClone(apps[0], receipt.clone);
+      peer.cell_id = clone.cell_id.map(encodeHashToBase64);
+      if ((peer.cell_id[0] === receipt.cell_id[0]) === peer.expect_absent)
+        throw Error('Member DNA must match write; outsider DNA must differ');
+      peer.id = clone.cell_id;
+    }
+    do {
+      await Promise.all(
+        peers.map(async (peer, index) => {
+          let cursor;
+          for (let page = 0; ; page++) {
+            if (page >= 10000) throw Error('Poll exceeded DHT page budget');
+            // @holochain/client/lib/api/admin/types.d.ts:201-205,801-829:
+            // cell_id + optional dht_ops_cursor; only integrated ops establish holding.
+            const dump = await bounded(() =>
+              connections[index].dumpFullState({
+                cell_id: peer.id,
+                dht_ops_cursor: cursor,
+              })
+            );
+            const ops = dump.integration_dump;
+            // DHT dumps carry signed actions, not necessarily action hashes. Match the
+            // exact 64-byte signature returned WITH this action hash by the authoring call;
+            // never match a referenced prev_action/entry hash or a limbo operation.
+            if (ops.integrated.some(op => holdsSignedAction(op, receipt.signature))) {
+              if (peer.first_seen === 'never') peer.first_seen = new Date().toISOString();
+              break;
+            }
+            if (
+              !ops.integrated.length &&
+              !ops.integration_limbo.length &&
+              !ops.validation_limbo.length
+            )
+              break;
+            const next = ops.dht_ops_cursor;
+            if (next == null || next === cursor) throw Error('DHT cursor did not advance');
+            cursor = next;
+          }
+          peer.samples++;
+          peer.last_checked = new Date().toISOString();
+        })
+      );
+      save();
+      if (peers.some(p => p.expect_absent && p.first_seen !== 'never'))
+        throw Error('Isolation failed: outsider holds probe');
+      if (!peers.some(p => p.expect_absent) && peers.every(p => p.first_seen !== 'never')) break;
+      const remaining = deadline - performance.now();
+      if (remaining <= 0) break;
+      await new Promise(resolve => setTimeout(resolve, Math.min(15000, remaining)));
+    } while (performance.now() < deadline);
+    if (peers.some(p => !p.expect_absent && p.first_seen === 'never'))
+      throw Error('Propagation timeout: see per-peer first_seen in poll.json');
+    result.passed = true;
+  } catch (error) {
+    result.passed = false;
+    result.error = error.message;
+    throw error;
+  } finally {
+    result.finished_at = new Date().toISOString();
+    for (const peer of peers) delete peer.id;
+    save();
+    await Promise.all(connections.map(c => c.client.close()));
+  }
+}
+function holdsSignedAction(op, signature) {
+  // lib/hdk/dht-ops.d.ts:67-84: ChainOp tuples start with a SignedAction
+  // (or a Signature for CreateEntry). Older 0.7 dumps use signature-first tuples.
+  // Inspect only the operation's signer, never arbitrary entry bytes/references.
+  const tuple = op.ChainOp && Object.values(op.ChainOp)[0];
+  const signer = tuple?.[0];
+  const bytes = signer?.signature ?? signer;
+  if (typeof bytes === 'string') return bytes === signature;
+  if (!(bytes instanceof Uint8Array) && !Array.isArray(bytes)) return false;
+  return bytes.length === 64 && Buffer.from(bytes).toString('base64') === signature;
+}
 const adminUrl = new URL(required('admin'));
 if (!['127.0.0.1', 'localhost', '[::1]'].includes(adminUrl.hostname))
   throw Error('Harness requires loopback admin');
@@ -185,8 +371,91 @@ try {
     };
     write(`network-${cells}.json`, await admin.dumpNetworkStats());
     write(`app-${cells}.json`, await app.appInfo());
+    const membership = [];
+    for (const cell of info.cell_info.lamad ?? []) {
+      if (
+        cell.type !== 'provisioned' &&
+        !(cell.type === 'cloned' && /^fixtures(?:-[1-9]\d*)?$/.test(cell.value.name ?? ''))
+      )
+        continue;
+      const id = cell.value.cell_id;
+      // @holochain/client/lib/api/admin/websocket.d.ts:93 and types.d.ts:520-526:
+      // agentInfo({ dna_hashes: DnaHash[] | null }) returns signed JSON strings.
+      const raw = await admin.agentInfo({ dna_hashes: [id[0]] });
+      const agents = raw.map(encoded => {
+        const signed = JSON.parse(encoded);
+        const value =
+          typeof signed.agentInfo === 'string'
+            ? JSON.parse(signed.agentInfo)
+            : (signed.agentInfo ?? signed);
+        if (typeof value.agent !== 'string') throw Error('Unrecognized agent-info identity');
+        // Kitsune2 advertises the raw 32-byte Ed25519 key as base64url.
+        // Normalize to base64; this is not a 39-byte HoloHash.
+        const pubkey = Buffer.from(value.agent, 'base64url');
+        if (pubkey.length !== 32) throw Error('Unexpected agent public-key length');
+        return {
+          agent_pubkey: pubkey.toString('base64'),
+          agent_pubkey_encoding: 'raw-ed25519-base64',
+          ...(Object.hasOwn(value, 'storageArc') ? { storage_arc: value.storageArc } : {}),
+          ...(Object.hasOwn(value, 'storage_arc') ? { storage_arc: value.storage_arc } : {}),
+        };
+      });
+      membership.push({
+        name: cell.type === 'provisioned' ? 'base' : cell.value.name,
+        cell_id: id.map(encodeHashToBase64),
+        agents,
+        raw,
+      });
+    }
+    write(`agents-${cells}.json`, membership);
     fs.appendFileSync(path.join(out, 'measurements.jsonl'), JSON.stringify(row) + '\n');
     console.log(JSON.stringify(row));
+  } else if (mode === 'write') {
+    if (fs.existsSync(path.join(out, 'write.json'))) throw Error('write.json already exists');
+    const clone = experimentClone(info, required('clone'));
+    const id = clone.cell_id;
+    const credentials = JSON.parse(fs.readFileSync(required('credentials'), 'utf8'), (_, value) =>
+      value?.bytes ? Uint8Array.from(value.bytes) : value
+    );
+    const credential = credentials[encodeHashToBase64(id[0])];
+    if (!credential) throw Error('No pre-baseline signing credential for clone');
+    setSigningCredentials(id, credential);
+    // content_store/src/lib.rs:15994-16001: one public FlowMilestone create_entry,
+    // then get; no anchors, links or content projection signal. Payload is defined
+    // in content_store_integrity/src/lib.rs:2580-2598 (public EntryTypes:3773).
+    const time = new Date().toISOString();
+    const record = await app.callZome({
+      cell_id: id,
+      zome_name: 'content_store',
+      fn_name: 'create_flow_milestone',
+      payload: {
+        id: `clone-probe-${randomUUID()}`,
+        milestone_number: 'probe',
+        plan_id: 'probe',
+        name: 'Clone probe',
+        description: null,
+        target_date: Date.now() * 1000,
+        actual_date: null,
+        success_criteria_json: '[]',
+        all_criteria_met: false,
+        depends_on_goals_json: '[]',
+        depends_on_milestones_json: '[]',
+        blocks_goals_json: '[]',
+        status: 'pending',
+        achieved_at: null,
+        milestone_event_ids_json: '[]',
+        schema_version: 1,
+        validation_status: 'valid',
+      },
+    });
+    write('write.json', {
+      time,
+      returned_at: new Date().toISOString(),
+      clone: clone.name,
+      cell_id: id.map(encodeHashToBase64),
+      action_hash: encodeHashToBase64(record.signed_action.hashed.hash),
+      signature: Buffer.from(record.signed_action.signature).toString('base64'),
+    });
   } else if (mode === 'authorize') {
     // This writes CapGrants: run once BEFORE the baseline, then reuse credentials.
     const file = localOutput(required('credentials'));
@@ -314,7 +583,7 @@ try {
       'sync.json',
       documents.sort((a, b) => a.docId.localeCompare(b.docId))
     );
-  } else throw Error('Modes: prepare, install, grow, measure, authorize, inventory');
+  } else throw Error('Modes: prepare, install, grow, measure, write, poll, authorize, inventory');
 } finally {
   if (app) await app.client.close();
   await admin.client.close();
