@@ -817,3 +817,143 @@ export async function postFixtureCommitment(
     );
   }
 }
+
+/**
+ * What a browser saw when it opened a content app's entry address as a PAGE.
+ *
+ * Extends the ordinary visit so the reused boot steps ("reported no uncaught
+ * error", "every asset … arrived") read it unchanged: the capture below listens
+ * at the page level, which includes every request and error the FRAME makes.
+ * The top document is the doorway's shell, so the root/bootstrap fields of the
+ * base shape describe nothing there; the app's own are the `frame*` fields.
+ */
+export interface ShellVisit extends BrowserVisit {
+  /** Status of the main (top-level document) response. */
+  mainStatus: number;
+  /** Lower-cased header names of the main response. */
+  mainHeaders: Record<string, string>;
+  /** Console messages of type `error`, from the top document and the frame. */
+  consoleErrors: string[];
+  /** Text of the resiliency badge, or null when the shell has none. */
+  badgeText: string | null;
+  badgeHref: string | null;
+  badgeHolders: string | null;
+  badgeTarget: string | null;
+  /** The frame element's `src` attribute as written, and its resolved form. */
+  frameSrc: string | null;
+  frameSrcResolved: string | null;
+  /** The framed app's own document: its url, root and bootstrap marker. */
+  frameUrl: string | null;
+  frameRootPresent: boolean;
+  frameRootText: string;
+  frameBootstrapReady: boolean;
+}
+
+/**
+ * Open one URL as a top-level page and report the shell the doorway wrapped
+ * around it, then wait for the app in the shell's frame to start in the frame's
+ * own document. Same capture surface as `captureBrowserShell`, widened to the
+ * frame (`page.on` events already include subframe traffic).
+ */
+export async function visitShellInBrowser(url: string, timeoutMs = 30_000): Promise<ShellVisit> {
+  const { chromium } = await import('playwright');
+  const rootSelector = 'app-root, lamad-root';
+  const visit: ShellVisit = {
+    url,
+    pageErrors: [],
+    failedRequests: [],
+    httpErrors: [],
+    rootText: '',
+    rootPresent: false,
+    bootstrapReady: false,
+    mainStatus: 0,
+    mainHeaders: {},
+    consoleErrors: [],
+    badgeText: null,
+    badgeHref: null,
+    badgeHolders: null,
+    badgeTarget: null,
+    frameSrc: null,
+    frameSrcResolved: null,
+    frameUrl: null,
+    frameRootPresent: false,
+    frameRootText: '',
+    frameBootstrapReady: false,
+  };
+  const started = Date.now();
+  const browser = await chromium.launch({
+    headless: true,
+    args: ['--no-sandbox', '--disable-dev-shm-usage'],
+  });
+  try {
+    const page = await browser.newPage();
+    const expectedOrigin = new URL(url).origin;
+    page.on('pageerror', error => visit.pageErrors.push(error.message));
+    page.on('console', message => {
+      if (message.type() === 'error') visit.consoleErrors.push(message.text());
+    });
+    page.on('requestfailed', request =>
+      visit.failedRequests.push({
+        url: request.url(),
+        failure: request.failure()?.errorText ?? 'unknown',
+      })
+    );
+    page.on('response', response => {
+      if (response.status() >= 400)
+        visit.httpErrors.push({ url: response.url(), status: response.status() });
+    });
+    try {
+      const response = await page.goto(url, { waitUntil: 'load', timeout: timeoutMs });
+      if (new URL(page.url()).origin !== expectedOrigin)
+        throw new Error(`navigation left doorway: ${url} -> ${page.url()}`);
+      visit.mainStatus = response?.status() ?? 0;
+      visit.mainHeaders = response?.headers() ?? {};
+      if (!response?.ok())
+        throw new Error(`navigation returned ${response?.status() ?? 'no response'}`);
+
+      const badge = page.locator('[data-testid="resiliency-badge"]').first();
+      if ((await badge.count()) > 0) {
+        visit.badgeText = (await badge.textContent())?.trim() ?? '';
+        visit.badgeHref = await badge.getAttribute('href');
+        visit.badgeHolders = await badge.getAttribute('data-holders');
+        visit.badgeTarget = await badge.getAttribute('data-target');
+      }
+
+      const frameElement = page.locator('[data-testid="content-app-frame"]').first();
+      if ((await frameElement.count()) > 0) {
+        visit.frameSrc = await frameElement.getAttribute('src');
+        if (visit.frameSrc) visit.frameSrcResolved = new URL(visit.frameSrc, page.url()).toString();
+        const handle = await frameElement.elementHandle();
+        const frame = await handle?.contentFrame();
+        if (frame) {
+          visit.frameUrl = frame.url();
+          await frame.waitForFunction(
+            (selector: string) => {
+              const root = document.querySelector(selector);
+              return (
+                root?.getAttribute('data-app-ready') === 'true' &&
+                !!root.textContent?.trim() &&
+                root.getBoundingClientRect().height > 0
+              );
+            },
+            rootSelector,
+            { timeout: timeoutMs }
+          );
+          // Include deferred startup failures after the root first paints.
+          await page.waitForTimeout(1000);
+          const root = frame.locator(rootSelector).first();
+          visit.frameRootText = (await root.textContent())?.trim() ?? '';
+          visit.frameRootPresent = true;
+          visit.frameBootstrapReady = (await root.getAttribute('data-app-ready')) === 'true';
+        }
+      }
+    } catch (error) {
+      visit.pageErrors.push(`navigation/boot: ${String(error)}`);
+    }
+  } finally {
+    await browser.close();
+  }
+  if (Date.now() - started > 45_000)
+    visit.pageErrors.push('Browser visit exceeded its 45-second deadline');
+  return visit;
+}

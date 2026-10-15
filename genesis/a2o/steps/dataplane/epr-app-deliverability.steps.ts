@@ -21,6 +21,8 @@
 
 import { strict as assert } from 'node:assert';
 import { createHash, randomBytes } from 'node:crypto';
+import { readFileSync } from 'node:fs';
+import { join } from 'node:path';
 
 import { Given, When, Then, After, Before } from '@cucumber/cucumber';
 
@@ -59,7 +61,9 @@ import {
   stageBundleThroughStorage,
   stageInvalidFixture,
   visitInBrowser,
+  visitShellInBrowser,
   type BrowserVisit,
+  type ShellVisit,
   type FixtureBundle,
 } from './epr-app-deliverability.helpers.js';
 
@@ -70,6 +74,8 @@ import {
 interface PublishedApp {
   /** The EPR id this run authored — fresh per scenario, never a seeded page. */
   slug: string;
+  /** The format the run-owned record declares (Station 5 varies it). */
+  declaredFormat?: 'html5-app' | 'spa-bundle';
   mountPath: string;
   rootCommitments?: string[];
   publicHostname?: string;
@@ -434,8 +440,12 @@ When('Matthew builds coherent successor artifact B', function (this: E2EWorld) {
  * declaration guard would refuse the write anyway (measured 2026-09-05 —
  * declare_earned_canonical_head is restricted to a page's root author).
  */
-async function authorOwnedEprRecord(world: E2EWorld): Promise<void> {
+async function authorOwnedEprRecord(
+  world: E2EWorld,
+  contentFormat: 'html5-app' | 'spa-bundle' = 'html5-app'
+): Promise<void> {
   const record = app(world);
+  record.declaredFormat = contentFormat;
   // Share one authoring observer across the whole mount phase. The outer
   // fixture step also needs 2 * 80s for guarded doorway restarts and 2 * 60s
   // for their readiness checks: a 180s outer ceiling could abandon a valid
@@ -456,7 +466,7 @@ async function authorOwnedEprRecord(world: E2EWorld): Promise<void> {
         title: `EPR app deliverability fixture (${record.slug})`,
         description: 'a small site this test run published, so it may declare its own head',
         contentType: 'collective',
-        contentFormat: 'html5-app',
+        contentFormat,
         content: { slug: record.slug, entryPoint: 'index.html' },
         reach: 'commons',
       },
@@ -590,6 +600,14 @@ Given(
   { timeout: OWNED_FIXTURE_SETUP_TIMEOUT_MS },
   async function (this: E2EWorld) {
     await authorOwnedEprRecord(this);
+  }
+);
+
+Given(
+  'an EPR record this run owns for it, declared as an app that draws its own chrome',
+  { timeout: OWNED_FIXTURE_SETUP_TIMEOUT_MS },
+  async function (this: E2EWorld) {
+    await authorOwnedEprRecord(this, 'spa-bundle');
   }
 );
 
@@ -2089,3 +2107,244 @@ After({ tags: '@deliverability-browser', timeout: 450_000 }, async function (thi
     })
   );
 });
+
+// ---------------------------------------------------------------------------
+// Station 5 — the content shell: a page-opening request gets the bar, a frame
+// gets the bytes
+// ---------------------------------------------------------------------------
+
+/** The entry address of the run-owned app on one doorway: `/apps/<slug>/index.html`. */
+function entryUrl(world: E2EWorld, peerName: string): string {
+  return `${resolvePeerUrl(peerName)}/apps/${encodeURIComponent(app(world).slug)}/index.html`;
+}
+
+function requireShellVisit(world: E2EWorld, peerName: string): ShellVisit {
+  const visit = requireVisit(world, peerName);
+  assert.ok(
+    'mainHeaders' in visit,
+    `${peerName}: the recorded browser visit was not a shell visit — "a visitor opens this app's entry address … as a page in a browser" must run first`
+  );
+  return visit as ShellVisit;
+}
+
+interface EntryAnswer {
+  status: number;
+  headers: Record<string, string | undefined>;
+  body: Buffer;
+}
+
+const entryAnswers = new WeakMap<E2EWorld, Map<string, EntryAnswer>>();
+
+function requireEntryAnswer(world: E2EWorld, peerName: string): EntryAnswer {
+  const answer = entryAnswers.get(world)?.get(peerName);
+  assert.ok(
+    answer,
+    `no request for the app's entry address was made to ${peerName} in this scenario`
+  );
+  return answer;
+}
+
+Then(
+  "within {int} seconds doorway {string} knows this app's record and that its declared format is {string}",
+  { timeout: 150_000 },
+  async function (this: E2EWorld, seconds: number, peerName: string, format: string) {
+    const record = app(this);
+    // The doorway's own read of its projection of content records, by slug.
+    const url = `${resolvePeerUrl(peerName)}/db/content/${encodeURIComponent(record.slug)}`;
+    let last = '';
+    const elapsed = await pollUntil(async () => {
+      const row = await getRaw(url, { timeoutMs: 5000 });
+      if (row.status !== 200) {
+        last = `HTTP ${row.status}`;
+        return false;
+      }
+      const declared = (JSON.parse(row.text) as { contentFormat?: unknown }).contentFormat;
+      last = `contentFormat ${JSON.stringify(declared)}`;
+      return declared === format;
+    }, seconds * 1000);
+    assert.notEqual(
+      elapsed,
+      null,
+      `${peerName} did not show a content record "${record.slug}" declared "${format}" within ${seconds}s ` +
+        `(GET ${url}: last ${last}). A doorway that has not heard of the app serves the bare file, ` +
+        'which would make the shell scenarios pass or fail for the wrong reason.'
+    );
+  }
+);
+
+When(
+  "a visitor opens this app's entry address on peer {string} as a page in a browser",
+  { timeout: 120_000 },
+  async function (this: E2EWorld, peerName: string) {
+    visitMap(this).set(peerName, await visitShellInBrowser(entryUrl(this, peerName)));
+  }
+);
+
+Then(
+  'doorway {string} answered the visitor with a content shell that no cache may keep',
+  function (this: E2EWorld, peerName: string) {
+    const visit = requireShellVisit(this, peerName);
+    assert.equal(visit.mainStatus, 200, `${peerName}: ${visit.url} answered ${visit.mainStatus}`);
+    assert.equal(
+      visit.mainHeaders['x-elohim-chrome'],
+      'content-shell',
+      `${peerName}: the page-opening answer for ${visit.url} was not marked as a content shell (x-elohim-chrome: ${visit.mainHeaders['x-elohim-chrome'] ?? 'absent'})`
+    );
+    assert.ok(
+      (visit.mainHeaders['cache-control'] ?? '').toLowerCase().includes('no-store'),
+      `${peerName}: the content shell's cache-control was "${visit.mainHeaders['cache-control'] ?? 'absent'}", which lets a cache keep it`
+    );
+  }
+);
+
+// A regular expression, not a cucumber expression: the quoted phrase would be read as a {string}.
+Then(
+  /^the shell's resiliency badge from doorway "([^"]*)" reads "Held by N of M households" with N at least one and no more than M$/,
+  function (this: E2EWorld, peerName: string) {
+    const visit = requireShellVisit(this, peerName);
+    assert.notEqual(visit.badgeText, null, `${peerName}: the shell has no resiliency badge`);
+    const match = /Held by (\d+) of (\d+) households/.exec(visit.badgeText ?? '');
+    assert.ok(
+      match,
+      `${peerName}: the badge reads "${visit.badgeText}", not "Held by N of M households"`
+    );
+    const held = Number(match[1]);
+    const target = Number(match[2]);
+    assert.ok(
+      held >= 1 && held <= target,
+      `${peerName}: the badge reads "${visit.badgeText}" — N must be at least one and no more than M`
+    );
+  }
+);
+
+Then(
+  "the shell's resiliency badge from doorway {string} links to this app's EPR page",
+  function (this: E2EWorld, peerName: string) {
+    const visit = requireShellVisit(this, peerName);
+    assert.equal(
+      visit.badgeHref,
+      `/epr/${app(this).slug}`,
+      `${peerName}: the badge leads to "${visit.badgeHref}", not this app's EPR page`
+    );
+  }
+);
+
+Then(
+  "the shell from doorway {string} shows the app in a frame whose address is this app's entry address",
+  function (this: E2EWorld, peerName: string) {
+    const visit = requireShellVisit(this, peerName);
+    assert.ok(visit.frameSrcResolved, `${peerName}: the shell has no content-app-frame`);
+    const resolved = new URL(visit.frameSrcResolved);
+    assert.equal(
+      resolved.pathname,
+      `/apps/${encodeURIComponent(app(this).slug)}/index.html`,
+      `${peerName}: the frame points at "${visit.frameSrc}", not this app's entry address`
+    );
+    assert.equal(resolved.origin, new URL(visit.url).origin);
+  }
+);
+
+Then(
+  "the app inside the shell's frame from doorway {string} completed client bootstrap in the frame's own document",
+  function (this: E2EWorld, peerName: string) {
+    const visit = requireShellVisit(this, peerName);
+    assert.equal(
+      visit.frameBootstrapReady,
+      true,
+      `${peerName}: the data-app-ready marker was absent in the frame's document (${visit.frameUrl ?? 'no frame document'}); the shell's own page can never carry it`
+    );
+  }
+);
+
+Then(
+  "the app root in the frame's own document from doorway {string} has content",
+  function (this: E2EWorld, peerName: string) {
+    const visit = requireShellVisit(this, peerName);
+    assert.ok(
+      visit.frameRootPresent,
+      `${peerName}: the frame's document (${visit.frameUrl ?? 'none'}) has no app root element`
+    );
+    assert.ok(
+      visit.frameRootText.length > 0,
+      `${peerName}: the app root in the frame's document was still empty after load`
+    );
+  }
+);
+
+async function requestEntryAs(
+  world: E2EWorld,
+  peerName: string,
+  dest: 'iframe' | 'document'
+): Promise<void> {
+  const response = await getRawWithHeaders(entryUrl(world, peerName), {
+    timeoutMs: 15_000,
+    headers: {
+      'sec-fetch-dest': dest,
+      'sec-fetch-mode': 'navigate',
+      'sec-fetch-site': 'same-origin',
+    },
+  });
+  let answers = entryAnswers.get(world);
+  if (!answers) {
+    answers = new Map<string, EntryAnswer>();
+    entryAnswers.set(world, answers);
+  }
+  answers.set(peerName, {
+    status: response.status,
+    headers: response.headers,
+    body: Buffer.from(response.text, 'utf8'),
+  });
+}
+
+When(
+  "this app's entry address is requested from doorway {string} the way a frame requests it",
+  { timeout: 30_000 },
+  async function (this: E2EWorld, peerName: string) {
+    await requestEntryAs(this, peerName, 'iframe');
+  }
+);
+
+When(
+  "this app's entry address is requested from doorway {string} the way a browser opening a page requests it",
+  { timeout: 30_000 },
+  async function (this: E2EWorld, peerName: string) {
+    await requestEntryAs(this, peerName, 'document');
+  }
+);
+
+Then(
+  "doorway {string} answers with the index page's bytes exactly as the bundle this run built holds them",
+  function (this: E2EWorld, peerName: string) {
+    const answer = requireEntryAnswer(this, peerName);
+    assert.equal(answer.status, 200, `${peerName}: the entry address answered ${answer.status}`);
+    const built = readFileSync(join(requireBundle(this).dir, 'index.html'));
+    assert.ok(
+      answer.body.equals(built),
+      `${peerName}: the entry address answered ${answer.body.length} bytes that differ from the ` +
+        `${built.length}-byte index.html this run built`
+    );
+  }
+);
+
+Then(
+  'that answer carries no content-shell marker and declares that it depends on how it was requested',
+  function (this: E2EWorld) {
+    const peers = [...(entryAnswers.get(this)?.keys() ?? [])];
+    assert.ok(peers.length > 0, 'no entry-address answer has been recorded');
+    for (const peerName of peers) {
+      const { headers } = requireEntryAnswer(this, peerName);
+      assert.equal(
+        headers['x-elohim-chrome'],
+        undefined,
+        `${peerName}: the answer carries x-elohim-chrome: ${headers['x-elohim-chrome']}`
+      );
+      const vary = (headers['vary'] ?? '').toLowerCase();
+      for (const field of ['sec-fetch-dest', 'sec-fetch-mode']) {
+        assert.ok(
+          vary.includes(field),
+          `${peerName}: vary is "${headers['vary'] ?? 'absent'}" — a cache could hand this answer to a request that asked differently (missing ${field})`
+        );
+      }
+    }
+  }
+);
