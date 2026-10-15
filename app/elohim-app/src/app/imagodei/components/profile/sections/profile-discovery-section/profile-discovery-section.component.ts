@@ -10,6 +10,8 @@ import {
 } from '@app/lamad/quiz-engine/models/discovery-assessment.model';
 import { DiscoveryAttestationService } from '@app/lamad/quiz-engine/services/discovery-attestation.service';
 
+import { eprToUniversalHref } from '@elohim/service';
+
 @Component({
   selector: 'app-profile-discovery-section',
   standalone: true,
@@ -42,7 +44,10 @@ export class ProfileDiscoverySectionComponent {
 
   navigateToResult(result: DiscoveryResult): void {
     if (result.contentNodeId) {
-      void this.router.navigate(['/resource', result.contentNodeId]);
+      // The shell owns the universal address, so an in-bundle navigation is right.
+      void this.router.navigateByUrl(
+        eprToUniversalHref({ id: result.contentNodeId, tier: 'head' })
+      );
     } else {
       this.navigateToDiscovery.emit();
     }

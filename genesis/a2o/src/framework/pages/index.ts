@@ -12,6 +12,7 @@ export { PipelineTabPage } from './pipeline-tab.page.js';
 export { EprContentPage } from './epr-content.page.js';
 export { ContributorsPage } from './contributors.page.js';
 export { EprHomePage, EPR_HOME } from './epr-home.page.js';
+export type { EprHomeLeg, EprHomeSection, SeeAlsoRow } from './epr-home.page.js';
 export {
   THRESHOLD,
   THRESHOLD_REGISTER,

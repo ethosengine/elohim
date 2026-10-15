@@ -33,6 +33,8 @@ import {
 } from '@app/lamad/quiz-engine/models/discovery-assessment.model';
 import { DiscoveryAttestationService } from '@app/lamad/quiz-engine/services/discovery-attestation.service';
 
+import { eprToUniversalHref } from '@elohim/service';
+
 import { AGENCY_STAGES, type AgencyStageInfo } from '../../models/agency.model';
 import { AgencyService } from '../../services/agency.service';
 import { AuthService } from '../../services/auth.service';
@@ -366,7 +368,7 @@ export class ProfileComponent implements OnInit, OnDestroy {
   }
 
   navigateToResource(contentNodeId: string): void {
-    void this.router.navigate(['/resource', contentNodeId]);
+    this.eprNav.navigate(eprToUniversalHref({ id: contentNodeId, tier: 'head' }));
   }
 
   getBadgeColor(result: DiscoveryResult): string {

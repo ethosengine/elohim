@@ -261,7 +261,11 @@ export const PATH_OVERVIEW = {
   VIEW_AS_CONTENT: 'overview-view-as-content',
 } as const;
 
-/** Cross-pillar resource viewer (shell-rendered at /resource/:id and /epr/:id). */
+/**
+ * Lamad's resource viewer (content-viewer.component.html). Since the atom home
+ * subsumed it (epr-atom-home spec §11), it renders only inside a learning path:
+ * /epr/:id is the shell's atom home (EPR_HOME) and /resource/:id redirects there.
+ */
 export const CONTENT_VIEWER = {
   ROOT: 'content-viewer',
   // The raw fallback's "Content format: {format}" notice — rendered ONLY when no
@@ -271,8 +275,10 @@ export const CONTENT_VIEWER = {
 } as const;
 
 /**
- * Contributors section (lamad: content-viewer.component.html).
- * The section renders when `contributorPresences.length > 0`.
+ * Contributors section — "Inspired by / contributed to by" in the atom home's
+ * "Where it came from" leg (epr-atom-home spec §11.2; the viewer's ids are kept,
+ * and the section sits in the leg itself, not in its fold).
+ * The section renders when the content has contributor presences.
  * Each `<elohim-contributor-card>` host element carries a per-card testid
  * (`viewer-contributor-card-{id}`) stamped via `[attr.data-testid]` in the *ngFor.
  * CARD_PREFIX is the attribute prefix for selecting by prefix: `[data-testid^="viewer-contributor-card-"]`.
@@ -289,32 +295,20 @@ export const RAW_NODE = {
   ROOT: 'epr-raw-node', // EPR shown AS an atom — the raw subview, never a 302 to a pillar mount
 } as const;
 
-/** Lens-complete /epr/{id} viewer surfaces (lamad: PathViewerComponent + ContentViewerComponent). */
+/** Lens surfaces from lamad's viewers (PathViewerComponent + the in-path ContentViewerComponent). */
 export const LENS_VIEWER = {
   COMPOSITE_OUTLINE: 'epr-composite-outline', // focal epr-composite render (a path AS its outline)
   OPEN_IN_PILLAR: 'epr-open-in-pillar', // the "Open in {pillar}" lens affordance (claimed types)
 } as const;
 
-// Content viewer (elohim-app: content-viewer.component.html)
-export const VIEWER = {
-  BACK_HOME: 'viewer-back-home',
-  ERROR_BACK: 'viewer-error-back',
-  EDIT_LINK: 'viewer-edit-link',
-  // 'viewer-explore-graph' retired — the explore affordance moved into the shared
-  // exploration sidebar; use EXPLORATION.EXPLORE_GRAPH ('exploration-explore-graph').
-  RETURN_TO_PATH: 'viewer-return-to-path',
-  TAB_CONTENT: 'viewer-tab-content',
-  TAB_GOVERNANCE: 'viewer-tab-governance',
-  TAB_NETWORK: 'viewer-tab-network',
-  TAB_TRUST: 'viewer-tab-trust',
-  AFFINITY_INCREASE: 'viewer-affinity-increase',
-  AFFINITY_DECREASE: 'viewer-affinity-decrease',
-  AFFINITY_MASTERED: 'viewer-affinity-mastered',
-  AFFINITY_PRACTICING: 'viewer-affinity-practicing',
-  FILE_CHALLENGE: 'viewer-file-challenge',
-  START_DISCUSSION: 'viewer-start-discussion',
-  FEEDBACK_TRIGGER: 'viewer-feedback-trigger',
-} as const;
+// The resource viewer's VIEWER group is retired: /resource/:id redirects to the
+// atom home (epr-atom-home spec §11.1), and no step reads these ids any more.
+// Retired with the viewer route: viewer-tab-{content,governance,network,trust},
+// viewer-affinity-*, viewer-file-challenge, viewer-start-discussion,
+// viewer-verify-resilience, and viewer-feedback-trigger (the trigger's host on
+// the atom home is EPR_HOME.RAISE_CONCERN). The in-path lesson viewer may still
+// render viewer-back-home / viewer-return-to-path / viewer-edit-link, but no
+// scenario reads them; add a group back when one does.
 
 // Gate feedback (elohim-app: gate-feedback-trigger + gate-feedback-modal)
 export const FEEDBACK_GATE = {
@@ -481,10 +475,10 @@ export const MARKDOWN = {
   BACK_TO_TOP: 'markdown-back-to-top',
   // The rendered markdown body. No data-testid (a content container, not an
   // interactive element); locate via this class. Render-verifies "the markdown
-  // content body is rendered". TWO render paths exist: the lesson-view's
-  // markdown renderer emits .markdown-content; the standalone /epr/{id}
-  // content-viewer renders the body into .content-body (verified live —
-  // unification of the two markdown paths is a tracked content-viewer concern).
+  // content body is rendered". The markdown renderer emits .markdown-content
+  // both in the lesson view and in the atom home's focal slot (epr-atom-home
+  // spec §6 keeps that class); .content-body is the in-path viewer's static
+  // wrapper.
   CONTENT: '.markdown-content, .content-viewer .content-body, .content-body', // CSS selector — used via locate(), not testId()
   // The markdown renderer's component host. Present ONLY when MarkdownRendererComponent
   // actually instantiated — unlike CONTENT above, this does NOT match the static
@@ -494,8 +488,9 @@ export const MARKDOWN = {
 } as const;
 
 // Shared exploration sidebar (lamad: exploration-sidebar.component.ts +
-// related-concepts-panel.component.ts). The SAME sidebar renders beside content
-// on BOTH the standalone /epr/{id} content-viewer AND the path-step lesson-view.
+// related-concepts-panel.component.ts). It renders beside a path-step lesson
+// view. Opened on its own, a resource's neighbours are the atom home's "See also"
+// fold under "Where this lives" (EPR_HOME.SEE_ALSO / SEE_ALSO_CARD) instead.
 // AUTHORED neighbors (explicit relatedNodeIds) surface as related-concept-card;
 // DISCOVERED (computed tag) neighbors surface as discovered-concept-card carrying
 // an inference-source attribute that is NOT "explicit".
@@ -739,8 +734,9 @@ export const CONTEXT_MENU = {
 } as const;
 
 // protocol-omni.component.ts — DOM-tier protocol chrome (the trust surface).
-// Renders on protocolContent routes ('' and /resource/:resourceId) in
-// elohim-app's app.component. The RESILIENCE segment wraps the library's
+// Renders on protocolContent routes ('', /epr/:resourceId and its /raw view)
+// in elohim-app's app.component; /resource/:resourceId redirects to /epr/.
+// The RESILIENCE segment wraps the library's
 // <elohim-resilience-snapshot density="icon"> once the snapshot loads; while
 // no data is available it holds a neutral glyph making no status claim
 // (trust surface never cries wolf). Inner icon/tooltip testids come from
@@ -764,4 +760,73 @@ export const PROTOCOL_OMNI = {
   // reaches them. Slotted full-density content (.resilience-full-card) lives in
   // light DOM (the default slot), reachable by the same descendant query.
   RESILIENCE_HYPERCARD: 'resilience-hypercard',
+} as const;
+
+// ─────────────────────────────────────────────────────────────────────────────
+// EPR atom home — the shell-owned /epr/{id} page
+// (elohim-app: elohim/components/epr-home/*). Contract: the epr-atom-home spec
+// §6 (frame) and §11.3 (the legs' folds, Slice 4).
+// ─────────────────────────────────────────────────────────────────────────────
+
+/** The four legs that ground a resource in its network. */
+export type EprHomeLeg = 'holds' | 'lives' | 'governed' | 'from';
+
+/** Every rail section with a leg test id: the four legs plus "Who's here". */
+export type EprHomeSection = EprHomeLeg | 'here';
+
+/** Selectors for the shell-owned EPR atom home (/epr/{id}). */
+export const EPR_HOME = {
+  ROOT: 'epr-home',
+  LOADING: 'epr-home-loading',
+  GATE: 'epr-home-gate',
+  GATE_BACK: 'epr-home-gate-back',
+  ARRIVAL: 'epr-home-arrival',
+  TITLE: 'epr-home-title',
+  CHIP_REACH: 'epr-home-chip-reach',
+  CHIP_NOTARIZED: 'epr-home-chip-notarized',
+  CHIP_HELD: 'epr-home-chip-held',
+  OPEN_IN_BUNDLE: 'epr-home-open-in-bundle',
+  FOCAL: 'epr-home-focal',
+  FOCAL_CLAIMED: 'epr-home-focal-claimed',
+  YOUR_MARK: 'epr-home-your-mark',
+  ADDRESS: 'epr-home-address',
+  /** The address line's in-page `#holds` anchor; opens the "Who holds it" fold. */
+  NETWORK_DETAIL: 'epr-home-network-detail',
+  LEG: (leg: EprHomeSection) => `epr-home-leg-${leg}`,
+  // §11.3 — each leg's fold, closed by default, opened by its toggle or by
+  // arriving with the leg's fragment (#holds · #lives · #governed · #from).
+  FOLD_TOGGLE: (leg: EprHomeLeg) => `epr-home-fold-toggle-${leg}`,
+  FOLD: (leg: EprHomeLeg) => `epr-home-fold-${leg}`,
+  // Who holds it → "Network detail"
+  HEALTH: 'epr-home-health',
+  PIECES: 'epr-home-pieces',
+  VERIFY: 'epr-home-verify',
+  VERIFY_RESULT: 'epr-home-verify-result',
+  // Who's here
+  ATTENTION: 'epr-home-attention',
+  // Where it came from
+  ATTESTATIONS: 'epr-home-attestations',
+  ATTESTATION: 'epr-home-attestation',
+  STEWARD: 'epr-home-steward',
+  DOWNLOAD: 'epr-home-download',
+  // How it's governed
+  LABELS: 'epr-home-labels',
+  CHALLENGE: 'epr-home-challenge',
+  /** Host of <elohim-gate-feedback-trigger>; its inner ids are FEEDBACK_GATE.*. */
+  RAISE_CONCERN: 'epr-home-raise-concern',
+  // Where this lives → "See also"
+  SEE_ALSO: 'epr-home-see-also',
+  /** One neighbour row; `data-inference` carries its inference source ('explicit' = authored). */
+  SEE_ALSO_CARD: 'epr-home-see-also-card',
+  SEE_ALSO_INFERENCE_ATTR: 'data-inference',
+  // The commons
+  CONVERSATION: 'epr-home-conversation',
+  DISCUSSION: 'epr-home-discussion',
+  START_CONVERSATION: 'epr-home-start-conversation',
+  REACTIONS: 'epr-home-reactions',
+  // Identity
+  TAGS: 'epr-home-tags',
+  TAG: 'epr-home-tag',
+  FOCUS: 'epr-home-focus',
+  EDIT: 'epr-home-edit',
 } as const;

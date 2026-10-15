@@ -30,15 +30,44 @@ Feature: The EPR atom home — every reachable resource has one place of its own
   # - focal slot: the main content area. A simulation fills the full width
   #   ("immersive"); an article reads in a column with the legs in a rail beside it,
   #   starting level with the top of the content ("reading").
+  # - rail: the side column that holds the legs. Beside an article it starts level
+  #   with the top of the text; under a full-width simulation it sits below.
   # - the legs: the four supporting sections that ground a resource in its network —
   #   Who holds it, Where this lives, How it's governed, Where it came from.
+  # - household: a family or group that runs its own computer on the network and
+  #   counts as one holder of a copy, however many people are in it.
   # - holding sentence: the one plain sentence about who keeps copies, reported by the
   #   doorway itself, e.g. "Held by only 1 household — invite another to help hold these".
-  #   Technical holding detail (shard maps, replica counts) lives behind a "Network
-  #   detail" link, never on the home itself.
+  #   Technical holding detail (piece maps, copy counts) stays folded away under
+  #   "Network detail" until someone opens it; it is never on the page before that.
   # - household floor: how many households currently hold a copy, out of how many
   #   the resource wants for safety — shown as "N of M", both numbers read from
   #   the doorway's own household report, never hardcoded.
+  # - fold: a closed section under a leg's one-line summary. It opens when you press
+  #   its title, or when you arrive at an address ending in that leg's name (for
+  #   example /epr/{id}#holds opens the fold under "Who holds it"). Each leg has one:
+  #   "Network detail" under Who holds it, "See also" under Where this lives,
+  #   "Attestations" under Where it came from, and one under How it's governed.
+  # - pieces: a resource is stored as pieces spread across the peers (the computers
+  #   households run). Some pieces carry the content and some are spares that can
+  #   rebuild a lost one. "Whole" means enough pieces can still be found to rebuild
+  #   the resource.
+  # - the old address: before the atom home, a resource also had a viewer page at
+  #   /resource/{id} with tabs (network, governance, trust). That address now hands
+  #   you to the atom home and opens the fold holding what the tab used to show:
+  #   network → Who holds it, governance → How it's governed, trust → Where it came from.
+  # - steward: a person or household who has taken on keeping the resource. Each
+  #   steward's row gives their share of that work and how the work is recognised.
+  # - attestation: a signed statement someone has made about the resource (that they
+  #   reviewed it, for example), shown with who made it and when.
+  # - raise a concern: challenge the resource or give feedback about it, through a
+  #   form that opens over the page. Raising one needs an account on this doorway.
+  # - Who's here: the section beside the legs that says, in a sentence, how many
+  #   times the resource has been viewed and finished. The doorway counts these as
+  #   protocol events, not as analytics about the people who viewed it.
+  # - neighbours: other resources shown under "See also". An authored neighbour is
+  #   one the author named as related; a discovered neighbour is one the doorway
+  #   found because the two share topic tags, and its row says "discovered".
   # - the tender: the short note above the reply box, written as if by the person's
   #   own agent, saying who a message will reach and that the author's standing
   #   travels with it.
@@ -52,7 +81,16 @@ Feature: The EPR atom home — every reachable resource has one place of its own
   # A doorway is the hosted gateway a learner reaches the protocol through.
   # "evolution-of-trust" is a seeded html5 simulation; "succession" is a seeded
   # markdown article; "concept-bidirectional-trust" is an address nothing on this
-  # doorway holds; "foundations-christian-technology" is a seeded learning path.
+  # doorway holds; "foundations-christian-technology" is a seeded learning path;
+  # "confession", "constitution", "manifesto" and "theology" are seeded doctrinal
+  # articles that name one another as related. Matthew is signed in on every
+  # scenario; "a visitor who has not signed in" is a second, separate browser.
+  # A scenario whose fixture is missing from the doorway (no piece map, no
+  # stewards, no relationships) is held as pending rather than failed.
+  # "What the doorway reports" means the test asks the doorway itself during the
+  # run and compares the page with its answer, so the page can never show a
+  # number of its own making; the scenarios name no fixed values for that reason.
+  # @wip marks a scenario whose behaviour is not built yet; it is skipped in runs.
   Background:
     Given doorway "alpha" at "E2E_DOORWAY_ALPHA"
     And human "Matthew" is logged in on doorway "alpha" with device
@@ -121,6 +159,98 @@ Feature: The EPR atom home — every reachable resource has one place of its own
     And the gate names "The Evolution of Trust" as the referring resource
     And the gate offers to go back to "The Evolution of Trust"
     And the atom home shows no edit, affinity, or invite controls
+
+  # --- The legs unfold ---
+
+  @browser-only
+  Scenario: Network detail unfolds under "Who holds it", health in words before any number
+    # Matthew has read the holding sentence and wants to see for himself. Until he
+    # asks, the technical picture stays folded, so nobody is handed piece counts
+    # they did not ask for. When he opens "Network detail" he reads first, in
+    # words, how healthy the copies are; then where the pieces are, one cell for
+    # each; and he can check, right now, whether the resource can still be rebuilt.
+    # The answer is one line: whole, or not whole.
+    Given doorway "alpha" knows how "evolution-of-trust" is split into pieces
+    When Matthew opens the atom home for "evolution-of-trust"
+    Then no piece counts are on the page while "Network detail" is folded
+    When Matthew opens "Network detail" under "Who holds it"
+    Then "Network detail" starts with the health of the copies in words, above the pieces
+    And "Network detail" shows where the pieces are, one cell for each piece
+    When Matthew presses "Check it's still whole" in "Network detail"
+    Then one line answers whether "evolution-of-trust" is whole
+
+  @browser-only
+  Scenario: The old address lands on the atom home with the matching fold open
+    # Links written before the atom home existed still point at the old viewer
+    # page and name one of its tabs; this one names the network tab. Matthew
+    # follows it. He should not land on a second page about the same resource,
+    # nor be sent back to the learning app. The old address hands him to the atom
+    # home with the fold that now holds what the tab used to show already open.
+    When Matthew opens the old address "/resource/evolution-of-trust#network"
+    Then the browser shows the atom home address "/epr/evolution-of-trust#holds"
+    And "Network detail" is open under "Who holds it"
+    And the atom home shows no "Back to Lamad" control
+
+  @browser-only
+  Scenario: Stewards and attestations sit under "Where it came from", with no trust percentage
+    # The old viewer reduced trust to a percentage. Here Matthew reads who has
+    # taken on keeping the resource, each steward with their share of the work
+    # and how that work is recognised. When he opens "Attestations" he sees each
+    # signed statement made about it, or one honest line saying nobody has made
+    # one yet. Nothing on the leg turns trust into a score.
+    Given doorway "alpha" knows who stewards "evolution-of-trust"
+    When Matthew opens the atom home for "evolution-of-trust"
+    Then every steward under "Where it came from" is named with a share and a recognition
+    When Matthew opens "Attestations" under "Where it came from"
+    Then "Attestations" lists each attestation the doorway reports for "evolution-of-trust", or reads "No one has attested to this yet."
+    And nothing under "Where it came from" is a trust percentage
+
+  @browser-only
+  Scenario: Raising a concern happens on the atom home itself
+    # Matthew thinks something in the simulation is wrong. Under "How it's
+    # governed" he starts a challenge, and the form opens over the page he is
+    # reading: objecting to a resource never sends him to another page. The
+    # scenario stops at the open form; it files nothing.
+    When Matthew opens the atom home for "evolution-of-trust"
+    And Matthew opens the fold under "How it's governed"
+    And Matthew raises a concern and chooses to challenge the resource
+    Then the concern form is open on the atom home
+    And the browser still shows the atom home for "evolution-of-trust"
+
+  @browser-only
+  Scenario: Someone who has not signed in is told how to raise a concern
+    # A neighbour opens a shared link in a browser that is not signed in to this
+    # doorway. Raising a concern needs an account here, so in place of a form
+    # they cannot send, the page tells them in one line to sign in first.
+    When a visitor who has not signed in opens the atom home for "evolution-of-trust"
+    And the visitor opens the fold under "How it's governed"
+    Then the visitor reads "Sign in to raise a concern." under "How it's governed"
+    And the visitor is offered no concern form
+
+  @browser-only
+  Scenario: "Who's here" counts attention in words, never as analytics
+    # Matthew wants to know whether anyone else has spent time with this. The
+    # page gives him the same counts the doorway reports, said as a sentence
+    # ("Viewed 12 times by 5 people · 3 completions"), or says that no one has
+    # been counted here yet. There are no charts, gauges or percentages.
+    When Matthew opens the atom home for "evolution-of-trust"
+    Then "Who's here" says in words the attention the doorway reports for "evolution-of-trust"
+    And "Who's here" shows no charts, gauges or percentages
+
+  @browser-only
+  Scenario: "See also" under "Where this lives" shows authored and discovered neighbours, told apart
+    # The article "confession" was written alongside three others its author named
+    # as related. The doorway also finds articles that share its topics. Matthew
+    # sees both kinds under "See also", and every discovered one says so: a
+    # suggestion offered for exploring is never passed off as the author's choice.
+    # Each neighbour opens at its own atom home.
+    Given "confession" names "constitution", "manifesto" and "theology" as related
+    And doorway "alpha" finds at least one more neighbour of "confession" by shared topics
+    When Matthew opens the atom home for "confession"
+    And Matthew opens "See also" under "Where this lives"
+    Then "See also" lists "constitution", "manifesto" and "theology" as authored neighbours
+    And "See also" shows at least one neighbour marked "discovered"
+    And every "See also" neighbour opens at its own atom home
 
   # --- The commons ---
 

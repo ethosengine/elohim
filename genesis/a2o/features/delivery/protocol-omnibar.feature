@@ -8,7 +8,8 @@ Feature: Full-Browser Content Delivery with Protocol Omnibar
   The protocol omnibar is the equivalent of a browser's address bar with SSL
   padlock. At a glance it says "you're on the network." Click to inspect the
   EPR provenance — like viewing a site's SSL certificate. Drill down to the
-  full governance hub. Initiate feedback or report actions.
+  resource's own home, where who holds it, how it is governed and where it came
+  from each unfold in place. Initiate feedback or report actions.
 
   Background:
     Given content node "manifesto" exists with:
@@ -63,13 +64,16 @@ Feature: Full-Browser Content Delivery with Protocol Omnibar
     When I click the collapse button
     Then it returns to the minimal pill
 
-  # --- Omnibar: Drill-Down (Navigate to Governance Hub) ---
+  # --- Omnibar: Drill-Down (to the resource's own home) ---
 
-  Scenario: Inspect EPR navigates to governance hub
-    Given the omnibar is expanded
-    When I click "Inspect" (or the EPR address link)
-    Then I navigate to "/resource/manifesto"
-    And I see the full content viewer with Attestations, Governance, and Network tabs
+  Scenario: Inspect opens the resource's own page, where its custody, place, governance and origin are shown
+    # Every resource has one page of its own at its universal address, /epr/{id}
+    # (EPR: Elohim Protocol Resource). That page answers four questions in plain
+    # sections; inspecting from the omnibar lands there, not in the learning app.
+    Given I am viewing "/deliver/manifesto" and the omnibar is expanded
+    When I click "Inspect" (or the resource address link)
+    Then I navigate to "/epr/manifesto"
+    And I see the sections "Who holds it", "Where this lives", "How it's governed" and "Where it came from"
 
   # --- Omnibar: Actions ---
 

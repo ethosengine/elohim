@@ -173,7 +173,7 @@ describe('EprLinkComponent (thin Lit wrapper)', () => {
     expect(ids).toContain('flag');
   });
 
-  it('should navigate to the resilience route with the network fragment on a "network" selection', async () => {
+  it('should land on the atom home with the "Who holds it" fold open on a "network" selection', async () => {
     component.epr = 'epr:manifesto';
     fixture.detectChanges();
 
@@ -189,7 +189,7 @@ describe('EprLinkComponent (thin Lit wrapper)', () => {
 
     expect(resolverSpy.resolve).toHaveBeenCalledWith('epr:manifesto');
     expect(routerNavSpy).toHaveBeenCalledWith(['/epr', 'manifesto'], {
-      fragment: 'network',
+      fragment: 'holds',
     });
   });
 

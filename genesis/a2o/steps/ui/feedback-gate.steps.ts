@@ -1,7 +1,8 @@
 /**
  * Feedback Gate Step Definitions — Playwright assertions for the
- * GateFeedbackTriggerComponent + GateFeedbackModalComponent surface in
- * content-viewer.
+ * <elohim-gate-feedback-trigger> surface on the atom home (/epr/{id}), where it
+ * is "Raise a concern" under the "How it's governed" leg (epr-atom-home spec
+ * §11.2; its host carries EPR_HOME.RAISE_CONCERN, its inner ids FEEDBACK_GATE.*).
  *
  * Operationalizes P4 from
  * genesis/docs/superpowers/specs/2026-04-19-gate-challenge-and-indemnification-design.md
@@ -15,7 +16,8 @@ import { strict as assert } from 'node:assert';
 import { Given, When, Then } from '@cucumber/cucumber';
 
 import { PlaywrightDevice } from '../../src/framework/devices/playwright-device.js';
-import { FEEDBACK_GATE, VIEWER } from '../../src/framework/pages/selectors.js';
+import { EprHomePage } from '../../src/framework/pages/epr-home.page.js';
+import { EPR_HOME, FEEDBACK_GATE } from '../../src/framework/pages/selectors.js';
 import { doorwayToAppUrl } from '../../src/framework/utils/url.js';
 import { E2EWorld } from '../../src/framework/world.js';
 
@@ -38,15 +40,15 @@ function requirePlaywright(world: E2EWorld, humanName?: string): PlaywrightDevic
 
 async function ensureOnContentPage(device: PlaywrightDevice): Promise<void> {
   const appUrl = doorwayToAppUrl(device.client.url);
-  // §12.1 Slice 2 — content is served at the universal /epr/{id} address.
-  await device.page.goto(`${appUrl}/epr/${DEFAULT_CONTENT_ID}`, {
-    waitUntil: 'networkidle',
-  });
-  // Wait for the content-viewer header to render — that's where our trigger lives.
-  // We don't need the markdown body fully loaded; the trigger sits in `.content-actions`
-  // alongside Edit/Download which render as soon as the node fetches.
+  // §12.1 Slice 2 — content is served at the universal /epr/{id} address, the
+  // atom home. The trigger lives under "How it's governed"; open that leg's
+  // fold (closed by default; a no-op if it is open or the trigger sits outside
+  // it), then wait for the trigger's host.
+  const home = new EprHomePage(device.page);
+  await home.goto(appUrl, DEFAULT_CONTENT_ID);
+  await home.openFold('governed');
   await device.page
-    .locator(`[data-testid="${VIEWER.FEEDBACK_TRIGGER}"]`)
+    .locator(`[data-testid="${EPR_HOME.RAISE_CONCERN}"]`)
     .waitFor({ state: 'visible', timeout: 30_000 });
 }
 
@@ -82,7 +84,7 @@ Then(
     const device = requirePlaywright(this);
     if (!device) return 'pending';
 
-    const trigger = device.page.locator(`[data-testid="${VIEWER.FEEDBACK_TRIGGER}"]`);
+    const trigger = device.page.locator(`[data-testid="${EPR_HOME.RAISE_CONCERN}"]`);
     await trigger.waitFor({ state: 'visible', timeout: 10_000 });
   }
 );

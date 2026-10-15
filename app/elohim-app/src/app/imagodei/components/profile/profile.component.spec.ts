@@ -303,10 +303,10 @@ describe('ProfileComponent', () => {
       expect(mockEprNav.navigate).toHaveBeenCalledWith('/lamad/discovery');
     });
 
-    it('should navigate to resource by contentNodeId', () => {
+    it("should navigate to the atom's universal address by contentNodeId", () => {
       component.navigateToResource('content-enneagram-001');
 
-      expect(mockRouter.navigate).toHaveBeenCalledWith(['/resource', 'content-enneagram-001']);
+      expect(mockEprNav.navigate).toHaveBeenCalledWith('/epr/content-enneagram-001');
     });
   });
 

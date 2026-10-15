@@ -21,6 +21,7 @@ import { request } from 'undici';
 
 import { PlaywrightDevice } from '../src/framework/devices/playwright-device.js';
 import { viewportArchetype } from '../src/framework/fixtures/viewport-archetypes.js';
+import { EprHomePage } from '../src/framework/pages/epr-home.page.js';
 import { PROTOCOL_OMNI } from '../src/framework/pages/selectors.js';
 import { retry } from '../src/framework/utils/retry.js';
 import { doorwayToAppUrl } from '../src/framework/utils/url.js';
@@ -691,9 +692,11 @@ When('I open the admin content list', async function (this: E2EWorld) {
 });
 
 /**
- * Open the EPR resource page (/resource/{id}) in elohim-app — one of the two
- * protocolContent routes where app.component mounts <app-protocol-omni>
- * (the trust surface). Waits for the omni chip so follow-up steps can expand it.
+ * Open the EPR resource page — the atom home at the universal address /epr/{id}
+ * (the old /resource/{id} viewer address now redirects there). It is a
+ * protocolContent route, so app.component mounts <app-protocol-omni> (the trust
+ * surface) above it. Waits for the atom home (its frame, or its out-of-reach
+ * gate) and then the omni chip so follow-up steps can expand it.
  *
  * Example:
  *   When I open the EPR resource page for "content-alpha"
@@ -704,9 +707,7 @@ When(
     const device = findPwDevice(this);
     if (!device) return 'pending';
     const appUrl = doorwayToAppUrl(device.client.url);
-    await device.page.goto(`${appUrl}/resource/${encodeURIComponent(contentId)}`, {
-      waitUntil: 'networkidle',
-    });
+    await new EprHomePage(device.page).goto(appUrl, encodeURIComponent(contentId));
     await device.page
       .locator(`[data-testid="${PROTOCOL_OMNI.CHIP}"]`)
       .waitFor({ state: 'visible', timeout: 15_000 });
@@ -898,11 +899,11 @@ Then('the omni resilience segment renders a live resilience icon', async functio
 });
 
 /**
- * Omni-scoped variant of the class assertion: on /resource/{id} TWO
- * resilience-icon instances can coexist (protocol-omni topbar + the
- * content-viewer header). The unscoped step's `.first()` could match the
- * wrong one, so omni scenarios assert through the PROTOCOL_OMNI.RESILIENCE
- * wrapper explicitly.
+ * Omni-scoped variant of the class assertion: on /epr/{id} TWO
+ * resilience-icon instances can coexist (protocol-omni topbar + any
+ * resilience surface the page itself renders). The unscoped step's
+ * `.first()` could match the wrong one, so omni scenarios assert through
+ * the PROTOCOL_OMNI.RESILIENCE wrapper explicitly.
  */
 Then(
   'the omni resilience icon has class {string} or {string}',
@@ -976,8 +977,9 @@ Then(
 /**
  * Resolve the omni resilience icon locator — the interactive button rendered by
  * <elohim-resilience-snapshot> inside the PROTOCOL_OMNI.RESILIENCE wrapper.
- * Two resilience-icon instances can coexist on /resource/{id} (omni topbar +
- * content-viewer header), so omni steps always scope through the wrapper.
+ * Two resilience-icon instances can coexist on /epr/{id} (omni topbar + any
+ * resilience surface the page itself renders), so omni steps always scope
+ * through the wrapper.
  */
 function omniResilienceIcon(device: PlaywrightDevice) {
   return device.page
