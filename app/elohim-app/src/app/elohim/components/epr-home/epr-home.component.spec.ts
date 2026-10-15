@@ -470,6 +470,21 @@ describe('EprHomeComponent', () => {
     expect(fixture.nativeElement.textContent).not.toContain('Back to Lamad');
   });
 
+  it('builds the download link even when resolving the blob URL writes a signal (NG0600)', async () => {
+    // The connection strategy logs while resolving the base URL, and the logger
+    // keeps recent lines in a signal: that write must not land inside a computed.
+    const recentLogs = signal<string[]>([]);
+    storage.getBlobUrl.mockImplementation((hash: string) => {
+      recentLogs.update(lines => [...lines, `resolve ${hash}`]);
+      return `https://doorway.test/blob/${hash}`;
+    });
+    await mount('evolution-of-trust');
+    expect(q(fixture, 'epr-home-download')?.getAttribute('href')).toBe(
+      'https://doorway.test/blob/sha256-abc'
+    );
+    expect(recentLogs()).toEqual(['resolve sha256-abc']);
+  });
+
   it('shows the tags under the lede and the version in the eyebrow', async () => {
     await mount('evolution-of-trust');
     const tags = fixture.nativeElement.querySelectorAll('[data-testid="epr-home-tag"]');

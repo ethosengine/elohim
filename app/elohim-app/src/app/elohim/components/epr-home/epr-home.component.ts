@@ -338,17 +338,14 @@ export class EprHomeComponent {
     { initialValue: [] as ChallengeView[] }
   );
 
-  /** Null until the governance-state endpoint answers (404 → null, silent — spec §8). */
-  readonly governanceState = toSignal<GovernanceStateView | null>(
-    this.atomId$.pipe(
-      switchMap(id =>
-        id
-          ? from(this.governance.getGovernanceState('content', id)).pipe(catchError(() => of(null)))
-          : of(null)
-      )
-    ),
-    { initialValue: null }
-  );
+  /**
+   * Not read yet (spec §8). GET /api/v1/governance/state answers 404 for every
+   * atom that has no governance record, and the browser logs each 404 as a
+   * console error on a page that has nothing wrong with it. The legs keep
+   * their labels input; wire the read back when the route answers "no state"
+   * without an error status.
+   */
+  readonly governanceState = signal<GovernanceStateView | null>(null).asReadonly();
 
   /**
    * Attestations name the content by its CID (subject_cid); the slug is asked
@@ -523,7 +520,11 @@ export class EprHomeComponent {
 
   readonly downloadHref = computed(() => {
     const hash = this.atom()?.blobHash;
-    return hash ? this.storage.getBlobUrl(hash) : null;
+    // getBlobUrl resolves the base URL through the connection strategy, which
+    // logs; the logger keeps its recent lines in a signal, and a signal write
+    // inside a computed throws NG0600 (seen signed in, where debug logging is
+    // on). Build the URL outside the reactive context.
+    return hash ? untracked(() => this.storage.getBlobUrl(hash)) : null;
   });
 
   readonly concernNote = signal<string | null>(null);
