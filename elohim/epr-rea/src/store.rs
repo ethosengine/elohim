@@ -281,6 +281,17 @@ impl FlowStore for SidecarFlowTransaction {
                 serde_json::from_str(line).map_err(|e| FabricError::Decode(e.to_string()))?;
             let computed = parsed.record.cid()?;
             if computed.to_string() != parsed.cid {
+                // A line from a NEWER writer (an additive field this binary predates) decodes
+                // with that field dropped and so re-hashes differently. Say so, naming the
+                // fields and this reader's version, instead of calling it tampering.
+                let unknown = unknown_fields(line, &parsed.record);
+                if !unknown.is_empty() {
+                    return Err(FabricError::NewerWriter {
+                        stored: parsed.cid,
+                        fields: unknown.join(", "),
+                        reader: env!("CARGO_PKG_VERSION"),
+                    });
+                }
                 return Err(FabricError::Integrity {
                     stored: parsed.cid,
                     computed: computed.to_string(),
@@ -291,6 +302,28 @@ impl FlowStore for SidecarFlowTransaction {
         self.log.mark_validated();
         Ok(records)
     }
+}
+
+/// The keys a stored line's `record` carries that this reader's types do not emit: present when
+/// the line was written by a newer writer whose record has a field this binary predates.
+#[cfg(feature = "sidecar")]
+fn unknown_fields(line: &str, record: &FlowRecord) -> Vec<String> {
+    let Ok(raw) = serde_json::from_str::<serde_json::Value>(line) else {
+        return Vec::new();
+    };
+    let Some(raw) = raw.get("record").and_then(|r| r.as_object()) else {
+        return Vec::new();
+    };
+    let Ok(serde_json::Value::Object(known)) = serde_json::to_value(record) else {
+        return Vec::new();
+    };
+    let mut unknown: Vec<String> = raw
+        .keys()
+        .filter(|k| !known.contains_key(*k))
+        .cloned()
+        .collect();
+    unknown.sort();
+    unknown
 }
 
 #[cfg(test)]
@@ -339,6 +372,41 @@ mod tests {
             seen += 1;
         }
         assert_eq!(seen, 2);
+    }
+
+    /// Forward compatibility: a line carrying a field this reader does not know (what an older
+    /// binary sees in a `toResource` edge) refuses loudly as `NewerWriter`, naming the field and
+    /// this reader's version; a line that is merely tampered stays an `Integrity` error.
+    #[cfg(feature = "sidecar")]
+    #[test]
+    fn a_line_from_a_newer_writer_refuses_naming_the_field_and_the_version() {
+        let fixture = include_str!("../tests/fixtures/depedge-before-to-resource.flows.jsonl");
+        let line = fixture.lines().next().unwrap();
+        let mut raw: serde_json::Value = serde_json::from_str(line).unwrap();
+        // The writer hashed a record with a field this reader cannot see.
+        raw["record"]["fieldFromTheFuture"] = serde_json::json!("x");
+        raw["cid"] = serde_json::json!(atom_cid(&"a different record".to_string())
+            .unwrap()
+            .to_string());
+        let newer = serde_json::to_string(&raw).unwrap();
+        let mut tampered: serde_json::Value = serde_json::from_str(line).unwrap();
+        tampered["cid"] = raw["cid"].clone();
+        let tampered = serde_json::to_string(&tampered).unwrap();
+
+        for (text, expect_newer) in [(newer, true), (tampered, false)] {
+            let dir = tempfile::tempdir().unwrap();
+            let store = SidecarFlowStore::open(dir.path()).unwrap();
+            std::fs::write(store.log_path(), format!("{text}\n")).unwrap();
+            let err = store.records().unwrap_err();
+            if expect_newer {
+                let message = err.to_string();
+                assert!(matches!(err, FabricError::NewerWriter { .. }), "{err:?}");
+                assert!(message.contains("fieldFromTheFuture"), "{message}");
+                assert!(message.contains(env!("CARGO_PKG_VERSION")), "{message}");
+            } else {
+                assert!(matches!(err, FabricError::Integrity { .. }), "{err:?}");
+            }
+        }
     }
 
     #[test]

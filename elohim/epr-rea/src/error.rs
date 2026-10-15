@@ -14,6 +14,19 @@ pub enum FabricError {
     #[error("integrity: stored cid {stored} does not match recomputed {computed}")]
     Integrity { stored: String, computed: String },
 
+    /// The line was written by a newer writer: its record carries fields this binary does not
+    /// know, so the stored CID cannot be re-verified here. Refused, never read without them.
+    #[error(
+        "sidecar record {stored} carries field(s) [{fields}] that this reader (elohim-epr-rea \
+         {reader}) does not know, so its CID cannot be re-verified here — the line was written by \
+         a newer writer; upgrade this binary (refusing rather than reading the record without them)"
+    )]
+    NewerWriter {
+        stored: String,
+        fields: String,
+        reader: &'static str,
+    },
+
     #[error("invalid edge: {0}")]
     InvalidEdge(String),
 
