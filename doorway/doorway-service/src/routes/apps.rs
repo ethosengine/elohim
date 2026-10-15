@@ -468,9 +468,15 @@ fn render_chrome_shell(slug: &str, desc: &AppDescriptor, holders: Option<(i64, i
     let frame_src = format!("/apps/{}/{}", encode_segment(slug), entry_path.join("/"));
 
     let (badge_attrs, badge_text) = match holders {
+        // Same wording as the EPR page's heldChip and <elohim-resiliency-badge>:
+        // the two surfaces that name holders must never say different things.
         Some((n, m)) => (
             format!(" data-holders=\"{n}\" data-target=\"{m}\""),
-            format!("Held by {n} of {m} households"),
+            if n <= 0 {
+                "Not yet held by any household".to_string()
+            } else {
+                format!("Held by {n} of {m} households")
+            },
         ),
         None => (
             String::new(),
@@ -1629,6 +1635,16 @@ mod tests {
             "<a data-testid=\"resiliency-badge\" class=\"resiliency-badge\" href=\"/epr/quiz-1\">Held by households \u{b7} see where it lives</a>"
         ));
         assert!(!body.contains("data-holders"));
+    }
+
+    #[test]
+    fn a_zero_holder_figure_reads_not_yet_held_and_keeps_its_numbers() {
+        let desc = descriptor("html5-app", "A quiz");
+        let html = render_chrome_shell("quiz-1", &desc, Some((0, 3)));
+        assert!(html.contains(
+            "<a data-testid=\"resiliency-badge\" class=\"resiliency-badge\" href=\"/epr/quiz-1\" data-holders=\"0\" data-target=\"3\">Not yet held by any household</a>"
+        ), "{html}");
+        assert!(!html.contains("Held by 0 of"), "{html}");
     }
 
     #[test]
