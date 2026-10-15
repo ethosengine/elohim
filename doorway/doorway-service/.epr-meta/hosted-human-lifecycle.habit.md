@@ -10,7 +10,7 @@ invariant: >
   was found. Hosted is a declared stage, never a default: only a human whose fixture declares
   agencyPhase hosted gets a cell, only on a doorway operator's conductor (matthew, adam), and a
   member's own conductor carries its member and nobody else.
-status: red
+status: green
 active: false
 checks:
   - "just mesh status — every `hosted` row is free of REFUSED: the operator within its ceiling, each member conductor at 0"
@@ -32,6 +32,13 @@ retire-when: >
   reclaims by construction) — at that point the doorway cannot keep hosting a closed human,
   and the practice under watch has become a property of the substrate.
 ---
+DELTA 2026-10-15b (RED -> GREEN on measured evidence): household doorway A on 22b5ba1f9 — 05-leaving.feature
+6/6 scenarios, 70/70 steps (sprint-report-household-20261015T175729Z), and `just mesh status` hosted rows free of
+REFUSED (matthew 6/14, jessica 0, james 0). Three more causes found on the way: closed agents' Mongo mappings
+survived and re-counted at every restart (A read 21/14 on 6 cells; alpha 94/50) — a33593660; a row with no
+recorded phase was hosted at sign-in — 9b98ac904; a one-conductor doorway never ran the prune — 22b5ba1f9.
+Household and alpha cleaned through the doorways' own close route (genesis/local-dev/hosted-cast-cleanup/:
+close.py, alpha-close.py — 7 doorway-minted cells for device/node humans returned on alpha).
 DELTA 2026-10-15 (GREEN -> RED on measured evidence): `just mesh status` hosted rows at a18cf0c41 read
 `matthew: REFUSED 19 agent(s), over the operator ceiling 14` and `jessica: REFUSED 1 agent(s) on a member's
 conductor: elohim-conductor-0-12add0`. Cause: undeclared fixtures defaulted to hosted, the device register arm
