@@ -4,6 +4,288 @@
   "modules": [
     {
       "kind": "javascript-module",
+      "path": "src/capability/certainty.ts",
+      "declarations": [
+        {
+          "kind": "variable",
+          "name": "UNKNOWN_CERTAINTY",
+          "type": {
+            "text": "ContentCertainty"
+          },
+          "description": "The safe default when no certainty has been provided. Elements MUST NOT render\ncanonical visuals when their certainty is unknown."
+        }
+      ],
+      "exports": [
+        {
+          "kind": "js",
+          "name": "UNKNOWN_CERTAINTY",
+          "declaration": {
+            "name": "UNKNOWN_CERTAINTY",
+            "module": "src/capability/certainty.ts"
+          }
+        }
+      ]
+    },
+    {
+      "kind": "javascript-module",
+      "path": "src/capability/context.ts",
+      "declarations": [
+        {
+          "kind": "variable",
+          "name": "capabilityProfileContext"
+        },
+        {
+          "kind": "variable",
+          "name": "contentCertaintyContext"
+        }
+      ],
+      "exports": [
+        {
+          "kind": "js",
+          "name": "capabilityProfileContext",
+          "declaration": {
+            "name": "capabilityProfileContext",
+            "module": "src/capability/context.ts"
+          }
+        },
+        {
+          "kind": "js",
+          "name": "contentCertaintyContext",
+          "declaration": {
+            "name": "contentCertaintyContext",
+            "module": "src/capability/context.ts"
+          }
+        }
+      ]
+    },
+    {
+      "kind": "javascript-module",
+      "path": "src/capability/index.ts",
+      "declarations": [],
+      "exports": [
+        {
+          "kind": "js",
+          "name": "*",
+          "declaration": {
+            "name": "*",
+            "module": "src/capability/profile.js"
+          }
+        },
+        {
+          "kind": "js",
+          "name": "*",
+          "declaration": {
+            "name": "*",
+            "module": "src/capability/certainty.js"
+          }
+        },
+        {
+          "kind": "js",
+          "name": "*",
+          "declaration": {
+            "name": "*",
+            "module": "src/capability/standing.js"
+          }
+        },
+        {
+          "kind": "js",
+          "name": "*",
+          "declaration": {
+            "name": "*",
+            "module": "src/capability/context.js"
+          }
+        },
+        {
+          "kind": "js",
+          "name": "*",
+          "declaration": {
+            "name": "*",
+            "module": "src/capability/mixin.js"
+          }
+        }
+      ]
+    },
+    {
+      "kind": "javascript-module",
+      "path": "src/capability/mixin.ts",
+      "declarations": [
+        {
+          "kind": "mixin",
+          "description": "",
+          "name": "CapabilityAwareElement",
+          "members": [
+            {
+              "kind": "field",
+              "name": "properties",
+              "type": {
+                "text": "PropertyDeclarations"
+              },
+              "static": true,
+              "readonly": true,
+              "default": "{ ...(Base as unknown as { properties?: PropertyDeclarations }).properties, profile: { attribute: false, state: true }, }"
+            },
+            {
+              "kind": "field",
+              "name": "profile",
+              "privacy": "public",
+              "type": {
+                "text": "CapabilityProfile"
+              },
+              "default": "DEFAULT_PROFILE"
+            }
+          ],
+          "parameters": [
+            {
+              "name": "Base",
+              "type": {
+                "text": "TBase"
+              }
+            }
+          ]
+        }
+      ],
+      "exports": [
+        {
+          "kind": "js",
+          "name": "CapabilityAwareElement",
+          "declaration": {
+            "name": "CapabilityAwareElement",
+            "module": "src/capability/mixin.ts"
+          }
+        }
+      ]
+    },
+    {
+      "kind": "javascript-module",
+      "path": "src/capability/profile.ts",
+      "declarations": [
+        {
+          "kind": "variable",
+          "name": "LENS_ORDER",
+          "type": {
+            "text": "[\n  'minimal',\n  'simple',\n  'standard',\n  'detail',\n  'debug',\n  'trace',\n]"
+          },
+          "default": "[ 'minimal', 'simple', 'standard', 'detail', 'debug', 'trace', ]"
+        },
+        {
+          "kind": "variable",
+          "name": "STIMULUS_ORDER",
+          "type": {
+            "text": "['still', 'gentle', 'lively']"
+          },
+          "default": "['still', 'gentle', 'lively']"
+        },
+        {
+          "kind": "variable",
+          "name": "DEFAULT_PROFILE",
+          "type": {
+            "text": "{\n  lens: 'standard',\n  theme: 'auto',\n  contrast: 'auto',\n  locale: 'auto',\n  stimulus: 'still',\n  textuality: 'textual',\n  standings: [],\n  lock: { kind: 'pilot' },\n  origin: 'pilot',\n}"
+          },
+          "default": "{ lens: 'standard', theme: 'auto', contrast: 'auto', locale: 'auto', stimulus: 'still', textuality: 'textual', standings: [], lock: { kind: 'pilot' }, origin: 'pilot', }",
+          "description": "The Sabbath default. Stillness in the type system; textual for the literate-adult baseline.\nStewards may pin pre-literate/symbolic, locked-lens, locked-locale, etc."
+        }
+      ],
+      "exports": [
+        {
+          "kind": "js",
+          "name": "LENS_ORDER",
+          "declaration": {
+            "name": "LENS_ORDER",
+            "module": "src/capability/profile.ts"
+          }
+        },
+        {
+          "kind": "js",
+          "name": "STIMULUS_ORDER",
+          "declaration": {
+            "name": "STIMULUS_ORDER",
+            "module": "src/capability/profile.ts"
+          }
+        },
+        {
+          "kind": "js",
+          "name": "DEFAULT_PROFILE",
+          "declaration": {
+            "name": "DEFAULT_PROFILE",
+            "module": "src/capability/profile.ts"
+          }
+        }
+      ]
+    },
+    {
+      "kind": "javascript-module",
+      "path": "src/capability/standing.ts",
+      "declarations": [
+        {
+          "kind": "function",
+          "name": "parseStandingRequirement",
+          "return": {
+            "type": {
+              "text": "readonly Standing[][]"
+            }
+          },
+          "parameters": [
+            {
+              "name": "requirement",
+              "type": {
+                "text": "readonly string[]"
+              }
+            }
+          ],
+          "description": "Parses the contract DSL into normalized form: outer array is AND, inner array is OR.\nEach inner array element is a Standing name."
+        },
+        {
+          "kind": "function",
+          "name": "satisfiesRequirement",
+          "return": {
+            "type": {
+              "text": "boolean"
+            }
+          },
+          "parameters": [
+            {
+              "name": "held",
+              "type": {
+                "text": "readonly Standing[]"
+              }
+            },
+            {
+              "name": "requirement",
+              "type": {
+                "text": "readonly string[]"
+              }
+            }
+          ],
+          "description": "Returns true if `held` satisfies `requirement`.\nAND across outer groups; OR within each group."
+        }
+      ],
+      "exports": [
+        {
+          "kind": "js",
+          "name": "parseStandingRequirement",
+          "declaration": {
+            "name": "parseStandingRequirement",
+            "module": "src/capability/standing.ts"
+          }
+        },
+        {
+          "kind": "js",
+          "name": "satisfiesRequirement",
+          "declaration": {
+            "name": "satisfiesRequirement",
+            "module": "src/capability/standing.ts"
+          }
+        }
+      ]
+    },
+    {
+      "kind": "javascript-module",
+      "path": "src/contracts/omnibar.contract.ts",
+      "declarations": [],
+      "exports": []
+    },
+    {
+      "kind": "javascript-module",
       "path": "src/elohim-button.ts",
       "declarations": [
         {
@@ -7775,484 +8057,6 @@
     },
     {
       "kind": "javascript-module",
-      "path": "src/register.ts",
-      "declarations": [],
-      "exports": [
-        {
-          "kind": "custom-element-definition",
-          "name": "elohim-button",
-          "declaration": {
-            "name": "ElohimButton",
-            "module": "/src/elohim-button.js"
-          }
-        },
-        {
-          "kind": "custom-element-definition",
-          "name": "elohim-compute-tile",
-          "declaration": {
-            "name": "ElohimComputeTile",
-            "module": "/src/elohim-compute-tile.js"
-          }
-        },
-        {
-          "kind": "custom-element-definition",
-          "name": "elohim-skeleton",
-          "declaration": {
-            "name": "ElohimSkeleton",
-            "module": "/src/elohim-skeleton.js"
-          }
-        },
-        {
-          "kind": "custom-element-definition",
-          "name": "elohim-mention-base",
-          "declaration": {
-            "name": "ElohimMentionBase",
-            "module": "/src/elohim-mention-base.js"
-          }
-        },
-        {
-          "kind": "custom-element-definition",
-          "name": "elohim-page-chrome",
-          "declaration": {
-            "name": "ElohimPageChrome",
-            "module": "/src/elohim-page-chrome.js"
-          }
-        },
-        {
-          "kind": "custom-element-definition",
-          "name": "elohim-default-omnibar",
-          "declaration": {
-            "name": "ElohimDefaultOmnibar",
-            "module": "/src/elohim-default-omnibar.js"
-          }
-        },
-        {
-          "kind": "custom-element-definition",
-          "name": "elohim-context-menu",
-          "declaration": {
-            "name": "ElohimContextMenu",
-            "module": "/src/elohim-context-menu.js"
-          }
-        },
-        {
-          "kind": "custom-element-definition",
-          "name": "elohim-epr-link",
-          "declaration": {
-            "name": "ElohimEprLink",
-            "module": "/src/elohim-epr-link.js"
-          }
-        },
-        {
-          "kind": "custom-element-definition",
-          "name": "elohim-epr-relationships-panel",
-          "declaration": {
-            "name": "ElohimEprRelationshipsPanel",
-            "module": "/src/elohim-epr-relationships-panel.js"
-          }
-        },
-        {
-          "kind": "custom-element-definition",
-          "name": "elohim-reaction-bar",
-          "declaration": {
-            "name": "ElohimReactionBar",
-            "module": "/src/elohim-reaction-bar.js"
-          }
-        },
-        {
-          "kind": "custom-element-definition",
-          "name": "elohim-graduated-feedback",
-          "declaration": {
-            "name": "ElohimGraduatedFeedback",
-            "module": "/src/elohim-graduated-feedback.js"
-          }
-        },
-        {
-          "kind": "custom-element-definition",
-          "name": "elohim-feedback-mechanism-gateway",
-          "declaration": {
-            "name": "ElohimFeedbackMechanismGateway",
-            "module": "/src/elohim-feedback-mechanism-gateway.js"
-          }
-        },
-        {
-          "kind": "custom-element-definition",
-          "name": "elohim-gate-feedback-trigger",
-          "declaration": {
-            "name": "ElohimGateFeedbackTrigger",
-            "module": "/src/elohim-gate-feedback-trigger.js"
-          }
-        },
-        {
-          "kind": "custom-element-definition",
-          "name": "elohim-navigator",
-          "declaration": {
-            "name": "ElohimNavigator",
-            "module": "/src/elohim-navigator.js"
-          }
-        },
-        {
-          "kind": "custom-element-definition",
-          "name": "elohim-content-analytics",
-          "declaration": {
-            "name": "ElohimContentAnalytics",
-            "module": "/src/elohim-content-analytics.js"
-          }
-        },
-        {
-          "kind": "custom-element-definition",
-          "name": "elohim-epr-popover",
-          "declaration": {
-            "name": "ElohimEprPopover",
-            "module": "/src/elohim-epr-popover.js"
-          }
-        },
-        {
-          "kind": "custom-element-definition",
-          "name": "elohim-theme-toggle",
-          "declaration": {
-            "name": "ElohimThemeToggle",
-            "module": "/src/elohim-theme-toggle.js"
-          }
-        },
-        {
-          "kind": "custom-element-definition",
-          "name": "elohim-lang-picker",
-          "declaration": {
-            "name": "ElohimLangPicker",
-            "module": "/src/elohim-lang-picker.js"
-          }
-        },
-        {
-          "kind": "custom-element-definition",
-          "name": "elohim-hypercard-panel",
-          "declaration": {
-            "name": "ElohimHypercardPanel",
-            "module": "/src/elohim-hypercard-panel.js"
-          }
-        },
-        {
-          "kind": "custom-element-definition",
-          "name": "elohim-seam-map",
-          "declaration": {
-            "name": "ElohimSeamMap",
-            "module": "/src/elohim-seam-map.js"
-          }
-        },
-        {
-          "kind": "custom-element-definition",
-          "name": "elohim-resiliency-badge",
-          "declaration": {
-            "name": "ElohimResiliencyBadge",
-            "module": "/src/elohim-resiliency-badge.js"
-          }
-        }
-      ]
-    },
-    {
-      "kind": "javascript-module",
-      "path": "src/viewport-archetypes.ts",
-      "declarations": [
-        {
-          "kind": "variable",
-          "name": "VIEWPORT_ARCHETYPES",
-          "default": "{ /** Small/older phones and split-screen Android — the floor. */ 'phone-small': { width: 320, height: 568, represents: 'small phone / split-screen floor' }, /** Mainstream phone portrait (iPhone 12-16 class). */ phone: { width: 390, height: 844, represents: 'mainstream phone portrait' }, /** Tablet portrait / phone landscape class. */ tablet: { width: 768, height: 1024, represents: 'tablet portrait' }, /** Default desktop window — matches the look/device default. */ desktop: { width: 1280, height: 800, represents: 'desktop window' }, } as const satisfies Record<string, ViewportArchetype>"
-        }
-      ],
-      "exports": [
-        {
-          "kind": "js",
-          "name": "VIEWPORT_ARCHETYPES",
-          "declaration": {
-            "name": "VIEWPORT_ARCHETYPES",
-            "module": "src/viewport-archetypes.ts"
-          }
-        }
-      ]
-    },
-    {
-      "kind": "javascript-module",
-      "path": "src/capability/certainty.ts",
-      "declarations": [
-        {
-          "kind": "variable",
-          "name": "UNKNOWN_CERTAINTY",
-          "type": {
-            "text": "ContentCertainty"
-          },
-          "description": "The safe default when no certainty has been provided. Elements MUST NOT render\ncanonical visuals when their certainty is unknown."
-        }
-      ],
-      "exports": [
-        {
-          "kind": "js",
-          "name": "UNKNOWN_CERTAINTY",
-          "declaration": {
-            "name": "UNKNOWN_CERTAINTY",
-            "module": "src/capability/certainty.ts"
-          }
-        }
-      ]
-    },
-    {
-      "kind": "javascript-module",
-      "path": "src/capability/context.ts",
-      "declarations": [
-        {
-          "kind": "variable",
-          "name": "capabilityProfileContext"
-        },
-        {
-          "kind": "variable",
-          "name": "contentCertaintyContext"
-        }
-      ],
-      "exports": [
-        {
-          "kind": "js",
-          "name": "capabilityProfileContext",
-          "declaration": {
-            "name": "capabilityProfileContext",
-            "module": "src/capability/context.ts"
-          }
-        },
-        {
-          "kind": "js",
-          "name": "contentCertaintyContext",
-          "declaration": {
-            "name": "contentCertaintyContext",
-            "module": "src/capability/context.ts"
-          }
-        }
-      ]
-    },
-    {
-      "kind": "javascript-module",
-      "path": "src/capability/index.ts",
-      "declarations": [],
-      "exports": [
-        {
-          "kind": "js",
-          "name": "*",
-          "declaration": {
-            "name": "*",
-            "module": "src/capability/profile.js"
-          }
-        },
-        {
-          "kind": "js",
-          "name": "*",
-          "declaration": {
-            "name": "*",
-            "module": "src/capability/certainty.js"
-          }
-        },
-        {
-          "kind": "js",
-          "name": "*",
-          "declaration": {
-            "name": "*",
-            "module": "src/capability/standing.js"
-          }
-        },
-        {
-          "kind": "js",
-          "name": "*",
-          "declaration": {
-            "name": "*",
-            "module": "src/capability/context.js"
-          }
-        },
-        {
-          "kind": "js",
-          "name": "*",
-          "declaration": {
-            "name": "*",
-            "module": "src/capability/mixin.js"
-          }
-        }
-      ]
-    },
-    {
-      "kind": "javascript-module",
-      "path": "src/capability/mixin.ts",
-      "declarations": [
-        {
-          "kind": "mixin",
-          "description": "",
-          "name": "CapabilityAwareElement",
-          "members": [
-            {
-              "kind": "field",
-              "name": "properties",
-              "type": {
-                "text": "PropertyDeclarations"
-              },
-              "static": true,
-              "readonly": true,
-              "default": "{ ...(Base as unknown as { properties?: PropertyDeclarations }).properties, profile: { attribute: false, state: true }, }"
-            },
-            {
-              "kind": "field",
-              "name": "profile",
-              "privacy": "public",
-              "type": {
-                "text": "CapabilityProfile"
-              },
-              "default": "DEFAULT_PROFILE"
-            }
-          ],
-          "parameters": [
-            {
-              "name": "Base",
-              "type": {
-                "text": "TBase"
-              }
-            }
-          ]
-        }
-      ],
-      "exports": [
-        {
-          "kind": "js",
-          "name": "CapabilityAwareElement",
-          "declaration": {
-            "name": "CapabilityAwareElement",
-            "module": "src/capability/mixin.ts"
-          }
-        }
-      ]
-    },
-    {
-      "kind": "javascript-module",
-      "path": "src/capability/profile.ts",
-      "declarations": [
-        {
-          "kind": "variable",
-          "name": "LENS_ORDER",
-          "type": {
-            "text": "[\n  'minimal',\n  'simple',\n  'standard',\n  'detail',\n  'debug',\n  'trace',\n]"
-          },
-          "default": "[ 'minimal', 'simple', 'standard', 'detail', 'debug', 'trace', ]"
-        },
-        {
-          "kind": "variable",
-          "name": "STIMULUS_ORDER",
-          "type": {
-            "text": "['still', 'gentle', 'lively']"
-          },
-          "default": "['still', 'gentle', 'lively']"
-        },
-        {
-          "kind": "variable",
-          "name": "DEFAULT_PROFILE",
-          "type": {
-            "text": "{\n  lens: 'standard',\n  theme: 'auto',\n  contrast: 'auto',\n  locale: 'auto',\n  stimulus: 'still',\n  textuality: 'textual',\n  standings: [],\n  lock: { kind: 'pilot' },\n  origin: 'pilot',\n}"
-          },
-          "default": "{ lens: 'standard', theme: 'auto', contrast: 'auto', locale: 'auto', stimulus: 'still', textuality: 'textual', standings: [], lock: { kind: 'pilot' }, origin: 'pilot', }",
-          "description": "The Sabbath default. Stillness in the type system; textual for the literate-adult baseline.\nStewards may pin pre-literate/symbolic, locked-lens, locked-locale, etc."
-        }
-      ],
-      "exports": [
-        {
-          "kind": "js",
-          "name": "LENS_ORDER",
-          "declaration": {
-            "name": "LENS_ORDER",
-            "module": "src/capability/profile.ts"
-          }
-        },
-        {
-          "kind": "js",
-          "name": "STIMULUS_ORDER",
-          "declaration": {
-            "name": "STIMULUS_ORDER",
-            "module": "src/capability/profile.ts"
-          }
-        },
-        {
-          "kind": "js",
-          "name": "DEFAULT_PROFILE",
-          "declaration": {
-            "name": "DEFAULT_PROFILE",
-            "module": "src/capability/profile.ts"
-          }
-        }
-      ]
-    },
-    {
-      "kind": "javascript-module",
-      "path": "src/capability/standing.ts",
-      "declarations": [
-        {
-          "kind": "function",
-          "name": "parseStandingRequirement",
-          "return": {
-            "type": {
-              "text": "readonly Standing[][]"
-            }
-          },
-          "parameters": [
-            {
-              "name": "requirement",
-              "type": {
-                "text": "readonly string[]"
-              }
-            }
-          ],
-          "description": "Parses the contract DSL into normalized form: outer array is AND, inner array is OR.\nEach inner array element is a Standing name."
-        },
-        {
-          "kind": "function",
-          "name": "satisfiesRequirement",
-          "return": {
-            "type": {
-              "text": "boolean"
-            }
-          },
-          "parameters": [
-            {
-              "name": "held",
-              "type": {
-                "text": "readonly Standing[]"
-              }
-            },
-            {
-              "name": "requirement",
-              "type": {
-                "text": "readonly string[]"
-              }
-            }
-          ],
-          "description": "Returns true if `held` satisfies `requirement`.\nAND across outer groups; OR within each group."
-        }
-      ],
-      "exports": [
-        {
-          "kind": "js",
-          "name": "parseStandingRequirement",
-          "declaration": {
-            "name": "parseStandingRequirement",
-            "module": "src/capability/standing.ts"
-          }
-        },
-        {
-          "kind": "js",
-          "name": "satisfiesRequirement",
-          "declaration": {
-            "name": "satisfiesRequirement",
-            "module": "src/capability/standing.ts"
-          }
-        }
-      ]
-    },
-    {
-      "kind": "javascript-module",
-      "path": "src/contracts/omnibar.contract.ts",
-      "declarations": [],
-      "exports": []
-    },
-    {
-      "kind": "javascript-module",
       "path": "src/loader/loader.ts",
       "declarations": [
         {
@@ -8320,6 +8124,110 @@
           "declaration": {
             "name": "Loader",
             "module": "src/loader/loader.ts"
+          }
+        }
+      ]
+    },
+    {
+      "kind": "javascript-module",
+      "path": "src/localize/generated/es.ts",
+      "declarations": [
+        {
+          "kind": "variable",
+          "name": "templates",
+          "type": {
+            "text": "object"
+          },
+          "default": "{ sdda0ebeb9a270e53: str`Hola, ${0}`, }"
+        }
+      ],
+      "exports": [
+        {
+          "kind": "js",
+          "name": "templates",
+          "declaration": {
+            "name": "templates",
+            "module": "src/localize/generated/es.ts"
+          }
+        }
+      ]
+    },
+    {
+      "kind": "javascript-module",
+      "path": "src/localize/generated/he.ts",
+      "declarations": [
+        {
+          "kind": "variable",
+          "name": "templates",
+          "type": {
+            "text": "object"
+          },
+          "default": "{ sdda0ebeb9a270e53: str`Hello, ${0}`, }"
+        }
+      ],
+      "exports": [
+        {
+          "kind": "js",
+          "name": "templates",
+          "declaration": {
+            "name": "templates",
+            "module": "src/localize/generated/he.ts"
+          }
+        }
+      ]
+    },
+    {
+      "kind": "javascript-module",
+      "path": "src/localize/generated/locale-codes.ts",
+      "declarations": [
+        {
+          "kind": "variable",
+          "name": "sourceLocale",
+          "default": "`en`",
+          "description": "The locale code that templates in this source code are written in."
+        },
+        {
+          "kind": "variable",
+          "name": "targetLocales",
+          "type": {
+            "text": "[`es`, `he`]"
+          },
+          "default": "[`es`, `he`]",
+          "description": "The other locale codes that this application is localized into. Sorted\nlexicographically."
+        },
+        {
+          "kind": "variable",
+          "name": "allLocales",
+          "type": {
+            "text": "[`en`, `es`, `he`]"
+          },
+          "default": "[`en`, `es`, `he`]",
+          "description": "All valid project locale codes. Sorted lexicographically."
+        }
+      ],
+      "exports": [
+        {
+          "kind": "js",
+          "name": "sourceLocale",
+          "declaration": {
+            "name": "sourceLocale",
+            "module": "src/localize/generated/locale-codes.ts"
+          }
+        },
+        {
+          "kind": "js",
+          "name": "targetLocales",
+          "declaration": {
+            "name": "targetLocales",
+            "module": "src/localize/generated/locale-codes.ts"
+          }
+        },
+        {
+          "kind": "js",
+          "name": "allLocales",
+          "declaration": {
+            "name": "allLocales",
+            "module": "src/localize/generated/locale-codes.ts"
           }
         }
       ]
@@ -8804,6 +8712,181 @@
           "declaration": {
             "name": "installEprResolutionProvider",
             "module": "src/navigation/epr-resolution-provider.ts"
+          }
+        }
+      ]
+    },
+    {
+      "kind": "javascript-module",
+      "path": "src/register.ts",
+      "declarations": [],
+      "exports": [
+        {
+          "kind": "custom-element-definition",
+          "name": "elohim-button",
+          "declaration": {
+            "name": "ElohimButton",
+            "module": "/src/elohim-button.js"
+          }
+        },
+        {
+          "kind": "custom-element-definition",
+          "name": "elohim-compute-tile",
+          "declaration": {
+            "name": "ElohimComputeTile",
+            "module": "/src/elohim-compute-tile.js"
+          }
+        },
+        {
+          "kind": "custom-element-definition",
+          "name": "elohim-skeleton",
+          "declaration": {
+            "name": "ElohimSkeleton",
+            "module": "/src/elohim-skeleton.js"
+          }
+        },
+        {
+          "kind": "custom-element-definition",
+          "name": "elohim-mention-base",
+          "declaration": {
+            "name": "ElohimMentionBase",
+            "module": "/src/elohim-mention-base.js"
+          }
+        },
+        {
+          "kind": "custom-element-definition",
+          "name": "elohim-page-chrome",
+          "declaration": {
+            "name": "ElohimPageChrome",
+            "module": "/src/elohim-page-chrome.js"
+          }
+        },
+        {
+          "kind": "custom-element-definition",
+          "name": "elohim-default-omnibar",
+          "declaration": {
+            "name": "ElohimDefaultOmnibar",
+            "module": "/src/elohim-default-omnibar.js"
+          }
+        },
+        {
+          "kind": "custom-element-definition",
+          "name": "elohim-context-menu",
+          "declaration": {
+            "name": "ElohimContextMenu",
+            "module": "/src/elohim-context-menu.js"
+          }
+        },
+        {
+          "kind": "custom-element-definition",
+          "name": "elohim-epr-link",
+          "declaration": {
+            "name": "ElohimEprLink",
+            "module": "/src/elohim-epr-link.js"
+          }
+        },
+        {
+          "kind": "custom-element-definition",
+          "name": "elohim-epr-relationships-panel",
+          "declaration": {
+            "name": "ElohimEprRelationshipsPanel",
+            "module": "/src/elohim-epr-relationships-panel.js"
+          }
+        },
+        {
+          "kind": "custom-element-definition",
+          "name": "elohim-reaction-bar",
+          "declaration": {
+            "name": "ElohimReactionBar",
+            "module": "/src/elohim-reaction-bar.js"
+          }
+        },
+        {
+          "kind": "custom-element-definition",
+          "name": "elohim-graduated-feedback",
+          "declaration": {
+            "name": "ElohimGraduatedFeedback",
+            "module": "/src/elohim-graduated-feedback.js"
+          }
+        },
+        {
+          "kind": "custom-element-definition",
+          "name": "elohim-feedback-mechanism-gateway",
+          "declaration": {
+            "name": "ElohimFeedbackMechanismGateway",
+            "module": "/src/elohim-feedback-mechanism-gateway.js"
+          }
+        },
+        {
+          "kind": "custom-element-definition",
+          "name": "elohim-gate-feedback-trigger",
+          "declaration": {
+            "name": "ElohimGateFeedbackTrigger",
+            "module": "/src/elohim-gate-feedback-trigger.js"
+          }
+        },
+        {
+          "kind": "custom-element-definition",
+          "name": "elohim-navigator",
+          "declaration": {
+            "name": "ElohimNavigator",
+            "module": "/src/elohim-navigator.js"
+          }
+        },
+        {
+          "kind": "custom-element-definition",
+          "name": "elohim-content-analytics",
+          "declaration": {
+            "name": "ElohimContentAnalytics",
+            "module": "/src/elohim-content-analytics.js"
+          }
+        },
+        {
+          "kind": "custom-element-definition",
+          "name": "elohim-epr-popover",
+          "declaration": {
+            "name": "ElohimEprPopover",
+            "module": "/src/elohim-epr-popover.js"
+          }
+        },
+        {
+          "kind": "custom-element-definition",
+          "name": "elohim-theme-toggle",
+          "declaration": {
+            "name": "ElohimThemeToggle",
+            "module": "/src/elohim-theme-toggle.js"
+          }
+        },
+        {
+          "kind": "custom-element-definition",
+          "name": "elohim-lang-picker",
+          "declaration": {
+            "name": "ElohimLangPicker",
+            "module": "/src/elohim-lang-picker.js"
+          }
+        },
+        {
+          "kind": "custom-element-definition",
+          "name": "elohim-hypercard-panel",
+          "declaration": {
+            "name": "ElohimHypercardPanel",
+            "module": "/src/elohim-hypercard-panel.js"
+          }
+        },
+        {
+          "kind": "custom-element-definition",
+          "name": "elohim-seam-map",
+          "declaration": {
+            "name": "ElohimSeamMap",
+            "module": "/src/elohim-seam-map.js"
+          }
+        },
+        {
+          "kind": "custom-element-definition",
+          "name": "elohim-resiliency-badge",
+          "declaration": {
+            "name": "ElohimResiliencyBadge",
+            "module": "/src/elohim-resiliency-badge.js"
           }
         }
       ]
@@ -9818,104 +9901,21 @@
     },
     {
       "kind": "javascript-module",
-      "path": "src/localize/generated/es.ts",
+      "path": "src/viewport-archetypes.ts",
       "declarations": [
         {
           "kind": "variable",
-          "name": "templates",
-          "type": {
-            "text": "object"
-          },
-          "default": "{ sdda0ebeb9a270e53: str`Hola, ${0}`, }"
+          "name": "VIEWPORT_ARCHETYPES",
+          "default": "{ /** Small/older phones and split-screen Android — the floor. */ 'phone-small': { width: 320, height: 568, represents: 'small phone / split-screen floor' }, /** Mainstream phone portrait (iPhone 12-16 class). */ phone: { width: 390, height: 844, represents: 'mainstream phone portrait' }, /** Tablet portrait / phone landscape class. */ tablet: { width: 768, height: 1024, represents: 'tablet portrait' }, /** Default desktop window — matches the look/device default. */ desktop: { width: 1280, height: 800, represents: 'desktop window' }, } as const satisfies Record<string, ViewportArchetype>"
         }
       ],
       "exports": [
         {
           "kind": "js",
-          "name": "templates",
+          "name": "VIEWPORT_ARCHETYPES",
           "declaration": {
-            "name": "templates",
-            "module": "src/localize/generated/es.ts"
-          }
-        }
-      ]
-    },
-    {
-      "kind": "javascript-module",
-      "path": "src/localize/generated/he.ts",
-      "declarations": [
-        {
-          "kind": "variable",
-          "name": "templates",
-          "type": {
-            "text": "object"
-          },
-          "default": "{ sdda0ebeb9a270e53: str`Hello, ${0}`, }"
-        }
-      ],
-      "exports": [
-        {
-          "kind": "js",
-          "name": "templates",
-          "declaration": {
-            "name": "templates",
-            "module": "src/localize/generated/he.ts"
-          }
-        }
-      ]
-    },
-    {
-      "kind": "javascript-module",
-      "path": "src/localize/generated/locale-codes.ts",
-      "declarations": [
-        {
-          "kind": "variable",
-          "name": "sourceLocale",
-          "default": "`en`",
-          "description": "The locale code that templates in this source code are written in."
-        },
-        {
-          "kind": "variable",
-          "name": "targetLocales",
-          "type": {
-            "text": "[`es`, `he`]"
-          },
-          "default": "[`es`, `he`]",
-          "description": "The other locale codes that this application is localized into. Sorted\nlexicographically."
-        },
-        {
-          "kind": "variable",
-          "name": "allLocales",
-          "type": {
-            "text": "[`en`, `es`, `he`]"
-          },
-          "default": "[`en`, `es`, `he`]",
-          "description": "All valid project locale codes. Sorted lexicographically."
-        }
-      ],
-      "exports": [
-        {
-          "kind": "js",
-          "name": "sourceLocale",
-          "declaration": {
-            "name": "sourceLocale",
-            "module": "src/localize/generated/locale-codes.ts"
-          }
-        },
-        {
-          "kind": "js",
-          "name": "targetLocales",
-          "declaration": {
-            "name": "targetLocales",
-            "module": "src/localize/generated/locale-codes.ts"
-          }
-        },
-        {
-          "kind": "js",
-          "name": "allLocales",
-          "declaration": {
-            "name": "allLocales",
-            "module": "src/localize/generated/locale-codes.ts"
+            "name": "VIEWPORT_ARCHETYPES",
+            "module": "src/viewport-archetypes.ts"
           }
         }
       ]

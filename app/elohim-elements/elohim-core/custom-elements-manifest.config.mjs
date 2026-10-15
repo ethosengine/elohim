@@ -1,3 +1,4 @@
+import sharedConfig from '../custom-elements-manifest.config.mjs';
 import capabilityContractPlugin from './cem-plugins/capability-contract.mjs';
 
 // Forward-affordance: when component-CID federation tooling lands,
@@ -6,10 +7,6 @@ import capabilityContractPlugin from './cem-plugins/capability-contract.mjs';
 // but not populated. See:
 // genesis/docs/superpowers/specs/2026-05-06-elohim-lit-component-pivot-design.md (D8)
 export default {
-  globs: ['src/**/*.ts'],
-  exclude: ['src/**/*.spec.ts'],
-  outdir: 'dist',
-  litelement: true,
-  packagejson: false,
-  plugins: [capabilityContractPlugin()],
+  ...sharedConfig,
+  plugins: [capabilityContractPlugin(), ...sharedConfig.plugins],
 };
