@@ -478,12 +478,21 @@ pub enum EdgeStatus {
 /// Source of truth: the `.eprfs/status/` sidecar (local observation floor, append-only; B2 —
 /// graduates to the existing Attestation entry type at push, gap #11). Never a DHT write here.
 /// `from`/`to` are repo-relative paths (v1 floor — slug identity for code artifacts is an open
-/// question tracked in the spec, not resolved by this record).
+/// question tracked in the spec, not resolved by this record). An edge to something made OUTSIDE
+/// the repository (a registry package) keeps a readable coordinate in `to`
+/// (`crates.io:serde@1.0.228`) and names the bytes in `to_resource`.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct DepEdge {
     pub from: String,
     pub to: String,
+    /// The upstream's content address when `to` is an outside resource: the raw CID wrapping its
+    /// published checksum (`elohim_epr::cid::raw_cid_from_sha256_hex` over a Cargo.lock
+    /// `checksum`). Additive and skipped when absent, so every record written before this field
+    /// existed serializes, and hashes, to the same bytes (pinned by
+    /// `store::tests::pre_to_resource_sidecar_lines_round_trip_byte_identical`).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub to_resource: Option<Cid>,
     /// The announcement — why this edge exists.
     pub desc: Option<String>,
     pub governor: Governor,
@@ -519,6 +528,7 @@ impl DepEdge {
         let edge = Self {
             from,
             to,
+            to_resource: None,
             desc,
             governor,
             sealed_cid,
@@ -528,6 +538,13 @@ impl DepEdge {
         };
         edge.validate()?;
         Ok(edge)
+    }
+
+    /// Name the upstream's bytes when `to` is an outside resource (see [`DepEdge::to_resource`]).
+    /// The seal invariant does not involve this field, so no re-validation is needed.
+    pub fn with_to_resource(mut self, resource: Cid) -> Self {
+        self.to_resource = Some(resource);
+        self
     }
 
     /// Re-check the seal invariant on an already-built value (e.g. one deserialized from the

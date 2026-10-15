@@ -319,6 +319,51 @@ mod tests {
         .expect("valid edge")
     }
 
+    /// `DepEdge.to_resource` is additive: sidecar lines written by the `epr` binary BEFORE the
+    /// field existed (a cite-seal edge and a compiler edge, produced by `epr flow seal` into a
+    /// scratch root and copied verbatim into the fixture) decode with `to_resource: None`,
+    /// re-verify against their stored CID, and re-serialize to the identical bytes.
+    #[cfg(feature = "sidecar")]
+    #[test]
+    fn pre_to_resource_sidecar_lines_round_trip_byte_identical() {
+        let fixture = include_str!("../tests/fixtures/depedge-before-to-resource.flows.jsonl");
+        let mut seen = 0;
+        for line in fixture.lines().filter(|l| !l.trim().is_empty()) {
+            let parsed: SidecarLine = serde_json::from_str(line).expect("old line decodes");
+            let FlowRecord::Edge(edge) = &parsed.record else {
+                panic!("fixture holds edges only");
+            };
+            assert_eq!(edge.to_resource, None);
+            assert_eq!(parsed.record.cid().unwrap().to_string(), parsed.cid);
+            assert_eq!(serde_json::to_string(&parsed).unwrap(), line);
+            seen += 1;
+        }
+        assert_eq!(seen, 2);
+    }
+
+    #[test]
+    fn to_resource_is_carried_and_addresses_a_distinct_record() {
+        let base = DepEdge::new(
+            "elohim/epr".into(),
+            "crates.io:serde@1.0.228".into(),
+            None,
+            Governor::Compiler("elohim".into()),
+            None,
+            agent("claude"),
+            1,
+            None,
+        )
+        .unwrap();
+        let resource = elohim_epr::cid::compute_raw_cid(b"serde-1.0.228.crate");
+        let named = base.clone().with_to_resource(resource);
+        let json = serde_json::to_string(&named).unwrap();
+        assert!(json.contains("\"toResource\""));
+        assert!(!serde_json::to_string(&base).unwrap().contains("toResource"));
+        let back: DepEdge = serde_json::from_str(&json).unwrap();
+        assert_eq!(back, named);
+        assert_ne!(atom_cid(&named).unwrap(), atom_cid(&base).unwrap());
+    }
+
     #[test]
     fn edges_round_trips_append_records_and_edges() {
         let mut store = MemoryFlowStore::new();
@@ -383,6 +428,7 @@ mod tests {
         let invalid = DepEdge {
             from: "app/other.ts".into(),
             to: "spec/other.md".into(),
+            to_resource: None,
             desc: None,
             governor: Governor::CiteSeal,
             sealed_cid: None,
