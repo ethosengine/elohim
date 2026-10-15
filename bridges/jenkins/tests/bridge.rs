@@ -318,11 +318,12 @@ fn observe_appends_idempotently_and_walk_renders_each_stage_with_its_duration() 
     let root = dir.path();
     let c = ctx(root);
     let first = observe(&c, &inputs(W1483, Some(G1903))).unwrap();
-    // 19 stages declared-and-reported; 2 NOT_EXECUTED produce no event; +1 Process.
-    assert_eq!(first.appended, 17 + 1, "{first:?}");
+    // 19 stages declared-and-reported; 2 NOT_EXECUTED produce no event; +1 source-commit Cite
+    // input (the graph carries the SHA); +1 Process.
+    assert_eq!(first.appended, 17 + 1 + 1, "{first:?}");
     assert!(first.stakes.contains("bootstrap (fixture co-steward)"));
     let again = observe(&c, &inputs(W1483, Some(G1903))).unwrap();
-    assert_eq!((again.appended, again.present), (0, 18));
+    assert_eq!((again.appended, again.present), (0, 19));
     assert_eq!(again.process, first.process, "same inputs, same CIDs");
 
     let failed = observe(&c, &inputs(W1484, Some(G1906))).unwrap();
@@ -456,12 +457,29 @@ fn the_process_carries_the_build_and_its_envelope_and_events_keep_their_address(
         ] {
             assert!(slots.contains(&slot), "{slot} on the Process");
         }
+        let input_cids: Vec<String> = process.inputs.iter().map(|c| c.to_string()).collect();
         let events: Vec<String> = t
             .observations
             .iter()
             .filter(|o| matches!(o, Observation::Event(_)))
             .map(|o| o.cid().unwrap().to_string())
+            .filter(|c| !input_cids.contains(c))
             .collect();
+        // Node 1: with the graph in hand, the build rests on its source commit — one Cite input.
+        assert_eq!(process.inputs.len(), 1, "the source-commit input");
+        let source = t
+            .observations
+            .iter()
+            .find_map(|o| match o {
+                Observation::Event(e) if e.action == ReaVerb::Cite => Some(e),
+                _ => None,
+            })
+            .expect("a source-commit Cite event");
+        assert_eq!(
+            source.classified_as[1],
+            format!("commit:{}", t.sha.as_deref().unwrap())
+        );
+        assert!(source.fulfills.is_empty() && source.satisfies.is_empty());
         assert!(
             events.contains(&event_golden.to_string()),
             "stage events of #{build} moved address"

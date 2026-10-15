@@ -282,6 +282,20 @@ struct StageClaimBody<'a> {
     duration_millis: i64,
 }
 
+/// The repository every edge build checks out; the source-commit input names a commit in it.
+pub const SOURCE_REPOSITORY: &str = "github.com/ethosengine/elohim";
+/// A fold key of its own for the source-commit input, never summed with stage time.
+pub const SOURCE_UNIT: &str = "source-commit";
+
+/// The source-commit input's resource: the commit as a coordinate. Git names it by SHA-1, which
+/// this record carries but does not wrap as a byte CID (`identity:coordinate-only`).
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+struct SourceCommitBody<'a> {
+    repository: &'a str,
+    commit: &'a str,
+}
+
 fn rfc3339_ms(millis: i64) -> Result<String, Refusal> {
     chrono::DateTime::from_timestamp_millis(millis)
         .map(|t| t.to_rfc3339_opts(chrono::SecondsFormat::Millis, true))
@@ -360,6 +374,44 @@ pub fn translate(
 
     let mut observations = Vec::new();
     let mut outputs = Vec::new();
+    // Node 1 (reliance-as-cite spec): what the build rests on, as Cite inputs on its Process.
+    // The source commit is in hand only with the orchestrator's graph; the deployed image digest
+    // is not in either archive (wfapi carries stage timings, the graph carries SHA and URLs), so
+    // the image input waits on the edge pipeline archiving its digest.
+    let mut inputs = Vec::new();
+    if let Some(sha) = &sha {
+        let body = SourceCommitBody {
+            repository: SOURCE_REPOSITORY,
+            commit: sha,
+        };
+        let resource = elohim_epr::cid::compute_cid(
+            &serde_ipld_dagcbor::to_vec(&body).map_err(|e| refuse(e.to_string()))?,
+        );
+        let event = FlowEvent {
+            action: ReaVerb::Cite,
+            provider: AgentRef(elohim_epr_cli::flow::REPO_AGENT.to_string()),
+            receiver: AgentRef(SOURCE.to_string()),
+            resource,
+            quantity: Magnitude::Count {
+                value: 1.0,
+                unit: SOURCE_UNIT.to_string(),
+            },
+            process: None,
+            in_scope_of: offer,
+            fulfills: Vec::new(),
+            satisfies: Vec::new(),
+            occurred_at: rfc3339_ms(run.start_time_millis)?,
+            classified_as: claim.classify(
+                "input:source-commit",
+                format!("commit:{sha}"),
+                std::iter::once("identity:coordinate-only".to_string())
+                    .chain(build_slots.iter().cloned()),
+            ),
+        };
+        let observation = Observation::Event(event);
+        inputs.push(observation.cid()?);
+        observations.push(observation);
+    }
     for stage in &observed {
         let Some(action) = stage.result.verb() else {
             continue;
@@ -405,7 +457,7 @@ pub fn translate(
     let process = Observation::Process(Process {
         spec: spec.clone(),
         in_scope_of: offer,
-        inputs: Vec::new(),
+        inputs,
         outputs,
         classified_as: claim.classify(
             format!("result:{}", StageResult::parse(&run.status)?.word()),
