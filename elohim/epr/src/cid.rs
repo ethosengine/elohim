@@ -64,6 +64,10 @@ pub enum ChecksumError {
     /// for a strong one.
     #[error("unsupported integrity algorithm `{0}` (sha256, sha384, sha512 only)")]
     UnsupportedAlgorithm(String),
+    /// Two different digests of the same (strongest) algorithm: which one names the bytes would
+    /// depend on their order in the string, so neither is chosen.
+    #[error("integrity string carries two different {0} digests")]
+    ConflictingDigests(&'static str),
 }
 
 /// Compute CIDv1(raw, sha2-256) over arbitrary bytes (`bafkrei…`). Byte-identical to
@@ -105,11 +109,19 @@ pub fn raw_cid_from_sha256_hex(hex_digest: &str) -> Result<Cid, ChecksumError> {
 
 /// Wrap a Subresource Integrity string (`<algorithm>-<base64 digest>`, e.g. npm/pnpm's
 /// `integrity: sha512-…`) as CIDv1(raw, sha2-*). When the string lists several space-separated
-/// entries, the strongest supported one is used, as the SRI spec directs.
+/// entries, the strongest supported algorithm is used, as the SRI spec directs. Every entry of
+/// that strength is decoded: identical digests collapse to one, and two DIFFERENT digests of the
+/// same strength are refused ([`ChecksumError::ConflictingDigests`]) — otherwise the entries'
+/// order would choose the address.
 pub fn raw_cid_from_sri(integrity: &str) -> Result<Cid, ChecksumError> {
     use base64::Engine as _;
 
-    let mut best: Option<(u64, &'static str, &str)> = None;
+    let strength = |c: u64| match c {
+        SHA2_256 => 1,
+        SHA2_384 => 2,
+        _ => 3,
+    };
+    let mut entries: Vec<(u64, &'static str, &str)> = Vec::new();
     let mut unsupported: Option<String> = None;
     for entry in integrity.split_whitespace() {
         // An SRI entry may carry `?options` after the digest; they never change the digest.
@@ -126,24 +138,26 @@ pub fn raw_cid_from_sri(integrity: &str) -> Result<Cid, ChecksumError> {
                 continue;
             }
         };
-        let strength = |c: u64| match c {
-            SHA2_256 => 1,
-            SHA2_384 => 2,
-            _ => 3,
-        };
-        if best.is_none_or(|(c, _, _)| strength(code) > strength(c)) {
-            best = Some((code, name, digest));
-        }
+        entries.push((code, name, digest));
     }
-    let Some((code, name, digest_b64)) = best else {
+    let Some(top) = entries.iter().map(|(c, _, _)| strength(*c)).max() else {
         return Err(match unsupported {
             Some(algorithm) => ChecksumError::UnsupportedAlgorithm(algorithm),
             None => ChecksumError::MalformedIntegrity(integrity.into()),
         });
     };
-    let digest = base64::engine::general_purpose::STANDARD
-        .decode(digest_b64)
-        .map_err(|_| ChecksumError::NotBase64(digest_b64.into()))?;
+    let mut chosen: Option<(u64, &'static str, Vec<u8>)> = None;
+    for (code, name, digest_b64) in entries.into_iter().filter(|(c, _, _)| strength(*c) == top) {
+        let digest = base64::engine::general_purpose::STANDARD
+            .decode(digest_b64)
+            .map_err(|_| ChecksumError::NotBase64(digest_b64.into()))?;
+        match &chosen {
+            None => chosen = Some((code, name, digest)),
+            Some((_, _, seen)) if *seen == digest => {}
+            Some(_) => return Err(ChecksumError::ConflictingDigests(name)),
+        }
+    }
+    let (code, name, digest) = chosen.expect("at least one entry has the top strength");
     wrap_raw(code, name, &digest)
 }
 
@@ -206,6 +220,33 @@ mod tests {
         );
         let only_384 = raw_cid_from_sri(FIXTURE_SRI_SHA384).unwrap();
         assert_eq!(only_384.hash().code(), SHA2_384);
+    }
+
+    #[test]
+    fn sri_entries_of_equal_strength_never_let_order_choose_the_address() {
+        // The same digest twice collapses to one CID, in either order.
+        let twice = format!("{FIXTURE_SRI_SHA512} {FIXTURE_SRI_SHA512}");
+        assert_eq!(
+            raw_cid_from_sri(&twice).unwrap().to_string(),
+            FIXTURE_RAW_SHA512_CID
+        );
+        // Two DIFFERENT sha512 digests refuse, whichever comes first.
+        let other = "sha512-3a81oZNherrMQXNJriBBMRLm+k6JqX6iCp7u5ktV05ohkpkqJ0/BqDa6PCOj/uu9RU1EI2Q86A4qmslPpUyknw==";
+        for s in [
+            format!("{FIXTURE_SRI_SHA512} {other}"),
+            format!("{other} {FIXTURE_SRI_SHA512}"),
+        ] {
+            assert_eq!(
+                raw_cid_from_sri(&s),
+                Err(ChecksumError::ConflictingDigests("sha512"))
+            );
+        }
+        // A weaker entry that disagrees is ignored: only the strongest algorithm is read.
+        let mixed = format!("sha256-YWJj {FIXTURE_SRI_SHA512}");
+        assert_eq!(
+            raw_cid_from_sri(&mixed).unwrap().to_string(),
+            FIXTURE_RAW_SHA512_CID
+        );
     }
 
     #[test]
