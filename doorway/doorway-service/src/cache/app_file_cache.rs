@@ -424,18 +424,39 @@ impl AppFileCacheService {
         }
 
         // Slow path: lazy load from MongoDB for this specific app
+        let data = self.scan_projected_app(slug).await?;
+        let blob_hash = data
+            .get_str("blobHash")
+            .ok()
+            .filter(|h| !h.is_empty())?
+            .to_string();
+        self.slug_index
+            .write()
+            .await
+            .insert(slug.to_string(), blob_hash.clone());
+        if let Some(d) = AppDescriptor::from_data(&data) {
+            self.descriptor_index
+                .write()
+                .await
+                .insert(slug.to_string(), d);
+        }
+        Some(blob_hash)
+    }
+
+    /// The projected `data` document of the bundled app whose slug is `slug`,
+    /// or `None` when no such app is projected or the projection is unreachable.
+    ///
+    /// The app's slug is inside contentBody (JSON string), not at data.hAppId
+    /// (which is the Holochain app context). We can't query inside a JSON
+    /// string with MongoDB, so this scans all bundled-app entries.
+    async fn scan_projected_app(&self, slug: &str) -> Option<bson::Document> {
         let db = self.mongo.inner().database(self.mongo.db_name());
         let collection = db.collection::<bson::Document>(PROJECTED_ENTRIES_COLLECTION);
-
-        // The app's slug is inside contentBody (JSON string), not at
-        // data.hAppId (which is the Holochain app context). We can't query
-        // inside a JSON string with MongoDB, so scan all bundled-app entries.
         let filter = doc! {
             "doc_type": "Content",
             "data.contentFormat": { "$in": ["html5-app", "spa-bundle"] },
             "metadata.is_deleted": { "$ne": true },
         };
-
         let mut cursor = match collection.find(filter).await {
             Ok(c) => c,
             Err(e) => {
@@ -443,28 +464,13 @@ impl AppFileCacheService {
                 return None;
             }
         };
-
         while let Ok(Some(doc)) = cursor.try_next().await {
             if let Some(data) = doc.get("data").and_then(|v| v.as_document()) {
-                let app_slug = extract_app_slug_from_data(data);
-                if app_slug.as_deref() == Some(slug) {
-                    if let Ok(blob_hash) = data.get_str("blobHash") {
-                        if !blob_hash.is_empty() {
-                            let mut index = self.slug_index.write().await;
-                            index.insert(slug.to_string(), blob_hash.to_string());
-                            if let Some(d) = AppDescriptor::from_data(data) {
-                                self.descriptor_index
-                                    .write()
-                                    .await
-                                    .insert(slug.to_string(), d);
-                            }
-                            return Some(blob_hash.to_string());
-                        }
-                    }
+                if extract_app_slug_from_data(data).as_deref() == Some(slug) {
+                    return Some(data.clone());
                 }
             }
         }
-
         None
     }
 
@@ -479,9 +485,19 @@ impl AppFileCacheService {
         if let Some(d) = self.descriptor_index.read().await.get(identifier) {
             return Some(d.clone());
         }
-        // The lazy scan in resolve_blob_hash fills the descriptor index.
-        self.resolve_blob_hash(identifier).await?;
-        self.descriptor_index.read().await.get(identifier).cloned()
+        // Read the projection directly rather than through resolve_blob_hash:
+        // a head the reconciler declared (set_slug_head) or re-resolved after
+        // refresh_app makes that fast path return before any scan, which would
+        // leave the descriptor empty for as long as the head stays cached.
+        // Only the descriptor is filled here — the head index belongs to the
+        // reconciler, and the projection's blobHash may be the stale one.
+        let data = self.scan_projected_app(identifier).await?;
+        let descriptor = AppDescriptor::from_data(&data)?;
+        self.descriptor_index
+            .write()
+            .await
+            .insert(identifier.to_string(), descriptor.clone());
+        Some(descriptor)
     }
 
     /// Reverse the slug index: which app slug currently declares `blob_hash` as
