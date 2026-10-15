@@ -18,6 +18,7 @@ import { PlacesApiService } from '../../services/places-api.service';
 import { SpatialDashboardApiService } from '../../services/spatial-dashboard-api.service';
 
 import type { PlaceView, SpatialDashboardView, PlaceDashboardEntry } from '@elohim/storage-client';
+import type * as GeoJSON from 'geojson';
 
 /** Color mapping for constitutional layers */
 const LAYER_COLORS: Record<string, string> = {
