@@ -321,7 +321,7 @@ Root `Jenkinsfile` (elohim-app pipeline) sits near the 64KB JVM CPS method size 
 MultiBranch pipeline params are null until the Jenkinsfile runs once. Always use `(params.MODE ?: 'auto')`.
 
 ### sophia-element UMD Must Be Pre-built
-Build before elohim-app builds; the `prebuild` script checks. Run: `cd sophia && pnpm install && pnpm build && pnpm build:umd`.
+Build before elohim-app builds; the `prebuild` script checks. Run: `cd sophia && pnpm install && pnpm build && pnpm --filter @ethosengine/sophia-element build:umd`.
 
 ### pnpm Workspace
 All TypeScript/Node.js projects use pnpm workspaces (sophia excluded — submodule). Target packages with `pnpm --filter <name> <cmd>`. The `libsodium-wrappers` package is overridden to `^0.8.2` in root `package.json` to fix a broken ESM relative import in 0.7.x that fails with pnpm's strict module resolution.

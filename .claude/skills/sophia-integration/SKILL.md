@@ -333,7 +333,7 @@ pnpm install
 pnpm build
 
 # Build UMD bundle for Angular consumption
-pnpm build:umd
+pnpm --filter @ethosengine/sophia-element build:umd
 
 # Build specific package
 pnpm build --filter=sophia-element
@@ -358,7 +358,7 @@ pnpm build --filter=sophia-element
 
 6. **sophia-element UMD must be pre-built** - The `prebuild` script in elohim-app checks for it. Build with:
    ```bash
-   cd sophia && pnpm install && pnpm build && pnpm build:umd
+   cd sophia && pnpm install && pnpm build && pnpm --filter @ethosengine/sophia-element build:umd
    ```
 
 7. **Sophia is rendering only** - Never add session management, persistence, or aggregation to sophia packages. Those belong in lamad services.

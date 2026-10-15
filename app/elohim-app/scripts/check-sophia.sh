@@ -64,7 +64,7 @@ fi
 if [ ! -f "$ASSET_DIR/$UMD_FILE" ]; then
   echo "ERROR: sophia-element.umd.js not available from any source"
   echo "Options:"
-  echo "  1. Build from submodule: cd sophia && pnpm install && pnpm build && pnpm build:umd"
+  echo "  1. Build from submodule: cd sophia && pnpm install && pnpm build && pnpm --filter @ethosengine/sophia-element build:umd"
   echo "  2. Ensure @ethosengine/sophia-element is published to Nexus"
   exit 1
 fi

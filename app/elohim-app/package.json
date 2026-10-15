@@ -7,7 +7,7 @@
     "prebuild": "pnpm --filter @elohim/storage-client build && bash scripts/check-sophia.sh && bash scripts/fetch-fonts.sh && pnpm run build:sw && pnpm run build:wasm",
     "build:sw": "esbuild src/apps-sw.ts --bundle --outfile=src/assets/apps-sw.js --format=iife --target=es2020",
     "build:wasm": "bash scripts/build-wasm.sh",
-    "build:sophia": "cd ../../sophia && pnpm install && pnpm build && pnpm build:umd",
+    "build:sophia": "cd ../../sophia && pnpm install && pnpm build && pnpm --filter @ethosengine/sophia-element build:umd",
     "start": "ng serve --proxy-config proxy.conf.mjs",
     "start:alpha": "ng serve --proxy-config proxy.conf.alpha.mjs",
     "stop": "pkill -f 'ng serve' 2>/dev/null && echo 'Stopped Angular dev server' || echo 'Angular dev server not running'",

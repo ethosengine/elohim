@@ -7,7 +7,7 @@
 #
 # Prerequisites:
 #   - gh CLI authenticated (gh auth login)
-#   - sophia built (cd sophia && pnpm build && pnpm build:umd)
+#   - sophia built (cd sophia && pnpm build && pnpm --filter @ethosengine/sophia-element build:umd)
 #
 # Creates release: sophia-v{version} with assets:
 #   - sophia-element.umd.js
@@ -34,7 +34,7 @@ STYLES="$SOPHIA_DIR/packages/sophia/dist/index.css"
 for f in "$UMD" "$UMD_MAP" "$STYLES"; do
   if [ ! -f "$f" ]; then
     echo "ERROR: Missing artifact: $f"
-    echo "Run: cd sophia && pnpm install && pnpm build && pnpm build:umd"
+    echo "Run: cd sophia && pnpm install && pnpm build && pnpm --filter @ethosengine/sophia-element build:umd"
     exit 1
   fi
 done
