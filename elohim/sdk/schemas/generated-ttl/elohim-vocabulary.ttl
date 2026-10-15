@@ -29,7 +29,90 @@
 <epr:vocab#verdictClosure> a rdfs:Datatype ;
   rdfs:comment "Posture of an axis VERDICT layer toward absence: closed = absence of a permit is a refusal." .
 
-# =============== vocabularies (41) ===============
+# =============== vocabularies (46) ===============
+
+<epr:schema:enum:aggregation-lane> a skos:ConceptScheme ;
+  skos:prefLabel "AggregationLane" ;
+  dct:description "Per-variety aggregation policy mode — the lane a SignalVariety travels (or does not travel) when flows aggregate upward from a private context. Declared by adoption-time policy contracts; enforced at the aggregation boundary (bounds_validator check family), never upstream. Design home: genesis/docs/superpowers/specs/2026-07-31-care-aggregation-adoption-policy-floor-design.md (§3-4)." ;
+  <epr:vocab#ordered> false ;
+  skos:hasTopConcept <epr:schema:enum:aggregation-lane#k-anonymous>, <epr:schema:enum:aggregation-lane#count-only>, <epr:schema:enum:aggregation-lane#after-graduation-only>, <epr:schema:enum:aggregation-lane#suppressed> .
+
+<epr:schema:enum:aggregation-lane#k-anonymous> a skos:Concept ;
+  skos:inScheme <epr:schema:enum:aggregation-lane> ;
+  skos:prefLabel "k-anonymous" ;
+  skos:notation "k-anonymous" .
+
+<epr:schema:enum:aggregation-lane#count-only> a skos:Concept ;
+  skos:inScheme <epr:schema:enum:aggregation-lane> ;
+  skos:prefLabel "count-only" ;
+  skos:notation "count-only" .
+
+<epr:schema:enum:aggregation-lane#after-graduation-only> a skos:Concept ;
+  skos:inScheme <epr:schema:enum:aggregation-lane> ;
+  skos:prefLabel "after-graduation-only" ;
+  skos:notation "after-graduation-only" .
+
+<epr:schema:enum:aggregation-lane#suppressed> a skos:Concept ;
+  skos:inScheme <epr:schema:enum:aggregation-lane> ;
+  skos:prefLabel "suppressed" ;
+  skos:notation "suppressed" .
+
+<epr:schema:enum:answer-reason> a skos:ConceptScheme ;
+  skos:prefLabel "AnswerReason" ;
+  dct:description "WHY a boundary answer is not `present` — the vocabulary a client renders when it must explain a non-answer (concern class C4; the `unverifiable` arm is C5's may-believe clause: evidence that cannot be evaluated confers nothing, in either direction). Exactly one reason (`observed_absent`) accompanies answerState `absent`; every other reason accompanies `unreachable`. A `present` answer takes no reason. Rust authority: seam_contracts::AnswerReason (crates/seam-contracts/src/answer.rs); agreement is asserted by elohim/elohim-storage/tests/schema_contract.rs." ;
+  <epr:vocab#ordered> false ;
+  skos:hasTopConcept <epr:schema:enum:answer-reason#observed_absent>, <epr:schema:enum:answer-reason#timeout>, <epr:schema:enum:answer-reason#transport_error>, <epr:schema:enum:answer-reason#refused>, <epr:schema:enum:answer-reason#unverifiable>, <epr:schema:enum:answer-reason#not_yet_delivered> .
+
+<epr:schema:enum:answer-reason#observed_absent> a skos:Concept ;
+  skos:inScheme <epr:schema:enum:answer-reason> ;
+  skos:prefLabel "observed_absent" ;
+  skos:notation "observed_absent" .
+
+<epr:schema:enum:answer-reason#timeout> a skos:Concept ;
+  skos:inScheme <epr:schema:enum:answer-reason> ;
+  skos:prefLabel "timeout" ;
+  skos:notation "timeout" .
+
+<epr:schema:enum:answer-reason#transport_error> a skos:Concept ;
+  skos:inScheme <epr:schema:enum:answer-reason> ;
+  skos:prefLabel "transport_error" ;
+  skos:notation "transport_error" .
+
+<epr:schema:enum:answer-reason#refused> a skos:Concept ;
+  skos:inScheme <epr:schema:enum:answer-reason> ;
+  skos:prefLabel "refused" ;
+  skos:notation "refused" .
+
+<epr:schema:enum:answer-reason#unverifiable> a skos:Concept ;
+  skos:inScheme <epr:schema:enum:answer-reason> ;
+  skos:prefLabel "unverifiable" ;
+  skos:notation "unverifiable" .
+
+<epr:schema:enum:answer-reason#not_yet_delivered> a skos:Concept ;
+  skos:inScheme <epr:schema:enum:answer-reason> ;
+  skos:prefLabel "not_yet_delivered" ;
+  skos:notation "not_yet_delivered" .
+
+<epr:schema:enum:answer-state> a skos:ConceptScheme ;
+  skos:prefLabel "AnswerState" ;
+  dct:description "The three states a boundary answer can be in, kept apart so absence is never inferred from silence (concern class C4, honest absence). `present` = the answer arrived and carries a value. `absent` = the answer arrived and reports the value does not exist — a positive, OBSERVED claim. `unreachable` = no answer arrived (timeout, transport failure, undelivered gossip, an unverifiable response); nothing is established in either direction. Refusal and unverifiability are reasons, not states — see answer-reason. Rust authority: seam_contracts::AnswerState (crates/seam-contracts/src/answer.rs); agreement is asserted by elohim/elohim-storage/tests/schema_contract.rs." ;
+  <epr:vocab#ordered> false ;
+  skos:hasTopConcept <epr:schema:enum:answer-state#present>, <epr:schema:enum:answer-state#absent>, <epr:schema:enum:answer-state#unreachable> .
+
+<epr:schema:enum:answer-state#present> a skos:Concept ;
+  skos:inScheme <epr:schema:enum:answer-state> ;
+  skos:prefLabel "present" ;
+  skos:notation "present" .
+
+<epr:schema:enum:answer-state#absent> a skos:Concept ;
+  skos:inScheme <epr:schema:enum:answer-state> ;
+  skos:prefLabel "absent" ;
+  skos:notation "absent" .
+
+<epr:schema:enum:answer-state#unreachable> a skos:Concept ;
+  skos:inScheme <epr:schema:enum:answer-state> ;
+  skos:prefLabel "unreachable" ;
+  skos:notation "unreachable" .
 
 <epr:schema:enum:capacity-model> a skos:ConceptScheme ;
   skos:prefLabel "CapacityModel" ;
@@ -1471,6 +1554,147 @@
   skos:prefLabel "custom" ;
   skos:notation "custom" .
 
+<epr:schema:enum:rea-action> a skos:ConceptScheme ;
+  skos:prefLabel "ReaAction" ;
+  dct:description "The one action vocabulary for REA (Resource–Event–Agent) flows: what an economic event or commitment does to a resource. The same words serve code, a co-op grocer and a community-garden network. Rival goods move by `transfer` / `transfer-custody` / `pickup` / `dropoff` (a crate of tomatoes delivered is no longer at the farm); non-rival knowledge, designs and code are `cite`d (a library a program builds on stays where it was). Aligned with ValueFlows actions (https://www.valueflo.ws/concepts/actions/) plus the protocol's own storage, doorway and review actions. Core tier = exactly the actions the elohim DNA declares in `content_store_integrity`'s hand-written `REA_ACTIONS` const; that const is never generated (generating into an integrity zome would move the DNA hash) and is instead checked against this tier by `pnpm run schema:check-dna` (see `_dnaMirror`). The remaining values are `affirm` and `dismiss`, the epistemic review verbs `elohim_epr::witness::ReaVerb` carries for witnessed interactions; every `ReaVerb` maps onto a value here (pinned by `rea_verb_maps_onto_the_generated_action_enum` in `elohim/epr/src/witness.rs`). Source of truth: this schema. The DNA const mirrors the core tier; no integrity rule validates an action against either list today, so membership here is a shared name, not an enforced gate." ;
+  <epr:vocab#ordered> false ;
+  skos:hasTopConcept <epr:schema:enum:rea-action#use>, <epr:schema:enum:rea-action#consume>, <epr:schema:enum:rea-action#cite>, <epr:schema:enum:rea-action#produce>, <epr:schema:enum:rea-action#raise>, <epr:schema:enum:rea-action#lower>, <epr:schema:enum:rea-action#transfer>, <epr:schema:enum:rea-action#transfer-custody>, <epr:schema:enum:rea-action#transfer-all-rights>, <epr:schema:enum:rea-action#move>, <epr:schema:enum:rea-action#modify>, <epr:schema:enum:rea-action#combine>, <epr:schema:enum:rea-action#separate>, <epr:schema:enum:rea-action#work>, <epr:schema:enum:rea-action#deliver-service>, <epr:schema:enum:rea-action#pickup>, <epr:schema:enum:rea-action#dropoff>, <epr:schema:enum:rea-action#give>, <epr:schema:enum:rea-action#take>, <epr:schema:enum:rea-action#accept>, <epr:schema:enum:rea-action#custody-blob>, <epr:schema:enum:rea-action#serve-blob>, <epr:schema:enum:rea-action#ack-projection>, <epr:schema:enum:rea-action#operate-doorway>, <epr:schema:enum:rea-action#project-epr>, <epr:schema:enum:rea-action#affirm>, <epr:schema:enum:rea-action#dismiss> .
+
+<epr:schema:enum:rea-action#use> a skos:Concept ;
+  skos:inScheme <epr:schema:enum:rea-action> ;
+  skos:prefLabel "use" ;
+  skos:notation "use" .
+
+<epr:schema:enum:rea-action#consume> a skos:Concept ;
+  skos:inScheme <epr:schema:enum:rea-action> ;
+  skos:prefLabel "consume" ;
+  skos:notation "consume" .
+
+<epr:schema:enum:rea-action#cite> a skos:Concept ;
+  skos:inScheme <epr:schema:enum:rea-action> ;
+  skos:prefLabel "cite" ;
+  skos:notation "cite" .
+
+<epr:schema:enum:rea-action#produce> a skos:Concept ;
+  skos:inScheme <epr:schema:enum:rea-action> ;
+  skos:prefLabel "produce" ;
+  skos:notation "produce" .
+
+<epr:schema:enum:rea-action#raise> a skos:Concept ;
+  skos:inScheme <epr:schema:enum:rea-action> ;
+  skos:prefLabel "raise" ;
+  skos:notation "raise" .
+
+<epr:schema:enum:rea-action#lower> a skos:Concept ;
+  skos:inScheme <epr:schema:enum:rea-action> ;
+  skos:prefLabel "lower" ;
+  skos:notation "lower" .
+
+<epr:schema:enum:rea-action#transfer> a skos:Concept ;
+  skos:inScheme <epr:schema:enum:rea-action> ;
+  skos:prefLabel "transfer" ;
+  skos:notation "transfer" .
+
+<epr:schema:enum:rea-action#transfer-custody> a skos:Concept ;
+  skos:inScheme <epr:schema:enum:rea-action> ;
+  skos:prefLabel "transfer-custody" ;
+  skos:notation "transfer-custody" .
+
+<epr:schema:enum:rea-action#transfer-all-rights> a skos:Concept ;
+  skos:inScheme <epr:schema:enum:rea-action> ;
+  skos:prefLabel "transfer-all-rights" ;
+  skos:notation "transfer-all-rights" .
+
+<epr:schema:enum:rea-action#move> a skos:Concept ;
+  skos:inScheme <epr:schema:enum:rea-action> ;
+  skos:prefLabel "move" ;
+  skos:notation "move" .
+
+<epr:schema:enum:rea-action#modify> a skos:Concept ;
+  skos:inScheme <epr:schema:enum:rea-action> ;
+  skos:prefLabel "modify" ;
+  skos:notation "modify" .
+
+<epr:schema:enum:rea-action#combine> a skos:Concept ;
+  skos:inScheme <epr:schema:enum:rea-action> ;
+  skos:prefLabel "combine" ;
+  skos:notation "combine" .
+
+<epr:schema:enum:rea-action#separate> a skos:Concept ;
+  skos:inScheme <epr:schema:enum:rea-action> ;
+  skos:prefLabel "separate" ;
+  skos:notation "separate" .
+
+<epr:schema:enum:rea-action#work> a skos:Concept ;
+  skos:inScheme <epr:schema:enum:rea-action> ;
+  skos:prefLabel "work" ;
+  skos:notation "work" .
+
+<epr:schema:enum:rea-action#deliver-service> a skos:Concept ;
+  skos:inScheme <epr:schema:enum:rea-action> ;
+  skos:prefLabel "deliver-service" ;
+  skos:notation "deliver-service" .
+
+<epr:schema:enum:rea-action#pickup> a skos:Concept ;
+  skos:inScheme <epr:schema:enum:rea-action> ;
+  skos:prefLabel "pickup" ;
+  skos:notation "pickup" .
+
+<epr:schema:enum:rea-action#dropoff> a skos:Concept ;
+  skos:inScheme <epr:schema:enum:rea-action> ;
+  skos:prefLabel "dropoff" ;
+  skos:notation "dropoff" .
+
+<epr:schema:enum:rea-action#give> a skos:Concept ;
+  skos:inScheme <epr:schema:enum:rea-action> ;
+  skos:prefLabel "give" ;
+  skos:notation "give" .
+
+<epr:schema:enum:rea-action#take> a skos:Concept ;
+  skos:inScheme <epr:schema:enum:rea-action> ;
+  skos:prefLabel "take" ;
+  skos:notation "take" .
+
+<epr:schema:enum:rea-action#accept> a skos:Concept ;
+  skos:inScheme <epr:schema:enum:rea-action> ;
+  skos:prefLabel "accept" ;
+  skos:notation "accept" .
+
+<epr:schema:enum:rea-action#custody-blob> a skos:Concept ;
+  skos:inScheme <epr:schema:enum:rea-action> ;
+  skos:prefLabel "custody-blob" ;
+  skos:notation "custody-blob" .
+
+<epr:schema:enum:rea-action#serve-blob> a skos:Concept ;
+  skos:inScheme <epr:schema:enum:rea-action> ;
+  skos:prefLabel "serve-blob" ;
+  skos:notation "serve-blob" .
+
+<epr:schema:enum:rea-action#ack-projection> a skos:Concept ;
+  skos:inScheme <epr:schema:enum:rea-action> ;
+  skos:prefLabel "ack-projection" ;
+  skos:notation "ack-projection" .
+
+<epr:schema:enum:rea-action#operate-doorway> a skos:Concept ;
+  skos:inScheme <epr:schema:enum:rea-action> ;
+  skos:prefLabel "operate-doorway" ;
+  skos:notation "operate-doorway" .
+
+<epr:schema:enum:rea-action#project-epr> a skos:Concept ;
+  skos:inScheme <epr:schema:enum:rea-action> ;
+  skos:prefLabel "project-epr" ;
+  skos:notation "project-epr" .
+
+<epr:schema:enum:rea-action#affirm> a skos:Concept ;
+  skos:inScheme <epr:schema:enum:rea-action> ;
+  skos:prefLabel "affirm" ;
+  skos:notation "affirm" .
+
+<epr:schema:enum:rea-action#dismiss> a skos:Concept ;
+  skos:inScheme <epr:schema:enum:rea-action> ;
+  skos:prefLabel "dismiss" ;
+  skos:notation "dismiss" .
+
 <epr:schema:enum:reach> a skos:ConceptScheme ;
   skos:prefLabel "Reach" ;
   dct:description "Content reach/visibility level. Ordered from most restrictive to most open. Source of truth: DNA-notarized CORE_REACH_LEVELS constant in content_store_integrity zome. Category A — enumeration values are part of the protocol vocabulary enforced by gateways without parsing payload." ;
@@ -1716,6 +1940,42 @@
   skos:prefLabel "affinityDerived" ;
   skos:notation "affinityDerived" .
 
+<epr:schema:enum:signal-variety> a skos:ConceptScheme ;
+  skos:prefLabel "SignalVariety" ;
+  dct:description "What a flow atom REVEALS about the context it was emitted from, independent of its EprKind. The policy-addressable taxonomy for aggregation lanes: adoption-time policy contracts declare, per variety, whether and how signals aggregate upward from private contexts. Design home: genesis/docs/superpowers/specs/2026-07-31-care-aggregation-adoption-policy-floor-design.md (care-aggregation-adoption-policy-floor-design §3)." ;
+  <epr:vocab#ordered> false ;
+  skos:hasTopConcept <epr:schema:enum:signal-variety#completion-count>, <epr:schema:enum:signal-variety#engagement-duration>, <epr:schema:enum:signal-variety#timing-pattern>, <epr:schema:enum:signal-variety#sequence-trace>, <epr:schema:enum:signal-variety#content-response>, <epr:schema:enum:signal-variety#presence-coincidence> .
+
+<epr:schema:enum:signal-variety#completion-count> a skos:Concept ;
+  skos:inScheme <epr:schema:enum:signal-variety> ;
+  skos:prefLabel "completion-count" ;
+  skos:notation "completion-count" .
+
+<epr:schema:enum:signal-variety#engagement-duration> a skos:Concept ;
+  skos:inScheme <epr:schema:enum:signal-variety> ;
+  skos:prefLabel "engagement-duration" ;
+  skos:notation "engagement-duration" .
+
+<epr:schema:enum:signal-variety#timing-pattern> a skos:Concept ;
+  skos:inScheme <epr:schema:enum:signal-variety> ;
+  skos:prefLabel "timing-pattern" ;
+  skos:notation "timing-pattern" .
+
+<epr:schema:enum:signal-variety#sequence-trace> a skos:Concept ;
+  skos:inScheme <epr:schema:enum:signal-variety> ;
+  skos:prefLabel "sequence-trace" ;
+  skos:notation "sequence-trace" .
+
+<epr:schema:enum:signal-variety#content-response> a skos:Concept ;
+  skos:inScheme <epr:schema:enum:signal-variety> ;
+  skos:prefLabel "content-response" ;
+  skos:notation "content-response" .
+
+<epr:schema:enum:signal-variety#presence-coincidence> a skos:Concept ;
+  skos:inScheme <epr:schema:enum:signal-variety> ;
+  skos:prefLabel "presence-coincidence" ;
+  skos:notation "presence-coincidence" .
+
 <epr:schema:enum:spatial-context-type> a skos:ConceptScheme ;
   skos:prefLabel "SpatialContextType" ;
   dct:description "Type of spatial context attached to an entity. point=single location, area=polygon boundary, route=path with waypoints." ;
@@ -1885,4 +2145,4 @@
   <epr:vocab#orthogonalTo> "retention (the temporal half of the same disclosure gradient — not yet carded)" ;
   <epr:vocab#verdictClosure> "closed" .
 
-# 41 vocabularies · 315 concepts · 2 axes
+# 46 vocabularies · 361 concepts · 2 axes
