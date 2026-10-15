@@ -27,6 +27,7 @@ use hyper::{Response, StatusCode};
 use std::sync::Arc;
 use tracing::{debug, info, warn};
 
+use crate::cache::AppDescriptor;
 use crate::server::AppState;
 
 /// Check whether an identifier looks like a content address (CID) rather than a slug.
@@ -123,7 +124,16 @@ async fn cached_app_reach_refusal(
 /// 2. Resolve blob_hash from slug index (projection store lookup)
 /// 3. If cache available AND blob_hash known: try cache → coalesce → fetch
 /// 4. Otherwise: fall through to direct proxy (BYPASS)
-pub async fn handle_app_request(state: Arc<AppState>, path: &str) -> Response<Full<Bytes>> {
+///
+/// A person who opens an html5-app's entry file directly as a page
+/// (`Sec-Fetch-Dest: document` + `Sec-Fetch-Mode: navigate`) is answered with
+/// the chrome shell instead of the bytes; every other request is served as
+/// before. See [`chrome_shell_applies`].
+pub async fn handle_app_request(
+    state: Arc<AppState>,
+    path: &str,
+    headers: &HeaderMap,
+) -> Response<Full<Bytes>> {
     let storage_url = match &state.args.storage_url {
         Some(url) => url.clone(),
         None => {
@@ -140,18 +150,20 @@ pub async fn handle_app_request(state: Arc<AppState>, path: &str) -> Response<Fu
 
     // Admin cache bypass — diagnostic tool for delivery testing.
     // When disabled via POST /admin/cache/disable, skip the projection cache
-    // entirely and proxy directly to elohim-storage.
-    if !state
+    // entirely and proxy directly to elohim-storage. Chrome selection still
+    // applies: the bypass changes where bytes come from, not what a person
+    // opening the page is shown.
+    let cache_bypassed = !state
         .cache_enabled
-        .load(std::sync::atomic::Ordering::Relaxed)
-    {
-        return forward_app_request_with_header(&storage_url, path, "BYPASS-ADMIN").await;
-    }
+        .load(std::sync::atomic::Ordering::Relaxed);
 
     // Parse /apps/{slug}/{file_path...}
     let (slug, file_path) = match parse_app_path(path) {
         Some(parsed) => parsed,
         None => {
+            if cache_bypassed {
+                return forward_app_request_with_header(&storage_url, path, "BYPASS-ADMIN").await;
+            }
             return Response::builder()
                 .status(StatusCode::BAD_REQUEST)
                 .header("Content-Type", "application/json")
@@ -165,6 +177,9 @@ pub async fn handle_app_request(state: Arc<AppState>, path: &str) -> Response<Fu
 
     // Path traversal protection — defense in depth (storage also validates)
     if file_path.contains("..") || file_path.contains('\0') || file_path.starts_with('/') {
+        if cache_bypassed {
+            return forward_app_request_with_header(&storage_url, path, "BYPASS-ADMIN").await;
+        }
         return Response::builder()
             .status(StatusCode::BAD_REQUEST)
             .header("Content-Type", "application/json")
@@ -172,6 +187,82 @@ pub async fn handle_app_request(state: Arc<AppState>, path: &str) -> Response<Fu
             .body(Full::new(Bytes::from(r#"{"error": "Invalid file path"}"#)))
             .unwrap();
     }
+
+    // The projection descriptor is only worth reading for a request that could
+    // be an entry page: a document navigation, or an html file.
+    let descriptor = if is_document_navigation(headers) || looks_like_html(file_path) {
+        match state.app_file_cache {
+            Some(ref cache) if !is_content_address(slug) => {
+                cache.resolve_app_descriptor(slug).await
+            }
+            _ => None,
+        }
+    } else {
+        None
+    };
+
+    serve_app_file(
+        &state,
+        &storage_url,
+        path,
+        slug,
+        file_path,
+        headers,
+        descriptor.as_ref(),
+        cache_bypassed,
+    )
+    .await
+}
+
+/// The serve itself, with the projection descriptor already read.
+#[allow(clippy::too_many_arguments)]
+async fn serve_app_file(
+    state: &Arc<AppState>,
+    storage_url: &str,
+    path: &str,
+    slug: &str,
+    file_path: &str,
+    headers: &HeaderMap,
+    descriptor: Option<&AppDescriptor>,
+    cache_bypassed: bool,
+) -> Response<Full<Bytes>> {
+    let entry_page = descriptor.filter(|d| is_html5_entry(d, file_path));
+
+    if let Some(desc) = entry_page {
+        if is_document_navigation(headers) {
+            // Reach before any shell output: the shell names the content
+            // (title, address), so a refused app gets the refusal.
+            if let Some(refused) = cached_app_reach_refusal(storage_url, slug).await {
+                return refused;
+            }
+            return chrome_shell_response(storage_url, slug, desc).await;
+        }
+    }
+
+    let mut response = if cache_bypassed {
+        forward_app_request_with_header(storage_url, path, "BYPASS-ADMIN").await
+    } else {
+        serve_raw_app_file(state, storage_url, slug, file_path).await
+    };
+
+    // The same URL now answers with two representations; shared caches must
+    // keep them apart.
+    if entry_page.is_some() {
+        response
+            .headers_mut()
+            .insert(hyper::header::VARY, HeaderValue::from_static(CHROME_VARY));
+    }
+    response
+}
+
+/// The raw (bytes) serve: projection cache first, storage as fallback.
+async fn serve_raw_app_file(
+    state: &Arc<AppState>,
+    storage_url: &str,
+    slug: &str,
+    file_path: &str,
+) -> Response<Full<Bytes>> {
+    let storage_url = storage_url.to_string();
 
     // Dual-path resolution: if the identifier is already a content address (sha256-...),
     // use it directly as the blob_hash — no slug resolution needed.
@@ -264,6 +355,171 @@ pub async fn handle_app_request(state: Arc<AppState>, path: &str) -> Response<Fu
     // has already been resolved to its index.html).
     let parsed_path = format!("/apps/{slug}/{file_path}");
     forward_app_request_with_header(&storage_url, &parsed_path, "BYPASS").await
+}
+
+/// `Vary` carried by html5-app entry responses (bytes and shell alike): the
+/// same URL answers differently for a page navigation and for a frame load.
+const CHROME_VARY: &str = "Sec-Fetch-Dest, Sec-Fetch-Mode";
+
+/// How long the shell waits for the holders figure before showing the unknown
+/// state. The figure decorates the page; it never gates it.
+const HOLDERS_FETCH_TIMEOUT: std::time::Duration = std::time::Duration::from_millis(1500);
+
+/// A person opening the URL as a page: Fetch Metadata says `document` +
+/// `navigate`. Absent headers (curl, old browsers, service workers fetching
+/// subresources) are NOT a navigation.
+fn is_document_navigation(headers: &HeaderMap) -> bool {
+    let is = |name: &str, want: &str| {
+        headers
+            .get(name)
+            .and_then(|v| v.to_str().ok())
+            .is_some_and(|v| v.trim().eq_ignore_ascii_case(want))
+    };
+    is("sec-fetch-dest", "document") && is("sec-fetch-mode", "navigate")
+}
+
+fn looks_like_html(file_path: &str) -> bool {
+    let lower = file_path.to_ascii_lowercase();
+    lower.ends_with(".html") || lower.ends_with(".htm")
+}
+
+/// The chrome branch's content test: an `html5-app` node, asked for its entry file.
+fn is_html5_entry(desc: &AppDescriptor, file_path: &str) -> bool {
+    desc.content_format == "html5-app" && file_path == desc.entry_file()
+}
+
+/// Escape a value for HTML text or a double-quoted attribute.
+fn html_escape(raw: &str) -> String {
+    let mut out = String::with_capacity(raw.len());
+    for c in raw.chars() {
+        match c {
+            '&' => out.push_str("&amp;"),
+            '<' => out.push_str("&lt;"),
+            '>' => out.push_str("&gt;"),
+            '"' => out.push_str("&quot;"),
+            '\'' => out.push_str("&#39;"),
+            c => out.push(c),
+        }
+    }
+    out
+}
+
+/// Percent-encode a path segment (unreserved characters pass through).
+fn encode_segment(raw: &str) -> String {
+    raw.bytes()
+        .map(|b| match b {
+            b'A'..=b'Z' | b'a'..=b'z' | b'0'..=b'9' | b'-' | b'_' | b'.' | b'~' => {
+                (b as char).to_string()
+            }
+            b => format!("%{b:02X}"),
+        })
+        .collect()
+}
+
+/// `(holding, wanted)` households for a content id from storage's household
+/// resilience snapshot, or `None` for any failure or an unmeasured snapshot.
+async fn fetch_holders(storage_url: &str, content_id: &str) -> Option<(i64, i64)> {
+    if content_id.is_empty() {
+        return None;
+    }
+    let url = format!(
+        "{}/api/v1/resilience/{}/household",
+        storage_url.trim_end_matches('/'),
+        encode_segment(content_id)
+    );
+    let resp = reqwest::Client::new()
+        .get(&url)
+        .timeout(HOLDERS_FETCH_TIMEOUT)
+        .send()
+        .await
+        .ok()?;
+    if !resp.status().is_success() {
+        return None;
+    }
+    let body: serde_json::Value = resp.json().await.ok()?;
+    let floor = body.get("feltStatus")?.get("floor")?;
+    Some((
+        floor.get("hasHouseholds")?.as_i64()?,
+        floor.get("wantsHouseholds")?.as_i64()?,
+    ))
+}
+
+/// The chrome shell document: the native omnibar, a thin bar carrying the
+/// resiliency badge, and the raw bundle framed beneath. Every substituted value
+/// is HTML-escaped.
+fn render_chrome_shell(slug: &str, desc: &AppDescriptor, holders: Option<(i64, i64)>) -> String {
+    let address = if desc.content_id.is_empty() {
+        slug
+    } else {
+        desc.content_id.as_str()
+    };
+    let title = desc.title.as_deref().unwrap_or(address);
+    let epr_href = format!("/epr/{}", encode_segment(address));
+    let frame_src = format!("/apps/{}/{}", encode_segment(slug), desc.entry_file());
+
+    let (badge_attrs, badge_text) = match holders {
+        Some((n, m)) => (
+            format!(" data-holders=\"{n}\" data-target=\"{m}\""),
+            format!("Held by {n} of {m} households"),
+        ),
+        None => (
+            String::new(),
+            "Held by households \u{b7} see where it lives".to_string(),
+        ),
+    };
+
+    let html = format!(
+        "<!DOCTYPE html><html lang=\"en\" data-elohim-chrome=\"content-shell\"><head>\
+<meta charset=\"utf-8\">\
+<meta name=\"viewport\" content=\"width=device-width, initial-scale=1\">\
+<title>{title}</title>\
+<style>html,body{{height:100%;margin:0}}\
+body{{display:flex;flex-direction:column;font:14px/1.4 system-ui,sans-serif}}\
+.elohim-content-chrome{{flex:none;padding:4px 12px;border-bottom:1px solid #8884}}\
+.elohim-content-chrome a{{color:inherit}}\
+iframe{{flex:1;width:100%;border:0}}</style></head><body>\
+<nav class=\"elohim-content-chrome\" data-testid=\"content-chrome\" aria-label=\"About this content\">\
+<a data-testid=\"resiliency-badge\" class=\"resiliency-badge\" href=\"{href}\"{badge_attrs}>{badge_text}</a></nav>\
+<iframe data-testid=\"content-app-frame\" title=\"{title}\" src=\"{src}\" \
+sandbox=\"allow-scripts allow-same-origin allow-forms allow-popups allow-downloads\"></iframe>\
+</body></html>",
+        title = html_escape(title),
+        href = html_escape(&epr_href),
+        src = html_escape(&frame_src),
+    );
+
+    let context = elohim_render::ChromeContext {
+        slug: address.to_string(),
+        authenticated: false,
+        title: Some(title.to_string()),
+        ..Default::default()
+    }
+    .to_json();
+    elohim_render::inject_element(&html, &context)
+}
+
+/// Answer a page navigation to an html5-app entry with the chrome shell.
+/// Never stocked in any cache: `no-store`, no validators, no address claims.
+async fn chrome_shell_response(
+    storage_url: &str,
+    slug: &str,
+    desc: &AppDescriptor,
+) -> Response<Full<Bytes>> {
+    let address = if desc.content_id.is_empty() {
+        slug
+    } else {
+        desc.content_id.as_str()
+    };
+    let holders = fetch_holders(storage_url, address).await;
+    let body = render_chrome_shell(slug, desc, holders);
+    Response::builder()
+        .status(StatusCode::OK)
+        .header("Content-Type", "text/html; charset=utf-8")
+        .header("Cache-Control", "no-store")
+        .header("Vary", CHROME_VARY)
+        .header("X-Elohim-Chrome", "content-shell")
+        .body(Full::new(Bytes::from(body)))
+        .unwrap()
 }
 
 /// Parse `/apps/{slug}/{file_path...}` into (slug, file_path).
@@ -1043,5 +1299,321 @@ mod tests {
     #[test]
     fn test_parse_capability_path_only_prefix() {
         assert!(parse_capability_path("/apps/_capability").is_none());
+    }
+
+    // =========================================================================
+    // Content-app chrome shell
+    // =========================================================================
+
+    fn nav_headers() -> HeaderMap {
+        let mut h = HeaderMap::new();
+        h.insert("sec-fetch-dest", HeaderValue::from_static("document"));
+        h.insert("sec-fetch-mode", HeaderValue::from_static("navigate"));
+        h
+    }
+
+    fn frame_headers() -> HeaderMap {
+        let mut h = HeaderMap::new();
+        h.insert("sec-fetch-dest", HeaderValue::from_static("iframe"));
+        h.insert("sec-fetch-mode", HeaderValue::from_static("navigate"));
+        h
+    }
+
+    fn descriptor(format: &str, title: &str) -> AppDescriptor {
+        AppDescriptor {
+            blob_hash: "sha256-abcdef123456".into(),
+            content_id: "quiz-1".into(),
+            content_format: format.into(),
+            entry_point: None,
+            title: Some(title.into()),
+        }
+    }
+
+    async fn state_for(storage: &str) -> Arc<AppState> {
+        use clap::Parser;
+        let mut args = crate::config::Args::parse_from(["doorway", "--listen", "127.0.0.1:0"]);
+        args.storage_url = Some(storage.to_string());
+        Arc::new(AppState::new(args))
+    }
+
+    /// A storage that is open to anonymous readers and serves one raw entry page.
+    async fn storage_with_entry() -> wiremock::MockServer {
+        use wiremock::matchers::{method, path};
+        use wiremock::{Mock, MockServer, ResponseTemplate};
+        let storage = MockServer::start().await;
+        Mock::given(method("HEAD"))
+            .respond_with(ResponseTemplate::new(200))
+            .mount(&storage)
+            .await;
+        Mock::given(method("GET"))
+            .and(path("/apps/quiz-1/index.html"))
+            .respond_with(
+                ResponseTemplate::new(200)
+                    .insert_header("content-type", "text/html")
+                    .set_body_bytes(b"<h1>raw bundle</h1>".to_vec()),
+            )
+            .mount(&storage)
+            .await;
+        storage
+    }
+
+    async fn serve(
+        state: &Arc<AppState>,
+        storage: &wiremock::MockServer,
+        file: &str,
+        headers: &HeaderMap,
+        desc: Option<&AppDescriptor>,
+    ) -> Response<Full<Bytes>> {
+        serve_app_file(
+            state,
+            &storage.uri(),
+            &format!("/apps/quiz-1/{file}"),
+            "quiz-1",
+            file,
+            headers,
+            desc,
+            false,
+        )
+        .await
+    }
+
+    async fn body_of(resp: Response<Full<Bytes>>) -> String {
+        use http_body_util::BodyExt;
+        let bytes = resp.into_body().collect().await.unwrap().to_bytes();
+        String::from_utf8(bytes.to_vec()).unwrap()
+    }
+
+    #[tokio::test]
+    async fn a_page_navigation_to_an_html5_entry_gets_the_shell() {
+        use wiremock::matchers::{method, path};
+        use wiremock::{Mock, ResponseTemplate};
+        let storage = storage_with_entry().await;
+        Mock::given(method("GET"))
+            .and(path("/api/v1/resilience/quiz-1/household"))
+            .respond_with(ResponseTemplate::new(200).set_body_json(serde_json::json!({
+                "contentId": "quiz-1",
+                "feltStatus": { "floor": { "hasHouseholds": 2, "wantsHouseholds": 3 } }
+            })))
+            .mount(&storage)
+            .await;
+        let state = state_for(&storage.uri()).await;
+        let desc = descriptor("html5-app", "A quiz");
+        let resp = serve(&state, &storage, "index.html", &nav_headers(), Some(&desc)).await;
+        assert_eq!(resp.status(), StatusCode::OK);
+        let h = resp.headers();
+        assert_eq!(h.get("content-type").unwrap(), "text/html; charset=utf-8");
+        assert_eq!(h.get("cache-control").unwrap(), "no-store");
+        assert_eq!(h.get("vary").unwrap(), "Sec-Fetch-Dest, Sec-Fetch-Mode");
+        assert_eq!(h.get("x-elohim-chrome").unwrap(), "content-shell");
+        assert!(h.get("etag").is_none());
+        assert!(h.get("x-content-address").is_none());
+        assert!(h.get("x-cache").is_none());
+        let body = body_of(resp).await;
+        assert!(body
+            .starts_with("<!DOCTYPE html><html lang=\"en\" data-elohim-chrome=\"content-shell\">"));
+        assert!(body.contains("data-testid=\"content-chrome\""));
+        assert!(body.contains(
+            "<a data-testid=\"resiliency-badge\" class=\"resiliency-badge\" href=\"/epr/quiz-1\" data-holders=\"2\" data-target=\"3\">Held by 2 of 3 households</a>"
+        ));
+        assert!(body.contains(
+            "data-testid=\"content-app-frame\" title=\"A quiz\" src=\"/apps/quiz-1/index.html\""
+        ));
+        assert!(body.contains("id=\"elohim-omni-context\""));
+        assert!(body.contains("/chrome/omni-element."));
+        // The shell never asked storage for the bundle bytes.
+        let gets: Vec<_> = storage
+            .received_requests()
+            .await
+            .unwrap()
+            .into_iter()
+            .filter(|r| r.url.path().starts_with("/apps/"))
+            .filter(|r| r.method.as_str() == "GET")
+            .collect();
+        assert!(
+            gets.is_empty(),
+            "shell must not fetch or stock bundle bytes"
+        );
+        eprintln!("SHELL:\n{body}");
+    }
+
+    #[tokio::test]
+    async fn a_frame_load_gets_the_same_bytes_as_no_headers_plus_vary() {
+        let storage = storage_with_entry().await;
+        let state = state_for(&storage.uri()).await;
+        let desc = descriptor("html5-app", "A quiz");
+        let plain = serve(
+            &state,
+            &storage,
+            "index.html",
+            &HeaderMap::new(),
+            Some(&desc),
+        )
+        .await;
+        let framed = serve(
+            &state,
+            &storage,
+            "index.html",
+            &frame_headers(),
+            Some(&desc),
+        )
+        .await;
+        for r in [&plain, &framed] {
+            assert_eq!(
+                r.headers().get("vary").unwrap(),
+                "Sec-Fetch-Dest, Sec-Fetch-Mode"
+            );
+            assert!(r.headers().get("x-elohim-chrome").is_none());
+        }
+        let (a, b) = (body_of(plain).await, body_of(framed).await);
+        assert_eq!(a, "<h1>raw bundle</h1>");
+        assert_eq!(a, b);
+    }
+
+    #[tokio::test]
+    async fn non_entry_other_format_and_missing_descriptor_are_served_raw() {
+        use wiremock::matchers::{method, path};
+        use wiremock::{Mock, ResponseTemplate};
+        let storage = storage_with_entry().await;
+        Mock::given(method("GET"))
+            .and(path("/apps/quiz-1/js/app.js"))
+            .respond_with(ResponseTemplate::new(200).set_body_bytes(b"js".to_vec()))
+            .mount(&storage)
+            .await;
+        let state = state_for(&storage.uri()).await;
+        let html5 = descriptor("html5-app", "A quiz");
+        let spa = descriptor("spa-bundle", "A quiz");
+
+        let sub = serve(&state, &storage, "js/app.js", &nav_headers(), Some(&html5)).await;
+        assert!(sub.headers().get("x-elohim-chrome").is_none());
+        assert!(sub.headers().get("vary").is_none());
+        assert_eq!(body_of(sub).await, "js");
+
+        let other = serve(&state, &storage, "index.html", &nav_headers(), Some(&spa)).await;
+        assert!(other.headers().get("x-elohim-chrome").is_none());
+        assert!(other.headers().get("vary").is_none());
+        assert_eq!(body_of(other).await, "<h1>raw bundle</h1>");
+
+        let none = serve(&state, &storage, "index.html", &nav_headers(), None).await;
+        assert!(none.headers().get("x-elohim-chrome").is_none());
+        assert_eq!(body_of(none).await, "<h1>raw bundle</h1>");
+
+        // Through the public entry with no projection cache: no descriptor, raw.
+        let via =
+            handle_app_request(state.clone(), "/apps/quiz-1/index.html", &nav_headers()).await;
+        assert!(via.headers().get("x-elohim-chrome").is_none());
+        assert_eq!(body_of(via).await, "<h1>raw bundle</h1>");
+    }
+
+    #[tokio::test]
+    async fn a_declared_entry_point_is_the_chrome_target_not_index_html() {
+        let storage = storage_with_entry().await;
+        let state = state_for(&storage.uri()).await;
+        let mut desc = descriptor("html5-app", "A quiz");
+        desc.entry_point = Some("game.html".into());
+        let index = serve(&state, &storage, "index.html", &nav_headers(), Some(&desc)).await;
+        assert!(index.headers().get("x-elohim-chrome").is_none());
+        let game = serve(&state, &storage, "game.html", &nav_headers(), Some(&desc)).await;
+        assert_eq!(
+            game.headers().get("x-elohim-chrome").unwrap(),
+            "content-shell"
+        );
+        assert!(body_of(game)
+            .await
+            .contains("src=\"/apps/quiz-1/game.html\""));
+    }
+
+    #[tokio::test]
+    async fn a_reach_refusal_comes_before_any_shell_output() {
+        use wiremock::matchers::method;
+        use wiremock::{Mock, MockServer, ResponseTemplate};
+        let storage = MockServer::start().await;
+        Mock::given(method("HEAD"))
+            .respond_with(ResponseTemplate::new(403))
+            .mount(&storage)
+            .await;
+        let state = state_for(&storage.uri()).await;
+        let desc = descriptor("html5-app", "Private");
+        let resp = serve_app_file(
+            &state,
+            &storage.uri(),
+            "/apps/refused-app/index.html",
+            "refused-app",
+            "index.html",
+            &nav_headers(),
+            Some(&desc),
+            false,
+        )
+        .await;
+        assert_eq!(resp.status(), StatusCode::FORBIDDEN);
+        assert!(resp.headers().get("x-elohim-chrome").is_none());
+    }
+
+    #[tokio::test]
+    async fn the_admin_cache_bypass_does_not_bypass_chrome_selection() {
+        let storage = storage_with_entry().await;
+        let state = state_for(&storage.uri()).await;
+        state
+            .cache_enabled
+            .store(false, std::sync::atomic::Ordering::Relaxed);
+        let desc = descriptor("html5-app", "A quiz");
+        let resp = serve_app_file(
+            &state,
+            &storage.uri(),
+            "/apps/quiz-1/index.html",
+            "quiz-1",
+            "index.html",
+            &nav_headers(),
+            Some(&desc),
+            true,
+        )
+        .await;
+        assert_eq!(
+            resp.headers().get("x-elohim-chrome").unwrap(),
+            "content-shell"
+        );
+    }
+
+    #[tokio::test]
+    async fn a_failing_holders_fetch_still_yields_a_shell_with_the_unknown_badge() {
+        use wiremock::matchers::{method, path};
+        use wiremock::{Mock, ResponseTemplate};
+        let storage = storage_with_entry().await;
+        Mock::given(method("GET"))
+            .and(path("/api/v1/resilience/quiz-1/household"))
+            .respond_with(ResponseTemplate::new(500))
+            .mount(&storage)
+            .await;
+        let state = state_for(&storage.uri()).await;
+        let desc = descriptor("html5-app", "A quiz");
+        let resp = serve(&state, &storage, "index.html", &nav_headers(), Some(&desc)).await;
+        assert_eq!(resp.status(), StatusCode::OK);
+        let body = body_of(resp).await;
+        assert!(body.contains(
+            "<a data-testid=\"resiliency-badge\" class=\"resiliency-badge\" href=\"/epr/quiz-1\">Held by households \u{b7} see where it lives</a>"
+        ));
+        assert!(!body.contains("data-holders"));
+    }
+
+    #[test]
+    fn a_hostile_title_is_escaped_everywhere_it_lands() {
+        let desc = descriptor("html5-app", "</title><script>alert(1)</script>\"'&");
+        let html = render_chrome_shell("quiz-1", &desc, None);
+        // Only the omnibar's two real script elements close; the island's copy
+        // of the title is JSON data with `</` neutralised.
+        assert_eq!(html.matches("</script>").count(), 2);
+        assert!(html.contains(
+            "<title>&lt;/title&gt;&lt;script&gt;alert(1)&lt;/script&gt;&quot;&#39;&amp;</title>"
+        ));
+        assert!(html.contains("title=\"&lt;/title&gt;"));
+    }
+
+    #[test]
+    fn fetch_metadata_must_say_document_and_navigate() {
+        assert!(is_document_navigation(&nav_headers()));
+        assert!(!is_document_navigation(&frame_headers()));
+        assert!(!is_document_navigation(&HeaderMap::new()));
+        let mut only_dest = HeaderMap::new();
+        only_dest.insert("sec-fetch-dest", HeaderValue::from_static("document"));
+        assert!(!is_document_navigation(&only_dest));
     }
 }

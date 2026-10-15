@@ -9010,7 +9010,7 @@ async fn handle_request(
                 None
             };
             debug!(path = %p, "Handling app request (projection cache)");
-            let mut response = routes::handle_app_request(Arc::clone(&state), p).await;
+            let mut response = routes::handle_app_request(Arc::clone(&state), p, req.headers()).await;
             stamp_addressed_admission(&mut response, admitted_reach.as_deref());
             return Ok(to_boxed(response));
         }
