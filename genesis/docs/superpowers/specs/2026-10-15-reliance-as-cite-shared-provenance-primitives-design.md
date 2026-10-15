@@ -17,6 +17,7 @@ cites:
   - "epr-rea-valueflow-fabric | EPR-REA ValueFlow Fabric | sha256:1cec32527dbff6d7 | path: genesis/docs/superpowers/specs/2026-07-18-epr-rea-valueflow-fabric-design.md"
   - "private-thought-governed-fruit | private-thought-governed-fruit | sha256:5b6f5cdb858277e4 | path: genesis/docs/architecture/private-thought-governed-fruit.md"
   - COVENANT.md
+  - "sealed-contract-edges-governor-frontier | Sealed Contract Edges | sha256:ace1788fa44a293f | path: genesis/docs/superpowers/specs/2026-07-21-sealed-contract-edges-governor-frontier-design.md"
   - genesis/data/timeline/backlog/commons-holonic-stewardship-backlog.md
   - .claude/skills/p2p-design-gate/SKILL.md
   - .claude/skills/elohim-commons-design/SKILL.md
@@ -130,7 +131,7 @@ The last column is implementation state, for engineers.
 | Records goods changing hands | — | each supplier invoice line, matched to the delivery note signed at the door | a seed packet checked out, and seed returned after the grow-out | DNA `REA_ACTIONS` (`:224`) only; not in `ReaVerb` |
 | Labels the parties where the thing arrives | the offer's `disclosure.inflows` | country-of-origin labelling on the shelf | the seed packet's label: variety, accession number, grow-out year | epr-rea `Inflow` · implemented (Jenkins offer) |
 | Notes a link someone else already checks | `DepEdge` with `Governor::Compiler` (cargo enforces it) | an organic certifier's certificate number on the invoice | an organic seed certificate, or a variety released under the Open Source Seed Initiative pledge (the seed world's own licence, which travels with the seed) | implemented, path identity only |
-| Records whole-work ancestry | a fork or vendored patch is `DERIVED_FROM` its upstream (plus `modify` for a patch) | a store-brand item whose spec sheet names the supplier product it is made from | a selection whose notes name its parent variety | SDK relationship `derived_from` · exists; four lists drift |
+| Records whole-work ancestry | a fork or vendored patch is `derived_from` its upstream (plus `modify` for a patch) | a store-brand item whose spec sheet names the supplier product it is made from | a selection whose notes name its parent variety | SDK relationship `derived_from` · exists; four lists drift |
 | Describes a pinned outside artifact | a crate's manifest | a supplier's spec sheet for one product | the variety record: name, isolation distance, grow-out history | the AI model manifest `.epr-meta/elohim/algorithms/embedding-models/all-minilm-l6-v2.json` (bytes CID, license, source, procedure) · used once |
 | Turns many observations into one lasting record | a summary per lockfile over its cite observations | the month's reconciliation of invoices against delivery notes | the grow-out year's summary across accessions | graduation evaluator, Path 2 `summary_event` with `observation_refs` · built, tests only |
 | Gathers members' records into a shared view | a reverse index of who relies on a package | which member stores stock each farm's lots, read by lot code | which gardens are growing out each accession this year | `CoverageRollup` (`recursion.rs:192`); rollup-atom spec (care-aggregation §5.3) · one level, unchained |
@@ -224,7 +225,7 @@ declared funding channels as facts. Probe: the model manifest validates against 
 Current state: the shape exists once, in the model manifest.
 
 **5. Ancestry of forks and vendored code.** Chain: ancestry, between a gitlink and the upstream it
-came from. Missing node: `DERIVED_FROM` declarations for brit (from gitoxide), sophia (from
+came from. Missing node: `derived_from` declarations for brit (from gitoxide), sophia (from
 Perseus), holochain-conductor (from holochain) and the vendored quinn (from quinn at `434c3586`),
 each in the parent repo's `.epr-meta` beside its gitlink, so no pin moves. Assertion: each declares
 the existing SDK `derived_from`. Probe: each declaration parses, its ancestor resolves to a held
@@ -272,9 +273,11 @@ level, unchained.
 - **Transport Affinity**: n-a; the record names a package's bytes and does not carry them.
 - **Source of Truth**: operational, the epr flow store, rebuilt from lockfiles; the summary too,
   until it graduates.
-- **Integrity Zome + DNA-hash class**: none touched — DNA-hash-NEUTRAL. The summary's target entry
-  type on graduation is §9, question 4. `FlowEvent`'s doc comment (`model.rs:373-374`) says an
-  observation "crystallizes to the DHT `EconomicEvent` per recipe-declared graduation policy".
+- **Integrity Zome + DNA-hash class**: none touched — DNA-hash-NEUTRAL. On graduation the summary
+  is the existing elohim-DNA `EconomicEvent` with action `cite`, through Path 2 (§9, question 4,
+  settled); integrity only checks that the action is non-empty, so no hash moves. `FlowEvent`'s
+  doc comment (`model.rs:373-374`) says the same: an observation "crystallizes to the DHT
+  `EconomicEvent` per recipe-declared graduation policy".
 - **Coordinator Zome**: none in this spec.
 - **Projections**: no SQLite table with `dht_anchor_hash`. Automerge sync at reach tier:
   `unresolved — reach vocabulary in declared drift`.
@@ -292,24 +295,27 @@ level, unchained.
 
 ### Entity: `DepEdge` (one per direct edge)
 
-- **Classification**: Attested-Private (B2), as its own doc comment states
-  (`elohim/epr-rea/src/model.rs:477-481`): its source of truth is the `.eprfs/status/` sidecar,
-  append-only, and it "graduates to the existing Attestation entry type at push, gap #11"; the
-  comment adds "Never a DHT write here." Gap #11 is tracked in the fabric spec
-  (`genesis/docs/superpowers/specs/2026-07-18-epr-rea-valueflow-fabric-design.md`).
-- **Justification**: the edge is a local observation; its effect becomes checkable by peers only
-  through the attestation it graduates to.
-- **Head-Plane Cost Budget**: none in the sidecar; whether bridge-minted edges graduate at all is
-  §9, question 3.
+- **Classification**: Ephemeral (C) for the edges `bridges/cargo` mints. They carry a `Compiler`
+  governor, which means "no seal: cite the unit", and they are computed from cargo's resolve, so
+  they are rebuilt, never graduated. A hand-sealed `DepEdge` keeps the B2 class its doc comment
+  states (`elohim/epr-rea/src/model.rs:477-481`), and even then gap #11 graduates one crystallized
+  *sealed edge-set* into the existing Attestation at push, never single edges ("B2: granular seals
+  stay sidecar, the crystallized proof notarizes";
+  `genesis/docs/superpowers/specs/2026-07-21-sealed-contract-edges-governor-frontier-design.md`
+  :216 and :266). The bridge is the "later accelerator" that spec's §7 names (:251), mining
+  cargo's dependency graph into edges; it is not a consumer of gap #11.
+- **Justification**: the edge restates what cargo already enforces; deleting it loses nothing the
+  lockfile cannot rebuild.
+- **Head-Plane Cost Budget**: none.
 - **Network Stakes**: unresolved.
-- **Content Address Strategy**: Slug.
+- **Content Address Strategy**: Slug, plus a CID for an outside upstream.
 - **Address Justification**: `from` and `to` are repo-relative paths, the v1 floor; "slug identity
-  for code artifacts is an open question" (`model.rs:480`). Node 2 supplies the CID for an outside
-  package.
+  for code artifacts is an open question" (`model.rs:480`). An edge to an outside package keeps a
+  readable coordinate in `to` (`crates.io:serde@1.0.228`) and names the bytes in the additive
+  `to_resource`, the CID node 2 wraps from the lockfile checksum.
 - **Transport Affinity**: n-a.
-- **Source of Truth**: the `.eprfs/status/` sidecar.
-- **Integrity Zome + DNA-hash class**: none touched — DNA-hash-NEUTRAL (the graduation target,
-  Attestation, is an existing type).
+- **Source of Truth**: the `.eprfs/status/` sidecar, rebuilt from the lockfile.
+- **Integrity Zome + DNA-hash class**: none touched — DNA-hash-NEUTRAL.
 - **Coordinator Zome**, **Projections**, **HTTP Route**: none in this plan.
 - **Anti-Pattern Check**: as for cite events, the path-versus-CID split is live.
 - **SDO/RWA Test**: (Drafted with the spec; for the operator's review.) An edge between two public
@@ -374,8 +380,9 @@ level, unchained.
 
 ### Design constraints discovered
 
-- Bridge-minted `DepEdge`s and cite events come from the same lockfile, but the `DepEdge` path is
-  B2 with graduation at push. Whether Compiler-governed edges take that path is §9, question 3.
+- Bridge-minted `DepEdge`s and cite events come from the same lockfile and share its class: both
+  are C and neither graduates. Only the per-lockfile summary is a candidate head (§9, question 3,
+  settled).
 - The generated action list is checked against `REA_ACTIONS`, not edited into integrity, because
   editing integrity moves the DNA hash.
 - The composite root holds only while cite events stay off the head plane, and the head count stays
@@ -455,8 +462,12 @@ licenses as they are today; write the pool spec and build nothing in the pool ri
 - **Node 4:** the existing model manifest validates against the new schema with no edits.
 - **Bridge** (`cargo test` in `bridges/cargo`): a fixture workspace yields a Process with one `Cite`
   input per resolved package, deterministic across two runs; each input names an unclaimed
-  presence and carries the license-text CID; one run over `elohim/` reports its 1,211-crate scale,
-  with `EXIT=$?` echoed on its own line.
+  presence and carries its declared SPDX licence (the licence-text CID needs the registry source
+  on disk and follows); one run over `elohim/` reports its scale, with `EXIT=$?` echoed on its
+  own line. 1,211 is the number of distinct crates across all 35 lockfiles, not one workspace's
+  scale: the largest lockfile, elohim-storage's, has 1,066 packages, and at `origin/dev`
+  245d7aec8 `elohim/Cargo.lock` has 468, of which the `elohim/` workspace resolves 457 and cites
+  438 (the rest are its members).
 - **Gate:** bump one crate in `Cargo.lock` without regenerating; `just gate` prints the rung-one
   notice naming the workspace and passes. With `RELIANCE=strict` it refuses.
 - **Habit:** `habits-project.py --check` is clean; `habits-status.py` shows
@@ -474,13 +485,16 @@ licenses as they are today; write the pool spec and build nothing in the pool ri
    2. If so, who rules on it, and when?
    3. brit's `FUNDING.json` is inherited from gitoxide and declares a Drips channel set up by
       Sebastian Thiel. Does a channel our fork inherited count as its maker's declaration to us?
-3. **Do bridge-minted `DepEdge`s graduate?** `DepEdge` is B2 and graduates to Attestation at push
-   (gap #11). Should Compiler-governed edges minted by `bridges/cargo` take that path? The
-   orchestrating agent recommends no: they are rebuildable from the lockfile, so only the
-   per-lockfile summary head graduates.
-4. **The summary's notarized entry type.** When a lockfile's summary graduates, is its entry type
-   the DHT `EconomicEvent`, as `FlowEvent`'s doc comment (`model.rs:373-374`) and Path 2's summary
-   `EconomicEvent` suggest?
+3. **Do bridge-minted `DepEdge`s graduate? Settled: no.** They are computed from cargo's resolve and
+   stay class C. Gap #11 graduates one crystallized sealed edge-set, never single edges (the
+   sealed-edges spec, :216 and :266); see §5. Settled in the working memorandum
+   `genesis/research/2026-10-15-covenant-commons-working-mou.md`, §F (F1).
+4. **The summary's notarized entry type. Settled:** the existing elohim-DNA `EconomicEvent` with
+   action `cite`, through Path 2; no new entry type. Building it means bridging three mismatches
+   between Path 2 and this caller: Path 2 summarizes a time window, where ours is a versioned head
+   per lockfile; Path 2 reads storage's `observations` table, where the cite events live in the
+   flow store; and `total_quantity` is an f64. Supersession is chosen by the declaring lockfile,
+   never by the newest link in the `triggered_by` chain. Same memorandum, §F (F2).
 5. **What promotes a held presence.** Every upstream has an unclaimed presence in the flow store
    from day one. Beyond the seed cohort, what triggers promotion to a notarized
    `ContributorPresence`? Deferred to the pool spec.
@@ -527,7 +541,10 @@ licenses as they are today; write the pool spec and build nothing in the pool ri
 - `genesis/docs/content/elohim-protocol/glossary.md`
 - `genesis/docs/content/elohim-protocol/succession.md` (§7.1)
 - `genesis/docs/superpowers/specs/2026-10-04-commons-pool-as-collective-party-design.md`
-- `genesis/docs/superpowers/specs/2026-07-18-epr-rea-valueflow-fabric-design.md` (§2.6, §8, gap #11)
+- `genesis/docs/superpowers/specs/2026-07-18-epr-rea-valueflow-fabric-design.md` (§2.6, §8)
+- `genesis/docs/superpowers/specs/2026-07-21-sealed-contract-edges-governor-frontier-design.md`
+  (gap #11: :216, :266; the later accelerator: §7, :251)
+- `genesis/research/2026-10-15-covenant-commons-working-mou.md` (§F, settling §9 questions 3 and 4)
 - `genesis/docs/architecture/private-thought-governed-fruit.md` (§4)
 - `genesis/data/timeline/backlog/commons-holonic-stewardship-backlog.md` (rows 3, 19, 22, 32–38)
 - `.claude/skills/p2p-design-gate/SKILL.md`
