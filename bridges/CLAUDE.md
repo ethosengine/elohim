@@ -43,6 +43,12 @@ by the kind of traffic it absorbs (web2 = doorway; protocol = storage).
 - `jenkins/` — the first consuming-app bridge (see below): the edge pipeline
   as a valueflow recipe, Jenkins builds observed as external claims, and the
   drift and governance-card gifts under a governed offer
+- `cargo/` — reliance as `cite`: a Rust workspace's resolved dependencies,
+  read from `cargo metadata` and `Cargo.lock`, enter as `Cite` inputs on its
+  build Process, each upstream project an unclaimed presence in the offer's
+  disclosure (spec
+  `genesis/docs/superpowers/specs/2026-10-15-reliance-as-cite-shared-provenance-primitives-design.md`);
+  consumed through a CLI, `verify` prints a rung-one notice when stale
 
 ## Consuming apps: served, never in control
 
