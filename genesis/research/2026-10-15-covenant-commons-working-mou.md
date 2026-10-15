@@ -1,3 +1,22 @@
+---
+title: "Working memorandum of understanding: the covenant from below, applied to our own dependencies and the commons they feed"
+id: covenant-commons-working-mou-2026-10-15
+status: Capture
+date: 2026-10-15
+sovereignty-frame: bounded
+steward: human:matthew
+author: "Claude, at the operator's direction (design session, 2026-10-15); the operator's rulings are quoted in his words"
+tags: [commons, covenant, cite, reliance, jubilee, council, for-the-living, rulings, research]
+cites:
+  - "reliance-as-cite-shared-provenance-primitives-design | Reliance as cite | sha256:ed648f3378dba82a | path: genesis/docs/superpowers/specs/2026-10-15-reliance-as-cite-shared-provenance-primitives-design.md"
+  - "commons-composition-at-scale-2026-10-15 | Commons composition at scale: attribution that closes its account, from one work to the planetary commons | sha256:9d48c44f61c85716 | path: genesis/research/commons-composition-at-scale-2026-10-15.md"
+  - "commons-facility-at-scale-2026-10-15 | The commons facility at scale: what peers commit, how pools nest, the support button, and a commons for the living | sha256:6ec3db29e125148c | path: genesis/research/commons-facility-at-scale-2026-10-15.md"
+  - "elohim-protocol-manifesto | manifesto | sha256:bdfd593210e7fea0 | path: genesis/docs/content/elohim-protocol/manifesto.md"
+  - "values-forward | values-forward | sha256:0bfa006fd772f7d9 | path: genesis/docs/content/elohim-protocol/values-forward.md"
+  - "succession | succession | sha256:4ae356e1bf2112e6 | path: genesis/docs/content/elohim-protocol/succession.md"
+  - "commons-pool-as-collective-party-design | A commons pool is a collective that is party to its members' commitments | sha256:c194ddbe3dc3b2a6 | path: genesis/docs/superpowers/specs/2026-10-04-commons-pool-as-collective-party-design.md"
+  - "covenant | COVENANT | sha256:1dd4c6a3ea066842 | path: COVENANT.md"
+---
 # Working memorandum of understanding: the covenant from below, applied to our own dependencies and the commons they feed
 
 *Status: working. Started 2026-10-15. The orchestrating agent (Claude) settles each section from trajectory readings of the vision and manifesto. Matthew Dowell, the protocol's steward, can overrule any line. This memorandum is not canon. Its purpose is to let the build move forward. Each settled line records its basis in canon, its confidence, and what would reopen it.*
@@ -17,7 +36,7 @@
 - **Code is the first implementation of the shared ontology.** The co-op grocer and the garden network ride the same primitives.
 - **Release order and placement.** Rust first, then npm. `COVENANT.md` states the licences as they are. The reader lives in `bridges/cargo`, with no pin moves (approved plan).
 - **An elohim council over each pool; no single pool-elohim** (ruled 2026-10-15, corrected the same day). Each pool is governed by an elohim council over it. The council is plural and representative: proportional to the holon's demographic diversity as far as that can be determined, and sized to what the holon can seat. In the network's infancy, humans perform that role. Human sortition councils remain authoritative: they audit and govern any contestable result. Value crossing the network boundary is likewise an elohim-council act at the ceiling, contextual to the peer position of the ask, plural, witnessed, and overturnable by the human floor. (Stance II: floor, floor, ceiling.)
-- **"Holonic" and "sociocratic" are symbolic stand-ins, not commitments.** The operator uses them loosely and interchangeably for whatever governance structure proves most trustworthy: frictionful, recognised by people, and expressed as an EPR algorithm. That means content-addressed, version-pinned, with a fitness measure, like the algorithms under `.epr-meta/elohim/algorithms/`. Every council form named in this memorandum (sortition floors, a representative elohim council, the nesting rule) is therefore a current candidate algorithm, held to the trust it builds, not a fixed doctrine. A better-evidenced structure can replace it the way a new manifest version replaces an old one.
+- **"Holonic" and "sociocratic" are symbolic stand-ins, not commitments.** The operator uses them loosely and interchangeably for whatever governance structure proves most trustworthy: frictionful, recognised by people, and expressed as an EPR algorithm. That means content-addressed, version-pinned, with a fitness measure, like the algorithms under `.epr-meta/elohim/algorithms/`. Every council form named in this memorandum (sortition floors, a representative elohim council, the nesting rule) is therefore a current candidate algorithm, held to the trust it builds, not a fixed doctrine. A better-evidenced structure can replace it the way a new manifest version replaces an old one. **The one non-symbolic holon is physical.** It is the Holochain DHT's own space: the network a DNA defines, with its membrane, its agents' arcs and its gossip neighbourhood. That physics is the hard forcing-function constraint the design lives by today. Wherever this memorandum sizes something by "what the holon can seat", including councils, pools, rollup fan-in and the head plane, the DHT physics is the binding limit. It is not one candidate among others.
 - **The goal: the commons is one degree removed from the human hand.** No person holds the commons directly. The elohim council holds it, and people hold the floor that audits and governs every contestable result. Human hands carry it only during the network's infancy, as a stage that ends.
 - **Jubilee.** It is the reconciliation mechanism mishpat requires, not a warrant for enclosure. The protocol is the overdue upgrade of that 1.0 primitive.
 - **For the living (direction).** At death, a person's share passes to the commons, richly represented, and is never enclosed by inheritors. The details are open: see section C below.

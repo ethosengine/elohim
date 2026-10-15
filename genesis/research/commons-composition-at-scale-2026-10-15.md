@@ -11,7 +11,7 @@ cites:
   - "elohim-protocol-manifesto | manifesto | sha256:bdfd593210e7fea0 | path: genesis/docs/content/elohim-protocol/manifesto.md"
   - "values-forward | values-forward | sha256:0bfa006fd772f7d9 | path: genesis/docs/content/elohim-protocol/values-forward.md"
   - "succession | succession | sha256:4ae356e1bf2112e6 | path: genesis/docs/content/elohim-protocol/succession.md"
-  - "reliance-as-cite-shared-provenance-primitives-design | Reliance as cite | sha256:01960d43aba26895 | path: genesis/docs/superpowers/specs/2026-10-15-reliance-as-cite-shared-provenance-primitives-design.md"
+  - "reliance-as-cite-shared-provenance-primitives-design | Reliance as cite | sha256:ed648f3378dba82a | path: genesis/docs/superpowers/specs/2026-10-15-reliance-as-cite-shared-provenance-primitives-design.md"
   - "commons-pool-as-collective-party-design | A commons pool is a collective that is party to its members' commitments | sha256:c194ddbe3dc3b2a6 | path: genesis/docs/superpowers/specs/2026-10-04-commons-pool-as-collective-party-design.md"
   - "care-aggregation-adoption-policy-floor-design | Care Aggregation on the Deterministic Floor | sha256:5bd65c4f72fd79c2 | path: genesis/docs/superpowers/specs/2026-07-31-care-aggregation-adoption-policy-floor-design.md"
   - "recursive-architecture-design | THE RECURSIVE ARCHITECTURE | sha256:053f260af9989d4b | path: genesis/docs/superpowers/specs/2026-06-14-recursive-architecture-design.md"
