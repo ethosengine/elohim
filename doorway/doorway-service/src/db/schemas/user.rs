@@ -265,7 +265,7 @@ pub struct UserDoc {
     /// The agency phase this account registered under: `hosted`, `doorway`,
     /// `node` or `device`. Only a `hosted` account may be given a cell by this
     /// doorway; the others run their own. Absent on rows written before
-    /// 2026-10-15, which keep the old behaviour (treated as hosted).
+    /// 2026-10-15; such a row is never given a cell (see `may_be_hosted`).
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub agency_phase: Option<String>,
 }
@@ -322,11 +322,16 @@ impl UserDoc {
         }
     }
 
-    /// Whether this doorway may give the account a cell of its own: only a
-    /// hosted account, or a legacy row that recorded no phase. A doorway,
-    /// node or device account runs its own cell and is never hosted here.
+    /// Whether this doorway may give the account a cell of its own: only an
+    /// account that registered as hosted. A doorway, node or device account
+    /// runs its own cell and is never hosted here, and a row that recorded no
+    /// phase (written before 2026-10-15) is not hosted either: hosted is a
+    /// declared stage, never a default. On alpha those legacy rows include
+    /// device humans whose old registration failed at capacity, and treating
+    /// them as hosted gave them a cell at their next sign-in. A legacy row that
+    /// already has a cell keeps it; login only reads it back.
     pub fn may_be_hosted(&self) -> bool {
-        matches!(self.agency_phase.as_deref(), None | Some("hosted"))
+        self.agency_phase.as_deref() == Some("hosted")
     }
 
     /// Create a new user document with custodial key (convenience method).
@@ -509,12 +514,16 @@ mod may_be_hosted_tests {
         u
     }
 
-    /// Only a hosted account (or a legacy row with no recorded phase) may be
-    /// given a cell by this doorway; doorway/node/device accounts run their own.
+    /// Only an account that registered as hosted may be given a cell by this
+    /// doorway; doorway/node/device accounts run their own, and a row with no
+    /// recorded phase is never hosted by default.
     #[test]
-    fn only_hosted_or_legacy_accounts_may_be_hosted() {
+    fn only_declared_hosted_accounts_may_be_hosted() {
         assert!(row(Some("hosted")).may_be_hosted());
-        assert!(row(None).may_be_hosted());
+        assert!(
+            !row(None).may_be_hosted(),
+            "no recorded phase is not hosted"
+        );
         for own in ["doorway", "node", "device"] {
             assert!(
                 !row(Some(own)).may_be_hosted(),
