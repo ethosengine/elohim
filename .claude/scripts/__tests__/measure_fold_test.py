@@ -137,6 +137,17 @@ check("diff-only drops untouched files", not mf.on_changed_lines(got, "steward/n
 check("storage gets the custom getrandom backend", mf.rustflags_for("elohim/elohim-storage") == '--cfg getrandom_backend="custom"')
 check("doorway gets empty RUSTFLAGS", mf.rustflags_for("doorway/doorway-service") == "")
 check("crates/* get empty RUSTFLAGS", mf.rustflags_for("crates/elohim-sdk") == "")
+check("crates/* with no gate project get empty RUSTFLAGS", mf.rustflags_for("crates/elohim-views") == "")
+
+# ── subjects come from gate.projects (one source of truth) ───────────────────
+KNOWN = mf.known_workspaces()
+check("bridges/jenkins is a known workspace", "bridges/jenkins" in KNOWN)
+check("elohim/epr is a known workspace", "elohim/epr" in KNOWN)
+check("elohim/eprfs is a known workspace", "elohim/eprfs" in KNOWN)
+check("the former fixed three are still known", all(w in KNOWN for w in ("doorway/doorway-service", "steward/node", "elohim/elohim-storage")))
+check("crates/* without a gate project stay known via the glob", "crates/elohim-views" in KNOWN)
+check("no DNA/WASM workspace is a subject", not any(w.startswith("elohim/holochain/dna/") for w in KNOWN))
+check("no '.' subject and no duplicates", "." not in KNOWN and len(KNOWN) == len(set(KNOWN)))
 
 # ── registry resolution ──────────────────────────────────────────────────────
 REG = {

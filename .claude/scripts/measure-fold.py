@@ -44,10 +44,13 @@ REGISTRY = ROOT / ".claude" / "epr-meta" / "measures.yaml"
 FOLD_ROOT = ROOT / ".claude" / "data" / "measure-folds"
 CARGO_POOL = ROOT / "genesis" / "agentic" / "bin" / "cargo-pool"
 
-# Native Rust workspaces that are legitimate measure subjects. DNA/WASM workspaces
-# (elohim/holochain/dna/**) are deliberately OUT of scope — they must stay plain cargo.
-FIXED_WORKSPACES = ("doorway/doorway-service", "steward/node", "elohim/elohim-storage")
-STORAGE_RUSTFLAGS = '--cfg getrandom_backend="custom"'  # hard repo rule: storage needs the custom getrandom backend
+# Measure subjects are the native cargo gate projects: `gate.projects.<name>` in every tracked
+# build-manifest.json whose `run.cargo` is a dict and whose `dir` (not ".") holds a Cargo.toml.
+# `run.cargo.rustflags` is the single source of RUSTFLAGS (storage declares its custom getrandom
+# backend there). DNA/WASM workspaces (elohim/holochain/dna/**) are deliberately OUT of scope —
+# they must stay plain cargo. `crates/*` is kept as a glob fallback because doorway-client,
+# elohim-storage-client and elohim-views have no gate project; their RUSTFLAGS are "".
+DNA_PREFIX = "elohim/holochain/dna/"
 HUNK = re.compile(r"^@@ -\d+(?:,\d+)? \+(\d+)(?:,(\d+))? @@")
 
 
@@ -109,10 +112,33 @@ def resolve_measure(registry, ref):
 
 
 # ── subjects (workspaces) ─────────────────────────────────────────────────────
+def _gate_workspaces():
+    """{dir: rustflags} from every tracked build-manifest.json's gate.projects (cargo ones only)."""
+    out = {}
+    for mf in git("ls-files", "*build-manifest.json").splitlines():
+        try:
+            gate = json.loads((ROOT / mf).read_text()).get("gate")
+        except (OSError, ValueError, AttributeError):
+            continue
+        projects = gate.get("projects") if isinstance(gate, dict) else None
+        if not isinstance(projects, dict):
+            continue
+        for proj in projects.values():
+            run_ = proj.get("run") if isinstance(proj, dict) else None
+            cargo = run_.get("cargo") if isinstance(run_, dict) else None
+            d = proj.get("dir") if isinstance(proj, dict) else None
+            if not isinstance(cargo, dict) or not isinstance(d, str) or d in ("", "."):
+                continue
+            if (d + "/").startswith(DNA_PREFIX) or not (ROOT / d / "Cargo.toml").exists():
+                continue
+            out.setdefault(d, cargo.get("rustflags") or "")
+    return out
+
+
 def known_workspaces():
-    ws = [w for w in FIXED_WORKSPACES if (ROOT / w / "Cargo.toml").exists()]
-    ws += sorted(f"crates/{d.name}" for d in (ROOT / "crates").glob("*") if (d / "Cargo.toml").exists())
-    return ws
+    ws = set(_gate_workspaces())
+    ws |= {f"crates/{d.name}" for d in (ROOT / "crates").glob("*") if (d / "Cargo.toml").exists()}
+    return sorted(ws)
 
 
 def changed_workspaces(base, head):
@@ -126,7 +152,7 @@ def changed_workspaces(base, head):
 
 
 def rustflags_for(crate):
-    return STORAGE_RUSTFLAGS if crate == "elohim/elohim-storage" else ""
+    return _gate_workspaces().get(crate, "")
 
 
 def sha256_file(path):
