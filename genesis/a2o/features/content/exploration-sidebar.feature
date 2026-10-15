@@ -23,16 +23,22 @@ Feature: A resource's neighbours, authored and discovered, honestly told apart
   ("manifesto", "constitution", "confession", "theology"), seeded as commons
   (readable by anyone) markdown pages. Each of the four names the other three as
   related, so every one of them has authored neighbours. The Background checks
-  that on "confession", and checks that the doorway also discovers at least one
+  that on "manifesto", and checks that the doorway also discovers at least one
   page sharing its topic tags that it does not name. "manifesto" is also a step
-  of a seeded learning path. The doctrinal pages render through the markdown
-  renderer, so none of this depends on the learning-path outline view.
+  of a seeded learning path, so the learner meets it inside a lesson. The
+  doctrinal pages render through the markdown renderer, so none of this depends
+  on the learning-path outline view.
+
+  What the learner sees that tells the two kinds apart: authored neighbours are
+  listed under the related-concepts heading; discovered neighbours sit in their
+  own "you might also explore" group, and each discovered card carries the way
+  it was found (its inference source), which is never "explicit".
 
   Background:
     Given doorway "alpha" at "E2E_DOORWAY_ALPHA"
     And the doctrinal docs "manifesto","constitution","confession","theology" are seeded as commons markdown EPR nodes
-    And "confession" names "constitution", "manifesto" and "theology" as related
-    And doorway "alpha" finds at least one more neighbour of "confession" by shared topics
+    And "manifesto" names "constitution", "confession" and "theology" as related
+    And doorway "alpha" finds at least one more neighbour of "manifesto" by shared topics
 
   # The scenario that checked authored and discovered neighbours on a page opened
   # on its own moved to features/content/epr-atom-home.feature ("See also" under
@@ -40,24 +46,16 @@ Feature: A resource's neighbours, authored and discovered, honestly told apart
   # standalone viewer that carried this sidebar is gone.
 
   @browser-only
-  Scenario: The same sidebar appears inside the path-step lesson view
-    # The path-coupled lesson-view renders the SAME app-exploration-sidebar (the
-    # whole point of the shared component): a learner who reaches the MANIFESTO as
-    # a path step gets the identical authored + discovered neighborhood.
-    #
-    # Retargeted from "confession" to "manifesto" (resolving the captured C2 seed
-    # gap the @wip documented): the doctrinal trio stays deliberately
-    # un-path-attached (slice plan C1 Step 3), but "manifesto" is the markdown
-    # node a seeded path ALREADY steps through (love-map-matthew-jessica step 2,
-    # resourceId: "manifesto") — exactly the "retarget at the node a seeded path
-    # already steps through" branch the gap note named. Manifesto's authored
-    # cards are its cites-mesh relatedNodeIds (constitution/confession/theology);
-    # its discovered card comes from the resolver's tag pass (external ≥1-shared-
-    # tag neighbors exist beyond the explicit-precedence-excluded trio). This is
-    # the operator-named delivery surface: graph-native discovery of the
-    # theology/confessional beside the Elohim Protocol manifesto lesson.
+  Scenario: Inside a lesson, the Explore sidebar tells authored neighbours from discovered ones
+    # The learner reaches "manifesto" as a step of a learning path and opens the
+    # lesson's Explore sidebar. The three pages the author named appear as
+    # authored; at least one page the doorway found by shared topics appears
+    # apart from them, marked as discovered, never as the author's choice.
     Given the learner is on a path step rendering "manifesto"
-    Then the exploration sidebar is visible with authored and discovered neighbors
+    When the learner opens the lesson's Explore sidebar
+    Then it lists "constitution", "confession" and "theology" as authored related concepts
+    And it shows at least one discovered concept card
+    And the discovered card's inference source is not "explicit"
 
   @browser-only
   Scenario: A doctrinal page opened on its own home renders its text and reaches its "See also" list

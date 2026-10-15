@@ -281,6 +281,22 @@ function parseBody(raw: unknown): PathBody | null {
 // Then — sidebar + neighbor assertions (render-verified)
 // ---------------------------------------------------------------------------
 
+/**
+ * "When the learner opens the lesson's Explore sidebar" — the path-step lesson
+ * view's sidebar is collapsible and starts closed; perform the learner's
+ * "Explore" tap (a no-op when it is already open).
+ */
+When("the learner opens the lesson's Explore sidebar", async function (this: E2EWorld) {
+  const page = await eprPage(this);
+  if (!page) {
+    return PENDING;
+  }
+  assert.ok(
+    await page.ensureSidebarOpen(),
+    'Expected the Explore sidebar to open in the path-step lesson view'
+  );
+});
+
 /** "Then the exploration sidebar is visible" — the shared sidebar mounted. */
 Then('the exploration sidebar is visible', async function (this: E2EWorld) {
   const page = await eprPage(this);

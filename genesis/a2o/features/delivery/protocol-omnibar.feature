@@ -66,11 +66,14 @@ Feature: Full-Browser Content Delivery with Protocol Omnibar
 
   # --- Omnibar: Drill-Down (to the resource's own home) ---
 
-  Scenario: Inspect EPR opens the resource's own home with its legs
-    Given the omnibar is expanded
-    When I click "Inspect" (or the EPR address link)
+  Scenario: Inspect opens the resource's own page, where its custody, place, governance and origin are shown
+    # Every resource has one page of its own at its universal address, /epr/{id}
+    # (EPR: Elohim Protocol Resource). That page answers four questions in plain
+    # sections; inspecting from the omnibar lands there, not in the learning app.
+    Given I am viewing "/deliver/manifesto" and the omnibar is expanded
+    When I click "Inspect" (or the resource address link)
     Then I navigate to "/epr/manifesto"
-    And I see the atom home with its legs "Who holds it", "Where this lives", "How it's governed" and "Where it came from"
+    And I see the sections "Who holds it", "Where this lives", "How it's governed" and "Where it came from"
 
   # --- Omnibar: Actions ---
 
