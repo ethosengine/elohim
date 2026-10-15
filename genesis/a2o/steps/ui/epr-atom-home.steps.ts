@@ -625,14 +625,17 @@ Then(
     );
     const cid = content?.blobCid ?? content?.blobHash;
     const subjects = [...new Set([id, ...(cid ? [cid] : [])])];
-    const lists = await Promise.all(subjects.map(subject =>
-      readJson<{ id: string }[]>(
-        `${doorway.url}/api/v1/attestations/unified?subjectCid=${encodeURIComponent(subject)}`
+    const lists = await Promise.all(
+      subjects.map(subject =>
+        readJson<{ id: string }[]>(
+          `${doorway.url}/api/v1/attestations/unified?subjectCid=${encodeURIComponent(subject)}`
+        )
       )
-    ));
-    const reported = content === null || lists.some(list => list === null)
-      ? null
-      : [...new Map(lists.flatMap(list => list ?? []).map(row => [row.id, row])).values()];
+    );
+    const reported =
+      content === null || lists.some(list => list === null)
+        ? null
+        : [...new Map(lists.flatMap(list => list ?? []).map(row => [row.id, row])).values()];
     const shown = await page.attestationCount();
     const text = await page.visibleText(EPR_HOME.ATTESTATIONS);
     if (reported === null) {
