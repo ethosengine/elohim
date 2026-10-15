@@ -21,7 +21,7 @@
 #
 # Proof signal (rendered, @wip/@browser-only — excluded from Dataplane Validation
 # by the CI script's "not @browser-only" tag filter): a runLook capture of the
-# rendered /resource/{id} card asserts no HTTP errors and a real screenshot. Kept
+# rendered card on the atom home (/epr/{id}) asserts no HTTP errors and a real screenshot. Kept
 # @wip because it launches a real headless browser, which the plain-cucumber-js
 # Dataplane Validation stage does not provision — this scenario documents the
 # deeper visual proof without blocking the suite on it.

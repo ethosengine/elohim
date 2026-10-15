@@ -1,6 +1,7 @@
 /**
  * ContributorsPage — page object for the "Contributors / Inspired by" section
- * of the content viewer (lamad: content-viewer.component.html).
+ * in the atom home's "Where it came from" leg (/epr/{id}; epr-atom-home spec
+ * §11.2, which keeps the resource viewer's test ids).
  *
  * The section is conditionally rendered (`*ngIf="contributorPresences.length > 0"`)
  * so helper methods clearly distinguish "present" from "absent". Per-card testids

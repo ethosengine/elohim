@@ -42,7 +42,7 @@ export class EprContentPage extends BasePage {
    * ONLY when MarkdownRendererComponent actually instantiated, and the raw
    * fallback's "Content format: …" notice (CONTENT_VIEWER.FALLBACK_NOTICE) must
    * be absent. This is the assertion that catches the renderer-registration gap
-   * on standalone /epr, /resource, /deliver routes.
+   * on standalone /epr and /deliver routes.
    */
   async isFormattedMarkdownRendered(timeoutMs = 15_000): Promise<boolean> {
     const rendererMounted = await this.locate(MARKDOWN.RENDERER_HOST)
@@ -72,8 +72,8 @@ export class EprContentPage extends BasePage {
   /**
    * Ensure the sidebar is open — the learner's "Explore" tap. In the
    * path-step lesson view the sidebar is collapsible and starts CLOSED
-   * (off-canvas, present in DOM but not visible); on the standalone
-   * /epr/{id} viewer it is pinned and this is a no-op.
+   * (off-canvas, present in DOM but not visible); when it is already open
+   * this is a no-op.
    */
   async ensureSidebarOpen(timeoutMs = 15_000): Promise<boolean> {
     if (await this.isSidebarVisible(2_000)) return true;

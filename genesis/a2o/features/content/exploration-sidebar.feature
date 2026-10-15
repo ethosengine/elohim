@@ -1,46 +1,43 @@
 @e2e @lamad @epr-decomposition @native-content-graph @regression @requires:doorway @requires:seeded-content @act:i
-Feature: Shared exploration sidebar surfaces authored and discovered neighbors
-  A learner reading a doctrinal page sees, beside the content, the SAME "Explore"
-  sidebar whether they opened it standalone at its universal EPR address or met it
-  inside a learning path. The sidebar shows two kinds of neighbor, honestly
-  distinguished: AUTHORED related concepts (the explicit relatedNodeIds the author
-  curated) and a DISCOVERED — "you might also explore" — section of computed tag
-  neighbors the resolver inferred (computed=true). Discovery is offered as
-  exploration, never dressed up as authored truth: its cards carry a
-  non-"explicit" inference source.
+Feature: A resource's neighbours, authored and discovered, honestly told apart
+  A learner reading a doctrinal page can see, beside it, the other pages it sits
+  among. There are two kinds of neighbour. AUTHORED neighbours are the related
+  pages the author named on purpose. DISCOVERED neighbours are pages the doorway
+  found because they share topic tags with this one ("you might also explore").
+  Discovery is offered for exploring, never dressed up as the author's choice:
+  every discovered neighbour is marked as discovered, and its card's inference
+  source (how the link was found) is never "explicit", the mark of an authored one.
 
-  This is the native content-graph seam slice. It is STORY-FIRST: the resolver
-  (computed=true) and the shared sidebar are not yet on any live stack (alpha runs
-  the old storage), so these scenarios go green once the branch is built and
-  deployed. The witness corpus is the doctrinal docs, seeded as commons markdown
-  EPR nodes: "confession" carries explicit relatedNodeIds to
-  "constitution"/"manifesto"/"theology" AND shares the "stewardship" tag with at
-  least one node NOT in its relatedNodeIds, which the resolver surfaces as a
-  discovered (inferenceSource:tag) neighbor. The doctrinal corpus renders via the
-  markdown renderer — independent of the absent epr-composite / PathViewer
-  keystone — so the experience is provable on the household floor.
+  The learner meets these neighbours in two places. Inside a learning path, the
+  lesson view has an "Explore" sidebar that lists them. Opened on its own, at its
+  universal address /epr/{id} (EPR: Elohim Protocol Resource, any resource the
+  protocol addresses), a page has its own home, the atom home, and the neighbours
+  are listed there in the "See also" section under "Where this lives".
+
+  Who proves what: features/content/epr-atom-home.feature proves that the atom
+  home's "See also" tells the two kinds apart. This file proves the same for the
+  learning-path sidebar, and, more modestly, that a doctrinal page opened on its
+  own home renders its text and reaches its "See also" list.
+
+  The witness pages are the doctrinal docs: the protocol's founding writings
+  ("manifesto", "constitution", "confession", "theology"), seeded as commons
+  (readable by anyone) markdown pages. Each of the four names the other three as
+  related, so every one of them has authored neighbours. The Background checks
+  that on "confession", and checks that the doorway also discovers at least one
+  page sharing its topic tags that it does not name. "manifesto" is also a step
+  of a seeded learning path. The doctrinal pages render through the markdown
+  renderer, so none of this depends on the learning-path outline view.
 
   Background:
     Given doorway "alpha" at "E2E_DOORWAY_ALPHA"
     And the doctrinal docs "manifesto","constitution","confession","theology" are seeded as commons markdown EPR nodes
-    And "confession" has authored relationships to "constitution","manifesto","theology"
-    And the backend computes at least one discovered (tag) neighbor for "confession" not in its relatedNodeIds
+    And "confession" names "constitution", "manifesto" and "theology" as related
+    And doorway "alpha" finds at least one more neighbour of "confession" by shared topics
 
-  @browser-only
-  Scenario: Standalone viewer shows the See-also sidebar with both edge kinds
-    # Runs against the legacy standalone /resource/{id} viewer (lamad's
-    # ContentViewerComponent) — the shared exploration sidebar is a lamad
-    # component and cannot cross into the shell-owned atom home at /epr/{id}
-    # (spec: 2026-09-02-epr-atom-home-shell-component-design.md §4.2); a
-    # standalone see-also affordance ON the atom home is filed against the
-    # commons plan (spec §8), not built here.
-    # Authored edges fill the See-also sections; the resolver's computed tag
-    # edges fill the "Discovered — you might also explore" section.
-    When the learner opens the EPR address for "confession"
-    Then the exploration sidebar is visible
-    And it lists "constitution", "manifesto" and "theology" as authored related concepts
-    And it shows at least one discovered concept card
-    And the discovered card's inference source is not "explicit"
+  # The scenario that checked authored and discovered neighbours on a page opened
+  # on its own moved to features/content/epr-atom-home.feature ("See also" under
+  # "Where this lives"): the address /epr/{id} is now the atom home, and the old
+  # standalone viewer that carried this sidebar is gone.
 
   @browser-only
   Scenario: The same sidebar appears inside the path-step lesson view
@@ -63,16 +60,14 @@ Feature: Shared exploration sidebar surfaces authored and discovered neighbors
     Then the exploration sidebar is visible with authored and discovered neighbors
 
   @browser-only
-  Scenario: Doctrinal markdown renders independently of the path keystone
-    # Runs against the legacy standalone /resource/{id} viewer — the shared
-    # exploration sidebar is a lamad component and cannot cross into the
-    # shell-owned atom home at /epr/{id} (spec: 2026-09-02-epr-atom-home-
-    # shell-component-design.md §4.2); a standalone see-also affordance ON
-    # the atom home is filed against the commons plan (spec §8).
-    # "theology" is a commons markdown EPR node. Its body renders via the markdown
-    # renderer with no dependency on the epr-composite / PathViewer keystone, and
-    # the shared sidebar populates beside it — the doctrinal reading experience
-    # stands on its own.
+  Scenario: A doctrinal page opened on its own home renders its text and reaches its "See also" list
+    # "theology" is a commons markdown page. Opened at its own address, outside
+    # any learning path, its body renders through the markdown renderer, and the
+    # "See also" section under "Where this lives" lists at least one neighbour:
+    # the doctrinal reading stands on its own. This is a reachability check;
+    # which neighbours are authored and which discovered is proven on the atom
+    # home's own feature (see the description above).
     When the learner opens the EPR address for "theology"
     Then the markdown content body is rendered
-    And the exploration sidebar is populated
+    When the learner opens "See also" under "Where this lives"
+    Then "See also" lists at least one neighbour

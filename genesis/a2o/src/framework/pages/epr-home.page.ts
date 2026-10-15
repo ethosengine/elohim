@@ -8,28 +8,18 @@
  */
 
 import { BasePage } from './base.page.js';
+import { EPR_HOME, FEEDBACK_GATE, type EprHomeLeg, type EprHomeSection } from './selectors.js';
 
-/** The four supporting sections that ground a resource in its network. */
-export type EprHomeLeg = 'holds' | 'lives' | 'governed' | 'from';
+// The selectors live in the shared registry (selectors.ts); re-exported here so
+// existing `import { EPR_HOME } from './epr-home.page.js'` callers keep working.
+export { EPR_HOME, type EprHomeLeg, type EprHomeSection } from './selectors.js';
 
-/** Selectors for the shell-owned EPR atom home (/epr/{id}) — data-testid contract from the spec §6. */
-export const EPR_HOME = {
-  ROOT: 'epr-home',
-  LOADING: 'epr-home-loading',
-  GATE: 'epr-home-gate',
-  GATE_BACK: 'epr-home-gate-back',
-  ARRIVAL: 'epr-home-arrival',
-  TITLE: 'epr-home-title',
-  CHIP_REACH: 'epr-home-chip-reach',
-  CHIP_NOTARIZED: 'epr-home-chip-notarized',
-  CHIP_HELD: 'epr-home-chip-held',
-  OPEN_IN_BUNDLE: 'epr-home-open-in-bundle',
-  FOCAL: 'epr-home-focal',
-  FOCAL_CLAIMED: 'epr-home-focal-claimed',
-  YOUR_MARK: 'epr-home-your-mark',
-  ADDRESS: 'epr-home-address',
-  LEG: (leg: EprHomeLeg) => `epr-home-leg-${leg}`,
-} as const;
+/** One "See also" row as rendered: its visible text, inference source and link. */
+export interface SeeAlsoRow {
+  text: string;
+  inference: string | null;
+  href: string | null;
+}
 
 export class EprHomePage extends BasePage {
   /** Wait until either the frame (ROOT) or the out-of-reach gate (GATE) is visible. */
@@ -59,11 +49,11 @@ export class EprHomePage extends BasePage {
     return null;
   }
 
-  async legText(leg: EprHomeLeg): Promise<string> {
+  async legText(leg: EprHomeSection): Promise<string> {
     return (await this.testId(EPR_HOME.LEG(leg)).textContent())?.trim() ?? '';
   }
 
-  async legVisible(leg: EprHomeLeg): Promise<boolean> {
+  async legVisible(leg: EprHomeSection): Promise<boolean> {
     return this.testId(EPR_HOME.LEG(leg)).isVisible();
   }
 
@@ -125,5 +115,116 @@ export class EprHomePage extends BasePage {
 
   async has(id: string): Promise<boolean> {
     return (await this.testId(id).count()) > 0;
+  }
+
+  // ───────────────────────────────────────────────────────────────────────
+  // Folds (spec §11.3) — closed by default, opened by toggle or #fragment
+  // ───────────────────────────────────────────────────────────────────────
+
+  /** Visible label of a leg's fold toggle (e.g. "Network detail"). */
+  async foldToggleText(leg: EprHomeLeg): Promise<string> {
+    const toggle = this.testId(EPR_HOME.FOLD_TOGGLE(leg));
+    return (await toggle.count()) > 0 ? (await toggle.first().innerText()).trim() : '';
+  }
+
+  async foldOpen(leg: EprHomeLeg): Promise<boolean> {
+    return this.testId(EPR_HOME.FOLD(leg)).first().isVisible();
+  }
+
+  /** Open a leg's fold with its toggle (a no-op when it is open or the leg has no toggle). */
+  async openFold(leg: EprHomeLeg): Promise<void> {
+    if (await this.foldOpen(leg)) return;
+    const toggle = this.testId(EPR_HOME.FOLD_TOGGLE(leg)).first();
+    if ((await toggle.count()) === 0) return;
+    await toggle.click();
+    await this.testId(EPR_HOME.FOLD(leg)).first().waitFor({ state: 'visible', timeout: 10_000 });
+  }
+
+  /** Visible text of an element by test id, or '' when it is absent or hidden. */
+  async visibleText(id: string): Promise<string> {
+    const el = this.testId(id).first();
+    if ((await el.count()) === 0 || !(await el.isVisible())) return '';
+    return (await el.innerText()).trim();
+  }
+
+  async isVisible(id: string): Promise<boolean> {
+    const el = this.testId(id).first();
+    return (await el.count()) > 0 && el.isVisible();
+  }
+
+  async top(id: string): Promise<number | null> {
+    return (await this.testId(id).first().boundingBox())?.y ?? null;
+  }
+
+  // ── Who holds it → Network detail ──
+
+  /** Press "Check it's still whole" and return the one-line answer. */
+  async verifyWhole(): Promise<string> {
+    await this.testId(EPR_HOME.VERIFY).first().click();
+    const result = this.testId(EPR_HOME.VERIFY_RESULT).first();
+    await result.waitFor({ state: 'visible', timeout: 30_000 });
+    return (await result.innerText()).trim();
+  }
+
+  /** Number of cells in the "Where the pieces are" grid. */
+  async pieceCellCount(): Promise<number> {
+    return this.testId(EPR_HOME.PIECES).first().locator(':scope > *, :scope [data-shard]').count();
+  }
+
+  // ── Where it came from ──
+
+  async stewardRows(): Promise<string[]> {
+    const rows = this.testId(EPR_HOME.STEWARD);
+    const out: string[] = [];
+    const n = await rows.count();
+    for (let i = 0; i < n; i += 1) out.push((await rows.nth(i).innerText()).trim());
+    return out;
+  }
+
+  async attestationCount(): Promise<number> {
+    return this.testId(EPR_HOME.ATTESTATION).count();
+  }
+
+  // ── Where this lives → See also ──
+
+  async seeAlsoRows(): Promise<SeeAlsoRow[]> {
+    const cards = this.testId(EPR_HOME.SEE_ALSO)
+      .first()
+      .locator(`[data-testid="${EPR_HOME.SEE_ALSO_CARD}"]`);
+    const rows: SeeAlsoRow[] = [];
+    const n = await cards.count();
+    for (let i = 0; i < n; i += 1) {
+      const card = cards.nth(i);
+      rows.push({
+        text: (await card.innerText()).trim(),
+        inference: await card.getAttribute(EPR_HOME.SEE_ALSO_INFERENCE_ATTR),
+        // The row is the link, or carries one. Inline arrow: no named function
+        // may cross into the browser (tsx keepNames → __name is undefined there).
+        href: await card.evaluate((el: Element) => {
+          const a = el.closest('a') ?? el.querySelector('a');
+          return a ? a.getAttribute('href') : null;
+        }),
+      });
+    }
+    return rows;
+  }
+
+  // ── How it's governed ──
+
+  /** Open the gate-feedback trigger's menu inside the "Raise a concern" host. */
+  async openConcernMenu(): Promise<void> {
+    const host = this.testId(EPR_HOME.RAISE_CONCERN).first();
+    await host.waitFor({ state: 'visible', timeout: 15_000 });
+    await host.locator(`[data-testid="${FEEDBACK_GATE.TRIGGER_BTN}"]`).first().click();
+    await this.testId(FEEDBACK_GATE.TRIGGER_MENU)
+      .first()
+      .waitFor({ state: 'visible', timeout: 5_000 });
+  }
+
+  async concernTriggerCount(): Promise<number> {
+    return this.testId(EPR_HOME.LEG('governed'))
+      .first()
+      .locator(`[data-testid="${FEEDBACK_GATE.TRIGGER_BTN}"]`)
+      .count();
   }
 }

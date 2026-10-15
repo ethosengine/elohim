@@ -260,3 +260,87 @@ the containing-paths reverse projection in §8, explicitly a projection over exi
 Doorway-side pretty-mount 302s; moving the content substrate out of lamad; restyling the rest of
 the shell; the elohim "tender" as a live agent (v1 renders the reach truth as copy); comments as a
 separate model (discussions are the conversation).
+
+## 11. Slice 4 — the atom home subsumes the resource viewer (2026-10-14)
+
+Operator direction 2026-10-14 after comparing `alpha.elohim.host/epr/evolution-of-trust` with
+`alpha.elohim.host/resource/evolution-of-trust#network`: *"this page needs to subsume ALL the
+designed concerns that you see on [the resource page]… both views are in-essence trying to do the
+same thing: provide the commons surface / epr meta, lenses, and tooling of this epr."* Two surfaces
+for one atom is the misrouting §1 named, half-cured: the home sends its own visitors back to the
+viewer for "Network detail" and "Raise a concern" (`epr-home.component.html:210`,
+`epr-home-legs.component.html:75`), and the epr-link context menu's "network" action lands on the
+viewer's tab (`epr-link.component.ts:308`).
+
+### 11.1 Principle
+
+One frame, the legs, no tabs. Every concern the viewer carried lands in the leg whose protocol leg
+it belongs to, as a **fold** under that leg's one-line verdict — closed by default, opened by its
+toggle or by arriving with the leg's fragment (`#holds · #lives · #governed · #from · #here`).
+Nothing on `/epr/{id}` links to `/resource/{id}`; `/resource/{id}` becomes a redirect to the
+universal address (fragment map: `network→holds`, `governance→governed`, `trust→from`,
+`content→` none; `holds|lives|governed|from|here` pass through). The viewer stays lamad's in-path
+lesson component only.
+
+### 11.2 Where each viewer concern lands
+
+| Viewer concern (`content-viewer.component.html`) | Atom home | Reads (shell reach, no new `@app/lamad/*` edge) |
+|---|---|---|
+| Network tab → resilience grid, health badge | **Who holds it → fold "Network detail"**: health in words first (`Healthy · can lose N peers and still be whole` / `At risk · …`), then rows encoding · pieces distributed (`shardsWithLocations/totalShards`) · peers holding pieces · storage committed | new shell `ResilienceDetailService` (`elohim/services/`) — `GET /api/v1/resilience/{id}` → `ResilienceView` from `@elohim/storage-client/generated` (lamad's `services/resilience.service.ts` is the duplicate to shrink later) |
+| Shard map | same fold, "Where the pieces are": one cell per shard, data vs parity, a missing shard Terracotta | same |
+| Verify Resilience + result | same fold, button "Check it's still whole" → one line: `Whole · 1 of 1 pieces found · 12 ms` or `Not whole · 2 pieces missing` | `POST /api/v1/resilience/{id}/verify` → `VerificationResultView` |
+| Distribution badge (replica count/target) | "Who holds it" row already reads `replicaCount`; the fold adds `copies: N of M wanted · {replicaHealth}` | `DistributionService.getDetails(blobHash)` (already fetched) |
+| Memory-safety card | the leg's headline (unchanged) | — |
+| Attention metrics | **Who's here** (new leg, §2.3): `Viewed N times by M people · K completions`; empty → `No one has been counted here yet.`; one quiet line: counted as protocol events, never analytics | `StorageClientService.getContentEngagement(id)` (JSON numbers; `Number()` the bigint-typed fields) |
+| Attestations tab → trust %, badges, reach label | no percentage (§2.2). **Where it came from → fold "Attestations"**: one row per attestation — `title · by {issuer, short} · {proofClass} · {date}`; revoked rows struck with the reason; empty → `No one has attested to this yet.` | `AttestationApiService.listBySubject(id)` (shell, all kinds) |
+| Stewardship allocations (ratio, recognition, dispute) | "Where it came from" steward rows gain `{displayName ?? presenceId} · {ratio}% share · {recognition} recognition`; disputed rows carry `Disputed: {reason}` in Terracotta | `StorageApiService.getContentStewardship(id)` replaces `getStewardshipAllocations` in `epr-home.component.ts:148` |
+| Content warnings / flags | **How it's governed**: labels from `GovernanceStateView.labels` (when the endpoint answers) and the atom's own flags, as warm pills | `GovernanceApiService.getGovernanceState('content', id)` — 404 → null, silent (§8 stands: nothing renders until it answers) |
+| Challenges + SLA | "How it's governed" rows gain the challenge's evidence line, `filed {date}`, and days remaining when a deadline exists | `getChallengesForEntity` (already read) |
+| File a Challenge · gate feedback trigger (flag/challenge/feedback/report) | "How it's governed" → **Raise a concern** is `<elohim-gate-feedback-trigger>` on the page itself (`elohim-core/register`), its `feedback-submit` event handled by the home: `challenge` → `fileChallenge`; `feedback` → `recordSignal`; menu items restricted to the kinds that have a real route. Signed out → one line `Sign in to raise a concern.` | `GovernanceApiService.fileChallenge / recordSignal` (the viewer composed the trigger with no listener — decorative; here it acts) |
+| Feedback-mechanism gateway | **not composed**: `getMechanismSelection`/`getAccumulationStatus` swallow a 404 into a default object (`governance-api.service.ts:291-350`), so "resolved" cannot be told from "absent"; §8 stands until the endpoints exist and the service surfaces absence | — |
+| Discussions + Start Discussion | **Conversation** (§2.3, first cut): rows `title · N messages · status`, newest first; `Start a conversation` (one message — `CreateDiscussionInputView` carries no title; rows read `title ?? first line`, plus `category`) when signed in; empty → `No one has spoken about this here yet.` The tender and standing rings stay Slice 2 | `queryDiscussions / createDiscussion` |
+| Reaction bar · graduated feedback · signal summary | **Your mark on it** grows "How it landed": `<elohim-reaction-bar>` with `.counts` adapted from the signal aggregate's bigint dictionaries (`epr-home-signals.ts`, pure, unit-tested) and `.onReactionSubmit` → `recordSignal` with every `RecordSignalInputView` field sourced from the session; `<elohim-graduated-feedback>` only with what the aggregate truly cross-tabulates, else omitted; one summary line in words (`N reactions · consensus {level}`), no percentages | `getSignalAggregate / recordSignal` |
+| Appears in learning paths | still §8 (storage-side reverse projection); not built | — |
+| Contributors / Inspired by | **Where it came from → "Inspired by / contributed to by"**: `<elohim-contributor-card compact>` per presence (`elohim-imagodei/register`, tag per `register.ts:81`), in the leg body — never inside a closed fold (`contributor-presences.steps.ts` asserts visibility on load); test ids `viewer-contributors-section / -list / viewer-contributor-card-{id}` kept for `contributor-presences.steps.ts` | `StorageApiService.getPresenceForContent(id)` |
+| Exploration sidebar (authored + discovered see-also, explore in graph) | **Where this lives → fold "See also"**: authored rows from `getRelatedContent(id)` (`relationshipType`, target title) and discovered rows tagged `discovered` when `inferenceSource !== 'explicit'`; each row a minted `/epr/{id}` link. "Explore in full graph" is lamad's and is filed, not built | `StorageApiService.getRelatedContent(id)` |
+| Download | "Where it came from": `Download ({format})` as `<a download>` to the blob when `blobHash` exists | `StorageClientService.getBlobUrl` |
+| Edit | identity actions: `Edit in Lamad` when signed in, minted through `bundle-lens.ts` (`BUNDLE_EDITORS`, same `route-literal-ok` composition-root pragma as `BUNDLE_MOUNTS`); never for generated step ids | — |
+| Focused view toggle | focal slot gains **Focus**: host class `epr-home--focused` hides everything but the focal; Escape exits | — |
+| Tags · version | identity: tag chips under the lede; `v{version}` in the eyebrow when present | raw `ContentView.tags`, `metadata.version` |
+| Affinity ± nudges | dropped by design (§2.3) | — |
+| Witnessed-attention observation (`content-viewer.component.ts` ~395-460, ~640-660: scroll depth → `ObservationEmitterService`) | the atom home emits the same observation the same way (window scroll, or the focused container when Focus is on) — `attention-witnessed-privately.feature` proves it | `@elohim/rea-runtime` `ObservationEmitterService`, `EventService`, `scrollDepthPct` |
+| Trust-badge actions (request review …), sentiment/effectiveness percentages, mini-graph | dropped: lamad-only UI with no backend route; the summary line in words and the See-also fold stand in | — |
+| Back to Lamad · Return to path · Open in pillar | arrival chip and lens (unchanged) | — |
+
+### 11.3 Test ids (contract for the a2o leg)
+
+Folds: `epr-home-fold-toggle-{holds|lives|governed|from}`, `epr-home-fold-{holds|lives|governed|from}`.
+Network detail: `epr-home-health`, `epr-home-pieces`, `epr-home-verify`, `epr-home-verify-result`.
+Who's here: `epr-home-leg-here`, `epr-home-attention`. From: `epr-home-attestations`,
+`epr-home-attestation`, `epr-home-steward`, `epr-home-download`. Governed: `epr-home-labels`,
+`epr-home-challenge`, `epr-home-raise-concern` (the trigger's host). Lives: `epr-home-see-also`,
+`epr-home-see-also-card[data-inference]`. Commons: `epr-home-conversation`, `epr-home-discussion`,
+`epr-home-start-conversation`, `epr-home-reactions`. Identity: `epr-home-tags`, `epr-home-tag`,
+`epr-home-focus`, `epr-home-edit`. The address footer keeps `epr-home-network-detail` as an in-page
+`#holds` anchor that opens the fold. Retired with the viewer route: `viewer-tab-*`,
+`viewer-affinity-*`, `viewer-file-challenge`, `viewer-start-discussion`, `viewer-verify-resilience`.
+
+### 11.4 Seams and gate
+
+The redirect is `pathMatch: 'full'`, preserves query params, and runs client-side with the fragment (a browser never sends the fragment to SSR; the hydrated router re-runs it). Zero new `@app/lamad/*` specifiers (the ratchet refuses). The redirect mints through
+`eprToUniversalHref`, never a literal. The epr-link "network" action targets fragment `holds`.
+The three pillar components that still `router.navigate(['/resource', id])`
+(`shefa/components/resource-explorer/resource-explorer.component.ts:278`,
+`imagodei/components/profile/profile.component.ts:369`,
+`profile-discovery-section.component.ts:45`) mint the universal address instead. Gate:
+`just gate elohim-app` (lint · lint-routes · lint-a11y · deps · build · test) plus a2o
+`@concern:epr-atom-home` against the local shell on alpha data; render proof with `pnpm look` for
+`#holds` open, the reading shape, the phone width. P2P design-gate record: unchanged from §9 —
+every addition is a read over existing views or a write through an existing coordinator-backed route.
+
+### 11.5 Filed, not built here
+
+Explore-in-graph from the atom home (lamad route, no claim shape for it yet); appears-in-paths
+(§8); lamad's duplicate `ResilienceService`/`resilience.service.ts` shrinking onto the shell's;
+the `exploration-sidebar.feature` standalone scenario retargets to the atom home's See-also fold
+(the lamad sidebar remains covered by its path-step scenario).

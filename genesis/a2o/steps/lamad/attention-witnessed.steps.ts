@@ -9,10 +9,10 @@
  * other peers.
  *
  * Surfaces this file reads (each is the thing the story claims, not a proxy):
- *   - the content viewer at `/resource/:id` (elohim-app shell) — it opens the
- *     witnessed view on load, tracks the window's deepest scroll, and POSTs
- *     `/api/v1/observations` when the viewer is destroyed or moves to another
- *     node. This lane exercises the IN-APP leave: the "moves on … without
+ *   - the atom home at `/epr/:id` (elohim-app shell; the old `/resource/:id`
+ *     viewer address redirects there) — it opens the witnessed view on load,
+ *     tracks the window's deepest scroll, and POSTs `/api/v1/observations` when
+ *     the page is destroyed or moves to another node. This lane exercises the IN-APP leave: the "moves on … without
  *     leaving the app" step routes inside the shell and waits for the POST's
  *     answer, which is the leave whose ack a scenario can read. A HARD leave
  *     (page.goto, tab close, cross-bundle navigation) is now witnessed too —
@@ -45,6 +45,7 @@ import {
   loadHouseholdMeshFixture,
   requireFixturePrimaryStorageUrl,
 } from '../../src/framework/fixtures/household-mesh.js';
+import { EPR_HOME } from '../../src/framework/pages/selectors.js';
 import { E2EWorld } from '../../src/framework/world.js';
 
 // ---------------------------------------------------------------------------
@@ -240,9 +241,10 @@ Given(
 // ---------------------------------------------------------------------------
 
 /**
- * Open a seeded content node in the shell's content viewer (`/resource/:id`)
- * and wait until its body has rendered taller than the window, so "scroll to
- * the bottom" means something. Starts listening for the observation POST.
+ * Open a seeded content node at its atom home (`/epr/:id`), wait for the atom
+ * home's frame, then until its body has rendered taller than the window, so
+ * "scroll to the bottom" means something. Starts listening for the observation
+ * POST.
  *
  * Example: When Jessica opens the "manifesto" page
  */
@@ -268,7 +270,10 @@ When('{word} opens the {string} page', async function (this: E2EWorld, name: str
     s.listening = true;
   }
   s.openedPage = id;
-  await device.navigate(`/resource/${encodeURIComponent(id)}`);
+  await device.navigate(`/epr/${encodeURIComponent(id)}`);
+  await device.page
+    .locator(`[data-testid="${EPR_HOME.ROOT}"]`)
+    .waitFor({ state: 'visible', timeout: 30_000 });
   await device.page.waitForFunction(
     () => document.documentElement.scrollHeight > window.innerHeight * 1.5,
     undefined,
@@ -292,9 +297,9 @@ When(
 );
 
 /**
- * Scroll the window to the end of the page. The viewer measures depth from the
+ * Scroll the window to the end of the page. The atom home measures depth from the
  * WINDOW's scroll events; if the window did not move (the page scrolls inside
- * an inner container instead), the viewer cannot see this reading and the step
+ * an inner container instead), the atom home cannot see this reading and the step
  * says so rather than letting the depth assertion fail later without a cause.
  *
  * Example: And Jessica scrolls to the bottom of the page
@@ -313,7 +318,7 @@ When('{word} scrolls to the bottom of the page', async function (this: E2EWorld,
   assert.ok(
     scrolled > 0,
     'the window did not scroll (scrollY is 0) although the page is taller than the window — the ' +
-      "page scrolls inside an inner container, so the content viewer's window scroll listener " +
+      "page scrolls inside an inner container, so the atom home's window scroll listener " +
       'cannot witness how far the reader got'
   );
 });
@@ -321,7 +326,7 @@ When('{word} scrolls to the bottom of the page', async function (this: E2EWorld,
 /**
  * Leave the content node by an in-app route change to the shell's home page
  * (`/`). Angular's router follows a popstate to the current history entry, so
- * the viewer is destroyed inside the living document and its POST is sent.
+ * the atom home is destroyed inside the living document and its POST is sent.
  * A page.goto would now also witness (the emitter's `pagehide` flush, R-A8),
  * but its request outlives the document with no response this lane can await —
  * the in-app leave is what gives the next step an ack to read.
@@ -360,7 +365,7 @@ When(
     assert.ok(
       s.posts.length > 0,
       `no POST ${OBSERVATION_WRITE_PATH} was answered within 15 s of ${name} leaving "${id}" — ` +
-        'the view was never witnessed (the content viewer posts on an in-app leave only)'
+        'the view was never witnessed (the atom home posts on an in-app leave only)'
     );
     const post = s.posts.at(-1);
     assert.ok(post, 'no observation answer was captured');

@@ -11,6 +11,7 @@ import { strict as assert } from 'node:assert';
 import { Then, When } from '@cucumber/cucumber';
 
 import { PlaywrightDevice } from '../../src/framework/devices/playwright-device.js';
+import { EprHomePage } from '../../src/framework/pages/epr-home.page.js';
 import {
   ASSESSMENT,
   COMPLETION,
@@ -492,10 +493,13 @@ When('I answer all quiz questions incorrectly', async function (this: E2EWorld) 
 // Reflection Assessment Navigation & Answering
 // ---------------------------------------------------------------------------
 
-const REFLECTION_ASSESSMENT_PATH = '/resource/assessment-personal-values';
+const REFLECTION_ASSESSMENT_PATH = '/epr/assessment-personal-values';
 
 /**
- * Navigate to a discovery/reflection assessment via the content-viewer route.
+ * Navigate to a discovery/reflection assessment at its atom home (/epr/{id};
+ * the old /resource/{id} viewer address redirects there). A sophia-quiz-json
+ * atom fills the focal slot at full width, so the assessment is answered on the
+ * atom home itself.
  * Uses the "Personal Values Reflection" seed content (assessment-personal-values)
  * which has discovery-mode sophia-quiz-json format. In a test environment the
  * Psyche API interpretation returns null, causing the completion summary to show
@@ -516,6 +520,7 @@ When('I navigate to a reflection assessment', async function (this: E2EWorld) {
     async () => {
       await device.navigate(REFLECTION_ASSESSMENT_PATH);
       await device.page.waitForLoadState('networkidle');
+      await new EprHomePage(device.page).waitForReady();
       await device.page
         .locator(SOPHIA_QUESTION_TAG)
         .waitFor({ state: 'attached', timeout: 15_000 });
