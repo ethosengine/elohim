@@ -289,7 +289,12 @@ async function handleAppFetch(event: FetchEvent): Promise<Response> {
   const url = new URL(request.url);
   const pathParts = url.pathname.replace('/apps/', '').split('/');
   const identifier = pathParts[0]; // Could be slug or blob_hash
-  const filePath = pathParts.slice(1).join('/');
+  // A directory address (`/apps/<slug>/`, `/apps/<slug>/sub/`) is the doorway's
+  // name for its index.html; the cache holds the file, not the directory, so a
+  // navigation that falls back offline must look up what was extracted.
+  const rawFilePath = pathParts.slice(1).join('/');
+  const filePath =
+    rawFilePath === '' || rawFilePath.endsWith('/') ? `${rawFilePath}index.html` : rawFilePath;
 
   console.log(`[apps-sw] fetch: ${url.pathname}`);
 
