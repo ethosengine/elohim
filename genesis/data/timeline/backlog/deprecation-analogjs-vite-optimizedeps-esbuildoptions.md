@@ -158,3 +158,13 @@ devDependencies. `pnpm install --frozen-lockfile` passes on the regenerated
   EXIT=0 (452 tests, Storybook build on Vite 8); `just gate doorway-app`
   EXIT=0 (115 tests); `pnpm --filter elohim-core|elohim-imagodei|elohim-qahal build`
   EXIT=0 each.
+
+**Lockfile audit 2026-10-15 (independent reader, read-only).** Every resolved
+`@analogjs/vite-plugin-angular@2.6.4`, `vitest@4.1.11`, `@vitest/mocker@4.1.11`,
+`@angular/build@22.1.0`, Storybook Vite builder and `vite-plugin-dts` instance in
+`pnpm-lock.yaml` binds `vite@8.1.5`. Two older Vite copies remain as development-tool
+transitives that cannot emit this warning: `vite@7.3.1` under `vitest@3.2.7`, which
+`elohim/elohim-agent/elohim-agent-sdk`, `elohim/sdk/epr-ts` and
+`elohim/sdk/storage-client-ts` declare; and `vite@6.4.1` under the optional
+`@angular-devkit/build-angular@19.2.22` that analogjs pulls. Moving those three SDK
+packages to vitest 4 is a separate, optional pass.
