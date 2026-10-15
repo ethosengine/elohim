@@ -612,6 +612,9 @@ _gate-elohim-compute:
 _gate-elohim-epr:
     cd elohim && cargo fmt --check && cargo clippy -p elohim-epr -p elohim-epr-rea -p elohim-epr-index -- -D warnings && cargo test -p elohim-epr -p elohim-epr-rea -p elohim-epr-index --all-targets
 
+_gate-elohim-live-session:
+    cd elohim && cargo fmt --check -p elohim-live-session && cargo clippy -p elohim-live-session --all-targets -- -D warnings && cargo test -p elohim-live-session --all-targets
+
 _gate-elohim-ark:
     cd elohim && cargo fmt --check -p elohim-ark-core -p elohim-ark-supervisor -p elohim-ark && cargo clippy -p elohim-ark-core -p elohim-ark-supervisor -p elohim-ark -- -D warnings && cargo test -p elohim-ark-core -p elohim-ark-supervisor -p elohim-ark --all-targets
 
