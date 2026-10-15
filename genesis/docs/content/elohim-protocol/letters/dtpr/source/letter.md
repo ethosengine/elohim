@@ -1,4 +1,5 @@
 ---
+id: letter
 to: Helpful Places and the DTPR Community of Practice (please share with the Council)
 from: Matthew Dowell, steward of the Elohim Protocol
 date: 2026-10-14
