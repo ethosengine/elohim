@@ -3048,6 +3048,12 @@ impl HttpServer {
                 }
             }
 
+            // The node signs a doorway's account-bind challenge for its own
+            // person (services::account_bind). Above the `/api/v1/` catch-all,
+            // which would otherwise answer it as an unknown identity route.
+            (Method::POST, "/api/v1/identity/account-bind/sign") => {
+                Box::pin(self.handle_account_bind_sign(req)).await
+            }
             // Enriched API: Business logic endpoints
             (method, p) if p.starts_with("/api/v1/") => {
                 if let Some(ref pool) = self.db_pool {
@@ -3240,9 +3246,6 @@ impl HttpServer {
             }
             // The node's own person's sign-in secret: set or reset here, on
             // this machine only (the deterministic floor for a lost secret).
-            (Method::POST, "/api/v1/identity/account-bind/sign") => {
-                Box::pin(self.handle_account_bind_sign(req)).await
-            }
             (Method::POST, "/auth/identity/secret") => {
                 Box::pin(self.handle_identity_secret(req)).await
             }
@@ -21094,6 +21097,33 @@ mod tests {
         let resp = HttpServer::handle_chrome_asset("/chrome/not-a-thing.js");
         let (status, _h, _b) = collect_body(resp).await;
         assert_eq!(status, StatusCode::NOT_FOUND);
+    }
+
+    /// An exact `/api/v1/...` arm written below the `/api/v1/` catch-all in
+    /// `handle_request` is dead: the guard arm answers first, and the compiler
+    /// does not warn because the catch-all is guarded. That is how the
+    /// account-bind sign route first shipped as a 404.
+    #[test]
+    fn no_exact_api_v1_arm_sits_below_the_api_v1_catch_all() {
+        let src = include_str!("http.rs");
+        let start = src
+            .find("    async fn handle_request(")
+            .expect("handle_request exists");
+        let body = &src[start..];
+        let catch_all = body
+            .find("(method, p) if p.starts_with(\"/api/v1/\") =>")
+            .expect("the /api/v1/ catch-all exists");
+        let rest = &body[catch_all..];
+        let end = rest.find("\n    async fn ").unwrap_or(rest.len());
+        let dead: Vec<&str> = rest[..end]
+            .lines()
+            .map(str::trim_start)
+            .filter(|l| l.starts_with("(Method::") && l.contains("\"/api/v1/"))
+            .collect();
+        assert!(
+            dead.is_empty(),
+            "these arms sit below the /api/v1/ catch-all and are unreachable: {dead:?}"
+        );
     }
 
     #[tokio::test]
