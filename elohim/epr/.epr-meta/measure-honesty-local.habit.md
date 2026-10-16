@@ -14,7 +14,7 @@ active: false
 checks:
   - "cargo test (elohim/epr) — measure_ontology.rs (L1/L3/L4) + canonical_bytes.rs confidence_is_inside_the_canonical_bytes (L2, asserted at the CID level via compute_cid, not byte-inequality)"
   - "cargo test (elohim/epr-rea) — uncertainty_closure.rs, fold::with_uncertainty (L5); also covers the branch the plan never tested — two rates with DIFFERENT periods refuse to fold, since Period rides inside MeasureKind's derived PartialEq"
-  - "python3 -m pytest .claude/scripts/_lib/__tests__/epr_meta_measure_ontology_test.py (L6 on BOTH gates — validate_meta for manifest rules and load_policies for registry policies, sharing one MEASURE_KIND_VOCAB — plus Rust/YAML kind-vocabulary parity read from measure.rs, not a copied constant)"
+  - "python3 -m pytest .claude/scripts/_lib/__tests__/epr_meta_measure_ontology_test.py (pytest must be user-installed in this container via `python3 -m pip install --user pytest`; L6 on BOTH gates — validate_meta for manifest rules and load_policies for registry policies, sharing one MEASURE_KIND_VOCAB — plus Rust/YAML kind-vocabulary parity read from measure.rs, not a copied constant)"
   - "python3 -m pytest .claude/scripts/_lib/__tests__/doc_dynamics_test.py (the index applied to this repo's own corpus — slice 2 upgraded it from a bare ratio to a STOCK: level + inflow + outflow, declared window, in-place-rename discrimination, and the Q12/Q13 zero-absorption guards mirrored from the Rust)"
   - "cargo test (elohim/epr) — measure_dimensional.rs: the dimensional algebra (MeasureKind::divide/combine_additive), Q12's sign check, Q10's multiplier_widen, and interval div/sub incl. the float-overflow case that manufactures +inf from two finite operands"
   - "cargo test (elohim/epr-rea) — stock_dynamics.rs: Stock refuses every incoherent construction, turnover/net-change/emission-absorption/harvest-regeneration, and stock_over_window folded from real FlowEvents"
@@ -119,3 +119,5 @@ ENTIRELY above 1.0 — confirmed overshoot even at 3x the counted
 absorption, which is a strictly stronger claim than the survey §6.2 rows
 it replaces (those were levels against ceilings, and §6.2 is now
 corrected in place).
+
+DELTA 2026-10-16 (GREEN preserved; python leg re-measured): at origin/dev@42941449e, after `python3 -m pip install --user pytest` installed pytest 9.1.1 in the user site (the container ships no pytest), `python3 -m pytest .claude/scripts/_lib/__tests__/epr_meta_measure_ontology_test.py -q` reported `10 passed in 0.92s`, exit 0; green holds on the python leg, with cargo legs unmeasured today.
