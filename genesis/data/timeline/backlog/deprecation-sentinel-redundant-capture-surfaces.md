@@ -906,6 +906,22 @@ than the two guards and should be measured separately, not bundled.
 
 ## Current decision
 
+**2026-10-16 — capture-surface rule fixed locally, pending landing.** The
+sentinel's existing command suppression now admits only the declared emitter
+classes: pnpm/npm/npx/node, cargo/cargo-clippy/rustc, ng/vitest/jest/eslint/tsc,
+just/gh/pip/docker, python3 running `-m pytest` or `-m pip`, and bash/sh directly
+running a script under `scripts/ci/`. A small table owns these rules. Leading
+environment assignments (including `env`) and simple `cd PATH &&` prefixes
+are resolved before checking the first executable. Readers and unrecognized
+commands are suppressed before scanning output; a later emitter does not
+promote a reader-led compound command. Existing line-level guards remain.
+Regression tests exercise actual capture with an isolated temporary ledger,
+including a cat-read GHSA advisory, pnpm lint, cd prefixes, and RUSTFLAGS cargo.
+The repository ledger is untouched; reconciliation belongs to a separate packet.
+The lifecycle vocabulary has no explicit fixed-locally-pending-landing value,
+so `status: backlog` and `deprecation_status: blocked` remain unchanged; this
+note records the local fix without claiming closure of the other classes below.
+
 **Classes 1 and 2 are CLOSED — Guards J and K landed 2026-07-30.** The
 permission blocker recorded below did **not** reproduce: a later triage run
 (dispatched on the `.angular/cache` capture `c3259594f97a`) edited

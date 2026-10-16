@@ -54,6 +54,7 @@ import hashlib
 import json
 import os
 import re
+import shlex
 import sys
 from datetime import datetime, timezone
 
@@ -61,6 +62,17 @@ MAX_SCAN_BYTES = 200_000  # bound the regex scan on huge outputs
 MAX_NEW_PER_CALL = 5  # bound dispatch-directive noise from one command
 MAX_CITED_PER_CALL = 3  # bound re-encounter citation noise
 LINE_TRUNC = 300
+
+# First executable after assignments / cd prefixes; unmatched commands deny capture.
+# Argument prefixes are token regexes (empty tuple permits any arguments).
+CAPTURE_SURFACES = (
+    ("cat sed grep rg find head tail less wc ls tree jq yq", None),
+    ("pnpm npm npx node cargo cargo-clippy rustc ng vitest jest eslint tsc just gh pip docker", ()),
+    # git is a reader (show/diff/log) except where its hooks run gates: push and commit.
+    ("git", (r"push|commit",)),
+    ("python3", (r"-m", r"pytest|pip|unittest")),
+    ("bash sh", (r"(?:\./)?scripts/ci/(?!.*\.\./).+",)),
+)
 
 # Deprecation signatures across the toolchains in this repo
 # (Vitest/Vite, npm/pnpm, Node, Angular, Rust, Python, generic).
@@ -1163,6 +1175,39 @@ def load_session_cited(path: str) -> set:
         return set()
 
 
+def _command_can_capture(command: str) -> bool:
+    """Resolve only the leading command; never promote a later reader/emitter."""
+    try:
+        lexer = shlex.shlex(command, posix=True, punctuation_chars=";&|()<>\n")
+        lexer.whitespace = " \t\r"
+        lexer.whitespace_split = True
+        words = list(lexer)
+    except ValueError:
+        return False
+    while words:
+        if words[0] == "env":
+            words.pop(0)
+        while words and re.fullmatch(r"[A-Za-z_][A-Za-z0-9_]*=.*", words[0], re.S):
+            words.pop(0)
+        if words[:1] != ["cd"]:
+            break
+        # Only a simple cd PATH && prefix is transparent (quoted paths supported).
+        offset = 3 if words[1:2] == ["--"] else 2
+        if len(words) <= offset or words[offset] != "&&":
+            return False
+        words = words[offset + 1:]
+    if not words:
+        return False
+    executable = os.path.basename(words[0])
+    for commands, arguments in CAPTURE_SURFACES:
+        if executable in commands.split():
+            return arguments is not None and len(words) > len(arguments) and all(
+                re.fullmatch(pattern, word)
+                for pattern, word in zip(arguments, words[1:])
+            )
+    return False
+
+
 def main() -> None:
     payload = json.load(sys.stdin)
     if payload.get("tool_name") != "Bash":
@@ -1175,7 +1220,7 @@ def main() -> None:
     # finding. Real sources (pnpm install, pnpm audit, cargo audit, git
     # push banners) don't carry these tokens in the command string.
     cmd_lower = command.lower()
-    if any(tok in cmd_lower for tok in GUARD_TOKENS):
+    if not _command_can_capture(command) or any(tok in cmd_lower for tok in GUARD_TOKENS):
         return
 
     texts: list = []
