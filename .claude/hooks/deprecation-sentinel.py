@@ -63,15 +63,16 @@ MAX_NEW_PER_CALL = 5  # bound dispatch-directive noise from one command
 MAX_CITED_PER_CALL = 3  # bound re-encounter citation noise
 LINE_TRUNC = 300
 
-# First executable after assignments / cd prefixes; unmatched commands deny capture.
-# Argument prefixes are token regexes (empty tuple permits any arguments).
+# Executable vocabulary and argument-prefix regexes; readers can be stdin filters.
+# Each row is (executables, argument prefixes, classification).
 CAPTURE_SURFACES = (
-    ("cat sed grep rg find head tail less wc ls tree jq yq", None),
-    ("pnpm npm npx node cargo cargo-clippy rustc ng vitest jest eslint tsc just gh pip docker", ()),
-    # git is a reader (show/diff/log) except where its hooks run gates: push and commit.
-    ("git", (r"push|commit",)),
-    ("python3", (r"-m", r"pytest|pip|unittest")),
-    ("bash sh", (r"(?:\./)?scripts/ci/(?!.*\.\./).+",)),
+    ("pnpm npm npx node cargo cargo-clippy rustc ng vitest jest eslint tsc just gh pip docker", (), "EMITTER"),
+    ("git", (r"push|commit",), "EMITTER"),
+    ("python3", (r"-m", r"pytest|pip|unittest"), "EMITTER"),
+    ("bash sh", (r"(?:\./)?scripts/ci/(?!.*\.\./).+",), "EMITTER"),
+    ("cat sed grep rg find head tail less wc ls tree jq yq awk", (), "READER/FILTER"),
+    ("git", (r"show|diff|log|status|blame|grep",), "READER/FILTER"),
+    ("echo printf printenv true date sleep", (), "NEUTRAL"),
 )
 
 # Deprecation signatures across the toolchains in this repo
@@ -1175,37 +1176,110 @@ def load_session_cited(path: str) -> set:
         return set()
 
 
+def _capture_executable(words):
+    """Remove transparent launch wrappers from one simple command."""
+    words = list(words)
+    while words:
+        if re.fullmatch(r"[A-Za-z_][A-Za-z0-9_]*=.*", words[0], re.S):
+            words.pop(0)
+            continue
+        executable = os.path.basename(words[0])
+        if executable not in {"env", "exec", "command", "nice", "time", "timeout", "sudo"}:
+            break
+        words.pop(0)
+        # Options taking a separate operand; other flags and --key=value are single tokens.
+        operands = {
+            "env": {"-u", "--unset", "-C", "--chdir"},
+            "exec": {"-a"},
+            "command": set(),
+            "nice": {"-n", "--adjustment"},
+            "time": {"-f", "--format", "-o", "--output"},
+            "timeout": {"-k", "--kill-after", "-s", "--signal"},
+            "sudo": {"-u", "--user", "-g", "--group", "-h", "--host", "-p", "--prompt", "-C", "-T", "-R", "-D"},
+        }[executable]
+        while words and words[0].startswith("-"):
+            option = words.pop(0)
+            if option == "--":
+                break
+            if option in operands and words:
+                words.pop(0)
+        if executable == "timeout" and words:
+            words.pop(0)  # duration
+    return words
+
+
+def _capture_surface(words, pipeline_first):
+    words = _capture_executable(words)
+    if not words:
+        return "NEUTRAL"
+    executable = os.path.basename(words[0])
+    for commands, arguments, surface in CAPTURE_SURFACES:
+        if executable not in commands.split() or len(words) <= len(arguments):
+            continue
+        if not all(re.fullmatch(pattern, word) for pattern, word in zip(arguments, words[1:])):
+            continue
+        if surface == "READER/FILTER":
+            path_argument = any(
+                not word.startswith("-") and ("/" in word or "." in word)
+                for word in words[1:]
+            )
+            return "FILE-READER" if pipeline_first or path_argument else "FILTER"
+        return surface
+    return "NEUTRAL"
+
+
 def _command_can_capture(command: str) -> bool:
-    """Resolve only the leading command; never promote a later reader/emitter."""
+    """Capture chains containing an emitter only when no command can echo files."""
     try:
-        lexer = shlex.shlex(command, posix=True, punctuation_chars=";&|()<>\n")
+        lexer = shlex.shlex(command, posix=True, punctuation_chars=";&|(){}<>\n")
         lexer.whitespace = " \t\r"
         lexer.whitespace_split = True
         words = list(lexer)
     except ValueError:
         return False
-    while words:
-        if words[0] == "env":
-            words.pop(0)
-        while words and re.fullmatch(r"[A-Za-z_][A-Za-z0-9_]*=.*", words[0], re.S):
-            words.pop(0)
-        if words[:1] != ["cd"]:
-            break
-        # Only a simple cd PATH && prefix is transparent (quoted paths supported).
-        offset = 3 if words[1:2] == ["--"] else 2
-        if len(words) <= offset or words[offset] != "&&":
+
+    # shlex groups adjacent punctuation (e.g. ';\n' or '>&'). Preserve
+    # redirections as units so their ampersands do not start a new command.
+    tokens = []
+    for word in words:
+        if word and all(char in ";&|(){}<>\n" for char in word):
+            tokens.extend(re.findall(r"[<>]+&?|&>>?|&&|\|\||[;&|(){}\n]", word))
+        else:
+            tokens.append(word)
+
+    commands = []
+    current = []
+    pipeline_first = True
+    skip_redirect_target = False
+    for token in tokens + [";"]:
+        if token in {"\n", ";", "&&", "||", "|", "&", "(", ")", "{", "}"}:
+            if current:
+                commands.append((current, pipeline_first))
+            current = []
+            pipeline_first = token != "|"
+            skip_redirect_target = False
+        elif skip_redirect_target:
+            skip_redirect_target = False
+        elif re.fullmatch(r"[<>]+&?|&>>?", token):
+            if current and current[-1].isdigit():
+                current.pop()  # redirection's file descriptor
+            skip_redirect_target = True
+        else:
+            current.append(token)
+
+    emitter = False
+    keywords = {"while", "until", "if", "then", "elif", "else", "fi", "do", "done", "esac"}
+    for words, pipeline_first in commands:
+        while words and words[0] in keywords:
+            words = words[1:]
+        # These headers contain names/patterns, not executable commands.
+        if not words or words[0] in {"for", "case", "function"}:
+            continue
+        surface = _capture_surface(words, pipeline_first)
+        if surface == "FILE-READER":
             return False
-        words = words[offset + 1:]
-    if not words:
-        return False
-    executable = os.path.basename(words[0])
-    for commands, arguments in CAPTURE_SURFACES:
-        if executable in commands.split():
-            return arguments is not None and len(words) > len(arguments) and all(
-                re.fullmatch(pattern, word)
-                for pattern, word in zip(arguments, words[1:])
-            )
-    return False
+        emitter |= surface == "EMITTER"
+    return emitter
 
 
 def main() -> None:

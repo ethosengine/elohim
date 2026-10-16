@@ -32,12 +32,35 @@ spec.loader.exec_module(sentinel)
     ("bash -c 'cat report.md'", False),
     ("cat report.md && pnpm lint", False),
     ("cat report.md | pnpm lint", False),
-    ("cd app; pnpm lint", False),
+    ("cd app; pnpm lint", True),
+    ('cd /projects/elohim\necho "=== eslint ==="\npnpm -C app/elohim-app exec eslint src/a.ts', True),
+    ('cd app && echo "=== PRETTIER ===" && pnpm exec prettier --check src', True),
+    ('cd app && timeout 300 pnpm run lint 2>&1 > /tmp/x/lint.txt; grep -c warn /tmp/x/lint.txt', False),
+    ('grep -n "Tier" app/x/identity.model.ts | head -40\necho done', False),
+    ("for f in a b; do pnpm -C $f lint; done", True),
+    ("SP=/tmp/s; cargo clippy -j1 2>&1 | tail -20", True),
+    ("time just gate elohim-sdk", True),
+    ("git log --oneline -5", False),
+    ("echo hello", False),
+    ("pnpm lint 2>&1 | tail -3", True),
+    ("pnpm lint | tail -3 saved.log", False),
+    ("pnpm lint; cat saved.log", False),
+    ("pnpm lint | awk '{print $1}'", True),
+    ("cd", False),
+    ("cd app\npnpm lint", True),
+    ("env -u DEBUG exec command nice -n 5 timeout -k 2s --signal TERM 300 sudo -u builder pnpm lint", True),
+    ("if true; then pnpm lint; else echo skipped; fi", True),
+    ("while true; do pnpm lint; done", True),
+    ("until true; do pnpm lint; done", True),
+    ("case $x in a) pnpm lint;; esac", True),
+    ("function build() { pnpm lint; }", True),
+    ("(pnpm lint) & echo done", True),
+    ("pnpm lint || echo failed", True),
     ("", False),
     ('cd "unfinished', False),
 ] + [(f"{reader} report.md", False) for reader in
-     "cat sed grep rg find head tail less wc git-show git-diff git-log git-status ls tree jq yq".split()]
-  + [(f"git {subcommand}", False) for subcommand in "show diff log status".split()])
+     "cat sed grep rg find head tail less wc git-show git-diff git-log git-status ls tree jq yq awk".split()]
+  + [(f"git {subcommand}", False) for subcommand in "show diff log status blame grep".split()])
 def test_command_surface(command, allowed):
     assert sentinel._command_can_capture(command) is allowed
 
