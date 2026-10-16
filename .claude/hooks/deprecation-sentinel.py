@@ -1359,7 +1359,9 @@ def main() -> None:
                             "fp": fp,
                             "class": cls,
                             "line": line[:LINE_TRUNC],
-                            "cmd": command[:160],
+                            # 400, not 160: a retroactive pass classifies the stored cmd, and
+                            # at 160 most multi-line commands were cut before their emitter.
+                            "cmd": command[:400],
                             "status": "open",
                         }
                     )
