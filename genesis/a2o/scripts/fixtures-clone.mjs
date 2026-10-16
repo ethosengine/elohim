@@ -7,12 +7,12 @@
 // S=$(node -p "require('./$R/bundle/prepare.json').seed")
 // for P in 4444 4454 4464 4474; do
 //   SEED=$S; [ "$P" = 4474 ] && SEED=$S-outsider
-//   node $F install --admin ws://localhost:$P --app probe --seed $SEED --cells 6 \
+//   node $F install --admin ws://localhost:$P --app probe --seed $SEED --clones 1 \
 //     --bundle $R/bundle/workdir/elohim.happ --out $R/peer-$P
 // done
 // node $F authorize --admin ws://localhost:4444 --app probe --out $R/auth \
 //   --credentials $R/credentials.json  # before the baseline; writes CapGrants
-// node $F measure --admin ws://localhost:4444 --app probe --cells 6 --pid $PID \
+// node $F measure --admin ws://localhost:4444 --app probe --clones 1 --pid $PID \
 //   --data $DATA --out $R/cost
 // node $F write --admin ws://localhost:4444 --app probe --clone fixtures \
 //   --credentials $R/credentials.json --out $R/probe
@@ -20,12 +20,13 @@
 //   --write $R/probe/write.json --timeout 600 --out $R/probe
 // for P in 4444 4454 4464 4474; do
 //   SEED=$S; [ "$P" = 4474 ] && SEED=$S-outsider
-//   node $F grow --admin ws://localhost:$P --app probe --seed $SEED --cells 10 \
+//   node $F grow --admin ws://localhost:$P --app probe --seed $SEED --clones 5 \
 //     --out $R/peer-$P
 // done
-// node $F measure --admin ws://localhost:4444 --app probe --cells 10 --pid $PID \
+// node $F measure --admin ws://localhost:4444 --app probe --clones 5 --pid $PID \
 //   --data $DATA --out $R/cost
-// Repeat grow/measure at 20; measure each peer with its own PID/data/output if desired.
+// --clones counts lamad clones; deprecated --cells counts all five roles plus clones.
+// Repeat grow/measure at 15 clones; measure each peer with its own PID/data/output if desired.
 import {
   AdminWebsocket,
   AppWebsocket,
@@ -55,6 +56,7 @@ const {
       'admin',
       'app',
       'seed',
+      'clones',
       'cells',
       'pid',
       'data',
@@ -84,6 +86,19 @@ function localOutput(value) {
   return result;
 }
 const out = localOutput(required('out'));
+function targetCells() {
+  const clones = o.clones === undefined ? undefined : Number(required('clones'));
+  const cells = o.cells === undefined ? undefined : Number(required('cells'));
+  if (clones !== undefined && cells !== undefined && clones + 5 !== cells)
+    throw Error('--clones and deprecated --cells disagree (cells must equal clones + 5)');
+  if (clones === undefined && cells === undefined && mode === 'measure') required('clones');
+  const target = clones === undefined ? (cells ?? 6) : clones + 5;
+  if (![5, 6, 10, 20].includes(target))
+    throw Error('--clones must be 0, 1, 5 or 15 (--cells: 5, 6, 10 or 20)');
+  return target;
+}
+const target = ['install', 'grow', 'measure'].includes(mode) ? targetCells() : undefined;
+
 if (mode === 'prepare') {
   const hc = required('hc');
   const version = execFileSync(hc, ['--version'], { encoding: 'utf8' });
@@ -314,8 +329,6 @@ try {
     wsClientOptions: { origin: 'http://localhost' },
   });
   if (mode === 'install' || mode === 'grow') {
-    const target = Number(o.cells ?? 6);
-    if (![5, 6, 10, 20].includes(target)) throw Error('--cells must be 5, 6, 10 or 20');
     const installed = Object.values(info.cell_info).flat();
     if (installed.filter(c => c.type === 'provisioned').length !== 5)
       throw Error('Expected five provisioned cells');
@@ -357,7 +370,7 @@ try {
     await new Promise(resolve => setTimeout(resolve, 60000)); // same settling interval as idle run
     const status = fs.readFileSync(`/proc/${pid}/status`, 'utf8');
     const cells = (await admin.listCellIds()).length;
-    if (cells !== Number(required('cells'))) throw Error(`Unexpected cell count ${cells}`);
+    if (cells !== target) throw Error(`Unexpected cell count ${cells}`);
     const row = {
       time: new Date().toISOString(),
       cells,
@@ -557,32 +570,36 @@ try {
         cellId: c.value.cell_id.map(encodeHashToBase64),
       })),
     });
-    const rows = execFileSync(
-      'python3',
-      [
-        '-c',
-        'import sqlite3,json,sys; c=sqlite3.connect("file:"+sys.argv[1]+"?mode=ro",uri=True); c.row_factory=sqlite3.Row; print(json.dumps([dict(r) for r in c.execute("SELECT * FROM content ORDER BY id")],sort_keys=True))',
-        required('db'),
-      ],
-      { encoding: 'utf8' }
-    );
-    write('projection.json', JSON.parse(rows));
-    const documents = [];
-    for (let offset = 0; ; offset += 100) {
-      const response = await fetch(
-        `${required('storage')}/sync/v1/elohim/docs?offset=${offset}&limit=100`
+    if (o.db === undefined && o.storage === undefined) {
+      console.log('Projection/storage inventory skipped: neither --db nor --storage was given');
+    } else {
+      const rows = execFileSync(
+        'python3',
+        [
+          '-c',
+          'import sqlite3,json,sys; c=sqlite3.connect("file:"+sys.argv[1]+"?mode=ro",uri=True); c.row_factory=sqlite3.Row; print(json.dumps([dict(r) for r in c.execute("SELECT * FROM content ORDER BY id")],sort_keys=True))',
+          required('db'),
+        ],
+        { encoding: 'utf8' }
       );
-      if (!response.ok) throw Error(`Sync inventory HTTP ${response.status}`);
-      const page = await response.json();
-      if (!Array.isArray(page.documents)) throw Error('Unexpected sync page');
-      documents.push(...page.documents);
-      if (documents.length >= page.total) break;
-      if (!page.documents.length) throw Error('Incomplete sync inventory');
+      write('projection.json', JSON.parse(rows));
+      const documents = [];
+      for (let offset = 0; ; offset += 100) {
+        const response = await fetch(
+          `${required('storage')}/sync/v1/elohim/docs?offset=${offset}&limit=100`
+        );
+        if (!response.ok) throw Error(`Sync inventory HTTP ${response.status}`);
+        const page = await response.json();
+        if (!Array.isArray(page.documents)) throw Error('Unexpected sync page');
+        documents.push(...page.documents);
+        if (documents.length >= page.total) break;
+        if (!page.documents.length) throw Error('Incomplete sync inventory');
+      }
+      write(
+        'sync.json',
+        documents.sort((a, b) => a.docId.localeCompare(b.docId))
+      );
     }
-    write(
-      'sync.json',
-      documents.sort((a, b) => a.docId.localeCompare(b.docId))
-    );
   } else throw Error('Modes: prepare, install, grow, measure, write, poll, authorize, inventory');
 } finally {
   if (app) await app.client.close();
