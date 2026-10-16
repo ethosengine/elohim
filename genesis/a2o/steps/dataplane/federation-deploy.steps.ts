@@ -1069,7 +1069,13 @@ interface HeadOnlyState {
   /** Laggard `/head` `earned` when both peers first held the page (expected false). */
   laggardEarnedBefore?: boolean;
   ledgerAfterGiven?: number;
-  announce?: { ledger: number; sweeps: number | null; adoption: number };
+  /** Receiver baseline, captured BEFORE the declaration so a fast receiver cannot beat it. */
+  announce?: {
+    ledger: number;
+    sweeps: number | null;
+    adoption: number;
+    byOutcome: Record<(typeof ADOPTION_OUTCOMES)[number], number>;
+  };
 }
 
 const headOnlyStates = new WeakMap<E2EWorld, HeadOnlyState>();
@@ -1127,12 +1133,18 @@ async function reconcileSweeps(peer: PeerRef): Promise<number | null> {
 
 /** Fleet-wide (not per id) sum of the adoption-trigger outcomes that can mean "told". */
 async function adoptionTriggers(peer: PeerRef): Promise<number> {
+  const by = await adoptionByOutcome(peer);
+  return ADOPTION_OUTCOMES.reduce((sum, outcome) => sum + by[outcome], 0);
+}
+
+/** Each outcome's counter separately, so a diagnostic shows which one moved. */
+async function adoptionByOutcome(
+  peer: PeerRef
+): Promise<Record<(typeof ADOPTION_OUTCOMES)[number], number>> {
   const text = await metricsText(peer);
-  return ADOPTION_OUTCOMES.reduce(
-    (sum, outcome) =>
-      sum + (parseLabeledPrometheusMetric(text, ADOPTION_SERIES, ADOPTION_LABEL, outcome) ?? 0),
-    0
-  );
+  const read = (outcome: string) =>
+    parseLabeledPrometheusMetric(text, ADOPTION_SERIES, ADOPTION_LABEL, outcome) ?? 0;
+  return { probe: read('probe'), election_refreshed: read('election_refreshed') };
 }
 
 Given(
@@ -1197,6 +1209,15 @@ Given(
       s.winner.alias,
       `"${alias}" is not the peer that authored the page (${s.winner.alias})`
     );
+    // Receiver baseline FIRST: a fast receiver may process the announcement (and probe) before any
+    // later snapshot, which would then show no increase although it was told.
+    const byOutcome = await adoptionByOutcome(s.laggard);
+    s.announce = {
+      ledger: stagingWriteCount(),
+      sweeps: await reconcileSweeps(s.laggard),
+      adoption: ADOPTION_OUTCOMES.reduce((sum, o) => sum + byOutcome[o], 0),
+      byOutcome,
+    };
     // "New head" here means a new EARNED declaration for the SAME action hash: the text and the
     // action are unchanged, only the declaration's ordering (earned tier, notarized clock) is new.
     await declareEarnedCanonicalHead(s.winnerRail, s.eprId, s.winnerHead);
@@ -1213,25 +1234,28 @@ Given(
       earned,
       `${s.winner.alias}'s /head never read earned=true for "${s.eprId}" after the declaration`
     );
+    // The declaration itself records a staging write in the global ledger (carried-election.ts), so
+    // the ledger watermark is taken only now; sweeps/adoption were captured before the declaration.
+    s.announce.ledger = stagingWriteCount();
   }
 );
 
 When(
   'peer {string} announces the change to its federation',
   { timeout: 60_000 },
-  async function (this: E2EWorld, alias: string) {
+  function (this: E2EWorld, alias: string) {
     const s = headOnly(this);
     assert.strictEqual(
       alias,
       s.winner.alias,
       `"${alias}" is not the declaring peer (${s.winner.alias})`
     );
-    // No write: announcing is the substrate's own act. This only snapshots what "before" is.
-    s.announce = {
-      ledger: stagingWriteCount(),
-      sweeps: await reconcileSweeps(s.laggard),
-      adoption: await adoptionTriggers(s.laggard),
-    };
+    // No write: announcing is the substrate's own act. The baseline was captured before the
+    // declaration (see the declaring step); this only asserts it exists.
+    assert.ok(
+      s.announce,
+      'the pre-declaration receiver baseline is missing — the declaring step must run first'
+    );
   }
 );
 
@@ -1245,17 +1269,19 @@ Then(
       s.laggard.alias,
       `"${alias}" is not the receiving peer (${s.laggard.alias})`
     );
-    assert.ok(s.announce, 'the announce snapshot is missing — the When step must run first');
+    assert.ok(s.announce, 'the announce snapshot is missing — the declaring step must run first');
     const before = s.announce.adoption;
     const told = await pollUntil(
       TOLD_WAIT_MS,
       async () => (await adoptionTriggers(s.laggard)) > before
     );
+    const after = await adoptionByOutcome(s.laggard);
+    const fmt = (o: Record<string, number>) => ADOPTION_OUTCOMES.map(k => `${k}=${o[k]}`).join(' ');
     assert.ok(
       told,
       `${s.laggard.alias} was never told: ${ADOPTION_SERIES}{${ADOPTION_LABEL}=${ADOPTION_OUTCOMES.join('|')}} ` +
         `stayed at ${before} for ${TOLD_WAIT_MS / 1000}s after ${s.winner.alias} re-declared the head — a head-only ` +
-        `declaration announced nothing`
+        `declaration announced nothing (before the declaration: ${fmt(s.announce.byOutcome)}; after: ${fmt(after)})`
     );
   }
 );
