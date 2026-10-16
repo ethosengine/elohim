@@ -3,6 +3,9 @@ Feature: Doorway visitors can trace access decisions, contributions and response
   These acceptance specifications cover successful serves and reach-based HTTP 403
   refusals through the household's owned mesh. Here, standing is the current identity
   and relationship evidence considered under the resource's declared reach.
+  Scenarios 2 and 3 prove standing through member serves and nonmember refusals under
+  the same declared reach, with each named requester's bearer and separately read peer
+  membership record identifying the same person.
 
   The Dowell household is the governing collective in this story. It decides who may
   read the shared garden resource and owes an answer when James objects. The fixture
@@ -10,8 +13,10 @@ Feature: Doorway visitors can trace access decisions, contributions and response
   recording actor's authority or a formal ruling ceremony.
 
   EPR means Elohim Protocol Record: here it identifies the published garden resource.
-  The project-epr (the EPR record a doorway projects, also called the projection contract
-  or declaration) gives alpha permission to serve and names alpha's provider. Its reach
+  The project-epr, projection contract and declaration are one record.
+  The steps call the record a contract, its returned representation a declaration,
+  and its link a declaration reference.
+  It gives alpha permission to serve and names alpha's provider. Its reach
   field states the audience. Narrowing updates
   that field in place, under the same contract identifier; it does not create a new
   contract. The full declaration means the complete returned contract record, including
@@ -23,11 +28,14 @@ Feature: Doorway visitors can trace access decisions, contributions and response
 
   Matthew, Ronald, and James make named requests with hosted bearer credentials tied to
   their canonical fixture humans: their pre-existing fixture identities.
-  The bearer credential and the separately read peer membership record must identify
-  the same person. This proves only the hosted-identity path used here; direct device-to-doorway
-  credential handoff remains unproved.
+  Hosted means the doorway holds the person's session and signs on their behalf;
+  the bearer token is that session's credential.
+  Device-native identity is a separate path not proved here.
 
-  Alpha holds the scenario's uniquely marked bytes. Beta is a separate entrance that
+  Alpha holds the scenario's uniquely marked bytes.
+  The live-projection-contract Background step creates and stages those bytes on alpha;
+  the observation step records their marker for later comparison.
+  Beta is a separate entrance that
   can relay them but cannot invent reach or claim alpha's holding work. Anonymous
   requests are clean probes of public permission: after the contract's reach changes
   from commons to Dowell members, their HTTP 403 shows that public permission was
@@ -57,7 +65,8 @@ Feature: Doorway visitors can trace access decisions, contributions and response
   and a projected credit (the record of who operated the entrance it was served through),
   each resolving to its exact credited record.
 
-  The household's fixture manifest declares its reconcile window (60 seconds in this fixture).
+  The household's fixture manifest, household-fixture.json written by the mesh prologue,
+  declares its reconcile window (60 seconds in this fixture).
   The holder-side anonymous-refusal observation has an explicit deadline of that convergence
   window plus one request/poll interval, at most
   15 seconds; it does not claim to prove the unobserved instant when enforcement began. Beta's
