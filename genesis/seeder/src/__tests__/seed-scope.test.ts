@@ -20,7 +20,7 @@ vi.mock('../doorway-client.js', () => ({
   },
 }));
 vi.mock('../seed-operator-bindings.js', () => ({
-  seedOperatorBindings: calls.bindings, seedHostingAgreements: calls.hosting,
+  seedConfiguredOperatorBindings: calls.bindings, seedHostingAgreements: calls.hosting,
   defaultM5Bindings: () => [], defaultHostingAgreements: () => [],
   createOperatorBindingClient: () => ({}),
 }));
@@ -85,7 +85,9 @@ describe('targeted content seeding does not run deployment writers', () => {
 
   it('retains the deployment completion chain without an explicit id scope', async () => {
     process.argv = ['node', 'test', '--content-only'];
+    process.env.OPERATOR_STEWARD_STORAGE_URL = 'http://steward.invalid';
     await (await import('../seed.js')).seed();
+    delete process.env.OPERATOR_STEWARD_STORAGE_URL;
     expect(calls.content.mock.calls[0][0]).toHaveLength(2);
     for (const writer of [calls.bindings, calls.hosting, calls.atom, calls.projections, calls.stakes, calls.emit]) {
       expect(writer).toHaveBeenCalledOnce();

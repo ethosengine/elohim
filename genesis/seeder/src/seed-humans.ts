@@ -661,4 +661,25 @@ async function main(): Promise<void> {
   process.exit(0);
 }
 
-main();
+/** Reuse the same login result as registration verification; never infer an agent key. */
+export async function operatorAgentKeysFromLogin(
+  doorwayUrl: string,
+  humanIds: string[],
+): Promise<Map<string, string>> {
+  const jsonPath = resolve(dirname(fileURLToPath(import.meta.url)), '../../data/humans/humans.json');
+  const humans = (JSON.parse(readFileSync(jsonPath, 'utf-8')) as HumansJson).humans;
+  const keys = new Map<string, string>();
+  for (const id of new Set(humanIds)) {
+    const human = humans.find(h => h.id === id);
+    if (!human) throw new Error(`OPERATOR_HUMAN_MISSING: ${id}`);
+    const result = await verifyExisting(doorwayUrl, deriveCredentials(human), human.displayName);
+    if (result.result === 'failed') {
+      throw new Error(`OPERATOR_LOGIN_FAILED: ${id}: ${result.error}`);
+    }
+    if (!result.agentPubKey?.trim()) throw new Error(`OPERATOR_AGENT_KEY_MISSING: ${id}`);
+    keys.set(id, result.agentPubKey);
+  }
+  return keys;
+}
+
+if (import.meta.url === `file://${process.argv[1]}`) main();
