@@ -1,5 +1,6 @@
 import { provideHttpClient } from '@angular/common/http';
 import { HttpTestingController, provideHttpClientTesting } from '@angular/common/http/testing';
+import { signal } from '@angular/core';
 import { TestBed } from '@angular/core/testing';
 import { ActivatedRoute, Router } from '@angular/router';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
@@ -11,6 +12,21 @@ import { ThresholdLoginComponent } from './threshold-login.component';
 
 /** Let pending zone promises settle so the next HttpClient request is issued. */
 const settle = () => new Promise<void>(resolve => setTimeout(resolve, 0));
+
+/** AuthStateService as the component reads it. Nobody is signed in unless `signedIn` says so. */
+function authStateStub(
+  signedIn: { identifier: string; isSteward?: boolean; token?: string } | null = null
+) {
+  return {
+    storeToken: vi.fn(),
+    refresh: vi.fn().mockResolvedValue(undefined),
+    isLoading: signal(false),
+    isAuthenticated: signal(signedIn !== null),
+    isSteward: signal(signedIn?.isSteward ?? false),
+    account: signal(signedIn ? { identifier: signedIn.identifier } : null),
+    storedToken: vi.fn().mockReturnValue(signedIn ? (signedIn.token ?? 'held-jwt') : null),
+  };
+}
 
 /**
  * Steward portal-handoff contract (GAP-2c).
@@ -27,7 +43,7 @@ describe('ThresholdLoginComponent — steward portal-handoff', () => {
   let httpMock: HttpTestingController;
   let originalLocation: Location;
   let hrefSink: { href: string; origin: string; hostname: string };
-  let mockAuthState: { storeToken: ReturnType<typeof vi.fn>; refresh: ReturnType<typeof vi.fn> };
+  let mockAuthState: ReturnType<typeof authStateStub>;
   let mockRouter: { navigate: ReturnType<typeof vi.fn> };
 
   const AUTH_RESPONSE_STEWARD = {
@@ -63,7 +79,7 @@ describe('ThresholdLoginComponent — steward portal-handoff', () => {
   }
 
   beforeEach(() => {
-    mockAuthState = { storeToken: vi.fn(), refresh: vi.fn().mockResolvedValue(undefined) };
+    mockAuthState = authStateStub();
     mockRouter = { navigate: vi.fn().mockResolvedValue(true) };
 
     // Stub location so the client-driven redirect is observable and does not
@@ -203,7 +219,7 @@ describe('ThresholdLoginComponent — return to the page that asked', () => {
         { provide: Router, useValue: mockRouter },
         {
           provide: AuthStateService,
-          useValue: { storeToken: vi.fn(), refresh: vi.fn().mockResolvedValue(undefined) },
+          useValue: authStateStub(),
         },
         { provide: IDENTITY_ELEMENTS, useValue: () => Promise.resolve(false) },
       ],
@@ -310,7 +326,7 @@ describe('ThresholdLoginComponent — witness trail while signing in', () => {
         { provide: Router, useValue: { navigate, navigateByUrl: vi.fn() } },
         {
           provide: AuthStateService,
-          useValue: { storeToken: vi.fn(), refresh: vi.fn().mockResolvedValue(undefined) },
+          useValue: authStateStub(),
         },
         { provide: IDENTITY_ELEMENTS, useValue: loader },
       ],
@@ -418,5 +434,152 @@ describe('ThresholdLoginComponent — witness trail while signing in', () => {
     const second = component.onSubmit();
     httpMock.expectOne('/auth/login').flush(AUTH_RESPONSE);
     await Promise.all([first, second]);
+  });
+});
+
+/**
+ * Already signed in here: an app that sends a hosted human over gets one
+ * deliberate click instead of a second password (06-reaching-the-app.feature,
+ * "one deliberate click"). The click is the consent — nothing is authorized
+ * before it — and the form stays one choice away.
+ */
+describe('ThresholdLoginComponent — continue as the person already signed in', () => {
+  let httpMock: HttpTestingController;
+  let originalLocation: Location;
+  let originalFetch: typeof globalThis.fetch;
+  let hrefSink: { href: string; origin: string; hostname: string };
+  let fetchMock: ReturnType<typeof vi.fn>;
+
+  const OAUTH = {
+    client_id: 'elohim-app',
+    redirect_uri: 'https://alpha.elohim.host/auth/callback',
+    response_type: 'code',
+    state: 'app-state',
+  };
+
+  function setup(
+    params: Record<string, string>,
+    signedIn: Parameters<typeof authStateStub>[0] = { identifier: 'linnet' }
+  ) {
+    TestBed.resetTestingModule();
+    const authState = authStateStub(signedIn);
+    TestBed.configureTestingModule({
+      imports: [ThresholdLoginComponent],
+      providers: [
+        provideHttpClient(),
+        provideHttpClientTesting(),
+        { provide: ActivatedRoute, useValue: { snapshot: { queryParams: params } } },
+        { provide: Router, useValue: { navigate: vi.fn(), navigateByUrl: vi.fn() } },
+        { provide: AuthStateService, useValue: authState },
+        { provide: IDENTITY_ELEMENTS, useValue: () => Promise.resolve(false) },
+      ],
+    });
+    httpMock = TestBed.inject(HttpTestingController);
+    const fixture = TestBed.createComponent(ThresholdLoginComponent);
+    fixture.detectChanges();
+    return { fixture, component: fixture.componentInstance, authState };
+  }
+
+  const el = (fixture: { nativeElement: HTMLElement }, testid: string) =>
+    fixture.nativeElement.querySelector(`[data-testid="${testid}"]`) as HTMLElement | null;
+
+  beforeEach(() => {
+    originalLocation = globalThis.location;
+    originalFetch = globalThis.fetch;
+    hrefSink = {
+      href: 'https://alpha.elohim.host/threshold/login',
+      origin: 'https://alpha.elohim.host',
+      hostname: 'alpha.elohim.host',
+    };
+    Object.defineProperty(globalThis, 'location', {
+      value: hrefSink,
+      writable: true,
+      configurable: true,
+    });
+    fetchMock = vi.fn().mockResolvedValue({
+      ok: true,
+      json: () =>
+        Promise.resolve({ redirect_uri: `${OAUTH.redirect_uri}?code=c1&state=app-state` }),
+    });
+    globalThis.fetch = fetchMock as unknown as typeof globalThis.fetch;
+  });
+
+  afterEach(() => {
+    Object.defineProperty(globalThis, 'location', {
+      value: originalLocation,
+      writable: true,
+      configurable: true,
+    });
+    globalThis.fetch = originalFetch;
+    httpMock.verify();
+  });
+
+  it('names who is signed in and asks for no password', () => {
+    const { fixture } = setup(OAUTH);
+    expect(el(fixture, 'threshold-continue-identifier')?.textContent?.trim()).toBe('linnet');
+    expect(el(fixture, 'threshold-continue-submit')?.textContent).toContain('Elohim App');
+    expect(el(fixture, 'threshold-password')).toBeNull();
+  });
+
+  it('hands nothing to the app until the person clicks', () => {
+    setup(OAUTH);
+    expect(fetchMock).not.toHaveBeenCalled();
+    expect(hrefSink.href).toBe('https://alpha.elohim.host/threshold/login');
+  });
+
+  it('the click authorizes with the held session and returns to the app', async () => {
+    const { component } = setup(OAUTH, { identifier: 'linnet', token: 'held-session' });
+    await component.onContinue();
+
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    const [url, init] = fetchMock.mock.calls[0] as [string, RequestInit];
+    const target = new URL(url);
+    expect(target.pathname).toBe('/auth/authorize');
+    expect(target.searchParams.get('client_id')).toBe('elohim-app');
+    expect(target.searchParams.get('state')).toBe('app-state');
+    expect((init.headers as Record<string, string>)['Authorization']).toBe('Bearer held-session');
+    expect(hrefSink.href).toBe(`${OAUTH.redirect_uri}?code=c1&state=app-state`);
+    // The held session never rides a URL.
+    expect(hrefSink.href).not.toContain('held-session');
+  });
+
+  it('a different account shows the form and keeps the request', () => {
+    const { fixture, component } = setup(OAUTH);
+    el(fixture, 'threshold-use-another-account')?.click();
+    fixture.detectChanges();
+
+    expect(el(fixture, 'threshold-continue')).toBeNull();
+    expect(el(fixture, 'threshold-password')).not.toBeNull();
+    expect(component.oauthParams()?.state).toBe('app-state');
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  it('a lapsed session falls back to the form and says why', async () => {
+    fetchMock.mockResolvedValueOnce({ ok: false, json: () => Promise.resolve({}) });
+    const { fixture, component } = setup(OAUTH);
+    await component.onContinue();
+    fixture.detectChanges();
+
+    expect(component.state()).toBe('form');
+    expect(el(fixture, 'threshold-error')?.textContent).toContain('Sign in again');
+    expect(el(fixture, 'threshold-password')).not.toBeNull();
+  });
+
+  it('makes no offer when no app is asking', () => {
+    const { fixture } = setup({});
+    expect(el(fixture, 'threshold-continue')).toBeNull();
+    expect(el(fixture, 'threshold-password')).not.toBeNull();
+  });
+
+  it('makes no offer when nobody is signed in here', () => {
+    const { fixture } = setup(OAUTH, null);
+    expect(el(fixture, 'threshold-continue')).toBeNull();
+    expect(el(fixture, 'threshold-password')).not.toBeNull();
+  });
+
+  it('makes no offer to a steward, whose own portal answers for their key', () => {
+    const { fixture } = setup(OAUTH, { identifier: 'matthew', isSteward: true });
+    expect(el(fixture, 'threshold-continue')).toBeNull();
+    expect(el(fixture, 'threshold-password')).not.toBeNull();
   });
 });

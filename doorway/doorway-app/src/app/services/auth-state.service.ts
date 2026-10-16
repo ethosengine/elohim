@@ -130,6 +130,14 @@ export class AuthStateService {
   }
 
   /**
+   * The session this portal already holds, for a person continuing to an app
+   * without typing their password again. Null when nobody is signed in here.
+   */
+  storedToken(): string | null {
+    return this.tokenStore.get()?.token ?? null;
+  }
+
+  /**
    * Check if a session_token query parameter is present in the URL.
    * If so, exchange it for a JWT and store it. This enables seamless
    * navigation from elohim-app to doorway-app without re-login.

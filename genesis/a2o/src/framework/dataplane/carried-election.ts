@@ -164,16 +164,34 @@ export interface MandateScope {
  * The household device binding the earned-declaration gate needs. `A2O_DEVICE_BINDING` names a
  * binding.json; absent that, the household ceremony's persisted default is used when present.
  */
+/** The one-line cure naming every location tried, for a mandated call with no binding. */
+export function missingDeviceBindingMessage(): string {
+  const explicit = process.env.A2O_DEVICE_BINDING;
+  const guard = 'the content_store mandate guard will refuse the declaration';
+  if (explicit) {
+    return `household device binding not found (looked at A2O_DEVICE_BINDING=${resolve(explicit)}); ${guard} — fix or unset A2O_DEVICE_BINDING`;
+  }
+  const meshDir = process.env.MESH_DIR;
+  const tried = [
+    'A2O_DEVICE_BINDING (unset)',
+    meshDir
+      ? resolve(meshDir, 'device-ceremony/binding.json')
+      : '$MESH_DIR/device-ceremony/binding.json (MESH_DIR unset)',
+    resolve(process.cwd(), '../local-dev/household-dowell/device-ceremony/binding.json'),
+  ];
+  return `household device binding not found (looked at ${tried.join(', ')}); ${guard} — set A2O_DEVICE_BINDING or run the lane with MESH_DIR`;
+}
+
 export function householdDeviceBinding(): string | undefined {
-  const path = resolve(
-    process.env.A2O_DEVICE_BINDING ??
-      resolve(
-        // The a2o lane runs from genesis/a2o; the loader may not define import.meta.dirname.
-        process.cwd(),
-        '../local-dev/household-dowell/device-ceremony/binding.json'
-      )
-  );
-  if (!existsSync(path)) return undefined;
+  const explicit = process.env.A2O_DEVICE_BINDING;
+  const meshDir = process.env.MESH_DIR;
+  const path = explicit
+    ? resolve(explicit)
+    : [
+        ...(meshDir ? [resolve(meshDir, 'device-ceremony/binding.json')] : []),
+        resolve(process.cwd(), '../local-dev/household-dowell/device-ceremony/binding.json'),
+      ].find(candidate => existsSync(candidate));
+  if (!path || !existsSync(path)) return undefined;
   const state = JSON.parse(readFileSync(path, 'utf8')) as { binding?: string };
   return state.binding;
 }
@@ -686,6 +704,7 @@ export async function declareEarnedCanonicalHead(
       delegation: null,
     };
     const binding = householdDeviceBinding();
+    if (rail.callMandated && !binding) throw new Error(missingDeviceBindingMessage());
     if (!rail.callMandated || !binding) {
       return (await rail.call('declare_earned_canonical_head', payload)) as {
         canonical?: boolean;

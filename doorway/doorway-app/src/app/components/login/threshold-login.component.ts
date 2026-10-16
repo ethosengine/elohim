@@ -4,7 +4,9 @@
  * Handles OAuth authorization at the doorway.
  * When elohim-app redirects a user here, this component:
  * 1. Reads OAuth params from URL (?client_id, ?redirect_uri, ?response_type, ?state)
- * 2. Shows login form for the user to authenticate
+ * 2. Shows login form for the user to authenticate — or, when this portal
+ *    already holds a hosted human's session, offers one click to continue as
+ *    them (the click is the consent; nothing is handed over without it)
  * 3. On success, generates authorization code and redirects back to elohim-app
  *
  * This enables the thin-federated architecture where any doorway
@@ -66,7 +68,12 @@ type LoginState = 'form' | 'authenticating' | 'authorizing' | 'error';
           <p>Welcome back.</p>
         </div>
 
-        @if (oauthParams()) {
+        @if (offerContinue()) {
+          <!-- prettier-ignore -->
+          <p class="portal-context oauth-info">
+            <strong class="app-name">{{ clientDisplayName() }}</strong> is asking who you are.
+          </p>
+        } @else if (oauthParams()) {
           <!-- prettier-ignore -->
           <p class="portal-context oauth-info">
             Sign in to continue to <strong class="app-name">{{ clientDisplayName() }}</strong>.
@@ -92,7 +99,32 @@ type LoginState = 'form' | 'authenticating' | 'authorizing' | 'error';
           </div>
         }
 
-        @if (state() === 'form' || state() === 'authenticating') {
+        @if (offerContinue()) {
+          <div class="portal-continue" data-testid="threshold-continue">
+            <p class="continue-who">
+              Signed in as
+              <strong data-testid="threshold-continue-identifier">{{ signedInAs() }}</strong>
+            </p>
+            <button
+              type="button"
+              class="btn-primary"
+              data-testid="threshold-continue-submit"
+              (click)="onContinue()"
+            >
+              Continue to {{ clientDisplayName() }}
+            </button>
+            <button
+              type="button"
+              class="portal-link continue-other"
+              data-testid="threshold-use-another-account"
+              (click)="useAnotherAccount()"
+            >
+              Use a different account
+            </button>
+          </div>
+        }
+
+        @if ((state() === 'form' && !offerContinue()) || state() === 'authenticating') {
           <form
             class="portal-form"
             (ngSubmit)="onSubmit(loginForm.valid)"
@@ -259,6 +291,26 @@ export class ThresholdLoginComponent implements OnInit {
   readonly trailElementReady = signal(false);
   /** How long the live trail waits before showing (the dev preview pins it to 0). */
   readonly trailRevealAfterMs = signal(400);
+  /** The person asked to sign in as someone other than whoever is signed in here. */
+  readonly choseAnotherAccount = signal(false);
+
+  /**
+   * An app sent someone here who is already signed in at this portal: offer
+   * one click instead of a second password. Stewards are excluded — their own
+   * portal answers for their key, and the form's sign-in hands them to it.
+   */
+  readonly offerContinue = computed(
+    () =>
+      this.state() === 'form' &&
+      this.oauthParams() !== null &&
+      !this.choseAnotherAccount() &&
+      !this.authState.isLoading() &&
+      this.authState.isAuthenticated() &&
+      !this.authState.isSteward()
+  );
+
+  /** Who the one click would continue as. */
+  readonly signedInAs = computed(() => this.authState.account()?.identifier ?? '');
 
   // Form model
   form: LoginForm = {
@@ -462,6 +514,35 @@ export class ThresholdLoginComponent implements OnInit {
         this.error.set(err instanceof Error ? err.message : 'An error occurred');
       }
     }
+  }
+
+  /**
+   * The one click: hand the session this portal already holds to the app that
+   * asked, through the same authorize call a fresh sign-in makes. If that
+   * session has lapsed, fall back to the form and say why.
+   */
+  async onContinue(): Promise<void> {
+    const params = this.oauthParams();
+    const token = this.authState.storedToken();
+    if (!this.offerContinue() || !params || !token) {
+      this.useAnotherAccount();
+      return;
+    }
+
+    this.state.set('authorizing');
+    this.error.set('');
+    try {
+      await this.authorizeOAuth(token, params);
+    } catch {
+      this.choseAnotherAccount.set(true);
+      this.state.set('form');
+      this.error.set('Your session here has ended. Sign in again to continue.');
+    }
+  }
+
+  /** Show the form instead of the one-click offer. */
+  useAnotherAccount(): void {
+    this.choseAnotherAccount.set(true);
   }
 
   private async authenticate(): Promise<AuthResponse | null> {
