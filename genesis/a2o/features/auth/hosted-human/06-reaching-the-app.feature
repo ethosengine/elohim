@@ -129,6 +129,75 @@ Feature: A hosted human reaches an application through their own doorway
     And the human's password was typed only on the doorway's own origin
 
   # ---------------------------------------------------------------------------
+  # Already signed in at the doorway: one deliberate click, not a second password.
+  # ---------------------------------------------------------------------------
+
+  # A person who is already signed in at their own doorway has already proved who they are there.
+  # Asking for the password again every time an application sends them over teaches them to type
+  # it whenever any page asks, which is the habit a phishing page counts on. So the portal does
+  # what a person already knows from signing in to one site with an account they hold elsewhere:
+  # it says who is signed in and which application is asking, and offers one click to go on. The
+  # click is the consent. Nothing is handed to the application until the person makes it, and the
+  # portal never sends them through on its own.
+  @wip
+  Scenario: Already signed in at my doorway, one deliberate click takes me to the application without a second password
+    "Signed in directly at the portal" means the person opened their doorway's portal themselves,
+    earlier and in this same browser, and typed their password there. The portal keeps that
+    sign-in in this browser's storage for the doorway's own site, until it expires or the person
+    signs out. Another browser, or the same one after signing out, starts signed out. No application has been told anything about them yet, which is why
+    they still meet the application's own sign-in step first: the application cannot see a
+    sign-in that lives at the doorway, and learns who the person is only by sending them there.
+    Every application is registered at the doorway under a name, and that registered name is
+    what the portal shows.
+
+    GAP today: the portal shows its password form to everyone an application sends over, even a
+    person it already has signed in, so they type their password a second time.
+
+    Given the application is registered at doorway "alpha" as "Elohim App"
+    And a hosted human "Linnet" is registered on doorway "alpha"
+    And the human has signed in directly at the portal of doorway "alpha" in this same browser
+    When the browser opens the application's sign-in on the way to "/lamad"
+    And the human resolves their identifier at the application
+    Then the browser is at the sign-in portal of doorway "alpha"
+    And the portal carries the request the application sent
+    And the portal names that human as the one signed in
+    And the portal names the application that asked as "Elohim App"
+    And the portal offers one button to continue to that application
+    And the portal never asks for a password
+    And the browser stays at the portal until the human chooses
+
+    When the human presses the portal's button to continue
+    Then the browser is handed back to the application that asked
+    And the doorway confirms a session for that human
+    And the application opens "/lamad"
+    And the trust chrome names the human rather than only the doorway
+
+  # The one click must never become the only way through. Someone else may be signed in at a
+  # shared computer, or the person may hold two accounts at this doorway.
+  @wip
+  Scenario: Already signed in at my doorway, I can turn down the one-click offer and reach the sign-in form with the request intact
+    Declining the offer leads to the ordinary sign-in form, where the person can sign in as
+    whoever they mean to. This scenario proves only that the way out of the offer exists and
+    keeps the application's request. Signing in through that form is the finish-line scenario
+    above, and is not repeated here.
+
+    GAP today: there is no offer to turn down; the portal always shows its sign-in form.
+
+    Given the application is registered at doorway "alpha" as "Elohim App"
+    And a hosted human "Linnet" is registered on doorway "alpha"
+    And the human has signed in directly at the portal of doorway "alpha" in this same browser
+    When the browser opens the application's sign-in on the way to "/lamad"
+    And the human resolves their identifier at the application
+    Then the portal names that human as the one signed in
+    And the portal offers one button to continue to that application
+
+    When the human declines the offer at the portal
+    Then the portal renders its sign-in form
+    And the portal carries the request the application sent
+    And the trust chrome names doorway "alpha"
+    And the browser was not handed back to the application
+
+  # ---------------------------------------------------------------------------
   # A refusal, and where it is allowed to happen.
   # ---------------------------------------------------------------------------
 

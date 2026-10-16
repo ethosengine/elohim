@@ -27,6 +27,11 @@ export const THRESHOLD = {
   DOMAIN_SUFFIX: 'threshold-domain-suffix',
   DIFFERENT_DOORWAY_HINT: 'threshold-different-doorway-hint',
   RETRY: 'threshold-retry',
+  // Already signed in here: one click to the app that asked, or the way back to the form.
+  CONTINUE: 'threshold-continue',
+  CONTINUE_IDENTIFIER: 'threshold-continue-identifier',
+  CONTINUE_SUBMIT: 'threshold-continue-submit',
+  USE_ANOTHER_ACCOUNT: 'threshold-use-another-account',
 } as const;
 
 // Doorway threshold register (doorway-app: threshold-register.component.ts)
