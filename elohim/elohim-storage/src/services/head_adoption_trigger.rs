@@ -2845,7 +2845,11 @@ mod tests {
             let (probe, skipped) = (sync_count("probe"), sync_count("skipped_current"));
             run_from_peer(&rig).await;
             assert_eq!(sync_count("probe"), probe + 1, "courier {courier:?}");
-            assert_eq!(sync_count("skipped_current"), skipped, "courier {courier:?}");
+            assert_eq!(
+                sync_count("skipped_current"),
+                skipped,
+                "courier {courier:?}"
+            );
             if courier.is_some() {
                 assert_eq!(rig.resolves(), 0, "the courier short-circuit stands");
             }
