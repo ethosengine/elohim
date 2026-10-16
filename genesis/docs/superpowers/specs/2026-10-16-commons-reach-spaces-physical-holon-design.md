@@ -13,7 +13,7 @@ graduation-trigger: >-
   habits carry evidence for admission, projection isolation, cross-space succession and
   phone/hub budgets, including the nachalah-allotment outsider scenario and completed probes.
 cites:
-  - "commons-spaces-probe-a-report | Probe A (clone spaces) and probe B (fractional arc) results and raw-evidence references (2026-10-16) | sha256:532809cf5ab9e751 | path: genesis/docs/superpowers/sprints/2026-10-16-commons-spaces-probe-a-report.md"
+  - "commons-spaces-probe-a-report | Probe A (clone spaces) and probe B (fractional arc) results and raw-evidence references (2026-10-16) | sha256:6cfcd8332e25a77d | path: genesis/docs/superpowers/sprints/2026-10-16-commons-spaces-probe-a-report.md"
   - "holons-are-spaces-how-we-use-holochain | Holons, Spaces, and Holochain — What the Vision Requires Us to Reconsider | sha256:8307626aa810f8a2 | path: genesis/docs/content/elohim-protocol/architecture/2026-09-06-holons-are-spaces-how-we-use-holochain.md"
   - genesis/data/timeline/backlog/arch-authority-in-integrity-backlog.md
   - "commons-pool-as-collective-party-design | A commons pool is a collective that is party to its members' commitments — the missing node under shared data, shared inference, edge serving and edge compute | sha256:095276e5ccec79b3 | path: genesis/docs/superpowers/specs/2026-10-04-commons-pool-as-collective-party-design.md"

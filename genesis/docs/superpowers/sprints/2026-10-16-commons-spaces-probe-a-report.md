@@ -168,7 +168,7 @@ the one the household installed, so lamad is excluded and the joiner's lamad cel
 | Out-of-arc reads correct | **PASS.** 120 records from james's and jessica's mishpat chains read through the joiner (`get_commitment_record`, a plain network get): 64 out-of-arc + 56 in-arc, **120 found, 0 not found, 0 errors**; median 59.5 ms out-of-arc vs 27 ms in-arc. Caveat: whether each read was served locally or by another peer was not recorded; with the joiner holding most ops, local service is likely. | `p1/reads.json` |
 | Gossip completes | **PASS** on the four matching spaces (lamad excluded: no household peer). mishpat/node_registry/imagodei: rounds complete with all 3 peers (5–9 per peer by 09:51Z). infrastructure: 6–8 completed with each household peer by 10:18Z (4–7 timeouts each along the way; 2 with the control joiner). 17 "Initiated round timed out" in the first minutes. | `p1/gossip*.log` |
 | `hc-mesh.sh blocks` empty | **PASS** on matthew, jessica, james (no block rows). Joiner log: no warrant/block lines. | `p1/blocks.txt` |
-| Savings | **Integrated-op counts only.** infrastructure −57.6 % integrated, −43.5 % counting limbo. node_registry −3.3 %, mishpat −1.1 % (not a sharding saving). No disk or bandwidth comparison. Joiner at 10:30Z: RssAnon 0.76 GiB, data 0.51 GB across all five cells (household peers 1.2–7.4 GiB and 1.8–2.2 GB, but those carry hosted agents, storage and history — not a matched comparison; no CPU or throttle reading taken). | `p1/snap-final-2.json` |
+| Savings | **Integrated-op counts only.** infrastructure −57.6 % integrated, −43.5 % counting limbo. node_registry −3.3 %, mishpat −1.1 % (not a sharding saving). No disk or bandwidth comparison. Joiner at 10:25Z: RssAnon 0.76 GiB, data 0.51 GB across all five cells (household peers 1.2–7.4 GiB and 1.8–2.2 GB, but those carry hosted agents, storage and history — not a matched comparison; no CPU or throttle reading taken). | `p1/snap-final-2.json` |
 
 Side observations: one `PeerBehaviorError { ctx: "Unsolicited RingSector…" }` (kitsune2_gossip
 gossip.rs:363); ~1,200 `SQLITE_BUSY`(5)/`BUSY_SNAPSHOT`(517) errors in `integrate_dht_ops_consumer`
@@ -208,7 +208,7 @@ Control run ended at 24 min, before its infrastructure arc grew; its final op co
 
 ### Teardown
 
-10:30Z: both joiners stopped by their recorded PIDs (sh wrapper + holochain child each); ports 4514
+10:35Z: both joiners stopped by their recorded PIDs (sh wrapper + holochain child each); ports 4514
 and 4524 confirmed closed; observers stopped. Mesh lease released. `just mesh status` afterwards:
 matthew/jessica/james storage UP, three doorways, portal, relay and mongod UP, conductors RUNNING
 on the pinned fork. Their data directories are kept under
