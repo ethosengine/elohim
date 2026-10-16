@@ -20,7 +20,7 @@ Feature: Doorway visitors can trace access decisions, contributions and response
   operate-doorway records operation of beta, and a challenge record applies the
   contract's prior response promise to James's objection.
 
-  Matthew, Susan, and James make named requests with hosted bearer credentials tied to
+  Matthew, Ronald, and James make named requests with hosted bearer credentials tied to
   their canonical fixture humans: the named people's existing Genesis identities.
   The bearer credential and the separately read peer membership record must identify
   the same person. This proves only the hosted-identity path used here; direct device-to-doorway
@@ -80,15 +80,15 @@ Feature: Doorway visitors can trace access decisions, contributions and response
 
   Scenario: A member and a nonmember receive different answers under one narrowed declaration
     Given Matthew's peer membership record states his membership in "the Dowell household"
-    And Susan's peer membership record states no membership in "the Dowell household"
+    And Ronald's peer membership record states no membership in "the Dowell household"
     When the Dowell household decision recorded through alpha says "community-garden-club" now admits only members of "the Dowell household"
     And within 75 seconds beta is polled without a refresh instruction until it enforces and references the changed reach on the same contract
     And canonical Matthew presents his hosted bearer when asking doorway "beta" for "community-garden-club"
     Then Matthew is served the originally observed byte marker for "community-garden-club"
     And doorway "beta" names alpha as the live holder that supplied the bytes
     And the chrome names the reach that admitted him and the holder that served the bytes
-    When canonical Susan presents her hosted bearer at doorway "beta" between two further Matthew requests for "community-garden-club"
-    Then Susan is refused "community-garden-club"
+    When canonical Ronald presents his hosted bearer at doorway "beta" between two further Matthew requests for "community-garden-club"
+    Then Ronald is refused "community-garden-club"
     And the refusal names "the Dowell household" as the collective whose recorded decision narrowed it
     And the refusal gives the collective's challenge address for that decision
     And the surrounding Matthew controls return the original marker while before-and-after reads keep the same contract identifier, reach and full declaration

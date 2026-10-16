@@ -107,9 +107,10 @@
  * `HOUSEHOLD_SLUG`; `genesis/data/humans/humans.json` gives matthew/jessica/james
  * each `householdId: "household-dowell"`). All THREE household peers are
  * participants (`qahal-formation.steps.ts` `HOUSEHOLD_TRIAD` asserts exactly this
- * triad is affirmed). Scenario 2 therefore uses Susan as its authenticated
- * non-member control: her canonical fixture declares `household-susan`, she is
- * already in the Act-I hosted cast, and the step still checks the asked doorway's
+ * triad is affirmed). Scenario 2 therefore uses Ronald as its authenticated
+ * non-member control: his canonical fixture declares no household, he is a
+ * declared-hosted persona (Susan is device-phase, so the prologue never registers
+ * her and her login 401s), and the step still checks the asked doorway's
  * LIVE `/db/participations/{humanId}` answer before relying on that premise.
  *
  * THE TWO CHROME CLAUSES, AND WHAT NOW ANSWERS THEM. Both were measured RED on
@@ -1718,20 +1719,20 @@ Given(
 );
 
 Given(
-  "Susan's peer membership record states no membership in {string}",
+  "Ronald's peer membership record states no membership in {string}",
   { timeout: 20_000 },
   async function (this: E2EWorld, collectiveName: string): Promise<void> {
     const state = getState(this);
     assert.equal(collectiveName, state.collectiveName);
     const fixture = loadHouseholdMeshFixture();
     // No login needed — see the sibling Matthew step's comment above.
-    const humanId = getFixture('Susan').id;
+    const humanId = getFixture('Ronald').id;
     const storageUrl = requireFixturePrimaryStorageUrl(fixture, 'beta');
     const isMember = await isLiveMember(storageUrl, humanId, HOUSEHOLD_COLLECTIVE_ID);
     assert.equal(
       isMember,
       false,
-      `Susan ("${humanId}") unexpectedly carries a live participation in ` +
+      `Ronald ("${humanId}") unexpectedly carries a live participation in ` +
         `"${HOUSEHOLD_COLLECTIVE_ID}" per ${storageUrl}/db/participations/${humanId}; ` +
         'the non-member control must be true in the substrate, not inferred from fixture prose'
     );
@@ -1841,15 +1842,16 @@ Then(
 );
 
 When(
-  'canonical Susan presents her hosted bearer at doorway {string} between two further Matthew requests for {string}',
+  'canonical Ronald presents his hosted bearer at doorway {string} between two further Matthew requests for {string}',
   { timeout: 60_000 },
   async function (this: E2EWorld, doorwayId: string, eprLabel: string): Promise<void> {
     const state = getState(this);
     assert.equal(eprLabel, state.label);
     const doorway = this.getDoorway(doorwayId);
-    // Susan is already an Act-I hosted-cast persona. Mint her bearer via the
+    // Ronald is declared `agencyPhase: hosted` and in HOUSEHOLD_HOSTED_CAST, so the
+    // prologue registers him (device-phase Susan is never registered). Mint his bearer via the
     // lane's provisioning doorway, then present it to the doorway under test.
-    const bearer = await loginBearer(this.getDoorway('alpha').url, 'Susan');
+    const bearer = await loginBearer(this.getDoorway('alpha').url, 'Ronald');
     const holder = requireHolder(this);
     const member = await loginBearer(this.getDoorway('alpha').url, 'Matthew');
     const declarationUrl = `${doorway.url}/api/v1/commitments/${holder.commitmentId}`;
@@ -1858,7 +1860,7 @@ When(
       const response = await rawGet(`${doorway.url}${holder.path}`, {
         Authorization: `Bearer ${member.token}`,
       });
-      assert.equal(response.status, 200, 'Matthew must remain admitted around Susan’s request');
+      assert.equal(response.status, 200, 'Matthew must remain admitted around Ronald’s request');
       assert.ok(state.originalMarker, 'the Background did not capture the original marker');
       assert.ok(response.text.includes(state.originalMarker));
       assert.equal(response.headers['x-elohim-standing'], `admitted;reach=${holder.currentReach}`);
@@ -1900,15 +1902,15 @@ Then(
   }
 );
 
-Then('Susan is refused {string}', function (this: E2EWorld, eprLabel: string): void {
+Then('Ronald is refused {string}', function (this: E2EWorld, eprLabel: string): void {
   const state = getState(this);
   assert.equal(eprLabel, state.label);
-  assert.ok(state.lastRefusal, `Susan was not refused: ${JSON.stringify(state.lastServed)}`);
+  assert.ok(state.lastRefusal, `Ronald was not refused: ${JSON.stringify(state.lastServed)}`);
   assert.equal(state.lastRefusal.status, 403);
 });
 
 // (the shared "the refusal names reach as the term that failed..." Then step
-// above is reused verbatim for Susan's refusal and for scenario 3's.)
+// above is reused verbatim for Ronald's refusal and for scenario 3's.)
 
 // =============================================================================
 // Scenario 3 — the holder's warm copy stops answering anonymously inside the
