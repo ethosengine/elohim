@@ -2533,6 +2533,7 @@ pipeline {
                         // (#1179 died "git-remote-https signal 15" at ~10:15).
                         // honorRefspec keeps fetch to single branch (orchestrator #787 spent
                         // 27min on +refs/heads/* even at depth:200).
+                        if (env.CHANGE_ID) { checkout scm } else {
                         checkout([
                             $class: 'GitSCM',
                             branches: [[name: "*/${env.BRANCH_NAME ?: 'dev'}"]],
@@ -2546,6 +2547,7 @@ pipeline {
                                 refspec: "+refs/heads/${env.BRANCH_NAME ?: 'dev'}:refs/remotes/origin/${env.BRANCH_NAME ?: 'dev'}"
                             ]]
                         ])
+                        }
                         sh 'git clean -fdx'
                         sh 'git reset --hard HEAD'
 

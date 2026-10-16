@@ -1280,7 +1280,6 @@ def triggerPipeline(String name, String branch, Object wait = null, List changed
     String runClass = runClassFor(name, env.PIPELINE_RUN_CLASSES)
     if (name == 'elohim-edge' && env.EDGE_VALIDATE_ONLY_FROM_TAG == 'true') runClass = 'verify'
     boolean belowDeploy = runClassBelowDeploy(runClass)
-    echo "▶️ Triggering ${jobName}/${jobBranch} [${waitMode}] RUN_CLASS=${runClass}..."
 
     try {
         // Only send FORCE_DEPLOY to pipelines that actually deploy (have a deploymentCheck)
@@ -1294,6 +1293,7 @@ def triggerPipeline(String name, String branch, Object wait = null, List changed
         boolean validateOnlyDownstream = name == 'elohim-edge' && belowDeploy
         boolean gateOnlyDownstream = name == 'elohim-edge' && env.EDGE_GATE_ONLY_FROM_TAG == 'true'
         if (gateOnlyDownstream) jobBranch = env.CHANGE_ID ? "PR-${env.CHANGE_ID}" : jobBranch.replace('/', '%2F')
+        echo "▶️ Triggering ${jobName}/${jobBranch} [${waitMode}] RUN_CLASS=${runClass}..."
         // Cross-repo pipelines share none of the monorepo's parameter vocabulary —
         // sending FORCE_BUILD/DEPLOY_ONLY/CHANGED_PATHS to a job that declares none
         // of them produces undefined-parameter warnings and no behaviour. They get
