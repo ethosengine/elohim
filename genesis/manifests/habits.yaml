@@ -1140,7 +1140,7 @@ habits:
     refs:
       - "doorway/doorway-service/src/auth/operator.rs (capability resolver, no production caller yet) · src/server/http.rs op_gate_capability (the per-request gate pattern to reuse)"
       - "elohim/elohim-storage/src/db/rea_commitments.rs find_active_operator_binding · src/services/rea_commitment_service.rs (operate-doorway is diesel-direct today, not conductor-notarized)"
-      - "genesis/seeder/src/seed-operator-bindings.ts (binds alpha and apex to Matthew with '*'; Adam unbound)"
+      - "genesis/seeder/src/seed-operator-bindings.ts (bindings per the 2026-10-16 operator ruling, authored through the steward's storage)"
       - "genesis/local-dev/doorway-operator-surface/ (census + design receipts, 2026-10-16)"
     retire-when: >
       when the doorway-app operator surface is served from the holder's own peer settings surface (the

@@ -51,7 +51,12 @@ record is Matthew. "Operators are not absolute sovereigns."
 ## Issuer rule (born narrow)
 
 A binding counts only when its root author on the DHT is the **steward of record** of the network
-the doorway serves (Matthew, for the household and the alpha test net). It does not count when the
+the doorway serves (Matthew, for the household and the alpha test net). The steward of record is
+read from the network itself, never from doorway config: the elohim DNA's bootstrap steward,
+`modifiers.properties.progenitor_pubkey`, which `content_store/src/bootstrap_steward.rs` already
+exposes. No `StewardOfRecordAttestation` entry exists in any DNA yet (it appears only in
+`2026-05-19-doorway-stewardship-chain-design.md` and a JWT field); the progenitor is its present
+stand-in, and a later attestation chain can replace it without changing this rule. It does not count when the
 holder authored it, unless the holder is that steward. That one check is what "held safe by the
 test-net standing" means in code. It also rules out self-grants. Widening the issuer set (a
 doorway's own commons council, the people who ingress through it) is a later governance story and
