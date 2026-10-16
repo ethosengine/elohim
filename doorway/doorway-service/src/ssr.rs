@@ -24,7 +24,11 @@
 use async_trait::async_trait;
 use sha2::{Digest, Sha256};
 use std::collections::HashMap;
+use std::future::Future;
+use std::pin::Pin;
+use std::sync::atomic::{AtomicU64, AtomicU8, Ordering};
 use std::sync::Arc;
+use std::task::{Context, Poll, Wake, Waker};
 use std::time::{Duration, Instant};
 
 use elohim_render::{DataFetcher, FetchRequest, FetchResponse, FetcherTrust, RenderError, Result};
@@ -150,7 +154,26 @@ impl DataFetcher for ResolverFetcher {
         }
     }
 
+    /// The fetch runs under a [`WatchedFetch`]: if the render's soft budget cuts
+    /// it (the `TracingFetcher` timeout drops this future), one `warn!` on target
+    /// `doorway::ssr::fetch` names the phase it reached and whether it was woken
+    /// and left unpolled. A completed fetch logs nothing.
     async fn fetch(&self, request: FetchRequest) -> Result<FetchResponse> {
+        let probe = FetchProbe::new(strip_to_path(&request.url));
+        let phase = probe.phase_handle();
+        WatchedFetch::new(Box::pin(self.send_and_read(request, phase)), probe).await
+    }
+}
+
+impl ResolverFetcher {
+    /// The fetch itself: one request to storage, response head, then body.
+    /// `phase` is advanced as each step is reached so an abandonment can say
+    /// how far it got.
+    async fn send_and_read(
+        &self,
+        request: FetchRequest,
+        phase: Arc<AtomicU8>,
+    ) -> Result<FetchResponse> {
         let path = strip_to_path(&request.url);
         let url = format!("{}{}", self.storage_base, path);
 
@@ -185,6 +208,7 @@ impl DataFetcher for ResolverFetcher {
             .send()
             .await
             .map_err(|e| RenderError::DataFetch(format!("storage fetch error: {e}")))?;
+        phase.store(FetchPhase::Body as u8, Ordering::Relaxed);
 
         let status = resp.status().as_u16();
 
@@ -372,64 +396,23 @@ fn ssr_dns_lookup_is_slow(elapsed_ms: u128) -> bool {
 /// cuts a fetch at the soft budget by DROPPING its future
 /// (`tokio::time::timeout` in `elohim_render::traced_fetcher`), and the lookup
 /// future goes with it — so a lookup slow enough to stall a fetch never
-/// reaches the completion arms below. [`LookupInFlight`] logs on that drop.
+/// reaches the completion arms below. [`LookupWatch`] logs on that drop.
 /// Without it the instrument is silent in exactly the case it exists for.
 #[derive(Debug, Default, Clone, Copy)]
 pub struct TimedDnsResolver;
-
-/// Marks a name lookup that has started and not yet completed. Dropped while
-/// still armed, it emits the `doorway::ssr::dns` "abandoned" warn: the caller
-/// gave up (the fetch was cut at the soft budget, or the connect timed out)
-/// before `getaddrinfo` answered.
-struct LookupInFlight {
-    host: String,
-    started: Instant,
-    armed: bool,
-    /// Test seam: set when the abandoned arm fires.
-    abandoned: Option<Arc<std::sync::atomic::AtomicBool>>,
-}
-
-impl LookupInFlight {
-    fn new(host: String) -> Self {
-        Self {
-            host,
-            started: Instant::now(),
-            armed: true,
-            abandoned: None,
-        }
-    }
-
-    /// The lookup completed; return how long it took and stand down.
-    fn complete(&mut self) -> u128 {
-        self.armed = false;
-        self.started.elapsed().as_millis()
-    }
-}
-
-impl Drop for LookupInFlight {
-    fn drop(&mut self) {
-        if !self.armed {
-            return;
-        }
-        if let Some(flag) = &self.abandoned {
-            flag.store(true, std::sync::atomic::Ordering::SeqCst);
-        }
-        tracing::warn!(
-            target: "doorway::ssr::dns",
-            host = %self.host,
-            elapsed_ms = self.started.elapsed().as_millis() as u64,
-            "SSR render fetch: name lookup abandoned before it answered"
-        );
-    }
-}
 
 impl reqwest::dns::Resolve for TimedDnsResolver {
     fn resolve(&self, name: reqwest::dns::Name) -> reqwest::dns::Resolving {
         Box::pin(async move {
             let host = name.as_str().to_string();
-            let mut in_flight = LookupInFlight::new(host.clone());
+            let started = Instant::now();
+            // Logs from `Drop` if the lookup never answers: the render's soft
+            // budget drops the whole fetch future at the cut, and a lookup still
+            // pending then would otherwise leave no line at all.
+            let mut watch = LookupWatch::new(&host, started);
             let looked_up = tokio::net::lookup_host((host.as_str(), 0)).await;
-            let elapsed_ms = in_flight.complete();
+            watch.answered();
+            let elapsed_ms = started.elapsed().as_millis();
             match looked_up {
                 Ok(addrs) => {
                     let addrs: Vec<std::net::SocketAddr> = addrs.collect();
@@ -456,6 +439,287 @@ impl reqwest::dns::Resolve for TimedDnsResolver {
                 }
             }
         })
+    }
+}
+
+/// Names a name lookup that was dropped before it answered. Disarmed by
+/// [`LookupWatch::answered`]; still armed at `Drop` means the lookup future was
+/// abandoned, which on the render path is the soft-budget cut.
+struct LookupWatch {
+    host: String,
+    started: Instant,
+    armed: bool,
+}
+
+impl LookupWatch {
+    fn new(host: &str, started: Instant) -> Self {
+        Self {
+            host: host.to_string(),
+            started,
+            armed: true,
+        }
+    }
+
+    fn answered(&mut self) {
+        self.armed = false;
+    }
+}
+
+impl Drop for LookupWatch {
+    fn drop(&mut self) {
+        if self.armed {
+            tracing::warn!(
+                target: "doorway::ssr::dns",
+                host = %self.host,
+                elapsed_ms = self.started.elapsed().as_millis() as u64,
+                "SSR render fetch: name lookup abandoned before it answered"
+            );
+        }
+    }
+}
+
+// =============================================================================
+// WatchedFetch — names the phase a render fetch was cut in
+// =============================================================================
+//
+// alpha's `/` renders stall at the 1200 ms soft budget on about one cold render
+// in three while storage's histogram shows no request slower than 1 s
+// (`genesis/data/timeline/backlog/self-heal-alpha-ssr-post-bundle-swap-cold-fetch-stall.md`).
+// The leading candidate is the render thread not polling its own fetches: the
+// render runs on a `current_thread` runtime that also runs the V8 isolate, so a
+// fetch woken by its socket waits until the isolate yields. A gap between polls
+// alone cannot separate that from honest waiting on the network (a future with
+// no wakeup is not polled either), so the watch also wraps the waker: it records
+// when the fetch was woken and how long each wake waited for its poll. A wake
+// that was never polled before the cut is the direct reading of starvation.
+
+/// How far a render fetch got.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[repr(u8)]
+pub enum FetchPhase {
+    /// Lookup, connect, request write, waiting for the response head.
+    Sending = 0,
+    /// Response head received; reading the body.
+    Body = 1,
+}
+
+impl FetchPhase {
+    fn from_u8(v: u8) -> Self {
+        match v {
+            1 => FetchPhase::Body,
+            _ => FetchPhase::Sending,
+        }
+    }
+
+    pub fn as_str(self) -> &'static str {
+        match self {
+            FetchPhase::Sending => "sending",
+            FetchPhase::Body => "body",
+        }
+    }
+}
+
+/// When the watched future was first woken since its last poll, as
+/// microseconds after `origin` plus one (0 = no pending wake).
+struct WakeLedger {
+    origin: Instant,
+    pending_wake_us: AtomicU64,
+}
+
+impl WakeLedger {
+    fn now_us(&self) -> u64 {
+        u64::try_from(self.origin.elapsed().as_micros()).unwrap_or(u64::MAX - 1)
+    }
+
+    fn mark_woken(&self) {
+        let stamp = self.now_us().saturating_add(1);
+        // Keep the EARLIEST wake since the last poll: that is the one whose wait
+        // measures how long the thread took to come back.
+        let _ =
+            self.pending_wake_us
+                .compare_exchange(0, stamp, Ordering::AcqRel, Ordering::Relaxed);
+    }
+
+    /// Microseconds the pending wake (if any) has waited as of now.
+    fn take_pending_wait_us(&self) -> Option<u64> {
+        let stamp = self.pending_wake_us.swap(0, Ordering::AcqRel);
+        (stamp != 0).then(|| self.now_us().saturating_sub(stamp - 1))
+    }
+
+    fn peek_pending_wait_us(&self) -> Option<u64> {
+        let stamp = self.pending_wake_us.load(Ordering::Acquire);
+        (stamp != 0).then(|| self.now_us().saturating_sub(stamp - 1))
+    }
+}
+
+/// The waker handed to the watched future: stamps the ledger, then wakes the
+/// task the runtime gave us.
+struct RecordingWaker {
+    inner: Waker,
+    ledger: Arc<WakeLedger>,
+}
+
+impl Wake for RecordingWaker {
+    fn wake(self: Arc<Self>) {
+        self.wake_by_ref();
+    }
+
+    fn wake_by_ref(self: &Arc<Self>) {
+        self.ledger.mark_woken();
+        self.inner.wake_by_ref();
+    }
+}
+
+/// What a fetch looked like when it was abandoned. Logged once, from `Drop`.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct AbandonedFetch {
+    pub path: String,
+    pub phase: FetchPhase,
+    pub elapsed_ms: u64,
+    pub polls: u32,
+    /// Longest stretch between two polls, counting the last poll to the drop.
+    pub max_poll_gap_ms: u64,
+    /// Longest a wake waited for the poll it asked for.
+    pub max_wake_to_poll_ms: u64,
+    /// The fetch was woken and dropped before that wake was polled: how long
+    /// the wake had been waiting. `Some` here is the render thread not polling.
+    pub woken_unpolled_ms: Option<u64>,
+}
+
+/// The per-fetch state a [`WatchedFetch`] reports from.
+pub struct FetchProbe {
+    path: String,
+    started: Instant,
+    phase: Arc<AtomicU8>,
+    ledger: Arc<WakeLedger>,
+    last_poll: Option<Instant>,
+    polls: u32,
+    max_poll_gap: Duration,
+    max_wake_to_poll_us: u64,
+    done: bool,
+}
+
+impl FetchProbe {
+    pub fn new(path: &str) -> Self {
+        let started = Instant::now();
+        Self {
+            path: path.to_string(),
+            started,
+            phase: Arc::new(AtomicU8::new(FetchPhase::Sending as u8)),
+            ledger: Arc::new(WakeLedger {
+                origin: started,
+                pending_wake_us: AtomicU64::new(0),
+            }),
+            last_poll: None,
+            polls: 0,
+            max_poll_gap: Duration::ZERO,
+            max_wake_to_poll_us: 0,
+            done: false,
+        }
+    }
+
+    /// The handle the fetch body advances as it reaches each phase.
+    pub fn phase_handle(&self) -> Arc<AtomicU8> {
+        Arc::clone(&self.phase)
+    }
+
+    fn on_poll(&mut self) {
+        let now = Instant::now();
+        if let Some(last) = self.last_poll {
+            self.max_poll_gap = self.max_poll_gap.max(now - last);
+        }
+        self.last_poll = Some(now);
+        self.polls = self.polls.saturating_add(1);
+        if let Some(waited) = self.ledger.take_pending_wait_us() {
+            self.max_wake_to_poll_us = self.max_wake_to_poll_us.max(waited);
+        }
+    }
+
+    /// `None` once the fetch completed; otherwise the reading at this instant.
+    pub fn abandonment(&self) -> Option<AbandonedFetch> {
+        if self.done {
+            return None;
+        }
+        let gap_to_now = self.last_poll.map(|t| t.elapsed()).unwrap_or_default();
+        Some(AbandonedFetch {
+            path: self.path.clone(),
+            phase: FetchPhase::from_u8(self.phase.load(Ordering::Relaxed)),
+            elapsed_ms: self.started.elapsed().as_millis() as u64,
+            polls: self.polls,
+            max_poll_gap_ms: self.max_poll_gap.max(gap_to_now).as_millis() as u64,
+            max_wake_to_poll_ms: self.max_wake_to_poll_us / 1_000,
+            woken_unpolled_ms: self.ledger.peek_pending_wait_us().map(|us| us / 1_000),
+        })
+    }
+}
+
+/// Polls `inner` through a [`RecordingWaker`] and reports from `Drop` if it was
+/// abandoned before it completed.
+pub struct WatchedFetch<F: Future> {
+    inner: Pin<Box<F>>,
+    probe: FetchProbe,
+    /// (the runtime's waker, the recording waker wrapping it), rebuilt only
+    /// when the runtime hands over a different task waker.
+    waker: Option<(Waker, Waker)>,
+}
+
+impl<F: Future> WatchedFetch<F> {
+    pub fn new(inner: Pin<Box<F>>, probe: FetchProbe) -> Self {
+        Self {
+            inner,
+            probe,
+            waker: None,
+        }
+    }
+
+    #[cfg(test)]
+    fn probe(&self) -> &FetchProbe {
+        &self.probe
+    }
+}
+
+impl<F: Future> Future for WatchedFetch<F> {
+    type Output = F::Output;
+
+    fn poll(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<F::Output> {
+        // Every field is Unpin (`inner` is boxed), so the wrapper is too.
+        let this = self.get_mut();
+        this.probe.on_poll();
+        let recording = match &this.waker {
+            Some((runtime, recording)) if runtime.will_wake(cx.waker()) => recording.clone(),
+            _ => {
+                let recording = Waker::from(Arc::new(RecordingWaker {
+                    inner: cx.waker().clone(),
+                    ledger: Arc::clone(&this.probe.ledger),
+                }));
+                this.waker = Some((cx.waker().clone(), recording.clone()));
+                recording
+            }
+        };
+        let mut watched_cx = Context::from_waker(&recording);
+        let out = this.inner.as_mut().poll(&mut watched_cx);
+        if out.is_ready() {
+            this.probe.done = true;
+        }
+        out
+    }
+}
+
+impl<F: Future> Drop for WatchedFetch<F> {
+    fn drop(&mut self) {
+        if let Some(a) = self.probe.abandonment() {
+            tracing::warn!(
+                target: "doorway::ssr::fetch",
+                path = %a.path,
+                phase = a.phase.as_str(),
+                elapsed_ms = a.elapsed_ms,
+                polls = a.polls,
+                max_poll_gap_ms = a.max_poll_gap_ms,
+                max_wake_to_poll_ms = a.max_wake_to_poll_ms,
+                woken_unpolled_ms = ?a.woken_unpolled_ms,
+                "SSR render fetch abandoned before it answered"
+            );
+        }
     }
 }
 
@@ -693,30 +957,6 @@ mod tests {
         assert!(SSR_DNS_SLOW_LOOKUP_MS < 1_200);
     }
 
-    #[test]
-    fn a_lookup_dropped_before_it_answers_is_named_as_abandoned() {
-        use std::sync::atomic::{AtomicBool, Ordering};
-
-        // The soft-budget cut drops the fetch future, and the lookup with it.
-        let abandoned = Arc::new(AtomicBool::new(false));
-        let mut cut = LookupInFlight::new("storage.example".to_string());
-        cut.abandoned = Some(Arc::clone(&abandoned));
-        drop(cut);
-        assert!(abandoned.load(Ordering::SeqCst));
-    }
-
-    #[test]
-    fn a_lookup_that_answered_is_not_named_as_abandoned() {
-        use std::sync::atomic::{AtomicBool, Ordering};
-
-        let abandoned = Arc::new(AtomicBool::new(false));
-        let mut done = LookupInFlight::new("storage.example".to_string());
-        done.abandoned = Some(Arc::clone(&abandoned));
-        let _elapsed_ms = done.complete();
-        drop(done);
-        assert!(!abandoned.load(Ordering::SeqCst));
-    }
-
     #[tokio::test]
     async fn timed_dns_resolver_resolves_like_the_system_resolver() {
         use reqwest::dns::Resolve;
@@ -760,6 +1000,117 @@ mod tests {
             .await
             .expect("body");
         assert_eq!(body, "ok");
+    }
+
+    // ── WatchedFetch: the phase and polling reading at the cut ──────────────
+
+    /// Stores the waker it is polled with and never completes — a fetch parked
+    /// on a socket.
+    struct Parked(Arc<std::sync::Mutex<Option<Waker>>>);
+
+    impl Future for Parked {
+        type Output = ();
+        fn poll(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<()> {
+            *self.0.lock().expect("slot") = Some(cx.waker().clone());
+            Poll::Pending
+        }
+    }
+
+    fn parked() -> (WatchedFetch<Parked>, Arc<std::sync::Mutex<Option<Waker>>>) {
+        let slot = Arc::new(std::sync::Mutex::new(None));
+        let w = WatchedFetch::new(
+            Box::pin(Parked(Arc::clone(&slot))),
+            FetchProbe::new("/api/v1/x"),
+        );
+        (w, slot)
+    }
+
+    fn poll_once<F: Future>(w: &mut WatchedFetch<F>) -> Poll<F::Output> {
+        let mut cx = Context::from_waker(Waker::noop());
+        Pin::new(w).poll(&mut cx)
+    }
+
+    fn wake(slot: &Arc<std::sync::Mutex<Option<Waker>>>) {
+        slot.lock()
+            .expect("slot")
+            .as_ref()
+            .expect("polled once")
+            .wake_by_ref();
+    }
+
+    #[test]
+    fn a_completed_watched_fetch_reports_nothing() {
+        let mut w = WatchedFetch::new(Box::pin(std::future::ready(7u8)), FetchProbe::new("/x"));
+        assert_eq!(poll_once(&mut w), Poll::Ready(7));
+        assert!(w.probe().abandonment().is_none());
+    }
+
+    #[test]
+    fn a_parked_fetch_never_woken_reads_as_waiting_not_starved() {
+        let (mut w, _slot) = parked();
+        assert!(poll_once(&mut w).is_pending());
+        std::thread::sleep(Duration::from_millis(30));
+        let a = w.probe().abandonment().expect("not completed");
+        assert_eq!(a.phase, FetchPhase::Sending);
+        assert_eq!(a.polls, 1);
+        assert_eq!(a.woken_unpolled_ms, None, "no wake => nothing was starved");
+        assert!(
+            a.max_poll_gap_ms >= 25,
+            "the last poll to now counts: {a:?}"
+        );
+        assert_eq!(a.path, "/api/v1/x");
+    }
+
+    #[test]
+    fn a_wake_left_unpolled_at_the_cut_is_named() {
+        let (mut w, slot) = parked();
+        assert!(poll_once(&mut w).is_pending());
+        wake(&slot);
+        std::thread::sleep(Duration::from_millis(30));
+        let a = w.probe().abandonment().expect("not completed");
+        let waited = a.woken_unpolled_ms.expect("woken and not polled");
+        assert!(waited >= 25, "the wake has waited ~30 ms: {a:?}");
+    }
+
+    #[test]
+    fn a_late_poll_after_a_wake_is_measured_and_clears_the_pending_wake() {
+        let (mut w, slot) = parked();
+        assert!(poll_once(&mut w).is_pending());
+        wake(&slot);
+        // A second wake before the poll must not move the stamp later.
+        std::thread::sleep(Duration::from_millis(30));
+        wake(&slot);
+        assert!(poll_once(&mut w).is_pending());
+        let a = w.probe().abandonment().expect("not completed");
+        assert_eq!(a.polls, 2);
+        assert_eq!(a.woken_unpolled_ms, None, "the wake was polled");
+        assert!(
+            a.max_wake_to_poll_ms >= 25,
+            "the earliest wake counts: {a:?}"
+        );
+    }
+
+    #[test]
+    fn the_phase_handle_moves_the_reading() {
+        let (w, _slot) = parked();
+        w.probe()
+            .phase_handle()
+            .store(FetchPhase::Body as u8, Ordering::Relaxed);
+        assert_eq!(
+            w.probe().abandonment().expect("not completed").phase,
+            FetchPhase::Body
+        );
+        assert_eq!(FetchPhase::Body.as_str(), "body");
+        assert_eq!(FetchPhase::Sending.as_str(), "sending");
+    }
+
+    #[test]
+    fn an_abandoned_lookup_watch_is_armed_and_an_answered_one_is_not() {
+        let mut answered = LookupWatch::new("h", Instant::now());
+        answered.answered();
+        assert!(!answered.armed);
+        let abandoned = LookupWatch::new("h", Instant::now());
+        assert!(abandoned.armed, "dropped without an answer => it logs");
     }
 
     // ── boot materialize budget (structural no-overwhelm) ───────────────────
