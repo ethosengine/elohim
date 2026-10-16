@@ -96,6 +96,63 @@ pub(crate) fn extract_http_permission<B>(
     PermissionLevel::Public
 }
 
+/// Is this method+path one of the operator actuators that mutate hosting,
+/// graduation, federation or route/bundle state and therefore need Admin?
+///
+/// An EXACT mirror of the dispatch arms in `server/http.rs` (same prefixes, same
+/// methods), so a path the router would not dispatch to an actuator is never
+/// gated here, and every GET stays public peer telemetry.
+pub(crate) fn is_operator_actuator(method: &hyper::Method, path: &str) -> bool {
+    use hyper::Method;
+    match (method, path) {
+        (&Method::POST, "/admin/hosted-users")
+        | (&Method::POST, "/admin/federation/peers")
+        | (&Method::DELETE, "/admin/federation/peers")
+        | (&Method::POST, "/admin/federation/peers/refresh")
+        | (&Method::POST, "/admin/steward-peers/refresh")
+        | (&Method::POST, "/admin/ssr-bundle/refresh") => true,
+        (&Method::DELETE, p) => p.starts_with("/admin/hosted-users/"),
+        (&Method::POST, p) => p.starts_with("/admin/graduation/force/"),
+        _ => false,
+    }
+}
+
+/// Require Admin authority on a request: a Bearer Admin JWT or the configured
+/// `API_KEY_ADMIN` via `X-API-Key`, resolved by [`extract_http_permission`].
+///
+/// 401 when no valid credential resolved (nothing presented, or invalid);
+/// 403 when a caller resolved but below Admin. Never consults `dev_mode`.
+#[allow(clippy::result_large_err)]
+pub(crate) fn require_admin_permission<B>(
+    state: &AppState,
+    req: &Request<B>,
+    peer_is_loopback: bool,
+) -> Result<(), hyper::Response<http_body_util::Full<hyper::body::Bytes>>> {
+    let level = extract_http_permission(state, req, peer_is_loopback);
+    if level >= PermissionLevel::Admin {
+        return Ok(());
+    }
+    let (status, message) = if level >= PermissionLevel::Authenticated {
+        (
+            hyper::StatusCode::FORBIDDEN,
+            "Admin permission required for this operator action",
+        )
+    } else {
+        (
+            hyper::StatusCode::UNAUTHORIZED,
+            "Authentication required for this operator action",
+        )
+    };
+    let body = serde_json::json!({ "success": false, "error": message });
+    Err(hyper::Response::builder()
+        .status(status)
+        .header("Content-Type", "application/json")
+        .body(http_body_util::Full::new(hyper::body::Bytes::from(
+            body.to_string(),
+        )))
+        .unwrap())
+}
+
 /// Validate a bearer JWT against the configured (or dev) validator and extract
 /// its permission level. Returns `None` if the token is invalid or the
 /// validator cannot be constructed.
@@ -258,5 +315,116 @@ mod tests {
             extract_http_permission(&state, &req, false),
             PermissionLevel::Public
         );
+    }
+
+    const ACTUATORS: [(&str, &str); 8] = [
+        ("POST", "/admin/hosted-users"),
+        ("DELETE", "/admin/hosted-users/uhCAkagent"),
+        ("POST", "/admin/graduation/force/uhCAkagent"),
+        ("POST", "/admin/federation/peers"),
+        ("DELETE", "/admin/federation/peers"),
+        ("POST", "/admin/federation/peers/refresh"),
+        ("POST", "/admin/steward-peers/refresh"),
+        ("POST", "/admin/ssr-bundle/refresh"),
+    ];
+
+    fn actuator_req(method: &str, path: &str) -> hyper::http::request::Builder {
+        Request::builder().method(method).uri(path)
+    }
+
+    #[test]
+    fn actuator_predicate_names_exactly_the_eight_and_no_reads() {
+        for (m, p) in ACTUATORS {
+            let method = hyper::Method::from_bytes(m.as_bytes()).unwrap();
+            assert!(is_operator_actuator(&method, p), "{m} {p} must be gated");
+        }
+        for (m, p) in [
+            ("GET", "/admin/hosted-users"),
+            ("GET", "/admin/federation/peers"),
+            ("GET", "/admin/graduation/pending"),
+            ("GET", "/admin/capabilities"),
+            ("GET", "/admin/ws"),
+            ("POST", "/admin/conductors/assign"),
+            ("POST", "/admin/cache/warm"),
+            ("PUT", "/admin/dev/shed"),
+            ("GET", "/admin/steward-peers/refresh"),
+        ] {
+            let method = hyper::Method::from_bytes(m.as_bytes()).unwrap();
+            assert!(
+                !is_operator_actuator(&method, p),
+                "{m} {p} must not be gated here"
+            );
+        }
+    }
+
+    #[test]
+    fn actuators_401_without_credential_403_below_admin_pass_for_admin() {
+        // dev_mode both ways: it must change nothing.
+        for dev_mode in [false, true] {
+            let state = test_state(dev_mode);
+            let auth = bearer_jwt(PermissionLevel::Authenticated);
+            let admin = bearer_jwt(PermissionLevel::Admin);
+            for (m, p) in ACTUATORS {
+                let status = |r: Request<Empty<Bytes>>| {
+                    require_admin_permission(&state, &r, false)
+                        .err()
+                        .map(|resp| resp.status().as_u16())
+                };
+                let none = actuator_req(m, p).body(Empty::<Bytes>::new()).unwrap();
+                assert_eq!(status(none), Some(401), "{m} {p} anon dev={dev_mode}");
+                let bad = actuator_req(m, p)
+                    .header("authorization", "Bearer not-a-jwt")
+                    .body(Empty::<Bytes>::new())
+                    .unwrap();
+                assert_eq!(status(bad), Some(401), "{m} {p} bad jwt dev={dev_mode}");
+                let wrongkey = actuator_req(m, p)
+                    .header("x-api-key", "wrong")
+                    .body(Empty::<Bytes>::new())
+                    .unwrap();
+                assert_eq!(
+                    status(wrongkey),
+                    Some(401),
+                    "{m} {p} wrong key dev={dev_mode}"
+                );
+                let low = actuator_req(m, p)
+                    .header("authorization", format!("Bearer {auth}"))
+                    .body(Empty::<Bytes>::new())
+                    .unwrap();
+                assert_eq!(
+                    status(low),
+                    Some(403),
+                    "{m} {p} ordinary jwt dev={dev_mode}"
+                );
+                let lowkey = actuator_req(m, p)
+                    .header("x-api-key", "test-auth-key")
+                    .body(Empty::<Bytes>::new())
+                    .unwrap();
+                assert_eq!(
+                    status(lowkey),
+                    Some(403),
+                    "{m} {p} authenticated key dev={dev_mode}"
+                );
+                let ok_jwt = actuator_req(m, p)
+                    .header("authorization", format!("Bearer {admin}"))
+                    .body(Empty::<Bytes>::new())
+                    .unwrap();
+                assert_eq!(status(ok_jwt), None, "{m} {p} admin jwt dev={dev_mode}");
+                let ok_key = actuator_req(m, p)
+                    .header("x-api-key", "test-admin-key")
+                    .body(Empty::<Bytes>::new())
+                    .unwrap();
+                assert_eq!(status(ok_key), None, "{m} {p} admin key dev={dev_mode}");
+            }
+        }
+    }
+
+    #[test]
+    fn actuator_denial_is_a_json_error_body() {
+        let state = test_state(true);
+        let req = actuator_req("POST", "/admin/hosted-users")
+            .body(Empty::<Bytes>::new())
+            .unwrap();
+        let resp = require_admin_permission(&state, &req, false).unwrap_err();
+        assert_eq!(resp.headers()["content-type"], "application/json");
     }
 }

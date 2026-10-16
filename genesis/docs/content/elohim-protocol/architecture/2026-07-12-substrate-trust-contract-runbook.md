@@ -107,7 +107,7 @@ not a readable gauge (that is the C8 clause these rows are watched by).
 | `✓/⚠ canonical head propagated` | every APP deploy console (`authorHeadOnce`) | live cross-conductor declare against a freshly-authored head |
 | `GET {doorway}/db/p2p/conductor-diagnostics` | on demand | the routed PRIMARY conductor's peer store (agent → relay URL) AND its running-cell membership; `?include=metrics` when conductor/client versions align |
 | `GET {doorway}/admin/bootstrap-coherence` | on demand | kitsune2 store shape |
-| `POST {doorway}/admin/steward-peers/refresh` | on demand | which storages answer, at which manifest (route counts); re-registers routes without a doorway restart |
+| `POST {doorway}/admin/steward-peers/refresh` | on demand | which storages answer, at which manifest (route counts); re-registers routes without a doorway restart; needs an Admin JWT or the admin `X-API-Key` (401 without a credential, 403 below Admin) |
 | Loki (`instance="<name>-alpha"`, container `elohim-node`) | on demand | conductor/storage behavior; heal lines are `projection-reconcile[content]` |
 | `validate-conductor-config.sh` | every human-manifest render (GATE) | ICE config actually parses into tx5's contract; dependency-free by hard requirement |
 

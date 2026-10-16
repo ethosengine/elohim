@@ -15,7 +15,9 @@ pub mod permissions;
 pub mod portal_host;
 
 pub use api_key::ApiKeyValidator;
-pub(crate) use http_permission::extract_http_permission;
+pub(crate) use http_permission::{
+    extract_http_permission, is_operator_actuator, require_admin_permission,
+};
 pub use jwt::{
     extract_token_from_header, Claims, JwtValidator, OperatorSnapshot, TokenInput,
     TokenValidationResult,

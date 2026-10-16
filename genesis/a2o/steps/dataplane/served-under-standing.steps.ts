@@ -363,7 +363,14 @@ async function adminCallOnce(
 ): Promise<{ status: number; text: string }> {
   const response = await fetch(url, {
     method,
-    headers: { Authorization: `Bearer ${ADMIN_KEY}`, 'Content-Type': 'application/json' },
+    // The doorway's operator actuators (/admin/*) resolve the admin KEY from X-API-Key
+    // (auth/http_permission.rs); a Bearer slot is read as a JWT only. Other routes keep Bearer.
+    headers: {
+      ...(new URL(url).pathname.startsWith('/admin/')
+        ? { 'X-API-Key': ADMIN_KEY }
+        : { Authorization: `Bearer ${ADMIN_KEY}` }),
+      'Content-Type': 'application/json',
+    },
     body: JSON.stringify(body),
     signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
   });
