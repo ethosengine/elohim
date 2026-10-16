@@ -34,6 +34,22 @@ His own pod is conductor-1. Re-binding the operator's admin account to his own k
 re-seeding it) is an operator decision. The doorway-phase registration branch never takes the
 pod's key the way node/device registration does since 9b98ac904, so a re-seed alone may not bind it.
 
+**The third fact (2026-10-16, after the 124524a44 roll).** Hosted placement reads the counts the prune
+corrects. `find_least_loaded_excluding` (`registry.rs` ~361, called from `provisioner.rs` ~180) takes the
+largest `capacity_max - capacity_used`, and `capacity_used` is seeded from the registry's agent counts at
+boot. Before the fix, adam's conductor-0 seeded at 94/50 and was never chosen; afterwards conductor-0 and
+conductor-1 both seed at 14/50, and `max_by_key` breaks the tie by DashMap order, which picked adam. adam
+is the saturated pod: 96-220 `get_links … response channel dropped` / read-permit timeouts an hour since
+before either roll. All three genesis #1649 registrations (04:03-04:04Z) went to conductor-0, their cells
+completed genesis, and `create_human` timed out at 10 s. Failed registrations leave the installed app behind
+uncounted, so the tie persists. Under that sits a capacity model that cannot hold: each hosted install
+keeps about 0.7 GiB of conductor heap until the conductor restarts (adam 1.17 → 3.18 GiB for three installs;
+matthew OOMKilled at the 5 GiB limit on 10-15 19:52:53Z, the genesis #1648 `ConnectionClosed`), yet alpha
+declares `capacity_max` 50. Every genesis run registers hosted humans, so a hosting conductor reaches its
+memory limit about every second run. What to settle: a capacity bound derived from the pod's memory limit
+(or the doorway counting installs rather than agents), a deterministic tie-break, and uninstalling the app
+when `create_human` fails. Choosing the bound and whether adam keeps hosting is the operator's call.
+
 **Done when.** The alpha registry lists one `elohim` agent per pod after a doorway boot
 (`GET /admin/conductors/conductor-N/agents`), and Matthew's alpha session reaches his own cell on
 conductor-1 (`/hc/connect` 200 in the observable-distribution scenario).
