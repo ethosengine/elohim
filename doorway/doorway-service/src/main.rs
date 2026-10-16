@@ -2224,8 +2224,15 @@ async fn discover_existing_agents(registry: &ConductorRegistry, conductor_urls: 
             Ok(apps) => {
                 // The conductor's own app list is the authority on who it hosts:
                 // drop persisted mappings whose cell is gone before counting.
-                let installed: std::collections::HashSet<String> =
-                    apps.iter().map(|a| a.installed_app_id.clone()).collect();
+                let installed: std::collections::HashSet<(String, String)> = apps
+                    .iter()
+                    .map(|a| {
+                        (
+                            a.installed_app_id.clone(),
+                            doorway::conductor::agent_key::canonical_agent_key(&a.agent_pub_key),
+                        )
+                    })
+                    .collect();
                 registry.prune_absent(&conductor_id, &installed);
                 let mut conductor_agents = 0usize;
                 for app in &apps {
