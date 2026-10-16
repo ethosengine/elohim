@@ -13,7 +13,7 @@ Feature: Doorway visitors can trace access decisions, contributions and response
   recording actor's authority or a formal ruling ceremony.
 
   EPR means Elohim Protocol Record: here it identifies the published garden resource.
-  The project-epr, projection contract and declaration are one record.
+  The project-epr, projection contract and declaration are three views of one published resource.
   The steps call the record a contract, its returned representation a declaration,
   and its link a declaration reference.
   It gives alpha permission to serve and names alpha's provider. Its reach
