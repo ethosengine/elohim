@@ -48,7 +48,8 @@ matthew OOMKilled at the 5 GiB limit on 10-15 19:52:53Z, the genesis #1648 `Conn
 declares `capacity_max` 50. Every genesis run registers hosted humans, so a hosting conductor reaches its
 memory limit about every second run. What to settle: a capacity bound derived from the pod's memory limit
 (or the doorway counting installs rather than agents), a deterministic tie-break, and uninstalling the app
-when `create_human` fails. Choosing the bound and whether adam keeps hosting is the operator's call.
+when `create_human` fails. Choosing the bound and whether adam keeps hosting is the operator's call. Catalogued as its own performance
+entry, with the code read and the fix shape: [doorway-hosted-capacity-bound-from-pod-memory](epr:doorway-hosted-capacity-bound-from-pod-memory).
 
 **Done when.** The alpha registry lists one `elohim` agent per pod after a doorway boot
 (`GET /admin/conductors/conductor-N/agents`), and Matthew's alpha session reaches his own cell on

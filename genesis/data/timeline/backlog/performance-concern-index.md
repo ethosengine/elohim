@@ -135,6 +135,7 @@ trustful context without reporting a cost carry the trust tag alone; `grep -lE '
 | [heal-pointer-bytes-ordering-blocking-serve](epr:heal-pointer-bytes-ordering-blocking-serve) | self | doorway serve ↔ its own storage heal-on-read | Serving blocks unboundedly in heal-on-read waiting for bytes behind the pointer on one node. |
 | [self-heal-alpha-ssr-post-bundle-swap-cold-fetch-stall](epr:self-heal-alpha-ssr-post-bundle-swap-cold-fetch-stall) | self | doorway SSR render ↔ its own cold fetches after bundle swap | One of 29 cold fetches exceeds soft budget for ~15 min after head swap. |
 | [self-heal-doorway-startup-conductor-mint-serialization](epr:self-heal-doorway-startup-conductor-mint-serialization) | self | doorway startup ↔ its own per-conductor token mints | Startup serializes N synchronous token mints before listener binds, blowing startupProbe on same-node conductors. |
+| [doorway-hosted-capacity-bound-from-pod-memory](epr:doorway-hosted-capacity-bound-from-pod-memory) | memory, scale, queue | self | mechanical | measured | Declared 50 hosted agents per conductor against a 5 GiB conductor that holds about five at ~0.7 GiB per install; ties go to the saturated pod; a failed `create_human` leaves its install behind uncounted | 5120 Mi conductor limit; ~0.7 GiB per install; adam 1.17 → 3.18 GiB for three; matthew OOMKilled 2026-10-15 |
 | [content-gap-limit-cycle-blocks-convergence](epr:content-gap-limit-cycle-blocks-convergence) | declared | fleet storage peers ↔ fleet peers via content gap discovery | Discovered-never-fetched ids oscillate across all pods; replicating peers fail to converge. |
 | [content-projection-plateau-ethosengine-household](epr:content-projection-plateau-ethosengine-household) | declared | household peers james/jessica/matthew ↔ each other, content projection | divergent_anchor plateau across the household peers; declared household convergence. |
 | [genesis-pair-cross-conductor-fetch-blocks-canonical-convergence](epr:genesis-pair-cross-conductor-fetch-blocks-canonical-convergence) | declared | adam conductor ↔ matthew conductor, genesis pair | Genesis pair cross-conductor fetch of REA commitments; cold-cell warm-up misattributed as retrieval failure. |
@@ -298,7 +299,7 @@ incident text.
 | [provide-revoke-arm-dormant-behind-namespace-mismatch](epr:provide-revoke-arm-dormant-behind-namespace-mismatch) | io, scale | self | mechanical | measured | The provide reconciler read its own commitments under the transport id while they are written under the agent key, so every restart re-authored a notarized commitment per scope; the revoke arm never ran and needs an operator decision. | matthew 729 live rows for 154 scopes, up to 8 per scope; jessica 613; james 202; none revoked |
 | [rea-inventory-advertises-rows-of-another-notary](epr:rea-inventory-advertises-rows-of-another-notary) | cpu, queue | declared | verify, wait | cured-unverified | Peers advertised mishpat commitments that a receiver's content_store can never resolve, so each receiver re-read about 800 ids on the miss ledger's ladder; the inventory now omits them. | get_rea_commitment 63-109 calls/min per peer; 819 / 937 / 1354 calls in the 300 s after a restart |
 
-## Doorway (4)
+## Doorway (5)
 
 | Entry | Mechanism | Trust | Friction | Evidence | What costs what | Figures in the entry |
 |---|---|---|---|---|---|---|
@@ -488,3 +489,21 @@ was the sprint's item. Results are on the atoms, not here:
   the same fork branch (`96bcd2bee`), fleet logs since the sqlx 0.9 move are to be treated as holding keys.
 - Tally tables above are NOT regenerated in this pass (tag counts for `unit-agent` and `custody-everyone` are each
   one higher than printed; the two new entries are not in the reading order yet).
+
+## Catalogued 2026-10-16 (the hosted-human footprint; operator question, code read, nothing re-measured)
+
+The operator asked what a hosted human's conductor must actually run, and whether the always-on
+parts can consume a shared runtime instead. Filed:
+
+- [doorway-hosted-capacity-bound-from-pod-memory](epr:doorway-hosted-capacity-bound-from-pod-memory) — the alpha
+  guard rail from genesis #1649: bound derived from pod memory, deterministic tie-break, uninstall on a failed
+  `create_human`. Two operator decisions: the number, and whether adam keeps hosting.
+- [arch-scale-risk](epr:arch-scale-risk-backlog) rows 14–17, row 7 decomposed by what needs the person's own cell.
+  Row 14 is new evidence: each install's genesis evicts the conductor's shared compiled-wasm cache, and wasmer's
+  engine never frees reloaded code, which would explain row 7's ten executable mappings per human. Read from code
+  (fork `96bcd2bee215`, wasmer 7.1.0), not yet tested. Rows 15–17 are design: sleep idle cells, a zero-arc hosting
+  conductor (heap saving unproven, given the prior arc-0 evidence), and the split onto live-session host, hub and
+  an on-demand signer.
+
+First experiment for all of it: one household session, two hosted registrations, smaps at four points (baseline,
+after each, after `disable_app` on one). It tests row 14 and row 15's E1 together. Tally tables are not regenerated.
