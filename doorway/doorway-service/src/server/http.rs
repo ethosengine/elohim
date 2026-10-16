@@ -12597,8 +12597,17 @@ mod root_projection_shadow_regression_tests {
                 ("admin jwt", ("authorization", format!("Bearer {admin}"))),
                 ("admin key", ("x-api-key", "test-admin-key".to_string())),
             ] {
+                // Admission only: the handler behind the guard needs a live
+                // conductor / federation / storage that this listener lacks,
+                // so the mutation's own status (200/404/503/...) is not
+                // pinned here; a guard refusal is exactly 401/403, which is
+                // the pair asserted absent (exact statuses for the refused
+                // callers are asserted above).
                 let s = send_actuator(addr, m, p, Some(h)).await;
-                assert!(s != 401 && s != 403, "{m} {p} {what} was refused: {s}");
+                assert!(
+                    !matches!(s, 401 | 403),
+                    "{m} {p} {what} was refused by the guard: {s}"
+                );
             }
         }
     }
