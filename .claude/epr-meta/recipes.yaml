@@ -44,6 +44,10 @@ recipes:
         paths:
           - "genesis/docs/superpowers/plans/*.md"
           - "genesis/docs/plans/*.md"
+          # Persona-walk burn-down docs: one per view, one `- [ ]` station per finding. Station
+          # ids are positional (`walks__<view>#n`), so a walk doc is append-only — stations are
+          # ticked, never reordered or deleted. Skill: ux-walk.
+          - "genesis/a2o/walks/*.md"
       - name: intent
         artifactKind: "gap-item"
         paths:
