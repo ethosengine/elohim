@@ -211,7 +211,9 @@ export function parseResourceProfileArgs(argv: string[]): ResourceProfileOptions
         break;
       case '--admin-ports':
       case '--pids': {
-        const numbers = value(argv, i).split(',').map(raw => positiveInteger(raw, flag));
+        const numbers = value(argv, i)
+          .split(',')
+          .map(raw => positiveInteger(raw, flag));
         if (new Set(numbers).size !== numbers.length)
           throw new Error(`${flag} values must be unique`);
         if (flag === '--admin-ports') {
@@ -300,7 +302,7 @@ export function parseResourceProfileArgs(argv: string[]): ResourceProfileOptions
   }
   if ((!out.meshDir && !out.adminPorts) || !out.seconds || !out.output || !out.mode)
     throw new Error(USAGE);
-  if (out.pids && (!out.adminPorts || out.pids.length !== out.adminPorts.length))
+  if (out.pids && out.pids.length !== out.adminPorts?.length)
     throw new Error('--pids requires --admin-ports with the same number of values');
   if (out.seconds > 600) throw new Error('--seconds must be in 1..600');
   if (out.mode !== 'metrics' && !out.perf) throw new Error(`--mode ${out.mode} requires --perf`);
@@ -1060,13 +1062,19 @@ export function expectedConductorConfigs(meshDir: string): Record<string, string
 // Resolve explicit listeners to the config identities used by every resource snapshot.
 // Peer names are stable within a capture: conductor-<admin-port>.
 function explicitConductorConfigs(adminPorts: number[], pids?: number[]): Record<string, string> {
-  const candidates = pids ?? readdirSync('/proc').filter(name => /^\d+$/.test(name)).map(Number);
+  const candidates =
+    pids ??
+    readdirSync('/proc')
+      .filter(name => /^\d+$/.test(name))
+      .map(Number);
   const configs: Record<string, string> = {};
   for (const [index, port] of adminPorts.entries()) {
     const matches: string[] = [];
     for (const pid of pids ? [pids[index]] : candidates) {
       try {
-        const argv = boundedText(`/proc/${pid}/cmdline`, 1024 * 1024).split('\0').filter(Boolean);
+        const argv = boundedText(`/proc/${pid}/cmdline`, 1024 * 1024)
+          .split('\0')
+          .filter(Boolean);
         const executable = readlinkSync(`/proc/${pid}/exe`).replace(/ \(deleted\)$/, '');
         if (!/(^|\/)holochain$/.test(executable) || !/(^|\/)holochain$/.test(argv[0] ?? ''))
           continue;
@@ -1088,7 +1096,9 @@ function explicitConductorConfigs(adminPorts: number[], pids?: number[]): Record
       }
     }
     if (matches.length !== 1)
-      throw new Error(`admin port ${port}: expected exactly one conductor with a config, observed ${matches.length}`);
+      throw new Error(
+        `admin port ${port}: expected exactly one conductor with a config, observed ${matches.length}`
+      );
     if (Object.values(configs).includes(matches[0]))
       throw new Error(`admin port ${port}: conductor config already selected`);
     configs[`conductor-${port}`] = matches[0];
