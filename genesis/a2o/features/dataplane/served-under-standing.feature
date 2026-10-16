@@ -10,18 +10,19 @@ Feature: Doorway visitors can trace access decisions, contributions and response
   recording actor's authority or a formal ruling ceremony.
 
   EPR means Elohim Protocol Record: here it identifies the published garden resource.
-  The project-epr contract is the same record later called the projection contract or
-  declaration. It gives alpha permission to serve and names alpha's provider. Its reach
+  The project-epr (the EPR record a doorway projects, also called the projection contract
+  or declaration) gives alpha permission to serve and names alpha's provider. Its reach
   field states the audience. Narrowing updates
   that field in place, under the same contract identifier; it does not create a new
   contract. The full declaration means the complete returned contract record, including
   its metadata; comparing it requires every returned field to remain unchanged.
   The hosting-agreement records computing and storage contribution,
-  operate-doorway records operation of beta, and a challenge record applies the
+  operate-doorway (the record of a doorway operating an entrance) records operation of
+  beta, and a challenge record applies the
   contract's prior response promise to James's objection.
 
   Matthew, Ronald, and James make named requests with hosted bearer credentials tied to
-  their canonical fixture humans: the named people's existing Genesis identities.
+  their canonical fixture humans: their pre-existing fixture identities.
   The bearer credential and the separately read peer membership record must identify
   the same person. This proves only the hosted-identity path used here; direct device-to-doorway
   credential handoff remains unproved.
@@ -32,6 +33,8 @@ Feature: Doorway visitors can trace access decisions, contributions and response
   from commons to Dowell members, their HTTP 403 shows that public permission was
   withdrawn. The member-control scenarios separately show that the scenario-created
   bytes still exist for an admitted member.
+  Scenario 2 brackets the nonmember's request between two member requests that act as
+  control requests, proving the system decided differently rather than changing state.
 
   Private reach is for the person the resource belongs to, established from that person's
   own record; household membership alone does not make someone that beneficiary. The current
@@ -50,9 +53,13 @@ Feature: Doorway visitors can trace access decisions, contributions and response
   credit sentences name who kept it and who operated the entrance. Their records support that
   audit but do not prove payment. A protocol-form URL returns the supporting records. The HTTP
   response frame is called chrome here; no browser presentation or rendered role label is asserted.
+  The receipt carries a held credit (the record of who kept the resource ready, the holder)
+  and a projected credit (the record of who operated the entrance it was served through),
+  each resolving to its exact credited record.
 
-  The fixture declares a 60-second convergence window. The holder-side anonymous-refusal
-  observation has an explicit deadline of that window plus one request/poll interval, at most
+  The household's fixture manifest declares its reconcile window (60 seconds in this fixture).
+  The holder-side anonymous-refusal observation has an explicit deadline of that convergence
+  window plus one request/poll interval, at most
   15 seconds; it does not claim to prove the unobserved instant when enforcement began. Beta's
   unprompted poll has its own 75-second local observation bound. These are local topology limits,
   not WAN guarantees. James's response is due
