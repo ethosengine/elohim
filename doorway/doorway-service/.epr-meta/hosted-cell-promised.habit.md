@@ -23,6 +23,10 @@ retire-when: >
   of installing the cell and the doorway only relays it — so a hosted cell without a notarized
   promise cannot exist by construction, and the count is a fold over the DHT, not a doorway row.
 ---
+DELTA 2026-10-16 (RED preserved; household measure without fresh prologue): doorway-humans-served 2/4; `humansServed=7` undercounts the nine cast humans; next step is the required `just mesh prologue`, then remeasure.
+Household lanes from a fresh worktree at origin/dev@11a0ce694, with `MESH_DIR=…/household-dowell A2O_DEVICE_BINDING=…/household-dowell/device-ceremony/binding.json MESH_ALLOW_STALE_BINARY=1`; storage binary built 2026-10-15T22:25Z, doorway 2026-10-16T03:30Z. At 20:35Z all three storage peers answered `/health` 200 and 8090 reported `connectedPeers 2, caughtUp true`. Reports under genesis/a2o/reports/, named `sprint-report-household-<id>-11a0ce69`.
+doorway-humans-served 2/4 (20261016T202051Z) ran without a fresh `just mesh prologue`: the 2026-10-16 03:25Z roster was newer than the archive, so the runner did not refuse. Failed at humans-served.steps.ts:459: "neither doorway's count includes a human hosted only by the other": `doorway "alpha" reports humansServed=7, fewer than the 9 humans this scenario cast at alpha (the roster's 3 plus the 6-name household cast) — it cannot be leaving out humans it itself hosts and still be counting only its own.` `just mesh status` showed matthew hosting 6 agents (ceiling 14). This atom's checks require `just mesh prologue` first; run that before the next lane measure. Not run here; red holds.
+
 DELTA 2026-09-11b (final sprint measure; RED, causes narrowed): glue now waits the fixture's convergenceWindowMs
 (60 s) on the off-pool read and the browser count scenario reads status itself (dc38ed3e5). Runs 20260911T0708{32}Z
 / 070905Z / 070928Z / 071014Z-dc38ed3e: humans-served browser **1/1 GREEN**; humans-served mesh 1/4 — 11 of 17
