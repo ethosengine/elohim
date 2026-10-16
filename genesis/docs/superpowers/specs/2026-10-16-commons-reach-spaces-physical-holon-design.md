@@ -13,7 +13,7 @@ graduation-trigger: >-
   habits carry evidence for admission, projection isolation, cross-space succession and
   phone/hub budgets, including the nachalah-allotment outsider scenario and completed probes.
 cites:
-  - "commons-spaces-probe-a-report | Probe A: clone-space results and raw-evidence references (2026-10-16) | sha256:c87c4015df1677ea | path: genesis/docs/superpowers/sprints/2026-10-16-commons-spaces-probe-a-report.md"
+  - "commons-spaces-probe-a-report | Probe A (clone spaces) and probe B (fractional arc) results and raw-evidence references (2026-10-16) | sha256:532809cf5ab9e751 | path: genesis/docs/superpowers/sprints/2026-10-16-commons-spaces-probe-a-report.md"
   - "holons-are-spaces-how-we-use-holochain | Holons, Spaces, and Holochain — What the Vision Requires Us to Reconsider | sha256:8307626aa810f8a2 | path: genesis/docs/content/elohim-protocol/architecture/2026-09-06-holons-are-spaces-how-we-use-holochain.md"
   - genesis/data/timeline/backlog/arch-authority-in-integrity-backlog.md
   - "commons-pool-as-collective-party-design | A commons pool is a collective that is party to its members' commitments — the missing node under shared data, shared inference, edge serving and edge compute | sha256:095276e5ccec79b3 | path: genesis/docs/superpowers/specs/2026-10-04-commons-pool-as-collective-party-design.md"
@@ -138,8 +138,8 @@ Receipt §Notes leaves `blockedIncoming` unexplained and the startup step unattr
 (`genesis/seeder/src/validate-deployments.ts:182`). The tracked reconciliation records
 fractional arcs compiled out on fork `2b334df7973d`
 (`genesis/data/timeline/backlog/dht-scale-envelope-and-web2-projection-at-planetary-scale.md:102`).
-That is a dated source reading, not independent verification of the probe fork `96bcd2bee`
-(Receipt §Versions and topology).
+That is a dated source reading. For the pinned fork `96bcd2bee` Probe B verified it directly:
+the pinned binary refuses `target_arc_factor: 0.5` at config parse (§4, Receipt B §P0).
 
 ## 3. The space model per tier
 
@@ -185,22 +185,45 @@ conductor-wide in the cited design; selecting different arcs per space needs a s
 (Holons §7). Do not describe phone participation as independent full custody without its
 measurement. Replica breadth must buy independent recovery, not merely headcount.
 
-**PROBE-B: pending.** No result or savings are inferred. The operator-approved plan of 2026-10-15
-(session evidence, not tracked), §2, proposes the following checks:
+**PROBE-B: measured 2026-10-16 — a partial arc holds where gossip delivers, and leaks where
+publication delivers.** Receipt B: `genesis/a2o/reports/recovery/commons-spaces-probe-b-2026-10-16/RECEIPT.md`
+on the measuring device (raw evidence beside it; summary in the tracked sprint report). The pinned
+fork cannot hold a fractional arc at all: `target_arc_factor: 0.5` is refused at config parse
+(exit 42, "expected u32"). A **scratch probe binary** — the pinned fork plus a local, unpushed
+commit that compiles kitsune2's partial-arc growth in and adds a `target_arc_span` setting — ran on
+**one fresh joiner** at exactly half the ring. James was not used: no layer at this fork deletes
+operations outside an agent's arc, so narrowing an established peer's arc cannot show a reduction.
+The household's three conductors stayed on the pinned binary.
 
-| Measurement | Exact comparison required by the approved probe |
+| Measurement | Result (Receipt B) |
 |---|---|
-| Arc percentage | Baseline advertised `storageArc`; patched James around **50%**, with Matthew/Jessica full; observe whether it remains empty or jumps full |
-| Operation count ratio | James/Matthew operation counts, target **50% ±10%**, after convergence on comparable data |
-| Out-of-arc read correctness | Each selected outside-range record returns the expected content through other peers; retain expected/actual addresses |
-| Gossip completion | Completed rounds, arc regrowth and empty block lists on all probe peers; any block/warrant or stuck-empty arc fails |
-| Savings | DHT database bytes, operation counts, `RssAnon` (resident anonymous memory: process pages not backed by files), CPU and throttling before/after, at matched cadence and phase |
+| Arc percentage | **PASS.** Storage arc stayed Empty for about 10 min, then settled exactly at the half target on each of the four spaces whose DNA matched the household's (about 56 min on the 197,467-operation infrastructure space). It never jumped to full. A full-arc control joiner on the pinned binary was still Empty on its two largest spaces at 24 min, so a full-arc joiner can start as slowly; one control does not establish the cause. |
+| Operation count ratio | **Split by space.** infrastructure: 84,344 integrated against Matthew's 198,717 (42.4 %), plus 27,993 still in validation limbo (56.5 % with them). node_registry: 96.7 %. mishpat: 98.9 %. |
+| Held by basis, integrated operations | Counts only, not operation identities. For operations whose basis is readable from the action (agent activity, links): infrastructure's integrated operations include 36,156 in-arc against Matthew's 36,237 (99.8 %) and **6** out-of-arc against his **64,727** — consistent with a correct shard; its 27,993 limbo operations were not classified. node_registry's include as many in-arc as Matthew's (8,072) **and 3,388 of his 3,445 out-of-arc (98 %)** — a leak. |
+| Out-of-arc read correctness | **PASS.** 120 of 120 records (64 outside the arc) read correctly through the joiner; no misses or errors. Whether each was served locally or by another peer was not recorded, and the leak makes local service likely, so this does not yet prove reads served by other peers under a correct shard. |
+| Gossip completion | **PASS.** Rounds complete with every household peer on the four matching spaces; `hc-mesh.sh blocks` lists no block on Matthew, Jessica or James; no warrant in the joiner's log. |
+| Savings | Only integrated-operation counts were compared. infrastructure: −57.6 % integrated, −43.5 % counting limbo. node_registry −3.3 % and mishpat −1.1 %, which is not a sharding saving. No matched disk, bandwidth, memory, CPU or throttling comparison was taken. |
 
-Those numeric targets are proposed probe criteria from that session plan, not measured facts
-or capacity findings. An empty arc can
-look cheap while holding nothing. Measure recovery and availability alongside savings.
-Sharding could reduce replicated operations, disk and gossip within a space. It need not
-remove per-cell runtime memory, and it does not implement a membership boundary.
+**The approved "50 % ±10 % of Matthew" criterion was the wrong yardstick.** Operations are not
+uniform on the ring: 70 % of Matthew's located node_registry operations and 36 % of his
+infrastructure operations lie in this half. The test that means custody is "holds the in-arc set
+and not the out-of-arc set", measured per operation (by identity, which this probe counted only in aggregate).
+
+**Why it leaks** (source reading, key path verified; Receipt B §Mechanism). Gossip is correct: it
+syncs only the intersection of the two sides' *target* arcs, and full-arc peers need no sharding
+support. Publication is not: `holochain_p2p` publishes each operation to every responsive peer
+near its basis with no check that the basis lies inside the receiver's arc
+(`crates/holochain_p2p/src/spawn/actor.rs:1981` at fork `96bcd2bee`), and the receiving conductor
+admits incoming operations with no arc gate. Why node_registry and mishpat are still being
+published to a newcomer while infrastructure is not is PLAUSIBLE only: an operation is
+republished until it holds five validation receipts, which a three-conductor household may never
+supply. Receipt counts were not measured.
+
+So sharding could reduce replicated operations, disk and gossip within a space — only the
+integrated-operation count was measured, on one space — but at this fork it does not hold under
+publication. It need not remove per-cell
+runtime memory, and it does not implement a membership boundary. An empty arc can look cheap while
+holding nothing; measure recovery and availability alongside savings.
 
 Shipping is a later **operator-gated fork change → reviewed pin move → fleet roll**. A scratch
 probe binary on one peer is not that release. A **pin move** changes the committed submodule
@@ -208,6 +231,11 @@ commit the fleet builds from; a **fleet roll** redeploys every running peer. Bef
 extend configuration validators,
 prove coverage/redundancy and out-of-arc reads under loss, declare compatible rollback and
 regrowth behavior, and measure the rollout. This document changes no pin or deployed policy.
+Probe B adds two items that fork change must contain before any of that: publication filtered to
+receivers whose arc contains the basis, and an arc gate on incoming operations keyed to the
+receiver's *target* arc (a storage-arc gate would starve a joiner whose arc is still Empty), with
+warrants and self-authored operations handled explicitly and operations already held outside the
+arc cleaned up. Repeat Probe B's per-operation held-set test on every space after the change.
 
 ## 5. Membrane
 
@@ -734,15 +762,17 @@ Additional spaces, confidential discovery, witnessed roots and independent custo
 | Three-seams §5 arc index versus Facility F6 presence ranges | Presence keys partition rollup payloads; DHT hash arcs partition operation custody. Optional co-location needs a measured mapping (§6). | Endorse this reconciliation before revising the older source; sharding funding is a separate ruling. |
 | Pool in imagodei versus its own space | Keep public identity/membership in imagodei now; dedicated operational/governance spaces are a separately selected placement, not a different kind of pool (§3/§8). Restricted metadata cannot use the public baseline. | Yes, per tier and role, after the D6 test. |
 | Tier as view, collective, or holon of stewards | Aggregate tier is a view (D1); its governing membership can be a Collective; its stewards may occupy a separately admitted physical space. None implies the others. | No new ruling needed for D1; yes for any steward-space commissioning. |
-| Fractional arc assumptions versus full/zero arcs | Price full custody today. Mark fractional benefits pending B and the fork/pin/fleet release path; do not inherit old capacity assertions. | Yes for funding and shipping; no to claiming an absent capability as built. |
+| Fractional arc assumptions versus full/zero arcs | Price full custody today. Probe B (§4) shows a scratch binary can hold an exact half arc, and its integrated operations on a gossip-delivered space are consistent with a correct shard, while publication leaks out-of-arc operations into the same peer; fractional benefits stay unclaimed until a fork change closes the leak and the pin/fleet release path is taken. Do not inherit old capacity assertions. | Yes for funding and shipping; no to claiming an absent capability as built. |
 
 ## 12. Rulings for the operator
 
 - Which peer-vouched membrane shape is acceptable for restricted groups: eligible voucher rule,
   founder-free first cohort, recognized policy epochs, and behavior when voucher evidence is
   unavailable? Does any public role have measured sybil pressure warranting admission changes?
-- Should a production sharding fork change be funded after B, and under what release evidence
-  may its pin move and fleet roll occur? Does per-space arc selection get separate funding?
+- Probe B measured a partial arc that holds under gossip and leaks under publication (§4).
+  Should a production sharding fork change be funded — the probe's arc setting plus a
+  publication filter and an incoming-operation arc gate — and under what release evidence may
+  its pin move and fleet roll occur? Does per-space arc selection get separate funding?
 - At household, pool, language and planetary steward tiers, which roles stay in shared
   imagodei/mishpat/content spaces, and which may become dedicated spaces after D6 passes?
 - What phone/hub resource and recovery budgets, independent-holder requirements, child fan-in
@@ -814,12 +844,14 @@ pair preserves Receipt's discoveries. Quoted measurements below come from Receip
 - `chain / commons composition MN-6 / between child result→parent authority / missing node B: witnessed cross-space root with successor, translation and residual; probe partition, replay and independent recomputation / current state: ABSENT; arithmetic quorum zero`
 - `chain / commons scale F6/F7 / between rollup roots→bounded planetary view / missing node B: presence-range chunks and per-child forwarding under total work bounds; probe hot presence, oversized proof, catch-up and child loss / current state: SPEC; no capacity envelope`
 - `chain / head-plane budget / between signed corpus→bounded reconciliation / missing node B: live-root indexing with bounded historical lookup; probe seed and annual retained-history workloads through restart / current state: SPEC; no marginal quiesce forecast`
-- `chain / custody sharding / between full-arc baseline→reduced custody cost / missing node B: fractional-arc evidence and compatible rollout; probe B arc/op ratio, outside reads, gossip and savings / current state: PROBE-B pending; no pin authorization`
+- `chain / custody sharding / between partial target arc→reduced custody cost / missing node B: publication and ingest honour the receiver's arc; probe per-operation held set (in-arc complete, out-of-arc absent) on every space of a fresh partial-arc joiner / current state: ABSENT at fork 96bcd2bee — infrastructure's integrated operations include 6 out-of-arc against Matthew's 64,727 (27,993 in limbo unclassified), node_registry's 98 % of them (Receipt B); no pin authorization`
+- `chain / household receipt / between mesh is running→a late joiner enters the same spaces / missing node B: the installed bundle's DNA hashes are recorded with the mesh; probe compare listApps cell hashes with the on-disk bundle at mesh status / current state: ABSENT — the on-disk bundle's lamad hash differs from the running household's, and a joiner installing it silently lands in a different lamad network (not a private one: any other joiner with that bundle meets it there) (Receipt B)`
 - `chain / commons governance / between declared pool→recognized local rule / missing node B: charter clauses, independent council and human challenge closure; probe each commons gate question from a member device / current state: unwired or absent as §10 reports`
 - `chain / pool lifecycle F10 / between dissolved pool→surviving obligations / missing node B: consented re-parenting and successor acceptance under a tombstone; probe unreachable successor and recovery without source deletion / current state: SPEC`
 
-The incomplete gates are part of this draft's result. Probe B, production steady state,
-phone budgets, membrane bootstrap/read behavior, council parameters, acceptance wiring and
-bundling behavior remain unverified. The tracked sprint report (Receipt) carries the probe A
-results; raw evidence stays in `genesis/a2o/reports/recovery/commons-spaces-2026-10-16/`
-on the measuring device. No source document is silently amended by these proposed reconciliations.
+The incomplete gates are part of this draft's result. Production steady state, phone budgets,
+membrane bootstrap/read behavior, council parameters, acceptance wiring and bundling behavior
+remain unverified; Probe B is measured (§4) but sharding is not shippable at this fork. The
+tracked sprint report (Receipt) carries the probe A and probe B results; raw evidence stays in
+`genesis/a2o/reports/recovery/commons-spaces-2026-10-16/` and
+`genesis/a2o/reports/recovery/commons-spaces-probe-b-2026-10-16/` on the measuring device. No source document is silently amended by these proposed reconciliations.

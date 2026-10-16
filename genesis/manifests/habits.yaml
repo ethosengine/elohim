@@ -1298,10 +1298,10 @@ habits:
     active: false
     checks: []
     evidence: >
-      DELTA 2026-10-16 (commons-spaces probe A, no status change): on four empty fork-96bcd2bee sandbox conductors a same-seed clone cell is a real isolated space (3 members converge on a direct-call write in 5.7 s; base cell untouched), and a non-member that merely knows the seed joins, and the write was first observed on it about 77 s after its install — admission is absent, so the outsider scenario in nachalah-allotment.feature would fail today by design. Per-clone cost at dev cadence ≈ 6.2 MiB RSS, 3 % core; prod-cadence steady state unmeasured. Evidence: genesis/docs/superpowers/sprints/2026-10-16-commons-spaces-probe-a-report.md; design: genesis/docs/superpowers/specs/2026-10-16-commons-reach-spaces-physical-holon-design.md §5.
-    evidence-fingerprint: sha256:e9fd2a3f1ca13523
-    evidence-bytes: 3168
-    evidence-entries: 5
+      DELTA 2026-10-16 (commons-spaces probe B, no status change): a scratch fork-96bcd2bee binary with a half `target_arc_span` (local commit, never pushed; pin unmoved) on one fresh joiner holds an exact half arc and its integrated ops on the gossip-delivered infrastructure space are consistent with a correct shard (36,156 in-arc vs matthew's 36,237; 6 out-of-arc vs his 64,727; −57.6 % integrated ops, −43.5 % counting 27,993 unclassified limbo ops), but node_registry and mishpat leak 98 % of their out-of-arc ops in through publication — holochain_p2p publishes to every nearby peer with no arc check and ingest has no arc gate. Out-of-arc reads 120/120, no blocks. Sharding cannot narrow what a nachalah's holders must carry until a fork change filters publication and ingest; the pinned binary refuses a fractional arc factor outright. Evidence: genesis/docs/superpowers/sprints/2026-10-16-commons-spaces-probe-a-report.md (probe B section); design: …-commons-reach-spaces-physical-holon-design.md §4.
+    evidence-fingerprint: sha256:31696be174634274
+    evidence-bytes: 4182
+    evidence-entries: 6
     first_move: >
       Connect the existing release adopter to durable supervised activation through ark,
       preserving the previous executable, runtime manifest, database compatibility, berth,
