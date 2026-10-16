@@ -1293,7 +1293,7 @@ def triggerPipeline(String name, String branch, Object wait = null, List changed
         // history depth.
         boolean validateOnlyDownstream = name == 'elohim-edge' && belowDeploy
         boolean gateOnlyDownstream = name == 'elohim-edge' && env.EDGE_GATE_ONLY_FROM_TAG == 'true'
-        if (gateOnlyDownstream) jobBranch = jobBranch.replace('/', '%2F')
+        if (gateOnlyDownstream) jobBranch = env.CHANGE_ID ? "PR-${env.CHANGE_ID}" : jobBranch.replace('/', '%2F')
         // Cross-repo pipelines share none of the monorepo's parameter vocabulary —
         // sending FORCE_BUILD/DEPLOY_ONLY/CHANGED_PATHS to a job that declares none
         // of them produces undefined-parameter warnings and no behaviour. They get
