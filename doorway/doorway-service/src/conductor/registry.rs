@@ -441,9 +441,15 @@ impl ConductorRegistry {
         });
     }
 
-    /// Drop every mapping on `conductor_id` whose app the conductor no longer
-    /// has installed, in memory and in Mongo, and recount its capacity.
-    /// Returns the keys dropped.
+    /// Drop every mapping on `conductor_id` that names an (app, agent) pair the
+    /// conductor no longer has installed, in memory and in Mongo, and recount
+    /// its capacity. Returns the keys dropped.
+    ///
+    /// `installed` holds `(installed_app_id, canonical agent key)` for each app
+    /// the conductor lists. Matching on the app id alone is not enough: a pod's
+    /// own agent is always installed as app `elohim`, and each reinstall mints a
+    /// new agent under that same id, so every mapping to an earlier agent would
+    /// survive (alpha, 2026-10-15: 17 to 27 `elohim` rows per pod, one real).
     ///
     /// The conductor's own `list_apps` is the authority on who it hosts; a
     /// persisted row is only a record of an assignment. Rows outlive their
@@ -455,14 +461,15 @@ impl ConductorRegistry {
     pub fn prune_absent(
         &self,
         conductor_id: &str,
-        installed_app_ids: &HashSet<String>,
+        installed: &HashSet<(String, String)>,
     ) -> Vec<String> {
         let absent: Vec<String> = self
             .agents
             .iter()
             .filter(|e| {
                 e.value().conductor_id == conductor_id
-                    && !installed_app_ids.contains(&e.value().app_id)
+                    && !installed
+                        .contains(&(e.value().app_id.clone(), normalize_agent_key(e.key())))
             })
             .map(|e| e.key().clone())
             .collect();
@@ -989,13 +996,13 @@ mod tests {
             4
         );
 
-        let installed: HashSet<String> = [
-            "elohim-conductor-0-maria",
-            "elohim-conductor-0-ezra",
-            "elohim",
+        let installed: HashSet<(String, String)> = [
+            ("elohim-conductor-0-maria", "uhCAk_maria"),
+            ("elohim-conductor-0-ezra", "uhCAk_ezra"),
+            ("elohim", "uhCAk_jessica"),
         ]
         .into_iter()
-        .map(String::from)
+        .map(|(app, key)| (app.to_string(), key.to_string()))
         .collect();
         let mut pruned = registry.prune_absent("conductor-0", &installed);
         pruned.sort();
@@ -1020,6 +1027,50 @@ mod tests {
             registry.get_conductor_for_agent("uhCAk_jessica").is_some(),
             "another conductor's rows are not judged by this conductor's apps"
         );
+    }
+
+    #[tokio::test]
+    async fn an_earlier_agent_under_the_pods_own_app_id_is_pruned() {
+        // A pod's own agent is always app `elohim`; a reinstall mints a new
+        // agent under the same id. Only the agent the conductor lists survives,
+        // in every key form it was registered under.
+        use super::super::agent_key::{canonical_agent_key, lookup_forms};
+        let raw = |fill: u8| {
+            let mut k = vec![0x84, 0x20, 0x24];
+            k.extend([fill; 36]);
+            k
+        };
+        let (current, earlier) = (raw(1), raw(2));
+
+        let registry = ConductorRegistry::new(None).await;
+        registry.register_conductor(ConductorInfo {
+            conductor_id: "conductor-1".to_string(),
+            conductor_url: "ws://c1:4445".to_string(),
+            admin_url: "ws://c1:4444".to_string(),
+            capacity_used: 0,
+            capacity_max: 0,
+        });
+        for key in lookup_forms(&current).iter().chain(&lookup_forms(&earlier)) {
+            registry
+                .register_agent(key, "conductor-1", "elohim")
+                .await
+                .unwrap();
+        }
+
+        let installed: HashSet<(String, String)> =
+            [("elohim".to_string(), canonical_agent_key(&current))].into();
+        let mut pruned = registry.prune_absent("conductor-1", &installed);
+        pruned.sort();
+        let mut expected = lookup_forms(&earlier);
+        expected.sort();
+
+        assert_eq!(pruned, expected, "every form of the earlier agent goes");
+        for form in lookup_forms(&current) {
+            assert!(
+                registry.get_conductor_for_agent(&form).is_some(),
+                "the pod's current agent still routes as {form}"
+            );
+        }
     }
 
     #[tokio::test]

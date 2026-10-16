@@ -18,8 +18,10 @@ a33593660) drops a mapping when its `app_id` is not in the conductor's `list_app
 installed as app `elohim`, and each conductor reinstall mints a new agent under that same app id. Every
 mapping to an earlier `elohim` agent therefore survives the prune: on alpha after the c06e99a9 deploy,
 `GET /admin/conductors/conductor-N/agents` lists 17 to 27 `elohim` rows per pod (about 8 agents in three key
-forms each), where one is real. The prune should compare (app id, agent key) against `list_apps`, which
-already returns both.
+forms each), where one is real. Fixed in the commit that adds this row: the prune now compares
+(app id, canonical agent key) against `list_apps`, which already returns both
+(`an_earlier_agent_under_the_pods_own_app_id_is_pruned`). The alpha registry shows it after the next
+doorway boot.
 
 **The second fact.** Matthew's alpha account (`matthew.dowell@alpha.elohim.host`, phase doorway) carries a
 custodial key, `hCAkmO-…`, from a hosted app `elohim-conductor-6-c16c7d` that had already gone from conductor-6
@@ -32,6 +34,6 @@ His own pod is conductor-1. Re-binding the operator's admin account to his own k
 re-seeding it) is an operator decision. The doorway-phase registration branch never takes the
 pod's key the way node/device registration does since 9b98ac904, so a re-seed alone may not bind it.
 
-**Done when.** The prune drops a mapping whose agent is not the agent of that app on that conductor, with
-a unit test, and the alpha registry lists one `elohim` agent per pod after a boot; and Matthew's alpha
-session reaches his own cell on conductor-1 (`/hc/connect` 200 in the observable-distribution scenario).
+**Done when.** The alpha registry lists one `elohim` agent per pod after a doorway boot
+(`GET /admin/conductors/conductor-N/agents`), and Matthew's alpha session reaches his own cell on
+conductor-1 (`/hc/connect` 200 in the observable-distribution scenario).
