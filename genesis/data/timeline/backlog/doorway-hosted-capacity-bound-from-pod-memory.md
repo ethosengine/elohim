@@ -28,7 +28,9 @@ shift_objective: |
   uninstall the app when create_human fails so a failed registration neither holds heap nor skews
   the count. Done when three consecutive genesis runs register their hosted humans on alpha without
   a create_human timeout or a conductor OOMKill, and the registry's capacity_used equals the
-  conductor's installed-app count after each run.
+  conductor's installed-app count after each run. Include close-account cleanup and explicit idle
+  sleep/wake policy, with measured relief, safe retries and seat decisions for operator mutations;
+  let humans release only apps they can prove are theirs.
 tags: [doorway, conductor, hosted, capacity, alpha, operator-decision, risk, performance, perf-memory, perf-scale, perf-queue, trustful-self, friction-mechanical, custody-everyone, plane-custody, unit-agent, phase-steady, phase-growth, lane-interactive]
 ---
 
@@ -36,8 +38,8 @@ tags: [doorway, conductor, hosted, capacity, alpha, operator-decision, risk, per
 
 Found by genesis #1649 (2026-10-16, against 89c41e696): all three hosted sign-up scenarios failed
 with `create_human` timing out at 10 s on conductor-0 (adam). The registry prune
-([doorway-registry-prune-matches-app-id-only](epr:doorway-registry-prune-matches-app-id-only),
-"the third fact") fixed the counts and so exposed three defects underneath. This entry holds them
+([doorway-registry-prune-matches-app-id-only](doorway-registry-prune-matches-app-id-only.md),
+"placement after the prune") fixed the counts and so exposed three defects underneath. This entry holds them
 as one performance concern because they compound into a single law: **a hosting conductor reaches
 its memory limit about every second genesis run.**
 
@@ -103,6 +105,38 @@ Smallest first:
   (`registry.rs:284–296`). The bound should be compared against that, including failed installs
   until they are removed.
 
+## Hosting cleanup and idle sleep (integrated 2026-10-16)
+
+Uninstall apps after account close as well as failed creation, reconcile installed-app counts,
+and make retries safe. Insert-failure grant ordering remains in the
+[grant-before-row entry](doorway-hosted-cell-grant-minted-before-row-insert-2026-09-11.md);
+reuse its rollback work. The [prune entry](doorway-registry-prune-matches-app-id-only.md) holds
+the 2026-10-16 alpha census: earlier-run apps may still hold heap, and conductors absent from
+the current list need separate registry cleanup.
+
+Enforce the per-conductor ceiling and route ceiling changes through the operator seat. Sleep
+idle cells only under an explicit policy with a wake path preserving identity and data.
+Measure actual relief; do not assume sleep or uninstall releases conductor heap.
+
+The signed-in human releases apps provably theirs from account settings, as specified by
+[the own-node-key design](../../../docs/superpowers/specs/2026-10-16-graduate-onto-own-node-key-design.md)
+(“What the bind does” and “Next slice: release what this doorway still hosts for me”). The bind
+best-effort deprovisions the one old-key app after the account swap; earlier leftovers need
+this separate release. Match installed apps across registered conductors by current or previous
+agent key, or a registry row under the human's `human_id`. Never match on identifier-derived
+app id alone: closing an account frees its name for another person. List why each app matched;
+re-check ownership and password on release, refuse `NOT_YOURS`, and refuse the hosted current
+cell as `IN_USE` (close the account to release it).
+
+Everything not provably theirs stays with the operator seat. Reuse the
+[prune entry's seat boundary and operator-standing dependency](doorway-registry-prune-matches-app-id-only.md):
+branch work in `.worktrees/doorway-operator-surface` (commits `5f66681fd`, `fb3c12867`,
+`991e10241`), not yet on dev. The loop proposes; the seat checks standing, capability and bounds;
+system code acts. Permit at birth covers only adding holders without removal, announcements
+and informing parties within bounds. Uninstalling apps, changing ceilings and sleeping cells
+Refer. Record decision and outcome; unanswered Refers leave mutations pending, and widening
+needs evidence. These actuators never re-point a key or perform the owner's graduation.
+
 ## Needs the operator
 
 - **The number.** About 5–6 per 5 GiB conductor today. Raising `edgenodeMemoryLimit` and letting the
@@ -116,7 +150,10 @@ Smallest first:
 Three consecutive genesis runs register their hosted humans on alpha with no `create_human`
 timeout and no conductor OOMKill, and after each run the registry's `capacity_used` for each
 hosting conductor equals its installed hosted-app count (`GET /admin/conductors/conductor-N/agents`
-against the conductor's `list_apps`).
+against the conductor's `list_apps`). Household scenarios also prove cleanup after close and
+failed creation leaves no orphan app, safe retries, ceiling enforcement, owner-release refusals,
+and idle sleep/wake preserving identity and data with measured relief. Exercise each operator
+act and its refusal; every mutation names its seat decision.
 
 The longer cure is to stop paying 0.7 GiB per registered human at all. That is the design question
 in [arch-scale-risk](epr:arch-scale-risk-backlog) rows 14–17 (what a hosted human's conductor must

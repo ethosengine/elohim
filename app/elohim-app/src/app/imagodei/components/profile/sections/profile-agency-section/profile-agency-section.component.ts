@@ -1,8 +1,6 @@
 import { CommonModule } from '@angular/common';
-import { Component, input, output } from '@angular/core';
+import { Component, computed, inject, input, output } from '@angular/core';
 import { FormsModule } from '@angular/forms';
-
-// @coverage: 4.3% (2026-02-24)
 
 import {
   type AgencyStageInfo,
@@ -10,6 +8,9 @@ import {
   type ConnectionStatus,
   AGENCY_STAGES,
 } from '../../../../models/agency.model';
+import { DoorwayRegistryService } from '../../../../services/doorway-registry.service';
+
+// @coverage: 4.3% (2026-02-24)
 
 @Component({
   selector: 'app-profile-agency-section',
@@ -32,6 +33,12 @@ export class ProfileAgencySectionComponent {
   readonly isGraduationEligible = input(false);
 
   readonly confirmGraduation = output<string>();
+
+  private readonly doorwayRegistry = inject(DoorwayRegistryService);
+  readonly moveToNodeUrl = computed(() => {
+    const doorway = this.doorwayRegistry.selectedUrl();
+    return doorway ? new URL('/threshold/account#move-to-node', doorway).href : '';
+  });
 
   graduationPassword = '';
 

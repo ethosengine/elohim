@@ -33,6 +33,7 @@ pub mod import;
 pub mod import_ws;
 pub mod journal;
 pub mod metrics;
+pub mod node_key_bind;
 pub mod p2p_manifests;
 pub mod pkarr_resolver;
 pub mod receipt;

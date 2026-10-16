@@ -42,7 +42,7 @@ use crate::server::AppState;
 use crate::types::DoorwayError;
 use rand::Rng;
 
-type BoxBody = http_body_util::combinators::BoxBody<Bytes, hyper::Error>;
+pub(crate) type BoxBody = http_body_util::combinators::BoxBody<Bytes, hyper::Error>;
 
 // =============================================================================
 // Session Transfer Store (cross-app session handoff)
@@ -478,7 +478,7 @@ pub fn active_user_filter(identifier: &str) -> bson::Document {
 /// through [`crate::routes::hosted_cell::rfc3339_utc_secs`]), so this reuses
 /// that exact helper rather than minting a second stamp format — one response
 /// must not speak two dialects of time.
-fn account_stamp(at: bson::DateTime) -> String {
+pub(crate) fn account_stamp(at: bson::DateTime) -> String {
     crate::routes::hosted_cell::rfc3339_utc_secs(at.to_chrono())
 }
 
@@ -507,6 +507,17 @@ pub struct AccountResponse {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub stewardship_at: Option<String>,
     pub key_exported: bool,
+    /// The key this account currently answers to (`uhCAk…`).
+    pub agent_pub_key: String,
+    /// `hosted`, `doorway`, `node` or `device`; absent on rows older than 2026-10-15.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub agency_phase: Option<String>,
+    /// When the human bound this account onto their own node's key (RFC3339).
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub node_key_bound_at: Option<String>,
+    /// The key the account answered to before that bind.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub previous_agent_pub_key: Option<String>,
     /// The name this human registered under, projected from their `Human`
     /// profile. A person's account page should greet them, not their identifier.
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -869,7 +880,7 @@ pub struct StewardshipConfirmedResponse {
 // Response Helpers
 // =============================================================================
 
-fn json_response<T: Serialize>(status: StatusCode, body: &T) -> Response<BoxBody> {
+pub(crate) fn json_response<T: Serialize>(status: StatusCode, body: &T) -> Response<BoxBody> {
     let json = serde_json::to_string(body).unwrap_or_else(|_| "{}".to_string());
 
     Response::builder()
@@ -926,7 +937,7 @@ fn empty_body() -> BoxBody {
         .boxed()
 }
 
-async fn parse_json_body<T: for<'de> Deserialize<'de>>(
+pub(crate) async fn parse_json_body<T: for<'de> Deserialize<'de>>(
     req: Request<hyper::body::Incoming>,
 ) -> Result<T, DoorwayError> {
     let body = req
@@ -942,7 +953,7 @@ async fn parse_json_body<T: for<'de> Deserialize<'de>>(
     serde_json::from_slice(&bytes).map_err(|e| DoorwayError::Http(format!("Invalid JSON: {e}")))
 }
 
-fn get_auth_header(req: &Request<hyper::body::Incoming>) -> Option<&str> {
+pub(crate) fn get_auth_header(req: &Request<hyper::body::Incoming>) -> Option<&str> {
     req.headers()
         .get(hyper::header::AUTHORIZATION)
         .and_then(|v| v.to_str().ok())
@@ -965,7 +976,7 @@ fn get_auth_header(req: &Request<hyper::body::Incoming>) -> Option<&str> {
 /// `gatewayDomain()` in `threshold-login.component.ts`, which strips the `doorway-`
 /// prefix off `window.location.hostname`. Returns `None` when no URL is configured (e.g.
 /// local dev) — callers then leave the identifier untouched.
-fn gateway_domain(doorway_url: Option<&str>) -> Option<String> {
+pub(crate) fn gateway_domain(doorway_url: Option<&str>) -> Option<String> {
     let url = doorway_url?;
     let host = url
         .split_once("://")
@@ -2793,6 +2804,10 @@ async fn handle_account(
                 is_steward: false,
                 stewardship_at: None,
                 key_exported: false,
+                agent_pub_key: claims.agent_pub_key.clone(),
+                agency_phase: None,
+                node_key_bound_at: None,
+                previous_agent_pub_key: None,
                 display_name: None,
                 hosted_cell_grant_cid: None,
                 hosted_cell_valid_until: None,
@@ -2907,6 +2922,10 @@ async fn handle_account(
             is_steward: user.is_steward,
             stewardship_at: user.stewardship_at.map(account_stamp),
             key_exported,
+            agent_pub_key: user.agent_pub_key,
+            agency_phase: user.agency_phase,
+            node_key_bound_at: user.node_key_bound_at.map(account_stamp),
+            previous_agent_pub_key: user.previous_agent_pub_key,
             display_name: user.display_name,
             // The household name is shown only when there is a promise to name.
             // A portal can paint a name; only the commitment makes it checkable,
@@ -5465,7 +5484,7 @@ async fn handle_exchange_session(
 // =============================================================================
 
 #[allow(clippy::result_large_err)]
-fn get_jwt_validator(state: &AppState) -> Result<JwtValidator, Response<BoxBody>> {
+pub(crate) fn get_jwt_validator(state: &AppState) -> Result<JwtValidator, Response<BoxBody>> {
     // Keyed on JWT_SECRET presence, never dev_mode (JwtValidator::from_config).
     // A configured-but-invalid secret is a config error; absence falls back to
     // the dev validator (bare local dev / keyless mesh).
@@ -5493,7 +5512,7 @@ fn get_jwt_validator(state: &AppState) -> Result<JwtValidator, Response<BoxBody>
 /// party, the portal host is the identity provider. Mirrors the probe used
 /// by `handle_exchange_session`.
 #[allow(clippy::too_many_arguments)]
-async fn generate_auth_response(
+pub(crate) async fn generate_auth_response(
     jwt: &JwtValidator,
     state: &AppState,
     human_id: &str,
@@ -5651,6 +5670,14 @@ pub async fn handle_auth_request(
             handle_confirm_stewardship(req, state).await
         }
 
+        // Graduation onto the human's own node key
+        (&Method::POST, "/auth/node-key/challenge") => {
+            crate::routes::node_key_bind::handle_challenge(req, state).await
+        }
+        (&Method::POST, "/auth/node-key/bind") => {
+            crate::routes::node_key_bind::handle_bind(req, state).await
+        }
+
         // Disaster recovery endpoints
         (&Method::POST, "/auth/recover-custody") => handle_recover_custody(req, state).await,
         (&Method::POST, "/auth/check-recovery-status") => {
@@ -5680,6 +5707,8 @@ pub async fn handle_auth_request(
         | (_, "/auth/export-key")
         | (_, "/auth/confirm-stewardship")
         | (_, "/auth/confirm-sovereignty")
+        | (_, "/auth/node-key/challenge")
+        | (_, "/auth/node-key/bind")
         | (_, "/auth/recover-custody")
         | (_, "/auth/check-recovery-status")
         | (_, "/auth/activate-recovery")

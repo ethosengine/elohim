@@ -7,9 +7,14 @@ title: "The doorway registry's boot prune keys on app id alone, so every stale m
 slug: "doorway-registry-prune-matches-app-id-only"
 written: "2026-10-15"
 author: "hosted-cast cleanup, alpha 401 follow-up, 2026-10-15"
-status: "open"
+status: "backlog"
 priority: "medium"
 jobs: [elohim-edge]
+shift_objective: |
+  Prune stale app/key mappings and rows for confirmed retired conductors, including conductors
+  absent from the doorway list. Show accounts with no installed app as stuck, distinguish unknown
+  lookups, and offer the remedy to the owner. Reuse the operator-standing branch work; cleanup
+  needs a seat decision and must never change an account key.
 tags: [doorway, conductor-registry, hosted-human-lifecycle, alpha]
 ---
 
@@ -30,27 +35,62 @@ custodial key, `hCAkmO-…`, from a hosted app `elohim-conductor-6-c16c7d` that 
 the dead mapping, so login now mints `conductor_id: conductor-6` with no `installed_app_id`, and `/hc/connect`
 answers 401 "Session is missing its installed app binding" at once (genesis #1647, #1648,
 observable-distribution After hooks). The prune did not cause this; it made the failure quick and named.
-His own pod is conductor-1. Re-binding the operator's admin account to his own key (or closing and
-re-seeding it) is an operator decision. The doorway-phase registration branch never takes the
+His own pod is conductor-1. The doorway-phase registration branch never takes the
 pod's key the way node/device registration does since 9b98ac904, so a re-seed alone may not bind it.
 
-**The third fact (2026-10-16, after the 124524a44 roll).** Hosted placement reads the counts the prune
-corrects. `find_least_loaded_excluding` (`registry.rs` ~361, called from `provisioner.rs` ~180) takes the
-largest `capacity_max - capacity_used`, and `capacity_used` is seeded from the registry's agent counts at
-boot. Before the fix, adam's conductor-0 seeded at 94/50 and was never chosen; afterwards conductor-0 and
-conductor-1 both seed at 14/50, and `max_by_key` breaks the tie by DashMap order, which picked adam. adam
-is the saturated pod: 96-220 `get_links … response channel dropped` / read-permit timeouts an hour since
-before either roll. All three genesis #1649 registrations (04:03-04:04Z) went to conductor-0, their cells
-completed genesis, and `create_human` timed out at 10 s. Failed registrations leave the installed app behind
-uncounted, so the tie persists. Under that sits a capacity model that cannot hold: each hosted install
-keeps about 0.7 GiB of conductor heap until the conductor restarts (adam 1.17 → 3.18 GiB for three installs;
-matthew OOMKilled at the 5 GiB limit on 10-15 19:52:53Z, the genesis #1648 `ConnectionClosed`), yet alpha
-declares `capacity_max` 50. Every genesis run registers hosted humans, so a hosting conductor reaches its
-memory limit about every second run. What to settle: a capacity bound derived from the pod's memory limit
-(or the doorway counting installs rather than agents), a deterministic tie-break, and uninstalling the app
-when `create_human` fails. Choosing the bound and whether adam keeps hosting is the operator's call. Catalogued as its own performance
-entry, with the code read and the fix shape: [doorway-hosted-capacity-bound-from-pod-memory](epr:doorway-hosted-capacity-bound-from-pod-memory).
+**Owner remedy (2026-10-16).** A hand Mongo edit moved the account from `hCAkmO-…` to the owner's
+node key, `hCAkJH75…`, after the hosted app vanished when its pod was retired. Operator and owner
+were the same person, but the edit used the wrong actor's authority. The operator never re-points
+a key. The owner chooses graduation or re-hosting on their own account page, following the
+[own-node-key design](../../../docs/superpowers/specs/2026-10-16-graduate-onto-own-node-key-design.md).
+No dashboard control, agent loop or Mongo edit substitutes for that act.
 
-**Done when.** The alpha registry lists one `elohim` agent per pod after a doorway boot
-(`GET /admin/conductors/conductor-N/agents`), and Matthew's alpha session reaches his own cell on
-conductor-1 (`/hc/connect` 200 in the observable-distribution scenario).
+Use the registry and provisioner lookup to list accounts whose `UserDoc.agent_pub_key` has no
+installed app on any registered pool conductor. This is read-only: failed lookups mean unknown,
+not absent. Show confirmed cases as stuck with their current key in the `doorway-app` hosting
+view, and address the remedy to the owner. The graduation view currently exposes only read-only
+`/admin/graduation/pending` and `/admin/graduation/completed` surfaces.
+
+**Placement after the prune (2026-10-16).** After the 124524a44 roll, conductor-0 and conductor-1
+both seeded at 14/50 instead of conductor-0's stale 94/50. DashMap tie order picked saturated
+adam for all three genesis #1649 registrations (04:03–04:04Z). Cells completed genesis but
+`create_human` timed out at 10 s. Installed leftovers, heap evidence and the capacity remedy
+have one home: [hosted capacity](doorway-hosted-capacity-bound-from-pod-memory.md).
+
+**Remaining prune scope (alpha, 2026-10-16).** Registry rows for earlier runs remain:
+conductor-4 about 20, conductor-6 about 17, conductor-1 three (newest 11:49Z). The apps are
+likely still installed and holding heap; registry rows alone do not prove that. Check actual
+installs and send app cleanup to the hosted-capacity work. Rows for conductor-10 through
+conductor-13 never clear because cleanup walks only the doorway's current conductor list.
+The prune must also inspect rows whose conductor is absent from that list. Delete only after
+retirement is confirmed; a timeout alone is not retirement. This concerns pool mappings, not
+[DHT doorway-registration TTL](doorway-registry-ttl-unenforced-no-heartbeat.md).
+
+**Seat boundary (2026-10-16).** Follow the
+[operator-loop design](../../../docs/superpowers/specs/2026-10-09-elohim-operator-loop-wedged-peer-design.md):
+pain → agent loop → seat → actuator. The loop gathers evidence and proposes an act; the seat
+checks standing, capability and bounds before system code executes it. At birth Permit alone
+covers only adding holders without removing anything, announcements and informing parties
+within bounds. Everything else Refers. Registry deletion therefore Refers; an unanswered Refer
+leaves it pending. Record the decision and outcome. Widen the seat only with evidence.
+Informing an owner gives no authority to perform their ceremony. Human-owned app release and
+the other hosting actuators follow the [capacity entry](doorway-hosted-capacity-bound-from-pod-memory.md).
+Hand edits in k8s or Mongo are not these actuators.
+
+**Operator-standing dependency.** Reuse branch work in `.worktrees/doorway-operator-surface`
+(commits `5f66681fd`, `fb3c12867`, `991e10241`), not yet on dev. `5f66681fd` carries the story
+`genesis/a2o/features/doorway/operator-standing.feature`, the habit
+`doorway/doorway-service/.epr-meta/operator-dashboard-under-standing.habit.md`, the plan
+`genesis/docs/superpowers/plans/2026-10-16-doorway-operator-surface-under-standing-plan.md`
+and operator bindings. The story includes the stuck-account owner boundary. `fb3c12867` adds
+interim Admin refusal on eight actuators; it does not complete standing checks. `991e10241`
+clarifies the binding issuer: the network's bootstrap steward (`progenitor_pubkey`), read from
+the network. Reuse that dashboard and per-action capability work; the habit remains red.
+
+**Done when.** Household scenarios prove authorized cleanup and refusal, including rows outside
+the current list; each mutation names its seat decision. After boot alpha lists one `elohim`
+agent per pod and no confirmed-retired conductor mappings. Missing apps appear as stuck;
+unreachable conductors remain unknown; healthy hosted accounts are not flagged. The operator
+has no key-changing control. The owner receives the remedy and can complete it from their own
+account; Matthew's session reaches his own cell on conductor-1 (`/hc/connect` 200 in
+observable-distribution).

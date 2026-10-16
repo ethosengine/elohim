@@ -23,6 +23,7 @@ import {
 } from 'elohim-imagodei/node-sign-in';
 import { createPendingAsksClient, type PendingAsksClient } from 'elohim-imagodei/pending-asks';
 import { sessionKeys } from 'elohim-imagodei/session-key';
+import { AccountBindComponent } from './account-bind/account-bind.component';
 import { DeviceApprovalComponent } from './device-approval/device-approval.component';
 import { IdentityViewComponent } from './identity/identity-view.component';
 import { PendingAsksComponent } from './pending/pending-asks.component';
@@ -42,6 +43,7 @@ type PortalMode =
   | 'login'
   | 'consent'
   | 'steward-login'
+  | 'account-bind'
   | 'device-consent'
   | 'identity'
   | 'sign-in'
@@ -124,6 +126,7 @@ export function identityPreviewFor(pathname: string): boolean {
   imports: [
     CommonModule,
     DeviceApprovalComponent,
+    AccountBindComponent,
     IdentityViewComponent,
     PendingAsksComponent,
     SignInViewComponent,
@@ -231,6 +234,11 @@ export function identityPreviewFor(pathname: string): boolean {
             </ng-container>
           </div>
         </ng-container>
+
+        <imagodei-portal-account-bind
+          *ngIf="mode() === 'account-bind'"
+          slot="primary"
+        ></imagodei-portal-account-bind>
 
         <ng-container *ngIf="mode() === 'device-consent'">
           <imagodei-portal-device-approval
@@ -390,6 +398,11 @@ export class AppComponent implements OnInit, AfterViewInit {
 
   async ngOnInit(): Promise<void> {
     const search = window.location.search;
+    if (window.location.pathname.replace(/\/+$/, '').endsWith('/consent/account-bind')) {
+      this.mode.set('account-bind');
+      this.step.set('consent');
+      return;
+    }
     // Pre-fetch authority so the shell receives it as a property (not via its own fetch),
     // for the hand-off and OAuth consent paths. The device approval page and the root ask
     // the node itself first, so a signed-out load does not also read /auth/me only to be

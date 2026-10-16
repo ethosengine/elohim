@@ -6,6 +6,7 @@
  */
 
 export interface HostingAccount {
+  agencyPhase?: 'hosted' | 'doorway' | 'node' | 'device';
   humanId: string;
   identifier: string;
   permissionLevel: string;

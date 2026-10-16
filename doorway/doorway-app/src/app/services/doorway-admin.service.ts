@@ -3,6 +3,7 @@ import { HttpClient, HttpErrorResponse } from '@angular/common/http';
 import { Observable, Subject, catchError, firstValueFrom, of, retry, timeout } from 'rxjs';
 import { webSocket, WebSocketSubject } from 'rxjs/webSocket';
 import { environment } from '../../environments/environment';
+import type { AuthResponse } from '../generated/auth-response';
 import { CircuitBreaker } from '../core/http/circuit-breaker';
 import { DEFAULT_HTTP_CONFIG } from '../core/http/http-config';
 import {
@@ -440,8 +441,29 @@ export class DoorwayAdminService {
   // ============================================================================
 
   /**
-   * Get current user's account details
+   * Request a password-confirmed challenge for moving to the node's key.
    */
+  challengeNodeKey(
+    password: string
+  ): Promise<{ challengeId: string; challenge: string; expiresAt: string }> {
+    return firstValueFrom(
+      this.http.post<{ challengeId: string; challenge: string; expiresAt: string }>(
+        `${this.baseUrl}/auth/node-key/challenge`,
+        { password }
+      )
+    );
+  }
+
+  bindNodeKey(binding: {
+    challengeId: string;
+    agentPubKey: string;
+    signature: string;
+  }): Promise<AuthResponse> {
+    return firstValueFrom(
+      this.http.post<AuthResponse>(`${this.baseUrl}/auth/node-key/bind`, binding)
+    );
+  }
+
   getAccount(): Observable<AccountResponse | null> {
     return this.http
       .get<AccountResponse>(`${this.baseUrl}/auth/account`)

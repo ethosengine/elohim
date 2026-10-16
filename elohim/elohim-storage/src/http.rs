@@ -3240,6 +3240,9 @@ impl HttpServer {
             }
             // The node's own person's sign-in secret: set or reset here, on
             // this machine only (the deterministic floor for a lost secret).
+            (Method::POST, "/api/v1/identity/account-bind/sign") => {
+                Box::pin(self.handle_account_bind_sign(req)).await
+            }
             (Method::POST, "/auth/identity/secret") => {
                 Box::pin(self.handle_identity_secret(req)).await
             }
@@ -14113,6 +14116,119 @@ impl HttpServer {
         )
     }
 
+    /// POST /api/v1/identity/account-bind/sign `{challenge}` — the node's half of
+    /// graduating a hosted account onto this node's key
+    /// (`services::account_bind`). Needs a proven, KEY-BOUND session with a valid
+    /// proof; the this-machine bypass of [`Self::signing_caller`] does not apply.
+    /// The challenge is parsed and bounded BEFORE the conductor is called.
+    async fn handle_account_bind_sign(
+        &self,
+        req: Request<Incoming>,
+    ) -> Result<Response<Full<Bytes>>, StorageError> {
+        use crate::services::account_bind::{
+            account_bind_challenge_parse, bound_verdict_refusal, sign_with_cell, Refusal,
+            MAX_CHALLENGE_BYTES,
+        };
+        // A JSON-escaped 1 KiB challenge (every byte a six-byte escape) plus the envelope.
+        const MAX_BIND_BODY_BYTES: usize = MAX_CHALLENGE_BYTES * 6 + 64;
+        use crate::services::node_account::{bound_signing_verdict, RequestFacts};
+        let render = |r: Refusal| {
+            response::json_response(
+                r.status,
+                &serde_json::json!({ "error": r.words, "code": r.code }),
+            )
+        };
+        // Read at most the cap (+1 to see overflow) — never the whole of an
+        // unbounded body — keeping the exact bytes a session proof signs.
+        let (parts, incoming) = req.into_parts();
+        let body = match http_body_util::Limited::new(incoming, MAX_BIND_BODY_BYTES + 1)
+            .collect()
+            .await
+        {
+            Ok(c) => c.to_bytes(),
+            Err(_) => {
+                return Ok(render(Refusal {
+                    status: StatusCode::PAYLOAD_TOO_LARGE,
+                    code: "BODY_TOO_LARGE",
+                    words: "the request body is too large for a bind challenge".into(),
+                }))
+            }
+        };
+        if body.len() > MAX_BIND_BODY_BYTES {
+            return Ok(render(Refusal {
+                status: StatusCode::PAYLOAD_TOO_LARGE,
+                code: "BODY_TOO_LARGE",
+                words: "the request body is too large for a bind challenge".into(),
+            }));
+        }
+        let req = Request::from_parts(parts, ());
+        let Some(pool) = &self.db_pool else {
+            return Ok(render(Refusal {
+                status: StatusCode::UNAUTHORIZED,
+                code: "NO_SESSION",
+                words: "sign in to this node first".into(),
+            }));
+        };
+        let verdict = {
+            let mut conn = pool
+                .get()
+                .map_err(|e| StorageError::Internal(format!("Pool error: {e}")))?;
+            bound_signing_verdict(
+                &mut conn,
+                &RequestFacts {
+                    headers: req.headers(),
+                    method: req.method().as_str(),
+                    path: req.uri().path(),
+                    body: &body,
+                },
+                chrono::Utc::now().timestamp_micros(),
+            )?
+        };
+        if let Some(refused) = bound_verdict_refusal(&verdict) {
+            if let crate::services::node_account::BoundVerdict::ProofRefused(r) = &verdict {
+                warn!(code = r.code(), "account-bind sign: session proof refused");
+                return Ok(response::json_response(
+                    refused.status,
+                    &serde_json::json!({
+                        "error": refused.words,
+                        "code": refused.code,
+                        "proofCode": r.code(),
+                    }),
+                ));
+            }
+            return Ok(render(refused));
+        }
+        #[derive(serde::Deserialize)]
+        #[serde(deny_unknown_fields)]
+        struct Input {
+            challenge: String,
+        }
+        let input: Input = match serde_json::from_slice(&body) {
+            Ok(i) => i,
+            Err(e) => return Ok(response::bad_request(&format!("Invalid JSON: {e}"))),
+        };
+        if let Err(r) = account_bind_challenge_parse(&input.challenge, chrono::Utc::now()) {
+            return Ok(render(r));
+        }
+        let Some(hc) = self.hc_registry.as_ref().and_then(|r| r.lamad_client()) else {
+            return Ok(render(Refusal {
+                status: StatusCode::SERVICE_UNAVAILABLE,
+                code: "NO_CONDUCTOR",
+                words: "this node has no conductor connected to sign with".into(),
+            }));
+        };
+        match sign_with_cell(&hc, &input.challenge).await {
+            Ok(s) => Ok(response::ok(&serde_json::json!({
+                "agentPubKey": s.agent_pub_key,
+                "signature": s.signature_b64,
+            }))),
+            Err(r) => {
+                warn!(code = r.code, "account-bind sign failed");
+                Ok(render(r))
+            }
+        }
+    }
+
     /// This node's own mishpat cell, as the person's controller.
     fn own_controller_cell(
         &self,
@@ -19463,6 +19579,12 @@ pub fn build_manifest() -> doorway_client::DoorwayRoutes {
         .route(
             Route::post("/api/v1/identity/register")
                 .handler("register_human")
+                .auth_required()
+                .build(),
+        )
+        .route(
+            Route::post("/api/v1/identity/account-bind/sign")
+                .handler("sign_account_bind")
                 .auth_required()
                 .build(),
         )

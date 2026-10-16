@@ -530,7 +530,15 @@ export interface PortalHostResponse {
  * shape (usage/quota objects, isActive/hasLocalConductor/doorwayName — none
  * of which the wire carries) was retired (auth-wire plan Task 4).
  */
-export type { AccountResponse } from '../generated/account-response';
+import type { AccountResponse as AccountWireResponse } from '../generated/account-response';
+
+/** Account-key fields supplied by the node-key ceremony. */
+export type AccountResponse = AccountWireResponse & {
+  agentPubKey?: string;
+  agencyPhase?: 'hosted' | 'doorway' | 'node' | 'device';
+  nodeKeyBoundAt?: string | null;
+  previousAgentPubKey?: string | null;
+};
 
 /**
  * Response to `POST /auth/close-account` (three-reds plan S2 Task 9 /

@@ -118,7 +118,7 @@ function requirePlaywright(world: E2EWorld): PlaywrightDevice | null {
   return device;
 }
 
-function human(world: E2EWorld, index = people(world).length - 1): HostedHuman {
+export function human(world: E2EWorld, index = people(world).length - 1): HostedHuman {
   const value = people(world)[index];
   assert.ok(value, `Hosted human ${index + 1} has not been registered.`);
   return value;
@@ -637,7 +637,7 @@ async function ensurePlaywrightPortalOpen(
  * `registerThroughPortal` and the plain `BrowserDevice` register — this just
  * enters it from one combined phrase instead of two separate ones.
  */
-async function registerNewcomer(
+export async function registerNewcomer(
   world: E2EWorld,
   displayName: string,
   doorwayId: string = STATION_7_DOORWAY_ID

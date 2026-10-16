@@ -268,6 +268,16 @@ pub struct UserDoc {
     /// 2026-10-15; such a row is never given a cell (see `may_be_hosted`).
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub agency_phase: Option<String>,
+
+    /// When this human bound the account onto their own node's key
+    /// (`POST /auth/node-key/bind`). Absent on an account that never graduated.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub node_key_bound_at: Option<DateTime>,
+
+    /// The key the account answered to before that bind, kept so a witnessed
+    /// key-lineage rotation can later be minted from what the doorway saw.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub previous_agent_pub_key: Option<String>,
 }
 
 fn default_identifier_type() -> String {
@@ -319,6 +329,8 @@ impl UserDoc {
             closed_at: None,
             closed_identifier: None,
             agency_phase: None,
+            node_key_bound_at: None,
+            previous_agent_pub_key: None,
         }
     }
 

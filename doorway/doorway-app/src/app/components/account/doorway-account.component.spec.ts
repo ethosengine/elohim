@@ -92,6 +92,159 @@ describe('DoorwayAccountComponent — hosted-steward is an in-between state', ()
     });
   });
 
+  describe('moving onto a node key', () => {
+    beforeEach(() => {
+      sessionStorage.clear();
+      // The stubbed location names another origin; jsdom refuses a real replaceState to it.
+      vi.spyOn(history, 'replaceState').mockImplementation(() => {});
+    });
+
+    it('offers the panel only for a hosted non-steward account and opens the anchor', async () => {
+      Object.assign(window.location, { hash: '#move-to-node' });
+      await renderWith({ ...BASE_ACCOUNT, agencyPhase: 'hosted' });
+      expect(fixture.nativeElement.querySelector('[data-testid="move-to-node-panel"]').open).toBe(
+        true
+      );
+      for (const account of [
+        { ...BASE_ACCOUNT, agencyPhase: 'node' as const },
+        { ...BASE_ACCOUNT, agencyPhase: 'doorway' as const },
+        { ...BASE_ACCOUNT, agencyPhase: 'device' as const },
+        { ...BASE_ACCOUNT, agencyPhase: 'hosted' as const, isSteward: true },
+        BASE_ACCOUNT,
+      ]) {
+        component.account.set(account);
+        fixture.detectChanges();
+        expect(
+          fixture.nativeElement.querySelector('[data-testid="move-to-node-panel"]')
+        ).toBeNull();
+      }
+    });
+
+    it('challenges with the password and navigates with UTF-8 base64url and return URL', async () => {
+      const assign = vi.fn();
+      Object.assign(window.location, { hash: '#move-to-node', assign });
+      await renderWith({ ...BASE_ACCOUNT, agencyPhase: 'hosted' });
+      const challengeNodeKey = vi.fn().mockResolvedValue({
+        challengeId: 'nonce',
+        challenge: 'account=Zoë\nnonce=abc',
+        expiresAt: '',
+      });
+      Object.assign(TestBed.inject(DoorwayAdminService), { challengeNodeKey });
+      component.nodeAddress = 'https://node.example';
+      component.nodePassword = 'secret';
+      await component.moveToNode();
+      expect(challengeNodeKey).toHaveBeenCalledWith('secret');
+      expect(component.nodePassword).toBe('');
+      const target = new URL(assign.mock.calls[0][0]);
+      expect(target.origin + target.pathname).toBe('https://node.example/consent/account-bind');
+      expect(target.searchParams.get('challenge')).toBe('YWNjb3VudD1ab8OrCm5vbmNlPWFiYw');
+      expect(target.searchParams.get('return')).toBe(
+        'https://doorway-alpha.elohim.host/threshold/account'
+      );
+      expect(sessionStorage.getItem('elohim.node-key-bind.challengeId')).toBe('nonce');
+    });
+
+    it('binds a returned signature as standard base64, replaces the token and shows both keys', async () => {
+      await renderWith({ ...BASE_ACCOUNT, agencyPhase: 'hosted' });
+      const bindNodeKey = vi
+        .fn()
+        .mockResolvedValue({ token: 'new-session', agentPubKey: 'uhCAk-new-node-key' });
+      const admin = TestBed.inject(DoorwayAdminService);
+      Object.assign(admin, { bindNodeKey });
+      vi.mocked(admin.getAccount).mockReturnValue(
+        of({ ...BASE_ACCOUNT, agencyPhase: 'node', previousAgentPubKey: 'old-key' })
+      );
+      sessionStorage.setItem('elohim.node-key-bind.challengeId', 'nonce');
+      Object.assign(window.location, {
+        hash: '#challengeId=nonce&agentPubKey=uhCAk-new-node-key&signature=-_8',
+      });
+      const replace = vi.spyOn(history, 'replaceState').mockImplementation(() => {});
+      component.ngOnInit();
+      await fixture.whenStable();
+      fixture.detectChanges();
+      expect(bindNodeKey).toHaveBeenCalledWith({
+        challengeId: 'nonce',
+        agentPubKey: 'uhCAk-new-node-key',
+        signature: '+/8=',
+      });
+      expect(localStorage.getItem(AUTH_TOKEN_KEY)).toBe('new-session');
+      expect(replace).toHaveBeenCalled();
+      expect(
+        fixture.nativeElement.querySelector('[data-testid="move-to-node-result"]').textContent
+      ).toContain("This account now answers to your node's key uhCAk-new-no");
+      expect(component.moveResult()).toContain('old-key');
+      expect(component.isCurrentStep('steward')).toBe(true);
+      replace.mockRestore();
+    });
+
+    it('drops a returned answer for a move this browser did not start', async () => {
+      await renderWith({ ...BASE_ACCOUNT, agencyPhase: 'hosted' });
+      const bindNodeKey = vi.fn();
+      Object.assign(TestBed.inject(DoorwayAdminService), { bindNodeKey });
+      sessionStorage.setItem('elohim.node-key-bind.challengeId', 'mine');
+      Object.assign(window.location, {
+        hash: '#challengeId=theirs&agentPubKey=uhCAk-their-key&signature=-_8',
+      });
+      const replace = vi.spyOn(history, 'replaceState').mockImplementation(() => {});
+      component.ngOnInit();
+      await fixture.whenStable();
+      expect(bindNodeKey).not.toHaveBeenCalled();
+      expect(component.moveError()).toContain('not for a move started from this browser');
+      expect(replace).toHaveBeenCalled();
+      expect(sessionStorage.getItem('elohim.node-key-bind.challengeId')).toBeNull();
+      replace.mockRestore();
+    });
+
+    it('clears the pending move and the fragment on a refusal', async () => {
+      sessionStorage.setItem('elohim.node-key-bind.challengeId', 'nonce');
+      Object.assign(window.location, { hash: '#refused=DECLINED' });
+      const replace = vi.spyOn(history, 'replaceState').mockImplementation(() => {});
+      await renderWith({ ...BASE_ACCOUNT, agencyPhase: 'hosted' });
+      expect(replace).toHaveBeenCalled();
+      expect(sessionStorage.getItem('elohim.node-key-bind.challengeId')).toBeNull();
+      replace.mockRestore();
+    });
+
+    it('explains a declined fragment', async () => {
+      Object.assign(window.location, { hash: '#refused=DECLINED' });
+      await renderWith({ ...BASE_ACCOUNT, agencyPhase: 'hosted' });
+      expect(
+        fixture.nativeElement.querySelector('[data-testid="move-to-node-error"]').textContent
+      ).toContain('You declined on your node. Nothing changed.');
+    });
+
+    it.each([
+      'NO_TOKEN',
+      'INVALID_TOKEN',
+      'WRONG_PASSWORD',
+      'NOT_HOSTED',
+      'NO_SESSION',
+      'SESSION_NOT_BOUND',
+      'PROOF_REFUSED',
+      'NOT_A_BIND_CHALLENGE',
+      'CHALLENGE_EXPIRED',
+      'NO_CONDUCTOR',
+      'CHALLENGE_UNKNOWN',
+      'CHALLENGE_NOT_YOURS',
+      'SAME_KEY',
+      'SIGNATURE_INVALID',
+      'KEY_MOVED',
+      'NOT_STARTED_HERE',
+    ])('explains refusal %s in plain words', async code => {
+      Object.assign(window.location, { hash: `#refused=${code}` });
+      await renderWith({ ...BASE_ACCOUNT, agencyPhase: 'hosted' });
+      expect(component.moveError()).toBeTruthy();
+      expect(component.moveError()).not.toContain('The move could not be completed');
+      expect(component.moveError()).not.toContain(code);
+    });
+
+    it('marks node phase as the current steward stage', async () => {
+      await renderWith({ ...BASE_ACCOUNT, agencyPhase: 'node' });
+      expect(component.isCurrentStep('steward')).toBe(true);
+      expect(component.isCurrentStep('hosted')).toBe(false);
+    });
+  });
+
   describe('a steward whose cell is still doorway-hosted', () => {
     beforeEach(async () => {
       await renderWith({ ...BASE_ACCOUNT, isSteward: true, conductorId: 'conductor-alpha-1' });

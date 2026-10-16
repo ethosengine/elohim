@@ -183,6 +183,8 @@ export class AgencyService {
    * account confirms `isSteward: true`.
    */
   private hostedOrHostedSteward(): AgencyStage {
+    // subject: imagodei-domain-gospel — node phase records where the human's key lives.
+    if (this.hostingAccountService.account()?.agencyPhase === 'node') return STAGE_NODE_STEWARD;
     return this.hostingAccountService.account()?.isSteward === true
       ? STAGE_HOSTED_STEWARD
       : STAGE_HOSTED;

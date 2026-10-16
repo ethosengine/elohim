@@ -700,6 +700,37 @@ fn claims_are_foreign(claims_doorway_id: Option<&str>, self_doorway_id: Option<&
     }
 }
 
+/// True when an account's recorded agency phase forbids giving it a hosted
+/// cell here: any declared phase other than `hosted` (`node`, `device`,
+/// `doorway`) runs its own. After a graduation (`/auth/node-key/bind`) the
+/// doorway is a router for that human, not their host. An absent phase is a
+/// pre-2026-10-15 row and keeps today's behavior.
+fn phase_forbids_auto_provision(agency_phase: Option<&str>) -> bool {
+    matches!(agency_phase, Some(p) if p != "hosted")
+}
+
+/// 409 `{"error":"not-hosted-here"}`: this doorway does not host the account.
+fn not_hosted_here_response() -> Response<Full<Bytes>> {
+    let body = serde_json::json!({ "error": "not-hosted-here" });
+    Response::builder()
+        .status(StatusCode::CONFLICT)
+        .header("Content-Type", "application/json")
+        .body(Full::new(Bytes::from(body.to_string())))
+        .unwrap()
+}
+
+/// Whether the account row, re-read after a provision, still wants the cell
+/// just installed: still hosted AND still holding the key that was installed.
+fn row_still_wants_provisioned_cell(
+    agency_phase: Option<&str>,
+    row_agent_pub_key: &str,
+    provisioned_key: &str,
+    claim_key: &str,
+) -> bool {
+    !phase_forbids_auto_provision(agency_phase)
+        && (row_agent_pub_key == provisioned_key || row_agent_pub_key == claim_key)
+}
+
 /// Build the honest-refusal response for a foreign-doorway auto-provision
 /// attempt or an unknown conductor pinned by a foreign-doorway claim:
 /// `409 {"error":"hosted-elsewhere","homeDoorway":"<url-or-id>"}`.
@@ -933,6 +964,55 @@ async fn auto_provision(
         return Err(hosted_elsewhere_response(claims));
     }
 
+    // Guard: never host a cell for an account that declared it runs its own
+    // (node/device/doorway phase, e.g. after graduating onto its node key).
+    if let Some(mongo) = &state.mongo {
+        match mongo
+            .collection::<crate::db::schemas::UserDoc>(crate::db::schemas::USER_COLLECTION)
+            .await
+        {
+            Ok(c) => match c
+                .find_one(bson::doc! { "identifier": &claims.identifier })
+                .await
+            {
+                Ok(Some(u)) if phase_forbids_auto_provision(u.agency_phase.as_deref()) => {
+                    warn!(
+                        identifier = %claims.identifier,
+                        phase = ?u.agency_phase,
+                        "Refusing auto-provision: account is not in the hosted phase"
+                    );
+                    return Err(not_hosted_here_response());
+                }
+                // No row: no account, no auto-provision. A JWT only exists for
+                // an account whose row was inserted first (register inserts,
+                // then mints), and all three call sites are behind a verified
+                // JWT, so a missing row is a deleted/closed account.
+                Ok(None) => {
+                    warn!(
+                        identifier = %claims.identifier,
+                        "Refusing auto-provision: no account row"
+                    );
+                    return Err(not_hosted_here_response());
+                }
+                Ok(Some(_)) => {}
+                Err(e) => {
+                    error!("Chaperone: account phase lookup failed: {}", e);
+                    return Err(sanitize_client_error(
+                        StatusCode::SERVICE_UNAVAILABLE,
+                        "Account lookup",
+                    ));
+                }
+            },
+            Err(e) => {
+                error!("Chaperone: account collection unavailable: {}", e);
+                return Err(sanitize_client_error(
+                    StatusCode::SERVICE_UNAVAILABLE,
+                    "Account lookup",
+                ));
+            }
+        }
+    }
+
     let provisioner = AgentProvisioner::new(Arc::clone(registry))
         .with_app_id(state.args.installed_app_id.clone())
         .with_bundle_path(state.args.happ_bundle_path.clone());
@@ -947,6 +1027,65 @@ async fn auto_provision(
             ));
         }
     };
+
+    // Close the race with `/auth/node-key/bind`: the phase was read before
+    // the provision, and a bind (CAS + cleanup) may have run in between. Re-read
+    // the row; if the account is no longer hosted or its key moved, take back
+    // what was just installed; a row gone since (account closed) takes it back
+    // too. This closes the window to the provision itself, not to the end of
+    // the request (a bind landing after this re-read finds a registered cell
+    // and deprovisions it in its own cleanup). When the re-read itself fails
+    // the cell is kept, since taking back a hosted person's live cell on a
+    // transient error costs more than an orphan; it is logged as one.
+    if let Some(mongo) = &state.mongo {
+        let wanted = match mongo
+            .collection::<crate::db::schemas::UserDoc>(crate::db::schemas::USER_COLLECTION)
+            .await
+        {
+            Ok(c) => match c
+                .find_one(bson::doc! { "identifier": &claims.identifier })
+                .await
+            {
+                Ok(Some(u)) => Some(row_still_wants_provisioned_cell(
+                    u.agency_phase.as_deref(),
+                    &u.agent_pub_key,
+                    &provisioned.agent_pub_key,
+                    &claims.agent_pub_key,
+                )),
+                Ok(None) => Some(false),
+                Err(e) => {
+                    error!(
+                        identifier = %claims.identifier,
+                        agent = %provisioned.agent_pub_key,
+                        "Re-read after provision failed; cell kept, may be orphaned: {}", e
+                    );
+                    None
+                }
+            },
+            Err(e) => {
+                error!(
+                    identifier = %claims.identifier,
+                    agent = %provisioned.agent_pub_key,
+                    "Account collection unavailable after provision; cell kept, may be orphaned: {}",
+                    e
+                );
+                None
+            }
+        };
+        if wanted == Some(false) {
+            warn!(
+                identifier = %claims.identifier,
+                "Account left the hosted phase during provision; deprovisioning"
+            );
+            if let Err(e) = provisioner
+                .deprovision_agent(&provisioned.agent_pub_key)
+                .await
+            {
+                warn!("Failed to deprovision raced cell: {}", e);
+            }
+            return Err(not_hosted_here_response());
+        }
+    }
 
     let info = match registry.get_conductor_info(&provisioned.conductor_id) {
         Some(i) => i,
@@ -1285,6 +1424,48 @@ mod tests {
             Some("sibling-doorway"),
             Some("self-doorway")
         ));
+    }
+
+    #[test]
+    fn a_node_phase_account_is_never_auto_provisioned() {
+        assert!(phase_forbids_auto_provision(Some("node")));
+        assert!(phase_forbids_auto_provision(Some("device")));
+        assert!(phase_forbids_auto_provision(Some("doorway")));
+        assert!(!phase_forbids_auto_provision(Some("hosted")));
+        assert!(!phase_forbids_auto_provision(None));
+    }
+
+    #[test]
+    fn a_raced_cell_is_kept_only_while_the_row_is_hosted_and_holds_its_key() {
+        assert!(row_still_wants_provisioned_cell(
+            Some("hosted"),
+            "k1",
+            "k1",
+            "c"
+        ));
+        assert!(row_still_wants_provisioned_cell(
+            Some("hosted"),
+            "c",
+            "k1",
+            "c"
+        ));
+        assert!(!row_still_wants_provisioned_cell(
+            Some("node"),
+            "k1",
+            "k1",
+            "c"
+        ));
+        assert!(!row_still_wants_provisioned_cell(
+            Some("hosted"),
+            "moved",
+            "k1",
+            "c"
+        ));
+    }
+
+    #[test]
+    fn not_hosted_here_is_a_409() {
+        assert_eq!(not_hosted_here_response().status(), StatusCode::CONFLICT);
     }
 
     // ---- auto_provision guard (Task 2.3: kill the silent identity fork) ----

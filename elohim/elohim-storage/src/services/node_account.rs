@@ -405,6 +405,41 @@ pub enum SigningVerdict {
     ProofRefused(consent_grant::ProofRefusal),
 }
 
+/// How a request to the account-bind signing route stands: it needs a proven
+/// session that IS bound to a key, and a valid proof from that key. An unbound
+/// session is [`SigningVerdict::Proven`] for other routes; here it is `NotBound`.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum BoundVerdict {
+    NoSession,
+    /// A proven session with no key bound to it.
+    NotBound,
+    ProofRefused(consent_grant::ProofRefusal),
+    ProvenBound,
+}
+
+/// [`signing_verdict`] for a route that refuses an unbound session. The
+/// session is read first, so an unbound one never spends a proof.
+pub fn bound_signing_verdict(
+    conn: &mut SqliteConnection,
+    facts: &RequestFacts<'_>,
+    now_micros: i64,
+) -> Result<BoundVerdict, StorageError> {
+    let Some(token) = session_token(facts.headers) else {
+        return Ok(BoundVerdict::NoSession);
+    };
+    let Some(session) = proven_session(conn, &token, now_micros)? else {
+        return Ok(BoundVerdict::NoSession);
+    };
+    if session.bound().is_none() {
+        return Ok(BoundVerdict::NotBound);
+    }
+    Ok(match signing_verdict(conn, facts, now_micros)? {
+        SigningVerdict::Proven => BoundVerdict::ProvenBound,
+        SigningVerdict::NoSession => BoundVerdict::NoSession,
+        SigningVerdict::ProofRefused(r) => BoundVerdict::ProofRefused(r),
+    })
+}
+
 /// Proofs already used, for this process.
 pub fn replay_set() -> &'static consent_grant::ReplaySet {
     static SEEN: std::sync::OnceLock<consent_grant::ReplaySet> = std::sync::OnceLock::new();
