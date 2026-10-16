@@ -190,7 +190,7 @@ export function householdDeviceBinding(): string | undefined {
     : [
         ...(meshDir ? [resolve(meshDir, 'device-ceremony/binding.json')] : []),
         resolve(process.cwd(), '../local-dev/household-dowell/device-ceremony/binding.json'),
-      ].find((candidate) => existsSync(candidate));
+      ].find(candidate => existsSync(candidate));
   if (!path || !existsSync(path)) return undefined;
   const state = JSON.parse(readFileSync(path, 'utf8')) as { binding?: string };
   return state.binding;

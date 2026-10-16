@@ -9,7 +9,10 @@ import { householdDeviceBinding, missingDeviceBindingMessage } from '../carried-
 
 const saved = { b: process.env.A2O_DEVICE_BINDING, m: process.env.MESH_DIR, cwd: process.cwd() };
 afterEach(() => {
-  for (const [k, v] of [['A2O_DEVICE_BINDING', saved.b], ['MESH_DIR', saved.m]] as const) {
+  for (const [k, v] of [
+    ['A2O_DEVICE_BINDING', saved.b],
+    ['MESH_DIR', saved.m],
+  ] as const) {
     if (v === undefined) delete process.env[k];
     else process.env[k] = v;
   }
