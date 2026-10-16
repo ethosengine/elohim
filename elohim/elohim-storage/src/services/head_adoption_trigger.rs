@@ -1703,6 +1703,12 @@ async fn process_trigger(
         }
         return;
     }
+    // The Probe decision is itself an outcome, counted once per trigger BEFORE
+    // the courier branching: a verified courier that stamps or confirms the head
+    // returns early below, and without this a same-head newer-ordering hint that
+    // correctly decided Probe would leave no trace on the receiver-wide counter.
+    // Counting here changes no other label and no decision.
+    count_outcome(trigger, action.label());
 
     // Verify the courier before waiting for the election to gossip into the own
     // conductor. Otherwise a slow local resolve consumes the visitor's whole
@@ -2775,6 +2781,104 @@ mod tests {
         async fn retained_pass(&self) -> Vec<String> {
             offered(&self.pool, &self.sync, &self.rest, Instant::now()).await
         }
+    }
+
+    /// The counter is process-global; these tests use the `sync` source (peer
+    /// non-empty), which no other `process_trigger` test uses, and serialize.
+    static PROBE_COUNT_LOCK: tokio::sync::Mutex<()> = tokio::sync::Mutex::const_new(());
+
+    fn sync_count(outcome: &str) -> u64 {
+        crate::metrics::HEAD_ADOPTION_TRIGGER
+            .with_label_values(&[outcome, "sync"])
+            .get()
+    }
+
+    /// Row "stuck" declares `"old head"` with a recorded election at 100; the doc
+    /// names `doc_head` carrying an ordering at `doc_at`.
+    async fn probe_rig(doc_head: &str, doc_at: i64) -> Rig {
+        let rig = Rig::new().await;
+        retained_election(&rig.pool, "stuck", 100, false);
+        let ord = DocHeadOrdering {
+            head: doc_head.to_string(),
+            canonical_declared_at: doc_at,
+            earned: false,
+            tiebreak: None,
+        };
+        retained_doc_with_ordering(&rig.sync, "stuck", doc_head, Some(&ord)).await;
+        rig
+    }
+
+    async fn run_from_peer(rig: &Rig) {
+        let trigger = HeadAdoptionTrigger {
+            content_id: "stuck".into(),
+            peer: "peerX".into(),
+            raised_at: Instant::now(),
+            attempt: 0,
+            slow_retry_used: false,
+            hosting_cursor: HostingCursor::default(),
+        };
+        process_trigger(
+            &trigger,
+            Some(&rig.io as &dyn TriggerIo),
+            &rig.pool,
+            &rig.sync,
+            &AppContext::default_lamad(),
+            &rig.gate,
+            &rig.courier,
+            &rig.memo,
+            &rig.probe_memo,
+            &rig.rest,
+        )
+        .await;
+    }
+
+    #[tokio::test]
+    async fn same_head_newer_ordering_counts_the_probe_even_when_the_courier_settles_it() {
+        let _g = PROBE_COUNT_LOCK.lock().await;
+        for courier in [
+            Some(CourierOutcome::Stamped),
+            Some(CourierOutcome::Current),
+            None,
+        ] {
+            let rig = probe_rig("old head", 200).await;
+            *rig.io.courier.lock().unwrap() = courier;
+            let (probe, skipped) = (sync_count("probe"), sync_count("skipped_current"));
+            run_from_peer(&rig).await;
+            assert_eq!(sync_count("probe"), probe + 1, "courier {courier:?}");
+            assert_eq!(sync_count("skipped_current"), skipped, "courier {courier:?}");
+            if courier.is_some() {
+                assert_eq!(rig.resolves(), 0, "the courier short-circuit stands");
+            }
+        }
+    }
+
+    #[tokio::test]
+    async fn same_head_equal_ordering_counts_no_probe() {
+        let _g = PROBE_COUNT_LOCK.lock().await;
+        let rig = probe_rig("old head", 100).await;
+        *rig.io.courier.lock().unwrap() = Some(CourierOutcome::Stamped);
+        let (probe, skipped) = (sync_count("probe"), sync_count("skipped_current"));
+        run_from_peer(&rig).await;
+        assert_eq!(sync_count("probe"), probe, "no probe, nothing to count");
+        assert_eq!(sync_count("skipped_current"), skipped + 1);
+        assert_eq!(rig.resolves(), 0);
+    }
+
+    #[tokio::test]
+    async fn a_different_head_keeps_its_labels_and_counts_the_probe_once() {
+        let _g = PROBE_COUNT_LOCK.lock().await;
+        let rig = probe_rig("uhCkk-new", 200).await;
+        // Own conductor cannot yet walk the head: the pre-existing label.
+        let (probe, nyw) = (sync_count("probe"), sync_count("not_yet_walkable"));
+        run_from_peer(&rig).await;
+        assert_eq!(sync_count("probe"), probe + 1);
+        assert_eq!(sync_count("not_yet_walkable"), nyw + 1, "unchanged label");
+        // Walkable: adopted exactly once as before, probe once more.
+        *rig.io.answer.lock().unwrap() = Answer::Walkable;
+        let adopted = sync_count("adopted");
+        run_from_peer(&rig).await;
+        assert_eq!(sync_count("probe"), probe + 2);
+        assert_eq!(sync_count("adopted"), adopted + 1, "unchanged label");
     }
 
     #[tokio::test]
