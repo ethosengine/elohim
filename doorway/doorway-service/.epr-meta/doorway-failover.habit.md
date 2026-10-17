@@ -32,6 +32,18 @@ retire-when: >
   declared head from the mesh directly. At that point "either doorway can die" is a
   statement about a component that no longer sits in the path.
 ---
+DELTA 2026-10-17 (RED preserved; household failover and serving receipt green): client-resilience (RED-FIRST) and the two cargo gates, relay-addr-beacon and epr-app-package, are unmeasured; served-shell-boots on alpha not read today; channel isolation is NOT green.
+
+Household lanes today on merged source a8d3e71a3 (= dev 1a87ed72c + the marathon's 8 commits; storage AND doorway rebuilt from it via `just mesh build storage|doorway`, restarted 07:4xZ, conductors on hc-fork-96bcd2bee215-proof):
+- `features/dataplane/doorway-failover.feature` run `sprint-report-household-20261017T080553Z-a8d3e71a`: 10 scenarios, 10 passed; 41 steps, 41 passed (the Act I authority of this habit, first run in this marathon).
+- `features/dataplane/epr-app-deliverability.feature` run `sprint-report-household-20261017T075224Z-a8d3e71a`: 7/7 scenarios, 135/135 steps (serving receipt; a first run 20261017T074034Z had 6/7 with `a doorway that restarts while its peer is down catches up on its own` failing at `peer "jessica" comes back` — `GET :8091/health no response within 2000ms`, a readiness-timing flake also seen once by the graduate-onto-node-key session's receipts at 02:46Z and clean at 03:06Z).
+
+The 2026-10-16 series on 11a0ce69 (stock dev then): doorway-apex-transition 4/4 (20261016T201713Z), doorway-catching-up-page 3/3 (T202025Z), doorway-fixture-readiness 2/2 (T202038Z), doorway-node-identity 2/2 (T202215Z), doorway-runtime-endpoint 2/2 (T202243Z), doorway-sibling-reader 1/1 (T202312Z); doorway-humans-served 2 failed / 2 passed (T202051Z, rerun on merged source in flight); epr-app-channel-isolation 18 steps: 1 failed, 6 skipped, 11 passed (T203407Z) — the channel-isolation check is NOT green.
+
+Unmeasured today: relay-addr-beacon justfile gate, `just gate epr-app-package`, served-shell-boots on the fleet, client-resilience (RED-FIRST).
+
+Counts verified against the named `sprint-report-household-<run>.json` files under `genesis/a2o/reports/`; step counts against their `cucumber-mesh-<run>.json` companions, excluding hidden hooks.
+
 DELTA 2026-10-16 (RED preserved; Act I measured): seven lanes green; deliverability 6/7 with `"distributionState":"unmeasured"`; channel isolation 0/1 with HTTP 409, cause undiagnosed; remaining gates and Act II proof unmeasured.
 Household lanes from a fresh worktree at origin/dev@11a0ce694, with `MESH_DIR=…/household-dowell A2O_DEVICE_BINDING=…/household-dowell/device-ceremony/binding.json MESH_ALLOW_STALE_BINARY=1`; storage binary built 2026-10-15T22:25Z, doorway 2026-10-16T03:30Z. At 20:35Z all three storage peers answered `/health` 200 and 8090 reported `connectedPeers 2, caughtUp true`. Reports under genesis/a2o/reports/, named `sprint-report-household-<id>-11a0ce69`.
 Passed: doorway-failover.feature 10/10 (20261016T201515Z), doorway-apex-transition 4/4 (20261016T201713Z), doorway-catching-up-page 3/3 (20261016T202025Z), doorway-fixture-readiness 2/2 (20261016T202038Z), doorway-node-identity 2/2 (20261016T202215Z), doorway-runtime-endpoint 2/2 (20261016T202243Z), doorway-sibling-reader 1/1 (20261016T202312Z).
