@@ -8645,7 +8645,14 @@ impl HttpServer {
 
         info!(count = count, "Bulk creating content");
 
-        match services.content.bulk_create(items) {
+        // The author roots what it registers before announcing it, when its
+        // conductor is attached (see `ContentService::bulk_create_and_notarize`).
+        let lamad_hc = self.hc_registry.as_ref().and_then(|r| r.lamad_client());
+        match services
+            .content
+            .bulk_create_and_notarize(lamad_hc.as_ref(), items)
+            .await
+        {
             Ok(result) => {
                 // EPR Head publishing is handled by the drain loop
                 // (p2p/mod.rs::drain_publish_queue), which is the sole writer of
@@ -10796,7 +10803,9 @@ impl HttpServer {
                                 content_body: Some(body_str),
                                 dht_anchor_hash: None,
                             };
-                            match svc.content.create(input) {
+                            // Resolved from a peer: persisted, never locally
+                            // authored — this peer holds no root authority.
+                            match svc.content.create_received_from_peer(input) {
                                 Ok(content_with_tags) => {
                                     info!(id = %content_id, "P2P content persisted to local SQLite");
 

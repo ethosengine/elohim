@@ -3434,6 +3434,51 @@ async fn witness_ghost_anchors(
         }
     }
 
+    // RECEIVER GUARD. Re-authoring a ghost mints a root under THIS peer's key.
+    // That is this peer's to do only for rows it authored; a ghost that arrived
+    // from a peer (its anchor is the author's action) waits to adopt the
+    // author's root instead. Partitioned AFTER the dead verdict above (the
+    // verdict is true either way) and BEFORE phase 1, so a held ghost is never
+    // paid an election probe. A failed lookup holds the whole tick (fail
+    // closed) — the sweep is idempotent and resumes next tick.
+    let ghosts: Vec<(String, String, String)> = {
+        let ids: Vec<String> = ghosts.iter().map(|(id, _, _)| id.clone()).collect();
+        let authored = match pool.get() {
+            Ok(mut conn) => {
+                crate::db::content_diesel::locally_authored_ids(&mut conn, &app_ctx, &ids)
+            }
+            Err(e) => Err(crate::error::StorageError::Internal(format!(
+                "Pool error: {e}"
+            ))),
+        };
+        let authored = match authored {
+            Ok(set) => set,
+            Err(e) => {
+                tracing::warn!(error = %e, "projection-reconcile[ghost-witness]: local-authorship lookup failed; holding this tick");
+                return;
+            }
+        };
+        let (own, received): (Vec<_>, Vec<_>) = ghosts
+            .into_iter()
+            .partition(|(id, _, _)| authored.contains(id));
+        if !received.is_empty() {
+            crate::metrics::inc_reanchor_skipped_by(
+                crate::metrics::ReanchorSkip::NotLocalAuthor,
+                received.len() as u64,
+            );
+            tracing::info!(
+                target: "elohim_storage::projection_reconcile",
+                held_not_author = received.len(),
+                "projection-reconcile[ghost-witness]: holding ghosts received from peers — \
+                 their root is the author's to mint"
+            );
+        }
+        own
+    };
+    if ghosts.is_empty() {
+        return;
+    }
+
     let content_service = crate::services::ContentService::new(
         pool.clone(),
         app_ctx,
@@ -3643,6 +3688,11 @@ async fn witness_ghost_anchors(
                             adopted += 1;
                         }
                     }
+                }
+                // The write-time receiver guard refused (authority lost in a
+                // race with the partition above): a hold, not a failure.
+                Err(e) if crate::services::content_service::is_not_local_author_refusal(&e) => {
+                    held += 1;
                 }
                 Err(e) => {
                     failed += 1;

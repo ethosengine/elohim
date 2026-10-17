@@ -5202,14 +5202,21 @@ pub enum ReanchorSkip {
     /// cannot change the verdict until the row moves, the advertiser changes, or
     /// the window lapses — all three of which re-admit it automatically.
     HeldBackoff,
+    /// A NULL-anchor row that arrived from a peer: this peer holds no local
+    /// authoring authority for it, so its root is the author's to mint and the
+    /// sweep never selects it (the receiver guard). Counted per sweep, like
+    /// `held_backoff`: a standing value is a received population waiting to
+    /// adopt its author's root.
+    NotLocalAuthor,
 }
 
 impl seam_contracts::ReasonLabel for ReanchorSkip {
-    const ALL: &'static [Self] = &[ReanchorSkip::HeldBackoff];
+    const ALL: &'static [Self] = &[ReanchorSkip::HeldBackoff, ReanchorSkip::NotLocalAuthor];
 
     fn label(&self) -> &'static str {
         match self {
             ReanchorSkip::HeldBackoff => "held_backoff",
+            ReanchorSkip::NotLocalAuthor => "not_local_author",
         }
     }
 }
@@ -5520,6 +5527,15 @@ pub fn inc_reanchor_skipped(reason: ReanchorSkip) {
     CONTENT_REANCHOR_SKIPPED
         .with_label_values(&[reason.label()])
         .inc();
+}
+
+/// Count `n` reanchor candidates skipped for `reason` at once (a sweep-level
+/// hold counted from one query, e.g. [`ReanchorSkip::NotLocalAuthor`]).
+pub fn inc_reanchor_skipped_by(reason: ReanchorSkip, n: u64) {
+    use seam_contracts::ReasonLabel as _;
+    CONTENT_REANCHOR_SKIPPED
+        .with_label_values(&[reason.label()])
+        .inc_by(n);
 }
 
 /// Count one pointer-audit candidate NOT asked about: remembered in step at the

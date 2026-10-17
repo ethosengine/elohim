@@ -149,6 +149,13 @@ pub struct ReanchorReport {
     /// `deadSettledByDeclaration`; the rows stay dead and stay counted in
     /// `dead_remaining`.
     pub dead_settled_by_declaration: usize,
+    /// NULL-anchor rows HELD because this peer is not their author: they
+    /// arrived from a peer, so minting their root is the author's act, not
+    /// this peer's (runbook I1/I2; the 2026-10-17 household defect). Never
+    /// candidates — the selection excludes them — and they stay counted in
+    /// `remaining` until the author's root is adopted. Includes any row the
+    /// write-time guard refused in a race with the selection.
+    pub held_not_author: usize,
     /// NULL-arm candidates held (fresh or replayed) because their slug is bound
     /// to a release channel (`HoldBasis::AwaitingChannel`) — not re-anchor work;
     /// they author when the channel adopts. Published as
@@ -371,10 +378,32 @@ pub async fn run_once(
         )?;
         (unanchored, dead)
     };
+    // The receiver guard's standing hold: NULL-anchor rows the selection above
+    // excluded because they arrived from a peer. One count query per sweep and
+    // one bounded INFO line — never a per-row loop.
+    let held_not_author = {
+        let mut conn = pool
+            .get()
+            .map_err(|e| StorageError::Internal(format!("reanchor: db conn: {e}")))?;
+        crate::db::content_diesel::count_unanchored_not_locally_authored(&mut conn, &app_ctx)?
+            as usize
+    };
+    if held_not_author > 0 {
+        crate::metrics::inc_reanchor_skipped_by(
+            crate::metrics::ReanchorSkip::NotLocalAuthor,
+            held_not_author as u64,
+        );
+        tracing::info!(
+            held_not_author,
+            "reanchor_backfill: holding NULL-anchor rows received from peers — their root is \
+             the author's to mint; they converge by adopting it"
+        );
+    }
 
     let mut report = ReanchorReport {
         candidates: candidates.len(),
         dead_candidates: dead_candidates.len(),
+        held_not_author,
         ..Default::default()
     };
     // The first `report.candidates` entries are the never-authored arm; the
@@ -593,6 +622,14 @@ pub async fn run_once(
             None
         };
 
+        // The write-time receiver guard refused: the row lost its local
+        // authority between the selection and the write. A hold, not a failure.
+        if matches!(&reauthor, Err(e) if crate::services::content_service::is_not_local_author_refusal(e))
+        {
+            report.held_not_author += 1;
+            continue;
+        }
+
         let mut outcome = decide_outcome(&reauthor, recovery.as_ref());
 
         // CHAIN ARRIVAL — a successful re-author (or an already-anchored
@@ -688,6 +725,7 @@ pub async fn run_once(
         held_unanswered = report.held_unanswered,
         dead_settled_by_declaration = report.dead_settled_by_declaration,
         awaiting_channel = report.awaiting_channel,
+        held_not_author = report.held_not_author,
         failed = report.failed,
         remaining = report.remaining,
         skipped_reach = report.skipped_reach,
