@@ -4509,7 +4509,8 @@ async fn carried_head_evidence_admits_only_an_authors_own_election() -> Result<(
 /// the verifier answers with the retryable `canonical-root-not-held` marker, not
 /// the standing refusal storage memoises. Once the root and its index link have
 /// integrated, the SAME carried declaration verifies. A receiver that holds a
-/// DIFFERENT root for the id still refuses for want of authoring standing.
+/// DIFFERENT root for the id does not get the unavailable marker (it reports the
+/// lineage it lacks instead).
 #[tokio::test(flavor = "multi_thread")]
 async fn carried_head_evidence_without_a_held_root_is_unavailable_not_unauthorized() -> Result<()> {
     let [(mut c1, a1), (mut c2, a2)] = two_agent_conductors_isolated().await?;
@@ -4558,7 +4559,7 @@ async fn carried_head_evidence_without_a_held_root_is_unavailable_not_unauthoriz
             (root, version, evidence.link_record, record)
         }
     };
-    let call_verify = |id: String, link: Record, head: Record| {
+    let call_verify = |id: String, link: Vec<u8>, head: Vec<u8>| {
         let (c2, zome2) = (&c2, &zome2);
         async move {
             let r: std::result::Result<Option<CarriedHeadEvidenceOutput>, _> = c2
@@ -4590,7 +4591,12 @@ async fn carried_head_evidence_without_a_held_root_is_unavailable_not_unauthoriz
         "an absent root is not a standing verdict: {err}"
     );
 
-    // (b) A receiver holding a DIFFERENT root for the id is a verdict.
+    // (b) A receiver holding a DIFFERENT root for the id has a canonical root, so
+    // the unavailable marker is not what it answers with. This receiver is
+    // isolated, so it does not hold the author's lineage either: the walk
+    // reports `lineage-not-held` before the standing predicate. The standing
+    // verdict itself (a held lineage whose root disagrees) is covered by the
+    // foreign-election case in the carried-evidence test above.
     let contested = unique_id("carried-root-contested");
     let (_croot, _cversion, clink, crecord) = declare(contested.clone()).await;
     let _competing: ContentOutput = c2
@@ -4602,8 +4608,8 @@ async fn carried_head_evidence_without_a_held_root_is_unavailable_not_unauthoriz
         mismatch.expect_err("a held competing root must not verify the declaration")
     );
     assert!(
-        err.contains("authoring standing") && !err.contains("canonical-root-not-held"),
-        "a held, disagreeing root is a standing refusal: {err}"
+        err.contains("lineage-not-held") && !err.contains("canonical-root-not-held"),
+        "a held competing root is not the unavailable-root marker: {err}"
     );
 
     // (c) Root and index evidence integrate; the SAME declaration now verifies.

@@ -364,7 +364,10 @@ fn classify_verify_failure(e: &StorageError) -> VerifyFailure {
     if crate::conductor_admission::is_admission_shed(e)
         || !msg.contains("verify_carried_head_evidence:")
         || msg.contains("lineage-not-held")
-        || msg.contains("canonical-root-not-held")
+        // Anchored on the zome's `<caller>: <marker>:` form so an id that merely
+        // contains the marker text inside another refusal cannot spoof it; the
+        // older markers above remain bare substrings.
+        || msg.contains("verify_carried_head_evidence: canonical-root-not-held:")
     {
         VerifyFailure::Unavailable
     } else if msg.contains("holds no authoring standing") {
