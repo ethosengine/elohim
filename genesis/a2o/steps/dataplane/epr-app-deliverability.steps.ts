@@ -125,6 +125,8 @@ const DOORWAYS = ['alpha-A', 'elohim.host'];
 const ROOT_AUTHOR = 'human-matthew-manager';
 const COMMITMENT_PAGE_SIZE = 100;
 const MAX_COMMITMENT_PAGES = 10;
+// Cold restart observed "ready in 94 s"; allow a separate health window after the restart arm.
+const PEER_COMEBACK_WINDOW_MS = loadHouseholdMeshFixture().convergenceWindowMs ?? 90_000;
 
 const householdPeers = new WeakMap<E2EWorld, HouseholdTopology>();
 const publishedApps = new WeakMap<E2EWorld, PublishedApp>();
@@ -1350,7 +1352,7 @@ When(
 
 When(
   'peer {string} comes back',
-  { timeout: 180_000 },
+  { timeout: 180_000 + PEER_COMEBACK_WINDOW_MS },
   async function (this: E2EWorld, peer: string) {
     assert.ok(app(this).heldPeers?.has(peer), `${peer} was not held down`);
     const restart = meshControl('storage-restart', peer).then(
@@ -1361,12 +1363,22 @@ When(
     assert.ok(storageUrl);
     const restartError = await restart;
     assert.equal(restartError, null, `peer restart failed: ${String(restartError)}`);
-    // The maintained arm owns its readiness horizon and returns only after the
-    // storage peer is ready. Check that completed state afresh: a concurrent
-    // shorter poll can expire while the arm is still making valid progress and
-    // leave a stale failure result even though the restart succeeds.
-    const health = await getRaw(`${storageUrl}/health`, { timeoutMs: 2000 });
-    assert.equal(health.status, 200, `${peer} did not become reachable`);
+    let lastHealth = 'no health response';
+    const ready = await pollUntil(async () => {
+      try {
+        const health = await getRaw(`${storageUrl}/health`, { timeoutMs: 2000 });
+        lastHealth = `HTTP ${health.status}`;
+        return health.status === 200;
+      } catch (error) {
+        lastHealth = String(error);
+        return false;
+      }
+    }, PEER_COMEBACK_WINDOW_MS);
+    assert.notEqual(
+      ready,
+      null,
+      `${peer} did not become reachable within ${PEER_COMEBACK_WINDOW_MS}ms: ${lastHealth}`
+    );
     app(this).recoveredAt = Date.now();
     app(this).heldPeers!.delete(peer);
   }
