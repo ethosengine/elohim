@@ -628,7 +628,8 @@ Given(
       assert.equal(head.status, 200, `${doorway}: fresh head read returned ${head.status}`);
       const projected = (await head.json()) as {
         headActionHash?: string;
-        declared?: boolean;
+        earned?: boolean;
+        blobHash?: string | null;
         dhtAnchorHash?: string | null;
         stagingCandidate?: string | null;
         stagingCandidateBlobHash?: string | null;
@@ -647,7 +648,10 @@ Given(
         content.dhtAnchorHash,
         `${doorway}: fresh head is neither absent nor the content's undeclared anchor fallback`
       );
-      assert.equal(projected.declared, false, `${doorway}: fresh record has a declared release`);
+      assert.ok(
+        projected.earned === false && projected.blobHash == null,
+        `${doorway}: fresh record already carries a release (earned or bytes bound)`
+      );
       assert.equal(
         projected.dhtAnchorHash,
         content.dhtAnchorHash,
