@@ -441,20 +441,6 @@ lazy_static! {
     )
     .unwrap();
 
-    /// Outcomes of the ordered `ContentHeadDeclared` hydration worker
-    /// (`rea_projection::handle_authenticated_content_head_signal_with_retry`).
-    /// `outcome` is a closed set (see [`ContentHeadHydrationOutcome`]): a
-    /// commit/read-visibility race right after the authoring call used to WARN
-    /// once and leave the author's projected head on the previous version.
-    pub static ref CONTENT_HEAD_DECLARED_HYDRATION: IntCounterVec = IntCounterVec::new(
-        Opts::new(
-            "content_head_declared_hydration_total",
-            "Ordered ContentHeadDeclared hydration outcomes (retried|recovered|exhausted|mismatch|dropped).",
-        ),
-        &["outcome"],
-    )
-    .unwrap();
-
     /// Hold/Contest decisions downgraded to Author by the ghost-declaration
     /// decay arm (`head_adoption::ghost_decay_authorizes_author`) — each one is
     /// a phantom declaration (dead conductor incarnation) positively falsified
@@ -5970,6 +5956,20 @@ pub fn add_projection_miss_readmissions(stream: &str, rung: &str, count: usize) 
 // A separate block: the main `lazy_static!` above sits at the macro recursion
 // limit, so new statics land here.
 lazy_static! {
+    /// Outcomes of the ordered `ContentHeadDeclared` hydration worker
+    /// (`rea_projection::handle_authenticated_content_head_signal_with_retry`).
+    /// `outcome` is a closed set (see [`ContentHeadHydrationOutcome`]): a
+    /// commit/read-visibility race right after the authoring call used to WARN
+    /// once and leave the author's projected head on the previous version.
+    pub static ref CONTENT_HEAD_DECLARED_HYDRATION: IntCounterVec = IntCounterVec::new(
+        Opts::new(
+            "content_head_declared_hydration_total",
+            "Ordered ContentHeadDeclared hydration outcomes (retried|recovered|exhausted|mismatch|dropped).",
+        ),
+        &["outcome"],
+    )
+    .unwrap();
+
     /// A re-admitted id's ONE read was offered again because the previous offer
     /// was never executed (shed by the leg budget / circuit, backpressure,
     /// `unattempted`, or a plan dropped by single-flight), by stream. Rising
