@@ -974,6 +974,51 @@ function bundleServeFailure(message: string, result: { last: BundleServeObservat
   return `${message}; last observations: ${JSON.stringify(result.last)}`;
 }
 
+/** Failure-only snapshot: distinguish storage projection lag from doorway reconciliation lag. */
+async function publicHeadStorageFailure(world: E2EWorld, record: PublishedApp): Promise<string> {
+  const peers = await Promise.all(
+    DOORWAYS.map(async doorway => {
+      const peer = householdPeers.get(world)?.behind[doorway];
+      try {
+        const storageUrl = storageUrlBehindDoorway(world, doorway);
+        const base = `${storageUrl}/db/content/${encodeURIComponent(record.slug)}`;
+        const read = async (suffix: string, fields: string[]) => {
+          let status: number | undefined;
+          try {
+            const response = await getRaw(`${base}${suffix}`, { timeoutMs: 2000 });
+            status = response.status;
+            const row = JSON.parse(response.text) as Record<string, unknown>;
+            return {
+              status,
+              ...Object.fromEntries(fields.map(field => [field, row[field] ?? null])),
+            };
+          } catch (error) {
+            return { status, error: String(error).slice(0, 160) };
+          }
+        };
+        const [head, content] = await Promise.all([
+          read('/head', [
+            'headActionHash',
+            'earned',
+            'blobHash',
+            'anchorMatchesHead',
+            'stagingCandidateState',
+            'updatedAt',
+          ]),
+          read('', ['blobHash', 'serverBlobHash']),
+        ]);
+        return { doorway, peer, head, content };
+      } catch (error) {
+        return { doorway, peer, error: String(error).slice(0, 160) };
+      }
+    })
+  );
+  return JSON.stringify({
+    expected: { headActionHash: record.candidateActionHash, blobHash: record.blobHash },
+    peers,
+  }).slice(0, 1200);
+}
+
 Then(
   'within 75 seconds both doorways serve PUBLIC_NAME with artifact A',
   { timeout: 90_000 },
@@ -1123,10 +1168,12 @@ Then(
     const record = app(this);
     assert.ok(record.publicHostname, 'public hostname absent');
     const result = await bothDoorwaysServe(record.publicHostname, requireBundle(this));
+    const storage = result.ok ? '' : `; storage: ${await publicHeadStorageFailure(this, record)}`;
     assert.equal(
       result.ok,
       true,
-      bundleServeFailure('public hostname did not follow the newly earned version', result)
+      bundleServeFailure('public hostname did not follow the newly earned version', result) +
+        storage
     );
   }
 );
