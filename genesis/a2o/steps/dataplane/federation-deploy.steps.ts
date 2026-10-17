@@ -1056,7 +1056,8 @@ const ADOPTION_OUTCOMES = ['probe', 'election_refreshed'] as const;
 // The receiver's trigger answers a carried ordering its conductor cannot yet walk with ONE slow
 // re-probe after SLOW_REPROBE_DELAY (30 s, head_adoption_trigger.rs), then the earned link must have
 // gossiped in: measured 2026-10-08 20:24:07Z on james, 30.1 s after the announce. Budget one slow
-// retry plus gossip; the reconcile sweep (300 s) stays far outside it, so step 5's "before any sweep" holds.
+// retry plus gossip. The household's reconcile cadence defaults to 30 s (MESH_RECONCILE_SECS), so a sweep
+// may well land inside the wait: step 5 attributes the move by the receiver's courier outcome counters, not by sweep count.
 const TOLD_WAIT_MS = 90_000;
 const HEAD_POLL_INTERVAL_MS = 2_000;
 
@@ -1069,7 +1070,15 @@ interface HeadOnlyState {
   /** Laggard `/head` `earned` when both peers first held the page (expected false). */
   laggardEarnedBefore?: boolean;
   ledgerAfterGiven?: number;
-  announce?: { ledger: number; sweeps: number | null; adoption: number };
+  /** Receiver baseline, captured BEFORE the declaration so a fast receiver cannot beat it. */
+  announce?: {
+    ledger: number;
+    sweeps: number | null;
+    adoption: number;
+    byOutcome: Record<(typeof ADOPTION_OUTCOMES)[number], number>;
+    /** Every adoption-trigger outcome label (summed over source) before the declaration. */
+    allOutcomes: Record<string, number>;
+  };
 }
 
 const headOnlyStates = new WeakMap<E2EWorld, HeadOnlyState>();
@@ -1127,12 +1136,33 @@ async function reconcileSweeps(peer: PeerRef): Promise<number | null> {
 
 /** Fleet-wide (not per id) sum of the adoption-trigger outcomes that can mean "told". */
 async function adoptionTriggers(peer: PeerRef): Promise<number> {
+  const by = await adoptionByOutcome(peer);
+  return ADOPTION_OUTCOMES.reduce((sum, outcome) => sum + by[outcome], 0);
+}
+
+/** Each outcome's counter separately, so a diagnostic shows which one moved. */
+async function adoptionByOutcome(
+  peer: PeerRef
+): Promise<Record<(typeof ADOPTION_OUTCOMES)[number], number>> {
   const text = await metricsText(peer);
-  return ADOPTION_OUTCOMES.reduce(
-    (sum, outcome) =>
-      sum + (parseLabeledPrometheusMetric(text, ADOPTION_SERIES, ADOPTION_LABEL, outcome) ?? 0),
-    0
-  );
+  const read = (outcome: string) =>
+    parseLabeledPrometheusMetric(text, ADOPTION_SERIES, ADOPTION_LABEL, outcome) ?? 0;
+  return { probe: read('probe'), election_refreshed: read('election_refreshed') };
+}
+
+/** Every `outcome` label of the adoption-trigger series (summed over `source`), by label value. */
+async function adoptionAllOutcomes(peer: PeerRef): Promise<Record<string, number>> {
+  const text = await metricsText(peer);
+  const out: Record<string, number> = {};
+  for (const raw of text.split('\n')) {
+    const line = raw.trim();
+    if (line.startsWith('#') || !line.startsWith(`${ADOPTION_SERIES}{`)) continue;
+    const m = new RegExp(`${ADOPTION_LABEL}="([^"]*)"`).exec(line);
+    const value = Number(line.split(/\s+/).pop());
+    if (!m || Number.isNaN(value)) continue;
+    out[m[1]] = (out[m[1]] ?? 0) + value;
+  }
+  return out;
 }
 
 Given(
@@ -1197,6 +1227,16 @@ Given(
       s.winner.alias,
       `"${alias}" is not the peer that authored the page (${s.winner.alias})`
     );
+    // Receiver baseline FIRST: a fast receiver may process the announcement (and probe) before any
+    // later snapshot, which would then show no increase although it was told.
+    const byOutcome = await adoptionByOutcome(s.laggard);
+    s.announce = {
+      ledger: stagingWriteCount(),
+      sweeps: await reconcileSweeps(s.laggard),
+      adoption: ADOPTION_OUTCOMES.reduce((sum, o) => sum + byOutcome[o], 0),
+      byOutcome,
+      allOutcomes: await adoptionAllOutcomes(s.laggard),
+    };
     // "New head" here means a new EARNED declaration for the SAME action hash: the text and the
     // action are unchanged, only the declaration's ordering (earned tier, notarized clock) is new.
     await declareEarnedCanonicalHead(s.winnerRail, s.eprId, s.winnerHead);
@@ -1213,25 +1253,28 @@ Given(
       earned,
       `${s.winner.alias}'s /head never read earned=true for "${s.eprId}" after the declaration`
     );
+    // The declaration itself records a staging write in the global ledger (carried-election.ts), so
+    // the ledger watermark is taken only now; sweeps/adoption were captured before the declaration.
+    s.announce.ledger = stagingWriteCount();
   }
 );
 
 When(
   'peer {string} announces the change to its federation',
   { timeout: 60_000 },
-  async function (this: E2EWorld, alias: string) {
+  function (this: E2EWorld, alias: string) {
     const s = headOnly(this);
     assert.strictEqual(
       alias,
       s.winner.alias,
       `"${alias}" is not the declaring peer (${s.winner.alias})`
     );
-    // No write: announcing is the substrate's own act. This only snapshots what "before" is.
-    s.announce = {
-      ledger: stagingWriteCount(),
-      sweeps: await reconcileSweeps(s.laggard),
-      adoption: await adoptionTriggers(s.laggard),
-    };
+    // No write: announcing is the substrate's own act. The baseline was captured before the
+    // declaration (see the declaring step); this only asserts it exists.
+    assert.ok(
+      s.announce,
+      'the pre-declaration receiver baseline is missing — the declaring step must run first'
+    );
   }
 );
 
@@ -1245,17 +1288,19 @@ Then(
       s.laggard.alias,
       `"${alias}" is not the receiving peer (${s.laggard.alias})`
     );
-    assert.ok(s.announce, 'the announce snapshot is missing — the When step must run first');
+    assert.ok(s.announce, 'the announce snapshot is missing — the declaring step must run first');
     const before = s.announce.adoption;
     const told = await pollUntil(
       TOLD_WAIT_MS,
       async () => (await adoptionTriggers(s.laggard)) > before
     );
+    const after = await adoptionByOutcome(s.laggard);
+    const fmt = (o: Record<string, number>) => ADOPTION_OUTCOMES.map(k => `${k}=${o[k]}`).join(' ');
     assert.ok(
       told,
       `${s.laggard.alias} was never told: ${ADOPTION_SERIES}{${ADOPTION_LABEL}=${ADOPTION_OUTCOMES.join('|')}} ` +
         `stayed at ${before} for ${TOLD_WAIT_MS / 1000}s after ${s.winner.alias} re-declared the head — a head-only ` +
-        `declaration announced nothing`
+        `declaration announced nothing (before the declaration: ${fmt(s.announce.byOutcome)}; after: ${fmt(after)})`
     );
   }
 );
@@ -1281,10 +1326,26 @@ Then(
       `${s.laggard.alias} /head did not reach earned=true at ${s.winnerHead} within ${PROJECTION_WAIT_MS / 1000}s ` +
         `(last read: ${JSON.stringify(last)}; earned before: ${s.laggardEarnedBefore})`
     );
-    assert.strictEqual(
-      await reconcileSweeps(s.laggard),
-      s.announce.sweeps,
-      `${SWEEPS_SERIES} on ${s.laggard.alias} moved while waiting — the head moved by the sweep, not by the carried declaration`
+    const afterAll = await adoptionAllOutcomes(s.laggard);
+    const delta = (k: string) => (afterAll[k] ?? 0) - (s.announce?.allOutcomes[k] ?? 0);
+    const sweepsAfter = await reconcileSweeps(s.laggard);
+    const courier = delta('courier_obeyed') + delta('courier_current');
+    const increased = Object.keys(afterAll)
+      .filter(k => delta(k) > 0)
+      .map(k => `${k} +${delta(k)}`);
+    const refusals = increased.filter(
+      k => k.startsWith('courier_') && !/^courier_(obeyed|current) /.test(k)
+    );
+    const refusedNote = refusals.length
+      ? 'the courier refused: ' + refusals.join(', ')
+      : 'no courier outcome increased';
+    assert.ok(
+      courier >= 1,
+      `the carried declaration did not move ${s.laggard.alias}'s head: courier_obeyed + courier_current ` +
+        `did not increase (${refusedNote}); ` +
+        `fallback: election_refreshed +${delta('election_refreshed')}, held +${delta('held')}. ` +
+        `Context only: sweeps ${s.announce.sweeps}->${sweepsAfter}, cadence 30 s default (MESH_RECONCILE_SECS); ` +
+        `all increases: ${increased.join(', ') || 'none'}`
     );
     assert.strictEqual(
       stagingWriteCount(),
