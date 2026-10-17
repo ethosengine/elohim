@@ -32,6 +32,16 @@ retire-when: >
   declared head from the mesh directly. At that point "either doorway can die" is a
   statement about a component that no longer sits in the path.
 ---
+DELTA 2026-10-17c (RED preserved; wave-3 channel isolation reaches 16/18 steps; deliverability 7/7 before and after the narrow-fix revert).
+
+Household evidence on conductors `hc-fork-96bcd2bee215-proof`, content_store hot-swapped at 08:5xZ, with storage rebuilt from the named source and restarted. Counts below were verified against reports under `genesis/a2o/reports/` and matching cucumber-mesh JSON, excluding hidden hooks; runtime diagnosis and the earlier 4/18 progression are operator-supplied.
+
+The `epr-app-channel-isolation` check moved from 4/18 steps at the registration predicate (fixed in `e7ba3dfcd` / `79dc0f46a`) through the receiver-authored-root hole: on second-wave storage, `sprint-report-household-20261017T113816Z-e7ba3dfc` failed Matthew's authorized publication claim for A (7 passed / 1 failed / 10 skipped steps), because Jessica's backfill had rooted his received registration first. Wave 3 (`143c828fb` + `2463b1487`, storage gate 4,674 passed) marks local authorship, bars received-row rooting, and roots fresh registrations before announcement within a bounded budget; see dataplane-convergence entry 2026-10-17f for the guard and counters.
+
+On `2463b148`, `sprint-report-household-20261017T155734Z-2463b148` reaches 16/18 steps (16 passed / 1 failed / 1 skipped; one failed scenario): Matthew retains authorship, A promotes, B stages beneath, both public/candidate names serve, and B's holon-author promotion succeeds. Only the post-promotion candidate-withdrawal assertion fails: CANDIDATE_NAME does not answer 404 with `no-candidate-staged` through both doorways within 75 s. A receiver's projection lags the election, storage answers `unavailable`, and the doorway keeps its prior observation. Narrow fix `c4c6cb9a9` made receiver absence sticky (operator-reported 12/18) and was reverted in `c353ab068`; wave 4 derives candidate authority from the local election alone and is written and reviewed, not yet gated.
+
+`epr-app-deliverability.feature` passed 7/7 scenarios and 135/135 steps on wave-3 source (`sprint-report-household-20261017T160148Z-2463b148`) and after the narrow-fix revert (`sprint-report-household-20261017T165922Z-c353ab06`). Between them, `sprint-report-household-20261017T165138Z-c353ab06` passed 6/7 scenarios (116 passed / 1 failed / 18 skipped steps), failing only `within 75 seconds both doorways serve the new browser bundle by content address`; operator context places this immediately after a storage restart. Client-resilience remains RED-FIRST; beacon and `epr-app-package` gates remain unmeasured, and served-shell-boots remains unread. No status change.
+
 DELTA 2026-10-17b (RED preserved; wave-2 deliverability 7/7, 135/135 three times; channel isolation now exposes receiver-authored roots).
 
 Operator-supplied runtime context: second-wave source dev d0b98ce58 + eight commits, final sha 79dc0f46a; storage rebuilt from that wave and restarted ~11:2xZ; doorways from a8d3e71a3; conductors hc-fork-96bcd2bee215-proof with content_store hot-swapped at 08:5xZ. Reports below live under `genesis/a2o/reports/`; scenario counts verified from sprint-report JSON, step counts from matching cucumber-mesh JSON excluding hidden hooks.
