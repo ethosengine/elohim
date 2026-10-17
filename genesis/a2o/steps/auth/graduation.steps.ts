@@ -1,20 +1,27 @@
 /** Graduation stations. Share hosted-human state so existing cell/pipeline steps stay authoritative. */
 import { strict as assert } from 'node:assert';
 import { generateKeyPairSync, sign } from 'node:crypto';
+
 import { After, Given, Then, When } from '@cucumber/cucumber';
+
 import {
   AdminWebsocket,
   HoloHashType,
   encodeHashToBase64,
   hashFrom32AndType,
 } from '@holochain/client';
-import type { Page } from 'playwright';
-import type { E2EWorld } from '../../src/framework/world.js';
+
 import { loadHouseholdMeshFixture } from '../../src/framework/fixtures/household-mesh.js';
 import { human, registerNewcomer } from '../ui/hosted-human.steps.js';
 
+import type { E2EWorld } from '../../src/framework/world.js';
+import type { Page } from 'playwright';
+
 type Json = Record<string, unknown>;
-type Reply = { status: number; body: Json };
+interface Reply {
+  status: number;
+  body: Json;
+}
 interface State {
   reply?: Reply;
   challenge?: Json;
@@ -128,7 +135,7 @@ Then('the doorway refuses with {string}', function (this: E2EWorld, code: string
 });
 Then(
   'the doorway answers with a challenge naming this doorway, the account and its current key',
-  async function (this: E2EWorld) {
+  function (this: E2EWorld) {
     const s = state(this);
     const person = human(this);
     assert.equal(s.reply?.status, 200);
