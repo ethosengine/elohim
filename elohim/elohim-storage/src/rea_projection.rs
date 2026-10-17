@@ -1018,6 +1018,29 @@ pub const HYDRATION_MAX_CONCURRENT_RETRIES: usize = 16;
 static HYDRATION_RETRIES_IN_FLIGHT: std::sync::atomic::AtomicUsize =
     std::sync::atomic::AtomicUsize::new(0);
 
+/// One slot of [`HYDRATION_MAX_CONCURRENT_RETRIES`]. Released on drop, so a
+/// panic or cancellation of the retry task cannot leak the slot.
+struct RetrySlot;
+
+impl RetrySlot {
+    /// Claim a slot, or `None` when the cap is already reached.
+    fn try_acquire() -> Option<Self> {
+        use std::sync::atomic::Ordering::SeqCst;
+        if HYDRATION_RETRIES_IN_FLIGHT.fetch_add(1, SeqCst) >= HYDRATION_MAX_CONCURRENT_RETRIES {
+            HYDRATION_RETRIES_IN_FLIGHT.fetch_sub(1, SeqCst);
+            None
+        } else {
+            Some(RetrySlot)
+        }
+    }
+}
+
+impl Drop for RetrySlot {
+    fn drop(&mut self) {
+        HYDRATION_RETRIES_IN_FLIGHT.fetch_sub(1, std::sync::atomic::Ordering::SeqCst);
+    }
+}
+
 /// Only a payload that was not (yet) readable or did not (yet) match is worth
 /// another look; a malformed or unsupported answer or a pool fault is not.
 pub fn is_retryable_hydration_error(err: &StorageError) -> bool {
@@ -1123,7 +1146,6 @@ pub async fn handle_authenticated_content_head_signal_with_retry(
     use crate::metrics::{
         inc_content_head_declared_hydration as count, ContentHeadHydrationOutcome as O,
     };
-    use std::sync::atomic::Ordering::SeqCst;
     let Err(first) =
         handle_authenticated_content_head_signal(signal.clone(), &registry, &pool, &ctx).await
     else {
@@ -1135,13 +1157,14 @@ pub async fn handle_authenticated_content_head_signal_with_retry(
     if !is_retryable_hydration_error(&first) {
         return Err(first);
     }
-    if HYDRATION_RETRIES_IN_FLIGHT.fetch_add(1, SeqCst) >= HYDRATION_MAX_CONCURRENT_RETRIES {
-        HYDRATION_RETRIES_IN_FLIGHT.fetch_sub(1, SeqCst);
+    let Some(slot) = RetrySlot::try_acquire() else {
         count(O::Dropped);
         return Err(first);
-    }
+    };
     let content_id = content_id.clone();
     tokio::spawn(async move {
+        // Held for the whole task body; released on every exit path.
+        let _slot = slot;
         run_hydration_retries(
             &content_id,
             &HYDRATION_RETRY_DELAYS,
@@ -1150,7 +1173,6 @@ pub async fn handle_authenticated_content_head_signal_with_retry(
             || handle_authenticated_content_head_signal(signal.clone(), &registry, &pool, &ctx),
         )
         .await;
-        HYDRATION_RETRIES_IN_FLIGHT.fetch_sub(1, SeqCst);
     });
     Ok(())
 }
