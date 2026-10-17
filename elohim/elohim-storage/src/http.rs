@@ -147,19 +147,11 @@ fn staging_candidate_for_projected_head(
     let Some(election) = election else {
         return Ok(None);
     };
-    // An answered election whose candidate slot is explicitly empty is
-    // authoritative absence, whatever the projection says: the winner was
-    // promoted (the earned winner excludes its own action) and the row's
-    // projection merely lags by a tick. Report `none` so the doorway replaces
-    // its observation instead of keeping a stale candidate on `unavailable`.
-    let Some(candidate) = election.staging_candidate.as_ref() else {
-        return Ok(None);
-    };
     let actual_winner = election.winner_target.to_string();
     if actual_winner != projected_head_action {
         return Err(actual_winner);
     }
-    Ok(Some(candidate.to_string()))
+    Ok(election.staging_candidate.map(|hash| hash.to_string()))
 }
 
 fn exact_candidate_blob(
@@ -22837,28 +22829,6 @@ mod candidate_head_state_tests {
             ),
             Err(other_winner.to_string()),
             "a candidate beneath another winner must not be attached to the projected head"
-        );
-    }
-
-    #[test]
-    fn promoted_winner_with_empty_candidate_is_none_even_when_projection_lags() {
-        // (a) answered, empty candidate, winner != projected head -> none
-        assert_eq!(
-            staging_candidate_for_projected_head(WINNER, Some(election(CANDIDATE, None))),
-            Ok(None),
-            "a promoted winner with no candidate is authoritative absence"
-        );
-        // (b) answered, non-empty candidate, winner != projected head -> unavailable
-        assert_eq!(
-            staging_candidate_for_projected_head(WINNER, Some(election(CANDIDATE, Some(WINNER)))),
-            Err(CANDIDATE.to_string())
-        );
-        // (c) answered, non-empty candidate, winner == projected head -> candidate
-        assert_eq!(
-            staging_candidate_for_projected_head(WINNER, Some(election(WINNER, Some(CANDIDATE))))
-                .unwrap()
-                .as_deref(),
-            Some(CANDIDATE)
         );
     }
 
