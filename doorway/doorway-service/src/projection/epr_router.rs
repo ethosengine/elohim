@@ -725,16 +725,19 @@ impl EprRouter {
                 serving_url,
                 projections,
             } => {
-                // `primary_empty == true` means the primary answered successfully
-                // (2xx) with nothing installable — an authoritative "I have none of
-                // these" answer, so anything it previously listed is shielded BEFORE
-                // the peer batch below is filtered and installed.
-                // `primary_empty == false` means the primary ERRORED/timed out — this
-                // is exactly the resilience case the fallback exists for (a primary
-                // wiped/unreachable while peers still hold the routes); never shield
-                // on that (see `shield_primary_omissions`'s doc).
+                // Revocation shielding needs an ANSWERED primary: a non-empty set that
+                // omits an id it listed before is evidence the id was revoked.
+                // `primary_empty == true` (answered nothing installable — e.g. shaded
+                // with `project-epr`) and `primary_empty == false` (errored/timed out)
+                // are both "no verdict": the primary says nothing about those ids, so
+                // the pool batch below must install, not be treated as revoked. The
+                // primary-sourced tracking is forgotten (not revoked) so a later
+                // non-empty answer diffs against nothing stale.
                 if primary_empty {
-                    self.shield_primary_omissions(&HashSet::new());
+                    self.primary_sourced_ids
+                        .write()
+                        .expect("router lock poisoned")
+                        .clear();
                 }
                 let (result, shielded) = self.install_projections(projections, true);
                 FallbackInstallOutcome::Peer {
@@ -2049,6 +2052,74 @@ mod tests {
                 router.dispatch(None, "/lamad").is_some(),
                 "B was never omitted by the primary and must remain reachable"
             );
+        }
+
+        #[test]
+        fn an_empty_primary_answer_does_not_shield_the_pool_batch() {
+            let router = EprRouter::new();
+            let a = make_projection("garden", "/nrt-garden");
+            let b = make_projection("lamad", "/lamad");
+
+            // Primary listed {A, B} earlier, then is shaded and answers empty.
+            router.install_from_fallback(FallbackOutcome::PrimaryNonEmpty {
+                url: "http://primary".to_string(),
+                projections: vec![a.clone(), b.clone()],
+            });
+            let outcome = router.install_from_fallback(FallbackOutcome::PeerServed {
+                primary_url: "http://primary".to_string(),
+                primary_empty: true,
+                serving_url: "http://peer".to_string(),
+                projections: vec![a.clone(), b.clone()],
+            });
+            match outcome {
+                FallbackInstallOutcome::Peer {
+                    installed,
+                    shielded,
+                    ..
+                } => {
+                    assert_eq!(shielded, 0, "an empty primary gives no revocation verdict");
+                    assert_eq!(installed, 2, "the pool batch must install");
+                }
+                other => panic!("expected Peer install outcome, got {other:?}"),
+            }
+            assert!(router.dispatch(None, "/nrt-garden").is_some());
+            assert!(router.dispatch(None, "/lamad").is_some());
+        }
+
+        #[test]
+        fn a_non_empty_primary_omitting_a_row_still_shields_it_from_the_pool_batch() {
+            let router = EprRouter::new();
+            let a = make_projection("garden", "/nrt-garden");
+            let b = make_projection("lamad", "/lamad");
+
+            router.install_from_fallback(FallbackOutcome::PrimaryNonEmpty {
+                url: "http://primary".to_string(),
+                projections: vec![a.clone(), b.clone()],
+            });
+            // Primary answers a non-empty set that omits A: provable revocation.
+            router.install_from_fallback(FallbackOutcome::PrimaryNonEmpty {
+                url: "http://primary".to_string(),
+                projections: vec![b.clone()],
+            });
+            let outcome = router.install_from_fallback(FallbackOutcome::PeerServed {
+                primary_url: "http://primary".to_string(),
+                primary_empty: true,
+                serving_url: "http://peer".to_string(),
+                projections: vec![a.clone(), b.clone()],
+            });
+            match outcome {
+                FallbackInstallOutcome::Peer {
+                    installed,
+                    shielded,
+                    ..
+                } => {
+                    assert_eq!(shielded, 1, "A was omitted by an answered primary");
+                    assert_eq!(installed, 1);
+                }
+                other => panic!("expected Peer install outcome, got {other:?}"),
+            }
+            assert!(router.dispatch(None, "/nrt-garden").is_none());
+            assert!(router.dispatch(None, "/lamad").is_some());
         }
 
         #[test]
