@@ -6688,6 +6688,90 @@ mod tests {
         );
     }
 
+    /// THE STAGING DECLARATION BENEATH AN EARNED HEAD. An author PATCH whose
+    /// version is only the election's staging candidate projects with
+    /// `PreserveExistingDeclaration`: the canonical projection stays on the
+    /// earned winner A (its declaration, ordering and version fields), the
+    /// anchor records the authored action B, re-declaring A is an idempotent
+    /// same-head refresh (never the B->A move that 409'd), and promoting B to
+    /// earned later moves the projection to B.
+    #[test]
+    fn a_staging_candidate_patch_leaves_the_earned_projection_on_the_winner() {
+        let mut conn = setup_test_db();
+        let ctx = AppContext::new("lamad");
+        create_content(&mut conn, &ctx, mk_plain("slug")).unwrap();
+        let earned_a = CanonicalOrdering::new(10, true);
+        let patch = |blob: &str| ContentProjectionPatch {
+            blob_cid: Some(blob.to_string()),
+            ..ContentProjectionPatch::default()
+        };
+        stamp_declared_head_mode(
+            &mut conn,
+            &ctx,
+            "slug",
+            "uhCkk-A",
+            Some(10),
+            Some(patch("blob-A")),
+            StampMode::HealCanonical,
+            Some(earned_a),
+        )
+        .unwrap();
+
+        // B's PATCH: the election named A the winner and B the candidate.
+        upsert_with_anchor(
+            &mut conn,
+            &ctx,
+            "slug",
+            patch("blob-B"),
+            "uhCkk-B",
+            HeadElection::PreserveExistingDeclaration,
+        )
+        .unwrap();
+        let row = get_content(&mut conn, &ctx, "slug", MinTrust::Invisible)
+            .unwrap()
+            .unwrap();
+        assert_eq!(row.dht_anchor_hash.as_deref(), Some("uhCkk-B"));
+        assert_eq!(row.declared_head_action_hash.as_deref(), Some("uhCkk-A"));
+        assert_eq!(row.blob_cid.as_deref(), Some("blob-A"));
+
+        // The follow-up declare of the winner is a same-head refresh.
+        let refresh = stamp_declared_head_mode(
+            &mut conn,
+            &ctx,
+            "slug",
+            "uhCkk-A",
+            Some(10),
+            Some(patch("blob-A")),
+            StampMode::HealCanonical,
+            Some(earned_a),
+        )
+        .unwrap();
+        assert_ne!(refresh, StampOutcome::SkippedStale);
+        let row = get_content(&mut conn, &ctx, "slug", MinTrust::Invisible)
+            .unwrap()
+            .unwrap();
+        assert_eq!(row.declared_head_action_hash.as_deref(), Some("uhCkk-A"));
+
+        // Promotion: B earned later moves the projection.
+        let promoted = stamp_declared_head_mode(
+            &mut conn,
+            &ctx,
+            "slug",
+            "uhCkk-B",
+            Some(20),
+            Some(patch("blob-B")),
+            StampMode::HealCanonical,
+            Some(CanonicalOrdering::new(20, true)),
+        )
+        .unwrap();
+        assert_ne!(promoted, StampOutcome::SkippedStale);
+        let row = get_content(&mut conn, &ctx, "slug", MinTrust::Invisible)
+            .unwrap()
+            .unwrap();
+        assert_eq!(row.declared_head_action_hash.as_deref(), Some("uhCkk-B"));
+        assert_eq!(row.blob_cid.as_deref(), Some("blob-B"));
+    }
+
     /// The verify-only mark and the unverified inventory the anchor-verify
     /// pass pages through: hash-exact, keyset-ordered, and shrinking as rows
     /// are confirmed.

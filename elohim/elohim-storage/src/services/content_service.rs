@@ -407,16 +407,23 @@ impl ContentService {
     /// sibling doc still naming the previous head could otherwise use to roll
     /// the author back (a complete old election beats a NULL ordering).
     ///
-    /// `None` when the election could not be declared or is out-voted (an earned
-    /// head stands over this publish): the row then keeps the declaration the
-    /// publish makes, with no ordering, exactly as before this existed, and
-    /// siblings adopt only once some election for the version reaches them.
+    /// [`AuthorElection::Unrecorded`] when the election could not be declared or
+    /// is out-voted by something other than an earned head this version stands
+    /// beneath: the row then keeps the declaration the publish makes, with no
+    /// ordering, exactly as before this existed, and siblings adopt only once
+    /// some election for the version reaches them.
+    ///
+    /// [`AuthorElection::StagedBeneath`] when the election's winner is another
+    /// head and this version is the election's STAGING CANDIDATE: the version is
+    /// admitted as the candidate (the live election, not a SQL column, carries
+    /// it — `staging_candidate_from_election` reads it back) and the canonical
+    /// projection must stay on the winner.
     async fn declare_author_election(
         &self,
         hc: &Arc<HcClient>,
         id: &str,
         action: &str,
-    ) -> Option<(content_diesel::CanonicalOrdering, i64)> {
+    ) -> AuthorElection {
         let declared = crate::chain_write_gate::as_writer(
             crate::chain_write_gate::WriterKind::HttpAuthor,
             conductor_writes::call_declare_canonical_content_head(
@@ -436,21 +443,34 @@ impl ContentService {
                     "publish: the author's own election for its new version was not declared; \
                      siblings cannot adopt it from carried evidence until an election for it exists"
                 );
-                return None;
+                return AuthorElection::Unrecorded;
             }
         };
         crate::metrics::inc_content_canonical_link_minted("author_publish");
-        if declared.head_action_hash.to_string() != action {
-            tracing::info!(
-                content_id = %id, head = %action, elected = %declared.head_action_hash,
-                "publish: the author's election for its new version is out-voted (an earned \
-                 head stands over it); the row keeps the declaration the publish makes"
-            );
-            return None;
+        let elected = declared.head_action_hash.to_string();
+        let candidate = declared.staging_candidate.as_ref().map(|c| c.to_string());
+        match author_election_disposition(action, &elected, candidate.as_deref()) {
+            AuthorElectionDisposition::Elected => declared
+                .canonical_ordering()
+                .map(|ordering| AuthorElection::Declared(ordering, declared.declared_at))
+                .unwrap_or(AuthorElection::Unrecorded),
+            AuthorElectionDisposition::StagedBeneath => {
+                tracing::info!(
+                    content_id = %id, head = %action, elected = %elected,
+                    "publish: the author's version is the staging candidate beneath the \
+                     elected head; the canonical projection stays on the winner"
+                );
+                AuthorElection::StagedBeneath
+            }
+            AuthorElectionDisposition::OutVoted => {
+                tracing::info!(
+                    content_id = %id, head = %action, elected = %elected,
+                    "publish: the author's election for its new version is out-voted (an earned \
+                     head stands over it); the row keeps the declaration the publish makes"
+                );
+                AuthorElection::Unrecorded
+            }
         }
-        declared
-            .canonical_ordering()
-            .map(|ordering| (ordering, declared.declared_at))
     }
 
     pub async fn update_via_conductor(
@@ -625,7 +645,21 @@ impl ContentService {
         let author_election = if matches!(election, content_diesel::HeadElection::Declare) {
             self.declare_author_election(hc, id, &action_hash_str).await
         } else {
-            None
+            AuthorElection::Unrecorded
+        };
+        // A version admitted only as the STAGING CANDIDATE beneath an elected
+        // head must not become the local projected head: the row keeps the
+        // winner's declaration (and its version fields), the anchor still
+        // records the authored action, and the later canonical-head declare of
+        // the winner is an idempotent same-head refresh instead of a B->A move
+        // at equal ordering.
+        let (election, author_election) = match author_election {
+            AuthorElection::StagedBeneath => (
+                content_diesel::HeadElection::PreserveExistingDeclaration,
+                None,
+            ),
+            AuthorElection::Declared(ordering, at) => (election, Some((ordering, at))),
+            AuthorElection::Unrecorded => (election, None),
         };
         // Mirror the COMMITTED reach into SQL when the re-publish carried a
         // reach change the projection would otherwise drop. See
@@ -1064,9 +1098,56 @@ pub(crate) fn committed_projection_patch(oc: &lamad_types::Content) -> ContentPr
     )
 }
 
+/// What the author's own election for a version it just committed came to.
+enum AuthorElection {
+    /// The version won; its ordering is recorded on the row it declares.
+    Declared(content_diesel::CanonicalOrdering, i64),
+    /// The version is the staging candidate beneath another elected head.
+    StagedBeneath,
+    /// No election was declared, or the version is out-voted without being
+    /// admitted as the candidate.
+    Unrecorded,
+}
+
+#[derive(Debug, PartialEq, Eq)]
+enum AuthorElectionDisposition {
+    Elected,
+    StagedBeneath,
+    OutVoted,
+}
+
+/// PURE. Classify the election answer for an authored `action`: it won, it is
+/// the election's staging candidate beneath another winner, or it lost outright.
+fn author_election_disposition(
+    action: &str,
+    elected: &str,
+    staging_candidate: Option<&str>,
+) -> AuthorElectionDisposition {
+    if elected == action {
+        AuthorElectionDisposition::Elected
+    } else if staging_candidate == Some(action) {
+        AuthorElectionDisposition::StagedBeneath
+    } else {
+        AuthorElectionDisposition::OutVoted
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn author_election_disposition_retains_a_staging_candidate_beneath_the_winner() {
+        use AuthorElectionDisposition::*;
+        assert_eq!(author_election_disposition("B", "B", None), Elected);
+        assert_eq!(author_election_disposition("B", "B", Some("C")), Elected);
+        assert_eq!(
+            author_election_disposition("B", "A", Some("B")),
+            StagedBeneath
+        );
+        assert_eq!(author_election_disposition("B", "A", Some("C")), OutVoted);
+        assert_eq!(author_election_disposition("B", "A", None), OutVoted);
+    }
 
     /// The 2026-10-07 household recast: `update_content` answers PENDING (no
     /// canonical identity root on this network) where it used to answer "no
