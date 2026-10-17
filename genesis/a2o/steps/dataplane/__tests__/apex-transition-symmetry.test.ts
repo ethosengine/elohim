@@ -48,6 +48,20 @@ void describe('siblingWorseThanPrimary', () => {
     );
   });
 
+  void it('forgives the household-absent /assets/config.json 404 when the primary shared it', () => {
+    assert.deepEqual(
+      primaryErrorsOutsideCorpusGap([{ status: 404, url: `${PRIMARY}/assets/config.json` }]),
+      []
+    );
+    assert.deepEqual(
+      siblingWorseThanPrimary(
+        [{ status: 404, url: `${PRIMARY}/assets/config.json` }],
+        [{ status: 404, url: `${SIBLING}/assets/config.json` }]
+      ),
+      []
+    );
+  });
+
   void it('fails a non-corpus-gap error even when the primary had it too', () => {
     assert.deepEqual(
       siblingWorseThanPrimary(

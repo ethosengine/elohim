@@ -24,7 +24,13 @@ function pathOf(url: string): string {
  * The only error class the sibling is forgiven for sharing with the primary.
  */
 export function isCorpusGap(e: HttpError): boolean {
-  return e.status === 404 && pathOf(e.url).startsWith('/epr-head/');
+  if (e.status !== 404) return false;
+  const path = pathOf(e.url);
+  // `/assets/config.json` is supplied on alpha by a ConfigMap mount; the household stages the
+  // dist as built, so every household doorway 404s it alike. ConfigService treats that 404 as
+  // designed (catchError -> DEFAULT_PROD_CONFIG), so it is a household fixture gap, not a
+  // failover fact, and the sibling is forgiven it only when the primary had it too.
+  return path.startsWith('/epr-head/') || path === '/assets/config.json';
 }
 
 /**
