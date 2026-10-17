@@ -32,6 +32,19 @@ retire-when: >
   declared head from the mesh directly. At that point "either doorway can die" is a
   statement about a component that no longer sits in the path.
 ---
+DELTA 2026-10-17e (RED preserved; fixture readiness and runtime endpoint pass; apex transition fails 2/4 scenarios; fleet shell, node identity and client resilience remain unmeasured).
+
+Household evidence at dev tip `89e96c740`, with storage and doorway built from `577b8fc5` source (operator-supplied runtime context). The new runs started at 21:49–21:51Z; the apex report was generated at 21:53:51Z. Scenario counts verified against the named sprint-report JSON under `genesis/a2o/reports/`, and step counts and exact failures against matching cucumber-mesh JSON, excluding hidden hooks.
+
+Newly measured checks named in this atom: `doorway-fixture-readiness.feature` passed 2/2 scenarios, 22/22 steps (`sprint-report-household-20261017T214951Z-89e96c74`); `doorway-runtime-endpoint.feature` passed 2/2 scenarios, 14/14 steps (`sprint-report-household-20261017T215011Z-89e96c74`); `doorway-apex-transition.feature` passed 2/4 scenarios and 28/42 steps, with 2 failed and 12 skipped steps (`sprint-report-household-20261017T215135Z-89e96c74`). The apex failures are observed, with diagnosis pending (Codex read in flight); no cause is claimed:
+
+- "The apex name survives its doorway's shed" failed at `a new visitor reaches the declared landing page through one owned public name`: `primary browser (http://localhost:8888) had HTTP errors outside the /epr-head/ 404 corpus-gap class (404 /assets/config.json) — no baseline to hold the sibling to`.
+- "A current governed version crosses withdrawal and recovery" failed at `doorway "elohim.host" serves authority B's exact head, blob, addressed version, HTML entry, and browser bootstrap`: `http://localhost:8889: page does not name current script`.
+
+Sibling lanes recorded as context only, neither named in `checks:`: `doorway-sibling-reader.feature` passed 1/1 scenario, 11/11 steps (`sprint-report-household-20261017T215027Z-89e96c74`); `doorway-catching-up-page.feature` passed 3/3 scenarios, 16/16 steps (`sprint-report-household-20261017T215120Z-89e96c74`). They do not discharge the apex transition check.
+
+Earlier today, reverified against their reports: `doorway-failover.feature` passed 10/10 scenarios, 41/41 steps (`sprint-report-household-20261017T080553Z-a8d3e71a`); `epr-app-channel-isolation.feature` passed 1/1 scenario, 18/18 steps (`sprint-report-household-20261017T210023Z-577b8fc5`); `epr-app-deliverability.feature` passed 7/7 scenarios, 135/135 steps (`sprint-report-household-20261017T210210Z-577b8fc5`). Still unmeasured today: `served-shell-boots.feature` on the fleet, `doorway-node-identity.feature` (its recast scenario remains deliberately `@wip`), and `delivery/client-resilience.feature` (RED-FIRST). `relay-addr-beacon` and `epr-app-package` gates remain unrun as recorded in the preceding entry. Apex transition is not all-pass and the remaining prerequisites are not discharged; `status: red` is unchanged.
+
 DELTA 2026-10-17d (RED preserved; channel isolation passes 18/18; client-resilience remains RED-FIRST, relay-addr-beacon and epr-app-package gates unrun, fleet served-shell-boots unread today).
 
 On the household, with conductors `hc-fork-96bcd2bee215-proof`, content_store hot-swapped at 08:5xZ, and storage rebuilt from `577b8fc5` and restarted, the first check in this atom, `epr-app-channel-isolation.feature`, passed 1/1 scenario and 18/18 steps (`sprint-report-household-20261017T210023Z-577b8fc5`). A stages and promotes, B stages beneath as the candidate, both names serve, the holon author promotes B, the candidate name answers 404 `no-candidate-staged`, and the public name follows B on both doorways. The candidate-election authority and bounded ordered-declaration hydration retry that close the lane are recorded in dataplane-convergence entry 2026-10-17g.
