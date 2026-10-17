@@ -21,7 +21,8 @@ function pathOf(url: string): string {
  * The corpus-gap class: a 404 on `/epr-head/<slug>`, which every household
  * doorway returns alike for the landing's unseeded epic links
  * (genesis/data/timeline/backlog/household-landing-links-unseeded-epics.md).
- * The only error class the sibling is forgiven for sharing with the primary.
+ * The only error classes the sibling is forgiven for sharing with the primary: the `/epr-head/`
+ * 404s above, and a 404 on exactly `/assets/config.json` (see below).
  */
 export function isCorpusGap(e: HttpError): boolean {
   if (e.status !== 404) return false;

@@ -122,11 +122,8 @@ const meshScript = fileURLToPath(
 
 /** One bounded GET; sized like every other single-fetch step in this suite. */
 const RAW_FETCH_TIMEOUT_MS = 30_000;
-/** How long the served HTML may trail head/blob/version before it must name the current script. */
-const HTML_ENTRY_CONVERGENCE_MS = 20_000;
-const HTML_ENTRY_POLL_MS = 1_000;
-/** Seven bounded reads plus the HTML-entry convergence wait in assertExactPublishedAuthority. */
-const EXACT_AUTHORITY_TIMEOUT_MS = 7 * RAW_FETCH_TIMEOUT_MS + HTML_ENTRY_CONVERGENCE_MS;
+/** Six server reads plus one browser boot in assertExactPublishedAuthority. */
+const EXACT_AUTHORITY_TIMEOUT_MS = 7 * RAW_FETCH_TIMEOUT_MS;
 const AUTHORITY_PUBLICATION_BOUND_MS = 75_000;
 /** Fallback bounds when the authority declares none (it always does today). */
 const DEFAULT_WITHDRAW_BOUND_MS = 30_000;
@@ -395,23 +392,9 @@ async function assertExactPublishedAuthority(
   });
   assert.equal(version.status, 200, `${origin}: addressed version answered ${version.status}`);
   assert.equal(stampOf(version.text), expected.version, `${origin}: governed version diverged`);
-  // The doorway's bundle observation can flip a few seconds after head, blob and version already
-  // agree (measured: 5s after the storage adoption), so the HTML entry is awaited inside the
-  // exact authority's own step budget (HTML_ENTRY_CONVERGENCE_MS is part of it) and then
-  // asserted unchanged below.
-  const htmlDeadlineAt = Date.now() + HTML_ENTRY_CONVERGENCE_MS;
-  let page = await getRaw(`${origin}${fresh(expected.mountPath)}`, {
+  const page = await getRaw(`${origin}${fresh(expected.mountPath)}`, {
     timeoutMs: RAW_FETCH_TIMEOUT_MS,
   });
-  while (
-    !(page.status === 200 && page.text.includes(expected.entryScript)) &&
-    Date.now() < htmlDeadlineAt
-  ) {
-    await new Promise(resolve => setTimeout(resolve, HTML_ENTRY_POLL_MS));
-    page = await getRaw(`${origin}${fresh(expected.mountPath)}`, {
-      timeoutMs: Math.max(1, Math.min(RAW_FETCH_TIMEOUT_MS, htmlDeadlineAt - Date.now())),
-    });
-  }
   assert.equal(page.status, 200, `${origin}: governed page answered ${page.status}`);
   assert.ok(
     page.text.includes(expected.entryScript),
@@ -453,10 +436,12 @@ async function lightweightAuthorityMismatch(
   const headUrl = origin + fresh(`/db/content/${encodedSlug}/head`);
   const contentUrl = origin + fresh(`/db/content/${encodedSlug}`);
   const versionUrl = origin + fresh(`/apps/${encodedBlobHash}/version.json`);
-  const [head, content, version] = await Promise.all([
+  const pageUrl = origin + fresh(expected.mountPath);
+  const [head, content, version, page] = await Promise.all([
     getRaw(headUrl, { timeoutMs }),
     getRaw(contentUrl, { timeoutMs }),
     getRaw(versionUrl, { timeoutMs }),
+    getRaw(pageUrl, { timeoutMs }),
   ]);
   if (head.status !== 200) return `head status ${head.status}`;
   if (content.status !== 200) return `content status ${content.status}`;
@@ -470,9 +455,16 @@ async function lightweightAuthorityMismatch(
   if (contentBody.blobHash !== expected.blobHash)
     return `content blob expected ${expected.blobHash}, observed ${contentBody.blobHash ?? 'absent'}`;
   const versionStamp = stampOf(version.text);
-  return versionStamp === expected.version
-    ? undefined
-    : `version expected ${expected.version}, observed ${versionStamp || 'absent'}`;
+  if (versionStamp !== expected.version)
+    return `version expected ${expected.version}, observed ${versionStamp || 'absent'}`;
+  // A visitor receives HTML, not head records: the doorway's bundle observation (declared tick
+  // 30s) can flip after head, blob and version already agree. That wait is part of "arrived
+  // through the survivor", so it is measured here, inside the stated adoption bound, and the
+  // exact reading afterwards stays a single uninterrupted pass.
+  if (page.status !== 200) return `served page status ${page.status}`;
+  if (!page.text.includes(expected.entryScript))
+    return `served page does not name entry script ${expected.entryScript}`;
+  return undefined;
 }
 
 async function assertExactPublishedSurface(
