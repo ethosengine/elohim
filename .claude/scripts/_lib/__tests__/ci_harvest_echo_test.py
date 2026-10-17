@@ -20,6 +20,8 @@ import importlib.util
 import json
 import re
 import sys
+import unittest
+from unittest.mock import patch
 from pathlib import Path
 
 here = Path(__file__).resolve()
@@ -106,3 +108,19 @@ check("deploy regex still catches CrashLoopBackOff", drx.search(CRASHLOOP))
 check("deploy regex still catches kubectl failure", drx.search("kubectl apply failed: connection refused"))
 
 print(f"ci_harvest_echo_test: {_passed} checks passed")
+
+
+class GenericFailureBannerTest(unittest.TestCase):
+    def test_banner_suppressed_with_sibling_but_kept_alone(self):
+        taxonomy = [("TEST_FAILURE", ["elohim-holochain"], re.compile("FAILED"), None)]
+        for tail, expected in (
+            ("DNA BUILD FAILED\nassertion FAILED", ["assertion FAILED"]),
+            ("DNA BUILD FAILED", ["DNA BUILD FAILED"]),
+        ):
+            with self.subTest(tail=tail), patch.object(
+                ci_harvest, "get_json", return_value={}
+            ), patch.object(ci_harvest, "get_console_tail", return_value=tail):
+                findings = ci_harvest.collect_build_findings(
+                    "elohim-holochain", 1440, taxonomy
+                )
+                self.assertEqual([f["display"] for f in findings], expected)
