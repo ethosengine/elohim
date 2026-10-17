@@ -430,6 +430,9 @@ mod tests {
     use diesel::prelude::*;
     use diesel::SqliteConnection;
 
+    // The skip counter is process-global; tests that read its delta must not interleave.
+    static SKIP_COUNTER_TEST_LOCK: std::sync::Mutex<()> = std::sync::Mutex::new(());
+
     // The canonical humans-projection scope (imagodei). `seed_human(.., APP)` seeds
     // rows the join (now hardcoded to this scope) will match. Content commitments
     // stay operating-scoped ("lamad"); only humans live under imagodei.
@@ -850,6 +853,9 @@ mod tests {
     /// write a transport-id provider. This is the core hole this task closes.
     #[test]
     fn run_salvage_pass_skips_authoring_when_agent_cid_unresolvable() {
+        let _serial = SKIP_COUNTER_TEST_LOCK
+            .lock()
+            .unwrap_or_else(|e| e.into_inner());
         let pool = test_pool();
         let mut conn = pool.get().unwrap();
         let now = chrono::Utc::now();
@@ -897,6 +903,9 @@ mod tests {
     /// the is_agent_cid gate refuses it, nothing is authored.
     #[test]
     fn run_salvage_pass_rejects_non_agent_cid_write_identity() {
+        let _serial = SKIP_COUNTER_TEST_LOCK
+            .lock()
+            .unwrap_or_else(|e| e.into_inner());
         let pool = test_pool();
         let mut conn = pool.get().unwrap();
         let now = chrono::Utc::now();
