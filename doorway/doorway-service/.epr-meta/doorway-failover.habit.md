@@ -32,6 +32,14 @@ retire-when: >
   declared head from the mesh directly. At that point "either doorway can die" is a
   statement about a component that no longer sits in the path.
 ---
+DELTA 2026-10-17f (RED preserved; apex transition passes 4/4 scenarios, 42/42 steps; fleet served-shell-boots, doorway-node-identity and delivery/client-resilience remain unmeasured).
+
+The two apex failures recorded in entry e were diagnosed as lane/fixture-class and fixed on the a2o side only: `bb9a28a73`, then its reviewed rework `8b74c89fa`. The household's staged dist carries no `/assets/config.json` (alpha mounts it from a ConfigMap; ConfigService falls back to DEFAULT_PROD_CONFIG on the 404). The first-visitor baseline now forgives that one 404 symmetrically: the sibling is forgiven only when the primary had it. Any other `/assets/*` 404 or a 5xx on config.json still fails; three negative unit tests were added.
+
+The served HTML naming the current entry script is now part of the ten-second bounded adoption predicate, `lightweightAuthorityMismatch`, where the story places all of a visitor's wait. The exact read stays a single uninterrupted pass. The first attempt hid a 20 s grace inside that exact read and was rejected in review on the story's own terms (`doorway-apex-transition.feature` lines 149–157); the reviewed rework keeps the ten-second deadline unchanged. In the failing run, the doorway's bundle observation trailed jessica's storage adoption by 4.6 s.
+
+`doorway-apex-transition.feature` passed 4/4 scenarios, 42/42 steps (`sprint-report-household-20261017T220556Z-bb9a28a7`). Scenario counts verified against that sprint-report JSON under `genesis/a2o/reports/`; step counts verified against matching `cucumber-mesh-20261017T220556Z-bb9a28a7.json`, excluding hidden hooks: all passed, none failed or skipped. The report records `bb9a28a73` with a dirty a2o tree, not a run at the later rework commit. This discharges the household apex-transition reading, not the remaining checks: `served-shell-boots.feature` on the fleet, `doorway-node-identity.feature` (recast scenario deliberately `@wip`) and `delivery/client-resilience.feature` remain unmeasured. `status: red` is unchanged.
+
 DELTA 2026-10-17e (RED preserved; fixture readiness and runtime endpoint pass; apex transition fails 2/4 scenarios; fleet shell, node identity and client resilience remain unmeasured).
 
 Household evidence at dev tip `89e96c740`, with storage and doorway built from `577b8fc5` source (operator-supplied runtime context). The new runs started at 21:49–21:51Z; the apex report was generated at 21:53:51Z. Scenario counts verified against the named sprint-report JSON under `genesis/a2o/reports/`, and step counts and exact failures against matching cucumber-mesh JSON, excluding hidden hooks.
