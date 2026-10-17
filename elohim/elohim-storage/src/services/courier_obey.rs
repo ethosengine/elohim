@@ -234,6 +234,25 @@ impl RefusalMemo {
         format!("{courier}\u{1}{id}\u{1}{hint}")
     }
 
+    /// Has this courier reached its refusal limit within the TTL? Decided
+    /// before any fetch, because it needs no declaration identity.
+    pub fn courier_suspended(&self, courier: &str, now: Instant) -> bool {
+        let Ok(mut inner) = self.inner.lock() else {
+            return false;
+        };
+        let ttl = self.ttl;
+        let Some(times) = inner.by_courier.get_mut(courier) else {
+            return false;
+        };
+        while times
+            .front()
+            .is_some_and(|t| now.saturating_duration_since(*t) >= ttl)
+        {
+            times.pop_front();
+        }
+        times.len() >= self.courier_limit as usize
+    }
+
     /// Skip this attempt? True when this exact triple was refused within the
     /// TTL, or the courier has reached its refusal limit within it.
     pub fn is_refused(&self, courier: &str, id: &str, hint: &str, now: Instant) -> bool {
@@ -469,6 +488,19 @@ pub async fn bytes_ready(
     ready
 }
 
+/// Identity of the declaration a courier carried: a digest of the signed
+/// election link record. A fresh declaration for the same head (new link, same
+/// action hash) has a different identity, so an earlier refusal never shadows it.
+fn declaration_id(link_record: &[u8]) -> String {
+    use sha2::{Digest, Sha256};
+    hex::encode(&Sha256::digest(link_record)[..8])
+}
+
+/// Memo hint: the head plus the declaration that carried it.
+fn memo_hint(doc_hint: &str, declaration: &str) -> String {
+    format!("{doc_hint}\u{2}{declaration}")
+}
+
 /// Ask `courier` for the evidence behind the head `doc_hint` names, verify it in
 /// the own conductor without committing anything, and — once the version's
 /// bytes are held here — stamp it under its election.
@@ -484,7 +516,7 @@ pub async fn courier_obey(
     courier: &str,
     doc_hint: &str,
 ) -> CourierOutcome {
-    if memo.is_refused(courier, id, doc_hint, Instant::now()) {
+    if memo.courier_suspended(courier, Instant::now()) {
         return CourierOutcome::Memoised;
     }
     if crate::services::head_adoption::held_by_release_channel(pool, ctx, id) {
@@ -507,6 +539,17 @@ pub async fn courier_obey(
         return CourierOutcome::NoEvidence;
     };
 
+    let declaration = declaration_id(&link_record);
+    let hint_key = memo_hint(doc_hint, &declaration);
+    if memo.is_refused(courier, id, &hint_key, Instant::now()) {
+        tracing::debug!(
+            target: "elohim_storage::head_adoption_trigger",
+            content_id = %id, courier = %courier, head = %doc_hint, declaration = %declaration,
+            "courier-obey: this declaration was refused within the TTL — skipped"
+        );
+        return CourierOutcome::Memoised;
+    }
+
     let verified = match verifier.verify(id, link_record, head_record).await {
         Ok(Some(v)) => v,
         Ok(None) => return CourierOutcome::NoWinner,
@@ -516,13 +559,20 @@ pub async fn courier_obey(
                 return CourierOutcome::VerifyUnavailable;
             }
             let no_standing = failure == VerifyFailure::NoStanding;
-            memo.remember(courier, id, doc_hint, Instant::now(), !no_standing);
+            memo.remember(courier, id, &hint_key, Instant::now(), !no_standing);
             if no_standing {
+                tracing::warn!(
+                    target: "elohim_storage::head_adoption_trigger",
+                    content_id = %id, courier = %courier, head = %doc_hint,
+                    declaration = %declaration, error = %e,
+                    "courier-obey: courier_no_standing — the own conductor found no authoring \
+                     standing for the carried declaration (full zome error attached)"
+                );
                 return CourierOutcome::NoStanding;
             }
             tracing::warn!(
                 target: "elohim_storage::head_adoption_trigger",
-                content_id = %id, courier = %courier, head = %doc_hint, error = %e,
+                content_id = %id, courier = %courier, head = %doc_hint, declaration = %declaration, error = %e,
                 "courier-obey: the own conductor REFUSED the courier's head evidence — \
                  remembered, not re-verified"
             );
@@ -684,6 +734,7 @@ pub(crate) mod tests {
     pub(crate) struct Courier {
         serves: &'static str,
         asked: AtomicUsize,
+        link: &'static [u8],
     }
 
     #[async_trait::async_trait]
@@ -694,7 +745,7 @@ pub(crate) mod tests {
                 head_action_hash: self.serves.to_string(),
                 record: Some(b"record".to_vec()),
                 record_absent_reason: None,
-                election_link_record: Some(b"link".to_vec()),
+                election_link_record: Some(self.link.to_vec()),
             })
         }
     }
@@ -703,6 +754,7 @@ pub(crate) mod tests {
         Courier {
             serves,
             asked: AtomicUsize::new(0),
+            link: b"link",
         }
     }
 
@@ -896,8 +948,67 @@ pub(crate) mod tests {
             run(&v, &f, &bytes(true), &m, &pool, HEAD_B).await,
             CourierOutcome::Memoised
         );
-        assert_eq!(f.asked.load(Ordering::SeqCst), 1);
+        // The declaration is only known once the evidence is carried, so the
+        // repeat is fetched again but never re-verified.
+        assert_eq!(f.asked.load(Ordering::SeqCst), 2);
         assert_eq!(v.calls.load(Ordering::SeqCst), 1);
+    }
+
+    #[tokio::test]
+    async fn a_no_standing_refusal_under_one_declaration_does_not_shadow_a_fresh_declaration() {
+        let pool = pool_with_row_at_a();
+        let v = verifier(Verdict::Refuses(
+            "verify_carried_head_evidence: declarer X holds no authoring standing over Y",
+        ));
+        let m = memo();
+        let mut a = courier(HEAD_B);
+        a.link = b"declaration-A";
+        let mut b = courier(HEAD_B);
+        b.link = b"declaration-B";
+        assert_eq!(
+            run(&v, &a, &bytes(true), &m, &pool, HEAD_B).await,
+            CourierOutcome::NoStanding
+        );
+        // (b) the same declaration within the TTL is still memoised
+        assert_eq!(
+            run(&v, &a, &bytes(true), &m, &pool, HEAD_B).await,
+            CourierOutcome::Memoised
+        );
+        assert_eq!(v.calls.load(Ordering::SeqCst), 1);
+        // (a) a different declaration, same content and head, re-verifies
+        assert_eq!(
+            run(&v, &b, &bytes(true), &m, &pool, HEAD_B).await,
+            CourierOutcome::NoStanding
+        );
+        assert_eq!(v.calls.load(Ordering::SeqCst), 2);
+    }
+
+    #[test]
+    fn declaration_identity_separates_links_and_is_stable() {
+        assert_eq!(declaration_id(b"x"), declaration_id(b"x"));
+        assert_ne!(declaration_id(b"x"), declaration_id(b"y"));
+        assert_ne!(memo_hint(HEAD_B, "a"), memo_hint(HEAD_B, "b"));
+    }
+
+    #[test]
+    fn no_standing_refusals_for_distinct_declarations_never_suspend_the_courier() {
+        let m = memo();
+        let now = Instant::now();
+        for i in 0..(COURIER_REFUSAL_LIMIT + 3) {
+            m.remember(
+                COURIER,
+                ID,
+                &memo_hint(HEAD_B, &format!("d{i}")),
+                now,
+                false,
+            );
+        }
+        assert!(!m.courier_suspended(COURIER, now));
+        for i in 0..COURIER_REFUSAL_LIMIT {
+            m.remember(COURIER, ID, &memo_hint(HEAD_B, &format!("e{i}")), now, true);
+        }
+        assert!(m.courier_suspended(COURIER, now));
+        assert!(!m.courier_suspended(COURIER, now + REFUSAL_TTL));
     }
 
     #[tokio::test]
