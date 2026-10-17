@@ -651,7 +651,8 @@ Given(
         `${doorway}: fresh head is neither absent nor the content's undeclared anchor fallback`
       );
       assert.ok(
-        projected.earned === false && projected.blobHash == null,
+        projected.earned === false &&
+          (projected.blobHash === null || projected.blobHash === undefined),
         `${doorway}: fresh record already carries a release (earned or bytes bound)`
       );
       assert.equal(
