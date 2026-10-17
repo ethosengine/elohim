@@ -32,6 +32,12 @@ retire-when: >
   declared head from the mesh directly. At that point "either doorway can die" is a
   statement about a component that no longer sits in the path.
 ---
+DELTA 2026-10-17d (RED preserved; channel isolation passes 18/18; client-resilience remains RED-FIRST, relay-addr-beacon and epr-app-package gates unrun, fleet served-shell-boots unread today).
+
+On the household, with conductors `hc-fork-96bcd2bee215-proof`, content_store hot-swapped at 08:5xZ, and storage rebuilt from `577b8fc5` and restarted, the first check in this atom, `epr-app-channel-isolation.feature`, passed 1/1 scenario and 18/18 steps (`sprint-report-household-20261017T210023Z-577b8fc5`). A stages and promotes, B stages beneath as the candidate, both names serve, the holon author promotes B, the candidate name answers 404 `no-candidate-staged`, and the public name follows B on both doorways. The candidate-election authority and bounded ordered-declaration hydration retry that close the lane are recorded in dataplane-convergence entry 2026-10-17g.
+
+`epr-app-deliverability.feature` passed 7/7 scenarios, 135/135 steps (`sprint-report-household-20261017T210210Z-577b8fc5`). Counts verified against both named reports under `genesis/a2o/reports/` and matching cucumber-mesh JSON, excluding hidden hooks; runtime setup is operator-supplied evidence. Client-resilience remains RED-FIRST; `relay-addr-beacon` and `epr-app-package` gates remain unrun; `served-shell-boots` on the fleet is unread today. No status change.
+
 DELTA 2026-10-17c (RED preserved; wave-3 channel isolation reaches 16/18 steps; deliverability 7/7 before and after the narrow-fix revert).
 
 Household evidence on conductors `hc-fork-96bcd2bee215-proof`, content_store hot-swapped at 08:5xZ, with storage rebuilt from the named source and restarted. Counts below were verified against reports under `genesis/a2o/reports/` and matching cucumber-mesh JSON, excluding hidden hooks; runtime diagnosis and the earlier 4/18 progression are operator-supplied.
