@@ -140,18 +140,19 @@ fn candidate_head_remaining_ms(deadline: tokio::time::Instant) -> u128 {
         .as_millis()
 }
 
-fn staging_candidate_for_projected_head(
-    projected_head_action: &str,
+/// The staging candidate declared by an ANSWERED local election.
+///
+/// The candidate channel takes its authority from the local election alone,
+/// never from the projected head: a candidate present is the declaration, a
+/// candidate absent (including an election with no candidate slot, or no
+/// election at all) is authoritative absence. The projected head may lag the
+/// election's winner (e.g. just after a promotion) and that lag says nothing
+/// about the candidate. The projected-head snapshot's own coherence guard is
+/// not this function's concern (see `anchorMatchesHead` on the head view).
+fn staging_candidate_from_answer(
     election: Option<crate::services::conductor_writes::CanonicalElectionWire>,
-) -> Result<Option<String>, String> {
-    let Some(election) = election else {
-        return Ok(None);
-    };
-    let actual_winner = election.winner_target.to_string();
-    if actual_winner != projected_head_action {
-        return Err(actual_winner);
-    }
-    Ok(election.staging_candidate.map(|hash| hash.to_string()))
+) -> Option<String> {
+    election.and_then(|election| election.staging_candidate.map(|hash| hash.to_string()))
 }
 
 fn exact_candidate_blob(
@@ -9165,7 +9166,6 @@ impl HttpServer {
     async fn resolve_staging_candidate(
         &self,
         content_id: &str,
-        projected_head_action: &str,
     ) -> (
         Option<String>,
         Option<String>,
@@ -9174,14 +9174,8 @@ impl HttpServer {
         let deadline =
             tokio::time::Instant::now() + crate::services::live_earned::LIVE_ELECTION_BUDGET;
         let (hc, election) = self.ask_local_election(content_id, deadline).await;
-        self.staging_candidate_from_election(
-            hc.as_ref(),
-            content_id,
-            projected_head_action,
-            &election,
-            deadline,
-        )
-        .await
+        self.staging_candidate_from_election(hc.as_ref(), content_id, &election, deadline)
+            .await
     }
 
     /// Put the ONE local-election ask a `/head` read makes for `content_id`
@@ -9252,15 +9246,17 @@ impl HttpServer {
         (Some(hc), election)
     }
 
-    /// The staging candidate beneath the projected head, derived from an
-    /// already-put local-election ask. An unanswered ask is `Unavailable`; a
-    /// winner other than the projected head is `Unavailable` too (the
-    /// candidate belongs to a head this row does not serve).
+    /// The staging candidate channel, derived from an already-put
+    /// local-election ask. Its authority is the LOCAL ELECTION alone, not the
+    /// projected head: an unanswered ask is `Unavailable`; an answered
+    /// election with a candidate is `Staged` (blob null while the bytes are
+    /// not yet verifiable locally = catching up, never `None`); an answered
+    /// election without one is `None`, whether or not the projection has
+    /// caught up to the election's winner.
     async fn staging_candidate_from_election(
         &self,
         hc: Option<&Arc<crate::hc_client::HcClient>>,
         content_id: &str,
-        projected_head_action: &str,
         election: &crate::services::live_earned::LocalElection,
         deadline: tokio::time::Instant,
     ) -> (
@@ -9275,21 +9271,7 @@ impl HttpServer {
         else {
             return (None, None, StagingCandidateState::Unavailable);
         };
-        let candidate = match staging_candidate_for_projected_head(
-            projected_head_action,
-            election.clone(),
-        ) {
-            Ok(candidate) => candidate,
-            Err(_actual_winner) => {
-                warn!(
-                        phase = "election_binding",
-                        outcome = "winner_mismatch",
-                        remaining_ms = candidate_head_remaining_ms(deadline),
-                        "head read: local election winner differs from projected head — reporting unavailable"
-                    );
-                return (None, None, StagingCandidateState::Unavailable);
-            }
-        };
+        let candidate = staging_candidate_from_answer(election.clone());
         let blob = match candidate.as_deref() {
             Some(action) => {
                 self.resolve_exact_candidate_blob(hc, content_id, action, deadline)
@@ -9697,15 +9679,11 @@ impl HttpServer {
                                     }
                                     (None, false) => (
                                         None,
-                                        self.resolve_staging_candidate(
-                                            content_id,
-                                            &view.head_action_hash,
-                                        )
-                                        .instrument(span)
-                                        .await,
+                                        self.resolve_staging_candidate(content_id)
+                                            .instrument(span)
+                                            .await,
                                     ),
                                     (None, true) => {
-                                        let head = view.head_action_hash.clone();
                                         async {
                                             let (hc, own) = self
                                                 .ask_local_election(content_id, live_deadline)
@@ -9714,7 +9692,6 @@ impl HttpServer {
                                                 .staging_candidate_from_election(
                                                     hc.as_ref(),
                                                     content_id,
-                                                    &head,
                                                     &own,
                                                     live_deadline,
                                                 )
@@ -22796,40 +22773,51 @@ mod candidate_head_state_tests {
         );
         let server = HttpServer::new(blob_store, "127.0.0.1:0".parse().unwrap());
 
-        let (candidate, blob, state) = server.resolve_staging_candidate("landing", WINNER).await;
+        let (candidate, blob, state) = server.resolve_staging_candidate("landing").await;
         assert_eq!(candidate, None);
         assert_eq!(blob, None);
         assert_eq!(state, StagingCandidateState::Unavailable);
     }
 
+    /// Four-state matrix: candidate present/absent x projection matches/lags.
+    /// The projected head is not an input, so the answer is identical either way.
     #[test]
-    fn candidate_election_must_belong_to_the_projected_winner() {
+    fn candidate_channel_takes_authority_from_the_election_alone() {
+        const LAGGING_PROJECTION_WINNER: &str = CANDIDATE;
+        for election_winner in [WINNER, LAGGING_PROJECTION_WINNER] {
+            assert_eq!(
+                staging_candidate_from_answer(Some(election(election_winner, Some(CANDIDATE))))
+                    .as_deref(),
+                Some(CANDIDATE),
+                "present candidate is staged whether the projection matches or lags"
+            );
+            assert_eq!(
+                staging_candidate_from_answer(Some(election(election_winner, None))),
+                None,
+                "absent candidate is authoritative none whether the projection matches or lags"
+            );
+        }
         assert_eq!(
-            staging_candidate_for_projected_head(WINNER, Some(election(WINNER, Some(CANDIDATE))))
-                .unwrap()
-                .as_deref(),
-            Some(CANDIDATE)
-        );
-        assert_eq!(
-            staging_candidate_for_projected_head(WINNER, None).unwrap(),
+            staging_candidate_from_answer(None),
             None,
-            "no local canonical election preserves the no-candidate response"
+            "an answered ask with no election preserves the no-candidate response"
         );
-        assert_eq!(
-            staging_candidate_for_projected_head(WINNER, Some(election(WINNER, None))).unwrap(),
-            None,
-            "the matching winner has no subordinate candidate after promotion"
-        );
+    }
 
-        let other_winner = CANDIDATE;
-        assert_eq!(
-            staging_candidate_for_projected_head(
-                WINNER,
-                Some(election(other_winner, Some(WINNER)))
-            ),
-            Err(other_winner.to_string()),
-            "a candidate beneath another winner must not be attached to the projected head"
-        );
+    /// Fixed lag: the projection stays on WINNER throughout while the election
+    /// goes absent -> candidate B -> promoted (winner B, absent).
+    #[test]
+    fn candidate_channel_follows_the_election_while_the_projection_lags() {
+        let sequence = [
+            election(WINNER, None),
+            election(WINNER, Some(CANDIDATE)),
+            election(CANDIDATE, None),
+        ];
+        let observed: Vec<Option<String>> = sequence
+            .into_iter()
+            .map(|e| staging_candidate_from_answer(Some(e)))
+            .collect();
+        assert_eq!(observed, vec![None, Some(CANDIDATE.to_string()), None]);
     }
 
     #[tokio::test]
