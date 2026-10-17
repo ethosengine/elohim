@@ -2013,8 +2013,8 @@ async fn async_main(
                                 tokio::spawn(async move {
                                     while let Some(signal) = authority_rx.recv().await {
                                         let result = if elohim_storage::rea_projection::requires_authenticated_head_projection(&signal) {
-                                            elohim_storage::rea_projection::handle_authenticated_content_head_signal(
-                                                signal, &worker_registry, &worker_pool, &worker_ctx,
+                                            elohim_storage::rea_projection::handle_authenticated_content_head_signal_with_retry(
+                                                signal, Arc::clone(&worker_registry), worker_pool.clone(), worker_ctx.clone(),
                                             ).await
                                         } else {
                                             elohim_storage::rea_projection::handle_authenticated_commitment_signal(

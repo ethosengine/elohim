@@ -441,6 +441,20 @@ lazy_static! {
     )
     .unwrap();
 
+    /// Outcomes of the ordered `ContentHeadDeclared` hydration worker
+    /// (`rea_projection::handle_authenticated_content_head_signal_with_retry`).
+    /// `outcome` is a closed set (see [`ContentHeadHydrationOutcome`]): a
+    /// commit/read-visibility race right after the authoring call used to WARN
+    /// once and leave the author's projected head on the previous version.
+    pub static ref CONTENT_HEAD_DECLARED_HYDRATION: IntCounterVec = IntCounterVec::new(
+        Opts::new(
+            "content_head_declared_hydration_total",
+            "Ordered ContentHeadDeclared hydration outcomes (retried|recovered|exhausted|mismatch|dropped).",
+        ),
+        &["outcome"],
+    )
+    .unwrap();
+
     /// Hold/Contest decisions downgraded to Author by the ghost-declaration
     /// decay arm (`head_adoption::ghost_decay_authorizes_author`) — each one is
     /// a phantom declaration (dead conductor incarnation) positively falsified
@@ -3262,6 +3276,12 @@ pub fn register_all() {
         let _ = REGISTRY.register(Box::new(VIEW_FEDERATION_OUTBOUND.clone()));
         let _ = REGISTRY.register(Box::new(VIEW_FEDERATION_INBOUND_SERVED.clone()));
         let _ = REGISTRY.register(Box::new(CONTENT_HEAD_RECORD_DEGRADED.clone()));
+        let _ = REGISTRY.register(Box::new(CONTENT_HEAD_DECLARED_HYDRATION.clone()));
+        for outcome in ContentHeadHydrationOutcome::ALL {
+            CONTENT_HEAD_DECLARED_HYDRATION
+                .with_label_values(&[outcome.label()])
+                .inc_by(0);
+        }
         // Pre-touch every degrade cause. `no_record` shipped UNCOUNTED until
         // 2026-08-03 and was the structural one; a series that only appears once
         // it fires cannot answer "is this class silent, or is it not measured?"
@@ -4470,6 +4490,47 @@ pub fn inc_view_federation_outbound(result: &str) {
 /// Record one inbound view-federation request answered with a signed slice.
 pub fn inc_view_federation_inbound_served() {
     VIEW_FEDERATION_INBOUND_SERVED.inc();
+}
+
+/// Closed label set of [`CONTENT_HEAD_DECLARED_HYDRATION`].
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum ContentHeadHydrationOutcome {
+    /// A failed attempt was scheduled for another try.
+    Retried,
+    /// A retry succeeded and the declaration projected.
+    Recovered,
+    /// Every scheduled attempt (or the deadline) was spent; the job was dropped.
+    Exhausted,
+    /// An attempt resolved a payload whose fields differed from the declaration.
+    Mismatch,
+    /// A retry was refused because the concurrent-retry cap was reached.
+    Dropped,
+}
+
+impl ContentHeadHydrationOutcome {
+    pub const ALL: [Self; 5] = [
+        Self::Retried,
+        Self::Recovered,
+        Self::Exhausted,
+        Self::Mismatch,
+        Self::Dropped,
+    ];
+
+    pub const fn label(self) -> &'static str {
+        match self {
+            Self::Retried => "retried",
+            Self::Recovered => "recovered",
+            Self::Exhausted => "exhausted",
+            Self::Mismatch => "mismatch",
+            Self::Dropped => "dropped",
+        }
+    }
+}
+
+pub fn inc_content_head_declared_hydration(outcome: ContentHeadHydrationOutcome) {
+    CONTENT_HEAD_DECLARED_HYDRATION
+        .with_label_values(&[outcome.label()])
+        .inc();
 }
 
 /// Why a `ContentHeadRecord` answer was served hash-only — the label vocabulary
