@@ -99,7 +99,7 @@ import { E2EWorld } from '../../src/framework/world.js';
 // each chapter keeping a private, unsynchronized capture store.
 import {
   primaryErrorsOutsideCorpusGap,
-  siblingWorseThanPrimary,
+  siblingErrorsOutsideCorpusGap,
 } from './apex-transition.compare.js';
 import { visitInBrowser, type BrowserVisit } from './epr-app-deliverability.helpers.js';
 import {
@@ -1454,18 +1454,16 @@ Then(
     // protocol, not the harness. The landing hero answers it for now with a click-to-load facade.
     // genesis/data/timeline/backlog/legacy-web-content-projected-inward.md
     assert.deepEqual(browser.failedRequests, [], 'sibling browser request failures');
-    // Held to the primary's own reading: only a /epr-head/ 404 the primary also had (the
+    // The same corpus-gap rule as the primary baseline (isCorpusGap): /epr-head/ 404s (the
     // landing's unseeded epic links, genesis/data/timeline/backlog/
-    // household-landing-links-unseeded-epics.md) is forgiven; every other error fails.
-    const worse = siblingWorseThanPrimary(
-      state.primaryBrowser?.httpErrors ?? [],
-      browser.httpErrors
-    );
+    // household-landing-links-unseeded-epics.md) and the /assets/config.json 404 are forgiven
+    // whether or not the primary's capture recorded them; every other error fails.
+    const worse = siblingErrorsOutsideCorpusGap(browser.httpErrors);
     const worseLine = worse.map(e => `${e.status} ${e.url}`).join(', ');
     assert.deepEqual(
       worse,
       [],
-      `sibling browser HTTP errors outside the /epr-head/ 404s the primary shared (${worseLine})`
+      `sibling browser HTTP errors outside the corpus-gap class (404 under /epr-head/, 404 on /assets/config.json) (${worseLine})`
     );
     assert.ok(browser.rootPresent, 'sibling browser saw no app-root');
     assert.ok(browser.bootstrapReady, 'sibling browser did not bootstrap its entry script');
@@ -1647,7 +1645,8 @@ Then(
         owner: state.siblingOwner,
         origin: state.siblingOrigin,
         publicName: state.authority.publicName,
-        probe: "the surviving doorway's own governed head, blob and addressed version",
+        probe:
+          "the surviving doorway's own governed head, blob, addressed version and served HTML naming the current entry script",
         publishedAt: published.authoredAt,
         expectedGovernedAction: published.authority.actionHash,
         previousGovernedAction: state.authorityA.authority.actionHash,
@@ -1678,7 +1677,10 @@ Then(
 
 Then(
   "doorway {string} serves authority B's exact head, blob, addressed version, HTML entry, and browser bootstrap",
-  { timeout: EXACT_AUTHORITY_TIMEOUT_MS + 10_000 },
+  // The ordinary public-name visit (resolvePublicName) reads the mount HTML once before the exact
+  // pass re-reads it: that eighth read is budgeted here, not reused, so the exact pass keeps its
+  // own cache-busted reads.
+  { timeout: EXACT_AUTHORITY_TIMEOUT_MS + RAW_FETCH_TIMEOUT_MS + 10_000 },
   async function (this: E2EWorld, survivingDoorway: string): Promise<void> {
     const state = getState(this);
     assert.ok(state.authorityA, 'authority A was not recorded before withdrawal');

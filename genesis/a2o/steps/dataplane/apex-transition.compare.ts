@@ -21,7 +21,7 @@ function pathOf(url: string): string {
  * The corpus-gap class: a 404 on `/epr-head/<slug>`, which every household
  * doorway returns alike for the landing's unseeded epic links
  * (genesis/data/timeline/backlog/household-landing-links-unseeded-epics.md).
- * The only error classes the sibling is forgiven for sharing with the primary: the `/epr-head/`
+ * The only error classes forgiven for either browser: the `/epr-head/`
  * 404s above, and a 404 on exactly `/assets/config.json` (see below).
  */
 export function isCorpusGap(e: HttpError): boolean {
@@ -30,7 +30,7 @@ export function isCorpusGap(e: HttpError): boolean {
   // `/assets/config.json` is supplied on alpha by a ConfigMap mount; the household stages the
   // dist as built, so every household doorway 404s it alike. ConfigService treats that 404 as
   // designed (catchError -> DEFAULT_PROD_CONFIG), so it is a household fixture gap, not a
-  // failover fact, and the sibling is forgiven it only when the primary had it too.
+  // failover fact, so both browsers are forgiven it whether or not a given capture recorded it.
   return path.startsWith('/epr-head/') || path === '/assets/config.json';
 }
 
@@ -44,15 +44,12 @@ export function primaryErrorsOutsideCorpusGap(primary: HttpError[]): HttpError[]
 }
 
 /**
- * HTTP errors the sibling's browser saw that are not a corpus gap the primary's
- * browser also had, compared by URL path + status so the two doorways' differing
- * origins do not count as a difference. Any other sibling error fails, even one
- * the primary shared. Returned URLs are paths.
+ * HTTP errors the sibling's browser saw outside the corpus-gap class, as paths. One rule
+ * (isCorpusGap) decides for both browsers. The sibling is forgiven the declared class whether or
+ * not the primary's capture recorded it: the primary may legitimately lack a corpus-gap 404 (the
+ * browser can serve /assets/config.json from cache on a repeat visit), and that absence is not a
+ * failover fact. Every other 404 and every 5xx still fails, even one the primary shared.
  */
-export function siblingWorseThanPrimary(primary: HttpError[], sibling: HttpError[]): HttpError[] {
-  const key = (e: HttpError): string => `${e.status} ${pathOf(e.url)}`;
-  const forgiven = new Set(primary.filter(isCorpusGap).map(key));
-  return sibling
-    .filter(e => !(isCorpusGap(e) && forgiven.has(key(e))))
-    .map(e => ({ status: e.status, url: pathOf(e.url) }));
+export function siblingErrorsOutsideCorpusGap(sibling: HttpError[]): HttpError[] {
+  return sibling.filter(e => !isCorpusGap(e)).map(e => ({ status: e.status, url: pathOf(e.url) }));
 }
