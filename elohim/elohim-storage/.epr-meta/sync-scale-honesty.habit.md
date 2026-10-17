@@ -8,7 +8,7 @@ invariant: >
 status: green
 active: false
 checks:
-  - "cargo test --test sync_scale_honesty -- --ignored (elohim/elohim-storage) — 2 scenarios: head-diff transfer + announce-on-change. The `--ignored` is load-bearing: the storage pre-push gate is `just gate` → `just test` → plain `cargo test`, which runs every tests/ target, so a standing red left in the default sweep would wedge the gate for everyone touching this crate. #[ignore] keeps both tests COMPILED on every gate run (no silent rot) and leaves execution to this check. Verified 2026-07-25: explicit run exits 101 (0 passed, 2 failed); default sweep exits 0 (2 ignored)."
+  - "cargo test --test p2p sync_scale_honesty -- --ignored (elohim/elohim-storage) — 2 scenarios: head-diff transfer + announce-on-change. The `--ignored` is load-bearing: the storage pre-push gate is `just gate` → `just test` → plain `cargo test`, which runs every tests/ target, so a standing red left in the default sweep would wedge the gate for everyone touching this crate. #[ignore] keeps both tests COMPILED on every gate run (no silent rot) and leaves execution to this check. Verified 2026-07-25: explicit run exits 101 (0 passed, 2 failed); default sweep exits 0 (2 ignored)."
 guard: >
   Regression risk = a second construction site for the opener. p2p/sync_round.rs
   must remain the ONLY constructor; tests/sync_libp2p_convergence.rs must call
@@ -22,6 +22,19 @@ retire-when: >
   when sync cost is bounded by a declared measure in the protocol itself — a peer refuses a
   plane whose cost class it cannot afford — rather than by our measuring it after the fact.
 ---
+DELTA 2026-10-18a (check target corrected; declared green now measured).
+Measured 2026-10-18 ~00:02Z in this worktree at HEAD 065bba3fd,
+elohim-storage warm build, toolchain 1.96.1,
+`CARGO_TARGET_DIR=/projects/.cargo-target-pool/family/land/elohim__elohim-storage/dev`.
+Corrected the declared command: sync_scale_honesty is a module in
+`tests/p2p/main.rs`, not a standalone test target.
+`cargo test --test p2p sync_scale_honesty -- --ignored` →
+`test result: ok. 2 passed; 0 failed`
+(`a_local_change_is_announced_to_connected_peers`,
+`the_round_opener_reflects_what_we_already_have`).
+The sole declared check is satisfied; status remains green.
+Log: `/tmp/claude-0/-projects-elohim/a405845c-b546-42b2-a18d-ce64c2ba0a50/scratchpad/hc-p2p.log`.
+
 GREEN 2026-07-27: `cargo test --test sync_scale_honesty -- --ignored` →
 2 passed, 0 failed. Cure = round_opener now emits
 ListDocumentsSince{corpus_digest} (p2p/sync_round.rs), so a converged

@@ -7,8 +7,8 @@ invariant: >
 status: red
 active: false
 checks:
-  - "cargo test --test binding_attribution_refuses_sentinel (elohim/elohim-storage — the admissibility decision: a sentinel is inadmissible AND a real cross-signature is admitted; no longer #[ignore]d, so it counts in the gate)"
-  - "cargo test --test binding_attribution_cut (elohim/elohim-storage — the same decision end-to-end through the projection: sentinel projects unverified, cross-signed projects cross_signed, Enforce admits only the proven peer and COUNTS the refusal, Observe is behaviour-preserving, a poisoned signature neither panics nor attributes, a lifted proof does not attach)"
+  - "cargo test --test rea binding_attribution_refuses_sentinel (elohim/elohim-storage — the admissibility decision: a sentinel is inadmissible AND a real cross-signature is admitted; no longer #[ignore]d, so it counts in the gate)"
+  - "cargo test --test rea binding_attribution_cut (elohim/elohim-storage — the same decision end-to-end through the projection: sentinel projects unverified, cross-signed projects cross_signed, Enforce admits only the proven peer and COUNTS the refusal, Observe is behaviour-preserving, a poisoned signature neither panics nor attributes, a lifted proof does not attach)"
   - "live: elohim_attribution_bindings_examined_total{posture=\"enforce\"} > 0 AND elohim_attribution_unverified_bindings_total{posture=\"enforce\"} == 0 on the alpha fleet — the flip-to-green measure, stated as a CONJUNCTION because the numerator alone cannot carry it. A bare zero is ambiguous between 'every binding examined was cross-signed' (the green) and 'no attribution join reached a binding' (silence), and MEASURED 2026-08-20 the live series is the second: max_over_time(...[7d]) == 0 across all 56 pod instances, and no posture=\"enforce\" series exists at all. Flipping the posture against the numerator alone would turn this habit green having verified nothing."
 first_move: >
   C2-S2 — the minting path. Storage signs the transport half locally (it
@@ -30,6 +30,21 @@ retire-when: >
   type itself carries the cross-signature — so no economic attribution can be constructed
   from a self-asserted one even by a caller trying to.
 ---
+DELTA 2026-10-18a (check targets corrected; Rust checks measured, live check outstanding).
+Measured 2026-10-18 ~00:02Z in this worktree at HEAD 065bba3fd,
+elohim-storage warm build, toolchain 1.96.1,
+`CARGO_TARGET_DIR=/projects/.cargo-target-pool/family/land/elohim__elohim-storage/dev`.
+Corrected both declared commands: binding_attribution_refuses_sentinel and
+binding_attribution_cut are modules in `tests/rea/main.rs`, not standalone targets.
+The combined run `cargo test --test rea binding_attribution` →
+`test result: ok. 13 passed; 0 failed`
+(binding_attribution_cut: 10; binding_attribution_refuses_sentinel: 3).
+Both Rust checks are satisfied. This evidence does not measure the alpha-fleet
+conjunction `elohim_attribution_bindings_examined_total{posture="enforce"} > 0`
+AND `elohim_attribution_unverified_bindings_total{posture="enforce"} == 0`.
+No status change; status remains red.
+Log: `/tmp/claude-0/-projects-elohim/a405845c-b546-42b2-a18d-ce64c2ba0a50/scratchpad/hc-rea.log`.
+
 DELTA 2026-08-28 (STAYS RED; first_move CORRECTED, not advanced). The
 first_move text below is stale: C2-S2 landed 2026-08-19 as
 p2p/binding_mint.rs (2aedf0947) — transport half signed with the libp2p

@@ -329,22 +329,27 @@ habits:
     status: red
     active: false
     checks:
-      - "cargo test --test binding_attribution_refuses_sentinel (elohim/elohim-storage — the admissibility decision: a sentinel is inadmissible AND a real cross-signature is admitted; no longer #[ignore]d, so it counts in the gate)"
-      - "cargo test --test binding_attribution_cut (elohim/elohim-storage — the same decision end-to-end through the projection: sentinel projects unverified, cross-signed projects cross_signed, Enforce admits only the proven peer and COUNTS the refusal, Observe is behaviour-preserving, a poisoned signature neither panics nor attributes, a lifted proof does not attach)"
+      - "cargo test --test rea binding_attribution_refuses_sentinel (elohim/elohim-storage — the admissibility decision: a sentinel is inadmissible AND a real cross-signature is admitted; no longer #[ignore]d, so it counts in the gate)"
+      - "cargo test --test rea binding_attribution_cut (elohim/elohim-storage — the same decision end-to-end through the projection: sentinel projects unverified, cross-signed projects cross_signed, Enforce admits only the proven peer and COUNTS the refusal, Observe is behaviour-preserving, a poisoned signature neither panics nor attributes, a lifted proof does not attach)"
       - "live: elohim_attribution_bindings_examined_total{posture=\"enforce\"} > 0 AND elohim_attribution_unverified_bindings_total{posture=\"enforce\"} == 0 on the alpha fleet — the flip-to-green measure, stated as a CONJUNCTION because the numerator alone cannot carry it. A bare zero is ambiguous between 'every binding examined was cross-signed' (the green) and 'no attribution join reached a binding' (silence), and MEASURED 2026-08-20 the live series is the second: max_over_time(...[7d]) == 0 across all 56 pod instances, and no posture=\"enforce\" series exists at all. Flipping the posture against the numerator alone would turn this habit green having verified nothing."
     evidence: >
-      DELTA 2026-08-28 (STAYS RED; first_move CORRECTED, not advanced). The
-      first_move text below is stale: C2-S2 landed 2026-08-19 as
-      p2p/binding_mint.rs (2aedf0947) — transport half signed with the libp2p
-      keypair, agent half via sign_for_agent, encode_proof, self-classified
-      cross_signed, spawned from main.rs, default-ON. The open rung is the
-      2026-08-20c one: read bindings_examined{enforce} on a deploy that carries
-      the counters (joins absent vs bindings absent), then decide the iroh
-      transport half under dual. Recorded as `epr flow note --kind correction`;
-      campaign spec ratchet-to-delivery-dataplane-sdk-lanes, lane P rung P8.
-    evidence-fingerprint: sha256:af41c6579c55e288
-    evidence-bytes: 4828
-    evidence-entries: 3
+      DELTA 2026-10-18a (check targets corrected; Rust checks measured, live check outstanding).
+      Measured 2026-10-18 ~00:02Z in this worktree at HEAD 065bba3fd,
+      elohim-storage warm build, toolchain 1.96.1,
+      `CARGO_TARGET_DIR=/projects/.cargo-target-pool/family/land/elohim__elohim-storage/dev`.
+      Corrected both declared commands: binding_attribution_refuses_sentinel and
+      binding_attribution_cut are modules in `tests/rea/main.rs`, not standalone targets.
+      The combined run `cargo test --test rea binding_attribution` →
+      `test result: ok. 13 passed; 0 failed`
+      (binding_attribution_cut: 10; binding_attribution_refuses_sentinel: 3).
+      Both Rust checks are satisfied. This evidence does not measure the alpha-fleet
+      conjunction `elohim_attribution_bindings_examined_total{posture="enforce"} > 0`
+      AND `elohim_attribution_unverified_bindings_total{posture="enforce"} == 0`.
+      No status change; status remains red.
+      Log: `/tmp/claude-0/-projects-elohim/a405845c-b546-42b2-a18d-ce64c2ba0a50/scratchpad/hc-rea.log`.
+    evidence-fingerprint: sha256:200c529ad13dd2e6
+    evidence-bytes: 5823
+    evidence-entries: 4
     first_move: >
       C2-S2 — the minting path. Storage signs the transport half locally (it
       owns the libp2p Keypair) and the agent half through the existing
@@ -377,12 +382,25 @@ habits:
     checks:
       - "a2o @concern:operator-runtime-surface (genesis/a2o/features/dataplane/operator-commitment-gated-verbs.feature — @wip DROPPED 2026-08-18 by operator decision: COUNTS in the edge Dataplane Validation byConcern rollup; also runnable locally with npx cucumber-js --tags '@concern:operator-runtime-surface')"
       - "a2o @concern:operator-runtime-surface effect station (genesis/a2o/features/dataplane/operator-commitment-gated-verbs.feature — the scenario named A verb success is a post-action observation, not the handler word: an accepted reconcile has an infrastructure:operator-effect row of phase post whose event id equals the verb attestation event id and whose observer is the peer sampler; a verb with no post row is listed by the compute dashboard as unverified-effect; @wip)"
-      - "cargo test --test operator_verbs (elohim/elohim-storage — 9 tests: holder accepted + attestation names grant cid AND recorded event id; no-grant refused; revoked refused; no verified performer refused; loopless peer honest 503 with no phantom rate charge; accepted use recorded bounded_by the grant; refusals record nothing; rate_per_hour ceiling refuses the over-limit use)"
+      - "cargo test --test api operator_verbs (elohim/elohim-storage — 9 tests: holder accepted + attestation names grant cid AND recorded event id; no-grant refused; revoked refused; no verified performer refused; loopless peer honest 503 with no phantom rate charge; accepted use recorded bounded_by the grant; refusals record nothing; rate_per_hour ceiling refuses the over-limit use)"
     evidence: >
-      DELTA 2026-09-25 (delegated compute via just measure, rung H — household stand-in, no offload proven): the compute-agreement chain ran end to end on the household under the sprint's code, six times, by the developer verb: measure-stage grant on jessica (uhCkk5djd…), work request, accept, execute under the ark envelope as UID 65534, complete with a CID-bound receipt, requester-side verification of the grant window + activation at startedAt and a minted compute-fulfilled event (observed.verified: true). Run 5 (04-doorway-serves, request uhCkka-xfWbXI3fMDOn0Ea6vVhBz4bsj-3xjoAt3gE_FQKV8d0uyx, receiptCid bafyreigeomsyi2hm2lww55w7vd5nz63ygffllfyfwmxwc6qjdymd4zyn2i) and run 6 (doorway-fixture-readiness, request uhCkkIbIARyZIZHRvEQeRfLtyUEcxlN_JleGU1cBfhpCXmMqkKZUF) PASSED with framed reports, durable copies and sprint-report-peer-stage-*.json; run 6's DELTA was written by the listener onto doorway-failover. Records: genesis/a2o/reports/compute-agreements-2026-09-25/rung-H-20260925T154700Z-run1.md, rung-H-20260925T155800Z-runs2-5.md. Skipped honestly: the brit validate ref (no brit-build-ref on this host) and the T2 admission leg. Status unchanged (green).
-    evidence-fingerprint: sha256:1ac914d695bac2c0
-    evidence-bytes: 17721
-    evidence-entries: 17
+      DELTA 2026-10-18a (check target corrected; Rust check measured, a2o checks outstanding).
+      Measured 2026-10-18 ~00:02Z in this worktree at HEAD 065bba3fd,
+      elohim-storage warm build, toolchain 1.96.1,
+      `CARGO_TARGET_DIR=/projects/.cargo-target-pool/family/land/elohim__elohim-storage/dev`.
+      Corrected the declared command: operator_verbs is a module in
+      `tests/api/main.rs`, not a standalone test target.
+      `cargo test --test api operator_verbs` →
+      `test result: ok. 9 passed; 0 failed`.
+      The Rust check is satisfied. This evidence does not measure either declared a2o
+      check: `@concern:operator-runtime-surface` or its effect station,
+      "A verb success is a post-action observation, not the handler word".
+      Earlier concern-run evidence remains in the ledger; no effect-station pass is
+      established here. No status change; status remains red.
+      Log: `/tmp/claude-0/-projects-elohim/a405845c-b546-42b2-a18d-ce64c2ba0a50/scratchpad/hc-api.log`.
+    evidence-fingerprint: sha256:a8877c13192f3895
+    evidence-bytes: 18650
+    evidence-entries: 18
     refs:
       - "task #10 (operator directive 2026-07-02)"
       - "elohim/elohim-storage/src/api/operator_verbs.rs (verb handler + kick) · doorway src/server/http.rs op_gate_capability/effective_op_gate_mode (per-verb gate) · seam-registry rows in both crates"
@@ -440,8 +458,21 @@ habits:
     status: green
     active: false
     checks:
-      - "cargo test --test sync_scale_honesty -- --ignored (elohim/elohim-storage) — 2 scenarios: head-diff transfer + announce-on-change. The `--ignored` is load-bearing: the storage pre-push gate is `just gate` → `just test` → plain `cargo test`, which runs every tests/ target, so a standing red left in the default sweep would wedge the gate for everyone touching this crate. #[ignore] keeps both tests COMPILED on every gate run (no silent rot) and leaves execution to this check. Verified 2026-07-25: explicit run exits 101 (0 passed, 2 failed); default sweep exits 0 (2 ignored)."
+      - "cargo test --test p2p sync_scale_honesty -- --ignored (elohim/elohim-storage) — 2 scenarios: head-diff transfer + announce-on-change. The `--ignored` is load-bearing: the storage pre-push gate is `just gate` → `just test` → plain `cargo test`, which runs every tests/ target, so a standing red left in the default sweep would wedge the gate for everyone touching this crate. #[ignore] keeps both tests COMPILED on every gate run (no silent rot) and leaves execution to this check. Verified 2026-07-25: explicit run exits 101 (0 passed, 2 failed); default sweep exits 0 (2 ignored)."
     evidence: >
+      DELTA 2026-10-18a (check target corrected; declared green now measured).
+      Measured 2026-10-18 ~00:02Z in this worktree at HEAD 065bba3fd,
+      elohim-storage warm build, toolchain 1.96.1,
+      `CARGO_TARGET_DIR=/projects/.cargo-target-pool/family/land/elohim__elohim-storage/dev`.
+      Corrected the declared command: sync_scale_honesty is a module in
+      `tests/p2p/main.rs`, not a standalone test target.
+      `cargo test --test p2p sync_scale_honesty -- --ignored` →
+      `test result: ok. 2 passed; 0 failed`
+      (`a_local_change_is_announced_to_connected_peers`,
+      `the_round_opener_reflects_what_we_already_have`).
+      The sole declared check is satisfied; status remains green.
+      Log: `/tmp/claude-0/-projects-elohim/a405845c-b546-42b2-a18d-ce64c2ba0a50/scratchpad/hc-p2p.log`.
+
       GREEN 2026-07-27: `cargo test --test sync_scale_honesty -- --ignored` →
       2 passed, 0 failed. Cure = round_opener now emits
       ListDocumentsSince{corpus_digest} (p2p/sync_round.rs), so a converged
@@ -461,9 +492,9 @@ habits:
       silently — the default sweep reports it "ignored", proving nothing, so it
       must be run explicitly after any automerge move.
       HELD 2026-08-08: T5 digest rollout stays default-off and abstains while any distribution-safe row lacks a DHT witness; focused lib filters passed (4 digest + 1 requester-gate + 6 responder-inventory tests, 0 failed).
-    evidence-fingerprint: sha256:3af0534d1a3a290c
-    evidence-bytes: 1368
-    evidence-entries: 0
+    evidence-fingerprint: sha256:3511a1374249d371
+    evidence-bytes: 2114
+    evidence-entries: 1
     guard: >
       Regression risk = a second construction site for the opener. p2p/sync_round.rs
       must remain the ONLY constructor; tests/sync_libp2p_convergence.rs must call

@@ -11,7 +11,7 @@ active: false
 checks:
   - "a2o @concern:operator-runtime-surface (genesis/a2o/features/dataplane/operator-commitment-gated-verbs.feature — @wip DROPPED 2026-08-18 by operator decision: COUNTS in the edge Dataplane Validation byConcern rollup; also runnable locally with npx cucumber-js --tags '@concern:operator-runtime-surface')"
   - "a2o @concern:operator-runtime-surface effect station (genesis/a2o/features/dataplane/operator-commitment-gated-verbs.feature — the scenario named A verb success is a post-action observation, not the handler word: an accepted reconcile has an infrastructure:operator-effect row of phase post whose event id equals the verb attestation event id and whose observer is the peer sampler; a verb with no post row is listed by the compute dashboard as unverified-effect; @wip)"
-  - "cargo test --test operator_verbs (elohim/elohim-storage — 9 tests: holder accepted + attestation names grant cid AND recorded event id; no-grant refused; revoked refused; no verified performer refused; loopless peer honest 503 with no phantom rate charge; accepted use recorded bounded_by the grant; refusals record nothing; rate_per_hour ceiling refuses the over-limit use)"
+  - "cargo test --test api operator_verbs (elohim/elohim-storage — 9 tests: holder accepted + attestation names grant cid AND recorded event id; no-grant refused; revoked refused; no verified performer refused; loopless peer honest 503 with no phantom rate charge; accepted use recorded bounded_by the grant; refusals record nothing; rate_per_hour ceiling refuses the over-limit use)"
 refs:
   - "task #10 (operator directive 2026-07-02)"
   - "elohim/elohim-storage/src/api/operator_verbs.rs (verb handler + kick) · doorway src/server/http.rs op_gate_capability/effective_op_gate_mode (per-verb gate) · seam-registry rows in both crates"
@@ -23,6 +23,21 @@ retire-when: >
   settings surface on a released steward build, with no developer-shaped tool in the path.
   The habit then describes a product, not a practice.
 ---
+DELTA 2026-10-18a (check target corrected; Rust check measured, a2o checks outstanding).
+Measured 2026-10-18 ~00:02Z in this worktree at HEAD 065bba3fd,
+elohim-storage warm build, toolchain 1.96.1,
+`CARGO_TARGET_DIR=/projects/.cargo-target-pool/family/land/elohim__elohim-storage/dev`.
+Corrected the declared command: operator_verbs is a module in
+`tests/api/main.rs`, not a standalone test target.
+`cargo test --test api operator_verbs` →
+`test result: ok. 9 passed; 0 failed`.
+The Rust check is satisfied. This evidence does not measure either declared a2o
+check: `@concern:operator-runtime-surface` or its effect station,
+"A verb success is a post-action observation, not the handler word".
+Earlier concern-run evidence remains in the ledger; no effect-station pass is
+established here. No status change; status remains red.
+Log: `/tmp/claude-0/-projects-elohim/a405845c-b546-42b2-a18d-ce64c2ba0a50/scratchpad/hc-api.log`.
+
 DELTA 2026-09-25 (delegated compute via just measure, rung H — household stand-in, no offload proven): the compute-agreement chain ran end to end on the household under the sprint's code, six times, by the developer verb: measure-stage grant on jessica (uhCkk5djd…), work request, accept, execute under the ark envelope as UID 65534, complete with a CID-bound receipt, requester-side verification of the grant window + activation at startedAt and a minted compute-fulfilled event (observed.verified: true). Run 5 (04-doorway-serves, request uhCkka-xfWbXI3fMDOn0Ea6vVhBz4bsj-3xjoAt3gE_FQKV8d0uyx, receiptCid bafyreigeomsyi2hm2lww55w7vd5nz63ygffllfyfwmxwc6qjdymd4zyn2i) and run 6 (doorway-fixture-readiness, request uhCkkIbIARyZIZHRvEQeRfLtyUEcxlN_JleGU1cBfhpCXmMqkKZUF) PASSED with framed reports, durable copies and sprint-report-peer-stage-*.json; run 6's DELTA was written by the listener onto doorway-failover. Records: genesis/a2o/reports/compute-agreements-2026-09-25/rung-H-20260925T154700Z-run1.md, rung-H-20260925T155800Z-runs2-5.md. Skipped honestly: the brit validate ref (no brit-build-ref on this host) and the T2 admission leg. Status unchanged (green).
 
 DELTA 2026-09-11 (correction to the 2026-09-10 delta below; no status change): the SUBSCRIBERS-0 cause named
