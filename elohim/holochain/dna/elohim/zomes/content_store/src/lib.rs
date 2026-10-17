@@ -3541,6 +3541,17 @@ mod canonical_tag_tier_tests {
     }
 
     #[test]
+    fn a_root_not_yet_held_is_unavailable_evidence_not_a_standing_verdict() {
+        // verify_carried_head_evidence itself needs HDK host calls (Local gets);
+        // the refusal text it returns for an absent root is pure and checked here.
+        let msg = canonical_root_not_held_message("verify_carried_head_evidence", "doc-1");
+        assert!(msg.contains(CANONICAL_ROOT_NOT_HELD));
+        assert!(msg.contains("canonical root not yet held for 'doc-1'"));
+        assert!(!msg.contains("holds no authoring standing"));
+        assert!(!msg.contains(LINEAGE_NOT_HELD));
+    }
+
+    #[test]
     fn canonical_tag_tier_refuses_non_declaration_tags() {
         // An unrecognized tag is a REFUSAL, never a default tier — an ordinary
         // IdToContent link must not read as a declaration.
@@ -7086,6 +7097,17 @@ fn prove_carried_declaration(
 /// not remember as a verdict on the evidence.
 pub const LINEAGE_NOT_HELD: &str = "lineage-not-held";
 
+/// Marker in [`verify_carried_head_evidence`]'s refusal when this conductor holds
+/// no canonical root for the id yet — unavailable evidence, not a verdict. A held
+/// root that disagrees, or an unauthorized declarer, stays "holds no authoring
+/// standing".
+pub const CANONICAL_ROOT_NOT_HELD: &str = "canonical-root-not-held";
+
+/// The refusal text for a canonical root this conductor does not hold yet.
+fn canonical_root_not_held_message(caller: &str, id: &str) -> String {
+    format!("{caller}: {CANONICAL_ROOT_NOT_HELD}: canonical root not yet held for '{id}'")
+}
+
 /// Input for [`verify_carried_head_evidence`].
 #[derive(Serialize, Deserialize, Debug)]
 pub struct VerifyCarriedHeadEvidenceInput {
@@ -7183,7 +7205,16 @@ pub fn verify_carried_head_evidence(
     // Authority is over the immutable first root advertised for this id, not
     // any root an attacker can later add (or make appear first by deleting the
     // legitimate root's live index link).
-    let identity_root = canonical_identity_root(id, GetStrategy::Local)?;
+    //
+    // No locally held root at all is unavailable evidence (the root or its index
+    // link has not integrated here yet), not a verdict: refuse with a retryable
+    // marker. A held root that disagrees with the version's root still falls
+    // through to the standing refusal below.
+    let identity_root = canonical_identity_root(id, GetStrategy::Local)?.ok_or_else(|| {
+        wasm_error!(WasmErrorInner::Guest(canonical_root_not_held_message(
+            CALLER, id
+        )))
+    })?;
     let version_root: Option<Record> = match &record.action().data {
         ActionData::Update(update) => {
             match correction::resolve_root_create(
@@ -7204,28 +7235,21 @@ pub fn verify_carried_head_evidence(
         _ => Some(record.clone()),
     };
     let root = version_root.filter(|root| {
-        is_content_root_for(root, id)
-            && identity_root
-                .as_ref()
-                .is_some_and(|identity| identity.action_address() == root.action_address())
+        is_content_root_for(root, id) && identity_root.action_address() == root.action_address()
     });
     let version_author = record.action().author().clone();
     let root_author = root.as_ref().map(|r| r.action().author().clone());
     let delegated = match (&root_author, delegation_from_tag(&declaration.tag)) {
-        (Some(root), Some(grant)) if &declaration.declarer != root => {
-            identity_root.as_ref().is_some_and(|identity| {
-                verify_accepted_head(
-                    &grant,
-                    &declaration.declarer,
-                    root,
-                    id,
-                    identity.action_address(),
-                    &target,
-                    GetStrategy::Local,
-                )
-                .is_ok()
-            })
-        }
+        (Some(root), Some(grant)) if &declaration.declarer != root => verify_accepted_head(
+            &grant,
+            &declaration.declarer,
+            root,
+            id,
+            identity_root.action_address(),
+            &target,
+            GetStrategy::Local,
+        )
+        .is_ok(),
         _ => false,
     };
     if !holds_authoring_standing(

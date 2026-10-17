@@ -364,6 +364,7 @@ fn classify_verify_failure(e: &StorageError) -> VerifyFailure {
     if crate::conductor_admission::is_admission_shed(e)
         || !msg.contains("verify_carried_head_evidence:")
         || msg.contains("lineage-not-held")
+        || msg.contains("canonical-root-not-held")
     {
         VerifyFailure::Unavailable
     } else if msg.contains("holds no authoring standing") {
@@ -1034,6 +1035,7 @@ pub(crate) mod tests {
         for msg in [
             "Conductor error: websocket closed",
             "verify_carried_head_evidence: lineage-not-held: the lineage of X is not fully held here yet",
+            "verify_carried_head_evidence: canonical-root-not-held: canonical root not yet held for 'X'",
         ] {
             let v = verifier(Verdict::Refuses(msg));
             let outcome = run(&v, &courier(HEAD_B), &bytes(true), &m, &pool, HEAD_B).await;

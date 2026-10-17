@@ -4505,6 +4505,132 @@ async fn carried_head_evidence_admits_only_an_authors_own_election() -> Result<(
     Ok(())
 }
 
+/// A receiver that does not yet hold the canonical root has no verdict to give:
+/// the verifier answers with the retryable `canonical-root-not-held` marker, not
+/// the standing refusal storage memoises. Once the root and its index link have
+/// integrated, the SAME carried declaration verifies. A receiver that holds a
+/// DIFFERENT root for the id still refuses for want of authoring standing.
+#[tokio::test(flavor = "multi_thread")]
+async fn carried_head_evidence_without_a_held_root_is_unavailable_not_unauthorized() -> Result<()> {
+    let [(mut c1, a1), (mut c2, a2)] = two_agent_conductors_isolated().await?;
+    let dna = load_dna(DNA, &network_seed(DNA), Some(a1.clone())).await?;
+    let app1 = c1
+        .setup_app_for_agent("lamad-app", a1, &[dna.clone()])
+        .await?;
+    let app2 = c2.setup_app_for_agent("lamad-app", a2, &[dna]).await?;
+    let cell1 = app1.cells().first().unwrap().clone();
+    let cell2 = app2.cells().first().unwrap().clone();
+    let zome1 = cell1.zome("content_store");
+    let zome2 = cell2.zome("content_store");
+
+    // The author's declaration for a version of its own root, made while the
+    // receiver is genuinely isolated.
+    let declare = |id: String| {
+        let (c1, zome1) = (&c1, &zome1);
+        async move {
+            let root: ContentOutput = c1.call(zome1, "create_content", test_content(&id)).await;
+            let version: ContentOutput = c1
+                .call(
+                    zome1,
+                    "update_content",
+                    UpdateContentInput {
+                        id: id.clone(),
+                        title: Some("Version B".to_string()),
+                    },
+                )
+                .await;
+            let _: ContentHeadOutput = c1
+                .call(
+                    zome1,
+                    "declare_canonical_content_head",
+                    DeclareCanonicalHeadInput {
+                        id: id.clone(),
+                        head_action_hash: ActionHashB64::from(version.action_hash.clone())
+                            .to_string(),
+                    },
+                )
+                .await;
+            let evidence: Option<CanonicalElectionEvidenceOutput> = c1
+                .call(zome1, "get_canonical_election_evidence", id.clone())
+                .await;
+            let evidence = evidence.expect("the author serves its own election");
+            let record = await_record(c1, zome1, &version.action_hash, "the author").await;
+            (root, version, evidence.link_record, record)
+        }
+    };
+    let call_verify = |id: String, link: Record, head: Record| {
+        let (c2, zome2) = (&c2, &zome2);
+        async move {
+            let r: std::result::Result<Option<CarriedHeadEvidenceOutput>, _> = c2
+                .call_fallible(
+                    zome2,
+                    "verify_carried_head_evidence",
+                    VerifyCarriedHeadEvidenceInput {
+                        id,
+                        link_record: link,
+                        head_record: head,
+                    },
+                )
+                .await;
+            r
+        }
+    };
+
+    // (a) No root evidence at all: unavailable, never a standing verdict.
+    let id = unique_id("carried-root-absent");
+    let (_root, version, link, record) = declare(id.clone()).await;
+    let absent = call_verify(id.clone(), link.clone(), record.clone()).await;
+    let err = format!("{:?}", absent.expect_err("an absent root cannot verify"));
+    assert!(
+        err.contains("canonical-root-not-held"),
+        "refused as unavailable evidence: {err}"
+    );
+    assert!(
+        !err.contains("authoring standing"),
+        "an absent root is not a standing verdict: {err}"
+    );
+
+    // (b) A receiver holding a DIFFERENT root for the id is a verdict.
+    let contested = unique_id("carried-root-contested");
+    let (_croot, _cversion, clink, crecord) = declare(contested.clone()).await;
+    let _competing: ContentOutput = c2
+        .call(&zome2, "create_content", test_content(&contested))
+        .await;
+    let mismatch = call_verify(contested.clone(), clink, crecord).await;
+    let err = format!(
+        "{:?}",
+        mismatch.expect_err("a held competing root must not verify the declaration")
+    );
+    assert!(
+        err.contains("authoring standing") && !err.contains("canonical-root-not-held"),
+        "a held, disagreeing root is a standing refusal: {err}"
+    );
+
+    // (c) Root and index evidence integrate; the SAME declaration now verifies.
+    tokio::time::timeout(Duration::from_secs(30), async {
+        while !SweetConductor::exchange_peer_info([&c1, &c2]).await {
+            sleep(Duration::from_millis(50)).await;
+        }
+    })
+    .await?;
+    await_consistency_s(60, [&cell1, &cell2])
+        .await
+        .map_err(|e| anyhow::anyhow!("root evidence did not integrate: {e}"))?;
+    await_resolves(&c2, &zome2, &id, "the receiver").await;
+    let verified = call_verify(id.clone(), link, record)
+        .await
+        .map_err(|e| anyhow::anyhow!("same declaration must verify once the root is held: {e:?}"))?
+        .expect("the author's election has a winner");
+    assert_eq!(
+        verified
+            .head
+            .expect("the carried version is the proven head")
+            .head_action_hash,
+        version.action_hash
+    );
+    Ok(())
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 struct HeadAcceptanceMirror {
     head_action_hash: ActionHash,
