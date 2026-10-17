@@ -622,21 +622,24 @@ impl EprRouter {
     /// conductor's post-commit signal, not the HTTP write that cancelled the
     /// contract — it can lag the cancel by tens of seconds. In that window, this
     /// doorway's own periodic refresh (`DOORWAY_EPR_REFRESH_SECS`) can already
-    /// see the primary's honest, successful, EMPTY answer (the cancel landed on
-    /// THIS doorway's own storage) and fall back to a sibling doorway whose
-    /// storage hasn't caught up yet — resurrecting the very row the primary just
-    /// omitted. A primary's own successful (2xx) answer that omits an id it
-    /// previously listed IS authoritative revocation evidence; it must not wait on
-    /// the SSE.
+    /// see the primary's honest, successful answer that omits the cancelled row
+    /// (the cancel landed on THIS doorway's own storage). A primary's successful
+    /// (2xx) NON-EMPTY answer that omits an id it previously listed IS
+    /// authoritative revocation evidence; it must not wait on the SSE. An EMPTY
+    /// successful answer is no verdict on any row and never shields (see the
+    /// `PeerServed` arm of `install_from_fallback`).
     ///
-    /// Call ONLY when the primary answered successfully (2xx) — pass an empty set
-    /// for a successful-but-empty (or wholly poisoned, per `batch_has_installable_row`'s
-    /// doc) answer. NEVER call this for a primary ERROR/timeout: that is exactly the
-    /// resilience case the pool fallback exists for (a primary wiped/unreachable
+    /// Call ONLY when the primary answered successfully (2xx) with a NON-EMPTY set.
+    /// An empty answer (successful-but-empty, or wholly poisoned per
+    /// `batch_has_installable_row`'s doc) is no verdict on any row, so `PeerServed`
+    /// never passes one here. `AllEmpty`'s successful-empty primary is the one path
+    /// that still passes an empty set, arming the shield for every row it had listed
+    /// (see that arm). NEVER call this for a primary ERROR/timeout: that is exactly
+    /// the resilience case the pool fallback exists for (a primary wiped/unreachable
     /// while peers still hold the routes), and marking anything revoked there would
-    /// defeat it — the caller (`install_from_fallback`) gates every call site on
-    /// `primary_empty` (true = successful-empty, false = errored) for exactly this
-    /// reason.
+    /// defeat it — the caller (`install_from_fallback`) gates every call site on the
+    /// primary having answered (`PrimaryNonEmpty`, or `AllEmpty` with `primary_empty`
+    /// true) for exactly this reason.
     ///
     /// An id that was never primary-sourced (only ever installed via a peer echo)
     /// is untouched: it isn't in `primary_sourced_ids` to begin with, so it can
@@ -730,7 +733,8 @@ impl EprRouter {
                 // `primary_empty == true` (answered nothing installable — e.g. shaded
                 // with `project-epr`) and `primary_empty == false` (errored/timed out)
                 // are both "no verdict": the primary says nothing about those ids, so
-                // the pool batch below must install, not be treated as revoked. The
+                // the pool batch below is offered for installation; existing shields
+                // (`revoked_recently`) still filter it. On `primary_empty` the
                 // primary-sourced tracking is forgotten (not revoked) so a later
                 // non-empty answer diffs against nothing stale.
                 if primary_empty {
@@ -754,9 +758,10 @@ impl EprRouter {
                 primary_empty,
             } => {
                 // Genuine empty state — every pool member returned 0 rows. Replace with
-                // an honest empty table. Shield only when the PRIMARY itself was the
-                // successful-empty answer (never on a primary error, even if a later
-                // pool member happened to answer empty too) — same rule as `PeerServed`.
+                // an honest empty table. Unlike `PeerServed`, a successful-empty PRIMARY
+                // is treated here as omitting every row it listed: `primary_empty == true`
+                // arms the shield for every primary-sourced id, then forgets them. Never
+                // on a primary error, even if a later pool member answered empty too.
                 if primary_empty {
                     self.shield_primary_omissions(&HashSet::new());
                 }
