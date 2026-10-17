@@ -62,10 +62,14 @@ pub(crate) fn is_stale_anchor_error(err: &StorageError) -> bool {
 /// minutes — they stay with the re-anchor backfill, marked locally authored.
 pub(crate) const INLINE_ROOT_NOTARIZE_MAX: usize = 16;
 
-/// Per-row bound on an inline root notarization. On elapse the row keeps its
-/// Diesel-only write and the backfill roots it later.
-pub(crate) const INLINE_ROOT_NOTARIZE_TIMEOUT: std::time::Duration =
-    std::time::Duration::from_secs(30);
+/// Aggregate wall-clock budget for all inline root notarizations in one bulk
+/// request; kept below the doorway's 12 s POST forward deadline so the request
+/// answers in time. Rows past it stay with the re-anchor backfill.
+pub(crate) const INLINE_ROOT_BUDGET_MS: u64 = 8_000;
+
+/// Bound on a single inline conductor root call (further clamped to the
+/// remaining aggregate budget). On elapse the row keeps its Diesel-only write.
+pub(crate) const INLINE_ROOT_PER_CALL_MS: u64 = 4_000;
 
 /// Prefix of the refusal a heal-class write returns for a row this peer did
 /// not author. Callers pre-filter, so reaching it means a race, not a loop.
@@ -110,34 +114,53 @@ pub(crate) fn empty_update_view() -> crate::views::UpdateContentInputView {
 
 /// Root each freshly authored id, THEN announce — the author-side ordering of
 /// [`ContentService::bulk_create_and_notarize`], lifted out so it is testable
-/// without a conductor. A batch over [`INLINE_ROOT_NOTARIZE_MAX`] skips the
-/// inline roots (the backfill owns them); a failed root is logged and left to
-/// the backfill. The announcement always happens, exactly once.
+/// without a conductor. Rows are rooted in order while the aggregate `budget`
+/// remains (checked before each call; each call is bounded by
+/// [`INLINE_ROOT_PER_CALL_MS`] and the remaining budget), at most
+/// [`INLINE_ROOT_NOTARIZE_MAX`]. On exhaustion or any error rooting stops and
+/// the rest is left to the backfill (rows stay marked locally authored). The
+/// announcement always happens, exactly once.
 pub(crate) async fn notarize_roots_then_announce<F, Fut>(
     authored: &[String],
+    budget: std::time::Duration,
     mut notarize: F,
     announce: impl FnOnce(),
 ) where
     F: FnMut(String) -> Fut,
     Fut: std::future::Future<Output = Result<(), StorageError>>,
 {
-    if authored.len() <= INLINE_ROOT_NOTARIZE_MAX {
-        for id in authored {
-            if let Err(e) = notarize(id.clone()).await {
+    let deadline = tokio::time::Instant::now() + budget;
+    let per_call = std::time::Duration::from_millis(INLINE_ROOT_PER_CALL_MS);
+    let mut rooted_inline = 0usize;
+    for id in authored.iter().take(INLINE_ROOT_NOTARIZE_MAX) {
+        let remaining = deadline.saturating_duration_since(tokio::time::Instant::now());
+        if remaining.is_zero() {
+            break;
+        }
+        let bound = remaining.min(per_call);
+        let outcome = match tokio::time::timeout(bound, notarize(id.clone())).await {
+            Ok(r) => r,
+            Err(_) => Err(StorageError::Timeout(format!(
+                "root notarization for {id} exceeded {bound:?}"
+            ))),
+        };
+        match outcome {
+            Ok(()) => rooted_inline += 1,
+            Err(e) => {
                 tracing::warn!(
                     content_id = %id, error = %e,
                     "bulk create: the author's root was not notarized before announcement; \
                      the re-anchor backfill roots it (the row is marked locally authored)"
                 );
+                break;
             }
         }
-    } else {
-        tracing::info!(
-            authored = authored.len(),
-            max = INLINE_ROOT_NOTARIZE_MAX,
-            "bulk create: batch too large to root inline; the re-anchor backfill roots it"
-        );
     }
+    tracing::info!(
+        rooted_inline,
+        left_to_backfill = authored.len() - rooted_inline,
+        "bulk create: inline roots done; the re-anchor backfill roots the rest"
+    );
     announce();
 }
 
@@ -371,7 +394,7 @@ impl ContentService {
     /// author holding its root.
     ///
     /// Bounded: only a batch of at most [`INLINE_ROOT_NOTARIZE_MAX`] fresh rows
-    /// is notarized inline, each under [`INLINE_ROOT_NOTARIZE_TIMEOUT`]. A larger
+    /// is notarized inline, within the [`INLINE_ROOT_BUDGET_MS`] aggregate budget. A larger
     /// seed batch, a failed notarization, or no conductor (`hc = None`) keeps
     /// today's Diesel-only write; the rows stay marked locally authored, so the
     /// re-anchor backfill roots them later. HTTP shapes are unchanged.
@@ -386,26 +409,19 @@ impl ContentService {
             Some(hc) => {
                 notarize_roots_then_announce(
                     &roots,
+                    std::time::Duration::from_millis(INLINE_ROOT_BUDGET_MS),
                     |id| async move {
-                        match tokio::time::timeout(
-                            INLINE_ROOT_NOTARIZE_TIMEOUT,
-                            self.update_via_conductor(
-                                hc,
-                                &id,
-                                empty_update_view(),
-                                // The same write the backfill would make for
-                                // this row: a heal-class root, not a head
-                                // declaration (a release declares its own).
-                                content_diesel::HeadElection::PreserveExistingDeclaration,
-                            ),
+                        self.update_via_conductor(
+                            hc,
+                            &id,
+                            empty_update_view(),
+                            // The same write the backfill would make for
+                            // this row: a heal-class root, not a head
+                            // declaration (a release declares its own).
+                            content_diesel::HeadElection::PreserveExistingDeclaration,
                         )
                         .await
-                        {
-                            Ok(written) => written.map(|_| ()),
-                            Err(_) => Err(StorageError::Timeout(format!(
-                                "root notarization for {id} exceeded {INLINE_ROOT_NOTARIZE_TIMEOUT:?}"
-                            ))),
-                        }
+                        .map(|_| ())
                     },
                     announce,
                 )
@@ -2059,8 +2075,10 @@ mod tests {
     #[tokio::test]
     async fn the_author_roots_its_registration_before_announcing_it() {
         let calls = std::cell::RefCell::new(Vec::<String>::new());
+        let budget = std::time::Duration::from_millis(INLINE_ROOT_BUDGET_MS);
         notarize_roots_then_announce(
             &["app".to_string()],
+            budget,
             |id| {
                 calls.borrow_mut().push(format!("root:{id}"));
                 async { Ok::<(), StorageError>(()) }
@@ -2073,6 +2091,7 @@ mod tests {
         calls.borrow_mut().clear();
         notarize_roots_then_announce(
             &["app".to_string()],
+            budget,
             |_| async { Err::<(), StorageError>(StorageError::Internal("conductor down".into())) },
             || calls.borrow_mut().push("announce".into()),
         )
@@ -2085,6 +2104,7 @@ mod tests {
             .collect();
         notarize_roots_then_announce(
             &seed,
+            budget,
             |id| {
                 calls.borrow_mut().push(format!("root:{id}"));
                 async { Ok::<(), StorageError>(()) }
@@ -2092,6 +2112,24 @@ mod tests {
             || calls.borrow_mut().push("announce".into()),
         )
         .await;
-        assert_eq!(*calls.borrow(), vec!["announce"]);
+        assert_eq!(calls.borrow().len(), INLINE_ROOT_NOTARIZE_MAX + 1);
+        assert_eq!(calls.borrow().last().unwrap(), "announce");
+
+        calls.borrow_mut().clear();
+        notarize_roots_then_announce(
+            &["app".to_string()],
+            std::time::Duration::ZERO,
+            |id| {
+                calls.borrow_mut().push(format!("root:{id}"));
+                async { Ok::<(), StorageError>(()) }
+            },
+            || calls.borrow_mut().push("announce".into()),
+        )
+        .await;
+        assert_eq!(
+            *calls.borrow(),
+            vec!["announce"],
+            "zero budget roots nothing"
+        );
     }
 }
