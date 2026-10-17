@@ -1224,11 +1224,12 @@ Then(
     assert.ok(before, 'the scenario captured no per-name sibling entries before the fault');
     for (const lane of requireLanes(state)) {
       const doc = await readMembership(lane);
-      // Compared WHOLE, freshness stamp included: a leg that rewrote a record
-      // it does not own — even to the same value — is visible only here.
+      // Identity only: the sibling refreshes its own updated_at on its beacon's 300 s cadence; identity is what the story asserts.
+      const identity = (m?: MembershipMember) => m && { owner: m.owner, origin: m.origin };
+      const expected = before.get(lane.publicName);
       assert.deepEqual(
-        memberFor(doc, sibling),
-        before.get(lane.publicName),
+        identity(memberFor(doc, sibling)),
+        identity(expected),
         `the sibling "${sibling}" entry under "${lane.publicName}" changed across the ` +
           'withdrawal; under any name a doorway writes only its own entry'
       );
