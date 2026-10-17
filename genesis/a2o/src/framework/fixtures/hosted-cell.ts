@@ -100,7 +100,7 @@ const DEFAULT_CONVERGENCE_WINDOW_MS = 60_000;
  * `readHostedCellCommitment`, retried every ~2s until it answers 200 or the
  * household fixture's declared `convergenceWindowMs` elapses (default 60s).
  * On timeout throws, naming the cid, the peer, the window, and the last
- * status seen — never loosens the 200 expectation, only gives convergence
+ * status/body summary seen — never loosens the 200 expectation, only gives convergence
  * its declared window before failing. Mirrors the wait pattern in
  * `steps/dataplane/resiliency-saga.steps.ts` (poll-for-anchor-convergence).
  */
@@ -117,7 +117,8 @@ export async function readHostedCellCommitmentConverged(
         throw new Error(
           `GET /api/v1/commitments/${cid} on ${peer} (peer "${NON_POOL_PEER_NAME}", not the ` +
             `doorway's pool) had not converged to 200 within the ${windowMs}ms convergence window ` +
-            `the household fixture declares — last status ${result.status}.`
+            `the household fixture declares — last: ${result.status} ` +
+            JSON.stringify(result.body).slice(0, 200)
         );
       }
       return result;
