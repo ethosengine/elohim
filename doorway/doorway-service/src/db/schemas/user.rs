@@ -261,6 +261,23 @@ pub struct UserDoc {
     /// Absent on rows that were never closed, and on rows closed before 17c.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub closed_identifier: Option<String>,
+
+    /// The agency phase this account registered under: `hosted`, `doorway`,
+    /// `node` or `device`. Only a `hosted` account may be given a cell by this
+    /// doorway; the others run their own. Absent on rows written before
+    /// 2026-10-15; such a row is never given a cell (see `may_be_hosted`).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub agency_phase: Option<String>,
+
+    /// When this human bound the account onto their own node's key
+    /// (`POST /auth/node-key/bind`). Absent on an account that never graduated.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub node_key_bound_at: Option<DateTime>,
+
+    /// The key the account answered to before that bind, kept so a witnessed
+    /// key-lineage rotation can later be minted from what the doorway saw.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub previous_agent_pub_key: Option<String>,
 }
 
 fn default_identifier_type() -> String {
@@ -311,7 +328,22 @@ impl UserDoc {
             hosted_cell_provider: None,
             closed_at: None,
             closed_identifier: None,
+            agency_phase: None,
+            node_key_bound_at: None,
+            previous_agent_pub_key: None,
         }
+    }
+
+    /// Whether this doorway may give the account a cell of its own: only an
+    /// account that registered as hosted. A doorway, node or device account
+    /// runs its own cell and is never hosted here, and a row that recorded no
+    /// phase (written before 2026-10-15) is not hosted either: hosted is a
+    /// declared stage, never a default. On alpha those legacy rows include
+    /// device humans whose old registration failed at capacity, and treating
+    /// them as hosted gave them a cell at their next sign-in. A legacy row that
+    /// already has a cell keeps it; login only reads it back.
+    pub fn may_be_hosted(&self) -> bool {
+        self.agency_phase.as_deref() == Some("hosted")
     }
 
     /// Create a new user document with custodial key (convenience method).
@@ -474,5 +506,41 @@ impl IntoIndexes for UserDoc {
 impl MutMetadata for UserDoc {
     fn mut_metadata(&mut self) -> &mut Metadata {
         &mut self.metadata
+    }
+}
+
+#[cfg(test)]
+mod may_be_hosted_tests {
+    use super::*;
+
+    fn row(phase: Option<&str>) -> UserDoc {
+        let mut u = UserDoc::new(
+            "x@localhost".into(),
+            "email".into(),
+            "hash".into(),
+            "human-x".into(),
+            "uhCAkx".into(),
+            None,
+        );
+        u.agency_phase = phase.map(str::to_string);
+        u
+    }
+
+    /// Only an account that registered as hosted may be given a cell by this
+    /// doorway; doorway/node/device accounts run their own, and a row with no
+    /// recorded phase is never hosted by default.
+    #[test]
+    fn only_declared_hosted_accounts_may_be_hosted() {
+        assert!(row(Some("hosted")).may_be_hosted());
+        assert!(
+            !row(None).may_be_hosted(),
+            "no recorded phase is not hosted"
+        );
+        for own in ["doorway", "node", "device"] {
+            assert!(
+                !row(Some(own)).may_be_hosted(),
+                "{own} must never be hosted"
+            );
+        }
     }
 }

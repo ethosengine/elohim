@@ -9,8 +9,8 @@ status: green
 active: false
 checks:
   - "a2o @concern:attention-witnessed-privately (genesis/a2o/features/lms/attention-witnessed-privately.feature — Jessica's dwell and scroll depth appear in her own /me/stream with the recipe CID printed, James's stream has no such entry, and her storage peer counts the cursor as suppressed, never announced; runnable via `just test mesh-browser '@concern:attention-witnessed-privately'`; MEASURED 2026-09-25: GREEN twice on the household, 14 of 14 steps, clean console, no bypass (receipts sprint-report-household-20260925T135856Z / T135922Z))"
-  - "cargo test --lib -- observation::gossip_gate (elohim/elohim-storage — an agent-private kind yields no cursor announcement on the real write path; MEASURED 2026-09-24: absent — no `gossip_gate` anywhere in elohim/elohim-storage/src; not run, since there is nothing to run)"
-  - "test $(grep -c \"trackContentLeave\\|trackContentView\" app/lamad/src/app/components/content-viewer/content-viewer.component.ts) -eq 0 (the content viewer no longer writes dwell as an AttentionTending lens record; MEASURED 2026-09-24: 3 — the viewer still tends on leave and on view)"
+  - "cargo test --lib -- observation::gossip_gate (elohim/elohim-storage — an agent-private kind yields no cursor announcement on the real write path; MEASURED 2026-10-16: `mod gossip_gate` exists at elohim/elohim-storage/src/p2p/observation_gossip.rs:92; source presence confirmed, Cargo leg not re-run today; supersedes the absent annotation)"
+  - "test $(grep -c \"trackContentLeave\\|trackContentView\" app/lamad/src/app/components/content-viewer/content-viewer.component.ts) -eq 0 (the content viewer no longer writes dwell as an AttentionTending lens record; MEASURED 2026-10-16: grep count 0, count assertion exit 0 — the viewer no longer makes these tending calls)"
 refs:
   - "plan: genesis/docs/superpowers/plans/2026-09-25-post-station-4-participant-classifier-search-attention-sprint.md (Lane A, rulings R-A0..R-A5, tasks A0..A10)"
   - "spec: genesis/docs/content/elohim-protocol/architecture/2026-05-11-observation-event-layer-design.md (the observation layer this habit makes live; §4 gate answers, §8.2 summary graduation)"
@@ -164,3 +164,5 @@ Checks (2) and (3) unchanged and green, as re-measured in the 2026-09-24 A1-A9 d
 `cargo test --lib -- gossip_gate` 2 passed EXIT=0; (3) re-measured now, after cfbfbe404 touched the viewer: the grep on content-viewer.component.ts = 0, EXIT=0.
 Environment: conductor fork e0bfc6c7a (the pin target, 81e77bcae), the recast 9adf9f01 made at 12:22Z;
 the receipts' `sutParts.conductor` names the submodule tree 25dd2d0be, not the running binary.
+
+DELTA 2026-10-16 (status STAYS green; stale leg annotations corrected). Read-only measurement at origin/dev@42941449e: the content-viewer `trackContentLeave\|trackContentView` grep count is 0 (`test ... -eq 0` exit 0); the source-presence probe finds `mod gossip_gate` at `elohim/elohim-storage/src/p2p/observation_gossip.rs:92`. The previously recorded `3` and `absent` observations are resolved; no Cargo test run is claimed today.

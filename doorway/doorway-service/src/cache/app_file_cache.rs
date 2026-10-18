@@ -61,6 +61,54 @@ pub struct CachedFile {
 /// Collection name for projected entries in MongoDB (the projection store).
 const PROJECTED_ENTRIES_COLLECTION: &str = "projected_entries";
 
+/// What the doorway's own content projection says about a bundled app: the
+/// facts the content-app chrome shell needs, read from the same projected
+/// document the slug index is built from. No storage round trip.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct AppDescriptor {
+    /// Blob hash of the current bundle head.
+    pub blob_hash: String,
+    /// The content node id (the EPR address is `/epr/{content_id}`).
+    pub content_id: String,
+    /// `html5-app`, `spa-bundle`, ...
+    pub content_format: String,
+    /// The bundle's declared entry file, when the node declares one.
+    pub entry_point: Option<String>,
+    /// The node's human title.
+    pub title: Option<String>,
+}
+
+impl AppDescriptor {
+    /// Read a descriptor from a projected content `data` document (camelCase
+    /// on the wire). `None` when the document names no bundle blob.
+    pub fn from_data(data: &bson::Document) -> Option<Self> {
+        let blob_hash = data.get_str("blobHash").ok().filter(|s| !s.is_empty())?;
+        let non_empty = |key: &str| {
+            data.get_str(key)
+                .ok()
+                .filter(|s| !s.is_empty())
+                .map(str::to_string)
+        };
+        Some(Self {
+            blob_hash: blob_hash.to_string(),
+            content_id: non_empty("id").unwrap_or_default(),
+            content_format: non_empty("contentFormat").unwrap_or_default(),
+            entry_point: content_body_field(data, "entryPoint"),
+            title: non_empty("title"),
+        })
+    }
+
+    /// The entry file the chrome branch compares the served path against:
+    /// the declared entry point, else `index.html`.
+    pub fn entry_file(&self) -> &str {
+        self.entry_point
+            .as_deref()
+            .map(|e| e.trim_start_matches("./"))
+            .filter(|e| !e.is_empty())
+            .unwrap_or("index.html")
+    }
+}
+
 pub struct AppFileCacheService {
     /// MongoDB client for persistent cache storage
     mongo: MongoClient,
@@ -76,6 +124,9 @@ pub struct AppFileCacheService {
     /// slug -> blob_hash mapping (populated from content projection).
     /// Used to construct cache keys for HTML5 app file lookups.
     slug_index: Arc<RwLock<HashMap<String, String>>>,
+
+    /// slug -> descriptor (same projection, same lifetime as `slug_index`).
+    descriptor_index: Arc<RwLock<HashMap<String, AppDescriptor>>>,
 }
 
 impl AppFileCacheService {
@@ -90,6 +141,7 @@ impl AppFileCacheService {
             agreement_id,
             in_flight: DashMap::new(),
             slug_index: Arc::new(RwLock::new(HashMap::new())),
+            descriptor_index: Arc::new(RwLock::new(HashMap::new())),
         }
     }
 
@@ -318,6 +370,7 @@ impl AppFileCacheService {
         };
 
         let mut index = HashMap::new();
+        let mut descriptors = HashMap::new();
         let mut count = 0u32;
 
         while let Ok(Some(doc)) = cursor.try_next().await {
@@ -331,6 +384,9 @@ impl AppFileCacheService {
                 if let (Some(slug), Some(blob_hash)) = (app_slug, blob_hash) {
                     if !slug.is_empty() && !blob_hash.is_empty() {
                         index.insert(slug.to_string(), blob_hash.to_string());
+                        if let Some(d) = AppDescriptor::from_data(data) {
+                            descriptors.insert(slug.to_string(), d);
+                        }
                         count += 1;
                     }
                 }
@@ -339,6 +395,8 @@ impl AppFileCacheService {
 
         let mut locked = self.slug_index.write().await;
         *locked = index;
+        drop(locked);
+        *self.descriptor_index.write().await = descriptors;
 
         info!(count = count, "Slug index loaded from projection store");
     }
@@ -366,18 +424,39 @@ impl AppFileCacheService {
         }
 
         // Slow path: lazy load from MongoDB for this specific app
+        let data = self.scan_projected_app(slug).await?;
+        let blob_hash = data
+            .get_str("blobHash")
+            .ok()
+            .filter(|h| !h.is_empty())?
+            .to_string();
+        self.slug_index
+            .write()
+            .await
+            .insert(slug.to_string(), blob_hash.clone());
+        if let Some(d) = AppDescriptor::from_data(&data) {
+            self.descriptor_index
+                .write()
+                .await
+                .insert(slug.to_string(), d);
+        }
+        Some(blob_hash)
+    }
+
+    /// The projected `data` document of the bundled app whose slug is `slug`,
+    /// or `None` when no such app is projected or the projection is unreachable.
+    ///
+    /// The app's slug is inside contentBody (JSON string), not at data.hAppId
+    /// (which is the Holochain app context). We can't query inside a JSON
+    /// string with MongoDB, so this scans all bundled-app entries.
+    async fn scan_projected_app(&self, slug: &str) -> Option<bson::Document> {
         let db = self.mongo.inner().database(self.mongo.db_name());
         let collection = db.collection::<bson::Document>(PROJECTED_ENTRIES_COLLECTION);
-
-        // The app's slug is inside contentBody (JSON string), not at
-        // data.hAppId (which is the Holochain app context). We can't query
-        // inside a JSON string with MongoDB, so scan all bundled-app entries.
         let filter = doc! {
             "doc_type": "Content",
             "data.contentFormat": { "$in": ["html5-app", "spa-bundle"] },
             "metadata.is_deleted": { "$ne": true },
         };
-
         let mut cursor = match collection.find(filter).await {
             Ok(c) => c,
             Err(e) => {
@@ -385,23 +464,40 @@ impl AppFileCacheService {
                 return None;
             }
         };
-
         while let Ok(Some(doc)) = cursor.try_next().await {
             if let Some(data) = doc.get("data").and_then(|v| v.as_document()) {
-                let app_slug = extract_app_slug_from_data(data);
-                if app_slug.as_deref() == Some(slug) {
-                    if let Ok(blob_hash) = data.get_str("blobHash") {
-                        if !blob_hash.is_empty() {
-                            let mut index = self.slug_index.write().await;
-                            index.insert(slug.to_string(), blob_hash.to_string());
-                            return Some(blob_hash.to_string());
-                        }
-                    }
+                if extract_app_slug_from_data(data).as_deref() == Some(slug) {
+                    return Some(data.clone());
                 }
             }
         }
-
         None
+    }
+
+    /// The projected descriptor for an app slug, from the doorway's own
+    /// projection only (index first, then one lazy scan). `None` for a
+    /// content address, an unknown slug, or when the projection is
+    /// unavailable — the caller then serves the bundle raw.
+    pub async fn resolve_app_descriptor(&self, identifier: &str) -> Option<AppDescriptor> {
+        if identifier.starts_with("sha256-") {
+            return None;
+        }
+        if let Some(d) = self.descriptor_index.read().await.get(identifier) {
+            return Some(d.clone());
+        }
+        // Read the projection directly rather than through resolve_blob_hash:
+        // a head the reconciler declared (set_slug_head) or re-resolved after
+        // refresh_app makes that fast path return before any scan, which would
+        // leave the descriptor empty for as long as the head stays cached.
+        // Only the descriptor is filled here — the head index belongs to the
+        // reconciler, and the projection's blobHash may be the stale one.
+        let data = self.scan_projected_app(identifier).await?;
+        let descriptor = AppDescriptor::from_data(&data)?;
+        self.descriptor_index
+            .write()
+            .await
+            .insert(identifier.to_string(), descriptor.clone());
+        Some(descriptor)
     }
 
     /// Reverse the slug index: which app slug currently declares `blob_hash` as
@@ -516,6 +612,8 @@ impl AppFileCacheService {
     pub async fn refresh_app(&self, slug: &str) {
         let mut index = self.slug_index.write().await;
         index.remove(slug);
+        drop(index);
+        self.descriptor_index.write().await.remove(slug);
         debug!(slug = %slug, "Removed app from index (will re-resolve on next request)");
     }
 
@@ -676,28 +774,32 @@ fn extract_app_slug(doc: &crate::projection::document::ProjectedDocument) -> Opt
 /// Same logic as `extract_app_slug` but for raw MongoDB documents
 /// used in the slug index load and resolve paths.
 fn extract_app_slug_from_data(data: &bson::Document) -> Option<String> {
-    // Parse contentBody (JSON string or BSON object) for the HTML5 slug
+    // contentBody (JSON string or BSON object) carries the HTML5 slug
+    content_body_field(data, "slug")
+        // Last resort: content id
+        .or_else(|| data.get_str("id").ok().map(|s| s.to_string()))
+}
+
+/// Read a non-empty string field of the app metadata under `contentBody`,
+/// which the projection stores either as a JSON string or as a BSON document.
+fn content_body_field(data: &bson::Document, key: &str) -> Option<String> {
     if let Ok(content_body) = data.get_str("contentBody") {
         if let Ok(body) = serde_json::from_str::<serde_json::Value>(content_body) {
-            if let Some(slug) = body.get("slug").and_then(|v| v.as_str()) {
-                if !slug.is_empty() {
-                    return Some(slug.to_string());
+            if let Some(v) = body.get(key).and_then(|v| v.as_str()) {
+                if !v.is_empty() {
+                    return Some(v.to_string());
                 }
             }
         }
     }
-
-    // Try contentBody as BSON document (not string)
     if let Ok(body) = data.get_document("contentBody") {
-        if let Ok(slug) = body.get_str("slug") {
-            if !slug.is_empty() {
-                return Some(slug.to_string());
+        if let Ok(v) = body.get_str(key) {
+            if !v.is_empty() {
+                return Some(v.to_string());
             }
         }
     }
-
-    // Last resort: content id
-    data.get_str("id").ok().map(|s| s.to_string())
+    None
 }
 
 /// The doorway's own projection IS the write-through target for a reconciled
@@ -783,6 +885,72 @@ pub fn spawn_app_cache_invalidation_task(
 
 #[cfg(test)]
 mod tests {
+    #[tokio::test]
+    async fn refresh_app_drops_the_descriptor_with_the_slug_head() {
+        let svc = super::AppFileCacheService::new(
+            &crate::db::mongo::MongoClient::unconnected_for_test(),
+            "t".to_string(),
+        );
+        let d = super::AppDescriptor {
+            blob_hash: "sha256-old-head".into(),
+            content_id: "quiz-1".into(),
+            content_format: "html5-app".into(),
+            entry_point: Some("old.html".into()),
+            title: Some("Old".into()),
+        };
+        svc.descriptor_index
+            .write()
+            .await
+            .insert("quiz-1".into(), d.clone());
+        assert_eq!(svc.resolve_app_descriptor("quiz-1").await, Some(d));
+        svc.refresh_app("quiz-1").await;
+        // The store is unreachable here, so a fresh read yields None; the
+        // point is that the stale descriptor is not returned.
+        assert_eq!(svc.resolve_app_descriptor("quiz-1").await, None);
+    }
+
+    #[test]
+    fn descriptor_parses_from_a_projected_document() {
+        // contentBody as a JSON string
+        let data = bson::doc! {
+            "id": "quiz-1",
+            "contentFormat": "html5-app",
+            "blobHash": "sha256-abcdef123456",
+            "title": "A quiz",
+            "contentBody": r#"{"slug":"quiz-1","entryPoint":"./game.html"}"#,
+        };
+        let d = super::AppDescriptor::from_data(&data).unwrap();
+        assert_eq!(d.content_id, "quiz-1");
+        assert_eq!(d.content_format, "html5-app");
+        assert_eq!(d.blob_hash, "sha256-abcdef123456");
+        assert_eq!(d.title.as_deref(), Some("A quiz"));
+        assert_eq!(d.entry_file(), "game.html");
+
+        // contentBody as a BSON document
+        let data = bson::doc! {
+            "id": "quiz-1", "contentFormat": "html5-app", "blobHash": "sha256-x",
+            "contentBody": { "slug": "quiz-1", "entryPoint": "game.html" },
+        };
+        assert_eq!(
+            super::AppDescriptor::from_data(&data).unwrap().entry_file(),
+            "game.html"
+        );
+
+        // a top-level entryPoint is not where the wire carries it
+        let top = bson::doc! { "blobHash": "sha256-x", "entryPoint": "game.html" };
+        assert_eq!(
+            super::AppDescriptor::from_data(&top).unwrap().entry_file(),
+            "index.html"
+        );
+
+        let bare = bson::doc! { "blobHash": "sha256-x", "contentFormat": "spa-bundle" };
+        let d = super::AppDescriptor::from_data(&bare).unwrap();
+        assert_eq!(d.entry_point, None);
+        assert_eq!(d.entry_file(), "index.html");
+
+        assert!(super::AppDescriptor::from_data(&bson::doc! { "id": "no-blob" }).is_none());
+    }
+
     use super::*;
 
     #[test]

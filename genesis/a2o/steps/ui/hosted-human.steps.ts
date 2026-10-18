@@ -33,6 +33,11 @@ import type { E2EWorld } from '../../src/framework/world.js';
 const AUTH_TOKEN_KEY = 'doorway_auth_token';
 const REGISTER_PATH = '/threshold/register';
 const ACCOUNT_PATH = '/threshold/account';
+// The fixture window is loaded at poll time; allow two default 60s windows plus 30s margin.
+const HOSTED_CELL_STEP_TIMEOUT_MS = 150_000;
+// Allow sequential cleanup closes plus a 10s margin within the hook's fixed budget.
+const HOSTED_HUMAN_CLEANUP_TIMEOUT_MS = 120_000;
+const HOSTED_HUMAN_CLOSE_TIMEOUT_MS = 20_000;
 // eslint-disable-next-line sonarjs/no-hardcoded-passwords -- required ephemeral E2E credential
 const PASSWORD = 'Test2026!';
 
@@ -118,7 +123,7 @@ function requirePlaywright(world: E2EWorld): PlaywrightDevice | null {
   return device;
 }
 
-function human(world: E2EWorld, index = people(world).length - 1): HostedHuman {
+export function human(world: E2EWorld, index = people(world).length - 1): HostedHuman {
   const value = people(world)[index];
   assert.ok(value, `Hosted human ${index + 1} has not been registered.`);
   return value;
@@ -637,7 +642,7 @@ async function ensurePlaywrightPortalOpen(
  * `registerThroughPortal` and the plain `BrowserDevice` register — this just
  * enters it from one combined phrase instead of two separate ones.
  */
-async function registerNewcomer(
+export async function registerNewcomer(
   world: E2EWorld,
   displayName: string,
   doorwayId: string = STATION_7_DOORWAY_ID
@@ -771,6 +776,7 @@ Then(
 
 Then(
   'the notary records a live {string} delegates-compute commitment naming that agent key as recipient',
+  { timeout: HOSTED_CELL_STEP_TIMEOUT_MS },
   async function (this: E2EWorld, scope: string) {
     const person = human(this);
     const body = await readBackCommitment(person);
@@ -854,6 +860,7 @@ When("the doorway names that human's hosting commitment", async function (this: 
 
 When(
   "that commitment is read back, by its identifier, from a household peer that is not the doorway's pool",
+  { timeout: HOSTED_CELL_STEP_TIMEOUT_MS },
   async function (this: E2EWorld) {
     await readBackCommitment(human(this));
   }
@@ -897,6 +904,7 @@ Then("its recipient is that human's own agent key", function (this: E2EWorld) {
 
 When(
   "both of their hosting commitments are read back from a household peer that is not the doorway's pool",
+  { timeout: HOSTED_CELL_STEP_TIMEOUT_MS },
   async function (this: E2EWorld) {
     await readBackCommitment(human(this, 0));
     await readBackCommitment(human(this, 1));
@@ -1052,13 +1060,34 @@ Then(
 // human, and never thrown — a cleanup defect must never turn a passed
 // scenario red, and must never mask the scenario's own failure either.
 // ---------------------------------------------------------------------------
-After({ tags: '@hosted-human or @concern:humans-served' }, async function (this: E2EWorld) {
-  const created = this.scenarioCreatedHumans.splice(0, this.scenarioCreatedHumans.length);
-  for (const entry of created) {
-    try {
-      await entry.close();
-    } catch (error) {
-      console.error(`[hosted-human cleanup] could not close ${entry.label}: ${String(error)}`);
+After(
+  {
+    tags: '@hosted-human or @concern:humans-served',
+    timeout: HOSTED_HUMAN_CLEANUP_TIMEOUT_MS,
+  },
+  async function (this: E2EWorld) {
+    const created = this.scenarioCreatedHumans.splice(0, this.scenarioCreatedHumans.length);
+    const closeTimeoutMs = Math.min(
+      HOSTED_HUMAN_CLOSE_TIMEOUT_MS,
+      (HOSTED_HUMAN_CLEANUP_TIMEOUT_MS - 10_000) / Math.max(1, created.length)
+    );
+    for (const entry of created) {
+      let timer: ReturnType<typeof setTimeout> | undefined;
+      try {
+        await Promise.race([
+          entry.close(),
+          new Promise<never>((_resolve, reject) => {
+            timer = setTimeout(
+              () => reject(new Error(`close timed out after ${closeTimeoutMs} ms`)),
+              closeTimeoutMs
+            );
+          }),
+        ]);
+      } catch (error) {
+        console.error(`[hosted-human cleanup] could not close ${entry.label}: ${String(error)}`);
+      } finally {
+        clearTimeout(timer);
+      }
     }
   }
-});
+);

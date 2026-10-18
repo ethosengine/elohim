@@ -21,6 +21,8 @@
 
 import { strict as assert } from 'node:assert';
 import { createHash, randomBytes } from 'node:crypto';
+import { readFileSync } from 'node:fs';
+import { join } from 'node:path';
 
 import { Given, When, Then, After, Before } from '@cucumber/cucumber';
 
@@ -59,7 +61,9 @@ import {
   stageBundleThroughStorage,
   stageInvalidFixture,
   visitInBrowser,
+  visitShellInBrowser,
   type BrowserVisit,
+  type ShellVisit,
   type FixtureBundle,
 } from './epr-app-deliverability.helpers.js';
 
@@ -70,6 +74,8 @@ import {
 interface PublishedApp {
   /** The EPR id this run authored — fresh per scenario, never a seeded page. */
   slug: string;
+  /** The format the run-owned record declares (Station 5 varies it). */
+  declaredFormat?: 'html5-app' | 'spa-bundle';
   mountPath: string;
   rootCommitments?: string[];
   publicHostname?: string;
@@ -119,6 +125,8 @@ const DOORWAYS = ['alpha-A', 'elohim.host'];
 const ROOT_AUTHOR = 'human-matthew-manager';
 const COMMITMENT_PAGE_SIZE = 100;
 const MAX_COMMITMENT_PAGES = 10;
+// Cold restart observed "ready in 94 s"; allow a separate health window after the restart arm.
+const PEER_COMEBACK_WINDOW_MS = loadHouseholdMeshFixture().convergenceWindowMs ?? 90_000;
 
 const householdPeers = new WeakMap<E2EWorld, HouseholdTopology>();
 const publishedApps = new WeakMap<E2EWorld, PublishedApp>();
@@ -434,8 +442,12 @@ When('Matthew builds coherent successor artifact B', function (this: E2EWorld) {
  * declaration guard would refuse the write anyway (measured 2026-09-05 —
  * declare_earned_canonical_head is restricted to a page's root author).
  */
-async function authorOwnedEprRecord(world: E2EWorld): Promise<void> {
+async function authorOwnedEprRecord(
+  world: E2EWorld,
+  contentFormat: 'html5-app' | 'spa-bundle' = 'html5-app'
+): Promise<void> {
   const record = app(world);
+  record.declaredFormat = contentFormat;
   // Share one authoring observer across the whole mount phase. The outer
   // fixture step also needs 2 * 80s for guarded doorway restarts and 2 * 60s
   // for their readiness checks: a 180s outer ceiling could abandon a valid
@@ -456,7 +468,7 @@ async function authorOwnedEprRecord(world: E2EWorld): Promise<void> {
         title: `EPR app deliverability fixture (${record.slug})`,
         description: 'a small site this test run published, so it may declare its own head',
         contentType: 'collective',
-        contentFormat: 'html5-app',
+        contentFormat,
         content: { slug: record.slug, entryPoint: 'index.html' },
         reach: 'commons',
       },
@@ -594,6 +606,14 @@ Given(
 );
 
 Given(
+  'an EPR record this run owns for it, declared as an app that draws its own chrome',
+  { timeout: OWNED_FIXTURE_SETUP_TIMEOUT_MS },
+  async function (this: E2EWorld) {
+    await authorOwnedEprRecord(this, 'spa-bundle');
+  }
+);
+
+Given(
   'Matthew has registered PUBLIC_NAME for published releases and CANDIDATE_NAME for staged releases of a fresh empty app',
   { timeout: OWNED_FIXTURE_SETUP_TIMEOUT_MS },
   async function (this: E2EWorld) {
@@ -610,7 +630,8 @@ Given(
       assert.equal(head.status, 200, `${doorway}: fresh head read returned ${head.status}`);
       const projected = (await head.json()) as {
         headActionHash?: string;
-        declared?: boolean;
+        earned?: boolean;
+        blobHash?: string | null;
         dhtAnchorHash?: string | null;
         stagingCandidate?: string | null;
         stagingCandidateBlobHash?: string | null;
@@ -629,7 +650,11 @@ Given(
         content.dhtAnchorHash,
         `${doorway}: fresh head is neither absent nor the content's undeclared anchor fallback`
       );
-      assert.equal(projected.declared, false, `${doorway}: fresh record has a declared release`);
+      assert.ok(
+        projected.earned === false &&
+          (projected.blobHash === null || projected.blobHash === undefined),
+        `${doorway}: fresh record already carries a release (earned or bytes bound)`
+      );
       assert.equal(
         projected.dhtAnchorHash,
         content.dhtAnchorHash,
@@ -949,6 +974,51 @@ function bundleServeFailure(message: string, result: { last: BundleServeObservat
   return `${message}; last observations: ${JSON.stringify(result.last)}`;
 }
 
+/** Failure-only snapshot: distinguish storage projection lag from doorway reconciliation lag. */
+async function publicHeadStorageFailure(world: E2EWorld, record: PublishedApp): Promise<string> {
+  const peers = await Promise.all(
+    DOORWAYS.map(async doorway => {
+      const peer = householdPeers.get(world)?.behind[doorway];
+      try {
+        const storageUrl = storageUrlBehindDoorway(world, doorway);
+        const base = `${storageUrl}/db/content/${encodeURIComponent(record.slug)}`;
+        const read = async (suffix: string, fields: string[]) => {
+          let status: number | undefined;
+          try {
+            const response = await getRaw(`${base}${suffix}`, { timeoutMs: 2000 });
+            status = response.status;
+            const row = JSON.parse(response.text) as Record<string, unknown>;
+            return {
+              status,
+              ...Object.fromEntries(fields.map(field => [field, row[field] ?? null])),
+            };
+          } catch (error) {
+            return { status, error: String(error).slice(0, 160) };
+          }
+        };
+        const [head, content] = await Promise.all([
+          read('/head', [
+            'headActionHash',
+            'earned',
+            'blobHash',
+            'anchorMatchesHead',
+            'stagingCandidateState',
+            'updatedAt',
+          ]),
+          read('', ['blobHash', 'serverBlobHash']),
+        ]);
+        return { doorway, peer, head, content };
+      } catch (error) {
+        return { doorway, peer, error: String(error).slice(0, 160) };
+      }
+    })
+  );
+  return JSON.stringify({
+    expected: { headActionHash: record.candidateActionHash, blobHash: record.blobHash },
+    peers,
+  }).slice(0, 1200);
+}
+
 Then(
   'within 75 seconds both doorways serve PUBLIC_NAME with artifact A',
   { timeout: 90_000 },
@@ -1098,10 +1168,12 @@ Then(
     const record = app(this);
     assert.ok(record.publicHostname, 'public hostname absent');
     const result = await bothDoorwaysServe(record.publicHostname, requireBundle(this));
+    const storage = result.ok ? '' : `; storage: ${await publicHeadStorageFailure(this, record)}`;
     assert.equal(
       result.ok,
       true,
-      bundleServeFailure('public hostname did not follow the newly earned version', result)
+      bundleServeFailure('public hostname did not follow the newly earned version', result) +
+        storage
     );
   }
 );
@@ -1328,7 +1400,7 @@ When(
 
 When(
   'peer {string} comes back',
-  { timeout: 180_000 },
+  { timeout: 180_000 + PEER_COMEBACK_WINDOW_MS },
   async function (this: E2EWorld, peer: string) {
     assert.ok(app(this).heldPeers?.has(peer), `${peer} was not held down`);
     const restart = meshControl('storage-restart', peer).then(
@@ -1339,12 +1411,22 @@ When(
     assert.ok(storageUrl);
     const restartError = await restart;
     assert.equal(restartError, null, `peer restart failed: ${String(restartError)}`);
-    // The maintained arm owns its readiness horizon and returns only after the
-    // storage peer is ready. Check that completed state afresh: a concurrent
-    // shorter poll can expire while the arm is still making valid progress and
-    // leave a stale failure result even though the restart succeeds.
-    const health = await getRaw(`${storageUrl}/health`, { timeoutMs: 2000 });
-    assert.equal(health.status, 200, `${peer} did not become reachable`);
+    let lastHealth = 'no health response';
+    const ready = await pollUntil(async () => {
+      try {
+        const health = await getRaw(`${storageUrl}/health`, { timeoutMs: 2000 });
+        lastHealth = `HTTP ${health.status}`;
+        return health.status === 200;
+      } catch (error) {
+        lastHealth = String(error);
+        return false;
+      }
+    }, PEER_COMEBACK_WINDOW_MS);
+    assert.notEqual(
+      ready,
+      null,
+      `${peer} did not become reachable within ${PEER_COMEBACK_WINDOW_MS}ms: ${lastHealth}`
+    );
     app(this).recoveredAt = Date.now();
     app(this).heldPeers!.delete(peer);
   }
@@ -2089,3 +2171,258 @@ After({ tags: '@deliverability-browser', timeout: 450_000 }, async function (thi
     })
   );
 });
+
+// ---------------------------------------------------------------------------
+// Station 5 — the content shell: a page-opening request gets the bar, a frame
+// gets the bytes
+// ---------------------------------------------------------------------------
+
+/** The entry address of the run-owned app on one doorway: `/apps/<slug>/index.html`. */
+function entryUrl(world: E2EWorld, peerName: string): string {
+  return `${resolvePeerUrl(peerName)}/apps/${encodeURIComponent(app(world).slug)}/index.html`;
+}
+
+function requireShellVisit(world: E2EWorld, peerName: string): ShellVisit {
+  const visit = requireVisit(world, peerName);
+  assert.ok(
+    'mainHeaders' in visit,
+    `${peerName}: the recorded browser visit was not a shell visit — "a visitor opens this app's entry address … as a page in a browser" must run first`
+  );
+  return visit as ShellVisit;
+}
+
+interface EntryAnswer {
+  status: number;
+  headers: Record<string, string | undefined>;
+  body: Buffer;
+}
+
+const entryAnswers = new WeakMap<E2EWorld, Map<string, EntryAnswer>>();
+
+function requireEntryAnswer(world: E2EWorld, peerName: string): EntryAnswer {
+  const answer = entryAnswers.get(world)?.get(peerName);
+  assert.ok(
+    answer,
+    `no request for the app's entry address was made to ${peerName} in this scenario`
+  );
+  return answer;
+}
+
+Then(
+  "within {int} seconds doorway {string} knows this app's record and that its declared format is {string}",
+  { timeout: 150_000 },
+  async function (this: E2EWorld, seconds: number, peerName: string, format: string) {
+    const record = app(this);
+    // The doorway's own read of its projection of content records, by slug.
+    const url = `${resolvePeerUrl(peerName)}/db/content/${encodeURIComponent(record.slug)}`;
+    let last = '';
+    const elapsed = await pollUntil(async () => {
+      const row = await getRaw(url, { timeoutMs: 5000 });
+      if (row.status !== 200) {
+        last = `HTTP ${row.status}`;
+        return false;
+      }
+      const declared = (JSON.parse(row.text) as { contentFormat?: unknown }).contentFormat;
+      last = `contentFormat ${JSON.stringify(declared)}`;
+      return declared === format;
+    }, seconds * 1000);
+    assert.notEqual(
+      elapsed,
+      null,
+      `${peerName} did not show a content record "${record.slug}" declared "${format}" within ${seconds}s ` +
+        `(GET ${url}: last ${last}). A doorway that has not heard of the app serves the bare file, ` +
+        'which would make the shell scenarios pass or fail for the wrong reason.'
+    );
+  }
+);
+
+When(
+  "a visitor opens this app's entry address on peer {string} as a page in a browser",
+  { timeout: 120_000 },
+  async function (this: E2EWorld, peerName: string) {
+    visitMap(this).set(peerName, await visitShellInBrowser(entryUrl(this, peerName)));
+  }
+);
+
+Then(
+  'doorway {string} answered the visitor with a content shell that no cache may keep',
+  function (this: E2EWorld, peerName: string) {
+    const visit = requireShellVisit(this, peerName);
+    assert.equal(visit.mainStatus, 200, `${peerName}: ${visit.url} answered ${visit.mainStatus}`);
+    assert.equal(
+      visit.mainHeaders['x-elohim-chrome'],
+      'content-shell',
+      `${peerName}: the page-opening answer for ${visit.url} was not marked as a content shell (x-elohim-chrome: ${visit.mainHeaders['x-elohim-chrome'] ?? 'absent'})`
+    );
+    assert.ok(
+      (visit.mainHeaders['cache-control'] ?? '').toLowerCase().includes('no-store'),
+      `${peerName}: the content shell's cache-control was "${visit.mainHeaders['cache-control'] ?? 'absent'}", which lets a cache keep it`
+    );
+  }
+);
+
+Then(
+  "the shell's resiliency badge from doorway {string} states the holder count from that doorway's own resilience reading for this app",
+  async function (this: E2EWorld, peerName: string) {
+    const visit = requireShellVisit(this, peerName);
+    const url = `${resolvePeerUrl(peerName)}/api/v1/resilience/${encodeURIComponent(app(this).slug)}/household`;
+    let floor: { hasHouseholds: number; wantsHouseholds: number } | undefined;
+    let reading: string;
+    try {
+      const response = await getRaw(url, { timeoutMs: 5000 });
+      reading = `HTTP ${response.status}: ${response.text}`;
+      if (response.status === 200) {
+        floor = (
+          JSON.parse(response.text) as {
+            feltStatus?: { floor?: { hasHouseholds: number; wantsHouseholds: number } };
+          }
+        ).feltStatus?.floor;
+      }
+    } catch (error) {
+      reading = `failed: ${String(error)}`;
+    }
+    const context = `${peerName}: resilience reading GET ${url} ${reading}; badge text "${visit.badgeText}"`;
+    assert.equal(visit.badgeHolders, floor ? String(floor.hasHouseholds) : null, context);
+    assert.equal(visit.badgeTarget, floor ? String(floor.wantsHouseholds) : null, context);
+    let expectedText = 'Held by households · see where it lives';
+    if (floor) {
+      expectedText =
+        floor.hasHouseholds === 0
+          ? 'Not yet held by any household'
+          : `Held by ${floor.hasHouseholds} of ${floor.wantsHouseholds} households`;
+    }
+    assert.equal(visit.badgeText, expectedText, context);
+  }
+);
+
+Then(
+  "the shell's resiliency badge from doorway {string} links to this app's EPR page",
+  function (this: E2EWorld, peerName: string) {
+    const visit = requireShellVisit(this, peerName);
+    assert.equal(
+      visit.badgeHref,
+      `/epr/${app(this).slug}`,
+      `${peerName}: the badge leads to "${visit.badgeHref}", not this app's EPR page`
+    );
+  }
+);
+
+Then(
+  "the shell from doorway {string} shows the app in a frame whose address is this app's entry address",
+  function (this: E2EWorld, peerName: string) {
+    const visit = requireShellVisit(this, peerName);
+    assert.ok(visit.frameSrcResolved, `${peerName}: the shell has no content-app-frame`);
+    const resolved = new URL(visit.frameSrcResolved);
+    assert.equal(
+      resolved.pathname,
+      `/apps/${encodeURIComponent(app(this).slug)}/index.html`,
+      `${peerName}: the frame points at "${visit.frameSrc}", not this app's entry address`
+    );
+    assert.equal(resolved.origin, new URL(visit.url).origin);
+  }
+);
+
+Then(
+  "the app inside the shell's frame from doorway {string} completed client bootstrap in the frame's own document",
+  function (this: E2EWorld, peerName: string) {
+    const visit = requireShellVisit(this, peerName);
+    assert.equal(
+      visit.frameBootstrapReady,
+      true,
+      `${peerName}: the data-app-ready marker was absent in the frame's document (${visit.frameUrl ?? 'no frame document'}); the shell's own page can never carry it`
+    );
+  }
+);
+
+Then(
+  "the app root in the frame's own document from doorway {string} has content",
+  function (this: E2EWorld, peerName: string) {
+    const visit = requireShellVisit(this, peerName);
+    assert.ok(
+      visit.frameRootPresent,
+      `${peerName}: the frame's document (${visit.frameUrl ?? 'none'}) has no app root element`
+    );
+    assert.ok(
+      visit.frameRootText.length > 0,
+      `${peerName}: the app root in the frame's document was still empty after load`
+    );
+  }
+);
+
+async function requestEntryAs(
+  world: E2EWorld,
+  peerName: string,
+  dest: 'iframe' | 'document'
+): Promise<void> {
+  const response = await getRawWithHeaders(entryUrl(world, peerName), {
+    timeoutMs: 15_000,
+    headers: {
+      'sec-fetch-dest': dest,
+      'sec-fetch-mode': 'navigate',
+      'sec-fetch-site': 'same-origin',
+    },
+  });
+  let answers = entryAnswers.get(world);
+  if (!answers) {
+    answers = new Map<string, EntryAnswer>();
+    entryAnswers.set(world, answers);
+  }
+  answers.set(peerName, {
+    status: response.status,
+    headers: response.headers,
+    body: Buffer.from(response.text, 'utf8'),
+  });
+}
+
+When(
+  "this app's entry address is requested from doorway {string} the way a frame requests it",
+  { timeout: 30_000 },
+  async function (this: E2EWorld, peerName: string) {
+    await requestEntryAs(this, peerName, 'iframe');
+  }
+);
+
+When(
+  "this app's entry address is requested from doorway {string} the way a browser opening a page requests it",
+  { timeout: 30_000 },
+  async function (this: E2EWorld, peerName: string) {
+    await requestEntryAs(this, peerName, 'document');
+  }
+);
+
+Then(
+  "doorway {string} answers with the index page's bytes exactly as the bundle this run built holds them",
+  function (this: E2EWorld, peerName: string) {
+    const answer = requireEntryAnswer(this, peerName);
+    assert.equal(answer.status, 200, `${peerName}: the entry address answered ${answer.status}`);
+    const built = readFileSync(join(requireBundle(this).dir, 'index.html'));
+    assert.ok(
+      answer.body.equals(built),
+      `${peerName}: the entry address answered ${answer.body.length} bytes that differ from the ` +
+        `${built.length}-byte index.html this run built`
+    );
+  }
+);
+
+Then(
+  'that answer carries no content-shell marker and declares that it depends on how it was requested',
+  function (this: E2EWorld) {
+    const peers = [...(entryAnswers.get(this)?.keys() ?? [])];
+    assert.ok(peers.length > 0, 'no entry-address answer has been recorded');
+    for (const peerName of peers) {
+      const { headers } = requireEntryAnswer(this, peerName);
+      assert.equal(
+        headers['x-elohim-chrome'],
+        undefined,
+        `${peerName}: the answer carries x-elohim-chrome: ${headers['x-elohim-chrome']}`
+      );
+      const vary = (headers['vary'] ?? '').toLowerCase();
+      for (const field of ['sec-fetch-dest', 'sec-fetch-mode']) {
+        assert.ok(
+          vary.includes(field),
+          `${peerName}: vary is "${headers['vary'] ?? 'absent'}" — a cache could hand this answer to a request that asked differently (missing ${field})`
+        );
+      }
+    }
+  }
+);

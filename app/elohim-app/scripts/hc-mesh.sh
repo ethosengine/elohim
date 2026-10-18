@@ -1604,6 +1604,14 @@ mesh_build() { # [storage|doorway|beacon] (default all three)
     [ "$dry" = "1" ] && return 0
     (cd "$REPO_ROOT/$crate" && "${cmd[@]}") || { echo "[mesh build] REFUSED $project: cargo build failed — $dest left unchanged" >&2; return 1; }
     [ "$built" = "$dest" ] || install -D -m 0755 "$built" "$dest" || return 1
+    # An install has returned 0 over a copy that differed from its source (2026-10-12:
+    # same size, bytes differing from 8 MB on, the iroh marker gone, and the next
+    # restart REFUSED on a binary cargo had just built correctly). Compare, retry once.
+    if [ "$built" != "$dest" ] && ! cmp -s "$built" "$dest"; then
+      echo "[mesh build] installed copy differs from $built — reinstalling" >&2
+      install -D -m 0755 "$built" "$dest" && cmp -s "$built" "$dest" || {
+        echo "[mesh build] REFUSED $project: $dest does not match the built binary" >&2; return 1; }
+    fi
     echo "[mesh build] ok $dest"
   }
   if [ "$which" = all ] || [ "$which" = storage ]; then
@@ -2863,6 +2871,7 @@ status_all() {
     fi
     i=$((i+1))
   done
+  hosted_agent_rows
   ark_status_rows
   if [ "$MESH_DOORWAYS_EFFECTIVE" = "1" ]; then
     printf "doorway  :%s " "$DOORWAY_PORT"
@@ -3274,6 +3283,37 @@ storage_ark_env() { # <peer-name>
 # is the one id that is always the steward — filter list-apps down to it
 # (2026-09-11: `head -1` picked a hosted human's key on matthew twice).
 STEWARD_APP_ID="elohim"
+# Hosted agents per conductor: every installed app other than the steward's own.
+# Only the doorway operator's conductor (peer 0, matthew) may host; a member's
+# conductor carrying anyone but its member is the 2026-10-14 mess (20 agents on
+# matthew, a second Jessica on jessica) and prints REFUSED, naming the apps.
+hosted_agent_rows() {
+  local i=0 name apps
+  for name in "${PEERS[@]}"; do
+    apps="$({ hc client call --port "$(admin_port "$i")" list-apps 2>/dev/null \
+        || hc sandbox call --running "$(admin_port "$i")" list-apps 2>/dev/null; } \
+      | STEWARD_APP_ID="$STEWARD_APP_ID" python3 -c '
+import json, os, sys
+try:
+    apps = json.load(sys.stdin)
+except Exception:
+    sys.exit(0)
+print(" ".join(a.get("installed_app_id", "") for a in apps
+               if a.get("installed_app_id") != os.environ["STEWARD_APP_ID"]))
+' 2>/dev/null)"
+    set -- $apps
+    if [ "$i" -eq 0 ] && [ "$#" -gt "${MESH_DOORWAY_MAX_AGENTS:-14}" ]; then
+      echo "  hosted   $name: REFUSED $# agent(s), over the operator ceiling ${MESH_DOORWAY_MAX_AGENTS:-14}"
+    elif [ "$i" -eq 0 ]; then
+      echo "  hosted   $name: $# agent(s) (operator; ceiling ${MESH_DOORWAY_MAX_AGENTS:-14})"
+    elif [ "$#" -eq 0 ]; then
+      echo "  hosted   $name: 0 (member conductor carries only its member)"
+    else
+      echo "  hosted   $name: REFUSED $# agent(s) on a member's conductor: $apps"
+    fi
+    i=$((i+1))
+  done
+}
 sandbox_agent_key() { # <admin-port> -> prints uhCAk…, or nothing
   { hc client call --port "$1" list-apps 2>/dev/null \
       || hc sandbox call --running "$1" list-apps 2>/dev/null; } \
@@ -4739,15 +4779,18 @@ EOF
     # capacity_used unconditionally, so the ceiling bit at HALF the agents it named —
     # fixed in 36b0e053a, which counts distinct identities instead of registration calls.
     #
-    # Sized to the DECLARED household cast, not to a round number, with no double-count
-    # headroom now the fix above lands: seed-humans.ts's HOUSEHOLD_HOSTED_CAST allow-list
-    # (14 names — the humans some household-lane a2o scenario actually signs in as) + 3
-    # `prologue-hosted-*` registrants (seed-hosted-humans.ts) = 17, + 8 headroom for
-    # story-created humans that register and close again within one scenario (closing
-    # deprovisions, so the count returns) = 25. The first `200` here was sized for the
-    # 29-persona cast that took matthew's conductor to 22.8 GB and got the lane shed; a
-    # ceiling no cast can reach is not a ceiling.
-    # MESH_DOORWAY_MAX_AGENTS overrides it for a convergence experiment.
+    # Sized to the DECLARED hosted cast, not to a round number: the humans in
+    # seed-humans.ts's HOUSEHOLD_HOSTED_CAST whose fixture declares agencyPhase "hosted"
+    # (3: Maria, Ronald, Ezra — hosted is a declared stage, never a default; doorway,
+    # node and device registrations install nothing) + 3 `prologue-hosted-*` registrants
+    # (seed-hosted-humans.ts) = 6, + 8 headroom for story-created humans that register
+    # and close again within one scenario = 14. The 25 before it was sized to a cast that
+    # defaulted undeclared personas to hosted and put 20 agents on matthew's conductor.
+    #
+    # Only a doorway OPERATOR's conductor hosts (matthew here; adam on the fleet). Doorways
+    # B and C sit on jessica's and james's own conductors, which carry their own human and
+    # nobody else, so their ceiling is 0.
+    # MESH_DOORWAY_MAX_AGENTS overrides doorway A for a convergence experiment.
     #
     # NO COMMENT LINES INSIDE THE ASSIGNMENT LIST BELOW: a comment ends the backslash
     # continuation, so everything above it becomes a plain shell assignment that the
@@ -4801,7 +4844,7 @@ EOF
     POOL_COMPUTE_URL="$primary" \
     POOL_COMPUTE_TOKEN="$MESH_COMPUTE_LOCAL_TOKEN" \
     POOL_COMPUTE_PERFORMER="$(peer_agent_key 0 "${PEERS[0]}")" \
-    DOORWAY_MAX_AGENTS_PER_CONDUCTOR="${MESH_DOORWAY_MAX_AGENTS:-25}" \
+    DOORWAY_MAX_AGENTS_PER_CONDUCTOR="${MESH_DOORWAY_MAX_AGENTS:-14}" \
     nohup "$DOORWAY_BIN" --dev-mode --dev-signal-subscriber --listen "0.0.0.0:$DOORWAY_PORT" \
       --conductor-url "ws://localhost:$(admin_port 0)" \
       --app-port-min "$(app_port 0)" \
@@ -4859,7 +4902,7 @@ EOF
     POOL_COMPUTE_URL="http://127.0.0.1:$(http_port 1)" \
     POOL_COMPUTE_TOKEN="$MESH_COMPUTE_LOCAL_TOKEN" \
     POOL_COMPUTE_PERFORMER="$(peer_agent_key 1 "${PEERS[1]}")" \
-    DOORWAY_MAX_AGENTS_PER_CONDUCTOR="${MESH_DOORWAY_MAX_AGENTS:-25}" \
+    DOORWAY_MAX_AGENTS_PER_CONDUCTOR=0 \
     nohup "$DOORWAY_BIN" --dev-mode --dev-signal-subscriber --listen "0.0.0.0:$DOORWAY_B_PORT" \
       --conductor-url "ws://localhost:$(admin_port 1)" \
       --app-port-min "$(app_port 1)" \
@@ -4930,7 +4973,7 @@ EOF
     POOL_COMPUTE_URL="http://127.0.0.1:$(http_port 2)" \
     POOL_COMPUTE_TOKEN="$MESH_COMPUTE_LOCAL_TOKEN" \
     POOL_COMPUTE_PERFORMER="$(peer_agent_key 2 "${PEERS[2]}")" \
-    DOORWAY_MAX_AGENTS_PER_CONDUCTOR="${MESH_DOORWAY_MAX_AGENTS:-25}" \
+    DOORWAY_MAX_AGENTS_PER_CONDUCTOR=0 \
     nohup "$DOORWAY_BIN" --dev-mode --dev-signal-subscriber --listen "0.0.0.0:$DOORWAY_C_PORT" \
       --conductor-url "ws://localhost:$(admin_port 2)" \
       --app-port-min "$(app_port 2)" \

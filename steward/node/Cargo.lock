@@ -1881,6 +1881,7 @@ dependencies = [
 name = "elohim-epr"
 version = "0.1.0"
 dependencies = [
+ "base64 0.22.1",
  "chrono",
  "cid",
  "ed25519-dalek",

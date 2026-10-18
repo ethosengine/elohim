@@ -26,7 +26,6 @@
     "elohim-app": {
       "note": "Shell -> lamad bundle. Dominated by models/content-node.model (the cross-pillar content substrate) — see rows 1-2. Ratchet down only.",
       "edges": {
-        "@app/lamad/components/content-viewer/content-viewer.component": 1,
         "@app/lamad/content-io/content-io.module": 1,
         "@app/lamad/interfaces/agent.interface": 1,
         "@app/lamad/interfaces/cross-pillar.interface": 1,

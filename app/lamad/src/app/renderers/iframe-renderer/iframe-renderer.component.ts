@@ -152,17 +152,15 @@ export class IframeRendererComponent implements OnChanges {
   /**
    * Build the doorway URL for an HTML5 app.
    * Format: ${doorwayUrl}/apps/${slug}/${entryPoint}
+   *
+   * The frame always shows the bundle the doorway serves and verifies by its hash.
+   * `fallbackUrl` only feeds the "open elsewhere" link: the doorway base is the empty
+   * string (same origin), so treating "no base" as "use the fallback" framed an outside
+   * copy instead of the protocol's own.
    */
   private buildHtml5AppUrl(content: Html5AppContent): string {
-    // Get doorway URL with Che environment detection
     const doorwayUrl = this.resolveDoorwayUrl();
     const { slug, entryPoint } = content;
-
-    // If no doorway URL configured, try fallback
-    if (!doorwayUrl && content.fallbackUrl) {
-      return content.fallbackUrl;
-    }
-
     return `${doorwayUrl}/apps/${slug}/${entryPoint}`;
   }
 

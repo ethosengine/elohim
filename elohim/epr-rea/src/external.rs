@@ -53,7 +53,7 @@ use serde::{Deserialize, Serialize};
 
 use crate::actor::{parse_acting_participant, parse_participant_ref, ParticipantRef};
 use crate::error::{FabricError, Result};
-use crate::model::{AgentRef, Intent, PinnedRef, ResourceSpec};
+use crate::model::{atom_cid, AgentRef, Intent, PinnedRef, ResourceSpec};
 
 /// The envelope's slot prefixes, in encoding order.
 pub const SOURCE_SLOT: &str = "source:";
@@ -431,10 +431,61 @@ impl OfferDeclaration {
             .collect()
     }
 
+    /// The declaration's identity: every term and disclosure — inflows sorted by presence, held
+    /// capabilities by id — and never the `author`, who is the runner that drafted it. Two
+    /// documents that disclose the same things under the same terms share it; a different
+    /// drafter (or a model-name bump in the author ref) does not move it.
+    pub fn identity_cid(&self) -> Result<Cid> {
+        let mut inflows: Vec<&Inflow> = self.disclosure.inflows.iter().collect();
+        inflows.sort_by(|a, b| (&a.presence, &a.brings).cmp(&(&b.presence, &b.brings)));
+        let mut held: Vec<&HeldCapability> = self.disclosure.held_capabilities.iter().collect();
+        held.sort_by(|a, b| (&a.id, &a.what).cmp(&(&b.id, &b.what)));
+        atom_cid(&OfferIdentity {
+            offer_version: self.offer_version,
+            id: &self.id,
+            collective: &self.collective,
+            provider: &self.provider,
+            receiver: &self.receiver,
+            recipe: &self.recipe,
+            offered: &self.offered,
+            terms: &self.terms,
+            crosses_network: self.crosses_network,
+            inflows,
+            held_capabilities: held,
+            externalities: &self.disclosure.externalities,
+        })
+    }
+
     /// The Intent this offer mints: provider (`raised_by`) the collective, the receiver and terms
     /// in slots, scoped to `body` — the offer document's own body CID, so an approval is an
     /// approval of the exact text a Steward read and an edit re-addresses the offer.
-    pub fn intent(&self, body: Cid) -> Intent {
+    ///
+    /// Two slots after the terms bind the rest. `declaration:<CID>` is [`Self::identity_cid`]:
+    /// the frontmatter's disclosures are part of the address, so changing an inflow, a held
+    /// capability or an externality re-addresses the offer even when the body is unchanged.
+    /// `supersedes:<CID>` names the address the same document had under the earlier body-only
+    /// rule ([`Self::legacy_intent`]), so records scoped to an offer minted before the
+    /// declaration was bound still resolve, and lead to the Intent that replaces it. An approval
+    /// of the legacy address does not carry over: a Steward approves the full declaration anew.
+    pub fn intent(&self, body: Cid) -> Result<Intent> {
+        let legacy = self.legacy_intent(body);
+        let legacy_cid = atom_cid(&legacy)?;
+        let mut intent = legacy;
+        intent
+            .resource_spec
+            .classified_as
+            .push(format!("{DECLARATION_SLOT}{}", self.identity_cid()?));
+        intent
+            .resource_spec
+            .classified_as
+            .push(format!("{SUPERSEDES_SLOT}{legacy_cid}"));
+        Ok(intent)
+    }
+
+    /// The Intent under the earlier rule, scoped to the body alone: the frontmatter (its
+    /// disclosures included) was not part of the address. Kept only so records minted under it
+    /// resolve; [`Self::intent`] names it in its `supersedes:` slot.
+    pub fn legacy_intent(&self, body: Cid) -> Intent {
         Intent {
             action: ReaVerb::Produce,
             resource_spec: ResourceSpec {
@@ -451,6 +502,30 @@ impl OfferDeclaration {
             raised_by: AgentRef(self.provider.clone()),
         }
     }
+}
+
+/// The slot an offer's Intent carries naming its declaration identity ([`OfferDeclaration::identity_cid`]).
+pub const DECLARATION_SLOT: &str = "declaration:";
+/// The slot naming the address the same offer had under the body-only rule.
+pub const SUPERSEDES_SLOT: &str = "supersedes:";
+
+/// The identity-bearing view of an [`OfferDeclaration`]: everything but `author`, canonically
+/// ordered. Only ever hashed.
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+struct OfferIdentity<'a> {
+    offer_version: u32,
+    id: &'a str,
+    collective: &'a str,
+    provider: &'a str,
+    receiver: &'a str,
+    recipe: &'a RecipePin,
+    offered: &'a [String],
+    terms: &'a Terms,
+    crosses_network: bool,
+    inflows: Vec<&'a Inflow>,
+    held_capabilities: Vec<&'a HeldCapability>,
+    externalities: &'a Externalities,
 }
 
 /// An offer document: its path, the exact text an approval is of, and the validated declaration.
@@ -667,8 +742,10 @@ mod tests {
         json["terms"]["refundable"] = serde_json::Value::Bool(true);
         assert!(serde_json::from_value::<OfferDeclaration>(json).is_err());
 
-        let a = declaration().intent(scope());
-        let b = declaration().intent(elohim_epr::cid::compute_cid(b"edited"));
+        let a = declaration().intent(scope()).unwrap();
+        let b = declaration()
+            .intent(elohim_epr::cid::compute_cid(b"edited"))
+            .unwrap();
         assert_eq!(a.raised_by.0, "collective:ethosengine/elohim");
         assert_ne!(atom_cid(&a).unwrap(), atom_cid(&b).unwrap());
 
@@ -677,5 +754,62 @@ mod tests {
             OfferDocument::frontmatter("o.md", "---\nid: x\n---\nbody").unwrap(),
             "id: x"
         );
+    }
+
+    /// The offer's address binds its whole declaration, not only the body: a disclosure changed
+    /// in the frontmatter alone re-addresses it, while the runner (author) never does.
+    #[test]
+    fn the_intent_binds_the_declaration_and_never_the_author() {
+        let base = atom_cid(&declaration().intent(scope()).unwrap()).unwrap();
+
+        let mut disclosed = declaration();
+        disclosed.disclosure.inflows[0].brings = "the server and its plugins".into();
+        assert_ne!(
+            atom_cid(&disclosed.intent(scope()).unwrap()).unwrap(),
+            base,
+            "a changed inflow, same body, must re-address the offer"
+        );
+        let mut capability = declaration();
+        capability.disclosure.held_capabilities[0].what = "kubectl, and more".into();
+        assert_ne!(
+            atom_cid(&capability.intent(scope()).unwrap()).unwrap(),
+            base
+        );
+
+        let mut runner = declaration();
+        runner.author = "human:someone-else".into();
+        assert_eq!(atom_cid(&runner.intent(scope()).unwrap()).unwrap(), base);
+
+        // Reordering the disclosure lists is not a change of meaning.
+        let mut two = declaration();
+        two.disclosure.inflows.push(Inflow {
+            presence: "presence:another".into(),
+            brings: "x".into(),
+        });
+        let mut reordered = two.clone();
+        reordered.disclosure.inflows.reverse();
+        assert_eq!(
+            atom_cid(&two.intent(scope()).unwrap()).unwrap(),
+            atom_cid(&reordered.intent(scope()).unwrap()).unwrap()
+        );
+    }
+
+    /// The legacy, body-only address is named by the Intent that replaces it, and is exactly the
+    /// address the earlier rule minted (the pre-change shape, unchanged).
+    #[test]
+    fn the_intent_names_the_legacy_address_it_supersedes() {
+        let d = declaration();
+        let legacy = d.legacy_intent(scope());
+        assert_eq!(legacy.resource_spec.classified_as.len(), 5);
+        let legacy_cid = atom_cid(&legacy).unwrap();
+        let current = d.intent(scope()).unwrap();
+        let slots = &current.resource_spec.classified_as;
+        assert_eq!(&slots[..5], &legacy.resource_spec.classified_as[..]);
+        assert_eq!(
+            slots[5],
+            format!("{DECLARATION_SLOT}{}", d.identity_cid().unwrap())
+        );
+        assert_eq!(slots[6], format!("{SUPERSEDES_SLOT}{legacy_cid}"));
+        assert_ne!(atom_cid(&current).unwrap(), legacy_cid);
     }
 }

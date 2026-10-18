@@ -101,6 +101,11 @@ while read -r LOCAL_REF LOCAL_SHA REMOTE_REF REMOTE_SHA; do
 
   # Track push targets — sweettest tiering keys off "is this the dev push?"
   PUSH_TARGETS="$PUSH_TARGETS $REMOTE_REF"
+  # The commit being pushed is what the gate's evidence is keyed on (gate-evidence.mjs reads
+  # GATE_COMMIT; HEAD is only what this checkout happens to have). Last ref wins when a push
+  # carries several — the gate selection below is already the union of their diffs.
+  GATE_COMMIT="$LOCAL_SHA"
+  export GATE_COMMIT
 
   # Determine what changed
   if [ "$REMOTE_SHA" = "$ZERO_SHA" ]; then

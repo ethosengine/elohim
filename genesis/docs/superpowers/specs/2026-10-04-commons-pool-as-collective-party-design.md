@@ -13,9 +13,9 @@ cites:
   - "memory-search-scale-three-seams-design | Memory, search and scale | sha256:c119695543a2854f | path: genesis/docs/superpowers/specs/2026-09-12-memory-search-scale-three-seams-design.md"
   - "elohim-seam-map-concern-routing | The Elohim Seam Map | sha256:7ea7563016174974 | path: genesis/docs/content/elohim-protocol/architecture/2026-06-21-elohim-seam-map-concern-routing.md"
   - "hardware-providence-commons | Hardware Providence | sha256:17e52609abf5f92a | path: genesis/docs/content/elohim-protocol/hardware-providence-commons.md"
-  - "elohim-protocol-manifesto | manifesto | sha256:66c8e3b40b858b92 | path: genesis/docs/content/elohim-protocol/manifesto.md"
-  - "values-forward | values-forward | sha256:f4e7524522d3b811 | path: genesis/docs/content/elohim-protocol/values-forward.md"
-  - "private-thought-governed-fruit | private-thought-governed-fruit | sha256:5b6f5cdb858277e4 | path: genesis/docs/architecture/private-thought-governed-fruit.md"
+  - "elohim-protocol-manifesto | manifesto | sha256:bdfd593210e7fea0 | path: genesis/docs/content/elohim-protocol/manifesto.md"
+  - "values-forward | values-forward | sha256:0bfa006fd772f7d9 | path: genesis/docs/content/elohim-protocol/values-forward.md"
+  - "private-thought-governed-fruit | private-thought-governed-fruit | sha256:2945eb608257be1e | path: genesis/docs/architecture/private-thought-governed-fruit.md"
   - "swarm-curve-and-blind-custody-design | The swarm curve and blind custody | sha256:ef23b30ec9b8145c | path: genesis/docs/superpowers/specs/2026-08-23-swarm-curve-and-blind-custody-design.md"
   - "compute-envelope-tevah | Tevah | sha256:d427a367f3b01a6e | path: genesis/docs/superpowers/specs/2026-09-02-compute-envelope-tevah-design.md"
   - "eprfs-witnessed-interaction-primitive | The eprfs Witnessed-Interaction Primitive | sha256:6a24773ffd7b83f4 | path: genesis/docs/superpowers/specs/2026-07-15-eprfs-witnessed-interaction-primitive-design.md"
@@ -73,8 +73,16 @@ Taking the capture's recommendation (its §8 question 3):
 - **A pool is a `Collective`** with a charter that says what the pool is for.
 - **It holds a resource** classified `commons-pool:<kind>`. The kind is an open label that says
   what the pool is for (storage, index, inference, serving and compute are the ones §4 uses); it
-  is not a closed list. The resource is the thing governed. Any treasury that funds its care is a separate
-  resource; the two are never confused (`hardware-providence-commons.md` §8).
+  is not a closed list. The resource is the thing governed. Funding its care is distinct from
+  the facility, but there is no accumulating treasury: money passes through a settlement window,
+  weighted by the payer's chosen lens. Unclaimed money stays with the payer as a standing
+  commitment; recognition stays held in trust. Any fiat leg sits with a licensed, swappable
+  bridge institution, a member and never an authority (working memorandum §A4–A5;
+  `succession.md` §5.3). The commitment horizon, lapse and Jubilee timing remain open.
+- **The commons share is held in custody by the pool's elohim council**: plural, representative,
+  sized to what the holon can seat, with people the holon seats performing that role during the
+  network's infancy. Human sortition councils audit it and can overturn any contestable result.
+  The facility stays the members' produce, governed by their own acts (working memorandum §D3).
 - **A member contributes by a commitment that names the collective**, using the actions that
   exist: `replicates-content` for storage, `delegates-compute` for compute. The collective's
   address goes in the commitment's `recipient` field. The bounds (`epr_scope`, `reach_ceiling`, a

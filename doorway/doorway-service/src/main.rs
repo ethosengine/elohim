@@ -484,12 +484,20 @@ async fn async_main(worker_threads: usize) -> anyhow::Result<()> {
         // Admin URL: an explicit --conductor-admin-url wins in the single-conductor
         // case, else port - 1 (socat convention: 8444=admin, 8445=app).
         let admin_url = args.admin_url_for(i, url, conductor_urls.len());
+        // A conductor outside DOORWAY_HOSTING_CONDUCTORS is a member's own
+        // device: it stays in the pool for projection and discovery, hosts no one.
+        let capacity_max = if args.conductor_hosts_agents(url) {
+            max_agents_per_conductor
+        } else {
+            0
+        };
+        info!(conductor = %conductor_id, url = %url, capacity_max, "Conductor registered");
         registry.register_conductor(ConductorInfo {
             conductor_id,
             conductor_url: url.clone(),
             admin_url,
             capacity_used: 0,
-            capacity_max: max_agents_per_conductor,
+            capacity_max,
         });
     }
 
@@ -516,10 +524,11 @@ async fn async_main(worker_threads: usize) -> anyhow::Result<()> {
 
     // Discover existing agents on each conductor (populate registry for affinity routing)
     // Without this, agents provisioned before the registry existed would have no
-    // conductor affinity → requests load-balance via ClusterIP → CellMissing on wrong conductor
-    if conductor_urls.len() > 1 {
-        discover_existing_agents(&registry, &conductor_urls).await;
-    }
+    // conductor affinity → requests load-balance via ClusterIP → CellMissing on wrong conductor.
+    // Runs for a single conductor too: discovery is also where mappings whose cell
+    // is gone get pruned, and a one-conductor doorway (the household's operator
+    // doorway) otherwise keeps counting every agent it ever hosted.
+    discover_existing_agents(&registry, &conductor_urls).await;
 
     let registry = Arc::new(registry);
     state.conductor_registry = Some(Arc::clone(&registry));
@@ -2156,7 +2165,12 @@ async fn discover_existing_agents(registry: &ConductorRegistry, conductor_urls: 
 
     for (i, url) in conductor_urls.iter().enumerate() {
         let conductor_id = format!("conductor-{i}");
-        let admin_url = derive_admin_url_from_app(url);
+        // The admin URL the registry was configured with (an explicit
+        // --conductor-admin-url wins there), else the port-1 convention.
+        let admin_url = registry
+            .get_conductor_info(&conductor_id)
+            .map(|c| c.admin_url)
+            .unwrap_or_else(|| derive_admin_url_from_app(url));
         let admin = match tokio::time::timeout(
             Duration::from_secs(10),
             TypedAdminClient::connect(&admin_url),
@@ -2187,8 +2201,8 @@ async fn discover_existing_agents(registry: &ConductorRegistry, conductor_urls: 
         // ZomeCaller uses. A conductor that accepts the admin connection then
         // stalls (the live NXDOMAIN / half-open class) must NOT wedge boot for the
         // full 120s startup-probe budget — it degrades to a skipped conductor.
-        // Safe to skip: this fn only runs for conductor_urls.len() > 1, so one
-        // conductor's agents being missed leaves the others' routing intact.
+        // Safe to skip: a skipped conductor keeps its persisted mappings (no
+        // prune) and the other conductors' routing stays intact.
         let list_apps_result = match tokio::time::timeout(
             doorway::services::zome_caller::zome_call_timeout(),
             admin.list_apps(),
@@ -2208,6 +2222,18 @@ async fn discover_existing_agents(registry: &ConductorRegistry, conductor_urls: 
 
         match list_apps_result {
             Ok(apps) => {
+                // The conductor's own app list is the authority on who it hosts:
+                // drop persisted mappings whose cell is gone before counting.
+                let installed: std::collections::HashSet<(String, String)> = apps
+                    .iter()
+                    .map(|a| {
+                        (
+                            a.installed_app_id.clone(),
+                            doorway::conductor::agent_key::canonical_agent_key(&a.agent_pub_key),
+                        )
+                    })
+                    .collect();
+                registry.prune_absent(&conductor_id, &installed);
                 let mut conductor_agents = 0usize;
                 for app in &apps {
                     // Encode in both formats to match any JWT key encoding

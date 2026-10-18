@@ -63,6 +63,20 @@ impl MongoClient {
         })
     }
 
+    /// A client that has not connected (the driver connects lazily), for unit
+    /// tests that exercise in-memory state beside a store they never reach.
+    #[cfg(test)]
+    pub(crate) fn unconnected_for_test() -> Self {
+        let client = futures::executor::block_on(Client::with_uri_str(
+            "mongodb://127.0.0.1:1/?serverSelectionTimeoutMS=200&connectTimeoutMS=200",
+        ))
+        .expect("lazy client");
+        Self {
+            client,
+            db_name: "unconnected".to_string(),
+        }
+    }
+
     /// Get a typed collection
     pub async fn collection<T>(&self, name: &str) -> Result<MongoCollection<T>, DoorwayError>
     where

@@ -191,6 +191,79 @@ async function checkAttestationKindsParity() {
   return { failures, checks };
 }
 
+/**
+ * `_dnaMirror` parity: an enum whose DNA counterpart is a HAND-WRITTEN const inside an
+ * integrity zome (so it is never generated — generating into integrity moves the DNA
+ * hash). The const is read from its source file as text and must equal the schema tier
+ * it names, as a set. First user: rea-action.schema.json <-> content_store_integrity's
+ * REA_ACTIONS. A mismatch means one side moved without the other: an action appended to
+ * the DNA (a deliberate DNA move) must be added to the schema's tier in the same change,
+ * and a schema tier value the DNA lacks must wait for that move.
+ *
+ * @returns {Promise<{failures: number, checks: number}>}
+ */
+async function checkDnaMirrors(enumFiles) {
+  let failures = 0;
+  let checks = 0;
+
+  for (const file of enumFiles) {
+    const schema = JSON.parse(await readFile(join(SCHEMA_DIR, file), 'utf8'));
+    const mirror = schema._dnaMirror;
+    if (!mirror) continue;
+
+    const tier = mirror.tier ?? 'core';
+    const tierValues = tier === 'all' ? schema.enum : schema._tiers?.[tier]?.values;
+    if (!Array.isArray(tierValues)) {
+      console.error(`FAIL: ${file} _dnaMirror names tier "${tier}" but the schema has no such tier`);
+      failures++;
+      continue;
+    }
+
+    let source;
+    try {
+      source = await readFile(resolve(REPO_ROOT, mirror.file), 'utf8');
+    } catch {
+      console.error(`FAIL: ${file} _dnaMirror file not readable: ${mirror.file}`);
+      failures++;
+      continue;
+    }
+
+    const dnaValues = extractRustConstArray(source, mirror.constant);
+    if (!dnaValues) {
+      console.error(`FAIL: ${file} _dnaMirror: no const ${mirror.constant} in ${mirror.file}`);
+      failures++;
+      continue;
+    }
+
+    checks++;
+    const inDnaNotSchema = dnaValues.filter((v) => !tierValues.includes(v));
+    const inSchemaNotDna = tierValues.filter((v) => !dnaValues.includes(v));
+    const notInEnum = tierValues.filter((v) => !schema.enum.includes(v));
+    if (inDnaNotSchema.length === 0 && inSchemaNotDna.length === 0 && notInEnum.length === 0) {
+      console.log(
+        `PASS: ${file} _tiers.${tier} (${tierValues.length}) <-> hand-written ${mirror.constant} (${dnaValues.length}) in ${mirror.file}`,
+      );
+      continue;
+    }
+    if (inDnaNotSchema.length > 0) {
+      console.error(
+        `FAIL: ${mirror.constant} has ${JSON.stringify(inDnaNotSchema)} but ${file} _tiers.${tier} does not`,
+      );
+    }
+    if (inSchemaNotDna.length > 0) {
+      console.error(
+        `FAIL: ${file} _tiers.${tier} has ${JSON.stringify(inSchemaNotDna)} but ${mirror.constant} does not`,
+      );
+    }
+    if (notInEnum.length > 0) {
+      console.error(`FAIL: ${file} _tiers.${tier} has ${JSON.stringify(notInEnum)} outside its enum`);
+    }
+    failures += inDnaNotSchema.length + inSchemaNotDna.length + notInEnum.length;
+  }
+
+  return { failures, checks };
+}
+
 async function main() {
   let generatedSource;
   try {
@@ -283,6 +356,11 @@ async function main() {
   if (checks === 0) {
     console.log('No schemas with _dna mappings found.');
   }
+
+  // Hand-written DNA const parity (`_dnaMirror`, e.g. rea-action <-> REA_ACTIONS)
+  const mirrorResult = await checkDnaMirrors(enumFiles);
+  failures += mirrorResult.failures;
+  checks += mirrorResult.checks;
 
   // Attestation-kinds parity check (DNA-vs-manifest)
   const parityResult = await checkAttestationKindsParity();

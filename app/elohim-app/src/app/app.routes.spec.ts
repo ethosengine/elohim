@@ -42,6 +42,14 @@ describe('App Routes', () => {
     expect(eprRoute?.data?.['protocolContent']).toBe(true);
   });
 
+  it('redirects the legacy resource/:resourceId URL to the atom home (spec 2026-09-02 §11)', () => {
+    const legacy = routes.find(r => r.path === 'resource/:resourceId');
+    expect(legacy).toBeDefined();
+    expect(legacy?.loadComponent).toBeUndefined();
+    expect(typeof legacy?.redirectTo).toBe('function');
+    expect(legacy?.pathMatch).toBe('full');
+  });
+
   it('should have the raw-node inspector route epr/:resourceId/raw (§12.6 Slice 0)', () => {
     const rawRoute = routes.find(r => r.path === 'epr/:resourceId/raw');
     expect(rawRoute).toBeDefined();

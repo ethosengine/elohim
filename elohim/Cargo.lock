@@ -1187,6 +1187,7 @@ dependencies = [
 name = "elohim-epr"
 version = "0.1.0"
 dependencies = [
+ "base64",
  "chrono",
  "cid",
  "ed25519-dalek",
@@ -1231,6 +1232,14 @@ dependencies = [
  "serde_json",
  "tempfile",
  "thiserror 2.0.17",
+]
+
+[[package]]
+name = "elohim-live-session"
+version = "0.1.0"
+dependencies = [
+ "serde",
+ "sha2 0.10.9",
 ]
 
 [[package]]

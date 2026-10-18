@@ -1627,6 +1627,19 @@ diesel::table! {
     }
 }
 
+// Category C, local — which content rows THIS peer authored (local write
+// paths only; rows that arrive from peers are never written here). Read by the
+// heal-class re-author sweeps: a peer mints a DHT root only for a row it holds
+// local authoring authority for.
+diesel::table! {
+    content_local_authorship (h_app_id, content_id) {
+        h_app_id -> Text,
+        content_id -> Text,
+        authored_via -> Text,
+        marked_at -> Text,
+    }
+}
+
 // Category C, local — how each blob in this peer's blob store got here. Read
 // by the retention pass to tell this peer's own bytes from bytes another peer
 // placed and from bytes with no record.
@@ -2089,6 +2102,7 @@ diesel::allow_tables_to_appear_in_same_query!(
     collective_participations,
     collectives,
     content,
+    content_local_authorship,
     content_mastery,
     content_tags,
     contributor_dashboards,

@@ -14,6 +14,7 @@ import {
   signal,
   computed,
 } from '@angular/core';
+import { FormsModule } from '@angular/forms';
 import { CommonModule } from '@angular/common';
 import { HttpErrorResponse } from '@angular/common/http';
 import { Router, RouterLink } from '@angular/router';
@@ -88,7 +89,7 @@ const AGENCY_STEPS: PipelineStep[] = [
 @Component({
   selector: 'app-doorway-account',
   standalone: true,
-  imports: [CommonModule, RouterLink],
+  imports: [CommonModule, RouterLink, FormsModule],
   template: `
     <div class="account-page">
       <header class="page-header">
@@ -114,7 +115,54 @@ const AGENCY_STEPS: PipelineStep[] = [
         </div>
       }
 
+      @if (moveError()) {
+        <p role="alert" data-testid="move-to-node-error">{{ moveError() }}</p>
+      }
+      @if (moveResult()) {
+        <p role="status" data-testid="move-to-node-result">{{ moveResult() }}</p>
+      }
       @if (account()) {
+        @if (canMoveToNode()) {
+          <details
+            id="move-to-node"
+            class="card"
+            data-testid="move-to-node-panel"
+            [open]="movePanelOpen"
+          >
+            <summary>Move this account onto my node</summary>
+            <form (ngSubmit)="moveToNode()">
+              <label for="node-address">Node portal address</label>
+              <input
+                id="node-address"
+                name="nodeAddress"
+                type="url"
+                required
+                [(ngModel)]="nodeAddress"
+                data-testid="move-to-node-address"
+                placeholder="https://my-node.example"
+              />
+              <label for="node-password">Doorway password</label>
+              <input
+                id="node-password"
+                name="nodePassword"
+                type="password"
+                required
+                autocomplete="current-password"
+                [(ngModel)]="nodePassword"
+                data-testid="move-to-node-password"
+              />
+              <button
+                type="submit"
+                class="btn-primary"
+                [disabled]="moving()"
+                data-testid="move-to-node-submit"
+              >
+                {{ moving() ? 'Moving…' : 'Continue on my node' }}
+              </button>
+            </form>
+          </details>
+        }
+
         <!-- Account Info -->
         <section class="card account-info">
           <h2>Account</h2>
@@ -310,7 +358,7 @@ const AGENCY_STEPS: PipelineStep[] = [
         </section>
 
         <!-- Graduation CTA -->
-        @if (!account()?.isSteward) {
+        @if (!account()?.isSteward && account()?.agencyPhase !== 'node') {
           <section class="card graduation-cta">
             <h2>Graduate to Steward</h2>
             <p>As a steward, you run your own node and contribute to the network.</p>
@@ -515,8 +563,127 @@ export class DoorwayAccountComponent implements OnInit {
   readonly portalHostUrl = computed(() => this.portalHostSignal()?.hostUrl ?? null);
 
   ngOnInit(): void {
-    this.loadAccount();
-    this.loadPortalHost();
+    const fragment = new URLSearchParams((window.location.hash ?? '').replace(/^#/, ''));
+    if (fragment.has('challengeId')) {
+      void this.handleNodeKeyReturn().then(() => this.loadAccount());
+    } else {
+      void this.handleNodeKeyReturn();
+      void this.loadAccount();
+    }
+    void this.loadPortalHost();
+  }
+
+  readonly canMoveToNode = computed(
+    () => this.account()?.agencyPhase === 'hosted' && !this.account()?.isSteward
+  );
+  readonly moving = signal(false);
+  readonly moveError = signal<string | null>(null);
+  readonly moveResult = signal<string | null>(null);
+  readonly movePanelOpen = window.location.hash === '#move-to-node';
+  nodeAddress = '';
+  nodePassword = '';
+
+  async moveToNode(): Promise<void> {
+    if (this.moving() || !this.canMoveToNode()) return;
+    this.moveError.set(null);
+    let origin: string;
+    try {
+      const url = new URL(this.nodeAddress);
+      if (
+        !['https:', 'http:'].includes(url.protocol) ||
+        url.username ||
+        url.password ||
+        url.pathname !== '/' ||
+        url.search ||
+        url.hash
+      )
+        throw new Error('Invalid origin');
+      origin = url.origin;
+    } catch {
+      this.moveError.set(
+        'Enter your node portal address as an http or https origin, without a path.'
+      );
+      return;
+    }
+    this.moving.set(true);
+    const password = this.nodePassword;
+    this.nodePassword = '';
+    try {
+      const response = await this.adminService.challengeNodeKey(password);
+      try {
+        sessionStorage.setItem('elohim.node-key-bind.challengeId', response.challengeId);
+      } catch {
+        /* Storage may be disabled. */
+      }
+      const challenge = btoa(String.fromCharCode(...new TextEncoder().encode(response.challenge)))
+        .replaceAll('+', '-')
+        .replaceAll('/', '_')
+        .replace(/=+$/, '');
+      const returnUrl = window.location.href.split('#')[0];
+      window.location.assign(
+        `${origin}/consent/account-bind?challenge=${challenge}&return=${encodeURIComponent(returnUrl)}`
+      );
+    } catch (error) {
+      this.moveError.set(
+        nodeKeyRefusal(error instanceof HttpErrorResponse ? error.error?.code : undefined)
+      );
+    } finally {
+      this.moving.set(false);
+    }
+  }
+
+  private async handleNodeKeyReturn(): Promise<void> {
+    const fragment = new URLSearchParams((window.location.hash ?? '').replace(/^#/, ''));
+    const ceremonyKeys = ['refused', 'challengeId', 'agentPubKey', 'signature'];
+    if (!ceremonyKeys.some(key => fragment.has(key))) return;
+
+    // Every return is terminal: the fragment and the pending challenge are cleared before
+    // anything is judged, so a reload never replays a spent or refused answer.
+    let pending: string | null = null;
+    try {
+      pending = sessionStorage.getItem('elohim.node-key-bind.challengeId');
+      sessionStorage.removeItem('elohim.node-key-bind.challengeId');
+    } catch {
+      /* Storage may be disabled; with no pending challenge the return is refused below. */
+    }
+    history.replaceState(history.state, '', window.location.href.split('#')[0]);
+
+    if (fragment.has('refused')) {
+      this.moveError.set(nodeKeyRefusal(fragment.get('refused')));
+      return;
+    }
+    const challengeId = fragment.get('challengeId');
+    const agentPubKey = fragment.get('agentPubKey');
+    const signature = fragment.get('signature');
+    if (!challengeId || !agentPubKey || !signature) {
+      this.moveError.set(nodeKeyRefusal('NOT_A_BIND_CHALLENGE'));
+      return;
+    }
+    // Only an answer to a move started from this browser is sent on; a link carrying someone
+    // else's challenge is dropped here rather than spent at the doorway.
+    if (pending !== challengeId) {
+      this.moveError.set(nodeKeyRefusal('NOT_STARTED_HERE'));
+      return;
+    }
+    this.moving.set(true);
+    try {
+      const base64 = signature.replaceAll('-', '+').replaceAll('_', '/');
+      const response = await this.adminService.bindNodeKey({
+        challengeId,
+        agentPubKey,
+        signature: base64.padEnd(Math.ceil(base64.length / 4) * 4, '='),
+      });
+      this.authState.storeToken(response.token);
+      this.moveResult.set(
+        `This account now answers to your node's key ${response.agentPubKey.slice(0, 12)}…`
+      );
+    } catch (error) {
+      this.moveError.set(
+        nodeKeyRefusal(error instanceof HttpErrorResponse ? error.error?.code : undefined)
+      );
+    } finally {
+      this.moving.set(false);
+    }
   }
 
   async loadAccount(): Promise<void> {
@@ -527,6 +694,11 @@ export class DoorwayAccountComponent implements OnInit {
       const account = await this.adminService.getAccount().toPromise();
       if (account) {
         this.account.set(account);
+        if (this.moveResult() && account.previousAgentPubKey) {
+          this.moveResult.update(
+            result => `${result} Previous key: ${account.previousAgentPubKey}`
+          );
+        }
       } else {
         this.error.set('Unable to load account. Please sign in.');
       }
@@ -646,9 +818,37 @@ export class DoorwayAccountComponent implements OnInit {
   isCurrentStep(step: AgencyStep): boolean {
     const acct = this.account();
     if (!acct) return step === 'hosted';
-    if (acct.isSteward) return step === 'steward';
+    if (acct.isSteward || acct.agencyPhase === 'node') return step === 'steward';
     if (this.runsOwnConductor()) return step === 'install_app';
     if (acct.keyExported) return step === 'key_export';
     return step === 'hosted';
   }
+}
+
+function nodeKeyRefusal(code: string | null | undefined): string {
+  const messages: Record<string, string> = {
+    DECLINED: 'You declined on your node. Nothing changed.',
+    NO_TOKEN: 'Sign in to this doorway to move your account.',
+    INVALID_TOKEN: 'Your doorway session has expired; sign in again.',
+    WRONG_PASSWORD: 'That password did not match your doorway account.',
+    NOT_HOSTED: 'This account is no longer hosted by this doorway.',
+    NO_SESSION: 'Sign in on your node before approving the move.',
+    SESSION_NOT_BOUND:
+      'Sign in on your node again from this browser, so the session carries this browser’s device key.',
+    PROOF_REFUSED: 'Your node could not verify your sign-in proof; sign in again.',
+    NOT_A_BIND_CHALLENGE: 'Your node did not recognize this request; start the move again.',
+    CHALLENGE_EXPIRED: 'This request has expired; start the move again.',
+    NO_CONDUCTOR: 'Your node cannot reach its conductor; try again when it is running.',
+    CHALLENGE_UNKNOWN: 'This request has expired or was already used; start the move again.',
+    CHALLENGE_NOT_YOURS:
+      'This request belongs to another doorway account; sign in to the account that started it.',
+    SAME_KEY: 'This account already uses that key.',
+    SIGNATURE_INVALID: 'The doorway could not verify your node’s signature; start the move again.',
+    KEY_MOVED: 'This account’s key changed during the move; reload the account page.',
+    NOT_STARTED_HERE:
+      'This answer is not for a move started from this browser. Nothing changed; start the move here.',
+  };
+  return (
+    messages[code ?? ''] ?? 'The move could not be completed; reload your account and try again.'
+  );
 }

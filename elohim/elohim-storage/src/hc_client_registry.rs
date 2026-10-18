@@ -55,6 +55,113 @@ pub fn should_warn_still_down(attempt: u32) -> bool {
 /// throwaway reproduction measured end-to-end.
 pub const BRIDGE_PROBE_INTERVAL: Duration = Duration::from_secs(20);
 
+/// The longest a QUIET, HEALTHY role goes between `app_info` round trips of its
+/// own.
+///
+/// The supervisor still TICKS every [`BRIDGE_PROBE_INTERVAL`]; what backs off is
+/// the question it puts to the conductor. A ping exists to supply evidence where
+/// there is none, and a role whose socket just answered — a zome call returned,
+/// or the last ping did — has evidence already. Four roles asking every 20s was
+/// 12 conductor round trips a minute per node with nobody acting: twice the
+/// whole `idle-is-free` budget, spent re-learning a settled fact.
+///
+/// What the stretch costs, exactly: an app websocket that dies ALONE (admin
+/// still answering, no caller on the role, no failed call to wake the
+/// supervisor) is found within this bound instead of within 20s — or at once by
+/// the first caller, whose failure wakes the supervisor. A conductor RESTART is
+/// not stretched: it takes the admin socket with it, the shared membership read
+/// fails on the next tick, and [`decide_probe`] asks immediately.
+pub const BRIDGE_QUIET_PROBE_CAP: Duration = Duration::from_secs(300);
+
+/// How long a healthy role's last app-websocket answer keeps vouching for it,
+/// after `quiet_probes` consecutive pings that were asked only because the
+/// window ran out and answered `Running`: 20s, 40s, 80s, 160s, then the cap.
+pub fn quiet_probe_spacing(quiet_probes: u32) -> Duration {
+    let shift = quiet_probes.min(16);
+    let secs = BRIDGE_PROBE_INTERVAL
+        .as_secs()
+        .saturating_mul(1u64 << shift);
+    Duration::from_secs(secs.min(BRIDGE_QUIET_PROBE_CAP.as_secs()))
+}
+
+/// Everything one supervisor tick knows before it decides whether to spend an
+/// `app_info` round trip.
+#[derive(Debug, Clone, Copy)]
+pub struct ProbeEvidence {
+    /// The tick was woken by the zome-call path rather than by the timer.
+    pub woken: bool,
+    /// Transport-closed failures on the current mint's socket.
+    pub closed_streak: u32,
+    /// Every role this probe vouches for is observed `Live` — no open
+    /// not-running episode, no unanswered transport failure, no role still
+    /// `Unknown`.
+    pub all_vouched_roles_live: bool,
+    /// The shared membership read's last attempt failed: the conductor's admin
+    /// socket is not answering, which is what a conductor restart looks like
+    /// from here.
+    pub membership_read_failed: bool,
+    /// The current mint's app websocket has not answered since the latest
+    /// process-wide doubt ([`TransportLedger::raise_doubt`]): some role's
+    /// socket closed, the admin read failed, or a bridge was re-minted, and
+    /// this role has not yet shown its own socket survived it.
+    pub owes_answer_since_doubt: bool,
+    /// How long ago bytes last crossed the current mint's app websocket (a
+    /// returned zome call or an answered ping); `None` = never on this mint.
+    pub app_socket_answered_ago: Option<Duration>,
+    /// Consecutive window-elapsed pings that answered `Running`.
+    pub quiet_probes: u32,
+}
+
+/// Why a tick spends a ping — or that it does not have to.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum ProbeDecision {
+    /// Something is, or may be, wrong: ask now and stay attentive.
+    AskForCause,
+    /// Nothing is wrong and nothing has vouched for the socket within the
+    /// current spacing: ask, and lengthen the spacing if it answers `Running`.
+    AskWindowElapsed,
+    /// The socket answered recently enough and every observation is healthy.
+    Vouched,
+}
+
+/// Does this tick need to ask the conductor anything?
+///
+/// Pure, so the whole policy is asserted in tests. The order is the argument:
+/// any sign of trouble asks at once, whatever the spacing says; only a role with
+/// no such sign is allowed to rest on evidence it already holds.
+pub fn decide_probe(ev: ProbeEvidence) -> ProbeDecision {
+    if ev.woken
+        || ev.closed_streak > 0
+        || !ev.all_vouched_roles_live
+        || ev.membership_read_failed
+        || ev.owes_answer_since_doubt
+    {
+        return ProbeDecision::AskForCause;
+    }
+    match ev.app_socket_answered_ago {
+        Some(ago) if ago < quiet_probe_spacing(ev.quiet_probes) => ProbeDecision::Vouched,
+        _ => ProbeDecision::AskWindowElapsed,
+    }
+}
+
+/// Has `role`'s bridge been vouched for by its own traffic within `window`?
+///
+/// For a caller that would otherwise ping only to learn what a returned zome
+/// call already proved (the heartbeat, whose own `record_peer_status` write
+/// crosses this socket every tick). `false` on any doubt, so the caller pings.
+pub fn bridge_vouched_within(role: &str, generation: u64, window: Duration) -> bool {
+    let ledger = transport_ledger();
+    ledger.streak(role, generation) == 0
+        && ledger.answered_since_doubt(role, generation)
+        && crate::conductor_bridge_health::role_bridge_health()
+            .for_role(role)
+            .status()
+            == crate::conductor_bridge_health::ZomePathStatus::Live
+        && ledger
+            .answered_ago(role, generation)
+            .is_some_and(|ago| ago < window)
+}
+
 /// How many CONSECUTIVE transport-closed zome-call failures on one mint's app
 /// websocket re-mint the role's bridge without asking `ping` first.
 ///
@@ -66,26 +173,100 @@ pub const BRIDGE_PROBE_INTERVAL: Duration = Duration::from_secs(20);
 /// Small on purpose: three in a row on one generation is past any doubt.
 pub const TRANSPORT_CLOSED_REMINT_BOUND: u32 = 3;
 
-/// One role's transport-closed streak, scoped to the mint that produced it.
+/// What the ledger knows about ONE connection (one mint) of a role.
+#[derive(Debug, Default, Clone, Copy)]
+struct MintTransport {
+    streak: u32,
+    /// When bytes last crossed this mint's socket.
+    last_ok: Option<std::time::Instant>,
+    /// The process-wide doubt epoch ([`TransportLedger::raise_doubt`]) the
+    /// newest credited answer was ASKED in. An answer from before the latest
+    /// doubt vouches for nothing.
+    ok_epoch: u64,
+    /// When this record was last written (an answer or a failure): what
+    /// eviction orders by.
+    touched: Option<std::time::Instant>,
+}
+
+/// How many replaced mints a role remembers, to drop their late reports.
+const RETIRED_REMEMBERED_PER_ROLE: usize = 256;
+
+/// How many mints of one role the ledger remembers at once.
+///
+/// A role has one supervised client, a few long-lived unsupervised ones (the
+/// identity fill's `imagodei`, the heal legs' late-connected `lamad`), and
+/// short-lived side clients minted per apply or per lineage tick. The ceiling
+/// is far above the long-lived set so that churn from the short-lived ones
+/// evicts each other, least recently written first, and not a record a
+/// supervisor is still writing to.
+const MINTS_REMEMBERED_PER_ROLE: usize = 64;
+
+/// One role's transport evidence, PER MINT, and the handle its supervisor
+/// waits on.
 #[derive(Debug, Default)]
 struct RoleTransport {
-    generation: u64,
-    streak: u32,
+    mints: std::collections::BTreeMap<u64, MintTransport>,
+    /// Mints an adoption has replaced. A late failure from one of these says
+    /// nothing about its successor and is dropped.
+    retired: std::collections::BTreeSet<u64>,
     wake: Arc<tokio::sync::Notify>,
 }
 
-/// Process-wide record of transport-closed evidence from the zome-call path,
-/// per role, keyed by connection generation
+impl RoleTransport {
+    /// The record for `generation`, made if absent and stamped as written now.
+    fn mint(&mut self, generation: u64, now: std::time::Instant) -> &mut MintTransport {
+        if !self.mints.contains_key(&generation) && self.mints.len() >= MINTS_REMEMBERED_PER_ROLE {
+            // Forget the LEAST RECENTLY WRITTEN, not the lowest generation: the
+            // supervised client is the oldest mint in the process and the one
+            // whose record matters most. Forgetting is always the asking
+            // direction — an unknown mint has never answered and is pinged.
+            let stalest = self
+                .mints
+                .iter()
+                .min_by_key(|(_, m)| m.touched)
+                .map(|(generation, _)| *generation);
+            if let Some(stalest) = stalest {
+                self.mints.remove(&stalest);
+            }
+        }
+        let mint = self.mints.entry(generation).or_default();
+        mint.touched = Some(now);
+        mint
+    }
+}
+
+/// Process-wide record of transport evidence from the zome-call path, per role
+/// AND per connection generation
 /// ([`crate::hc_client::HcClient::connection_generation`]).
 ///
 /// It carries the one fact the supervisor could not see for itself: that the
-/// socket callers are USING has closed. Reports against an older generation
-/// than the one on record come from a socket already replaced and are dropped,
-/// so a burst of stale failures can never re-arm a re-mint of a healthy
-/// successor.
+/// socket callers are USING has closed — and, since 2026-10-12, when that
+/// socket last answered.
+///
+/// PER MINT, NOT "THE ROLE'S CURRENT MINT". More than one live client can carry
+/// the same role name: the registry's supervised `imagodei` client and the
+/// reconcile controller's own, the supervised `lamad` client and the import
+/// API's. Tracking one generation per role and letting the newest win made the
+/// unsupervised client's traffic displace the supervised one's record: every
+/// answer the supervisor's own pings got was discarded as "older than the mint
+/// on record" (measured: `imagodei` pinged on every tick and never rested),
+/// and its closed-streak read zero whatever its socket did. Generations are
+/// process-wide unique, so keeping them apart needs no other identity.
+///
+/// A failure from a socket an ADOPTION has replaced is dropped
+/// ([`Self::retire`]), so a burst of stale failures can never re-arm a re-mint
+/// of a healthy successor.
 #[derive(Debug, Default)]
 pub struct TransportLedger {
     roles: std::sync::Mutex<std::collections::HashMap<String, RoleTransport>>,
+    /// Raised whenever ANYTHING suggests the conductor on the far side may not
+    /// be the one the roles' sockets were opened to: a closed app websocket on
+    /// any role, a failed admin read, a re-mint. It is an OBLIGATION, not a
+    /// level: every mint must get an answer over its own app websocket AFTER
+    /// the latest raise before it may rest on evidence again, and nothing —
+    /// in particular another role's recovery clearing the shared membership
+    /// error — discharges that for it.
+    doubt_epoch: std::sync::atomic::AtomicU64,
 }
 
 impl TransportLedger {
@@ -94,8 +275,22 @@ impl TransportLedger {
         f(roles.entry(role.to_string()).or_default())
     }
 
+    /// `generation`'s socket has been replaced (its client adopted a fresh
+    /// mint). Its record is dropped and any report still in flight from it is
+    /// ignored from here on.
+    pub fn retire(&self, role: &str, generation: u64) {
+        self.with_role(role, |r| {
+            r.mints.remove(&generation);
+            r.retired.insert(generation);
+            while r.retired.len() > RETIRED_REMEMBERED_PER_ROLE {
+                r.retired.pop_first();
+            }
+        })
+    }
+
     /// Record one transport-closed failure on `generation`'s socket; returns
-    /// the streak on that generation (0 for a stale report, which is dropped).
+    /// the streak on that generation (0 for a report from a retired mint,
+    /// which is dropped).
     ///
     /// Wakes the role's supervisor on the FIRST failure of a generation (so a
     /// dead socket is pinged now rather than up to 20s from now) and again when
@@ -103,41 +298,125 @@ impl TransportLedger {
     /// somehow still answers `ping` is re-minted anyway). Two wakes per
     /// generation at most: a flood of failures cannot spin the supervisor.
     pub fn note_closed(&self, role: &str, generation: u64) -> u32 {
-        self.with_role(role, |r| {
-            if generation < r.generation {
-                return 0;
+        let mut roles = self.roles.lock().unwrap_or_else(|e| e.into_inner());
+        let r = roles.entry(role.to_string()).or_default();
+        if r.retired.contains(&generation) {
+            return 0;
+        }
+        let mint = r.mint(generation, std::time::Instant::now());
+        mint.streak = mint.streak.saturating_add(1);
+        let streak = mint.streak;
+        if streak == 1 || streak == TRANSPORT_CLOSED_REMINT_BOUND {
+            r.wake.notify_one();
+        }
+        if streak == 1 {
+            self.doubt_epoch
+                .fetch_add(1, std::sync::atomic::Ordering::SeqCst);
+        }
+        // ONE ROLE'S CLOSED SOCKET IS NEWS FOR ALL OF THEM. Every role dials the
+        // same conductor, and a conductor restart closes every app websocket at
+        // once — but a quiet role, resting on its last answer, has no caller to
+        // find that out. So the FIRST closed failure of a mint wakes the other
+        // roles' supervisors too, and a woken tick always asks (`decide_probe`).
+        // If only this socket died the siblings spend one ping each and rest
+        // again; if the conductor restarted they all re-mint now instead of at
+        // the end of their spacing. Once per mint, so a flood cannot spin them.
+        if streak == 1 {
+            for (other, sibling) in roles.iter() {
+                if other != role {
+                    sibling.wake.notify_one();
+                }
             }
-            if generation > r.generation {
-                r.generation = generation;
-                r.streak = 0;
-            }
-            r.streak = r.streak.saturating_add(1);
-            if r.streak == 1 || r.streak == TRANSPORT_CLOSED_REMINT_BOUND {
-                r.wake.notify_one();
-            }
-            r.streak
-        })
+        }
+        streak
     }
 
     /// Bytes crossed `generation`'s socket: its closed-streak is over.
     pub fn note_ok(&self, role: &str, generation: u64) {
+        self.note_ok_at(role, generation, std::time::Instant::now())
+    }
+
+    /// [`Self::note_ok`] with the clock passed in, for a question asked NOW.
+    pub fn note_ok_at(&self, role: &str, generation: u64, at: std::time::Instant) {
+        self.note_ok_asked_in(role, generation, at, self.doubt_epoch());
+    }
+
+    /// The doubt epoch in force now. A caller reads this BEFORE it dispatches
+    /// a question and hands it back with the answer.
+    pub fn doubt_epoch(&self) -> u64 {
+        self.doubt_epoch.load(std::sync::atomic::Ordering::SeqCst)
+    }
+
+    /// Bytes crossed `generation`'s socket in answer to a question asked while
+    /// `asked_epoch` was in force.
+    ///
+    /// THE ANSWER IS CREDITED TO THE EPOCH ITS QUESTION WAS ASKED IN, not the
+    /// one it is recorded in. A response can be received just before the
+    /// conductor is replaced and recorded just after another role has raised
+    /// doubt about it; stamped with the epoch at RECORDING it would discharge
+    /// an obligation it predates. An answer from an older epoch still clears
+    /// the closed-streak and refreshes the age — bytes did cross — but never
+    /// moves the mint's discharged epoch backwards.
+    pub fn note_ok_asked_in(
+        &self,
+        role: &str,
+        generation: u64,
+        at: std::time::Instant,
+        asked_epoch: u64,
+    ) {
         self.with_role(role, |r| {
-            if generation >= r.generation {
-                r.generation = generation;
-                r.streak = 0;
+            if r.retired.contains(&generation) {
+                return;
             }
+            let mint = r.mint(generation, at);
+            mint.streak = 0;
+            mint.last_ok = Some(at);
+            mint.ok_epoch = mint.ok_epoch.max(asked_epoch);
         })
     }
 
-    /// The current closed-streak for `generation` (0 for any other).
-    pub fn streak(&self, role: &str, generation: u64) -> u32 {
+    /// Something suggests the conductor may have changed under the roles'
+    /// sockets. Every mint owes an answer over its own app websocket after
+    /// this before it may rest again.
+    pub fn raise_doubt(&self) {
+        self.doubt_epoch
+            .fetch_add(1, std::sync::atomic::Ordering::SeqCst);
+    }
+
+    /// Has `generation`'s socket answered since the latest doubt was raised?
+    pub fn answered_since_doubt(&self, role: &str, generation: u64) -> bool {
+        let epoch = self.doubt_epoch.load(std::sync::atomic::Ordering::SeqCst);
         self.with_role(role, |r| {
-            if r.generation == generation {
-                r.streak
-            } else {
-                0
-            }
+            r.mints
+                .get(&generation)
+                .is_some_and(|m| m.last_ok.is_some() && m.ok_epoch == epoch)
         })
+    }
+
+    /// How long ago bytes last crossed `generation`'s socket; `None` when they
+    /// never have.
+    pub fn answered_ago(&self, role: &str, generation: u64) -> Option<Duration> {
+        self.answered_ago_at(role, generation, std::time::Instant::now())
+    }
+
+    /// [`Self::answered_ago`] with the clock passed in.
+    pub fn answered_ago_at(
+        &self,
+        role: &str,
+        generation: u64,
+        now: std::time::Instant,
+    ) -> Option<Duration> {
+        self.with_role(role, |r| {
+            r.mints
+                .get(&generation)
+                .and_then(|m| m.last_ok)
+                .map(|at| now.saturating_duration_since(at))
+        })
+    }
+
+    /// The current closed-streak for `generation` (0 when it has none).
+    pub fn streak(&self, role: &str, generation: u64) -> u32 {
+        self.with_role(role, |r| r.mints.get(&generation).map_or(0, |m| m.streak))
     }
 
     /// The handle a role's supervisor waits on between ticks.
@@ -152,6 +431,11 @@ pub fn transport_ledger() -> &'static TransportLedger {
     LEDGER.get_or_init(TransportLedger::default)
 }
 
+/// `role`'s client has replaced `generation`'s sockets with a fresh mint.
+pub fn retire_transport_generation(role: &str, generation: u64) {
+    transport_ledger().retire(role, generation);
+}
+
 /// A zome call (or ping) on `role`'s client failed transport-closed on the
 /// socket minted as `generation`.
 pub fn note_transport_closed(role: &str, generation: u64) {
@@ -159,8 +443,16 @@ pub fn note_transport_closed(role: &str, generation: u64) {
 }
 
 /// A zome call (or ping) on `role`'s client got an answer over `generation`.
-pub fn note_transport_ok(role: &str, generation: u64) {
-    transport_ledger().note_ok(role, generation);
+///
+/// `asked_in_doubt_epoch` is [`TransportLedger::doubt_epoch`] as read before the
+/// question was dispatched (`HcConnection::asked_in_doubt_epoch`).
+pub fn note_transport_ok(role: &str, generation: u64, asked_in_doubt_epoch: u64) {
+    transport_ledger().note_ok_asked_in(
+        role,
+        generation,
+        std::time::Instant::now(),
+        asked_in_doubt_epoch,
+    );
 }
 
 /// Does this closed-streak re-mint the bridge without a ping?
@@ -224,6 +516,10 @@ pub struct HcClientRegistry {
     /// knows no URLs, and [`Self::connect_app`] fails closed there rather than
     /// guessing a localhost default.
     inputs: Option<HcRegistryInputs>,
+    /// One gate per [`SUPERVISED_ROLES`] entry, held by whoever is filling
+    /// that role's EMPTY slot: a late connect ([`Self::supervised_client`]) or
+    /// the supervisor's re-mint. See [`acquire_through_slot`].
+    connect_gates: [tokio::sync::Mutex<()>; SUPERVISED_ROLES.len()],
 }
 
 /// The roles the supervisor keeps alive. Ordered coldest-first, matching the
@@ -531,6 +827,46 @@ pub(crate) async fn execute_not_running_action(
     .await
 }
 
+/// The handle in `slot`, connecting and storing one if the slot is empty.
+///
+/// `gate` makes filling a slot single-flight. Without it two waiters on an
+/// empty slot would each dial, and the loser would walk away holding a client
+/// that is not the one in the slot — unsupervised, which is the defect
+/// [`HcClientRegistry::supervised_client`] exists to prevent. The supervisor
+/// holds the same gate from before it clears a slot until the re-minted
+/// handle is back in it, so a waiter arriving mid-re-mint gets that handle
+/// instead of storing a rival the supervisor would then overwrite.
+///
+/// Generic over the handle so the slot discipline is testable without a
+/// conductor. `connect` returns `None` only when it gave up (shutdown).
+pub(crate) async fn acquire_through_slot<T, F, Fut>(
+    slot: &RwLock<Option<Arc<T>>>,
+    gate: &tokio::sync::Mutex<()>,
+    mut shutdown: tokio::sync::broadcast::Receiver<()>,
+    connect: F,
+) -> Option<Arc<T>>
+where
+    F: FnOnce(tokio::sync::broadcast::Receiver<()>) -> Fut,
+    Fut: std::future::Future<Output = Option<Arc<T>>>,
+{
+    let held =
+        |slot: &RwLock<Option<Arc<T>>>| slot.read().unwrap_or_else(|e| e.into_inner()).clone();
+    if let Some(hc) = held(slot) {
+        return Some(hc);
+    }
+    let _filling = tokio::select! {
+        guard = gate.lock() => guard,
+        _ = shutdown.recv() => return None,
+    };
+    // Whoever held the gate may have filled the slot while this waited.
+    if let Some(hc) = held(slot) {
+        return Some(hc);
+    }
+    let fresh = connect(shutdown).await?;
+    *slot.write().unwrap_or_else(|e| e.into_inner()) = Some(Arc::clone(&fresh));
+    Some(fresh)
+}
+
 /// Connection inputs. Mirrors the relevant CLI args without depending on
 /// the Args struct directly (cleaner test surface).
 #[derive(Debug, Clone)]
@@ -560,6 +896,7 @@ impl HcClientRegistry {
             lamad: RwLock::new(lamad),
             node_registry: RwLock::new(node_registry),
             inputs: Some(inputs.clone()),
+            connect_gates: Default::default(),
         }
     }
 
@@ -572,6 +909,7 @@ impl HcClientRegistry {
             lamad: RwLock::new(None),
             node_registry: RwLock::new(None),
             inputs: None,
+            connect_gates: Default::default(),
         }
     }
 
@@ -636,6 +974,43 @@ impl HcClientRegistry {
         if let Some(slot) = self.slot(role) {
             *slot.write().unwrap_or_else(|e| e.into_inner()) = hc;
         }
+    }
+
+    fn connect_gate(&self, role: &str) -> Option<&tokio::sync::Mutex<()>> {
+        let at = SUPERVISED_ROLES.iter().position(|r| *r == role)?;
+        self.connect_gates.get(at)
+    }
+
+    /// The SUPERVISED handle for `role`, waiting for it if the role is not
+    /// connected yet. `None` only on shutdown, for a role with no slot, or on
+    /// a registry that never dialed a conductor and holds no handle.
+    ///
+    /// For a long-lived task that keeps the handle for the life of the
+    /// process. [`Self::connect_role_forever`] hands back a client nothing
+    /// watches: the supervisor re-mints only the handle in the slot, so after
+    /// a conductor restart a privately connected client holds a closed socket
+    /// for good — and each of its failures is filed against the role, waking
+    /// the supervisor to ping a bridge that is fine. The handle returned here
+    /// is the one in the slot, so the re-mint's in-place adoption reaches it.
+    ///
+    /// When the bounded boot ramp left the slot empty this connects (forever,
+    /// like `connect_role_forever`) and STORES the result, which is also what
+    /// brings a late role under the supervisor at all: its loop skips a role
+    /// whose slot is empty.
+    pub async fn supervised_client(
+        &self,
+        role: &str,
+        shutdown: tokio::sync::broadcast::Receiver<()>,
+    ) -> Option<Arc<HcClient>> {
+        acquire_through_slot(
+            self.slot(role)?,
+            self.connect_gate(role)?,
+            shutdown,
+            |shutdown| async move {
+                Self::connect_role_forever(self.inputs.as_ref()?, role, shutdown).await
+            },
+        )
+        .await
     }
 
     /// Snapshot the current `infrastructure` handle.
@@ -1191,10 +1566,14 @@ impl HcClientRegistry {
                 // and when the last one landed: the pacing in `remint_spacing`.
                 let mut consecutive_remints: u32 = 0;
                 let mut last_remint: Option<tokio::time::Instant> = None;
+                // Window-elapsed pings in a row that answered `Running`: the
+                // rung of `quiet_probe_spacing` this role rests on.
+                let mut quiet_probes: u32 = 0;
                 loop {
+                    let mut woken = false;
                     tokio::select! {
                         _ = tokio::time::sleep(BRIDGE_PROBE_INTERVAL) => {}
-                        _ = wake.notified() => {}
+                        _ = wake.notified() => { woken = true; }
                         _ = shutdown_rx.recv() => {
                             info!(role, "bridge supervisor exiting (shutdown)");
                             return;
@@ -1262,6 +1641,48 @@ impl HcClientRegistry {
                              waiting on a ping"
                         );
                     } else {
+                        // ASK ONLY WHEN THERE IS SOMETHING TO LEARN. A role whose
+                        // socket answered inside its spacing, with every
+                        // observation healthy and the admin read answering, is
+                        // not asked again: see `decide_probe`.
+                        // A failed admin read is doubt for EVERY role, and must
+                        // outlive the read's own recovery: the role that
+                        // re-mints first refreshes membership over its fresh
+                        // admin socket and clears the shared error while the
+                        // others still hold sockets to the old process.
+                        let membership_read_failed = crate::services::cell_membership::membership()
+                            .last_error()
+                            .is_some();
+                        if membership_read_failed {
+                            transport_ledger().raise_doubt();
+                        }
+                        let decision = decide_probe(ProbeEvidence {
+                            woken,
+                            closed_streak: streak,
+                            all_vouched_roles_live: crate::hc_client::roles_a_probe_vouches_for(
+                                role,
+                            )
+                            .into_iter()
+                            .all(|vouched| {
+                                crate::conductor_bridge_health::role_bridge_health()
+                                    .for_role(vouched)
+                                    .status()
+                                    == crate::conductor_bridge_health::ZomePathStatus::Live
+                            }),
+                            membership_read_failed,
+                            owes_answer_since_doubt: !transport_ledger()
+                                .answered_since_doubt(role, generation),
+                            app_socket_answered_ago: transport_ledger()
+                                .answered_ago(role, generation),
+                            quiet_probes,
+                        });
+                        if decision == ProbeDecision::Vouched {
+                            // Healthy evidence since the last re-mint, exactly
+                            // as an answered ping would be.
+                            consecutive_remints = 0;
+                            crate::metrics::inc_bridge_probe_vouched(role, "supervisor");
+                            continue;
+                        }
                         // `ping` crosses the authenticated APP websocket used by
                         // zome calls (not merely the independently-live admin
                         // websocket) and folds its result into the zome-path
@@ -1296,6 +1717,14 @@ impl HcClientRegistry {
                                     .await;
                                 }
                                 consecutive_remints = 0;
+                                // Only a ping asked because the window ran out
+                                // lengthens the next window; one asked for cause
+                                // keeps the role on the shortest rung.
+                                quiet_probes = if decision == ProbeDecision::AskWindowElapsed {
+                                    quiet_probes.saturating_add(1)
+                                } else {
+                                    0
+                                };
                                 continue;
                             }
                             Ok(BridgeProbe::NotRunning { reason }) => {
@@ -1304,6 +1733,7 @@ impl HcClientRegistry {
                                 // answering perfectly well; the cure for this state
                                 // is `enable_app`, on a bounded ladder.
                                 consecutive_remints = 0;
+                                quiet_probes = 0;
                                 Self::try_enable_disabled_app(&inputs, role, &hc, &reason).await;
                                 continue;
                             }
@@ -1315,6 +1745,12 @@ impl HcClientRegistry {
                              re-minting the app auth token; zome routes answer 503 until it lands"
                         );
                     }
+
+                    // A re-mint puts the role back on the shortest rung, and is
+                    // itself doubt for every other role: the process on the far
+                    // side may be a new one.
+                    quiet_probes = 0;
+                    transport_ledger().raise_doubt();
 
                     // PACE a re-mint that follows another with no healthy probe
                     // between them (the first after a restart is immediate).
@@ -1328,6 +1764,14 @@ impl HcClientRegistry {
                             }
                         }
                     }
+
+                    // Hold the role's connect gate for as long as the slot is
+                    // empty, so a `supervised_client` waiter takes the handle
+                    // this re-mint stores rather than dialing one of its own.
+                    let filling = match registry.connect_gate(role) {
+                        Some(gate) => Some(gate.lock().await),
+                        None => None,
+                    };
 
                     // Clear the slot FIRST, so nothing NEW picks up the dead
                     // handle and `/health` stops advertising its DNA hashes.
@@ -1378,10 +1822,15 @@ impl HcClientRegistry {
                                  identity changed) — storing it as a NEW handle; consumers that \
                                  cloned the old one keep failing until they re-read the registry"
                             );
+                            // The abandoned handle's socket is dead and will
+                            // never be adopted into: its late failures are not
+                            // news about the handle now in the slot.
+                            retire_transport_generation(role, hc.connection_generation());
                             fresh
                         }
                     };
                     registry.set_client(role, Some(Arc::clone(&serving)));
+                    drop(filling);
 
                     // "Live" is said about the socket zome calls will use, and
                     // only after it has answered.
@@ -1408,6 +1857,347 @@ impl HcClientRegistry {
                 }
             });
         }
+    }
+}
+
+#[cfg(test)]
+mod quiet_probe_tests {
+    use super::*;
+
+    fn healthy(answered_ago_secs: Option<u64>, quiet_probes: u32) -> ProbeEvidence {
+        ProbeEvidence {
+            woken: false,
+            closed_streak: 0,
+            all_vouched_roles_live: true,
+            membership_read_failed: false,
+            owes_answer_since_doubt: false,
+            app_socket_answered_ago: answered_ago_secs.map(Duration::from_secs),
+            quiet_probes,
+        }
+    }
+
+    #[test]
+    fn the_spacing_doubles_from_the_tick_to_the_cap_and_holds() {
+        let secs: Vec<u64> = (0..7).map(|n| quiet_probe_spacing(n).as_secs()).collect();
+        assert_eq!(secs, vec![20, 40, 80, 160, 300, 300, 300]);
+        assert_eq!(quiet_probe_spacing(u32::MAX), BRIDGE_QUIET_PROBE_CAP);
+        assert_eq!(quiet_probe_spacing(0), BRIDGE_PROBE_INTERVAL);
+    }
+
+    #[test]
+    fn a_socket_that_never_answered_on_this_mint_is_always_asked() {
+        // Fresh boot and the tick after a re-mint whose first probe failed.
+        for quiet in [0, 4, 99] {
+            assert_eq!(
+                decide_probe(healthy(None, quiet)),
+                ProbeDecision::AskWindowElapsed
+            );
+        }
+    }
+
+    #[test]
+    fn a_healthy_role_rests_on_an_answer_inside_its_spacing_and_no_longer() {
+        assert_eq!(decide_probe(healthy(Some(19), 0)), ProbeDecision::Vouched);
+        // The tick after a ping lands exactly one interval later: asked, so a
+        // role with no traffic climbs the ladder one rung per answered ping.
+        assert_eq!(
+            decide_probe(healthy(Some(20), 0)),
+            ProbeDecision::AskWindowElapsed
+        );
+        assert_eq!(decide_probe(healthy(Some(299), 4)), ProbeDecision::Vouched);
+        assert_eq!(
+            decide_probe(healthy(Some(300), 4)),
+            ProbeDecision::AskWindowElapsed
+        );
+        assert_eq!(
+            decide_probe(healthy(Some(300), 40)),
+            ProbeDecision::AskWindowElapsed,
+            "no rung outlives the cap"
+        );
+    }
+
+    #[test]
+    fn any_sign_of_trouble_asks_now_whatever_the_spacing_says() {
+        // The freshest possible answer on the longest rung: the most this
+        // policy would ever rest on. Each doubt alone overrides it.
+        let rested = healthy(Some(0), 9);
+        assert_eq!(decide_probe(rested), ProbeDecision::Vouched);
+        let doubts = [
+            ProbeEvidence {
+                woken: true,
+                ..rested
+            },
+            ProbeEvidence {
+                closed_streak: 1,
+                ..rested
+            },
+            ProbeEvidence {
+                all_vouched_roles_live: false,
+                ..rested
+            },
+            ProbeEvidence {
+                membership_read_failed: true,
+                ..rested
+            },
+            ProbeEvidence {
+                owes_answer_since_doubt: true,
+                ..rested
+            },
+        ];
+        for doubt in doubts {
+            assert_eq!(decide_probe(doubt), ProbeDecision::AskForCause, "{doubt:?}");
+        }
+    }
+
+    #[test]
+    fn a_quiet_node_asks_about_once_per_cap_not_once_per_tick() {
+        // Drive the supervisor's own arithmetic for an hour with no traffic:
+        // every ping answers `Running` and stamps the ledger, exactly as
+        // `HcClient::ping` does.
+        let mut quiet_probes = 0u32;
+        let mut answered_at: Option<u64> = None;
+        let mut pings = 0u32;
+        let tick = BRIDGE_PROBE_INTERVAL.as_secs();
+        let mut now = 0u64;
+        while now < 3600 {
+            now += tick;
+            match decide_probe(healthy(answered_at.map(|at| now - at), quiet_probes)) {
+                ProbeDecision::Vouched => {}
+                ProbeDecision::AskWindowElapsed => {
+                    pings += 1;
+                    answered_at = Some(now);
+                    quiet_probes += 1;
+                }
+                ProbeDecision::AskForCause => unreachable!("nothing is wrong"),
+            }
+        }
+        // 20, 40, 80, 160, 320 to climb, then one per 300s: 15 in the hour,
+        // against 180 at one per tick.
+        assert_eq!(pings, 15);
+    }
+
+    #[test]
+    fn traffic_inside_the_spacing_spares_every_ping() {
+        // A role with a returned zome call every 60s (the heartbeat's write on
+        // `infrastructure`): once the spacing passes 60s it is never asked.
+        let mut quiet_probes = 0u32;
+        let mut answered_at: Option<u64> = None;
+        let mut pings = 0u32;
+        let mut now = 0u64;
+        while now < 3600 {
+            now += BRIDGE_PROBE_INTERVAL.as_secs();
+            if now.is_multiple_of(60) {
+                answered_at = Some(now - 1); // the write returned just before this tick
+            }
+            if decide_probe(healthy(answered_at.map(|at| now - at), quiet_probes))
+                == ProbeDecision::AskWindowElapsed
+            {
+                pings += 1;
+                answered_at = Some(now);
+                quiet_probes += 1;
+            }
+        }
+        assert!(
+            pings <= 2,
+            "asked {pings} times in an hour of steady traffic"
+        );
+    }
+
+    #[test]
+    fn the_ledger_ages_an_answer_per_mint_and_forgets_it_with_the_mint() {
+        let ledger = TransportLedger::default();
+        let t0 = std::time::Instant::now();
+        assert_eq!(ledger.answered_ago_at("r", 1, t0), None, "never answered");
+        ledger.note_ok_at("r", 1, t0);
+        assert_eq!(
+            ledger.answered_ago_at("r", 1, t0 + Duration::from_secs(45)),
+            Some(Duration::from_secs(45))
+        );
+        // Another mint's answer is not this mint's.
+        assert_eq!(ledger.answered_ago_at("r", 2, t0), None);
+        // The client adopts mint 2: mint 1's record goes with it, and a late
+        // answer or failure from the replaced socket is dropped.
+        ledger.retire("r", 1);
+        assert_eq!(
+            ledger.answered_ago_at("r", 1, t0 + Duration::from_secs(1)),
+            None
+        );
+        ledger.note_ok_at("r", 1, t0 + Duration::from_secs(2));
+        assert_eq!(
+            ledger.answered_ago_at("r", 1, t0 + Duration::from_secs(3)),
+            None
+        );
+        assert_eq!(ledger.note_closed("r", 1), 0);
+        assert_eq!(ledger.note_closed("r", 2), 1);
+        assert_eq!(ledger.streak("r", 2), 1);
+    }
+
+    /// THE DEFECT THE FIRST HOUSEHOLD READING SHOWED. Two live clients carry
+    /// the role name `imagodei`: the supervised one (older mint) and the
+    /// reconcile controller's (newer). With one generation per role, the
+    /// newer client's traffic displaced the supervised client's record, every
+    /// answer its pings got was discarded, and it pinged on every tick.
+    #[test]
+    fn two_live_clients_of_one_role_do_not_displace_each_other() {
+        let ledger = TransportLedger::default();
+        let t0 = std::time::Instant::now();
+        let (supervised, unsupervised) = (3, 9);
+        ledger.note_ok_at("imagodei", supervised, t0);
+        // The unsupervised client has traffic of its own, on a NEWER mint.
+        for s in 1..=10 {
+            ledger.note_ok_at("imagodei", unsupervised, t0 + Duration::from_secs(s));
+        }
+        // The supervised client's evidence is still its own, and still there.
+        assert_eq!(
+            ledger.answered_ago_at("imagodei", supervised, t0 + Duration::from_secs(15)),
+            Some(Duration::from_secs(15))
+        );
+        assert!(ledger.answered_since_doubt("imagodei", supervised));
+        ledger.note_ok_at("imagodei", supervised, t0 + Duration::from_secs(20));
+        assert_eq!(
+            ledger.answered_ago_at("imagodei", supervised, t0 + Duration::from_secs(20)),
+            Some(Duration::ZERO)
+        );
+        // And its closed socket is seen, though it is the OLDER mint — before,
+        // a failure on it was dropped as stale and its streak read zero.
+        assert_eq!(ledger.note_closed("imagodei", supervised), 1);
+        assert_eq!(ledger.streak("imagodei", supervised), 1);
+        assert_eq!(ledger.streak("imagodei", unsupervised), 0);
+    }
+
+    /// Short-lived side clients churn through the ledger; the record a
+    /// supervisor keeps writing to must survive them, however old its mint.
+    #[test]
+    fn churn_evicts_the_least_recently_written_mint_never_the_one_in_use() {
+        let ledger = TransportLedger::default();
+        let t0 = std::time::Instant::now();
+        let supervised = 1; // the oldest generation in the process
+        ledger.note_ok_at("r", supervised, t0);
+        let mut generation = 100;
+        for tick in 1..=20u64 {
+            let at = t0 + Duration::from_secs(20 * tick);
+            // The supervisor's own answer, every tick...
+            ledger.note_ok_at("r", supervised, at);
+            // ...and a burst of new side clients, more than the ledger holds.
+            for _ in 0..(MINTS_REMEMBERED_PER_ROLE / 2) {
+                generation += 1;
+                ledger.note_ok_at("r", generation, at);
+            }
+            assert_eq!(
+                ledger.answered_ago_at("r", supervised, at),
+                Some(Duration::ZERO),
+                "tick {tick}: the supervised record was evicted by churn"
+            );
+        }
+        // The stalest side clients were the ones forgotten.
+        assert_eq!(ledger.answered_ago_at("r", 101, t0), None);
+        assert!(ledger.answered_ago_at("r", generation, t0).is_some());
+    }
+
+    #[tokio::test]
+    async fn the_first_closed_socket_of_a_mint_wakes_every_other_roles_supervisor() {
+        let ledger = TransportLedger::default();
+        let quiet = ledger.wake("quiet");
+        let also_quiet = ledger.wake("also-quiet");
+        let failing = ledger.wake("failing");
+        // Drain nothing: `notify_one` stores a permit for a waiter that has not
+        // arrived yet, which is exactly the supervisor between ticks.
+        assert_eq!(ledger.note_closed("failing", 1), 1);
+        let soon = Duration::from_millis(50);
+        for (name, wake) in [
+            ("quiet", &quiet),
+            ("also-quiet", &also_quiet),
+            ("failing", &failing),
+        ] {
+            assert!(
+                tokio::time::timeout(soon, wake.notified()).await.is_ok(),
+                "{name} was not woken"
+            );
+        }
+        // The second failure of the same mint wakes nobody: once per mint.
+        assert_eq!(ledger.note_closed("failing", 1), 2);
+        assert!(tokio::time::timeout(soon, quiet.notified()).await.is_err());
+        // The third re-mints the failing role without a ping, and still leaves
+        // the siblings alone.
+        assert_eq!(
+            ledger.note_closed("failing", 1),
+            TRANSPORT_CLOSED_REMINT_BOUND
+        );
+        assert!(tokio::time::timeout(soon, failing.notified()).await.is_ok());
+        assert!(tokio::time::timeout(soon, quiet.notified()).await.is_err());
+        // A NEW mint failing is a new first failure.
+        assert_eq!(ledger.note_closed("failing", 2), 1);
+        assert!(tokio::time::timeout(soon, quiet.notified()).await.is_ok());
+    }
+
+    /// The schedule the independent review found: the conductor restarts, role
+    /// A re-mints first and its fresh admin socket clears the shared membership
+    /// error — while quiet role B still holds a socket to the old process, a
+    /// `Live` status and a recent answer. B must still owe a ping.
+    #[test]
+    fn another_roles_recovery_does_not_discharge_this_roles_obligation() {
+        let ledger = TransportLedger::default();
+        let t0 = std::time::Instant::now();
+        ledger.note_ok_at("a", 1, t0);
+        ledger.note_ok_at("b", 1, t0);
+        assert!(ledger.answered_since_doubt("a", 1) && ledger.answered_since_doubt("b", 1));
+
+        // Any one of: A's socket closes, the admin read fails, A is re-minted.
+        ledger.raise_doubt();
+        assert!(!ledger.answered_since_doubt("a", 1));
+        assert!(!ledger.answered_since_doubt("b", 1));
+
+        // A re-mints (generation 2) and its fresh socket answers.
+        ledger.note_ok_at("a", 2, t0 + Duration::from_secs(1));
+        assert!(ledger.answered_since_doubt("a", 2));
+        // B has answered nothing since: its old answer vouches for nothing,
+        // however recent, and whatever the shared membership read now says.
+        assert!(!ledger.answered_since_doubt("b", 1));
+        // B's own socket answers: the obligation is discharged for B alone.
+        ledger.note_ok_at("b", 1, t0 + Duration::from_secs(2));
+        assert!(ledger.answered_since_doubt("b", 1));
+
+        // A closed socket on one role is doubt for all.
+        assert_eq!(ledger.note_closed("a", 2), 1);
+        assert!(!ledger.answered_since_doubt("b", 1));
+        // THE IN-FLIGHT ANSWER (review round two): B asked before the doubt,
+        // the reply was already on its way, and it is RECORDED after. It is
+        // credited to the epoch it was asked in and discharges nothing.
+        let asked_before = ledger.doubt_epoch();
+        ledger.raise_doubt();
+        ledger.note_ok_asked_in("b", 1, t0 + Duration::from_secs(3), asked_before);
+        assert!(!ledger.answered_since_doubt("b", 1));
+        // Bytes did cross, though: the age is fresh and the streak is clear.
+        assert_eq!(
+            ledger.answered_ago_at("b", 1, t0 + Duration::from_secs(3)),
+            Some(Duration::ZERO)
+        );
+        // Asked after the doubt, it does discharge; and a straggler from the
+        // older epoch arriving later still cannot undo that.
+        ledger.note_ok_asked_in("b", 1, t0 + Duration::from_secs(4), ledger.doubt_epoch());
+        ledger.note_ok_asked_in("b", 1, t0 + Duration::from_secs(5), asked_before);
+        assert!(ledger.answered_since_doubt("b", 1));
+        // An answer on a mint the ledger is not tracking never counts.
+        assert!(!ledger.answered_since_doubt("b", 7));
+        assert!(!ledger.answered_since_doubt("never-seen", 1));
+    }
+
+    #[test]
+    fn the_supervisor_consults_the_decision_before_it_pings() {
+        // Source scan: the ping must stay behind `decide_probe`, and a vouched
+        // tick must leave the loop before reaching it.
+        let src = include_str!("hc_client_registry.rs");
+        let body = src
+            .split("pub fn spawn_bridge_supervisor(")
+            .nth(1)
+            .expect("supervisor");
+        let decide = body.find("decide_probe(ProbeEvidence {").expect("decision");
+        let vouched = body
+            .find("if decision == ProbeDecision::Vouched {")
+            .expect("vouched exit");
+        let ping = body.find("match hc.ping().await").expect("ping");
+        assert!(decide < vouched && vouched < ping);
+        assert!(body[vouched..ping].contains("continue;"));
     }
 }
 
@@ -1513,6 +2303,151 @@ mod supervised_slot_tests {
             "the cross-cell driver must itself be a supervised role, or nothing spawns the task \
              that tends mishpat"
         );
+    }
+
+    // ---- a late role is acquired THROUGH its slot -------------------------
+
+    /// Stands in for an `HcClient`: only its identity matters here.
+    struct Handle;
+
+    fn shutdown_pair() -> (
+        tokio::sync::broadcast::Sender<()>,
+        tokio::sync::broadcast::Receiver<()>,
+    ) {
+        tokio::sync::broadcast::channel::<()>(1)
+    }
+
+    fn in_slot(slot: &RwLock<Option<Arc<Handle>>>) -> Option<Arc<Handle>> {
+        slot.read().unwrap().clone()
+    }
+
+    /// The property a long-lived task depends on: the handle it is given for a
+    /// role that connected late IS the one in the slot, because the slot's
+    /// handle is the only one the supervisor re-mints after a conductor
+    /// restart. A handle from `connect_role_forever` alone is in no slot.
+    #[tokio::test]
+    async fn a_late_connection_is_stored_in_the_slot_it_was_awaited_through() {
+        let slot = RwLock::new(None);
+        let gate = tokio::sync::Mutex::new(());
+        let (_tx, rx) = shutdown_pair();
+
+        let got = acquire_through_slot(&slot, &gate, rx, |_| async { Some(Arc::new(Handle)) })
+            .await
+            .expect("connected");
+
+        let supervised = in_slot(&slot).expect("the late connection reached the slot");
+        assert!(Arc::ptr_eq(&got, &supervised));
+    }
+
+    #[tokio::test]
+    async fn a_connected_role_is_handed_out_without_dialing() {
+        let boot = Arc::new(Handle);
+        let slot = RwLock::new(Some(Arc::clone(&boot)));
+        let gate = tokio::sync::Mutex::new(());
+        let (_tx, rx) = shutdown_pair();
+
+        let got = acquire_through_slot(&slot, &gate, rx, |_| async {
+            panic!("a role that is already connected is never dialed again")
+        })
+        .await
+        .expect("held");
+
+        assert!(Arc::ptr_eq(&got, &boot));
+    }
+
+    #[tokio::test]
+    async fn waiters_on_one_empty_slot_share_one_connection() {
+        let slot = RwLock::new(None);
+        let gate = tokio::sync::Mutex::new(());
+        let dials = std::sync::atomic::AtomicU32::new(0);
+        let (tx, _rx) = shutdown_pair();
+        let dials = &dials;
+        let dial = |_: tokio::sync::broadcast::Receiver<()>| async move {
+            dials.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
+            // Stay in the connect long enough for the other waiter to arrive.
+            tokio::task::yield_now().await;
+            Some(Arc::new(Handle))
+        };
+
+        let (a, b) = tokio::join!(
+            acquire_through_slot(&slot, &gate, tx.subscribe(), dial),
+            acquire_through_slot(&slot, &gate, tx.subscribe(), dial),
+        );
+
+        assert_eq!(dials.load(std::sync::atomic::Ordering::SeqCst), 1);
+        let supervised = in_slot(&slot).expect("stored");
+        assert!(Arc::ptr_eq(&a.expect("a"), &supervised));
+        assert!(Arc::ptr_eq(&b.expect("b"), &supervised));
+    }
+
+    /// The supervisor clears the slot for the length of a re-mint and then
+    /// puts the handle it adopted into back. A waiter that arrives in that gap
+    /// must leave with that handle, not store a rival the supervisor's write
+    /// would displace.
+    #[tokio::test]
+    async fn a_waiter_arriving_mid_remint_takes_the_reminted_handle() {
+        let slot = Arc::new(RwLock::new(None));
+        let gate = Arc::new(tokio::sync::Mutex::new(()));
+        let (_tx, rx) = shutdown_pair();
+
+        let reminting = gate.clone().lock_owned().await;
+        let waiter = tokio::spawn({
+            let (slot, gate) = (Arc::clone(&slot), Arc::clone(&gate));
+            async move {
+                acquire_through_slot(&slot, &gate, rx, |_| async {
+                    panic!("the re-mint in flight owns this slot")
+                })
+                .await
+            }
+        });
+        tokio::task::yield_now().await;
+        assert!(!waiter.is_finished(), "it waits on the re-mint");
+
+        let reminted = Arc::new(Handle);
+        *slot.write().unwrap() = Some(Arc::clone(&reminted));
+        drop(reminting);
+
+        let got = waiter.await.expect("joined").expect("handle");
+        assert!(Arc::ptr_eq(&got, &reminted));
+    }
+
+    #[tokio::test]
+    async fn shutdown_releases_a_waiter_held_behind_the_gate() {
+        let slot: Arc<RwLock<Option<Arc<Handle>>>> = Arc::new(RwLock::new(None));
+        let gate = Arc::new(tokio::sync::Mutex::new(()));
+        let (tx, rx) = shutdown_pair();
+
+        let _filling = gate.clone().lock_owned().await;
+        let waiter = tokio::spawn({
+            let (slot, gate) = (Arc::clone(&slot), Arc::clone(&gate));
+            async move {
+                acquire_through_slot(&slot, &gate, rx, |_| async {
+                    panic!("shutdown came first")
+                })
+                .await
+            }
+        });
+        tokio::task::yield_now().await;
+        tx.send(()).expect("a waiter is subscribed");
+
+        assert!(waiter.await.expect("joined").is_none());
+    }
+
+    #[tokio::test]
+    async fn a_registry_with_no_conductor_and_no_handle_has_nothing_to_wait_for() {
+        let reg = HcClientRegistry::empty();
+        let (tx, _rx) = shutdown_pair();
+        // No slot for the role: a miss, not a hang.
+        assert!(reg
+            .supervised_client("qahal", tx.subscribe())
+            .await
+            .is_none());
+        // A slot, but no conductor URLs to dial with.
+        assert!(reg
+            .supervised_client("imagodei", tx.subscribe())
+            .await
+            .is_none());
+        assert!(reg.imagodei_client().is_none());
     }
 
     #[test]
@@ -2580,7 +3515,9 @@ mod transport_remint_tests {
         for _ in 0..5 {
             ledger.note_closed("lamad", 1);
         }
-        // Re-minted: the successor answers.
+        // Re-minted: the client adopts mint 2, retiring mint 1, and the
+        // successor answers.
+        ledger.retire("lamad", 1);
         ledger.note_ok("lamad", 2);
         // In-flight calls that started on the OLD socket fail late.
         for _ in 0..10 {

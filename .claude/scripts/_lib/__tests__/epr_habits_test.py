@@ -82,6 +82,63 @@ def test_evidence_is_the_body_and_survives_the_round_trip():
         assert "    evidence: >" in lines, lines
 
 
+LEDGER = """DELTA 2026-09-11 (older, written second): the first observation.
+with a wrapped line.
+
+DELTA 2026-09-12 (newer, written first): the newest observation.
+"""
+
+
+def test_register_projects_the_newest_delta_by_date_with_a_fingerprint():
+    """The register carries the newest DELTA entry BY DATE, not the last one in the file (atoms
+    are not reliably newest-first), beside the body's cite fingerprint, byte count and entry
+    count — the ledger stays whole in the atom. This is what keeps the projection under the
+    recall contract's `habit_register_bytes` budget (1,076,077 B against 1,048,576 on
+    2026-10-14, bootstrap refused on every prompt)."""
+    with tempfile.TemporaryDirectory() as td:
+        root = Path(td)
+        p = _write(root, "svc", "ledgered", patch=[("2026-08-27: declared.\n", LEDGER)])
+        h = eh.load(p)
+        assert eh.delta_entries(h["evidence"]) == [
+            ("2026-09-11", "DELTA 2026-09-11 (older, written second): the first observation.\n"
+                           "with a wrapped line."),
+            ("2026-09-12", "DELTA 2026-09-12 (newer, written first): the newest observation."),
+        ], eh.delta_entries(h["evidence"])
+        lines = eh.project_habit(h)
+        text = "\n".join(lines)
+        assert "DELTA 2026-09-12 (newer" in text, text
+        assert "DELTA 2026-09-11 (older" not in text, text
+        from _lib import cite_graph
+        assert f"    evidence-fingerprint: {cite_graph.fingerprint_text(h['evidence'])}" in lines
+        assert "    evidence-bytes: " + str(len(h["evidence"].encode("utf-8"))) in lines, lines
+        assert "    evidence-entries: 2" in lines, lines
+        # An older-dated append changes only the fingerprint, byte and entry lines — the
+        # register grows with the newest entry, never with the ledger.
+        p.write_text(p.read_text(encoding="utf-8") + "\nDELTA 2026-09-10 (oldest): late note.\n",
+                     encoding="utf-8")
+        again = eh.project_habit(eh.load(p))
+        changed = [ln for ln in set(lines) ^ set(again)]
+        assert all(ln.startswith(("    evidence-fingerprint:", "    evidence-bytes:",
+                                  "    evidence-entries:")) for ln in changed), changed
+
+
+def test_same_day_letters_order_deltas_before_file_position():
+    """`2026-10-13c` is newer than `2026-10-13b` is newer than `2026-10-13`, wherever each sits
+    in the atom — the idle-is-free atom carries 10-13 at its top, 10-13c second and 10-13b
+    last, and the register must name c (found by a peer session's Codex read, 2026-10-14)."""
+    body = ("DELTA 2026-10-13 (plain): first of the day.\n\n"
+            "DELTA 2026-10-13c (third): newest of the day.\n\n"
+            "DELTA 2026-10-12e (yesterday): older.\n\n"
+            "DELTA 2026-10-13b (second): middle of the day.\n")
+    assert eh.newest_delta(body) == "DELTA 2026-10-13c (third): newest of the day."
+    assert [d for d, _ in eh.delta_entries(body)] == ["2026-10-13", "2026-10-13c", "2026-10-12e", "2026-10-13b"]
+
+
+def test_a_body_without_deltas_projects_whole():
+    assert eh.newest_delta("2026-08-27: declared.") == "2026-08-27: declared."
+    assert eh.delta_entries("no ledger here") == []
+
+
 def test_list_valued_evidence_stays_in_the_frontmatter():
     """`reach-enforced-everywhere` carries a LIST of evidence entries, not a prose ledger. Moving
     it to the body would silently change the field's TYPE — the projection would emit a folded

@@ -45,6 +45,15 @@ describe('AgencyService', () => {
     error: null,
   });
 
+  it('reads node phase as node-steward from the doorway account', () => {
+    mockAuthService.isAuthenticated.mockReturnValue(true);
+    vi.spyOn(TestBed.inject(HostingAccountService), 'account').mockReturnValue({
+      agencyPhase: 'node',
+      isSteward: false,
+    } as ReturnType<HostingAccountService['account']>);
+    expect(service.currentStage()).toBe('node-steward');
+  });
+
   beforeEach(() => {
     // Create connection signal
     connectionSignal = signal<HolochainConnection>({

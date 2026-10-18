@@ -625,6 +625,16 @@ class StoreUnavailableTest(unittest.TestCase):
         self.assertIn(os.path.join(self.store, "berth.lock"), r.stderr)
         self.assertIn("lane proceeds unleased", r.stderr)
 
+    def test_help_prints_usage_and_never_takes_a_lease(self):
+        for args in (("claim", "--help"), ("release", "-h"), ("--help",), ("who", "--help")):
+            r = self.run_berth(*args, BERTH_DIR=self.store, BERTH_SESSION="dev")
+            self.assertEqual(r.returncode, 0, (args, r.stderr))
+            self.assertIn("berth claim", r.stdout, args)
+        r = self.run_berth("who", "--", BERTH_DIR=self.store, BERTH_SESSION="dev")
+        self.assertEqual(r.stdout.strip(), "null")
+        leases = os.path.join(self.store, "leases")
+        self.assertFalse(os.path.exists(leases) and any("help" in n for n in os.listdir(leases)))
+
     def test_a_store_that_cannot_be_created_exits_4(self):
         missing = "/proc/berth-no-such-store"  # mkdir under /proc fails for every uid, root included
         r = self.run_berth("claim", "mesh", "--ttl", "60", BERTH_DIR=missing, BERTH_SESSION="stage:probe")

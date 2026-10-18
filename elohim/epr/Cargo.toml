@@ -24,6 +24,9 @@ chrono.workspace = true
 thiserror.workspace = true
 ts-rs = { workspace = true, features = ["chrono-impl", "serde-compat"] }
 hex.workspace = true
+# Decodes Subresource Integrity digests (npm/pnpm `integrity: sha512-<base64>`) for
+# `cid::raw_cid_from_sri`. Already in Cargo.lock at 0.22.1 via other members.
+base64 = "0.22"
 
 [dev-dependencies]
 rand = "0.8"

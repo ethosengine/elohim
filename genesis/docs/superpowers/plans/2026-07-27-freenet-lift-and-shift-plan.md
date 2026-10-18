@@ -10,7 +10,7 @@ topic: [freenet, prior-art, sync-scale-honesty, hosting-budget, reach-negotiatio
 cites:
   - genesis/research/freenet-peer-confrontation-2026-07-27.md
   - genesis/manifests/habits.yaml
-  - stewardship-over-sovereignty | stewardship-over-sovereignty | sha256:995eb2079924ea2e | path: genesis/docs/architecture/stewardship-over-sovereignty.md
+  - "stewardship-over-sovereignty | stewardship-over-sovereignty | sha256:5186f53fbeb95a65 | path: genesis/docs/architecture/stewardship-over-sovereignty.md"
 ---
 
 # Freenet lift-and-shift — implementation plan

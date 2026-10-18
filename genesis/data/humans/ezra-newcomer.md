@@ -1,6 +1,7 @@
 ---
 id: "human-ezra-newcomer"
 displayName: "Ezra"
+agencyPhase: "hosted"
 category: "newcomer"
 profileReach: "private"
 bio: "New to the network. Eager to contribute but still building trust and understanding norms."

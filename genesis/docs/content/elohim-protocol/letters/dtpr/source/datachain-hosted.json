@@ -1,0 +1,47 @@
+{
+  "id": "elohim-protocol-hosted-stage",
+  "schema_version": "dtpr@2026-09-01-beta",
+  "created_at": "2026-10-14T18:00:00Z",
+  "instance_version": "production commitment, drafted from the alpha protocol",
+  "title": [{ "locale": "en", "value": "Elohim Protocol, while a doorway hosts you" }],
+  "description": [{ "locale": "en", "value": "Before you run your own node, a doorway can give you a web address and run your node for you. This is a first stage, not a destination: it costs the doorway real resources, so it is designed to be outgrown. Many doorways can front the same network, and a doorway answers to the people who come through it." }],
+  "elements": [
+    { "element_id": "entry", "priority": 0, "variables": [{ "id": "additional_description", "value": [{ "locale": "en", "value": "A doorway gives you a web address and signs you in from an ordinary browser before you run your own node." }] }] },
+
+    { "element_id": "organization", "element_instance_id": "accountable-doorway", "context_type_id": "deployer", "priority": 0, "variables": [
+      { "id": "title", "value": [{ "locale": "en", "value": "The doorway that hosts you" }] },
+      { "id": "description", "value": [{ "locale": "en", "value": "Runs your node and keeps your key, encrypted with your password, until you take it to your own device. Its operator holds that role through a signed commitment and answers to the people who come through the doorway." }] }
+    ] },
+    { "element_id": "organization", "element_instance_id": "accountable-authors", "context_type_id": "vendor", "priority": 1, "variables": [
+      { "id": "title", "value": [{ "locale": "en", "value": "Elohim Protocol contributors" }] },
+      { "id": "description", "value": [{ "locale": "en", "value": "Write the open-source rules the doorway and every node run, stewarded by Matthew Dowell." }] }
+    ] },
+
+    { "element_id": "people", "element_instance_id": "affected-you", "context_type_id": "subject", "priority": 0, "variables": [
+      { "id": "title", "value": [{ "locale": "en", "value": "You, at your first stage" }] },
+      { "id": "description", "value": [{ "locale": "en", "value": "While you are hosted, the doorway can see your account and signs for you when you act." }] }
+    ] },
+
+    { "element_id": "acts", "context_type_id": "human_decides", "priority": 0, "variables": [{ "id": "additional_description", "value": [{ "locale": "en", "value": "Signs what you choose to do, with your key, on your behalf." }] }] },
+
+    { "element_id": "security_breach", "priority": 0, "variables": [
+      { "id": "risk", "value": [{ "locale": "en", "value": "The doorway holds your key while it hosts you, and could act as you if it were compromised or misused." }] },
+      { "id": "mitigation", "value": [{ "locale": "en", "value": "Your key is encrypted with your password. You can export it and move to your own node at any time, and when you leave, the doorway keeps nothing that would let it act as you." }] }
+    ] },
+
+    { "element_id": "right_object", "priority": 0, "variables": [{ "id": "rights", "value": [{ "locale": "en", "value": "You can close your account, or take your key to your own device and keep everything you signed." }] }] },
+
+    { "element_id": "user_input", "priority": 0, "variables": [{ "id": "additional_description", "value": [{ "locale": "en", "value": "What you type and choose in your browser, sent to the doorway." }] }] },
+    { "element_id": "network_connection", "priority": 1, "variables": [{ "id": "additional_description", "value": [{ "locale": "en", "value": "The doorway sees your network address and the pages you ask for." }] }] },
+
+    { "element_id": "input_about_behaviour", "context_type_id": "identifiable", "priority": 0, "variables": [{ "id": "additional_description", "value": [{ "locale": "en", "value": "The doorway knows your sign-in name or email alongside what you do." }] }] },
+
+    { "element_id": "available_to_the_accountable_organization", "priority": 0, "variables": [{ "id": "additional_description", "value": [{ "locale": "en", "value": "The doorway operator can see your account and request logs, and can use your key for you while you are signed in." }] }] },
+    { "element_id": "available_to_me", "priority": 1, "variables": [{ "id": "additional_description", "value": [{ "locale": "en", "value": "Your account, your key to export, and everything you signed." }] }] },
+
+    { "element_id": "data_retained", "priority": 0, "variables": [
+      { "id": "duration", "value": [{ "locale": "en", "value": "until you leave" }] },
+      { "id": "additional_description", "value": [{ "locale": "en", "value": "Request logs are kept briefly. When you close your account or move to your own node, the doorway erases your account and its copy of your key." }] }
+    ] }
+  ]
+}

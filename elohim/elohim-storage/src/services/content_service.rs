@@ -56,6 +56,114 @@ pub(crate) fn is_stale_anchor_error(err: &StorageError) -> bool {
     msg.contains("no Content entry found") || msg.contains("canonical root history unavailable")
 }
 
+/// Largest batch of freshly authored rows [`ContentService::bulk_create_and_notarize`]
+/// roots inline. An app registration is one row; a seed batch is hundreds, and
+/// rooting those inline would hold the HTTP request on the conductor for
+/// minutes — they stay with the re-anchor backfill, marked locally authored.
+pub(crate) const INLINE_ROOT_NOTARIZE_MAX: usize = 16;
+
+/// Aggregate wall-clock budget for all inline root notarizations in one bulk
+/// request; kept below the doorway's 12 s POST forward deadline so the request
+/// answers in time. Rows past it stay with the re-anchor backfill.
+pub(crate) const INLINE_ROOT_BUDGET_MS: u64 = 8_000;
+
+/// Bound on a single inline conductor root call (further clamped to the
+/// remaining aggregate budget). On elapse the row keeps its Diesel-only write.
+pub(crate) const INLINE_ROOT_PER_CALL_MS: u64 = 4_000;
+
+/// Prefix of the refusal a heal-class write returns for a row this peer did
+/// not author. Callers pre-filter, so reaching it means a race, not a loop.
+pub(crate) const NOT_LOCAL_AUTHOR_REFUSAL: &str = "not locally authored";
+
+/// True when `err` is the receiver guard's refusal (see
+/// [`NOT_LOCAL_AUTHOR_REFUSAL`]) — a HOLD, never a failure to retry hot.
+pub(crate) fn is_not_local_author_refusal(err: &StorageError) -> bool {
+    matches!(err, StorageError::Forbidden(msg) if msg.starts_with(NOT_LOCAL_AUTHOR_REFUSAL))
+}
+
+/// The receiver guard. A heal-class write (`PreserveExistingDeclaration` —
+/// the re-anchor backfill, the ghost witness, an inline registration root) may
+/// mint a DHT root only for a row this peer authored; minting one for a row
+/// that arrived from a peer makes THIS peer the root author of somebody else's
+/// content (runbook I1/I2). A request-borne write (`Declare` — the HTTP PATCH a
+/// person or deploy sends this peer) is itself the local act of authority.
+pub(crate) fn may_mint_root(
+    election: content_diesel::HeadElection,
+    locally_authored: bool,
+) -> bool {
+    locally_authored || matches!(election, content_diesel::HeadElection::Declare)
+}
+
+/// A PATCH that changes nothing: on a NULL-anchor row `update_via_conductor`
+/// publishes the row as it stands (its root).
+pub(crate) fn empty_update_view() -> crate::views::UpdateContentInputView {
+    crate::views::UpdateContentInputView {
+        title: None,
+        description: None,
+        content_body: None,
+        content_format: None,
+        content_type: None,
+        metadata: None,
+        tags: None,
+        reach: None,
+        blob_hash: None,
+        server_blob_hash: None,
+        p2p_published_at: None,
+    }
+}
+
+/// Root each freshly authored id, THEN announce — the author-side ordering of
+/// [`ContentService::bulk_create_and_notarize`], lifted out so it is testable
+/// without a conductor. Rows are rooted in order while the aggregate `budget`
+/// remains (checked before each call; each call is bounded by
+/// [`INLINE_ROOT_PER_CALL_MS`] and the remaining budget), at most
+/// [`INLINE_ROOT_NOTARIZE_MAX`]. On exhaustion or any error rooting stops and
+/// the rest is left to the backfill (rows stay marked locally authored). The
+/// announcement always happens, exactly once.
+pub(crate) async fn notarize_roots_then_announce<F, Fut>(
+    authored: &[String],
+    budget: std::time::Duration,
+    mut notarize: F,
+    announce: impl FnOnce(),
+) where
+    F: FnMut(String) -> Fut,
+    Fut: std::future::Future<Output = Result<(), StorageError>>,
+{
+    let deadline = tokio::time::Instant::now() + budget;
+    let per_call = std::time::Duration::from_millis(INLINE_ROOT_PER_CALL_MS);
+    let mut rooted_inline = 0usize;
+    for id in authored.iter().take(INLINE_ROOT_NOTARIZE_MAX) {
+        let remaining = deadline.saturating_duration_since(tokio::time::Instant::now());
+        if remaining.is_zero() {
+            break;
+        }
+        let bound = remaining.min(per_call);
+        let outcome = match tokio::time::timeout(bound, notarize(id.clone())).await {
+            Ok(r) => r,
+            Err(_) => Err(StorageError::Timeout(format!(
+                "root notarization for {id} exceeded {bound:?}"
+            ))),
+        };
+        match outcome {
+            Ok(()) => rooted_inline += 1,
+            Err(e) => {
+                tracing::warn!(
+                    content_id = %id, error = %e,
+                    "bulk create: the author's root was not notarized before announcement; \
+                     the re-anchor backfill roots it (the row is marked locally authored)"
+                );
+                break;
+            }
+        }
+    }
+    tracing::info!(
+        rooted_inline,
+        left_to_backfill = authored.len() - rooted_inline,
+        "bulk create: inline roots done; the re-anchor backfill roots the rest"
+    );
+    announce();
+}
+
 /// Content service for business logic
 pub struct ContentService {
     pool: DbPool,
@@ -209,10 +317,33 @@ impl ContentService {
     // Write Operations
     // =========================================================================
 
-    /// Create a single content item with validation
+    /// Create a single content item THIS peer authors (HTTP create, local
+    /// producers). The row is marked locally authored, so the re-anchor
+    /// backfill may mint its DHT root if no conductor was attached at write
+    /// time. A row that arrived from a peer must use
+    /// [`Self::create_received_from_peer`] instead.
     pub fn create(
         &self,
         input: content_diesel::CreateContentInput,
+    ) -> Result<crate::db::models::ContentWithTags, StorageError> {
+        self.create_with_authority(input, true)
+    }
+
+    /// Persist a content row that arrived from a peer (resolve-on-read). NOT
+    /// marked locally authored: this peer holds no authority to mint its DHT
+    /// root, so the heal-class sweeps hold it until the author's root is
+    /// adopted (runbook I1/I2 — transport evidence is never authority).
+    pub fn create_received_from_peer(
+        &self,
+        input: content_diesel::CreateContentInput,
+    ) -> Result<crate::db::models::ContentWithTags, StorageError> {
+        self.create_with_authority(input, false)
+    }
+
+    fn create_with_authority(
+        &self,
+        input: content_diesel::CreateContentInput,
+        locally_authored: bool,
     ) -> Result<crate::db::models::ContentWithTags, StorageError> {
         // Validate required fields
         self.validate_content(&input)?;
@@ -220,6 +351,14 @@ impl ContentService {
         // Create content
         let mut conn = self.conn()?;
         let result = content_diesel::create_content(&mut conn, &self.ctx, input)?;
+        if locally_authored {
+            content_diesel::mark_locally_authored(
+                &mut conn,
+                &self.ctx,
+                std::slice::from_ref(&result.content.id),
+                content_diesel::AUTHORED_VIA_LOCAL_CREATE,
+            )?;
+        }
 
         // Emit event
         self.events.emit(StorageEvent::ContentCreated {
@@ -232,11 +371,75 @@ impl ContentService {
         Ok(result)
     }
 
-    /// Bulk create content items (for seeding)
+    /// Bulk create content items THIS peer authors (seeding, app
+    /// registration). Rows this call inserted are marked locally authored;
+    /// rows that already existed (e.g. received from a peer first) are not.
     pub fn bulk_create(
         &self,
         items: Vec<content_diesel::CreateContentInput>,
     ) -> Result<content_diesel::BulkResult, StorageError> {
+        let (result, ids, _authored) = self.bulk_insert_authored(items)?;
+        self.announce_bulk(&result, ids);
+        Ok(result)
+    }
+
+    /// [`Self::bulk_create`], notarizing each freshly authored root through the
+    /// own conductor BEFORE the creation is announced to sync.
+    ///
+    /// The announcement is what carries the row to peers. Announced first, a
+    /// sibling's heal sweep could reach the row before this peer's root exists
+    /// (household, 2026-10-17: the receiver rooted the author's slug 3 s ahead
+    /// of the author). The receiver guard already refuses that; this ordering
+    /// closes the window from the author's side, so a registration leaves the
+    /// author holding its root.
+    ///
+    /// Bounded: only a batch of at most [`INLINE_ROOT_NOTARIZE_MAX`] fresh rows
+    /// is notarized inline, within the [`INLINE_ROOT_BUDGET_MS`] aggregate budget. A larger
+    /// seed batch, a failed notarization, or no conductor (`hc = None`) keeps
+    /// today's Diesel-only write; the rows stay marked locally authored, so the
+    /// re-anchor backfill roots them later. HTTP shapes are unchanged.
+    pub async fn bulk_create_and_notarize(
+        &self,
+        hc: Option<&Arc<HcClient>>,
+        items: Vec<content_diesel::CreateContentInput>,
+    ) -> Result<content_diesel::BulkResult, StorageError> {
+        let (result, ids, roots) = self.bulk_insert_authored(items)?;
+        let announce = || self.announce_bulk(&result, ids);
+        match hc {
+            Some(hc) => {
+                notarize_roots_then_announce(
+                    &roots,
+                    std::time::Duration::from_millis(INLINE_ROOT_BUDGET_MS),
+                    |id| async move {
+                        self.update_via_conductor(
+                            hc,
+                            &id,
+                            empty_update_view(),
+                            // The same write the backfill would make for
+                            // this row: a heal-class root, not a head
+                            // declaration (a release declares its own).
+                            content_diesel::HeadElection::PreserveExistingDeclaration,
+                        )
+                        .await
+                        .map(|_| ())
+                    },
+                    announce,
+                )
+                .await
+            }
+            None => announce(),
+        }
+        Ok(result)
+    }
+
+    /// Validate, insert, and mark the rows THIS call inserted as locally
+    /// authored. Returns the result, every input id (for the announcement), and
+    /// the freshly authored ids born without an anchor (the roots left to
+    /// mint). Emits nothing.
+    fn bulk_insert_authored(
+        &self,
+        items: Vec<content_diesel::CreateContentInput>,
+    ) -> Result<(content_diesel::BulkResult, Vec<String>, Vec<String>), StorageError> {
         // Validate all items first
         for (i, item) in items.iter().enumerate() {
             if let Err(e) = self.validate_content(item) {
@@ -245,11 +448,49 @@ impl ContentService {
         }
 
         let ids: Vec<String> = items.iter().map(|i| i.id.clone()).collect();
+        // Only a row born WITHOUT an anchor has a root left to mint; a row the
+        // caller stamped with a provenance anchor keeps today's path.
+        let born_unanchored: std::collections::HashSet<String> = items
+            .iter()
+            .filter(|i| i.dht_anchor_hash.is_none())
+            .map(|i| i.id.clone())
+            .collect();
 
         // Perform bulk create
         let mut conn = self.conn()?;
+        // Chunked: a seed batch can carry more ids than one IN list may bind.
+        let present = |conn: &mut diesel::SqliteConnection| {
+            let mut found = std::collections::HashSet::new();
+            for chunk in ids.chunks(500) {
+                found.extend(content_diesel::check_content_exists(
+                    conn, &self.ctx, chunk,
+                )?);
+            }
+            Ok::<_, StorageError>(found)
+        };
+        let existed = present(&mut conn)?;
         let result = content_diesel::bulk_create_content(&mut conn, &self.ctx, items)?;
+        let mut authored: Vec<String> = present(&mut conn)?
+            .into_iter()
+            .filter(|id| !existed.contains(id))
+            .collect();
+        authored.sort();
+        authored.dedup();
+        content_diesel::mark_locally_authored(
+            &mut conn,
+            &self.ctx,
+            &authored,
+            content_diesel::AUTHORED_VIA_LOCAL_BULK,
+        )?;
+        let roots = authored
+            .into_iter()
+            .filter(|id| born_unanchored.contains(id))
+            .collect();
+        Ok((result, ids, roots))
+    }
 
+    /// Announce a bulk creation (the event the sync projector broadcasts from).
+    fn announce_bulk(&self, result: &content_diesel::BulkResult, ids: Vec<String>) {
         // Emit event if any items were inserted
         if result.inserted > 0 {
             self.events.emit(StorageEvent::ContentBulkCreated {
@@ -258,8 +499,6 @@ impl ContentService {
             });
             self.notify_search();
         }
-
-        Ok(result)
     }
 
     /// Partially update a content item (PATCH semantics) — metadata-only /
@@ -407,16 +646,23 @@ impl ContentService {
     /// sibling doc still naming the previous head could otherwise use to roll
     /// the author back (a complete old election beats a NULL ordering).
     ///
-    /// `None` when the election could not be declared or is out-voted (an earned
-    /// head stands over this publish): the row then keeps the declaration the
-    /// publish makes, with no ordering, exactly as before this existed, and
-    /// siblings adopt only once some election for the version reaches them.
+    /// [`AuthorElection::Unrecorded`] when the election could not be declared or
+    /// is out-voted by something other than an earned head this version stands
+    /// beneath: the row then keeps the declaration the publish makes, with no
+    /// ordering, exactly as before this existed, and siblings adopt only once
+    /// some election for the version reaches them.
+    ///
+    /// [`AuthorElection::StagedBeneath`] when the election's winner is another
+    /// head and this version is the election's STAGING CANDIDATE: the version is
+    /// admitted as the candidate (the live election, not a SQL column, carries
+    /// it — `staging_candidate_from_election` reads it back) and the canonical
+    /// projection must stay on the winner.
     async fn declare_author_election(
         &self,
         hc: &Arc<HcClient>,
         id: &str,
         action: &str,
-    ) -> Option<(content_diesel::CanonicalOrdering, i64)> {
+    ) -> AuthorElection {
         let declared = crate::chain_write_gate::as_writer(
             crate::chain_write_gate::WriterKind::HttpAuthor,
             conductor_writes::call_declare_canonical_content_head(
@@ -436,21 +682,34 @@ impl ContentService {
                     "publish: the author's own election for its new version was not declared; \
                      siblings cannot adopt it from carried evidence until an election for it exists"
                 );
-                return None;
+                return AuthorElection::Unrecorded;
             }
         };
         crate::metrics::inc_content_canonical_link_minted("author_publish");
-        if declared.head_action_hash.to_string() != action {
-            tracing::info!(
-                content_id = %id, head = %action, elected = %declared.head_action_hash,
-                "publish: the author's election for its new version is out-voted (an earned \
-                 head stands over it); the row keeps the declaration the publish makes"
-            );
-            return None;
+        let elected = declared.head_action_hash.to_string();
+        let candidate = declared.staging_candidate.as_ref().map(|c| c.to_string());
+        match author_election_disposition(action, &elected, candidate.as_deref()) {
+            AuthorElectionDisposition::Elected => declared
+                .canonical_ordering()
+                .map(|ordering| AuthorElection::Declared(ordering, declared.declared_at))
+                .unwrap_or(AuthorElection::Unrecorded),
+            AuthorElectionDisposition::StagedBeneath => {
+                tracing::info!(
+                    content_id = %id, head = %action, elected = %elected,
+                    "publish: the author's version is the staging candidate beneath the \
+                     elected head; the canonical projection stays on the winner"
+                );
+                AuthorElection::StagedBeneath
+            }
+            AuthorElectionDisposition::OutVoted => {
+                tracing::info!(
+                    content_id = %id, head = %action, elected = %elected,
+                    "publish: the author's election for its new version is out-voted (an earned \
+                     head stands over it); the row keeps the declaration the publish makes"
+                );
+                AuthorElection::Unrecorded
+            }
         }
-        declared
-            .canonical_ordering()
-            .map(|ordering| (ordering, declared.declared_at))
     }
 
     pub async fn update_via_conductor(
@@ -482,6 +741,21 @@ impl ContentService {
         ) {
             return Err(refusal);
         }
+
+        // RECEIVER GUARD — both create fallbacks below (the NULL-anchor
+        // bootstrap and the stale-anchor heal) mint a DHT root under THIS
+        // conductor's key. Resolved once, enforced at each fallback.
+        let locally_authored = {
+            let mut conn = self.conn()?;
+            content_diesel::is_locally_authored(&mut conn, &self.ctx, id)?
+        };
+        let root_refusal = || {
+            StorageError::Forbidden(format!(
+                "{NOT_LOCAL_AUTHOR_REFUSAL}: content {id} arrived from a peer; this peer holds \
+                 no authority to mint its root — held for adoption of the author's root"
+            ))
+        };
+        let may_mint = may_mint_root(election, locally_authored);
 
         // Both executable hashes belong to the same Content snapshot. Never
         // bootstrap from the mutable SQL server column (an unverified hint).
@@ -554,6 +828,9 @@ impl ContentService {
             merged_metadata_json.clone(),
         );
         let output_bytes = if existing.content.dht_anchor_hash.is_none() {
+            if !may_mint {
+                return Err(root_refusal());
+            }
             create_or_update_existing_content(
                 election,
                 conductor_writes::call_create_content(hc, &bootstrap),
@@ -581,6 +858,9 @@ impl ContentService {
                 // Without this, every post-reset PATCH 503s forever and the
                 // EPR-routed mounts (the landing a human visits) stay 404.
                 Err(e) if is_stale_anchor_error(&e) => {
+                    if !may_mint {
+                        return Err(root_refusal());
+                    }
                     tracing::warn!(
                         id = %id,
                         "update_via_conductor: stale dht_anchor_hash (no DHT entry behind it) — healing via create_content re-publish"
@@ -625,7 +905,21 @@ impl ContentService {
         let author_election = if matches!(election, content_diesel::HeadElection::Declare) {
             self.declare_author_election(hc, id, &action_hash_str).await
         } else {
-            None
+            AuthorElection::Unrecorded
+        };
+        // A version admitted only as the STAGING CANDIDATE beneath an elected
+        // head must not become the local projected head: the row keeps the
+        // winner's declaration (and its version fields), the anchor still
+        // records the authored action, and the later canonical-head declare of
+        // the winner is an idempotent same-head refresh instead of a B->A move
+        // at equal ordering.
+        let (election, author_election) = match author_election {
+            AuthorElection::StagedBeneath => (
+                content_diesel::HeadElection::PreserveExistingDeclaration,
+                None,
+            ),
+            AuthorElection::Declared(ordering, at) => (election, Some((ordering, at))),
+            AuthorElection::Unrecorded => (election, None),
         };
         // Mirror the COMMITTED reach into SQL when the re-publish carried a
         // reach change the projection would otherwise drop. See
@@ -650,6 +944,17 @@ impl ContentService {
                 author_election,
                 mirror_reach.as_deref(),
             )?;
+            // The own conductor just committed this row: this peer now holds a
+            // chain for it, so a later heal of it (dead / ghost anchor) is its
+            // own to make. Non-fatal — a lost mark only holds that heal.
+            if let Err(e) = content_diesel::mark_locally_authored(
+                &mut pooled,
+                &self.ctx,
+                &[id.to_string()],
+                content_diesel::AUTHORED_VIA_OWN_COMMIT,
+            ) {
+                tracing::warn!(content_id = %id, error = %e, "could not mark the own commit locally authored");
+            }
         }
 
         // Tags, type and authored edges ride `committed_projection_patch` (the
@@ -734,6 +1039,7 @@ impl ContentService {
     pub fn delete(&self, id: &str) -> Result<bool, StorageError> {
         let mut conn = self.conn()?;
         let deleted = content_diesel::delete_content(&mut conn, &self.ctx, id)?;
+        content_diesel::clear_locally_authored(&mut conn, &self.ctx, id)?;
 
         if deleted {
             self.events
@@ -760,6 +1066,7 @@ impl ContentService {
             db::relationships_diesel::delete_relationships_for_content(&mut conn, &self.ctx, id);
         // Then delete content
         content_diesel::delete_content(&mut conn, &self.ctx, id)?;
+        content_diesel::clear_locally_authored(&mut conn, &self.ctx, id)?;
 
         self.events
             .emit(StorageEvent::ContentDeleted { id: id.to_string() });
@@ -1064,9 +1371,56 @@ pub(crate) fn committed_projection_patch(oc: &lamad_types::Content) -> ContentPr
     )
 }
 
+/// What the author's own election for a version it just committed came to.
+enum AuthorElection {
+    /// The version won; its ordering is recorded on the row it declares.
+    Declared(content_diesel::CanonicalOrdering, i64),
+    /// The version is the staging candidate beneath another elected head.
+    StagedBeneath,
+    /// No election was declared, or the version is out-voted without being
+    /// admitted as the candidate.
+    Unrecorded,
+}
+
+#[derive(Debug, PartialEq, Eq)]
+enum AuthorElectionDisposition {
+    Elected,
+    StagedBeneath,
+    OutVoted,
+}
+
+/// PURE. Classify the election answer for an authored `action`: it won, it is
+/// the election's staging candidate beneath another winner, or it lost outright.
+fn author_election_disposition(
+    action: &str,
+    elected: &str,
+    staging_candidate: Option<&str>,
+) -> AuthorElectionDisposition {
+    if elected == action {
+        AuthorElectionDisposition::Elected
+    } else if staging_candidate == Some(action) {
+        AuthorElectionDisposition::StagedBeneath
+    } else {
+        AuthorElectionDisposition::OutVoted
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn author_election_disposition_retains_a_staging_candidate_beneath_the_winner() {
+        use AuthorElectionDisposition::*;
+        assert_eq!(author_election_disposition("B", "B", None), Elected);
+        assert_eq!(author_election_disposition("B", "B", Some("C")), Elected);
+        assert_eq!(
+            author_election_disposition("B", "A", Some("B")),
+            StagedBeneath
+        );
+        assert_eq!(author_election_disposition("B", "A", Some("C")), OutVoted);
+        assert_eq!(author_election_disposition("B", "A", None), OutVoted);
+    }
 
     /// The 2026-10-07 household recast: `update_content` answers PENDING (no
     /// canonical identity root on this network) where it used to answer "no
@@ -1624,6 +1978,158 @@ mod tests {
                 ("psalm-23".into(), "intimate".into(), true),
             ],
             "every edge of the atom narrowed with it, in the same commit"
+        );
+    }
+
+    // ── Receiver guard: only a local author mints a content root ────────────
+
+    fn registration(id: &str) -> content_diesel::CreateContentInput {
+        content_diesel::CreateContentInput {
+            id: id.into(),
+            title: id.into(),
+            description: None,
+            content_type: "concept".into(),
+            content_format: "markdown".into(),
+            blob_hash: None,
+            blob_cid: None,
+            content_size_bytes: None,
+            metadata_json: None,
+            reach: "commons".into(),
+            created_by: None,
+            tags: vec![],
+            content_body: None,
+            dht_anchor_hash: None,
+        }
+    }
+
+    /// The 2026-10-17 household defect at its selection: a row stored by the
+    /// acquisition arm (`bulk_create_content` direct — received from a peer)
+    /// or by resolve-on-read is never a re-anchor candidate, so the backfill
+    /// makes no create call for it, and it is counted held. A NULL-anchor row
+    /// this peer registered stays a candidate: the backfill's real job.
+    #[test]
+    fn received_rows_are_held_and_own_rows_stay_backfill_candidates() {
+        let pool = crate::test_util::test_pool();
+        let ctx = AppContext::default_lamad();
+        let service = ContentService::new(pool.clone(), ctx.clone(), Arc::new(EventBus::new()));
+        service.bulk_create(vec![registration("own-slug")]).unwrap();
+        service
+            .create_received_from_peer(registration("resolved-on-read"))
+            .unwrap();
+        {
+            let mut conn = pool.get().unwrap();
+            content_diesel::bulk_create_content(&mut conn, &ctx, vec![registration("their-slug")])
+                .unwrap();
+        }
+        // Re-registering an id that arrived first does not claim it.
+        service
+            .bulk_create(vec![registration("their-slug")])
+            .unwrap();
+        let mut conn = pool.get().unwrap();
+        assert!(!content_diesel::is_locally_authored(&mut conn, &ctx, "their-slug").unwrap());
+
+        let candidates: Vec<String> =
+            content_diesel::list_unanchored_content_ids(&mut conn, &ctx, 100)
+                .unwrap()
+                .into_iter()
+                .map(|(id, _, _)| id)
+                .collect();
+        assert_eq!(candidates, vec!["own-slug".to_string()]);
+        assert_eq!(
+            content_diesel::count_unanchored_not_locally_authored(&mut conn, &ctx).unwrap(),
+            2,
+            "both received rows are held, and counted"
+        );
+        assert_eq!(
+            content_diesel::count_unanchored_content(&mut conn, &ctx).unwrap(),
+            3,
+            "a held row is still pending, not healed"
+        );
+    }
+
+    #[test]
+    fn only_a_local_author_or_a_request_borne_write_may_mint_a_root() {
+        use content_diesel::HeadElection::{Declare, PreserveExistingDeclaration};
+        assert!(
+            may_mint_root(PreserveExistingDeclaration, true),
+            "its own rows"
+        );
+        assert!(
+            !may_mint_root(PreserveExistingDeclaration, false),
+            "never a received row"
+        );
+        assert!(
+            may_mint_root(Declare, false),
+            "a PATCH sent to this peer is the local act"
+        );
+        let refusal = StorageError::Forbidden(format!("{NOT_LOCAL_AUTHOR_REFUSAL}: x"));
+        assert!(is_not_local_author_refusal(&refusal));
+        assert!(!is_not_local_author_refusal(&StorageError::Forbidden(
+            "x".into()
+        )));
+    }
+
+    /// Author-side ordering: a registration's root is notarized BEFORE the
+    /// creation is announced to sync. A failed root still announces (the
+    /// backfill roots it later); a seed-sized batch skips inline roots.
+    #[tokio::test]
+    async fn the_author_roots_its_registration_before_announcing_it() {
+        let calls = std::cell::RefCell::new(Vec::<String>::new());
+        let budget = std::time::Duration::from_millis(INLINE_ROOT_BUDGET_MS);
+        notarize_roots_then_announce(
+            &["app".to_string()],
+            budget,
+            |id| {
+                calls.borrow_mut().push(format!("root:{id}"));
+                async { Ok::<(), StorageError>(()) }
+            },
+            || calls.borrow_mut().push("announce".into()),
+        )
+        .await;
+        assert_eq!(*calls.borrow(), vec!["root:app", "announce"]);
+
+        calls.borrow_mut().clear();
+        notarize_roots_then_announce(
+            &["app".to_string()],
+            budget,
+            |_| async { Err::<(), StorageError>(StorageError::Internal("conductor down".into())) },
+            || calls.borrow_mut().push("announce".into()),
+        )
+        .await;
+        assert_eq!(*calls.borrow(), vec!["announce"]);
+
+        calls.borrow_mut().clear();
+        let seed: Vec<String> = (0..=INLINE_ROOT_NOTARIZE_MAX)
+            .map(|i| format!("s{i}"))
+            .collect();
+        notarize_roots_then_announce(
+            &seed,
+            budget,
+            |id| {
+                calls.borrow_mut().push(format!("root:{id}"));
+                async { Ok::<(), StorageError>(()) }
+            },
+            || calls.borrow_mut().push("announce".into()),
+        )
+        .await;
+        assert_eq!(calls.borrow().len(), INLINE_ROOT_NOTARIZE_MAX + 1);
+        assert_eq!(calls.borrow().last().unwrap(), "announce");
+
+        calls.borrow_mut().clear();
+        notarize_roots_then_announce(
+            &["app".to_string()],
+            std::time::Duration::ZERO,
+            |id| {
+                calls.borrow_mut().push(format!("root:{id}"));
+                async { Ok::<(), StorageError>(()) }
+            },
+            || calls.borrow_mut().push("announce".into()),
+        )
+        .await;
+        assert_eq!(
+            *calls.borrow(),
+            vec!["announce"],
+            "zero budget roots nothing"
         );
     }
 }

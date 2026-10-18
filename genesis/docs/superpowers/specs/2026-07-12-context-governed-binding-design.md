@@ -13,10 +13,10 @@ graduation-trigger: decompose-complete OR negotiation-runtime-shipped
 refines:
   - genesis/docs/superpowers/specs/2026-07-12-epr-meta-kinship-lineage-reconciliation-design.md
 cites:
-  - epr-meta-kinship-lineage-reconciliation | the spec this REFINES — supplies the kinship lineage DAG, authority-anchored head declaration (§4), and the P2P design-gate output every binding primitive here reuses | sha256:adb7385729b94c24 | path: genesis/docs/superpowers/specs/2026-07-12-epr-meta-kinship-lineage-reconciliation-design.md
-  - epr-meta-native-capability-dogfood-and-graph | names the elohim behavioral-ceiling judge, the EprRef REA-accountability anchor, and the reach-gradient/capstone seam this design reuses as its negotiation resolver, self-updating qualifier, and reach-graded context | sha256:99f0bf58985ff85b | path: genesis/docs/superpowers/specs/2026-07-10-epr-meta-native-capability-dogfood-and-graph-design.md
-  - cite-fingerprint-cid-convergence | the convergence behind the motivating specimen — one digest, two CID renderings — whose BritCid/BlobCid divergence is the ungoverned binding this design would have surfaced | sha256:0a657c9c1b0c43e7 | path: genesis/docs/superpowers/specs/2026-07-12-cite-fingerprint-cid-convergence-design.md
-  - stewardship-over-sovereignty | the canon grounding binding authority in community-backstopped standing, not key possession — why the negotiation anchor is socially-trusted, never self-sovereign apex | sha256:995eb2079924ea2e | path: genesis/docs/architecture/stewardship-over-sovereignty.md
+  - "epr-meta-kinship-lineage-reconciliation | the spec this REFINES — supplies the kinship lineage DAG, authority-anchored head declaration (§4), and the P2P design-gate output every binding primitive here reuses | sha256:adb7385729b94c24 | path: genesis/docs/superpowers/specs/2026-07-12-epr-meta-kinship-lineage-reconciliation-design.md"
+  - "epr-meta-native-capability-dogfood-and-graph | names the elohim behavioral-ceiling judge, the EprRef REA-accountability anchor, and the reach-gradient/capstone seam this design reuses as its negotiation resolver, self-updating qualifier, and reach-graded context | sha256:99f0bf58985ff85b | path: genesis/docs/superpowers/specs/2026-07-10-epr-meta-native-capability-dogfood-and-graph-design.md"
+  - "cite-fingerprint-cid-convergence | the convergence behind the motivating specimen — one digest, two CID renderings — whose BritCid/BlobCid divergence is the ungoverned binding this design would have surfaced | sha256:0a657c9c1b0c43e7 | path: genesis/docs/superpowers/specs/2026-07-12-cite-fingerprint-cid-convergence-design.md"
+  - "stewardship-over-sovereignty | the canon grounding binding authority in community-backstopped standing, not key possession — why the negotiation anchor is socially-trusted, never self-sovereign apex | sha256:5186f53fbeb95a65 | path: genesis/docs/architecture/stewardship-over-sovereignty.md"
 ---
 
 # Context-Governed Binding

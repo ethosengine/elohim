@@ -1,0 +1,155 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "epr:schema:objects:external-artifact-manifest",
+  "title": "ExternalArtifactManifest",
+  "description": "Describes one pinned artifact made outside the protocol and relied on inside it: a library version a build cites, a supplier's spec sheet a co-op grocer stocks against, a variety record a community-garden network saves seed from, an embedding model a recall fold runs. It names the artifact's bytes by content address, the terms it was received under (an SPDX license expression plus the CID of the license or NOTICE text carried with it), where it came from, and the funding channels its makers have declared, recorded as facts with no amounts: valuation and settlement are separate governance acts. Generalized from the embedding-model manifest (.epr-meta/elohim/algorithms/embedding-models/all-minilm-l6-v2.json), which validates against this schema unchanged; `artifact_type` selects a profile that declares that kind's own fields (today: `model-manifest`). Source of truth: the version-controlled manifest file in the `.epr-meta` of the directory that pins the artifact; others cite it by the file's CID. P2P design-gate classification: configuration (not an HTTP wire shape, not notarized), the same class as epr-meta.schema.json.",
+  "type": "object",
+  "required": ["artifact_type", "license", "source"],
+  "properties": {
+    "artifact_type": {
+      "type": "string",
+      "pattern": "^[a-z][a-z0-9-]*$",
+      "description": "What kind of artifact this is; selects the profile (below) that declares the kind's own fields. A different artifact is a new manifest, never an edit of this field."
+    },
+    "role": {
+      "type": "string",
+      "description": "Why the artifact is pinned here and how it is judged, in one or two sentences."
+    },
+    "bytes": {
+      "$ref": "#/$defs/cid",
+      "description": "CID of the artifact's own bytes as received (e.g. the `.crate` file, whose Cargo.lock `checksum` is the sha256 inside this CID; an npm tarball, whose `integrity` is the sha2-512 inside it). Construct it with elohim_epr::cid::raw_cid_from_sha256_hex / raw_cid_from_sri, or compute_raw_cid over the bytes."
+    },
+    "license": {
+      "type": "string",
+      "pattern": "^\\(*[A-Za-z0-9][A-Za-z0-9.:+-]*\\)*( +(AND|OR|WITH) +\\(*[A-Za-z0-9][A-Za-z0-9.:+-]*\\)*)*$",
+      "description": "The terms the artifact was received under, as an SPDX license expression (e.g. `Apache-2.0`, `MIT OR Apache-2.0`, `(MIT OR Apache-2.0) AND Unicode-3.0`, `LicenseRef-<id>`), copied from the artifact's own declaration and never inferred."
+    },
+    "license_texts": {
+      "type": "array",
+      "minItems": 1,
+      "description": "The license and NOTICE texts carried with the artifact, each by CID, so the exact notice a downstream owes can be produced from the record. One entry per file (a dual-licensed crate carries two).",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["file", "text"],
+        "properties": {
+          "file": {
+            "type": "string",
+            "description": "The file's name within the artifact (e.g. `LICENSE-APACHE`, `NOTICE`)."
+          },
+          "text": {
+            "$ref": "#/$defs/cid",
+            "description": "CID (raw codec) of the file's bytes."
+          }
+        }
+      }
+    },
+    "source": {
+      "type": "string",
+      "minLength": 1,
+      "description": "Where the bytes were drawn from, in the source ecosystem's own coordinates: `crates.io:serde@1.0.228`, a Hugging Face repo id, a supplier's catalogue number."
+    },
+    "repository": {
+      "type": "string",
+      "pattern": "^[a-z][a-z0-9+.-]*://",
+      "description": "The upstream repository the makers publish from (a URL). It is also the canonical external identifier of the presence held in trust for them."
+    },
+    "funding": {
+      "type": "array",
+      "description": "Funding channels the makers have themselves declared, recorded as facts. There is no amount, share or obligation field, by construction: `additionalProperties: false` keeps valuation out of the record.",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["channel", "url", "declared_in"],
+        "properties": {
+          "channel": {
+            "type": "string",
+            "pattern": "^[a-z][a-z0-9-]*$",
+            "description": "The channel's kind as the makers name it (e.g. `github-sponsors`, `open-collective`, `drips`, `liberapay`)."
+          },
+          "url": {
+            "type": "string",
+            "pattern": "^[a-z][a-z0-9+.-]*:",
+            "description": "Where the channel is reached."
+          },
+          "declared_in": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The makers' own declaration this fact was read from (e.g. `FUNDING.json`, `.github/FUNDING.yml`, `package.json#funding`), so the record never asserts a channel the makers did not."
+          }
+        }
+      }
+    },
+    "procedure": {
+      "$ref": "#/$defs/cid",
+      "description": "CID of the procedure that judges or uses the artifact, when one is pinned with it."
+    },
+    "fitness": {
+      "type": "string",
+      "pattern": "^[a-z0-9][a-z0-9-]*@[1-9][0-9]*$",
+      "description": "The versioned measure (`<id>@<version>`) that judges this artifact by evidence on its CID."
+    }
+  },
+  "patternProperties": {
+    "^[a-z][a-z0-9_]*_bytes$": {
+      "$ref": "#/$defs/cid",
+      "description": "CID of one named part of the artifact's bytes (e.g. `model_bytes`, `tokenizer_bytes`), or of the source it was built from (`source_bytes`, when that differs from `bytes`). At least one `bytes` or `*_bytes` field is required (the `not`/`propertyNames` clause below)."
+    }
+  },
+  "not": {
+    "propertyNames": { "not": { "pattern": "(^bytes$)|(_bytes$)" } }
+  },
+  "allOf": [
+    {
+      "if": {
+        "properties": { "artifact_type": { "const": "model-manifest" } },
+        "required": ["artifact_type"]
+      },
+      "then": {
+        "required": ["model_bytes", "tokenizer_bytes", "dims", "resolve", "fitness"],
+        "properties": {
+          "model_bytes": {
+            "$ref": "#/$defs/cid",
+            "description": "CID of the model weights (raw codec)."
+          },
+          "tokenizer_bytes": {
+            "$ref": "#/$defs/cid",
+            "description": "CID of the tokenizer the model is run with (raw codec)."
+          },
+          "fitness": true,
+          "dims": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "Embedding dimension the model emits."
+          },
+          "pooling": {
+            "type": "string",
+            "description": "How token vectors are pooled into one (e.g. `mean`)."
+          },
+          "normalize": {
+            "type": "boolean",
+            "description": "Whether the pooled vector is L2-normalized."
+          },
+          "max_tokens": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "Input length the model is run with."
+          },
+          "resolve": {
+            "type": "array",
+            "items": { "type": "string" },
+            "description": "Model directories in order: `$VAR` (skipped when unset), `~`, or a path. The first that exists wins."
+          }
+        }
+      }
+    }
+  ],
+  "unevaluatedProperties": false,
+  "$defs": {
+    "cid": {
+      "type": "string",
+      "pattern": "^b[a-z2-7]{20,}$",
+      "description": "A CIDv1 in base32 (`bafkrei…` for raw sha2-256 bytes, `bafkrgq…` for raw sha2-512)."
+    }
+  }
+}

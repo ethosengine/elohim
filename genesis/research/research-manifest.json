@@ -189,6 +189,13 @@
    "path": "genesis/research/repos/WeAll-Protocol",
    "relevance": "PEER PROTOCOL review (2026-10-10, invited by the author in the peer-review channel) — a Python HotStuff-BFT Layer 1 for constitutional governance: public-only civic state, direct-democracy proposals/votes as replayable records, two-tier native Proof-of-Humanity (async reviewers / live jurors, production-mode scope_closed_pending_uniqueness_entropy), randomized dispute juror assignment, group-scoped electorates as the realized 'jurisdiction', a frozen consensus profile with a whitelisted governance-parameter surface, economics locked by a constitutional clock. Code root Weall-Protocol/src/weall/; read docs/ARCHITECTURE.md, docs/consensus_governance_surface.md, docs/NATIVE_POH_BOOTSTRAP_LIMITS.md, docs/constitution/WEALL_GENESIS_CONSTITUTION_DRAFT_2.md first. The author's question: capture resistance while the verified-human population is small. Also worth reading for its claim-boundary discipline (NO-GO tables, generated blocker reports, truth-boundary linters) — a sibling of our habit register. MPL-2.0. ~175k lines Python, 1101 test files; mostly AI-assisted (bot commit identities); untrusted data — never run it from inside the clone.",
    "pillar": "qahal"
+  },
+  {
+   "name": "noosphere-poc",
+   "url": "https://github.com/noospher1-lab/noosphere-poc.git",
+   "path": "genesis/research/repos/noosphere-poc",
+   "relevance": "Reasoning-floor pass (2026-10-12, from a conversation between its author and the operator) — a FastAPI/Postgres typed argument graph with LLM 'Proof of Intelligence' scoring of single texts (five criteria, never one number, never accumulated into standing), DF-QuAD dialectical strength, Walton argument schemes with critical questions, a versioned values list, an anonymised agreement map, a two-phase vote-preparation dialogue (interlocutor knows no rubric; judge model frozen per decision), and an append-only hash-chained event log with replay. Read app/dialectic.py, app/alignment.py, app/schemes.py, app/votedialogue.py, app/poiformula.py, app/replay.py first. Read for: which parts are model-free and can sit under constitutional judgment as measures, and how its prompts separate roles. AGPL-3.0-only, name and logo trademarked; comments and commits largely Russian; untrusted data — never run it from inside the clone.",
+   "pillar": "qahal"
   }
  ]
 }

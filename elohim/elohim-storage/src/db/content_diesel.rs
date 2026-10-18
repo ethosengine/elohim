@@ -7,7 +7,7 @@ use diesel::r2d2::{ConnectionManager, Pool, PooledConnection};
 use serde::{Deserialize, Serialize};
 
 use super::context::AppContext;
-use super::diesel_schema::{content, content_tags};
+use super::diesel_schema::{content, content_local_authorship, content_tags};
 use super::models::{Content, ContentWithTags, NewContent, NewContentTag};
 use crate::error::StorageError;
 
@@ -356,6 +356,15 @@ pub fn list_dead_anchor_content_ids(
         .filter(content::h_app_id.eq(&ctx.h_app_id))
         .filter(content::dht_anchor_hash.is_not_null())
         .filter(content::dht_anchor_state.eq("dead"))
+        // Same receiver guard as the NULL arm: re-authoring a dead anchor
+        // mints a root under this peer's key, which only a local author may do.
+        .filter(
+            content::id.eq_any(
+                content_local_authorship::table
+                    .filter(content_local_authorship::h_app_id.eq(&ctx.h_app_id))
+                    .select(content_local_authorship::content_id),
+            ),
+        )
         .select((content::id, content::reach, content::content_type))
         .order((content::created_at.asc(), content::id.asc()))
         .limit(limit)
@@ -3673,6 +3682,19 @@ pub fn list_unanchored_content_ids(
     content::table
         .filter(content::h_app_id.eq(&ctx.h_app_id))
         .filter(content::dht_anchor_hash.is_null())
+        // Receiver guard: only rows this peer holds local authoring authority
+        // for. A row that arrived from a peer is the author's to root; the
+        // sweep that re-authors it would make THIS peer the DHT root author
+        // (the 2026-10-17 household defect). Filtered in SQL, not after the
+        // LIMIT, so a standing received population can never starve the
+        // budget this peer's own rows need.
+        .filter(
+            content::id.eq_any(
+                content_local_authorship::table
+                    .filter(content_local_authorship::h_app_id.eq(&ctx.h_app_id))
+                    .select(content_local_authorship::content_id),
+            ),
+        )
         .select((content::id, content::reach, content::content_type))
         .order((content::created_at.asc(), content::id.asc()))
         .limit(limit)
@@ -3723,6 +3745,114 @@ pub fn count_unanchored_content(
         .count()
         .get_result(conn)
         .map_err(|e| StorageError::Internal(format!("count_unanchored_content failed: {}", e)))
+}
+
+// ============================================================================
+// Local authoring authority (receiver guard)
+// ============================================================================
+
+/// How a row came to be locally authored — the `authored_via` column of
+/// `content_local_authorship`. Diagnostic only; every value grants the same
+/// authority.
+pub const AUTHORED_VIA_LOCAL_CREATE: &str = "local-create";
+/// See [`AUTHORED_VIA_LOCAL_CREATE`].
+pub const AUTHORED_VIA_LOCAL_BULK: &str = "local-bulk";
+/// See [`AUTHORED_VIA_LOCAL_CREATE`].
+pub const AUTHORED_VIA_OWN_COMMIT: &str = "own-commit";
+
+/// Record that THIS peer authored `ids` (idempotent; the first mark's
+/// `authored_via` stands). Called only by local write paths — never by a path
+/// that stores a row received from a peer. Returns rows newly marked.
+pub fn mark_locally_authored(
+    conn: &mut SqliteConnection,
+    ctx: &AppContext,
+    ids: &[String],
+    authored_via: &str,
+) -> Result<usize, StorageError> {
+    let now = chrono::Utc::now().to_rfc3339();
+    let mut marked = 0;
+    for id in ids {
+        marked += diesel::insert_or_ignore_into(content_local_authorship::table)
+            .values((
+                content_local_authorship::h_app_id.eq(&ctx.h_app_id),
+                content_local_authorship::content_id.eq(id),
+                content_local_authorship::authored_via.eq(authored_via),
+                content_local_authorship::marked_at.eq(&now),
+            ))
+            .execute(conn)
+            .map_err(|e| StorageError::Internal(format!("mark_locally_authored failed: {e}")))?;
+    }
+    Ok(marked)
+}
+
+/// Drop the local-authorship mark for a deleted row, so a later arrival of the
+/// same id from a peer does not inherit this peer's old authority.
+pub fn clear_locally_authored(
+    conn: &mut SqliteConnection,
+    ctx: &AppContext,
+    id: &str,
+) -> Result<(), StorageError> {
+    diesel::delete(
+        content_local_authorship::table
+            .filter(content_local_authorship::h_app_id.eq(&ctx.h_app_id))
+            .filter(content_local_authorship::content_id.eq(id)),
+    )
+    .execute(conn)
+    .map(|_| ())
+    .map_err(|e| StorageError::Internal(format!("clear_locally_authored failed: {e}")))
+}
+
+/// The subset of `ids` this peer holds local authoring authority for.
+pub fn locally_authored_ids(
+    conn: &mut SqliteConnection,
+    ctx: &AppContext,
+    ids: &[String],
+) -> Result<std::collections::HashSet<String>, StorageError> {
+    let mut found = std::collections::HashSet::new();
+    for chunk in ids.chunks(500) {
+        let rows: Vec<String> = content_local_authorship::table
+            .filter(content_local_authorship::h_app_id.eq(&ctx.h_app_id))
+            .filter(content_local_authorship::content_id.eq_any(chunk))
+            .select(content_local_authorship::content_id)
+            .load(conn)
+            .map_err(|e| StorageError::Internal(format!("locally_authored_ids failed: {e}")))?;
+        found.extend(rows);
+    }
+    Ok(found)
+}
+
+/// True when this peer holds local authoring authority for `id`.
+pub fn is_locally_authored(
+    conn: &mut SqliteConnection,
+    ctx: &AppContext,
+    id: &str,
+) -> Result<bool, StorageError> {
+    Ok(locally_authored_ids(conn, ctx, &[id.to_string()])?.contains(id))
+}
+
+/// NULL-anchor rows the re-anchor sweep HOLDS because this peer is not their
+/// author: they wait for the author's root to be adopted. Counted so the hold
+/// is legible on the sweep's log line and metric; they stay in
+/// [`count_unanchored_content`]'s `remaining` (they are not healed).
+pub fn count_unanchored_not_locally_authored(
+    conn: &mut SqliteConnection,
+    ctx: &AppContext,
+) -> Result<i64, StorageError> {
+    content::table
+        .filter(content::h_app_id.eq(&ctx.h_app_id))
+        .filter(content::dht_anchor_hash.is_null())
+        .filter(
+            content::id.ne_all(
+                content_local_authorship::table
+                    .filter(content_local_authorship::h_app_id.eq(&ctx.h_app_id))
+                    .select(content_local_authorship::content_id),
+            ),
+        )
+        .count()
+        .get_result(conn)
+        .map_err(|e| {
+            StorageError::Internal(format!("count_unanchored_not_locally_authored failed: {e}"))
+        })
 }
 
 /// Drain-loop write: mark a content row as p2p_published at the current time.
@@ -3965,6 +4095,20 @@ mod tests {
         )
         .execute(&mut conn)
         .expect("Failed to create content_tags table");
+
+        diesel::sql_query(
+            r#"
+            CREATE TABLE content_local_authorship (
+                h_app_id TEXT NOT NULL,
+                content_id TEXT NOT NULL,
+                authored_via TEXT NOT NULL,
+                marked_at TEXT NOT NULL,
+                PRIMARY KEY (h_app_id, content_id)
+            )
+            "#,
+        )
+        .execute(&mut conn)
+        .expect("Failed to create content_local_authorship table");
 
         conn
     }
@@ -6688,6 +6832,90 @@ mod tests {
         );
     }
 
+    /// THE STAGING DECLARATION BENEATH AN EARNED HEAD. An author PATCH whose
+    /// version is only the election's staging candidate projects with
+    /// `PreserveExistingDeclaration`: the canonical projection stays on the
+    /// earned winner A (its declaration, ordering and version fields), the
+    /// anchor records the authored action B, re-declaring A is an idempotent
+    /// same-head refresh (never the B->A move that 409'd), and promoting B to
+    /// earned later moves the projection to B.
+    #[test]
+    fn a_staging_candidate_patch_leaves_the_earned_projection_on_the_winner() {
+        let mut conn = setup_test_db();
+        let ctx = AppContext::new("lamad");
+        create_content(&mut conn, &ctx, mk_plain("slug")).unwrap();
+        let earned_a = CanonicalOrdering::new(10, true);
+        let patch = |blob: &str| ContentProjectionPatch {
+            blob_cid: Some(blob.to_string()),
+            ..ContentProjectionPatch::default()
+        };
+        stamp_declared_head_mode(
+            &mut conn,
+            &ctx,
+            "slug",
+            "uhCkk-A",
+            Some(10),
+            Some(patch("blob-A")),
+            StampMode::HealCanonical,
+            Some(earned_a),
+        )
+        .unwrap();
+
+        // B's PATCH: the election named A the winner and B the candidate.
+        upsert_with_anchor(
+            &mut conn,
+            &ctx,
+            "slug",
+            patch("blob-B"),
+            "uhCkk-B",
+            HeadElection::PreserveExistingDeclaration,
+        )
+        .unwrap();
+        let row = get_content(&mut conn, &ctx, "slug", MinTrust::Invisible)
+            .unwrap()
+            .unwrap();
+        assert_eq!(row.dht_anchor_hash.as_deref(), Some("uhCkk-B"));
+        assert_eq!(row.declared_head_action_hash.as_deref(), Some("uhCkk-A"));
+        assert_eq!(row.blob_cid.as_deref(), Some("blob-A"));
+
+        // The follow-up declare of the winner is a same-head refresh.
+        let refresh = stamp_declared_head_mode(
+            &mut conn,
+            &ctx,
+            "slug",
+            "uhCkk-A",
+            Some(10),
+            Some(patch("blob-A")),
+            StampMode::HealCanonical,
+            Some(earned_a),
+        )
+        .unwrap();
+        assert_ne!(refresh, StampOutcome::SkippedStale);
+        let row = get_content(&mut conn, &ctx, "slug", MinTrust::Invisible)
+            .unwrap()
+            .unwrap();
+        assert_eq!(row.declared_head_action_hash.as_deref(), Some("uhCkk-A"));
+
+        // Promotion: B earned later moves the projection.
+        let promoted = stamp_declared_head_mode(
+            &mut conn,
+            &ctx,
+            "slug",
+            "uhCkk-B",
+            Some(20),
+            Some(patch("blob-B")),
+            StampMode::HealCanonical,
+            Some(CanonicalOrdering::new(20, true)),
+        )
+        .unwrap();
+        assert_ne!(promoted, StampOutcome::SkippedStale);
+        let row = get_content(&mut conn, &ctx, "slug", MinTrust::Invisible)
+            .unwrap()
+            .unwrap();
+        assert_eq!(row.declared_head_action_hash.as_deref(), Some("uhCkk-B"));
+        assert_eq!(row.blob_cid.as_deref(), Some("blob-B"));
+    }
+
     /// The verify-only mark and the unverified inventory the anchor-verify
     /// pass pages through: hash-exact, keyset-ordered, and shrinking as rows
     /// are confirmed.
@@ -8320,6 +8548,10 @@ mod tests {
             .values(&new)
             .execute(conn)
             .expect("insert anchored row");
+        // These liveness tests model this peer's OWN rows (the re-keyed-peer
+        // class), which the heal arms may re-author.
+        mark_locally_authored(conn, ctx, &[id.to_string()], AUTHORED_VIA_LOCAL_CREATE)
+            .expect("mark locally authored");
     }
 
     fn anchor_state_of(conn: &mut SqliteConnection, ctx: &AppContext, id: &str) -> AnchorState {

@@ -66,6 +66,8 @@ RECENT_WINDOW = 15  # rolling per-job result window (pass/unstable/fail ratio ra
 SHALLOW_INIT = 5  # first run: look back this many builds, never full history
 MAX_BUILDS_PER_JOB = 10  # per harvest run
 MAX_NEW_FINDINGS = 12  # ledger appends per run (per-build console findings also capped)
+# Generic failure banners duplicate sibling findings but remain useful as the only signal.
+GENERIC_FAILURE_BANNERS = frozenset({"DNA BUILD FAILED"})
 MAX_CONSOLE_FINDINGS_PER_BUILD = 4
 
 # bash `set -x` trace lines are COMMAND ECHOES, not output — a tool-name token
@@ -618,6 +620,8 @@ def collect_build_findings(job, build, taxonomy, describe=None):
     # stage's clock as a field (never a fingerprint input).
     if not findings:
         findings.append(_unclassified_from_describe(describe or _get_describe(job, build)))
+    if len(findings) > 1:
+        findings = [f for f in findings if f["display"] not in GENERIC_FAILURE_BANNERS]
     return findings
 
 

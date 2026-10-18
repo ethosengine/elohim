@@ -3,6 +3,9 @@ Feature: Doorway visitors can trace access decisions, contributions and response
   These acceptance specifications cover successful serves and reach-based HTTP 403
   refusals through the household's owned mesh. Here, standing is the current identity
   and relationship evidence considered under the resource's declared reach.
+  Scenarios 2 and 3 prove standing through member serves and nonmember refusals under
+  the same declared reach, with each named requester's bearer and separately read peer
+  membership record identifying the same person.
 
   The Dowell household is the governing collective in this story. It decides who may
   read the shared garden resource and owes an answer when James objects. The fixture
@@ -10,28 +13,36 @@ Feature: Doorway visitors can trace access decisions, contributions and response
   recording actor's authority or a formal ruling ceremony.
 
   EPR means Elohim Protocol Record: here it identifies the published garden resource.
-  The project-epr contract is the same record later called the projection contract or
-  declaration. It gives alpha permission to serve and names alpha's provider. Its reach
+  The project-epr, projection contract and declaration are three views of one published resource.
+  The steps call the record a contract, its returned representation a declaration,
+  and its link a declaration reference.
+  It gives alpha permission to serve and names alpha's provider. Its reach
   field states the audience. Narrowing updates
   that field in place, under the same contract identifier; it does not create a new
   contract. The full declaration means the complete returned contract record, including
   its metadata; comparing it requires every returned field to remain unchanged.
   The hosting-agreement records computing and storage contribution,
-  operate-doorway records operation of beta, and a challenge record applies the
+  operate-doorway (the record of a doorway operating an entrance) records operation of
+  beta, and a challenge record applies the
   contract's prior response promise to James's objection.
 
-  Matthew, Susan, and James make named requests with hosted bearer credentials tied to
-  their canonical fixture humans: the named people's existing Genesis identities.
-  The bearer credential and the separately read peer membership record must identify
-  the same person. This proves only the hosted-identity path used here; direct device-to-doorway
-  credential handoff remains unproved.
+  Matthew, Ronald, and James make named requests with hosted bearer credentials tied to
+  their canonical fixture humans: their pre-existing fixture identities.
+  Hosted means the doorway holds the person's session and signs on their behalf;
+  the bearer token is that session's credential.
+  Device-native identity is a separate path not proved here.
 
-  Alpha holds the scenario's uniquely marked bytes. Beta is a separate entrance that
+  Alpha holds the scenario's uniquely marked bytes.
+  The live-projection-contract Background step creates and stages those bytes on alpha;
+  the observation step records their marker for later comparison.
+  Beta is a separate entrance that
   can relay them but cannot invent reach or claim alpha's holding work. Anonymous
   requests are clean probes of public permission: after the contract's reach changes
   from commons to Dowell members, their HTTP 403 shows that public permission was
   withdrawn. The member-control scenarios separately show that the scenario-created
   bytes still exist for an admitted member.
+  Scenario 2 brackets the nonmember's request between two member requests that act as
+  control requests, proving the system decided differently rather than changing state.
 
   Private reach is for the person the resource belongs to, established from that person's
   own record; household membership alone does not make someone that beneficiary. The current
@@ -50,9 +61,14 @@ Feature: Doorway visitors can trace access decisions, contributions and response
   credit sentences name who kept it and who operated the entrance. Their records support that
   audit but do not prove payment. A protocol-form URL returns the supporting records. The HTTP
   response frame is called chrome here; no browser presentation or rendered role label is asserted.
+  The receipt carries a held credit (the record of who kept the resource ready, the holder)
+  and a projected credit (the record of who operated the entrance it was served through),
+  each resolving to its exact credited record.
 
-  The fixture declares a 60-second convergence window. The holder-side anonymous-refusal
-  observation has an explicit deadline of that window plus one request/poll interval, at most
+  The household's fixture manifest, household-fixture.json written by the mesh prologue,
+  declares its reconcile window (60 seconds in this fixture).
+  The holder-side anonymous-refusal observation has an explicit deadline of that convergence
+  window plus one request/poll interval, at most
   15 seconds; it does not claim to prove the unobserved instant when enforcement began. Beta's
   unprompted poll has its own 75-second local observation bound. These are local topology limits,
   not WAN guarantees. James's response is due
@@ -80,15 +96,15 @@ Feature: Doorway visitors can trace access decisions, contributions and response
 
   Scenario: A member and a nonmember receive different answers under one narrowed declaration
     Given Matthew's peer membership record states his membership in "the Dowell household"
-    And Susan's peer membership record states no membership in "the Dowell household"
+    And Ronald's peer membership record states no membership in "the Dowell household"
     When the Dowell household decision recorded through alpha says "community-garden-club" now admits only members of "the Dowell household"
     And within 75 seconds beta is polled without a refresh instruction until it enforces and references the changed reach on the same contract
     And canonical Matthew presents his hosted bearer when asking doorway "beta" for "community-garden-club"
     Then Matthew is served the originally observed byte marker for "community-garden-club"
     And doorway "beta" names alpha as the live holder that supplied the bytes
     And the chrome names the reach that admitted him and the holder that served the bytes
-    When canonical Susan presents her hosted bearer at doorway "beta" between two further Matthew requests for "community-garden-club"
-    Then Susan is refused "community-garden-club"
+    When canonical Ronald presents his hosted bearer at doorway "beta" between two further Matthew requests for "community-garden-club"
+    Then Ronald is refused "community-garden-club"
     And the refusal names "the Dowell household" as the collective whose recorded decision narrowed it
     And the refusal gives the collective's challenge address for that decision
     And the surrounding Matthew controls return the original marker while before-and-after reads keep the same contract identifier, reach and full declaration

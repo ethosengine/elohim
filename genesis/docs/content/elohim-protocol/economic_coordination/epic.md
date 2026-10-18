@@ -90,7 +90,7 @@ Your skill attestations: Circuit Repair (Master), Sustainable Electronics (Pione
 
 The phone rings. It's the Lagos Environmental Elohim:
 
-"Chidi, your repair work last month prevented 2.3 tonnes of e-waste. The network values this at ₦450,000 in environmental stewardship. This flows to your family's accumulation. Additionally, three international electronics companies want to license your board-level repair techniques—your documented methods have been viewed 12,000 times. Creator recognition accumulating."
+"Chidi, your repair work last month kept 2.3 tonnes of e-waste out of the ground. The network records it in your family's ledger as stewardship, and it meets your household's needs inside the network. Additionally, three international electronics companies want to license your board-level repair techniques—your documented methods have been viewed 12,000 times. Creator recognition accumulating."
 
 ### **7:30 AM - Amara's University Dream**
 
@@ -421,6 +421,7 @@ Six months into the network, the Okonkwo family's reality has shifted:
 
 ```
 OKONKWO FAMILY ECONOMIC DASHBOARD (Month 6)
+(₦ figures are the bridge: what reaches the family when the network settles with the economy outside it)
 
 Traditional Economy:
 ├── Adaeze: ₦240,000/month (raise from visibility)

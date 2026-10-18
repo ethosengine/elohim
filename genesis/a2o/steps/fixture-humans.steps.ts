@@ -9,19 +9,19 @@
  * genesis/a2o/src/framework/fixtures/humans.ts (same algorithm as the seeder).
  */
 
-import { Given } from '@cucumber/cucumber';
+import { strict as assert } from 'node:assert';
+
+import { DataTable, Given, Then } from '@cucumber/cucumber';
 
 import { ensureFixtureAdmin } from '../src/framework/api/admin-bootstrap.js';
 import { BrowserDevice } from '../src/framework/devices/browser-device.js';
 import { PlaywrightDevice } from '../src/framework/devices/playwright-device.js';
+import { resolveDoorwayUrl } from '../src/framework/fixtures/household-mesh.js';
 import {
-  loadHouseholdMeshFixture,
-  resolveDoorwayUrl,
-} from '../src/framework/fixtures/household-mesh.js';
-import {
-  autoSkippedHumans,
+  declaredStanding,
   getFixture,
   isHumanDeployed,
+  signInStanding,
 } from '../src/framework/fixtures/humans.js';
 import { Human } from '../src/framework/human.js';
 import { DoorwayDashboardPage } from '../src/framework/pages/index.js';
@@ -31,28 +31,72 @@ import { DoorwayEntry, E2EWorld } from '../src/framework/world.js';
 /**
  * Can this human log in on THIS lane?
  *
- * deployments.json is the k8s roster: which humans have a conductor POD, and
- * on which pool. `isHumanDeployed` reads it two ways — a hard `suspended`
- * (the operator retired the pod AND the seeder skips the human, so no account
- * exists anywhere) and a soft pool-skip (the human's only pool, shem, is
- * unavailable to this run). The soft skip is a statement about pods, not about
- * accounts: a household lane that OWNS its substrate (`processControl: true`
- * in the fixture manifest — `just mesh prologue`) seeds every fixture human as
- * a hosted registration on doorway A's pool, matthew's conductor, so susan's
- * or gertrude's remote pod being down on shem says nothing about whether she
- * can log in here. On that lane the soft skip is lifted and the login is
- * attempted for real: it passes on its own evidence or reds honestly. A hard
- * suspension still holds everywhere — that human was never seeded.
+ * First, standing (`signInStanding`, ruled 2026-10-14): only a human with their
+ * own peer runtime or one declared `hosted` may sign in at all. A scenario that
+ * signs in as anyone else is misdeclared, so this throws rather than skipping;
+ * a scenario about such a human asserts the refusal instead
+ * (`human {string} is refused sign-in on doorway {string}`).
+ *
+ * Then, this run: deployments.json is the k8s roster of which humans have a
+ * conductor POD, and on which pool. `isHumanDeployed` reads it two ways — a
+ * hard `suspended` and a soft pool-skip (the human's only pool, shem, is
+ * unavailable to this run). Either way the human has no runtime here, so the
+ * login is skipped. The household lane gets no exemption: it registers only its
+ * own peers' humans and the declared-hosted cast, so susan's or gertrude's
+ * remote pod being down means she has nowhere to sign in on this run.
  */
 function loginableOnThisLane(humanName: string): boolean {
-  if (isHumanDeployed(humanName)) return true;
-  if (!autoSkippedHumans().includes(humanName.toLowerCase())) return false;
-  try {
-    return loadHouseholdMeshFixture().processControl === true;
-  } catch {
-    return false;
+  const standing = signInStanding(humanName);
+  if (!standing.allowed) {
+    throw new Error(
+      `${humanName} has no sign-in standing (${standing.reason}). Sign in as a human with ` +
+        `their own peer runtime or one declared hosted, or assert the refusal with ` +
+        `'human "${humanName}" is refused sign-in on doorway "<id>"'.`
+    );
   }
+  return isHumanDeployed(humanName);
 }
+
+/**
+ * A human with no sign-in standing is turned away by the doorway.
+ *
+ * The precondition is checked first: if the fixture HAS standing, the scenario
+ * is misdeclared and this throws instead of passing on a doorway quirk. Then a
+ * real login is attempted with the fixture's derived credentials; it must fail.
+ *
+ * Example:
+ *   Then human "Charlie" is refused sign-in on doorway "alpha"
+ */
+Then(
+  'human {string} is refused sign-in on doorway {string}',
+  async function (this: E2EWorld, humanName: string, doorwayId: string) {
+    const standing = signInStanding(humanName);
+    if (standing.allowed) {
+      throw new Error(
+        `${humanName} HAS sign-in standing (${standing.reason}); a refusal scenario must name a human without it.`
+      );
+    }
+    const fixture = getFixture(humanName);
+    const doorway = resolveDoorwayFor(this, doorwayId);
+    const device = new BrowserDevice(`${humanName}-browser`, doorway.url);
+    let signedIn = false;
+    try {
+      await device.login({
+        identifier: fixture.credentials.identifier,
+        password: fixture.credentials.password,
+      });
+      signedIn = true;
+    } catch {
+      // Refused, which is what this step asserts.
+    }
+    if (signedIn) {
+      throw new Error(
+        `doorway "${doorwayId}" signed in ${humanName}, who has no standing (${standing.reason}). ` +
+          `Something registered an account the seeder never casts.`
+      );
+    }
+  }
+);
 
 /**
  * Login a pre-seeded fixture human via HTTP (BrowserDevice).
@@ -239,3 +283,71 @@ Given(
     this.addHuman(humanName, human);
   }
 );
+
+/**
+ * Whether the doorway runs a cell for a signed-in human, read from their own
+ * `GET /auth/account`: `conductorId` is set only when the doorway provisioned a
+ * cell for them (the hosted arm). A human with their own runtime (device, node)
+ * or the doorway's own operator holds an account with no conductor here.
+ */
+async function doorwayRunsCellFor(
+  world: E2EWorld,
+  doorwayId: string,
+  humanName: string
+): Promise<string | null> {
+  const human = world.humans.get(humanName);
+  const token = human?.getToken(doorwayId);
+  assert.ok(token, `${humanName} is not signed in on doorway "${doorwayId}"`);
+  const doorway = resolveDoorwayFor(world, doorwayId);
+  const res = await fetch(`${doorway.url.replace(/\/$/, '')}/auth/account`, {
+    headers: { authorization: `Bearer ${token}` },
+  });
+  const body = await res.text();
+  assert.equal(res.status, 200, `GET /auth/account for ${humanName}: ${res.status} ${body}`);
+  return (JSON.parse(body) as { conductorId?: string | null }).conductorId ?? null;
+}
+
+Then(
+  'doorway {string} runs a cell for {string}',
+  async function (this: E2EWorld, doorwayId: string, humanName: string) {
+    const conductor = await doorwayRunsCellFor(this, doorwayId, humanName);
+    assert.ok(conductor, `doorway "${doorwayId}" runs no cell for ${humanName}`);
+  }
+);
+
+Then(
+  'doorway {string} runs no cell for {string}',
+  async function (this: E2EWorld, doorwayId: string, humanName: string) {
+    const conductor = await doorwayRunsCellFor(this, doorwayId, humanName);
+    assert.equal(
+      conductor,
+      null,
+      `doorway "${doorwayId}" runs a cell for ${humanName} on ${conductor}`
+    );
+  }
+);
+
+/**
+ * Shows, and checks against the fixture data, what each human in a scenario
+ * declares: their stage, their household and whether they have a runtime of
+ * their own. A mismatch fails here, before any sign-in, so a scenario's cause
+ * is visible in the Gherkin and cannot silently drift from humans.json or
+ * deployments.json.
+ */
+Given('these fixture humans declare:', function (table: DataTable) {
+  const wrong: string[] = [];
+  for (const row of table.hashes()) {
+    const actual = declaredStanding(row['human']);
+    const declared: Partial<Record<string, string>> = row;
+    for (const [column, key] of [
+      ['stage', 'stage'],
+      ['household', 'household'],
+      ['own runtime', 'ownRuntime'],
+    ] as const) {
+      if (declared[column] !== undefined && declared[column] !== actual[key]) {
+        wrong.push(`${row['human']}: ${column} is "${actual[key]}", not "${row[column]}"`);
+      }
+    }
+  }
+  assert.deepEqual(wrong, [], 'the fixture data says otherwise');
+});

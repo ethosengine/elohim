@@ -1,0 +1,75 @@
+{
+  "id": "letter-to-dtpr",
+  "contentType": "article",
+  "title": "Our protocol, read through your label",
+  "name": "Elohim, Read Through DTPR — a letter to the DTPR community",
+  "description": "A letter from the Elohim Protocol to Helpful Places and the DTPR (Digital Trust for Places and Routines) Community of Practice. It describes the protocol in DTPR's own visual language as three validated datachains, from the seat of a person running their own node, from a doorway's hosted first stage, and for solidarity pricing, and offers one piece of advice: don't label the AI; label the parties who arrive carrying it. Every claim carries a trust mark for what backs it and where it stands today.",
+  "contentFormat": "html5-app",
+  "content": {
+    "slug": "letter-to-dtpr",
+    "entryPoint": "index.html",
+    "fallbackUrl": "https://claude.ai/artifact/NgJu5DhD3gWg1QZ6L87UNx"
+  },
+  "entryPoint": "index.html",
+  "fallbackUrl": "https://claude.ai/artifact/NgJu5DhD3gWg1QZ6L87UNx",
+  "sourcePath": "docs/content/elohim-protocol/letters/dtpr",
+  "tags": [
+    "letter",
+    "dtpr",
+    "transparency",
+    "legibility",
+    "reach",
+    "commons",
+    "trust",
+    "html5-app"
+  ],
+  "relatedNodeIds": [
+    "manifesto",
+    "constitution",
+    "governance-epic",
+    "evolution-of-trust"
+  ],
+  "blobHash": "sha256-85448fd17a2fee1e18ccc2842b48fb6697b60aecc4700d4c6488c789168e9ab2",
+  "metadata": {
+    "category": "letter",
+    "author": "Matthew Dowell",
+    "publishedFor": "org-ethosengine",
+    "publishedForNote": "Published by Matthew Dowell as part of the EthosEngine collective. Content carries no enforced on-behalf-of field yet; this is a declared affiliation, not a collective signature.",
+    "embedStrategy": "iframe",
+    "localSourcePath": "docs/content/elohim-protocol/letters/dtpr",
+    "localZipPath": "docs/content/elohim-protocol/letters/dtpr.zip",
+    "requiredCapabilities": [
+      "javascript"
+    ],
+    "securityPolicy": {
+      "sandbox": [
+        "allow-scripts",
+        "allow-same-origin"
+      ],
+      "csp": "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; font-src 'self'"
+    },
+    "keywords": [
+      "DTPR",
+      "Digital Trust for Places and Routines",
+      "datachain",
+      "disclosure",
+      "solidarity pricing",
+      "reach"
+    ],
+    "originalContentType": "article",
+    "originalContentFormat": "html5-app",
+    "dtprSchema": "dtpr@2026-09-01-beta",
+    "attribution": "DTPR icons, taxonomy and datachain structure by the Digital Transparency in the Public Realm contributors, CC BY 4.0; fonts under the SIL Open Font License 1.1"
+  },
+  "reach": "commons",
+  "trustScore": 1,
+  "createdAt": "2026-10-14T00:00:00.000000",
+  "updatedAt": "2026-10-14T00:00:00.000000",
+  "stewardedBy": [
+    {
+      "humanId": "human-matthew-manager",
+      "affinity": 1,
+      "role": "author"
+    }
+  ]
+}

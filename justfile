@@ -410,7 +410,17 @@ mesh action="status" *args:
       preflight) exec "{{ app_dir }}/scripts/hc-mesh.sh" preflight ;;
       # build the mesh's OWN storage (p2p p2p-iroh) + doorway binaries and install them into the
       # pool's mesh-bin/ paths, which the gate never writes; MESH_BUILD_DRY_RUN=1 prints the commands.
-      build) exec "{{ app_dir }}/scripts/hc-mesh.sh" build {{ args }} ;;
+      # build writes the mesh-bin paths every running household doorway/storage re-execs from, so it
+      # is held to the same owner-check as the restart arms below.
+      build)
+        if [[ "${MESH_BUILD_DRY_RUN:-0}" != "1" ]]; then
+          owner_rc=0
+          force=()
+          if [[ "${MESH_RESTART_FORCE:-0}" == "1" ]]; then force=(--force); fi
+          "{{ root }}/genesis/agentic/bin/berth" owner-check mesh --action build --note "just mesh build {{ args }}" "${force[@]}" || owner_rc=$?
+          if [[ "$owner_rc" -ne 0 && "$owner_rc" -ne 4 ]]; then echo "  (for this arm the override is MESH_RESTART_FORCE=1)" >&2; exit "$owner_rc"; fi
+        fi
+        exec "{{ app_dir }}/scripts/hc-mesh.sh" build {{ args }} ;;
       wait) exec "{{ app_dir }}/scripts/hc-mesh.sh" wait {{ args }} ;;
       quiesce) exec "{{ app_dir }}/scripts/hc-mesh-quiesce.sh" ;;
       monitor) exec python3 "{{ app_dir }}/scripts/hc-mesh-monitor.py" ;;
@@ -434,11 +444,18 @@ mesh action="status" *args:
         esac ;;
       # Restart arms (ratchet lane D, rung D2 pawls — 2026-08-28): the same hc-mesh.sh actions the
       # recovery harness drives, reachable through the verb so a shift never has to know the script.
-      conductors-restart) exec "{{ app_dir }}/scripts/hc-mesh.sh" conductors-restart ;;
-      storage-restart) exec "{{ app_dir }}/scripts/hc-mesh.sh" storage-restart {{ args }} ;;
-      # Re-exec one doorway (a | b | c) on the binary now at its path, with its captured env —
-      # how a rebuilt doorway reaches the running household without a full mesh restart.
-      doorway-restart) exec "{{ app_dir }}/scripts/hc-mesh.sh" doorway-restart {{ args }} ;;
+      # doorway-restart re-execs one doorway (a | b | c) on the binary now at its path, with its
+      # captured env — how a rebuilt doorway reaches the running household without a full restart.
+      # Every restart arm swaps the bytes under whoever holds the household: refused (exit 3, holder
+      # named) while another live session holds `mesh` — a restart under a running lane makes its
+      # receipt attest a binary it never tested (2026-10-16). MESH_RESTART_FORCE=1 = override row.
+      conductors-restart|storage-restart|doorway-restart)
+        owner_rc=0
+        force=()
+        if [[ "${MESH_RESTART_FORCE:-0}" == "1" ]]; then force=(--force); fi
+        "{{ root }}/genesis/agentic/bin/berth" owner-check mesh --action "{{ action }}" --note "just mesh {{ action }} {{ args }}" "${force[@]}" || owner_rc=$?
+        if [[ "$owner_rc" -ne 0 && "$owner_rc" -ne 4 ]]; then echo "  (for this arm the override is MESH_RESTART_FORCE=1)" >&2; exit "$owner_rc"; fi
+        exec "{{ app_dir }}/scripts/hc-mesh.sh" "{{ action }}" {{ args }} ;;
       # The sign-in portal (doorway-app `ng serve` on THRESHOLD_PORT) is shed by the
       # workspace RAM guard like any other fat node process and nothing supervises it.
       # `just test mesh-browser` refuses to start without it, and this is the arm that
@@ -611,6 +628,9 @@ _gate-elohim-compute:
 
 _gate-elohim-epr:
     cd elohim && cargo fmt --check && cargo clippy -p elohim-epr -p elohim-epr-rea -p elohim-epr-index -- -D warnings && cargo test -p elohim-epr -p elohim-epr-rea -p elohim-epr-index --all-targets
+
+_gate-elohim-live-session:
+    cd elohim && cargo fmt --check -p elohim-live-session && cargo clippy -p elohim-live-session --all-targets -- -D warnings && cargo test -p elohim-live-session --all-targets
 
 _gate-elohim-ark:
     cd elohim && cargo fmt --check -p elohim-ark-core -p elohim-ark-supervisor -p elohim-ark && cargo clippy -p elohim-ark-core -p elohim-ark-supervisor -p elohim-ark -- -D warnings && cargo test -p elohim-ark-core -p elohim-ark-supervisor -p elohim-ark --all-targets

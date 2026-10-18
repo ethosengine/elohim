@@ -88,3 +88,10 @@ export type {
   WitnessTrailStrings,
   WitnessWho,
 } from './elohim-imagodei-witness-trail.js';
+
+export { parseAccountBindChallenge, signAccountBind, returnFragment } from './account-bind.js';
+export type {
+  AccountBindChallenge,
+  AccountBindRefusal,
+  SignedAccountBind,
+} from './account-bind.js';

@@ -302,10 +302,10 @@ export class EprLinkComponent implements OnInit, OnDestroy {
         this.startPeerPin(epr);
         break;
       case 'network':
-        // Resolve to the resource route, then land directly on the Network /
-        // resilience tab via the route fragment (content-viewer honors it).
+        // Resolve to the atom's address, then land on "Who holds it" with its
+        // network-detail fold open (the atom home opens the fold named by #holds).
         this.eprResolver.resolve(epr).subscribe(resolved => {
-          this.navigateResolved(resolved, { fragment: 'network' });
+          this.navigateResolved(resolved, { fragment: 'holds' });
         });
         break;
       case 'relationships':

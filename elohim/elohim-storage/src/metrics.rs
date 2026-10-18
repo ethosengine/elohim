@@ -1672,6 +1672,10 @@ lazy_static! {
     /// - `skipped_current` — the worker found the row already declaring exactly
     ///   the doc's head hint, so no conductor call was spent. On a converged
     ///   corpus this is the series that should dominate;
+    /// - `skipped_rested` — (source `retained` only) the retained pass withheld an
+    ///   offer because the last re-probe ladder for this exact `(doc head, row
+    ///   head)` claim ended without a walkable answer and its rest has not lapsed;
+    ///   no queue slot and no conductor call spent;
     /// - `adopted` — a canonical head landed FROM a sync apply rather than from
     ///   the heal leg's period. This is the series that says the 2026-09-17
     ///   130–450 s adoption lag is actually closed;
@@ -2270,6 +2274,17 @@ lazy_static! {
     )
     .unwrap();
 
+    /// Pointer-audit candidates the sweep did NOT ask the conductor about,
+    /// because this process already found them in step at the head and blob
+    /// pointer they still carry. Its own series rather than an `outcome` label:
+    /// every `outcome` is an answer the conductor gave, and this is the absence
+    /// of a question.
+    pub static ref CONTENT_POINTER_AUDIT_SETTLED: IntCounter = IntCounter::new(
+        "elohim_content_pointer_audit_settled_total",
+        "Pointer-audit candidates skipped as remembered in step at an unchanged head and blob pointer.",
+    )
+    .unwrap();
+
     /// Divergent REA commitments the heal leg ADJUDICATED without paying for a
     /// `get_rea_commitment` round-trip, by the remembered [`ReaHealSkip`].
     ///
@@ -2580,6 +2595,21 @@ lazy_static! {
             "Conductor calls dispatched, by zome, function and admission class.",
         ),
         &["zome", "fn", "class"],
+    )
+    .unwrap();
+
+    /// Liveness questions NOT put to the conductor because the socket had
+    /// already answered: a supervisor tick (`asker="supervisor"`) or a heartbeat
+    /// sample (`asker="heartbeat"`) that rested on a returned zome call or a
+    /// recent ping. The other half of `elohim_conductor_calls_total{fn="app_info"}`:
+    /// together they are every tick, so a probe that stopped firing is
+    /// distinguishable from one that was spared.
+    pub static ref BRIDGE_PROBES_VOUCHED: IntCounterVec = IntCounterVec::new(
+        Opts::new(
+            "elohim_conductor_bridge_probes_vouched_total",
+            "Bridge liveness probes spared because the role's app websocket had already answered, by role and asker.",
+        ),
+        &["role", "asker"],
     )
     .unwrap();
 
@@ -3232,6 +3262,12 @@ pub fn register_all() {
         let _ = REGISTRY.register(Box::new(VIEW_FEDERATION_OUTBOUND.clone()));
         let _ = REGISTRY.register(Box::new(VIEW_FEDERATION_INBOUND_SERVED.clone()));
         let _ = REGISTRY.register(Box::new(CONTENT_HEAD_RECORD_DEGRADED.clone()));
+        let _ = REGISTRY.register(Box::new(CONTENT_HEAD_DECLARED_HYDRATION.clone()));
+        for outcome in ContentHeadHydrationOutcome::ALL {
+            CONTENT_HEAD_DECLARED_HYDRATION
+                .with_label_values(&[outcome.label()])
+                .inc_by(0);
+        }
         // Pre-touch every degrade cause. `no_record` shipped UNCOUNTED until
         // 2026-08-03 and was the structural one; a series that only appears once
         // it fires cannot answer "is this class silent, or is it not measured?"
@@ -3319,6 +3355,7 @@ pub fn register_all() {
         let _ = REGISTRY.register(Box::new(CONTENT_CONTEST_BACKOFF_CLEARED.clone()));
         let _ = REGISTRY.register(Box::new(CONTENT_REANCHOR_SKIPPED.clone()));
         let _ = REGISTRY.register(Box::new(CONTENT_POINTER_AUDIT.clone()));
+        let _ = REGISTRY.register(Box::new(CONTENT_POINTER_AUDIT_SETTLED.clone()));
         // Pre-touch every outcome — a torn-row class this sweep never sees
         // (e.g. `not_canonical` on a fully converged corpus) must read as a
         // MEASURED zero, not an absent series.
@@ -3499,6 +3536,16 @@ pub fn register_all() {
             }
         }
         let _ = REGISTRY.register(Box::new(PROJECTION_MISS_READMISSIONS.clone()));
+        let _ = REGISTRY.register(Box::new(PROJECTION_MISS_OWED_REOFFERS.clone()));
+        let _ = REGISTRY.register(Box::new(PROJECTION_MISS_OWED_EXPIRED.clone()));
+        for stream in ["rea", "content", "collectives", "participations", "humans"] {
+            PROJECTION_MISS_OWED_REOFFERS
+                .with_label_values(&[stream])
+                .inc_by(0);
+            PROJECTION_MISS_OWED_EXPIRED
+                .with_label_values(&[stream])
+                .inc_by(0);
+        }
         // Pre-touch every (stream, rung) pair so "no id has come back from
         // dormancy yet" reads as a measured zero rather than an absent series —
         // the distinction that matters when the question being asked is whether
@@ -3660,8 +3707,17 @@ pub fn register_all() {
         let _ = REGISTRY.register(Box::new(CONDUCTOR_ADMISSION_HOLD_MS.clone()));
         let _ = REGISTRY.register(Box::new(CONDUCTOR_ADMISSION_ACQUIRED.clone()));
         let _ = REGISTRY.register(Box::new(CONDUCTOR_ADMISSION_SHED.clone()));
+        // Pre-touch the gated classes so "nothing was shed" reads as a measured 0
+        // rather than an absent series: the idle-is-free lane sums this counter at
+        // both ends of its window and could not measure a household that shed nothing.
+        for class in ["interactive", "background"] {
+            CONDUCTOR_ADMISSION_SHED
+                .with_label_values(&[class, "content_store"])
+                .inc_by(0);
+        }
         let _ = REGISTRY.register(Box::new(SHARD_REGISTRATION_OUTCOMES.clone()));
         let _ = REGISTRY.register(Box::new(CONDUCTOR_CALLS.clone()));
+        let _ = REGISTRY.register(Box::new(BRIDGE_PROBES_VOUCHED.clone()));
         let _ = REGISTRY.register(Box::new(CONDUCTOR_CALL_DURATION_MS.clone()));
         let _ = REGISTRY.register(Box::new(CONDUCTOR_CALL_DROPPED.clone()));
         let _ = REGISTRY.register(Box::new(CONDUCTOR_CALL_TIMEOUTS.clone()));
@@ -3947,6 +4003,13 @@ pub fn inc_head_moved_exhausted(writer: &str) {
 pub fn inc_conductor_call(zome: &str, fn_name: &str, class: &str) {
     CONDUCTOR_CALLS
         .with_label_values(&[zome, fn_name, class])
+        .inc();
+}
+
+/// Count one bridge liveness probe spared by evidence already held.
+pub fn inc_bridge_probe_vouched(role: &str, asker: &str) {
+    BRIDGE_PROBES_VOUCHED
+        .with_label_values(&[role, asker])
         .inc();
 }
 
@@ -4413,6 +4476,47 @@ pub fn inc_view_federation_outbound(result: &str) {
 /// Record one inbound view-federation request answered with a signed slice.
 pub fn inc_view_federation_inbound_served() {
     VIEW_FEDERATION_INBOUND_SERVED.inc();
+}
+
+/// Closed label set of [`CONTENT_HEAD_DECLARED_HYDRATION`].
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum ContentHeadHydrationOutcome {
+    /// A failed attempt was scheduled for another try.
+    Retried,
+    /// A retry succeeded and the declaration projected.
+    Recovered,
+    /// Every scheduled attempt (or the deadline) was spent; the job was dropped.
+    Exhausted,
+    /// An attempt resolved a payload whose fields differed from the declaration.
+    Mismatch,
+    /// A retry was refused because the concurrent-retry cap was reached.
+    Dropped,
+}
+
+impl ContentHeadHydrationOutcome {
+    pub const ALL: [Self; 5] = [
+        Self::Retried,
+        Self::Recovered,
+        Self::Exhausted,
+        Self::Mismatch,
+        Self::Dropped,
+    ];
+
+    pub const fn label(self) -> &'static str {
+        match self {
+            Self::Retried => "retried",
+            Self::Recovered => "recovered",
+            Self::Exhausted => "exhausted",
+            Self::Mismatch => "mismatch",
+            Self::Dropped => "dropped",
+        }
+    }
+}
+
+pub fn inc_content_head_declared_hydration(outcome: ContentHeadHydrationOutcome) {
+    CONTENT_HEAD_DECLARED_HYDRATION
+        .with_label_values(&[outcome.label()])
+        .inc();
 }
 
 /// Why a `ContentHeadRecord` answer was served hash-only — the label vocabulary
@@ -5145,14 +5249,21 @@ pub enum ReanchorSkip {
     /// cannot change the verdict until the row moves, the advertiser changes, or
     /// the window lapses — all three of which re-admit it automatically.
     HeldBackoff,
+    /// A NULL-anchor row that arrived from a peer: this peer holds no local
+    /// authoring authority for it, so its root is the author's to mint and the
+    /// sweep never selects it (the receiver guard). Counted per sweep, like
+    /// `held_backoff`: a standing value is a received population waiting to
+    /// adopt its author's root.
+    NotLocalAuthor,
 }
 
 impl seam_contracts::ReasonLabel for ReanchorSkip {
-    const ALL: &'static [Self] = &[ReanchorSkip::HeldBackoff];
+    const ALL: &'static [Self] = &[ReanchorSkip::HeldBackoff, ReanchorSkip::NotLocalAuthor];
 
     fn label(&self) -> &'static str {
         match self {
             ReanchorSkip::HeldBackoff => "held_backoff",
+            ReanchorSkip::NotLocalAuthor => "not_local_author",
         }
     }
 }
@@ -5463,6 +5574,21 @@ pub fn inc_reanchor_skipped(reason: ReanchorSkip) {
     CONTENT_REANCHOR_SKIPPED
         .with_label_values(&[reason.label()])
         .inc();
+}
+
+/// Count `n` reanchor candidates skipped for `reason` at once (a sweep-level
+/// hold counted from one query, e.g. [`ReanchorSkip::NotLocalAuthor`]).
+pub fn inc_reanchor_skipped_by(reason: ReanchorSkip, n: u64) {
+    use seam_contracts::ReasonLabel as _;
+    CONTENT_REANCHOR_SKIPPED
+        .with_label_values(&[reason.label()])
+        .inc_by(n);
+}
+
+/// Count one pointer-audit candidate NOT asked about: remembered in step at the
+/// head and blob pointer it still carries.
+pub fn inc_pointer_audit_settled() {
+    CONTENT_POINTER_AUDIT_SETTLED.inc();
 }
 
 /// Record one pointer-audit sweep candidate's outcome (story 1.4d).
@@ -5825,6 +5951,68 @@ pub fn add_projection_miss_readmissions(stream: &str, rung: &str, count: usize) 
     PROJECTION_MISS_READMISSIONS
         .with_label_values(&[stream, rung])
         .inc_by(count as u64);
+}
+
+// A separate block: the main `lazy_static!` above sits at the macro recursion
+// limit, so new statics land here.
+lazy_static! {
+    /// Outcomes of the ordered `ContentHeadDeclared` hydration worker
+    /// (`rea_projection::handle_authenticated_content_head_signal_with_retry`).
+    /// `outcome` is a closed set (see [`ContentHeadHydrationOutcome`]): a
+    /// commit/read-visibility race right after the authoring call used to WARN
+    /// once and leave the author's projected head on the previous version.
+    pub static ref CONTENT_HEAD_DECLARED_HYDRATION: IntCounterVec = IntCounterVec::new(
+        Opts::new(
+            "content_head_declared_hydration_total",
+            "Ordered ContentHeadDeclared hydration outcomes (retried|recovered|exhausted|mismatch|dropped).",
+        ),
+        &["outcome"],
+    )
+    .unwrap();
+
+    /// A re-admitted id's ONE read was offered again because the previous offer
+    /// was never executed (shed by the leg budget / circuit, backpressure,
+    /// `unattempted`, or a plan dropped by single-flight), by stream. Rising
+    /// alongside a flat `get_*` conductor-call rate is a heal leg that keeps
+    /// shedding the same owed ids.
+    pub static ref PROJECTION_MISS_OWED_REOFFERS: IntCounterVec = IntCounterVec::new(
+        Opts::new(
+            "elohim_projection_reconcile_miss_owed_reoffers_total",
+            "Re-admitted reconcile gaps whose owed read was offered again because the \
+             previous offer was not executed, by stream.",
+        ),
+        &["stream"],
+    )
+    .unwrap();
+
+    /// An owed re-admission read reached `MAX_OWED_REOFFERS` unexecuted offers
+    /// and the id went back to dormancy as if read, by stream — the bound that
+    /// keeps repeated backpressure from becoming a per-sweep hot loop.
+    pub static ref PROJECTION_MISS_OWED_EXPIRED: IntCounterVec = IntCounterVec::new(
+        Opts::new(
+            "elohim_projection_reconcile_miss_owed_expired_total",
+            "Re-admitted reconcile gaps returned to dormancy after the owed read went \
+             unexecuted for MAX_OWED_REOFFERS consecutive sweeps, by stream.",
+        ),
+        &["stream"],
+    )
+    .unwrap();
+
+}
+
+/// Record a sweep's owed-read re-offers and expiries on `stream` (see
+/// [`PROJECTION_MISS_OWED_REOFFERS`] / [`PROJECTION_MISS_OWED_EXPIRED`]).
+pub fn add_projection_miss_owed(stream: &str, reoffered: usize, expired: usize) {
+    if reoffered > 0 {
+        PROJECTION_MISS_OWED_REOFFERS
+            .with_label_values(&[stream])
+            .inc_by(reoffered as u64);
+    }
+    if expired > 0 {
+        PROJECTION_MISS_OWED_EXPIRED
+            .with_label_values(&[stream])
+            .inc_by(expired as u64);
+    }
 }
 
 /// Publish a reconcile stream's last-sweep gauges: discovered `gaps` (pending after

@@ -1,0 +1,298 @@
+{
+  "accountable-you": {
+    "backed": "peer",
+    "today": "live",
+    "confidence": "high",
+    "rationale": "Every record carries its author's signature and peers reject one whose signature does not match. Authority over others is witnessed as a signed commitment that the people served can revoke.",
+    "sources": [
+      {
+        "quote": "designed so that no single party, including its creator, can own or control it",
+        "context": "elohim README.md, About"
+      }
+    ]
+  },
+  "accountable-authors": {
+    "backed": "peer",
+    "today": "live",
+    "today_note": "community adoption of rule changes is designed",
+    "confidence": "high",
+    "rationale": "The contributors hold no key that signs for anyone. No legal entity is named yet; licensing is an open decision the README states plainly.",
+    "sources": [
+      {
+        "quote": "a root LICENSE and a single policy are an open decision",
+        "context": "elohim README.md, License"
+      }
+    ]
+  },
+  "affected-in-care": {
+    "backed": "peer",
+    "today": "building",
+    "today_note": "naming and basis rules are live; the always-reachable features are not yet enforced",
+    "confidence": "high",
+    "rationale": "The identity network's rules refuse a grant with no steward or subject, a person stewarding themselves, a basis outside a fixed list, or delegation deeper than three.",
+    "sources": [
+      {
+        "quote": "Cannot grant stewardship to yourself",
+        "context": "imagodei_integrity/src/stewardship.rs, validate_stewardship_grant"
+      }
+    ]
+  },
+  "affected-named": {
+    "backed": "promise",
+    "today": "building",
+    "today_note": "some profile details and relationship links still sit on the public record; moving them is planned",
+    "confidence": "high",
+    "rationale": "The canon draws the line before publication, because nothing published can be withdrawn.",
+    "sources": [
+      {
+        "quote": "Already-gossiped data CANNOT be recalled",
+        "context": "genesis/docs/superpowers/plans/2026-06-23-dht-pii-leak-remediation-plan.md"
+      }
+    ]
+  },
+  "decides": {
+    "backed": "peer",
+    "today": "live",
+    "confidence": "high",
+    "rationale": "Validation rules ship inside each network's shared code; every peer that stores a record runs them, so a record that breaks a rule is refused everywhere.",
+    "sources": [
+      {
+        "quote": "Each layer can only ADD restrictions, never remove parent layer restrictions.",
+        "context": "imagodei_integrity/src/stewardship.rs, policy composition"
+      }
+    ]
+  },
+  "acts": {
+    "backed": "people",
+    "today": "designed",
+    "today_note": "the agent runtime is written, and no elohim takes part in any decision yet",
+    "confidence": "high",
+    "rationale": "The personal constitution (act freely, ask first, never) and the human floor over any machine are constitutional canon.",
+    "sources": [
+      {
+        "quote": "No machine here will ever hold final authority over you that a human floor cannot overturn",
+        "context": "genesis/docs/content/elohim-protocol/values-forward.md"
+      },
+      {
+        "quote": "no elohim takes part in any gate yet",
+        "context": "elohim README.md, What runs today"
+      }
+    ]
+  },
+  "understands": {
+    "backed": "people",
+    "today": "designed",
+    "confidence": "medium",
+    "rationale": "An arriving party announces who it is, for whom and why, and the person's elohim reads and explains it; the observer discloses to earn disclosure.",
+    "sources": [
+      {
+        "quote": "discloses to earn disclosure",
+        "context": "genesis/research/letter-to-rea-practitioners-observed-presence-2026-07-22.md"
+      }
+    ]
+  },
+  "privacy_loss": {
+    "backed": "promise",
+    "today": "building",
+    "today_note": "the five-person threshold is live; profile details are still being moved off the public record",
+    "confidence": "high",
+    "rationale": "The canon's line is between thought and fruit: thoughts never enter the shared record, so the boundary sits before publication.",
+    "sources": [
+      {
+        "quote": "T16 aggregator enforces k-anonymity threshold before publication.",
+        "context": "content_store_integrity/src/collective_filter_pattern.rs"
+      },
+      {
+        "quote": "Activity ledgers are held by the holon they describe.",
+        "context": "genesis/docs/architecture/private-thought-governed-fruit.md"
+      }
+    ]
+  },
+  "autonomy_loss": {
+    "backed": "peer",
+    "today": "building",
+    "today_note": "naming and depth limits are live; consent to a grant and deciding appeals are being built",
+    "confidence": "high",
+    "rationale": "Delegation depth and the naming rules are enforced by every peer; the appeal and the always-reachable features are declared in the identity network's code.",
+    "sources": [
+      {
+        "quote": "Delegation depth cannot exceed 3",
+        "context": "imagodei_integrity/src/stewardship.rs"
+      }
+    ]
+  },
+  "security_breach": {
+    "backed": "people",
+    "today": "building",
+    "today_note": "self-revocation and an emergency-contact vote run; quorum recovery is designed",
+    "confidence": "high",
+    "rationale": "Recovery is a quorum of people who know you; cryptography accelerates community recovery paths and never becomes the sole gate."
+  },
+  "societal_cultural_harm": {
+    "backed": "signed",
+    "today": "live",
+    "confidence": "high",
+    "rationale": "The rules are published source anyone can read, copy and run, and the canon refuses to let model capability confer deference.",
+    "sources": [
+      {
+        "quote": "No machine here will ever hold final authority over you that a human floor cannot overturn",
+        "context": "genesis/docs/content/elohim-protocol/values-forward.md"
+      }
+    ]
+  },
+  "right_contest": {
+    "backed": "people",
+    "today": "building",
+    "today_note": "filing an objection works; answering by a deadline is written as a test that fails today",
+    "confidence": "high",
+    "rationale": "Appeal is declared inalienable in the identity network, and the protocol keeps its own claims honest by writing each one as a runnable check before it is built.",
+    "sources": [
+      {
+        "quote": "An objection nobody answered is reported as unanswered, never as refused",
+        "context": "genesis/a2o/features/stewardship/collective-steward-answerable.feature"
+      }
+    ]
+  },
+  "right_to_human_review": {
+    "backed": "signed",
+    "today": "live",
+    "today_note": "the rule is in the decision type; councils that answer are designed",
+    "confidence": "high",
+    "rationale": "Every decision has three outcomes (permit, refuse, refer to a person) and a tested law that a referral may never be converted into a refusal.",
+    "sources": [
+      {
+        "quote": "a collapsed refer silently swallows a question a human was owed",
+        "context": "elohim/epr/src/verdict.rs (test refer_never_collapses_to_refuse)"
+      }
+    ]
+  },
+  "right_access": {
+    "backed": "signed",
+    "today": "building",
+    "today_note": "the functions exist; a steward can still hide an activity log, which we count as a bug",
+    "confidence": "high",
+    "rationale": "Records about you are signed records you can read on your own node, and the person in care's dashboard is declared inalienable."
+  },
+  "right_object": {
+    "backed": "signed",
+    "today": "live",
+    "confidence": "high",
+    "rationale": "Either party to a grant can revoke it; revocation is itself a signed record."
+  },
+  "right_correction": {
+    "backed": "people",
+    "today": "designed",
+    "confidence": "medium",
+    "rationale": "Counter-evidence about a person is floor-protected and routed to the person it names."
+  },
+  "available_to_3rd_parties": {
+    "backed": "promise",
+    "today": "building",
+    "today_note": "reach is enforced on some read paths, not yet on copying",
+    "confidence": "high",
+    "rationale": "Reach (how far a record is meant to travel) is chosen when you publish; making it a gate everywhere is the work in progress."
+  },
+  "not_available_to_vendor": {
+    "backed": "signed",
+    "today": "live",
+    "confidence": "high",
+    "rationale": "The node software is open source and contains no access path for the contributors; anyone can read it to check."
+  },
+  "data_retained": {
+    "backed": "peer",
+    "today": "live",
+    "today_note": "the 365-day limit is live; withdrawal requests and returning reach are designed",
+    "confidence": "high",
+    "rationale": "The shared record is append-only, so withdrawal works by a superseding record and a returned reach rather than by erasure; the identity network's rules refuse a device policy whose log retention exceeds 365 days.",
+    "sources": [
+      {
+        "quote": "retention_days cannot exceed 365",
+        "context": "imagodei_integrity/src/stewardship.rs, validate_device_policy"
+      },
+      {
+        "quote": "Reach can be returned, an attestation withdrawn by a superseding one",
+        "context": "genesis/docs/content/elohim-protocol/constitution.md, repair"
+      }
+    ]
+  },
+  "shared_storage_and_governance": {
+    "backed": "peer",
+    "today": "live",
+    "confidence": "high",
+    "rationale": "This element's own definition, governance enforced by policies built into the structure of the data, is how the protocol stores everything: the rules ship inside each network's code and every peer holding a share checks them."
+  },
+  "output_about_behaviour": {
+    "backed": "promise",
+    "today": "building",
+    "confidence": "medium",
+    "rationale": "Publishing outcomes rather than raw data is the canon's attested-private class; some progress records still publish more than that."
+  },
+  "mobile_notification": {
+    "backed": "signed",
+    "today": "live",
+    "confidence": "high",
+    "rationale": "The storage layer reports a withheld record as refused rather than missing.",
+    "sources": [
+      {
+        "quote": "A withheld row is REFUSED, never reported missing",
+        "context": "elohim-storage/src/private_reach.rs"
+      }
+    ]
+  },
+  "language_models": {
+    "backed": "peer",
+    "today": "building",
+    "today_note": "registering an AI agent in the identity network is live; attesting each layer's capabilities, and pinning the constitutional context at each gate, are designed",
+    "confidence": "high",
+    "rationale": "The identity network's rules accept an AI agent as a kind of participant beside a human and an organization, so a model is held in the same identity layer, with the same attestations, as a person.",
+    "sources": [
+      {
+        "quote": "\"ai-agent\",     // AI assistant or agent",
+        "context": "imagodei_integrity/src/lib.rs, AGENT_TYPES"
+      }
+    ]
+  },
+  "search_retrieval": {
+    "backed": "signed",
+    "today": "building",
+    "today_note": "our own tooling pins algorithms by content address today; the product's search is not yet published that way",
+    "confidence": "medium",
+    "rationale": "Algorithms are governed artifacts: content-addressed records whose every use can pin the exact version that ran.",
+    "sources": [
+      {
+        "quote": "governed algorithm artifact",
+        "context": "repository CLAUDE.md, Bounded recall (.epr-meta/elohim/algorithms/recall-contract.json)"
+      }
+    ]
+  },
+  "creates": {
+    "backed": "people",
+    "today": "designed",
+    "confidence": "medium",
+    "rationale": "The produce of labor is the person's; value co-created with an intelligence drawn from everyone is common inheritance, so it is cited and shared back.",
+    "sources": [
+      {
+        "quote": "the new value we co-create with an intelligence drawn from all of us",
+        "context": "genesis/docs/content/elohim-protocol/values-forward.md, Stance I.4"
+      }
+    ]
+  },
+  "output_generated_content": {
+    "backed": "signed",
+    "today": "designed",
+    "confidence": "medium",
+    "rationale": "Every record is signed by its author, so attribution of the person's part is structural; citing the commons' part is designed."
+  },
+  "civil_liberties_harm": {
+    "backed": "people",
+    "today": "designed",
+    "confidence": "medium",
+    "rationale": "The counsel elohim is canon: a role with standing to defend the person on the protocol that cannot be removed while they are under pressure; plural doorways and forkable rules mean no one institution holds the off switch.",
+    "sources": [
+      {
+        "quote": "first-class standing to defend the human's interests on the protocol",
+        "context": "genesis/docs/architecture/stewardship-over-sovereignty.md, the counsel elohim"
+      }
+    ]
+  }
+}

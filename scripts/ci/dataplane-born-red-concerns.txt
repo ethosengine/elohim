@@ -1,0 +1,14 @@
+# Declared born-red @dataplane concerns — run-dataplane-validation.sh downgrades a
+# cucumber exit 1 to a PENDING-ONLY pass ONLY when every undefined/pending scenario
+# carries a tag @concern:<one of these> and no step is failed or ambiguous.
+#
+# A concern is listed here only when its feature file's header says why it is born
+# red without @wip (an undefined step is the habit register's honest red for a
+# missing capability). Listing is the single reviewable declaration. An undefined
+# step under any OTHER concern stays a real red: an accidentally deleted step
+# definition must not go green.
+#
+# One @concern: value per line; '#' starts a comment.
+#
+# operator-answers-pain.feature, runtime-band-external-imposition.feature
+pain-is-answered

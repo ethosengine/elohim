@@ -2,14 +2,19 @@
  * Exploration-sidebar step definitions.
  *
  * Drives genesis/a2o/features/content/exploration-sidebar.feature — the native
- * content-graph seam slice. The SAME shared ExplorationSidebarComponent renders
- * beside content on BOTH the standalone /epr/{id} content-viewer AND the
- * path-step lesson-view, and its related-concepts panel (sourced from the
- * resolver graph endpoint with computed=true) surfaces two honestly-distinguished
- * kinds of neighbor:
- *   - AUTHORED related concepts (explicit relatedNodeIds) → related-concept-card
- *   - DISCOVERED tag neighbors (computed=true)            → discovered-concept-card
- *     carrying an inference-source attribute that is NOT "explicit".
+ * content-graph seam slice. A resource's neighbours surface in two places, each
+ * honestly distinguishing two kinds (sourced from the resolver graph endpoint
+ * with computed=true):
+ *   - inside a learning path, lamad's shared ExplorationSidebarComponent beside
+ *     the path-step lesson view: AUTHORED related concepts (explicit
+ *     relatedNodeIds) → related-concept-card; DISCOVERED tag neighbors →
+ *     discovered-concept-card carrying an inference-source attribute that is
+ *     NOT "explicit";
+ *   - opened on its own at /epr/{id}, the shell's atom home, whose "See also"
+ *     fold under "Where this lives" lists the same two kinds
+ *     (epr-home-see-also-card[data-inference]; spec 2026-09-02-epr-atom-home-
+ *     shell-component-design.md §11.2). The atom home's own See-also scenario
+ *     lives in features/content/epr-atom-home.feature.
  *
  * STORY-FIRST: the resolver (computed=true) + the shared sidebar are not yet on a
  * live stack (alpha runs the old storage). These steps go green once the branch
@@ -34,7 +39,7 @@ import { Given, When, Then } from '@cucumber/cucumber';
 
 import { PlaywrightDevice } from '../../src/framework/devices/playwright-device.js';
 import { Human } from '../../src/framework/human.js';
-import { EprContentPage } from '../../src/framework/pages/index.js';
+import { EprContentPage, EprHomePage } from '../../src/framework/pages/index.js';
 import { doorwayToAppUrl } from '../../src/framework/utils/url.js';
 import { E2EWorld } from '../../src/framework/world.js';
 
@@ -116,69 +121,10 @@ Given(
   }
 );
 
-/**
- * "Given {string} has authored relationships to {string}" — the focal node's
- * explicit relatedNodeIds resolve to RELATES_TO edges with inferenceSource
- * "explicit" (NOT computed). Verified via the resolver graph endpoint with
- * computed=false where reachable.
- */
-Given(
-  '{string} has authored relationships to {string},{string},{string}',
-  async function (this: E2EWorld, focalId: string, a: string, b: string, c: string) {
-    const expected = [a, b, c];
-    let doorwayUrl: string | undefined;
-    try {
-      doorwayUrl = this.getDoorway('alpha').url;
-    } catch {
-      return PENDING;
-    }
-    const resp = await fetch(
-      `${doorwayUrl}/db/relationships/graph/${focalId}?computed=false`
-    ).catch(() => null);
-    if (!resp?.ok) return PENDING; // resolver not yet deployed — story-first
-    const graph = (await resp.json()) as { related?: { contentId: string }[] };
-    const got = new Set((graph.related ?? []).map(r => r.contentId));
-    for (const id of expected) {
-      assert.ok(
-        got.has(id),
-        `"${focalId}" must have an authored relationship to "${id}" ` +
-          `(explicit edge in /db/relationships/graph/${focalId}?computed=false). Got: ${[...got].join(', ')}`
-      );
-    }
-  }
-);
-
-/**
- * "Given the backend computes at least one discovered (tag) neighbor for {string}
- * not in its relatedNodeIds" — with computed=true the resolver yields ≥1
- * inferenceSource:"tag" neighbor that is NOT among the focal node's authored
- * relatedNodeIds (the discovery the sidebar surfaces). Verified where reachable;
- * tolerated as a precondition when the resolver is not yet deployed (story-first).
- */
-Given(
-  String.raw`the backend computes at least one discovered \(tag) neighbor for {string} not in its relatedNodeIds`,
-  async function (this: E2EWorld, focalId: string) {
-    let doorwayUrl: string | undefined;
-    try {
-      doorwayUrl = this.getDoorway('alpha').url;
-    } catch {
-      return PENDING;
-    }
-    const resp = await fetch(`${doorwayUrl}/db/relationships/graph/${focalId}?computed=true`).catch(
-      () => null
-    );
-    if (!resp?.ok) return PENDING; // resolver not yet deployed — story-first
-    const graph = (await resp.json()) as {
-      related?: { contentId: string; inferenceSource?: string }[];
-    };
-    const discovered = (graph.related ?? []).filter(r => r.inferenceSource === 'tag');
-    assert.ok(
-      discovered.length >= 1,
-      `Expected ≥1 computed (tag) neighbor for "${focalId}" with computed=true; ` +
-        `found ${discovered.length}. Check the C1 tag overlap (≥2 shared tags) / minSharedTags.`
-    );
-  }
-);
+// The Background's relationship and discovery checks ("confession" names …
+// as related; doorway "alpha" finds at least one more neighbour … by shared
+// topics) are shared with the atom home's "See also" scenario and live in
+// steps/ui/epr-atom-home.steps.ts.
 
 // ---------------------------------------------------------------------------
 // When / Given — open the surface
@@ -186,21 +132,44 @@ Given(
 
 /**
  * "When the learner opens the EPR address for {string}" — the visitor navigates
- * cold to the legacy standalone /resource/{id} viewer, where lamad's
- * ContentViewerComponent renders the focal markdown AND the shared exploration
- * sidebar (pinned rail). NOT the universal /epr/{id} address: that route is
- * now the shell-owned atom home (spec: 2026-09-02-epr-atom-home-shell-
- * component-design.md), which does not (and per §4.2 cannot without a new
- * cross-workspace edge) mount lamad's exploration sidebar. The standalone
- * see-also affordance on the atom home itself is filed against the commons
- * plan (spec §8), not built here.
+ * cold to the universal /epr/{id} address, the shell-owned atom home (the old
+ * /resource/{id} viewer address redirects there), and waits for its frame or its
+ * out-of-reach gate. The atom home renders the focal markdown (keeping lamad's
+ * .markdown-content) and lists the neighbours in its "See also" fold; it does not
+ * mount lamad's exploration sidebar (spec §4.2 — no new cross-workspace edge).
  */
 When('the learner opens the EPR address for {string}', async function (this: E2EWorld, id: string) {
   const device = await ensureVisitor(this);
   if (!device) {
     return PENDING;
   }
-  await device.navigate(`/resource/${id}`);
+  await device.navigate(`/epr/${id}`);
+  await new EprHomePage(device.page).waitForReady();
+});
+
+/**
+ * "When the learner opens "See also" under "Where this lives"" — open the atom
+ * home's "See also" fold (closed by default; spec §11.1).
+ */
+When('the learner opens "See also" under "Where this lives"', async function (this: E2EWorld) {
+  const device = await ensureVisitor(this);
+  if (!device) {
+    return PENDING;
+  }
+  await new EprHomePage(device.page).openFold('lives');
+});
+
+/**
+ * "Then "See also" lists at least one neighbour" — the fold carries ≥1 row,
+ * authored or discovered.
+ */
+Then('"See also" lists at least one neighbour', async function (this: E2EWorld) {
+  const device = await ensureVisitor(this);
+  if (!device) {
+    return PENDING;
+  }
+  const rows = await new EprHomePage(device.page).seeAlsoRows();
+  assert.ok(rows.length >= 1, 'Expected the "See also" fold to list at least one neighbour');
 });
 
 /**
@@ -312,6 +281,22 @@ function parseBody(raw: unknown): PathBody | null {
 // Then — sidebar + neighbor assertions (render-verified)
 // ---------------------------------------------------------------------------
 
+/**
+ * "When the learner opens the lesson's Explore sidebar" — the path-step lesson
+ * view's sidebar is collapsible and starts closed; perform the learner's
+ * "Explore" tap (a no-op when it is already open).
+ */
+When("the learner opens the lesson's Explore sidebar", async function (this: E2EWorld) {
+  const page = await eprPage(this);
+  if (!page) {
+    return PENDING;
+  }
+  assert.ok(
+    await page.ensureSidebarOpen(),
+    'Expected the Explore sidebar to open in the path-step lesson view'
+  );
+});
+
 /** "Then the exploration sidebar is visible" — the shared sidebar mounted. */
 Then('the exploration sidebar is visible', async function (this: E2EWorld) {
   const page = await eprPage(this);
@@ -396,7 +381,7 @@ Then(
       return PENDING;
     }
     // The lesson-view sidebar is collapsible and starts CLOSED — perform the
-    // learner's "Explore" tap first (no-op on the pinned standalone viewer).
+    // learner's "Explore" tap first (a no-op when the sidebar is already open).
     assert.ok(
       await page.ensureSidebarOpen(),
       'Expected the shared exploration sidebar to open (Explore toggle) in the path-step lesson view'
@@ -428,7 +413,11 @@ Then('the markdown content body is rendered', async function (this: E2EWorld) {
   );
 });
 
-/** "Then the exploration sidebar is populated" — sidebar mounted with ≥1 card. */
+/**
+ * "Then the exploration sidebar is populated" — sidebar mounted with ≥1 card.
+ * Lamad's sidebar only; no scenario reaches it outside a learning path now
+ * that /epr/{id} is the atom home (whose neighbours are in "See also").
+ */
 Then('the exploration sidebar is populated', async function (this: E2EWorld) {
   const page = await eprPage(this);
   if (!page) {

@@ -1,0 +1,26 @@
+---
+epr-meta-version: 1
+id: a2o-auth-graduation
+covers: subtree
+purpose: >
+  The graduation series: stories of a human moving past the hosted stage at a doorway, told from
+  the person's side. The hosted-human series (../hosted-human/) ends at the door and says
+  "graduation is its own series"; this is that series. Station 01 is graduating onto your own
+  node's key — the human proves, by a signature from their node, which key is theirs, and the
+  doorway follows. It serves the habit graduates-onto-own-key
+  (doorway/doorway-service/.epr-meta/graduates-onto-own-key.habit.md).
+cites:
+  - genesis/docs/superpowers/specs/2026-10-16-graduate-onto-own-node-key-design.md
+  - genesis/a2o/features/auth/hosted-human/README.md
+---
+# graduation/ — moving past hosted
+
+Series discipline is the hosted-human series' own (one life in order; the person is created by
+the story and removed by it; judged from the portal and from the doorway's own answers), with
+one addition: **who acts is part of the claim.** A graduation step that an operator or an agent
+could take on a person's behalf is not graduation, so each station asserts both that the human
+can take it and that nobody else can.
+
+**Considered, no enforcing rule beyond the parent's.** This manifest satisfies the parent
+`genesis/a2o/.epr-meta` no-orphan-subtree rule and claims coverage; the blind-reader obligation
+is inherited.

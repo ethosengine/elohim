@@ -19,7 +19,8 @@
 //! The offer's DECLARATION (terms, the two-sided disclosure) and the external-claim envelope it
 //! governs are shared, pure shapes in [`elohim_epr_rea::external`]; this module adds only what
 //! needs the repository: reading an offer document off disk ([`load_offer`]), addressing it by its
-//! body ([`offer_intent`], [`offer_cid`]) and deriving its standing from the verdicts on record.
+//! body and declaration ([`offer_intent`], [`offer_cid`]; [`legacy_offer_cid`] for records minted
+//! under the earlier body-only rule) and deriving its standing from the verdicts on record.
 
 use std::path::Path;
 
@@ -135,15 +136,28 @@ pub fn load_offer(root: &Path, path: &str) -> FlowResult<OfferDocument> {
     parse_offer(path, &text)
 }
 
-/// The Intent an offer document mints, scoped to its own body CID: an approval is an approval of
-/// the exact text a Steward read, and an edit re-addresses the offer.
-pub fn offer_intent(doc: &OfferDocument) -> Intent {
-    doc.declaration().intent(crate::flow::body_cid(doc.text()))
+/// The Intent an offer document mints, scoped to its own body CID and bound to its whole
+/// declaration (every term and disclosure in the frontmatter, never the author): an approval is
+/// an approval of what a Steward read, and an edit to either half re-addresses the offer. See
+/// [`elohim_epr_rea::OfferDeclaration::intent`].
+pub fn offer_intent(doc: &OfferDocument) -> FlowResult<Intent> {
+    Ok(doc
+        .declaration()
+        .intent(crate::flow::body_cid(doc.text()))?)
 }
 
 /// The offer's address — its Intent's atom CID, the value every claim it admits is scoped to.
 pub fn offer_cid(doc: &OfferDocument) -> FlowResult<Cid> {
-    Ok(atom_cid(&offer_intent(doc))?)
+    Ok(atom_cid(&offer_intent(doc)?)?)
+}
+
+/// The address this document had under the earlier body-only rule. Records minted under that
+/// rule are scoped to it; the current Intent names it in its `supersedes:` slot.
+pub fn legacy_offer_cid(doc: &OfferDocument) -> FlowResult<Cid> {
+    Ok(atom_cid(
+        &doc.declaration()
+            .legacy_intent(crate::flow::body_cid(doc.text())),
+    )?)
 }
 
 /// Read the standing of `offer` (its declaration) minted at Intent CID `cid`, under the

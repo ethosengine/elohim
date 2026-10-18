@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 /* eslint-disable sonarjs/no-duplicate-string -- stable CLI flags and mode names intentionally recur. */
-/** Bounded, read-only resource observation for an already-running household mesh. */
+/** Bounded, read-only resource observation for an already-running household mesh or explicit conductors. */
 
 import { execFileSync, spawn, spawnSync, type ChildProcess } from 'node:child_process';
 import { createHash, randomBytes } from 'node:crypto';
@@ -54,7 +54,9 @@ export type ProfileMode = 'metrics' | 'cpu' | 'io' | 'cpu-io';
 export type DwarfStackBytes = 8192 | 16384 | 32768;
 
 export interface ResourceProfileOptions {
-  meshDir: string;
+  meshDir?: string;
+  adminPorts?: number[];
+  pids?: number[];
   seconds: number;
   output: string;
   mode: ProfileMode;
@@ -121,7 +123,7 @@ export const MAX_METRICS_BODY_BYTES = 4 * 1024 * 1024;
 export const METRICS_TIMEOUT_MS = 5000;
 
 const USAGE =
-  'Usage: resource-profile --mesh-dir <path> --seconds <1..600> --output <new-dir|new.json> ' +
+  'Usage: resource-profile (--mesh-dir <path> | --admin-ports 4474,4484 [--pids 123,456]) --seconds <1..600> --output <new-dir|new.json> ' +
   '--mode metrics|cpu|io|cpu-io [--perf <absolute-perf> --max-bytes <bounded-per-conductor>] [--max-events <1..100000>] ' +
   '[--call-graph dwarf|fp] [--dwarf-stack-bytes 8192|16384|32768] ' +
   '[--metrics-url NAME=http://127.0.0.1:8090/metrics]... [--network-stats] [--cohort <label>] ' +
@@ -207,6 +209,21 @@ export function parseResourceProfileArgs(argv: string[]): ResourceProfileOptions
         out.meshDir = resolve(value(argv, i));
         i += 1;
         break;
+      case '--admin-ports':
+      case '--pids': {
+        const numbers = value(argv, i)
+          .split(',')
+          .map(raw => positiveInteger(raw, flag));
+        if (new Set(numbers).size !== numbers.length)
+          throw new Error(`${flag} values must be unique`);
+        if (flag === '--admin-ports') {
+          if (numbers.some(port => port > 65535))
+            throw new Error('--admin-ports must be in 1..65535');
+          out.adminPorts = numbers;
+        } else out.pids = numbers;
+        i += 1;
+        break;
+      }
       case '--seconds':
         out.seconds = positiveInteger(value(argv, i), flag);
         i += 1;
@@ -283,7 +300,10 @@ export function parseResourceProfileArgs(argv: string[]): ResourceProfileOptions
         throw new Error(`Unknown flag: ${flag}\n${USAGE}`);
     }
   }
-  if (!out.meshDir || !out.seconds || !out.output || !out.mode) throw new Error(USAGE);
+  if ((!out.meshDir && !out.adminPorts) || !out.seconds || !out.output || !out.mode)
+    throw new Error(USAGE);
+  if (out.pids && out.pids.length !== out.adminPorts?.length)
+    throw new Error('--pids requires --admin-ports with the same number of values');
   if (out.seconds > 600) throw new Error('--seconds must be in 1..600');
   if (out.mode !== 'metrics' && !out.perf) throw new Error(`--mode ${out.mode} requires --perf`);
   if (out.mode !== 'metrics' && !out.maxBytes)
@@ -1039,6 +1059,53 @@ export function expectedConductorConfigs(meshDir: string): Record<string, string
   return expected;
 }
 
+// Resolve explicit listeners to the config identities used by every resource snapshot.
+// Peer names are stable within a capture: conductor-<admin-port>.
+function explicitConductorConfigs(adminPorts: number[], pids?: number[]): Record<string, string> {
+  const candidates =
+    pids ??
+    readdirSync('/proc')
+      .filter(name => /^\d+$/.test(name))
+      .map(Number);
+  const configs: Record<string, string> = {};
+  for (const [index, port] of adminPorts.entries()) {
+    const matches: string[] = [];
+    for (const pid of pids ? [pids[index]] : candidates) {
+      try {
+        const argv = boundedText(`/proc/${pid}/cmdline`, 1024 * 1024)
+          .split('\0')
+          .filter(Boolean);
+        const executable = readlinkSync(`/proc/${pid}/exe`).replace(/ \(deleted\)$/, '');
+        if (!/(^|\/)holochain$/.test(executable) || !/(^|\/)holochain$/.test(argv[0] ?? ''))
+          continue;
+        if (!listenerOwnedByPid(pid, port)) continue;
+        let config: string | undefined;
+        for (let i = 0; i < argv.length; i += 1) {
+          if (argv[i] === '--config-path' || argv[i] === '-c') {
+            config = argv[i + 1];
+            break;
+          }
+          if (argv[i].startsWith('--config-path=')) {
+            config = argv[i].slice('--config-path='.length);
+            break;
+          }
+        }
+        if (config) matches.push(resolve(readlinkSync(`/proc/${pid}/cwd`), config));
+      } catch {
+        // Processes may exit or be inaccessible while enumerating; require one match below.
+      }
+    }
+    if (matches.length !== 1)
+      throw new Error(
+        `admin port ${port}: expected exactly one conductor with a config, observed ${matches.length}`
+      );
+    if (Object.values(configs).includes(matches[0]))
+      throw new Error(`admin port ${port}: conductor config already selected`);
+    configs[`conductor-${port}`] = matches[0];
+  }
+  return configs;
+}
+
 interface PerfResult {
   peer: string;
   identity: ProcessIdentity;
@@ -1531,7 +1598,9 @@ async function ioForPeer(
 }
 
 export async function runResourceProfile(options: ResourceProfileOptions): Promise<number> {
-  const configs = expectedConductorConfigs(options.meshDir);
+  const configs = options.adminPorts
+    ? explicitConductorConfigs(options.adminPorts, options.pids)
+    : expectedConductorConfigs(options.meshDir!);
   const cpuCapability =
     options.mode === 'cpu' || options.mode === 'cpu-io'
       ? validatePerf(options.perf!, options.dwarfStackBytes, options.callGraph)
@@ -1557,7 +1626,9 @@ export async function runResourceProfile(options: ResourceProfileOptions): Promi
     const preArm = captureHouseholdResources(configs);
     const ports =
       options.networkStats || options.armSqlTiming.length || options.armWorkflow.length
-        ? networkPorts(options.meshDir, configs)
+        ? options.adminPorts
+          ? Object.fromEntries(options.adminPorts.map(port => [`conductor-${port}`, port]))
+          : networkPorts(options.meshDir!, configs)
         : null;
     const networkMembershipSalt = options.networkStats ? randomBytes(32) : null;
     const networkBefore = options.networkStats

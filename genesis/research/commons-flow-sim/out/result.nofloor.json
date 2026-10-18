@@ -1,0 +1,5891 @@
+{
+ "lens": "illustrative/commons-flow/v0",
+ "status": "ILLUSTRATIVE LENS, NOT A DEFAULT ALLOCATION. One probe's weights, chosen to make the flow visible. Nobody has adopted it; every number below is a claim a person would author, contest and replace.",
+ "lock": "elohim/Cargo.lock",
+ "inflow": {
+  "exact": "1000",
+  "decimal": "1,000.000000000000"
+ },
+ "unit": "USD",
+ "floor": {
+  "exact": "0",
+  "decimal": "0.000000000000"
+ },
+ "graph": {
+  "packages_in_lockfile": 491,
+  "workspace_crates_collapsed_into_entry": 28,
+  "external_nodes_relied_on": 463,
+  "edges": 1220,
+  "max_degree": 7,
+  "direct_reliances_of_entry": 56
+ },
+ "by_degree": {
+  "0": {
+   "nodes_reached": 1,
+   "received": {
+    "exact": "1000",
+    "decimal": "1,000.000000000000"
+   },
+   "kept_by_makers": {
+    "exact": "500",
+    "decimal": "500.000000000000"
+   },
+   "positional_to_commons": {
+    "exact": "0",
+    "decimal": "0.000000000000"
+   },
+   "no_record_to_commons": {
+    "exact": "0",
+    "decimal": "0.000000000000"
+   },
+   "below_floor_to_commons": {
+    "exact": "0",
+    "decimal": "0.000000000000"
+   }
+  },
+  "1": {
+   "nodes_reached": 56,
+   "received": {
+    "exact": "17944726472403284810755288769261250413/33772203797090687319040650000000000",
+    "decimal": "531.346031790473"
+   },
+   "kept_by_makers": {
+    "exact": "731136771115453359015256126774996563214717/1899348741548380254822846156000000000000",
+    "decimal": "384.940772129829"
+   },
+   "positional_to_commons": {
+    "exact": "3681684498645313471771707644634711315089/203501650880183598731019231000000000000",
+    "decimal": "18.091668950701"
+   },
+   "no_record_to_commons": {
+    "exact": "95201609328035633763300134363517717148717/5698046224645140764468538468000000000000",
+    "decimal": "16.707763604351"
+   },
+   "below_floor_to_commons": {
+    "exact": "0",
+    "decimal": "0.000000000000"
+   }
+  },
+  "2": {
+   "nodes_reached": 167,
+   "received": {
+    "exact": "156615773978885205387324599398608086489373411798044297/1731131990145547758303750340239958593750000000000000",
+    "decimal": "90.470151825753"
+   },
+   "kept_by_makers": {
+    "exact": "21379485923962405862730208670464446307706617766168092723/328915078127654074077712564645592132812500000000000000",
+    "decimal": "65.000017772566"
+   },
+   "positional_to_commons": {
+    "exact": "1876523736057471809927093487674412034058186830106439199/493372617191481111116568846968388199218750000000000000",
+    "decimal": "3.803461462332"
+   },
+   "no_record_to_commons": {
+    "exact": "1363430273503464767795494916123030449541/204480591195376435015456380000000000000",
+    "decimal": "6.667773530646"
+   },
+   "below_floor_to_commons": {
+    "exact": "0",
+    "decimal": "0.000000000000"
+   }
+  },
+  "3": {
+   "nodes_reached": 124,
+   "received": {
+    "exact": "630515299489754939334714741604377560020237154525200601/123343154297870277779142211742097049804687500000000000",
+    "decimal": "5.111879155993"
+   },
+   "kept_by_makers": {
+    "exact": "150025402506254912250779282253628459169627653366623487/39732388639369977435858135435129301757812500000000000",
+    "decimal": "3.775896885233"
+   },
+   "positional_to_commons": {
+    "exact": "365722616114826597373752310592090945861503255961763101/4728154248085027314867118116780386909179687500000000000",
+    "decimal": "0.077349975683"
+   },
+   "no_record_to_commons": {
+    "exact": "241475332224295482822691928603471087801656462174213591/311746433939672130650579216491014521484375000000000000",
+    "decimal": "0.774588915654"
+   },
+   "below_floor_to_commons": {
+    "exact": "0",
+    "decimal": "0.000000000000"
+   }
+  },
+  "4": {
+   "nodes_reached": 67,
+   "received": {
+    "exact": "129724194463925538534077128223746507397779861/713721702801710063205009416714062500000000000",
+    "decimal": "0.181757390808"
+   },
+   "kept_by_makers": {
+    "exact": "21525409653686063827518750963888999925876361/160129869218332385975482881955078125000000000",
+    "decimal": "0.134424700143"
+   },
+   "positional_to_commons": {
+    "exact": "21020532756897524189599762447405258113337349/8326753199353284070725109861664062500000000000",
+    "decimal": "0.002524457283"
+   },
+   "no_record_to_commons": {
+    "exact": "13722166396478371425759083/741681914103183133080000000",
+    "decimal": "0.018501417030"
+   },
+   "below_floor_to_commons": {
+    "exact": "0",
+    "decimal": "0.000000000000"
+   }
+  },
+  "5": {
+   "nodes_reached": 27,
+   "received": {
+    "exact": "402699590760298114785126551959/72845124558768524243531250000000",
+    "decimal": "0.005528161194"
+   },
+   "kept_by_makers": {
+    "exact": "10083641974342577402027071763/2472119611722913718671875000000",
+    "decimal": "0.004078945827"
+   },
+   "positional_to_commons": {
+    "exact": "293602573575738318546831961171/3278030605144583590958906250000000",
+    "decimal": "8.957E-5"
+   },
+   "no_record_to_commons": {
+    "exact": "2175208584069633223509247/3020196435450200015625000000",
+    "decimal": "0.000720220896"
+   },
+   "below_floor_to_commons": {
+    "exact": "0",
+    "decimal": "0.000000000000"
+   }
+  },
+  "6": {
+   "nodes_reached": 19,
+   "received": {
+    "exact": "7090699667463151646087150308963/17020543526712260953055859375000000",
+    "decimal": "0.000416596547"
+   },
+   "kept_by_makers": {
+    "exact": "1108773233249550303761674526300317/3640505143213455814959169921875000000",
+    "decimal": "0.000304565765"
+   },
+   "positional_to_commons": {
+    "exact": "344318060871963273577670029149971/32764546288921102334632529296875000000",
+    "decimal": "1.051E-5"
+   },
+   "no_record_to_commons": {
+    "exact": "5292945596972037595721/329137203206875464843750000",
+    "decimal": "1.608E-5"
+   },
+   "below_floor_to_commons": {
+    "exact": "0",
+    "decimal": "0.000000000000"
+   }
+  },
+  "7": {
+   "nodes_reached": 3,
+   "received": {
+    "exact": "9543878161326062667128697487/210233986248916266712646484375000",
+    "decimal": "4.540E-5"
+   },
+   "kept_by_makers": {
+    "exact": "124070416097238814672673067331/3679094759356034667471313476562500",
+    "decimal": "3.372E-5"
+   },
+   "positional_to_commons": {
+    "exact": "9543878161326062667128697487/22074568556136208004827880859375000",
+    "decimal": "4.323E-7"
+   },
+   "no_record_to_commons": {
+    "exact": "83675396902788968035058580293/38851240658799726088497070312500000",
+    "decimal": "2.154E-6"
+   },
+   "below_floor_to_commons": {
+    "exact": "0",
+    "decimal": "0.000000000000"
+   }
+  }
+ },
+ "recipients": [
+  {
+   "node": "(entry work)",
+   "kept": {
+    "exact": "500",
+    "decimal": "500.000000000000"
+   },
+   "degree": 0,
+   "fan_in": 0
+  },
+  {
+   "node": "serde 1.0.228",
+   "kept": {
+    "exact": "2310769148746489137449/232750787589936000000",
+    "decimal": "9.928083048284"
+   },
+   "degree": 1,
+   "fan_in": 30
+  },
+  {
+   "node": "libc 0.2.189",
+   "kept": {
+    "exact": "54937485149415030031120001504013313/6704159562697903189884000000000000",
+    "decimal": "8.194537232540"
+   },
+   "degree": 1,
+   "fan_in": 28
+  },
+  {
+   "node": "pin-project-lite 0.2.16",
+   "kept": {
+    "exact": "1390779118810160128412024689/176238714526546734562500000",
+    "decimal": "7.891450652862"
+   },
+   "degree": 1,
+   "fan_in": 17
+  },
+  {
+   "node": "tokio 1.49.0",
+   "kept": {
+    "exact": "17829531287877455347/2272284636496875000",
+    "decimal": "7.846521954822"
+   },
+   "degree": 1,
+   "fan_in": 19
+  },
+  {
+   "node": "bytes 1.11.1",
+   "kept": {
+    "exact": "25876772994758549826566128901/3401211451219194863250000000",
+    "decimal": "7.608104749113"
+   },
+   "degree": 1,
+   "fan_in": 18
+  },
+  {
+   "node": "serde_bytes 0.11.19",
+   "kept": {
+    "exact": "5749503/779240",
+    "decimal": "7.378346850778"
+   },
+   "degree": 1,
+   "fan_in": 3
+  },
+  {
+   "node": "serde_json 1.0.149",
+   "kept": {
+    "exact": "23289642045407/3245021472000",
+    "decimal": "7.177037885994"
+   },
+   "degree": 1,
+   "fan_in": 12
+  },
+  {
+   "node": "sha2 0.10.9",
+   "kept": {
+    "exact": "8065/1127",
+    "decimal": "7.156166814552"
+   },
+   "degree": 1,
+   "fan_in": 3
+  },
+  {
+   "node": "cid 0.11.2",
+   "kept": {
+    "exact": "677889/94864",
+    "decimal": "7.145903609378"
+   },
+   "degree": 1,
+   "fan_in": 2
+  },
+  {
+   "node": "tokio-stream 0.1.18",
+   "kept": {
+    "exact": "1395/196",
+    "decimal": "7.117346938776"
+   },
+   "degree": 1,
+   "fan_in": 2
+  },
+  {
+   "node": "rand_core 0.6.4",
+   "kept": {
+    "exact": "14986968790337867/2111173909425000",
+    "decimal": "7.098879312325"
+   },
+   "degree": 1,
+   "fan_in": 9
+  },
+  {
+   "node": "ipld-core 0.4.3",
+   "kept": {
+    "exact": "30105/4312",
+    "decimal": "6.981679035250"
+   },
+   "degree": 1,
+   "fan_in": 2
+  },
+  {
+   "node": "tracing 0.1.44",
+   "kept": {
+    "exact": "227288621553296777/32728879303312500",
+    "decimal": "6.944589194360"
+   },
+   "degree": 1,
+   "fan_in": 13
+  },
+  {
+   "node": "chrono 0.4.42",
+   "kept": {
+    "exact": "14877/2156",
+    "decimal": "6.900278293135"
+   },
+   "degree": 1,
+   "fan_in": 2
+  },
+  {
+   "node": "rustix 1.1.3",
+   "kept": {
+    "exact": "14877/2156",
+    "decimal": "6.900278293135"
+   },
+   "degree": 1,
+   "fan_in": 2
+  },
+  {
+   "node": "thiserror 1.0.69",
+   "kept": {
+    "exact": "14877/2156",
+    "decimal": "6.900278293135"
+   },
+   "degree": 1,
+   "fan_in": 2
+  },
+  {
+   "node": "getrandom 0.3.4",
+   "kept": {
+    "exact": "98046999088808413859/14215672054718750000",
+    "decimal": "6.897106145345"
+   },
+   "degree": 1,
+   "fan_in": 5
+  },
+  {
+   "node": "url 2.5.8",
+   "kept": {
+    "exact": "6993493314932/1026745075125",
+    "decimal": "6.811323944340"
+   },
+   "degree": 1,
+   "fan_in": 7
+  },
+  {
+   "node": "http 1.4.0",
+   "kept": {
+    "exact": "21238761073741667/3130529787000000",
+    "decimal": "6.784398334729"
+   },
+   "degree": 1,
+   "fan_in": 14
+  },
+  {
+   "node": "parking_lot 0.12.5",
+   "kept": {
+    "exact": "115780871636489896872941/17178471851916375000000",
+    "decimal": "6.739881907690"
+   },
+   "degree": 1,
+   "fan_in": 4
+  },
+  {
+   "node": "blake2b_simd 1.0.4",
+   "kept": {
+    "exact": "7263/1078",
+    "decimal": "6.737476808905"
+   },
+   "degree": 1,
+   "fan_in": 2
+  },
+  {
+   "node": "thiserror 2.0.17",
+   "kept": {
+    "exact": "1509110494721/225481271400",
+    "decimal": "6.692841872635"
+   },
+   "degree": 1,
+   "fan_in": 10
+  },
+  {
+   "node": "futures 0.3.31",
+   "kept": {
+    "exact": "100042/14973",
+    "decimal": "6.681493354705"
+   },
+   "degree": 1,
+   "fan_in": 3
+  },
+  {
+   "node": "base64 0.22.1",
+   "kept": {
+    "exact": "8568734501/1282820000",
+    "decimal": "6.679607817932"
+   },
+   "degree": 1,
+   "fan_in": 5
+  },
+  {
+   "node": "reqwest 0.12.28",
+   "kept": {
+    "exact": "244485/36652",
+    "decimal": "6.670440903634"
+   },
+   "degree": 1,
+   "fan_in": 2
+  },
+  {
+   "node": "axum 0.7.9",
+   "kept": {
+    "exact": "325/49",
+    "decimal": "6.632653061224"
+   },
+   "degree": 1,
+   "fan_in": 1
+  },
+  {
+   "node": "axum 0.8.9",
+   "kept": {
+    "exact": "325/49",
+    "decimal": "6.632653061224"
+   },
+   "degree": 1,
+   "fan_in": 1
+  },
+  {
+   "node": "bs58 0.5.1",
+   "kept": {
+    "exact": "325/49",
+    "decimal": "6.632653061224"
+   },
+   "degree": 1,
+   "fan_in": 1
+  },
+  {
+   "node": "clap 4.5.60",
+   "kept": {
+    "exact": "325/49",
+    "decimal": "6.632653061224"
+   },
+   "degree": 1,
+   "fan_in": 1
+  },
+  {
+   "node": "dashmap 6.1.0",
+   "kept": {
+    "exact": "325/49",
+    "decimal": "6.632653061224"
+   },
+   "degree": 1,
+   "fan_in": 1
+  },
+  {
+   "node": "deno_core 0.339.0",
+   "kept": {
+    "exact": "325/49",
+    "decimal": "6.632653061224"
+   },
+   "degree": 1,
+   "fan_in": 1
+  },
+  {
+   "node": "ed25519-dalek 2.2.0",
+   "kept": {
+    "exact": "325/49",
+    "decimal": "6.632653061224"
+   },
+   "degree": 1,
+   "fan_in": 1
+  },
+  {
+   "node": "hex 0.4.3",
+   "kept": {
+    "exact": "325/49",
+    "decimal": "6.632653061224"
+   },
+   "degree": 1,
+   "fan_in": 1
+  },
+  {
+   "node": "jsonschema 0.28.3",
+   "kept": {
+    "exact": "325/49",
+    "decimal": "6.632653061224"
+   },
+   "degree": 1,
+   "fan_in": 1
+  },
+  {
+   "node": "llama-cpp-2 0.1.131",
+   "kept": {
+    "exact": "325/49",
+    "decimal": "6.632653061224"
+   },
+   "degree": 1,
+   "fan_in": 1
+  },
+  {
+   "node": "multihash-codetable 0.2.1",
+   "kept": {
+    "exact": "325/49",
+    "decimal": "6.632653061224"
+   },
+   "degree": 1,
+   "fan_in": 1
+  },
+  {
+   "node": "nix 0.31.3",
+   "kept": {
+    "exact": "325/49",
+    "decimal": "6.632653061224"
+   },
+   "degree": 1,
+   "fan_in": 1
+  },
+  {
+   "node": "p256 0.13.2",
+   "kept": {
+    "exact": "325/49",
+    "decimal": "6.632653061224"
+   },
+   "degree": 1,
+   "fan_in": 1
+  },
+  {
+   "node": "rusqlite 0.37.0",
+   "kept": {
+    "exact": "325/49",
+    "decimal": "6.632653061224"
+   },
+   "degree": 1,
+   "fan_in": 1
+  },
+  {
+   "node": "serde_ipld_dagcbor 0.6.4",
+   "kept": {
+    "exact": "325/49",
+    "decimal": "6.632653061224"
+   },
+   "degree": 1,
+   "fan_in": 1
+  },
+  {
+   "node": "serde_yaml 0.9.34+deprecated",
+   "kept": {
+    "exact": "325/49",
+    "decimal": "6.632653061224"
+   },
+   "degree": 1,
+   "fan_in": 1
+  },
+  {
+   "node": "tempfile 3.25.0",
+   "kept": {
+    "exact": "325/49",
+    "decimal": "6.632653061224"
+   },
+   "degree": 1,
+   "fan_in": 1
+  },
+  {
+   "node": "tokio-test 0.4.5",
+   "kept": {
+    "exact": "325/49",
+    "decimal": "6.632653061224"
+   },
+   "degree": 1,
+   "fan_in": 1
+  },
+  {
+   "node": "tracing-subscriber 0.3.23",
+   "kept": {
+    "exact": "325/49",
+    "decimal": "6.632653061224"
+   },
+   "degree": 1,
+   "fan_in": 1
+  },
+  {
+   "node": "ts-rs 10.1.0",
+   "kept": {
+    "exact": "325/49",
+    "decimal": "6.632653061224"
+   },
+   "degree": 1,
+   "fan_in": 1
+  },
+  {
+   "node": "unicode-normalization 0.1.25",
+   "kept": {
+    "exact": "325/49",
+    "decimal": "6.632653061224"
+   },
+   "degree": 1,
+   "fan_in": 1
+  },
+  {
+   "node": "wiremock 0.6.5",
+   "kept": {
+    "exact": "325/49",
+    "decimal": "6.632653061224"
+   },
+   "degree": 1,
+   "fan_in": 1
+  },
+  {
+   "node": "zip 2.4.2",
+   "kept": {
+    "exact": "325/49",
+    "decimal": "6.632653061224"
+   },
+   "degree": 1,
+   "fan_in": 1
+  },
+  {
+   "node": "anyhow 1.0.100",
+   "kept": {
+    "exact": "442935/66836",
+    "decimal": "6.627191932491"
+   },
+   "degree": 1,
+   "fan_in": 2
+  },
+  {
+   "node": "http-body-util 0.1.3",
+   "kept": {
+    "exact": "4877183548/736017975",
+    "decimal": "6.626446246778"
+   },
+   "degree": 1,
+   "fan_in": 7
+  },
+  {
+   "node": "tower 0.5.3",
+   "kept": {
+    "exact": "1799624133/272599250",
+    "decimal": "6.601720778762"
+   },
+   "degree": 1,
+   "fan_in": 5
+  },
+  {
+   "node": "async-trait 0.1.89",
+   "kept": {
+    "exact": "968/147",
+    "decimal": "6.585034013605"
+   },
+   "degree": 1,
+   "fan_in": 3
+  },
+  {
+   "node": "rand 0.8.6",
+   "kept": {
+    "exact": "28414880557321/4321724368500",
+    "decimal": "6.574894216862"
+   },
+   "degree": 1,
+   "fan_in": 2
+  },
+  {
+   "node": "uuid 1.19.0",
+   "kept": {
+    "exact": "4479313054/685987995",
+    "decimal": "6.529725136079"
+   },
+   "degree": 1,
+   "fan_in": 3
+  },
+  {
+   "node": "deno_error 0.5.7",
+   "kept": {
+    "exact": "5176363/797475",
+    "decimal": "6.490940781843"
+   },
+   "degree": 1,
+   "fan_in": 5
+  },
+  {
+   "node": "glob 0.3.3",
+   "kept": {
+    "exact": "3787406211829/583598584800",
+    "decimal": "6.489745366889"
+   },
+   "degree": 1,
+   "fan_in": 4
+  },
+  {
+   "node": "tinyvec 1.10.0",
+   "kept": {
+    "exact": "56700950059/17555391700",
+    "decimal": "3.229831098499"
+   },
+   "degree": 2,
+   "fan_in": 3
+  },
+  {
+   "node": "serde_core 1.0.228",
+   "kept": {
+    "exact": "5654438246361480063226601/2032125967285223040000000",
+    "decimal": "2.782523493814"
+   },
+   "degree": 2,
+   "fan_in": 8
+  },
+  {
+   "node": "serde_derive 1.0.228",
+   "kept": {
+    "exact": "203613185402329151664721591/91808548164850255200000000",
+    "decimal": "2.217802039923"
+   },
+   "degree": 2,
+   "fan_in": 3
+  },
+  {
+   "node": "futures-core 0.3.31",
+   "kept": {
+    "exact": "87995308029418432945871/44782302143497668750000",
+    "decimal": "1.964957222330"
+   },
+   "degree": 2,
+   "fan_in": 15
+  },
+  {
+   "node": "getrandom 0.2.17",
+   "kept": {
+    "exact": "95292621942180993107/54685659584209500000",
+    "decimal": "1.742552301037"
+   },
+   "degree": 2,
+   "fan_in": 2
+  },
+  {
+   "node": "cfg-if 1.0.4",
+   "kept": {
+    "exact": "500587208553158325856000447728300587/291858551332882483004055000000000000",
+    "decimal": "1.715170606676"
+   },
+   "degree": 2,
+   "fan_in": 22
+  },
+  {
+   "node": "thiserror-impl 1.0.69",
+   "kept": {
+    "exact": "64467/37730",
+    "decimal": "1.708640339253"
+   },
+   "degree": 2,
+   "fan_in": 1
+  },
+  {
+   "node": "thiserror-impl 2.0.17",
+   "kept": {
+    "exact": "19618436431373/11837766748500",
+    "decimal": "1.657275130367"
+   },
+   "degree": 2,
+   "fan_in": 1
+  },
+  {
+   "node": "itoa 1.0.17",
+   "kept": {
+    "exact": "1621098720101011945967/994864477566960000000",
+    "decimal": "1.629466883837"
+   },
+   "degree": 2,
+   "fan_in": 10
+  },
+  {
+   "node": "proc-macro2 1.0.105",
+   "kept": {
+    "exact": "69086406431554683428412680548156974072104456310871/51010402935430222406593139678286621093750000000000",
+    "decimal": "1.354359159229"
+   },
+   "degree": 2,
+   "fan_in": 37
+  },
+  {
+   "node": "once_cell 1.21.3",
+   "kept": {
+    "exact": "959156371569127614777344581396049/798114233654512284510000000000000",
+    "decimal": "1.201778305816"
+   },
+   "degree": 2,
+   "fan_in": 16
+  },
+  {
+   "node": "wasm-bindgen 0.2.106",
+   "kept": {
+    "exact": "110412569738569635181647435847/92560947412232999700000000000",
+    "decimal": "1.192863435665"
+   },
+   "degree": 2,
+   "fan_in": 12
+  },
+  {
+   "node": "quote 1.0.43",
+   "kept": {
+    "exact": "517963311728085809586031833394357883209327285319/462374997367934764504206821645288085937500000000",
+    "decimal": "1.120223443475"
+   },
+   "degree": 2,
+   "fan_in": 35
+  },
+  {
+   "node": "lock_api 0.4.14",
+   "kept": {
+    "exact": "153760486275080521872941/139972733608207500000000",
+    "decimal": "1.098503132085"
+   },
+   "degree": 2,
+   "fan_in": 2
+  },
+  {
+   "node": "parking_lot_core 0.9.12",
+   "kept": {
+    "exact": "153760486275080521872941/139972733608207500000000",
+    "decimal": "1.098503132085"
+   },
+   "degree": 2,
+   "fan_in": 2
+  },
+  {
+   "node": "js-sys 0.3.83",
+   "kept": {
+    "exact": "17249268823397849583135047/16069608925734895781250000",
+    "decimal": "1.073409371884"
+   },
+   "degree": 2,
+   "fan_in": 11
+  },
+  {
+   "node": "syn 2.0.114",
+   "kept": {
+    "exact": "69755575122237128825039749019166317856107534593/67254545071699602109702810421132812500000000000",
+    "decimal": "1.037187524618"
+   },
+   "degree": 2,
+   "fan_in": 36
+  },
+  {
+   "node": "bitflags 2.10.0",
+   "kept": {
+    "exact": "83298556577033846371860587/84375532150988203125000000",
+    "decimal": "0.987235925552"
+   },
+   "degree": 2,
+   "fan_in": 9
+  },
+  {
+   "node": "windows-sys 0.61.2",
+   "kept": {
+    "exact": "1018125271153666146998015231/1089007749962423697656250000",
+    "decimal": "0.934910950991"
+   },
+   "degree": 2,
+   "fan_in": 10
+  },
+  {
+   "node": "tracing-core 0.1.36",
+   "kept": {
+    "exact": "14353574534229731533/15709862065590000000",
+    "decimal": "0.913666490151"
+   },
+   "degree": 2,
+   "fan_in": 4
+  },
+  {
+   "node": "clap_builder 4.5.60",
+   "kept": {
+    "exact": "845/1029",
+    "decimal": "0.821185617104"
+   },
+   "degree": 2,
+   "fan_in": 1
+  },
+  {
+   "node": "clap_derive 4.5.55",
+   "kept": {
+    "exact": "845/1029",
+    "decimal": "0.821185617104"
+   },
+   "degree": 2,
+   "fan_in": 1
+  },
+  {
+   "node": "tinyvec_macros 0.1.1",
+   "kept": {
+    "exact": "737112350767/921658064250",
+    "decimal": "0.799767700581"
+   },
+   "degree": 3,
+   "fan_in": 1
+  },
+  {
+   "node": "percent-encoding 2.3.2",
+   "kept": {
+    "exact": "2726389864199187647/3724444421082000000",
+    "decimal": "0.732025922784"
+   },
+   "degree": 2,
+   "fan_in": 10
+  },
+  {
+   "node": "indexmap 2.13.0",
+   "kept": {
+    "exact": "150964464300691918001/209191095096117750000",
+    "decimal": "0.721658176852"
+   },
+   "degree": 2,
+   "fan_in": 7
+  },
+  {
+   "node": "scopeguard 1.2.0",
+   "kept": {
+    "exact": "385858131288689896872941/570259285070475000000000",
+    "decimal": "0.676636297541"
+   },
+   "degree": 2,
+   "fan_in": 2
+  },
+  {
+   "node": "digest 0.10.7",
+   "kept": {
+    "exact": "153756163/242020800",
+    "decimal": "0.635301441033"
+   },
+   "degree": 2,
+   "fan_in": 8
+  },
+  {
+   "node": "memchr 2.7.6",
+   "kept": {
+    "exact": "2030894256129859467731239019/3266787644265802124160000000",
+    "decimal": "0.621679300059"
+   },
+   "degree": 2,
+   "fan_in": 12
+  },
+  {
+   "node": "futures-util 0.3.31",
+   "kept": {
+    "exact": "63085286067211/103290192390000",
+    "decimal": "0.610757755480"
+   },
+   "degree": 2,
+   "fan_in": 11
+  },
+  {
+   "node": "cpufeatures 0.2.17",
+   "kept": {
+    "exact": "312585983/524839392",
+    "decimal": "0.595584073461"
+   },
+   "degree": 2,
+   "fan_in": 4
+  },
+  {
+   "node": "log 0.4.29",
+   "kept": {
+    "exact": "10104798931653006337/17217374081985000000",
+    "decimal": "0.586895474509"
+   },
+   "degree": 2,
+   "fan_in": 8
+  },
+  {
+   "node": "arrayref 0.3.9",
+   "kept": {
+    "exact": "21080/37191",
+    "decimal": "0.566803796617"
+   },
+   "degree": 2,
+   "fan_in": 3
+  },
+  {
+   "node": "arrayvec 0.7.6",
+   "kept": {
+    "exact": "21080/37191",
+    "decimal": "0.566803796617"
+   },
+   "degree": 2,
+   "fan_in": 3
+  },
+  {
+   "node": "constant_time_eq 0.4.2",
+   "kept": {
+    "exact": "21080/37191",
+    "decimal": "0.566803796617"
+   },
+   "degree": 2,
+   "fan_in": 3
+  },
+  {
+   "node": "smallvec 1.15.1",
+   "kept": {
+    "exact": "732739488603311690192633231/1309381298934959250000000000",
+    "decimal": "0.559607418557"
+   },
+   "degree": 2,
+   "fan_in": 8
+  },
+  {
+   "node": "windows-link 0.2.1",
+   "kept": {
+    "exact": "12388401128950797825588466395673/22767522025881071439000000000000",
+    "decimal": "0.544126019286"
+   },
+   "degree": 2,
+   "fan_in": 8
+  },
+  {
+   "node": "rand_chacha 0.3.1",
+   "kept": {
+    "exact": "369393447245173/680671588038750",
+    "decimal": "0.542689681392"
+   },
+   "degree": 2,
+   "fan_in": 1
+  },
+  {
+   "node": "elliptic-curve 0.13.8",
+   "kept": {
+    "exact": "754/1449",
+    "decimal": "0.520358868185"
+   },
+   "degree": 2,
+   "fan_in": 3
+  },
+  {
+   "node": "http-body 1.0.1",
+   "kept": {
+    "exact": "64109424316291/130578247800000",
+    "decimal": "0.490965573489"
+   },
+   "degree": 2,
+   "fan_in": 9
+  },
+  {
+   "node": "no_std_io2 0.8.1",
+   "kept": {
+    "exact": "10953654641/22539686400",
+    "decimal": "0.485971918447"
+   },
+   "degree": 2,
+   "fan_in": 4
+  },
+  {
+   "node": "idna 1.1.0",
+   "kept": {
+    "exact": "8996447393057/20915177456250",
+    "decimal": "0.430139663499"
+   },
+   "degree": 2,
+   "fan_in": 2
+  },
+  {
+   "node": "tracing-attributes 0.1.31",
+   "kept": {
+    "exact": "2954752080192858101/6873064653695625000",
+    "decimal": "0.429903140603"
+   },
+   "degree": 2,
+   "fan_in": 1
+  },
+  {
+   "node": "unicode-ident 1.0.22",
+   "kept": {
+    "exact": "11126223875639106456566923821386922842985164128791679/25978869494972677554214934707584543457031250000000000",
+    "decimal": "0.428279755506"
+   },
+   "degree": 3,
+   "fan_in": 3
+  },
+  {
+   "node": "cbor4ii 0.2.14",
+   "kept": {
+    "exact": "845/2058",
+    "decimal": "0.410592808552"
+   },
+   "degree": 2,
+   "fan_in": 1
+  },
+  {
+   "node": "ecdsa 0.16.9",
+   "kept": {
+    "exact": "845/2058",
+    "decimal": "0.410592808552"
+   },
+   "degree": 2,
+   "fan_in": 1
+  },
+  {
+   "node": "primeorder 0.13.6",
+   "kept": {
+    "exact": "845/2058",
+    "decimal": "0.410592808552"
+   },
+   "degree": 2,
+   "fan_in": 1
+  },
+  {
+   "node": "form_urlencoded 1.2.2",
+   "kept": {
+    "exact": "1578615115467113/3879629605293750",
+    "decimal": "0.406898409403"
+   },
+   "degree": 2,
+   "fan_in": 3
+  },
+  {
+   "node": "cfg_aliases 0.2.1",
+   "kept": {
+    "exact": "761314151/1880934825",
+    "decimal": "0.404753073249"
+   },
+   "degree": 2,
+   "fan_in": 3
+  },
+  {
+   "node": "lazy_static 1.5.0",
+   "kept": {
+    "exact": "4767919/12594960",
+    "decimal": "0.378557692918"
+   },
+   "degree": 2,
+   "fan_in": 4
+  },
+  {
+   "node": "tower-service 0.3.3",
+   "kept": {
+    "exact": "41357339581/111605340000",
+    "decimal": "0.370567748649"
+   },
+   "degree": 2,
+   "fan_in": 9
+  },
+  {
+   "node": "sync_wrapper 1.0.2",
+   "kept": {
+    "exact": "314897703919/850509660000",
+    "decimal": "0.370245887529"
+   },
+   "degree": 2,
+   "fan_in": 6
+  },
+  {
+   "node": "errno 0.3.14",
+   "kept": {
+    "exact": "12043558539325814343253/33241994809597792968750",
+    "decimal": "0.362299513261"
+   },
+   "degree": 2,
+   "fan_in": 3
+  },
+  {
+   "node": "crossbeam-utils 0.8.21",
+   "kept": {
+    "exact": "585/1694",
+    "decimal": "0.345336481700"
+   },
+   "degree": 2,
+   "fan_in": 2
+  },
+  {
+   "node": "linux-raw-sys 0.11.0",
+   "kept": {
+    "exact": "64467/188650",
+    "decimal": "0.341728067851"
+   },
+   "degree": 2,
+   "fan_in": 1
+  },
+  {
+   "node": "ryu 1.0.22",
+   "kept": {
+    "exact": "5301590589/15764025200",
+    "decimal": "0.336309446460"
+   },
+   "degree": 2,
+   "fan_in": 2
+  },
+  {
+   "node": "enumflags2 0.7.12",
+   "kept": {
+    "exact": "338/1029",
+    "decimal": "0.328474246842"
+   },
+   "degree": 2,
+   "fan_in": 1
+  },
+  {
+   "node": "fastrand 2.4.1",
+   "kept": {
+    "exact": "338/1029",
+    "decimal": "0.328474246842"
+   },
+   "degree": 2,
+   "fan_in": 1
+  },
+  {
+   "node": "llama-cpp-sys-2 0.1.131",
+   "kept": {
+    "exact": "338/1029",
+    "decimal": "0.328474246842"
+   },
+   "degree": 2,
+   "fan_in": 1
+  },
+  {
+   "node": "ts-rs-macros 10.1.0",
+   "kept": {
+    "exact": "338/1029",
+    "decimal": "0.328474246842"
+   },
+   "degree": 2,
+   "fan_in": 1
+  },
+  {
+   "node": "unsafe-libyaml 0.2.11",
+   "kept": {
+    "exact": "338/1029",
+    "decimal": "0.328474246842"
+   },
+   "degree": 2,
+   "fan_in": 1
+  },
+  {
+   "node": "zeroize 1.8.2",
+   "kept": {
+    "exact": "4709433188314888595251/14505629729798592000000",
+    "decimal": "0.324662443206"
+   },
+   "degree": 2,
+   "fan_in": 10
+  },
+  {
+   "node": "tower-layer 0.3.3",
+   "kept": {
+    "exact": "276093044719/850509660000",
+    "decimal": "0.324620704154"
+   },
+   "degree": 2,
+   "fan_in": 6
+  },
+  {
+   "node": "getrandom 0.4.3",
+   "kept": {
+    "exact": "162379513829/502722580500",
+    "decimal": "0.323000239352"
+   },
+   "degree": 2,
+   "fan_in": 3
+  },
+  {
+   "node": "unsigned-varint 0.8.0",
+   "kept": {
+    "exact": "5099801769/16069961600",
+    "decimal": "0.317349966101"
+   },
+   "degree": 2,
+   "fan_in": 2
+  },
+  {
+   "node": "multihash 0.19.4",
+   "kept": {
+    "exact": "44670111/146090560",
+    "decimal": "0.305770003209"
+   },
+   "degree": 2,
+   "fan_in": 2
+  },
+  {
+   "node": "futures-channel 0.3.31",
+   "kept": {
+    "exact": "61202982293280329/204334945815000000",
+    "decimal": "0.299522835162"
+   },
+   "degree": 2,
+   "fan_in": 5
+  },
+  {
+   "node": "zmij 1.0.13",
+   "kept": {
+    "exact": "302765346590291/1022181763680000",
+    "decimal": "0.296195214343"
+   },
+   "degree": 2,
+   "fan_in": 1
+  },
+  {
+   "node": "multibase 0.9.2",
+   "kept": {
+    "exact": "979173/3320240",
+    "decimal": "0.294910307689"
+   },
+   "degree": 2,
+   "fan_in": 1
+  },
+  {
+   "node": "iana-time-zone 0.1.64",
+   "kept": {
+    "exact": "21489/75460",
+    "decimal": "0.284773389875"
+   },
+   "degree": 2,
+   "fan_in": 1
+  },
+  {
+   "node": "r-efi 5.3.0",
+   "kept": {
+    "exact": "1274610988154509380167/4477936697236406250000",
+    "decimal": "0.284642475840"
+   },
+   "degree": 2,
+   "fan_in": 1
+  },
+  {
+   "node": "wasip2 1.0.1+wasi-0.2.4",
+   "kept": {
+    "exact": "1274610988154509380167/4477936697236406250000",
+    "decimal": "0.284642475840"
+   },
+   "degree": 2,
+   "fan_in": 1
+  },
+  {
+   "node": "subtle 2.6.1",
+   "kept": {
+    "exact": "14198946813962923/50053932815040000",
+    "decimal": "0.283672950664"
+   },
+   "degree": 2,
+   "fan_in": 10
+  },
+  {
+   "node": "futures-sink 0.3.31",
+   "kept": {
+    "exact": "37364763014001862493/132452830947937500000",
+    "decimal": "0.282098636523"
+   },
+   "degree": 2,
+   "fan_in": 5
+  },
+  {
+   "node": "hyper 1.8.1",
+   "kept": {
+    "exact": "27388789261/97201104000",
+    "decimal": "0.281774466893"
+   },
+   "degree": 2,
+   "fan_in": 6
+  },
+  {
+   "node": "hyper-util 0.1.19",
+   "kept": {
+    "exact": "30465839/109039700",
+    "decimal": "0.279401346482"
+   },
+   "degree": 2,
+   "fan_in": 5
+  },
+  {
+   "node": "fallible-iterator 0.3.0",
+   "kept": {
+    "exact": "845/3087",
+    "decimal": "0.273728539035"
+   },
+   "degree": 2,
+   "fan_in": 1
+  },
+  {
+   "node": "fallible-streaming-iterator 0.1.9",
+   "kept": {
+    "exact": "845/3087",
+    "decimal": "0.273728539035"
+   },
+   "degree": 2,
+   "fan_in": 1
+  },
+  {
+   "node": "hashbrown 0.14.5",
+   "kept": {
+    "exact": "845/3087",
+    "decimal": "0.273728539035"
+   },
+   "degree": 2,
+   "fan_in": 1
+  },
+  {
+   "node": "hashlink 0.10.0",
+   "kept": {
+    "exact": "845/3087",
+    "decimal": "0.273728539035"
+   },
+   "degree": 2,
+   "fan_in": 1
+  },
+  {
+   "node": "libsqlite3-sys 0.35.0",
+   "kept": {
+    "exact": "845/3087",
+    "decimal": "0.273728539035"
+   },
+   "degree": 2,
+   "fan_in": 1
+  },
+  {
+   "node": "num-traits 0.2.19",
+   "kept": {
+    "exact": "3233238676572728/11814513992386875",
+    "decimal": "0.273666667851"
+   },
+   "degree": 2,
+   "fan_in": 7
+  },
+  {
+   "node": "deno_error_macro 0.5.7",
+   "kept": {
+    "exact": "67292719/251204625",
+    "decimal": "0.267880095759"
+   },
+   "degree": 2,
+   "fan_in": 1
+  },
+  {
+   "node": "futures-task 0.3.31",
+   "kept": {
+    "exact": "71213019397794293/267263372809125000",
+    "decimal": "0.266452595615"
+   },
+   "degree": 2,
+   "fan_in": 3
+  },
+  {
+   "node": "futures-io 0.3.31",
+   "kept": {
+    "exact": "58639147371459/235236463000000",
+    "decimal": "0.249277457345"
+   },
+   "degree": 2,
+   "fan_in": 2
+  },
+  {
+   "node": "digest 0.11.2",
+   "kept": {
+    "exact": "6292/25725",
+    "decimal": "0.244586977648"
+   },
+   "degree": 2,
+   "fan_in": 5
+  },
+  {
+   "node": "futures-executor 0.3.31",
+   "kept": {
+    "exact": "2601092/11005155",
+    "decimal": "0.236352145881"
+   },
+   "degree": 2,
+   "fan_in": 1
+  },
+  {
+   "node": "curve25519-dalek 4.1.3",
+   "kept": {
+    "exact": "1690/7203",
+    "decimal": "0.234624462030"
+   },
+   "degree": 2,
+   "fan_in": 1
+  },
+  {
+   "node": "ed25519 2.2.3",
+   "kept": {
+    "exact": "1690/7203",
+    "decimal": "0.234624462030"
+   },
+   "degree": 2,
+   "fan_in": 1
+  },
+  {
+   "node": "socket2 0.6.1",
+   "kept": {
+    "exact": "207725859085029889525321/961994423707317000000000",
+    "decimal": "0.215932498116"
+   },
+   "degree": 2,
+   "fan_in": 4
+  },
+  {
+   "node": "mio 1.1.1",
+   "kept": {
+    "exact": "17829531287877455347/82588806980367187500",
+    "decimal": "0.215883143731"
+   },
+   "degree": 2,
+   "fan_in": 1
+  },
+  {
+   "node": "signal-hook-registry 1.4.8",
+   "kept": {
+    "exact": "17829531287877455347/82588806980367187500",
+    "decimal": "0.215883143731"
+   },
+   "degree": 2,
+   "fan_in": 1
+  },
+  {
+   "node": "tokio-macros 2.6.0",
+   "kept": {
+    "exact": "17829531287877455347/82588806980367187500",
+    "decimal": "0.215883143731"
+   },
+   "degree": 2,
+   "fan_in": 1
+  },
+  {
+   "node": "regex-automata 0.4.13",
+   "kept": {
+    "exact": "13607727913/63502888680",
+    "decimal": "0.214285179712"
+   },
+   "degree": 2,
+   "fan_in": 4
+  },
+  {
+   "node": "serde_urlencoded 0.7.1",
+   "kept": {
+    "exact": "893001/5118190",
+    "decimal": "0.174475937783"
+   },
+   "degree": 2,
+   "fan_in": 3
+  },
+  {
+   "node": "blake2s_simd 1.0.4",
+   "kept": {
+    "exact": "169/1029",
+    "decimal": "0.164237123421"
+   },
+   "degree": 2,
+   "fan_in": 1
+  },
+  {
+   "node": "blake3 1.8.4",
+   "kept": {
+    "exact": "169/1029",
+    "decimal": "0.164237123421"
+   },
+   "degree": 2,
+   "fan_in": 1
+  },
+  {
+   "node": "matchers 0.2.0",
+   "kept": {
+    "exact": "169/1029",
+    "decimal": "0.164237123421"
+   },
+   "degree": 2,
+   "fan_in": 1
+  },
+  {
+   "node": "multihash-derive 0.9.2",
+   "kept": {
+    "exact": "169/1029",
+    "decimal": "0.164237123421"
+   },
+   "degree": 2,
+   "fan_in": 1
+  },
+  {
+   "node": "nu-ansi-term 0.50.3",
+   "kept": {
+    "exact": "169/1029",
+    "decimal": "0.164237123421"
+   },
+   "degree": 2,
+   "fan_in": 1
+  },
+  {
+   "node": "ripemd 0.2.0",
+   "kept": {
+    "exact": "169/1029",
+    "decimal": "0.164237123421"
+   },
+   "degree": 2,
+   "fan_in": 1
+  },
+  {
+   "node": "sha1 0.11.0",
+   "kept": {
+    "exact": "169/1029",
+    "decimal": "0.164237123421"
+   },
+   "degree": 2,
+   "fan_in": 1
+  },
+  {
+   "node": "sha2 0.11.0",
+   "kept": {
+    "exact": "169/1029",
+    "decimal": "0.164237123421"
+   },
+   "degree": 2,
+   "fan_in": 1
+  },
+  {
+   "node": "sha3 0.11.0",
+   "kept": {
+    "exact": "169/1029",
+    "decimal": "0.164237123421"
+   },
+   "degree": 2,
+   "fan_in": 1
+  },
+  {
+   "node": "sharded-slab 0.1.7",
+   "kept": {
+    "exact": "169/1029",
+    "decimal": "0.164237123421"
+   },
+   "degree": 2,
+   "fan_in": 1
+  },
+  {
+   "node": "thread_local 1.1.10",
+   "kept": {
+    "exact": "169/1029",
+    "decimal": "0.164237123421"
+   },
+   "degree": 2,
+   "fan_in": 1
+  },
+  {
+   "node": "tracing-log 0.2.0",
+   "kept": {
+    "exact": "169/1029",
+    "decimal": "0.164237123421"
+   },
+   "degree": 2,
+   "fan_in": 1
+  },
+  {
+   "node": "mime 0.3.17",
+   "kept": {
+    "exact": "1743799/13582800",
+    "decimal": "0.128382881291"
+   },
+   "degree": 2,
+   "fan_in": 4
+  },
+  {
+   "node": "serde_path_to_error 0.1.20",
+   "kept": {
+    "exact": "1377/10780",
+    "decimal": "0.127736549165"
+   },
+   "degree": 2,
+   "fan_in": 2
+  },
+  {
+   "node": "regex-syntax 0.8.8",
+   "kept": {
+    "exact": "20140233688679/160027279473600",
+    "decimal": "0.125855002690"
+   },
+   "degree": 2,
+   "fan_in": 4
+  },
+  {
+   "node": "rustversion 1.0.22",
+   "kept": {
+    "exact": "230890669277206645351647435847/1915054084391027580000000000000",
+    "decimal": "0.120566135003"
+   },
+   "degree": 2,
+   "fan_in": 4
+  },
+  {
+   "node": "valuable 0.1.1",
+   "kept": {
+    "exact": "186596468944986509929/1649535516886950000000",
+    "decimal": "0.113120613066"
+   },
+   "degree": 3,
+   "fan_in": 1
+  },
+  {
+   "node": "assert-json-diff 2.0.2",
+   "kept": {
+    "exact": "338/3087",
+    "decimal": "0.109491415614"
+   },
+   "degree": 2,
+   "fan_in": 1
+  },
+  {
+   "node": "deadpool 0.12.3",
+   "kept": {
+    "exact": "338/3087",
+    "decimal": "0.109491415614"
+   },
+   "degree": 2,
+   "fan_in": 1
+  },
+  {
+   "node": "regex 1.12.2",
+   "kept": {
+    "exact": "23526022/217902069",
+    "decimal": "0.107966033127"
+   },
+   "degree": 2,
+   "fan_in": 3
+  },
+  {
+   "node": "wasi 0.11.1+wasi-snapshot-preview1",
+   "kept": {
+    "exact": "27238985022304822776723983/263926664568291099375000000",
+    "decimal": "0.103206642902"
+   },
+   "degree": 3,
+   "fan_in": 2
+  },
+  {
+   "node": "ahash 0.8.12",
+   "kept": {
+    "exact": "64467/641410",
+    "decimal": "0.100508255250"
+   },
+   "degree": 2,
+   "fan_in": 2
+  },
+  {
+   "node": "bytecount 0.6.9",
+   "kept": {
+    "exact": "1690/17493",
+    "decimal": "0.096610072600"
+   },
+   "degree": 2,
+   "fan_in": 1
+  },
+  {
+   "node": "email_address 0.2.9",
+   "kept": {
+    "exact": "1690/17493",
+    "decimal": "0.096610072600"
+   },
+   "degree": 2,
+   "fan_in": 1
+  },
+  {
+   "node": "fancy-regex 0.14.0",
+   "kept": {
+    "exact": "1690/17493",
+    "decimal": "0.096610072600"
+   },
+   "degree": 2,
+   "fan_in": 1
+  },
+  {
+   "node": "fraction 0.15.3",
+   "kept": {
+    "exact": "1690/17493",
+    "decimal": "0.096610072600"
+   },
+   "degree": 2,
+   "fan_in": 1
+  },
+  {
+   "node": "num-cmp 0.1.0",
+   "kept": {
+    "exact": "1690/17493",
+    "decimal": "0.096610072600"
+   },
+   "degree": 2,
+   "fan_in": 1
+  },
+  {
+   "node": "referencing 0.28.3",
+   "kept": {
+    "exact": "1690/17493",
+    "decimal": "0.096610072600"
+   },
+   "degree": 2,
+   "fan_in": 1
+  },
+  {
+   "node": "uuid-simd 0.8.0",
+   "kept": {
+    "exact": "1690/17493",
+    "decimal": "0.096610072600"
+   },
+   "degree": 2,
+   "fan_in": 1
+  },
+  {
+   "node": "equivalent 1.0.2",
+   "kept": {
+    "exact": "1962538035908994934013/21965064985092363750000",
+    "decimal": "0.089348155229"
+   },
+   "degree": 3,
+   "fan_in": 1
+  },
+  {
+   "node": "hashbrown 0.16.1",
+   "kept": {
+    "exact": "1962538035908994934013/21965064985092363750000",
+    "decimal": "0.089348155229"
+   },
+   "degree": 3,
+   "fan_in": 1
+  },
+  {
+   "node": "crc32fast 1.5.0",
+   "kept": {
+    "exact": "1534213187/17684805600",
+    "decimal": "0.086753183592"
+   },
+   "degree": 2,
+   "fan_in": 4
+  },
+  {
+   "node": "hmac 0.12.1",
+   "kept": {
+    "exact": "43069/509355",
+    "decimal": "0.084555958025"
+   },
+   "degree": 2,
+   "fan_in": 3
+  },
+  {
+   "node": "enumflags2_derive 0.7.12",
+   "kept": {
+    "exact": "8788/108045",
+    "decimal": "0.081336480170"
+   },
+   "degree": 3,
+   "fan_in": 1
+  },
+  {
+   "node": "zeroize_derive 1.5.0",
+   "kept": {
+    "exact": "61222631448093551738263/761545560814426080000000",
+    "decimal": "0.080392604984"
+   },
+   "degree": 3,
+   "fan_in": 1
+  },
+  {
+   "node": "autocfg 1.5.0",
+   "kept": {
+    "exact": "108111144992900384/1358669109124490625",
+    "decimal": "0.079571357196"
+   },
+   "degree": 3,
+   "fan_in": 3
+  },
+  {
+   "node": "aes 0.8.4",
+   "kept": {
+    "exact": "845/11319",
+    "decimal": "0.074653237919"
+   },
+   "degree": 2,
+   "fan_in": 1
+  },
+  {
+   "node": "arbitrary 1.4.2",
+   "kept": {
+    "exact": "845/11319",
+    "decimal": "0.074653237919"
+   },
+   "degree": 2,
+   "fan_in": 1
+  },
+  {
+   "node": "bzip2 0.5.2",
+   "kept": {
+    "exact": "845/11319",
+    "decimal": "0.074653237919"
+   },
+   "degree": 2,
+   "fan_in": 1
+  },
+  {
+   "node": "constant_time_eq 0.3.1",
+   "kept": {
+    "exact": "845/11319",
+    "decimal": "0.074653237919"
+   },
+   "degree": 2,
+   "fan_in": 1
+  },
+  {
+   "node": "deflate64 0.1.12",
+   "kept": {
+    "exact": "845/11319",
+    "decimal": "0.074653237919"
+   },
+   "degree": 2,
+   "fan_in": 1
+  },
+  {
+   "node": "flate2 1.1.9",
+   "kept": {
+    "exact": "845/11319",
+    "decimal": "0.074653237919"
+   },
+   "degree": 2,
+   "fan_in": 1
+  },
+  {
+   "node": "lzma-rs 0.3.0",
+   "kept": {
+    "exact": "845/11319",
+    "decimal": "0.074653237919"
+   },
+   "degree": 2,
+   "fan_in": 1
+  },
+  {
+   "node": "pbkdf2 0.12.2",
+   "kept": {
+    "exact": "845/11319",
+    "decimal": "0.074653237919"
+   },
+   "degree": 2,
+   "fan_in": 1
+  },
+  {
+   "node": "sha1 0.10.6",
+   "kept": {
+    "exact": "845/11319",
+    "decimal": "0.074653237919"
+   },
+   "degree": 2,
+   "fan_in": 1
+  },
+  {
+   "node": "time 0.3.51",
+   "kept": {
+    "exact": "845/11319",
+    "decimal": "0.074653237919"
+   },
+   "degree": 2,
+   "fan_in": 1
+  },
+  {
+   "node": "xz2 0.1.7",
+   "kept": {
+    "exact": "845/11319",
+    "decimal": "0.074653237919"
+   },
+   "degree": 2,
+   "fan_in": 1
+  },
+  {
+   "node": "zopfli 0.8.3",
+   "kept": {
+    "exact": "845/11319",
+    "decimal": "0.074653237919"
+   },
+   "degree": 2,
+   "fan_in": 1
+  },
+  {
+   "node": "zstd 0.13.3",
+   "kept": {
+    "exact": "845/11319",
+    "decimal": "0.074653237919"
+   },
+   "degree": 2,
+   "fan_in": 1
+  },
+  {
+   "node": "displaydoc 0.2.5",
+   "kept": {
+    "exact": "484778008791741159757699/6737830742685410156250000",
+    "decimal": "0.071948677149"
+   },
+   "degree": 2,
+   "fan_in": 6
+  },
+  {
+   "node": "wit-bindgen 0.46.0",
+   "kept": {
+    "exact": "16569942846008621942171/235091676604911328125000",
+    "decimal": "0.070482898779"
+   },
+   "degree": 3,
+   "fan_in": 1
+  },
+  {
+   "node": "hashbrown 0.15.5",
+   "kept": {
+    "exact": "4394/64827",
+    "decimal": "0.067780400142"
+   },
+   "degree": 3,
+   "fan_in": 1
+  },
+  {
+   "node": "ppv-lite86 0.2.21",
+   "kept": {
+    "exact": "4802114814187249/71470516744068750",
+    "decimal": "0.067190151029"
+   },
+   "degree": 3,
+   "fan_in": 1
+  },
+  {
+   "node": "axum-core 0.5.6",
+   "kept": {
+    "exact": "338/5145",
+    "decimal": "0.065694849368"
+   },
+   "degree": 2,
+   "fan_in": 1
+  },
+  {
+   "node": "matchit 0.8.4",
+   "kept": {
+    "exact": "338/5145",
+    "decimal": "0.065694849368"
+   },
+   "degree": 2,
+   "fan_in": 1
+  },
+  {
+   "node": "bit-vec 0.6.3",
+   "kept": {
+    "exact": "15327/233926",
+    "decimal": "0.065520720228"
+   },
+   "degree": 2,
+   "fan_in": 2
+  },
+  {
+   "node": "axum-core 0.4.5",
+   "kept": {
+    "exact": "65/1029",
+    "decimal": "0.063168124393"
+   },
+   "degree": 2,
+   "fan_in": 1
+  },
+  {
+   "node": "matchit 0.7.3",
+   "kept": {
+    "exact": "65/1029",
+    "decimal": "0.063168124393"
+   },
+   "degree": 2,
+   "fan_in": 1
+  },
+  {
+   "node": "rustls-pki-types 1.13.2",
+   "kept": {
+    "exact": "666039684657969/10696576490600000",
+    "decimal": "0.062266621965"
+   },
+   "degree": 2,
+   "fan_in": 6
+  },
+  {
+   "node": "wasm-bindgen-macro 0.2.106",
+   "kept": {
+    "exact": "110412569738569635181647435847/1869019130439320186250000000000",
+    "decimal": "0.059075141576"
+   },
+   "degree": 3,
+   "fan_in": 1
+  },
+  {
+   "node": "wasm-bindgen-shared 0.2.106",
+   "kept": {
+    "exact": "6123812355410287676079711734382161/103938230531653305913125000000000000",
+    "decimal": "0.058917804585"
+   },
+   "degree": 3,
+   "fan_in": 2
+  },
+  {
+   "node": "rustls 0.23.36",
+   "kept": {
+    "exact": "65010957453/1175447966000",
+    "decimal": "0.055307388616"
+   },
+   "degree": 2,
+   "fan_in": 5
+  },
+  {
+   "node": "v8 134.5.0",
+   "kept": {
+    "exact": "6396/116963",
+    "decimal": "0.054683959885"
+   },
+   "degree": 2,
+   "fan_in": 2
+  },
+  {
+   "node": "redox_syscall 0.5.18",
+   "kept": {
+    "exact": "153760486275080521872941/2826372505550343750000000",
+    "decimal": "0.054402059875"
+   },
+   "degree": 3,
+   "fan_in": 1
+  },
+  {
+   "node": "az 1.3.0",
+   "kept": {
+    "exact": "1690/31899",
+    "decimal": "0.052979717233"
+   },
+   "degree": 2,
+   "fan_in": 1
+  },
+  {
+   "node": "bincode 1.3.3",
+   "kept": {
+    "exact": "1690/31899",
+    "decimal": "0.052979717233"
+   },
+   "degree": 2,
+   "fan_in": 1
+  },
+  {
+   "node": "bit-set 0.5.3",
+   "kept": {
+    "exact": "1690/31899",
+    "decimal": "0.052979717233"
+   },
+   "degree": 2,
+   "fan_in": 1
+  },
+  {
+   "node": "capacity_builder 0.1.3",
+   "kept": {
+    "exact": "1690/31899",
+    "decimal": "0.052979717233"
+   },
+   "degree": 2,
+   "fan_in": 1
+  },
+  {
+   "node": "cooked-waker 5.0.0",
+   "kept": {
+    "exact": "1690/31899",
+    "decimal": "0.052979717233"
+   },
+   "degree": 2,
+   "fan_in": 1
+  },
+  {
+   "node": "deno_core_icudata 0.74.0",
+   "kept": {
+    "exact": "1690/31899",
+    "decimal": "0.052979717233"
+   },
+   "degree": 2,
+   "fan_in": 1
+  },
+  {
+   "node": "deno_ops 0.215.0",
+   "kept": {
+    "exact": "1690/31899",
+    "decimal": "0.052979717233"
+   },
+   "degree": 2,
+   "fan_in": 1
+  },
+  {
+   "node": "deno_path_util 0.3.3",
+   "kept": {
+    "exact": "1690/31899",
+    "decimal": "0.052979717233"
+   },
+   "degree": 2,
+   "fan_in": 1
+  },
+  {
+   "node": "deno_unsync 0.4.4",
+   "kept": {
+    "exact": "1690/31899",
+    "decimal": "0.052979717233"
+   },
+   "degree": 2,
+   "fan_in": 1
+  },
+  {
+   "node": "memoffset 0.9.1",
+   "kept": {
+    "exact": "1690/31899",
+    "decimal": "0.052979717233"
+   },
+   "degree": 2,
+   "fan_in": 1
+  },
+  {
+   "node": "pin-project 1.1.12",
+   "kept": {
+    "exact": "1690/31899",
+    "decimal": "0.052979717233"
+   },
+   "degree": 2,
+   "fan_in": 1
+  },
+  {
+   "node": "serde_v8 0.248.0",
+   "kept": {
+    "exact": "1690/31899",
+    "decimal": "0.052979717233"
+   },
+   "degree": 2,
+   "fan_in": 1
+  },
+  {
+   "node": "sourcemap 8.0.1",
+   "kept": {
+    "exact": "1690/31899",
+    "decimal": "0.052979717233"
+   },
+   "degree": 2,
+   "fan_in": 1
+  },
+  {
+   "node": "static_assertions 1.1.0",
+   "kept": {
+    "exact": "1690/31899",
+    "decimal": "0.052979717233"
+   },
+   "degree": 2,
+   "fan_in": 1
+  },
+  {
+   "node": "wasm_dep_analyzer 0.2.0",
+   "kept": {
+    "exact": "1690/31899",
+    "decimal": "0.052979717233"
+   },
+   "degree": 2,
+   "fan_in": 1
+  },
+  {
+   "node": "web-sys 0.3.83",
+   "kept": {
+    "exact": "5181892173/98525157500",
+    "decimal": "0.052594609382"
+   },
+   "degree": 2,
+   "fan_in": 3
+  },
+  {
+   "node": "anstyle 1.0.14",
+   "kept": {
+    "exact": "40626079/782786025",
+    "decimal": "0.051899341202"
+   },
+   "degree": 3,
+   "fan_in": 3
+  },
+  {
+   "node": "anstream 0.6.21",
+   "kept": {
+    "exact": "2197/43218",
+    "decimal": "0.050835300106"
+   },
+   "degree": 3,
+   "fan_in": 1
+  },
+  {
+   "node": "clap_lex 1.1.0",
+   "kept": {
+    "exact": "2197/43218",
+    "decimal": "0.050835300106"
+   },
+   "degree": 3,
+   "fan_in": 1
+  },
+  {
+   "node": "heck 0.5.0",
+   "kept": {
+    "exact": "2197/43218",
+    "decimal": "0.050835300106"
+   },
+   "degree": 3,
+   "fan_in": 1
+  },
+  {
+   "node": "strsim 0.11.1",
+   "kept": {
+    "exact": "2197/43218",
+    "decimal": "0.050835300106"
+   },
+   "degree": 3,
+   "fan_in": 1
+  },
+  {
+   "node": "wasm-bindgen-futures 0.4.56",
+   "kept": {
+    "exact": "242480223/4797746800",
+    "decimal": "0.050540437649"
+   },
+   "degree": 2,
+   "fan_in": 2
+  },
+  {
+   "node": "cc 1.2.52",
+   "kept": {
+    "exact": "13216101672553/262040037875000",
+    "decimal": "0.050435428798"
+   },
+   "degree": 3,
+   "fan_in": 9
+  },
+  {
+   "node": "tokio-rustls 0.26.4",
+   "kept": {
+    "exact": "47478987/959549360",
+    "decimal": "0.049480505099"
+   },
+   "degree": 2,
+   "fan_in": 2
+  },
+  {
+   "node": "webpki-roots 1.0.5",
+   "kept": {
+    "exact": "47478987/959549360",
+    "decimal": "0.049480505099"
+   },
+   "degree": 2,
+   "fan_in": 2
+  },
+  {
+   "node": "hyper-rustls 0.27.7",
+   "kept": {
+    "exact": "211887/4361588",
+    "decimal": "0.048580241875"
+   },
+   "degree": 2,
+   "fan_in": 1
+  },
+  {
+   "node": "quinn 0.11.9",
+   "kept": {
+    "exact": "211887/4361588",
+    "decimal": "0.048580241875"
+   },
+   "degree": 2,
+   "fan_in": 1
+  },
+  {
+   "node": "tower-http 0.6.8",
+   "kept": {
+    "exact": "211887/4361588",
+    "decimal": "0.048580241875"
+   },
+   "degree": 2,
+   "fan_in": 1
+  },
+  {
+   "node": "wasm-streams 0.4.2",
+   "kept": {
+    "exact": "211887/4361588",
+    "decimal": "0.048580241875"
+   },
+   "degree": 2,
+   "fan_in": 1
+  },
+  {
+   "node": "tokio-util 0.7.18",
+   "kept": {
+    "exact": "12734496664261/263876074000000",
+    "decimal": "0.048259383548"
+   },
+   "degree": 2,
+   "fan_in": 2
+  },
+  {
+   "node": "const-oid 0.9.6",
+   "kept": {
+    "exact": "1188238338849433/28401100543200000",
+    "decimal": "0.041837756852"
+   },
+   "degree": 3,
+   "fan_in": 2
+  },
+  {
+   "node": "crypto-common 0.1.7",
+   "kept": {
+    "exact": "5172378979/130153408000",
+    "decimal": "0.039740634214"
+   },
+   "degree": 3,
+   "fan_in": 2
+  },
+  {
+   "node": "block-buffer 0.10.4",
+   "kept": {
+    "exact": "1998830119/50824368000",
+    "decimal": "0.039328184445"
+   },
+   "degree": 3,
+   "fan_in": 1
+  },
+  {
+   "node": "signature 2.2.0",
+   "kept": {
+    "exact": "7605/211288",
+    "decimal": "0.035993525425"
+   },
+   "degree": 3,
+   "fan_in": 2
+  },
+  {
+   "node": "idna_adapter 1.2.1",
+   "kept": {
+    "exact": "116953816109741/3294140449359375",
+    "decimal": "0.035503591273"
+   },
+   "degree": 3,
+   "fan_in": 1
+  },
+  {
+   "node": "utf8_iter 1.0.4",
+   "kept": {
+    "exact": "116953816109741/3294140449359375",
+    "decimal": "0.035503591273"
+   },
+   "degree": 3,
+   "fan_in": 1
+  },
+  {
+   "node": "cpufeatures 0.3.0",
+   "kept": {
+    "exact": "15589893791771/441794789493750",
+    "decimal": "0.035287636166"
+   },
+   "degree": 3,
+   "fan_in": 5
+  },
+  {
+   "node": "pkcs8 0.10.2",
+   "kept": {
+    "exact": "125435752/4041731925",
+    "decimal": "0.031035148874"
+   },
+   "degree": 3,
+   "fan_in": 3
+  },
+  {
+   "node": "block-buffer 0.12.0",
+   "kept": {
+    "exact": "81796/2701125",
+    "decimal": "0.030282197233"
+   },
+   "degree": 3,
+   "fan_in": 1
+  },
+  {
+   "node": "crypto-common 0.2.1",
+   "kept": {
+    "exact": "81796/2701125",
+    "decimal": "0.030282197233"
+   },
+   "degree": 3,
+   "fan_in": 1
+  },
+  {
+   "node": "generic-array 0.14.7",
+   "kept": {
+    "exact": "11801781560522197/441305954369280000",
+    "decimal": "0.026742855934"
+   },
+   "degree": 3,
+   "fan_in": 6
+  },
+  {
+   "node": "windows-sys 0.60.2",
+   "kept": {
+    "exact": "208047309340702864525321/7838473082059620000000000",
+    "decimal": "0.026541815882"
+   },
+   "degree": 3,
+   "fan_in": 2
+  },
+  {
+   "node": "pkg-config 0.3.33",
+   "kept": {
+    "exact": "9855911/374375925",
+    "decimal": "0.026326241464"
+   },
+   "degree": 3,
+   "fan_in": 4
+  },
+  {
+   "node": "aho-corasick 1.1.4",
+   "kept": {
+    "exact": "131248909051/5433024920400",
+    "decimal": "0.024157612191"
+   },
+   "degree": 3,
+   "fan_in": 2
+  },
+  {
+   "node": "der 0.7.10",
+   "kept": {
+    "exact": "3307685189159/142268963760000",
+    "decimal": "0.023249520498"
+   },
+   "degree": 3,
+   "fan_in": 4
+  },
+  {
+   "node": "vcpkg 0.2.15",
+   "kept": {
+    "exact": "4394/194481",
+    "decimal": "0.022593466714"
+   },
+   "degree": 3,
+   "fan_in": 1
+  },
+  {
+   "node": "data-encoding 2.10.0",
+   "kept": {
+    "exact": "3896462087531/181564004160000",
+    "decimal": "0.021460542829"
+   },
+   "degree": 3,
+   "fan_in": 4
+  },
+  {
+   "node": "spki 0.7.3",
+   "kept": {
+    "exact": "1357208879/65865261000",
+    "decimal": "0.020605837712"
+   },
+   "degree": 3,
+   "fan_in": 2
+  },
+  {
+   "node": "zerocopy 0.8.33",
+   "kept": {
+    "exact": "11998688608298873/582352358655375000",
+    "decimal": "0.020603829331"
+   },
+   "degree": 3,
+   "fan_in": 2
+  },
+  {
+   "node": "keccak 0.2.0",
+   "kept": {
+    "exact": "2197/108045",
+    "decimal": "0.020334120043"
+   },
+   "degree": 3,
+   "fan_in": 1
+  },
+  {
+   "node": "termcolor 1.4.1",
+   "kept": {
+    "exact": "2197/108045",
+    "decimal": "0.020334120043"
+   },
+   "degree": 3,
+   "fan_in": 1
+  },
+  {
+   "node": "pin-utils 0.1.0",
+   "kept": {
+    "exact": "38604530014992993/1969399668236000000",
+    "decimal": "0.019602181638"
+   },
+   "degree": 3,
+   "fan_in": 2
+  },
+  {
+   "node": "bzip2-sys 0.1.13+1.0.8",
+   "kept": {
+    "exact": "4394/237699",
+    "decimal": "0.018485563675"
+   },
+   "degree": 3,
+   "fan_in": 1
+  },
+  {
+   "node": "derive_arbitrary 1.4.2",
+   "kept": {
+    "exact": "4394/237699",
+    "decimal": "0.018485563675"
+   },
+   "degree": 3,
+   "fan_in": 1
+  },
+  {
+   "node": "lzma-sys 0.1.20",
+   "kept": {
+    "exact": "4394/237699",
+    "decimal": "0.018485563675"
+   },
+   "degree": 3,
+   "fan_in": 1
+  },
+  {
+   "node": "zstd-safe 7.2.4",
+   "kept": {
+    "exact": "4394/237699",
+    "decimal": "0.018485563675"
+   },
+   "degree": 3,
+   "fan_in": 1
+  },
+  {
+   "node": "base-x 0.2.11",
+   "kept": {
+    "exact": "4243083/232416800",
+    "decimal": "0.018256352381"
+   },
+   "degree": 3,
+   "fan_in": 1
+  },
+  {
+   "node": "base256emoji 1.0.2",
+   "kept": {
+    "exact": "4243083/232416800",
+    "decimal": "0.018256352381"
+   },
+   "degree": 3,
+   "fan_in": 1
+  },
+  {
+   "node": "data-encoding-macro 0.1.19",
+   "kept": {
+    "exact": "4243083/232416800",
+    "decimal": "0.018256352381"
+   },
+   "degree": 3,
+   "fan_in": 1
+  },
+  {
+   "node": "rfc6979 0.4.0",
+   "kept": {
+    "exact": "2197/129654",
+    "decimal": "0.016945100035"
+   },
+   "degree": 3,
+   "fan_in": 1
+  },
+  {
+   "node": "foldhash 0.1.5",
+   "kept": {
+    "exact": "114244/6806835",
+    "decimal": "0.016783718130"
+   },
+   "degree": 4,
+   "fan_in": 1
+  },
+  {
+   "node": "futures-macro 0.3.31",
+   "kept": {
+    "exact": "820108718873743/54227351004750000",
+    "decimal": "0.015123525374"
+   },
+   "degree": 3,
+   "fan_in": 1
+  },
+  {
+   "node": "slab 0.4.11",
+   "kept": {
+    "exact": "4319060344403498621/288109915888236750000",
+    "decimal": "0.014991015950"
+   },
+   "degree": 3,
+   "fan_in": 3
+  },
+  {
+   "node": "hybrid-array 0.4.10",
+   "kept": {
+    "exact": "22308/1500625",
+    "decimal": "0.014865805914"
+   },
+   "degree": 4,
+   "fan_in": 2
+  },
+  {
+   "node": "bindgen 0.72.1",
+   "kept": {
+    "exact": "4394/324135",
+    "decimal": "0.013556080028"
+   },
+   "degree": 3,
+   "fan_in": 1
+  },
+  {
+   "node": "cmake 0.1.57",
+   "kept": {
+    "exact": "4394/324135",
+    "decimal": "0.013556080028"
+   },
+   "degree": 3,
+   "fan_in": 1
+  },
+  {
+   "node": "find_cuda_helper 0.2.0",
+   "kept": {
+    "exact": "4394/324135",
+    "decimal": "0.013556080028"
+   },
+   "degree": 3,
+   "fan_in": 1
+  },
+  {
+   "node": "multihash-derive-impl 0.1.2",
+   "kept": {
+    "exact": "4394/324135",
+    "decimal": "0.013556080028"
+   },
+   "degree": 3,
+   "fan_in": 1
+  },
+  {
+   "node": "walkdir 2.5.0",
+   "kept": {
+    "exact": "4394/324135",
+    "decimal": "0.013556080028"
+   },
+   "degree": 3,
+   "fan_in": 1
+  },
+  {
+   "node": "r-efi 6.0.0",
+   "kept": {
+    "exact": "2110933679777/158357612857500",
+    "decimal": "0.013330168608"
+   },
+   "degree": 3,
+   "fan_in": 1
+  },
+  {
+   "node": "pin-project-internal 1.1.12",
+   "kept": {
+    "exact": "8788/669879",
+    "decimal": "0.013118787124"
+   },
+   "degree": 3,
+   "fan_in": 1
+  },
+  {
+   "node": "rand_core 0.10.1",
+   "kept": {
+    "exact": "7617875377122751/585289737121320000",
+    "decimal": "0.013015562881"
+   },
+   "degree": 3,
+   "fan_in": 4
+  },
+  {
+   "node": "ff 0.13.1",
+   "kept": {
+    "exact": "11687/929775",
+    "decimal": "0.012569707725"
+   },
+   "degree": 3,
+   "fan_in": 2
+  },
+  {
+   "node": "base16ct 0.2.0",
+   "kept": {
+    "exact": "123656/10227525",
+    "decimal": "0.012090510656"
+   },
+   "degree": 3,
+   "fan_in": 2
+  },
+  {
+   "node": "num 0.4.3",
+   "kept": {
+    "exact": "4394/367353",
+    "decimal": "0.011961247084"
+   },
+   "degree": 3,
+   "fan_in": 1
+  },
+  {
+   "node": "crypto-bigint 0.5.5",
+   "kept": {
+    "exact": "19604/1673595",
+    "decimal": "0.011713706124"
+   },
+   "degree": 3,
+   "fan_in": 1
+  },
+  {
+   "node": "group 0.13.0",
+   "kept": {
+    "exact": "19604/1673595",
+    "decimal": "0.011713706124"
+   },
+   "degree": 3,
+   "fan_in": 1
+  },
+  {
+   "node": "sec1 0.7.3",
+   "kept": {
+    "exact": "19604/1673595",
+    "decimal": "0.011713706124"
+   },
+   "degree": 3,
+   "fan_in": 1
+  },
+  {
+   "node": "typenum 1.19.0",
+   "kept": {
+    "exact": "57789555323233159/5437519794907200000",
+    "decimal": "0.010627925507"
+   },
+   "degree": 4,
+   "fan_in": 3
+  },
+  {
+   "node": "android_system_properties 0.1.5",
+   "kept": {
+    "exact": "93119/9243850",
+    "decimal": "0.010073616513"
+   },
+   "degree": 3,
+   "fan_in": 1
+  },
+  {
+   "node": "core-foundation-sys 0.8.7",
+   "kept": {
+    "exact": "93119/9243850",
+    "decimal": "0.010073616513"
+   },
+   "degree": 3,
+   "fan_in": 1
+  },
+  {
+   "node": "iana-time-zone-haiku 0.1.2",
+   "kept": {
+    "exact": "93119/9243850",
+    "decimal": "0.010073616513"
+   },
+   "degree": 3,
+   "fan_in": 1
+  },
+  {
+   "node": "windows-core 0.62.2",
+   "kept": {
+    "exact": "93119/9243850",
+    "decimal": "0.010073616513"
+   },
+   "degree": 3,
+   "fan_in": 1
+  },
+  {
+   "node": "byteorder 1.5.0",
+   "kept": {
+    "exact": "2197/237699",
+    "decimal": "0.009242781838"
+   },
+   "degree": 3,
+   "fan_in": 1
+  },
+  {
+   "node": "crc 3.4.0",
+   "kept": {
+    "exact": "2197/237699",
+    "decimal": "0.009242781838"
+   },
+   "degree": 3,
+   "fan_in": 1
+  },
+  {
+   "node": "miniz_oxide 0.8.9",
+   "kept": {
+    "exact": "2197/237699",
+    "decimal": "0.009242781838"
+   },
+   "degree": 3,
+   "fan_in": 1
+  },
+  {
+   "node": "web-time 1.1.0",
+   "kept": {
+    "exact": "32790371977303/3820205889500000",
+    "decimal": "0.008583404383"
+   },
+   "degree": 3,
+   "fan_in": 3
+  },
+  {
+   "node": "bit-set 0.8.0",
+   "kept": {
+    "exact": "8788/1102059",
+    "decimal": "0.007974164723"
+   },
+   "degree": 3,
+   "fan_in": 1
+  },
+  {
+   "node": "outref 0.5.2",
+   "kept": {
+    "exact": "8788/1102059",
+    "decimal": "0.007974164723"
+   },
+   "degree": 3,
+   "fan_in": 1
+  },
+  {
+   "node": "vsimd 0.8.0",
+   "kept": {
+    "exact": "8788/1102059",
+    "decimal": "0.007974164723"
+   },
+   "degree": 3,
+   "fan_in": 1
+  },
+  {
+   "node": "wasm-bindgen-macro-support 0.2.106",
+   "kept": {
+    "exact": "1435363406601405257361416666011/196247008696128619556250000000000",
+    "decimal": "0.007314065147"
+   },
+   "degree": 4,
+   "fan_in": 1
+  },
+  {
+   "node": "curve25519-dalek-derive 0.1.1",
+   "kept": {
+    "exact": "2197/302526",
+    "decimal": "0.007262185729"
+   },
+   "degree": 3,
+   "fan_in": 1
+  },
+  {
+   "node": "fiat-crypto 0.2.9",
+   "kept": {
+    "exact": "2197/302526",
+    "decimal": "0.007262185729"
+   },
+   "degree": 3,
+   "fan_in": 1
+  },
+  {
+   "node": "rustc_version 0.4.1",
+   "kept": {
+    "exact": "2197/302526",
+    "decimal": "0.007262185729"
+   },
+   "degree": 3,
+   "fan_in": 1
+  },
+  {
+   "node": "winapi-util 0.1.11",
+   "kept": {
+    "exact": "3919448/559132875",
+    "decimal": "0.007009868629"
+   },
+   "degree": 4,
+   "fan_in": 3
+  },
+  {
+   "node": "deadpool-runtime 0.1.4",
+   "kept": {
+    "exact": "2197/324135",
+    "decimal": "0.006778040014"
+   },
+   "degree": 3,
+   "fan_in": 1
+  },
+  {
+   "node": "num_cpus 1.17.0",
+   "kept": {
+    "exact": "2197/324135",
+    "decimal": "0.006778040014"
+   },
+   "degree": 3,
+   "fan_in": 1
+  },
+  {
+   "node": "windows-targets 0.53.5",
+   "kept": {
+    "exact": "208047309340702864525321/31655372062163850000000000",
+    "decimal": "0.006572259171"
+   },
+   "degree": 4,
+   "fan_in": 1
+  },
+  {
+   "node": "version_check 0.9.5",
+   "kept": {
+    "exact": "577646864322733349/91693570518950400000",
+    "decimal": "0.006299753200"
+   },
+   "degree": 3,
+   "fan_in": 2
+  },
+  {
+   "node": "cipher 0.4.4",
+   "kept": {
+    "exact": "4394/713097",
+    "decimal": "0.006161854558"
+   },
+   "degree": 3,
+   "fan_in": 1
+  },
+  {
+   "node": "simd-adler32 0.3.9",
+   "kept": {
+    "exact": "66417/11620840",
+    "decimal": "0.005715335552"
+   },
+   "degree": 3,
+   "fan_in": 2
+  },
+  {
+   "node": "zerocopy-derive 0.8.33",
+   "kept": {
+    "exact": "155982951907885349/30573498829407187500",
+    "decimal": "0.005101900596"
+   },
+   "degree": 4,
+   "fan_in": 1
+  },
+  {
+   "node": "bumpalo 3.19.1",
+   "kept": {
+    "exact": "19748456695344744280798916666011/3997624251217434842812500000000000",
+    "decimal": "0.004940048252"
+   },
+   "degree": 3,
+   "fan_in": 2
+  },
+  {
+   "node": "fluent-uri 0.3.2",
+   "kept": {
+    "exact": "8788/1836765",
+    "decimal": "0.004784498834"
+   },
+   "degree": 3,
+   "fan_in": 1
+  },
+  {
+   "node": "atomic-waker 1.1.2",
+   "kept": {
+    "exact": "32346160117241/6860777924000000",
+    "decimal": "0.004714649049"
+   },
+   "degree": 3,
+   "fan_in": 2
+  },
+  {
+   "node": "h2 0.4.13",
+   "kept": {
+    "exact": "27388789261/5888143800000",
+    "decimal": "0.004651515009"
+   },
+   "degree": 3,
+   "fan_in": 1
+  },
+  {
+   "node": "httparse 1.10.1",
+   "kept": {
+    "exact": "27388789261/5888143800000",
+    "decimal": "0.004651515009"
+   },
+   "degree": 3,
+   "fan_in": 1
+  },
+  {
+   "node": "httpdate 1.0.3",
+   "kept": {
+    "exact": "27388789261/5888143800000",
+    "decimal": "0.004651515009"
+   },
+   "degree": 3,
+   "fan_in": 1
+  },
+  {
+   "node": "want 0.3.1",
+   "kept": {
+    "exact": "27388789261/5888143800000",
+    "decimal": "0.004651515009"
+   },
+   "degree": 3,
+   "fan_in": 1
+  },
+  {
+   "node": "zstd-sys 2.0.16+zstd.1.5.7",
+   "kept": {
+    "exact": "114244/24958395",
+    "decimal": "0.004577377672"
+   },
+   "degree": 4,
+   "fan_in": 1
+  },
+  {
+   "node": "icu_properties 2.1.2",
+   "kept": {
+    "exact": "9590212920998762/2113740121672265625",
+    "decimal": "0.004537082313"
+   },
+   "degree": 4,
+   "fan_in": 2
+  },
+  {
+   "node": "icu_normalizer 2.1.1",
+   "kept": {
+    "exact": "1520399609426633/345884747182734375",
+    "decimal": "0.004395682729"
+   },
+   "degree": 4,
+   "fan_in": 1
+  },
+  {
+   "node": "ipnet 2.11.0",
+   "kept": {
+    "exact": "396055907/91593348000",
+    "decimal": "0.004324068457"
+   },
+   "degree": 3,
+   "fan_in": 1
+  },
+  {
+   "node": "deranged 0.5.8",
+   "kept": {
+    "exact": "4394/1188495",
+    "decimal": "0.003697112735"
+   },
+   "degree": 3,
+   "fan_in": 1
+  },
+  {
+   "node": "num-conv 0.2.2",
+   "kept": {
+    "exact": "4394/1188495",
+    "decimal": "0.003697112735"
+   },
+   "degree": 3,
+   "fan_in": 1
+  },
+  {
+   "node": "powerfmt 0.2.0",
+   "kept": {
+    "exact": "4394/1188495",
+    "decimal": "0.003697112735"
+   },
+   "degree": 3,
+   "fan_in": 1
+  },
+  {
+   "node": "time-core 0.1.9",
+   "kept": {
+    "exact": "4394/1188495",
+    "decimal": "0.003697112735"
+   },
+   "degree": 3,
+   "fan_in": 1
+  },
+  {
+   "node": "shlex 1.3.0",
+   "kept": {
+    "exact": "36488837911030583/10809713076710625000",
+    "decimal": "0.003375560263"
+   },
+   "degree": 4,
+   "fan_in": 3
+  },
+  {
+   "node": "find-msvc-tools 0.1.7",
+   "kept": {
+    "exact": "171809321743189/55028407953750000",
+    "decimal": "0.003122193211"
+   },
+   "degree": 4,
+   "fan_in": 1
+  },
+  {
+   "node": "jobserver 0.1.34",
+   "kept": {
+    "exact": "171809321743189/55028407953750000",
+    "decimal": "0.003122193211"
+   },
+   "degree": 4,
+   "fan_in": 1
+  },
+  {
+   "node": "num-bigint 0.4.6",
+   "kept": {
+    "exact": "472995848/176797815075",
+    "decimal": "0.002675348945"
+   },
+   "degree": 3,
+   "fan_in": 3
+  },
+  {
+   "node": "sys_traits 0.1.27",
+   "kept": {
+    "exact": "8788/3349395",
+    "decimal": "0.002623757425"
+   },
+   "degree": 3,
+   "fan_in": 1
+  },
+  {
+   "node": "base64ct 1.8.3",
+   "kept": {
+    "exact": "17643715427/6915852405000",
+    "decimal": "0.002551198955"
+   },
+   "degree": 4,
+   "fan_in": 1
+  },
+  {
+   "node": "ring 0.17.14",
+   "kept": {
+    "exact": "75177813659/30721935475000",
+    "decimal": "0.002447040282"
+   },
+   "degree": 3,
+   "fan_in": 3
+  },
+  {
+   "node": "crc-catalog 2.5.0",
+   "kept": {
+    "exact": "57122/24958395",
+    "decimal": "0.002288688836"
+   },
+   "degree": 4,
+   "fan_in": 1
+  },
+  {
+   "node": "rustls-webpki 0.103.13",
+   "kept": {
+    "exact": "93904716321/41140678810000",
+    "decimal": "0.002282527149"
+   },
+   "degree": 3,
+   "fan_in": 1
+  },
+  {
+   "node": "const-str 0.4.3",
+   "kept": {
+    "exact": "18386693/8134588000",
+    "decimal": "0.002260310295"
+   },
+   "degree": 4,
+   "fan_in": 1
+  },
+  {
+   "node": "data-encoding-macro-internal 0.1.17",
+   "kept": {
+    "exact": "18386693/8134588000",
+    "decimal": "0.002260310295"
+   },
+   "degree": 4,
+   "fan_in": 1
+  },
+  {
+   "node": "match-lookup 0.1.2",
+   "kept": {
+    "exact": "18386693/8134588000",
+    "decimal": "0.002260310295"
+   },
+   "degree": 4,
+   "fan_in": 1
+  },
+  {
+   "node": "utf8parse 0.2.2",
+   "kept": {
+    "exact": "287807/129413900",
+    "decimal": "0.002223926487"
+   },
+   "degree": 4,
+   "fan_in": 2
+  },
+  {
+   "node": "bit-vec 0.8.0",
+   "kept": {
+    "exact": "228488/115716195",
+    "decimal": "0.001974555074"
+   },
+   "degree": 4,
+   "fan_in": 1
+  },
+  {
+   "node": "strum_macros 0.25.3",
+   "kept": {
+    "exact": "22139/12281115",
+    "decimal": "0.001802686482"
+   },
+   "degree": 3,
+   "fan_in": 2
+  },
+  {
+   "node": "anstyle-parse 0.2.7",
+   "kept": {
+    "exact": "28561/15882615",
+    "decimal": "0.001798255514"
+   },
+   "degree": 4,
+   "fan_in": 1
+  },
+  {
+   "node": "anstyle-query 1.1.5",
+   "kept": {
+    "exact": "28561/15882615",
+    "decimal": "0.001798255514"
+   },
+   "degree": 4,
+   "fan_in": 1
+  },
+  {
+   "node": "anstyle-wincon 3.0.11",
+   "kept": {
+    "exact": "28561/15882615",
+    "decimal": "0.001798255514"
+   },
+   "degree": 4,
+   "fan_in": 1
+  },
+  {
+   "node": "colorchoice 1.0.5",
+   "kept": {
+    "exact": "28561/15882615",
+    "decimal": "0.001798255514"
+   },
+   "degree": 4,
+   "fan_in": 1
+  },
+  {
+   "node": "is_terminal_polyfill 1.70.2",
+   "kept": {
+    "exact": "28561/15882615",
+    "decimal": "0.001798255514"
+   },
+   "degree": 4,
+   "fan_in": 1
+  },
+  {
+   "node": "semver 1.0.28",
+   "kept": {
+    "exact": "28561/15882615",
+    "decimal": "0.001798255514"
+   },
+   "degree": 4,
+   "fan_in": 1
+  },
+  {
+   "node": "same-file 1.0.6",
+   "kept": {
+    "exact": "57122/34034175",
+    "decimal": "0.001678371813"
+   },
+   "degree": 4,
+   "fan_in": 1
+  },
+  {
+   "node": "home 0.5.12",
+   "kept": {
+    "exact": "356577/225153775",
+    "decimal": "0.001583704293"
+   },
+   "degree": 3,
+   "fan_in": 2
+  },
+  {
+   "node": "bindgen 0.70.1",
+   "kept": {
+    "exact": "55432/36843345",
+    "decimal": "0.001504532230"
+   },
+   "degree": 3,
+   "fan_in": 1
+  },
+  {
+   "node": "fslock 0.2.1",
+   "kept": {
+    "exact": "55432/36843345",
+    "decimal": "0.001504532230"
+   },
+   "degree": 3,
+   "fan_in": 1
+  },
+  {
+   "node": "gzip-header 1.1.0",
+   "kept": {
+    "exact": "55432/36843345",
+    "decimal": "0.001504532230"
+   },
+   "degree": 3,
+   "fan_in": 1
+  },
+  {
+   "node": "miniz_oxide 0.7.4",
+   "kept": {
+    "exact": "55432/36843345",
+    "decimal": "0.001504532230"
+   },
+   "degree": 3,
+   "fan_in": 1
+  },
+  {
+   "node": "paste 1.0.15",
+   "kept": {
+    "exact": "55432/36843345",
+    "decimal": "0.001504532230"
+   },
+   "degree": 3,
+   "fan_in": 1
+  },
+  {
+   "node": "which 6.0.3",
+   "kept": {
+    "exact": "55432/36843345",
+    "decimal": "0.001504532230"
+   },
+   "degree": 3,
+   "fan_in": 1
+  },
+  {
+   "node": "proc-macro-rules 0.4.0",
+   "kept": {
+    "exact": "8788/6028911",
+    "decimal": "0.001457643014"
+   },
+   "degree": 3,
+   "fan_in": 1
+  },
+  {
+   "node": "stringcase 0.3.0",
+   "kept": {
+    "exact": "8788/6028911",
+    "decimal": "0.001457643014"
+   },
+   "degree": 3,
+   "fan_in": 1
+  },
+  {
+   "node": "strum 0.25.0",
+   "kept": {
+    "exact": "8788/6028911",
+    "decimal": "0.001457643014"
+   },
+   "degree": 3,
+   "fan_in": 1
+  },
+  {
+   "node": "rustc-hash 2.1.1",
+   "kept": {
+    "exact": "2429869/1901051775",
+    "decimal": "0.001278170869"
+   },
+   "degree": 3,
+   "fan_in": 3
+  },
+  {
+   "node": "rustc-hash 1.1.0",
+   "kept": {
+    "exact": "273104/225153775",
+    "decimal": "0.001212966560"
+   },
+   "degree": 3,
+   "fan_in": 2
+  },
+  {
+   "node": "iri-string 0.7.10",
+   "kept": {
+    "exact": "918177/763277900",
+    "decimal": "0.001202939323"
+   },
+   "degree": 3,
+   "fan_in": 1
+  },
+  {
+   "node": "base64-simd 0.7.0",
+   "kept": {
+    "exact": "8788/7368669",
+    "decimal": "0.001192617011"
+   },
+   "degree": 3,
+   "fan_in": 1
+  },
+  {
+   "node": "bitvec 1.0.1",
+   "kept": {
+    "exact": "8788/7368669",
+    "decimal": "0.001192617011"
+   },
+   "degree": 3,
+   "fan_in": 1
+  },
+  {
+   "node": "debugid 0.8.0",
+   "kept": {
+    "exact": "8788/7368669",
+    "decimal": "0.001192617011"
+   },
+   "degree": 3,
+   "fan_in": 1
+  },
+  {
+   "node": "if_chain 1.0.3",
+   "kept": {
+    "exact": "8788/7368669",
+    "decimal": "0.001192617011"
+   },
+   "degree": 3,
+   "fan_in": 1
+  },
+  {
+   "node": "rustc_version 0.2.3",
+   "kept": {
+    "exact": "8788/7368669",
+    "decimal": "0.001192617011"
+   },
+   "degree": 3,
+   "fan_in": 1
+  },
+  {
+   "node": "unicode-id-start 1.4.0",
+   "kept": {
+    "exact": "8788/7368669",
+    "decimal": "0.001192617011"
+   },
+   "degree": 3,
+   "fan_in": 1
+  },
+  {
+   "node": "try-lock 0.2.5",
+   "kept": {
+    "exact": "356054260393/309127549500000",
+    "decimal": "0.001151803717"
+   },
+   "degree": 4,
+   "fan_in": 1
+  },
+  {
+   "node": "adler2 2.0.1",
+   "kept": {
+    "exact": "28561/24958395",
+    "decimal": "0.001144344418"
+   },
+   "degree": 4,
+   "fan_in": 1
+  },
+  {
+   "node": "quinn-proto 0.11.16",
+   "kept": {
+    "exact": "306059/305311160",
+    "decimal": "0.001002449436"
+   },
+   "degree": 3,
+   "fan_in": 1
+  },
+  {
+   "node": "quinn-udp 0.5.14",
+   "kept": {
+    "exact": "306059/305311160",
+    "decimal": "0.001002449436"
+   },
+   "degree": 3,
+   "fan_in": 1
+  },
+  {
+   "node": "hermit-abi 0.5.2",
+   "kept": {
+    "exact": "28561/34034175",
+    "decimal": "0.000839185907"
+   },
+   "degree": 4,
+   "fan_in": 1
+  },
+  {
+   "node": "num-integer 0.1.46",
+   "kept": {
+    "exact": "346095823489/445530493989000",
+    "decimal": "0.000776817363"
+   },
+   "degree": 4,
+   "fan_in": 4
+  },
+  {
+   "node": "inout 0.1.4",
+   "kept": {
+    "exact": "57122/74875185",
+    "decimal": "0.000762896279"
+   },
+   "degree": 4,
+   "fan_in": 1
+  },
+  {
+   "node": "proc-macro-crate 3.5.0",
+   "kept": {
+    "exact": "114244/170170875",
+    "decimal": "0.000671348725"
+   },
+   "degree": 4,
+   "fan_in": 1
+  },
+  {
+   "node": "synstructure 0.13.2",
+   "kept": {
+    "exact": "502851880311203612374733037916829/759845693156797363975708007812500000",
+    "decimal": "0.000661781576"
+   },
+   "degree": 4,
+   "fan_in": 3
+  },
+  {
+   "node": "sys_traits_macros 0.1.0",
+   "kept": {
+    "exact": "228488/351686475",
+    "decimal": "0.000649692315"
+   },
+   "degree": 4,
+   "fan_in": 1
+  },
+  {
+   "node": "windows-implement 0.60.2",
+   "kept": {
+    "exact": "1210547/2426510625",
+    "decimal": "0.000498883865"
+   },
+   "degree": 4,
+   "fan_in": 1
+  },
+  {
+   "node": "windows-interface 0.59.3",
+   "kept": {
+    "exact": "1210547/2426510625",
+    "decimal": "0.000498883865"
+   },
+   "degree": 4,
+   "fan_in": 1
+  },
+  {
+   "node": "windows-result 0.4.1",
+   "kept": {
+    "exact": "1210547/2426510625",
+    "decimal": "0.000498883865"
+   },
+   "degree": 4,
+   "fan_in": 1
+  },
+  {
+   "node": "windows-strings 0.5.1",
+   "kept": {
+    "exact": "1210547/2426510625",
+    "decimal": "0.000498883865"
+   },
+   "degree": 4,
+   "fan_in": 1
+  },
+  {
+   "node": "num-complex 0.4.6",
+   "kept": {
+    "exact": "57122/115716195",
+    "decimal": "0.000493638769"
+   },
+   "degree": 4,
+   "fan_in": 1
+  },
+  {
+   "node": "num-iter 0.1.45",
+   "kept": {
+    "exact": "57122/115716195",
+    "decimal": "0.000493638769"
+   },
+   "degree": 4,
+   "fan_in": 1
+  },
+  {
+   "node": "num-rational 0.4.2",
+   "kept": {
+    "exact": "57122/115716195",
+    "decimal": "0.000493638769"
+   },
+   "degree": 4,
+   "fan_in": 1
+  },
+  {
+   "node": "zerovec 0.11.5",
+   "kept": {
+    "exact": "11347571105034293831617448/28550294428865172022705078125",
+    "decimal": "0.000397458987"
+   },
+   "degree": 5,
+   "fan_in": 7
+  },
+  {
+   "node": "borrow-or-share 0.2.4",
+   "kept": {
+    "exact": "228488/578580975",
+    "decimal": "0.000394911015"
+   },
+   "degree": 4,
+   "fan_in": 1
+  },
+  {
+   "node": "ref-cast 1.0.25",
+   "kept": {
+    "exact": "228488/578580975",
+    "decimal": "0.000394911015"
+   },
+   "degree": 4,
+   "fan_in": 1
+  },
+  {
+   "node": "adler 1.0.2",
+   "kept": {
+    "exact": "1441232/3868551225",
+    "decimal": "0.000372550838"
+   },
+   "degree": 4,
+   "fan_in": 1
+  },
+  {
+   "node": "icu_collections 2.1.1",
+   "kept": {
+    "exact": "169933894807453673/465022826767898437500",
+    "decimal": "0.000365431297"
+   },
+   "degree": 5,
+   "fan_in": 2
+  },
+  {
+   "node": "icu_provider 2.1.1",
+   "kept": {
+    "exact": "169933894807453673/465022826767898437500",
+    "decimal": "0.000365431297"
+   },
+   "degree": 5,
+   "fan_in": 2
+  },
+  {
+   "node": "cexpr 0.6.0",
+   "kept": {
+    "exact": "33293/108073812",
+    "decimal": "0.000308057978"
+   },
+   "degree": 4,
+   "fan_in": 2
+  },
+  {
+   "node": "clang-sys 1.8.1",
+   "kept": {
+    "exact": "33293/108073812",
+    "decimal": "0.000308057978"
+   },
+   "degree": 4,
+   "fan_in": 2
+  },
+  {
+   "node": "itertools 0.13.0",
+   "kept": {
+    "exact": "33293/108073812",
+    "decimal": "0.000308057978"
+   },
+   "degree": 4,
+   "fan_in": 2
+  },
+  {
+   "node": "prettyplease 0.2.37",
+   "kept": {
+    "exact": "33293/108073812",
+    "decimal": "0.000308057978"
+   },
+   "degree": 4,
+   "fan_in": 2
+  },
+  {
+   "node": "semver 0.9.0",
+   "kept": {
+    "exact": "228488/773710245",
+    "decimal": "0.000295314689"
+   },
+   "degree": 4,
+   "fan_in": 1
+  },
+  {
+   "node": "simd-abstraction 0.7.1",
+   "kept": {
+    "exact": "228488/773710245",
+    "decimal": "0.000295314689"
+   },
+   "degree": 4,
+   "fan_in": 1
+  },
+  {
+   "node": "untrusted 0.9.0",
+   "kept": {
+    "exact": "74644803128961/260214793473250000",
+    "decimal": "0.000286858415"
+   },
+   "degree": 4,
+   "fan_in": 2
+  },
+  {
+   "node": "icu_locale_core 2.1.1",
+   "kept": {
+    "exact": "7894265633591407759/39785286290142421875000",
+    "decimal": "0.000198421738"
+   },
+   "degree": 5,
+   "fan_in": 2
+  },
+  {
+   "node": "zerotrie 0.2.3",
+   "kept": {
+    "exact": "7894265633591407759/39785286290142421875000",
+    "decimal": "0.000198421738"
+   },
+   "degree": 5,
+   "fan_in": 2
+  },
+  {
+   "node": "icu_properties_data 2.1.2",
+   "kept": {
+    "exact": "124672767972983906/665828138326763671875",
+    "decimal": "0.000187244667"
+   },
+   "degree": 5,
+   "fan_in": 1
+  },
+  {
+   "node": "winapi 0.3.9",
+   "kept": {
+    "exact": "720616/3868551225",
+    "decimal": "0.000186275419"
+   },
+   "degree": 4,
+   "fan_in": 1
+  },
+  {
+   "node": "icu_normalizer_data 2.1.1",
+   "kept": {
+    "exact": "19765194922546229/108953695362561328125",
+    "decimal": "0.000181409128"
+   },
+   "degree": 5,
+   "fan_in": 1
+  },
+  {
+   "node": "windows_aarch64_gnullvm 0.53.1",
+   "kept": {
+    "exact": "208047309340702864525321/1150551023028647625000000000",
+    "decimal": "0.000180824062"
+   },
+   "degree": 5,
+   "fan_in": 1
+  },
+  {
+   "node": "windows_aarch64_msvc 0.53.1",
+   "kept": {
+    "exact": "208047309340702864525321/1150551023028647625000000000",
+    "decimal": "0.000180824062"
+   },
+   "degree": 5,
+   "fan_in": 1
+  },
+  {
+   "node": "windows_i686_gnu 0.53.1",
+   "kept": {
+    "exact": "208047309340702864525321/1150551023028647625000000000",
+    "decimal": "0.000180824062"
+   },
+   "degree": 5,
+   "fan_in": 1
+  },
+  {
+   "node": "windows_i686_gnullvm 0.53.1",
+   "kept": {
+    "exact": "208047309340702864525321/1150551023028647625000000000",
+    "decimal": "0.000180824062"
+   },
+   "degree": 5,
+   "fan_in": 1
+  },
+  {
+   "node": "windows_i686_msvc 0.53.1",
+   "kept": {
+    "exact": "208047309340702864525321/1150551023028647625000000000",
+    "decimal": "0.000180824062"
+   },
+   "degree": 5,
+   "fan_in": 1
+  },
+  {
+   "node": "windows_x86_64_gnu 0.53.1",
+   "kept": {
+    "exact": "208047309340702864525321/1150551023028647625000000000",
+    "decimal": "0.000180824062"
+   },
+   "degree": 5,
+   "fan_in": 1
+  },
+  {
+   "node": "windows_x86_64_gnullvm 0.53.1",
+   "kept": {
+    "exact": "208047309340702864525321/1150551023028647625000000000",
+    "decimal": "0.000180824062"
+   },
+   "degree": 5,
+   "fan_in": 1
+  },
+  {
+   "node": "windows_x86_64_msvc 0.53.1",
+   "kept": {
+    "exact": "208047309340702864525321/1150551023028647625000000000",
+    "decimal": "0.000180824062"
+   },
+   "degree": 5,
+   "fan_in": 1
+  },
+  {
+   "node": "either 1.15.0",
+   "kept": {
+    "exact": "3327441/19813532200",
+    "decimal": "0.000167937800"
+   },
+   "degree": 4,
+   "fan_in": 2
+  },
+  {
+   "node": "toml_edit 0.25.11+spec-1.1.0",
+   "kept": {
+    "exact": "2970344/17867941875",
+    "decimal": "0.000166238732"
+   },
+   "degree": 5,
+   "fan_in": 1
+  },
+  {
+   "node": "once_cell_polyfill 1.70.2",
+   "kept": {
+    "exact": "742586/5003023725",
+    "decimal": "0.000148427439"
+   },
+   "degree": 5,
+   "fan_in": 1
+  },
+  {
+   "node": "proc-macro-rules-macros 0.4.0",
+   "kept": {
+    "exact": "228488/1899106965",
+    "decimal": "0.000120313392"
+   },
+   "degree": 4,
+   "fan_in": 1
+  },
+  {
+   "node": "fnv 1.0.7",
+   "kept": {
+    "exact": "356054260393/3400403044500000",
+    "decimal": "0.000104709429"
+   },
+   "degree": 4,
+   "fan_in": 1
+  },
+  {
+   "node": "windows-sys 0.52.0",
+   "kept": {
+    "exact": "21932596921261/209523599939500000",
+    "decimal": "0.000104678408"
+   },
+   "degree": 4,
+   "fan_in": 2
+  },
+  {
+   "node": "ref-cast-impl 1.0.25",
+   "kept": {
+    "exact": "5940688/60751002375",
+    "decimal": "9.779E-5"
+   },
+   "degree": 5,
+   "fan_in": 1
+  },
+  {
+   "node": "rustix 0.38.44",
+   "kept": {
+    "exact": "360308/3868551225",
+    "decimal": "9.314E-5"
+   },
+   "degree": 4,
+   "fan_in": 1
+  },
+  {
+   "node": "winsafe 0.0.19",
+   "kept": {
+    "exact": "360308/3868551225",
+    "decimal": "9.314E-5"
+   },
+   "degree": 4,
+   "fan_in": 1
+  },
+  {
+   "node": "tap 1.0.1",
+   "kept": {
+    "exact": "287807/3152152850",
+    "decimal": "9.130E-5"
+   },
+   "degree": 4,
+   "fan_in": 2
+  },
+  {
+   "node": "heck 0.4.1",
+   "kept": {
+    "exact": "575614/6447585375",
+    "decimal": "8.928E-5"
+   },
+   "degree": 4,
+   "fan_in": 1
+  },
+  {
+   "node": "zerofrom 0.1.6",
+   "kept": {
+    "exact": "86338804761763683197978216801/1027810599439146192817382812500000",
+    "decimal": "8.400E-5"
+   },
+   "degree": 6,
+   "fan_in": 5
+  },
+  {
+   "node": "yoke 0.8.1",
+   "kept": {
+    "exact": "6436568992522228310389121561/82224847955131695425390625000000",
+    "decimal": "7.828E-5"
+   },
+   "degree": 6,
+   "fan_in": 4
+  },
+  {
+   "node": "nom 7.1.3",
+   "kept": {
+    "exact": "432809/5673875130",
+    "decimal": "7.628E-5"
+   },
+   "degree": 5,
+   "fan_in": 1
+  },
+  {
+   "node": "funty 2.0.0",
+   "kept": {
+    "exact": "57122/773710245",
+    "decimal": "7.383E-5"
+   },
+   "degree": 4,
+   "fan_in": 1
+  },
+  {
+   "node": "radium 0.7.0",
+   "kept": {
+    "exact": "57122/773710245",
+    "decimal": "7.383E-5"
+   },
+   "degree": 4,
+   "fan_in": 1
+  },
+  {
+   "node": "wyz 0.5.1",
+   "kept": {
+    "exact": "57122/773710245",
+    "decimal": "7.383E-5"
+   },
+   "degree": 4,
+   "fan_in": 1
+  },
+  {
+   "node": "outref 0.1.0",
+   "kept": {
+    "exact": "5940688/81239575725",
+    "decimal": "7.313E-5"
+   },
+   "degree": 5,
+   "fan_in": 1
+  },
+  {
+   "node": "semver-parser 0.7.0",
+   "kept": {
+    "exact": "5940688/81239575725",
+    "decimal": "7.313E-5"
+   },
+   "degree": 5,
+   "fan_in": 1
+  },
+  {
+   "node": "zerovec-derive 0.11.2",
+   "kept": {
+    "exact": "295036848730891639622053648/8993342745092529187152099609375",
+    "decimal": "3.281E-5"
+   },
+   "degree": 6,
+   "fan_in": 1
+  },
+  {
+   "node": "windows-targets 0.52.6",
+   "kept": {
+    "exact": "285123759976393/10999988996823750000",
+    "decimal": "2.592E-5"
+   },
+   "degree": 5,
+   "fan_in": 1
+  },
+  {
+   "node": "libloading 0.8.9",
+   "kept": {
+    "exact": "432809/17021625390",
+    "decimal": "2.543E-5"
+   },
+   "degree": 5,
+   "fan_in": 1
+  },
+  {
+   "node": "winapi-i686-pc-windows-gnu 0.4.0",
+   "kept": {
+    "exact": "9368008/406197878625",
+    "decimal": "2.306E-5"
+   },
+   "degree": 5,
+   "fan_in": 1
+  },
+  {
+   "node": "winapi-x86_64-pc-windows-gnu 0.4.0",
+   "kept": {
+    "exact": "9368008/406197878625",
+    "decimal": "2.306E-5"
+   },
+   "degree": 5,
+   "fan_in": 1
+  },
+  {
+   "node": "writeable 0.6.2",
+   "kept": {
+    "exact": "164512032846422189981/7293969153192777343750000",
+    "decimal": "2.255E-5"
+   },
+   "degree": 6,
+   "fan_in": 2
+  },
+  {
+   "node": "zerofrom-derive 0.1.6",
+   "kept": {
+    "exact": "1122404461902927881573716818413/53960056470555175122912597656250000",
+    "decimal": "2.080E-5"
+   },
+   "degree": 7,
+   "fan_in": 1
+  },
+  {
+   "node": "potential_utf 0.1.4",
+   "kept": {
+    "exact": "2209140632496897749/122068492026573339843750",
+    "decimal": "1.810E-5"
+   },
+   "degree": 6,
+   "fan_in": 1
+  },
+  {
+   "node": "lru-slab 0.1.2",
+   "kept": {
+    "exact": "3978767/224403702600",
+    "decimal": "1.773E-5"
+   },
+   "degree": 4,
+   "fan_in": 1
+  },
+  {
+   "node": "rand 0.10.2",
+   "kept": {
+    "exact": "3978767/224403702600",
+    "decimal": "1.773E-5"
+   },
+   "degree": 4,
+   "fan_in": 1
+  },
+  {
+   "node": "rand_pcg 0.10.2",
+   "kept": {
+    "exact": "3978767/224403702600",
+    "decimal": "1.773E-5"
+   },
+   "degree": 4,
+   "fan_in": 1
+  },
+  {
+   "node": "winnow 1.0.2",
+   "kept": {
+    "exact": "48639383/3821754234375",
+    "decimal": "1.273E-5"
+   },
+   "degree": 6,
+   "fan_in": 2
+  },
+  {
+   "node": "toml_datetime 1.1.1+spec-1.1.0",
+   "kept": {
+    "exact": "19307236/1876133896875",
+    "decimal": "1.029E-5"
+   },
+   "degree": 6,
+   "fan_in": 1
+  },
+  {
+   "node": "toml_parser 1.1.2+spec-1.1.0",
+   "kept": {
+    "exact": "19307236/1876133896875",
+    "decimal": "1.029E-5"
+   },
+   "degree": 6,
+   "fan_in": 1
+  },
+  {
+   "node": "litemap 0.8.1",
+   "kept": {
+    "exact": "102625453236688300867/10443637651162385742187500",
+    "decimal": "9.827E-6"
+   },
+   "degree": 6,
+   "fan_in": 1
+  },
+  {
+   "node": "tinystr 0.8.2",
+   "kept": {
+    "exact": "102625453236688300867/10443637651162385742187500",
+    "decimal": "9.827E-6"
+   },
+   "degree": 6,
+   "fan_in": 1
+  },
+  {
+   "node": "minimal-lexical 0.2.1",
+   "kept": {
+    "exact": "5626517/595756888650",
+    "decimal": "9.444E-6"
+   },
+   "degree": 6,
+   "fan_in": 1
+  },
+  {
+   "node": "stable_deref_trait 1.2.1",
+   "kept": {
+    "exact": "83675396902788968035058580293/12950413552933242029499023437500000",
+    "decimal": "6.461E-6"
+   },
+   "degree": 7,
+   "fan_in": 1
+  },
+  {
+   "node": "yoke-derive 0.8.1",
+   "kept": {
+    "exact": "83675396902788968035058580293/12950413552933242029499023437500000",
+    "decimal": "6.461E-6"
+   },
+   "degree": 7,
+   "fan_in": 1
+  },
+  {
+   "node": "linux-raw-sys 0.4.15",
+   "kept": {
+    "exact": "9368008/2030989393125",
+    "decimal": "4.613E-6"
+   },
+   "degree": 5,
+   "fan_in": 1
+  },
+  {
+   "node": "chacha20 0.10.1",
+   "kept": {
+    "exact": "51723971/35343583159500",
+    "decimal": "1.463E-6"
+   },
+   "degree": 5,
+   "fan_in": 1
+  },
+  {
+   "node": "windows_aarch64_gnullvm 0.52.6",
+   "kept": {
+    "exact": "3706608879693109/4619995378665975000000",
+    "decimal": "8.023E-7"
+   },
+   "degree": 6,
+   "fan_in": 1
+  },
+  {
+   "node": "windows_aarch64_msvc 0.52.6",
+   "kept": {
+    "exact": "3706608879693109/4619995378665975000000",
+    "decimal": "8.023E-7"
+   },
+   "degree": 6,
+   "fan_in": 1
+  },
+  {
+   "node": "windows_i686_gnu 0.52.6",
+   "kept": {
+    "exact": "3706608879693109/4619995378665975000000",
+    "decimal": "8.023E-7"
+   },
+   "degree": 6,
+   "fan_in": 1
+  },
+  {
+   "node": "windows_i686_gnullvm 0.52.6",
+   "kept": {
+    "exact": "3706608879693109/4619995378665975000000",
+    "decimal": "8.023E-7"
+   },
+   "degree": 6,
+   "fan_in": 1
+  },
+  {
+   "node": "windows_i686_msvc 0.52.6",
+   "kept": {
+    "exact": "3706608879693109/4619995378665975000000",
+    "decimal": "8.023E-7"
+   },
+   "degree": 6,
+   "fan_in": 1
+  },
+  {
+   "node": "windows_x86_64_gnu 0.52.6",
+   "kept": {
+    "exact": "3706608879693109/4619995378665975000000",
+    "decimal": "8.023E-7"
+   },
+   "degree": 6,
+   "fan_in": 1
+  },
+  {
+   "node": "windows_x86_64_gnullvm 0.52.6",
+   "kept": {
+    "exact": "3706608879693109/4619995378665975000000",
+    "decimal": "8.023E-7"
+   },
+   "degree": 6,
+   "fan_in": 1
+  },
+  {
+   "node": "windows_x86_64_msvc 0.52.6",
+   "kept": {
+    "exact": "3706608879693109/4619995378665975000000",
+    "decimal": "8.023E-7"
+   },
+   "degree": 6,
+   "fan_in": 1
+  }
+ ],
+ "tiers": {
+  "rust-ecosystem-commons": {
+   "received": {
+    "exact": "32290370328697490224283424581401065679425457295265707122211/699766828716584042600333481283497262558593750000000000000",
+    "decimal": "46.144471277554"
+   },
+   "kept": {
+    "exact": "32290370328697490224283424581401065679425457295265707122211/1049650243074876063900500221925245893837890625000000000000",
+    "decimal": "30.762980851703"
+   },
+   "passed_up": {
+    "exact": "32290370328697490224283424581401065679425457295265707122211/2099300486149752127801000443850491787675781250000000000000",
+    "decimal": "15.381490425851"
+   },
+   "kept_by_reason": {
+    "positional": {
+     "exact": "46132349352768704437775173550512241199960497303297342669839/3148950729224628191701500665775737681513671875000000000000",
+     "decimal": "14.650070235976"
+    },
+    "no-record": {
+     "exact": "73963209378022982849963702906255037665183490645043409179/4590307185458641678865161320372795454101562500000000000",
+     "decimal": "16.112910615727"
+    },
+    "below-floor": {
+     "exact": "0",
+     "decimal": "0.000000000000"
+    }
+   }
+  },
+  "software-commons": {
+   "received": {
+    "exact": "32290370328697490224283424581401065679425457295265707122211/2099300486149752127801000443850491787675781250000000000000",
+    "decimal": "15.381490425851"
+   },
+   "kept": {
+    "exact": "32290370328697490224283424581401065679425457295265707122211/3148950729224628191701500665775737681513671875000000000000",
+    "decimal": "10.254326950568"
+   },
+   "passed_up": {
+    "exact": "32290370328697490224283424581401065679425457295265707122211/6297901458449256383403001331551475363027343750000000000000",
+    "decimal": "5.127163475284"
+   },
+   "kept_by_reason": {
+    "positional": {
+     "exact": "46132349352768704437775173550512241199960497303297342669839/9446852187673884575104501997327213044541015625000000000000",
+     "decimal": "4.883356745325"
+    },
+    "no-record": {
+     "exact": "73963209378022982849963702906255037665183490645043409179/13770921556375925036595483961118386362304687500000000000",
+     "decimal": "5.370970205242"
+    },
+    "below-floor": {
+     "exact": "0",
+     "decimal": "0.000000000000"
+    }
+   }
+  },
+  "planetary-commons": {
+   "received": {
+    "exact": "32290370328697490224283424581401065679425457295265707122211/6297901458449256383403001331551475363027343750000000000000",
+    "decimal": "5.127163475284"
+   },
+   "kept": {
+    "exact": "32290370328697490224283424581401065679425457295265707122211/6297901458449256383403001331551475363027343750000000000000",
+    "decimal": "5.127163475284"
+   },
+   "passed_up": {
+    "exact": "0",
+    "decimal": "0.000000000000"
+   },
+   "kept_by_reason": {
+    "positional": {
+     "exact": "46132349352768704437775173550512241199960497303297342669839/18893704375347769150209003994654426089082031250000000000000",
+     "decimal": "2.441678372663"
+    },
+    "no-record": {
+     "exact": "73963209378022982849963702906255037665183490645043409179/27541843112751850073190967922236772724609375000000000000",
+     "decimal": "2.685485102621"
+    },
+    "below-floor": {
+     "exact": "0",
+     "decimal": "0.000000000000"
+    }
+   }
+  }
+ },
+ "unexplained_descent": [
+  {
+   "from": "hex 0.4.3",
+   "kind": "no-record",
+   "reason": "descent:hex 0.4.3 has no recorded reliance",
+   "amount": {
+    "exact": "325/147",
+    "decimal": "2.210884353741"
+   }
+  },
+  {
+   "from": "matchit 0.7.3",
+   "kind": "no-record",
+   "reason": "descent:matchit 0.7.3 has no recorded reliance",
+   "amount": {
+    "exact": "65/3087",
+    "decimal": "0.021056041464"
+   }
+  },
+  {
+   "from": "matchit 0.8.4",
+   "kind": "no-record",
+   "reason": "descent:matchit 0.8.4 has no recorded reliance",
+   "amount": {
+    "exact": "338/15435",
+    "decimal": "0.021898283123"
+   }
+  },
+  {
+   "from": "hashbrown 0.14.5",
+   "kind": "no-record",
+   "reason": "descent:hashbrown 0.14.5 has no recorded reliance",
+   "amount": {
+    "exact": "845/9261",
+    "decimal": "0.091242846345"
+   }
+  },
+  {
+   "from": "anyhow 1.0.100",
+   "kind": "no-record",
+   "reason": "descent:anyhow 1.0.100 has no recorded reliance",
+   "amount": {
+    "exact": "147645/66836",
+    "decimal": "2.209063977497"
+   }
+  },
+  {
+   "from": "az 1.3.0",
+   "kind": "no-record",
+   "reason": "descent:az 1.3.0 has no recorded reliance",
+   "amount": {
+    "exact": "1690/95697",
+    "decimal": "0.017659905744"
+   }
+  },
+  {
+   "from": "cooked-waker 5.0.0",
+   "kind": "no-record",
+   "reason": "descent:cooked-waker 5.0.0 has no recorded reliance",
+   "amount": {
+    "exact": "1690/95697",
+    "decimal": "0.017659905744"
+   }
+  },
+  {
+   "from": "deno_core_icudata 0.74.0",
+   "kind": "no-record",
+   "reason": "descent:deno_core_icudata 0.74.0 has no recorded reliance",
+   "amount": {
+    "exact": "1690/95697",
+    "decimal": "0.017659905744"
+   }
+  },
+  {
+   "from": "static_assertions 1.1.0",
+   "kind": "no-record",
+   "reason": "descent:static_assertions 1.1.0 has no recorded reliance",
+   "amount": {
+    "exact": "1690/95697",
+    "decimal": "0.017659905744"
+   }
+  },
+  {
+   "from": "bytecount 0.6.9",
+   "kind": "no-record",
+   "reason": "descent:bytecount 0.6.9 has no recorded reliance",
+   "amount": {
+    "exact": "1690/52479",
+    "decimal": "0.032203357533"
+   }
+  },
+  {
+   "from": "num-cmp 0.1.0",
+   "kind": "no-record",
+   "reason": "descent:num-cmp 0.1.0 has no recorded reliance",
+   "amount": {
+    "exact": "1690/52479",
+    "decimal": "0.032203357533"
+   }
+  },
+  {
+   "from": "fallible-iterator 0.3.0",
+   "kind": "no-record",
+   "reason": "descent:fallible-iterator 0.3.0 has no recorded reliance",
+   "amount": {
+    "exact": "845/9261",
+    "decimal": "0.091242846345"
+   }
+  },
+  {
+   "from": "fallible-streaming-iterator 0.1.9",
+   "kind": "no-record",
+   "reason": "descent:fallible-streaming-iterator 0.1.9 has no recorded reliance",
+   "amount": {
+    "exact": "845/9261",
+    "decimal": "0.091242846345"
+   }
+  },
+  {
+   "from": "unsafe-libyaml 0.2.11",
+   "kind": "no-record",
+   "reason": "descent:unsafe-libyaml 0.2.11 has no recorded reliance",
+   "amount": {
+    "exact": "338/3087",
+    "decimal": "0.109491415614"
+   }
+  },
+  {
+   "from": "fastrand 2.4.1",
+   "kind": "no-record",
+   "reason": "descent:fastrand 2.4.1 has no recorded reliance",
+   "amount": {
+    "exact": "338/3087",
+    "decimal": "0.109491415614"
+   }
+  },
+  {
+   "from": "constant_time_eq 0.3.1",
+   "kind": "no-record",
+   "reason": "descent:constant_time_eq 0.3.1 has no recorded reliance",
+   "amount": {
+    "exact": "845/33957",
+    "decimal": "0.024884412640"
+   }
+  },
+  {
+   "from": "crossbeam-utils 0.8.21",
+   "kind": "no-record",
+   "reason": "descent:crossbeam-utils 0.8.21 has no recorded reliance",
+   "amount": {
+    "exact": "195/1694",
+    "decimal": "0.115112160567"
+   }
+  },
+  {
+   "from": "deflate64 0.1.12",
+   "kind": "no-record",
+   "reason": "descent:deflate64 0.1.12 has no recorded reliance",
+   "amount": {
+    "exact": "845/33957",
+    "decimal": "0.024884412640"
+   }
+  },
+  {
+   "from": "mime 0.3.17",
+   "kind": "no-record",
+   "reason": "descent:mime 0.3.17 has no recorded reliance",
+   "amount": {
+    "exact": "1743799/40748400",
+    "decimal": "0.042794293764"
+   }
+  },
+  {
+   "from": "clap_lex 1.1.0",
+   "kind": "no-record",
+   "reason": "descent:clap_lex 1.1.0 has no recorded reliance",
+   "amount": {
+    "exact": "2197/129654",
+    "decimal": "0.016945100035"
+   }
+  },
+  {
+   "from": "strsim 0.11.1",
+   "kind": "no-record",
+   "reason": "descent:strsim 0.11.1 has no recorded reliance",
+   "amount": {
+    "exact": "2197/129654",
+    "decimal": "0.016945100035"
+   }
+  },
+  {
+   "from": "heck 0.5.0",
+   "kind": "no-record",
+   "reason": "descent:heck 0.5.0 has no recorded reliance",
+   "amount": {
+    "exact": "2197/129654",
+    "decimal": "0.016945100035"
+   }
+  },
+  {
+   "from": "bit-vec 0.6.3",
+   "kind": "no-record",
+   "reason": "descent:bit-vec 0.6.3 has no recorded reliance",
+   "amount": {
+    "exact": "5109/233926",
+    "decimal": "0.021840240076"
+   }
+  },
+  {
+   "from": "stringcase 0.3.0",
+   "kind": "no-record",
+   "reason": "descent:stringcase 0.3.0 has no recorded reliance",
+   "amount": {
+    "exact": "8788/18086733",
+    "decimal": "0.000485881005"
+   }
+  },
+  {
+   "from": "if_chain 1.0.3",
+   "kind": "no-record",
+   "reason": "descent:if_chain 1.0.3 has no recorded reliance",
+   "amount": {
+    "exact": "8788/22106007",
+    "decimal": "0.000397539004"
+   }
+  },
+  {
+   "from": "unicode-id-start 1.4.0",
+   "kind": "no-record",
+   "reason": "descent:unicode-id-start 1.4.0 has no recorded reliance",
+   "amount": {
+    "exact": "8788/22106007",
+    "decimal": "0.000397539004"
+   }
+  },
+  {
+   "from": "fiat-crypto 0.2.9",
+   "kind": "no-record",
+   "reason": "descent:fiat-crypto 0.2.9 has no recorded reliance",
+   "amount": {
+    "exact": "2197/907578",
+    "decimal": "0.002420728576"
+   }
+  },
+  {
+   "from": "outref 0.5.2",
+   "kind": "no-record",
+   "reason": "descent:outref 0.5.2 has no recorded reliance",
+   "amount": {
+    "exact": "8788/3306177",
+    "decimal": "0.002658054908"
+   }
+  },
+  {
+   "from": "vsimd 0.8.0",
+   "kind": "no-record",
+   "reason": "descent:vsimd 0.8.0 has no recorded reliance",
+   "amount": {
+    "exact": "8788/3306177",
+    "decimal": "0.002658054908"
+   }
+  },
+  {
+   "from": "arrayref 0.3.9",
+   "kind": "no-record",
+   "reason": "descent:arrayref 0.3.9 has no recorded reliance",
+   "amount": {
+    "exact": "21080/111573",
+    "decimal": "0.188934598872"
+   }
+  },
+  {
+   "from": "arrayvec 0.7.6",
+   "kind": "no-record",
+   "reason": "descent:arrayvec 0.7.6 has no recorded reliance",
+   "amount": {
+    "exact": "21080/111573",
+    "decimal": "0.188934598872"
+   }
+  },
+  {
+   "from": "constant_time_eq 0.4.2",
+   "kind": "no-record",
+   "reason": "descent:constant_time_eq 0.4.2 has no recorded reliance",
+   "amount": {
+    "exact": "21080/111573",
+    "decimal": "0.188934598872"
+   }
+  },
+  {
+   "from": "vcpkg 0.2.15",
+   "kind": "no-record",
+   "reason": "descent:vcpkg 0.2.15 has no recorded reliance",
+   "amount": {
+    "exact": "4394/583443",
+    "decimal": "0.007531155571"
+   }
+  },
+  {
+   "from": "linux-raw-sys 0.11.0",
+   "kind": "no-record",
+   "reason": "descent:linux-raw-sys 0.11.0 has no recorded reliance",
+   "amount": {
+    "exact": "21489/188650",
+    "decimal": "0.113909355950"
+   }
+  },
+  {
+   "from": "deadpool-runtime 0.1.4",
+   "kind": "no-record",
+   "reason": "descent:deadpool-runtime 0.1.4 has no recorded reliance",
+   "amount": {
+    "exact": "2197/972405",
+    "decimal": "0.002259346671"
+   }
+  },
+  {
+   "from": "lazy_static 1.5.0",
+   "kind": "no-record",
+   "reason": "descent:lazy_static 1.5.0 has no recorded reliance",
+   "amount": {
+    "exact": "4767919/37784880",
+    "decimal": "0.126185897639"
+   }
+  },
+  {
+   "from": "byteorder 1.5.0",
+   "kind": "no-record",
+   "reason": "descent:byteorder 1.5.0 has no recorded reliance",
+   "amount": {
+    "exact": "2197/713097",
+    "decimal": "0.003080927279"
+   }
+  },
+  {
+   "from": "deranged 0.5.8",
+   "kind": "no-record",
+   "reason": "descent:deranged 0.5.8 has no recorded reliance",
+   "amount": {
+    "exact": "4394/3565485",
+    "decimal": "0.001232370912"
+   }
+  },
+  {
+   "from": "num-conv 0.2.2",
+   "kind": "no-record",
+   "reason": "descent:num-conv 0.2.2 has no recorded reliance",
+   "amount": {
+    "exact": "4394/3565485",
+    "decimal": "0.001232370912"
+   }
+  },
+  {
+   "from": "powerfmt 0.2.0",
+   "kind": "no-record",
+   "reason": "descent:powerfmt 0.2.0 has no recorded reliance",
+   "amount": {
+    "exact": "4394/3565485",
+    "decimal": "0.001232370912"
+   }
+  },
+  {
+   "from": "time-core 0.1.9",
+   "kind": "no-record",
+   "reason": "descent:time-core 0.1.9 has no recorded reliance",
+   "amount": {
+    "exact": "4394/3565485",
+    "decimal": "0.001232370912"
+   }
+  },
+  {
+   "from": "colorchoice 1.0.5",
+   "kind": "no-record",
+   "reason": "descent:colorchoice 1.0.5 has no recorded reliance",
+   "amount": {
+    "exact": "28561/47647845",
+    "decimal": "0.000599418505"
+   }
+  },
+  {
+   "from": "is_terminal_polyfill 1.70.2",
+   "kind": "no-record",
+   "reason": "descent:is_terminal_polyfill 1.70.2 has no recorded reliance",
+   "amount": {
+    "exact": "28561/47647845",
+    "decimal": "0.000599418505"
+   }
+  },
+  {
+   "from": "paste 1.0.15",
+   "kind": "no-record",
+   "reason": "descent:paste 1.0.15 has no recorded reliance",
+   "amount": {
+    "exact": "55432/110530035",
+    "decimal": "0.000501510743"
+   }
+  },
+  {
+   "from": "funty 2.0.0",
+   "kind": "no-record",
+   "reason": "descent:funty 2.0.0 has no recorded reliance",
+   "amount": {
+    "exact": "57122/2321130735",
+    "decimal": "2.461E-5"
+   }
+  },
+  {
+   "from": "radium 0.7.0",
+   "kind": "no-record",
+   "reason": "descent:radium 0.7.0 has no recorded reliance",
+   "amount": {
+    "exact": "57122/2321130735",
+    "decimal": "2.461E-5"
+   }
+  },
+  {
+   "from": "semver 1.0.28",
+   "kind": "no-record",
+   "reason": "descent:semver 1.0.28 has no recorded reliance",
+   "amount": {
+    "exact": "28561/47647845",
+    "decimal": "0.000599418505"
+   }
+  },
+  {
+   "from": "bit-vec 0.8.0",
+   "kind": "no-record",
+   "reason": "descent:bit-vec 0.8.0 has no recorded reliance",
+   "amount": {
+    "exact": "228488/347148585",
+    "decimal": "0.000658185025"
+   }
+  },
+  {
+   "from": "borrow-or-share 0.2.4",
+   "kind": "no-record",
+   "reason": "descent:borrow-or-share 0.2.4 has no recorded reliance",
+   "amount": {
+    "exact": "228488/1735742925",
+    "decimal": "0.000131637005"
+   }
+  },
+  {
+   "from": "ryu 1.0.22",
+   "kind": "no-record",
+   "reason": "descent:ryu 1.0.22 has no recorded reliance",
+   "amount": {
+    "exact": "1767196863/15764025200",
+    "decimal": "0.112103148820"
+   }
+  },
+  {
+   "from": "foldhash 0.1.5",
+   "kind": "no-record",
+   "reason": "descent:foldhash 0.1.5 has no recorded reliance",
+   "amount": {
+    "exact": "114244/20420505",
+    "decimal": "0.005594572710"
+   }
+  },
+  {
+   "from": "core-foundation-sys 0.8.7",
+   "kind": "no-record",
+   "reason": "descent:core-foundation-sys 0.8.7 has no recorded reliance",
+   "amount": {
+    "exact": "93119/27731550",
+    "decimal": "0.003357872171"
+   }
+  },
+  {
+   "from": "hermit-abi 0.5.2",
+   "kind": "no-record",
+   "reason": "descent:hermit-abi 0.5.2 has no recorded reliance",
+   "amount": {
+    "exact": "28561/102102525",
+    "decimal": "0.000279728636"
+   }
+  },
+  {
+   "from": "adler2 2.0.1",
+   "kind": "no-record",
+   "reason": "descent:adler2 2.0.1 has no recorded reliance",
+   "amount": {
+    "exact": "28561/74875185",
+    "decimal": "0.000381448139"
+   }
+  },
+  {
+   "from": "simd-adler32 0.3.9",
+   "kind": "no-record",
+   "reason": "descent:simd-adler32 0.3.9 has no recorded reliance",
+   "amount": {
+    "exact": "22139/11620840",
+    "decimal": "0.001905111851"
+   }
+  },
+  {
+   "from": "crc-catalog 2.5.0",
+   "kind": "no-record",
+   "reason": "descent:crc-catalog 2.5.0 has no recorded reliance",
+   "amount": {
+    "exact": "57122/74875185",
+    "decimal": "0.000762896279"
+   }
+  },
+  {
+   "from": "utf8parse 0.2.2",
+   "kind": "no-record",
+   "reason": "descent:utf8parse 0.2.2 has no recorded reliance",
+   "amount": {
+    "exact": "287807/388241700",
+    "decimal": "0.000741308829"
+   }
+  },
+  {
+   "from": "anstyle 1.0.14",
+   "kind": "no-record",
+   "reason": "descent:anstyle 1.0.14 has no recorded reliance",
+   "amount": {
+    "exact": "40626079/2348358075",
+    "decimal": "0.017299780401"
+   }
+  },
+  {
+   "from": "once_cell_polyfill 1.70.2",
+   "kind": "no-record",
+   "reason": "descent:once_cell_polyfill 1.70.2 has no recorded reliance",
+   "amount": {
+    "exact": "742586/15009071175",
+    "decimal": "4.948E-5"
+   }
+  },
+  {
+   "from": "heck 0.4.1",
+   "kind": "no-record",
+   "reason": "descent:heck 0.4.1 has no recorded reliance",
+   "amount": {
+    "exact": "575614/19342756125",
+    "decimal": "2.976E-5"
+   }
+  },
+  {
+   "from": "rustc-hash 1.1.0",
+   "kind": "no-record",
+   "reason": "descent:rustc-hash 1.1.0 has no recorded reliance",
+   "amount": {
+    "exact": "273104/675461325",
+    "decimal": "0.000404322187"
+   }
+  },
+  {
+   "from": "adler 1.0.2",
+   "kind": "no-record",
+   "reason": "descent:adler 1.0.2 has no recorded reliance",
+   "amount": {
+    "exact": "1441232/11605653675",
+    "decimal": "0.000124183613"
+   }
+  },
+  {
+   "from": "winsafe 0.0.19",
+   "kind": "no-record",
+   "reason": "descent:winsafe 0.0.19 has no recorded reliance",
+   "amount": {
+    "exact": "360308/11605653675",
+    "decimal": "3.105E-5"
+   }
+  },
+  {
+   "from": "outref 0.1.0",
+   "kind": "no-record",
+   "reason": "descent:outref 0.1.0 has no recorded reliance",
+   "amount": {
+    "exact": "5940688/243718727175",
+    "decimal": "2.438E-5"
+   }
+  },
+  {
+   "from": "tap 1.0.1",
+   "kind": "no-record",
+   "reason": "descent:tap 1.0.1 has no recorded reliance",
+   "amount": {
+    "exact": "287807/9456458550",
+    "decimal": "3.043E-5"
+   }
+  },
+  {
+   "from": "semver-parser 0.7.0",
+   "kind": "no-record",
+   "reason": "descent:semver-parser 0.7.0 has no recorded reliance",
+   "amount": {
+    "exact": "5940688/243718727175",
+    "decimal": "2.438E-5"
+   }
+  },
+  {
+   "from": "zmij 1.0.13",
+   "kind": "no-record",
+   "reason": "descent:zmij 1.0.13 has no recorded reliance",
+   "amount": {
+    "exact": "302765346590291/3066545291040000",
+    "decimal": "0.098731738114"
+   }
+  },
+  {
+   "from": "base64 0.22.1",
+   "kind": "no-record",
+   "reason": "descent:base64 0.22.1 has no recorded reliance",
+   "amount": {
+    "exact": "8568734501/3848460000",
+    "decimal": "2.226535939311"
+   }
+  },
+  {
+   "from": "ipnet 2.11.0",
+   "kind": "no-record",
+   "reason": "descent:ipnet 2.11.0 has no recorded reliance",
+   "amount": {
+    "exact": "396055907/274780044000",
+    "decimal": "0.001441356152"
+   }
+  },
+  {
+   "from": "lru-slab 0.1.2",
+   "kind": "no-record",
+   "reason": "descent:lru-slab 0.1.2 has no recorded reliance",
+   "amount": {
+    "exact": "3978767/673211107800",
+    "decimal": "5.910E-6"
+   }
+  },
+  {
+   "from": "rustc-hash 2.1.1",
+   "kind": "no-record",
+   "reason": "descent:rustc-hash 2.1.1 has no recorded reliance",
+   "amount": {
+    "exact": "2429869/5703155325",
+    "decimal": "0.000426056956"
+   }
+  },
+  {
+   "from": "cfg_aliases 0.2.1",
+   "kind": "no-record",
+   "reason": "descent:cfg_aliases 0.2.1 has no recorded reliance",
+   "amount": {
+    "exact": "761314151/5642804475",
+    "decimal": "0.134917691083"
+   }
+  },
+  {
+   "from": "tower-layer 0.3.3",
+   "kind": "no-record",
+   "reason": "descent:tower-layer 0.3.3 has no recorded reliance",
+   "amount": {
+    "exact": "276093044719/2551528980000",
+    "decimal": "0.108206901385"
+   }
+  },
+  {
+   "from": "tower-service 0.3.3",
+   "kind": "no-record",
+   "reason": "descent:tower-service 0.3.3 has no recorded reliance",
+   "amount": {
+    "exact": "41357339581/334816020000",
+    "decimal": "0.123522582883"
+   }
+  },
+  {
+   "from": "base16ct 0.2.0",
+   "kind": "no-record",
+   "reason": "descent:base16ct 0.2.0 has no recorded reliance",
+   "amount": {
+    "exact": "123656/30682575",
+    "decimal": "0.004030170219"
+   }
+  },
+  {
+   "from": "base-x 0.2.11",
+   "kind": "no-record",
+   "reason": "descent:base-x 0.2.11 has no recorded reliance",
+   "amount": {
+    "exact": "1414361/232416800",
+    "decimal": "0.006085450794"
+   }
+  },
+  {
+   "from": "unsigned-varint 0.8.0",
+   "kind": "no-record",
+   "reason": "descent:unsigned-varint 0.8.0 has no recorded reliance",
+   "amount": {
+    "exact": "1699933923/16069961600",
+    "decimal": "0.105783322034"
+   }
+  },
+  {
+   "from": "pkg-config 0.3.33",
+   "kind": "no-record",
+   "reason": "descent:pkg-config 0.3.33 has no recorded reliance",
+   "amount": {
+    "exact": "9855911/1123127775",
+    "decimal": "0.008775413821"
+   }
+  },
+  {
+   "from": "glob 0.3.3",
+   "kind": "no-record",
+   "reason": "descent:glob 0.3.3 has no recorded reliance",
+   "amount": {
+    "exact": "3787406211829/1750795754400",
+    "decimal": "2.163248455630"
+   }
+  },
+  {
+   "from": "either 1.15.0",
+   "kind": "no-record",
+   "reason": "descent:either 1.15.0 has no recorded reliance",
+   "amount": {
+    "exact": "1109147/19813532200",
+    "decimal": "5.598E-5"
+   }
+  },
+  {
+   "from": "winapi-i686-pc-windows-gnu 0.4.0",
+   "kind": "no-record",
+   "reason": "descent:winapi-i686-pc-windows-gnu 0.4.0 has no recorded reliance",
+   "amount": {
+    "exact": "9368008/1218593635875",
+    "decimal": "7.688E-6"
+   }
+  },
+  {
+   "from": "winapi-x86_64-pc-windows-gnu 0.4.0",
+   "kind": "no-record",
+   "reason": "descent:winapi-x86_64-pc-windows-gnu 0.4.0 has no recorded reliance",
+   "amount": {
+    "exact": "9368008/1218593635875",
+    "decimal": "7.688E-6"
+   }
+  },
+  {
+   "from": "linux-raw-sys 0.4.15",
+   "kind": "no-record",
+   "reason": "descent:linux-raw-sys 0.4.15 has no recorded reliance",
+   "amount": {
+    "exact": "9368008/6092968179375",
+    "decimal": "1.538E-6"
+   }
+  },
+  {
+   "from": "percent-encoding 2.3.2",
+   "kind": "no-record",
+   "reason": "descent:percent-encoding 2.3.2 has no recorded reliance",
+   "amount": {
+    "exact": "2726389864199187647/11173333263246000000",
+    "decimal": "0.244008640928"
+   }
+  },
+  {
+   "from": "utf8_iter 1.0.4",
+   "kind": "no-record",
+   "reason": "descent:utf8_iter 1.0.4 has no recorded reliance",
+   "amount": {
+    "exact": "116953816109741/9882421348078125",
+    "decimal": "0.011834530424"
+   }
+  },
+  {
+   "from": "httparse 1.10.1",
+   "kind": "no-record",
+   "reason": "descent:httparse 1.10.1 has no recorded reliance",
+   "amount": {
+    "exact": "27388789261/17664431400000",
+    "decimal": "0.001550505003"
+   }
+  },
+  {
+   "from": "httpdate 1.0.3",
+   "kind": "no-record",
+   "reason": "descent:httpdate 1.0.3 has no recorded reliance",
+   "amount": {
+    "exact": "27388789261/17664431400000",
+    "decimal": "0.001550505003"
+   }
+  },
+  {
+   "from": "tinyvec_macros 0.1.1",
+   "kind": "no-record",
+   "reason": "descent:tinyvec_macros 0.1.1 has no recorded reliance",
+   "amount": {
+    "exact": "737112350767/2764974192750",
+    "decimal": "0.266589233527"
+   }
+  },
+  {
+   "from": "futures-io 0.3.31",
+   "kind": "no-record",
+   "reason": "descent:futures-io 0.3.31 has no recorded reliance",
+   "amount": {
+    "exact": "19546382457153/235236463000000",
+    "decimal": "0.083092485782"
+   }
+  },
+  {
+   "from": "futures-task 0.3.31",
+   "kind": "no-record",
+   "reason": "descent:futures-task 0.3.31 has no recorded reliance",
+   "amount": {
+    "exact": "71213019397794293/801790118427375000",
+    "decimal": "0.088817531872"
+   }
+  },
+  {
+   "from": "pin-utils 0.1.0",
+   "kind": "no-record",
+   "reason": "descent:pin-utils 0.1.0 has no recorded reliance",
+   "amount": {
+    "exact": "12868176671664331/1969399668236000000",
+    "decimal": "0.006534060546"
+   }
+  },
+  {
+   "from": "subtle 2.6.1",
+   "kind": "no-record",
+   "reason": "descent:subtle 2.6.1 has no recorded reliance",
+   "amount": {
+    "exact": "14198946813962923/150161798445120000",
+    "decimal": "0.094557650221"
+   }
+  },
+  {
+   "from": "const-str 0.4.3",
+   "kind": "no-record",
+   "reason": "descent:const-str 0.4.3 has no recorded reliance",
+   "amount": {
+    "exact": "18386693/24403764000",
+    "decimal": "0.000753436765"
+   }
+  },
+  {
+   "from": "minimal-lexical 0.2.1",
+   "kind": "no-record",
+   "reason": "descent:minimal-lexical 0.2.1 has no recorded reliance",
+   "amount": {
+    "exact": "5626517/1787270665950",
+    "decimal": "3.148E-6"
+   }
+  },
+  {
+   "from": "regex-syntax 0.8.8",
+   "kind": "no-record",
+   "reason": "descent:regex-syntax 0.8.8 has no recorded reliance",
+   "amount": {
+    "exact": "20140233688679/480081838420800",
+    "decimal": "0.041951667563"
+   }
+  },
+  {
+   "from": "atomic-waker 1.1.2",
+   "kind": "no-record",
+   "reason": "descent:atomic-waker 1.1.2 has no recorded reliance",
+   "amount": {
+    "exact": "32346160117241/20582333772000000",
+    "decimal": "0.001571549683"
+   }
+  },
+  {
+   "from": "fnv 1.0.7",
+   "kind": "no-record",
+   "reason": "descent:fnv 1.0.7 has no recorded reliance",
+   "amount": {
+    "exact": "356054260393/10201209133500000",
+    "decimal": "3.490E-5"
+   }
+  },
+  {
+   "from": "slab 0.4.11",
+   "kind": "no-record",
+   "reason": "descent:slab 0.4.11 has no recorded reliance",
+   "amount": {
+    "exact": "4319060344403498621/864329747664710250000",
+    "decimal": "0.004997005317"
+   }
+  },
+  {
+   "from": "try-lock 0.2.5",
+   "kind": "no-record",
+   "reason": "descent:try-lock 0.2.5 has no recorded reliance",
+   "amount": {
+    "exact": "356054260393/927382648500000",
+    "decimal": "0.000383934572"
+   }
+  },
+  {
+   "from": "r-efi 6.0.0",
+   "kind": "no-record",
+   "reason": "descent:r-efi 6.0.0 has no recorded reliance",
+   "amount": {
+    "exact": "2110933679777/475072838572500",
+    "decimal": "0.004443389536"
+   }
+  },
+  {
+   "from": "rand_core 0.10.1",
+   "kind": "no-record",
+   "reason": "descent:rand_core 0.10.1 has no recorded reliance",
+   "amount": {
+    "exact": "7617875377122751/1755869211363960000",
+    "decimal": "0.004338520960"
+   }
+  },
+  {
+   "from": "base64ct 1.8.3",
+   "kind": "no-record",
+   "reason": "descent:base64ct 1.8.3 has no recorded reliance",
+   "amount": {
+    "exact": "17643715427/20747557215000",
+    "decimal": "0.000850399652"
+   }
+  },
+  {
+   "from": "data-encoding 2.10.0",
+   "kind": "no-record",
+   "reason": "descent:data-encoding 2.10.0 has no recorded reliance",
+   "amount": {
+    "exact": "3896462087531/544692012480000",
+    "decimal": "0.007153514276"
+   }
+  },
+  {
+   "from": "icu_normalizer_data 2.1.1",
+   "kind": "no-record",
+   "reason": "descent:icu_normalizer_data 2.1.1 has no recorded reliance",
+   "amount": {
+    "exact": "19765194922546229/326861086087683984375",
+    "decimal": "6.047E-5"
+   }
+  },
+  {
+   "from": "autocfg 1.5.0",
+   "kind": "no-record",
+   "reason": "descent:autocfg 1.5.0 has no recorded reliance",
+   "amount": {
+    "exact": "108111144992900384/4076007327373471875",
+    "decimal": "0.026523785732"
+   }
+  },
+  {
+   "from": "equivalent 1.0.2",
+   "kind": "no-record",
+   "reason": "descent:equivalent 1.0.2 has no recorded reliance",
+   "amount": {
+    "exact": "1962538035908994934013/65895194955277091250000",
+    "decimal": "0.029782718410"
+   }
+  },
+  {
+   "from": "hashbrown 0.16.1",
+   "kind": "no-record",
+   "reason": "descent:hashbrown 0.16.1 has no recorded reliance",
+   "amount": {
+    "exact": "1962538035908994934013/65895194955277091250000",
+    "decimal": "0.029782718410"
+   }
+  },
+  {
+   "from": "futures-core 0.3.31",
+   "kind": "no-record",
+   "reason": "descent:futures-core 0.3.31 has no recorded reliance",
+   "amount": {
+    "exact": "87995308029418432945871/134346906430493006250000",
+    "decimal": "0.654985740777"
+   }
+  },
+  {
+   "from": "futures-sink 0.3.31",
+   "kind": "no-record",
+   "reason": "descent:futures-sink 0.3.31 has no recorded reliance",
+   "amount": {
+    "exact": "37364763014001862493/397358492843812500000",
+    "decimal": "0.094032878841"
+   }
+  },
+  {
+   "from": "log 0.4.29",
+   "kind": "no-record",
+   "reason": "descent:log 0.4.29 has no recorded reliance",
+   "amount": {
+    "exact": "10104798931653006337/51652122245955000000",
+    "decimal": "0.195631824836"
+   }
+  },
+  {
+   "from": "itoa 1.0.17",
+   "kind": "no-record",
+   "reason": "descent:itoa 1.0.17 has no recorded reliance",
+   "amount": {
+    "exact": "1621098720101011945967/2984593432700880000000",
+    "decimal": "0.543155627946"
+   }
+  },
+  {
+   "from": "untrusted 0.9.0",
+   "kind": "no-record",
+   "reason": "descent:untrusted 0.9.0 has no recorded reliance",
+   "amount": {
+    "exact": "24881601042987/260214793473250000",
+    "decimal": "9.562E-5"
+   }
+  },
+  {
+   "from": "memchr 2.7.6",
+   "kind": "no-record",
+   "reason": "descent:memchr 2.7.6 has no recorded reliance",
+   "amount": {
+    "exact": "2030894256129859467731239019/9800362932797406372480000000",
+    "decimal": "0.207226433353"
+   }
+  },
+  {
+   "from": "typenum 1.19.0",
+   "kind": "no-record",
+   "reason": "descent:typenum 1.19.0 has no recorded reliance",
+   "amount": {
+    "exact": "57789555323233159/16312559384721600000",
+    "decimal": "0.003542641836"
+   }
+  },
+  {
+   "from": "version_check 0.9.5",
+   "kind": "no-record",
+   "reason": "descent:version_check 0.9.5 has no recorded reliance",
+   "amount": {
+    "exact": "577646864322733349/275080711556851200000",
+    "decimal": "0.002099917733"
+   }
+  },
+  {
+   "from": "const-oid 0.9.6",
+   "kind": "no-record",
+   "reason": "descent:const-oid 0.9.6 has no recorded reliance",
+   "amount": {
+    "exact": "1188238338849433/85203301629600000",
+    "decimal": "0.013945918951"
+   }
+  },
+  {
+   "from": "icu_properties_data 2.1.2",
+   "kind": "no-record",
+   "reason": "descent:icu_properties_data 2.1.2 has no recorded reliance",
+   "amount": {
+    "exact": "124672767972983906/1997484414980291015625",
+    "decimal": "6.241E-5"
+   }
+  },
+  {
+   "from": "bytes 1.11.1",
+   "kind": "no-record",
+   "reason": "descent:bytes 1.11.1 has no recorded reliance",
+   "amount": {
+    "exact": "25876772994758549826566128901/10203634353657584589750000000",
+    "decimal": "2.536034916371"
+   }
+  },
+  {
+   "from": "pin-project-lite 0.2.16",
+   "kind": "no-record",
+   "reason": "descent:pin-project-lite 0.2.16 has no recorded reliance",
+   "amount": {
+    "exact": "1390779118810160128412024689/528716143579640203687500000",
+    "decimal": "2.630483550954"
+   }
+  },
+  {
+   "from": "valuable 0.1.1",
+   "kind": "no-record",
+   "reason": "descent:valuable 0.1.1 has no recorded reliance",
+   "amount": {
+    "exact": "186596468944986509929/4948606550660850000000",
+    "decimal": "0.037706871022"
+   }
+  },
+  {
+   "from": "find-msvc-tools 0.1.7",
+   "kind": "no-record",
+   "reason": "descent:find-msvc-tools 0.1.7 has no recorded reliance",
+   "amount": {
+    "exact": "171809321743189/165085223861250000",
+    "decimal": "0.001040731070"
+   }
+  },
+  {
+   "from": "shlex 1.3.0",
+   "kind": "no-record",
+   "reason": "descent:shlex 1.3.0 has no recorded reliance",
+   "amount": {
+    "exact": "36488837911030583/32429139230131875000",
+    "decimal": "0.001125186754"
+   }
+  },
+  {
+   "from": "wasi 0.11.1+wasi-snapshot-preview1",
+   "kind": "no-record",
+   "reason": "descent:wasi 0.11.1+wasi-snapshot-preview1 has no recorded reliance",
+   "amount": {
+    "exact": "27238985022304822776723983/791779993704873298125000000",
+    "decimal": "0.034402214301"
+   }
+  },
+  {
+   "from": "windows_aarch64_gnullvm 0.52.6",
+   "kind": "no-record",
+   "reason": "descent:windows_aarch64_gnullvm 0.52.6 has no recorded reliance",
+   "amount": {
+    "exact": "3706608879693109/13859986135997925000000",
+    "decimal": "2.674E-7"
+   }
+  },
+  {
+   "from": "windows_aarch64_msvc 0.52.6",
+   "kind": "no-record",
+   "reason": "descent:windows_aarch64_msvc 0.52.6 has no recorded reliance",
+   "amount": {
+    "exact": "3706608879693109/13859986135997925000000",
+    "decimal": "2.674E-7"
+   }
+  },
+  {
+   "from": "windows_i686_gnu 0.52.6",
+   "kind": "no-record",
+   "reason": "descent:windows_i686_gnu 0.52.6 has no recorded reliance",
+   "amount": {
+    "exact": "3706608879693109/13859986135997925000000",
+    "decimal": "2.674E-7"
+   }
+  },
+  {
+   "from": "windows_i686_gnullvm 0.52.6",
+   "kind": "no-record",
+   "reason": "descent:windows_i686_gnullvm 0.52.6 has no recorded reliance",
+   "amount": {
+    "exact": "3706608879693109/13859986135997925000000",
+    "decimal": "2.674E-7"
+   }
+  },
+  {
+   "from": "windows_i686_msvc 0.52.6",
+   "kind": "no-record",
+   "reason": "descent:windows_i686_msvc 0.52.6 has no recorded reliance",
+   "amount": {
+    "exact": "3706608879693109/13859986135997925000000",
+    "decimal": "2.674E-7"
+   }
+  },
+  {
+   "from": "windows_x86_64_gnu 0.52.6",
+   "kind": "no-record",
+   "reason": "descent:windows_x86_64_gnu 0.52.6 has no recorded reliance",
+   "amount": {
+    "exact": "3706608879693109/13859986135997925000000",
+    "decimal": "2.674E-7"
+   }
+  },
+  {
+   "from": "windows_x86_64_gnullvm 0.52.6",
+   "kind": "no-record",
+   "reason": "descent:windows_x86_64_gnullvm 0.52.6 has no recorded reliance",
+   "amount": {
+    "exact": "3706608879693109/13859986135997925000000",
+    "decimal": "2.674E-7"
+   }
+  },
+  {
+   "from": "windows_x86_64_msvc 0.52.6",
+   "kind": "no-record",
+   "reason": "descent:windows_x86_64_msvc 0.52.6 has no recorded reliance",
+   "amount": {
+    "exact": "3706608879693109/13859986135997925000000",
+    "decimal": "2.674E-7"
+   }
+  },
+  {
+   "from": "litemap 0.8.1",
+   "kind": "no-record",
+   "reason": "descent:litemap 0.8.1 has no recorded reliance",
+   "amount": {
+    "exact": "102625453236688300867/31330912953487157226562500",
+    "decimal": "3.276E-6"
+   }
+  },
+  {
+   "from": "writeable 0.6.2",
+   "kind": "no-record",
+   "reason": "descent:writeable 0.6.2 has no recorded reliance",
+   "amount": {
+    "exact": "164512032846422189981/21881907459578332031250000",
+    "decimal": "7.518E-6"
+   }
+  },
+  {
+   "from": "scopeguard 1.2.0",
+   "kind": "no-record",
+   "reason": "descent:scopeguard 1.2.0 has no recorded reliance",
+   "amount": {
+    "exact": "385858131288689896872941/1710777855211425000000000",
+    "decimal": "0.225545432514"
+   }
+  },
+  {
+   "from": "smallvec 1.15.1",
+   "kind": "no-record",
+   "reason": "descent:smallvec 1.15.1 has no recorded reliance",
+   "amount": {
+    "exact": "732739488603311690192633231/3928143896804877750000000000",
+    "decimal": "0.186535806186"
+   }
+  },
+  {
+   "from": "libc 0.2.189",
+   "kind": "no-record",
+   "reason": "descent:libc 0.2.189 has no recorded reliance",
+   "amount": {
+    "exact": "54937485149415030031120001504013313/20112478688093709569652000000000000",
+    "decimal": "2.731512410847"
+   }
+  },
+  {
+   "from": "r-efi 5.3.0",
+   "kind": "no-record",
+   "reason": "descent:r-efi 5.3.0 has no recorded reliance",
+   "amount": {
+    "exact": "1274610988154509380167/13433810091709218750000",
+    "decimal": "0.094880825280"
+   }
+  },
+  {
+   "from": "bitflags 2.10.0",
+   "kind": "no-record",
+   "reason": "descent:bitflags 2.10.0 has no recorded reliance",
+   "amount": {
+    "exact": "83298556577033846371860587/253126596452964609375000000",
+    "decimal": "0.329078641851"
+   }
+  },
+  {
+   "from": "windows-link 0.2.1",
+   "kind": "no-record",
+   "reason": "descent:windows-link 0.2.1 has no recorded reliance",
+   "amount": {
+    "exact": "12388401128950797825588466395673/68302566077643214317000000000000",
+    "decimal": "0.181375339762"
+   }
+  },
+  {
+   "from": "windows_aarch64_gnullvm 0.53.1",
+   "kind": "no-record",
+   "reason": "descent:windows_aarch64_gnullvm 0.53.1 has no recorded reliance",
+   "amount": {
+    "exact": "208047309340702864525321/3451653069085942875000000000",
+    "decimal": "6.027E-5"
+   }
+  },
+  {
+   "from": "windows_aarch64_msvc 0.53.1",
+   "kind": "no-record",
+   "reason": "descent:windows_aarch64_msvc 0.53.1 has no recorded reliance",
+   "amount": {
+    "exact": "208047309340702864525321/3451653069085942875000000000",
+    "decimal": "6.027E-5"
+   }
+  },
+  {
+   "from": "windows_i686_gnu 0.53.1",
+   "kind": "no-record",
+   "reason": "descent:windows_i686_gnu 0.53.1 has no recorded reliance",
+   "amount": {
+    "exact": "208047309340702864525321/3451653069085942875000000000",
+    "decimal": "6.027E-5"
+   }
+  },
+  {
+   "from": "windows_i686_gnullvm 0.53.1",
+   "kind": "no-record",
+   "reason": "descent:windows_i686_gnullvm 0.53.1 has no recorded reliance",
+   "amount": {
+    "exact": "208047309340702864525321/3451653069085942875000000000",
+    "decimal": "6.027E-5"
+   }
+  },
+  {
+   "from": "windows_i686_msvc 0.53.1",
+   "kind": "no-record",
+   "reason": "descent:windows_i686_msvc 0.53.1 has no recorded reliance",
+   "amount": {
+    "exact": "208047309340702864525321/3451653069085942875000000000",
+    "decimal": "6.027E-5"
+   }
+  },
+  {
+   "from": "windows_x86_64_gnu 0.53.1",
+   "kind": "no-record",
+   "reason": "descent:windows_x86_64_gnu 0.53.1 has no recorded reliance",
+   "amount": {
+    "exact": "208047309340702864525321/3451653069085942875000000000",
+    "decimal": "6.027E-5"
+   }
+  },
+  {
+   "from": "windows_x86_64_gnullvm 0.53.1",
+   "kind": "no-record",
+   "reason": "descent:windows_x86_64_gnullvm 0.53.1 has no recorded reliance",
+   "amount": {
+    "exact": "208047309340702864525321/3451653069085942875000000000",
+    "decimal": "6.027E-5"
+   }
+  },
+  {
+   "from": "windows_x86_64_msvc 0.53.1",
+   "kind": "no-record",
+   "reason": "descent:windows_x86_64_msvc 0.53.1 has no recorded reliance",
+   "amount": {
+    "exact": "208047309340702864525321/3451653069085942875000000000",
+    "decimal": "6.027E-5"
+   }
+  },
+  {
+   "from": "wit-bindgen 0.46.0",
+   "kind": "no-record",
+   "reason": "descent:wit-bindgen 0.46.0 has no recorded reliance",
+   "amount": {
+    "exact": "16569942846008621942171/705275029814733984375000",
+    "decimal": "0.023494299593"
+   }
+  },
+  {
+   "from": "cfg-if 1.0.4",
+   "kind": "no-record",
+   "reason": "descent:cfg-if 1.0.4 has no recorded reliance",
+   "amount": {
+    "exact": "500587208553158325856000447728300587/875575653998647449012165000000000000",
+    "decimal": "0.571723535559"
+   }
+  },
+  {
+   "from": "once_cell 1.21.3",
+   "kind": "no-record",
+   "reason": "descent:once_cell 1.21.3 has no recorded reliance",
+   "amount": {
+    "exact": "959156371569127614777344581396049/2394342700963536853530000000000000",
+    "decimal": "0.400592768605"
+   }
+  },
+  {
+   "from": "rustversion 1.0.22",
+   "kind": "no-record",
+   "reason": "descent:rustversion 1.0.22 has no recorded reliance",
+   "amount": {
+    "exact": "230890669277206645351647435847/5745162253173082740000000000000",
+    "decimal": "0.040188711668"
+   }
+  },
+  {
+   "from": "stable_deref_trait 1.2.1",
+   "kind": "no-record",
+   "reason": "descent:stable_deref_trait 1.2.1 has no recorded reliance",
+   "amount": {
+    "exact": "83675396902788968035058580293/38851240658799726088497070312500000",
+    "decimal": "2.154E-6"
+   }
+  },
+  {
+   "from": "bumpalo 3.19.1",
+   "kind": "no-record",
+   "reason": "descent:bumpalo 3.19.1 has no recorded reliance",
+   "amount": {
+    "exact": "19748456695344744280798916666011/11992872753652304528437500000000000",
+    "decimal": "0.001646682751"
+   }
+  },
+  {
+   "from": "unicode-ident 1.0.22",
+   "kind": "no-record",
+   "reason": "descent:unicode-ident 1.0.22 has no recorded reliance",
+   "amount": {
+    "exact": "11126223875639106456566923821386922842985164128791679/77936608484918032662644804122753630371093750000000000",
+    "decimal": "0.142759918502"
+   }
+  }
+ ],
+ "work": {
+  "nodes_split": 464,
+  "ratio_lines_verified": 2301,
+  "ratio_tables_judged": 464,
+  "ratio_tables_reused": 0,
+  "max_amount_denominator_digits": 54,
+  "f64_splits_failing_exact_sum_check": 0,
+  "edges_sent": 1220,
+  "edges_pooled_below_floor": 0,
+  "edges_touched": 1220,
+  "naive_per_path_pushes": 67076,
+  "max_paths_to_one_node": 20906,
+  "max_paths_node": "unicode-ident 1.0.22",
+  "hot_spot": "proc-macro2 1.0.105",
+  "hot_spot_fan_in": 37,
+  "hot_spot_messages_this_window": 37
+ },
+ "conservation": {
+  "total": {
+   "exact": "1000",
+   "decimal": "1,000.000000000000"
+  },
+  "exact": true
+ },
+ "float_sums": {
+  "insertion_order": 1000.0,
+  "reversed": 1000.0,
+  "ascending": 1000.0,
+  "descending": 1000.0
+ },
+ "bridge": null
+}

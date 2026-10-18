@@ -4,7 +4,7 @@ id: blob-durability
 invariant: >
   Blob bytes survive peer loss and churn: custody commitments honored,
   RS-quilt placement household-diverse, salvage re-places without data loss.
-status: green
+status: red
 active: false
 checks:
   - "a2o @concern:blob-durability — 9 scenarios across genesis/a2o/features/resilience/ (governed-distribution, salvage-placement, chaos-peer-churn, grandma-photos-survive-node-loss, app-blob-heal-on-read, observable-distribution, resilience-dimensions, household-diversity-dataplane)"
@@ -16,6 +16,13 @@ retire-when: >
   silent and irreversible — nobody reports the blob they can no longer fetch — which is
   exactly the class that must not depend on someone remembering to look.
 ---
+DELTA 2026-10-17 (flip green→red): no custody-blob commitment names a second provider for the protected household fixtures, so the habit's protection scenarios cannot start.
+
+Two household lanes today on merged source (dev 1a87ed72c + the marathon's commits, storage and doorway rebuilt from a8d3e71a3, conductors hc-fork-96bcd2bee215-proof):
+- Tag lane `@concern:blob-durability and not @wip and not @browser-only and not @requires:shem`, run `sprint-report-household-20261017T081515Z-7a4ae280`: 14 scenarios — 7 passed, 3 failed, 1 pending, 3 skipped (114 steps: 72 passed, 3 failed, 1 pending, 38 skipped). The three failures are every non-browser chaos-peer-churn scenario (flapping peer; cascading loss; simultaneous two-peer loss), each stopping in the Given custody guard before any peer is killed: `no custody-blob commitment names jessica (…) as provider for sha256-… — providers on record: matthew only` and, for the chaos-ladder blob, `providers on record: none` while the footprint reports commitmentBacked>0. app-blob-heal-on-read 3/3 passed; grandma-photos 4 passed, `A holder lapses but coverage survives` PENDING (undefined step, steps/resilience.steps.ts:537), the album scenario skipped (only 1 attributed household committed); observable-distribution ×2 held on substrate.
+- Rerun `features/resilience/chaos-peer-churn.feature` ten minutes after the last conductor restart (outside the churn window), run `sprint-report-household-20261017T082200Z-7a4ae280`: 3 scenarios, 3 failed, same custody-guard assertions. The deciding fact: on the household no custody-blob commitment names a second provider for the fixtures these scenarios protect, so the habit's own protection scenarios cannot even start — the "five holders" claim this habit declares is contradicted, not merely unobservable, on the one substrate that can run it.
+- Declaration drift to note in the DELTA (do not rewrite the checks line): the check names "9 scenarios across 8 files"; six of those files are wholly @wip (governed-distribution, salvage-placement, resilience-dimensions, household-diversity-dataplane, sdk-write-retention, peer-byteplane-reconstruction — the last two carry the concern tag but are unlisted), so the runnable set today is 14 scenarios in 4 files.
+
 DELTA 2026-10-05 (status unchanged; a gap in what this habit can observe, not a measurement of it): the five-holder claim is unobservable on the fleet and unknown to the nodes themselves. Offline read of the stopped household's matthew database: 3,549 of 3,574 shards list one known holder (matthew), though jessica holds the same 31.8 MB. Seven fleet peers hold 0.27–1.25 GB of storage and 6.0–6.6 GB of conductor volume each against a ~0.3 GB floor (`genesis/docs/content/elohim-protocol/architecture/2026-10-05-storage-physics-benchmark.md`). Added, gate green, not yet on the fleet: `elohim_node_store_bytes` / `elohim_node_store_files` (persisted bytes by file class, apparent and allocated, conductor and storage) and `elohim_shard_known_holders` (shards by known holder count). Owed: the fleet read of all three; a story asserting the declared defaults.
 
 DELTA 2026-09-09 (SDK retention prerequisite): `just gate elohim-sdk` EXIT=0 across eight feature selections and clippy; seven identical regressions failed against the frozen pre-repair source and pass against the repair. Native sprint gap 1 fulfilled and independently approved; `genesis/a2o/reports/network-sprint-20260909/task-sdk-report.md` bounds proof to in-process HTTP-client retention. Ambiguous create reconciliation, actual remote custody and cold RS source-loss proof remain open; no habit status flip.

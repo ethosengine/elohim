@@ -350,7 +350,10 @@ recorded here rather than left as a gap.
 
 Eight minutes after the clone-targeted write, **jessica's DHT — her base cell and her own
 corresponding `lamad.0` clone alike — contained neither of matthew's probe action hashes**;
-clone-to-clone DHT gossip had not propagated in the window. But **jessica's storage projection
+clone-to-clone DHT gossip had not propagated in the window. *(Correction 2026-10-16: not reproduced. On fork `96bcd2bee`, three same-seed clone
+members converged on a direct-call write in 5.7 s; read this as a non-propagation inside one
+8-minute window on the 09-07 setup, not as a property of clone gossip. Evidence: probe A,
+`genesis/docs/superpowers/sprints/2026-10-16-commons-spaces-probe-a-report.md` §Results.)* But **jessica's storage projection
 did contain `fxclone-beta-20260907`, carrying a different `dht_anchor_hash` than matthew's
 clone action** — and that hash is present in jessica's **base** source-chain inventory and
 absent from her clone's. Jessica's storage re-authored the clone-originated content into her

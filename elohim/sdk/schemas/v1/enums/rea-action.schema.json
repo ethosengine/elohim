@@ -1,0 +1,79 @@
+{
+  "$id": "epr:schema:enum:rea-action",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "ReaAction",
+  "description": "The one action vocabulary for REA (Resource–Event–Agent) flows: what an economic event or commitment does to a resource. The same words serve code, a co-op grocer and a community-garden network. Rival goods move by `transfer` / `transfer-custody` / `pickup` / `dropoff` (a crate of tomatoes delivered is no longer at the farm); non-rival knowledge, designs and code are `cite`d (a library a program builds on stays where it was). Aligned with ValueFlows actions (https://www.valueflo.ws/concepts/actions/) plus the protocol's own storage, doorway and review actions. Core tier = exactly the actions the elohim DNA declares in `content_store_integrity`'s hand-written `REA_ACTIONS` const; that const is never generated (generating into an integrity zome would move the DNA hash) and is instead checked against this tier by `pnpm run schema:check-dna` (see `_dnaMirror`). The remaining values are `affirm` and `dismiss`, the epistemic review verbs `elohim_epr::witness::ReaVerb` carries for witnessed interactions; every `ReaVerb` maps onto a value here (pinned by `rea_verb_maps_onto_the_generated_action_enum` in `elohim/epr/src/witness.rs`). Source of truth: this schema. The DNA const mirrors the core tier; no integrity rule validates an action against either list today, so membership here is a shared name, not an enforced gate.",
+  "type": "string",
+  "enum": [
+    "use",
+    "consume",
+    "cite",
+    "produce",
+    "raise",
+    "lower",
+    "transfer",
+    "transfer-custody",
+    "transfer-all-rights",
+    "move",
+    "modify",
+    "combine",
+    "separate",
+    "work",
+    "deliver-service",
+    "pickup",
+    "dropoff",
+    "give",
+    "take",
+    "accept",
+    "custody-blob",
+    "serve-blob",
+    "ack-projection",
+    "operate-doorway",
+    "project-epr",
+    "affirm",
+    "dismiss"
+  ],
+  "_tiers": {
+    "core": {
+      "values": [
+        "use",
+        "consume",
+        "cite",
+        "produce",
+        "raise",
+        "lower",
+        "transfer",
+        "transfer-custody",
+        "transfer-all-rights",
+        "move",
+        "modify",
+        "combine",
+        "separate",
+        "work",
+        "deliver-service",
+        "pickup",
+        "dropoff",
+        "give",
+        "take",
+        "accept",
+        "custody-blob",
+        "serve-blob",
+        "ack-projection",
+        "operate-doorway",
+        "project-epr"
+      ],
+      "rationale": "Declared in the elohim DNA's REA_ACTIONS (content_store_integrity)."
+    }
+  },
+  "_codegen": {
+    "constant": "REA_ACTIONS",
+    "rust": ["epr"],
+    "rationale": "Emitted to TypeScript (schema-enums.ts) and to the epr crate (elohim/epr/src/generated/), never to an integrity zome's generated_enums.rs. epr is upstream of epr-rea and elohim-storage, so every Rust consumer can read one list."
+  },
+  "_dnaMirror": {
+    "constant": "REA_ACTIONS",
+    "file": "elohim/holochain/dna/elohim/zomes/content_store_integrity/src/lib.rs",
+    "tier": "core",
+    "rationale": "The DNA const is hand-written in an integrity zome and is declared, never validated, by any integrity rule. It changes only with a deliberate DNA move; check-dna holds it equal to the core tier so neither side drifts silently."
+  }
+}

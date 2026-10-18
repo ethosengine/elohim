@@ -318,11 +318,12 @@ fn observe_appends_idempotently_and_walk_renders_each_stage_with_its_duration() 
     let root = dir.path();
     let c = ctx(root);
     let first = observe(&c, &inputs(W1483, Some(G1903))).unwrap();
-    // 19 stages declared-and-reported; 2 NOT_EXECUTED produce no event; +1 Process.
-    assert_eq!(first.appended, 17 + 1, "{first:?}");
+    // 19 stages declared-and-reported; 2 NOT_EXECUTED produce no event; +1 source-commit Cite
+    // input (the graph carries the SHA); +1 Process.
+    assert_eq!(first.appended, 17 + 1 + 1, "{first:?}");
     assert!(first.stakes.contains("bootstrap (fixture co-steward)"));
     let again = observe(&c, &inputs(W1483, Some(G1903))).unwrap();
-    assert_eq!((again.appended, again.present), (0, 18));
+    assert_eq!((again.appended, again.present), (0, 19));
     assert_eq!(again.process, first.process, "same inputs, same CIDs");
 
     let failed = observe(&c, &inputs(W1484, Some(G1906))).unwrap();
@@ -414,6 +415,11 @@ fn translate_output_can_only_express_observations() {
 /// the shared reader — while every stage EVENT keeps the exact address it had before the Process
 /// grew a classification (goldens from dev 914e8aa87: the first stage event of #1483 and the last
 /// of #1484; all 17+19+19 event records were diffed byte-identical when the envelope moved).
+///
+/// The goldens were pinned scoped to the offer's LEGACY (body-only) address. The offer's address
+/// now binds its whole declaration, which moves every event's `in_scope_of`; translating against
+/// the legacy address reproduces the goldens exactly, so the stage events' own encoding is
+/// unchanged and only their scope moved.
 #[test]
 fn the_process_carries_the_build_and_its_envelope_and_events_keep_their_address() {
     let (dir, _) = active_with(OFFER_GOLDEN);
@@ -456,14 +462,50 @@ fn the_process_carries_the_build_and_its_envelope_and_events_keep_their_address(
         ] {
             assert!(slots.contains(&slot), "{slot} on the Process");
         }
+        let input_cids: Vec<String> = process.inputs.iter().map(|c| c.to_string()).collect();
         let events: Vec<String> = t
+            .observations
+            .iter()
+            .filter(|o| matches!(o, Observation::Event(_)))
+            .map(|o| o.cid().unwrap().to_string())
+            .filter(|c| !input_cids.contains(c))
+            .collect();
+        // Node 1: with the graph in hand, the build rests on its source commit — one Cite input.
+        assert_eq!(process.inputs.len(), 1, "the source-commit input");
+        let source = t
+            .observations
+            .iter()
+            .find_map(|o| match o {
+                Observation::Event(e) if e.action == ReaVerb::Cite => Some(e),
+                _ => None,
+            })
+            .expect("a source-commit Cite event");
+        assert_eq!(
+            source.classified_as[1],
+            format!("commit:{}", t.sha.as_deref().unwrap())
+        );
+        assert!(source.fulfills.is_empty() && source.satisfies.is_empty());
+        let legacy = elohim_epr_cli::flow::memory::offer::legacy_offer_cid(&c.offer).unwrap();
+        assert_ne!(
+            legacy, offer,
+            "the offer's address binds its declaration now"
+        );
+        let scoped_to_legacy = jenkins_bridge::translate(
+            &jenkins_bridge::translate::parse_wfapi(stages).unwrap(),
+            Some(&jenkins_bridge::translate::parse_graph(graph).unwrap()),
+            &c.offer.declaration().spec(),
+            legacy,
+            jenkins_bridge::translate::DEFAULT_JENKINS,
+        )
+        .unwrap();
+        let legacy_events: Vec<String> = scoped_to_legacy
             .observations
             .iter()
             .filter(|o| matches!(o, Observation::Event(_)))
             .map(|o| o.cid().unwrap().to_string())
             .collect();
         assert!(
-            events.contains(&event_golden.to_string()),
+            legacy_events.contains(&event_golden.to_string()),
             "stage events of #{build} moved address"
         );
         assert_eq!(
@@ -575,6 +617,78 @@ fn the_card_is_legible_before_approval_and_prints_the_stakes_after() {
         .as_str()
         .unwrap()
         .starts_with("presence:"));
+}
+
+/// The offer's address now binds its whole declaration (`OfferDeclaration::intent`), so the
+/// address an offer minted under the earlier body-only rule had is SUPERSEDED, not rewritten.
+/// Records scoped to that legacy address still resolve: the legacy Intent stays in the store, its
+/// standing still reads from the verdicts written against it, observations scoped to it still
+/// walk, and the new Intent names it in its `supersedes:` slot. The legacy approval does not
+/// carry over: the new address is Proposed until a Steward approves the full declaration.
+#[test]
+fn records_scoped_to_a_legacy_offer_address_still_resolve_and_are_superseded() {
+    use elohim_epr_cli::flow::memory::offer::{legacy_offer_cid, offer_standing};
+
+    let dir = fixture();
+    let root = dir.path();
+    let c = ctx(root);
+    let declaration = c.offer.declaration().clone();
+
+    // A store as the earlier rule left it: the legacy Intent, approved, with an observed build
+    // scoped to it.
+    let legacy = declaration.legacy_intent(elohim_epr_cli::flow::body_cid(c.offer.text()));
+    let legacy_cid = elohim_epr_rea::atom_cid(&legacy).unwrap();
+    assert_eq!(legacy_cid, legacy_offer_cid(&c.offer).unwrap());
+    SidecarFlowStore::open(root)
+        .unwrap()
+        .append(FlowRecord::Intent(legacy))
+        .unwrap();
+    verdict(root, &legacy_cid.to_string(), "bob", "approved");
+    let run = jenkins_bridge::translate::parse_wfapi(W1483).unwrap();
+    let graph = jenkins_bridge::translate::parse_graph(G1903).unwrap();
+    let old = jenkins_bridge::translate(
+        &run,
+        Some(&graph),
+        &declaration.spec(),
+        legacy_cid,
+        jenkins_bridge::translate::DEFAULT_JENKINS,
+    )
+    .unwrap();
+    let mut store = SidecarFlowStore::open(root).unwrap();
+    for observation in old.observations.iter().cloned() {
+        store.append(observation.into_record()).unwrap();
+    }
+
+    // The legacy address still reads: its standing, and every record scoped to it.
+    let legacy_standing = offer_standing(root, &declaration, &legacy_cid).unwrap();
+    assert!(
+        legacy_standing.is_active(),
+        "{}",
+        legacy_standing.stakes_line()
+    );
+    let walked = walk::walk_cid(root, &old.process_cid).unwrap();
+    assert_eq!(walked.in_scope_of, legacy_cid.to_string());
+
+    // The current address is new, names what it supersedes, and needs its own approval.
+    let (current, minted) = jenkins_bridge::mint_offer(&c).unwrap();
+    assert!(minted);
+    assert_ne!(current, legacy_cid);
+    let records = SidecarFlowStore::open(root).unwrap().records().unwrap();
+    let Some(FlowRecord::Intent(intent)) = records
+        .iter()
+        .find(|(cid, _)| *cid == current)
+        .map(|(_, r)| r)
+    else {
+        panic!("the current Intent is in the store");
+    };
+    assert!(intent
+        .resource_spec
+        .classified_as
+        .contains(&format!("supersedes:{legacy_cid}")));
+    let Standing::Minted(now) = c.standing().unwrap() else {
+        panic!("minted");
+    };
+    assert!(!now.is_active(), "a legacy approval never carries over");
 }
 
 /// Stage the end-to-end receipt fixture at `$JENKINS_BRIDGE_RECEIPT_DIR` (a fresh, empty directory)

@@ -4,6 +4,288 @@
   "modules": [
     {
       "kind": "javascript-module",
+      "path": "src/capability/certainty.ts",
+      "declarations": [
+        {
+          "kind": "variable",
+          "name": "UNKNOWN_CERTAINTY",
+          "type": {
+            "text": "ContentCertainty"
+          },
+          "description": "The safe default when no certainty has been provided. Elements MUST NOT render\ncanonical visuals when their certainty is unknown."
+        }
+      ],
+      "exports": [
+        {
+          "kind": "js",
+          "name": "UNKNOWN_CERTAINTY",
+          "declaration": {
+            "name": "UNKNOWN_CERTAINTY",
+            "module": "src/capability/certainty.ts"
+          }
+        }
+      ]
+    },
+    {
+      "kind": "javascript-module",
+      "path": "src/capability/context.ts",
+      "declarations": [
+        {
+          "kind": "variable",
+          "name": "capabilityProfileContext"
+        },
+        {
+          "kind": "variable",
+          "name": "contentCertaintyContext"
+        }
+      ],
+      "exports": [
+        {
+          "kind": "js",
+          "name": "capabilityProfileContext",
+          "declaration": {
+            "name": "capabilityProfileContext",
+            "module": "src/capability/context.ts"
+          }
+        },
+        {
+          "kind": "js",
+          "name": "contentCertaintyContext",
+          "declaration": {
+            "name": "contentCertaintyContext",
+            "module": "src/capability/context.ts"
+          }
+        }
+      ]
+    },
+    {
+      "kind": "javascript-module",
+      "path": "src/capability/index.ts",
+      "declarations": [],
+      "exports": [
+        {
+          "kind": "js",
+          "name": "*",
+          "declaration": {
+            "name": "*",
+            "module": "src/capability/profile.js"
+          }
+        },
+        {
+          "kind": "js",
+          "name": "*",
+          "declaration": {
+            "name": "*",
+            "module": "src/capability/certainty.js"
+          }
+        },
+        {
+          "kind": "js",
+          "name": "*",
+          "declaration": {
+            "name": "*",
+            "module": "src/capability/standing.js"
+          }
+        },
+        {
+          "kind": "js",
+          "name": "*",
+          "declaration": {
+            "name": "*",
+            "module": "src/capability/context.js"
+          }
+        },
+        {
+          "kind": "js",
+          "name": "*",
+          "declaration": {
+            "name": "*",
+            "module": "src/capability/mixin.js"
+          }
+        }
+      ]
+    },
+    {
+      "kind": "javascript-module",
+      "path": "src/capability/mixin.ts",
+      "declarations": [
+        {
+          "kind": "mixin",
+          "description": "",
+          "name": "CapabilityAwareElement",
+          "members": [
+            {
+              "kind": "field",
+              "name": "properties",
+              "type": {
+                "text": "PropertyDeclarations"
+              },
+              "static": true,
+              "readonly": true,
+              "default": "{ ...(Base as unknown as { properties?: PropertyDeclarations }).properties, profile: { attribute: false, state: true }, }"
+            },
+            {
+              "kind": "field",
+              "name": "profile",
+              "privacy": "public",
+              "type": {
+                "text": "CapabilityProfile"
+              },
+              "default": "DEFAULT_PROFILE"
+            }
+          ],
+          "parameters": [
+            {
+              "name": "Base",
+              "type": {
+                "text": "TBase"
+              }
+            }
+          ]
+        }
+      ],
+      "exports": [
+        {
+          "kind": "js",
+          "name": "CapabilityAwareElement",
+          "declaration": {
+            "name": "CapabilityAwareElement",
+            "module": "src/capability/mixin.ts"
+          }
+        }
+      ]
+    },
+    {
+      "kind": "javascript-module",
+      "path": "src/capability/profile.ts",
+      "declarations": [
+        {
+          "kind": "variable",
+          "name": "LENS_ORDER",
+          "type": {
+            "text": "[\n  'minimal',\n  'simple',\n  'standard',\n  'detail',\n  'debug',\n  'trace',\n]"
+          },
+          "default": "[ 'minimal', 'simple', 'standard', 'detail', 'debug', 'trace', ]"
+        },
+        {
+          "kind": "variable",
+          "name": "STIMULUS_ORDER",
+          "type": {
+            "text": "['still', 'gentle', 'lively']"
+          },
+          "default": "['still', 'gentle', 'lively']"
+        },
+        {
+          "kind": "variable",
+          "name": "DEFAULT_PROFILE",
+          "type": {
+            "text": "{\n  lens: 'standard',\n  theme: 'auto',\n  contrast: 'auto',\n  locale: 'auto',\n  stimulus: 'still',\n  textuality: 'textual',\n  standings: [],\n  lock: { kind: 'pilot' },\n  origin: 'pilot',\n}"
+          },
+          "default": "{ lens: 'standard', theme: 'auto', contrast: 'auto', locale: 'auto', stimulus: 'still', textuality: 'textual', standings: [], lock: { kind: 'pilot' }, origin: 'pilot', }",
+          "description": "The Sabbath default. Stillness in the type system; textual for the literate-adult baseline.\nStewards may pin pre-literate/symbolic, locked-lens, locked-locale, etc."
+        }
+      ],
+      "exports": [
+        {
+          "kind": "js",
+          "name": "LENS_ORDER",
+          "declaration": {
+            "name": "LENS_ORDER",
+            "module": "src/capability/profile.ts"
+          }
+        },
+        {
+          "kind": "js",
+          "name": "STIMULUS_ORDER",
+          "declaration": {
+            "name": "STIMULUS_ORDER",
+            "module": "src/capability/profile.ts"
+          }
+        },
+        {
+          "kind": "js",
+          "name": "DEFAULT_PROFILE",
+          "declaration": {
+            "name": "DEFAULT_PROFILE",
+            "module": "src/capability/profile.ts"
+          }
+        }
+      ]
+    },
+    {
+      "kind": "javascript-module",
+      "path": "src/capability/standing.ts",
+      "declarations": [
+        {
+          "kind": "function",
+          "name": "parseStandingRequirement",
+          "return": {
+            "type": {
+              "text": "readonly Standing[][]"
+            }
+          },
+          "parameters": [
+            {
+              "name": "requirement",
+              "type": {
+                "text": "readonly string[]"
+              }
+            }
+          ],
+          "description": "Parses the contract DSL into normalized form: outer array is AND, inner array is OR.\nEach inner array element is a Standing name."
+        },
+        {
+          "kind": "function",
+          "name": "satisfiesRequirement",
+          "return": {
+            "type": {
+              "text": "boolean"
+            }
+          },
+          "parameters": [
+            {
+              "name": "held",
+              "type": {
+                "text": "readonly Standing[]"
+              }
+            },
+            {
+              "name": "requirement",
+              "type": {
+                "text": "readonly string[]"
+              }
+            }
+          ],
+          "description": "Returns true if `held` satisfies `requirement`.\nAND across outer groups; OR within each group."
+        }
+      ],
+      "exports": [
+        {
+          "kind": "js",
+          "name": "parseStandingRequirement",
+          "declaration": {
+            "name": "parseStandingRequirement",
+            "module": "src/capability/standing.ts"
+          }
+        },
+        {
+          "kind": "js",
+          "name": "satisfiesRequirement",
+          "declaration": {
+            "name": "satisfiesRequirement",
+            "module": "src/capability/standing.ts"
+          }
+        }
+      ]
+    },
+    {
+      "kind": "javascript-module",
+      "path": "src/contracts/omnibar.contract.ts",
+      "declarations": [],
+      "exports": []
+    },
+    {
+      "kind": "javascript-module",
       "path": "src/elohim-button.ts",
       "declarations": [
         {
@@ -5694,6 +5976,283 @@
     },
     {
       "kind": "javascript-module",
+      "path": "src/elohim-resiliency-badge.ts",
+      "declarations": [
+        {
+          "kind": "class",
+          "description": "<elohim-resiliency-badge> — how many households hold a piece of content, as a\nsingle link to where it lives (the EPR page). The whole badge is the anchor.\n\nWording is ported from the EPR page's held chip: \"Held by {holders} of {target}\nhouseholds\"; zero holders reads \"Not yet held by any household\"; when the figures\nare unknown, \"Held by households · see where it lives\".\n\nFigures come from the `holders` / `target` properties, or — when `content-id` is\nset and neither is supplied — from a same-origin fetch of\n`{base-url}/api/v1/resilience/{content-id}/household`, reading\n`feltStatus.floor.hasHouseholds` / `wantsHouseholds`. A failed or unmeasured\nfetch silently keeps the unknown state.\n\n`data-state` reflects `held | thin | unknown` (thin when holders < target) so\nthemes can colour it; the figures are always text, never colour alone.",
+          "name": "ElohimResiliencyBadge",
+          "cssProperties": [
+            {
+              "description": "Foreground color (default: inherit)",
+              "name": "--elohim-resiliency-badge-fg"
+            },
+            {
+              "description": "Background (default: transparent)",
+              "name": "--elohim-resiliency-badge-bg"
+            },
+            {
+              "description": "Border (default: 1px solid currentColor)",
+              "name": "--elohim-resiliency-badge-border"
+            },
+            {
+              "description": "Border radius (default: 999px)",
+              "name": "--elohim-resiliency-badge-radius"
+            },
+            {
+              "description": "Padding (default: 0.125rem 0.625rem)",
+              "name": "--elohim-resiliency-badge-padding"
+            },
+            {
+              "description": "Foreground when data-state=held",
+              "name": "--elohim-resiliency-badge-held-fg"
+            },
+            {
+              "description": "Foreground when data-state=thin",
+              "name": "--elohim-resiliency-badge-thin-fg"
+            },
+            {
+              "description": "Background on hover / focus",
+              "name": "--elohim-resiliency-badge-hover-bg"
+            }
+          ],
+          "cssParts": [
+            {
+              "description": "The anchor",
+              "name": "badge"
+            }
+          ],
+          "members": [
+            {
+              "kind": "field",
+              "name": "contentId",
+              "type": {
+                "text": "string"
+              },
+              "default": "''",
+              "description": "(attr `content-id`) content to look up when figures are not supplied",
+              "attribute": "content-id"
+            },
+            {
+              "kind": "field",
+              "name": "href",
+              "type": {
+                "text": "string"
+              },
+              "default": "''",
+              "description": "EPR address the badge links to, e.g. `/epr/<id>`",
+              "attribute": "href"
+            },
+            {
+              "kind": "field",
+              "name": "holders",
+              "type": {
+                "text": "number | undefined"
+              },
+              "description": "households holding the content",
+              "attribute": "holders"
+            },
+            {
+              "kind": "field",
+              "name": "target",
+              "type": {
+                "text": "number | undefined"
+              },
+              "description": "households wanted to hold it",
+              "attribute": "target"
+            },
+            {
+              "kind": "field",
+              "name": "state",
+              "type": {
+                "text": "ResiliencyBadgeState | undefined"
+              },
+              "description": "explicit state override",
+              "attribute": "state"
+            },
+            {
+              "kind": "field",
+              "name": "baseUrl",
+              "type": {
+                "text": "string"
+              },
+              "default": "''",
+              "description": "(attr `base-url`) prefix for the lookup; default same-origin",
+              "attribute": "base-url"
+            },
+            {
+              "kind": "field",
+              "name": "fetchedHolders",
+              "type": {
+                "text": "number | undefined"
+              },
+              "privacy": "private"
+            },
+            {
+              "kind": "field",
+              "name": "fetchedTarget",
+              "type": {
+                "text": "number | undefined"
+              },
+              "privacy": "private"
+            },
+            {
+              "kind": "field",
+              "name": "fetchSeq",
+              "type": {
+                "text": "number"
+              },
+              "privacy": "private",
+              "default": "0"
+            },
+            {
+              "kind": "field",
+              "name": "figures",
+              "type": {
+                "text": "{ holders?: number; target?: number }"
+              },
+              "privacy": "private",
+              "readonly": true
+            },
+            {
+              "kind": "field",
+              "name": "derivedState",
+              "type": {
+                "text": "ResiliencyBadgeState"
+              },
+              "privacy": "private",
+              "readonly": true
+            },
+            {
+              "kind": "field",
+              "name": "label",
+              "type": {
+                "text": "string"
+              },
+              "privacy": "private",
+              "readonly": true
+            },
+            {
+              "kind": "method",
+              "name": "lookup",
+              "privacy": "private",
+              "return": {
+                "type": {
+                  "text": "Promise<void>"
+                }
+              }
+            }
+          ],
+          "attributes": [
+            {
+              "name": "content-id",
+              "type": {
+                "text": "string"
+              },
+              "default": "''",
+              "description": "(attr `content-id`) content to look up when figures are not supplied",
+              "fieldName": "contentId"
+            },
+            {
+              "name": "href",
+              "type": {
+                "text": "string"
+              },
+              "default": "''",
+              "description": "EPR address the badge links to, e.g. `/epr/<id>`",
+              "fieldName": "href"
+            },
+            {
+              "name": "holders",
+              "type": {
+                "text": "number | undefined"
+              },
+              "description": "households holding the content",
+              "fieldName": "holders"
+            },
+            {
+              "name": "target",
+              "type": {
+                "text": "number | undefined"
+              },
+              "description": "households wanted to hold it",
+              "fieldName": "target"
+            },
+            {
+              "name": "state",
+              "type": {
+                "text": "ResiliencyBadgeState | undefined"
+              },
+              "description": "explicit state override",
+              "fieldName": "state"
+            },
+            {
+              "name": "base-url",
+              "type": {
+                "text": "string"
+              },
+              "default": "''",
+              "description": "(attr `base-url`) prefix for the lookup; default same-origin",
+              "fieldName": "baseUrl"
+            }
+          ],
+          "superclass": {
+            "name": "LitElement",
+            "package": "lit"
+          },
+          "tagName": "elohim-resiliency-badge",
+          "customElement": true,
+          "capabilityContract": {
+            "a11y": "unknown",
+            "i18n": "unknown",
+            "uaPrefs": "unknown",
+            "maxLens": "simple",
+            "themes": [
+              "light",
+              "dark"
+            ],
+            "contrast": [
+              "normal",
+              "high"
+            ],
+            "locales": [
+              "en"
+            ],
+            "maxStimulus": "still",
+            "textuality": [
+              "textual"
+            ],
+            "standings": {
+              "required": [
+                "pilot | steward | elohim-support"
+              ]
+            },
+            "contentCertainty": "observed",
+            "states": {
+              "empty": "n/a",
+              "loading": "n/a",
+              "error": "designed",
+              "stale": "n/a",
+              "contested": "n/a",
+              "offline": "designed",
+              "unauthorized": "n/a"
+            }
+          }
+        }
+      ],
+      "exports": [
+        {
+          "kind": "js",
+          "name": "ElohimResiliencyBadge",
+          "declaration": {
+            "name": "ElohimResiliencyBadge",
+            "module": "src/elohim-resiliency-badge.ts"
+          }
+        }
+      ]
+    },
+    {
+      "kind": "javascript-module",
       "path": "src/elohim-seam-map.ts",
       "declarations": [
         {
@@ -6704,6 +7263,22 @@
         },
         {
           "kind": "js",
+          "name": "ElohimResiliencyBadge",
+          "declaration": {
+            "name": "ElohimResiliencyBadge",
+            "module": "./elohim-resiliency-badge.js"
+          }
+        },
+        {
+          "kind": "js",
+          "name": "ResiliencyBadgeState",
+          "declaration": {
+            "name": "ResiliencyBadgeState",
+            "module": "./elohim-resiliency-badge.js"
+          }
+        },
+        {
+          "kind": "js",
           "name": "ElohimDefaultOmnibar",
           "declaration": {
             "name": "ElohimDefaultOmnibar",
@@ -7482,6 +8057,667 @@
     },
     {
       "kind": "javascript-module",
+      "path": "src/loader/loader.ts",
+      "declarations": [
+        {
+          "kind": "class",
+          "description": "",
+          "name": "Loader",
+          "members": [
+            {
+              "kind": "field",
+              "name": "verifyCid",
+              "type": {
+                "text": "boolean"
+              },
+              "privacy": "private",
+              "readonly": true
+            },
+            {
+              "kind": "method",
+              "name": "resolve",
+              "return": {
+                "type": {
+                  "text": "Promise<LoaderResolution>"
+                }
+              },
+              "parameters": [
+                {
+                  "name": "cid",
+                  "type": {
+                    "text": "string"
+                  }
+                }
+              ]
+            },
+            {
+              "kind": "method",
+              "name": "verifyCidMatches",
+              "privacy": "private",
+              "return": {
+                "type": {
+                  "text": "Promise<void>"
+                }
+              },
+              "parameters": [
+                {
+                  "name": "cid",
+                  "type": {
+                    "text": "string"
+                  }
+                },
+                {
+                  "name": "bytes",
+                  "type": {
+                    "text": "Uint8Array"
+                  }
+                }
+              ]
+            }
+          ]
+        }
+      ],
+      "exports": [
+        {
+          "kind": "js",
+          "name": "Loader",
+          "declaration": {
+            "name": "Loader",
+            "module": "src/loader/loader.ts"
+          }
+        }
+      ]
+    },
+    {
+      "kind": "javascript-module",
+      "path": "src/localize/generated/es.ts",
+      "declarations": [
+        {
+          "kind": "variable",
+          "name": "templates",
+          "type": {
+            "text": "object"
+          },
+          "default": "{ sdda0ebeb9a270e53: str`Hola, ${0}`, }"
+        }
+      ],
+      "exports": [
+        {
+          "kind": "js",
+          "name": "templates",
+          "declaration": {
+            "name": "templates",
+            "module": "src/localize/generated/es.ts"
+          }
+        }
+      ]
+    },
+    {
+      "kind": "javascript-module",
+      "path": "src/localize/generated/he.ts",
+      "declarations": [
+        {
+          "kind": "variable",
+          "name": "templates",
+          "type": {
+            "text": "object"
+          },
+          "default": "{ sdda0ebeb9a270e53: str`Hello, ${0}`, }"
+        }
+      ],
+      "exports": [
+        {
+          "kind": "js",
+          "name": "templates",
+          "declaration": {
+            "name": "templates",
+            "module": "src/localize/generated/he.ts"
+          }
+        }
+      ]
+    },
+    {
+      "kind": "javascript-module",
+      "path": "src/localize/generated/locale-codes.ts",
+      "declarations": [
+        {
+          "kind": "variable",
+          "name": "sourceLocale",
+          "default": "`en`",
+          "description": "The locale code that templates in this source code are written in."
+        },
+        {
+          "kind": "variable",
+          "name": "targetLocales",
+          "type": {
+            "text": "[`es`, `he`]"
+          },
+          "default": "[`es`, `he`]",
+          "description": "The other locale codes that this application is localized into. Sorted\nlexicographically."
+        },
+        {
+          "kind": "variable",
+          "name": "allLocales",
+          "type": {
+            "text": "[`en`, `es`, `he`]"
+          },
+          "default": "[`en`, `es`, `he`]",
+          "description": "All valid project locale codes. Sorted lexicographically."
+        }
+      ],
+      "exports": [
+        {
+          "kind": "js",
+          "name": "sourceLocale",
+          "declaration": {
+            "name": "sourceLocale",
+            "module": "src/localize/generated/locale-codes.ts"
+          }
+        },
+        {
+          "kind": "js",
+          "name": "targetLocales",
+          "declaration": {
+            "name": "targetLocales",
+            "module": "src/localize/generated/locale-codes.ts"
+          }
+        },
+        {
+          "kind": "js",
+          "name": "allLocales",
+          "declaration": {
+            "name": "allLocales",
+            "module": "src/localize/generated/locale-codes.ts"
+          }
+        }
+      ]
+    },
+    {
+      "kind": "javascript-module",
+      "path": "src/localize/locale-store.ts",
+      "declarations": [
+        {
+          "kind": "variable",
+          "name": "LOCALE_STORAGE_KEY",
+          "type": {
+            "text": "string"
+          },
+          "default": "'elohim-locale'"
+        },
+        {
+          "kind": "variable",
+          "name": "LOCALE_CHANGE_EVENT",
+          "type": {
+            "text": "string"
+          },
+          "default": "'elohim-locale-changed'"
+        },
+        {
+          "kind": "variable",
+          "name": "SUPPORTED_LOCALES",
+          "type": {
+            "text": "[sourceLocale, ...targetLocales]"
+          },
+          "default": "[sourceLocale, ...targetLocales]"
+        },
+        {
+          "kind": "variable",
+          "name": "LOCALE_LABELS",
+          "type": {
+            "text": "Readonly<Record<ElohimLocale, string>>"
+          },
+          "default": "{ en: 'English', es: 'Español', he: 'עברית', }",
+          "description": "Native-script labels — intentionally NOT localized (each language names itself)."
+        },
+        {
+          "kind": "function",
+          "name": "detectLocale",
+          "return": {
+            "type": {
+              "text": "ElohimLocale"
+            }
+          },
+          "description": "navigator.language 'es-MX' → 'es' when supported, else the en source locale."
+        },
+        {
+          "kind": "class",
+          "description": "",
+          "name": "LocaleStore",
+          "members": [
+            {
+              "kind": "field",
+              "name": "_locale",
+              "type": {
+                "text": "ElohimLocale"
+              },
+              "privacy": "private"
+            },
+            {
+              "kind": "field",
+              "name": "_destroyed",
+              "type": {
+                "text": "boolean"
+              },
+              "privacy": "private",
+              "default": "false"
+            },
+            {
+              "kind": "field",
+              "name": "subscribers",
+              "privacy": "private",
+              "readonly": true,
+              "default": "new Set<Subscriber>()"
+            },
+            {
+              "kind": "field",
+              "name": "_onStorage",
+              "type": {
+                "text": "(e: StorageEvent) => void"
+              },
+              "privacy": "private",
+              "readonly": true
+            },
+            {
+              "kind": "field",
+              "name": "_onLocaleChange",
+              "type": {
+                "text": "(e: Event) => void"
+              },
+              "privacy": "private",
+              "readonly": true
+            },
+            {
+              "kind": "method",
+              "name": "destroy",
+              "return": {
+                "type": {
+                  "text": "void"
+                }
+              },
+              "description": "Remove all window listeners and clear subscribers.\nCall from a web component's disconnectedCallback (or in tests) to avoid\nlistener accumulation on short-lived instances.\nThe module singleton (getLocaleStore()) is intentionally never destroyed."
+            },
+            {
+              "kind": "field",
+              "name": "locale",
+              "type": {
+                "text": "ElohimLocale"
+              },
+              "readonly": true
+            },
+            {
+              "kind": "method",
+              "name": "set",
+              "return": {
+                "type": {
+                  "text": "void"
+                }
+              },
+              "parameters": [
+                {
+                  "name": "locale",
+                  "type": {
+                    "text": "ElohimLocale"
+                  }
+                }
+              ]
+            },
+            {
+              "kind": "method",
+              "name": "subscribe",
+              "return": {
+                "type": {
+                  "text": "() => void"
+                }
+              },
+              "parameters": [
+                {
+                  "name": "fn",
+                  "type": {
+                    "text": "Subscriber"
+                  }
+                }
+              ],
+              "description": "Subscribe to locale changes. Returns an unsubscribe function."
+            },
+            {
+              "kind": "method",
+              "name": "adopt",
+              "privacy": "private",
+              "return": {
+                "type": {
+                  "text": "void"
+                }
+              },
+              "parameters": [
+                {
+                  "name": "locale",
+                  "type": {
+                    "text": "ElohimLocale"
+                  }
+                }
+              ],
+              "description": "External change (other tab/island): apply + notify, never re-persist/dispatch."
+            },
+            {
+              "kind": "method",
+              "name": "applyToDocument",
+              "privacy": "private",
+              "return": {
+                "type": {
+                  "text": "void"
+                }
+              },
+              "parameters": [
+                {
+                  "name": "locale",
+                  "type": {
+                    "text": "ElohimLocale"
+                  }
+                }
+              ]
+            },
+            {
+              "kind": "method",
+              "name": "load",
+              "privacy": "private",
+              "return": {
+                "type": {
+                  "text": "ElohimLocale | null"
+                }
+              }
+            }
+          ]
+        },
+        {
+          "kind": "function",
+          "name": "getLocaleStore",
+          "return": {
+            "type": {
+              "text": "LocaleStore"
+            }
+          },
+          "description": "Module-level singleton — all islands in a document share one store."
+        }
+      ],
+      "exports": [
+        {
+          "kind": "js",
+          "name": "LOCALE_STORAGE_KEY",
+          "declaration": {
+            "name": "LOCALE_STORAGE_KEY",
+            "module": "src/localize/locale-store.ts"
+          }
+        },
+        {
+          "kind": "js",
+          "name": "LOCALE_CHANGE_EVENT",
+          "declaration": {
+            "name": "LOCALE_CHANGE_EVENT",
+            "module": "src/localize/locale-store.ts"
+          }
+        },
+        {
+          "kind": "js",
+          "name": "SUPPORTED_LOCALES",
+          "declaration": {
+            "name": "SUPPORTED_LOCALES",
+            "module": "src/localize/locale-store.ts"
+          }
+        },
+        {
+          "kind": "js",
+          "name": "LOCALE_LABELS",
+          "declaration": {
+            "name": "LOCALE_LABELS",
+            "module": "src/localize/locale-store.ts"
+          }
+        },
+        {
+          "kind": "js",
+          "name": "detectLocale",
+          "declaration": {
+            "name": "detectLocale",
+            "module": "src/localize/locale-store.ts"
+          }
+        },
+        {
+          "kind": "js",
+          "name": "LocaleStore",
+          "declaration": {
+            "name": "LocaleStore",
+            "module": "src/localize/locale-store.ts"
+          }
+        },
+        {
+          "kind": "js",
+          "name": "getLocaleStore",
+          "declaration": {
+            "name": "getLocaleStore",
+            "module": "src/localize/locale-store.ts"
+          }
+        }
+      ]
+    },
+    {
+      "kind": "javascript-module",
+      "path": "src/localize/runtime.ts",
+      "declarations": [
+        {
+          "kind": "variable",
+          "name": "sourceLocale",
+          "type": {
+            "text": "string"
+          },
+          "default": "'en'"
+        },
+        {
+          "kind": "variable",
+          "name": "targetLocales",
+          "type": {
+            "text": "['es', 'he']"
+          },
+          "default": "['es', 'he']"
+        },
+        {
+          "kind": "variable",
+          "name": "{ getLocale, setLocale }",
+          "default": "(globalHost.__ELOHIM_CORE_LOCALIZE_RUNTIME__ ??= configureLocalization({ sourceLocale, targetLocales: [...targetLocales], loadLocale: async (locale: string) => { // eslint-disable-next-line @typescript-eslint/no-unsafe-return -- dynamic locale import; shape verified at runtime by lit-localize return import(`./generated/${locale}.js`); }, }))"
+        }
+      ],
+      "exports": [
+        {
+          "kind": "js",
+          "name": "sourceLocale",
+          "declaration": {
+            "name": "sourceLocale",
+            "module": "src/localize/runtime.ts"
+          }
+        },
+        {
+          "kind": "js",
+          "name": "targetLocales",
+          "declaration": {
+            "name": "targetLocales",
+            "module": "src/localize/runtime.ts"
+          }
+        },
+        {
+          "kind": "js",
+          "name": "{ getLocale, setLocale }",
+          "declaration": {
+            "name": "{ getLocale, setLocale }",
+            "module": "src/localize/runtime.ts"
+          }
+        }
+      ]
+    },
+    {
+      "kind": "javascript-module",
+      "path": "src/localize/source-locale.ts",
+      "declarations": [
+        {
+          "kind": "function",
+          "name": "smokeGreeting",
+          "parameters": [
+            {
+              "name": "name",
+              "type": {
+                "text": "string"
+              }
+            }
+          ],
+          "description": "Smoke-test source string — proves the localize pipeline is wired and provides\none entry for the xliff seed."
+        }
+      ],
+      "exports": [
+        {
+          "kind": "js",
+          "name": "smokeGreeting",
+          "declaration": {
+            "name": "smokeGreeting",
+            "module": "src/localize/source-locale.ts"
+          }
+        }
+      ]
+    },
+    {
+      "kind": "javascript-module",
+      "path": "src/navigation/epr-link-interceptor.ts",
+      "declarations": [
+        {
+          "kind": "function",
+          "name": "recordCrossBundleHandoff",
+          "return": {
+            "type": {
+              "text": "void"
+            }
+          },
+          "parameters": [
+            {
+              "name": "cid",
+              "default": "''"
+            }
+          ],
+          "description": "Append a handoff entry to the shared session-nav-stack — the same\nsessionStorage shape elohim-app's SessionNavStackService reads, so the\nprotocol-omni back affordance survives the bundle boundary."
+        },
+        {
+          "kind": "function",
+          "name": "baseHrefOwnsPath",
+          "return": {
+            "type": {
+              "text": "boolean"
+            }
+          },
+          "parameters": [
+            {
+              "name": "path",
+              "type": {
+                "text": "string"
+              }
+            }
+          ],
+          "description": "Default ownsPath: prefix match against this bundle's <base href>. A \"/\"\nbase owns everything — the shell (base \"/\") installs explicitly with a\nrouter-aware predicate instead of relying on this heuristic."
+        },
+        {
+          "kind": "function",
+          "name": "installEprLinkInterceptor",
+          "return": {
+            "type": {
+              "text": "() => void"
+            }
+          },
+          "parameters": [
+            {
+              "name": "options",
+              "default": "{}",
+              "type": {
+                "text": "EprLinkInterceptorOptions"
+              }
+            }
+          ]
+        }
+      ],
+      "exports": [
+        {
+          "kind": "js",
+          "name": "recordCrossBundleHandoff",
+          "declaration": {
+            "name": "recordCrossBundleHandoff",
+            "module": "src/navigation/epr-link-interceptor.ts"
+          }
+        },
+        {
+          "kind": "js",
+          "name": "baseHrefOwnsPath",
+          "declaration": {
+            "name": "baseHrefOwnsPath",
+            "module": "src/navigation/epr-link-interceptor.ts"
+          }
+        },
+        {
+          "kind": "js",
+          "name": "installEprLinkInterceptor",
+          "declaration": {
+            "name": "installEprLinkInterceptor",
+            "module": "src/navigation/epr-link-interceptor.ts"
+          }
+        }
+      ]
+    },
+    {
+      "kind": "javascript-module",
+      "path": "src/navigation/epr-resolution-provider.ts",
+      "declarations": [
+        {
+          "kind": "variable",
+          "name": "eprResolutionContext"
+        },
+        {
+          "kind": "function",
+          "name": "installEprResolutionProvider",
+          "return": {
+            "type": {
+              "text": "() => void"
+            }
+          },
+          "parameters": [
+            {
+              "name": "host",
+              "type": {
+                "text": "HTMLElement"
+              }
+            },
+            {
+              "name": "provider",
+              "type": {
+                "text": "EprResolutionProvider"
+              }
+            }
+          ],
+          "description": "Install the ambient EPR resolution provider on a surface root element.\n\nSymmetric with `installEprLinkInterceptor` — the shell root calls both, so\n\"what does resolving mean\" has exactly one answer per surface. Attaches a\n`@lit/context` provider that answers `context-request` events bubbling up from\nany `<elohim-*>` element beneath `host`; those elements then resolve through\n`provider` with no per-element wiring. Encapsulates `@lit/context` so\nframework hosts (the Angular shell) never depend on it directly.\n\nReturns a teardown that detaches the value (elements degrade to their id-only\nface). The host typically outlives the app, so teardown is rarely needed."
+        }
+      ],
+      "exports": [
+        {
+          "kind": "js",
+          "name": "eprResolutionContext",
+          "declaration": {
+            "name": "eprResolutionContext",
+            "module": "src/navigation/epr-resolution-provider.ts"
+          }
+        },
+        {
+          "kind": "js",
+          "name": "installEprResolutionProvider",
+          "declaration": {
+            "name": "installEprResolutionProvider",
+            "module": "src/navigation/epr-resolution-provider.ts"
+          }
+        }
+      ]
+    },
+    {
+      "kind": "javascript-module",
       "path": "src/register.ts",
       "declarations": [],
       "exports": [
@@ -7644,517 +8880,13 @@
             "name": "ElohimSeamMap",
             "module": "/src/elohim-seam-map.js"
           }
-        }
-      ]
-    },
-    {
-      "kind": "javascript-module",
-      "path": "src/viewport-archetypes.ts",
-      "declarations": [
-        {
-          "kind": "variable",
-          "name": "VIEWPORT_ARCHETYPES",
-          "default": "{ /** Small/older phones and split-screen Android — the floor. */ 'phone-small': { width: 320, height: 568, represents: 'small phone / split-screen floor' }, /** Mainstream phone portrait (iPhone 12-16 class). */ phone: { width: 390, height: 844, represents: 'mainstream phone portrait' }, /** Tablet portrait / phone landscape class. */ tablet: { width: 768, height: 1024, represents: 'tablet portrait' }, /** Default desktop window — matches the look/device default. */ desktop: { width: 1280, height: 800, represents: 'desktop window' }, } as const satisfies Record<string, ViewportArchetype>"
-        }
-      ],
-      "exports": [
-        {
-          "kind": "js",
-          "name": "VIEWPORT_ARCHETYPES",
-          "declaration": {
-            "name": "VIEWPORT_ARCHETYPES",
-            "module": "src/viewport-archetypes.ts"
-          }
-        }
-      ]
-    },
-    {
-      "kind": "javascript-module",
-      "path": "src/contracts/omnibar.contract.ts",
-      "declarations": [],
-      "exports": []
-    },
-    {
-      "kind": "javascript-module",
-      "path": "src/capability/certainty.ts",
-      "declarations": [
-        {
-          "kind": "variable",
-          "name": "UNKNOWN_CERTAINTY",
-          "type": {
-            "text": "ContentCertainty"
-          },
-          "description": "The safe default when no certainty has been provided. Elements MUST NOT render\ncanonical visuals when their certainty is unknown."
-        }
-      ],
-      "exports": [
-        {
-          "kind": "js",
-          "name": "UNKNOWN_CERTAINTY",
-          "declaration": {
-            "name": "UNKNOWN_CERTAINTY",
-            "module": "src/capability/certainty.ts"
-          }
-        }
-      ]
-    },
-    {
-      "kind": "javascript-module",
-      "path": "src/capability/context.ts",
-      "declarations": [
-        {
-          "kind": "variable",
-          "name": "capabilityProfileContext"
         },
         {
-          "kind": "variable",
-          "name": "contentCertaintyContext"
-        }
-      ],
-      "exports": [
-        {
-          "kind": "js",
-          "name": "capabilityProfileContext",
+          "kind": "custom-element-definition",
+          "name": "elohim-resiliency-badge",
           "declaration": {
-            "name": "capabilityProfileContext",
-            "module": "src/capability/context.ts"
-          }
-        },
-        {
-          "kind": "js",
-          "name": "contentCertaintyContext",
-          "declaration": {
-            "name": "contentCertaintyContext",
-            "module": "src/capability/context.ts"
-          }
-        }
-      ]
-    },
-    {
-      "kind": "javascript-module",
-      "path": "src/capability/index.ts",
-      "declarations": [],
-      "exports": [
-        {
-          "kind": "js",
-          "name": "*",
-          "declaration": {
-            "name": "*",
-            "module": "src/capability/profile.js"
-          }
-        },
-        {
-          "kind": "js",
-          "name": "*",
-          "declaration": {
-            "name": "*",
-            "module": "src/capability/certainty.js"
-          }
-        },
-        {
-          "kind": "js",
-          "name": "*",
-          "declaration": {
-            "name": "*",
-            "module": "src/capability/standing.js"
-          }
-        },
-        {
-          "kind": "js",
-          "name": "*",
-          "declaration": {
-            "name": "*",
-            "module": "src/capability/context.js"
-          }
-        },
-        {
-          "kind": "js",
-          "name": "*",
-          "declaration": {
-            "name": "*",
-            "module": "src/capability/mixin.js"
-          }
-        }
-      ]
-    },
-    {
-      "kind": "javascript-module",
-      "path": "src/capability/mixin.ts",
-      "declarations": [
-        {
-          "kind": "mixin",
-          "description": "",
-          "name": "CapabilityAwareElement",
-          "members": [
-            {
-              "kind": "field",
-              "name": "properties",
-              "type": {
-                "text": "PropertyDeclarations"
-              },
-              "static": true,
-              "readonly": true,
-              "default": "{ ...(Base as unknown as { properties?: PropertyDeclarations }).properties, profile: { attribute: false, state: true }, }"
-            },
-            {
-              "kind": "field",
-              "name": "profile",
-              "privacy": "public",
-              "type": {
-                "text": "CapabilityProfile"
-              },
-              "default": "DEFAULT_PROFILE"
-            }
-          ],
-          "parameters": [
-            {
-              "name": "Base",
-              "type": {
-                "text": "TBase"
-              }
-            }
-          ]
-        }
-      ],
-      "exports": [
-        {
-          "kind": "js",
-          "name": "CapabilityAwareElement",
-          "declaration": {
-            "name": "CapabilityAwareElement",
-            "module": "src/capability/mixin.ts"
-          }
-        }
-      ]
-    },
-    {
-      "kind": "javascript-module",
-      "path": "src/capability/profile.ts",
-      "declarations": [
-        {
-          "kind": "variable",
-          "name": "LENS_ORDER",
-          "type": {
-            "text": "[\n  'minimal',\n  'simple',\n  'standard',\n  'detail',\n  'debug',\n  'trace',\n]"
-          },
-          "default": "[ 'minimal', 'simple', 'standard', 'detail', 'debug', 'trace', ]"
-        },
-        {
-          "kind": "variable",
-          "name": "STIMULUS_ORDER",
-          "type": {
-            "text": "['still', 'gentle', 'lively']"
-          },
-          "default": "['still', 'gentle', 'lively']"
-        },
-        {
-          "kind": "variable",
-          "name": "DEFAULT_PROFILE",
-          "type": {
-            "text": "{\n  lens: 'standard',\n  theme: 'auto',\n  contrast: 'auto',\n  locale: 'auto',\n  stimulus: 'still',\n  textuality: 'textual',\n  standings: [],\n  lock: { kind: 'pilot' },\n  origin: 'pilot',\n}"
-          },
-          "default": "{ lens: 'standard', theme: 'auto', contrast: 'auto', locale: 'auto', stimulus: 'still', textuality: 'textual', standings: [], lock: { kind: 'pilot' }, origin: 'pilot', }",
-          "description": "The Sabbath default. Stillness in the type system; textual for the literate-adult baseline.\nStewards may pin pre-literate/symbolic, locked-lens, locked-locale, etc."
-        }
-      ],
-      "exports": [
-        {
-          "kind": "js",
-          "name": "LENS_ORDER",
-          "declaration": {
-            "name": "LENS_ORDER",
-            "module": "src/capability/profile.ts"
-          }
-        },
-        {
-          "kind": "js",
-          "name": "STIMULUS_ORDER",
-          "declaration": {
-            "name": "STIMULUS_ORDER",
-            "module": "src/capability/profile.ts"
-          }
-        },
-        {
-          "kind": "js",
-          "name": "DEFAULT_PROFILE",
-          "declaration": {
-            "name": "DEFAULT_PROFILE",
-            "module": "src/capability/profile.ts"
-          }
-        }
-      ]
-    },
-    {
-      "kind": "javascript-module",
-      "path": "src/capability/standing.ts",
-      "declarations": [
-        {
-          "kind": "function",
-          "name": "parseStandingRequirement",
-          "return": {
-            "type": {
-              "text": "readonly Standing[][]"
-            }
-          },
-          "parameters": [
-            {
-              "name": "requirement",
-              "type": {
-                "text": "readonly string[]"
-              }
-            }
-          ],
-          "description": "Parses the contract DSL into normalized form: outer array is AND, inner array is OR.\nEach inner array element is a Standing name."
-        },
-        {
-          "kind": "function",
-          "name": "satisfiesRequirement",
-          "return": {
-            "type": {
-              "text": "boolean"
-            }
-          },
-          "parameters": [
-            {
-              "name": "held",
-              "type": {
-                "text": "readonly Standing[]"
-              }
-            },
-            {
-              "name": "requirement",
-              "type": {
-                "text": "readonly string[]"
-              }
-            }
-          ],
-          "description": "Returns true if `held` satisfies `requirement`.\nAND across outer groups; OR within each group."
-        }
-      ],
-      "exports": [
-        {
-          "kind": "js",
-          "name": "parseStandingRequirement",
-          "declaration": {
-            "name": "parseStandingRequirement",
-            "module": "src/capability/standing.ts"
-          }
-        },
-        {
-          "kind": "js",
-          "name": "satisfiesRequirement",
-          "declaration": {
-            "name": "satisfiesRequirement",
-            "module": "src/capability/standing.ts"
-          }
-        }
-      ]
-    },
-    {
-      "kind": "javascript-module",
-      "path": "src/loader/loader.ts",
-      "declarations": [
-        {
-          "kind": "class",
-          "description": "",
-          "name": "Loader",
-          "members": [
-            {
-              "kind": "field",
-              "name": "verifyCid",
-              "type": {
-                "text": "boolean"
-              },
-              "privacy": "private",
-              "readonly": true
-            },
-            {
-              "kind": "method",
-              "name": "resolve",
-              "return": {
-                "type": {
-                  "text": "Promise<LoaderResolution>"
-                }
-              },
-              "parameters": [
-                {
-                  "name": "cid",
-                  "type": {
-                    "text": "string"
-                  }
-                }
-              ]
-            },
-            {
-              "kind": "method",
-              "name": "verifyCidMatches",
-              "privacy": "private",
-              "return": {
-                "type": {
-                  "text": "Promise<void>"
-                }
-              },
-              "parameters": [
-                {
-                  "name": "cid",
-                  "type": {
-                    "text": "string"
-                  }
-                },
-                {
-                  "name": "bytes",
-                  "type": {
-                    "text": "Uint8Array"
-                  }
-                }
-              ]
-            }
-          ]
-        }
-      ],
-      "exports": [
-        {
-          "kind": "js",
-          "name": "Loader",
-          "declaration": {
-            "name": "Loader",
-            "module": "src/loader/loader.ts"
-          }
-        }
-      ]
-    },
-    {
-      "kind": "javascript-module",
-      "path": "src/navigation/epr-link-interceptor.ts",
-      "declarations": [
-        {
-          "kind": "function",
-          "name": "recordCrossBundleHandoff",
-          "return": {
-            "type": {
-              "text": "void"
-            }
-          },
-          "parameters": [
-            {
-              "name": "cid",
-              "default": "''"
-            }
-          ],
-          "description": "Append a handoff entry to the shared session-nav-stack — the same\nsessionStorage shape elohim-app's SessionNavStackService reads, so the\nprotocol-omni back affordance survives the bundle boundary."
-        },
-        {
-          "kind": "function",
-          "name": "baseHrefOwnsPath",
-          "return": {
-            "type": {
-              "text": "boolean"
-            }
-          },
-          "parameters": [
-            {
-              "name": "path",
-              "type": {
-                "text": "string"
-              }
-            }
-          ],
-          "description": "Default ownsPath: prefix match against this bundle's <base href>. A \"/\"\nbase owns everything — the shell (base \"/\") installs explicitly with a\nrouter-aware predicate instead of relying on this heuristic."
-        },
-        {
-          "kind": "function",
-          "name": "installEprLinkInterceptor",
-          "return": {
-            "type": {
-              "text": "() => void"
-            }
-          },
-          "parameters": [
-            {
-              "name": "options",
-              "default": "{}",
-              "type": {
-                "text": "EprLinkInterceptorOptions"
-              }
-            }
-          ]
-        }
-      ],
-      "exports": [
-        {
-          "kind": "js",
-          "name": "recordCrossBundleHandoff",
-          "declaration": {
-            "name": "recordCrossBundleHandoff",
-            "module": "src/navigation/epr-link-interceptor.ts"
-          }
-        },
-        {
-          "kind": "js",
-          "name": "baseHrefOwnsPath",
-          "declaration": {
-            "name": "baseHrefOwnsPath",
-            "module": "src/navigation/epr-link-interceptor.ts"
-          }
-        },
-        {
-          "kind": "js",
-          "name": "installEprLinkInterceptor",
-          "declaration": {
-            "name": "installEprLinkInterceptor",
-            "module": "src/navigation/epr-link-interceptor.ts"
-          }
-        }
-      ]
-    },
-    {
-      "kind": "javascript-module",
-      "path": "src/navigation/epr-resolution-provider.ts",
-      "declarations": [
-        {
-          "kind": "variable",
-          "name": "eprResolutionContext"
-        },
-        {
-          "kind": "function",
-          "name": "installEprResolutionProvider",
-          "return": {
-            "type": {
-              "text": "() => void"
-            }
-          },
-          "parameters": [
-            {
-              "name": "host",
-              "type": {
-                "text": "HTMLElement"
-              }
-            },
-            {
-              "name": "provider",
-              "type": {
-                "text": "EprResolutionProvider"
-              }
-            }
-          ],
-          "description": "Install the ambient EPR resolution provider on a surface root element.\n\nSymmetric with `installEprLinkInterceptor` — the shell root calls both, so\n\"what does resolving mean\" has exactly one answer per surface. Attaches a\n`@lit/context` provider that answers `context-request` events bubbling up from\nany `<elohim-*>` element beneath `host`; those elements then resolve through\n`provider` with no per-element wiring. Encapsulates `@lit/context` so\nframework hosts (the Angular shell) never depend on it directly.\n\nReturns a teardown that detaches the value (elements degrade to their id-only\nface). The host typically outlives the app, so teardown is rarely needed."
-        }
-      ],
-      "exports": [
-        {
-          "kind": "js",
-          "name": "eprResolutionContext",
-          "declaration": {
-            "name": "eprResolutionContext",
-            "module": "src/navigation/epr-resolution-provider.ts"
-          }
-        },
-        {
-          "kind": "js",
-          "name": "installEprResolutionProvider",
-          "declaration": {
-            "name": "installEprResolutionProvider",
-            "module": "src/navigation/epr-resolution-provider.ts"
+            "name": "ElohimResiliencyBadge",
+            "module": "/src/elohim-resiliency-badge.js"
           }
         }
       ]
@@ -9169,452 +9901,21 @@
     },
     {
       "kind": "javascript-module",
-      "path": "src/localize/locale-store.ts",
+      "path": "src/viewport-archetypes.ts",
       "declarations": [
         {
           "kind": "variable",
-          "name": "LOCALE_STORAGE_KEY",
-          "type": {
-            "text": "string"
-          },
-          "default": "'elohim-locale'"
-        },
-        {
-          "kind": "variable",
-          "name": "LOCALE_CHANGE_EVENT",
-          "type": {
-            "text": "string"
-          },
-          "default": "'elohim-locale-changed'"
-        },
-        {
-          "kind": "variable",
-          "name": "SUPPORTED_LOCALES",
-          "type": {
-            "text": "[sourceLocale, ...targetLocales]"
-          },
-          "default": "[sourceLocale, ...targetLocales]"
-        },
-        {
-          "kind": "variable",
-          "name": "LOCALE_LABELS",
-          "type": {
-            "text": "Readonly<Record<ElohimLocale, string>>"
-          },
-          "default": "{ en: 'English', es: 'Español', he: 'עברית', }",
-          "description": "Native-script labels — intentionally NOT localized (each language names itself)."
-        },
-        {
-          "kind": "function",
-          "name": "detectLocale",
-          "return": {
-            "type": {
-              "text": "ElohimLocale"
-            }
-          },
-          "description": "navigator.language 'es-MX' → 'es' when supported, else the en source locale."
-        },
-        {
-          "kind": "class",
-          "description": "",
-          "name": "LocaleStore",
-          "members": [
-            {
-              "kind": "field",
-              "name": "_locale",
-              "type": {
-                "text": "ElohimLocale"
-              },
-              "privacy": "private"
-            },
-            {
-              "kind": "field",
-              "name": "_destroyed",
-              "type": {
-                "text": "boolean"
-              },
-              "privacy": "private",
-              "default": "false"
-            },
-            {
-              "kind": "field",
-              "name": "subscribers",
-              "privacy": "private",
-              "readonly": true,
-              "default": "new Set<Subscriber>()"
-            },
-            {
-              "kind": "field",
-              "name": "_onStorage",
-              "type": {
-                "text": "(e: StorageEvent) => void"
-              },
-              "privacy": "private",
-              "readonly": true
-            },
-            {
-              "kind": "field",
-              "name": "_onLocaleChange",
-              "type": {
-                "text": "(e: Event) => void"
-              },
-              "privacy": "private",
-              "readonly": true
-            },
-            {
-              "kind": "method",
-              "name": "destroy",
-              "return": {
-                "type": {
-                  "text": "void"
-                }
-              },
-              "description": "Remove all window listeners and clear subscribers.\nCall from a web component's disconnectedCallback (or in tests) to avoid\nlistener accumulation on short-lived instances.\nThe module singleton (getLocaleStore()) is intentionally never destroyed."
-            },
-            {
-              "kind": "field",
-              "name": "locale",
-              "type": {
-                "text": "ElohimLocale"
-              },
-              "readonly": true
-            },
-            {
-              "kind": "method",
-              "name": "set",
-              "return": {
-                "type": {
-                  "text": "void"
-                }
-              },
-              "parameters": [
-                {
-                  "name": "locale",
-                  "type": {
-                    "text": "ElohimLocale"
-                  }
-                }
-              ]
-            },
-            {
-              "kind": "method",
-              "name": "subscribe",
-              "return": {
-                "type": {
-                  "text": "() => void"
-                }
-              },
-              "parameters": [
-                {
-                  "name": "fn",
-                  "type": {
-                    "text": "Subscriber"
-                  }
-                }
-              ],
-              "description": "Subscribe to locale changes. Returns an unsubscribe function."
-            },
-            {
-              "kind": "method",
-              "name": "adopt",
-              "privacy": "private",
-              "return": {
-                "type": {
-                  "text": "void"
-                }
-              },
-              "parameters": [
-                {
-                  "name": "locale",
-                  "type": {
-                    "text": "ElohimLocale"
-                  }
-                }
-              ],
-              "description": "External change (other tab/island): apply + notify, never re-persist/dispatch."
-            },
-            {
-              "kind": "method",
-              "name": "applyToDocument",
-              "privacy": "private",
-              "return": {
-                "type": {
-                  "text": "void"
-                }
-              },
-              "parameters": [
-                {
-                  "name": "locale",
-                  "type": {
-                    "text": "ElohimLocale"
-                  }
-                }
-              ]
-            },
-            {
-              "kind": "method",
-              "name": "load",
-              "privacy": "private",
-              "return": {
-                "type": {
-                  "text": "ElohimLocale | null"
-                }
-              }
-            }
-          ]
-        },
-        {
-          "kind": "function",
-          "name": "getLocaleStore",
-          "return": {
-            "type": {
-              "text": "LocaleStore"
-            }
-          },
-          "description": "Module-level singleton — all islands in a document share one store."
+          "name": "VIEWPORT_ARCHETYPES",
+          "default": "{ /** Small/older phones and split-screen Android — the floor. */ 'phone-small': { width: 320, height: 568, represents: 'small phone / split-screen floor' }, /** Mainstream phone portrait (iPhone 12-16 class). */ phone: { width: 390, height: 844, represents: 'mainstream phone portrait' }, /** Tablet portrait / phone landscape class. */ tablet: { width: 768, height: 1024, represents: 'tablet portrait' }, /** Default desktop window — matches the look/device default. */ desktop: { width: 1280, height: 800, represents: 'desktop window' }, } as const satisfies Record<string, ViewportArchetype>"
         }
       ],
       "exports": [
         {
           "kind": "js",
-          "name": "LOCALE_STORAGE_KEY",
+          "name": "VIEWPORT_ARCHETYPES",
           "declaration": {
-            "name": "LOCALE_STORAGE_KEY",
-            "module": "src/localize/locale-store.ts"
-          }
-        },
-        {
-          "kind": "js",
-          "name": "LOCALE_CHANGE_EVENT",
-          "declaration": {
-            "name": "LOCALE_CHANGE_EVENT",
-            "module": "src/localize/locale-store.ts"
-          }
-        },
-        {
-          "kind": "js",
-          "name": "SUPPORTED_LOCALES",
-          "declaration": {
-            "name": "SUPPORTED_LOCALES",
-            "module": "src/localize/locale-store.ts"
-          }
-        },
-        {
-          "kind": "js",
-          "name": "LOCALE_LABELS",
-          "declaration": {
-            "name": "LOCALE_LABELS",
-            "module": "src/localize/locale-store.ts"
-          }
-        },
-        {
-          "kind": "js",
-          "name": "detectLocale",
-          "declaration": {
-            "name": "detectLocale",
-            "module": "src/localize/locale-store.ts"
-          }
-        },
-        {
-          "kind": "js",
-          "name": "LocaleStore",
-          "declaration": {
-            "name": "LocaleStore",
-            "module": "src/localize/locale-store.ts"
-          }
-        },
-        {
-          "kind": "js",
-          "name": "getLocaleStore",
-          "declaration": {
-            "name": "getLocaleStore",
-            "module": "src/localize/locale-store.ts"
-          }
-        }
-      ]
-    },
-    {
-      "kind": "javascript-module",
-      "path": "src/localize/runtime.ts",
-      "declarations": [
-        {
-          "kind": "variable",
-          "name": "sourceLocale",
-          "type": {
-            "text": "string"
-          },
-          "default": "'en'"
-        },
-        {
-          "kind": "variable",
-          "name": "targetLocales",
-          "type": {
-            "text": "['es', 'he']"
-          },
-          "default": "['es', 'he']"
-        },
-        {
-          "kind": "variable",
-          "name": "{ getLocale, setLocale }",
-          "default": "(globalHost.__ELOHIM_CORE_LOCALIZE_RUNTIME__ ??= configureLocalization({ sourceLocale, targetLocales: [...targetLocales], loadLocale: async (locale: string) => { // eslint-disable-next-line @typescript-eslint/no-unsafe-return -- dynamic locale import; shape verified at runtime by lit-localize return import(`./generated/${locale}.js`); }, }))"
-        }
-      ],
-      "exports": [
-        {
-          "kind": "js",
-          "name": "sourceLocale",
-          "declaration": {
-            "name": "sourceLocale",
-            "module": "src/localize/runtime.ts"
-          }
-        },
-        {
-          "kind": "js",
-          "name": "targetLocales",
-          "declaration": {
-            "name": "targetLocales",
-            "module": "src/localize/runtime.ts"
-          }
-        },
-        {
-          "kind": "js",
-          "name": "{ getLocale, setLocale }",
-          "declaration": {
-            "name": "{ getLocale, setLocale }",
-            "module": "src/localize/runtime.ts"
-          }
-        }
-      ]
-    },
-    {
-      "kind": "javascript-module",
-      "path": "src/localize/source-locale.ts",
-      "declarations": [
-        {
-          "kind": "function",
-          "name": "smokeGreeting",
-          "parameters": [
-            {
-              "name": "name",
-              "type": {
-                "text": "string"
-              }
-            }
-          ],
-          "description": "Smoke-test source string — proves the localize pipeline is wired and provides\none entry for the xliff seed."
-        }
-      ],
-      "exports": [
-        {
-          "kind": "js",
-          "name": "smokeGreeting",
-          "declaration": {
-            "name": "smokeGreeting",
-            "module": "src/localize/source-locale.ts"
-          }
-        }
-      ]
-    },
-    {
-      "kind": "javascript-module",
-      "path": "src/localize/generated/es.ts",
-      "declarations": [
-        {
-          "kind": "variable",
-          "name": "templates",
-          "type": {
-            "text": "object"
-          },
-          "default": "{ sdda0ebeb9a270e53: str`Hola, ${0}`, }"
-        }
-      ],
-      "exports": [
-        {
-          "kind": "js",
-          "name": "templates",
-          "declaration": {
-            "name": "templates",
-            "module": "src/localize/generated/es.ts"
-          }
-        }
-      ]
-    },
-    {
-      "kind": "javascript-module",
-      "path": "src/localize/generated/he.ts",
-      "declarations": [
-        {
-          "kind": "variable",
-          "name": "templates",
-          "type": {
-            "text": "object"
-          },
-          "default": "{ sdda0ebeb9a270e53: str`Hello, ${0}`, }"
-        }
-      ],
-      "exports": [
-        {
-          "kind": "js",
-          "name": "templates",
-          "declaration": {
-            "name": "templates",
-            "module": "src/localize/generated/he.ts"
-          }
-        }
-      ]
-    },
-    {
-      "kind": "javascript-module",
-      "path": "src/localize/generated/locale-codes.ts",
-      "declarations": [
-        {
-          "kind": "variable",
-          "name": "sourceLocale",
-          "default": "`en`",
-          "description": "The locale code that templates in this source code are written in."
-        },
-        {
-          "kind": "variable",
-          "name": "targetLocales",
-          "type": {
-            "text": "[`es`, `he`]"
-          },
-          "default": "[`es`, `he`]",
-          "description": "The other locale codes that this application is localized into. Sorted\nlexicographically."
-        },
-        {
-          "kind": "variable",
-          "name": "allLocales",
-          "type": {
-            "text": "[`en`, `es`, `he`]"
-          },
-          "default": "[`en`, `es`, `he`]",
-          "description": "All valid project locale codes. Sorted lexicographically."
-        }
-      ],
-      "exports": [
-        {
-          "kind": "js",
-          "name": "sourceLocale",
-          "declaration": {
-            "name": "sourceLocale",
-            "module": "src/localize/generated/locale-codes.ts"
-          }
-        },
-        {
-          "kind": "js",
-          "name": "targetLocales",
-          "declaration": {
-            "name": "targetLocales",
-            "module": "src/localize/generated/locale-codes.ts"
-          }
-        },
-        {
-          "kind": "js",
-          "name": "allLocales",
-          "declaration": {
-            "name": "allLocales",
-            "module": "src/localize/generated/locale-codes.ts"
+            "name": "VIEWPORT_ARCHETYPES",
+            "module": "src/viewport-archetypes.ts"
           }
         }
       ]

@@ -384,16 +384,60 @@ pub fn inventory_for_reconcile(
     offset: i64,
     cap: i64,
 ) -> Result<(Vec<ReconcileInventoryRow>, usize), StorageError> {
+    reconcile_inventory_page(conn, ctx, offset, cap, false)
+}
+
+/// The inventory a peer ADVERTISES on the unfiltered REA reconcile stream:
+/// [`inventory_for_reconcile`] minus every row whose id is also the `cid` of a
+/// `mishpat_commitments` row. Those rows are replication commitments this peer
+/// authored through the mishpat zome and mirrored in
+/// ([`mirror_replication_commitment`]); the asker heals a missing id by asking
+/// its own conductor's content_store zome, which cannot answer for a mishpat
+/// entry hash, so advertising them only makes every peer re-read them forever.
+///
+/// `total` is counted over the SAME filtered set (the requester windows on it).
+/// The local diff keeps using the full [`inventory_for_reconcile`]. Exact join
+/// only: a hash-shaped id with no `mishpat_commitments` row is still advertised.
+pub fn inventory_for_peer_reconcile(
+    conn: &mut SqliteConnection,
+    ctx: &AppContext,
+    offset: i64,
+    cap: i64,
+) -> Result<(Vec<ReconcileInventoryRow>, usize), StorageError> {
+    reconcile_inventory_page(conn, ctx, offset, cap, true)
+}
+
+fn reconcile_inventory_page(
+    conn: &mut SqliteConnection,
+    ctx: &AppContext,
+    offset: i64,
+    cap: i64,
+    omit_mishpat_notary: bool,
+) -> Result<(Vec<ReconcileInventoryRow>, usize), StorageError> {
+    use diesel::dsl::sql;
+    use diesel::sql_types::Bool;
+
+    // `mishpat_commitments` carries no `h_app_id`; the join is on `cid` alone.
+    let not_mishpat = || {
+        sql::<Bool>(if omit_mishpat_notary {
+            "NOT EXISTS (SELECT 1 FROM mishpat_commitments m WHERE m.cid = rea_commitments.id)"
+        } else {
+            "1"
+        })
+    };
+
     // `total` is already the honest whole-corpus count (offset-invariant), so the
     // requester can always tell a windowed page from the full inventory.
     let total: i64 = rea_commitments::table
         .filter(rea_commitments::h_app_id.eq(&ctx.h_app_id))
+        .filter(not_mishpat())
         .count()
         .get_result(conn)
         .map_err(|e| StorageError::Internal(format!("inventory count failed: {e}")))?;
 
     let rows: Vec<(String, Option<String>, String)> = rea_commitments::table
         .filter(rea_commitments::h_app_id.eq(&ctx.h_app_id))
+        .filter(not_mishpat())
         .order(rea_commitments::created_at.desc())
         .offset(offset.max(0))
         .limit(cap)
@@ -3918,5 +3962,127 @@ mod hosting_inventory_tests {
             parse_projection_scope(&nested).is_err(),
             "legacy nesting has a fixed codec budget"
         );
+    }
+}
+
+#[cfg(test)]
+mod peer_inventory_tests {
+    use super::*;
+    use crate::db::models::NewReaCommitment;
+    use diesel_migrations::{embed_migrations, EmbeddedMigrations, MigrationHarness};
+
+    const MIGRATIONS: EmbeddedMigrations = embed_migrations!("migrations");
+
+    fn setup() -> SqliteConnection {
+        let mut conn = SqliteConnection::establish(":memory:").expect("in-memory DB");
+        conn.run_pending_migrations(MIGRATIONS).expect("migrations");
+        conn
+    }
+
+    fn insert(conn: &mut SqliteConnection, ctx: &AppContext, id: &str) {
+        let row = NewReaCommitment {
+            id,
+            h_app_id: &ctx.h_app_id,
+            action: "replicates-dwelling",
+            provider: "provider",
+            receiver: "receiver",
+            resource_conforms_to: None,
+            resource_classified_as: None,
+            resource_quantity_value: None,
+            resource_quantity_unit: None,
+            effort_quantity_value: None,
+            effort_quantity_unit: None,
+            has_beginning: None,
+            has_end: None,
+            due: None,
+            clause_of: None,
+            in_scope_of: None,
+            medium_of_exchange_id: None,
+            state: "active",
+            finished: 0,
+            note: None,
+            metadata_json: None,
+            dht_anchor_hash: None,
+        };
+        diesel::insert_into(rea_commitments::table)
+            .values(&row)
+            .execute(conn)
+            .expect("insert commitment");
+    }
+
+    /// The mishpat-side row whose `cid` is the mirrored `rea_commitments.id`.
+    fn insert_mishpat(conn: &mut SqliteConnection, cid: &str) {
+        diesel::sql_query(
+            "INSERT INTO mishpat_commitments \
+             (cid, action, scope, provider, recipient, bounds_json, valid_from, valid_until) \
+             VALUES (?, 'replicates-dwelling', 's', 'p', 'r', '{}', 'a', 'b')",
+        )
+        .bind::<diesel::sql_types::Text, _>(cid)
+        .execute(conn)
+        .expect("insert mishpat commitment");
+    }
+
+    fn ids(rows: &[ReconcileInventoryRow]) -> Vec<String> {
+        let mut v: Vec<String> = rows.iter().map(|r| r.0.clone()).collect();
+        v.sort();
+        v
+    }
+
+    #[test]
+    fn peer_inventory_omits_rows_whose_notary_is_mishpat() {
+        let mut conn = setup();
+        let ctx = AppContext::new("test-app");
+        insert(&mut conn, &ctx, "custody-blob-x");
+        insert(&mut conn, &ctx, "uhCEkmirrored");
+        insert_mishpat(&mut conn, "uhCEkmirrored");
+
+        let (peer, total) = inventory_for_peer_reconcile(&mut conn, &ctx, 0, i64::MAX).unwrap();
+        assert_eq!(ids(&peer), vec!["custody-blob-x".to_string()]);
+        assert_eq!(total, 1);
+
+        let (full, full_total) = inventory_for_reconcile(&mut conn, &ctx, 0, i64::MAX).unwrap();
+        assert_eq!(full.len(), 2);
+        assert_eq!(full_total, 2);
+    }
+
+    #[test]
+    fn peer_inventory_total_and_paging_agree_under_the_filter() {
+        let mut conn = setup();
+        let ctx = AppContext::new("test-app");
+        let mut native = Vec::new();
+        for i in 0..5 {
+            let n = format!("native-{i}");
+            insert(&mut conn, &ctx, &n);
+            native.push(n);
+            let m = format!("uhCEkmirror{i}");
+            insert(&mut conn, &ctx, &m);
+            insert_mishpat(&mut conn, &m);
+        }
+        native.sort();
+
+        let mut seen = Vec::new();
+        let mut offset = 0;
+        loop {
+            let (page, total) = inventory_for_peer_reconcile(&mut conn, &ctx, offset, 2).unwrap();
+            assert_eq!(total, native.len());
+            if page.is_empty() {
+                break;
+            }
+            assert!((offset as usize) < total, "page served past total");
+            offset += page.len() as i64;
+            seen.extend(page);
+        }
+        assert_eq!(ids(&seen), native);
+    }
+
+    #[test]
+    fn a_row_with_a_hash_shaped_id_but_no_mishpat_row_is_still_advertised() {
+        let mut conn = setup();
+        let ctx = AppContext::new("test-app");
+        insert(&mut conn, &ctx, "uhCEkNoMishpatRow");
+
+        let (peer, total) = inventory_for_peer_reconcile(&mut conn, &ctx, 0, i64::MAX).unwrap();
+        assert_eq!(ids(&peer), vec!["uhCEkNoMishpatRow".to_string()]);
+        assert_eq!(total, 1);
     }
 }

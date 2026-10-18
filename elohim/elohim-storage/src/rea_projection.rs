@@ -681,6 +681,79 @@ fn current_lamad_client(
     })
 }
 
+/// Which fields of a resolved head differ from the declaration, each as
+/// `name expected=… actual=…` (values truncated). Empty when it matches.
+pub(crate) fn ordered_head_mismatch_fields(
+    content_id: &str,
+    head_action_hash: &HoloHashB64,
+    ordering: content_diesel::CanonicalOrdering,
+    head: &crate::services::conductor_writes::ContentHeadWire,
+) -> Vec<String> {
+    fn clip(v: impl std::fmt::Display) -> String {
+        let s = v.to_string();
+        if s.chars().count() > 24 {
+            format!("{}…", s.chars().take(24).collect::<String>())
+        } else {
+            s
+        }
+    }
+    let mut out = Vec::new();
+    if head.content_id != content_id {
+        out.push(format!(
+            "content_id expected={} actual={}",
+            clip(content_id),
+            clip(&head.content_id)
+        ));
+    }
+    if head.content.id != content_id {
+        out.push(format!(
+            "content.id expected={} actual={}",
+            clip(content_id),
+            clip(&head.content.id)
+        ));
+    }
+    if head.head_action_hash.as_str() != head_action_hash.as_str() {
+        out.push(format!(
+            "head_hash expected={} actual={}",
+            clip(head_action_hash.as_str()),
+            clip(head.head_action_hash.as_str())
+        ));
+    }
+    if !head.canonical {
+        out.push("canonical_status expected=true actual=false".into());
+    }
+    match head.canonical_ordering() {
+        None => out.push(format!(
+            "ordering expected=(at={},earned={}) actual=none",
+            ordering.declared_at, ordering.earned
+        )),
+        Some(resolved) => {
+            if resolved.declared_at != ordering.declared_at {
+                out.push(format!(
+                    "timestamp expected={} actual={}",
+                    ordering.declared_at, resolved.declared_at
+                ));
+            }
+            if resolved.earned != ordering.earned {
+                out.push(format!(
+                    "tier expected_earned={} actual_earned={}",
+                    ordering.earned, resolved.earned
+                ));
+            }
+            if let Some(l) = ordering.link {
+                if resolved.link != Some(l) {
+                    out.push(format!(
+                        "ordering_link expected={:?} actual={:?}",
+                        clip(format!("{l:?}")),
+                        clip(format!("{:?}", resolved.link))
+                    ));
+                }
+            }
+        }
+    }
+    out
+}
+
 fn validate_ordered_content_head(
     content_id: &str,
     head_action_hash: &HoloHashB64,
@@ -697,8 +770,10 @@ fn validate_ordered_content_head(
             resolved.same_clock(&ordering) && ordering.link.is_none_or(|l| resolved.link == Some(l))
         })
     {
+        let fields = ordered_head_mismatch_fields(content_id, head_action_hash, ordering, &head);
         return Err(StorageError::InvalidInput(format!(
-            "ordered ContentHeadDeclared did not resolve its exact canonical payload: {content_id}"
+            "ordered ContentHeadDeclared did not resolve its exact canonical payload: {content_id} [mismatched: {}]",
+            fields.join("; ")
         )));
     }
     Ok(head)
@@ -881,6 +956,10 @@ pub async fn handle_authenticated_content_head_signal(
         ));
     };
 
+    // The ordered twin of the poke in `handle_rea_signal`'s arm — first, so a
+    // failed hydration below still ends a followed release channel's rest.
+    crate::services::release_adoption::watch::poke(&content_id);
+
     // This subscriber is registered through the infrastructure bridge because
     // that app websocket carries every installed cell's signals. The content
     // read itself belongs to lamad, though. Resolve its CURRENT supervised
@@ -915,6 +994,186 @@ pub async fn handle_authenticated_content_head_signal(
         ctx,
     )?;
     notify_content_touched(&content_id);
+    Ok(())
+}
+
+// ----------------------------------------------------------------------------
+// Bounded hydration retry
+// ----------------------------------------------------------------------------
+
+/// Delays before each retry of a failed ordered-head hydration. The authoring
+/// call emits the signal before its commit is necessarily readable through the
+/// local batch resolver, so the first retries are short.
+pub const HYDRATION_RETRY_DELAYS: [std::time::Duration; 4] = [
+    std::time::Duration::from_secs(1),
+    std::time::Duration::from_secs(3),
+    std::time::Duration::from_secs(10),
+    std::time::Duration::from_secs(30),
+];
+/// Total time (from the first failure) after which no further retry starts.
+pub const HYDRATION_RETRY_DEADLINE: std::time::Duration = std::time::Duration::from_secs(90);
+/// Retry tasks allowed in flight at once; beyond it a failing job is dropped.
+pub const HYDRATION_MAX_CONCURRENT_RETRIES: usize = 16;
+
+static HYDRATION_RETRIES_IN_FLIGHT: std::sync::atomic::AtomicUsize =
+    std::sync::atomic::AtomicUsize::new(0);
+
+/// One slot of [`HYDRATION_MAX_CONCURRENT_RETRIES`]. Released on drop, so a
+/// panic or cancellation of the retry task cannot leak the slot.
+struct RetrySlot;
+
+impl RetrySlot {
+    /// Claim a slot, or `None` when the cap is already reached.
+    fn try_acquire() -> Option<Self> {
+        use std::sync::atomic::Ordering::SeqCst;
+        if HYDRATION_RETRIES_IN_FLIGHT.fetch_add(1, SeqCst) >= HYDRATION_MAX_CONCURRENT_RETRIES {
+            HYDRATION_RETRIES_IN_FLIGHT.fetch_sub(1, SeqCst);
+            None
+        } else {
+            Some(RetrySlot)
+        }
+    }
+}
+
+impl Drop for RetrySlot {
+    fn drop(&mut self) {
+        HYDRATION_RETRIES_IN_FLIGHT.fetch_sub(1, std::sync::atomic::Ordering::SeqCst);
+    }
+}
+
+/// Only a payload that was not (yet) readable or did not (yet) match is worth
+/// another look; a malformed or unsupported answer or a pool fault is not.
+pub fn is_retryable_hydration_error(err: &StorageError) -> bool {
+    matches!(
+        err,
+        StorageError::InvalidInput(_) | StorageError::NotFound(_) | StorageError::Conductor(_)
+    )
+}
+
+/// The delay before the next attempt, or `None` when the schedule or the
+/// deadline is spent. `failed_attempts` counts failures so far (>= 1).
+pub fn hydration_retry_plan(
+    delays: &[std::time::Duration],
+    deadline: std::time::Duration,
+    failed_attempts: usize,
+    elapsed: std::time::Duration,
+) -> Option<std::time::Duration> {
+    let delay = *delays.get(failed_attempts.checked_sub(1)?)?;
+    (elapsed + delay <= deadline).then_some(delay)
+}
+
+#[derive(Debug, PartialEq, Eq)]
+pub enum HydrationRetryOutcome {
+    Recovered { attempts: usize },
+    Exhausted { attempts: usize },
+}
+
+/// Re-run `attempt` on the schedule after a first failure. Logs every failure
+/// at WARN (the error text names the mismatched fields), counts outcomes, and
+/// logs once at ERROR on exhaustion.
+pub async fn run_hydration_retries<F, Fut>(
+    content_id: &str,
+    delays: &[std::time::Duration],
+    deadline: std::time::Duration,
+    first_error: StorageError,
+    mut attempt: F,
+) -> HydrationRetryOutcome
+where
+    F: FnMut() -> Fut,
+    Fut: std::future::Future<Output = Result<(), StorageError>>,
+{
+    use crate::metrics::{
+        inc_content_head_declared_hydration as count, ContentHeadHydrationOutcome as O,
+    };
+    let started = tokio::time::Instant::now();
+    let mut failed = 1usize;
+    let mut last = first_error;
+    loop {
+        if matches!(last, StorageError::InvalidInput(_)) {
+            count(O::Mismatch);
+        }
+        warn!(error = %last, content_id, attempt = failed, "ordered ContentHeadDeclared hydration failed");
+        let plan = if is_retryable_hydration_error(&last) {
+            hydration_retry_plan(delays, deadline, failed, started.elapsed())
+        } else {
+            None
+        };
+        let Some(delay) = plan else {
+            count(O::Exhausted);
+            tracing::error!(
+                error = %last, content_id, attempts = failed,
+                "ordered ContentHeadDeclared hydration exhausted; dropping (reconcile will not revisit an InSync inventory)"
+            );
+            return HydrationRetryOutcome::Exhausted { attempts: failed };
+        };
+        count(O::Retried);
+        tokio::time::sleep(delay).await;
+        match attempt().await {
+            Ok(()) => {
+                count(O::Recovered);
+                info!(
+                    content_id,
+                    attempts = failed + 1,
+                    "ordered ContentHeadDeclared hydration recovered"
+                );
+                return HydrationRetryOutcome::Recovered {
+                    attempts: failed + 1,
+                };
+            }
+            Err(e) => {
+                failed += 1;
+                last = e;
+            }
+        }
+    }
+}
+
+/// Worker entry: one inline attempt; on a retryable failure the job is retained
+/// as its own bounded task (so other signals are not blocked), up to
+/// [`HYDRATION_MAX_CONCURRENT_RETRIES`] at once.
+///
+/// Late-retry safety: every attempt re-resolves the CURRENT head from the
+/// conductor and validates it against this declaration's exact ordering; if a
+/// newer declaration has since superseded it, the validation mismatches and the
+/// job exhausts without writing, and the SQL stamp itself still compares
+/// ordering before moving a declared head.
+pub async fn handle_authenticated_content_head_signal_with_retry(
+    signal: ReaProjectionSignal,
+    registry: std::sync::Arc<crate::hc_client_registry::HcClientRegistry>,
+    pool: DbPool,
+    ctx: AppContext,
+) -> Result<(), StorageError> {
+    use crate::metrics::{
+        inc_content_head_declared_hydration as count, ContentHeadHydrationOutcome as O,
+    };
+    let Err(first) =
+        handle_authenticated_content_head_signal(signal.clone(), &registry, &pool, &ctx).await
+    else {
+        return Ok(());
+    };
+    let ReaProjectionSignal::ContentHeadDeclared { content_id, .. } = &signal else {
+        return Err(first);
+    };
+    if !is_retryable_hydration_error(&first) {
+        return Err(first);
+    }
+    let Some(slot) = RetrySlot::try_acquire() else {
+        count(O::Dropped);
+        return Err(first);
+    };
+    let content_id = content_id.clone();
+    tokio::spawn(async move {
+        // Held for the whole task body; released on every exit path.
+        let _slot = slot;
+        run_hydration_retries(
+            &content_id,
+            &HYDRATION_RETRY_DELAYS,
+            HYDRATION_RETRY_DEADLINE,
+            first,
+            || handle_authenticated_content_head_signal(signal.clone(), &registry, &pool, &ctx),
+        )
+        .await;
+    });
     Ok(())
 }
 
@@ -1149,6 +1408,11 @@ pub fn handle_rea_signal(
                 hash = %head_action_hash,
                 "Declaring Content HEAD from DHT"
             );
+            // This cell declared a head. If the id is a followed release
+            // channel, its adoption controller should look now rather than
+            // finish a rest — whatever the stamp below decides. Attention
+            // only: the controller asks the conductor itself.
+            crate::services::release_adoption::watch::poke(&content_id);
             // Own-conductor-witnessed HEAD declaration → verified stamp on the
             // EXISTING row only (no insert: a HEAD declaration for a row this
             // node never seeded is a no-op here). No value patch — the HEAD
@@ -1312,6 +1576,39 @@ mod tests {
     }
 
     #[test]
+    fn mismatch_logger_names_the_differing_fields() {
+        let ordering = content_diesel::CanonicalOrdering::new(100, true);
+        let head = ordered_head("c1", "head-actual", "blob", ordering);
+        // Exact match names nothing.
+        assert!(ordered_head_mismatch_fields(
+            "c1",
+            &HoloHashB64("head-actual".into()),
+            ordering,
+            &head
+        )
+        .is_empty());
+        let fields = ordered_head_mismatch_fields(
+            "c1",
+            &HoloHashB64("head-expected".into()),
+            content_diesel::CanonicalOrdering::new(200, false),
+            &head,
+        )
+        .join("; ");
+        assert!(fields.contains("head_hash expected=head-expected actual=head-actual"));
+        assert!(fields.contains("timestamp expected=200 actual=100"));
+        assert!(fields.contains("tier expected_earned=false actual_earned=true"));
+        let err = validate_ordered_content_head(
+            "c1",
+            &HoloHashB64("head-expected".into()),
+            ordering,
+            head,
+        )
+        .unwrap_err()
+        .to_string();
+        assert!(err.contains("[mismatched: head_hash"), "{err}");
+    }
+
+    #[test]
     fn accepted_version_ordering_survives_authenticated_signal_projection() {
         let stable = content_diesel::ElectionLink::from_raw(&[2; 39]).unwrap();
         let proof = content_diesel::ElectionLink::from_raw(&[9; 39]).unwrap();
@@ -1380,6 +1677,42 @@ mod tests {
             Some(10),
             None
         )));
+    }
+
+    /// A head this cell declared pokes the release-adoption controller for
+    /// the id on BOTH signal shapes — the legacy stamp arm even when there is
+    /// no row to stamp, the ordered arm even when its hydration cannot run.
+    #[tokio::test]
+    async fn a_declared_head_pokes_the_release_adoption_controller() {
+        use crate::services::release_adoption::watch::poke_capture;
+        let pool = content_signal_test_pool();
+        let ctx = AppContext::default_lamad();
+        let declared = |id: &str, at, earned| ReaProjectionSignal::ContentHeadDeclared {
+            content_id: id.into(),
+            head_action_hash: HoloHashB64("uhCkk-poke-head".into()),
+            entry_hash: None,
+            author: None,
+            canonical_declared_at: at,
+            canonical_earned: earned,
+            canonical_link_hash: None,
+            canonical_ordering_hash: None,
+        };
+
+        poke_capture::drain();
+        handle_rea_signal(declared("runtime:poke:legacy", None, None), &pool, &ctx)
+            .expect("a legacy declaration with no row is handled");
+        assert_eq!(poke_capture::drain(), vec!["runtime:poke:legacy"]);
+
+        let registry = crate::hc_client_registry::HcClientRegistry::empty();
+        let result = handle_authenticated_content_head_signal(
+            declared("runtime:poke:ordered", Some(10), Some(true)),
+            &registry,
+            &pool,
+            &ctx,
+        )
+        .await;
+        assert!(result.is_err(), "no lamad bridge, so the hydration defers");
+        assert_eq!(poke_capture::drain(), vec!["runtime:poke:ordered"]);
     }
 
     #[tokio::test]
@@ -2528,5 +2861,119 @@ mod custody_state_on_the_wire_tests {
                 "active".to_string()
             ),
         );
+    }
+}
+
+#[cfg(test)]
+mod hydration_retry_tests {
+    use super::*;
+    use std::cell::Cell;
+    use std::time::Duration;
+
+    const D: [Duration; 4] = [
+        Duration::from_secs(1),
+        Duration::from_secs(3),
+        Duration::from_secs(10),
+        Duration::from_secs(30),
+    ];
+
+    fn err() -> StorageError {
+        StorageError::InvalidInput("mismatch".into())
+    }
+
+    #[test]
+    fn plan_follows_the_schedule_and_respects_the_deadline() {
+        let z = Duration::ZERO;
+        assert_eq!(
+            hydration_retry_plan(&D, HYDRATION_RETRY_DEADLINE, 1, z),
+            Some(D[0])
+        );
+        assert_eq!(
+            hydration_retry_plan(&D, HYDRATION_RETRY_DEADLINE, 4, z),
+            Some(D[3])
+        );
+        assert_eq!(
+            hydration_retry_plan(&D, HYDRATION_RETRY_DEADLINE, 5, z),
+            None
+        );
+        assert_eq!(
+            hydration_retry_plan(&D, HYDRATION_RETRY_DEADLINE, 0, z),
+            None
+        );
+        // 80s elapsed + 30s would pass the 90s deadline.
+        assert_eq!(
+            hydration_retry_plan(&D, HYDRATION_RETRY_DEADLINE, 4, Duration::from_secs(80)),
+            None
+        );
+    }
+
+    #[test]
+    fn only_unavailable_or_mismatched_payloads_retry() {
+        assert!(is_retryable_hydration_error(&err()));
+        assert!(is_retryable_hydration_error(&StorageError::NotFound(
+            "x".into()
+        )));
+        assert!(!is_retryable_hydration_error(&StorageError::Serialization(
+            "x".into()
+        )));
+        assert!(!is_retryable_hydration_error(&StorageError::Internal(
+            "x".into()
+        )));
+    }
+
+    #[tokio::test(start_paused = true)]
+    async fn a_resolver_that_fails_then_succeeds_projects_once() {
+        let calls = Cell::new(0usize);
+        let applied = Cell::new(0usize);
+        let out = run_hydration_retries("c", &D, HYDRATION_RETRY_DEADLINE, err(), || {
+            calls.set(calls.get() + 1);
+            let n = calls.get();
+            let applied = &applied;
+            async move {
+                if n < 3 {
+                    Err(StorageError::NotFound("not yet".into()))
+                } else {
+                    applied.set(applied.get() + 1);
+                    Ok(())
+                }
+            }
+        })
+        .await;
+        assert_eq!(out, HydrationRetryOutcome::Recovered { attempts: 4 });
+        assert_eq!(applied.get(), 1);
+    }
+
+    #[tokio::test(start_paused = true)]
+    async fn a_resolver_that_keeps_failing_exhausts_without_applying() {
+        let applied = Cell::new(0usize);
+        let calls = Cell::new(0usize);
+        let started = tokio::time::Instant::now();
+        let out = run_hydration_retries("c", &D, HYDRATION_RETRY_DEADLINE, err(), || {
+            calls.set(calls.get() + 1);
+            async { Err::<(), _>(err()) }
+        })
+        .await;
+        assert_eq!(out, HydrationRetryOutcome::Exhausted { attempts: 5 });
+        assert_eq!(calls.get(), 4);
+        assert_eq!(applied.get(), 0);
+        assert!(started.elapsed() <= HYDRATION_RETRY_DEADLINE);
+    }
+
+    #[tokio::test(start_paused = true)]
+    async fn a_non_retryable_first_error_is_not_retried() {
+        let calls = Cell::new(0usize);
+        let out = run_hydration_retries(
+            "c",
+            &D,
+            HYDRATION_RETRY_DEADLINE,
+            StorageError::Serialization("bad".into()),
+            || {
+                calls.set(calls.get() + 1);
+                async { Ok(()) }
+            },
+        )
+        .await;
+        assert_eq!(out, HydrationRetryOutcome::Exhausted { attempts: 1 });
+        assert_eq!(calls.get(), 0);
     }
 }

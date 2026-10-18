@@ -1410,7 +1410,9 @@ fn build_filtered_inventory_payload(
     }
 
     // rea_commitments (the pre-Leg-4 path, plus the shared byte-budget guard).
-    match crate::db::rea_commitments::inventory_for_reconcile(
+    // The peer-facing variant: rows mirrored from the mishpat zome are not
+    // advertised, because the asker's notary cannot answer for those ids.
+    match crate::db::rea_commitments::inventory_for_peer_reconcile(
         &mut conn,
         &app_ctx,
         i64::from(offset),
@@ -1980,6 +1982,80 @@ mod tests {
             payload.entries[0].id, ANCHOR,
             "the id slot repeats the anchor — the peer-local row UUID never reaches the wire"
         );
+    }
+
+    #[test]
+    fn rea_inventory_does_not_serve_rows_mirrored_from_the_mishpat_notary() {
+        // A replication commitment this peer authored through the mishpat zome is
+        // mirrored into rea_commitments under the mishpat entry hash; the asker's
+        // notary cannot answer for that id, so it must not be advertised.
+        use diesel::prelude::*;
+        let pool = crate::test_util::test_pool();
+        let ctx = crate::db::AppContext::default_lamad();
+        {
+            let mut conn = pool.get().expect("pool conn");
+            let mirror = crate::mishpat_projection::ReplicationMirror {
+                cid: "uhCEkmirrored".into(),
+                action: "replicates-dwelling".into(),
+                provider: "hub".into(),
+                receiver: "hub-2".into(),
+                metadata_json: "{}".into(),
+                resource_classified_as: None,
+                dht_anchor_hash: None,
+            };
+            assert!(crate::db::rea_commitments::mirror_replication_commitment(
+                &mut conn,
+                &ctx.h_app_id,
+                &mirror,
+            )
+            .unwrap());
+            diesel::sql_query(
+                "INSERT INTO mishpat_commitments \
+                 (cid, action, scope, provider, recipient, bounds_json, valid_from, valid_until) \
+                 VALUES ('uhCEkmirrored', 'replicates-dwelling', 's', 'p', 'r', '{}', 'a', 'b')",
+            )
+            .execute(&mut conn)
+            .unwrap();
+            crate::db::rea_commitments::upsert_with_anchor(
+                &mut conn,
+                &ctx,
+                crate::rea_projection::project_commitment_from_wire(
+                    &crate::rea_projection::CommitmentWireFields {
+                        id: "custody-blob-x",
+                        action: "custody-blob",
+                        provider: "p",
+                        receiver: "r",
+                        resource_conforms_to: None,
+                        resource_classified_as_json: None,
+                        resource_quantity_value: None,
+                        resource_quantity_unit: None,
+                        effort_quantity_value: None,
+                        effort_quantity_unit: None,
+                        has_beginning: None,
+                        has_end: None,
+                        due: None,
+                        clause_of: None,
+                        in_scope_of_json: None,
+                        note: None,
+                        metadata_json: None,
+                        state: Some("active"),
+                    },
+                ),
+                Some("uhCkkA"),
+            )
+            .unwrap();
+        }
+
+        let (val, _) = build_inventory_payload(
+            Some(&pool),
+            PROJECTION_INVENTORY_TABLE_REA_COMMITMENTS,
+            0,
+            None,
+        );
+        let payload: ProjectionInventoryPayload = serde_json::from_value(val).unwrap();
+        let ids: Vec<&str> = payload.entries.iter().map(|e| e.id.as_str()).collect();
+        assert_eq!(ids, vec!["custody-blob-x"]);
+        assert_eq!(payload.total, 1);
     }
 
     #[test]

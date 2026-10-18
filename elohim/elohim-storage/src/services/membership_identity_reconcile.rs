@@ -165,14 +165,24 @@ pub fn reconcile_secs_from_env() -> u64 {
 ///
 /// Every failure is logged and swallowed: this is a reconciler, and the next
 /// tick gets another chance. Nothing here is a startup failure.
-pub async fn run_membership_pass(pool: &DbPool, ctx: &AppContext, reader: &dyn MembershipReader) {
+///
+/// Returns the households whose membership read the conductor answered
+/// ([`crate::services::holochain_humans_replayer::MembershipSnapshot::queried_households`]) —
+/// empty when the pass asked the
+/// conductor nothing (projection-read failure, no household collectives).
+pub async fn run_membership_pass(
+    pool: &DbPool,
+    ctx: &AppContext,
+    reader: &dyn MembershipReader,
+) -> std::collections::HashSet<String> {
     let snapshot = match snapshot_household_ids(pool, ctx, reader).await {
         Ok(snapshot) => snapshot,
         Err(e) => {
             tracing::warn!(error = %e, "household_backfill snapshot failed (non-fatal)");
-            return;
+            return std::collections::HashSet::new();
         }
     };
+    let queried = snapshot.queried_households.clone();
     if let Err(e) = household_backfill::run_once_by_membership(pool, snapshot.pairs.clone()) {
         tracing::warn!(error = %e, "household_backfill failed (non-fatal)");
     }
@@ -204,6 +214,7 @@ pub async fn run_membership_pass(pool: &DbPool, ctx: &AppContext, reader: &dyn M
             tracing::warn!(error = %e, "membership_identity_reconcile failed (non-fatal)")
         }
     }
+    queried
 }
 
 /// Spawn the membership-truth task: one pass at boot, then one every
@@ -234,7 +245,7 @@ pub fn spawn_periodic(
             hc_client: imagodei,
         };
         loop {
-            run_membership_pass(&pool, &ctx, &reader).await;
+            let _queried = run_membership_pass(&pool, &ctx, &reader).await;
             if reconcile_secs == 0 {
                 break;
             }

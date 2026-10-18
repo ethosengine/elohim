@@ -25,6 +25,20 @@ retire-when: >
   legs and gate) so that the shell component and the runtime path are one rendering path — the
   habit then describes the runtime, not an Angular component.
 ---
+DELTA 2026-10-15 (LOCAL PROOF of Slice 4, stays GREEN on the fleet frame; the new scenarios need a
+fleet run): the atom home subsumes the resource viewer (spec §11). Every Network/Attestations/
+Governance/Content-tab concern lands in a leg; /resource/{id} redirects to /epr/{id} and the legacy
+fragment is renamed to its leg. Branch feat/epr-home-subsumes-resource-viewer (69b7f2ea7..0b2a9eb04).
+`just gate` in app/elohim-app green (lint, route + import rails, build, 4707 tests). a2o
+@concern:epr-atom-home + @native-content-graph against the local shell on alpha data: 16 scenarios,
+109/114 steps passed. Remaining reds are not the slice: the browser-error contract trips on the
+unbuilt cache-core wasm (no wasm-pack in this workspace) and on doorway-alpha /hc/connect 502 for
+signed-in Matthew (also on `/`); one Given fails because no seeded alpha path steps through
+"manifesto". Renders: genesis/a2o/reports/look/epr-s4-{network,reading,phone,gate}. Codex reviewed
+the design and the diff; a live render then caught three faults the unit tests missed (See also
+read a list that ignores sourceId, NG0600 from a logging URL builder inside a computed, a 404 per
+page from governance state). Flip of the new scenarios needs an app build on alpha and a run there.
+
 DELTA 2026-09-11 (FLEET MEASURE, stays RED — one named failure left): a2o @concern:epr-atom-home run
 against the deployed alpha (app build face02de, buildTime 2026-09-09T13:40:18Z) — three runs. Runs 1–2:
 5 passed / 2 failed. The custody literal `"1 of 3"` in epr-atom-home.feature asserted live state (alpha

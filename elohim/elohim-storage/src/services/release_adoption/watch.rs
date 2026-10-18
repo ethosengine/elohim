@@ -19,11 +19,12 @@
 //! # I1 — where authority terminates
 //!
 //! The head comes from THIS node's conductor and nowhere else. A peer hint or a
-//! `ContentHeadDeclared` signal may *trigger* a sweep; it may never *supply* an
-//! answer. That is why the resolve is a `resolve_content_head_local` call
-//! (`GetStrategy::Local` — gossip already delivered, never a network fetch)
-//! rather than a read of the local projection: the projection is a record of what we were
-//! told, and this loop is deciding whether to change what we RUN.
+//! `ContentHeadDeclared` signal may *trigger* a check ([`poke`] ends a settled
+//! channel's rest); it may never *supply* an answer. That is why the resolve
+//! is a `resolve_content_head_local` call (`GetStrategy::Local` — gossip
+//! already delivered, never a network fetch) rather than a read of the local
+//! projection: the projection is a record of what we were told, and this loop
+//! is deciding whether to change what we RUN.
 //!
 //! # Where the manifest actually lives
 //!
@@ -60,6 +61,19 @@ use crate::services::release_attestation::{self, ReleaseAttestationCtx};
 /// The lineage-window sweep (revert arm + sunset arm). Split out of this
 /// file for the source-file LoC ceiling; `sweep_once` calls into it.
 mod lineage_windows;
+
+/// The head read's seam (`HeadReader`), so a sweep's one recurring conductor
+/// call can be counted and answered by a test.
+mod head_reader;
+
+/// The settled rest: a channel whose last check left nothing to do is asked
+/// again every third sweep instead of every sweep, until a head hint or a
+/// local declaration pokes it. `sweep_once` and `check_channel` call into it.
+mod settled_rest;
+
+#[cfg(test)]
+pub(crate) use settled_rest::poke_capture;
+pub use settled_rest::{poke, ALERT_SWEEPS, RESTED_SWEEPS};
 
 /// How often the controller sweeps. Slower than the runtime-config poller by an
 /// order of magnitude on purpose: a release is a ceremony act with a soak
@@ -597,6 +611,9 @@ impl InstalledRealitySource for PassportInstalledReality {
 /// conditions, each with a typed refusal, none of them a default.
 pub struct AdoptionController {
     hc: Option<Arc<HcClient>>,
+    /// Where `resolve_head` reads from — the same conductor as `hc`, behind
+    /// the [`head_reader::HeadReader`] seam. Set by `with_conductor`.
+    heads: Option<Arc<dyn head_reader::HeadReader>>,
     artifacts: Option<Arc<dyn ArtifactSource>>,
     installed: Option<Arc<dyn InstalledRealitySource>>,
     /// The vehicles this node is equipped with. `None` means every `apply`
@@ -629,12 +646,16 @@ pub struct AdoptionController {
     /// `channel|releaseCid` pairs already written to the release ledger by
     /// this process, so a head that stands for hours costs one write.
     ledger_recorded: std::sync::Mutex<std::collections::HashSet<String>>,
+    /// Channels resting on a settled check — see [`settled_rest`]. In-process
+    /// only: a restart asks every channel once.
+    settled_rest: settled_rest::RestMemo,
 }
 
 impl AdoptionController {
     pub fn new(staging_root: impl Into<PathBuf>) -> Self {
         Self {
             hc: None,
+            heads: None,
             artifacts: None,
             installed: None,
             apply: None,
@@ -646,6 +667,7 @@ impl AdoptionController {
             staging_root: staging_root.into(),
             cached_reality: tokio::sync::Mutex::new(None),
             ledger_recorded: std::sync::Mutex::new(std::collections::HashSet::new()),
+            settled_rest: settled_rest::RestMemo::default(),
         }
     }
 
@@ -738,6 +760,7 @@ impl AdoptionController {
     /// The conductor this peer resolves heads through. Without one every sweep
     /// reports `conductor_unavailable` — honestly, and without guessing.
     pub fn with_conductor(mut self, hc: Arc<HcClient>) -> Self {
+        self.heads = Some(Arc::new(head_reader::ConductorHeads(hc.clone())));
         self.hc = Some(hc);
         self
     }
@@ -926,25 +949,30 @@ impl AdoptionController {
     /// release, an unparseable manifest, or a controller without a database
     /// (nothing to compare, so nothing to re-apply). One DB read per slug,
     /// never a conductor call. See the idempotence exit for why.
-    fn applied_pointers_drifted(&self, head_metadata_json: &str) -> Vec<String> {
+    ///
+    /// `None` when the rows could not be READ at all (no connection), kept
+    /// apart from "nothing drifted": the idempotence exit still reads it as
+    /// nothing to re-apply on, but the settled rest must not, because an
+    /// unread pointer is not a verified one.
+    fn read_applied_pointer_drift(&self, head_metadata_json: &str) -> Option<Vec<String>> {
         let Some(db) = self.db.as_ref() else {
-            return Vec::new();
+            return Some(Vec::new());
         };
         let Ok(Some(body)) = extract_release_body(head_metadata_json) else {
-            return Vec::new();
+            return Some(Vec::new());
         };
         let Ok(manifest) = verify::verify_shape(&body) else {
-            return Vec::new();
+            return Some(Vec::new());
         };
         if !matches!(manifest.artifact_class, super::ArtifactClass::AppBundle) {
-            return Vec::new();
+            return Some(Vec::new());
         }
         let expected = super::apply::expected_browser_pointers(&manifest);
         if expected.is_empty() {
-            return Vec::new();
+            return Some(Vec::new());
         }
         let Ok(mut conn) = db.get() else {
-            return Vec::new();
+            return None;
         };
         let ctx = crate::db::AppContext::default_lamad();
         let mut actual = std::collections::BTreeMap::new();
@@ -954,7 +982,7 @@ impl AdoptionController {
                 .flatten();
             actual.insert(slug.clone(), pointer);
         }
-        super::apply::drifted_pointers(&expected, &actual)
+        Some(super::apply::drifted_pointers(&expected, &actual))
     }
 
     /// Resolve one channel's canonical head through THIS node's conductor —
@@ -974,44 +1002,9 @@ impl AdoptionController {
     /// way its declare path already has one — it belongs to another lane, so
     /// this reuses the type rather than editing the file.)
     async fn resolve_head(&self, channel_id: &str) -> Answer<ContentHeadWire> {
-        let Some(hc) = self.hc.as_ref() else {
-            return Answer::Unreachable;
-        };
-        let payload = match rmp_serde::to_vec_named(&channel_id.to_string()) {
-            Ok(p) => p,
-            Err(_) => return Answer::Unreachable,
-        };
-        let bytes = match hc
-            .call_zome_timed(
-                "content_store",
-                "resolve_content_head_local",
-                payload,
-                AdmissionClass::Background,
-            )
-            .await
-        {
-            Ok((bytes, _timing)) => bytes,
-            Err(e) => {
-                tracing::debug!(
-                    channel = %channel_id,
-                    error = %e,
-                    "release-adoption: head resolve failed — unreachable, never absence"
-                );
-                return Answer::Unreachable;
-            }
-        };
-        match rmp_serde::from_slice::<Option<ContentHeadWire>>(&bytes) {
-            // The conductor ANSWERED and reports no head. That is an observed
-            // absence, and it is the C4-correct input to an idle verdict.
-            Ok(head) => Answer::observed_absence(head),
-            Err(e) => {
-                tracing::warn!(
-                    channel = %channel_id,
-                    error = %e,
-                    "release-adoption: could not decode ContentHeadWire"
-                );
-                Answer::Unreachable
-            }
+        match self.heads.as_ref() {
+            Some(heads) => heads.resolve(channel_id).await,
+            None => Answer::Unreachable,
         }
     }
 
@@ -1251,6 +1244,7 @@ impl AdoptionController {
     pub async fn sweep_once(&self, followed: &FollowedChannels) -> usize {
         let now = state::now_unix();
         state::reconcile_followed(followed);
+        self.prune_rests(followed);
 
         // **Task 13a.** The revert arm runs FIRST: a window whose path has
         // been revoked should stop authoring on v2 before this sweep does
@@ -1265,6 +1259,14 @@ impl AdoptionController {
 
         for channel in followed.channels.iter().take(MAX_CHANNELS_PER_SWEEP) {
             let existing = state::channel_state(&channel.channel_id);
+            // THE SETTLED REST. A channel whose last check left nothing to do
+            // is not resolved again for `RESTED_SWEEPS` sweeps — no conductor
+            // call, and (like a deferral) no state transition, so
+            // `lastCheckedAt` keeps naming the last time we actually looked.
+            let alert = match self.rest_gate(channel, existing.as_ref()) {
+                settled_rest::RestGate::Rested => continue,
+                settled_rest::RestGate::Check { alert } => alert,
+            };
             if let Some(existing) = existing.as_ref() {
                 if existing.is_backing_off(now) {
                     // The backoff on this row was computed for a SPECIFIC
@@ -1298,10 +1300,18 @@ impl AdoptionController {
                     state::reset_refusals_for_new_head(&channel.channel_id);
                 }
             }
+            let mut settled = None;
             let outcome = self
-                .check_channel(channel, now, &mut byte_budget, &mut threshold_reads)
+                .check_channel(
+                    channel,
+                    now,
+                    &mut byte_budget,
+                    &mut threshold_reads,
+                    &mut settled,
+                )
                 .await;
             if let Some((head, verdict, attestations)) = outcome_transition(outcome) {
+                self.record_rest(&channel.channel_id, head.as_ref(), settled, alert);
                 record_decision(verdict_arm(&verdict), verdict.reason_label());
                 state::record_check(&channel.channel_id, now, head, verdict, attestations);
                 checked += 1;
@@ -1386,6 +1396,10 @@ impl AdoptionController {
         now: i64,
         byte_budget: &mut u64,
         threshold_reads: &mut usize,
+        // Set at exactly the exits that leave this channel nothing to do until
+        // its head moves; every other exit leaves it `None`, which is "ask
+        // again next sweep".
+        settled: &mut Option<settled_rest::Settled>,
     ) -> CheckOutcome {
         // Exhaustive on purpose, and NOT a wildcard: the mode's meaning must be
         // decided at the point of ACTION, not only at the point of
@@ -1451,6 +1465,9 @@ impl AdoptionController {
             &head,
             applied.as_ref().map(|a| a.cid.as_str()),
         );
+        // A candidate this canary could not read is unfinished business: the
+        // exits below must not rest on the winner while it stands.
+        let mut candidate_unread = false;
         let head = match follow {
             CandidateFollow::Leave => head,
             // The C6b idempotence rule, applied to the candidate — the SAME rule
@@ -1461,6 +1478,9 @@ impl AdoptionController {
             CandidateFollow::AlreadyApplied(candidate) => {
                 let applied = applied
                     .expect("AlreadyApplied is returned only when an applied release was read");
+                // NOT a settled exit for the rest: it reads the winner's wire
+                // only, so it holds no candidate metadata to keep checking
+                // the applied pointers against while the channel rested.
                 return CheckOutcome::Checked {
                     head: Some(ResolvedHead {
                         cid: candidate.clone(),
@@ -1491,7 +1511,10 @@ impl AdoptionController {
                     }
                     // Unreadable candidate: keep the winner. Honest, and the
                     // next sweep asks again.
-                    None => head,
+                    None => {
+                        candidate_unread = true;
+                        head
+                    }
                 }
             }
         };
@@ -1534,7 +1557,9 @@ impl AdoptionController {
                 // conductor call, so C6b's cost contract holds — and when a
                 // pointer has drifted the exit is NOT taken, so the sweep
                 // falls through to verify and re-apply.
-                let drifted = self.applied_pointers_drifted(&head.content.metadata_json);
+                let pointer_read = self.read_applied_pointer_drift(&head.content.metadata_json);
+                let pointers_read = pointer_read.is_some();
+                let drifted = pointer_read.unwrap_or_default();
                 if !drifted.is_empty() {
                     tracing::warn!(
                         channel = %channel.channel_id,
@@ -1561,6 +1586,15 @@ impl AdoptionController {
                              not report a reality it no longer has"
                         );
                     }
+                    // Settled: converged on this head, with its pointers READ
+                    // and found in place. The rest carries the head's metadata
+                    // so the pointer check above keeps running every sweep
+                    // while the resolve does not.
+                    if !candidate_unread && pointers_read {
+                        *settled = Some(settled_rest::Settled {
+                            applied_metadata_json: Some(head.content.metadata_json.clone()),
+                        });
+                    }
                     return CheckOutcome::Checked {
                         head: Some(resolved),
                         verdict: Verdict::Applied {
@@ -1577,6 +1611,10 @@ impl AdoptionController {
         let body = match extract_release_body(&head.content.metadata_json) {
             Ok(Some(body)) => body,
             Ok(None) => {
+                // Settled: a pure function of this head's own content.
+                if !candidate_unread {
+                    *settled = Some(settled_rest::Settled::default());
+                }
                 return CheckOutcome::Checked {
                     head: Some(resolved),
                     verdict: Verdict::Idle {
@@ -1585,7 +1623,7 @@ impl AdoptionController {
                             .to_string(),
                     },
                     attestations: None,
-                }
+                };
             }
             Err(refusal) => {
                 return CheckOutcome::Checked {
@@ -2283,7 +2321,7 @@ pub fn spawn(controller: AdoptionController) -> bool {
                 // tick `sweeps`/`lastSweepUnixSecs` on `/admin/adoption` for a
                 // tick that examined zero channels, which is not the same
                 // fact as a sweep that ran and found nothing to do.
-                state::reconcile_followed(&followed);
+                controller.unfollowed_tick(&followed);
                 0
             };
             tracing::debug!(
@@ -2785,6 +2823,7 @@ mod tests {
     /// judges nothing. The honest floor: no conductor, no authority, no guess.
     #[tokio::test]
     async fn a_controller_without_a_conductor_refuses_honestly_and_applies_nothing() {
+        let _serial = settled_rest::sweep_test_lock().lock().await;
         let dir = tempfile::tempdir().unwrap();
         let controller = AdoptionController::new(dir.path());
         let followed = state::parse_followed_channels("runtime:coordinators:elohim:test-a");

@@ -863,6 +863,10 @@ def _main(argv):
     if not argv:
         argv = ["status"]
     cmd = argv.pop(0)
+    if cmd in ("-h", "--help", "help") or "-h" in argv or "--help" in argv:
+        # A flag is never a resource: `berth claim --help` once took a lease named "--help".
+        print(__doc__.split("Commands:")[1].split("Resources")[0])
+        return 0
     b = Berth()
     session = _opt(argv, "--session")
     source = "flag" if session else None

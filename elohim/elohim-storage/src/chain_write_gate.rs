@@ -411,6 +411,8 @@ const CRATE_READ_FNS: &[&str] = &[
     "query_my_source_chain",
     "query_my_source_chain_links",
     "sign_for_agent",
+    // Signs a purpose-bound account-bind challenge with `sign_raw`; commits nothing.
+    "sign_account_bind_challenge",
     // --- mishpat -----------------------------------------------------------
     "get_commitment",
     "get_commitment_authority_links",
@@ -990,6 +992,7 @@ mod tests {
             "verify_carried_head_evidence",
             "find_publishers",
             "sign_for_agent",
+            "sign_account_bind_challenge",
             "known_agents",
             "my_chain_activity",
             "export_records",

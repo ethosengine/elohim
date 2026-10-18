@@ -31,6 +31,7 @@ export interface HumansJsonHuman {
   displayName: string;
   bio: string;
   category: string;
+  agencyPhase?: string;
   profileReach: string;
   location?: { layer: string; name: string };
   organizations?: { id: string; name: string; role: string }[];
@@ -436,6 +437,59 @@ export function isHumanDeployed(displayName: string): boolean {
   return true;
 }
 
+/** Phases whose identity lives on the human's own peer runtime. */
+const PEER_RUNTIME_PHASES = new Set(['doorway', 'node', 'device']);
+
+/** Whether a fixture human may sign in at all, and why. */
+export interface SignInStanding {
+  allowed: boolean;
+  reason: string;
+}
+
+/**
+ * May this fixture human sign in anywhere? (ruled 2026-10-14)
+ *
+ * Exactly two kinds of fixture human sign in:
+ *   - one with their own peer runtime: humans.json declares `doorway`, `node`
+ *     or `device`, AND deployments.json carries their pod, not suspended. The
+ *     doorway holds only an account row and routes them to peer-native sign-in.
+ *   - one declared `hosted`: hosted by the operator of the doorway they
+ *     register through (matthew on the household and alpha, adam on the fleet).
+ * Everyone else, including every persona that declares no phase, has no
+ * standing. The seeder never registers them, so a scenario that signs in as
+ * them is wrong, not red.
+ *
+ * Standing is about the human, not the run: a remote pod that is merely
+ * unavailable this run (shem down) keeps its standing, and
+ * `isHumanDeployed` is what turns that into a skipped login.
+ */
+export function signInStanding(displayName: string): SignInStanding {
+  const fixture = ensureLoaded().fixtures.get(displayName);
+  if (!fixture) return { allowed: false, reason: 'not a fixture human in humans.json' };
+  const phase = fixture.raw.agencyPhase;
+  if (phase === 'hosted') {
+    return { allowed: true, reason: 'declared hosted' };
+  }
+  if (phase === undefined || !PEER_RUNTIME_PHASES.has(phase)) {
+    const declaredPhase = phase === undefined ? 'no agencyPhase' : `agencyPhase "${phase}"`;
+    return {
+      allowed: false,
+      reason: `declares ${declaredPhase}: no peer runtime and not hosted`,
+    };
+  }
+  const suspended = ensureDeploymentsLoaded().byName.get(displayName.toLowerCase());
+  if (suspended === undefined) {
+    return {
+      allowed: false,
+      reason: `declares agencyPhase "${phase}" but deployments.json carries no pod for them`,
+    };
+  }
+  if (suspended) {
+    return { allowed: false, reason: `declares agencyPhase "${phase}" but their pod is suspended` };
+  }
+  return { allowed: true, reason: `own peer runtime (agencyPhase "${phase}")` };
+}
+
 /**
  * True if the named persona has NO on-prem fallback — every declared nodeType
  * is the "remote" pool (shem). These are exactly the personas that auto-skip
@@ -459,4 +513,29 @@ export function isRemoteOnlyPersona(displayName: string): boolean {
 export function _resetDeploymentsCacheForTests(): void {
   _deploymentsCache = null;
   _autoSkippedHumans = new Set();
+}
+
+/** What a fixture human declares, as one row a scenario can show and check. */
+export interface DeclaredStanding {
+  /** agencyPhase, or 'none' when the fixture declares no stage. */
+  stage: string;
+  /** householdId, or 'none'. */
+  household: string;
+  /** 'running' (a live pod), 'switched off' (suspended pod), or 'none' (no pod). */
+  ownRuntime: string;
+}
+
+export function declaredStanding(displayName: string): DeclaredStanding {
+  const fixture = ensureLoaded().fixtures.get(displayName);
+  if (!fixture) throw new Error(`${displayName} is not a fixture human in humans.json`);
+  const suspended = ensureDeploymentsLoaded().byName.get(displayName.toLowerCase());
+  let ownRuntime = 'none';
+  if (suspended !== undefined) {
+    ownRuntime = suspended ? 'switched off' : 'running';
+  }
+  return {
+    stage: fixture.raw.agencyPhase ?? 'none',
+    household: fixture.raw.householdId ?? 'none',
+    ownRuntime,
+  };
 }

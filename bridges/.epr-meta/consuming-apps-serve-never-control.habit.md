@@ -7,7 +7,7 @@ invariant: >
   external-claim observation with the app as provenance only. Every gift sits under a governed
   offer that is active only on a verdict from a Steward who is not its author, creates no claims,
   and discloses both sides of the edge. A fixture approval never reads as network validation.
-status: green
+status: red
 active: false
 checks:
   - "cd bridges/jenkins && just gate: the translator's output admits only Process/FlowEvent; observe refuses without mutation on malformed input and on a Proposed or withdrawn offer; re-observing is idempotent (the `jenkins-bridge` gate project)"
@@ -74,3 +74,23 @@ Guard (4) is closed too: a FAILED stage that started after an earlier failure en
 cascade skip that exercises nothing. The invariant holds at Bootstrap stakes for the one
 consumer the collective owns (crossesNetwork: false).
 
+
+DELTA 2026-10-15 (FLIPPED RED on check 3; the offer was re-addressed, not edited):
+An offer's address now binds its whole declaration, not only its body
+(`OfferDeclaration::intent` in elohim/epr-rea/src/external.rs: a `declaration:<CID>` slot over
+every term and disclosure, never the author, and a `supersedes:<CID>` slot naming the address
+the same text had under the body-only rule). Before, an inflow, held capability or externality
+could change in the frontmatter while the address, and so the approval, stayed the same. The
+Jenkins offer's text is unchanged, but its address moved from
+bafyreibkpfcowvdxtxzpyomqfeqawbo4dh4uhjsmpo5q7vpnvl3xvvwsxe to
+bafyreiaqf6nf4vockvs5kznuen2mzmiglojodj2nnlnh433mihgogwl5eq
+(`jenkins-bridge offer status` at this commit). Records scoped to the old address still resolve
+and the new Intent names it (test
+`records_scoped_to_a_legacy_offer_address_still_resolve_and_are_superseded`), but an approval
+never carries over. Check 3 reads drift "against the ACTIVE offer", and the new address has no
+Steward's approval yet, so it is red until a Steward who did not author it re-approves:
+`jenkins-bridge offer mint`, then `epr flow note --on
+bafyreiaqf6nf4vockvs5kznuen2mzmiglojodj2nnlnh433mihgogwl5eq --kind verdict --verdict approved`.
+No store in this workspace holds the 2026-09-26 approval, so nothing here was orphaned. Checks 1
+and 2: `just gate jenkins-bridge` EXIT=0 with the legacy-resolution test and the stage-event
+goldens reproduced against the legacy address; `just gate eprfs` re-run for the epr-cli change.

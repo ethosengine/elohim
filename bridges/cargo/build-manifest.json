@@ -1,0 +1,58 @@
+{
+  "manifestVersion": "1.0",
+  "pipeline": "cargo-bridge",
+  "description": "Reliance as cite: a Rust workspace's resolved dependencies observed from cargo metadata and Cargo.lock as Cite inputs under a governed offer",
+  "steps": {
+    "gate-cargo-bridge": {
+      "description": "fmt, clippy, tests",
+      "inputs": {
+        "sources": [
+          "bridges/cargo/**",
+          "bridges/.epr-meta/offers/**",
+          ".claude/epr-meta/recipes.yaml",
+          ".epr-meta/collective.json",
+          "elohim/epr/**",
+          "elohim/epr-rea/**",
+          "elohim/eprfs/**",
+          "bridges/did/did-bridge/**",
+          "bridges/did/Cargo.toml",
+          "bridges/did/did-types/**",
+          "elohim/Cargo.toml",
+          "elohim/epr-index/**",
+          "elohim/sdk/domains/elohim-agent/adapter/**",
+          "crates/consent-grant/**"
+        ],
+        "buildProcess": []
+      },
+      "outputs": {
+        "artifacts": [],
+        "verify": null
+      },
+      "depends": [],
+      "executor": {
+        "stage": "Gate Cargo Bridge",
+        "function": null
+      }
+    }
+  },
+  "gate": {
+    "projects": {
+      "cargo-bridge": {
+        "dir": "bridges/cargo",
+        "steps": [
+          "gate-cargo-bridge"
+        ],
+        "run": {
+          "kind": "just",
+          "recipe": "gate",
+          "cargo": {
+            "workspace": "cargo-bridge",
+            "profile": "dev",
+            "rustflags": ""
+          }
+        }
+      }
+    }
+  },
+  "deployment": {}
+}

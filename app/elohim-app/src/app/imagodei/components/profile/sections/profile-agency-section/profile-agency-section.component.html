@@ -58,8 +58,13 @@
 </div>
 
 <!-- Upgrade Section -->
-@if (canUpgrade()) {
+@if (canUpgrade() || (agencyState().currentStage === 'hosted' && !isTauriApp())) {
   <div class="upgrade-section" id="upgrade">
+    @if (agencyState().currentStage === 'hosted' && !isTauriApp()) {
+      @if (moveToNodeUrl(); as url) {
+        <a [href]="url" data-testid="move-to-node-entry">Move this account onto my node</a>
+      }
+    }
     <span class="section-title">Upgrade to {{ nextStageLabel() }}</span>
     @if (nextStageInfo(); as info) {
       <p class="section-description">{{ info.description }}</p>

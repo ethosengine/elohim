@@ -10,7 +10,7 @@ doorway manifests' hosted cast) — so the author argues with the model rather t
 
 The primary fixture is REAL: the CPU raise drafted and reverted on 2026-09-13 (matthew
 4000m -> 10000m, adam 8000m -> 12000m, plus both halves of adam's split manifest 4000m -> 6000m).
-The diff is applied positionally to the live files to synthesize post-content, with the on-disk file
+The diff is applied to the live files (each hunk located by its pre-image, as `patch` does) to synthesize post-content, with the on-disk file
 as the pre-state — exactly the shape the PreToolUse hook hands the validator. If that raise ever
 stops firing, this suite says so.
 
@@ -76,7 +76,22 @@ def fire(write: dict):
     return result, buf.getvalue()
 
 
-# ── unified-diff applier (positional; the fixture is a plain git diff) ────────────────────────
+# ── unified-diff applier (the fixture is a plain git diff) ────────────────────────────────────
+def _locate(src: list, pre: list, hint: int) -> int | None:
+    """Where a hunk's pre-image (context and removed lines) sits in src. The live files gain
+    unrelated lines over time (the adam record grew two fields by 2026-10-15), so the hunk's
+    stated line drifts while the raised lines themselves stay exact; the pre-image is matched by
+    content, as `patch` does. It must match exactly once: a pre-image that has vanished returns
+    None (the fixture no longer applies), and one that matches twice refuses, because the test
+    would no longer know which human's record it is raising. `hint` is kept for the message."""
+    want = [h.rstrip("\n") for h in pre]
+    have = [s.rstrip("\n") for s in src]
+    n = len(want)
+    hits = [at for at in range(len(have) - n + 1) if have[at:at + n] == want]
+    assert len(hits) <= 1, f"hunk pre-image near line {hint + 1} matches {len(hits)} places: {hits}"
+    return hits[0] if hits else None
+
+
 def apply_diff(diff_text: str) -> dict:
     """{repo_relative_path: post_content} for every file section of a unified diff."""
     out: dict[str, str] = {}
@@ -101,7 +116,13 @@ def apply_diff(diff_text: str) -> dict:
             continue
         m = re.match(r"^@@ -(\d+)(?:,(\d+))? \+\d+(?:,\d+)? @@", line)
         if m:
-            cursor = int(m.group(1)) - 1 + offset
+            body_start = i + 1
+            body_end = body_start
+            while body_end < len(lines) and not lines[body_end].startswith(("@@", "diff --git ")):
+                body_end += 1
+            pre = [h[1:] for h in lines[body_start:body_end] if h.startswith((" ", "-"))]
+            cursor = _locate(src, pre, int(m.group(1)) - 1 + offset)
+            assert cursor is not None, f"diff pre-image no longer in {path} (near line {m.group(1)})"
             i += 1
             while i < len(lines) and not lines[i].startswith(("@@", "diff --git ")):
                 h = lines[i]

@@ -856,6 +856,19 @@ pub fn channel_state(channel_id: &str) -> Option<ChannelAdoptionState> {
     REGISTRY.channels.lock().unwrap().get(channel_id).cloned()
 }
 
+/// Is `channel_id` in the follow set right now? A map lookup, no clone — the
+/// sync apply path asks this for every content id it offers.
+///
+/// A poisoned registry answers `false` rather than panicking: the callers are
+/// on the sync apply and signal paths, which must not inherit a panic from
+/// here.
+pub fn is_followed(channel_id: &str) -> bool {
+    REGISTRY
+        .channels
+        .lock()
+        .is_ok_and(|channels| channels.contains_key(channel_id))
+}
+
 /// Clear a channel's refusal streak because its canonical election moved to a
 /// NEW resolved head while the channel was backing off.
 ///
@@ -956,6 +969,12 @@ pub fn report_json() -> serde_json::Value {
             "maxChannelsPerSweep": super::watch::MAX_CHANNELS_PER_SWEEP,
             "maxArtifactBytesPerSweep": super::watch::MAX_ARTIFACT_BYTES_PER_SWEEP,
             "backoffLadderSecs": BACKOFF_LADDER_SECS,
+            // A settled channel is resolved once per `restedSweeps + 1` sweeps,
+            // so its `lastCheckedAt` can be that many intervals old with no
+            // backoff standing; a poked channel is checked every sweep for
+            // `alertSweeps`. Named here so a stale-looking row is explicable.
+            "restedSweeps": super::watch::RESTED_SWEEPS,
+            "alertSweeps": super::watch::ALERT_SWEEPS,
             "sweeps": *REGISTRY.sweeps.lock().unwrap(),
             "lastSweepUnixSecs": *REGISTRY.last_sweep_unix.lock().unwrap(),
         },

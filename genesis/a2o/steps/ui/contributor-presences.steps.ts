@@ -1,7 +1,9 @@
 /**
  * Contributor Presences Step Definitions — Playwright-powered contributor visibility flows.
  *
- * These steps verify the "Contributors" section of the content viewer:
+ * These steps verify the "Contributors" section of the atom home (/epr/{id}),
+ * which sits in its "Where it came from" leg (not in the leg's fold) and keeps
+ * the old viewer's test ids:
  * that learners can see who inspired or contributed to a piece of content
  * (recognition before registration — a presence is established the moment
  * a contributor's work enters the content graph).
@@ -27,6 +29,7 @@ import { Given, When, Then } from '@cucumber/cucumber';
 
 import { PlaywrightDevice } from '../../src/framework/devices/playwright-device.js';
 import { ContributorsPage } from '../../src/framework/pages/contributors.page.js';
+import { EprHomePage } from '../../src/framework/pages/epr-home.page.js';
 import { CONTRIBUTORS } from '../../src/framework/pages/selectors.js';
 import { E2EWorld } from '../../src/framework/world.js';
 
@@ -123,9 +126,12 @@ When('the learner opens the content {string}', async function (this: E2EWorld, c
   const device = requirePlaywright(this);
   if (!device) return 'pending';
 
-  // Content is reachable at the universal EPR viewer route.
+  // Content is reachable at its universal address, the atom home. Waiting for
+  // its frame keeps "the contributors section is absent" from passing on a page
+  // that has not rendered yet.
   await device.navigate(`/epr/${contentId}`);
   await device.page.waitForLoadState('networkidle');
+  await new EprHomePage(device.page).waitForReady();
 });
 
 // ---------------------------------------------------------------------------

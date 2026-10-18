@@ -104,6 +104,15 @@ To add a new distributed file, add it to `INTERFACE_FILES` in `codegen-ts.mjs`.
 2. Run `pnpm run schema:codegen:ts`
 3. Import: `import { MyEnum, ALL_MY_ENUMS, CORE_MY_ENUMS } from './generated/schema-enums.js'`
 
+### An enum whose DNA const is hand-written: `_codegen` + `_dnaMirror`
+
+`_dna` makes `codegen-rs.mjs` write `CORE_*`/`ALL_*` into `content_store_integrity/src/generated_enums.rs`, which is compiled into the DNA: a new const there moves the DNA hash. When the DNA already carries the list as a hand-written const and must not move, use the pair instead (first user: `enums/rea-action.schema.json`):
+
+- `_codegen: { "constant": "REA_ACTIONS", "rust": ["epr"] }` generates the TS constants and `elohim/epr/src/generated/enums.rs` (re-exported from `elohim_epr::generated`), and never touches a zome.
+- `_dnaMirror: { "constant": "REA_ACTIONS", "file": "<integrity lib.rs>", "tier": "core" }` makes `pnpm run schema:check-dna` read that const from source as text and hold it equal to the named tier.
+
+Moving the DNA const is still a deliberate DNA move: append the value there and to the tier in the same change.
+
 ## Adding a New Input/View Schema
 
 1. Create `v1/inputs/create-thing-input.schema.json` or `v1/views/thing-view.schema.json`

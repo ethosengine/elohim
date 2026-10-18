@@ -21,7 +21,7 @@
  *                              PREREQUISITE / TEACHES / REFERENCES; the <h3>
  *                              heading reads "Prerequisites" / "This teaches" /
  *                              "References"
- *   epr-relationship-card    — a single navigable card (an <a> to /resource/:id)
+ *   epr-relationship-card    — a single navigable card (an <a> to /epr/:id)
  *   epr-rel-card-reach       — reach badge
  *   epr-rel-card-resilience  — stewardship-resilience glyph
  *   epr-rel-card-peers       — distinct-peers count (present only when > 0)
@@ -32,6 +32,7 @@ import { strict as assert } from 'node:assert';
 import { Given, When, Then } from '@cucumber/cucumber';
 
 import { PlaywrightDevice } from '../../src/framework/devices/playwright-device.js';
+import { EprHomePage } from '../../src/framework/pages/epr-home.page.js';
 import { RELATIONSHIP_CARD, RELATIONSHIP_PANEL } from '../../src/framework/pages/selectors.js';
 import { E2EWorld } from '../../src/framework/world.js';
 
@@ -116,8 +117,19 @@ Given(
 );
 
 /**
- * "Given the learner is viewing the {string} concept" — navigate to the concept
- * resource page so the click scenario starts from the right surface.
+ * Open a concept at its atom home (/epr/{id}) and wait for the frame (or its
+ * out-of-reach gate). The typed relationship cards render in the "Where this
+ * lives" leg, inside the kept `viewer-relationships-panel` wrapper (spec §4.4).
+ * The old /resource/{id} viewer address now redirects here.
+ */
+async function openConceptHome(device: PlaywrightDevice, conceptId: string): Promise<void> {
+  await device.navigate(`/epr/${conceptId}`);
+  await new EprHomePage(device.page).waitForReady();
+}
+
+/**
+ * "Given the learner is viewing the {string} concept" — open the concept's
+ * atom home so the click scenario starts from the right surface.
  *
  * Example: Given the learner is viewing the "systems-thinking" concept
  */
@@ -128,7 +140,7 @@ Given(
     if (!device) {
       return PENDING;
     }
-    await device.navigate(`/resource/${conceptId}`);
+    await openConceptHome(device, conceptId);
   }
 );
 
@@ -137,8 +149,8 @@ Given(
 // ---------------------------------------------------------------------------
 
 /**
- * "When the learner opens the {string} concept" — navigate to the concept's
- * cross-pillar resource viewer (route /resource/:resourceId).
+ * "When the learner opens the {string} concept" — open the concept's atom home
+ * at its universal address (route /epr/:resourceId).
  *
  * Example: When the learner opens the "systems-thinking" concept
  */
@@ -147,7 +159,7 @@ When('the learner opens the {string} concept', async function (this: E2EWorld, c
   if (!device) {
     return PENDING;
   }
-  await device.navigate(`/resource/${conceptId}`);
+  await openConceptHome(device, conceptId);
 });
 
 /**
@@ -163,7 +175,7 @@ When(
     if (!device) {
       return PENDING;
     }
-    // The card is an <a> whose href routes to /resource/{target}. Click by href
+    // The card is an <a> whose href routes to /epr/{target}. Click by href
     // so we hit the specific prerequisite rather than the first card.
     const card = device.page
       .locator(`[data-testid="${RELATIONSHIP_CARD.CARD}"][href*="${target}"]`)
@@ -242,7 +254,7 @@ Then('the card shows a reach badge and a resilience badge', async function (this
 
 /**
  * "Then the {string} concept is displayed" — after clicking a card, assert the
- * target concept's resource viewer rendered.
+ * browser is at the target concept's atom home and the atom home rendered.
  *
  * Example: Then the "feedback-loops" concept is displayed
  */
@@ -251,16 +263,17 @@ Then('the {string} concept is displayed', async function (this: E2EWorld, concep
   if (!device) {
     return PENDING;
   }
+  await new EprHomePage(device.page).waitForReady();
   const url = device.page.url();
   assert.ok(
-    url.includes(`/resource/${conceptId}`),
-    `Expected the "${conceptId}" concept to be displayed; URL is "${url}"`
+    url.includes(`/epr/${conceptId}`),
+    `Expected the "${conceptId}" concept to be displayed at its atom home; URL is "${url}"`
   );
 });
 
 /**
  * "Then the URL reflects the {string} concept" — assert the browser URL routed
- * to the target concept's resource path.
+ * to the target concept's universal address (/epr/{id}).
  *
  * Example: And the URL reflects the "feedback-loops" concept
  */
@@ -271,7 +284,7 @@ Then('the URL reflects the {string} concept', async function (this: E2EWorld, co
   }
   const url = device.page.url();
   assert.ok(
-    url.includes(`/resource/${conceptId}`),
+    url.includes(`/epr/${conceptId}`),
     `Expected URL to reflect the "${conceptId}" concept; got "${url}"`
   );
 });

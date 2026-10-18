@@ -1,0 +1,3 @@
+site/
+source/*.final.json
+source/__pycache__/

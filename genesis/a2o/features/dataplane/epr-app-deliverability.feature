@@ -30,7 +30,9 @@ Feature: An app a doorway serves reaches a visitor able to run
   address, and whichever door they happen to reach hands them the new version — and it
   works. That is the whole promise. Everything in this file exists because each link in
   that sentence has broken on its own at least once, silently, with every health check
-  still green.
+  still green. One clause rides inside "it works": a page that runs but does not say what
+  it is, or who holds it, has left the visitor unable to judge what they are looking at,
+  and Station 5 holds the doorway to that.
 
   VOCABULARY, because every assertion below rests on it.
 
@@ -38,7 +40,8 @@ Feature: An app a doorway serves reaches a visitor able to run
   holds them. This mesh runs two — "alpha-A", whose storage peer is matthew, and
   "elohim.host", whose storage peer is jessica — so that a visitor who reaches either one
   gets the same site. They are two front doors to one household, and the household holds
-  a third peer, james, that serves no door.
+  a third peer, james, that serves no door. A HOUSEHOLD is the protocol's unit of holding:
+  a home's set of peers. This mesh is one household; the protocol's network is many.
 
   An EPR — Elohim Protocol Resource — is a named, content-addressed app bundle: a zip of
   the files a browser needs (an index page, an entry script, a stylesheet, a build stamp),
@@ -106,6 +109,19 @@ Feature: An app a doorway serves reaches a visitor able to run
   `@requires:owned-substrate` is the permission to WRITE: it is satisfied only on a mesh
   this run owns, so on the shared fleet these stations are held rather than run. Every
   station here publishes a site and declares a head, so every station carries it.
+
+  TWO KINDS OF APP, used only by Station 5. A record declares its app's FORMAT, a field
+  its steward sets from a fixed list of content formats; two of them matter here. A
+  CONTENT APP (format html5-app) is a piece of content packaged as a site, and the sites
+  this run publishes are declared that way unless a step says otherwise. A CHROMED APP
+  (format spa-bundle) is an app that draws the protocol's own qualifying bar itself (the
+  thin bar that tells a person what they are looking at and who holds it). A
+  CONTENT SHELL is what a doorway wraps around a content app when a person opens it as a
+  page; Station 5 describes it in full. The shell's bar carries a RESILIENCY BADGE, a link
+  that says how many households hold the app, read from the doorway's HOUSEHOLD RESILIENCE
+  READING for it, and leads to its EPR page. An app's EPR PAGE is the page every doorway serves
+  at /epr/<record id>: the full account of the record, its reach, its holders, its steward
+  and its governance.
 
   Background:
     Given peer "alpha-A" at "alpha-A"
@@ -334,3 +350,135 @@ Feature: An app a doorway serves reaches a visitor able to run
     # "On the wire" is the x-elohim-bundle response header, whose value reads
     # `behind;missing-asset:<file>` — machine-readable, and present on every response so a
     # monitor sees it without anyone opening the page.
+
+  # STATION 5 — a person who opens a content app's own address meets it qualified.
+  #
+  # Every station above asks whether a visitor gets a page that runs. This one asks whether
+  # they can tell what they are looking at. A CONTENT APP is an EPR whose record declares
+  # its format as html5-app: a self-contained piece of content (a simulation, a letter, an
+  # explorable essay) whose files live in a zip. Its ENTRY ADDRESS is the address where the
+  # doorway serves the first file of that zip, /apps/<slug>/<entry file>; for the site this
+  # run publishes the entry file is its index page, so the address is
+  # /apps/<this run's slug>/index.html. People share that address.
+  # Until this station, a person who followed such a link got the app's page bare — nothing
+  # on screen said what it was, who holds it, or where its full record lives, and a bare
+  # page could have come from anywhere. On this protocol, nothing a doorway shows a person
+  # should arrive without the frame that qualifies it.
+  #
+  # So a doorway answers a person opening an entry address with a CONTENT SHELL: one thin
+  # bar across the top, and the app itself filling the rest of the window in a frame. The
+  # bar carries a RESILIENCY BADGE, a link that reads "Held by N of M households" and leads
+  # to the app's EPR PAGE, /epr/<record id> — the full page about the record: its reach, its
+  # holders, its steward, its governance. The person stays on the app; the qualification is
+  # one glance and the full account is one click away.
+  #
+  # THE BADGE'S FIGURES come from that doorway's HOUSEHOLD RESILIENCE READING for this app.
+  # N is how many distinct households appear among the content's RECORDED HOLDERS. A peer
+  # that has the bytes counts only once its holding is recorded under the household it
+  # belongs to, so N is not how many peers happen to have the bytes right now. M is a
+  # target: how many households the content should live in, set by its RESILIENCE TIER, a
+  # value class the content's owner may declare (a keepsake wants more homes than an
+  # ephemeral note). A record that declares no tier gets the standard tier, whose target is
+  # three. A record this run has just published usually has no recorded household holder
+  # yet, so zero is an honest reading. This station asserts faithfulness, not a number: the badge says
+  # exactly what the reading says. The badge has three wordings, literally:
+  #   "Held by N of M households" when at least one household holds the app;
+  #   "Not yet held by any household" when N is zero;
+  #   "Held by households · see where it lives" when the doorway could not get a reading.
+  #
+  # HOW THE DOORWAY TELLS A PERSON FROM A FRAME. A browser declares, on every request, what
+  # the request is for: opening a page, filling a frame, fetching a script. A person typing
+  # or following the address is opening a page. The protocol's own surfaces that show
+  # content — the protocol's own learning app, whose content viewer is where a person
+  # studies the protocol's material, and the EPR page — show the app in a frame
+  # at that same entry address, and they already draw their own qualifying chrome around
+  # it. A second bar inside their frame would be noise. Worse, if the shell ever answered a
+  # frame, the shell's own frame would load another shell, endlessly. So a frame always
+  # gets the zip's bytes exactly as built, and the bytes a person runs inside the shell are
+  # still exactly the bytes the record's content address names. The shell decides what is
+  # around the app; it never touches the app.
+  #
+  # CACHES MUST NOT MIX THE TWO ANSWERS. One address now has two answers. If any cache on
+  # the path (the doorway's own, a CDN's, the browser's) handed a frame the shell, every
+  # embedding surface would show a bar inside a bar; if it handed a person the bare file,
+  # the qualification would silently vanish. The shell is therefore never stored, and the
+  # bare file declares that it depends on how the request was made, so no cache hands it to
+  # a person opening a page. On the wire that is the shell's `X-Elohim-Chrome: content-shell`
+  # and `Cache-Control: no-store`, and the bare file's `Vary: Sec-Fetch-Dest, Sec-Fetch-Mode`
+  # (the two request headers in which a browser declares what a request is for). The doorway
+  # sends the same Vary on the shell too, but a cache that never stores the shell cannot mix
+  # it up, so the scenario checks no-store on the shell and Vary on the bare file, which is
+  # where each one does the work.
+  #
+  # THE DOORWAY MUST KNOW THE RECORD FIRST. The doorway reads a slug's record id, format and
+  # entry file from its own copy of the content records, and when it has no copy it serves
+  # the bare file, exactly as before the shell existed. So each scenario first waits until
+  # the doorway knows this app's record and its declared format. Without that wait, the
+  # second scenario's "served as it is" would pass on a doorway that simply had not heard of
+  # the app yet, and prove nothing.
+  #
+  # ONE DOOR IS ENOUGH HERE. Whether both doors converge on a new version is Station 1's
+  # question. The shell is a decision each doorway makes alone from what it already holds,
+  # so this station asks it of doorway "alpha-A" only.
+  #
+  # WHERE THE BOOT CHECKS LOOK. The app inside the shell runs in the frame's own document,
+  # not in the shell's page. The two frame steps below look inside that document for the
+  # app's root element and its data-app-ready marker, exactly as Station 1 looks at a bare
+  # page; the shell's own page has no app root and is never what they inspect.
+  #
+  # NOT PROVEN HERE, named so each gap is a decision: a request that declares nothing about
+  # its purpose (an older client, a command-line tool) is served the bare file as before;
+  # this station asserts where the badge leads, not that the EPR page there renders,
+  # which is that page's own story; and the badge's third wording, for a doorway that
+  # could not get a reading, is checked by the doorway's own unit tests rather than here,
+  # because a household run cannot make the reading fail on purpose without breaking the
+  # peer it reads from.
+  @requires:owned-substrate
+  @deliverability-browser
+  Scenario: a person opening a content app's own address sees it under a thin bar that says who holds it, while a frame gets the app's bytes untouched
+    Given a coherent EPR app bundle this run just built
+    And an EPR record this run owns for it
+    When each doorway is handed the bundle's bytes
+    And only doorway "alpha-A" is told this bundle is the new version
+    And within 75 seconds doorway "alpha-A" serves a page naming that bundle's entry script
+    And within 75 seconds doorway "alpha-A" knows this app's record and that its declared format is "html5-app"
+    # The person: open the entry address as a page, in a real browser.
+    When a visitor opens this app's entry address on peer "alpha-A" as a page in a browser
+    Then doorway "alpha-A" answered the visitor with a content shell that no cache may keep
+    And the shell's resiliency badge from doorway "alpha-A" states the holder count from that doorway's own resilience reading for this app
+    And the shell's resiliency badge from doorway "alpha-A" links to this app's EPR page
+    And the shell from doorway "alpha-A" shows the app in a frame whose address is this app's entry address
+    # The app inside the frame starts exactly as it would bare: the frame's requests are
+    # the browser's own, so they count toward the checks below.
+    And the browser on peer "alpha-A" reported no uncaught error
+    And every asset the browser asked peer "alpha-A" for arrived
+    And the app inside the shell's frame from doorway "alpha-A" completed client bootstrap in the frame's own document
+    And the app root in the frame's own document from doorway "alpha-A" has content
+    # The frame: the same address, asked for the way a frame asks for it.
+    # "Depends on how it was requested" is the bare file's Vary on the two headers in which a
+    # browser says what a request is for; see CACHES MUST NOT MIX THE TWO ANSWERS above.
+    When this app's entry address is requested from doorway "alpha-A" the way a frame requests it
+    Then doorway "alpha-A" answers with the index page's bytes exactly as the bundle this run built holds them
+    And that answer carries no content-shell marker and declares that it depends on how it was requested
+
+  # The other half of the rule. A CHROMED APP is an EPR whose record declares its format as
+  # spa-bundle: an app that draws the protocol's qualifying bar itself (the learning app is
+  # built this way). It is already a qualified surface, so a
+  # doorway serves its entry address as built, even to a person opening it as a page.
+  #
+  # The doorway decides from the record's DECLARED format, never by inspecting the bytes.
+  # So this scenario publishes the same small site as above under a record declared
+  # spa-bundle; the claim is that the doorway adds no bar, not that the site draws one.
+  # Nothing here needs a browser: the claim is about what the doorway adds, not about what
+  # the app does, so the answer to a page-opening request is read directly off the wire.
+  @requires:owned-substrate
+  Scenario: an app that draws its own chrome is served as built when its entry address is opened as a page
+    Given a coherent EPR app bundle this run just built
+    And an EPR record this run owns for it, declared as an app that draws its own chrome
+    When each doorway is handed the bundle's bytes
+    And only doorway "alpha-A" is told this bundle is the new version
+    And within 75 seconds doorway "alpha-A" serves a page naming that bundle's entry script
+    And within 75 seconds doorway "alpha-A" knows this app's record and that its declared format is "spa-bundle"
+    When this app's entry address is requested from doorway "alpha-A" the way a browser opening a page requests it
+    Then doorway "alpha-A" answers with the index page's bytes exactly as the bundle this run built holds them
+    And that answer carries no content-shell marker and declares that it depends on how it was requested

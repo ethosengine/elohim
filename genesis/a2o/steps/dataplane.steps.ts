@@ -498,6 +498,80 @@ Then(
 );
 
 /**
+ * Bounded-wait form of the caughtUp assertion. On the fleet p2p.caughtUp goes
+ * false for a few minutes while a 300 s projection-reconcile sweep is in
+ * flight, so a single sample lands in the trough intermittently
+ * (backlog ci-edge-inventory-convergence-caughtup-sawtooth-flap). This polls
+ * /health every 15 s for up to the stated seconds and passes on the first
+ * reading where p2p.caughtUp is true. A node that stays behind past the
+ * window still fails, and the message carries the last /health body's
+ * evidence. `false` and absent stay distinct: false is a snapshot reporting
+ * behind, absent is no snapshot at all.
+ *
+ * Fields are read from the /health body as it came back; any that the body
+ * does not carry print as `absent` (healedTotal and sweeps live on
+ * storage /p2p/status today, so they read absent here unless /health grows
+ * them).
+ */
+const CAUGHTUP_WAIT_POLL_INTERVAL_MS = 15_000;
+const CAUGHTUP_WAIT_MAX_SECONDS = 600;
+
+Then(
+  /^peer "([^"]+)" \/health p2p\.caughtUp becomes true within (\d+) seconds$/,
+  // Default cucumber step timeout (30s) is far shorter than the wait; +30s
+  // margin over the longest wait this step permits (one probe may be in flight
+  // at the deadline).
+  { timeout: (CAUGHTUP_WAIT_MAX_SECONDS + 30) * 1000 },
+  async function (this: E2EWorld, peerName: string, secondsStr: string) {
+    const seconds = Number.parseInt(secondsStr, 10);
+    assert.ok(
+      seconds > 0 && seconds <= CAUGHTUP_WAIT_MAX_SECONDS,
+      `wait of ${seconds} s is outside 1..${CAUGHTUP_WAIT_MAX_SECONDS} s (the step timeout)`
+    );
+    const url = getPeerUrl(this, peerName);
+    const startedAt = Date.now();
+    let samples = 0;
+    let lastBody: Record<string, unknown> | undefined;
+    let lastError: string | undefined;
+    const reached = await pollForGauge<true>(
+      async () => {
+        samples += 1;
+        try {
+          const { body } = await probeHealth(url);
+          lastBody = body as unknown as Record<string, unknown>;
+          lastError = undefined;
+          return body.p2p?.caughtUp === true ? true : undefined;
+        } catch (err) {
+          lastError = err instanceof Error ? err.message : String(err);
+          throw err; // pollForGauge treats a thrown probe as "keep polling"
+        }
+      },
+      { intervalMs: CAUGHTUP_WAIT_POLL_INTERVAL_MS, timeoutMs: seconds * 1000 }
+    );
+    if (reached) return;
+    const elapsedS = Math.round((Date.now() - startedAt) / 1000);
+    const p2p = (lastBody?.p2p ?? undefined) as Record<string, unknown> | undefined;
+    const show = (v: unknown): string => (v === undefined ? 'absent' : JSON.stringify(v));
+    let evidence: string;
+    if (lastBody === undefined) {
+      evidence = `no /health body was ever read (last error: ${lastError ?? 'none'})`;
+    } else if (p2p === undefined) {
+      evidence = 'p2p section absent — P2P may not be enabled';
+    } else {
+      evidence =
+        `p2p.caughtUp=${show(p2p.caughtUp)} p2p.converged=${show(p2p.converged)} ` +
+        `p2p.divergentAnchor=${show(p2p.divergentAnchor)} ` +
+        `p2p.observedAgeMs=${show(p2p.observedAgeMs)} ` +
+        `p2p.healedTotal=${show(p2p.healedTotal)} p2p.sweeps=${show(p2p.sweeps)}`;
+    }
+    assert.fail(
+      `${peerName} /health: p2p.caughtUp did not become true within ${seconds} s ` +
+        `(${samples} samples over ${elapsedS} s; last body: ${evidence})`
+    );
+  }
+);
+
+/**
  * Assert that the p2p.peerCount is at least the given number.
  */
 Then(

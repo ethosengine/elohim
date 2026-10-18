@@ -46,8 +46,10 @@ Agent (who)  -->  Event (what happened)  -->  Resource (what changed)
 │ STEWARDSHIP LAYER (Constitutional AI)                   │
 │ Dignity floor, accumulation ceiling, graduated care     │
 ├────────────────────────────────────────────────────────┤
-│ SETTLEMENT LAYER (future blockchain)                    │
-│ External settlement when needed                         │
+│ SETTLEMENT BRIDGE (outward)                             │
+│ Exchanges are REA economic events. Settling in          │
+│ fiat with the economy outside the network is a          │
+│ bridge, never a chain or a token.                       │
 ├────────────────────────────────────────────────────────┤
 │ LEDGER LAYER (hREA / Holochain)                        │
 │ EconomicEvent entries, agent-centric accounting         │
@@ -76,7 +78,7 @@ The Elohim Protocol uses Unyt-inspired mutual credit with multiple currency swim
 ### Mutual Credit Principles
 
 - **Agent-centric creation**: Credit created at the point of value flow (not minted centrally)
-- **Constitutional limits**: Dignity floor (minimum access) + accumulation ceiling (maximum balance)
+- **Constitutional limits**: Dignity floor (minimum access) + accumulation ceiling (maximum balance). The floor is internal to the network: no seller or counterparty ever sees who stands at it.
 - **No debt spiral**: Negative balances limited by community-set bounds
 - **Graduated stewardship**: As contributors demonstrate care, they gain stewardship privileges
 

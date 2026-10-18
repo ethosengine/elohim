@@ -1269,25 +1269,45 @@ stage_once() {
         actual=$(curl -fSs "${DOORWAY_EPR_URL}/db/content/${SLUG}" \
             | HASH_FIELD="${HASH_FIELD}" python3 -c "import os, sys, json; print(json.load(sys.stdin).get(os.environ['HASH_FIELD'],''))") || return 1
         if [ "${actual}" != "${SPA_HASH}" ]; then
-            echo "  ✗ [${SLUG}] ${HASH_FIELD} drift after PATCH: expected ${SPA_HASH}, got ${actual:-<empty>}" >&2
-            return 1
+            local earned_head=""
+            earned_head=$(curl -fSs \
+                -H "X-API-Key: ${STORAGE_API_KEY_ADMIN:-}" \
+                "${DOORWAY_EPR_URL}/db/content/${SLUG}/head" \
+                2>/dev/null \
+                | AUTHORED_ACTION="${authored_action}" SPA_HASH="${SPA_HASH}" python3 -c '
+import os, sys, json
+head = json.load(sys.stdin)
+if (head.get("earned") is True
+        and head.get("stagingCandidate") == os.environ["AUTHORED_ACTION"]
+        and head.get("stagingCandidateBlobHash") == os.environ["SPA_HASH"]):
+    print(head.get("headActionHash") or "")
+' 2>/dev/null) || earned_head=""
+            if [ -n "${earned_head}" ]; then
+                echo "  ✓ [${SLUG}] staged beneath earned head ${earned_head}; candidate ${authored_action} carries ${SPA_HASH}"
+            else
+                echo "  ✗ [${SLUG}] ${HASH_FIELD} drift after PATCH: expected ${SPA_HASH}, got ${actual:-<empty>}" >&2
+                return 1
+            fi
+        else
+            echo "  ✓ verified ${SLUG} ${HASH_FIELD} = ${SPA_HASH}"
         fi
-        echo "  ✓ verified ${SLUG} ${HASH_FIELD} = ${SPA_HASH}"
 
         # 3. Declare the CROSS-ROOT canonical head (staging tier) — ADVISORY.
-        #    Resolves the notary HEAD this same conductor just witnessed via
-        #    GET /db/content/{id}/head, then names it the canonical head via
+        #    Uses the PATCH's authored action (falling back to the notary HEAD
+        #    via GET /db/content/{id}/head), then declares it at staging tier via
         #    POST /db/content/{id}/canonical-head so scenario 2 (multi-root
         #    convergence) has a declared answer to resolve. This leg is
         #    best-effort: the coordinator may be pre-cure (fn-not-found) on a
         #    host that hasn't picked up the hot-swap yet. NEVER fails the
         #    deploy — any failure here is a loud warning, not a retry/abort.
-        local head_hash=""
-        head_hash=$(curl -fSs \
-            -H "X-API-Key: ${STORAGE_API_KEY_ADMIN:-}" \
-            "${DOORWAY_EPR_URL}/db/content/${SLUG}/head" \
-            2>/dev/null \
-            | python3 -c "import sys, json; print(json.load(sys.stdin).get('headActionHash',''))" 2>/dev/null) || head_hash=""
+        local head_hash="${authored_action}"
+        if [ -z "${head_hash}" ]; then
+            head_hash=$(curl -fSs \
+                -H "X-API-Key: ${STORAGE_API_KEY_ADMIN:-}" \
+                "${DOORWAY_EPR_URL}/db/content/${SLUG}/head" \
+                2>/dev/null \
+                | python3 -c "import sys, json; print(json.load(sys.stdin).get('headActionHash',''))" 2>/dev/null) || head_hash=""
+        fi
 
         if [ -z "${head_hash}" ]; then
             echo "  ⚠ canonical-head declare FAILED — could not resolve headActionHash from GET ${DOORWAY_EPR_URL}/db/content/${SLUG}/head — coordinator may be pre-cure; scenario 2 will stay red" >&2

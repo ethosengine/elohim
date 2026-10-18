@@ -39,6 +39,11 @@ pub use hosted_binding::*;
 pub mod sign_for_agent;
 pub use sign_for_agent::*;
 
+// sign_account_bind_challenge — graduating a hosted account onto this node's key.
+// Coordinator-only: the DNA hash does not move.
+pub mod sign_account_bind_challenge;
+pub use sign_account_bind_challenge::*;
+
 // PortalHost coordinator functions (Recovery Phase 2 M5)
 pub mod portal_host;
 pub use portal_host::*;

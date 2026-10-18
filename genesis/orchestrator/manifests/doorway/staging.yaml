@@ -171,6 +171,8 @@ spec:
             # Staging hosts Pete (pastor) + Terrance (tutor)
             - name: CONDUCTOR_URLS
               value: "CONDUCTOR_URLS_PLACEHOLDER"
+            - name: DOORWAY_HOSTING_CONDUCTORS
+              value: "HOSTING_CONDUCTORS_PLACEHOLDER"
             - name: CONDUCTOR_ADMIN_URL
               value: "ws://elohim-pete-staging-conductor:4444"
             - name: STORAGE_URL

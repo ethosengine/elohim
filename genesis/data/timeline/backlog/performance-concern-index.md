@@ -135,6 +135,7 @@ trustful context without reporting a cost carry the trust tag alone; `grep -lE '
 | [heal-pointer-bytes-ordering-blocking-serve](epr:heal-pointer-bytes-ordering-blocking-serve) | self | doorway serve ↔ its own storage heal-on-read | Serving blocks unboundedly in heal-on-read waiting for bytes behind the pointer on one node. |
 | [self-heal-alpha-ssr-post-bundle-swap-cold-fetch-stall](epr:self-heal-alpha-ssr-post-bundle-swap-cold-fetch-stall) | self | doorway SSR render ↔ its own cold fetches after bundle swap | One of 29 cold fetches exceeds soft budget for ~15 min after head swap. |
 | [self-heal-doorway-startup-conductor-mint-serialization](epr:self-heal-doorway-startup-conductor-mint-serialization) | self | doorway startup ↔ its own per-conductor token mints | Startup serializes N synchronous token mints before listener binds, blowing startupProbe on same-node conductors. |
+| [doorway-hosted-capacity-bound-from-pod-memory](epr:doorway-hosted-capacity-bound-from-pod-memory) | memory, scale, queue | self | mechanical | measured | Declared 50 hosted agents per conductor against a 5 GiB conductor that holds about five at ~0.7 GiB per install; ties go to the saturated pod; a failed `create_human` leaves its install behind uncounted | 5120 Mi conductor limit; ~0.7 GiB per install; adam 1.17 → 3.18 GiB for three; matthew OOMKilled 2026-10-15 |
 | [content-gap-limit-cycle-blocks-convergence](epr:content-gap-limit-cycle-blocks-convergence) | declared | fleet storage peers ↔ fleet peers via content gap discovery | Discovered-never-fetched ids oscillate across all pods; replicating peers fail to converge. |
 | [content-projection-plateau-ethosengine-household](epr:content-projection-plateau-ethosengine-household) | declared | household peers james/jessica/matthew ↔ each other, content projection | divergent_anchor plateau across the household peers; declared household convergence. |
 | [genesis-pair-cross-conductor-fetch-blocks-canonical-convergence](epr:genesis-pair-cross-conductor-fetch-blocks-canonical-convergence) | declared | adam conductor ↔ matthew conductor, genesis pair | Genesis pair cross-conductor fetch of REA commitments; cold-cell warm-up misattributed as retrieval failure. |
@@ -269,7 +270,7 @@ incident text.
 | [household-lamad-gossip-wedge-large-dht](epr:household-lamad-gossip-wedge-large-dht) | convergence, scale | declared | wait, mechanical | measured | Full-arc gossip on the household lamad DHT cannot complete rounds inside roundTimeoutMs at ~120k ops; fleet risk unconfirmed. | ~120k ops; rounds in 2.5h matthew None, jessica 1, james 2; 63-102 peer_timeouts per peer |
 | [sovereign-peer-network-read-no-authorities](epr:sovereign-peer-network-read-no-authorities) | convergence | trustless | wait | measured | A freshly joined iroh peer cannot read fleet content for hours because live agent-infos advertise no storage arc and gossip fills slowly. | gossip ~90 KB/min (3.29 to 3.74 MB in 5 min); null in 7-10ms; not held after 15 min |
 
-## elohim-storage (22)
+## elohim-storage (24)
 
 | Entry | Mechanism | Trust | Friction | Evidence | What costs what | Figures in the entry |
 |---|---|---|---|---|---|---|
@@ -295,8 +296,10 @@ incident text.
 | [susan-conductor-ws-dead-heal-pacing-blind-to-instant-errors](epr:susan-conductor-ws-dead-heal-pacing-blind-to-instant-errors) | queue | self | mechanical, blind | measured | susan's storage-conductor websocket is dead and HealCircuit pacing never trips on instant connection-closed errors, so heal attempts retry-storm at full speed. | heal_outcomes failed ~64,658 content + 1,849 rea per 12h on susan; others 60k-155k Ok(None) |
 | [sync-edge-susan-timeouts-per-edge-observability](epr:sync-edge-susan-timeouts-per-edge-observability) | latency, telemetry | declared | blind, wait | measured | susan is the fleet's expensive sync edge: every pod times out to her and she to everyone, and nothing in the dataplane prices that edge. | 274 outbound sync failures/6h (susan 93, gertrude 53); susan working set 753 MB of 3 GiB |
 | [transport-route-metrics-pretouch-zero](epr:transport-route-metrics-pretouch-zero) | telemetry | — | blind | cured-unverified | Transport route, path RTT and acquisition dispatch metric series are invisible on the fleet until first decision; pre-touch at zero landed locally, fleet read pending. | — |
+| [provide-revoke-arm-dormant-behind-namespace-mismatch](epr:provide-revoke-arm-dormant-behind-namespace-mismatch) | io, scale | self | mechanical | measured | The provide reconciler read its own commitments under the transport id while they are written under the agent key, so every restart re-authored a notarized commitment per scope; the revoke arm never ran and needs an operator decision. | matthew 729 live rows for 154 scopes, up to 8 per scope; jessica 613; james 202; none revoked |
+| [rea-inventory-advertises-rows-of-another-notary](epr:rea-inventory-advertises-rows-of-another-notary) | cpu, queue | declared | verify, wait | cured-unverified | Peers advertised mishpat commitments that a receiver's content_store can never resolve, so each receiver re-read about 800 ids on the miss ledger's ladder; the inventory now omits them. | get_rea_commitment 63-109 calls/min per peer; 819 / 937 / 1354 calls in the 300 s after a restart |
 
-## Doorway (4)
+## Doorway (5)
 
 | Entry | Mechanism | Trust | Friction | Evidence | What costs what | Figures in the entry |
 |---|---|---|---|---|---|---|
@@ -448,3 +451,59 @@ Trust × friction (verify / wait / mechanical / blind):
 Plane: plane-notary 18, plane-custody 9, plane-projection 13, plane-head 6, plane-authority 2, plane-bytes 1, plane-reference 1; fused-planes 27.
 
 Unit: unit-call 16, unit-item 15, unit-once 13, unit-peer 8, unit-history 5, unit-agent 2. Phase: phase-steady 37, phase-transition 23, phase-growth 6. Lane: lane-operator 24, lane-interactive 21, lane-background 15, lane-borrowed 8.
+
+## Sprint 2026-10-11 (idle-CPU residual; the top open entry taken from the reading order, this is the snapshot)
+
+Plan: `genesis/docs/superpowers/sprints/2026-10-11-idle-cpu-residual-sprint.md`. The reading order's first entry
+(`conductor-cap-grant-scan-per-zome-call`) was already cured; the next, `conductor-residual-cpu-full-chain-read-and-perpetual-republish`,
+was the sprint's item. Results are on the atoms, not here:
+
+- `conductor-residual-cpu-full-chain-read-and-perpetual-republish` → the publish-time lock probe reads CLOSED for the
+  current fleet pods (0 lines of every shape in the first 90 minutes and the last 24 h; Loki holds nothing from the
+  original 2026-10-06 window); the publish loop is now the second workflow by wall time on every conductor, not the
+  first; a loop the entry had not named — the scheduler's two reads per running cell every 100 ms — is attributed
+  by cell count on the household and is the sprint's cure (fork branch `perf/scheduler-latch`). Status unchanged
+  until the after half is read.
+- `alpha-conductor-sys-validation-spin-unfetchable-deps` → owns the fleet's largest idle workflow (1.0 s/s on all
+  seven conductors, 10–20 s per run over a capped 10,000-row unindexed selection); a suspected starvation defect
+  is named (`sys_validation_attempts` is never incremented, so the selection is oldest-first and a backlog over
+  10,000 never reaches newer ops); does NOT reproduce on the household (0.002 s/s). Cure shapes weighed, none built.
+- `idle-is-free` habit → the declared check run for the first time since the conductor cures: RED at 20–24 calls/min
+  per peer and 157 CPU s/min; the residual split into a scheduler share proportional to cells (65% of matthew's
+  database checkouts) and a cell-independent base of ≈1,100 checkouts/s per conductor that no workflow metric
+  explains.
+- After half (2026-10-12, latch on): matthew's checkouts 3,068 → 1,007/s and CPU 63.7 → 47.5 s/min; the small
+  conductors unchanged within noise; household 155 → 147 CPU s/min against a budget of 10. The cured share is
+  proportional to hosted cells; the residual-cpu entry now carries `unit-agent` and `custody-everyone`. The
+  cell-independent base (≈1,000 checkouts/s, ≈48 CPU s/min per conductor) is the open frontier; the cure is a
+  three-commit fork branch (`fbdf961df`, reviewed by Sonnet and Codex), pin unmoved.
+- The statement window (60 s, latch binary) named the household's cell-independent base: four kitsune2 gossip
+  round costs (a full-index "new ops since" scan at ~90 ms per side per round, 512 uncached slice-hash reads per
+  snapshot, a dependency check fed by a stuck bookmark, peer-meta reads per candidate agent), fired every second
+  by the mesh's dev gossip acceleration — alpha runs the default 120–300 s cadence, so this base is the fixture's,
+  not the fleet's. New entry: `conductor-gossip-round-op-store-cost` (fork/upstream, medium; scales with op count
+  and peer count). The `idle-is-free` check as declared is confounded by that acceleration; a production-cadence
+  reading is in its ledger.
+- Found on the way, not a performance item: `conductor-sqlcipher-key-logged-by-sqlx-slow-statement` (security,
+  high) — sqlx's slow-statement WARN prints `PRAGMA key` with the SQLCipher key at the default log level; cured on
+  the same fork branch (`96bcd2bee`), fleet logs since the sqlx 0.9 move are to be treated as holding keys.
+- Tally tables above are NOT regenerated in this pass (tag counts for `unit-agent` and `custody-everyone` are each
+  one higher than printed; the two new entries are not in the reading order yet).
+
+## Catalogued 2026-10-16 (the hosted-human footprint; operator question, code read, nothing re-measured)
+
+The operator asked what a hosted human's conductor must actually run, and whether the always-on
+parts can consume a shared runtime instead. Filed:
+
+- [doorway-hosted-capacity-bound-from-pod-memory](epr:doorway-hosted-capacity-bound-from-pod-memory) — the alpha
+  guard rail from genesis #1649: bound derived from pod memory, deterministic tie-break, uninstall on a failed
+  `create_human`. Two operator decisions: the number, and whether adam keeps hosting.
+- [arch-scale-risk](epr:arch-scale-risk-backlog) rows 14–17, row 7 decomposed by what needs the person's own cell.
+  Row 14 is new evidence: each install's genesis evicts the conductor's shared compiled-wasm cache, and wasmer's
+  engine never frees reloaded code, which would explain row 7's ten executable mappings per human. Read from code
+  (fork `96bcd2bee215`, wasmer 7.1.0), not yet tested. Rows 15–17 are design: sleep idle cells, a zero-arc hosting
+  conductor (heap saving unproven, given the prior arc-0 evidence), and the split onto live-session host, hub and
+  an on-demand signer.
+
+First experiment for all of it: one household session, two hosted registrations, smaps at four points (baseline,
+after each, after `disable_app` on one). It tests row 14 and row 15's E1 together. Tally tables are not regenerated.

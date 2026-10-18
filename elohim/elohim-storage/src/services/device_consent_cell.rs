@@ -33,6 +33,7 @@ use crate::error::StorageError;
 use crate::hc_client::{HcClient, MISHPAT_ROLE};
 
 const MISHPAT_ZOME: &str = "mishpat";
+const STANDING: &str = "my_consent_standing";
 const SIGN_APPROVAL: &str = "sign_device_approval";
 const BOOTSTRAP: &str = "bootstrap_device_identity";
 const SIGN_ENROLLMENT: &str = "sign_device_enrollment";
@@ -306,6 +307,24 @@ fn failure(error: StorageError) -> CellFailure {
     }
 }
 
+/// Whether the conductor answered that the standing function itself does not
+/// exist on this cell's coordinator: an answer that stands until the
+/// coordinator changes. Its words name the zome and the function, and both
+/// are checked: another function's absence, met inside the standing read
+/// (it reads the agent's Human from another zome), is not this one's.
+pub fn standing_function_missing(why: &CellFailure) -> bool {
+    let (CellFailure::Unavailable(message) | CellFailure::Refused(message)) = why;
+    let named = format!(": Zome: {MISHPAT_ZOME} Fn {STANDING}");
+    message
+        .split("zome function that doesn't exist")
+        .skip(1)
+        .any(|after| {
+            after.strip_prefix(named.as_str()).is_some_and(|rest| {
+                !rest.starts_with(|c: char| c.is_ascii_alphanumeric() || c == '_')
+            })
+        })
+}
+
 /// A controller cell on the conductor `hc` speaks to.
 pub struct ConductorControllerCell {
     hc: Arc<HcClient>,
@@ -344,7 +363,7 @@ impl ControllerCell for ConductorControllerCell {
             .into_vec();
         let answer = self
             .hc
-            .call_zome_mishpat("mishpat", "my_consent_standing", payload)
+            .call_zome_mishpat(MISHPAT_ZOME, STANDING, payload)
             .await
             .map_err(failure)?;
         let standing: Option<ConsentStandingWire> = ExternIO::from(answer)
@@ -549,13 +568,19 @@ impl ControllerCell for ConductorControllerCell {
 pub struct ConductorDeviceCell {
     hc: Arc<HcClient>,
     cell: CellId,
+    /// A call that writes this node's standing came back successful.
+    wrote: std::sync::atomic::AtomicBool,
 }
 
 impl ConductorDeviceCell {
     /// This node's own mishpat cell, when the installed hApp has one.
     pub fn own(hc: Arc<HcClient>) -> Option<Self> {
         let cell = hc.cell_id_for_role(MISHPAT_ROLE)?.clone();
-        Some(Self { hc, cell })
+        Some(Self {
+            hc,
+            cell,
+            wrote: std::sync::atomic::AtomicBool::new(false),
+        })
     }
 }
 
@@ -578,6 +603,10 @@ impl DeviceCell for ConductorDeviceCell {
         challenge: &str,
     ) -> Result<consent_grant::CarrierProof, CellFailure> {
         sign_carrier_with(&self.hc, &self.cell, kind, state, transport_id, challenge).await
+    }
+
+    fn wrote_standing(&self) -> bool {
+        self.wrote.load(std::sync::atomic::Ordering::SeqCst)
     }
 
     async fn whoami(&self) -> Result<DeviceSelf, CellFailure> {
@@ -664,6 +693,12 @@ impl DeviceCell for ConductorDeviceCell {
             .call_zome_mishpat(MISHPAT_ZOME, ENROLL, payload)
             .await
             .map_err(failure)?;
+        // The binding is on this cell's chain from here, whatever fails
+        // after: reading its receipt, or registering whose this node is.
+        // Said here, to this request and to the carrier: a request that goes
+        // away during what follows still leaves the read owed.
+        self.wrote.store(true, std::sync::atomic::Ordering::SeqCst);
+        super::device_carrier::carrier().standing_written();
         let receipt: CommitmentOutputWire = ExternIO::from(answer)
             .decode()
             .map_err(|e| CellFailure::Unavailable(format!("receipt decode: {e}")))?;
@@ -691,6 +726,34 @@ impl DeviceCell for ConductorDeviceCell {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn only_the_standing_functions_own_absence_is_taken_for_it() {
+        let said = |message: &str| {
+            standing_function_missing(&CellFailure::Unavailable(message.to_string()))
+        };
+        let missing = "Conductor error: Attempted to call a zome function that doesn't exist: \
+                       Zome: mishpat Fn my_consent_standing";
+        assert!(said(missing));
+        assert!(standing_function_missing(&CellFailure::Refused(
+            missing.to_string()
+        )));
+        assert!(said(&format!("{missing} (source: guest)")));
+        // Another function, another zome, a longer name, or other words.
+        assert!(!said(
+            &missing.replace("my_consent_standing", "identity_devices")
+        ));
+        assert!(!said(
+            &missing.replace("my_consent_standing", "my_consent_standing_v2")
+        ));
+        assert!(!said(&missing.replace("mishpat", "imagodei")));
+        assert!(!said(
+            "Guest error in mishpat my_consent_standing: Attempted to call a zome function \
+             that doesn't exist: Zome: imagodei Fn get_my_human"
+        ));
+        assert!(!said("Zome: mishpat Fn my_consent_standing timed out"));
+        assert!(!said("the conductor is down"));
+    }
 
     const IDENTITY: &str = "uhCkkRrENFlI2RlXCelrj6C6ttNq8qTI_wSh0fFmsrSvBgdkkM39j";
     const AUTHORITY: &str = "uhCkkN_k9u6glm7eRydJ_WWbyUSSWbBYMHd_6aWO4ag-PrcWHA5_-";

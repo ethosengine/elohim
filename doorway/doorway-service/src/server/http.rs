@@ -2968,7 +2968,43 @@ pub(crate) const AUTH_OWNED_PATHS: &[&str] = &[
     "/auth/activate-recovery",
     "/auth/elohim-verify/start",
     "/auth/elohim-verify/answer",
+    "/auth/node-key/challenge",
+    "/auth/node-key/bind",
 ];
+
+#[cfg(test)]
+mod auth_owned_paths_cover_the_handler {
+    use super::AUTH_OWNED_PATHS;
+
+    /// Every `/auth/*` literal a match arm in `handle_auth_request` answers is
+    /// owned here; a path missing from this list falls through to the EPR
+    /// router and returns 404 even though its handler exists (how the node-key
+    /// routes first shipped).
+    #[test]
+    fn every_auth_route_arm_is_an_owned_path() {
+        let src = include_str!("../routes/auth_routes.rs");
+        let mut missing = Vec::new();
+        for line in src.lines() {
+            let t = line.trim_start();
+            if !(t.starts_with("(&Method::") || t.starts_with("| (")) {
+                continue;
+            }
+            let Some(start) = t.find("\"/auth/") else {
+                continue;
+            };
+            let rest = &t[start + 1..];
+            let Some(end) = rest.find('"') else { continue };
+            let path = &rest[..end];
+            if !AUTH_OWNED_PATHS.contains(&path) && !missing.contains(&path) {
+                missing.push(path);
+            }
+        }
+        assert!(
+            missing.is_empty(),
+            "auth_routes.rs answers these paths but AUTH_OWNED_PATHS does not own them: {missing:?}"
+        );
+    }
+}
 
 #[cfg(test)]
 mod auth_discovery_symmetry {
@@ -9010,7 +9046,7 @@ async fn handle_request(
                 None
             };
             debug!(path = %p, "Handling app request (projection cache)");
-            let mut response = routes::handle_app_request(Arc::clone(&state), p).await;
+            let mut response = routes::handle_app_request(Arc::clone(&state), p, req.headers()).await;
             stamp_addressed_admission(&mut response, admitted_reach.as_deref());
             return Ok(to_boxed(response));
         }

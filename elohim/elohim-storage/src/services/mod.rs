@@ -30,6 +30,7 @@ pub mod back_prop;
 pub(crate) mod rea_commitment_projection;
 pub(crate) mod rea_commitment_record;
 
+pub mod account_bind; // the node's half of graduating a hosted account onto its key: parse + sign a doorway bind challenge
 pub mod behavioral_trust;
 pub mod boot_registration;
 pub mod bootstrap_manifests;

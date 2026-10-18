@@ -1,0 +1,666 @@
+{
+  "id": "elohim-protocol-own-seat",
+  "schema_version": "dtpr@2026-09-01-beta",
+  "created_at": "2026-10-14T18:00:00Z",
+  "instance_version": "production commitment, drafted from the alpha protocol",
+  "title": [
+    {
+      "locale": "en",
+      "value": "Elohim Protocol, from your own seat"
+    }
+  ],
+  "description": [
+    {
+      "locale": "en",
+      "value": "A peer-to-peer protocol for learning, identity, community decisions and shared provision. Each person or household runs their own node and signs everything they add. An AI helper called an elohim works for them under rules they write, and no machine holds final authority over a person. This label states what the protocol commits to in production, read from the seat of a person running their own node. Each claim says what backs it and where it stands today."
+    }
+  ],
+  "elements": [
+    {
+      "element_id": "education",
+      "priority": 0,
+      "variables": [
+        {
+          "id": "additional_description",
+          "value": [
+            {
+              "locale": "en",
+              "value": "Learning paths people walk together. What you have learned is shown by your own record, not certified by a platform."
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "element_id": "social",
+      "priority": 1,
+      "variables": [
+        {
+          "id": "additional_description",
+          "value": [
+            {
+              "locale": "en",
+              "value": "Being known by your own people: households, neighbours and groups that decide things together and keep account of the care they give each other."
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "element_id": "organization",
+      "element_instance_id": "accountable-you",
+      "context_type_id": "deployer",
+      "priority": 0,
+      "variables": [
+        {
+          "id": "title",
+          "value": [
+            {
+              "locale": "en",
+              "value": "You, or your household"
+            }
+          ]
+        },
+        {
+          "id": "description",
+          "value": [
+            {
+              "locale": "en",
+              "value": "You run the node. Everything you add is signed with your own key, so you answer for what you sign and nobody else can sign as you. Anyone who holds authority over others (a steward, a doorway operator, a council) holds it through a signed, expiring commitment from the people they serve, and answers to them."
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "element_id": "organization",
+      "element_instance_id": "accountable-authors",
+      "context_type_id": "vendor",
+      "priority": 1,
+      "variables": [
+        {
+          "id": "title",
+          "value": [
+            {
+              "locale": "en",
+              "value": "Elohim Protocol contributors"
+            }
+          ]
+        },
+        {
+          "id": "description",
+          "value": [
+            {
+              "locale": "en",
+              "value": "Write the open-source rules every node runs, stewarded by Matthew Dowell. They cannot sign for you or change what you signed, and a change to the shared rules reaches a community only when that community adopts it."
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "element_id": "people",
+      "element_instance_id": "affected-you",
+      "context_type_id": "subject",
+      "priority": 0,
+      "variables": [
+        {
+          "id": "title",
+          "value": [
+            {
+              "locale": "en",
+              "value": "You"
+            }
+          ]
+        },
+        {
+          "id": "description",
+          "value": [
+            {
+              "locale": "en",
+              "value": "The person the system works for, not the person it is used on. You choose what to publish and how far it travels, and you write the rules the elohim working with you follows."
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "element_id": "people",
+      "element_instance_id": "affected-in-care",
+      "context_type_id": "subject",
+      "priority": 1,
+      "variables": [
+        {
+          "id": "title",
+          "value": [
+            {
+              "locale": "en",
+              "value": "People in someone's care"
+            }
+          ]
+        },
+        {
+          "id": "description",
+          "value": [
+            {
+              "locale": "en",
+              "value": "Children, and adults who receive support, can be under a stewardship grant from a named person. Every grant names both people, its reason and an end date, and the person in care can always see it, object to it and reach help."
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "element_id": "people",
+      "element_instance_id": "affected-community",
+      "context_type_id": "community",
+      "priority": 2,
+      "variables": [
+        {
+          "id": "title",
+          "value": [
+            {
+              "locale": "en",
+              "value": "Households, neighbourhoods and groups"
+            }
+          ]
+        },
+        {
+          "id": "description",
+          "value": [
+            {
+              "locale": "en",
+              "value": "Decide together at the smallest layer that fits the decision. Rules are layered outward from the household: a wider layer can bound a narrower one, and a narrower layer can add care but never remove a protection."
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "element_id": "people",
+      "element_instance_id": "affected-named",
+      "context_type_id": "bystander",
+      "priority": 3,
+      "variables": [
+        {
+          "id": "title",
+          "value": [
+            {
+              "locale": "en",
+              "value": "People named by others"
+            }
+          ]
+        },
+        {
+          "id": "description",
+          "value": [
+            {
+              "locale": "en",
+              "value": "A relationship link or a post can name someone who never joined. Personal details and relationship links stay between the people involved instead of on the public record."
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "element_id": "decides",
+      "context_type_id": "autonomous",
+      "priority": 0,
+      "variables": [
+        {
+          "id": "additional_description",
+          "value": [
+            {
+              "locale": "en",
+              "value": "Every peer checks every new record against the same published rules and refuses records that break them. No person reviews each check, and no single party, the contributors included, can override it."
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "element_id": "acts",
+      "context_type_id": "human_decides",
+      "priority": 1,
+      "variables": [
+        {
+          "id": "additional_description",
+          "value": [
+            {
+              "locale": "en",
+              "value": "The elohim works alongside you under a constitution you write: what it may do on its own, what it must ask you first, and what it may never do. What it cannot settle comes back to you, you can correct it, and a person can always overturn it."
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "element_id": "understands",
+      "context_type_id": "human_decides",
+      "priority": 2,
+      "variables": [
+        {
+          "id": "additional_description",
+          "value": [
+            {
+              "locale": "en",
+              "value": "The elohim working with you reads what other systems and people declare about themselves (who they are, for whom, and why, including labels like this one) and explains it to you before you share anything."
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "element_id": "creates",
+      "context_type_id": "human_decides",
+      "priority": 3,
+      "variables": [
+        {
+          "id": "additional_description",
+          "value": [
+            {
+              "locale": "en",
+              "value": "Makes things with you: a draft, a lesson, a plan. Your attention, stewardship and direction are yours and are what you are rewarded for. What the elohim brings comes from the commons, so it is cited, and value flows back to the commons and in part to the people it drew on."
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "element_id": "privacy_loss",
+      "priority": 0,
+      "variables": [
+        {
+          "id": "risk",
+          "value": [
+            {
+              "locale": "en",
+              "value": "Anything given to the commons is copied by many peers. If something is published by mistake, the network can recover it only as far as it is able, and that cannot be guaranteed."
+            }
+          ]
+        },
+        {
+          "id": "mitigation",
+          "value": [
+            {
+              "locale": "en",
+              "value": "Thoughts, drafts and personal details never enter the shared record, and the reach gate asks before anything travels further than you. What you publish carries the reach you chose, and summaries about a group are published only when at least five people contribute."
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "element_id": "autonomy_loss",
+      "priority": 1,
+      "variables": [
+        {
+          "id": "risk",
+          "value": [
+            {
+              "locale": "en",
+              "value": "A steward, such as a parent, holds real authority over someone in their care and could misuse it."
+            }
+          ]
+        },
+        {
+          "id": "mitigation",
+          "value": [
+            {
+              "locale": "en",
+              "value": "Authority over another person is always bounded: it names its reason, expires, can be revoked and can be appealed. A grant cannot be made on one person's say-so, it can be handed on at most three times, and the person in care can always reach their steward, an advocate and emergency help."
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "element_id": "security_breach",
+      "priority": 2,
+      "variables": [
+        {
+          "id": "risk",
+          "value": [
+            {
+              "locale": "en",
+              "value": "A key could be lost or stolen."
+            }
+          ]
+        },
+        {
+          "id": "mitigation",
+          "value": [
+            {
+              "locale": "en",
+              "value": "Recovery runs through a group of people who actually know you, not a support desk. Cryptography speeds recovery but is never the only way back, and a stolen key can be revoked by the people you named."
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "element_id": "societal_cultural_harm",
+      "priority": 3,
+      "variables": [
+        {
+          "id": "risk",
+          "value": [
+            {
+              "locale": "en",
+              "value": "Communities could come to depend on rules and models they cannot see or change."
+            }
+          ]
+        },
+        {
+          "id": "mitigation",
+          "value": [
+            {
+              "locale": "en",
+              "value": "The rules are open source and published, communities can copy and change them, and a more capable model earns the same audit as any other, never more deference."
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "element_id": "civil_liberties_harm",
+      "priority": 4,
+      "variables": [
+        {
+          "id": "risk",
+          "value": [
+            {
+              "locale": "en",
+              "value": "An institution could pressure or target a person, or the network itself, to get at what people make and say together."
+            }
+          ]
+        },
+        {
+          "id": "mitigation",
+          "value": [
+            {
+              "locale": "en",
+              "value": "The network shares the duty to defend the rights it labels. Each person's elohim has standing to defend their interests and cannot be dismissed while they are under pressure, doorways are plural, and the rules can be copied, so no single host or institution can switch the network off."
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "element_id": "right_contest",
+      "priority": 0,
+      "variables": [
+        {
+          "id": "rights",
+          "value": [
+            {
+              "locale": "en",
+              "value": "You can object to a decision made about you, by a steward, a group or an elohim, and a named person must answer before a deadline. An objection nobody answered is shown as unanswered, never as refused."
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "element_id": "right_to_human_review",
+      "priority": 1,
+      "variables": [
+        {
+          "id": "rights",
+          "value": [
+            {
+              "locale": "en",
+              "value": "A question a machine cannot settle goes to a person, and \"ask a person\" can never quietly become \"no\"."
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "element_id": "right_access",
+      "priority": 2,
+      "variables": [
+        {
+          "id": "rights",
+          "value": [
+            {
+              "locale": "en",
+              "value": "You can see every record about you, who your stewards are, every limit that applies to you and which person set it."
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "element_id": "right_object",
+      "priority": 3,
+      "variables": [
+        {
+          "id": "rights",
+          "value": [
+            {
+              "locale": "en",
+              "value": "You can withdraw anything you granted, to a person, a group or the elohim working with you, and it stops applying from then on."
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "element_id": "right_correction",
+      "priority": 4,
+      "variables": [
+        {
+          "id": "rights",
+          "value": [
+            {
+              "locale": "en",
+              "value": "A correction to something said about you reaches you, and only you can settle it."
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "element_id": "user_input",
+      "priority": 0,
+      "variables": [
+        {
+          "id": "additional_description",
+          "value": [
+            {
+              "locale": "en",
+              "value": "What you type, choose and publish, on your own device. No ambient sensors and no third-party analytics."
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "element_id": "input_about_behaviour",
+      "context_type_id": "pseudonymous",
+      "priority": 0,
+      "variables": [
+        {
+          "id": "additional_description",
+          "value": [
+            {
+              "locale": "en",
+              "value": "Your signed actions (posts, learning progress, relationship links, feedback) under a key that is not your name."
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "element_id": "search_retrieval",
+      "priority": 0,
+      "variables": [
+        {
+          "id": "additional_description",
+          "value": [
+            {
+              "locale": "en",
+              "value": "Search runs on a published algorithm that is itself a governed record with a content address, so anyone can see exactly which version ran. No model is involved."
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "element_id": "language_models",
+      "priority": 1,
+      "variables": [
+        {
+          "id": "additional_description",
+          "value": [
+            {
+              "locale": "en",
+              "value": "A model is a participant with an identity, not a hidden tool. It is registered in the same identity network people use, and both its identity and its capabilities are layered: a base model; a tuning layer above it that customizes it, for instance to one person; and the system prompt that emerged from the community's layered constitution at the moment something was authored or gated. Each layer can hold an identity with capabilities attested through the same records people use to understand and show their own learning, never taken on a maker's word, so any decision can name exactly which layers made it. A more capable model earns the same audit as any other, never more deference."
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "element_id": "output_about_behaviour",
+      "context_type_id": "pseudonymous",
+      "priority": 0,
+      "variables": [
+        {
+          "id": "additional_description",
+          "value": [
+            {
+              "locale": "en",
+              "value": "Signed records of what you chose to say and do, and outcomes rather than raw data: a mastery level without the quiz answers."
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "element_id": "output_generated_content",
+      "context_type_id": "pseudonymous",
+      "priority": 1,
+      "variables": [
+        {
+          "id": "additional_description",
+          "value": [
+            {
+              "locale": "en",
+              "value": "What you make together carries its attribution from the start: your direction, and the commons it drew on, cited."
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "element_id": "mobile_notification",
+      "priority": 0,
+      "variables": [
+        {
+          "id": "additional_description",
+          "value": [
+            {
+              "locale": "en",
+              "value": "In your own app, on your own device. When something is refused, it says so instead of pretending the data is missing."
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "element_id": "available_to_me",
+      "priority": 0,
+      "variables": [
+        {
+          "id": "additional_description",
+          "value": [
+            {
+              "locale": "en",
+              "value": "Everything you hold, on your own node."
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "element_id": "available_to_3rd_parties",
+      "priority": 1,
+      "variables": [
+        {
+          "id": "additional_description",
+          "value": [
+            {
+              "locale": "en",
+              "value": "Only the people and groups you share with, at the reach you chose. Records meant for everyone can be read by anyone in the network, because that is how peers check them."
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "element_id": "not_available_to_vendor",
+      "priority": 2,
+      "variables": [
+        {
+          "id": "additional_description",
+          "value": [
+            {
+              "locale": "en",
+              "value": "The contributors have no special access to your node or your records."
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "element_id": "data_retained",
+      "priority": 0,
+      "variables": [
+        {
+          "id": "duration",
+          "value": [
+            {
+              "locale": "en",
+              "value": "for as long as others rely on it, once given to the commons"
+            }
+          ]
+        },
+        {
+          "id": "additional_description",
+          "value": [
+            {
+              "locale": "en",
+              "value": "Thoughts and drafts stay on your device. What you give to the commons becomes something others may come to rely on. If nobody has received it yet, taking it back is clean, and we keep that cheap. Once it has had reach, you can ask to withdraw it and the network honours that as far as it can: it may drop to a narrower reach, and a fresh note that you withdrew it stays beside the network's position on it, so the next person can consent knowing both. Researchers can still find it; someone looking for answers is guided to current, qualified help. Activity logs kept under a stewardship grant last at most 365 days."
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "element_id": "shared_storage_and_governance",
+      "priority": 0,
+      "variables": [
+        {
+          "id": "duration",
+          "value": [
+            {
+              "locale": "en",
+              "value": "as long as the network holds it"
+            }
+          ]
+        },
+        {
+          "id": "additional_description",
+          "value": [
+            {
+              "locale": "en",
+              "value": "Kept on your own device and copied across the devices of the network, each holding a share. There is no central server. The rules for what may be stored travel with the data and are checked by every peer."
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

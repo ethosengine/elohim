@@ -8,6 +8,7 @@ import { Routes } from '@angular/router';
 export const routes: Routes = [
   { path: '', children: [] },
   { path: 'consent', children: [] },
+  { path: 'consent/account-bind', children: [] },
   { path: 'consent/device', children: [] },
   { path: 'consent/device/preview', children: [] },
   { path: 'identity/preview', children: [] },

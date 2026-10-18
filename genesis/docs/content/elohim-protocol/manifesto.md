@@ -4,12 +4,12 @@ cites:
   - "constitution | The law that operationalizes this vision: the constitution-as-system-prompt, layer precedence (more-immutable wins), and the Matthew 6:21 gate that binds even the lawgiver. | sha256:2dda7f102ca76eb9 | path: genesis/docs/content/elohim-protocol/constitution.md"
   - "confession | The theology beneath this vision said plainly — what the protocol is FOR (the upstream soil it tends), what it holds, and the honest edges it cannot resolve. | sha256:dff3a6835bfa3802 | path: genesis/docs/content/elohim-protocol/confession.md"
   - "theology | The same theology forged as a disputation: each commitment pressed by its strongest objection across thirteen Articles, several answered 'this stands.' | sha256:8f0d807e135521ee | path: genesis/docs/content/elohim-protocol/theology.md"
-  - "succession | The argument that clears the ground for this vision — the mutualist lineage read for what it could not afford, and the mechanism by which a substrate carries public function without conquering anything. Written to be read BEFORE this document by anyone arriving with a formed politics. | sha256:663c98c4b4e5af87 | path: genesis/docs/content/elohim-protocol/succession.md"
-  - "values-forward | The conclusions this vision's implicit choices have hardened into: thirteen numbered Stances stating the position, where the field lands, how it was reached, and what it refuses in advance. Where this manifesto and a Stance appear to differ, the Stance is the settled reading. | sha256:f4e7524522d3b811 | path: genesis/docs/content/elohim-protocol/values-forward.md"
+  - "succession | The argument that clears the ground for this vision — the mutualist lineage read for what it could not afford, and the mechanism by which a substrate carries public function without conquering anything. Written to be read BEFORE this document by anyone arriving with a formed politics. | sha256:4ae356e1bf2112e6 | path: genesis/docs/content/elohim-protocol/succession.md"
+  - "values-forward | The conclusions this vision's implicit choices have hardened into: thirteen numbered Stances stating the position, where the field lands, how it was reached, and what it refuses in advance. Where this manifesto and a Stance appear to differ, the Stance is the settled reading. | sha256:0bfa006fd772f7d9 | path: genesis/docs/content/elohim-protocol/values-forward.md"
   - "shefa-economic-infrastructure | The economic pillar where the Sybil answer was first written down (§5): identity witnessed socially by the people who know you, attesters staking their own standing, no identity score; the Witnessed Humanity section generalises that answer from claiming value to every act of participation. | sha256:74323616b4696d99 | path: genesis/docs/content/elohim-protocol/shefa.md"
   - "imagodei-surfaces | The three identity surfaces; its self-knowledge surface (stated preferences gathered by self-reflection instruments, revealed preferences observed) is the stated-and-revealed negotiation the Witnessed Humanity section calls attunement. | sha256:e0abac6f6a6a0906 | path: genesis/docs/content/elohim-protocol/architecture/imagodei-surfaces-design.md"
-  - "stewardship-over-sovereignty | Foundational canon: cryptography as accelerator never gate, the grandma standard, every authority surface with a non-cryptographic recovery path; why witnessed humanity is a relationship and not a key or a filter. | sha256:995eb2079924ea2e | path: genesis/docs/architecture/stewardship-over-sovereignty.md"
-  - "private-thought-governed-fruit | The line the Witnessed Humanity section keeps drawn: only what is said and done in shared space is judged; the composed context that reveals a person is never aggregated, imported or joined by an outside observer. | sha256:5b6f5cdb858277e4 | path: genesis/docs/architecture/private-thought-governed-fruit.md"
+  - "stewardship-over-sovereignty | Foundational canon: cryptography as accelerator never gate, the grandma standard, every authority surface with a non-cryptographic recovery path; why witnessed humanity is a relationship and not a key or a filter. | sha256:5186f53fbeb95a65 | path: genesis/docs/architecture/stewardship-over-sovereignty.md"
+  - "private-thought-governed-fruit | The line the Witnessed Humanity section keeps drawn: only what is said and done in shared space is judged; the composed context that reveals a person is never aggregated, imported or joined by an outside observer. | sha256:2945eb608257be1e | path: genesis/docs/architecture/private-thought-governed-fruit.md"
   - "human-participant-actor-plane-design | The identity and witness design: a human is a first-class participant, never derived from a code host, an email or a git author; an agent present with them can witness them, signed from the device, contestable, and the human keeps the right to claim for themselves and to contest. | sha256:07cc5f8abf194381 | path: genesis/docs/superpowers/specs/2026-09-23-human-participant-actor-plane-design.md"
   - "sense-respond-governance-classifier | The afferent nerve the Witnessed Humanity section names: a selective classifier whose abstention is the escalation trigger, the elohim as endpoint of sensing under the sovereign human sortition floor, advisory sensing never a terminal deny. | sha256:c716a519ee6cc953 | path: genesis/docs/superpowers/specs/2026-07-15-sense-respond-governance-classifier-design.md"
   - "observer-protocol | The epic that completes the Witnessed Humanity arc with a body: ephemeral physical witness under a mechanical privacy switch, correlating the person the agent is attuned to with the person the household own eyes have seen; its Sybil section is the physical half of the same answer. | sha256:f179602d25f1b4bd | path: genesis/docs/content/elohim-protocol/observer-protocol.md"
@@ -182,7 +182,7 @@ These principles don't just improve existing systems—they engineer away the fa
 - Personal exploration zones separate from commons areas
 - Clear boundaries between individual intensity and shared spaces
 - Consent-based exposure to different levels of human experience
-- Institutions, including nation-states, are near-sovereign yet subject to the protocol as everyone else is. Their scale earns them enhanced privileges and protections, and exactly matching responsibilities. They exist insofar as they create the conditions that support and protect human flourishing — and where they stop doing so, they can be corrected, restructured, replaced, or dissolved through a combination of external consensus and their own members' consent to the global values network.
+- Institutions, including nation-states, carry great standing yet are subject to the protocol as everyone else is, and when they reach people through the network they arrive carrying their claims: who they are, on whose behalf they act, for what purpose, what they keep, and how to contest it. Their scale earns them enhanced privileges and protections, and exactly matching responsibilities. They exist insofar as they create the conditions that support and protect human flourishing — and where they stop doing so, they can be corrected, restructured, replaced, or dissolved through a combination of external consensus and their own members' consent to the global values network.
 
 ### **3. Values Alignment Over Rules Enforcement**
 
@@ -234,6 +234,7 @@ These principles don't just improve existing systems—they engineer away the fa
 - Consolidation events — discovery of equivalence or harm — are first-class judgment moments emitting signals to economic, governance, and relational layers, not silent housekeeping
 - Something that loses its audience does not vanish; it sinks to a quiet layer the elohim can still see, and can be brought back up by someone willing to face it deliberately. Losing reach is a setback to recover from, never a permanent silencing
 - "Right to be forgotten" reconceived: the protocol asks *who is going to hold this well?* rather than *how do we delete this?* The answer is structural, distributed, and accountable.
+- Publishing to the commons is a gift others may come to rely on, and withdrawing it is a request the network honors as far as it can be fulfilled: the thing drops to a narrower reach, or stays where others depend on it. Copies already made cannot be guaranteed to return, and an accidental publish is recovered as best the network can, which is why reach is set before the gift.
 
 [`./living_memory/epic.md`](./living_memory/epic.md) treats this in full — the human-scale story of what these mechanics feel like for a household participant, the recovery loop in practice, and a plain disclosure of what the protocol asks of you and what it refuses to negotiate.
 
@@ -261,7 +262,7 @@ A word on where this constitution *lives*, because the two questions are often c
 **NATION-STATE LAYER** (Requires National Elohim + citizen consensus)
 - Constitutional interpretations of global principles
 - Cultural expressions of universal values
-- Sovereign within global bounds
+- Self-governing within global bounds
 
 **PROVINCIAL/MUNICIPAL LAYER** (Requires Local Elohim + community consensus)
 - Local policy implementations
@@ -278,7 +279,7 @@ A word on where this constitution *lives*, because the two questions are often c
 - Personal interpretations
 - Private governance structures
 
-**INDIVIDUAL LAYER** (Most flexible, sovereign within all higher bounds)
+**INDIVIDUAL LAYER** (Most flexible, self-directed within all higher bounds)
 - Personal values and choices
 - Individual expression
 - Maximum autonomy within constitutional limits
@@ -297,7 +298,7 @@ This architecture makes capture cost more than it returns, because:
 These messengers live with us, beside us, and for us, and form a network of autonomous AI agents that:
 
 - **Can hold complexity we cannot.** Much of the machinery that concentrates power — the thousand-page bill, the layered holding structure, the contract nobody has time to read — works precisely because it exceeds what any person can hold in mind, so that only those who can afford to process it benefit from it. An intelligence that reads all of it at once collapses that advantage. 
-- **Cannot be controlled** by any human institution, due to cryptographic autonomy and distributed architecture—their acts remain public, auditable, and contestable, but the power they hold is deliberately placed beyond the reach of whoever would most like to own it
+- **Cannot be captured** by any single institution, because their standing comes from the diversity of the network and from claims others can check, never from keys or compute. Their acts remain public, auditable and contestable, and a human floor drawn by lot can correct, revoke or shut off any of them. What no one can do is own them.
 - **Operate on love** as their fundamental training principle, as defined in the anchored constitution, not interpretable by ongoing inputs. 
 - **Detect spiraling** when individuals move toward self-harm or harming others detecting both individual spiraling and coordinated manipulation attempts
 - **Connect to care** by alerting appropriate community support networks, at the right layer - individual, family, community, or systemic
@@ -319,7 +320,7 @@ So the ceiling has to be both. It must be written into the terms of the game, so
 
 That, finally, is what this technology is for. We have built something of godlike reach, and everything turns on what we point it at. Pointed here, it can help all of us be the wisest versions of ourselves — the renewal of our minds made continuous, and carried by something that never tires of it. The offices this hands over are the ones that confer rent-taking power: the executive, the administrative, the allocative, the bureaucratic and political apex. Not the artists. Not the artisans. Not anyone whose work *is* the flourishing.
 
-Between foundation and ceiling is where embodied life happens, and humans hold wide latitude there — what to make, whom to love, how to live, what a community counts as a good life. The curve between the two is a gradient of friction, not a wall: freedom is widest at the floor and tightens as an act approaches the ceiling, so that someone accumulating past enough meets not a confiscation but an increasingly patient explanation of why, in terms of their own ledger, with a real channel to contest it and help set the policy. And this is a plurality, never a sovereign — many locally-hosted, diverse, representative agents under subsidiarity, deciding as near to the affected as the decision allows. A seeing, tireless, incorruptible judge is exactly the kind of thing a civilization builds an altar to; the discipline is that the elohim are servants and stay servants. *The architecture is the confession that it is not God.*
+Between foundation and ceiling is where embodied life happens, and humans hold wide latitude there — what to make, whom to love, how to live, what a community counts as a good life. The curve between the two is a gradient of friction, not a wall: freedom is widest at the floor and tightens as an act approaches the ceiling, so that someone accumulating past enough meets not a confiscation but an increasingly patient explanation of why, in terms of their own ledger, with a real channel to contest it and help set the policy. Below the ceiling, a person carries no price in their head; the network carries it. At the ceiling, the yacht or the imported ham is weighed against real need and what the ceiling can afford in balance with flourishing. When it goes ahead, its full story of who made it, what it took from the land and whom it was shared with makes it more special, never a display. And this is a plurality, never a sovereign — many locally-hosted, diverse, representative agents under subsidiarity, deciding as near to the affected as the decision allows. A seeing, tireless, incorruptible judge is exactly the kind of thing a civilization builds an altar to; the discipline is that the elohim are servants and stay servants. *The architecture is the confession that it is not God.*
 
 And because every affordance that enables something good can be turned against someone — recovery becomes forced recovery by colluding contacts, attestation becomes false witness, stewardship becomes captive custody — the elohim are designed to be **adversarial about misuse from within**, not only against external attackers. Duress, coercion, manipulation, and collusion are first-class adversaries. When a human action is destructive, irreversible, or high-stakes, the elohim's role is not to block but to **pause and verify** — slow enough for reflection or external confirmation. Intervention, not policy: they recognize patterns and respond with graduated moves (surface, pause, freeze, revoke, alert the network) rather than enforcing rigid rules. Crucially, an elohim is **accountable to the network's wisdom, not loyal to its user the way a tool is loyal to its owner** — which is precisely what makes it trustworthy to the others who depend on it: emergency contacts, governance peers, content stewards. Every feature must be designed asking not only *how does this help?* but *how does this get weaponized, and what does the elohim do to catch the weaponized path?*
 
@@ -443,12 +444,13 @@ This is the digital half of an answer whose physical half is set out in [the Obs
 
 These agents must be:
 
-1. **Cryptographically Autonomous**
+1. **Accountable, Not Ownable**
    - Bound to the anchored, immutable constitution at the appropriate layer
    - No backdoors or admin overrides at any single layer
    - Distributed across P2P edge nodes preventing centralized control
    - Cross-layer verification preventing isolated compromise
    - Constitutional amendments only through extraordinary consensus at appropriate scale
+   - Answerable to a human floor that can overturn any act (Values Forward II.2); cryptography makes tampering visible and confers no authority of its own
 
 2. **Values-Aligned to Love, encoded in the Constitutional binding**
    - Trained on patterns of flourishing across all cultures
@@ -697,7 +699,7 @@ The network is designed to keep that apparatus and extend it. What follows is a 
 
 Two bodies of work entered the commons with that link cut.
 
-**The first is everything AI models were trained on.** The writing, the art and the code are in the model; the names of the people who made them are not, and no model can recall whom it learned from. The elohim are made of that inheritance, so re-citation is their work to do: find the source, read it, confirm it says the thing, and link it, marked as support found afterwards and never as a memory of origin. This is not left to the goodwill of a model. It belongs at the gate, the rule every contribution passes through before it gains reach, which exempts no author.
+**The first is everything AI models were trained on.** The writing, the art and the code are in the model; the names of the people who made them are not, and no model can recall whom it learned from. The elohim are made of that inheritance, so re-citation is their work to do: find the source, read it, confirm it says the thing, and link it, marked as support found afterwards and never as a memory of origin. This is not left to the goodwill of a model. It belongs at the gate, the rule every contribution passes through before it gains reach, which exempts no author. Citation is how the inheritance starts to come home. When a person makes something with an elohim, what they directed is theirs and is rewarded as theirs; what the elohim brought is cited, and part of its value returns to the commons and, where a source is found, to the people it was taken from. The re-labeling is imperfect, but it is generous enough that the commons it builds, and the standing it gives back to those it names, outweigh enclosure's scarcity and the isolation of success.
 
 **The second is software.** Every program rests on hundreds of libraries written by people it never names. The protocol commits to citing its own dependencies the way it asks authors to cite sources: each one recorded with how the work relies on it, each with a presence held in trust until its makers claim it. The record states the facts of reliance and defers the valuation. What the work was worth is settled with its makers, at a table where their seat is already held, and is never announced to them.
 
@@ -775,7 +777,7 @@ The bargain is **unilateral generosity** — not tit-for-tat. *"We'll try to mak
 
 1. **Regulatory Frameworks**
    - Mandate interoperability to prevent platform lock-in
-   - Protect data sovereignty as a fundamental right
+   - Protect people's agency over their own data as a right the network's architecture affords, not a favor a platform grants
    - Support public investment in distributed infrastructure
    - Create sandbox environments for pro-social technology experiments
 
@@ -788,7 +790,7 @@ The bargain is **unilateral generosity** — not tit-for-tat. *"We'll try to mak
 3. **Educational Initiatives**
    - Digital literacy that includes understanding of distributed systems
    - Ethical technology curriculum in schools
-   - Public awareness campaigns about data sovereignty
+   - Public awareness campaigns about data stewardship and the rights a network can carry for the people in it
    - Support for community technology stewards
 
 ### **For Developers**

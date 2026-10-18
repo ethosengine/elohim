@@ -3,11 +3,11 @@ id: succession
 sovereignty-frame: adversary
 cites:
   - "elohim-protocol-manifesto | The vision this document clears the ground for — the crisis it answers and the love-centered alternative it proposes, which a reader arriving with a formed politics will not see until the older argument is settled. | sha256:c1b65508df47bcaa | path: genesis/docs/content/elohim-protocol/manifesto.md"
-  - "values-forward | The thirteen Stances this document treats as settled law — most of all I.1 (the commons owned by no one), I.2 (not a blockchain and not a token), I.4 (the common inheritance), II.4 (stewardship over sovereignty), and IV.2 (enforcement by participation, never coercion). | sha256:f4e7524522d3b811 | path: genesis/docs/content/elohim-protocol/values-forward.md"
+  - "values-forward | The thirteen Stances this document treats as settled law — most of all I.1 (the commons owned by no one), I.2 (not a blockchain and not a token), I.4 (the common inheritance), II.4 (stewardship over sovereignty), and IV.2 (enforcement by participation, never coercion). | sha256:0bfa006fd772f7d9 | path: genesis/docs/content/elohim-protocol/values-forward.md"
   - "constitution | The law that operationalizes the vision — the layer precedence and the universal gate this document's refusals inherit. | sha256:2dda7f102ca76eb9 | path: genesis/docs/content/elohim-protocol/constitution.md"
   - "confession | The theology beneath the vision, and the discipline this document's most present-tense claim answers to: leaven, not the Kingdom. | sha256:dff3a6835bfa3802 | path: genesis/docs/content/elohim-protocol/confession.md"
   - "justice-manifesto | Where justice is defined as restored capability rather than punishment, and where humility is named as the one virtue a confident system structurally cannot perform. | sha256:6080173b0d21848c | path: genesis/docs/architecture/justice-manifesto.md"
-  - "stewardship-over-sovereignty | The foundational canon behind this document's refusal of the illegibility position — no self-sovereign apex, trust made load-bearing rather than eliminated. | sha256:995eb2079924ea2e | path: genesis/docs/architecture/stewardship-over-sovereignty.md"
+  - "stewardship-over-sovereignty | The foundational canon behind this document's refusal of the illegibility position — no self-sovereign apex, trust made load-bearing rather than eliminated. | sha256:5186f53fbeb95a65 | path: genesis/docs/architecture/stewardship-over-sovereignty.md"
   - "glossary | Plain definitions of the recurring terms (elohim, reach, standing, substrate, REA) that this document's orientation section restates for a reader arriving from outside. | sha256:faeef215b3a16143 | path: genesis/docs/content/elohim-protocol/glossary.md"
 ---
 
@@ -269,7 +269,7 @@ The contribution here is only to notice that the **same organ** is what six diff
 
 An agent that *sets* credit limits is a central planner with better manners. An agent that computes and shows a member's reciprocity record, flags a drifting balance with the evidence attached, and proposes a limit for a council to accept, amend, or reject is a clerk. The difference is the difference between an aggregate a council can only accept or reject and a **mechanism a council can argue with**.
 
-Two qualifications, both binding. The council is **not a human veto-floor** — by this project's own standing conviction, human-in-the-loop is not the terminal authority; the *method* is, and humans hold the right to be heard by the method, the right to leave and to withhold consent, and a guaranteed minimum of participation no deliberation can go beneath — and they are the evidence. And the AI ceiling is **phased, not shipped**: today the human floor governs. Claiming otherwise would violate the project's own honesty stance, which readers are entitled to hold it to.
+Two qualifications, both binding. The council is the human floor in the sense of Stance II.2: it can audit, amend or overturn whatever the clerk proposes, and no machine reading is final over it. What it cannot do is vote past a limit that has graduated, and every member keeps the right to be heard by the method, to leave, and to withhold consent, along with a guaranteed minimum of participation no deliberation can go beneath — and the members are the evidence. And the AI ceiling is **phased, not shipped**: today the human floor governs. Claiming otherwise would violate the project's own honesty stance, which readers are entitled to hold it to.
 
 ### 5.4 What this does not repeal
 

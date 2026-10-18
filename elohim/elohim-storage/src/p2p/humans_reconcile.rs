@@ -393,6 +393,7 @@ pub async fn heal_humans(
     discovered_by: &HashMap<String, String>,
     hc: &Arc<HcClient>,
     pool: &DbPool,
+    receipts: &crate::p2p::projection_reconcile::ReadReceipts,
 ) -> HumansHealOutcome {
     use crate::services::holochain_humans_replayer::ConductorMembershipReader;
     use crate::services::membership_identity_reconcile;
@@ -441,7 +442,18 @@ pub async fn heal_humans(
     let reader = ConductorMembershipReader {
         hc_client: hc.clone(),
     };
-    membership_identity_reconcile::run_membership_pass(pool, &ctx, &reader).await;
+    let queried = membership_identity_reconcile::run_membership_pass(pool, &ctx, &reader).await;
+    // Receipt an owed re-admission read ONLY for humans whose household the
+    // conductor actually answered for. A pass that read nothing (projection
+    // failure, no household collectives) or failed a household's read asks the
+    // conductor nothing about those ids; a pre-pass database failure above
+    // returns before here. See `ReadReceipts`.
+    if !queried.is_empty() {
+        let households = households_of(pool, &pending);
+        for id in ids_in_queried_households(&pending, &households, &queried) {
+            receipts.executed(PROJECTION_INVENTORY_TABLE_HUMANS, &id);
+        }
+    }
 
     let after: HashMap<String, String> = match pool.get() {
         Ok(mut conn) => match crate::db::humans::agent_key_inventory(&mut conn, 0, i64::MAX) {
@@ -512,6 +524,41 @@ pub async fn heal_humans(
     HumansHealOutcome { healed, unresolved }
 }
 
+/// `human_id -> household_id` for `ids` (absent when unknown or NULL). A read
+/// failure yields an empty map, which receipts nothing — the conservative side.
+fn households_of(pool: &DbPool, ids: &[String]) -> HashMap<String, String> {
+    use crate::db::diesel_schema::humans::dsl;
+    use diesel::prelude::*;
+    let Ok(mut conn) = pool.get() else {
+        return HashMap::new();
+    };
+    dsl::humans
+        .filter(dsl::id.eq_any(ids))
+        .select((dsl::id, dsl::household_id))
+        .load::<(String, Option<String>)>(&mut conn)
+        .map(|rows| {
+            rows.into_iter()
+                .filter_map(|(id, h)| h.map(|h| (id, h)))
+                .collect()
+        })
+        .unwrap_or_default()
+}
+
+/// The pending ids whose household is in `queried` — the humans the membership
+/// pass actually asked the conductor about. Pure, so the receipt rule is
+/// testable without a conductor.
+fn ids_in_queried_households(
+    pending: &[String],
+    households: &HashMap<String, String>,
+    queried: &HashSet<String>,
+) -> Vec<String> {
+    pending
+        .iter()
+        .filter(|id| households.get(*id).is_some_and(|h| queried.contains(h)))
+        .cloned()
+        .collect()
+}
+
 /// Ids whose binding CHANGED between two inventory snapshots.
 ///
 /// Pure + total so the "did the pass actually move anything" verdict is
@@ -532,6 +579,25 @@ pub(crate) fn moved_bindings(
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn only_humans_of_answered_households_are_receipted() {
+        let pending: Vec<String> = ["alice", "bob", "carol"].map(String::from).to_vec();
+        let households: HashMap<String, String> = HashMap::from([
+            ("alice".to_string(), "h-read".to_string()),
+            ("bob".to_string(), "h-failed".to_string()),
+        ]);
+        // An empty pass (no household collectives / projection failure) asked
+        // the conductor nothing: no receipts.
+        assert!(ids_in_queried_households(&pending, &households, &HashSet::new()).is_empty());
+        // Only alice's household was answered; bob's read failed and carol has
+        // no household — neither was asked about.
+        let queried = HashSet::from(["h-read".to_string()]);
+        assert_eq!(
+            ids_in_queried_households(&pending, &households, &queried),
+            vec!["alice".to_string()]
+        );
+    }
 
     const KEY_OLD: &str = "uhCAkFossilAgentKey000000000000000000000000";
     const KEY_NEW: &str = "uhCAkLiveAgentKey00000000000000000000000000";

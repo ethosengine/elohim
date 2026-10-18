@@ -2,6 +2,15 @@
 # run-dataplane-validation.sh — run @dataplane cucumber suite against deployed alpha,
 # then build sprint-report-dataplane.{json,md} with per-concern byConcern rollup.
 #
+# Exit semantics: cucumber exits 1 for failed, ambiguous and undefined steps alike
+# (edge #1591-#1607: "149 scenarios (14 undefined, 126 skipped, 9 passed)").
+# Born-red habit features deliberately keep undefined steps visible. A cucumber
+# exit 1 is downgraded to 0 (PENDING-ONLY banner) only when the RAW cucumber JSON
+# shows no failed/ambiguous/unknown step status and every undefined/pending
+# scenario carries a @concern: listed in dataplane-born-red-concerns.txt. Anything
+# else keeps CUCUMBER_EXIT. The zero-scenario / unreadable-count guards force 3
+# and take precedence; stale reports are deleted before the run.
+#
 # Called from the edge Jenkinsfile "Dataplane Validation" stage.
 # The Jenkinsfile caller wraps in catchError->UNSTABLE so a red concern
 # (e.g. blob-replication, epr-projection-fallback — both RED-FIRST as of
@@ -32,6 +41,7 @@ REPORTS_DIR="${A2O_DIR}/reports"
 CUCUMBER_OUT="${REPORTS_DIR}/cucumber-report-dataplane.json"
 SPRINT_JSON="${REPORTS_DIR}/sprint-report-dataplane.json"
 SPRINT_MD="${REPORTS_DIR}/sprint-report-dataplane.md"
+CUCUMBER_LOG="${REPORTS_DIR}/cucumber-console-dataplane.log"
 DOORWAY="${E2E_DOORWAY_ALPHA:-https://doorway-alpha.elohim.host}"
 STORAGE_URL="${E2E_STORAGE_URL:-http://elohim-matthew-alpha.elohim-alpha.svc.cluster.local:8090}"
 RUN_ID="${BUILD_TAG:-dataplane-$(date +%Y%m%dT%H%M%S)}"
@@ -121,6 +131,10 @@ pnpm --filter @elohim/storage-client build
 pnpm --dir "${A2O_DIR}" exec playwright install --with-deps chromium \
   || echo "WARNING: playwright chromium install failed — browser stations will report Executable doesn't exist"
 
+# Remove last run's evidence so a crash before the formatter initialises cannot
+# leave a stale report for the guards below (or the pending-only rule) to re-read.
+rm -f "${CUCUMBER_OUT}" "${SPRINT_JSON}" "${SPRINT_MD}" "${CUCUMBER_LOG}"
+
 # Run the @dataplane cucumber suite.
 # --format json:... ADDS this formatter alongside any config defaults so we get a
 # per-run file (cucumber-report-dataplane.json) distinct from the main report.
@@ -146,8 +160,10 @@ E2E_DOORWAY_BETA="${E2E_DOORWAY_BETA:-${E2E_DOORWAY_B:-https://elohim.host}}" \
 E2E_STORAGE_URL_B="${E2E_STORAGE_URL_B:-http://elohim-adam-alpha.elohim-alpha.svc.cluster.local:8090}" \
   pnpm exec cucumber-js \
     --format "json:${CUCUMBER_OUT}" \
-    --tags '@dataplane and not @wip and not @browser-only' \
+    --tags '@dataplane and not @wip and not @browser-only' 2>&1 \
+    | tee "${CUCUMBER_LOG}" \
     || CUCUMBER_EXIT=$?
+# pipefail (set above) keeps CUCUMBER_EXIT cucumber's own status through the tee.
 
 # Build the per-concern sprint report.
 # Runs even on cucumber failure so the byConcern block is always available
@@ -202,6 +218,118 @@ if [ -z "${SCENARIO_COUNT}" ]; then
 elif [ "${SCENARIO_COUNT}" -eq 0 ]; then
   echo "ERROR: 0 dataplane scenarios ran — support load or tag filter is broken, this is NOT a pass."
   VALIDATION_EXIT=3
+fi
+
+# Pending-only downgrade for DECLARED born-red concerns. Cucumber exits 1 for
+# failed, ambiguous AND undefined steps (and for exceptions), so the decision is
+# made from the RAW cucumber JSON, not the sprint report (whose loader folds
+# ambiguous into passed/skipped/pending): every step/hook status is collected and
+# the run downgrades only when the non-passed/skipped statuses are a non-empty
+# subset of {undefined, pending} AND every scenario holding an UNDEFINED step carries
+# @concern:<value> listed in dataplane-born-red-concerns.txt. No JSON (a crash
+# before the formatter starts; stale files were removed above) -> no downgrade.
+# `pending` is the harness HELD/skip convention and is allowed under any concern;
+# `undefined` (a missing capability, or a deleted step definition) is concern-gated.
+# Every refusal prints one `PENDING-ONLY refused: <predicate> — <item>` line.
+# The sprint report supplies the banner's scenario count only.
+BORN_RED_FILE="${WORKSPACE}/scripts/ci/dataplane-born-red-concerns.txt"
+if [ "${CUCUMBER_EXIT}" -eq 1 ] && [ "${VALIDATION_EXIT}" -eq 1 ] \
+   && [ -r "${CUCUMBER_LOG}" ] && [ -r "${CUCUMBER_OUT}" ] && [ -r "${SPRINT_JSON}" ] && [ -r "${BORN_RED_FILE}" ]; then
+  PENDING_INFO="$(python3 -c "
+import json, re, sys
+
+def refuse(pred, item):
+    print('REFUSED|' + pred + ' — ' + str(item)[:200])
+    sys.exit(0)
+
+try:
+    raw = json.load(open(sys.argv[1]))
+    allowed = set()
+    for line in open(sys.argv[3]):
+        line = line.split('#', 1)[0].strip()
+        if line:
+            allowed.add(line)
+    statuses = set()
+    concerns = set()
+    for feat in raw:
+        ftags = {t.get('name', '') for t in feat.get('tags', []) or []}
+        for el in feat.get('elements', []) or []:
+            st = set()
+            for grp in (el.get('before', []), el.get('after', []), el.get('steps', [])):
+                for step in grp or []:
+                    st.add((step.get('result') or {}).get('status') or 'unknown')
+            statuses |= st
+            if 'undefined' in st:
+                tags = ftags | {t.get('name', '') for t in el.get('tags', []) or []}
+                hit = {t[len('@concern:'):] for t in tags if t.startswith('@concern:')} & allowed
+                if not hit:
+                    refuse('undefined-under-unlisted-concern', feat.get('uri', '?') + ' :: ' + el.get('name', '?'))
+                concerns |= hit
+    bad = statuses - {'passed', 'skipped', 'pending', 'undefined'}
+    if bad:
+        refuse('non-pending-step-status', ','.join(sorted(bad)))
+    if 'undefined' not in statuses and 'pending' not in statuses:
+        refuse('no-undefined-or-pending-step', 'raw JSON shows none')
+    # Console witness. A formatter stream error (run_cucumber.js:122 fails the run on
+    # it; create_stream.js:21-24 logs error.message, arbitrary errno text) has no
+    # distinctive marker, so refuse on an Error: line or errno token outside the
+    # 'Undefined. Implement with the following snippet' blocks. The bare word
+    # 'formatter' is NOT a marker: cucumber's own non-TTY notice ('Cannot use
+    # progress-bar formatter ... Switching to progress') contains it (edge #1610).
+    ansi = re.compile(r'\x1b\[[0-9;]*[A-Za-z]')
+    errpat = re.compile(r'^\s*Error\b|formatterStreamError|\bE[A-Z]{2,}: ')
+    summary = None
+    in_snippet = False   # heading seen, snippet body not yet started
+    in_body = False      # inside the snippet body (contiguous non-blank lines)
+    for line in open(sys.argv[4], errors='replace'):
+        line = ansi.sub('', line.rstrip('\n'))
+        if 'Undefined. Implement with the following snippet' in line:
+            in_snippet, in_body = True, False
+            continue
+        if in_snippet:
+            # cucumber emits heading + blank line + snippet (test_case_attempt_formatter.js:61):
+            # skip blank lines up to the body, then the body up to the next blank line.
+            if line.strip() == '':
+                if in_body:
+                    in_snippet = False
+                continue
+            in_body = True
+            continue
+        if errpat.search(line):
+            refuse('console-error-line', line)
+        m = re.match(r'^(\d+) scenarios? \((.*)\)\s*$', line)
+        if m:
+            summary = m.group(2)
+    if summary is None:
+        refuse('console-summary-line-missing', sys.argv[4])
+    if re.search(r'failed|ambiguous', summary):
+        refuse('console-summary-has-failed-or-ambiguous', summary)
+    rep = json.load(open(sys.argv[2]))['summary']['scenarios']
+    print('OK|' + str(int(rep['pending'])) + '|' + ', '.join(sorted(concerns)))
+except SystemExit:
+    raise
+except Exception as e:
+    print('REFUSED|unreadable-evidence — ' + repr(e)[:200])
+" "${CUCUMBER_OUT}" "${SPRINT_JSON}" "${BORN_RED_FILE}" "${CUCUMBER_LOG}" 2>/dev/null || true)"
+  case "${PENDING_INFO}" in
+    OK\|*)
+      P_REST="${PENDING_INFO#OK|}"
+      echo ""
+      echo "PENDING-ONLY (declared born-red concerns: ${P_REST#*|}): cucumber exited 1 with 0 failed and 0 ambiguous steps; ${P_REST%%|*} scenario(s) undefined/pending. The fleet verdict is the measured concerns'."
+      VALIDATION_EXIT=0
+      ;;
+    REFUSED\|*)
+      echo ""
+      echo "PENDING-ONLY refused: ${PENDING_INFO#REFUSED|}"
+      ;;
+    *)
+      echo ""
+      echo "PENDING-ONLY refused: evidence-check-crashed — no verdict from the checker"
+      ;;
+  esac
+elif [ "${CUCUMBER_EXIT}" -ne 0 ]; then
+  echo ""
+  echo "PENDING-ONLY refused: precondition — need cucumber exit 1 (got ${CUCUMBER_EXIT}, validation ${VALIDATION_EXIT}) and readable console log, cucumber JSON, sprint report and allowlist"
 fi
 
 # Propagate cucumber failures and the measurement invariant above. The

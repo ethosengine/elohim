@@ -59,11 +59,13 @@ Feature: Protocol-Native Attention Analytics
 
   # --- Steward Analytics ---
 
-  Scenario: Steward sees content engagement metrics
+  Scenario: Steward sees content engagement in words on the resource's own home
+    # The resource viewer's Network tab is gone; attention is read under "Who's
+    # here" on the atom home (/epr/{id}), as a sentence and never as a percentage.
     Given content "concept-trust" has 42 views and 8 completions
-    When Maya views the Network tab for "concept-trust"
-    Then Maya sees "42 views" and "8 completions"
-    And Maya sees the completion rate as "19%"
+    When Maya opens the atom home for "concept-trust"
+    Then "Who's here" reads "Viewed 42 times" and "8 completions"
+    And "Who's here" shows no completion rate as a percentage
 
   # --- GA Removal ---
 

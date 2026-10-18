@@ -1,0 +1,38 @@
+[workspace]
+resolver = "2"
+members = ["."]
+
+[package]
+name = "cargo-bridge"
+version = "0.1.0"
+edition = "2021"
+license = "Apache-2.0"
+description = "Observes cargo, never in control of it: a workspace's resolved dependencies enter as Cite inputs on its build Process, each upstream project named as an unclaimed presence under a governed offer"
+
+[lib]
+name = "cargo_bridge"
+path = "src/lib.rs"
+
+[[bin]]
+name = "cargo-bridge"
+path = "src/main.rs"
+
+[dependencies]
+# The valueflow vocabulary (Process, FlowEvent, DepEdge, the offer and external-claim shapes,
+# SidecarFlowStore) — the only record shapes this bridge speaks.
+elohim-epr-rea = { path = "../../elohim/epr-rea" }
+# The one CID codec: raw CIDs wrapping a published checksum (node 2) and dag-cbor CIDs.
+elohim-epr = { path = "../../elohim/epr" }
+# Reused, never re-minted: offer parsing, its body-CID address and the repository agent.
+elohim-epr-cli = { path = "../../elohim/eprfs/epr-cli" }
+cid = "0.11"
+chrono = "0.4"
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+serde_yaml = "0.9"
+serde_ipld_dagcbor = "0.6"
+# Reads Cargo.lock: `cargo metadata` does not carry the per-package checksum.
+toml = "0.8"
+
+[dev-dependencies]
+tempfile = "3"

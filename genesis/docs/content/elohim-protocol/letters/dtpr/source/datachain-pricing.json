@@ -1,0 +1,546 @@
+{
+  "id": "elohim-protocol-solidarity-pricing",
+  "schema_version": "dtpr@2026-09-01-beta",
+  "created_at": "2026-10-14T18:00:00Z",
+  "instance_version": "a future we are designing for",
+  "title": [
+    {
+      "locale": "en",
+      "value": "Solidarity pricing: values instead of price tags"
+    }
+  ],
+  "description": [
+    {
+      "locale": "en",
+      "value": "The value scanner takes the dollar price, which belongs to the economy outside the network, off a person's mind, the way a wealthy person rarely thinks about cost. The network pays sellers their ordinary price and shows people the human story of what they choose instead. Everyday needs are met as a floor inside the network, negotiated privately in solidarity, so no seller ever learns who is in need. Only ceiling choices, like a yacht or an imported ham, carry a felt limit, weighed against what the commons can carry, and their fuller story makes them more special rather than cheaper. Nothing on this label is built yet."
+    }
+  ],
+  "elements": [
+    {
+      "element_id": "commerce",
+      "priority": 0,
+      "variables": [
+        {
+          "id": "additional_description",
+          "value": [
+            {
+              "locale": "en",
+              "value": "Buying everyday goods without carrying their dollar price in your head, with the human story of each choice in view and the care people give each other counted alongside money."
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "element_id": "organization",
+      "element_instance_id": "accountable-household",
+      "context_type_id": "deployer",
+      "priority": 0,
+      "variables": [
+        {
+          "id": "title",
+          "value": [
+            {
+              "locale": "en",
+              "value": "You, or your household"
+            }
+          ]
+        },
+        {
+          "id": "description",
+          "value": [
+            {
+              "locale": "en",
+              "value": "Your devices and your readings, with the elohim working alongside you. You decide what is shared, with whom, and for how long."
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "element_id": "organization",
+      "element_instance_id": "accountable-pool",
+      "context_type_id": "deployer",
+      "priority": 1,
+      "variables": [
+        {
+          "id": "title",
+          "value": [
+            {
+              "locale": "en",
+              "value": "Your community's solidarity pool"
+            }
+          ]
+        },
+        {
+          "id": "description",
+          "value": [
+            {
+              "locale": "en",
+              "value": "Meets everyday needs as a floor, negotiated privately among members in solidarity, and pays sellers outside the network in dollars."
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "element_id": "organization",
+      "element_instance_id": "accountable-seller",
+      "context_type_id": "deployer",
+      "priority": 2,
+      "variables": [
+        {
+          "id": "title",
+          "value": [
+            {
+              "locale": "en",
+              "value": "The shop or cooperative making the offer"
+            }
+          ]
+        },
+        {
+          "id": "description",
+          "value": [
+            {
+              "locale": "en",
+              "value": "Sells at its ordinary price and is paid in full by the network. It arrives with a signed offer (what it is, where it came from, how it was made) that the elohim working with you reads. It never learns who is in need."
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "element_id": "people",
+      "element_instance_id": "affected-you",
+      "context_type_id": "subject",
+      "priority": 0,
+      "variables": [
+        {
+          "id": "title",
+          "value": [
+            {
+              "locale": "en",
+              "value": "You and your household"
+            }
+          ]
+        },
+        {
+          "id": "description",
+          "value": [
+            {
+              "locale": "en",
+              "value": "Everyday needs are met without a price to weigh. Ceiling choices are yours to make, with their full story in view."
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "element_id": "people",
+      "element_instance_id": "affected-neighbours",
+      "context_type_id": "community",
+      "priority": 1,
+      "variables": [
+        {
+          "id": "title",
+          "value": [
+            {
+              "locale": "en",
+              "value": "Neighbours who share the pool"
+            }
+          ]
+        },
+        {
+          "id": "description",
+          "value": [
+            {
+              "locale": "en",
+              "value": "Members share the floor between them, negotiated privately in solidarity, and see the pool only as totals."
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "element_id": "understands",
+      "context_type_id": "human_decides",
+      "priority": 0,
+      "variables": [
+        {
+          "id": "additional_description",
+          "value": [
+            {
+              "locale": "en",
+              "value": "The elohim working with you reads what you scan (the offer, its origin, how it was made) privately on your own device. The offer is read; you are not."
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "element_id": "recommends",
+      "context_type_id": "human_decides",
+      "priority": 1,
+      "variables": [
+        {
+          "id": "additional_description",
+          "value": [
+            {
+              "locale": "en",
+              "value": "Shows the human values of a choice (who made it, how far it travelled, what it asks of the commons) to nudge toward sustainable consumption, never toward a seller's margin."
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "element_id": "decides",
+      "context_type_id": "human_decides",
+      "priority": 2,
+      "variables": [
+        {
+          "id": "additional_description",
+          "value": [
+            {
+              "locale": "en",
+              "value": "For everyday needs, nothing to weigh: the floor is met. For ceiling choices, it helps you weigh what you want against what the commons can carry in balance with everyone's flourishing. You decide."
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "element_id": "privacy_loss",
+      "priority": 0,
+      "variables": [
+        {
+          "id": "risk",
+          "value": [
+            {
+              "locale": "en",
+              "value": "Meeting people's needs could become surveillance of need."
+            }
+          ]
+        },
+        {
+          "id": "mitigation",
+          "value": [
+            {
+              "locale": "en",
+              "value": "Need never leaves the network. The floor is negotiated privately inside the community, and sellers are paid by the network, so no seller learns who is in need or why."
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "element_id": "financial_harm",
+      "priority": 1,
+      "variables": [
+        {
+          "id": "risk",
+          "value": [
+            {
+              "locale": "en",
+              "value": "A shared floor could be overdrawn, or the people selling could be squeezed."
+            }
+          ]
+        },
+        {
+          "id": "mitigation",
+          "value": [
+            {
+              "locale": "en",
+              "value": "Sellers are paid their ordinary price. Members can see the pool's totals, and ceilings are negotiated in the open against what the commons can carry."
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "element_id": "psychological_harm",
+      "priority": 2,
+      "variables": [
+        {
+          "id": "risk",
+          "value": [
+            {
+              "locale": "en",
+              "value": "A felt limit on ceiling choices could feel like judgment or shame."
+            }
+          ]
+        },
+        {
+          "id": "mitigation",
+          "value": [
+            {
+              "locale": "en",
+              "value": "Ceiling choices are not forbidden or shamed. Their fuller story makes them more meaningful, and the person decides."
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "element_id": "political_economic_harm",
+      "priority": 3,
+      "variables": [
+        {
+          "id": "risk",
+          "value": [
+            {
+              "locale": "en",
+              "value": "Whoever runs the market could take a toll on every exchange."
+            }
+          ]
+        },
+        {
+          "id": "mitigation",
+          "value": [
+            {
+              "locale": "en",
+              "value": "The toll of a network is common inheritance, not private profit. It returns to the commons on a schedule anyone can read before they join, and a plan that depends on capturing it is designed to be the one thing the protocol will not allow."
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "element_id": "right_to_notice",
+      "priority": 0,
+      "variables": [
+        {
+          "id": "rights",
+          "value": [
+            {
+              "locale": "en",
+              "value": "You see how the floor and the ceilings are agreed, and by whom."
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "element_id": "right_contest",
+      "priority": 1,
+      "variables": [
+        {
+          "id": "rights",
+          "value": [
+            {
+              "locale": "en",
+              "value": "You can contest how the floor or a ceiling was set, with the community that agreed it."
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "element_id": "right_object",
+      "priority": 2,
+      "variables": [
+        {
+          "id": "rights",
+          "value": [
+            {
+              "locale": "en",
+              "value": "You can stop sharing any reading at any time."
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "element_id": "connected_device_telemetry",
+      "priority": 0,
+      "variables": [
+        {
+          "id": "additional_description",
+          "value": [
+            {
+              "locale": "en",
+              "value": "A meter, a shared fridge, a household battery. The readings are for the household that owns the devices, and travel only as far as it chooses."
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "element_id": "user_input",
+      "priority": 1,
+      "variables": [
+        {
+          "id": "additional_description",
+          "value": [
+            {
+              "locale": "en",
+              "value": "What you scan with the value scanner on your own phone."
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "element_id": "input_sensitive_personal",
+      "context_type_id": "pseudonymous",
+      "priority": 0,
+      "variables": [
+        {
+          "id": "additional_description",
+          "value": [
+            {
+              "locale": "en",
+              "value": "Your household's needs are known only inside your community's network, where the floor is negotiated. Sellers never receive them."
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "element_id": "language_models",
+      "priority": 0,
+      "variables": [
+        {
+          "id": "additional_description",
+          "value": [
+            {
+              "locale": "en",
+              "value": "Private inference: the model runs on your own devices or your household's node, so no seller's system sees its input. Like any model here, it is a participant whose capabilities are attested, not a black box."
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "element_id": "output_recommendation",
+      "context_type_id": "pseudonymous",
+      "priority": 0,
+      "variables": [
+        {
+          "id": "additional_description",
+          "value": [
+            {
+              "locale": "en",
+              "value": "The human story of a choice and a suggestion, shown only to you, in place of a dollar price."
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "element_id": "output_about_behaviour",
+      "context_type_id": "pseudonymous",
+      "priority": 1,
+      "variables": [
+        {
+          "id": "additional_description",
+          "value": [
+            {
+              "locale": "en",
+              "value": "A record of the exchange as REA (resource, event, agent) events, held inside the network and counted in the shared pool only as totals."
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "element_id": "dynamic_price",
+      "priority": 0,
+      "variables": [
+        {
+          "id": "additional_description",
+          "value": [
+            {
+              "locale": "en",
+              "value": "For everyday needs there is no price to weigh: the network settles the dollar price. For ceiling choices a felt limit appears, set by what the commons can carry, not by what a seller can extract."
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "element_id": "automatic_transaction",
+      "priority": 1,
+      "variables": [
+        {
+          "id": "additional_description",
+          "value": [
+            {
+              "locale": "en",
+              "value": "The network pays the seller's ordinary price in dollars on your behalf. Inside the network the exchange is recorded as economic events that tell its full story."
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "element_id": "available_to_me",
+      "priority": 0,
+      "variables": [
+        {
+          "id": "additional_description",
+          "value": [
+            {
+              "locale": "en",
+              "value": "All your readings and your household's history."
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "element_id": "available_to_3rd_parties",
+      "priority": 1,
+      "variables": [
+        {
+          "id": "additional_description",
+          "value": [
+            {
+              "locale": "en",
+              "value": "Only if your household chooses: its readings join an aggregate in the commons, anonymized in a way you can trust. The value that aggregate earns flows back to the households who shared it and to the commons, in the ways they prefer."
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "element_id": "not_available_to_the_accountable_organization",
+      "priority": 2,
+      "variables": [
+        {
+          "id": "additional_description",
+          "value": [
+            {
+              "locale": "en",
+              "value": "The seller never sees who is in need or how a need was met. It sees a paid order."
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "element_id": "shared_storage_and_governance",
+      "priority": 0,
+      "variables": [
+        {
+          "id": "duration",
+          "value": [
+            {
+              "locale": "en",
+              "value": "readings for as long as you keep them; the exchange record permanently"
+            }
+          ]
+        },
+        {
+          "id": "additional_description",
+          "value": [
+            {
+              "locale": "en",
+              "value": "Readings stay on your own devices. The exchange record is held by you, the seller and the peers who check it."
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

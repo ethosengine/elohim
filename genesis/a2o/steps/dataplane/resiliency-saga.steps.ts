@@ -63,7 +63,7 @@ import {
   DOORWAY_READY_POLL_TIMEOUT_MS,
   probeDeclaredHead,
 } from '../../src/framework/dataplane/surfaces.js';
-import { PROTOCOL_OMNI } from '../../src/framework/pages/selectors.js';
+import { EPR_HOME } from '../../src/framework/pages/selectors.js';
 import { retry } from '../../src/framework/utils/retry.js';
 import { E2EWorld } from '../../src/framework/world.js';
 
@@ -903,8 +903,9 @@ const lookResults = new WeakMap<E2EWorld, LookResult>();
 const lookErrors = new WeakMap<E2EWorld, string>();
 
 /**
- * Render the resilience card's host surface (/resource/{contentId}, where
- * <app-protocol-omni> mounts the resilience snapshot) via the shared `runLook`
+ * Render the resilience card's host surface (/epr/{contentId}, the atom home,
+ * where <app-protocol-omni> mounts the resilience snapshot above the page and
+ * the "Who holds it" leg carries the felt-status card) via the shared `runLook`
  * primitive (scripts/look.ts — same capture PlaywrightDevice used by the cucumber
  * suite in browser mode). @wip: launches a real headless browser, which the
  * plain-cucumber-js Dataplane Validation stage does not provision — kept as
@@ -917,12 +918,12 @@ When(
   'I render the resilience card for {string} on peer {string}',
   async function (this: E2EWorld, contentId: string, peerName: string) {
     const doorway = this.getDoorway(peerName);
-    const url = `${doorway.url}/resource/${encodeURIComponent(contentId)}`;
+    const url = `${doorway.url}/epr/${encodeURIComponent(contentId)}`;
     try {
       const result = await runLook({
         url,
         out: `resiliency-saga-ch10-${peerName}`,
-        waitTestid: PROTOCOL_OMNI.CHIP,
+        waitTestid: EPR_HOME.ROOT,
       });
       lookResults.set(this, result);
     } catch (err) {

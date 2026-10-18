@@ -1372,3 +1372,215 @@ fn a_notified_act_whose_hash_is_not_an_action_hash_is_refused() {
     );
     assert_eq!(sub_db::count(&mut conn).unwrap(), 0);
 }
+
+fn durable_row(key: &str, visits: i32, last_visited: Option<&str>) -> sub_db::SubscriptionRow {
+    sub_db::SubscriptionRow {
+        member_kind: sub_db::KIND_CONTENT_TARGET.to_string(),
+        member_key: key.to_string(),
+        origin_dna_hash: DNA.to_string(),
+        source: sub_db::SOURCE_STEWARD.to_string(),
+        added_at: "2026-09-06T00:00:00Z".to_string(),
+        last_visited_at: last_visited.map(str::to_string),
+        visit_count: visits,
+    }
+}
+
+fn settled_keys(keys: &[&str]) -> std::collections::HashSet<(String, String)> {
+    keys.iter()
+        .map(|k| (sub_db::KIND_CONTENT_TARGET.to_string(), (*k).to_string()))
+        .collect()
+}
+
+/// A restart no longer makes the whole set Hot. A member with a durable
+/// settled row for the current generation, and nothing pending, starts Cold;
+/// everything else starts Hot exactly as before — in particular a member with
+/// many VISITS and no settled row, because a visit is recorded before its
+/// enumeration and three failed ones prove nothing.
+#[test]
+fn a_restart_recovers_retirement_from_the_durable_settled_record() {
+    let rows = vec![
+        durable_row("settled", 3, Some("2026-10-12T09:00:00Z")),
+        durable_row(
+            "visited-often-never-settled",
+            40,
+            Some("2026-10-12T09:00:00Z"),
+        ),
+        durable_row("never-visited", 0, None),
+        durable_row("settled-but-pending", 7, Some("2026-10-12T09:00:00Z")),
+        durable_row(
+            "rearmed-before-first-sweep",
+            3,
+            Some("2026-10-12T09:00:00Z"),
+        ),
+    ];
+    let settled = settled_keys(&[
+        "settled",
+        "settled-but-pending",
+        "rearmed-before-first-sweep",
+    ]);
+    let pending: std::collections::HashSet<String> = ["settled-but-pending".to_string()].into();
+
+    // Without the live sweep's switch nothing is seeded: a test-built scheduler
+    // keeps the in-memory ladder exactly as written.
+    let plain = SweepScheduler::new();
+    assert!(!plain.wants_seed());
+    assert_eq!(plain.seed_from_durable(&rows, &settled, &pending), 0);
+    assert_eq!(plain.schedule(rows.clone(), 8).len(), 5);
+
+    let live = SweepScheduler::new();
+    live.enable_durable_heat();
+    // A notification landed before the first sweep: this process's own state
+    // wins over the record.
+    live.rearm(sub_db::KIND_CONTENT_TARGET, "rearmed-before-first-sweep");
+    assert!(live.wants_seed());
+    assert_eq!(live.seed_from_durable(&rows, &settled, &pending), 1);
+    assert!(!live.wants_seed(), "once per process");
+    assert_eq!(live.seed_from_durable(&rows, &settled, &pending), 0);
+
+    let heat = |key: &str| live.heat(sub_db::KIND_CONTENT_TARGET, key);
+    assert_eq!(heat("settled"), MemberHeat::Cold);
+    for key in [
+        "visited-often-never-settled",
+        "never-visited",
+        "settled-but-pending",
+        "rearmed-before-first-sweep",
+    ] {
+        assert_eq!(heat(key), MemberHeat::Hot, "{key}");
+    }
+}
+
+/// The settled record is keyed to its generation and cleared by a re-arm. A
+/// policy change makes a new generation with no settled rows, so nothing is
+/// seeded Cold and every member is swept again before that generation can
+/// publish; a notification removes the row in the same step it re-arms.
+#[test]
+fn the_settled_record_is_per_generation_and_a_notification_clears_it() {
+    let pool = test_pool();
+    let mut conn = pool.get().unwrap();
+    let now = "2026-10-12T09:00:00Z";
+    let action = ah(7);
+    sub_db::mark_settled(&mut conn, sub_db::KIND_CORRECTION_ACTION, &action, 4, now).unwrap();
+    sub_db::mark_settled(&mut conn, sub_db::KIND_CONTENT_TARGET, "other", 4, now).unwrap();
+
+    assert_eq!(
+        sub_db::settled_in_generation(&mut conn, 4).unwrap().len(),
+        2
+    );
+    assert!(
+        sub_db::settled_in_generation(&mut conn, 5)
+            .unwrap()
+            .is_empty(),
+        "a new generation inherits no retirement"
+    );
+    // The lock-holder's variant writes the same row and leaves the connection's
+    // own busy wait as it found it.
+    sub_db::mark_settled_briefly(&mut conn, sub_db::KIND_CONTENT_TARGET, "brief", 4, now).unwrap();
+    assert_eq!(
+        sub_db::settled_in_generation(&mut conn, 4).unwrap().len(),
+        3
+    );
+    assert!(sub_db::clear_settled(&mut conn, sub_db::KIND_CONTENT_TARGET, "brief").unwrap());
+    #[derive(diesel::QueryableByName)]
+    struct Timeout {
+        #[diesel(sql_type = diesel::sql_types::Integer)]
+        timeout: i32,
+    }
+    let after: Timeout = diesel::sql_query("SELECT timeout AS timeout FROM pragma_busy_timeout")
+        .get_result(&mut conn)
+        .unwrap();
+    assert_eq!(after.timeout as u32, crate::db::CONNECTION_BUSY_TIMEOUT_MS);
+
+    // Settling again in a later generation moves the row, never duplicates it.
+    sub_db::mark_settled(&mut conn, sub_db::KIND_CONTENT_TARGET, "other", 5, now).unwrap();
+    assert_eq!(
+        sub_db::settled_in_generation(&mut conn, 4).unwrap().len(),
+        1
+    );
+    assert_eq!(
+        sub_db::settled_in_generation(&mut conn, 5).unwrap().len(),
+        1
+    );
+
+    // A notification for the settled correction action: re-armed AND cleared,
+    // with no live scheduler registered.
+    let notified = act_ref(&action, "not-an-action-hash");
+    assert!(admit_notified_signal_with(&mut conn, Some(&notified), Some(DNA), None).unwrap());
+    assert!(sub_db::settled_in_generation(&mut conn, 4)
+        .unwrap()
+        .is_empty());
+    assert!(!sub_db::clear_settled(&mut conn, sub_db::KIND_CORRECTION_ACTION, &action).unwrap());
+}
+
+/// The deliberate backstop that replaces "a restart re-sweeps everything": one
+/// Cold member every [`COLD_REAUDIT_EVERY_SWEEPS`] sweeps, the longest
+/// unvisited first, on spare budget only.
+#[test]
+fn cold_members_are_re_audited_one_per_lap_step_least_recently_visited_first() {
+    let k = i32::from(COLD_AFTER_CLEAN_SWEEPS);
+    let rows = vec![
+        durable_row("cold-newer", k, Some("2026-10-12T09:05:00Z")),
+        durable_row("cold-oldest", k, Some("2026-10-12T09:00:00Z")),
+        durable_row("cold-middle", k, Some("2026-10-12T09:02:00Z")),
+    ];
+    let live = SweepScheduler::new();
+    live.enable_durable_heat();
+    let all = settled_keys(&["cold-newer", "cold-oldest", "cold-middle"]);
+    assert_eq!(live.seed_from_durable(&rows, &all, &Default::default()), 3);
+
+    let mut visited = Vec::new();
+    for sweep in 1..=(2 * COLD_REAUDIT_EVERY_SWEEPS) {
+        let members = live.schedule(rows.clone(), 8);
+        if sweep.is_multiple_of(COLD_REAUDIT_EVERY_SWEEPS) {
+            assert_eq!(members.len(), 1, "sweep {sweep}");
+            visited.push(members[0].member_key.clone());
+        } else {
+            assert!(
+                members.is_empty(),
+                "sweep {sweep}: a settled set costs nothing"
+            );
+        }
+    }
+    // The rows here never move their `last_visited_at` (the tick does that),
+    // so the stalest is chosen both times: the choice is by record, not by turn.
+    assert_eq!(visited, vec!["cold-oldest", "cold-oldest"]);
+
+    // A clean re-audit leaves the member Cold; one that finds something open
+    // re-arms it.
+    let token = live.begin_visit(sub_db::KIND_CONTENT_TARGET, "cold-oldest");
+    live.record_sweep(sub_db::KIND_CONTENT_TARGET, "cold-oldest", token, false);
+    assert_eq!(
+        live.heat(sub_db::KIND_CONTENT_TARGET, "cold-oldest"),
+        MemberHeat::Cold
+    );
+    let token = live.begin_visit(sub_db::KIND_CONTENT_TARGET, "cold-middle");
+    live.record_sweep(sub_db::KIND_CONTENT_TARGET, "cold-middle", token, true);
+    assert_eq!(
+        live.heat(sub_db::KIND_CONTENT_TARGET, "cold-middle"),
+        MemberHeat::Hot
+    );
+}
+
+/// The lap never displaces a live member: with the budget full, no Cold member
+/// is added.
+#[test]
+fn the_cold_lap_rides_on_spare_budget_only() {
+    let k = i32::from(COLD_AFTER_CLEAN_SWEEPS);
+    let mut rows = vec![durable_row("cold", k, Some("2026-10-12T09:00:00Z"))];
+    rows.extend((0..3).map(|n| durable_row(&format!("hot-{n}"), 0, None)));
+    let live = SweepScheduler::new();
+    live.enable_durable_heat();
+    live.seed_from_durable(&rows, &settled_keys(&["cold"]), &Default::default());
+    for _ in 1..COLD_REAUDIT_EVERY_SWEEPS {
+        live.schedule(rows.clone(), 3);
+    }
+    let on_lap_step = live.schedule(rows.clone(), 3);
+    assert_eq!(on_lap_step.len(), 3);
+    assert!(on_lap_step.iter().all(|r| r.member_key.starts_with("hot-")));
+    // With room to spare on a later lap step, it is added after the live ones.
+    for _ in 1..COLD_REAUDIT_EVERY_SWEEPS {
+        live.schedule(rows.clone(), 8);
+    }
+    let roomy = live.schedule(rows.clone(), 8);
+    assert_eq!(roomy.last().map(|r| r.member_key.as_str()), Some("cold"));
+    assert_eq!(roomy.len(), 4);
+}

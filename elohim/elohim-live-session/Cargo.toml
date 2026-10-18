@@ -1,0 +1,11 @@
+[package]
+name = "elohim-live-session"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+authors.workspace = true
+description = "Live session logic for passing state between a person's machines: register, dedup, expiry, caps, frame type, session id. Pure: no I/O, no clock."
+
+[dependencies]
+serde = { workspace = true }
+sha2 = { workspace = true }

@@ -860,6 +860,14 @@ def computeConductorUrls(String targetEnv, List allHumans) {
 }
 
 /**
+ * The subset of the conductor pool that HOSTS agents: humans flagged hostsAgents
+ * in deployments.json (the doorway operators). Empty = every conductor hosts.
+ */
+def computeHostingConductorUrls(String targetEnv, List allHumans) {
+    return computeConductorUrls(targetEnv, allHumans.findAll { it.hostsAgents })
+}
+
+/**
  * Compute storage HTTP URLs for a doorway in a given environment.
  */
 def computeStorageUrls(String targetEnv, List allHumans) {
@@ -2068,6 +2076,7 @@ def deployDoorwayManifest(String targetEnv, String envFile, List allHumans, Stri
     def manifest = manifestOverride ?: envConfig.doorwayManifest
     def depName = deploymentName ?: "elohim-doorway-${targetEnv}"
     def conductorUrls = computeConductorUrls(targetEnv, allHumans)
+    def hostingConductorUrls = computeHostingConductorUrls(targetEnv, allHumans)
     def storageUrls = computeStorageUrls(targetEnv, allHumans)
     def versions = readProperties(file: envFile)
     def deployVersion = sh(script: 'git rev-parse HEAD | cut -c1-8', returnStdout: true).trim()
@@ -2084,6 +2093,7 @@ def deployDoorwayManifest(String targetEnv, String envFile, List allHumans, Stri
         "s|AGENT_SDK_TAG_PLACEHOLDER|${versions.AGENT_SDK_TAG ?: versions.EDGENODE_TAG}|g",
         "s|DEPLOY_VERSION_PLACEHOLDER|${deployVersion}|g",
         "s|CONDUCTOR_URLS_PLACEHOLDER|${conductorUrls}|g",
+        "s|HOSTING_CONDUCTORS_PLACEHOLDER|${hostingConductorUrls}|g",
         "s|STORAGE_URLS_PLACEHOLDER|${storageUrls}|g",
     ].collect { "-e '${it}'" }.join(' ')
 
@@ -3198,7 +3208,7 @@ AGENT_SDK_TAG=${AGENT_SDK_TAG}
             }
             post {
                 always {
-                    archiveArtifacts artifacts: 'genesis/a2o/reports/sprint-report-dataplane.*,genesis/a2o/reports/served-shell/**', allowEmptyArchive: true
+                    archiveArtifacts artifacts: 'genesis/a2o/reports/sprint-report-dataplane.*,genesis/a2o/reports/cucumber-*-dataplane.*,genesis/a2o/reports/served-shell/**', allowEmptyArchive: true
                 }
             }
         }

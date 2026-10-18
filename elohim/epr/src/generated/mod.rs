@@ -7,6 +7,8 @@
 //!
 //! DO NOT EDIT the generated submodules by hand.
 
+mod enums;
 mod ordinals;
 
+pub use enums::{ALL_REA_ACTIONS, CORE_REA_ACTIONS};
 pub use ordinals::REACH_OPENNESS;

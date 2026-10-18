@@ -5539,3 +5539,30 @@ decisionPoints:
     contractTests:
       - { path: elohim/elohim-storage/src/services/node_account.rs, testName: a_bound_session_signs_only_with_its_keys_proof, kind: unit }
       - { path: elohim/elohim-storage/src/services/node_account.rs, testName: a_session_lives_thirty_days_and_ends_at_sign_out_or_a_new_secret, kind: unit }
+
+  - name: account_bind_challenge_parse
+    kind: pure-decision-predicate
+    sourceLocation:
+      file: src/services/account_bind.rs
+      modulePath: services::account_bind::account_bind_challenge_parse
+      line: 77
+    summary: >
+      Decides whether a text a doorway handed over is an account-bind challenge this node may sign
+      (exactly the seven v1 lines, <= 1 KiB, no CR, nonce 64 lowercase hex, expires RFC3339 UTC
+      seconds) and whether it is still live. POST /api/v1/identity/account-bind/sign parses before
+      any conductor call, so the route can never be a general signing oracle; the zome re-checks
+      the purpose line. Asked after bound_verdict_refusal (a proven, key-bound session; no
+      loopback bypass).
+    concernIds:
+      - { id: C1, status: answered, justification: "The doorway never picks the key; the node's own key signs for itself, and the signer is asserted equal to this node's agent key." }
+      - { id: C4, status: answered, justification: "NOT_A_BIND_CHALLENGE, CHALLENGE_EXPIRED, NO_SESSION, SESSION_NOT_BOUND, PROOF_REFUSED, NO_CONDUCTOR, SIGN_FAILED, SIGNER_MISMATCH: each refusal is named." }
+      - { id: C6b, status: answered, justification: "Pure; the doorway's single-use nonce makes a replayed bind find its challenge spent." }
+      - { id: C9, status: partial, justification: "No witnessed key lineage; the doorway keeps previous_agent_pub_key (see the design's frontier)." }
+      - { id: C12, status: answered, justification: "Two credentials from two parties: the doorway password and this node's key-bound session proof." }
+      - { id: C14, status: partial, justification: "The row at the doorway records the move; the network does not." }
+    contractTests:
+      - { path: elohim/elohim-storage/src/services/account_bind.rs, testName: a_well_formed_unexpired_challenge_parses, kind: unit }
+      - { path: elohim/elohim-storage/src/services/account_bind.rs, testName: wrong_purpose_line_is_not_a_bind_challenge, kind: unit }
+      - { path: elohim/elohim-storage/src/services/account_bind.rs, testName: an_expired_challenge_is_refused_as_expired, kind: unit }
+      - { path: elohim/elohim-storage/src/services/account_bind.rs, testName: a_challenge_more_than_ten_minutes_ahead_is_refused, kind: unit }
+      - { path: elohim/elohim-storage/src/services/account_bind.rs, testName: only_a_proven_bound_session_goes_on, kind: unit }

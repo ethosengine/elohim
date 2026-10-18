@@ -11,7 +11,7 @@ cites:
   - "did-bridge-identity-resolution | DID Bridge | sha256:5769f6cd4c7163ca | path: genesis/docs/superpowers/specs/2026-07-17-did-bridge-identity-resolution-design.md"
   - "reach-ontology-vocabulary-split-spec | Reach Ontology/Vocabulary Split | sha256:2a1ef52c1ced3c48 | path: genesis/docs/superpowers/specs/2026-07-22-reach-ontology-vocabulary-split-spec.md"
   - "holons-are-spaces-how-we-use-holochain | Holons, Spaces, and Holochain | sha256:ac1de36d2423be82 | path: genesis/docs/content/elohim-protocol/architecture/2026-09-06-holons-are-spaces-how-we-use-holochain.md"
-  - "stewardship-over-sovereignty | stewardship-over-sovereignty | sha256:995eb2079924ea2e | path: genesis/docs/architecture/stewardship-over-sovereignty.md"
+  - "stewardship-over-sovereignty | stewardship-over-sovereignty | sha256:5186f53fbeb95a65 | path: genesis/docs/architecture/stewardship-over-sovereignty.md"
   - "qahal-collective-membership-dht-design | 2026-05-19-qahal-collective-membership-dht-design | sha256:8d7b9704f7aa9ca0 | path: genesis/docs/superpowers/specs/2026-05-19-qahal-collective-membership-dht-design.md"
 ---
 

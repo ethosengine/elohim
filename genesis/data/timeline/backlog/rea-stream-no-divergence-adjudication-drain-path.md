@@ -97,3 +97,13 @@ described and sharpened the shape of the fix:
 
 This doc's status stays `open` — the design gap is confirmed, not yet a bounded code
 fix; Stage 2 above is the shape the fix should take when picked up.
+
+## 2026-10-12 — the large stale cohort was a misroute, not this gap
+
+The cohort of about 800 advertised-but-unseen commitments per peer, which the `idle-is-free` ledger had been reading
+as REA divergence, is explained and cured by `rea-inventory-advertises-rows-of-another-notary`. Those ids are mishpat
+entry hashes that only the authoring peer holds, and the receiver was asking its content_store, which cannot answer
+for them on any conductor. This entry's own subject, genuinely divergent content_store REA rows (0 to 12 live when
+last counted), stands as written, and its status is unchanged. One caution for whoever builds Stage 2: peer-probe
+adjudication must first establish that the notary being asked is the row's notary. Had it been built against the
+cohort above, every advertiser would have answered Absent and durably retired ids that are notarized on another DNA.

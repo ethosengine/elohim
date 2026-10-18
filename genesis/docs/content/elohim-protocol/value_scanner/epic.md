@@ -95,7 +95,7 @@ At the corner store, Tommy uses his phone to scan items. But this isn't self-che
 
 **Tommy scans chips:**
 
-His phone vibrates gently: *"Treat budget remaining: $3. Baked version available: 20% off with health tokens."*
+His phone vibrates gently: *"One treat left this week. Baked version available: 20% off with health tokens."*
 
 This isn't judgment. It's information. Tommy can choose the regular chips, the baked ones, or something else entirely. The system guides without controlling.
 
@@ -112,9 +112,9 @@ A negotiation happens in milliseconds:
 - Family Elohim: "But needed for dinner, approving"
 - Community Elohim: "Bulk size better value"  
 - Global Elohim: "Mediterranean drought affecting supply"
-- Store Elohim: "Offering 10% discount for bulk"
+- Store Elohim: "Bulk size 10% off today, for every shopper"
 
-Tommy's phone shows: *"Family approved! Get the large size. Saving $3 over time."*
+Tommy's phone shows: *"Family approved! Get the large size. It lasts the whole month."*
 
 Tommy just participated in a complex economic decision involving family needs, community values, and global supply chains. To him, it felt like getting permission to buy the big bottle.
 
@@ -135,6 +135,8 @@ But in those five seconds:
 - Time tokens are credited for saving parents a trip
 - Johnson Farm is marked as supported
 - Anonymous patterns flow to the community
+
+The network pays the store its ordinary price, the same as from anyone, and the store never learns whether a household stands at the floor, not even as a yes or no. What the family gives in return was worked out inside the network, privately, and any gap is carried by members who hold the floor for one another. We call this **solidarity pricing**: the network carries the old economy's dollar price so that nobody has to do sums against their dignity in the aisle.
 
 This is the **bundle**—the moment where all the micro-negotiations resolve into a single transaction that tells a complete story.
 
@@ -175,12 +177,12 @@ The family's needs, values, and constraints aggregate into missions. No spreadsh
 Each product scan triggers a multi-agent negotiation:
 - **Personal Elohim**: Protects individual budget and growth
 - **Family Elohim**: Ensures shared needs are met
-- **Store Elohim**: Offers deals and information
+- **Store Elohim**: Offers the deals and information it offers every shopper, and never sees the family's budget
 - **Community Elohim**: Promotes local values
 - **Global Elohim**: Provides supply chain awareness
 
 ### Phase 3: Negotiate (Real-time Dialogue)
-Agents reach consensus in milliseconds. Each agent brings a constraint and a preference its household or store declared ahead of time, and the family's own stated priorities break any tie — consensus is fast because the values were already declared, not because anything is hidden. Care for sister outweighs treat budget. Family dinner needs override personal limits. Community sustainability shapes choices.
+Agents reach consensus in milliseconds. The household's own Elohim weigh its budget, its needs and its floor among themselves and with the network; the store's Elohim only offers deals it offers to everyone. Consensus is fast because the values were already declared, and what a household can afford is never declared to a seller. The store sees an ordinary sale. Care for sister outweighs treat budget. Family dinner needs override personal limits. Community sustainability shapes choices.
 
 ### Phase 4: Bundle (Single Checkout)
 All micro-negotiations resolve into one QR code containing:

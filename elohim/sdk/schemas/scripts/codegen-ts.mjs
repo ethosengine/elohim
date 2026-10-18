@@ -2,7 +2,7 @@
 /**
  * Generates TypeScript from protocol schemas:
  * 1. Interfaces from input/view schemas (json-schema-to-typescript)
- * 2. Enum constants from _dna schemas (tier-aware CORE_* and ALL_*)
+ * 2. Enum constants from _dna and _codegen schemas (tier-aware CORE_* and ALL_*)
  *
  * Usage:
  *   node codegen-ts.mjs           # Generate all
@@ -33,6 +33,19 @@ const VERIFY = process.argv.includes('--verify');
 const CACHE_DIR = resolve(__dirname, '../generated-ts');
 await mkdir(CACHE_DIR, { recursive: true });
 const OUTPUT_DIR = VERIFY ? await mkdtemp(join(CACHE_DIR, '.verify-')) : CACHE_DIR;
+
+// A distributed copy that git ignores is a local cache (genesis/seeder/src/generated/ is
+// gitignored apart from three early tracked files). A fresh worktree has never materialised
+// it, so its absence says nothing about drift: nothing stale can be committed from it.
+// Tracked outputs stay strict, and an ignored file that exists is still compared.
+function isGitIgnored(path) {
+  try {
+    execSync(`git check-ignore -q -- "${path}"`, { cwd: REPO_ROOT, stdio: 'ignore' });
+    return true;
+  } catch {
+    return false;
+  }
+}
 
 // All locations get identical copies of generated files
 const GENERATED_OUTPUT_DIRS = [
@@ -522,10 +535,15 @@ async function generateEnumConstants() {
     const raw = await readFile(join(ENUM_DIR, file), 'utf8');
     const schema = JSON.parse(raw);
 
-    if (!schema._dna) continue;
+    // `_dna` enums are mirrored as generated DNA constants; `_codegen` enums are
+    // generated everywhere EXCEPT a DNA (e.g. rea-action, whose DNA const is
+    // hand-written in an integrity zome and only checked, see check-dna.mjs).
+    // Both carry the same `constant` base name.
+    const spec = schema._dna ?? schema._codegen;
+    if (!spec) continue;
 
     const title = schema.title;
-    const baseName = schema._dna.constant; // e.g. "CONTENT_TYPES", "REACH_LEVELS"
+    const baseName = spec.constant; // e.g. "CONTENT_TYPES", "REACH_LEVELS"
     const allValues = schema.enum;
     const coreValues = schema._tiers?.core?.values || allValues;
 
@@ -682,6 +700,7 @@ async function main() {
 
   if (VERIFY) {
     let hasFailure = false;
+    let skippedCache = 0;
 
     // Verify enum files
     for (const outPath of ENUM_OUTPUT_PATHS) {
@@ -689,6 +708,10 @@ async function main() {
       try {
         existing = await readFile(outPath, 'utf8');
       } catch {
+        if (isGitIgnored(outPath)) {
+          skippedCache += 1;
+          continue;
+        }
         console.error(`FAIL: Generated file does not exist: ${outPath}`);
         hasFailure = true;
         continue;
@@ -707,6 +730,10 @@ async function main() {
         try {
           existing = await readFile(outPath, 'utf8');
         } catch {
+          if (isGitIgnored(outPath)) {
+            skippedCache += 1;
+            continue;
+          }
           console.error(`FAIL: Generated file does not exist: ${outPath}`);
           hasFailure = true;
           continue;
@@ -719,6 +746,11 @@ async function main() {
     }
 
     await rm(OUTPUT_DIR, { recursive: true, force: true });
+    if (skippedCache) {
+      console.log(
+        `note: ${skippedCache} gitignored generated file(s) not materialised here (local cache); run pnpm run schema:codegen:ts to create them`
+      );
+    }
     if (hasFailure) {
       process.exit(1);
     }

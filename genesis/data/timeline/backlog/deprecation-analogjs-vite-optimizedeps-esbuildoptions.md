@@ -9,9 +9,9 @@ written: "2026-09-24"
 author: "deprecation-triage"
 status: "backlog"
 priority: "low"
-deprecation_status: blocked
+deprecation_status: fixed
 severity: low
-fingerprints: ["612e34199acb", "8a122f0ee621", "19d73e162a53"]
+fingerprints: ["612e34199acb", "8a122f0ee621", "19d73e162a53", "6e0477ffb653", "8313995dfeea"]
 relatedNodeIds: []
 tags: [deprecation, vite, vite-8, rolldown, analogjs, vite-plugin-angular, vitest, lamad, elohim-app, elohim-library, peer-dependency]
 cites:
@@ -42,6 +42,9 @@ This warning has been captured three times so far:
 - `19d73e162a53` (2026-10-08), the same text again behind a logger prefix
   (`12:28:04 AM [vite] warning: …`), from a vitest run in `app/lamad`. This is
   the second Class 13 re-mint, not a new concern.
+- `6e0477ffb653` (2026-10-14), the third Class 13 re-mint
+  (`9:55:42 PM [vite] warning: …`), from a vitest run of
+  `src/app/renderers/iframe-renderer` in `app/lamad`.
 
 ## Usage inventory
 
@@ -118,6 +121,50 @@ new timestamped re-mint should be folded in here and set to `blocked` until
 Class 13 lands. The real fix for the re-mints is the `fingerprint()`
 normalization in the sentinel entry, and that is waiting on operator approval.
 
+**Re-checked 2026-10-14 (fingerprint `6e0477ffb653`).** Still unchanged:
+from `app/lamad`, `vitest` resolves `vite@8.1.5` and
+`@analogjs/vite-plugin-angular@2.6.4` resolves `vite@7.3.1`;
+`app/elohim-app` and `app/elohim-library` still declare `"vite": "^7.3.1"`,
+and `app/lamad` declares none. The `fingerprint()` normalization for Class 13
+has not landed in `.claude/hooks/deprecation-sentinel.py`, which is why this
+re-minted. The new ledger row is `blocked` and cites this entry. Note that
+the ledger rows for `8a122f0ee621` and `19d73e162a53` are no longer present
+(only `612e34199acb` and `6e0477ffb653` remain, both `blocked`); since every
+re-mint carries a unique time prefix, that absence costs nothing until Class
+13 lands.
+
+**Class 13 landed 2026-10-14 (fingerprint `8313995dfeea`).** `fingerprint()` in
+`.claude/hooks/deprecation-sentinel.py` now strips a leading wall-clock time of
+day (`11:07:38 PM `, `9:55:42 PM `) before hashing, so every timestamped
+emission of this warning collapses to `8313995dfeea`; that fingerprint is
+pre-registered `blocked` in the ledger against this entry so the first
+post-fix emission does not dispatch. The concern itself is unchanged: the
+Vite 8 devDependency alignment below is still the fix.
+
 ## Verification
 
-N/A. Not fixed; blocked on the Vite 8 devDependency alignment above.
+2026-10-15, branch `chore/vite-8-alignment`. `"vite": "^8.1.5"` now declared in
+`app/elohim-app`, `app/elohim-library`, `doorway/doorway-app`, the three
+`app/elohim-elements/*` packages (were `^6.0.0`), and added to `app/lamad`
+devDependencies. `pnpm install --frozen-lockfile` passes on the regenerated
+`pnpm-lock.yaml`.
+
+- `pnpm exec vitest run --config vite.config.ts src/app/renderers/iframe-renderer`
+  in `app/lamad`: 23/23 passed, EXIT=0, no `optimizeDeps.esbuildOptions` line
+  (the only banner left is the unrelated `vite-tsconfig-paths` hint).
+- `just gate elohim-app` EXIT=0 (lint, `ng build`, 228 files / 4641 tests);
+  the full log contains zero `optimizeDeps.esbuildOptions` lines.
+- `just gate elohim-library` EXIT=0 (864 tests); `just gate elohim-storybook`
+  EXIT=0 (452 tests, Storybook build on Vite 8); `just gate doorway-app`
+  EXIT=0 (115 tests); `pnpm --filter elohim-core|elohim-imagodei|elohim-qahal build`
+  EXIT=0 each.
+
+**Lockfile audit 2026-10-15 (independent reader, read-only).** Every resolved
+`@analogjs/vite-plugin-angular@2.6.4`, `vitest@4.1.11`, `@vitest/mocker@4.1.11`,
+`@angular/build@22.1.0`, Storybook Vite builder and `vite-plugin-dts` instance in
+`pnpm-lock.yaml` binds `vite@8.1.5`. Two older Vite copies remain as development-tool
+transitives that cannot emit this warning: `vite@7.3.1` under `vitest@3.2.7`, which
+`elohim/elohim-agent/elohim-agent-sdk`, `elohim/sdk/epr-ts` and
+`elohim/sdk/storage-client-ts` declare; and `vite@6.4.1` under the optional
+`@angular-devkit/build-angular@19.2.22` that analogjs pulls. Moving those three SDK
+packages to vitest 4 is a separate, optional pass.

@@ -15,7 +15,17 @@ cleanup() {
 }
 trap cleanup EXIT
 
-mkdir -p "${TEST_WORKSPACE}/genesis/a2o"
+mkdir -p "${TEST_WORKSPACE}/genesis/a2o" "${TEST_WORKSPACE}/scripts/ci"
+cp "${REPO_ROOT}/scripts/ci/dataplane-born-red-concerns.txt" "${TEST_WORKSPACE}/scripts/ci/"
+
+# Raw cucumber JSON fixture: one scenario with the given concern tag and step statuses.
+cuke_json() {
+  local concern="$1"; shift
+  local steps="" st
+  for st in "$@"; do steps="${steps}{\"result\":{\"status\":\"${st}\"}},"; done
+  printf '[{"tags":[],"elements":[{"type":"scenario","tags":[{"name":"@concern:%s"}],"steps":[%s{"result":{"status":"passed"}}]}]}]' \
+    "${concern}" "${steps}"
+}
 
 pnpm() {
   if [ "${1:-}" = "install" ]; then
@@ -37,7 +47,10 @@ pnpm() {
       esac
     done
     mkdir -p "$(dirname "${cucumber_out}")"
-    printf '[]\n' > "${cucumber_out}"
+    if [ -z "${TEST_NO_REPORT:-}" ]; then
+      printf '%s\n' "${TEST_CUCUMBER_LOG:-1 scenario (1 undefined)}"
+      printf '%s\n' "${TEST_CUCUMBER_JSON:-[]}" > "${cucumber_out}"
+    fi
     return "${TEST_CUCUMBER_EXIT:-0}"
   fi
 
@@ -57,8 +70,11 @@ pnpm() {
         *) shift ;;
       esac
     done
-    printf '{\n  "summary": {\n    "scenarios": {\n      "total": %s\n    },\n    "byConcern": {}\n  }\n}\n' \
-      "${TEST_SCENARIO_COUNT}" > "${out_json}"
+    if [ -n "${TEST_NO_REPORT:-}" ]; then
+      return 0
+    fi
+    printf '{\n  "summary": {\n    "scenarios": {\n      "total": %s,\n      "failed": %s,\n      "pending": %s\n    },\n    "byConcern": %s\n  }\n}\n' \
+      "${TEST_SCENARIO_COUNT}" "${TEST_FAILED:-0}" "${TEST_PENDING:-0}" "${TEST_BYCONCERN:-{\}}" > "${out_json}"
     printf '# test report\n' > "${out_md}"
     return 0
   fi
@@ -127,6 +143,77 @@ if [ "${CUCUMBER_STATUS}" -ne 7 ]; then
   echo "Expected cucumber exit 7 to be preserved; got ${CUCUMBER_STATUS}" >&2
   sed -n '1,200p' "${CUCUMBER_OUTPUT}" >&2
   exit 1
+fi
+
+expect_case() { # name expected_status banner(yes|no) output status
+  if [ "$5" -ne "$2" ]; then
+    echo "$1: expected exit $2; got $5" >&2; sed -n '1,200p' "$4" >&2; exit 1
+  fi
+  if [ "$3" = yes ] && ! grep -Fq 'PENDING-ONLY (declared born-red concerns: pain-is-answered): cucumber exited 1 with 0 failed and 0 ambiguous steps; 14 scenario(s)' "$4"; then
+    echo "$1: expected the PENDING-ONLY banner" >&2; sed -n '1,200p' "$4" >&2; exit 1
+  fi
+  if [ "$3" = no ] && grep -Fq 'PENDING-ONLY (declared' "$4"; then
+    echo "$1: must not print the PENDING-ONLY banner" >&2; exit 1
+  fi
+}
+
+O="${TEST_ROOT}/c-undef-listed.log"
+S="$(TEST_PENDING=14 TEST_CUCUMBER_JSON="$(cuke_json pain-is-answered undefined)" run_case 20 1 "$O")"
+expect_case "undefined under listed concern" 0 yes "$O" "$S"
+
+O="${TEST_ROOT}/c-ambiguous.log"
+S="$(TEST_PENDING=14 TEST_CUCUMBER_JSON="$(cuke_json pain-is-answered undefined ambiguous)" run_case 20 1 "$O")"
+expect_case "ambiguous step" 1 no "$O" "$S"
+
+O="${TEST_ROOT}/c-failed.log"
+S="$(TEST_FAILED=1 TEST_PENDING=14 TEST_CUCUMBER_JSON="$(cuke_json pain-is-answered undefined failed)" run_case 20 1 "$O")"
+expect_case "failed step" 1 no "$O" "$S"
+
+O="${TEST_ROOT}/c-unlisted.log"
+S="$(TEST_PENDING=14 TEST_CUCUMBER_JSON="$(cuke_json some-other-concern undefined)" run_case 20 1 "$O")"
+expect_case "undefined under non-listed concern" 1 no "$O" "$S"
+
+O="${TEST_ROOT}/c-fmt.log"
+S="$(TEST_PENDING=14 TEST_CUCUMBER_LOG=$'ENOSPC: no space left on device, write\n1 scenario (1 undefined)' TEST_CUCUMBER_JSON="$(cuke_json pain-is-answered undefined)" run_case 20 1 "$O")"
+expect_case "formatter error marker" 1 no "$O" "$S"
+
+O="${TEST_ROOT}/c-noresult.log"
+S="$(TEST_PENDING=14 TEST_CUCUMBER_JSON='[{"tags":[],"elements":[{"type":"scenario","tags":[{"name":"@concern:pain-is-answered"}],"steps":[{"result":{"status":"undefined"}},{}]}]}]' run_case 20 1 "$O")"
+expect_case "step without result" 1 no "$O" "$S"
+
+O="${TEST_ROOT}/c-nosummary.log"
+S="$(TEST_PENDING=14 TEST_CUCUMBER_LOG='progress only' TEST_CUCUMBER_JSON="$(cuke_json pain-is-answered undefined)" run_case 20 1 "$O")"
+expect_case "summary line absent" 1 no "$O" "$S"
+
+O="${TEST_ROOT}/c-efbig.log"
+S="$(TEST_PENDING=14 TEST_CUCUMBER_LOG=$'EFBIG: file too large, write\n1 scenario (1 undefined)' TEST_CUCUMBER_JSON="$(cuke_json pain-is-answered undefined)" run_case 20 1 "$O")"
+expect_case "EFBIG errno" 1 no "$O" "$S"
+
+O="${TEST_ROOT}/c-snippet.log"
+S="$(TEST_PENDING=14 TEST_CUCUMBER_LOG=$'  ? Given x\n      Undefined. Implement with the following snippet:\n\n        Given(\'x\', async function () {\n          // Write code here; throw new Error(\'nope\')\n          return \'pending\';\n        });\n\n14 scenarios (14 undefined)' TEST_CUCUMBER_JSON="$(cuke_json pain-is-answered undefined)" run_case 20 1 "$O")"
+if [ "${S}" -ne 0 ]; then echo "snippet body containing Error must not refuse; got ${S}" >&2; cat "$O" >&2; exit 1; fi
+
+# Modelled on edge #1610: cucumber's non-TTY formatter notice, skipped steps, a held
+# (pending) scenario under an unlisted concern, undefined only under the listed one.
+O="${TEST_ROOT}/c-1610.log"
+FIX_1610="$(printf '[%s,%s]' \
+  "$(cuke_json pain-is-answered undefined skipped | sed 's/^\[//; s/\]$//')" \
+  "$(cuke_json doorway-failover pending skipped | sed 's/^\[//; s/\]$//')")"
+S="$(TEST_PENDING=14 TEST_CUCUMBER_LOG=$'Cannot use \'progress-bar\' formatter for output to \'stdout\' as not a TTY. Switching to \'progress\' formatter.\n149 scenarios (14 undefined, 126 skipped, 9 passed)' TEST_CUCUMBER_JSON="${FIX_1610}" run_case 20 1 "$O")"
+expect_case "edge 1610 shape" 0 yes "$O" "$S"
+
+grep -Fq 'PENDING-ONLY refused: console-error-line — ENOSPC' "${TEST_ROOT}/c-fmt.log" \
+  || { echo "missing refusal line for formatter error" >&2; cat "${TEST_ROOT}/c-fmt.log" >&2; exit 1; }
+grep -Fq 'PENDING-ONLY refused: undefined-under-unlisted-concern' "${TEST_ROOT}/c-unlisted.log" \
+  || { echo "missing refusal line for unlisted concern" >&2; exit 1; }
+grep -Fq 'PENDING-ONLY refused: non-pending-step-status — ambiguous' "${TEST_ROOT}/c-ambiguous.log" \
+  || { echo "missing refusal line for ambiguous" >&2; exit 1; }
+
+O="${TEST_ROOT}/c-noreport.log"
+S="$(TEST_NO_REPORT=1 run_case 20 1 "$O")"
+expect_case "report absent" 3 no "$O" "$S"
+if [ -e "${TEST_WORKSPACE}/genesis/a2o/reports/cucumber-report-dataplane.json" ]; then
+  echo "stale cucumber report was not removed" >&2; exit 1
 fi
 
 echo "run-dataplane-validation: zero-scenario guard tests passed"

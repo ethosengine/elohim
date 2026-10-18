@@ -80,6 +80,31 @@ self.addEventListener('fetch', (event: FetchEvent) => {
     return;
   }
 
+  // Top-level navigation (destination 'document'): network-first, so a direct
+  // visit sees whatever the doorway answers (e.g. the no-store chrome shell)
+  // instead of the CID-cached raw bundle. The response is never cached here;
+  // the raw entry is already cached under its CID path by the iframe's own
+  // load. An iframe's request has destination 'iframe' and keeps the cached
+  // path below. Offline, fall back to the cached bytes.
+  if (event.request.destination === 'document') {
+    event.respondWith(
+      (async () => {
+        console.log(`[apps-sw] document-navigation: network-first ${url.pathname}`);
+        try {
+          const answered = await fetch(event.request);
+          // A doorway that is up but cannot serve (5xx) is as good as away for
+          // the person; a 4xx is the doorway's own answer and stands.
+          if (answered.status < 500) return answered;
+          console.log(`[apps-sw] document-navigation: doorway ${answered.status} → cached bytes`);
+        } catch {
+          console.log('[apps-sw] document-navigation: offline → cached bytes');
+        }
+        return handleAppFetch(event);
+      })()
+    );
+    return;
+  }
+
   event.respondWith(handleAppFetch(event));
 });
 
@@ -264,7 +289,12 @@ async function handleAppFetch(event: FetchEvent): Promise<Response> {
   const url = new URL(request.url);
   const pathParts = url.pathname.replace('/apps/', '').split('/');
   const identifier = pathParts[0]; // Could be slug or blob_hash
-  const filePath = pathParts.slice(1).join('/');
+  // A directory address (`/apps/<slug>/`, `/apps/<slug>/sub/`) is the doorway's
+  // name for its index.html; the cache holds the file, not the directory, so a
+  // navigation that falls back offline must look up what was extracted.
+  const rawFilePath = pathParts.slice(1).join('/');
+  const filePath =
+    rawFilePath === '' || rawFilePath.endsWith('/') ? `${rawFilePath}index.html` : rawFilePath;
 
   console.log(`[apps-sw] fetch: ${url.pathname}`);
 

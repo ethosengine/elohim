@@ -245,12 +245,20 @@ impl DormancySchedule {
         )
     }
 
-    /// Dormancy for the `nth` consecutive exhaustion (1-based): `base` doubled
-    /// `nth - 1` times, capped.
+    /// The UNJITTERED rung for the `nth` consecutive exhaustion (1-based):
+    /// `base` doubled `nth - 1` times, capped. This is the ladder's arithmetic
+    /// and the value the `rung` label reads; the window an id is actually held
+    /// for is [`Self::window_for_id`].
     ///
     /// A zero `base` is the documented OFF switch — it yields zero dormancy at
     /// every rung, so an exhausted id is re-admitted immediately.
     fn window_for(self, nth: u32) -> Duration {
+        self.uncapped_rung(nth).min(self.cap)
+    }
+
+    /// `base` doubled `nth - 1` times, stopping once it reaches the cap but
+    /// NOT clamped to it — the value the jitter lengthens before the clamp.
+    fn uncapped_rung(self, nth: u32) -> Duration {
         if self.base.is_zero() {
             return Duration::ZERO;
         }
@@ -264,8 +272,54 @@ impl DormancySchedule {
             }
             window = window.saturating_mul(2);
         }
-        window.min(self.cap)
+        window
     }
+
+    /// The window `id` is held for on its `nth` consecutive exhaustion: the
+    /// rung LENGTHENED by a deterministic 0–50% spread keyed on `(id, nth)`,
+    /// then clamped to the cap.
+    ///
+    /// ## Why spread (the 2026-10-12 cohort burst)
+    ///
+    /// A stale set is discovered in one sweep, so every id in it exhausts in
+    /// the same sweep, goes dormant at the same instant, and — on an identical
+    /// window — lapses at the same instant. Measured on the household at
+    /// production gossip cadence: 796 / 914 / 1316 REA ids re-admitted inside
+    /// one 300 s window, every one of them a conductor read in the same ~90 s.
+    /// Spreading each id's window over `[rung, 1.5 × rung]` turns that
+    /// synchronized burst into a trickle across the window, and because the
+    /// next dormancy starts from the (spread) lapse, the cohort stays spread.
+    ///
+    /// It only ever LENGTHENS (never sooner than the rung), the cap remains the
+    /// ceiling (jitter is applied before the clamp), and it is a pure function
+    /// of `(id, nth)` — no RNG, no clock — so a test and a restart compute the
+    /// same window.
+    ///
+    /// RUNG 1 IS NOT SPREAD. Its window is exactly `base` for every id, so the
+    /// documented first-rung contract (identical to the pre-ladder cadence;
+    /// content arriving just after a first exhaustion waits no longer than it
+    /// always did) is unchanged. The measured burst was rung 2; spreading from
+    /// rung 2 up is enough to de-synchronize a cohort for every later lapse.
+    fn window_for_id(self, id: &str, nth: u32) -> Duration {
+        if nth <= 1 {
+            return self.window_for(nth);
+        }
+        let rung = self.uncapped_rung(nth);
+        let spread = rung.mul_f64(f64::from(dormancy_spread_permille(id, nth)) / 1000.0);
+        rung.saturating_add(spread).min(self.cap)
+    }
+}
+
+/// Deterministic spread in `0..=500` permille for `(id, nth)` — FNV-1a 64, a
+/// stable hash with no per-process keying (unlike `DefaultHasher`, whose output
+/// the standard library does not promise across releases).
+fn dormancy_spread_permille(id: &str, nth: u32) -> u32 {
+    let mut h: u64 = 0xcbf2_9ce4_8422_2325;
+    for b in id.as_bytes().iter().chain(nth.to_le_bytes().iter()) {
+        h ^= u64::from(*b);
+        h = h.wrapping_mul(0x0000_0100_0000_01b3);
+    }
+    (h % 501) as u32
 }
 
 impl Default for DormancySchedule {
@@ -395,7 +449,11 @@ pub fn advertised_head_corpus_digest(
 #[derive(Debug, Clone, Copy)]
 struct Dormancy {
     since: std::time::Instant,
+    /// The (spread) window the id is actually held for.
     window: Duration,
+    /// The unjittered rung it went dormant on — what the `rung` label reads,
+    /// so the spread never moves an id into the `capped` series early.
+    rung_window: Duration,
 }
 
 impl Dormancy {
@@ -429,6 +487,143 @@ struct MissEntry {
     /// `elohim_projection_reconcile_known_divergent{stream}` gauge — see
     /// [`MissLedger::divergent_tracked`].
     divergent: bool,
+    /// A dormancy lapsed and re-admitted this id for ONE read that has not yet
+    /// been EXECUTED. While set, every admit returns `Retry` (the allowance is
+    /// held, not spent), up to [`MAX_OWED_REOFFERS`]; a [`ReadReceipts`]
+    /// receipt clears it, and only then can the next admit send the id back to
+    /// dormancy.
+    owed_read: bool,
+    /// Consecutive sweeps the owed read was offered again without executing.
+    owed_reoffers: u32,
+}
+
+/// How many consecutive sweeps an owed re-admission read may be offered again
+/// without executing before the id returns to dormancy as if read.
+///
+/// 8 because it is long enough to ride out a transient (a saturated read pool,
+/// a single-flight heal overrunning a few ticks) and short enough that the
+/// ladder takes over well inside the first rung on every cadence: 8 × 30 s =
+/// 4 min on the household (rung 1 = 360 s), 8 × 300 s = 40 min in production
+/// (rung 1 = 3600 s). Past it, re-offering is a per-sweep hot loop against a
+/// leg that keeps shedding the id; dormancy is the honest place to wait.
+pub const MAX_OWED_REOFFERS: u32 = 8;
+
+/// Did a heal read's final `Err` come back FROM the conductor (it answered, or
+/// the call was in flight when it timed out), rather than from a local refusal
+/// before anything was dispatched?
+///
+/// Excluded — the conductor was NEVER asked:
+/// - an admission-gate shed (`conductor_admission::is_admission_shed`): the
+///   permit wait expired (`hc_client.rs` `admit`, reached from `call_zome_timed`
+///   ~:1218 and `call_zome_imagodei` ~:1019; shed built at
+///   `conductor_admission.rs` ~:382), and `call_with_retry`'s "parked on the
+///   chain write gate, never dispatched" timeout, which carries the same marker;
+/// - the admission permit pool closed — `Conductor("conductor admission: …")`
+///   (`conductor_admission.rs` ~:375);
+/// - no imagodei cell provisioned — `NotFound("imagodei cell not provisioned …")`
+///   (`hc_client.rs` ~:987);
+/// - an input that never encodes into a call — `InvalidInput` (malformed
+///   collective cid / membership action hash, `conductor_writes.rs` ~:162,
+///   ~:281, ~:286 via ~:115 / ~:227) and `Internal` (payload encode failure).
+///
+/// Everything else counts as asked: `Conductor` from a failed zome call
+/// (`HcClient::zome_call_failed`), `Serialization` of an answer that did not
+/// decode, and `call_with_retry`'s synthetic per-attempt timeout — which can
+/// only fire after admission, because every admission wait (1 s Background, 5 s
+/// Interactive by default) is far shorter than the 25 s attempt timeout, so a
+/// slow gate sheds first.
+pub(crate) fn conductor_was_asked(err: &crate::error::StorageError) -> bool {
+    use crate::error::StorageError as E;
+    if crate::conductor_admission::is_admission_shed(err) {
+        return false;
+    }
+    match err {
+        E::Conductor(msg) => !msg.starts_with("conductor admission:"),
+        E::NotFound(msg) => !msg.contains("cell not provisioned"),
+        E::InvalidInput(_) | E::Internal(_) => false,
+        _ => true,
+    }
+}
+
+/// Receipt a completed heal read for an owed id — unless its `Err` was a local
+/// refusal ([`conductor_was_asked`]).
+pub(crate) fn receipt_read<T>(
+    receipts: &ReadReceipts,
+    stream: &'static str,
+    id: &str,
+    result: &Result<T, crate::error::StorageError>,
+) {
+    if result.as_ref().err().is_none_or(conductor_was_asked) {
+        receipts.executed(stream, id);
+    }
+}
+
+/// The heal-side half of the one-read re-admission allowance.
+///
+/// ## ALLOWANCE AT EXECUTION (the invariant)
+///
+/// A re-admission's single read is SPENT WHEN IT IS EXECUTED, not when the id
+/// is admitted. Discovery only *offers* the read; the heal leg may never run it
+/// — the leg's wall-clock budget or circuit can shed it, a batch can return it
+/// `unattempted` or refuse it for backpressure, a pre-pass database failure can
+/// end the leg before any conductor call, or the whole plan can be dropped
+/// because an earlier heal is still in flight (`HealAction::SkipInFlight`).
+/// Spending at admission would let any of those turn a lapse into zero reads and
+/// a fresh dormancy, so repeated shedding could starve an id forever while
+/// `miss_readmissions_total` kept counting.
+///
+/// "Executed" means the conductor was ASKED about this id and the read
+/// COMPLETED — `Ok(Some)`, `Ok(None)`, or an `Err` after `call_with_retry`
+/// gave up — and each heal leg reports it at that call site
+/// ([`Self::executed`]), never from a tracker transition (a tracker can drop an
+/// id without a read, and keep one pending after a read).
+///
+/// ONE DELIBERATE EXCEPTION — a REPLAYED verdict ([`Self::replayed`]). An id
+/// settled from a remembered verdict against unchanged evidence (REA's
+/// `rea_verdict_backoff`, content's `heal_backoff` missing replay) issues no
+/// conductor read, yet CONSUMES the allowance: the lapse's question is answered
+/// by a verdict the conductor gave inside the replay window, and the next lapse
+/// asks again. Replays vs reads read off
+/// `elohim_projection_heal_outcomes_total{outcome="refused_deferred"|"missing_deferred"}`
+/// against `{outcome="missing"}` (and `elohim_rea_heal_refused_skipped_total`).
+///
+/// Unexecuted offers are bounded: after [`MAX_OWED_REOFFERS`] consecutive
+/// sweeps the id returns to dormancy as if read
+/// (`elohim_projection_reconcile_miss_owed_expired_total`; each re-offer is on
+/// `..._miss_owed_reoffers_total`). Receipts travel back through a shared sink
+/// and are absorbed at the start of the next discovery, so the discovery loop
+/// stays the ledger's only owner.
+#[derive(Debug, Clone, Default)]
+pub struct ReadReceipts {
+    /// Ids owed their one re-admission read when this plan was built. Only
+    /// these are reported back — the sink is bounded by the owed set, not by
+    /// the sweep's whole gap list.
+    owed: std::collections::HashMap<&'static str, std::collections::HashSet<String>>,
+    sink: std::sync::Arc<std::sync::Mutex<Vec<(&'static str, String)>>>,
+}
+
+impl ReadReceipts {
+    /// The conductor was asked about `id` and the read completed. A no-op for
+    /// an id that owes no re-admission read.
+    pub fn executed(&self, stream: &'static str, id: &str) {
+        self.consume(stream, id);
+    }
+
+    /// `id` was settled from a remembered verdict against unchanged evidence —
+    /// the deliberate exception that also consumes the allowance (see the type
+    /// docs).
+    pub fn replayed(&self, stream: &'static str, id: &str) {
+        self.consume(stream, id);
+    }
+
+    fn consume(&self, stream: &'static str, id: &str) {
+        if !self.owed.get(stream).is_some_and(|owed| owed.contains(id)) {
+            return;
+        }
+        if let Ok(mut sink) = self.sink.lock() {
+            sink.push((stream, id.to_string()));
+        }
+    }
 }
 
 /// Per-sweep, per-stream miss-ledger observability, folded into the arm's
@@ -443,6 +638,10 @@ pub struct MissLedgerFacts {
     pub dormant: usize,
     /// Ids whose dormancy lapsed and were re-admitted since the last read.
     pub readmitted: usize,
+    /// Owed re-admission reads offered again (previous offer unexecuted).
+    pub owed_reoffered: usize,
+    /// Owed reads that hit [`MAX_OWED_REOFFERS`] and went back to dormancy.
+    pub owed_expired: usize,
     /// How long the longest-dormant id has been dormant right now.
     pub longest_dormancy: Duration,
     /// Re-admissions since the last read, by ladder rung
@@ -476,11 +675,11 @@ pub struct MissLedgerFacts {
 ///   resets its counter immediately AND drops it to the first rung of the
 ///   dormancy ladder. The thing we gave up on is not the thing being advertised
 ///   now, so it does not inherit the patience we had run out of.
-/// - **Dormancy lapse** — the id is re-admitted for another round once its
+/// - **Dormancy lapse** — the id is re-admitted for ONE read once its
 ///   WALL-CLOCK dormancy window elapses ([`DormancySchedule`]). The window
-///   lengthens — doubling, capped — with each consecutive exhaustion against
-///   unchanged evidence, so a stale set costs a settled node less and less
-///   while never costing it nothing.
+///   lengthens — doubling, spread 0–50% per id, capped — with each consecutive
+///   exhaustion against unchanged evidence, so a stale set costs a settled node
+///   less and less (one read per id per window) while never costing it nothing.
 ///
 /// An id the ledger holds back is ADJUDICATED: it does not defeat convergence
 /// (we have done what the substrate permits), but it never vanishes silently —
@@ -494,10 +693,65 @@ pub struct MissLedger {
     /// publishes is honestly per-sweep.
     readmissions:
         std::collections::HashMap<&'static str, std::collections::BTreeMap<&'static str, usize>>,
+    /// Owed-read re-offers / expiries since the last read, per stream.
+    owed_flow: std::collections::HashMap<&'static str, (usize, usize)>,
     schedule: DormancySchedule,
+    /// Execution receipts from the heal leg — see [`ReadReceipts`].
+    receipts: std::sync::Arc<std::sync::Mutex<Vec<(&'static str, String)>>>,
 }
 
 impl MissLedger {
+    /// The receipt handle for THIS sweep's plan: the ids currently owed their
+    /// one re-admission read, and the sink the heal leg reports them into.
+    pub fn read_receipts(&self) -> ReadReceipts {
+        let owed = self
+            .streams
+            .iter()
+            .filter_map(|(stream, entries)| {
+                let ids: std::collections::HashSet<String> = entries
+                    .iter()
+                    .filter(|(_, e)| e.owed_read)
+                    .map(|(id, _)| id.clone())
+                    .collect();
+                (!ids.is_empty()).then_some((*stream, ids))
+            })
+            .collect();
+        ReadReceipts {
+            owed,
+            sink: self.receipts.clone(),
+        }
+    }
+
+    /// Absorb every execution receipt the heal leg has reported since the last
+    /// call. Run at the top of each discovery, before any admit.
+    pub fn absorb_receipts(&mut self) {
+        let drained = match self.receipts.lock() {
+            Ok(mut sink) => std::mem::take(&mut *sink),
+            Err(_) => return,
+        };
+        for (stream, id) in drained {
+            self.read_executed(stream, &id);
+        }
+    }
+
+    /// The owed re-admission read for `id` was EXECUTED: the allowance is spent,
+    /// and the next admit under unchanged evidence returns it to dormancy.
+    pub fn read_executed(&mut self, stream: &'static str, id: &str) {
+        if let Some(e) = self.streams.get_mut(stream).and_then(|m| m.get_mut(id)) {
+            e.owed_read = false;
+        }
+    }
+
+    /// Reads the CURRENT admission round grants `id`: 1 while it holds a
+    /// re-admission allowance, otherwise the full `MAX_RETRIES`. For the
+    /// adjudication log, which used to claim `MAX_RETRIES` regardless.
+    pub fn granted_reads(&self, stream: &'static str, id: &str) -> u32 {
+        match self.streams.get(stream).and_then(|m| m.get(id)) {
+            Some(e) if e.owed_read => 1,
+            _ => MAX_RETRIES,
+        }
+    }
+
     /// A ledger on the compile-time default schedule. Production re-sources it
     /// from the runtime-config registry each sweep ([`Self::set_schedule`]).
     pub fn new() -> Self {
@@ -558,6 +812,7 @@ impl MissLedger {
         // Field-level borrow split: `streams` and `readmissions` are disjoint.
         let entries = self.streams.entry(stream).or_default();
         let readmissions = &mut self.readmissions;
+        let owed_flow = &mut self.owed_flow;
         match entries.get_mut(id) {
             None => {
                 if entries.len() >= MISS_LEDGER_CAP {
@@ -573,6 +828,8 @@ impl MissLedger {
                         exhaustions: 0,
                         dormant: None,
                         divergent,
+                        owed_read: false,
+                        owed_reoffers: 0,
                     },
                 );
                 Admission::Retry
@@ -588,6 +845,8 @@ impl MissLedger {
                     e.exhaustions = 0;
                     e.dormant = None;
                     e.divergent = divergent;
+                    e.owed_read = false;
+                    e.owed_reoffers = 0;
                     return Admission::Retry;
                 }
                 // Same evidence: this sweep's classification may UPGRADE the
@@ -604,21 +863,55 @@ impl MissLedger {
                     }
                     // The rung lapsed. Exhaustion was always temporary; this is
                     // where that promise is kept, and metered.
+                    // ONE READ PER RE-ADMISSION. The re-admitted id gets a
+                    // budget of exactly one read, not `MAX_RETRIES`: a lapse
+                    // asks a single question — "has gossip delivered it yet?" —
+                    // and one own-conductor read answers it. The full budget
+                    // exists to ride out transients while a claim is FRESH;
+                    // this claim already spent it against unchanged evidence,
+                    // and transient faults inside the one read are still ridden
+                    // out by `call_with_retry`. Spending three reads per lapse
+                    // only tripled the cost of a stale set (measured
+                    // 2026-10-12: Background `get_rea_commitment` = 3 ×
+                    // re-admissions, exactly). New evidence and `resolved()`
+                    // still grant the full budget. Because this read IS the last
+                    // granted attempt, `budget_spent` is true for it, so a
+                    // divergent id is adjudicated on it rather than marked
+                    // failed against a budget that is already gone. The read is
+                    // OWED until executed — see [`ReadReceipts`].
                     e.dormant = None;
-                    e.misses = 1;
+                    e.misses = MAX_RETRIES;
+                    e.owed_read = true;
+                    e.owed_reoffers = 0;
                     record_readmission(
                         readmissions,
                         stream,
                         e.exhaustions,
-                        dormancy.window,
+                        dormancy.rung_window,
                         schedule.cap,
                     );
                     return Admission::Retry;
                 }
 
+                if e.owed_read {
+                    if e.owed_reoffers < MAX_OWED_REOFFERS {
+                        // The one re-admission read was offered but not
+                        // executed (shed, refused, unattempted, or its plan
+                        // dropped): offer it again. Not a new re-admission —
+                        // the counter booked it once.
+                        e.owed_reoffers += 1;
+                        owed_flow.entry(stream).or_default().0 += 1;
+                        return Admission::Retry;
+                    }
+                    // Bounded: go back to dormancy as if read, on the next rung.
+                    e.owed_read = false;
+                    e.owed_reoffers = 0;
+                    owed_flow.entry(stream).or_default().1 += 1;
+                }
                 if e.misses >= MAX_RETRIES {
                     e.exhaustions = e.exhaustions.saturating_add(1);
-                    let window = schedule.window_for(e.exhaustions);
+                    let rung_window = schedule.window_for(e.exhaustions);
+                    let window = schedule.window_for_id(id, e.exhaustions);
                     if window.is_zero() {
                         // Dormancy DISABLED (base 0) — the documented OFF
                         // switch. Re-admit immediately rather than recording a
@@ -633,7 +926,11 @@ impl MissLedger {
                         );
                         return Admission::Retry;
                     }
-                    e.dormant = Some(Dormancy { since: now, window });
+                    e.dormant = Some(Dormancy {
+                        since: now,
+                        window,
+                        rung_window,
+                    });
                     return Admission::Exhausted;
                 }
                 e.misses = e.misses.saturating_add(1);
@@ -661,6 +958,7 @@ impl MissLedger {
     ) -> MissLedgerFacts {
         let readmissions_by_rung = self.readmissions.remove(stream).unwrap_or_default();
         let readmitted = readmissions_by_rung.values().sum();
+        let (owed_reoffered, owed_expired) = self.owed_flow.remove(stream).unwrap_or_default();
         let (dormant, longest_dormancy) = self
             .streams
             .get(stream)
@@ -676,6 +974,8 @@ impl MissLedger {
         MissLedgerFacts {
             dormant,
             readmitted,
+            owed_reoffered,
+            owed_expired,
             longest_dormancy,
             readmissions_by_rung,
         }
@@ -1980,7 +2280,7 @@ pub struct ReaDiscovery {
     /// failed for a budget that no longer exists. Discovery is the only place
     /// that can know this — the ledger is per-node and long-lived, while the
     /// tracker the heal leg sees is rebuilt every sweep.
-    exhausting_divergent: std::collections::HashSet<String>,
+    exhausting_divergent: std::collections::HashMap<String, u32>,
     /// gap id → the EVIDENCE this sweep enqueued it on, as
     /// `advertised_anchor|advertised_state|local_anchor|local_state`.
     ///
@@ -2026,7 +2326,7 @@ impl ReaDiscovery {
             ids_discovered: 0,
             divergent_anchor: 0,
             divergent_state: 0,
-            exhausting_divergent: std::collections::HashSet::new(),
+            exhausting_divergent: std::collections::HashMap::new(),
             heal_evidence: std::collections::HashMap::new(),
             divergent_refused: 0,
             exhausted_persistent: 0,
@@ -2044,6 +2344,10 @@ pub struct SweepPlan {
     collectives: CollectivesDiscovery,
     participations: crate::p2p::participations_reconcile::ParticipationsDiscovery,
     humans: crate::p2p::humans_reconcile::HumansDiscovery,
+    /// Where the heal leg reports which owed re-admission reads it EXECUTED —
+    /// see [`ReadReceipts`]. A plan that is dropped reports nothing, so its
+    /// owed reads stay owed.
+    receipts: ReadReceipts,
 }
 
 /// What the per-tick heal scheduler should do, given whether the lamad bridge is
@@ -2321,6 +2625,9 @@ pub async fn run_discovery(
     // MISS_DORMANCY_BASE_SECONDS / MISS_DORMANCY_CAP_SECONDS are honestly HOT on
     // a RUNNING node rather than captured once at spawn.
     misses.set_schedule(DormancySchedule::from_config());
+    // Execution receipts from the previous heal leg land BEFORE any admit, so
+    // an owed re-admission read that was executed is not offered again.
+    misses.absorb_receipts();
     let mut rea = discover_rea(p2p, pool, window, misses).await;
     let content = discover_content(p2p, pool, window, misses).await;
     let collectives = discover_collectives(p2p, pool, window, misses).await;
@@ -2357,6 +2664,7 @@ pub async fn run_discovery(
         for (rung, count) in &facts.readmissions_by_rung {
             crate::metrics::add_projection_miss_readmissions(stream, rung, *count);
         }
+        crate::metrics::add_projection_miss_owed(stream, facts.owed_reoffered, facts.owed_expired);
         if table == PROJECTION_INVENTORY_TABLE_REA_COMMITMENTS {
             rea.miss_facts = facts;
         }
@@ -2402,6 +2710,7 @@ pub async fn run_discovery(
         collectives,
         participations,
         humans,
+        receipts: misses.read_receipts(),
     }
 }
 
@@ -2436,6 +2745,7 @@ pub async fn run_heal(
         collectives,
         participations,
         humans,
+        receipts,
     } = plan;
     // Bounded heal pacing (per-row transient retry + per-leg wall-clock budget).
     // REA runs FIRST with its own reserved budget so its small backlog is never
@@ -2503,6 +2813,7 @@ pub async fn run_heal(
         hc,
         pool,
         &pacing,
+        &receipts,
     )
     .await;
     // The arm's FULL adjudication: the discovery-side retry-exhausted share plus
@@ -2555,6 +2866,7 @@ pub async fn run_heal(
         &peer_head_hints,
         &divergent_actionable_advertisers,
         resolver,
+        &receipts,
     )
     .await;
 
@@ -2597,6 +2909,7 @@ pub async fn run_heal(
         hc,
         pool,
         &pacing,
+        &receipts,
     )
     .await;
 
@@ -2635,6 +2948,7 @@ pub async fn run_heal(
         hc,
         pool,
         &pacing,
+        &receipts,
     )
     .await;
 
@@ -2679,6 +2993,7 @@ pub async fn run_heal(
         &humans_discovered_by,
         hc,
         pool,
+        &receipts,
     )
     .await;
     // A binding the membership pass ABSTAINED on is adjudicated, not undone
@@ -3124,6 +3439,51 @@ async fn witness_ghost_anchors(
         }
     }
 
+    // RECEIVER GUARD. Re-authoring a ghost mints a root under THIS peer's key.
+    // That is this peer's to do only for rows it authored; a ghost that arrived
+    // from a peer (its anchor is the author's action) waits to adopt the
+    // author's root instead. Partitioned AFTER the dead verdict above (the
+    // verdict is true either way) and BEFORE phase 1, so a held ghost is never
+    // paid an election probe. A failed lookup holds the whole tick (fail
+    // closed) — the sweep is idempotent and resumes next tick.
+    let ghosts: Vec<(String, String, String)> = {
+        let ids: Vec<String> = ghosts.iter().map(|(id, _, _)| id.clone()).collect();
+        let authored = match pool.get() {
+            Ok(mut conn) => {
+                crate::db::content_diesel::locally_authored_ids(&mut conn, &app_ctx, &ids)
+            }
+            Err(e) => Err(crate::error::StorageError::Internal(format!(
+                "Pool error: {e}"
+            ))),
+        };
+        let authored = match authored {
+            Ok(set) => set,
+            Err(e) => {
+                tracing::warn!(error = %e, "projection-reconcile[ghost-witness]: local-authorship lookup failed; holding this tick");
+                return;
+            }
+        };
+        let (own, received): (Vec<_>, Vec<_>) = ghosts
+            .into_iter()
+            .partition(|(id, _, _)| authored.contains(id));
+        if !received.is_empty() {
+            crate::metrics::inc_reanchor_skipped_by(
+                crate::metrics::ReanchorSkip::NotLocalAuthor,
+                received.len() as u64,
+            );
+            tracing::info!(
+                target: "elohim_storage::projection_reconcile",
+                held_not_author = received.len(),
+                "projection-reconcile[ghost-witness]: holding ghosts received from peers — \
+                 their root is the author's to mint"
+            );
+        }
+        own
+    };
+    if ghosts.is_empty() {
+        return;
+    }
+
     let content_service = crate::services::ContentService::new(
         pool.clone(),
         app_ctx,
@@ -3333,6 +3693,11 @@ async fn witness_ghost_anchors(
                             adopted += 1;
                         }
                     }
+                }
+                // The write-time receiver guard refused (authority lost in a
+                // race with the partition above): a hold, not a failure.
+                Err(e) if crate::services::content_service::is_not_local_author_refusal(&e) => {
+                    held += 1;
                 }
                 Err(e) => {
                     failed += 1;
@@ -3793,8 +4158,8 @@ async fn discover_rea(
     let mut exhausted_divergent = 0usize;
     // Divergent ids on their LAST granted retry this sweep — see
     // [`ReaDiscovery::exhausting_divergent`].
-    let mut exhausting_divergent: std::collections::HashSet<String> =
-        std::collections::HashSet::new();
+    let mut exhausting_divergent: std::collections::HashMap<String, u32> =
+        std::collections::HashMap::new();
     let mut admitted: Vec<String> = Vec::new();
     // Heal-leg evidence for every ADMITTED id — see [`ReaDiscovery::heal_evidence`].
     let mut heal_evidence: std::collections::HashMap<String, String> =
@@ -3826,7 +4191,13 @@ async fn discover_rea(
                 if divergent_ids.contains(id)
                     && misses.budget_spent(PROJECTION_INVENTORY_TABLE_REA_COMMITMENTS, id)
                 {
-                    exhausting_divergent.insert(id.clone());
+                    // Carry the reads THIS round granted (1 on a re-admission,
+                    // MAX_RETRIES on a fresh claim) so the adjudication line
+                    // reports what was actually spent.
+                    exhausting_divergent.insert(
+                        id.clone(),
+                        misses.granted_reads(PROJECTION_INVENTORY_TABLE_REA_COMMITMENTS, id),
+                    );
                 }
                 // The heal-leg key composes the MissLedger's peer-advertised
                 // evidence with the LOCAL row's own standing, so a local write
@@ -3997,7 +4368,7 @@ fn apply_remembered_rea_refusals(
 struct ReaHealContext<'a> {
     discovered_by: &'a std::collections::HashMap<String, String>,
     divergent_ids: &'a std::collections::HashSet<String>,
-    exhausting_divergent: &'a std::collections::HashSet<String>,
+    exhausting_divergent: &'a std::collections::HashMap<String, u32>,
     heal_evidence: &'a std::collections::HashMap<String, String>,
     miss_facts: &'a MissLedgerFacts,
 }
@@ -4008,6 +4379,7 @@ async fn heal_rea(
     hc: &Arc<HcClient>,
     pool: &DbPool,
     pacing: &HealPacing,
+    receipts: &ReadReceipts,
 ) -> ReaHealOutcome {
     let ReaHealContext {
         discovered_by,
@@ -4039,6 +4411,11 @@ async fn heal_rea(
         replay_window,
     );
     divergent_refused += apply_remembered_rea_refusals(&remembered, tracker);
+    // The deliberate exception: a replayed verdict consumes an owed
+    // re-admission read (see [`ReadReceipts`]).
+    for (id, _) in &remembered {
+        receipts.replayed(PROJECTION_INVENTORY_TABLE_REA_COMMITMENTS, id);
+    }
     let to_read_total = gap_ids.len();
     let prioritized_divergent = gap_ids
         .iter()
@@ -4057,6 +4434,13 @@ async fn heal_rea(
             )
         })
         .await;
+        // The read completed — receipted unless it was a local refusal.
+        receipt_read(
+            receipts,
+            PROJECTION_INVENTORY_TABLE_REA_COMMITMENTS,
+            &id,
+            &attempt.result,
+        );
         circuit.record(&attempt.result);
         let kind = match attempt.result {
             Ok(Some(output)) => match heal_one(&output, pool, &app_ctx, hc).await {
@@ -4185,7 +4569,7 @@ async fn heal_rea(
                     HealOutcomeKind::Failed
                 }
             },
-            Ok(None) if exhausting_divergent.contains(&id) => {
+            Ok(None) if exhausting_divergent.contains_key(&id) => {
                 // The own conductor cannot see a commitment this projection
                 // HOLDS, and the cross-sweep retry budget for this claim is now
                 // spent: next sweep the `MissLedger` stops admitting the id
@@ -4207,9 +4591,9 @@ async fn heal_rea(
                     target: "elohim_storage::projection_reconcile",
                     commitment_id = %id,
                     discovered_via_peer = %peer,
-                    retries = MAX_RETRIES,
+                    reads_granted = exhausting_divergent.get(&id).copied().unwrap_or(MAX_RETRIES),
                     "projection-reconcile[rea]: own conductor cannot see this divergent \
-                     commitment after its full retry budget — ADJUDICATED, not actionable by \
+                     commitment after every read its admission round granted — ADJUDICATED, not actionable by \
                      this peer (only the peer whose conductor holds the entry can converge it)"
                 );
                 HealOutcomeKind::MissingRefused
@@ -5153,6 +5537,7 @@ fn apply_replayed_missing(
     replayed.len()
 }
 
+#[allow(clippy::too_many_arguments)]
 async fn heal_content(
     tracker: &mut GapTracker,
     discovered_by: &std::collections::HashMap<String, String>,
@@ -5161,6 +5546,7 @@ async fn heal_content(
     peer_head_hints: &crate::services::head_adoption::PeerHeadHints,
     divergent_actionable: &std::collections::HashMap<String, String>,
     resolver: &dyn crate::services::head_batch_resolver::HeadBatchResolver,
+    receipts: &ReadReceipts,
 ) -> ContentHealOutcome {
     let app_ctx = crate::db::AppContext::default_lamad();
     let mut ghost_candidates: Vec<String> = Vec::new();
@@ -5201,6 +5587,11 @@ async fn heal_content(
         &mut ghost_candidates,
         &mut adopt_candidates,
     );
+    // The deliberate exception: a replayed missing verdict consumes an owed
+    // re-admission read (see [`ReadReceipts`]).
+    for id in &replayed {
+        receipts.replayed(PROJECTION_INVENTORY_TABLE_CONTENT, id);
+    }
 
     // ── DRAIN LEVER 1: resolve the rest with bounded fan-out ─────────────────
     //
@@ -5394,6 +5785,17 @@ async fn heal_content(
             let id = item.id;
             let answer = item.answer;
             let failure_reason = item.reason;
+            // EXECUTED unless the coordinator refused this id for BACKPRESSURE
+            // (which says nothing about it). `unattempted` ids never reach this
+            // loop and a call-level failure delivered no per-id answer, so
+            // neither is executed; both keep an owed re-admission read.
+            let refused_for_backpressure = matches!(answer, seam_contracts::Answer::Unreachable)
+                && failure_reason.is_some_and(
+                    crate::services::conductor_writes::BatchFailureReason::is_backpressure,
+                );
+            if !refused_for_backpressure {
+                receipts.executed(PROJECTION_INVENTORY_TABLE_CONTENT, &id);
+            }
             // LEDGER COHERENCE. Any answer other than an observed absence
             // falsifies a cached "missing" for this id, so it must not survive
             // to be replayed — the conductor-missing arm below re-stamps it
@@ -7226,6 +7628,7 @@ async fn heal_collectives(
     hc: &Arc<HcClient>,
     pool: &DbPool,
     pacing: &HealPacing,
+    receipts: &ReadReceipts,
 ) -> CollectivesHealOutcome {
     use crate::db::collectives::CollectiveProjectionOutcome as Outcome;
 
@@ -7240,6 +7643,12 @@ async fn heal_collectives(
             crate::services::conductor_writes::get_collective_by_cid(hc, &cid)
         })
         .await;
+        receipt_read(
+            receipts,
+            PROJECTION_INVENTORY_TABLE_COLLECTIVES,
+            &cid,
+            &attempt.result,
+        );
         circuit.record(&attempt.result);
         match attempt.result {
             Ok(Some(wire)) => {
@@ -8289,24 +8698,45 @@ mod tests {
         DormancySchedule::new(Duration::from_secs(60), Duration::from_secs(240))
     }
 
-    /// Drive an entry that currently holds a FRESH budget (`misses == 1`, which
-    /// is true right after the first admit and right after any re-admission)
-    /// through one full ladder rung, asserting the dormancy it is given is
-    /// exactly `want`. Returns the instant the entry was re-admitted, which is a
-    /// fresh-budget instant again.
+    /// Drive an entry through ladder rung `nth`, asserting the dormancy it is
+    /// given is exactly its spread window for `(id, nth)` — and that the window
+    /// sits in `[rung, min(1.5 × rung, cap)]`. Returns the instant it was
+    /// re-admitted.
+    ///
+    /// `fresh` is the budget the entry holds on entry: `true` right after the
+    /// first admit (or new evidence / `resolved()`), which still spends the
+    /// full `MAX_RETRIES`; `false` right after a re-admission, which holds
+    /// exactly ONE read — offered by the admit that re-admitted it and spent
+    /// here by its execution receipt — so the next admit is `Exhausted`.
     fn assert_rung(
         ledger: &mut MissLedger,
         t: std::time::Instant,
         id: &str,
         evidence: &str,
-        want: Duration,
+        nth: u32,
+        fresh: bool,
     ) -> std::time::Instant {
-        for attempt in 1..MAX_RETRIES {
-            assert_eq!(
-                ledger.admit_at(t, DORMANCY_STREAM, id, evidence, false),
-                Admission::Retry,
-                "attempt {attempt} is still inside the retry budget"
-            );
+        let s = ledger.schedule;
+        let rung = s.window_for(nth);
+        let want = s.window_for_id(id, nth);
+        assert!(
+            want >= rung && want <= s.uncapped_rung(nth).mul_f64(1.5).min(s.cap),
+            "rung {nth}: spread window {want:?} outside [{rung:?}, 1.5 × rung ∧ cap]"
+        );
+        if nth == 1 {
+            assert_eq!(want, rung, "rung 1 is never spread");
+        }
+        if !fresh {
+            ledger.read_executed(DORMANCY_STREAM, id);
+        }
+        if fresh {
+            for attempt in 1..MAX_RETRIES {
+                assert_eq!(
+                    ledger.admit_at(t, DORMANCY_STREAM, id, evidence, false),
+                    Admission::Retry,
+                    "attempt {attempt} is still inside the fresh retry budget"
+                );
+            }
         }
         assert_eq!(
             ledger.admit_at(t, DORMANCY_STREAM, id, evidence, false),
@@ -8371,7 +8801,7 @@ mod tests {
         }
         assert_eq!(
             ledger.admit_at(
-                t0 + Duration::from_secs(60),
+                t0 + test_schedule().window_for_id("row-1", 1),
                 DORMANCY_STREAM,
                 "row-1",
                 DORMANCY_EVIDENCE,
@@ -8414,14 +8844,8 @@ mod tests {
             Admission::Retry
         );
         let mut t = t0;
-        for want in [60u64, 120, 240, 240] {
-            t = assert_rung(
-                &mut ledger,
-                t,
-                "row-1",
-                DORMANCY_EVIDENCE,
-                Duration::from_secs(want),
-            );
+        for nth in 1..=4u32 {
+            t = assert_rung(&mut ledger, t, "row-1", DORMANCY_EVIDENCE, nth, nth == 1);
         }
     }
 
@@ -8439,19 +8863,12 @@ mod tests {
         );
         // Climb to the capped rung under anchor-A.
         let mut t = t0;
-        for want in [60u64, 120, 240] {
-            t = assert_rung(
-                &mut ledger,
-                t,
-                "row-1",
-                DORMANCY_EVIDENCE,
-                Duration::from_secs(want),
-            );
+        for nth in 1..=3u32 {
+            t = assert_rung(&mut ledger, t, "row-1", DORMANCY_EVIDENCE, nth, nth == 1);
         }
-        // Exhaust once more so the id is sitting DORMANT on the capped rung.
-        for _ in 1..MAX_RETRIES {
-            ledger.admit_at(t, DORMANCY_STREAM, "row-1", DORMANCY_EVIDENCE, false);
-        }
+        // The re-admission held ONE read; once it is executed, the next admit
+        // puts the id back DORMANT on the capped rung.
+        ledger.read_executed(DORMANCY_STREAM, "row-1");
         assert_eq!(
             ledger.admit_at(t, DORMANCY_STREAM, "row-1", DORMANCY_EVIDENCE, false),
             Admission::Exhausted
@@ -8464,7 +8881,7 @@ mod tests {
             "a DIFFERENT advertised anchor is fresh evidence — ask about it now"
         );
         // ...and back on the FIRST rung: 60s, not the 240s it had climbed to.
-        assert_rung(&mut ledger, t, "row-1", "anchor-B", Duration::from_secs(60));
+        assert_rung(&mut ledger, t, "row-1", "anchor-B", 1, true);
     }
 
     #[test]
@@ -8482,16 +8899,8 @@ mod tests {
         let mut t = t0;
         // Climb past the cap, then keep going: ten more full cap periods, each
         // of which must hand the id back.
-        for want in [
-            60u64, 120, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240,
-        ] {
-            t = assert_rung(
-                &mut ledger,
-                t,
-                "row-1",
-                DORMANCY_EVIDENCE,
-                Duration::from_secs(want),
-            );
+        for nth in 1..=13u32 {
+            t = assert_rung(&mut ledger, t, "row-1", DORMANCY_EVIDENCE, nth, nth == 1);
         }
         assert_eq!(
             ledger.tracked(DORMANCY_STREAM),
@@ -8585,8 +8994,15 @@ mod tests {
         );
         assert!(held.readmissions_by_rung.is_empty());
 
-        // row-1's window closes; row-2 has 30s of its own left.
-        let t1 = t0 + Duration::from_secs(60);
+        // row-1's (spread) window closes; row-2 went dormant 30s later on a
+        // window of at least the 60s rung, so it is still held.
+        let w1 = test_schedule().window_for_id("row-1", 1);
+        let w2 = test_schedule().window_for_id("row-2", 1);
+        assert!(
+            w1 - Duration::from_secs(30) < w2,
+            "fixture: row-2 still held at t1"
+        );
+        let t1 = t0 + w1;
         assert_eq!(
             ledger.admit_at(t1, DORMANCY_STREAM, "row-1", DORMANCY_EVIDENCE, false),
             Admission::Retry
@@ -8599,7 +9015,7 @@ mod tests {
             "the first rung is what lapsed"
         );
         assert_eq!(facts.dormant, 1, "row-2 is still inside its window");
-        assert_eq!(facts.longest_dormancy, Duration::from_secs(30));
+        assert_eq!(facts.longest_dormancy, w1 - Duration::from_secs(30));
 
         // READ-AND-CLEAR: the counter is per-sweep or it double-counts.
         let after = ledger.take_sweep_facts_at(t1, DORMANCY_STREAM);
@@ -8608,6 +9024,336 @@ mod tests {
         assert_eq!(
             after.dormant, 1,
             "the dormant POPULATION is a level, not a flow — reading it does not drain it"
+        );
+    }
+
+    /// Spend a fresh budget on `id` at `at` until it goes dormant.
+    fn exhaust_fresh(ledger: &mut MissLedger, at: std::time::Instant, id: &str, evidence: &str) {
+        for _ in 0..MAX_RETRIES {
+            assert_eq!(
+                ledger.admit_at(at, DORMANCY_STREAM, id, evidence, false),
+                Admission::Retry
+            );
+        }
+        assert_eq!(
+            ledger.admit_at(at, DORMANCY_STREAM, id, evidence, false),
+            Admission::Exhausted
+        );
+    }
+
+    /// Exhaust a fresh budget, let rung 1 lapse, execute the one re-admission
+    /// read, and send the id dormant on rung 2. Returns the instant rung 2
+    /// started.
+    fn reach_rung_two(
+        ledger: &mut MissLedger,
+        t0: std::time::Instant,
+        id: &str,
+    ) -> std::time::Instant {
+        exhaust_fresh(ledger, t0, id, DORMANCY_EVIDENCE);
+        let t1 = t0 + ledger.schedule.window_for_id(id, 1);
+        assert_eq!(
+            ledger.admit_at(t1, DORMANCY_STREAM, id, DORMANCY_EVIDENCE, false),
+            Admission::Retry
+        );
+        ledger.read_executed(DORMANCY_STREAM, id);
+        assert_eq!(
+            ledger.admit_at(t1, DORMANCY_STREAM, id, DORMANCY_EVIDENCE, false),
+            Admission::Exhausted
+        );
+        t1
+    }
+
+    #[test]
+    fn a_local_refusal_does_not_spend_an_owed_read() {
+        use crate::error::StorageError as E;
+        let shed = E::Timeout(format!(
+            "{}: no conductor permit",
+            crate::conductor_admission::ADMISSION_SHED_MARKER
+        ));
+        let refusals = [
+            shed,
+            E::Conductor("conductor admission: permit pool closed".into()),
+            E::NotFound("imagodei cell not provisioned in installed happ".into()),
+            E::InvalidInput("invalid ActionHash 'x'".into()),
+            E::Internal("conductor_writes: encode ActionHash: boom".into()),
+        ];
+        for err in &refusals {
+            assert!(!conductor_was_asked(err), "{err} is a local refusal");
+        }
+        let asked = [
+            E::Conductor("Zome call failed: Websocket error: Timeout".into()),
+            E::Timeout(format!("{HEAL_SYNTHETIC_TIMEOUT_MARKER} 25s")),
+            E::Serialization("decode ReaCommitmentOutput".into()),
+        ];
+        for err in &asked {
+            assert!(
+                conductor_was_asked(err),
+                "{err} came back from the conductor"
+            );
+        }
+
+        // Through the receipt seam the heal legs call: an admission refusal
+        // keeps the read owed; an answered miss spends it.
+        let s = test_schedule();
+        let mut ledger = MissLedger::with_schedule(s);
+        let t0 = std::time::Instant::now();
+        for id in ["refused", "answered"] {
+            exhaust_fresh(&mut ledger, t0, id, DORMANCY_EVIDENCE);
+            assert_eq!(
+                ledger.admit_at(t0 + s.base, DORMANCY_STREAM, id, DORMANCY_EVIDENCE, false),
+                Admission::Retry
+            );
+        }
+        let receipts = ledger.read_receipts();
+        let refused: Result<Option<()>, E> = Err(E::Timeout(format!(
+            "{}: no conductor permit",
+            crate::conductor_admission::ADMISSION_SHED_MARKER
+        )));
+        receipt_read(&receipts, DORMANCY_STREAM, "refused", &refused);
+        receipt_read(
+            &receipts,
+            DORMANCY_STREAM,
+            "answered",
+            &Ok::<Option<()>, E>(None),
+        );
+        ledger.absorb_receipts();
+        let t1 = t0 + s.base;
+        assert_eq!(
+            ledger.admit_at(t1, DORMANCY_STREAM, "refused", DORMANCY_EVIDENCE, false),
+            Admission::Retry,
+            "never dispatched — still owed"
+        );
+        assert_eq!(
+            ledger.admit_at(t1, DORMANCY_STREAM, "answered", DORMANCY_EVIDENCE, false),
+            Admission::Exhausted
+        );
+    }
+
+    #[test]
+    fn a_re_admission_grants_one_read_then_dormancy_not_three() {
+        // The 2026-10-12 burst: a lapse re-granted MAX_RETRIES, so every stale
+        // id cost three conductor reads per window (Background
+        // `get_rea_commitment` = 3 × re-admissions, exactly). A lapse asks one
+        // question; one EXECUTED read answers it.
+        let s = test_schedule();
+        let mut ledger = MissLedger::with_schedule(s);
+        let t0 = std::time::Instant::now();
+        exhaust_fresh(&mut ledger, t0, "row-1", DORMANCY_EVIDENCE);
+        let t1 = t0 + s.window_for_id("row-1", 1);
+        assert_eq!(
+            ledger.admit_at(t1, DORMANCY_STREAM, "row-1", DORMANCY_EVIDENCE, true),
+            Admission::Retry,
+            "the lapse re-admits for ONE read"
+        );
+        assert!(
+            ledger.budget_spent(DORMANCY_STREAM, "row-1"),
+            "that one read IS the last granted attempt — a divergent id is adjudicated on it"
+        );
+        assert_eq!(ledger.granted_reads(DORMANCY_STREAM, "row-1"), 1);
+        ledger.read_executed(DORMANCY_STREAM, "row-1");
+        assert_eq!(
+            ledger.admit_at(t1, DORMANCY_STREAM, "row-1", DORMANCY_EVIDENCE, true),
+            Admission::Exhausted,
+            "once executed, a second read is NOT granted: straight back to dormancy"
+        );
+        let facts = ledger.take_sweep_facts_at(t1, DORMANCY_STREAM);
+        assert_eq!(
+            facts.readmitted, 1,
+            "one re-admission booked, so reads = re-admissions"
+        );
+        assert_eq!(facts.dormant, 1);
+        // ...and it is now held for rung 2's spread window, the arithmetic unchanged.
+        let t2 = t1 + s.window_for_id("row-1", 2);
+        assert_eq!(
+            ledger.admit_at(
+                t2 - Duration::from_millis(1),
+                DORMANCY_STREAM,
+                "row-1",
+                DORMANCY_EVIDENCE,
+                false
+            ),
+            Admission::Exhausted
+        );
+        assert_eq!(
+            ledger.admit_at(t2, DORMANCY_STREAM, "row-1", DORMANCY_EVIDENCE, false),
+            Admission::Retry
+        );
+    }
+
+    #[test]
+    fn a_shed_re_admission_read_keeps_its_allowance_until_executed() {
+        // Codex FIX FIRST: spending the allowance at ADMISSION let a shed read
+        // (leg budget / circuit, batch `unattempted`, or a plan dropped by
+        // SkipInFlight) turn a lapse into zero reads and a fresh dormancy.
+        let s = test_schedule();
+        let mut ledger = MissLedger::with_schedule(s);
+        let t0 = std::time::Instant::now();
+        exhaust_fresh(&mut ledger, t0, "row-1", DORMANCY_EVIDENCE);
+        exhaust_fresh(&mut ledger, t0, "row-2", DORMANCY_EVIDENCE);
+        let t1 = t0 + s.base;
+        for id in ["row-1", "row-2"] {
+            assert_eq!(
+                ledger.admit_at(t1, DORMANCY_STREAM, id, DORMANCY_EVIDENCE, false),
+                Admission::Retry
+            );
+        }
+        // Sweep N: the heal leg executes row-1 and SHEDS row-2 (still pending).
+        let receipts = ledger.read_receipts();
+        receipts.executed(DORMANCY_STREAM, "row-1");
+        receipts.executed(DORMANCY_STREAM, "not-owed");
+        ledger.absorb_receipts();
+        // Sweep N+1: the shed id is STILL admitted, the executed one is not.
+        assert_eq!(
+            ledger.admit_at(t1, DORMANCY_STREAM, "row-2", DORMANCY_EVIDENCE, false),
+            Admission::Retry,
+            "shed, not executed — the allowance is held"
+        );
+        assert_eq!(
+            ledger.admit_at(t1, DORMANCY_STREAM, "row-1", DORMANCY_EVIDENCE, false),
+            Admission::Exhausted,
+            "executed — the allowance is spent, back to dormancy"
+        );
+        // A dropped plan reports nothing: row-2 stays owed across many sweeps,
+        // booked as ONE re-admission, never re-counted.
+        drop(ledger.read_receipts());
+        ledger.absorb_receipts();
+        for _ in 0..5 {
+            assert_eq!(
+                ledger.admit_at(t1, DORMANCY_STREAM, "row-2", DORMANCY_EVIDENCE, false),
+                Admission::Retry
+            );
+        }
+        assert_eq!(
+            ledger.take_sweep_facts_at(t1, DORMANCY_STREAM).readmitted,
+            2
+        );
+        // The executed read is what spends it.
+        let receipts = ledger.read_receipts();
+        receipts.executed(DORMANCY_STREAM, "row-2");
+        ledger.absorb_receipts();
+        assert_eq!(
+            ledger.admit_at(t1, DORMANCY_STREAM, "row-2", DORMANCY_EVIDENCE, false),
+            Admission::Exhausted
+        );
+        // Receipts only ever name OWED ids: nothing is owed now, so a settled
+        // fresh-budget id is not reported.
+        let receipts = ledger.read_receipts();
+        receipts.executed(DORMANCY_STREAM, "row-3");
+        receipts.replayed(DORMANCY_STREAM, "row-3");
+        assert!(receipts.sink.lock().unwrap().is_empty());
+    }
+
+    #[test]
+    fn fresh_evidence_after_a_re_admission_grants_the_full_budget() {
+        let s = test_schedule();
+        let mut ledger = MissLedger::with_schedule(s);
+        let t0 = std::time::Instant::now();
+        exhaust_fresh(&mut ledger, t0, "row-1", DORMANCY_EVIDENCE);
+        let t1 = t0 + s.window_for_id("row-1", 1);
+        assert_eq!(
+            ledger.admit_at(t1, DORMANCY_STREAM, "row-1", DORMANCY_EVIDENCE, false),
+            Admission::Retry
+        );
+        // New evidence while the one read is still owed: a full MAX_RETRIES.
+        exhaust_fresh(&mut ledger, t1, "row-1", "anchor-B");
+        assert_eq!(ledger.granted_reads(DORMANCY_STREAM, "row-1"), MAX_RETRIES);
+        // And `resolved()` then a relapse is a clean, full budget too.
+        ledger.resolved(DORMANCY_STREAM, "row-1");
+        exhaust_fresh(&mut ledger, t1, "row-1", "anchor-B");
+    }
+
+    #[test]
+    fn dormancy_spread_is_deterministic_bounded_capped_and_spares_rung_one() {
+        let s = test_schedule();
+        let mut rung_two = std::collections::HashSet::new();
+        for n in 0..200 {
+            let id = format!("uhCEk-commitment-{n}");
+            assert_eq!(
+                s.window_for_id(&id, 1),
+                s.base,
+                "{id}: rung 1 is exactly the base — the first-rung contract is unchanged"
+            );
+            rung_two.insert(s.window_for_id(&id, 2));
+            for nth in 1..=6u32 {
+                let w = s.window_for_id(&id, nth);
+                assert_eq!(w, s.window_for_id(&id, nth), "pure in (id, rung)");
+                let rung = s.window_for(nth);
+                assert!(w >= rung, "{id} rung {nth}: never SHORTER than the rung");
+                assert!(
+                    w <= s.uncapped_rung(nth).mul_f64(1.5),
+                    "{id} rung {nth}: at most +50%"
+                );
+                assert!(w <= s.cap, "{id} rung {nth}: the cap stays the ceiling");
+            }
+            assert!(dormancy_spread_permille(&id, 2) <= 500);
+        }
+        assert!(
+            rung_two.len() > 50,
+            "rung 2 IS spread: {} distinct windows",
+            rung_two.len()
+        );
+        // Spread can push a rung INTO the cap; the label still names the rung
+        // it went dormant on, not `capped` (keeps the series' meaning).
+        let tight = DormancySchedule::new(Duration::from_secs(60), Duration::from_secs(121));
+        let id = (0..1000)
+            .map(|n| format!("row-{n}"))
+            .find(|id| tight.window_for_id(id, 2) == tight.cap)
+            .expect("some id spreads into the cap");
+        let mut ledger = MissLedger::with_schedule(tight);
+        let t0 = std::time::Instant::now();
+        let t1 = reach_rung_two(&mut ledger, t0, &id);
+        let _ = ledger.take_sweep_facts_at(t1, DORMANCY_STREAM);
+        assert_eq!(
+            ledger.admit_at(
+                t1 + tight.cap,
+                DORMANCY_STREAM,
+                &id,
+                DORMANCY_EVIDENCE,
+                false
+            ),
+            Admission::Retry
+        );
+        let facts = ledger.take_sweep_facts_at(t1 + tight.cap, DORMANCY_STREAM);
+        assert_eq!(facts.readmissions_by_rung.get("2").copied(), Some(1));
+        // The OFF switch is still off: zero base, zero window, whatever the spread.
+        let off = DormancySchedule::new(Duration::ZERO, Duration::ZERO);
+        assert_eq!(off.window_for_id(&id, 3), Duration::ZERO);
+    }
+
+    #[test]
+    fn a_cohort_that_went_dormant_together_lapses_spread() {
+        // 128 ids discovered in one sweep exhaust in one sweep, lapse rung 1
+        // together (rung 1 is unspread by contract) and go dormant on rung 2 in
+        // the same instant. On identical windows they would lapse rung 2 in one
+        // instant — the measured burst.
+        let s = test_schedule();
+        let mut ledger = MissLedger::with_schedule(s);
+        let t0 = std::time::Instant::now();
+        let ids: Vec<String> = (0..128).map(|n| format!("uhCEk-stale-{n}")).collect();
+        let t1 = ids
+            .iter()
+            .map(|id| reach_rung_two(&mut ledger, t0, id))
+            .max()
+            .unwrap();
+        let lapses: Vec<Duration> = ids.iter().map(|id| s.window_for_id(id, 2)).collect();
+        let (min, max) = (*lapses.iter().min().unwrap(), *lapses.iter().max().unwrap());
+        assert!(
+            max - min > s.base.mul_f64(0.3),
+            "cohort lapses spread over {:?}, want > 0.3 × base",
+            max - min
+        );
+        // And the ledger honours each id's own window: at the earliest lapse
+        // only part of the cohort is re-admitted.
+        let readmitted = ids
+            .iter()
+            .filter(|id| {
+                ledger.admit_at(t1 + min, DORMANCY_STREAM, id, DORMANCY_EVIDENCE, false)
+                    == Admission::Retry
+            })
+            .count();
+        assert!(
+            readmitted >= 1 && readmitted < ids.len() / 2,
+            "readmitted {readmitted}"
         );
     }
 
@@ -8643,14 +9389,8 @@ mod tests {
             Admission::Retry
         );
         let mut t = t0;
-        for want in [60u64, 120, 240] {
-            t = assert_rung(
-                &mut ledger,
-                t,
-                "row-1",
-                DORMANCY_EVIDENCE,
-                Duration::from_secs(want),
-            );
+        for nth in 1..=3u32 {
+            t = assert_rung(&mut ledger, t, "row-1", DORMANCY_EVIDENCE, nth, nth == 1);
         }
         ledger.resolved(DORMANCY_STREAM, "row-1");
         assert_eq!(ledger.tracked(DORMANCY_STREAM), 0);
@@ -8659,13 +9399,7 @@ mod tests {
             Admission::Retry,
             "a relapsed row starts from a clean budget"
         );
-        assert_rung(
-            &mut ledger,
-            t,
-            "row-1",
-            DORMANCY_EVIDENCE,
-            Duration::from_secs(60),
-        );
+        assert_rung(&mut ledger, t, "row-1", DORMANCY_EVIDENCE, 1, true);
     }
 
     #[test]
@@ -10878,6 +11612,7 @@ mod tests {
             &hints,
             &std::collections::HashMap::new(),
             resolver,
+            &ReadReceipts::default(),
         )
         .await
     }
@@ -10919,6 +11654,128 @@ mod tests {
         );
         assert_eq!(out.healed, 0);
         assert_eq!(out.conductor_missing, 0, "unattempted is NOT a miss");
+    }
+
+    /// ALLOWANCE AT EXECUTION, through the REAL content heal leg.
+    ///
+    /// The content arm is the one heal leg with a conductor seam
+    /// (`HeadBatchResolver`); REA, collectives, participations and humans take
+    /// an `HcClient` with no mock in front of it, so their receipts are pinned
+    /// at the read call site by construction and exercised here only through
+    /// the shared `ReadReceipts` contract. In particular the humans pre-pass
+    /// database failure (c) cannot be driven without a conductor client; its
+    /// guarantee is structural — the receipt loop sits AFTER
+    /// `run_membership_pass`, and the pre-pass error arms return before it.
+    #[tokio::test]
+    async fn owed_reads_are_receipted_by_execution_through_the_real_heal_leg() {
+        let stream = PROJECTION_INVENTORY_TABLE_CONTENT;
+        let schedule = DormancySchedule::new(Duration::from_secs(60), Duration::from_secs(240));
+        let mut ledger = MissLedger::with_schedule(schedule);
+        let t0 = std::time::Instant::now();
+        let missing = "owed-exec-missing".to_string();
+        let backpressure = "owed-exec-backpressure".to_string();
+        let unattempted = "owed-exec-unattempted".to_string();
+        let replayed = "owed-exec-replayed".to_string();
+        let ids = [&missing, &backpressure, &unattempted, &replayed];
+        // Every id: fresh budget spent, rung 1 lapses, re-admitted for ONE read.
+        let t1 = t0 + schedule.base;
+        for id in ids {
+            for _ in 0..MAX_RETRIES {
+                assert_eq!(
+                    ledger.admit_at(t0, stream, id, "ev", false),
+                    Admission::Retry
+                );
+            }
+            assert_eq!(
+                ledger.admit_at(t0, stream, id, "ev", false),
+                Admission::Exhausted
+            );
+            assert_eq!(
+                ledger.admit_at(t1, stream, id, "ev", false),
+                Admission::Retry
+            );
+        }
+        // (d) a remembered missing verdict is replayed, not read.
+        crate::services::heal_backoff::note_conductor_missing(&replayed);
+
+        let mock = MockHeadBatchResolver::new();
+        mock.seed_head(&missing, MockAnswer::Absent);
+        mock.seed_head(
+            &backpressure,
+            MockAnswer::Failed(BatchFailureReason::PermitTimeout),
+        );
+        mock.seed_head(&unattempted, MockAnswer::Unattempted);
+        let mut tracker = GapTracker::new(MAX_RETRIES);
+        tracker.discover(ids.iter().map(|id| (*id).clone()).collect());
+        let receipts = ledger.read_receipts();
+        let pool = crate::test_util::test_pool();
+        let hints = crate::services::head_adoption::PeerHeadHints::new();
+        heal_content(
+            &mut tracker,
+            &std::collections::HashMap::new(),
+            &pool,
+            &HealPacing::test_fast(),
+            &hints,
+            &std::collections::HashMap::new(),
+            &mock,
+            &receipts,
+        )
+        .await;
+        crate::services::heal_backoff::note_resolved(&replayed);
+        crate::services::heal_backoff::note_resolved(&missing);
+        ledger.absorb_receipts();
+
+        // (a) read, answered missing → receipted → dormant on rung 2.
+        assert_eq!(
+            ledger.admit_at(t1, stream, &missing, "ev", false),
+            Admission::Exhausted
+        );
+        // (d) replayed verdict → consumed → dormant.
+        assert_eq!(
+            ledger.admit_at(t1, stream, &replayed, "ev", false),
+            Admission::Exhausted
+        );
+        // (b) backpressure refusal and `unattempted` → NOT receipted → re-offered.
+        assert_eq!(
+            ledger.admit_at(t1, stream, &backpressure, "ev", false),
+            Admission::Retry
+        );
+        assert_eq!(
+            ledger.admit_at(t1, stream, &unattempted, "ev", false),
+            Admission::Retry
+        );
+        let facts = ledger.take_sweep_facts_at(t1, stream);
+        assert_eq!(facts.owed_reoffered, 2);
+        assert_eq!(facts.owed_expired, 0);
+
+        // (e) the backpressure id keeps being shed: MAX_OWED_REOFFERS offers in
+        // all (one already spent above), then back to dormancy as if read.
+        for _ in 1..MAX_OWED_REOFFERS {
+            assert_eq!(
+                ledger.admit_at(t1, stream, &backpressure, "ev", false),
+                Admission::Retry
+            );
+        }
+        assert_eq!(
+            ledger.admit_at(t1, stream, &backpressure, "ev", false),
+            Admission::Exhausted,
+            "re-offer cap reached — dormant, no hot loop"
+        );
+        let facts = ledger.take_sweep_facts_at(t1, stream);
+        assert_eq!(facts.owed_reoffered, (MAX_OWED_REOFFERS - 1) as usize);
+        assert_eq!(facts.owed_expired, 1);
+        // ...and the cap took it to the NEXT rung, not a reset.
+        let lapse = t1 + schedule.window_for_id(&backpressure, 2);
+        assert_eq!(
+            ledger.admit_at(
+                lapse - Duration::from_millis(1),
+                stream,
+                &backpressure,
+                "ev",
+                false
+            ),
+            Admission::Exhausted
+        );
     }
 
     /// PER-ITEM `Failed` ROUTING BY REASON CLASS.
@@ -11094,6 +11951,7 @@ mod tests {
             &hints,
             &std::collections::HashMap::new(),
             &mock,
+            &ReadReceipts::default(),
         )
         .await;
 
@@ -11164,6 +12022,7 @@ mod tests {
             &hints,
             &std::collections::HashMap::new(),
             &mock,
+            &ReadReceipts::default(),
         )
         .await;
 

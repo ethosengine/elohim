@@ -36,7 +36,7 @@
  * lane's Prologue casts TWO populations at doorway A: the 3
  * `prologue-hosted-*` registrants this file's roster tracks, AND the
  * standing household cast (`HOUSEHOLD_HOSTED_CAST` in
- * `genesis/seeder/src/seed-humans.ts`, 14 names as of 2026-09-11) that
+ * `genesis/seeder/src/seed-humans.ts`, 6 names as of 2026-10-14) that
  * `just mesh prologue` also registers there. A doorway's `humansServed`
  * legitimately counts both — the earlier `== 3` / `== live.length` (roster
  * only) equalities assumed a world where only the roster caster provisioned
@@ -77,7 +77,7 @@ import {
   readHostedCellCommitmentConverged,
 } from '../../src/framework/fixtures/hosted-cell.js';
 import { householdMeshDir } from '../../src/framework/fixtures/household-mesh.js';
-import { fixtureCredentials } from '../../src/framework/fixtures/humans.js';
+import { fixtureCredentials, getFixture } from '../../src/framework/fixtures/humans.js';
 
 import type { AccountResponse, StatusResponse } from '../../src/framework/api/doorway-client.js';
 import type { E2EWorld } from '../../src/framework/world.js';
@@ -167,7 +167,7 @@ function grantCidOf(entry: HostedRosterEntry): string | undefined {
 // ---------------------------------------------------------------------------
 // Household cast — the OTHER population doorway A's Prologue casts (see the
 // module doc's CORRECTION note). Mirrored from `HOUSEHOLD_HOSTED_CAST` in
-// `genesis/seeder/src/seed-humans.ts` (14 names as of 2026-09-11) — the only
+// `genesis/seeder/src/seed-humans.ts` (6 names as of 2026-10-14) — the only
 // source on disk naming this cast after a Prologue run (neither
 // `seed-humans.ts` nor `${MESH_DIR}/household-fixture.json` write a
 // humans/roster record of it). Cast only at doorway A, same as the roster.
@@ -175,20 +175,25 @@ function grantCidOf(entry: HostedRosterEntry): string | undefined {
 
 const HOUSEHOLD_HOSTED_CAST: readonly string[] = [
   'Matthew',
-  'Susan',
   'James',
-  'Gertrude',
+  'Jessica',
   'Maria',
   'Ronald',
-  'Charlie',
-  'Sam',
-  'Dr. Dolittle',
-  'Jessica',
-  'Terrance',
-  'Miriam',
   'Ezra',
-  'Levi',
 ];
+
+/**
+ * Rule: a doorway hosts only what is DECLARED hosted — the household names
+ * whose fixture declares `agencyPhase: "hosted"` (never the whole cast list;
+ * conductor owners are `doorway`/`device`). Hosted is a declared stage.
+ */
+const HOUSEHOLD_HOSTED_DECLARED: readonly string[] = HOUSEHOLD_HOSTED_CAST.filter(name => {
+  try {
+    return getFixture(name).raw.agencyPhase === 'hosted';
+  } catch {
+    return false;
+  }
+});
 
 /**
  * This household-cast member's live hosted-cell grant cid, read the only way
@@ -268,7 +273,7 @@ async function hostedCellPopulationCheck(
   );
 
   return {
-    attempted: rosterLive.length + HOUSEHOLD_HOSTED_CAST.length,
+    attempted: rosterLive.length + HOUSEHOLD_HOSTED_DECLARED.length,
     minted: allCids.length,
     live: liveFlags.filter(Boolean).length,
   };
@@ -427,7 +432,7 @@ Then(
       assert.fail(
         `doorway "${lastRead}" reports humansServed=${String(served)}; independently, ${minted} of ` +
           `${attempted} hosted registrants (the roster's ${liveRosterEntries(roster).length} plus the ` +
-          `${HOUSEHOLD_HOSTED_CAST.length}-name household cast) carry a hosted-cell grant cid, but only ` +
+          `${HOUSEHOLD_HOSTED_DECLARED.length} declared-hosted household names: ${HOUSEHOLD_HOSTED_DECLARED.join(', ')}) carry a hosted-cell grant cid, but only ` +
           `${live} of those ${minted} read back LIVE from jessica's storage (the non-pool peer) — this ` +
           'is the off-pool read defect, not a count mismatch.'
       );
@@ -438,7 +443,7 @@ Then(
       live,
       `doorway "${lastRead}" reports humansServed=${String(served)} but ${live} registrants (of ` +
         `${attempted} attempted: the roster's ${liveRosterEntries(roster).length} plus the ` +
-        `${HOUSEHOLD_HOSTED_CAST.length}-name household cast) have a live hosted-cell commitment, read ` +
+        `${HOUSEHOLD_HOSTED_DECLARED.length} declared-hosted household names: ${HOUSEHOLD_HOSTED_DECLARED.join(', ')}) have a live hosted-cell commitment, read ` +
         "independently from a household peer that is not the doorway's pool."
     );
   }
@@ -471,7 +476,7 @@ Then(
     // Everything this scenario's Given casts at alpha: the roster's live
     // entries plus the household cast (see the module doc's CORRECTION note —
     // both are real, provisioned registrants there now, not just the roster).
-    const castAtAlpha = live.length + HOUSEHOLD_HOSTED_CAST.length;
+    const castAtAlpha = live.length + HOUSEHOLD_HOSTED_DECLARED.length;
     const alpha = statusFor(this, 'alpha');
     const beta = statusFor(this, 'beta');
     const alphaServed = humansServedOf(alpha);
@@ -484,7 +489,7 @@ Then(
       (alphaServed as number) >= castAtAlpha,
       `doorway "alpha" reports humansServed=${String(alphaServed)}, fewer than the ${castAtAlpha} ` +
         `humans this scenario cast at alpha (the roster's ${live.length} plus the ` +
-        `${HOUSEHOLD_HOSTED_CAST.length}-name household cast) — it cannot be leaving out humans it ` +
+        `${HOUSEHOLD_HOSTED_DECLARED.length} declared-hosted household names: ${HOUSEHOLD_HOSTED_DECLARED.join(', ')}) — it cannot be leaving out humans it ` +
         'itself hosts and still be counting only its own.'
     );
     assert.equal(
@@ -508,7 +513,7 @@ Then(
     // Everything the mesh cast at this doorway: the roster's live entries
     // plus the household cast (see the module doc's CORRECTION note — both
     // are real, provisioned registrants there now, not just the roster).
-    const cast = live.length + HOUSEHOLD_HOSTED_CAST.length;
+    const cast = live.length + HOUSEHOLD_HOSTED_DECLARED.length;
     const status = statusFor(this, hostId);
     const served = humansServedOf(status);
     assert.equal(
@@ -520,7 +525,7 @@ Then(
       (served as number) >= cast,
       `doorway "${hostId}" reports humansServed=${String(served)}, fewer than the ${cast} humans ` +
         `the mesh cast there (the roster's ${live.length} plus the ` +
-        `${HOUSEHOLD_HOSTED_CAST.length}-name household cast) — it is not counting every human it ` +
+        `${HOUSEHOLD_HOSTED_DECLARED.length} declared-hosted household names: ${HOUSEHOLD_HOSTED_DECLARED.join(', ')}) — it is not counting every human it ` +
         'hosts.'
     );
   }

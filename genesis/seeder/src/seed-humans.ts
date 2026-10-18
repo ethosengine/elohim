@@ -25,6 +25,13 @@ import { fileURLToPath } from 'node:url';
 import type { CreateHumanInputView } from '@elohim/storage-client';
 
 import { sendRetryingShed } from './doorway-client.js';
+import { AdminWebsocket, encodeHashToBase64 } from '@holochain/client';
+import {
+  conductorUrlForHuman,
+  parseConductorUrls,
+  selectStewardApp,
+  toAdminUrl,
+} from './seed-conductor-identities.js';
 // =============================================================================
 // Types (mirrors humans.json schema)
 // =============================================================================
@@ -117,18 +124,29 @@ function loadSuspendedNames(): Set<string> {
  * the honest household answer is absence, not a fake.
  *
  * DERIVATION — do not edit this list by intuition; re-derive it. A name belongs
- * here iff some scenario under genesis/a2o/features/ that the household lane can
- * run — `@e2e`, act I or untagged, per the `mesh` / `mesh-browser` cucumber
- * profiles — contains a step of the form `human "<Name>" is logged in` (or
- * registers / signs in). Names referenced only as DATA ("Jessica holds a valid
- * record") need a row, not a cell, and are not here. Names that appear only under
- * `@act:ii`/`@act:iii` (the deployed-fleet acts) are not here either — the fleet
- * has the conductors for them; one household does not.
+ * here iff (1) some scenario the household lane can run (`@e2e`, act I or
+ * untagged, per the `mesh` / `mesh-browser` cucumber profiles) signs in as them,
+ * AND (2) their own markdown in genesis/data/humans/ DECLARES an agencyPhase.
+ * Names referenced only as DATA need a row, not a cell, and are not here; names
+ * only under `@act:ii`/`@act:iii` belong to the deployed fleet.
+ *
+ * WHO MAY SIGN IN (ruled 2026-10-14). Two kinds of fixture human, and nobody
+ * else:
+ *   - a human with their own peer runtime (a pod on the fleet, a peer on the
+ *     household), declared `device` or `node`. Their doorway registration is an
+ *     account row the doorway routes to peer-native sign-in; it looks up an
+ *     existing agent and never installs one.
+ *   - a human declared `agencyPhase: "hosted"`, hosted by the operator of the
+ *     doorway they register through: matthew on the household and alpha, adam
+ *     on the fleet.
+ * A persona with no declared phase is never registered, in any mode; the
+ * skip is printed. Before this rule the undeclared default to hosted put 20
+ * agents on matthew's conductor, including a second James and a second
+ * Jessica.
  *
  * The three `prologue-hosted-*` registrants are cast separately by
- * seed-hosted-humans.ts and are part of the same heap budget (they are what
- * hc-mesh.sh's MESH_DOORWAY_MAX_AGENTS default is sized against, together with
- * this list).
+ * seed-hosted-humans.ts and share the same heap budget. Together with this
+ * list, they set hc-mesh.sh's MESH_DOORWAY_MAX_AGENTS default.
  *
  * MESH_HOSTED_CAST=all restores the full standing cast for someone who has the
  * RAM; MESH_HOSTED_CAST=lane forces the allow-list even against a remote doorway.
@@ -140,27 +158,15 @@ const HOUSEHOLD_HOSTED_CAST: readonly string[] = [
   // Everywhere. agencyPhase=doorway, so the operator alone costs NO provisioned
   // cell — the doorway branch calls the singleton ZomeCaller on its own conductor.
   'Matthew',
-  // features/auth/fixture-humans.feature "Core family — Matthew's household" (@act:i)
-  'Susan',
+  // agencyPhase=device: an account row on this doorway, identity on their own
+  // household peer (james, jessica).
   'James',
-  'Gertrude',
+  'Jessica',
+  // agencyPhase=hosted — newcomers arriving through the doorway.
   // features/auth/fixture-humans.feature "Newcomers" (@act:i)
   'Maria',
   'Ronald',
-  // features/auth/fixture-humans.feature "Red-team humans can login" (@act:i)
-  'Charlie',
-  'Sam',
-  'Dr. Dolittle',
-  // features/content/stewardship-allocation.feature (@act:i)
-  'Jessica',
-  // features/lms/know-thyself-discovery.feature (@act:i)
-  'Terrance',
-  // features/elohim/content-reach-negotiation.feature (@act:i @wip) — the lane runs
-  // these under A2O_RUN_WIP=1, which is the documented local red loop, so they are
-  // cast. Drop them here first if a household ever needs the heap back.
-  'Miriam',
   'Ezra',
-  'Levi',
 ];
 
 function hostedCastMode(doorwayUrl: string): 'all' | 'lane' {
@@ -234,6 +240,37 @@ interface RegisterResult {
   agentPubKey?: string;
 }
 
+/**
+ * A node/device human's REAL agent key, read from their own conductor (the
+ * named CONDUCTOR_URLS entry, exact steward app). Their doorway row is the
+ * routing record for peer-native sign-in, so it must carry the key their peer
+ * actually holds; without one the doorway derives a key from the identifier
+ * that no conductor holds. Undefined when the human has no conductor here
+ * (e.g. adam or eve on the household) or it does not answer.
+ */
+async function ownConductorAgentKey(human: HumansJsonHuman): Promise<string | undefined> {
+  const entries = parseConductorUrls(process.env.CONDUCTOR_URLS ?? '');
+  const appUrl = conductorUrlForHuman(human.id, entries);
+  if (!appUrl) return undefined;
+  try {
+    const admin = await AdminWebsocket.connect({
+      url: new URL(toAdminUrl(appUrl)),
+      wsClientOptions: { origin: 'http://localhost' },
+    });
+    try {
+      const app = selectStewardApp(
+        await admin.listApps({}),
+        process.env.INSTALLED_APP_ID || 'elohim'
+      );
+      return app ? encodeHashToBase64(app.agent_pub_key) : undefined;
+    } finally {
+      await admin.client.close();
+    }
+  } catch {
+    return undefined;
+  }
+}
+
 async function registerHuman(
   doorwayUrl: string,
   human: HumansJsonHuman,
@@ -263,6 +300,11 @@ async function registerHuman(
 
   if (isAdmin && adminBootstrapKey) {
     body.adminBootstrapKey = adminBootstrapKey;
+  }
+
+  if (human.agencyPhase === 'device' || human.agencyPhase === 'node') {
+    const key = await ownConductorAgentKey(human);
+    if (key) body.agentPubKey = key;
   }
 
   try {
@@ -474,10 +516,14 @@ async function main(): Promise<void> {
     if (h.category === 'visitor' || h.agencyPhase === 'visitor') return false;
     if (suspendedNames.has(h.displayName.toLowerCase())) return false;
     if (castMode === 'lane' && !castAllowed.has(h.displayName.toLowerCase())) return false;
+    if (!h.agencyPhase) return false;
     return true;
   });
   const skippedSuspended = humansJson.humans.filter(h =>
     suspendedNames.has(h.displayName.toLowerCase())
+  );
+  const skippedUndeclared = humansJson.humans.filter(
+    h => h.category !== 'visitor' && !h.agencyPhase
   );
   const skippedOffCast =
     castMode === 'lane'
@@ -485,6 +531,7 @@ async function main(): Promise<void> {
           h =>
             h.category !== 'visitor' &&
             h.agencyPhase !== 'visitor' &&
+            !!h.agencyPhase &&
             !suspendedNames.has(h.displayName.toLowerCase()) &&
             !castAllowed.has(h.displayName.toLowerCase())
         )
@@ -498,21 +545,26 @@ async function main(): Promise<void> {
       `Skipping: ${skippedSuspended.length} suspended (${skippedSuspended.map(h => h.displayName).join(', ')}) — see deployments.json`
     );
   }
+  if (skippedUndeclared.length > 0) {
+    console.log(
+      `Skipping: ${skippedUndeclared.length} with no declared agencyPhase — no peer runtime and not hosted, so no sign-in (${skippedUndeclared.map(h => h.displayName).join(', ')})`
+    );
+  }
   if (castMode === 'lane') {
     console.log(
       `Cast:     household allow-list (${HOUSEHOLD_HOSTED_CAST.length} names) — registering IS provisioning (~786 MB of conductor heap per human, 5 cells at ~157 MB)`
     );
-    // Only a registration that PROVISIONS costs heap. agencyPhase=doorway uses the
-    // singleton ZomeCaller on the doorway's own conductor and installs nothing, so
-    // counting it would overstate the projection by one human.
-    const provisioning = active.filter(h => (h.agencyPhase ?? 'hosted') !== 'doorway');
+    // Only a hosted registration PROVISIONS. agencyPhase=doorway uses the
+    // singleton ZomeCaller on the doorway's own conductor; node/device only look
+    // up an existing agent. Neither installs anything.
+    const provisioning = active.filter(h => h.agencyPhase === 'hosted');
     console.log(
       `          projected conductor heap: ${provisioning.length} provisioning registrations x 786 MB ~= ${((provisioning.length * 786) / 1024).toFixed(1)} GB` +
-        ` (+3 for the prologue-hosted-* registrants; ${active.length - provisioning.length} agencyPhase=doorway registration(s) provision nothing)`
+        ` (+3 for the prologue-hosted-* registrants; ${active.length - provisioning.length} doorway/node/device registration(s) provision nothing)`
     );
     if (skippedOffCast.length > 0) {
       console.log(
-        `Skipping: ${skippedOffCast.length} off-cast — no household-lane scenario signs in as them, and a registration here would install a 5-cell app for a persona nothing exercises:`
+        `Skipping: ${skippedOffCast.length} off-cast — no household peer and not on the lane's hosted cast:`
       );
       console.log(`          ${skippedOffCast.map(h => h.displayName).join(', ')}`);
       console.log(
