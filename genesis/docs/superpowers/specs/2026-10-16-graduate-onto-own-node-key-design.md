@@ -15,7 +15,7 @@ graduation-trigger: >-
 cites:
   - genesis/a2o/features/auth/hosted-human/05-leaving.feature
   - genesis/a2o/features/auth/recovery/identity-key-lineage-recovery.feature
-  - genesis/docs/superpowers/plans/2026-07-17-identity-head-key-lineage-plan.md
+  - identity-head-key-lineage-plan | Identity Head + Agent-Key Lineage | sha256:70f0a3d32f0aa184 | path: genesis/docs/superpowers/plans/2026-07-17-identity-head-key-lineage-plan.md
   - doorway/doorway-service/.epr-meta/hosted-human-lifecycle.habit.md
   - .claude/skills/p2p-design-gate/SKILL.md
 ---

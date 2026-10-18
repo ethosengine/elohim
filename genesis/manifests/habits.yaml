@@ -102,7 +102,7 @@ habits:
     checks:
       - "a2o @concern:federation-deploy (genesis/a2o/features/dataplane/federation-deploy.feature — deploy uniformity, Act II; and genesis/a2o/features/dataplane/federation-version-convergence.feature — version convergence, Act I, runnable on the household mesh)"
       - "a2o @concern:content-sync, @concern:blob-replication, @concern:peer-mesh, @concern:epr-projection-fallback, @concern:reconcile-inventory (edge Dataplane Validation stage)"
-      - "cargo test --test sync_libp2p_convergence (elohim/elohim-storage)"
+      - "cargo test --test p2p sync_libp2p_convergence (elohim/elohim-storage; the module lives in tests/p2p/sync_libp2p_convergence.rs inside the consolidated `p2p` test binary — there is no target named sync_libp2p_convergence)"
       - "a2o @concern:transport-parity (genesis/a2o/features/dataplane/transport-comparison-matrix.feature; just mesh matrix) — identical fresh-document contract under libp2p, iroh, and dual; successful samples alone contribute timing percentiles"
       - ".claude/scripts/latency-scoreboard.py --local (and --deployed) — bounded convergence, not merely eventual: a CONJUNCTION of speed AND this habit's trust invariant, never speed alone. A fast stale head is worse than a slow correct one, so this check can only ever narrow the habit, never carry it."
       - "a2o @concern:trust-priced-sync (genesis/a2o/features/dataplane/trust-priced-sync.feature) — RED-FIRST 2026-09-01: a household peer prices its household edges `trusted` and no edge `public` on a pure-household mesh; the trust handshake is a stub that prices every edge `public`, so this check is born red and runnable on existing steps"
@@ -110,32 +110,10 @@ habits:
       - "a2o @concern:accountable-correction (genesis/a2o/features/dataplane/accountable-correction.feature — RED-FIRST 2026-09-06: a correction filed by one household peer against another's record converges to the SAME verdict on every peer, and only the record's root author can accept it or publish its successor. Contract: genesis/docs/superpowers/specs/2026-09-06-accountable-correction-contract.md; the coordinator + storage surface it binds to is documented in features/dataplane/README-accountable-correction.md. Born red: the eight stations have never run on the mesh)"
       - "a2o @concern:hub-carries-edit (genesis/a2o/features/dataplane/hub-carries-edit.feature — RED-FIRST 2026-09-22, runnable on the household mesh with A2O_ALLOW_DESTRUCTIVE=1: a write through doorway alpha reaches the peer that stays up within 5s and a stopped peer after restart with nothing written to it. Seam of the local-first shared-sheet vision, features/federation/local-first-shared-sheet.feature)"
     evidence: >
-      DELTA 2026-10-18a (RED preserved; projection fallback passes, federation-deploy skips on household, and outstanding convergence checks remain unmeasured).
-
-      `features/dataplane/epr-projection-fallback.feature` passed 2/2 scenarios,
-      6/6 steps on the household, verified against
-      `genesis/a2o/reports/sprint-report-household-20261017T225055Z-15f4e9bc.md`
-      and matching `cucumber-mesh-20261017T225055Z-15f4e9bc.json` (hidden hooks excluded).
-      `features/dataplane/federation-deploy.feature` RAN AND SKIPPED both scenarios:
-      0 passed, 0 failed, 2 skipped (11 skipped steps), verified against
-      `genesis/a2o/reports/sprint-report-household-20261017T225033Z-15f4e9bc.md`
-      and matching `cucumber-mesh-20261017T225033Z-15f4e9bc.json`.
-      The supplied @requires-gate evidence names alpha-cluster-6peer, apex-dns,
-      deploy-churn, dht-anchored-content, harbor-registry, jenkins, observability,
-      per-human-conductor and tls. This confirms the atom's Act II scoping;
-      a household skip is no federation-deploy measurement. Its measurement stays
-      the operator-reported validate-only edge build #1647, 2/2 federation-deploy.
-
-      Operator-supplied restart observation, 2026-10-17: after the full household
-      conductor restart at 22:38Z, the write path returned ~2.5 min later.
-      CellDisabled was quiet from 22:40:49Z; `ordered ContentHeadDeclared hydration recovered`
-      logged at 22:41:03Z — wave-5 retry working after a restart.
-      Transport-parity, `sync_libp2p_convergence` and the RED-FIRST checks
-      (`trust-priced-sync`, `accountable-correction`, `hub-carries-edit`) remain
-      unmeasured as recorded in 2026-10-17g. Status stays red.
-    evidence-fingerprint: sha256:5eb951fbb58de555
-    evidence-bytes: 244526
-    evidence-entries: 155
+      DELTA 2026-10-18a (RED preserved; Act I checks on the merged tree — dev 80db9208b, storage p2p+p2p-iroh, fork 96bcd2bee): `cargo test --test p2p sync_libp2p_convergence` 7 passed / 0 failed (the check line now names the real target; the old one named no target). federation-version-convergence 0/2 (sprint-report-household-20261018T114102Z-80db9208): both scenarios stop before the declaration with `household device binding not found` — this household's `device-ceremony/binding.json` is gone, and re-running `genesis/a2o/scripts/household-device-ceremony.ts 4444 4445` bootstraps an authority, then mishpat refuses the enrolment: `device_enrollment:127 "a device cannot approve its own joining"` (the guard from 0b73bcd23, "every device of a person speaks for them, and any may approve the next"). The ceremony script still self-approves, so the lane is unrunnable on any household whose binding predates that commit until the ceremony gains a second approver — a missing node between "device enrols" and "another device approves". hub-carries-edit 0/1 (…114121Z): james served matthew's new heads within 5 s; jessica, restarted, held 00278ede… and did not reach 1f87bdad… within 90 s — the RED-FIRST it was born as, now measured on the merged tree. trust-priced-sync: the metric step `labeled metric "elohim_sync_request_outcomes_total" with label "peer_class"` is Pending (resiliency-saga.steps.ts:236); the lane discharges nothing. Red holds; the Act II half is unmeasured.
+    evidence-fingerprint: sha256:5c29449c97c7e449
+    evidence-bytes: 247834
+    evidence-entries: 158
     guard: >
       Regression risk = the fleet-safety invariants in sync/projector.rs
       (empty-never-projects, reconcile-offers/events-assert, broadcast-tier reach
@@ -199,20 +177,15 @@ habits:
     invariant: >
       Blob bytes survive peer loss and churn: custody commitments honored,
       RS-quilt placement household-diverse, salvage re-places without data loss.
-    status: red
+    status: green
     active: false
     checks:
       - "a2o @concern:blob-durability — 9 scenarios across genesis/a2o/features/resilience/ (governed-distribution, salvage-placement, chaos-peer-churn, grandma-photos-survive-node-loss, app-blob-heal-on-read, observable-distribution, resilience-dimensions, household-diversity-dataplane)"
     evidence: >
-      DELTA 2026-10-17 (flip green→red): no custody-blob commitment names a second provider for the protected household fixtures, so the habit's protection scenarios cannot start.
-
-      Two household lanes today on merged source (dev 1a87ed72c + the marathon's commits, storage and doorway rebuilt from a8d3e71a3, conductors hc-fork-96bcd2bee215-proof):
-      - Tag lane `@concern:blob-durability and not @wip and not @browser-only and not @requires:shem`, run `sprint-report-household-20261017T081515Z-7a4ae280`: 14 scenarios — 7 passed, 3 failed, 1 pending, 3 skipped (114 steps: 72 passed, 3 failed, 1 pending, 38 skipped). The three failures are every non-browser chaos-peer-churn scenario (flapping peer; cascading loss; simultaneous two-peer loss), each stopping in the Given custody guard before any peer is killed: `no custody-blob commitment names jessica (…) as provider for sha256-… — providers on record: matthew only` and, for the chaos-ladder blob, `providers on record: none` while the footprint reports commitmentBacked>0. app-blob-heal-on-read 3/3 passed; grandma-photos 4 passed, `A holder lapses but coverage survives` PENDING (undefined step, steps/resilience.steps.ts:537), the album scenario skipped (only 1 attributed household committed); observable-distribution ×2 held on substrate.
-      - Rerun `features/resilience/chaos-peer-churn.feature` ten minutes after the last conductor restart (outside the churn window), run `sprint-report-household-20261017T082200Z-7a4ae280`: 3 scenarios, 3 failed, same custody-guard assertions. The deciding fact: on the household no custody-blob commitment names a second provider for the fixtures these scenarios protect, so the habit's own protection scenarios cannot even start — the "five holders" claim this habit declares is contradicted, not merely unobservable, on the one substrate that can run it.
-      - Declaration drift to note in the DELTA (do not rewrite the checks line): the check names "9 scenarios across 8 files"; six of those files are wholly @wip (governed-distribution, salvage-placement, resilience-dimensions, household-diversity-dataplane, sdk-write-retention, peer-byteplane-reconstruction — the last two carry the concern tag but are unlisted), so the runnable set today is 14 scenarios in 4 files.
-    evidence-fingerprint: sha256:77ed45b45fb788ba
-    evidence-bytes: 32931
-    evidence-entries: 23
+      DELTA 2026-10-18 (flip red→green on household evidence; ruling recorded): the three chaos-peer-churn scenarios whose custody guard refused on 2026-10-17 pass on this household — `features/resilience/chaos-peer-churn.feature` 3/3, 34/34 (sprint-report-household-20261018T154019Z-58ef1c20) and the habit's own `@concern:blob-durability` tag lane 14 scenarios: 10 passed, 1 pending, 3 skipped, 0 failed (…154413Z-e42c7f45; the pending and skipped set is the one the lane carried before the 10-17 flip, when the habit was green). The custody substrate is present: `genesis/local-dev/household-dowell/drill-custody-pairs.json` holds 9 pairs (matthew, jessica, james × manifesto, chaos-ladder, heal-target blobs) and jessica's `/api/v1/commitments?action=custody-blob&limit=5000` lists active rows for all three blobs × three providers. The 10-17 red was that household's state, and its most likely cause is now impossible to miss: the prologue's `seed-drill-custody` leg skipped with exit 0 when `seed-drill-fixtures` wrote no pairs; e42c7f453 makes it print `REFUSED seed-drill-custody:` with the pairs path, the fixtures leg's exit code and the consequence, and return nonzero. Side finding for the clients of that route: `/api/v1/commitments` without `limit` returns only the newest 100 rows (the a2o steps pass `limit=500`). Fleet half still unmeasured (the 2026-09-11 Dataplane Validation red stands on its own evidence); green holds on the household's Act I checks.
+    evidence-fingerprint: sha256:5995c43382339aab
+    evidence-bytes: 34407
+    evidence-entries: 24
     refs:
       - "genesis/data/timeline/backlog/dataplane-peer-fallback-and-blob-replication.md"
       - "memory: project_dataplane_next_lens_diversity_placement (1a+1b landed; prod join dormant)"
@@ -1122,16 +1095,10 @@ habits:
       - "a2o @concern:hosted-compute-contracted (genesis/a2o/features/auth/hosted-human/07-hosted-by-a-household.feature — @act:i; household lane is the authority: `just test mesh features/auth/hosted-human/07-hosted-by-a-household.feature` for the API-side scenarios and `just test mesh-browser features/auth/hosted-human/07-hosted-by-a-household.feature` for the two @browser-only ones. The story creates and removes its own human.)"
       - "a2o @concern:humans-served (genesis/a2o/features/dataplane/doorway-humans-served.feature — @act:i; needs `just mesh prologue` to have cast the hosted humans: `just test mesh features/dataplane/doorway-humans-served.feature`. The count is doorway-local and substrate-derived; a federation-wide aggregate is a different number and is not this check.)"
     evidence: >
-      DELTA 2026-10-17b (RED preserved; hosted promise lane returns to 2/3 baseline; provider/service-identity fixture seam remains).
-
-      Operator-supplied runtime context: wave-2 source dev d0b98ce58 + eight commits, final sha 79dc0f46a; storage rebuilt and restarted ~11:2xZ, doorways a8d3e71a3, conductors hc-fork-96bcd2bee215-proof with content_store hot-swapped at 08:5xZ. `features/auth/hosted-human/07-hosted-by-a-household.feature`, run `sprint-report-household-20261017T113613Z-e7ba3dfc`: 3 scenarios, 2 passed / 1 failed; 23 steps, 21 passed / 1 failed / 1 skipped. Counts verified against the named JSON under `genesis/a2o/reports/` and its cucumber-mesh companion, excluding hidden hooks.
-
-      This returns to the 2026-09-12 baseline after `sprint-report-household-20261017T082605Z-362c3ce8` passed 0/3 scenarios (14 passed / 3 failed / 6 skipped steps): scenarios 1 and 3 and all three After hooks hit Cucumber's 31000 ms deadline; scenario 2 already failed the provider-identity assertion. Operator-supplied diagnosis and cure: the polling steps were trying to observe a 60 s hosted-cell convergence window inside a 31 s deadline; 27159f54c gives them 150 s, reports the last status on timeout, and bounds story-human cleanup at 120 s to avoid leaving phantoms behind. The later run's hooks all passed.
-
-      The remaining failure is scenario 2, `its provider is not the doorway's own service identity`; the report records `steps/ui/hosted-human.steps.ts:895` (supplied reference :885). Doorway A's pool steward is Matthew's storage key, also its doorway service key: the same fixture topology named on 2026-09-12. The open product question is unchanged; this run does not resolve the earlier humansServed/promise-count discrepancy or measure the browser checks. No status change.
-    evidence-fingerprint: sha256:82c41ab826608da8
-    evidence-bytes: 11565
-    evidence-entries: 8
+      DELTA 2026-10-18 (RED preserved; both checks measured on the household, dev 80db9208b): 07-hosted-by-a-household 0/3 (sprint-report-household-20261018T114946Z-80db9208) — every account creation was refused `Conductor conductor-0 at capacity (17/14)`: the household archive carries 16–17 hosted agents on matthew's conductor against the 14 ceiling (`just mesh status`: "hosted matthew: REFUSED 16 agent(s), over the operator ceiling 14"; "hosted jessica: REFUSED 1 agent(s) on a member's conductor"), i.e. story-created humans that registered and never closed. doorway-humans-served 0/4 (…114956Z): humansServed=14 while only 3 registrants hold a live hosted-cell commitment read from a non-doorway peer (the invariant's disagreement, wider than 09-12's 14 vs 13); beta reports 1 where none is owed; the re-cast of prologue-hosted-1 failed. Cure order: (1) a household verb that reconciles hosted agents against live commitments and closes the agents no promise names, so the ceiling counts living promises; (2) re-run both lanes. Red holds.
+    evidence-fingerprint: sha256:8f89176f4f316ed8
+    evidence-bytes: 12613
+    evidence-entries: 9
     refs:
       - "genesis/docs/superpowers/plans/2026-09-10-doorway-federation-three-reds-to-green-plan.md (D2, D3, Tasks 13, 13b, 13c, 15, 16, 17c)"
       - "doorway/doorway-service/src/routes/hosted_cell.rs · elohim/elohim-storage/src/api/compute_grants.rs · elohim/elohim-storage/src/services/commitment_read_fallback.rs"
@@ -1166,9 +1133,9 @@ habits:
       recorded phase was hosted at sign-in — 9b98ac904; a one-conductor doorway never ran the prune — 22b5ba1f9.
       Household and alpha cleaned through the doorways' own close route (genesis/local-dev/hosted-cast-cleanup/:
       close.py, alpha-close.py — 7 doorway-minted cells for device/node humans returned on alpha).
-    evidence-fingerprint: sha256:20c147947d298687
-    evidence-bytes: 14697
-    evidence-entries: 12
+    evidence-fingerprint: sha256:a84b6ee5a17d736f
+    evidence-bytes: 15484
+    evidence-entries: 13
     first_move: >
       Land the step definitions and the close-account route so the @wip scenarios execute and
       this habit measures red on a real run, then move the register/login provisioning
@@ -1208,12 +1175,10 @@ habits:
       - "a2o @concern:served-under-standing (genesis/a2o/features/dataplane/name-routing.feature — @act:i @requires:multi-node, household lane: `just test mesh features/dataplane/name-routing.feature` against the built binaries, after the pair has converged (a listed non-holder relays for ~60-90 s after a doorway restart). Measures the PUBLIC-NAME half of routing, doorway/doorway-service/src/services/name_routing/standing.rs served_under_standing: a listed non-holder answers the name itself only with the holder's served landing bundle, a doorway that stands for no household name answers 421 naming the listed doorways, and every public-name answer carries x-elohim-served-by with the answering doorway's federation id. Relay-when-behind and withdrawn-candidate relay are unit/integration-proven only. Green here never certifies eligibility or DNS/WAN ingress.)"
       - "chrome affordances: the five commons affordances of the EPR chrome are declared as epr-atom-home's NEXT commons checks (app/elohim-app/.epr-meta/epr-atom-home.habit.md — governance mark, fair-trade receipt, redress entry, feedback with an owed response, interpretability surface; its three @wip commons scenarios in genesis/a2o/features/content/epr-atom-home.feature). This habit's chrome clause is discharged THERE, by that register's own evidence, and is deliberately not re-registered here — one home per check."
     evidence: >
-      DELTA 2026-10-17 (RED preserved; merged-source household standing and public-name routing pass): served-under-standing 5/5, 94/94 steps; dataplane/name-routing 3/3, 25/25 steps.
-      Household lanes on merged source (dev 1a87ed72c + the marathon's commits); operator-supplied runtime context: storage and doorway rebuilt from a8d3e71a3 and restarted 07:4xZ, conductors hc-fork-96bcd2bee215-proof; app-delivery restarted every conductor at ~08:10Z.
-      Reports under genesis/a2o/reports/: `sprint-report-household-20261017T081915Z-7a4ae280` measures `features/dataplane/served-under-standing.feature`; `sprint-report-household-20261017T082136Z-7a4ae280` measures `features/dataplane/name-routing.feature`. Scenario totals verified against those reports; step totals against their matching cucumber-mesh JSON, excluding hooks. The checks' `features/federation/name-routing.feature` and chrome affordances delegated to epr-atom-home remain unmeasured today. Relay-when-behind and withdrawn-candidate relay remain unit/integration-proven only; these household passes do not certify DNS/WAN ingress or discharge the remaining checks. Red holds.
-    evidence-fingerprint: sha256:55961c86192db097
-    evidence-bytes: 26155
-    evidence-entries: 24
+      DELTA 2026-10-18 (RED preserved; three checks measured on the household, dev 80db9208b): dataplane/name-routing 3/3, 25/25 (sprint-report-household-20261018T115026Z-80db9208); federation/name-routing 5/5, 94/94 — born @wip, now fully defined and green (…115809Z); served-under-standing.feature 3/5, 80 passed / 2 failed / 12 skipped (…115551Z). The two reds share one shape: after the Dowell household decision narrows "community-garden-club" to members, the anonymous visitor is refused as wanted (403 reach=household) but the ADMITTED member is refused too — steps.ts:1651 never converged to "narrowed but standing admitted" within 75 s, and :1969's authenticated re-serve answered 403 where 200 was owed. Either the membership fixture does not make Matthew a member in the doorway's standing read, or narrowing drops its members; that is the next cure's first question. Chrome affordances stay delegated to epr-atom-home. Red holds.
+    evidence-fingerprint: sha256:3a561a7ef892e072
+    evidence-bytes: 27100
+    evidence-entries: 25
     refs:
       - "genesis/docs/superpowers/plans/2026-07-31-doorway-federation-failover-sprint-plan.md (WS3 — the 2026-09-12 operator ruling, passes three and four: serving eligibility as a four-term fold, the governance lever as a holon's ruling rather than a config flag, the named cache gap `cache is bytes, never permission`, and standing-not-property with the public challenge path shipped as part of the feature)"
       - ".claude/memory/feedback_doorway_projection_is_commons_privilege.md (the standing is afforded by the network and publicly challengeable)"
@@ -2001,13 +1966,10 @@ habits:
       - "ledger: `.claude/scripts/ci-harvest.py` files a BUDGET_EXHAUSTED finding for any build its own timeout killed (`python3 .claude/scripts/_lib/__tests__/ci_harvest_budget_exhausted_test.py`)."
       - "a2o @concern:push-delivers-within-budget (genesis/a2o/features/dataplane/app-delivery-refuses-fast.feature — @act:i, four household stations: the not-ready window is answered in seconds; `just test mesh features/dataplane/app-delivery-refuses-fast.feature`)"
     evidence: >
-      DELTA 2026-10-17b (ACTIVE, RED preserved; post-restart write-readiness exceeds 120 s after caughtUp): app-delivery-refuses-fast 1/4 scenarios, 22/50 steps; deploy-window stations unmeasured.
-      Household mesh, dev tip e62725273 in flight / daf3d62af landed; operator-supplied runtime context: conductors on hc-fork-96bcd2bee215-proof, storage built from 577b8fc5 source. `features/dataplane/app-delivery-refuses-fast.feature`, report `genesis/a2o/reports/sprint-report-household-20261017T223747Z-e6272527`: 4 scenarios, 1 passed / 3 failed; 50 steps, 22 passed / 3 failed / 25 skipped. Counts verified against the sprint report and matching cucumber-mesh JSON, excluding hooks.
-      Station 2, `restarting every conductor opens a window the probe names, and the window closes on its own`, passed the 30 s ready probe and the 600 s both-doorways-caught-up step, then failed at `the fleet write-readiness probe answers ready within 120 seconds`: `the probe did not answer ready within 120s (23 ask(s) every 5s)`. Last face: `FLEET-NOT-READY http://localhost:8889 face=storage-refused retryAfter=20`; both doorways answered storage-refused. The earlier `genesis/a2o/reports/sprint-report-household-20261017T081007Z-7a4ae280` run failed the same station and step with the same 23-ask deadline and face: 3/4 scenarios, 47/50 steps (47 passed / 1 failed / 2 skipped), verified against its report and matching cucumber-mesh JSON. Against this atom's 2026-09-25h budget, "station 2's close is bounded at 120 s after caughtUp", the household's post-restart write-readiness exceeds the 120 s bound today; the earlier run shows the same. This keeps the habit red.
-      The two deploy-window scenarios, `a deploy that meets a shorter window waits it out and goes through without being sent again` and `a deploy that meets a longer window stops at its deadline, names the face, and leaves the previous version in place`, both failed at the prerequisite `an EPR record this run owns for it` with `503 Zome call failed … CellDisabled`. Operator-supplied storage evidence: at 22:38:37Z matthew logged `STRANDED: this role's cell is ABSENT from the conductor's running-cell map while its app's persisted status IS Enabled` and was attempting enable_app. These stations were blocked by the restart churn station 2 measures, not by the deploy-window code; their deploy-window behavior is unmeasured on this run. The live delivery series and other non-household checks were not remeasured; status remains red and active remains true.
-    evidence-fingerprint: sha256:457136e5e473b714
-    evidence-bytes: 29220
-    evidence-entries: 28
+      DELTA 2026-10-18 (ACTIVE, RED preserved; station 2's window measured, explained and cut on the household; two readings of 10-17b corrected): the household (dev 80db9208b → 6e2609870, storage p2p+p2p-iroh, conductors on fork 96bcd2bee, matthew 85 cells / 17 apps, jessica 10, james 5) ran `app-delivery-refuses-fast.feature` nine times today, 4/4 scenarios and 50/50 steps every time. Correction 1: storage never attempted `enable_app` on the stranded cells — `decide_not_running_action` returns ObserveOnly when membership proves a cell absent, and the STRANDED line is the normal restart face. Correction 2: the window is not the conductor's. A/B on the pin vs a fork branch with bounded per-app startup (`fix/startup-per-app-publication`, on the forge, reviewed LAND-WITH-NITS) gave the same distribution — pin 43.4 / 25.6 / 43.4 s, fix 13.2 / 43.1 s (cucumber-mesh-20261018T11{2217,2538,2818,3228,3531}Z-80db9208) — so the gitlink did not move. What the logs showed instead: storage re-mints its app sockets ~+6–10 s after the restart and logs "Found cell", but the very next ListCellIds still shows the cells absent (the conductor accepts sockets before cells join `running_cells`); the cells return seconds later and nothing re-reads membership until each role's 20 s supervisor tick, mishpat one tick later — hence the 43 s mode. Cure (storage, eb589a8bb..6e2609870 + follow-ups): `services/presence_recovery.rs` — every membership reading that lands can trigger one pass that probes every not-running role whose cell is shown running (mishpat in the same pass), one probe per cell per presence run; a re-mint opens a watch (`PRESENCE_WATCH_CADENCE` 2 s, `PRESENCE_WATCH_WINDOW` 120 s, reads only while a role is red, a physical-read throttle invalidation cannot clear); probes run in a bounded set inside the driver's own event loop; a probe the gate refuses keeps its chance. Independent review (gpt-6-astra) twice; schedule tests through the real ProbeGate, mutation-checked; lib suite green, clippy default + iroh clean. Measured with the new storage binary and the pinned conductors, three consecutive runs: not-ready window 10.0 / 6.9 / 9.6 s (first not-ready → first ready, 3 s probe); the "ready within 120 s" step answered in 463 ms / 5757 ms / 5679 ms with 1 / 2 / 2 asks (cucumber-mesh-20261018T132741Z-3a0ad3b8, …133049Z-3a0ad3b8, …133316Z-6e260987) — against 42757 / 21165 / 43147 ms and 9 / 5 / 9 asks before. The window is now bounded by the conductor's own cell join plus one 2 s cadence, not by a tick. The deploy-window stations 3–4 created their records without `CellDisabled` in all nine runs. Still unmeasured: the live delivery series, budget arithmetic, measurement-liveness, no-op-roll and ledger checks, and shem's ~100-cell/grown-store shape where the conductor's serial startup remains the plausible residual (branch kept as the frontier). Red preserved; active stays true.
+    evidence-fingerprint: sha256:edb2e50a74689593
+    evidence-bytes: 32152
+    evidence-entries: 29
     refs:
       - "genesis/data/timeline/backlog/edge-quiesce-gate-timeout-aborts.md (the budget arithmetic, one layer down then up)"
       - "genesis/data/timeline/backlog/ci-edge-a2o-steps-glob-redeploys-fleet.md (no-op fleet rolls)"

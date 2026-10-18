@@ -1543,6 +1543,9 @@ async fn async_main(
     let mut hc_registry_for_http: Option<
         std::sync::Arc<elohim_storage::hc_client_registry::HcClientRegistry>,
     > = None;
+    // The presence driver's handle, awaited at shutdown so its drain of offered
+    // cell probes completes before the runtime is torn down.
+    let mut presence_drain: Option<tokio::task::JoinHandle<()>> = None;
     if let Some(admin_url) = &args.admin_url {
         // Registry connect + the bridge supervisor depend on NOTHING from
         // PolicyConfig — hoisted above the policy-load branch below on
@@ -1572,7 +1575,7 @@ async fn async_main(
         // `spawn_bridge_supervisor`'s own doc comment for the why. Runs
         // whenever a conductor is configured (admin_url is set), independent
         // of whether the peer-policy file loaded.
-        std::sync::Arc::clone(&registry).spawn_bridge_supervisor(
+        presence_drain = Some(std::sync::Arc::clone(&registry).spawn_bridge_supervisor(
             elohim_storage::hc_client_registry::HcRegistryInputs {
                 admin_url: admin_url.clone(),
                 app_url: args.app_url.clone(),
@@ -1580,7 +1583,7 @@ async fn async_main(
                 lineage: std::sync::Arc::clone(&lineage_roles),
             },
             shutdown_tx.clone(),
-        );
+        ));
 
         // Stash the registry in shared state for HTTP handlers.
         hc_registry_for_http = Some(registry.clone());
@@ -2835,6 +2838,7 @@ async fn async_main(
                                 );
                             }
                             Err(e) => {
+                                reanchor_state.note_reanchor_sweep_abandoned().await;
                                 warn!(error = %e, "reanchor_backfill failed (non-fatal)");
                             }
                         }
@@ -6689,6 +6693,23 @@ async fn async_main(
     let _ = shutdown_tx.send(());
     if let Some(handle) = import_handle {
         let _ = handle.await;
+    }
+    if let Some(handle) = presence_drain {
+        let bound = elohim_storage::services::presence_recovery::PRESENCE_SHUTDOWN_DRAIN_BOUND;
+        match tokio::time::timeout(bound, handle).await {
+            Ok(Ok(())) => {}
+            Ok(Err(join_error)) => warn!(
+                error = %join_error,
+                panicked = join_error.is_panic(),
+                "presence recovery driver task ended abnormally (panic or cancellation) before \
+                 finishing its shutdown drain — any cell probes it had offered were abandoned"
+            ),
+            Err(_) => warn!(
+                bound_secs = bound.as_secs(),
+                "presence recovery did not finish draining its offered cell probes within the \
+                 shutdown bound — abandoning them; the conductor may still be running those calls"
+            ),
+        }
     }
 
     // Print stats before exit

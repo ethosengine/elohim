@@ -61,7 +61,15 @@ pub fn run_identity(args: &[String]) -> Outcome<ExitCode> {
             println!("{}", usage());
             Ok(ExitCode::SUCCESS)
         }
-        Some(other) => Err(format!("unknown identity command `{other}`\n{}", usage())),
+        Some(other) => Err(format!(
+            "unknown identity command `{other}`{}\n{}",
+            crate::hint::did_you_mean(
+                other,
+                "epr identity",
+                &["begin", "standing", "show", "secret"]
+            ),
+            usage()
+        )),
     }
 }
 
@@ -96,7 +104,23 @@ impl Options {
                 "--decline" => o.decline = true,
                 "--declare" => o.declare = true,
                 other if other.starts_with("--") => {
-                    return Err(format!("unknown argument `{other}`\n{}", usage()))
+                    return Err(format!(
+                        "unknown argument `{other}`{}\n{}",
+                        crate::hint::did_you_mean(
+                            other,
+                            "",
+                            &[
+                                "--node",
+                                "--name",
+                                "--identifier",
+                                "--only",
+                                "--yes",
+                                "--decline",
+                                "--declare"
+                            ]
+                        ),
+                        usage()
+                    ))
                 }
                 other => o.positional.push(other.to_string()),
             }
@@ -745,6 +769,130 @@ pub(crate) fn pending_lines(view: &PendingView) -> Vec<String> {
     lines
 }
 
+/// Said by a node whose transport has no local discovery.
+const NO_LOCAL_DISCOVERY: &str = "This node has no local discovery in its transport mode, so \
+     nothing can ask it over the private network.";
+
+/// How a device still asks a node that nothing can announce to: by name.
+/// The asking terminal reaches the approving node over plain http before it
+/// asks, and a node answers its identity routes only under names it was told.
+const NAME_THIS_NODE: &str = "A device can still ask it by name: on that device run `epr device \
+     join --label <name> --approver http://<this machine's address>:<this node's port>`, then \
+     approve the link it prints here with `epr device approve '<link>'`. This node answers \
+     under that address only when ELOHIM_ALLOWED_HOSTS lists it.";
+
+/// What `epr device status` found on this machine, before any word is chosen.
+#[derive(Default)]
+pub(crate) struct StatusFacts {
+    pub node: String,
+    /// This device's key, as a fingerprint; absent when the node did not say.
+    pub device: Option<String>,
+    /// The person the node speaks for, by the name they gave.
+    pub speaks: Option<String>,
+    /// Whether that person is signed in on this node from this terminal.
+    pub signed_in: bool,
+    /// The node's carrier (`absent` with no local discovery); absent when the
+    /// node did not answer.
+    pub carrier: Option<String>,
+    /// How many devices are asking this node over its private network.
+    pub asking: usize,
+    /// The asks this device keeps while it waits on an approving node.
+    pub kept: Vec<String>,
+}
+
+/// `epr device status` in plain words: which node, which device, whose it is,
+/// what is waiting on either side, and the one thing to run next.
+pub(crate) fn status_lines(f: &StatusFacts) -> Vec<String> {
+    let mut lines = vec![format!("This machine's node is {}.", f.node)];
+    if let Some(device) = &f.device {
+        lines.push(format!("This device is {device}."));
+    }
+    for kept in &f.kept {
+        lines.push(format!(
+            "Waiting on a yes: {kept}. Run `epr device join` again to keep waiting."
+        ));
+    }
+    let Some(name) = &f.speaks else {
+        lines.push("It speaks for nobody yet.".into());
+        if f.kept.is_empty() {
+            lines.push(
+                "To make it yours, run `epr device join --label <name>` here and say yes on a \
+                 device that is already yours; to begin a new identity on it, run `epr identity \
+                 begin --name <your name>`."
+                    .into(),
+            );
+        }
+        return lines;
+    };
+    lines.push(format!(
+        "It speaks for {name}, so it is the side that says yes to another device."
+    ));
+    if !f.signed_in {
+        lines.push(format!(
+            "Nobody is signed in on it from this terminal, so it will not show {name}'s standing \
+             or sign a yes until {name} signs in."
+        ));
+    }
+    match f.carrier.as_deref() {
+        Some("absent") => {
+            lines.push(NO_LOCAL_DISCOVERY.into());
+            lines.push(NAME_THIS_NODE.into());
+        }
+        Some(_) if f.asking == 0 => lines.push("Nothing is asking it.".into()),
+        Some(_) => lines.push(format!(
+            "{} asking it. See them with `epr device pending`.",
+            if f.asking == 1 {
+                "One device is".to_string()
+            } else {
+                format!("{} devices are", f.asking)
+            }
+        )),
+        None => lines.push("It did not say what is asking it.".into()),
+    }
+    lines
+}
+
+/// `epr device status`: reads only, and never fails on a node that cannot
+/// say one of these things; what it cannot say is left out or said so.
+pub fn status(args: &[String]) -> Outcome<ExitCode> {
+    let opts = Options::parse(args)?;
+    let node = opts.node()?;
+    let cookie = session_cookie();
+    let signed_in = http_timed(
+        "GET",
+        &format!("{node}/auth/identity/standing"),
+        None,
+        &cookie_headers(&cookie),
+        std::time::Duration::from_secs(10),
+    )
+    .is_ok_and(|(status, _, _)| (200..300).contains(&status));
+    let device =
+        json_call_with::<serde_json::Value>("GET", &format!("{node}/auth/device/self"), None, &[])
+            .ok()
+            .and_then(|(me, _)| {
+                me["deviceKey"]
+                    .as_str()
+                    .map(consent_grant::hash_shape::fingerprint)
+            });
+    let pending =
+        json_call_with::<PendingAnswer>("GET", &format!("{node}/auth/consent/pending"), None, &[])
+            .ok()
+            .map(|(answer, _)| answer);
+    let facts = StatusFacts {
+        speaks: speaks_for(&node),
+        signed_in,
+        device,
+        asking: pending.as_ref().map_or(0, |p| p.asks.len()),
+        carrier: pending.map(|p| p.carrier),
+        kept: crate::device::kept_asks(),
+        node,
+    };
+    for line in status_lines(&facts) {
+        println!("{line}");
+    }
+    Ok(ExitCode::SUCCESS)
+}
+
 /// `epr device pending`: what is asking this node over its private network.
 pub fn pending(args: &[String]) -> Outcome<ExitCode> {
     let opts = Options::parse(args)?;
@@ -752,10 +900,8 @@ pub fn pending(args: &[String]) -> Outcome<ExitCode> {
     let (answer, _): (PendingAnswer, String) =
         json_call_with("GET", &format!("{node}/auth/consent/pending"), None, &[])?;
     if answer.carrier == "absent" {
-        println!(
-            "This node has no local discovery in its transport mode, so nothing can ask it over \
-             the private network."
-        );
+        println!("{NO_LOCAL_DISCOVERY}");
+        println!("{NAME_THIS_NODE}");
         return Ok(ExitCode::SUCCESS);
     }
     if let Some(me) = &answer.approver {
@@ -1449,5 +1595,55 @@ mod tests {
         assert!(lines
             .iter()
             .any(|l| l.starts_with("  signed: this node (uhCAkiqcz")));
+    }
+
+    #[test]
+    fn status_says_whose_the_node_is_and_what_to_run_next() {
+        let nobody = status_lines(&StatusFacts {
+            node: "http://127.0.0.1:8095".into(),
+            device: Some("uhCAk0t5…DucibY".into()),
+            carrier: Some("absent".into()),
+            ..Default::default()
+        });
+        assert_eq!(nobody[0], "This machine's node is http://127.0.0.1:8095.");
+        assert_eq!(nobody[1], "This device is uhCAk0t5…DucibY.");
+        assert_eq!(nobody[2], "It speaks for nobody yet.");
+        assert!(nobody[3].contains("epr device join --label <name>"));
+        assert_eq!(
+            nobody.len(),
+            4,
+            "a node that speaks for nobody is not told how to approve"
+        );
+
+        let waiting = status_lines(&StatusFacts {
+            kept: vec!["che-shem asking device.enroll, approved at http://a:8095".into()],
+            ..Default::default()
+        });
+        assert!(waiting[1].starts_with("Waiting on a yes: che-shem asking device.enroll"));
+        assert_eq!(waiting.last().unwrap(), "It speaks for nobody yet.");
+
+        let signed_out = status_lines(&StatusFacts {
+            speaks: Some("Matthew".into()),
+            carrier: Some("absent".into()),
+            ..Default::default()
+        });
+        assert!(signed_out[1].starts_with("It speaks for Matthew, so it is the side that says yes"));
+        assert!(signed_out[2].starts_with("Nobody is signed in on it from this terminal"));
+        assert_eq!(signed_out[3], NO_LOCAL_DISCOVERY);
+        assert!(signed_out[4].contains("--approver http://<this machine's address>"));
+        assert!(signed_out[4].contains("ELOHIM_ALLOWED_HOSTS"));
+
+        let asked = status_lines(&StatusFacts {
+            speaks: Some("Matthew".into()),
+            signed_in: true,
+            carrier: Some("libp2p".into()),
+            asking: 2,
+            ..Default::default()
+        });
+        assert_eq!(asked.len(), 3);
+        assert_eq!(
+            asked[2],
+            "2 devices are asking it. See them with `epr device pending`."
+        );
     }
 }

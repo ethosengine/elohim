@@ -173,6 +173,69 @@ Feature: A person's identity starts on one node and grows to others
       And node "home" is one of Matthew's nodes
       And no code was shown to Matthew or carried by him
 
+  Rule: A terminal says where a join stands and what to run next, before, during and after asking
+
+    A node acts for Matthew only while he is signed in on it. Signing in is done on the
+    node's own machine, in its terminal or its portal, whether or not the node is a doorway.
+    Asking where a node stands is one terminal command, `epr device status`.
+
+    # held: needs the one-person multi-node topology (arch-device-recognition-backlog.md row 2); the words are unit-tested in epr-cli (`status_says_whose_the_node_is_and_what_to_run_next`)
+    @wip
+    Scenario: A node that speaks for nobody is told how to become Matthew's
+      Given node "home" speaks for nobody
+      When Matthew asks the terminal on node "home" where it stands
+      Then the terminal names node "home" and shows its key
+      And it says the node speaks for nobody yet
+      And it shows the one command that asks to join an identity
+
+    # held: needs the one-person multi-node topology (arch-device-recognition-backlog.md row 2)
+    @wip
+    Scenario: A node that has asked and is waiting says what it is waiting on
+      Given Matthew's identity began on node "workspace"
+      And the terminal on node "home" has asked to join Matthew's identity, naming itself "home"
+      And Matthew has not yet approved on node "workspace"
+      When Matthew asks the terminal on node "home" where it stands
+      Then the terminal says "home" is waiting for an approval and names the node it asked
+      And it shows the command that goes on waiting for that approval
+      And it says the node speaks for nobody yet
+
+    # held: needs the one-person multi-node topology (arch-device-recognition-backlog.md row 2)
+    @wip
+    Scenario: A node that already speaks for Matthew is told it is the one that approves
+      Given Matthew's identity began on node "workspace"
+      And Matthew is not signed in on node "workspace"
+      When Matthew asks the terminal on node "workspace" where it stands
+      Then the terminal says the node speaks for Matthew, so it is the node that approves another
+      And it says nobody is signed in, so it will approve nothing until Matthew signs in
+
+  Rule: A node that cannot be found says how it can still be asked
+
+    A node answers requests about Matthew's identity only at addresses it has been
+    configured to treat as its own: on its own machine it always answers, and whoever
+    operates it lists any other address in the node's settings before another machine can ask it there. A node
+    that cannot be asked cannot be joined to, so its terminal says how to reach it.
+
+    # held: needs two nodes of one person that cannot find each other on a local network (two workspaces on 2026-10-10)
+    @wip
+    Scenario: A node that nothing can find on the local network says how to be asked at its address
+      Given Matthew's identity began on node "workspace"
+      And node "workspace" cannot be found by other nodes on a local network
+      When Matthew asks the terminal on node "workspace" where it stands
+      Then the terminal says nothing can ask this node over a local network
+      And it shows the command a new node runs to ask this node at its address
+      And it says whoever operates this node must first list that address, in the node's settings, as one of the node's own
+
+  Rule: A terminal answers a command it does not know with the one the person likely meant
+
+    # held: the words are unit-tested in epr-cli (`a_word_that_is_no_command_is_answered_with_the_likely_one`); held until a terminal scenario runs in the lane
+    @wip
+    Scenario: A mistyped or guessed command is answered with the one Matthew likely meant
+      Given node "home" is running, whether or not it speaks for anyone
+      When Matthew types "epr device stauts" on node "home", one slip away from "status"
+      Then the terminal names "epr device status" as the command he likely meant, above its list of commands
+      When Matthew types "epr device feedback" on node "home", which is near no command
+      Then the terminal lists the commands and guesses nothing
+
   Rule: A doorway that cannot take approvals says so before anyone signs in
 
     # held: needs a doorway that serves the approval page without taking approvals (alpha on 2026-10-07)

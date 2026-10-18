@@ -1353,8 +1353,27 @@ impl HcClientRegistry {
         cache: &crate::services::cell_membership::MembershipCache,
         at: crate::services::cell_membership::ObservedAt,
     ) -> TickObservation {
-        use crate::conductor_bridge_health as health;
         cache.refresh_if_stale_at(src, at).await;
+        Self::publish_cell_state_from(role, cell_id, cache, at)
+    }
+
+    /// The publication half of [`Self::observe_and_publish_cell_state_from`]:
+    /// classify and publish from the reading the cache ALREADY holds, asking
+    /// the conductor nothing.
+    ///
+    /// Separate so a caller that must not originate a read can still publish
+    /// through the one publication path. The presence planner is that caller:
+    /// its reads are ceiling-bounded (`refresh_if_older_than_at`), and
+    /// borrowing the supervisor's refresh here would hand it the supervisor's
+    /// revocable window — a re-mint landing between its presence check and
+    /// this publish would then admit a read inside the ceiling.
+    pub(crate) fn publish_cell_state_from(
+        role: &str,
+        cell_id: Option<&holochain_client::CellId>,
+        cache: &crate::services::cell_membership::MembershipCache,
+        at: crate::services::cell_membership::ObservedAt,
+    ) -> TickObservation {
+        use crate::conductor_bridge_health as health;
 
         // THE OBSERVATION'S IDENTITY IS THE READING'S, NOT THIS MOMENT'S — and
         // that identity is an ORDER, not a timestamp.
@@ -1456,13 +1475,12 @@ impl HcClientRegistry {
     /// One read-only question to `role`'s own cell. Every bound on it lives in
     /// [`crate::services::cell_probe`]; awaited inline, so this task makes
     /// exactly one and cannot start a second before the first answers.
-    async fn probe_the_cell(role: &str, hc: &Arc<HcClient>) {
-        let _ = crate::services::cell_probe::probe_cell(
-            role,
-            hc,
-            crate::services::cell_probe::probe_gate(),
-        )
-        .await;
+    pub(crate) async fn probe_the_cell(
+        role: &str,
+        hc: &Arc<HcClient>,
+    ) -> crate::services::cell_probe::ProbeVerdict {
+        crate::services::cell_probe::probe_cell(role, hc, crate::services::cell_probe::probe_gate())
+            .await
     }
 
     /// One `enable_app` attempt, already paced by the caller's ladder rung.
@@ -1548,11 +1566,35 @@ impl NotRunningActuator for SupervisorActuator<'_> {
 }
 
 impl HcClientRegistry {
+    /// Returns the presence driver's handle. On shutdown that driver DRAINS
+    /// the probes it offered rather than abandoning them, so the caller awaits
+    /// this handle — bounded by
+    /// [`crate::services::presence_recovery::PRESENCE_SHUTDOWN_DRAIN_BOUND`] —
+    /// before the runtime is torn down; otherwise teardown drops the drain.
+    #[must_use = "await the presence driver's drain at shutdown, or teardown abandons its probes"]
     pub fn spawn_bridge_supervisor(
         self: Arc<Self>,
         inputs: HcRegistryInputs,
         shutdown: tokio::sync::broadcast::Sender<()>,
-    ) {
+    ) -> tokio::task::JoinHandle<()> {
+        // ONE presence driver for the conductor, beside the per-role loops: it
+        // owns no slot and re-mints nothing; it probes every observed role when
+        // a reading shows their cells present again (see
+        // `services::presence_recovery::PresenceRecovery`).
+        let presence = {
+            let registry = Arc::clone(&self);
+            let presence_shutdown = shutdown.subscribe();
+            tokio::spawn(async move {
+                crate::services::presence_recovery::drive_presence_recovery(
+                    crate::services::presence_recovery::presence_recovery(),
+                    crate::services::cell_membership::membership(),
+                    registry.as_ref(),
+                    presence_shutdown,
+                )
+                .await;
+                info!("presence recovery driver exiting (shutdown)");
+            })
+        };
         for role in SUPERVISED_ROLES {
             let registry = Arc::clone(&self);
             let inputs = inputs.clone();
@@ -1831,6 +1873,12 @@ impl HcClientRegistry {
                     };
                     registry.set_client(role, Some(Arc::clone(&serving)));
                     drop(filling);
+                    // The cells on the far side are coming back: open the
+                    // presence watch so the moment they rejoin the running map
+                    // every role of this conductor is probed in one pass,
+                    // instead of on this loop's next tick.
+                    crate::services::presence_recovery::presence_recovery()
+                        .reopen_at(std::time::Instant::now());
 
                     // "Live" is said about the socket zome calls will use, and
                     // only after it has answered.
@@ -1857,6 +1905,7 @@ impl HcClientRegistry {
                 }
             });
         }
+        presence
     }
 }
 
@@ -2507,7 +2556,7 @@ mod supervised_slot_tests {
         // inputs + a shutdown sender.
         let reg = std::sync::Arc::new(HcClientRegistry::empty());
         let (shutdown_tx, _rx) = tokio::sync::broadcast::channel::<()>(1);
-        reg.spawn_bridge_supervisor(
+        let presence = reg.spawn_bridge_supervisor(
             HcRegistryInputs {
                 admin_url: "ws://127.0.0.1:1".into(),
                 app_url: "ws://127.0.0.1:1".into(),
@@ -2521,6 +2570,16 @@ mod supervised_slot_tests {
         // test run — this test asserts the call succeeds without a
         // PolicyConfig, not the supervisor's steady-state probing behavior.
         let _ = shutdown_tx.send(());
+        // The handle it returns is the presence driver's, and shutdown ends it
+        // inside the bound production awaits it with — nothing offered, so
+        // nothing to drain.
+        tokio::time::timeout(
+            crate::services::presence_recovery::PRESENCE_SHUTDOWN_DRAIN_BOUND,
+            presence,
+        )
+        .await
+        .expect("the presence driver ends on shutdown inside the drain bound")
+        .expect("the presence driver did not panic");
     }
     // ---- the membership-informed tick decision (2026-09-22) ---------------
 

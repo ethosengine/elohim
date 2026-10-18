@@ -380,6 +380,7 @@ fn p2p_status_fixture() -> P2PStatusInfo {
             reanchor_held_unanswered: 0,
             dead_settled_by_declaration: 0,
             reanchor_awaiting_channel: 0,
+            reanchor_sweeps_abandoned: 0,
         }),
         // Dual-stack: exercise the additive irohNodeId serialization against the
         // schema (64-char hex NodeId).
@@ -518,6 +519,7 @@ fn p2p_status_view_with_stuck_dead_anchor_population_matches_schema() {
             reanchor_held_unanswered: 0,
             dead_settled_by_declaration: 0,
             reanchor_awaiting_channel: 0,
+            reanchor_sweeps_abandoned: 0,
         }),
         iroh_node_id: None,
     };
@@ -568,10 +570,12 @@ fn p2p_status_view_with_per_arm_counts_and_settled_dead_rows_matches_schema() {
         reanchor_held_unanswered: 0,
         dead_settled_by_declaration: 3,
         reanchor_awaiting_channel: 13,
+        reanchor_sweeps_abandoned: 2,
     });
     let json = serde_json::to_value(&status).unwrap();
     let provide_loop = json.get("provideLoop").expect("provideLoop present");
     assert_eq!(provide_loop.get("reanchorAdopted"), Some(&1.into()));
+    assert_eq!(provide_loop.get("reanchorSweepsAbandoned"), Some(&2.into()));
     assert_eq!(provide_loop.get("reanchorHeld"), Some(&1.into()));
     assert_eq!(provide_loop.get("reanchorHeldBackoff"), Some(&2.into()));
     assert_eq!(provide_loop.get("reanchorHeldUnbacked"), Some(&52.into()));

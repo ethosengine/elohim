@@ -223,7 +223,12 @@ pub fn run(args: &[String]) -> ActorResult<ExitCode> {
         }
         "device" => run_device(&args[1..]),
         other => Err(ActorError::InvalidArguments(format!(
-            "unknown actor subcommand `{other}`\n{}",
+            "unknown actor subcommand `{other}`{}\n{}",
+            crate::hint::did_you_mean(
+                other,
+                "epr actor",
+                &["claim", "current", "witness", "contest", "device"]
+            ),
             usage()
         ))),
     }
@@ -273,7 +278,8 @@ fn run_device(args: &[String]) -> ActorResult<ExitCode> {
             Ok(ExitCode::SUCCESS)
         }
         other => Err(ActorError::InvalidArguments(format!(
-            "unknown device verb `{other}` — enroll | authorize | bind\n{}",
+            "unknown device verb `{other}`{} — enroll | authorize | bind\n{}",
+            crate::hint::did_you_mean(other, "epr actor device", &["enroll", "authorize", "bind"]),
             usage()
         ))),
     }
@@ -1931,8 +1937,10 @@ pub fn usage() -> String {
      | device enroll --handle <handle> [--root DIR]\n  \
      | device authorize <request-json-or-path> [--root DIR]\n  \
      | device bind <authorization-json-or-path> [--root DIR]\n\
-     >"
-    .to_string()
+     >\n\
+     `actor device` puts this machine's key on this repository's roster for a participant. \
+     To join a node to a person's identity on the network instead, see `epr device`."
+        .to_string()
 }
 
 #[cfg(test)]

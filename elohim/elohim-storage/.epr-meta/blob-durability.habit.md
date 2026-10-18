@@ -4,7 +4,7 @@ id: blob-durability
 invariant: >
   Blob bytes survive peer loss and churn: custody commitments honored,
   RS-quilt placement household-diverse, salvage re-places without data loss.
-status: red
+status: green
 active: false
 checks:
   - "a2o @concern:blob-durability — 9 scenarios across genesis/a2o/features/resilience/ (governed-distribution, salvage-placement, chaos-peer-churn, grandma-photos-survive-node-loss, app-blob-heal-on-read, observable-distribution, resilience-dimensions, household-diversity-dataplane)"
@@ -16,6 +16,8 @@ retire-when: >
   silent and irreversible — nobody reports the blob they can no longer fetch — which is
   exactly the class that must not depend on someone remembering to look.
 ---
+DELTA 2026-10-18 (flip red→green on household evidence; ruling recorded): the three chaos-peer-churn scenarios whose custody guard refused on 2026-10-17 pass on this household — `features/resilience/chaos-peer-churn.feature` 3/3, 34/34 (sprint-report-household-20261018T154019Z-58ef1c20) and the habit's own `@concern:blob-durability` tag lane 14 scenarios: 10 passed, 1 pending, 3 skipped, 0 failed (…154413Z-e42c7f45; the pending and skipped set is the one the lane carried before the 10-17 flip, when the habit was green). The custody substrate is present: `genesis/local-dev/household-dowell/drill-custody-pairs.json` holds 9 pairs (matthew, jessica, james × manifesto, chaos-ladder, heal-target blobs) and jessica's `/api/v1/commitments?action=custody-blob&limit=5000` lists active rows for all three blobs × three providers. The 10-17 red was that household's state, and its most likely cause is now impossible to miss: the prologue's `seed-drill-custody` leg skipped with exit 0 when `seed-drill-fixtures` wrote no pairs; e42c7f453 makes it print `REFUSED seed-drill-custody:` with the pairs path, the fixtures leg's exit code and the consequence, and return nonzero. Side finding for the clients of that route: `/api/v1/commitments` without `limit` returns only the newest 100 rows (the a2o steps pass `limit=500`). Fleet half still unmeasured (the 2026-09-11 Dataplane Validation red stands on its own evidence); green holds on the household's Act I checks.
+
 DELTA 2026-10-17 (flip green→red): no custody-blob commitment names a second provider for the protected household fixtures, so the habit's protection scenarios cannot start.
 
 Two household lanes today on merged source (dev 1a87ed72c + the marathon's commits, storage and doorway rebuilt from a8d3e71a3, conductors hc-fork-96bcd2bee215-proof):
