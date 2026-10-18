@@ -274,7 +274,7 @@ struct SeamState {
 /// that finds the supervisor's probe of the same role already in flight keeps
 /// the run, waits on the gate's release (no polling) and is re-offered then —
 /// so a supervisor probe that fails does not cost the run its own.
-pub struct PresenceRecovery {
+pub(crate) struct PresenceRecovery {
     cadence: Duration,
     window: Duration,
     state: std::sync::Mutex<SeamState>,
@@ -333,8 +333,9 @@ impl PresenceRecovery {
         self.state().watch_until.is_some_and(|until| now < until)
     }
 
-    /// How many passes have run. Observability and tests.
-    pub fn passes(&self) -> u64 {
+    /// How many passes have run. Tests only.
+    #[cfg(test)]
+    pub(crate) fn passes(&self) -> u64 {
         self.passes.load(std::sync::atomic::Ordering::SeqCst)
     }
 
@@ -1440,5 +1441,60 @@ mod presence_recovery_tests {
             1,
             "the planner asked the conductor nothing"
         );
+    }
+
+    /// RE-REVIEW C — a probe offered before a re-mint that FAILS after it
+    /// leaves the new epoch's opportunity intact.
+    ///
+    /// A's probe is offered in one epoch and parks; a re-mint opens the next
+    /// while it is in flight (no second probe meanwhile). The old probe then
+    /// lands REFUSED: its verdict spends nothing in the new epoch, so A is
+    /// offered again at once — and exactly once.
+    #[tokio::test]
+    async fn an_old_epoch_probe_that_fails_still_lets_the_new_epoch_offer() {
+        const A: &str = "test-presence-old-epoch-fails";
+        let cadence = Duration::from_millis(10);
+        let c = cell(101);
+        let admin = Arc::new(FakeAdmin::new(Ok(vec![c.clone()])));
+        let conductor = Arc::new(FakeConductor::new(
+            vec![observed(A, A, &c)],
+            Arc::clone(&admin),
+            false,
+        ));
+        conductor.park(A);
+        open_episode(A);
+        let seam = Arc::new(PresenceRecovery::with_timing(
+            cadence,
+            Duration::from_secs(5),
+        ));
+        let cache = Arc::new(MembershipCache::new());
+        let (tx, handle) = spawn_driver(&seam, &cache, &conductor);
+
+        seam.reopen_at(std::time::Instant::now());
+        until("the first epoch's probe parked", || {
+            conductor.probes_of(A) == 1
+        })
+        .await;
+        seam.reopen_at(std::time::Instant::now());
+        let reads = admin.call_count();
+        until("the new epoch's readings", || {
+            admin.call_count() >= reads + 5
+        })
+        .await;
+        assert_eq!(conductor.probes_of(A), 1, "still one probe in flight");
+
+        // The old-epoch probe lands REFUSED.
+        conductor.unpark(A);
+        until("the new epoch's own probe", || conductor.probes_of(A) == 2).await;
+        until("it landed", || conductor.landed_of(A) == 2).await;
+        let reads = admin.call_count();
+        until("ten more readings", || admin.call_count() >= reads + 10).await;
+        assert_eq!(
+            conductor.probes_of(A),
+            2,
+            "the new epoch's run is spent once"
+        );
+        assert!(role_is_not_running(A), "refused probes recover nothing");
+        stop(tx, handle).await;
     }
 }
