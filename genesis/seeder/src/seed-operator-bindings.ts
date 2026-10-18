@@ -14,25 +14,22 @@
  *
  * Sister to seed-commitments.ts (custody-blob) — same POST endpoint, different
  * action discriminator. Same idempotency story: id is content-addressed over
- * (operator_peer_id, action, scope), re-runs collapse to 409.
+ * (operator_agent_key, action, scope), re-runs collapse to 409.
  *
- * Default M5 binding set:
- *   - human-matthew-manager  →  doorway:alpha-elohim-host  (primary, *)
- *   - human-matthew-manager  →  doorway:apex-elohim-host   (primary, *)
+ * Matthew is primary on household A and alpha; Adam is primary on apex,
+ * with Matthew holding enumerated deputy capabilities there.
  *
- * One human, two doorways, one capability scope. Federation pair
- * alpha.elohim.host ↔ elohim.host both list Matthew as primary operator.
- *
- * Usage:
- *   DOORWAY_URL=http://localhost:8888 npx tsx src/seed-operator-bindings.ts
- *   DOORWAY_URL=https://alpha.elohim.host DOORWAY_API_KEY=xxx \
- *     OPERATOR_BINDINGS_JSON=./bindings.json npx tsx src/seed-operator-bindings.ts
+ * Required: OPERATOR_STEWARD_STORAGE_URL names Matthew's conductor-backed
+ * storage. DOORWAY_URL names the doorway used to verify operator logins.
+ * DOORWAY_ID selects household A (same default as hc-mesh.sh: alpha-elohim-host).
+ * OPERATOR_BINDINGS_JSON optionally supplies a different binding set.
  */
 
 import { readFileSync } from 'node:fs';
 import { createHash } from 'node:crypto';
 import { DoorwayClient } from './doorway-client.js';
-import { deterministicPeerId, type Archetype } from './peer-id.js';
+import type { Archetype } from './peer-id.js';
+import { operatorAgentKeysFromLogin } from './seed-humans.js';
 
 // =============================================================================
 // Types
@@ -48,6 +45,8 @@ export interface OperatorBinding {
   capabilities: string[];
   successionRole: SuccessionRole;
   reachScope?: ReachScope;
+  standingBasis?: 'test-fixture';
+  testNetSteward?: string;
 }
 
 interface CommitmentBody {
@@ -92,27 +91,26 @@ interface CommitmentBody {
 /**
  * Build a CreateReaCommitmentInputView body for one operator binding.
  *
- * `id` is content-addressed over (operator_peer_id, action, scope) so re-runs
+ * `id` is content-addressed over (operator_agent_key, action, scope) so re-runs
  * are idempotent — POST returns 409 on the second invocation. Distinct
  * (operator, doorway) pairs produce distinct ids; the same operator on a
  * different doorway is a separate binding row.
  *
- * `provider` is the operator's deterministic peer_id (Stage 1 opaque hash,
- * see peer-id.ts). `receiver` is the same peer_id by convention — REA's
- * provider/receiver semantics don't apply cleanly to operate-doorway (the
- * "service" is doorway operation, not a transfer between agents). The auth
- * resolver filters by provider + scope; receiver is informational.
+ * `provider` and `receiver` are the real agent key returned by this human's
+ * registration/login. Key rotation intentionally creates a different id.
  */
-export function buildOperatorCommitmentBody(binding: OperatorBinding): CommitmentBody {
-  const peerId = deterministicPeerId(binding.operatorHumanId, binding.operatorArchetype);
+export function buildOperatorCommitmentBody(
+  binding: OperatorBinding,
+  agentPubKey?: string,
+): CommitmentBody {
+  if (!agentPubKey?.trim()) {
+    throw new Error(`OPERATOR_AGENT_KEY_MISSING: ${binding.operatorHumanId}`);
+  }
   const scope = `doorway:${binding.doorwayId}`;
 
-  // Digest input is STABLE: changing this string would change the id for
-  // existing rows and cause idempotent re-runs to insert duplicates. The scope
-  // value here is a plain string (not JSON), intentionally matching the original
-  // digest input before the wire-shape fix.
+  // Stable digest over (agent key | action | scope), not a synthetic peer id.
   const idDigest = createHash('sha256')
-    .update(`${peerId}|operate-doorway|${scope}`, 'utf8')
+    .update(`${agentPubKey}|operate-doorway|${scope}`, 'utf8')
     .digest('hex')
     .slice(0, 16);
 
@@ -122,13 +120,16 @@ export function buildOperatorCommitmentBody(binding: OperatorBinding): Commitmen
     reachScope: binding.reachScope ?? 'operator-private',
     seedGeneration: 'genesis',
     operatorHumanId: binding.operatorHumanId,
+    issuedBy: STEWARD_HUMAN_ID,
+    ...(binding.standingBasis ? { standingBasis: binding.standingBasis } : {}),
+    ...(binding.testNetSteward ? { testNetSteward: binding.testNetSteward } : {}),
   };
 
   return {
     id: `operate-doorway-${idDigest}`,
     action: 'operate-doorway',
-    provider: peerId,
-    receiver: peerId,
+    provider: agentPubKey,
+    receiver: agentPubKey,
     // JSON-encoded array string — CreateReaCommitmentInput.resource_classified_as
     // is Option<String>; the view layer parses it back to Vec<String>.
     resourceClassifiedAs: JSON.stringify(binding.capabilities),
@@ -141,29 +142,51 @@ export function buildOperatorCommitmentBody(binding: OperatorBinding): Commitmen
 }
 
 // =============================================================================
-// Default M5 binding set
-//
-// One human (Matthew) registered as primary operator of both alpha-cluster
-// doorways. Each doorway projects the same elohim-host-landing EPR; the
-// operator binding is per-doorway but the human is the same.
+// Default operator ruling (2026-10-16)
 // =============================================================================
 
-export function defaultM5Bindings(): OperatorBinding[] {
+export const STEWARD_HUMAN_ID = 'human-matthew-manager';
+export const APEX_DEPUTY_CAPABILITIES = [
+  'doorway-observe',
+  'topology.read',
+  'federation.peers.read',
+  'federation.peers.mutate',
+  'hosted_users.lifecycle',
+  'graduation.record',
+  'registry.read',
+  'registry.mutate',
+  'cache.read',
+  'cache.mutate',
+];
+
+export function defaultM5Bindings(env: NodeJS.ProcessEnv = process.env): OperatorBinding[] {
+  // Matches hc-mesh.sh doorway A's DOORWAY_ID default. Collapse coincident scopes.
+  const primaryDoorways = new Set([env.DOORWAY_ID || 'alpha-elohim-host', 'alpha-elohim-host']);
   return [
-    {
-      operatorHumanId: 'human-matthew-manager',
-      operatorArchetype: 'desktop',
-      doorwayId: 'alpha-elohim-host',
+    ...[...primaryDoorways].map(doorwayId => ({
+      operatorHumanId: STEWARD_HUMAN_ID,
+      operatorArchetype: 'desktop' as const,
+      doorwayId,
       capabilities: ['*'],
-      successionRole: 'primary',
-      reachScope: 'stewards-only',
-    },
+      successionRole: 'primary' as const,
+      reachScope: 'stewards-only' as const,
+    })),
     {
-      operatorHumanId: 'human-matthew-manager',
-      operatorArchetype: 'desktop',
+      operatorHumanId: 'human-adam-firstman',
+      operatorArchetype: 'node',
       doorwayId: 'apex-elohim-host',
       capabilities: ['*'],
       successionRole: 'primary',
+      reachScope: 'stewards-only',
+      standingBasis: 'test-fixture',
+      testNetSteward: STEWARD_HUMAN_ID,
+    },
+    {
+      operatorHumanId: STEWARD_HUMAN_ID,
+      operatorArchetype: 'desktop',
+      doorwayId: 'apex-elohim-host',
+      capabilities: [...APEX_DEPUTY_CAPABILITIES],
+      successionRole: 'deputy',
       reachScope: 'stewards-only',
     },
   ];
@@ -181,7 +204,7 @@ export function defaultM5Bindings(): OperatorBinding[] {
 //   And that commitment's metadata signalKind is "compute-allocation"
 //   And that commitment's metadata triggerKind is "subscription"
 //
-// Unlike operator bindings (where provider is a deterministic peer_id),
+// Unlike operator bindings (where provider is the real agent key),
 // hosting commitments use the human's short name literally as the provider
 // so the /api/v1/commitments?provider=matthew query can locate them without
 // knowing the peer_id.
@@ -263,6 +286,10 @@ export function defaultHostingAgreements(): HostingAgreementSpec[] {
 // =============================================================================
 
 class OperatorBindingClient extends DoorwayClient {
+  async getCommitment(id: string): Promise<Response> {
+    return this.fetch(`/api/v1/commitments/${encodeURIComponent(id)}`);
+  }
+
   async createCommitment(body: CommitmentBody): Promise<Response> {
     return this.fetch('/api/v1/commitments', {
       method: 'POST',
@@ -287,44 +314,58 @@ export function createOperatorBindingClient(
 // Seeding (fail-fast on non-409 errors)
 // =============================================================================
 
-export async function seedOperatorBindings(
-  client: OperatorBindingClient,
-  bindings: OperatorBinding[],
-): Promise<void> {
-  console.log(`[seed-operator-bindings] Seeding ${bindings.length} operate-doorway commitments...`);
-
-  let created = 0;
-  let alreadyExists = 0;
-
-  for (const binding of bindings) {
-    const body = buildOperatorCommitmentBody(binding);
-    const label = `${binding.operatorHumanId.replace(/^human-/, '')}→${binding.doorwayId} (${binding.successionRole})`;
-
-    const response = await client.createCommitment(body);
-
-    if (response.ok) {
-      console.log(`  [+] ${label}  caps=[${binding.capabilities.join(',')}]`);
-      created += 1;
-      continue;
-    }
-
-    const text = await response.text();
-    if (response.status === 409 || text.includes('UNIQUE') || text.includes('already exists')) {
-      console.log(`  [=] ${label} (idempotent re-run)`);
-      alreadyExists += 1;
-      continue;
-    }
-
-    // ANY other failure is a shape mismatch or doorway issue — fail fast.
-    console.error(`  [X] ${label}: HTTP ${response.status}`);
-    console.error(`      Body: ${text.slice(0, 500)}`);
-    console.error(`      Sent: ${JSON.stringify(body, null, 2)}`);
-    process.exit(1);
+/** The URL is an explicit operator declaration: this storage authors as Matthew. */
+export function createStewardOperatorBindingClient(env: NodeJS.ProcessEnv = process.env) {
+  const url = env.OPERATOR_STEWARD_STORAGE_URL;
+  if (!url?.trim()) {
+    throw new Error(
+      "OPERATOR_STEWARD_STORAGE_MISSING: set OPERATOR_STEWARD_STORAGE_URL to Matthew's conductor-backed storage",
+    );
   }
+  return createOperatorBindingClient(url, env.OPERATOR_STEWARD_STORAGE_API_KEY);
+}
 
-  console.log(
-    `[seed-operator-bindings] Done. created=${created} already-exists=${alreadyExists} total=${bindings.length}`,
+export async function seedConfiguredOperatorBindings(
+  doorwayUrl: string,
+  bindings: OperatorBinding[] = defaultM5Bindings(),
+): Promise<void> {
+  const client = createStewardOperatorBindingClient();
+  const keys = await operatorAgentKeysFromLogin(
+    doorwayUrl,
+    bindings.map(b => b.operatorHumanId),
   );
+  await seedOperatorBindings(client, bindings, keys);
+}
+
+export async function seedOperatorBindings(
+  client: Pick<OperatorBindingClient, 'createCommitment' | 'getCommitment'>,
+  bindings: OperatorBinding[],
+  agentKeys: ReadonlyMap<string, string>,
+): Promise<void> {
+  // Validate all identities before writing any binding.
+  const bodies = bindings.map(binding =>
+    buildOperatorCommitmentBody(binding, agentKeys.get(binding.operatorHumanId)),
+  );
+  for (const body of bodies) {
+    const response = await client.createCommitment(body);
+    if (!response.ok && response.status !== 409) {
+      throw new Error(
+        `OPERATOR_BINDING_CREATE_FAILED: ${body.note}: HTTP ${response.status}: ${await response.text()}`,
+      );
+    }
+    // A 409 is not proof: old projection-only rows must fail readback too.
+    const readback = await client.getCommitment(body.id);
+    if (!readback.ok) {
+      throw new Error(
+        `OPERATOR_BINDING_READBACK_FAILED: ${body.id}: HTTP ${readback.status}: ${await readback.text()}`,
+      );
+    }
+    const record = (await readback.json()) as { dhtAnchorHash?: string | null };
+    if (typeof record.dhtAnchorHash !== 'string' || !record.dhtAnchorHash.trim()) {
+      throw new Error(`OPERATOR_BINDING_ANCHOR_MISSING: ${body.id}`);
+    }
+    console.log(`[seed-operator-bindings] anchored ${body.id}`);
+  }
 }
 
 export async function seedHostingAgreements(
@@ -399,7 +440,7 @@ if (isMain) {
     process.exit(1);
   }
 
-  await seedOperatorBindings(client, bindings);
+  await seedConfiguredOperatorBindings(doorwayUrl, bindings);
   await seedHostingAgreements(client, hostingAgreements);
   process.exit(0);
 }

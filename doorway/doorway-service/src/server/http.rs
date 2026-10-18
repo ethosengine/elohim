@@ -8234,6 +8234,18 @@ async fn handle_request(
         }
     }
 
+    // ── Operator actuators need Admin ──────────────────────────────────────────
+    // Hosting, graduation, federation and refresh mutations: one gate, decided by
+    // the declared permission ladder (Admin JWT or admin X-API-Key), never by
+    // `dev_mode`. Runs before any body is read.
+    if crate::auth::is_operator_actuator(&method, &path) {
+        if let Err(denied) =
+            crate::auth::require_admin_permission(&state, &req, peer_is_loopback(&addr))
+        {
+            return Ok(to_boxed(denied));
+        }
+    }
+
     let response = match (method, path.as_str()) {
         // Startup progress probe - reports identity/storage/projection/root-app readiness
         (Method::GET, "/health/startup") => {
@@ -12541,6 +12553,99 @@ mod root_projection_shadow_regression_tests {
         .await
         .unwrap_or_else(|_| panic!("PUT {path} did not answer within 5s"))
         .unwrap_or_else(|e| panic!("PUT {path} transport error: {e}"))
+    }
+
+    // ── Operator actuators: Admin required, through the real dispatch ──────
+
+    async fn send_actuator(
+        addr: SocketAddr,
+        method: &str,
+        path: &str,
+        header: Option<(&str, String)>,
+    ) -> u16 {
+        let client = reqwest::Client::new();
+        let mut rb = client.request(
+            reqwest::Method::from_bytes(method.as_bytes()).unwrap(),
+            format!("http://{addr}{path}"),
+        );
+        if let Some((k, v)) = header {
+            rb = rb.header(k, v);
+        }
+        tokio::time::timeout(std::time::Duration::from_secs(5), rb.send())
+            .await
+            .unwrap_or_else(|_| panic!("{method} {path} did not answer within 5s"))
+            .unwrap_or_else(|e| panic!("{method} {path} transport error: {e}"))
+            .status()
+            .as_u16()
+    }
+
+    #[tokio::test]
+    async fn operator_actuators_refuse_callers_below_admin_through_dispatch() {
+        use crate::auth::{JwtValidator, PermissionLevel, TokenInput};
+        const SECRET: &str = "test-secret-that-is-at-least-32-characters-long";
+        let mut args = Args::parse_from(["doorway", "--listen", "127.0.0.1:0"]);
+        args.api_key_admin = Some("test-admin-key".to_string());
+        args.jwt_secret = Some(SECRET.to_string());
+        let mut state = AppState::new(args);
+        // The test peer is loopback; retire the pre-coordination on-the-box
+        // grant so anonymity is genuinely anonymous.
+        state.network_stage = seam_contracts::freshness::NetworkStage::Coordinated;
+        let addr = spawn_test_doorway(Arc::new(state)).await;
+
+        let jwt = |level| {
+            JwtValidator::new(SECRET.into(), 3600)
+                .unwrap()
+                .generate_token(TokenInput {
+                    human_id: "human-123".into(),
+                    agent_pub_key: "uhCAk...".into(),
+                    identifier: "ci@example.com".into(),
+                    permission_level: level,
+                    session_id: None,
+                    doorway_id: None,
+                    doorway_url: None,
+                    conductor_id: None,
+                    installed_app_id: None,
+                    is_steward: false,
+                    has_local_conductor: false,
+                })
+                .unwrap()
+        };
+        let low = jwt(PermissionLevel::Authenticated);
+        let admin = jwt(PermissionLevel::Admin);
+
+        for (m, p) in [
+            ("POST", "/admin/hosted-users"),
+            ("DELETE", "/admin/hosted-users/uhCAkagent"),
+            ("POST", "/admin/graduation/force/uhCAkagent"),
+            ("POST", "/admin/federation/peers"),
+            ("DELETE", "/admin/federation/peers"),
+            ("POST", "/admin/federation/peers/refresh"),
+            ("POST", "/admin/steward-peers/refresh"),
+            ("POST", "/admin/ssr-bundle/refresh"),
+        ] {
+            assert_eq!(send_actuator(addr, m, p, None).await, 401, "{m} {p} anon");
+            assert_eq!(
+                send_actuator(addr, m, p, Some(("authorization", format!("Bearer {low}")))).await,
+                403,
+                "{m} {p} ordinary jwt"
+            );
+            for (what, h) in [
+                ("admin jwt", ("authorization", format!("Bearer {admin}"))),
+                ("admin key", ("x-api-key", "test-admin-key".to_string())),
+            ] {
+                // Admission only: the handler behind the guard needs a live
+                // conductor / federation / storage that this listener lacks,
+                // so the mutation's own status (200/404/503/...) is not
+                // pinned here; a guard refusal is exactly 401/403, which is
+                // the pair asserted absent (exact statuses for the refused
+                // callers are asserted above).
+                let s = send_actuator(addr, m, p, Some(h)).await;
+                assert!(
+                    !matches!(s, 401 | 403),
+                    "{m} {p} {what} was refused by the guard: {s}"
+                );
+            }
+        }
     }
 
     // ── Story 2.2: public-name standing through a real listener ────────────

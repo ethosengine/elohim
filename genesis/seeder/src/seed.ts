@@ -44,7 +44,7 @@ import { SeedingVerification, type ExpectedCounts } from './verification.js';
 import { applyPathThumbnail } from './path-thumbnail.js';
 import { seedReach } from './reach-resolver.js';
 import {
-  seedOperatorBindings,
+  seedConfiguredOperatorBindings,
   seedHostingAgreements,
   defaultM5Bindings,
   defaultHostingAgreements,
@@ -2228,10 +2228,17 @@ export async function seed() {
   // before projection commitments cite them.
   // ========================================
   console.log('\n=== Seeding Doorway-Operator Bindings ===');
-  await seedOperatorBindings(
-    createOperatorBindingClient(DOORWAY_URL!, DOORWAY_API_KEY),
-    defaultM5Bindings(),
-  );
+  // Bindings are network records authored by the steward of record, so they
+  // need the steward's storage named. Nothing reads them yet (the doorway's
+  // standing resolver lands with plan doorway-operator-surface-under-standing,
+  // S1b), so an unconfigured run says so and goes on rather than failing.
+  if (process.env.OPERATOR_STEWARD_STORAGE_URL?.trim()) {
+    await seedConfiguredOperatorBindings(DOORWAY_URL!, defaultM5Bindings());
+  } else {
+    console.warn(
+      '   OPERATOR-BINDINGS-SKIPPED: set OPERATOR_STEWARD_STORAGE_URL to the steward of record\'s storage',
+    );
+  }
 
   // ========================================
   // HOSTING AGREEMENTS
