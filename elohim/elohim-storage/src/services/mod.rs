@@ -128,6 +128,7 @@ pub mod peer_selection;
 pub mod peer_status_fanout; // Cross-agent PeerStatus fan-in — breaks the self-only peer_statuses ceiling
 pub mod peer_topology_view;
 pub mod pointer_audit; // story 1.4d — heal a declared row's drifted blob pointer via pointer_heal_patch; never authors, declares, contests, or moves a head
+pub mod presence_recovery; // Cells present again: one pass probes every observed role of the conductor
 pub mod presence_service;
 pub mod private_replica; // Wave 5.1 Slice-0 — encrypt-then-erasure-code + DEK envelope PROOF
 pub mod projection_shade; // Operational (Path C) admin verb — hide one projection kind from this peer's read route without deleting it

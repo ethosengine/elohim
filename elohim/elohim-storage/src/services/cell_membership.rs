@@ -51,11 +51,11 @@
 //!   a 20s tick therefore cost roughly ONE admin read per 15–20s between them,
 //!   not five: the gate is on the CACHE, not on the caller, so it holds no
 //!   matter how many drivers appear. The ONE exception is the presence watch
-//!   ([`crate::hc_client_registry::PresenceRecovery`]): for at most
-//!   [`crate::hc_client_registry::PRESENCE_WATCH_WINDOW`] after a bridge
+//!   ([`crate::services::presence_recovery::PresenceRecovery`]): for at most
+//!   [`crate::services::presence_recovery::PRESENCE_WATCH_WINDOW`] after a bridge
 //!   re-mint, and only while an observed role is not running, it reads through
 //!   [`MembershipCache::refresh_if_older_than_at`] at most once per
-//!   [`crate::hc_client_registry::PRESENCE_WATCH_CADENCE`] — the same claim, the
+//!   [`crate::services::presence_recovery::PRESENCE_WATCH_CADENCE`] — the same claim, the
 //!   same attempt-pacing, a shorter window.
 //! * **Concurrency budget** — ONE refresh in flight, claimed atomically. The
 //!   window check and the window store used to be separate operations, so two
@@ -75,8 +75,9 @@
 //!   read. Nothing accumulates.
 //! * No loop, no task and no timer of its own. The supervisor's
 //!   `BRIDGE_PROBE_INTERVAL` tick is the steady pacing authority and the
-//!   presence watch the bounded post-re-mint one; both live in
-//!   [`crate::hc_client_registry`], and this cache only ANNOUNCES each reading
+//!   presence watch the bounded post-re-mint one (the supervisor in
+//!   [`crate::hc_client_registry`], the watch in
+//!   [`crate::services::presence_recovery`]), and this cache only ANNOUNCES each reading
 //!   that lands ([`MembershipCache::read_landed`]) so the presence pass can act
 //!   on it without waiting for anyone's tick.
 //!
@@ -434,7 +435,7 @@ impl MembershipCache {
     /// successful one), the deadline and the never-rewind rule are the same
     /// code — so a shorter window is a higher ceiling on admin reads and
     /// nothing else. Its one production caller is the presence watch, whose
-    /// window is [`crate::hc_client_registry::PRESENCE_WATCH_CADENCE`].
+    /// window is [`crate::services::presence_recovery::PRESENCE_WATCH_CADENCE`].
     pub async fn refresh_if_older_than_at(
         &self,
         src: &dyn RunningCellSource,
@@ -716,7 +717,7 @@ impl MembershipCache {
     /// while nobody is waiting coalesce into ONE wake, so a waiter that acts on
     /// the CURRENT reading when it wakes can never be owed more than one pass
     /// per wake. Its one production waiter is the presence pass in
-    /// [`crate::hc_client_registry`], which is how a cell that a read finds
+    /// [`crate::services::presence_recovery`], which is how a cell that a read finds
     /// running again is probed in that read's own wake instead of on some
     /// role's next tick.
     pub fn read_landed(&self) -> &tokio::sync::Notify {
