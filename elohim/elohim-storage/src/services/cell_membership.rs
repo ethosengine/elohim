@@ -55,8 +55,9 @@
 //!   [`crate::services::presence_recovery::PRESENCE_WATCH_WINDOW`] after a bridge
 //!   re-mint, and only while an observed role is not running, it reads through
 //!   [`MembershipCache::refresh_if_older_than_at`] at most once per
-//!   [`crate::services::presence_recovery::PRESENCE_WATCH_CADENCE`] — the same claim, the
-//!   same attempt-pacing, a shorter window.
+//!   [`crate::services::presence_recovery::PRESENCE_WATCH_CADENCE`], measured
+//!   from the last read that went out by ANYONE — a ceiling no invalidation
+//!   resets — with the same claim and attempt-pacing.
 //! * **Concurrency budget** — ONE refresh in flight, claimed atomically. The
 //!   window check and the window store used to be separate operations, so two
 //!   askers could both read "stale" before either stored its attempt and both
@@ -328,6 +329,16 @@ pub enum RefreshOutcome {
     Failed { msg: String },
 }
 
+/// Which attempt a refresh window is measured from.
+#[derive(Debug, Clone, Copy)]
+enum RefreshWindow {
+    /// From the last attempt not revoked by [`MembershipCache::invalidate`]:
+    /// the supervisor's window, cleared on a re-mint so the next tick re-reads.
+    SinceUnrevokedAttempt(Duration),
+    /// From the last `ListCellIds` that went out, revoked or not: a ceiling.
+    SincePhysicalAttempt(Duration),
+}
+
 /// Releases the single-flight claim on drop, so a panic or an early return
 /// inside a refresh cannot wedge the cache shut for the life of the process.
 struct RefreshClaim<'a>(&'a AtomicBool);
@@ -348,6 +359,12 @@ pub struct MembershipCache {
     /// MONOTONIC instant of the last attempt. The refresh window is measured
     /// from this, so a backward wall-clock step cannot suspend refreshing.
     last_attempt_at: RwLock<Option<Instant>>,
+    /// MONOTONIC instant the last `ListCellIds` actually went out, whoever
+    /// sent it. Unlike `last_attempt_at` NOTHING clears it — not
+    /// [`MembershipCache::invalidate`] — so a ceiling measured from it holds
+    /// across a re-mint. The presence watch's read budget is measured from
+    /// here; see [`MembershipCache::refresh_if_older_than_at`].
+    last_physical_attempt_at: RwLock<Option<Instant>>,
     /// Epoch-ms of the last revocation. DIAGNOSTICS ONLY.
     invalidated_at_ms: AtomicU64,
     /// Observation sequence at which every reading taken at or before it lost
@@ -395,17 +412,20 @@ impl MembershipCache {
     /// step made `now_ms.saturating_sub(last)` answer `0` and suspended
     /// refreshing for about an hour plus the window.
     pub fn is_stale_at(&self, at: ObservedAt) -> bool {
-        self.is_older_than_at(at, MEMBERSHIP_REFRESH_INTERVAL)
+        self.is_older_than_at(
+            at,
+            RefreshWindow::SinceUnrevokedAttempt(MEMBERSHIP_REFRESH_INTERVAL),
+        )
     }
 
-    /// Has at least `window` passed (monotonically) since the last attempt?
-    /// `true` before the first attempt.
-    fn is_older_than_at(&self, at: ObservedAt, window: Duration) -> bool {
-        match *self
-            .last_attempt_at
-            .read()
-            .unwrap_or_else(|e| e.into_inner())
-        {
+    /// Has at least `window` passed (monotonically) since the attempt the
+    /// window is measured from? `true` before the first attempt.
+    fn is_older_than_at(&self, at: ObservedAt, window: RefreshWindow) -> bool {
+        let (stamp, window) = match window {
+            RefreshWindow::SinceUnrevokedAttempt(w) => (&self.last_attempt_at, w),
+            RefreshWindow::SincePhysicalAttempt(w) => (&self.last_physical_attempt_at, w),
+        };
+        match *stamp.read().unwrap_or_else(|e| e.into_inner()) {
             None => true,
             Some(last) => at.mono.saturating_duration_since(last) >= window,
         }
@@ -423,24 +443,47 @@ impl MembershipCache {
         src: &dyn RunningCellSource,
         at: ObservedAt,
     ) -> RefreshOutcome {
-        self.refresh_if_older_than_at(src, at, MEMBERSHIP_REFRESH_INTERVAL)
-            .await
+        self.refresh_within_at(
+            src,
+            at,
+            RefreshWindow::SinceUnrevokedAttempt(MEMBERSHIP_REFRESH_INTERVAL),
+        )
+        .await
     }
 
-    /// [`Self::refresh_if_stale_at`] with the refresh window named by the
-    /// caller instead of [`MEMBERSHIP_REFRESH_INTERVAL`].
+    /// Refresh from `src` only if no `ListCellIds` at all — by any caller —
+    /// went out within `window`.
     ///
-    /// Only the window changes. The single-flight claim, the recheck under it,
-    /// the attempt-pacing (a failed read advances the window exactly like a
-    /// successful one), the deadline and the never-rewind rule are the same
-    /// code — so a shorter window is a higher ceiling on admin reads and
-    /// nothing else. Its one production caller is the presence watch, whose
-    /// window is [`crate::services::presence_recovery::PRESENCE_WATCH_CADENCE`].
+    /// A HARD CEILING, which is the difference from [`Self::refresh_if_stale_at`].
+    /// That window is measured from an attempt [`Self::invalidate`] clears, on
+    /// purpose: after a re-mint the next supervisor tick must re-read at once.
+    /// Measured from that stamp, a short window would let staggered sibling
+    /// re-mints admit reads back to back. This one is measured from the last
+    /// PHYSICAL attempt, which nothing clears, so a caller using it adds at most
+    /// one admin read per `window` however the re-mints fall. The single-flight
+    /// claim, its recheck, the attempt-pacing, the deadline and the
+    /// never-rewind rule are the same code.
+    ///
+    /// Its one production caller is the presence watch, at
+    /// [`crate::services::presence_recovery::PRESENCE_WATCH_CADENCE`]. The
+    /// supervisor's own post-invalidation re-reads stay exactly as they were;
+    /// they are not inside this ceiling and the watch never adds to them inside
+    /// one cadence.
     pub async fn refresh_if_older_than_at(
         &self,
         src: &dyn RunningCellSource,
         at: ObservedAt,
         window: Duration,
+    ) -> RefreshOutcome {
+        self.refresh_within_at(src, at, RefreshWindow::SincePhysicalAttempt(window))
+            .await
+    }
+
+    async fn refresh_within_at(
+        &self,
+        src: &dyn RunningCellSource,
+        at: ObservedAt,
+        window: RefreshWindow,
     ) -> RefreshOutcome {
         if !self.is_older_than_at(at, window) {
             return RefreshOutcome::Cached;
@@ -466,7 +509,7 @@ impl MembershipCache {
         &self,
         src: &dyn RunningCellSource,
         at: ObservedAt,
-        window: Duration,
+        window: RefreshWindow,
     ) -> RefreshOutcome {
         // ONE in flight, whoever asks. Claimed BEFORE the window is stored so a
         // loser cannot mistake the winner's store for its own permission.
@@ -486,6 +529,10 @@ impl MembershipCache {
         self.last_attempt_ms.store(at.wall_ms, Ordering::Relaxed);
         *self
             .last_attempt_at
+            .write()
+            .unwrap_or_else(|e| e.into_inner()) = Some(at.mono);
+        *self
+            .last_physical_attempt_at
             .write()
             .unwrap_or_else(|e| e.into_inner()) = Some(at.mono);
         // The observation's ORDER, claimed before the request goes out — see
@@ -551,7 +598,9 @@ impl MembershipCache {
     /// `readAgeSecs` and `runningCellIds` still render; it simply stops deciding
     /// cures until a fresh read lands. Also clears the refresh window so the
     /// next asker re-reads immediately rather than waiting out 15s of a reading
-    /// that no longer counts.
+    /// that no longer counts. Only that window: the PHYSICAL-attempt ceiling
+    /// [`Self::refresh_if_older_than_at`] reads survives, so a revocation
+    /// cannot buy a caller of it an extra admin read.
     pub fn invalidate_at(&self, at_ms: u64, why: &str) {
         self.invalidate_at_seq(at_ms, crate::conductor_bridge_health::next_obs_seq(), why);
     }
@@ -1150,7 +1199,11 @@ mod tests {
         // under the claim is what must refuse it.
         assert_eq!(
             cache
-                .claim_and_refresh_at(&admin, at(T0 + 1), MEMBERSHIP_REFRESH_INTERVAL)
+                .claim_and_refresh_at(
+                    &admin,
+                    at(T0 + 1),
+                    RefreshWindow::SinceUnrevokedAttempt(MEMBERSHIP_REFRESH_INTERVAL),
+                )
                 .await,
             RefreshOutcome::Cached,
             "A's pre-claim staleness decision must be re-made under the claim"
@@ -1494,5 +1547,59 @@ mod tests {
             rendered.iter().all(|s| s.contains('/')),
             "each entry names the DNA and the agent: {rendered:?}"
         );
+    }
+
+    /// FINDING 4 — the watch's ceiling survives a re-mint's revocation.
+    ///
+    /// `invalidate` clears the supervisor's window so the next tick re-reads at
+    /// once; measured from that stamp, staggered sibling re-mints could admit
+    /// presence-watch reads back to back. The ceiling is measured from the last
+    /// read that went OUT, which no revocation clears.
+    #[tokio::test]
+    async fn a_revocation_does_not_reset_the_physical_read_ceiling() {
+        let cadence = Duration::from_secs(2);
+        let cache = MembershipCache::new();
+        let admin = FakeAdmin::new(Ok(Vec::new()));
+        assert!(matches!(
+            cache
+                .refresh_if_older_than_at(&admin, at(T0), cadence)
+                .await,
+            RefreshOutcome::Read { .. }
+        ));
+        // Three sibling re-mints inside one cadence each revoke the reading.
+        for (n, ms) in [300u64, 700, 1_200].into_iter().enumerate() {
+            cache.invalidate_at(T0 + ms, "sibling bridge re-mint (test)");
+            assert_eq!(
+                cache
+                    .refresh_if_older_than_at(&admin, at(T0 + ms + 1), cadence)
+                    .await,
+                RefreshOutcome::Cached,
+                "re-mint {n}: inside the ceiling a revocation buys no read"
+            );
+        }
+        assert_eq!(admin.call_count(), 1, "one read inside one cadence");
+        // The supervisor's own window IS cleared by the revocation — its next
+        // tick re-reads at once, exactly as before.
+        assert!(cache.is_stale_at(at(T0 + 1_300)));
+        assert!(matches!(
+            cache.refresh_if_stale_at(&admin, at(T0 + 1_300)).await,
+            RefreshOutcome::Read { .. }
+        ));
+        assert_eq!(admin.call_count(), 2);
+        // That supervisor read is itself a physical attempt: the ceiling now
+        // runs from it, not from the first read.
+        assert_eq!(
+            cache
+                .refresh_if_older_than_at(&admin, at(T0 + 2_100), cadence)
+                .await,
+            RefreshOutcome::Cached
+        );
+        assert!(matches!(
+            cache
+                .refresh_if_older_than_at(&admin, at(T0 + 3_300), cadence)
+                .await,
+            RefreshOutcome::Read { .. }
+        ));
+        assert_eq!(admin.call_count(), 3);
     }
 }
