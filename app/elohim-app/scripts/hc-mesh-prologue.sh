@@ -541,10 +541,14 @@ DRILL_PAIRS_PATH="$MESH_DIR/drill-custody-pairs.json"
 rm -f "$DRILL_PAIRS_PATH"
 export DRILL_PAIRS_PATH
 
+# Both drill legs stay soft (a household without drill fixtures is still a
+# household), but neither is quiet: a leg-1 failure is surfaced below and leg 2
+# turns an absent pairs file into a nonzero REFUSED line, so the final EXIT
+# table names the missing custody instead of an exit-0 skip.
 run_seed_leg "seed-drill-fixtures" soft \
   'DOORWAY_URL="$DOORWAY_A_URL" DOORWAY_B_URL="$DOORWAY_B_URL" STORAGE_URL="$STORAGE_URL" PEER_STORAGE_URLS="$PEER_STORAGE_URLS" DRILL_CUSTODY_PAIRS_OUT="$DRILL_PAIRS_PATH" npx tsx src/seed-drill-fixtures.ts'
 run_seed_leg "seed-drill-custody" soft \
-  'if [ -s "$DRILL_PAIRS_PATH" ]; then DOORWAY_URL="$DOORWAY_A_URL" CUSTODY_PAIRS_JSON="$DRILL_PAIRS_PATH" npx tsx src/seed-commitments.ts; else echo "no drill custody pairs written (leg 1 found no seedable fixture) — nothing to promise"; fi'
+  'if [ -s "$DRILL_PAIRS_PATH" ]; then DOORWAY_URL="$DOORWAY_A_URL" CUSTODY_PAIRS_JSON="$DRILL_PAIRS_PATH" npx tsx src/seed-commitments.ts; else echo "REFUSED seed-drill-custody: no drill custody pairs at $DRILL_PAIRS_PATH — seed-drill-fixtures exited ${LEG_RC[seed-drill-fixtures]:-unset} and wrote none, so NO custody-blob commitment names jessica/james for the manifesto / chaos-ladder / heal-target blobs and the chaos-peer-churn drills will refuse in their Given guard (read the seed-drill-fixtures leg above for the reason)" >&2; false; fi'
 run_seed_leg "seed-household-costeward" soft \
   'DOORWAY_URL="$DOORWAY_A_URL" DOORWAY_B_URL="$DOORWAY_B_URL" STORAGE_URL="$STORAGE_URL" PEER_STORAGE_URLS="$PEER_STORAGE_URLS" npx tsx src/seed-household-costeward.ts'
 
