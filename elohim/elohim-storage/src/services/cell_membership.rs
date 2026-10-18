@@ -127,7 +127,7 @@
 //! BACKWARDS, at which point "later" and "larger" are simply different
 //! relations.
 
-use std::collections::HashSet;
+use std::collections::{HashMap, HashSet};
 use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
 use std::sync::{OnceLock, RwLock};
 use std::time::{Duration, Instant};
@@ -287,6 +287,17 @@ pub struct MembershipReading {
     /// reading that was already in flight, and newer status evidence always
     /// gets to contradict it. Both are the safe way to be wrong.
     pub seq: u64,
+    /// Each running cell's PRESENCE RUN: the `seq` of the reading in which the
+    /// cell's current unbroken stretch of "running" began.
+    ///
+    /// Recorded HERE, as each reading lands, because a reader that only ever
+    /// sees the latest reading cannot tell "running throughout" from "gone and
+    /// back": two readings landing back to back (absent, then running) leave
+    /// only the second for anyone who wakes afterwards. A run continues only
+    /// across a reading that still shows the cell AND follows an unrevoked
+    /// one; an absence, or a re-mint's revocation, ends it, and the next
+    /// reading that shows the cell starts a new run under its own `seq`.
+    pub runs: HashMap<CellId, u64>,
 }
 
 /// A membership answer plus the identity of the observation it came from.
@@ -563,12 +574,29 @@ impl MembershipCache {
                 }
                 let cells: HashSet<CellId> = cells.into_iter().collect();
                 let running = cells.len();
-                *self.last.write().unwrap_or_else(|e| e.into_inner()) = Some(MembershipReading {
+                let mut last = self.last.write().unwrap_or_else(|e| e.into_inner());
+                // The previous reading continues a run only if no revocation
+                // came between it and this one.
+                let continues = last
+                    .as_ref()
+                    .filter(|prev| prev.seq > self.invalidated_seq.load(Ordering::SeqCst));
+                let runs = cells
+                    .iter()
+                    .map(|cell| {
+                        let run = continues
+                            .and_then(|prev| prev.runs.get(cell).copied())
+                            .unwrap_or(seq);
+                        (cell.clone(), run)
+                    })
+                    .collect();
+                *last = Some(MembershipReading {
                     cells,
                     at_ms: at.wall_ms,
                     taken_at: at.mono,
                     seq,
+                    runs,
                 });
+                drop(last);
                 self.stored_seq.store(seq, Ordering::SeqCst);
                 *self.last_error.write().unwrap_or_else(|e| e.into_inner()) = None;
                 self.reads.fetch_add(1, Ordering::Relaxed);
@@ -672,6 +700,17 @@ impl MembershipCache {
     /// `false` and never a believed-forever `true`.
     pub fn cell_running_at(&self, cell_id: &CellId, at: ObservedAt) -> Option<bool> {
         self.authoritative_at(at).map(|r| r.cells.contains(cell_id))
+    }
+
+    /// The PRESENCE RUN `cell_id` is in, if the authoritative reading shows it
+    /// running: the `seq` of the reading that began its current unbroken
+    /// stretch of "running". Two answers differ exactly when an absence or a
+    /// revocation came between them — however many of the readings in between
+    /// the caller missed. `None` wherever [`Self::cell_running_at`] would not
+    /// answer `Some(true)`.
+    pub fn presence_run_at(&self, cell_id: &CellId, at: ObservedAt) -> Option<u64> {
+        self.authoritative_at(at)
+            .and_then(|r| r.runs.get(cell_id).copied())
     }
 
     /// [`Self::cell_running_at`] against the wall clock.

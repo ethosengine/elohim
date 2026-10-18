@@ -155,8 +155,11 @@ struct SeamState {
     /// Bumped by every re-mint, and carried by every offered probe, so a probe
     /// offered before a re-mint is recognised when it lands after one.
     epoch: u64,
-    /// Roles whose current presence run has already been probed by a pass.
-    spent: std::collections::BTreeSet<&'static str>,
+    /// The presence run ([`crate::services::cell_membership::MembershipCache::presence_run_at`])
+    /// each role was last offered a probe for. A role is owed once per RUN, so
+    /// a run that began after this one — however the readings in between were
+    /// coalesced — is owed again.
+    probed: std::collections::BTreeMap<&'static str, u64>,
     /// Roles with a probe the driver offered and has not seen land.
     in_flight: std::collections::BTreeSet<&'static str>,
 }
@@ -211,13 +214,17 @@ struct SeamState {
 ///
 /// ## Not a probe storm
 ///
-/// ONE probe per role per PRESENCE RUN — a stretch of readings that show its
-/// cell running. The pass spends the role's run when it probes; a role whose
-/// probe was refused while its cell stays present is left to its own
+/// ONE probe per role per PRESENCE RUN — an unbroken stretch of readings that
+/// show its cell running, identified by the reading that began it and recorded
+/// by the cache as each reading LANDS
+/// ([`crate::services::cell_membership::MembershipCache::presence_run_at`]),
+/// not inferred from whichever reading the driver happens to wake on. A role
+/// whose probe was refused while its cell stays present is left to its own
 /// supervisor tick (the steady cadence it always had), not re-probed on every
-/// watch read. The run is released when a reading no longer shows the cell
-/// (absent, unknown, revoked) and by a re-mint, so the next return of the cells
-/// earns exactly one more pass.
+/// watch read. A reading that shows the cell absent, or a re-mint's revocation,
+/// ends the run — even when the driver never sees that reading because a later
+/// one coalesced it — so the next return of the cells earns exactly one more
+/// pass. A re-mint also forgets which runs were probed.
 pub struct PresenceRecovery {
     cadence: Duration,
     window: Duration,
@@ -266,7 +273,7 @@ impl PresenceRecovery {
             let mut state = self.state();
             state.watch_until = Some(state.watch_until.map_or(until, |open| open.max(until)));
             state.epoch = state.epoch.wrapping_add(1);
-            state.spent.clear();
+            state.probed.clear();
         }
         self.reopened.notify_one();
     }
@@ -285,10 +292,10 @@ impl PresenceRecovery {
     /// CURRENT reading: which probes are owed now. Offers them; does not run
     /// them — [`drive_presence_recovery`] does, beside its event loop.
     ///
-    /// For each role: a cell the reading does not show running releases the
-    /// role's presence run and is left alone. A cell it shows running, on a
-    /// role in a not-running episode with no probe of this seam in flight and
-    /// an unspent run, is published through
+    /// For each role: a cell the reading does not show running is left alone.
+    /// A cell it shows running, on a role in a not-running episode with no
+    /// probe of this seam in flight and a presence run not yet probed, is
+    /// published through
     /// [`HcClientRegistry::observe_and_publish_cell_state_from`] — the
     /// supervisor's own publication path, contradiction gate included — and
     /// offered a probe when that classification owes one now. The per-role
@@ -305,21 +312,20 @@ impl PresenceRecovery {
             .fetch_add(1, std::sync::atomic::Ordering::SeqCst);
         let mut offered = Vec::new();
         for cell in cells {
-            let present = cell
+            let Some(run) = cell
                 .cell_id
                 .as_ref()
-                .and_then(|id| cache.cell_running_at(id, at))
-                == Some(true);
-            if !present {
-                self.state().spent.remove(cell.role);
+                .and_then(|id| cache.presence_run_at(id, at))
+            else {
                 continue;
-            }
+            };
             if !crate::conductor_bridge_health::role_is_not_running(cell.role) {
                 continue;
             }
             {
                 let state = self.state();
-                if state.in_flight.contains(cell.role) || state.spent.contains(cell.role) {
+                if state.in_flight.contains(cell.role) || state.probed.get(cell.role) == Some(&run)
+                {
                     continue;
                 }
             }
@@ -337,9 +343,10 @@ impl PresenceRecovery {
             let mut state = self.state();
             // Re-checked under the lock the claim is made in: the publish above
             // was an await.
-            if state.in_flight.contains(cell.role) || !state.spent.insert(cell.role) {
+            if state.in_flight.contains(cell.role) || state.probed.get(cell.role) == Some(&run) {
                 continue;
             }
+            state.probed.insert(cell.role, run);
             state.in_flight.insert(cell.role);
             offered.push(cell.clone());
         }
@@ -1119,5 +1126,88 @@ mod presence_recovery_tests {
             .expect("the driver task did not panic");
         assert_eq!(conductor.landed_of(A), 1);
         assert!(is_live(A), "A's verdict landed through the zome-call path");
+    }
+
+    /// FINDING 1 — a burst of readings cannot hide a new presence run.
+    ///
+    /// A's run is probed (refused) and A stays not running. Then, while B's
+    /// probe is parked, the cells go ABSENT and come back in two readings that
+    /// land back to back — one wake for the driver, which only ever sees the
+    /// second. The run recorded at landing still differs, so A is owed again.
+    #[tokio::test]
+    async fn two_readings_behind_a_parked_probe_still_start_a_new_run() {
+        const A: &str = "test-presence-burst-a";
+        const B: &str = "test-presence-burst-parked";
+        let (ca, cb) = (cell(96), cell(97));
+        let present = vec![ca.clone(), cb.clone()];
+        let admin = Arc::new(FakeAdmin::new(Ok(present.clone())));
+        let conductor = Arc::new(FakeConductor::new(
+            vec![observed(A, A, &ca), observed(B, B, &cb)],
+            Arc::clone(&admin),
+            false,
+        ));
+        conductor.park(B);
+        open_episode(A);
+        open_episode(B);
+        let seam = Arc::new(PresenceRecovery::new());
+        let cache = Arc::new(MembershipCache::new());
+        let (tx, handle) = spawn_driver(&seam, &cache, &conductor);
+
+        someone_reads(&cache, &admin).await;
+        until("A's first probe landed", || conductor.landed_of(A) == 1).await;
+        until("B's probe offered and parked", || {
+            conductor.probes_of(B) == 1
+        })
+        .await;
+
+        // Absent, then running again — two readings with no yield between
+        // them, so the driver wakes once and sees only the second.
+        admin.set_tail(Ok(Vec::new()));
+        assert_eq!(
+            someone_reads(&cache, &admin).await,
+            RefreshOutcome::Read { running: 0 }
+        );
+        admin.set_tail(Ok(present.clone()));
+        assert_eq!(
+            someone_reads(&cache, &admin).await,
+            RefreshOutcome::Read { running: 2 }
+        );
+        until("the new run probed", || conductor.probes_of(A) == 2).await;
+        assert_eq!(conductor.probes_of(B), 1, "B's parked probe is not doubled");
+
+        conductor.unpark(B);
+        stop(tx, handle).await;
+    }
+
+    /// The run is recorded by the cache as each reading lands: continuous
+    /// presence keeps it, an absence or a revocation ends it.
+    #[tokio::test]
+    async fn the_cache_records_a_presence_run_per_cell_at_landing() {
+        let c = cell(98);
+        let admin = FakeAdmin::new(Ok(vec![c.clone()]));
+        let cache = MembershipCache::new();
+        someone_reads(&cache, &admin).await;
+        let first = cache
+            .presence_run_at(&c, ObservedAt::now())
+            .expect("running");
+        someone_reads(&cache, &admin).await;
+        assert_eq!(cache.presence_run_at(&c, ObservedAt::now()), Some(first));
+
+        admin.set_tail(Ok(Vec::new()));
+        someone_reads(&cache, &admin).await;
+        assert_eq!(cache.presence_run_at(&c, ObservedAt::now()), None);
+        admin.set_tail(Ok(vec![c.clone()]));
+        someone_reads(&cache, &admin).await;
+        let second = cache
+            .presence_run_at(&c, ObservedAt::now())
+            .expect("running");
+        assert!(second > first, "absence ended the run");
+
+        cache.invalidate("re-mint (test)");
+        someone_reads(&cache, &admin).await;
+        let third = cache
+            .presence_run_at(&c, ObservedAt::now())
+            .expect("running");
+        assert!(third > second, "a revocation ended the run too");
     }
 }
