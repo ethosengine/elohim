@@ -331,16 +331,16 @@ impl PresenceRecovery {
     /// For each role: a cell the reading does not show running is left alone.
     /// A cell it shows running, on a role in a not-running episode with no
     /// probe of this seam in flight and a presence run not yet probed, is
-    /// published through
-    /// [`HcClientRegistry::observe_and_publish_cell_state_from`] — the
-    /// supervisor's own publication path, contradiction gate included — and
-    /// offered a probe when that classification owes one now. The per-role
+    /// published through [`HcClientRegistry::publish_cell_state_from`] — the
+    /// supervisor's own publication path, contradiction gate included, minus
+    /// its refresh — and offered a probe when that classification owes one
+    /// now. It asks the conductor nothing: the only reads this seam originates
+    /// are the watch's. The per-role
     /// [`crate::services::cell_probe::ProbeGate`] keeps a probe the supervisor
     /// already has in flight from becoming two.
-    pub(crate) async fn plan_at(
+    pub(crate) fn plan_at(
         &self,
         cells: &[ObservedCell],
-        src: &dyn crate::services::cell_membership::RunningCellSource,
         cache: &crate::services::cell_membership::MembershipCache,
         at: crate::services::cell_membership::ObservedAt,
     ) -> (u64, Vec<Offer>) {
@@ -367,20 +367,20 @@ impl PresenceRecovery {
                     continue;
                 }
             }
-            let tick = HcClientRegistry::observe_and_publish_cell_state_from(
+            // Published from the reading in hand. The planner never reads: its
+            // only reads are the watch's, under the ceiling no revocation resets.
+            let tick = HcClientRegistry::publish_cell_state_from(
                 cell.role,
-                src,
                 cell.cell_id.as_ref(),
                 cache,
                 at,
-            )
-            .await;
+            );
             if !tick.state.probe_is_owed_now() {
                 continue;
             }
             let mut state = self.state();
-            // Re-checked under the lock the claim is made in: the publish above
-            // was an await.
+            // Re-checked under the lock the claim is made in: the seam lock is
+            // not held across the publish, which takes the role's own locks.
             if state.in_flight.contains(cell.role)
                 || state.pending.contains(cell.role)
                 || state.probed.get(cell.role) == Some(&run)
@@ -474,12 +474,11 @@ impl PresenceRecovery {
     pub(crate) async fn run_pass_at(
         &self,
         cells: &[ObservedCell],
-        src: &dyn crate::services::cell_membership::RunningCellSource,
         cache: &crate::services::cell_membership::MembershipCache,
         at: crate::services::cell_membership::ObservedAt,
         conductor: &dyn PresenceConductor,
     ) -> PresencePass {
-        let (epoch, offered) = self.plan_at(cells, src, cache, at).await;
+        let (epoch, offered) = self.plan_at(cells, cache, at);
         let verdicts = futures_util::future::join_all(
             offered
                 .iter()
@@ -564,9 +563,6 @@ pub(crate) async fn drive_presence_recovery(
                 }
             }
         }
-        let Some(src) = conductor.membership_source() else {
-            continue;
-        };
         let cells = conductor.observed_cells();
         let at = crate::services::cell_membership::ObservedAt::now();
         if seam.watching_at(at.mono)
@@ -574,18 +570,18 @@ pub(crate) async fn drive_presence_recovery(
                 .iter()
                 .any(|cell| crate::conductor_bridge_health::role_is_not_running(cell.role))
         {
-            cache
-                .refresh_if_older_than_at(src.as_ref(), at, seam.cadence)
-                .await;
+            // The ONE read this seam originates, under the ceiling.
+            if let Some(src) = conductor.membership_source() {
+                cache
+                    .refresh_if_older_than_at(src.as_ref(), at, seam.cadence)
+                    .await;
+            }
         }
-        let (epoch, offered) = seam
-            .plan_at(
-                &cells,
-                src.as_ref(),
-                cache,
-                crate::services::cell_membership::ObservedAt::now(),
-            )
-            .await;
+        let (epoch, offered) = seam.plan_at(
+            &cells,
+            cache,
+            crate::services::cell_membership::ObservedAt::now(),
+        );
         for offer in offered {
             probes.push(Box::pin(async move {
                 let verdict = conductor
@@ -969,7 +965,6 @@ mod presence_recovery_tests {
         let pass = seam
             .run_pass_at(
                 &conductor.observed_cells(),
-                admin.as_ref(),
                 &cache,
                 ObservedAt::now(),
                 &conductor,
@@ -1029,7 +1024,6 @@ mod presence_recovery_tests {
             let pass = seam
                 .run_pass_at(
                     &conductor.observed_cells(),
-                    admin.as_ref(),
                     &cache,
                     ObservedAt::now(),
                     &conductor,
@@ -1393,5 +1387,44 @@ mod presence_recovery_tests {
         until("A recovered", || is_live(A)).await;
         assert!(!seam.has_pending());
         stop(tx, handle).await;
+    }
+
+    /// RE-REVIEW A — the planner originates no read at all.
+    ///
+    /// The supervisor's 15 s window has lapsed (a revocation clears it just
+    /// the same) while the reading still holds authority. Publishing through
+    /// the supervisor's refresh would have read here, inside the watch's
+    /// ceiling; the planner publishes from the reading in hand and asks the
+    /// conductor nothing.
+    #[tokio::test]
+    async fn the_planner_publishes_from_the_reading_in_hand_and_reads_nothing() {
+        use crate::services::cell_membership::{
+            MEMBERSHIP_AUTHORITY_TTL, MEMBERSHIP_REFRESH_INTERVAL,
+        };
+        const A: &str = "test-presence-planner-no-read";
+        let c = cell(100);
+        let admin = FakeAdmin::new(Ok(vec![c.clone()]));
+        let cache = MembershipCache::new();
+        let t0: u64 = 1_700_000_000_000;
+        cache
+            .refresh_if_older_than_at(&admin, ObservedAt::from(t0), Duration::ZERO)
+            .await;
+        open_episode(A);
+
+        let later = t0 + MEMBERSHIP_REFRESH_INTERVAL.as_millis() as u64 + 1_000;
+        assert!(later < t0 + MEMBERSHIP_AUTHORITY_TTL.as_millis() as u64);
+        assert!(cache.is_stale_at(ObservedAt::from(later)), "precondition");
+        let seam = PresenceRecovery::new();
+        let (_, offered) = seam.plan_at(&[observed(A, A, &c)], &cache, ObservedAt::from(later));
+        assert_eq!(
+            offered.iter().map(|o| o.cell.role).collect::<Vec<_>>(),
+            vec![A],
+            "owed, and published from the reading in hand"
+        );
+        assert_eq!(
+            admin.call_count(),
+            1,
+            "the planner asked the conductor nothing"
+        );
     }
 }

@@ -1353,8 +1353,27 @@ impl HcClientRegistry {
         cache: &crate::services::cell_membership::MembershipCache,
         at: crate::services::cell_membership::ObservedAt,
     ) -> TickObservation {
-        use crate::conductor_bridge_health as health;
         cache.refresh_if_stale_at(src, at).await;
+        Self::publish_cell_state_from(role, cell_id, cache, at)
+    }
+
+    /// The publication half of [`Self::observe_and_publish_cell_state_from`]:
+    /// classify and publish from the reading the cache ALREADY holds, asking
+    /// the conductor nothing.
+    ///
+    /// Separate so a caller that must not originate a read can still publish
+    /// through the one publication path. The presence planner is that caller:
+    /// its reads are ceiling-bounded (`refresh_if_older_than_at`), and
+    /// borrowing the supervisor's refresh here would hand it the supervisor's
+    /// revocable window — a re-mint landing between its presence check and
+    /// this publish would then admit a read inside the ceiling.
+    pub(crate) fn publish_cell_state_from(
+        role: &str,
+        cell_id: Option<&holochain_client::CellId>,
+        cache: &crate::services::cell_membership::MembershipCache,
+        at: crate::services::cell_membership::ObservedAt,
+    ) -> TickObservation {
+        use crate::conductor_bridge_health as health;
 
         // THE OBSERVATION'S IDENTITY IS THE READING'S, NOT THIS MOMENT'S — and
         // that identity is an ORDER, not a timestamp.
