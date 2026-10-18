@@ -140,11 +140,20 @@ hard watermark of 20; delivery-cost 2.23 pipeline-hours against 1; operator-surf
 
 ## 5. What did not go well
 
-1. **0 of 0.** Fifty-five granted hours and 260 commits produced two `fulfills` edges and no
-   dated commitment event. The ledger the project built to measure delivery saw nothing. Part
-   instrument (no `epr flow project` since 09-27; 190 undated mints), mostly the work: neither
-   controller worked in the unit the ledger counts. This is the finding the rest of the retro
-   hangs from.
+1. **0 of 0, and it would read 0 of 0 for any sprint run the way CLAUDE.md says to run one.**
+   The ledger's commitments are two things, and the work is neither. (a) 4 940 gap lines minted
+   from 297 spec and plan documents (`.eprfs/status/gap-items/`): 4 214 OPEN, 716 CLAIMED, none
+   DONE; 3 636 of them sit in documents whose status is `draft`, and 3 661 were born in May and
+   June. No open gap describes the marathon's cure, the custody fixture, or the idle-CPU work.
+   (b) one `a2o:scenario-green` commitment per feature file, minted by `epr flow project` and
+   discharged by the first green household run — once. Tonight's receipt lane dry-runs as
+   "already fulfilled: 1"; the blob-durability lane as "skipped (pending): 4"; 19 of the 21
+   feature files the marathon touched were never minted because nothing has projected since
+   September (577 dated mints in September, 2 in October). The habit register, which CLAUDE.md
+   names as the unit of work, mints nothing; `claim --serves <habit>` has been used 0 times in
+   7 092 flow events. So the ledger measures the discharge of spring design-doc gaps plus
+   first-time scenario greens, and the agents follow the register. Both controllers stayed on
+   goal and the instrument could not see it. This is the finding the rest of the retro hangs from.
 2. **The register moved backwards.** 15 → 14 green while 3 habits regressed inside the window
    and 15 backlog rows were born against 0 closed. Discovery outran discharge by 2.3× (commitments,
    4-week), 2.7× (habits, 90-day) and 8× (backlog rows, 90-day).
@@ -182,9 +191,18 @@ hard watermark of 20; delivery-cost 2.23 pipeline-hours against 1; operator-surf
 - **Mint > discharge is structural, not a mood.** Birth has a gate (the compose gate, frontmatter,
   cites); closure has none. `fix-what-you-find` and the story-maintainer rule oblige recording;
   nothing obliges retiring. `retire-when:` is written and never read.
-- **Delivery measurement is wave-shaped because projection is manual.** Mints are dated when
-  `epr flow project` runs; the harness witnesses cites, not fulfils; so the stocks read moves
-  only when someone projects, and the marathon did not.
+- **The ledger's unit and the work's unit were never joined.** Commitments come from spec/plan
+  gap lines and from feature files; work comes from red habits. The one join that exists
+  (`claim --serves <habit-id>`) is optional and unused; the register has no `commitments:` field
+  and mints nothing. A sprint that does exactly what the gospel says, moving the top red with
+  proof, discharges nothing by construction.
+- **Where the join exists it is one-shot and manual.** A scenario-green commitment discharges on
+  its first green run and never again, so a mature suite reads 0 outflow forever; mints are
+  dated at `epr flow project` time, which is a hand-run verb last run in September, so the 21
+  features the marathon wrote or changed had nothing to discharge into.
+- **Gap lines in drafts are counted as promises.** 74% of open commitments live in `draft`
+  documents and 74% were born in May–June; a draft retiring to `held/` or being superseded does
+  not retire its gaps. The stock is a library of spring design notes read as a backlog.
 - **Lost time was a missing heartbeat, not a slow agent.** The harness re-invokes on completion
   only while the session is live. A suspended session loses wall-clock silently.
 - **Alpha has a single point of infrastructure with no node-level sensor.** Four peers and a
@@ -201,7 +219,7 @@ Each item has a done-when that can be read without asking anyone.
 | # | action | owner | done-when |
 |---|---|---|---|
 | S1 | A granted sprint writes its record in the repo at hour 0 (`genesis/docs/superpowers/sprints/<date>-<name>.md`) and mirrors the Journal into it at close; the plan file is a working copy, never the only copy | every sprint controller; the `agentic-developer`/`delivery-stasis` skill text names it | the next sprint's record exists before its first commit |
-| S2 | A sprint names ≤3 commitments it will fulfil, writes `fulfills:` on landing, and its close runs `epr flow project` so the sprint window is dated | me (close procedure); the operator rules whether projection may run unattended, since it writes the sidecar | `epr flow stocks --window <sprint> --per week` is not REFUSED for the next sprint |
+| S2 | Join the ledger to the register, in the register's favour: a red habit mints ONE commitment ("<habit> to green with proof"), discharged by its evidence-backed flip and re-opened by a regression (dismiss); deltas become notes on it. Gap lines in `draft` docs demote to intents (only `active`/`approved`/`in-flight` docs mint); a doc moving to `held/` or `superseded` retires its gaps; scenario-green discharges per measured window, not once. Then "x of y" is 14 of 47 and the marathon reads 2 fulfils, 3 dismissals, 1 mint, which is what happened | operator rules the design (it changes what a commitment IS); me: a spec under `genesis/docs/superpowers/specs/` and the `recipes.yaml` change; `epr flow project` runs in the sprint close so the window is dated | `epr flow stocks --window <sprint> --per week` is not REFUSED for the next sprint, and its fulfils equal the register's green flips in that window |
 | S3 | A node sensor: `kube_node_status_condition{status="unknown"}==1` sustained 10 min fires one fingerprint naming the node, routed to the runtime ledger | `algedonic-designer` dispatch; operator confirms the reader | the next node loss is one finding, not four |
 | S4 | `habits-status.py` prints each habit's `retire-when:` and whether its evidence exists; a quarterly retire pass | me (script); operator + librarian (pass) | at least one habit retires on evidence by 2027-01-18 |
 | S5 | Local pre-push dry run: `just gate` on changed projects plus the MEMORY.md parity test before the 20–50 min hook; `pytest` provisioned by an on-demand devfile command | me (script); operator (devfile) | the next sprint's first push is not refused |
