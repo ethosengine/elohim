@@ -9,6 +9,9 @@
 // every story passes. Submodules are separate repositories with their own
 // tests, so keep jest out of all of them, read from .gitmodules so a new
 // submodule is covered without editing this file.
+//
+// `.worktrees/` (the repo's git-worktree convention) holds whole checkouts of
+// this repository, submodule snapshots included, so it is kept out the same way.
 const { readFileSync } = require('node:fs');
 const { join } = require('node:path');
 const { getJestConfig } = require('@storybook/test-runner');
@@ -27,7 +30,7 @@ function submoduleIgnorePatterns(rootDir) {
   );
 }
 
-const submodules = submoduleIgnorePatterns(base.rootDir);
+const submodules = [...submoduleIgnorePatterns(base.rootDir), '<rootDir>/.worktrees/'];
 
 module.exports = {
   ...base,
