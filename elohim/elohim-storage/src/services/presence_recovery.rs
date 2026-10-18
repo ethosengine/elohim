@@ -48,6 +48,20 @@ pub(crate) const PRESENCE_WATCH_CADENCE: Duration = Duration::from_secs(2);
 /// the steady cadence: the next ordinary membership read wakes the same pass.
 pub(crate) const PRESENCE_WATCH_WINDOW: Duration = Duration::from_secs(120);
 
+/// How long shutdown waits for the presence driver to DRAIN the probes it
+/// offered before the runtime is torn down.
+///
+/// The driver never drops a probe it offered — a conductor call cannot be
+/// cancelled, only abandoned — so at shutdown it finishes them, and `main`
+/// awaits that drain. A drain holds at most one probe per observed role, each
+/// one read-only extern with no DHT access, issued to a conductor that is
+/// still running while storage stops; the same order as
+/// [`crate::services::cell_membership::MEMBERSHIP_READ_DEADLINE`], the
+/// longest this crate waits on any single admin answer. Past it, the drain is
+/// abandoned and said so: `call_zome` has no deadline of its own, and a
+/// conductor that never answers must not hold the process open.
+pub const PRESENCE_SHUTDOWN_DRAIN_BOUND: Duration = Duration::from_secs(10);
+
 /// One observed role, as the presence pass sees it: which client TENDS it and
 /// the `CellId` that client carries for it.
 ///

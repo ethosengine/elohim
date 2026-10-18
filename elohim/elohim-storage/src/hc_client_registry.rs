@@ -1566,16 +1566,22 @@ impl NotRunningActuator for SupervisorActuator<'_> {
 }
 
 impl HcClientRegistry {
+    /// Returns the presence driver's handle. On shutdown that driver DRAINS
+    /// the probes it offered rather than abandoning them, so the caller awaits
+    /// this handle — bounded by
+    /// [`crate::services::presence_recovery::PRESENCE_SHUTDOWN_DRAIN_BOUND`] —
+    /// before the runtime is torn down; otherwise teardown drops the drain.
+    #[must_use = "await the presence driver's drain at shutdown, or teardown abandons its probes"]
     pub fn spawn_bridge_supervisor(
         self: Arc<Self>,
         inputs: HcRegistryInputs,
         shutdown: tokio::sync::broadcast::Sender<()>,
-    ) {
+    ) -> tokio::task::JoinHandle<()> {
         // ONE presence driver for the conductor, beside the per-role loops: it
         // owns no slot and re-mints nothing; it probes every observed role when
         // a reading shows their cells present again (see
         // `services::presence_recovery::PresenceRecovery`).
-        {
+        let presence = {
             let registry = Arc::clone(&self);
             let presence_shutdown = shutdown.subscribe();
             tokio::spawn(async move {
@@ -1587,8 +1593,8 @@ impl HcClientRegistry {
                 )
                 .await;
                 info!("presence recovery driver exiting (shutdown)");
-            });
-        }
+            })
+        };
         for role in SUPERVISED_ROLES {
             let registry = Arc::clone(&self);
             let inputs = inputs.clone();
@@ -1899,6 +1905,7 @@ impl HcClientRegistry {
                 }
             });
         }
+        presence
     }
 }
 
@@ -2549,7 +2556,7 @@ mod supervised_slot_tests {
         // inputs + a shutdown sender.
         let reg = std::sync::Arc::new(HcClientRegistry::empty());
         let (shutdown_tx, _rx) = tokio::sync::broadcast::channel::<()>(1);
-        reg.spawn_bridge_supervisor(
+        let presence = reg.spawn_bridge_supervisor(
             HcRegistryInputs {
                 admin_url: "ws://127.0.0.1:1".into(),
                 app_url: "ws://127.0.0.1:1".into(),
@@ -2563,6 +2570,16 @@ mod supervised_slot_tests {
         // test run — this test asserts the call succeeds without a
         // PolicyConfig, not the supervisor's steady-state probing behavior.
         let _ = shutdown_tx.send(());
+        // The handle it returns is the presence driver's, and shutdown ends it
+        // inside the bound production awaits it with — nothing offered, so
+        // nothing to drain.
+        tokio::time::timeout(
+            crate::services::presence_recovery::PRESENCE_SHUTDOWN_DRAIN_BOUND,
+            presence,
+        )
+        .await
+        .expect("the presence driver ends on shutdown inside the drain bound")
+        .expect("the presence driver did not panic");
     }
     // ---- the membership-informed tick decision (2026-09-22) ---------------
 
