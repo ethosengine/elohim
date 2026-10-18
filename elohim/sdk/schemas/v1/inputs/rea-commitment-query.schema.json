@@ -6,6 +6,7 @@
   "type": "object",
   "properties": {
     "action": { "type": "string", "description": "Filter to commitments with this REA action verb." },
+    "excludeStates": { "type": "string", "description": "Comma-separated exact state strings to exclude (e.g. cancelled,superseded). Trimmed; empty items ignored; absent or empty excludes nothing; combinable with state." },
     "limit": { "type": "integer", "minimum": 0, "description": "Maximum number of commitments to return." }
   },
   "additionalProperties": false

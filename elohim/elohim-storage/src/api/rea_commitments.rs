@@ -1,6 +1,11 @@
 //! REA Commitments API controller
 //!
 //! Routes: `/api/v1/commitments[/{id}][/agent/{id}]`
+//!
+//! `GET /api/v1/commitments` query: `action`, `provider`, `receiver`, `state`, `clauseOf`,
+//! `mediumOfExchangeId`, `limit`, `offset`, and `excludeStates` — comma-separated exact
+//! state strings to exclude (e.g. `excludeStates=cancelled,superseded`); trimmed, empty
+//! items ignored, absent/empty = no exclusion; combinable with `state`.
 
 use bytes::Bytes;
 use http_body_util::Full;

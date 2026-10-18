@@ -269,6 +269,11 @@ pub struct ReaCommitmentQuery {
     pub receiver: Option<String>,
     /// Filter by commitment state
     pub state: Option<String>,
+    /// Comma-separated exact `state` strings to exclude (`excludeStates=cancelled,superseded`).
+    /// Items are trimmed, empty items ignored, unknown states have no effect; empty or
+    /// absent means no exclusion. Combines with `state` (positive filter) — both apply.
+    #[serde(default)]
+    pub exclude_states: Option<String>,
     /// Filter by agreement/clause
     pub clause_of: Option<String>,
     /// Filter by medium of exchange
@@ -277,6 +282,20 @@ pub struct ReaCommitmentQuery {
     pub limit: i64,
     #[serde(default)]
     pub offset: i64,
+}
+
+impl ReaCommitmentQuery {
+    /// Parsed `excludeStates` items: trimmed, empties dropped.
+    pub fn excluded_states(&self) -> Vec<String> {
+        self.exclude_states
+            .as_deref()
+            .unwrap_or("")
+            .split(',')
+            .map(str::trim)
+            .filter(|s| !s.is_empty())
+            .map(str::to_owned)
+            .collect()
+    }
 }
 
 fn default_limit() -> i64 {
@@ -338,6 +357,11 @@ pub fn list_commitments(
 
     if let Some(ref state) = query.state {
         base_query = base_query.filter(rea_commitments::state.eq(state));
+    }
+
+    let excluded = query.excluded_states();
+    if !excluded.is_empty() {
+        base_query = base_query.filter(rea_commitments::state.ne_all(excluded));
     }
 
     if let Some(ref clause) = query.clause_of {
@@ -4084,5 +4108,123 @@ mod peer_inventory_tests {
         let (peer, total) = inventory_for_peer_reconcile(&mut conn, &ctx, 0, i64::MAX).unwrap();
         assert_eq!(ids(&peer), vec!["uhCEkNoMishpatRow".to_string()]);
         assert_eq!(total, 1);
+    }
+}
+
+#[cfg(test)]
+mod exclude_states_tests {
+    use super::*;
+    use crate::db::models::NewReaCommitment;
+    use diesel_migrations::{embed_migrations, EmbeddedMigrations, MigrationHarness};
+
+    const MIGRATIONS: EmbeddedMigrations = embed_migrations!("migrations");
+
+    fn setup() -> SqliteConnection {
+        let mut conn = SqliteConnection::establish(":memory:").expect("in-memory DB");
+        conn.run_pending_migrations(MIGRATIONS).expect("migrations");
+        conn
+    }
+
+    fn insert(conn: &mut SqliteConnection, ctx: &AppContext, id: &str, state: &str) {
+        let row = NewReaCommitment {
+            id,
+            h_app_id: &ctx.h_app_id,
+            action: "project-epr",
+            provider: "provider",
+            receiver: "receiver",
+            resource_conforms_to: None,
+            resource_classified_as: None,
+            resource_quantity_value: None,
+            resource_quantity_unit: None,
+            effort_quantity_value: None,
+            effort_quantity_unit: None,
+            has_beginning: None,
+            has_end: None,
+            due: None,
+            clause_of: None,
+            in_scope_of: None,
+            medium_of_exchange_id: None,
+            state,
+            finished: 0,
+            note: None,
+            metadata_json: None,
+            dht_anchor_hash: None,
+        };
+        diesel::insert_into(rea_commitments::table)
+            .values(&row)
+            .execute(conn)
+            .expect("insert commitment");
+    }
+
+    fn ids(rows: Vec<ReaCommitment>) -> Vec<String> {
+        let mut v: Vec<String> = rows.into_iter().map(|r| r.id).collect();
+        v.sort();
+        v
+    }
+
+    fn seeded() -> (SqliteConnection, AppContext) {
+        let mut conn = setup();
+        let ctx = AppContext::new("test-app");
+        for (id, st) in [
+            ("c1", "created"),
+            ("c2", "active"),
+            ("c3", "cancelled"),
+            ("c4", "superseded"),
+        ] {
+            insert(&mut conn, &ctx, id, st);
+        }
+        (conn, ctx)
+    }
+
+    fn q(exclude: Option<&str>, state: Option<&str>) -> ReaCommitmentQuery {
+        ReaCommitmentQuery {
+            exclude_states: exclude.map(str::to_owned),
+            state: state.map(str::to_owned),
+            limit: 100,
+            ..Default::default()
+        }
+    }
+
+    #[test]
+    fn exclude_states_drops_listed_states_only() {
+        let (mut conn, ctx) = seeded();
+        let rows =
+            list_commitments(&mut conn, &ctx, &q(Some("cancelled, superseded,,"), None)).unwrap();
+        assert_eq!(ids(rows), vec!["c1", "c2"]);
+    }
+
+    #[test]
+    fn exclude_states_unknown_empty_or_absent_is_no_exclusion() {
+        let (mut conn, ctx) = seeded();
+        for e in [Some("nonesuch"), Some(""), Some(" , "), None] {
+            let rows = list_commitments(&mut conn, &ctx, &q(e, None)).unwrap();
+            assert_eq!(rows.len(), 4, "exclude={e:?}");
+        }
+    }
+
+    #[test]
+    fn exclude_states_combines_with_state_filter() {
+        let (mut conn, ctx) = seeded();
+        let rows = list_commitments(
+            &mut conn,
+            &ctx,
+            &q(Some("cancelled,superseded"), Some("active")),
+        )
+        .unwrap();
+        assert_eq!(ids(rows), vec!["c2"]);
+        // state wins as the positive filter; exclusion still applies on top.
+        let rows = list_commitments(&mut conn, &ctx, &q(Some("active"), Some("active"))).unwrap();
+        assert!(rows.is_empty());
+    }
+
+    #[test]
+    fn exclude_states_parses_from_the_wire_query_string() {
+        let query: ReaCommitmentQuery = serde_urlencoded::from_str(
+            "action=project-epr&limit=100&offset=0&excludeStates=cancelled%2Csuperseded",
+        )
+        .unwrap();
+        assert_eq!(query.excluded_states(), vec!["cancelled", "superseded"]);
+        let none: ReaCommitmentQuery = serde_urlencoded::from_str("action=x").unwrap();
+        assert!(none.excluded_states().is_empty());
     }
 }
