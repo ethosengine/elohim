@@ -13,11 +13,10 @@
 //      === x for ANY bytes, strict `===` on the raw read — no trailing-newline
 //      normalization, no trim(), no YAML round-trip. `projectHook` is pure
 //      passthrough for exactly this reason.
-//   2. NEVER auto-write `.claude/settings.json`. Registration is RECORDED into
-//      the package and RECONCILED READ-ONLY: verify WARNs (lodges a governance
-//      finding) if the recorded registration diverges from the live settings.json
-//      but MUST NEVER modify settings.json. Planting a hook anchors its code; it
-//      does not rewrite its wiring.
+//   2. Imported registrations stay READ-ONLY. Native packages may explicitly
+//      declare `registrations` for projection; merge only their own handlers,
+//      preserving unrelated settings. Verification never writes registration
+//      or runtime trust. Projected registration does not establish activation.
 //   3. The executable `.py` is never mutated to carry an authority marker — no
 //      banner, no comment. Discoverability lives in the package + compose-graph
 //      + the `.claude/hooks/.epr-meta` note, not in the code bytes.
@@ -26,9 +25,9 @@
 //      fidelity floor and needs no CID; `source.cid`, when present, is stamped
 //      by `eprfs-agent`, recorded read-only, and not recomputed here.
 
-import { basename, relative } from 'node:path';
+import { basename, relative } from "node:path";
 
-export const HOOK_KIND = 'HookPackage';
+export const HOOK_KIND = "HookPackage";
 
 // Derive a human description from a hook's module docstring first line. Hooks
 // carry no declared description; the triple-quoted docstring after the shebang
@@ -39,7 +38,7 @@ export function firstDocstringLine(rawBytes) {
   const close = rawBytes.indexOf('"""', open + 3);
   if (close === -1) return null;
   const doc = rawBytes.slice(open + 3, close);
-  for (const line of doc.split('\n')) {
+  for (const line of doc.split("\n")) {
     const trimmed = line.trim();
     if (trimmed) return trimmed;
   }
@@ -55,7 +54,7 @@ export function firstDocstringLine(rawBytes) {
 // READ-ONLY: this only reads settings; nothing here writes it.
 export function registrationFromSettings(settings, hookRelPath) {
   const hooks = settings?.hooks;
-  if (!hooks || typeof hooks !== 'object') return null;
+  if (!hooks || typeof hooks !== "object") return null;
   // Match by the repo-relative hook path appearing in the command string; the
   // command uses `$CLAUDE_PROJECT_DIR/.claude/hooks/<name>.py`, so the relative
   // path is a stable substring regardless of the env-var prefix.
@@ -65,7 +64,7 @@ export function registrationFromSettings(settings, hookRelPath) {
     for (const group of groups) {
       const entries = Array.isArray(group?.hooks) ? group.hooks : [];
       for (const entry of entries) {
-        const command = typeof entry?.command === 'string' ? entry.command : '';
+        const command = typeof entry?.command === "string" ? entry.command : "";
         if (command.includes(needle)) {
           const reg = {
             event,
@@ -74,7 +73,7 @@ export function registrationFromSettings(settings, hookRelPath) {
             // Timeout is in SECONDS (normalized 2026-07-02 — values had been
             // mis-written as milliseconds). Record it verbatim; the reconcile
             // compares in the same unit so it never lodges false drift.
-            timeout: typeof entry.timeout === 'number' ? entry.timeout : null,
+            timeout: typeof entry.timeout === "number" ? entry.timeout : null,
           };
           if (entry.type) reg.type = entry.type;
           return reg;
@@ -87,43 +86,51 @@ export function registrationFromSettings(settings, hookRelPath) {
 
 // Normalize a registration for a stable deep-equal (key order independent).
 function normalizeRegistration(reg) {
-  if (!reg || typeof reg !== 'object') return null;
+  if (!reg || typeof reg !== "object") return null;
   return {
     event: reg.event ?? null,
     matcher: reg.matcher ?? null,
     command: reg.command ?? null,
-    timeout: typeof reg.timeout === 'number' ? reg.timeout : null,
+    timeout: typeof reg.timeout === "number" ? reg.timeout : null,
     type: reg.type ?? null,
   };
 }
 
 export function registrationsCoherent(a, b) {
-  return JSON.stringify(normalizeRegistration(a)) === JSON.stringify(normalizeRegistration(b));
+  return (
+    JSON.stringify(normalizeRegistration(a)) ===
+    JSON.stringify(normalizeRegistration(b))
+  );
 }
 
 // Import a hook from its executable source. The body is copied VERBATIM (rule 1);
 // no transform of any kind is applied to the bytes.
-export function hookPackageFromSource(sourcePath, rawBytes, settings, { repoRoot, governance }) {
-  const id = basename(sourcePath, '.py');
+export function hookPackageFromSource(
+  sourcePath,
+  rawBytes,
+  settings,
+  { repoRoot, governance },
+) {
+  const id = basename(sourcePath, ".py");
   const relPath = relative(repoRoot, sourcePath);
   const description = firstDocstringLine(rawBytes) ?? id;
   const registration = registrationFromSettings(settings, relPath);
 
   return {
-    apiVersion: 'elohim-agent/v1alpha1',
+    apiVersion: "elohim-agent/v1alpha1",
     kind: HOOK_KIND,
     metadata: {
       id,
       name: id,
-      version: '1.0.0',
+      version: "1.0.0",
       description,
-      sourceRuntime: 'claude', // origin: born as a Claude Code hook
-      runtimeTargets: ['claude'],
+      sourceRuntime: "claude", // origin: born as a Claude Code hook
+      runtimeTargets: ["claude"],
       // Wiring facets mirrored from the live registration (null when inert).
       event: registration?.event ?? null,
       matcher: registration?.matcher ?? null,
-      interpreter: 'python3',
-      language: 'python',
+      interpreter: "python3",
+      language: "python",
       assetRefs: [],
       governance,
     },
@@ -131,8 +138,8 @@ export function hookPackageFromSource(sourcePath, rawBytes, settings, { repoRoot
     // intentionally omitted here — it is single-sourced from eprfs-agent, never
     // computed in JS (rule 4). Byte-identity is the fidelity floor.
     source: {
-      language: 'python',
-      interpreter: 'python3',
+      language: "python",
+      interpreter: "python3",
       path: relPath,
       body: rawBytes,
     },
@@ -164,7 +171,7 @@ export function projectHook(pkg) {
 // reconcile. It NEVER writes settings.json.
 export async function verifyHookPackage(pkg, { assert, settings, lodge }) {
   assert(
-    typeof pkg.source?.body === 'string' && pkg.source.body.length > 0,
+    typeof pkg.source?.body === "string" && pkg.source.body.length > 0,
     `${pkg.metadata.id} has verbatim source body`,
   );
 
@@ -177,11 +184,33 @@ export async function verifyHookPackage(pkg, { assert, settings, lodge }) {
   );
   if (!coherent && lodge) {
     await lodge({
-      assertionClass: 'registration-drift',
+      assertionClass: "registration-drift",
       detail:
         `hook registration drift: recorded registration for ${pkg.projections.claude.path} ` +
         `does not match the live .claude/settings.json entry (reconcile is read-only; ` +
         `resolve by re-recording the package registration, never by auto-editing settings.json)`,
     });
   }
+}
+
+// Native packages may explicitly own one registration per runtime. Legacy imported
+// registrations remain read-only. Merge only the named hook, preserving other handlers.
+export function mergeNativeRegistration(settings, pkg, runtime) {
+  const registration = pkg.registrations?.[runtime];
+  if (!registration || pkg.metadata.sourceRuntime !== "elohim-agent")
+    return settings;
+  const result = structuredClone(settings);
+  const hooks = (result.hooks ??= {});
+  const needle = pkg.projections[runtime].path;
+  for (const [event, groups] of Object.entries(hooks)) {
+    hooks[event] = groups
+      .map((group) => ({
+        ...group,
+        hooks: group.hooks.filter((h) => !h.command?.includes(needle)),
+      }))
+      .filter((group) => group.hooks.length > 0);
+  }
+  const { event, matcher, ...handler } = registration;
+  (hooks[event] ??= []).push({ matcher, hooks: [handler] });
+  return result;
 }

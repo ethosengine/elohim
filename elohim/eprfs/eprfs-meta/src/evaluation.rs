@@ -710,7 +710,11 @@ fn evaluate_rule(
             format!("this concern already lives at {path}. {why}")
         }
         GovernanceRulePredicate::Validator => {
-            let reference = rule.parameters.as_str().unwrap_or("?");
+            let reference = rule
+                .parameters
+                .as_str()
+                .or_else(|| rule.parameters["ref"].as_str())
+                .unwrap_or("?");
             // Resolve the reference against what the cascade DECLARED for it. Absent
             // declaration stays `None` rather than defaulting: "no manifest named an
             // identity or a budget" and "this validator may run unmetered as anything" are

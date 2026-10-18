@@ -15,6 +15,8 @@ rules:
     policy: sovereignty-ontology-guard@5
   - id: ownership-ontology-guard
     policy: ownership-ontology-guard@5
+  - id: absolutes-guard
+    policy: absolutes-guard@1
   - id: manifesto-epic-blind-reader-review
     class: inject
     when: { write: "epic*.md" }
@@ -30,6 +32,8 @@ validators:
   - ref: epr:validator-sovereignty-ontology-guard
     fuel: 100
   - ref: epr:validator-ownership-ontology-guard
+    fuel: 100
+  - ref: epr:validator-absolutes-guard
     fuel: 100
 cites:
   - stewardship-over-sovereignty | the foundational canon this guard enforces — rejects crypto-sovereignty, reserves stewardship/agency/authority, frames threshold/hardware crypto as accelerators of community recovery never gates | path: genesis/docs/architecture/stewardship-over-sovereignty.md
@@ -71,6 +75,33 @@ that the cage is liberty").
 Dismissals aggregate through `sovereignty-guard-signal.py` (PostToolUse) into a drift ledger so the
 rule itself surfaces for evaluation: the protocol exercising its own governance over the bytes of this
 repo. (The ownership guard has no equivalent sink yet — a known asymmetry, not a decision.)
+
+## Absolutes guard — a promise names its enforcer
+
+**`absolutes-guard@1`** is the same machinery pointed at a different defect: an *absolute* on a trust
+surface (this canon, every `genesis/docs/**` and `genesis/a2o/features/**` story, `app/**/*.html`,
+`app/elohim-elements/**`, the content chrome's `omni-element.js`). *Always, never, forever, guaranteed,
+impossible, every time, at all times, no one can, everyone, 100%, without exception* — the protocol is
+graduated, governed, revocable and plural (reach narrows, gates re-admit, a steward acts under a
+StewardshipGrant for a person who holds their rights through others, trust lags delivery), so prose that
+says one of these usually promises more than the system keeps. The lexicon is the frame atom
+`elohim/sdk/schemas/v1/frames/frame-absolute-promise.json`; the scan is `.claude/scripts/_lib/absolutes.py`
+(word-bounded, prose only, net-new only).
+
+Two honest repairs, nothing else:
+
+- **Cite the enforcer** in the same sentence or line, and it must resolve — `(enforced: <repo path |
+  policy:<id>@<version> | seam:<id>>)` in prose (a path may carry `#anchor`, `:line` or `::test`), or
+  `// absolute: <ref>` / `<!-- absolute: <ref> -->` on or just above a UI string. A test, a refusing
+  predicate, a registered policy or a schema constraint is an enforcer; a sentence that says so is not.
+  A negated capability ("no one can read it") needs the citation too.
+- **Say what actually holds** — *by default*, *unless …*, *until …*, *as far as this device knows*.
+
+Quoted speech, blockquotes and declared testimony (`testimony: true`, the ontology atom's paths) are
+exempt; code comments and identifiers are never scanned. Like the pair above it is a guard, not a ban: a
+`dispatch` storyteller review, and `absolutes-guard-signal.py` (PostToolUse) lists each net-new absolute
+with its line, logs it to `.claude/data/absolutes-guard.jsonl` and folds it onto `absolutes-landings@1`
+(ceiling `absolutes-landings-ceiling@1`, hard 5) so the rule itself comes up for review.
 
 ## Manifesto-epic blind-reader review
 

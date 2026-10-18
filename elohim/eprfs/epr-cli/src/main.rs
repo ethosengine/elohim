@@ -24,11 +24,36 @@ fn main() -> ExitCode {
         println!("{}", usage());
         return ExitCode::SUCCESS;
     }
+    if raw.first().map(String::as_str) == Some("view") {
+        return match elohim_epr_cli::view::run(&raw[1..]) {
+            Ok(code) => code,
+            Err(error) => {
+                if raw.iter().any(|a| a == "--json") {
+                    println!(
+                        "{}",
+                        serde_json::json!({"version": 1, "diagnostics": [error]})
+                    );
+                } else {
+                    eprintln!("epr view: {error}");
+                }
+                ExitCode::from(2)
+            }
+        };
+    }
     if raw.first().map(String::as_str) == Some("flow") {
         return match flow::run(&raw[1..]) {
             Ok(code) => code,
             Err(error) => {
                 eprintln!("epr flow: {error}");
+                ExitCode::from(2)
+            }
+        };
+    }
+    if raw.first().map(String::as_str) == Some("integrate") {
+        return match elohim_epr_cli::integrate::run(&raw[1..]) {
+            Ok(code) => code,
+            Err(error) => {
+                eprintln!("epr integrate: {error}");
                 ExitCode::from(2)
             }
         };
@@ -277,5 +302,5 @@ fn print_human(report: &Report) {
 }
 
 fn usage() -> &'static str {
-    "usage: epr [--repo PATH] [--json] <setup|doctor|explain PATH|check [PATH...]|govern --path REL ...|ready [--target REF] [--deep]|flow ...|actor <claim --as agent:<role>@<model> --session ID|current --session ID>|canon-lift [--check|--write]|device <ask|redeem|approve> ...|identity <begin|standing> ...>"
+    "usage: epr [--repo PATH] [--json] <setup|doctor|explain PATH|check [PATH...]|govern --path REL ...|ready [--target REF] [--deep]|integrate --acceptance CID [--root DIR]|view <declaration> --root DIR [--save STORE] [--json]|flow ...|actor <claim --as agent:<role>@<model> --session ID|current --session ID>|canon-lift [--check|--write]|device <ask|redeem|approve> ...|identity <begin|standing> ...>"
 }

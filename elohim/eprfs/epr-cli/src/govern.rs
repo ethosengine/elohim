@@ -204,6 +204,9 @@ fn claimed_for(root: &Path, session: &str) -> Option<(cid::Cid, ActorClaim)> {
 
 /// Evaluate the prospective write and return the decision payload.
 pub fn evaluate(root: &Path, args: &[String]) -> Result<Value> {
+    if args.first().map(String::as_str) == Some("seam") {
+        return crate::seam::command(root, &args[1..]);
+    }
     evaluate_with(root, args, &ElohimRepositoryValidators)
 }
 
@@ -301,7 +304,7 @@ fn evaluate_with(
 }
 
 pub fn usage() -> &'static str {
-    "usage: epr [--repo PATH] govern --path REL [--new] [--new-subdir] [--content-stdin | --content-file PATH] [--session ID]"
+    "usage: epr [--repo PATH] govern --path REL [--new] [--new-subdir] [--content-stdin | --content-file PATH] [--session ID]\n       epr govern seam [capabilities HARNESS] (JSON request on stdin)"
 }
 
 #[cfg(test)]

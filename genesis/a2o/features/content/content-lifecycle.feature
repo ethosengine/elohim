@@ -4,7 +4,7 @@ Feature: Content Lifecycle
   I want to create, read, and discover content
   So that I can participate in the knowledge graph
 
-  Matthew is the primary content creator. Susan and Terrance discover
+  Matthew is the primary content creator. Susan and Ezra discover
   his content — validating that hosted humans share a common content
   space through the doorway.
 
@@ -45,9 +45,9 @@ Feature: Content Lifecycle
     When Susan searches for content with tag "e2e-shared"
     Then the search results should include "Family Governance"
 
-  @requires:shem @act:iii
-  Scenario: Terrance discovers Matthew's content
+  @act:i
+  Scenario: Ezra discovers Matthew's content
     Given Matthew has created content titled "Learning Science" with tags "e2e-learning,education"
-    And human "Terrance" is logged in on doorway "alpha"
-    When Terrance searches for content with tag "e2e-learning"
+    And human "Ezra" is logged in on doorway "alpha"
+    When Ezra searches for content with tag "e2e-learning"
     Then the search results should include "Learning Science"

@@ -2,22 +2,23 @@
   "version": 1,
   "collective": {
     "path": ".epr-meta/collective.json",
-    "cid": "bafkreihcq3q7qgwncossxf6q7rowjsysgw3wqt2lpu2w6mnoosd7abmfku"
+    "cid": "bafkreihdh5j5y4mkjijuekeknoyspyjgv2u23e5ecmso67b3f5ehpbmtai"
   },
-  "author": "agent:integrator@claude-fable-5-1",
+  "author": "human:matthew",
   "steward": "repo:ethosengine/elohim",
   "scope": "repository",
   "reach": "repository",
   "concern": "doorway-ssr-arm-shadowed-chrome-every-serve",
   "claim": "EPR-matched GETs divert to serve_ssr_route on SsrRoute disposition (shed → chrome-carrying bundle + x-ssr-skipped); page-borne wiring goes on BOTH serve paths",
   "uncertainty": [
-    "Imported verbatim from .claude/memory/project_doorway_ssr_arm_shadowed_chrome_every_serve.md; the claim is the entry's own one-line description and the entry body is the pinned source, not restated here."
+    "Imported verbatim from .claude/memory/project_doorway_ssr_arm_shadowed_chrome_every_serve.md; the claim is the entry's own one-line description and the entry body is the pinned source, not restated here.",
+    "authorship: steward-of-record — human:matthew stands for this entry; no agent author was witnessed writing it, and this record does not say human:matthew wrote it. Origin session: 4a08a7cc-d02d-48dc-b1ef-639a7844a195."
   ],
   "sources": [
     {
       "resource": {
         "path": ".claude/memory/project_doorway_ssr_arm_shadowed_chrome_every_serve.md",
-        "cid": "bafkreifco3aaky3osiug6fahj3uuuadia3twlgfsilyy7pyvs2cwek76re"
+        "cid": "bafkreifh55d5qcqzd35pq2tm7gnhaanzz575eivii2rynh555nqzfzzwly"
       },
       "reach": "repository"
     }

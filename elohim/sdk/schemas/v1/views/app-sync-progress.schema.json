@@ -1,0 +1,47 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "epr:schema:view:app-sync-progress",
+  "title": "AppSyncProgressView",
+  "description": "Source of truth: peer runtime operational state (Category C). Portable app lifecycle foundation; private checkpoint references retain existing working-version authority. This shape does not declare a served HTTP endpoint.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "target",
+    "reachable",
+    "localEpoch",
+    "localPosition",
+    "caughtUp"
+  ],
+  "properties": {
+    "target": {
+      "$ref": "app-sync-target.schema.json"
+    },
+    "reachable": {
+      "type": [
+        "boolean",
+        "null"
+      ],
+      "description": "Observed remote availability, independent of retained local cursor. Null means not observed."
+    },
+    "localEpoch": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "localPosition": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "pattern": "^[0-9]+$"
+    },
+    "caughtUp": {
+      "type": [
+        "boolean",
+        "null"
+      ],
+      "description": "Null means unknown, false behind, true caught-up to fixed target."
+    }
+  }
+}

@@ -1,0 +1,33 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "epr:schema:view:app-sync-target",
+  "title": "AppSyncTargetView",
+  "description": "Source of truth: peer runtime operational state (Category C). Portable app lifecycle foundation; private checkpoint references retain existing working-version authority. This shape does not declare a served HTTP endpoint.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "deviceId",
+    "streamId",
+    "epoch",
+    "endPosition"
+  ],
+  "properties": {
+    "deviceId": {
+      "type": "string"
+    },
+    "streamId": {
+      "type": "string"
+    },
+    "epoch": {
+      "type": "string"
+    },
+    "endPosition": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "pattern": "^[0-9]+$",
+      "description": "Decimal u64. Null means remote end unknown, never zero. Runtime validates u64 range."
+    }
+  }
+}

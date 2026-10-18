@@ -62,7 +62,7 @@ pub fn default_policies(root: &Path) -> PathBuf {
 /// and a bare id is exactly the recency-shaped reference that rule forbids. Accepting one here
 /// would let an observation silently re-target when a new version row lands, which is the
 /// failure the pin exists to prevent.
-#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, serde::Serialize)]
 pub struct MeasureRef {
     pub id: String,
     pub version: u64,

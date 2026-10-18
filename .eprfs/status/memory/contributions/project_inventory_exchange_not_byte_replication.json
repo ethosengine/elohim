@@ -2,16 +2,17 @@
   "version": 1,
   "collective": {
     "path": ".epr-meta/collective.json",
-    "cid": "bafkreihcq3q7qgwncossxf6q7rowjsysgw3wqt2lpu2w6mnoosd7abmfku"
+    "cid": "bafkreihdh5j5y4mkjijuekeknoyspyjgv2u23e5ecmso67b3f5ehpbmtai"
   },
-  "author": "agent:integrator@claude-fable-5-1",
+  "author": "human:matthew",
   "steward": "repo:ethosengine/elohim",
   "scope": "repository",
   "reach": "repository",
   "concern": "P2P inventory exchange ≠ byte replication",
   "claim": "Inventory gossip is metadata-only (\"Received content inventory count=N\"); byte replication is separate — check per-peer blob counts before calling sync alive.",
   "uncertainty": [
-    "Imported verbatim from .claude/memory/project_inventory_exchange_not_byte_replication.md; the claim is the entry's own one-line description and the entry body is the pinned source, not restated here."
+    "Imported verbatim from .claude/memory/project_inventory_exchange_not_byte_replication.md; the claim is the entry's own one-line description and the entry body is the pinned source, not restated here.",
+    "authorship: steward-of-record — human:matthew stands for this entry; no agent author was witnessed writing it, and this record does not say human:matthew wrote it. Origin session: 872c2e1c-02fe-453a-93b3-e69dac1e54e3."
   ],
   "sources": [
     {

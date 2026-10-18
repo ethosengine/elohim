@@ -1080,16 +1080,24 @@ habits:
       cell of their own on a pool conductor (never a shared one), and closing through the portal
       leaves no session, no cell on any pool conductor, and no active account row — so the
       whole hosted stage can be walked end to end from the UI and leave the deployment as it
-      was found.
-    status: green
+      was found. Hosted is a declared stage, never a default: only a human whose fixture declares
+      agencyPhase hosted gets a cell, only on a doorway operator's conductor (matthew, adam), and a
+      member's own conductor carries its member and nobody else.
+    status: red
     active: false
     checks:
+      - "just mesh status — every `hosted` row is free of REFUSED: the operator within its ceiling, each member conductor at 0"
       - "a2o @concern:hosted-human-lifecycle (genesis/a2o/features/auth/hosted-human/05-leaving.feature — @browser-only @act:i; authority is the household lane: `just test mesh features/auth/hosted-human/05-leaving.feature`; on a deployed doorway run with ELOHIM_CLUSTER_STATE_PATH_OVERRIDE=genesis/manifests/cluster-state.act1-household.yaml A2O_ALLOW_DESTRUCTIVE=0 — the story creates and removes its own human, so it is safe on a shared fleet)"
     evidence: >
-      DELTA 2026-10-08b (fleet standing of the cure; status unchanged): edge #1582 (SUCCESS 16:10Z) carries 4fecf8185 in the edgenode image and rolled the storages, but a conductor pod keeps its running image unless the conductor pin moves or the commit says `[conductor-roll]` (rung 2, `resolveConductorWorkloadImage`); gertrude's pod is unchanged (uid 1f68b5b9, restarts 5, 4445 refused at 16:11Z) and both doorways still log `Handshake not finished` against conductor-4. The probe fix is therefore on dev and in the image, in no conductor pod yet. Operator order: restart gertrude's conductor pod now (the old supervisor respawns her child on boot, which ends the 503s), then — once adam's and eve's datasets are grown, so their rollouts cannot HALT the phase — one `[conductor-roll]` push to make every conductor's probe honest.
-    evidence-fingerprint: sha256:839ec5326fb156f6
-    evidence-bytes: 13303
-    evidence-entries: 10
+      DELTA 2026-10-15 (GREEN -> RED on measured evidence): `just mesh status` hosted rows at a18cf0c41 read
+      `matthew: REFUSED 19 agent(s), over the operator ceiling 14` and `jessica: REFUSED 1 agent(s) on a member's
+      conductor: elohim-conductor-0-12add0`. Cause: undeclared fixtures defaulted to hosted, the device register arm
+      installed a second James and Jessica, doorways B/C hosted on member conductors. Cured in code (lookup-only device
+      arm, DOORWAY_HOSTING_CONDUCTORS, declared-phase cast, agency-phase-coherence test); green waits on
+      genesis/local-dev/hosted-cast-cleanup/close.py run against the household and the probe reading clean.
+    evidence-fingerprint: sha256:f18fe5feafa8def5
+    evidence-bytes: 13940
+    evidence-entries: 11
     first_move: >
       Land the step definitions and the close-account route so the @wip scenarios execute and
       this habit measures red on a real run, then move the register/login provisioning
@@ -1239,10 +1247,10 @@ habits:
       - "a2o @concern:idle-is-free (genesis/a2o/features/dataplane/household-at-rest.feature — @act:i, the household lane: `just test mesh features/dataplane/household-at-rest.feature`). Two snapshots 300 s apart on a settled household with nobody acting: each storage peer's conductor calls (admission permits released) at most 6 a minute, no permit refused, and the three conductors together at most 10 CPU seconds a minute. The budgets are the target, not a reading."
       - "store growth, per DNA, read from a STOPPED conductor (`app/elohim-app/scripts/conductor-store-sniff.py <data-root> --json`, folded as `dna-actions-per-day@1`, `wal-main-ratio@1`, `subject-anchor-links@1`) and rendered by `epr flow report --bound <id>` for each of `dna-actions-per-day-ceiling@1`, `wal-main-ratio-ceiling@1` and `subject-anchor-links-ceiling@1`: lamad at most 5,000 actions a day per peer at idle, WAL no larger than its database, at most 100 attestation links on one subject anchor. Fleet: the conductor's integrated-ops series is a proxy for the first; nothing on the fleet reports WAL or anchor size."
     evidence: >
-      DELTA 2026-10-13c (RED preserved; the call budget held with the consent read answering for the first time; alpha's pull stream caught up after a pin cleanup; three storage cures drafted and none landed). CONSENT READ: the household's storage peers had been measuring against a mishpat coordinator from 2026-10-05, because a peer without an embedded conductor compares against `<peer>/coordinators/last-applied.happ` and nothing delivers a rebuilt coordinator to it; the built bundle was hot-swapped on all three at 18:24Z, operator-approved, no restart (`idle-call-floor-20261013/coordinator-sync-apply-{8090,8091,8092}.json`). Settled 300 s window after it, storage aea44bb2a, dev gossip cadence: matthew 27, jessica 23, james 27 calls against a budget of 30 (`shift-measure-consent-answering-1.txt`). `my_consent_standing` is still 10 calls a window on each peer, now answering, so the working read costs the same ten calls the failing one did and is a third of the floor. CPU leg not re-read. FLEET: edge #1618 to #1620 never passed the quiesce gate because alpha matthew's pull stream was not caught up; 1,103 retired acquisition pins, 1,063 of them `epr:e2e-*` scenario residue, were being re-admitted on a flat 6 h cooldown about a thousand at a time. The operator removed the 1,063 at 19:15Z (`genesis/local-dev/alpha-pin-cleanup/removed-20261013T191535Z.log`); edge #1621 then passed the gate in 363 s and failed one scenario, `inventory-convergence.feature:42`, sampled mid reconcile sweep (`ci-edge-inventory-convergence-caughtup-sawtooth-flap`). Only alpha matthew was cleaned and the cause is still in the code. NOT LANDED, each on a local branch with its first draft reviewed unsafe by Codex and reworked: the consent read on demand (`perf/consent-read-on-demand`, round 3 still unsafe on a clock-failure path), the retired-pin re-admit backoff (`fix/retired-pin-readmit-backoff`), the provide revoke arm (`fix/provide-revoke-arm`, default off). No fleet reading of any of them exists.
-    evidence-fingerprint: sha256:fe2b1c0baf3527cc
-    evidence-bytes: 57369
-    evidence-entries: 29
+      DELTA 2026-10-14b (RED preserved; the CPU leg is attributed for the first time, and it is higher than recorded). Household on the pin (hc-fork-96bcd2bee215-proof, direct launch), production gossip cadence, conductors and storage restarted 19:53Z, nobody acting; profiler `perf` from the distro repo (the container has full capabilities). CPU, process total from /proc (the lane's own source), eight consecutive 300 s windows from 40 min to 88 min after the restart: 101.2, 71.1, 72.2, 87.7, 51.6, 52.5, 86.0, 71.4 CPU s/min for the three conductors (clean 40-min window 57.9), peaks about every 15 min, budget 10; not the 20.5-21.1 of 2026-10-13 at the same uptime, and why it differs is not established (hosting is unchanged from 2026-10-12: running cells matthew 100, jessica 10, james 5; jessica with 2 agents burns as much as matthew with 20, so the cost does not scale with hosted agents). WHERE IT GOES: two thirds of conductor CPU is sqlite on `sqlx-sqlite-worker` threads, which exit with their pooled connection (idle_timeout 30 s, min 0), so per-thread accounting and statement time both missed it; the sqlite cost is SQLCipher page work on cache misses (HMAC-SHA512 and AES-CBC per 4-KB page, plus ZFS copies; about 7,400 page reads a second on matthew; 2 MiB page cache per connection). Page reads by statement (uprobes on `sqlite3VdbeExec` and `sqlcipher_page_cipher`, 60 s per conductor): jessica `UPDATE ChainOpPublish SET last_publish_time` 37% and its COMMITs 35%; matthew that UPDATE 19%, COMMIT 18%, the receiving side's `LimboChainOp WHERE hash IN (...)` 27%; james the gossip since-scan 50%, LimboChainOp 22%. The conductor's own `hc_conductor_workflow_duration` agrees: `publish_dht_ops_consumer` 13.0 wall-s/min against 2.1 for integration, the next largest. So the perpetual republish (`conductor-residual-cpu-full-chain-read-and-perpetual-republish` item 4, receipts never complete on three peers) is the largest measured consumer on both the sending and receiving side. Cure designed, not built (Codex, read-only): bounded per-op republish backoff with `receipts_complete` untouched; capping required receipts at reachable authorities rejected as unsafe. NOT DONE, operator: the no-build A/B (`tuning_params.min_publish_interval` 24 h in the three household conductor configs) was refused as a shared-resource edit. Evidence: `genesis/a2o/reports/recovery/idle-cpu-20261014/README.md`.
+    evidence-fingerprint: sha256:958001ba394b7b1a
+    evidence-bytes: 59782
+    evidence-entries: 30
     refs:
       - "genesis/data/timeline/backlog/conductor-cap-grant-scan-per-zome-call.md — what unbounded per-call cost did to the fleet"
       - "genesis/data/timeline/backlog/conductor-admission-saturated-for-hours-after-restart.md"
@@ -1369,29 +1377,17 @@ habits:
       - "cargo test --features 'p2p p2p-iroh' --lib -- retention release_ledger holds blob_arrivals shard_service a_forgotten_blob (elohim/elohim-storage)"
       - "fleet read: elohim_node_holds_bytes{store=blobs,reason} per alpha peer, own_unnamed falling at 64 blobs per pass for bytes older than a day and unrecorded naming what nobody can account for, beside elohim_release_retention_releases{standing}, elohim_release_retention_blobs_held{reason} and elohim_node_store_bytes{store=blobs|blobs_iroh|cache}"
     evidence: >
-      DELTA 2026-10-07b (status red -> GREEN; the fleet read completes check 3). Read from Prometheus at
-      04:23Z, 33 minutes after the roll: the blob store fell by exactly the bytes the holds pass released,
-      one gauge step after each pass, on every peer — matthew 1,297 MB -> 492 MB (own_unnamed 238 -> 6
-      blobs over five passes of 64, 64, 64, 40; 984 MB released), adam 841 -> 353 MB (134 -> 6; 487 MB),
-      jessica 331 -> 294 MB (75 -> 7; 36.6 MB), james -36.6 MB, susan, eve and gertrude -33.5 MB each
-      (their eight bundles, all gone at the second pass). matthew's and adam's iroh stores fell with it
-      (-265 MB each at 04:16Z: the BLAKE3 alias computed from the bytes before the delete). kept_release
-      and served did not move on any peer (matthew and jessica keep 9 releases, 50.9 MB; the others one);
-      release_retention_failures_total 0 everywhere. Doorway alpha answered 200 on /, /version.json and
-      /db/content/elohim-host-landing at 04:07Z, 04:10Z and 04:23Z, through matthew's second to fifth
-      passes. What is left on the fleet is what the rule keeps: kept releases, served bundles, pledged
-      bytes, and the unrecorded (matthew 88 MB, adam 84 MB) that nothing deletes. The two scenarios are
-      green on the household (DELTA 2026-10-06b), the unit checks pass (87 lib tests under both
-      transports), and the fleet gauges read as the rule predicts: green. Retire-when stands as written.
-    evidence-fingerprint: sha256:737aa694781b6180
-    evidence-bytes: 7183
-    evidence-entries: 4
+      DELTA 2026-10-14 (daily-experience clarification; status unchanged): epic-daily-life.md, daily-experience-design and daily-app-residency.feature now require autosave from first edit, Host on this device with background pin progress during uninterrupted live collaboration, seamless local continuation and automatic permitted reconciliation on reconnect. Offline pin readiness and live presence are distinct; local edits remove host round-trip waiting without claiming zero compute latency. Fresh blind reviews each READY in one round (epic correctness/interpretability/preference 0/0/2; story 0/0/0). Gherkin gate passed all 254 files; optional Brit receipt unavailable; scoped epr check passed and the changed epic citation was refreshed. Stories remain @wip; no runtime proof claimed.
+    evidence-fingerprint: sha256:a51b2169c488b80c
+    evidence-bytes: 10278
+    evidence-entries: 7
     first_move: >
       Keep reading what is let go. matthew's recentlyLetGo on GET /admin/adoption names the 232
       blobs (984 MB) that read own_unnamed on 2026-10-07; the ledger gap had named 449 MB of
       nineteen releases, so about half of what went was something else this peer put and nothing
       named. Name it from that list before the next peer class (a hub, a phone) carries the pass.
     refs:
+      - "genesis/docs/superpowers/plans/2026-10-14-portable-app-migration-plan.md — foundation contracts, then Che access, Rakia adoption and runtime integration"
       - "genesis/docs/content/elohim-protocol/architecture/2026-10-05-storage-physics-benchmark.md — §3 fleet read, §7 retention floor, §8 declared defaults"
       - "elohim/elohim-storage/src/services/release_adoption/retention.rs"
       - "elohim/elohim-storage/src/db/release_ledger.rs"

@@ -2,16 +2,17 @@
   "version": 1,
   "collective": {
     "path": ".epr-meta/collective.json",
-    "cid": "bafkreihcq3q7qgwncossxf6q7rowjsysgw3wqt2lpu2w6mnoosd7abmfku"
+    "cid": "bafkreihdh5j5y4mkjijuekeknoyspyjgv2u23e5ecmso67b3f5ehpbmtai"
   },
-  "author": "agent:integrator@claude-fable-5-1",
+  "author": "human:matthew",
   "steward": "repo:ethosengine/elohim",
   "scope": "repository",
   "reach": "repository",
   "concern": "feedback_harness_witnesses_agents_dont_narrate",
   "claim": "Operator 2026-09-23 — an agent's change is captured by the harness (PostToolUse observer) into eprfs; agents never run import/witness verbs by hand. Friction only at validation.",
   "uncertainty": [
-    "Imported verbatim from .claude/memory/feedback_harness_witnesses_agents_dont_narrate.md; the claim is the entry's own one-line description and the entry body is the pinned source, not restated here."
+    "Imported verbatim from .claude/memory/feedback_harness_witnesses_agents_dont_narrate.md; the claim is the entry's own one-line description and the entry body is the pinned source, not restated here.",
+    "authorship: steward-of-record — human:matthew stands for this entry; no agent author was witnessed writing it, and this record does not say human:matthew wrote it. Origin session: fa35e94d-33e3-4301-a1ba-263d90ff52da."
   ],
   "sources": [
     {

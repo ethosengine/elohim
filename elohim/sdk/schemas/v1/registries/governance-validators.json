@@ -29,6 +29,11 @@
       "why": "Commons-ownership framing guard; pure text over the written content."
     },
     {
+      "ref": "epr:validator-absolutes-guard",
+      "runtime": "python",
+      "why": "Absolute-promise guard over trust-surface prose (stories, specs, UI copy, the content chrome). Python owns it because its prose extraction (Markdown, Gherkin, Angular/Lit templates, UI string literals) and its enforcer-citation resolution against the repository tree are a repository-census concern; the lexicon lives in the shared frame atom frame-absolute-promise, so it graduates to `both` when the native frame host grows a word-bounded prose scan. Class `dispatch` (advisory), so a declared skip in Rust costs nothing enforceable."
+    },
+    {
       "ref": "epr:validator-archetype-resource-alignment",
       "runtime": "both",
       "why": "Cross-checks a write against the archetype budget ledger; both hosts read the same JSON."
@@ -67,6 +72,11 @@
       "ref": "epr:validator-eprfs-meta-domain-neutrality",
       "runtime": "rust",
       "why": "Guards eprfs-meta against gaining concrete validator identities — it is a claim ABOUT the Rust crate's own source, so the host that compiles that crate is the only one that can meaningfully assert it."
+    },
+    {
+      "ref": "epr:validator-native-seam-guidance",
+      "runtime": "rust",
+      "why": "Single native advisory classifier over explicit owner-local declarations. Compatibility hosts report native unavailability without duplicating classification."
     }
   ]
 }

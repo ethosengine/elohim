@@ -1,0 +1,20 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "epr:schema:view:app-route",
+  "title": "AppRouteView",
+  "description": "Source of truth: peer runtime operational state (Category C). Portable app lifecycle foundation; private checkpoint references retain existing working-version authority. This shape does not declare a served HTTP endpoint.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "url",
+    "expiresAt"
+  ],
+  "properties": {
+    "url": {
+      "type": "string"
+    },
+    "expiresAt": {
+      "type": "string"
+    }
+  }
+}

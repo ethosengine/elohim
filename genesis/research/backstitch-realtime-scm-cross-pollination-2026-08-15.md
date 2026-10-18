@@ -17,6 +17,31 @@ Method: repo cloned and read directly (registered in `research-manifest.json`; s
 
 ## ⚠️ Name / lineage guard (read first)
 
+**2026-10-13 internal reconciliation — no new external survey.** The August
+commit-lift absence claim in the brit follow-up below is superseded in part:
+`elohim/brit/brit-bridge/src/lib.rs` now seals committed Git trees to canonical
+EPRFS trees and restores them. It explicitly does not move refs, write indexes or
+decide standing. The snapshot bridge is real; a live shared branch, safe projection
+into independently edited working trees and acceptance ceremonies do not follow
+from it. The earlier evidence is retained with its August scope.
+
+The requested contract now covers live editor operations and filesystem saves,
+not just Backstitch's save-granularity precedent. Own admitted devices see
+attributed live proposals under the person's standing choice, with explicit
+device-private work; a project goal/reach template selects the channel, and
+following grants co-editing only when the agreement says so. Agents propose
+attributed work unless shared editing is explicitly authorized. Received code
+remains unbuilt and executes nothing. Review pins candidate and policy before
+reviewers act; new candidates inherit no green evidence. Gate refusal preserves
+the author's work and is not a sanction.
+
+The durable composition contract is the 2026-10-13 extension of
+`elohim/brit/docs/specs/2026-04-12-brit-design.md`; the cross-plane integration map is
+`genesis/docs/superpowers/specs/2026-10-13-shared-working-versions-social-coding-design.md`.
+These are implementation requirements, not a report of a shipped collaborative
+editor. The existing branch-as-document/worktree-contention backlog outputs below
+remain the research's work destinations; this correction creates no parallel queue.
+
 - **`inkandswitch/backstitch` ≠ backstitch.io** — the latter is an unrelated HR/marketing company. The project's domain is **backstitch.dev**. ⚠
 - **Product-in-alpha, not a lab probe** ✅◐: MIT, three named core engineers, Endless Foundation funding ("we're able to work full-time on Backstitch" ⚠), `v2.0.3-alpha` (2026-07-23), last push the day before this survey, 231 stars, near-daily cadence. An Automerge/samod core maintainer (alexjg) has commits ✅. Their own disclaimer: *"This is alpha-grade software"* with an explicit several-GB memory ceiling ⚠. Cite capabilities, not longevity.
 - **No stated lineage to Patchwork or Cambria** ✅-by-absence: the connection is organizational (same org, same Automerge substrate). Do not cite a "universal version control" program — none is asserted in any primary text found.

@@ -5,7 +5,8 @@
 
 use std::path::{Path, PathBuf};
 
-use serde::Deserialize;
+pub use super::habit_census::parse_habit;
+use serde::{Deserialize, Serialize};
 
 use super::{FlowError, FlowResult};
 
@@ -24,7 +25,7 @@ struct HabitRegister {
 /// One habit as the register projects it. A habit is a SCOPE — the standard a piece of work is
 /// accounted to — so the fields read here are the ones that say what the standard is
 /// (`invariant`, `checks`), where it stands (`status`, `active`), and what names it (`refs`).
-#[derive(Debug, Clone, Deserialize)]
+#[derive(Debug, Clone, Deserialize, Serialize)]
 pub struct HabitEntry {
     #[serde(default, rename = "_source")]
     pub source: Option<String>,

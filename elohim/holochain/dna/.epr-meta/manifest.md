@@ -78,6 +78,19 @@ cites:
 
 # elohim/holochain/dna — DNA sources (hash-neutrality gate)
 
+## Publication authority in the application lifecycle
+
+The [root composition map](../../../../.epr-meta/manifest.md#application-lifecycle--authoritative-homes-and-composition)
+routes working values, publication and serving to distinct owners. Existing integrity
+and coordinator contracts own signed declarations, delegation and canonical-head
+election; SDKs compose submission and storage projects verified results. A CRDT merge,
+presence heartbeat, HTTP success or artifact availability must not become authority.
+Keep keystrokes and passing state off the notary. Changes to publication policy belong
+at this authority boundary with adversarial tests, then in generated/client contracts;
+an app or gateway must not implement a competing election. Apply the P2P design gate
+before new entities and retain the integrity-versus-coordinator deployment distinction
+below. Working-version lifecycle design does not itself add a DNA type.
+
 Integrity and coordinator zomes plus each DNA's `dna.yaml`. One pipeline builds every DNA
 (`elohim/holochain/dna/Jenkinsfile`); a DNA subdirectory holding only `dna.yaml` + `zomes/` + a
 `justfile` is normal and fully covered — the absence of a per-DNA Jenkinsfile is not missing CI.

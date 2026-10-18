@@ -2,16 +2,17 @@
   "version": 1,
   "collective": {
     "path": ".epr-meta/collective.json",
-    "cid": "bafkreihcq3q7qgwncossxf6q7rowjsysgw3wqt2lpu2w6mnoosd7abmfku"
+    "cid": "bafkreihdh5j5y4mkjijuekeknoyspyjgv2u23e5ecmso67b3f5ehpbmtai"
   },
-  "author": "agent:integrator@claude-fable-5-1",
+  "author": "human:matthew",
   "steward": "repo:ethosengine/elohim",
   "scope": "repository",
   "reach": "repository",
   "concern": "project-saga-convergence-flag-decision",
   "claim": "The both-sides-missing exit ships dormant (flag default-OFF); an operator env-flip enacts it, then converged-on-A → recording ×2 → saga 11/11.",
   "uncertainty": [
-    "Imported verbatim from .claude/memory/project_saga_convergence_flag_decision.md; the claim is the entry's own one-line description and the entry body is the pinned source, not restated here."
+    "Imported verbatim from .claude/memory/project_saga_convergence_flag_decision.md; the claim is the entry's own one-line description and the entry body is the pinned source, not restated here.",
+    "authorship: steward-of-record — human:matthew stands for this entry; no agent author was witnessed writing it, and this record does not say human:matthew wrote it. Origin session: 9e9e69ab-dae2-42a4-8cb8-cc022008f6ee."
   ],
   "sources": [
     {

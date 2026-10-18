@@ -1,0 +1,16 @@
+{
+  "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": ".*",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "f=\"$(git rev-parse --show-toplevel 2>/dev/null)/.codex/hooks/native-seam-guidance.py\"; [ -f \"$f\" ] && python3 \"$f\" codex || exit 0",
+            "timeout": 2
+          }
+        ]
+      }
+    ]
+  }
+}

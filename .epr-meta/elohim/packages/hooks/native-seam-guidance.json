@@ -1,0 +1,57 @@
+{
+  "apiVersion": "elohim-agent/v1alpha1",
+  "kind": "HookPackage",
+  "metadata": {
+    "id": "native-seam-guidance",
+    "name": "native-seam-guidance",
+    "version": "1.0.0",
+    "description": "Bounded advisory native seam classification and active-agent review packets for proposed code writes.",
+    "sourceRuntime": "elohim-agent",
+    "master": "package",
+    "runtimeTargets": [
+      "claude",
+      "codex"
+    ],
+    "assetRefs": [],
+    "governance": {
+      "eprRef": "epr:elohim-agent/hooks/native-seam-guidance"
+    }
+  },
+  "source": {
+    "language": "python",
+    "interpreter": "python3",
+    "path": ".claude/hooks/native-seam-guidance.py",
+    "body": "#!/usr/bin/env python3\n\"\"\"Advisory native seam guidance; normalization and classification belong to epr.\"\"\"\nimport json\nimport os\nfrom pathlib import Path\nimport subprocess\nimport sys\nimport time\n\n\ndef main():\n    started = time.monotonic()\n    try:\n        raw = sys.stdin.buffer.read(1572865)\n        if len(raw) > 1572864:\n            raise ValueError(\"event exceeds size limit\")\n        event = json.loads(raw)\n        root = Path(__file__).resolve().parents[2]\n        harness = sys.argv[1] if len(sys.argv) > 1 else \"unknown\"\n        remaining = 1.8 - (time.monotonic() - started)\n        if remaining <= 0:\n            raise TimeoutError(\"normalization deadline\")\n        result = subprocess.run(\n            [os.environ.get(\"EPR_SEAM_BIN\", \"epr\"), \"govern\", \"seam\", \"--repo\", str(root)],\n            input=json.dumps({\"harness\": harness, \"event\": event}),\n            text=True, capture_output=True, timeout=remaining, check=True,\n        )\n        report = json.loads(result.stdout)\n        if \"packet\" not in report:\n            raise ValueError(\"native evaluator does not support seam guidance\")\n        context = report[\"packet\"]\n        if not isinstance(context, str):\n            raise ValueError(\"native packet is not text\")\n        if len(context.encode(\"utf-8\")) > 8192:\n            raise ValueError(\"native packet exceeds 8 KiB\")\n    except (OSError, ValueError, subprocess.SubprocessError, TimeoutError) as error:\n        context = \"Seam guidance coverage gap: native evaluator unavailable, failed or timed out (\" + type(error).__name__ + \"). Existing governance gates remain in effect.\"\n    if context:\n        print(json.dumps({\"hookSpecificOutput\": {\"hookEventName\": \"PreToolUse\", \"additionalContext\": context}}))\n    return 0\n\n\nif __name__ == \"__main__\":\n    sys.exit(main())\n"
+  },
+  "registration": {
+    "event": "PreToolUse",
+    "matcher": ".*",
+    "type": "command",
+    "command": "f=\"$CLAUDE_PROJECT_DIR/.claude/hooks/native-seam-guidance.py\"; [ -f \"$f\" ] && python3 \"$f\" claude || exit 0",
+    "timeout": 2
+  },
+  "registrations": {
+    "claude": {
+      "event": "PreToolUse",
+      "matcher": ".*",
+      "type": "command",
+      "command": "f=\"$CLAUDE_PROJECT_DIR/.claude/hooks/native-seam-guidance.py\"; [ -f \"$f\" ] && python3 \"$f\" claude || exit 0",
+      "timeout": 2
+    },
+    "codex": {
+      "event": "PreToolUse",
+      "matcher": ".*",
+      "type": "command",
+      "command": "f=\"$(git rev-parse --show-toplevel 2>/dev/null)/.codex/hooks/native-seam-guidance.py\"; [ -f \"$f\" ] && python3 \"$f\" codex || exit 0",
+      "timeout": 2
+    }
+  },
+  "projections": {
+    "claude": {
+      "path": ".claude/hooks/native-seam-guidance.py"
+    },
+    "codex": {
+      "path": ".codex/hooks/native-seam-guidance.py"
+    }
+  }
+}

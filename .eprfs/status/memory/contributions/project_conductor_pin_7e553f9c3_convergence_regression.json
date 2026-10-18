@@ -2,22 +2,23 @@
   "version": 1,
   "collective": {
     "path": ".epr-meta/collective.json",
-    "cid": "bafkreihcq3q7qgwncossxf6q7rowjsysgw3wqt2lpu2w6mnoosd7abmfku"
+    "cid": "bafkreihdh5j5y4mkjijuekeknoyspyjgv2u23e5ecmso67b3f5ehpbmtai"
   },
-  "author": "agent:integrator@claude-fable-5-1",
+  "author": "human:matthew",
   "steward": "repo:ethosengine/elohim",
   "scope": "repository",
   "reach": "repository",
   "concern": "project_conductor_pin_7e553f9c3_convergence_regression",
   "claim": "Household A/B on 2026-09-24 — deliverability lane passes on fleet pin 25dd2d0be, misses doorway-B convergence 3× on 7e553f9c3; pin held, bisect owed",
   "uncertainty": [
-    "Imported verbatim from .claude/memory/project_conductor_pin_7e553f9c3_convergence_regression.md; the claim is the entry's own one-line description and the entry body is the pinned source, not restated here."
+    "Imported verbatim from .claude/memory/project_conductor_pin_7e553f9c3_convergence_regression.md; the claim is the entry's own one-line description and the entry body is the pinned source, not restated here.",
+    "authorship: steward-of-record — human:matthew stands for this entry; no agent author was witnessed writing it, and this record does not say human:matthew wrote it. Origin session: 3a11e1a8-7c12-4116-80f9-fcf59b56702c."
   ],
   "sources": [
     {
       "resource": {
         "path": ".claude/memory/project_conductor_pin_7e553f9c3_convergence_regression.md",
-        "cid": "bafkreiderwqq3rohbtnsjjetm3lqfz7k3tecrvp7lid4ewlrudwnnavhtu"
+        "cid": "bafkreigvtjpamo65zbuu3ynfw6idpyaerrvoebswh4rwsau6u23m2lzq7y"
       },
       "reach": "repository"
     }
@@ -28,7 +29,7 @@
     "display": "project_conductor_pin_7e553f9c3_convergence_regression",
     "file": "project_conductor_pin_7e553f9c3_convergence_regression.md",
     "scopePath": ".claude/memory/project_conductor_pin_7e553f9c3_convergence_regression.md",
-    "gitName": "(untracked: no commit carries these bytes)",
+    "gitName": "Matthew Dowell",
     "entryType": "project",
     "indexed": true
   }

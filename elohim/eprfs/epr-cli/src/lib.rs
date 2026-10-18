@@ -18,11 +18,15 @@ pub mod flow;
 pub mod frames;
 pub mod git;
 pub mod govern;
+pub mod integrate;
 pub mod process;
 pub mod ready;
 pub mod report;
 pub mod repository_validators;
+pub mod seam;
 pub mod setup;
 
 pub use error::{Error, Result};
 pub use report::{Finding, FindingStatus, Report};
+
+pub mod view;

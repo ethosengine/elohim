@@ -503,6 +503,16 @@ measures:
     status: active
     established_by: memory-kit-replacement-station-6b-2026-09-11
 
+  - id: absolutes-landings-reset
+    version: 1
+    family: absolutes-guard
+    unit: reset-marks
+    procedure: "epr flow note --kind observation --measure absolutes-landings-reset@1 --subject . --value 1"
+    provenance: "the drain for absolutes-landings-ceiling@1, appended by whoever finishes the drift review the ceiling asks for (sovereignty-landings-reset@1's shape)"
+    default-authority: observation
+    status: active
+    established_by: requested-operator-2026-10-15+agents
+
   - id: package-description-chars
     version: 1
     family: package-quality
@@ -622,6 +632,16 @@ measures:
     default-authority: observation
     status: active
     established_by: memory-kit-replacement-station-1-2026-09-10
+
+  - id: absolutes-landings
+    version: 1
+    family: absolutes-guard
+    unit: landings
+    procedure: ".claude/hooks/absolutes-guard-signal.py — net-new uncited absolutes (always / never / forever / guaranteed / no one can …) that landed in trust-surface prose after the advisory review; classified by .claude/scripts/_lib/absolutes.py over the frame atom frame-absolute-promise"
+    provenance: ".claude/hooks/absolutes-guard-signal.py _ESCALATE_AT=5; operator request 2026-10-15 ('always is a serious word')"
+    default-authority: observation
+    status: active
+    established_by: requested-operator-2026-10-15+agents
 
   - id: frame-probe-abstain
     version: 1
@@ -1721,6 +1741,25 @@ lenses:
     hard: 3
     status: active
     established_by: memory-kit-replacement-station-1-2026-09-10
+
+  - id: absolutes-landings-ceiling
+    version: 1
+    compare: at-or-above
+    binding: binding-local
+    class: inject
+    # The number absolutes-guard-signal.py escalates on: landing EVENTS since the last reset (one
+    # per write that landed net-new uncited absolutes on a trust surface), read back with
+    # `epr flow report --bound absolutes-landings-ceiling --json`. Higher than the sovereignty
+    # ceiling's 3 because the lexicon is broad and ordinary ("never", "always") while the review
+    # it asks for is the same: is the corpus promising what the system does not keep, or has the
+    # RULE drifted (a lexicon word that keeps mis-flagging a legitimate, enforced or qualified use)?
+    derive: count-since-reset
+    reset: absolutes-landings-reset@1
+    consumes: [absolutes-landings@1]
+    context: post-tool-guard
+    hard: 5
+    status: active
+    established_by: requested-operator-2026-10-15+agents
 
   - id: mempalace-surfaces-changed-ceiling
     version: 1

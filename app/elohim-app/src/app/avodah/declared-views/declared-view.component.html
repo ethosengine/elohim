@@ -1,0 +1,445 @@
+<main class="view-shell" data-testid="declared-view" [class.dense]="dense()">
+  <header>
+    <div>
+      <p class="eyebrow">AVODAH / PRIVATE LOCAL VIEW</p>
+      <h1>{{ current()?.projection?.purpose ?? 'Declared view' }}</h1>
+      <p>Authored progress and verified acceptance, read independently.</p>
+    </div>
+    <div class="actions">
+      <button type="button" (click)="view.refresh()" [disabled]="view.busy()" data-testid="refresh">
+        Refresh
+      </button>
+      <button
+        type="button"
+        (click)="view.keepOffline()"
+        [disabled]="view.busy() || !current()"
+        data-testid="keep-offline"
+      >
+        Keep offline
+      </button>
+      @if (view.retained()) {
+        <button type="button" (click)="view.forget()" data-testid="forget-offline">
+          Forget offline copy
+        </button>
+      }
+    </div>
+  </header>
+  <p role="status" data-testid="view-state">
+    {{
+      view.busy()
+        ? 'Working…'
+        : view.offline()
+          ? 'Offline · retained reading'
+          : 'Connected · captured reading'
+    }}
+    @if (view.retained()) {
+      <span data-testid="offline-ready">
+        · Available offline through observation #{{ view.retainedSequence() }}
+      </span>
+    }
+    @if (current(); as reading) {
+      <span>· Observed {{ reading.observation.observedAt | date: 'medium' }}</span>
+    }
+  </p>
+  @if (view.error()) {
+    <p role="alert" class="error">{{ view.error() }} Previous usable readings are preserved.</p>
+  }
+  @if (current(); as reading) {
+    <div class="toolbar">
+      <nav aria-label="View readings">
+        @for (name of tabs(); track name) {
+          <button
+            type="button"
+            [attr.aria-current]="tab() === name ? 'page' : null"
+            (click)="selectTab(name)"
+            [attr.data-testid]="'tab-' + name"
+          >
+            {{ name }}
+          </button>
+        }
+      </nav>
+      <label>
+        Observation
+        <select
+          [ngModel]="view.selected()"
+          (ngModelChange)="selectObservation($event)"
+          data-testid="observation"
+        >
+          @for (r of view.readings(); track r.observation.sequence; let i = $index) {
+            <option [ngValue]="i">
+              #{{ r.observation.sequence }} · {{ r.observation.observedAt | date: 'medium' }}
+            </option>
+          }
+        </select>
+      </label>
+    </div>
+    @if (reading.projection.composition; as composition) {
+      <p class="composition-context">{{ composition.authority }}</p>
+      @if (tab() === 'Board' || tab() === 'Burndown') {
+        <label>
+          Collection
+          <select
+            [ngModel]="group()"
+            (ngModelChange)="group.set($event)"
+            data-testid="work-collection"
+          >
+            @for (g of composition.groups; track g.id) {
+              @if (tab() !== 'Burndown' || g.role === 'work') {
+                <option [ngValue]="g.id">{{ g.label }}</option>
+              }
+            }
+          </select>
+        </label>
+      }
+    }
+    @if (tab() === 'Progress') {
+      <section aria-label="Progress" data-testid="work-progress">
+        <h2>Movement and remaining conditions</h2>
+        <label>
+          Search progress
+          <input
+            type="search"
+            [ngModel]="progressQuery()"
+            (ngModelChange)="progressQuery.set($event)"
+            data-testid="progress-search"
+          />
+        </label>
+        <p data-testid="progress-count">
+          {{ progressSubjects().length }} visible / {{ focusSubjects().length }} total
+        </p>
+        <label>
+          Compare with
+          <select
+            [ngModel]="comparison()"
+            (ngModelChange)="comparison.set($event)"
+            data-testid="comparison"
+          >
+            <option [ngValue]="-1">Previous observation</option>
+            @for (r of view.readings(); track r.observation.sequence; let i = $index) {
+              @if (i < view.selected()) {
+                <option [ngValue]="i">
+                  #{{ r.observation.sequence }} · {{ r.observation.observedAt | date: 'medium' }}
+                </option>
+              }
+            }
+          </select>
+        </label>
+        <p>
+          Claims describe authored progress. Verification reads native evidence. Neither changes the
+          declared condition.
+        </p>
+        @if (!previous()) {
+          <p>
+            Baseline established. Earlier dated claims are source material, not earlier
+            observations.
+          </p>
+        }
+        @if (missing().length) {
+          <p>{{ missing().length }} subjects missing since comparison; none count as completed.</p>
+        }
+        @for (subject of progressSubjects(); track subject.identity) {
+          <article class="progress-card" data-testid="progress-card">
+            <h3>
+              <button type="button" (click)="detail.set(subject)">
+                {{ field(subject, '$title') }}
+              </button>
+            </h3>
+            <p>
+              <strong>{{ field(subject, '$nativeIdentity') }}</strong>
+              · Declared: {{ field(subject, '$status') }} · {{ change(subject) }}
+            </p>
+            <p>{{ evidenceSummary(subject) }} · {{ unresolved(subject) }} unresolved links</p>
+            @if (strings(subject.fields['$conditions']).length) {
+              <details>
+                <summary>Declared conditions (verification shown separately)</summary>
+                <ol>
+                  @for (condition of strings(subject.fields['$conditions']); track $index) {
+                    <li>{{ condition }}</li>
+                  }
+                </ol>
+              </details>
+            }
+            @if (claims(subject).length) {
+              <details>
+                <summary>{{ claims(subject).length }} authored claims · exact source</summary>
+                @for (claim of claims(subject); track claim.line) {
+                  <p class="claim">
+                    {{ claim.text }}
+                    <button type="button" (click)="showSource(subject.source)">
+                      Source line {{ claim.line }}
+                    </button>
+                  </p>
+                }
+              </details>
+            }
+            <ul class="linked-work">
+              @for (work of linked(subject); track work.identity) {
+                <li>
+                  <button type="button" (click)="detail.set(work)">
+                    {{ field(work, '$title') || work.identity }}
+                  </button>
+                  <p>
+                    {{ field(work, '$status') }} · {{ change(work) }} · {{ evidenceSummary(work) }}
+                  </p>
+                  @for (action of remainingActions(work); track $index) {
+                    <p>Remaining: {{ action }}</p>
+                  }
+                </li>
+              } @empty {
+                <li>No resolved work links. Evidence coverage is incomplete.</li>
+              }
+            </ul>
+            <button type="button" (click)="showSource(subject.source)">Captured source</button>
+          </article>
+        }
+        @if (reading.projection.diagnostics.length) {
+          <details>
+            <summary>
+              {{ reading.projection.diagnostics.length }} capture and relationship diagnostics
+            </summary>
+            <ul>
+              @for (diagnostic of reading.projection.diagnostics; track $index) {
+                <li>{{ diagnostic }}</li>
+              }
+            </ul>
+          </details>
+        }
+      </section>
+    }
+    @if (tab() === 'Board') {
+      <section class="filters" aria-label="Board filters">
+        <label>
+          Search
+          <input
+            type="search"
+            [ngModel]="query()"
+            (ngModelChange)="query.set($event)"
+            placeholder="Title, identity or source"
+            data-testid="view-search"
+          />
+        </label>
+        <label>
+          Authored status
+          <select
+            [ngModel]="status()"
+            (ngModelChange)="status.set($event)"
+            data-testid="status-filter"
+          >
+            <option value="">All statuses</option>
+            @for (c of columns(); track c.value) {
+              <option [value]="c.value">{{ c.label }}</option>
+            }
+          </select>
+        </label>
+        <label>
+          Density
+          <select [ngModel]="dense()" (ngModelChange)="dense.set($event)">
+            <option [ngValue]="false">Comfortable</option>
+            <option [ngValue]="true">Compact</option>
+          </select>
+        </label>
+        <span data-testid="visible-count">
+          {{ visible().length }} visible / {{ board()!.projection.subjects.length }} total
+        </span>
+      </section>
+      <div class="columns">
+        @for (column of columns(); track column.value) {
+          <section
+            class="column"
+            [attr.aria-label]="column.label"
+            [attr.data-status]="column.value"
+          >
+            <h2>
+              {{ column.label }}
+              <span>{{ cards(column.value).length }}</span>
+            </h2>
+            @for (subject of cards(column.value); track subject.identity) {
+              <button
+                type="button"
+                class="subject-card"
+                (click)="detail.set(subject)"
+                [attr.data-subject]="subject.identity"
+              >
+                <span class="identity">{{ subject.identity }}</span>
+                <strong>
+                  {{ field(subject, board()!.presentation.titleField) || subject.identity }}
+                </strong>
+                <span>
+                  Authored: {{ field(subject, board()!.presentation.statusField) || 'unmapped' }}
+                </span>
+                <span class="evidence">
+                  Acceptance: {{ acceptance(subject, board()!.presentation.reconciliationReading) }}
+                </span>
+                @for (name of board()!.presentation.readings; track name) {
+                  <span class="native-reading">{{ name }}: {{ readingState(subject, name) }}</span>
+                }
+                <small>{{ subject.source }}</small>
+              </button>
+            }
+          </section>
+        }
+      </div>
+    }
+    @if (tab() === 'Burndown') {
+      <section aria-label="Burndown" data-testid="burndown">
+        <label>
+          Baseline
+          <select
+            [ngModel]="baseline()"
+            (ngModelChange)="baseline.set($event)"
+            data-testid="baseline"
+          >
+            @for (r of view.readings(); track r.observation.sequence; let i = $index) {
+              <option [ngValue]="i">
+                #{{ r.observation.sequence }} · {{ r.observation.observedAt | date: 'medium' }}
+              </option>
+            }
+          </select>
+        </label>
+        <p>
+          {{ cohortSize() }} baseline subjects · unweighted counts · board filters do not change
+          this cohort.
+        </p>
+        <p class="legend">
+          <span class="authored">● Authored remaining</span>
+          <span class="accepted">● Verified acceptance remaining</span>
+          · Vertical ranges include unknown evidence. Recorded observations only.
+        </p>
+        <svg
+          viewBox="0 0 740 220"
+          role="img"
+          aria-label="Recorded burndown observations; exact counts in the table below"
+        >
+          <path d="M 45 20 V 180 H 710" fill="none" stroke="currentColor" />
+          <text x="32" y="184" text-anchor="end">0</text>
+          <text x="32" y="34" text-anchor="end">{{ cohortSize() }}</text>
+          @for (point of points(); track point.sequence; let i = $index) {
+            <circle
+              [attr.cx]="x(i)"
+              [attr.cy]="y(point.authoredRemaining)"
+              r="5"
+              class="authored-dot"
+            />
+            @if (point.available) {
+              <line
+                [attr.x1]="x(i) + 8"
+                [attr.x2]="x(i) + 8"
+                [attr.y1]="y(point.acceptanceMin)"
+                [attr.y2]="y(point.acceptanceMax)"
+                class="range"
+              />
+              <circle
+                [attr.cx]="x(i) + 8"
+                [attr.cy]="y(point.acceptanceMax)"
+                r="4"
+                class="acceptance-dot"
+              />
+            }
+            <text [attr.x]="x(i)" y="205" text-anchor="middle">#{{ point.sequence }}</text>
+          }
+        </svg>
+        @if (points().length && !points()[points().length - 1].available) {
+          <p>
+            Verified acceptance unavailable: the current cohort has no structured acceptance
+            reading. This is not zero remaining work.
+          </p>
+        }
+        <div class="table-scroll">
+          <table>
+            <caption>Remaining work in the baseline cohort</caption>
+            <thead>
+              <tr>
+                <th>Observation</th>
+                <th>Authored remaining</th>
+                <th>Acceptance remaining</th>
+                <th>Unknown</th>
+                <th>Missing</th>
+                <th>Added</th>
+                <th>Declaration</th>
+              </tr>
+            </thead>
+            <tbody>
+              @for (p of points(); track p.sequence) {
+                <tr>
+                  <td>#{{ p.sequence }} {{ p.time | date: 'short' }}</td>
+                  <td>{{ p.authoredRemaining }}</td>
+                  <td>
+                    {{ p.available ? p.acceptanceMin + '–' + p.acceptanceMax : 'Unavailable' }}
+                  </td>
+                  <td>{{ p.unknown }}</td>
+                  <td>{{ p.missing }}</td>
+                  <td>{{ p.additions }}</td>
+                  <td class="cid">{{ p.declaration }}</td>
+                </tr>
+              }
+            </tbody>
+          </table>
+        </div>
+      </section>
+    }
+    @if (tab() === 'Sources') {
+      <section class="sources" aria-label="Captured sources">
+        <div>
+          <h2>Exact captured sources</h2>
+          <p>These bytes belong to observation #{{ reading.observation.sequence }}.</p>
+          <label>
+            Source
+            <select
+              [ngModel]="sourcePath()"
+              (ngModelChange)="sourcePath.set($event)"
+              data-testid="source-select"
+            >
+              <option value="">Choose a source</option>
+              @for (path of sourcePaths(); track path) {
+                <option [value]="path">{{ path }}</option>
+              }
+            </select>
+          </label>
+          @if (sourcePath()) {
+            <p class="cid">{{ reading.projection.sources[sourcePath()] }}</p>
+            <pre data-testid="source-content">{{ sourceText() }}</pre>
+          }
+        </div>
+        <details>
+          <summary>Reader provenance and diagnostics</summary>
+          <pre>{{ reading.projection.reader_versions | json }}</pre>
+          <pre>{{ reading.projection.diagnostics | json }}</pre>
+        </details>
+      </section>
+    }
+    @if (detail(); as subject) {
+      <aside class="detail" aria-label="Subject details" data-testid="subject-detail">
+        <button
+          type="button"
+          class="close"
+          (click)="detail.set(null)"
+          aria-label="Close subject details"
+        >
+          Close
+        </button>
+        <h2>{{ field(subject, reading.presentation.titleField) || subject.identity }}</h2>
+        <p>{{ subject.identity }}</p>
+        <button
+          type="button"
+          (click)="showSource(subject.source); detail.set(null)"
+          data-testid="exact-source"
+        >
+          Open exact captured source
+        </button>
+        <h3>Authored fields</h3>
+        <pre>{{ subject.fields | json }}</pre>
+        <h3>Native evidence · independent readings</h3>
+        <pre>{{ subject.readings | json }}</pre>
+        <h3>Relationships, including unresolved references</h3>
+        <pre>{{ subject.relationships | json }}</pre>
+        @if (reading.projection.composition) {
+          <pre>{{ compositionLinks(subject) | json }}</pre>
+        }
+        <h3>Diagnostics</h3>
+        <pre>{{ reading.projection.diagnostics | json }}</pre>
+      </aside>
+    }
+  } @else if (!view.busy()) {
+    <p>No usable observation. Open the private launcher link to capture this view.</p>
+  }
+</main>

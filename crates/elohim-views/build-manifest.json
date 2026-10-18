@@ -1,0 +1,76 @@
+{
+  "manifestVersion": "1.0",
+  "pipeline": "app-lifecycle-contracts",
+  "manualOnly": true,
+  "triggersGenesis": false,
+  "cascades": false,
+  "dependsOn": [],
+  "description": "Portable app foundation contract gates; no deployment claim",
+  "steps": {
+    "gate-contract": {
+      "description": "Verify owning native contract boundary",
+      "inputs": {
+        "sources": [
+          "crates/elohim-views/**",
+          "elohim/sdk/schemas/v1/views/app-*.schema.json",
+          "elohim/sdk/schemas/v1/enums/app-sync-urgency.schema.json",
+          "elohim/sdk/schemas/tests/app-lifecycle.test.mjs",
+          "elohim/sdk/storage-client-ts/src/generated/App*.ts",
+          "elohim/sdk/storage-client-ts/src/app-lifecycle.ts",
+          "elohim/sdk/storage-client-ts/tests/app-lifecycle.test.ts",
+          "elohim/sdk/storage-client-ts/tsconfig.lifecycle-contract.json",
+          "genesis/a2o/features/devflow/portable-app-lifecycle.feature",
+          "genesis/a2o/steps/devflow/portable-app-lifecycle.steps.ts"
+        ],
+        "buildProcess": []
+      },
+      "outputs": {
+        "artifacts": [],
+        "verify": null
+      },
+      "depends": [],
+      "executor": {
+        "stage": "Contract Gate",
+        "function": null
+      }
+    }
+  },
+  "gate": {
+    "projects": {
+      "app-lifecycle-contracts": {
+        "dir": "crates/elohim-views",
+        "inputs": {
+          "sources": [
+            "crates/elohim-views/**",
+            "elohim/sdk/schemas/v1/views/app-*.schema.json",
+            "elohim/sdk/schemas/v1/enums/app-sync-urgency.schema.json",
+            "elohim/sdk/schemas/tests/app-lifecycle.test.mjs",
+            "elohim/sdk/storage-client-ts/src/generated/App*.ts",
+            "elohim/sdk/storage-client-ts/src/app-lifecycle.ts",
+            "elohim/sdk/storage-client-ts/tests/app-lifecycle.test.ts",
+            "elohim/sdk/storage-client-ts/tsconfig.lifecycle-contract.json",
+            "genesis/a2o/features/devflow/portable-app-lifecycle.feature",
+            "genesis/a2o/steps/devflow/portable-app-lifecycle.steps.ts"
+          ],
+          "buildProcess": []
+        },
+        "run": {
+          "kind": "just",
+          "recipe": "gate",
+          "cargo": {
+            "workspace": "crates/elohim-views",
+            "profile": "dev",
+            "rustflags": "",
+            "env": {
+              "CARGO_BUILD_JOBS": "1"
+            }
+          }
+        },
+        "steps": [
+          "gate-contract"
+        ]
+      }
+    }
+  },
+  "deployment": {}
+}

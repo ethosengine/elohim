@@ -1,0 +1,6779 @@
+{
+ "lens": "illustrative/commons-flow/v0",
+ "status": "ILLUSTRATIVE LENS, NOT A DEFAULT ALLOCATION. One probe's weights, chosen to make the flow visible. Nobody has adopted it; every number below is a claim a person would author, contest and replace.",
+ "lock": "elohim/Cargo.lock",
+ "inflow": {
+  "exact": "1000",
+  "decimal": "1,000.000000000000"
+ },
+ "unit": "USD",
+ "floor": {
+  "exact": "1/100",
+  "decimal": "0.010000000000"
+ },
+ "graph": {
+  "packages_in_lockfile": 491,
+  "workspace_crates_collapsed_into_entry": 28,
+  "external_nodes_relied_on": 463,
+  "edges": 1220,
+  "max_degree": 7,
+  "direct_reliances_of_entry": 56
+ },
+ "by_degree": {
+  "0": {
+   "nodes_reached": 1,
+   "received": {
+    "exact": "1000",
+    "decimal": "1,000.000000000000"
+   },
+   "kept_by_makers": {
+    "exact": "500",
+    "decimal": "500.000000000000"
+   },
+   "positional_to_commons": {
+    "exact": "0",
+    "decimal": "0.000000000000"
+   },
+   "no_record_to_commons": {
+    "exact": "0",
+    "decimal": "0.000000000000"
+   },
+   "below_floor_to_commons": {
+    "exact": "0",
+    "decimal": "0.000000000000"
+   }
+  },
+  "1": {
+   "nodes_reached": 56,
+   "received": {
+    "exact": "4357150042900594602570747673/8204348887151449032000000",
+    "decimal": "531.078102946619"
+   },
+   "kept_by_makers": {
+    "exact": "2689871328290683241301058645177/6991099718384810508480000000",
+    "decimal": "384.756538548150"
+   },
+   "positional_to_commons": {
+    "exact": "1042180190393664401760711044243/57676572676674686694960000000",
+    "decimal": "18.069384882419"
+   },
+   "no_record_to_commons": {
+    "exact": "7141558825409679187718149973/428026513370498602560000000",
+    "decimal": "16.684851527475"
+   },
+   "below_floor_to_commons": {
+    "exact": "0",
+    "decimal": "0.000000000000"
+   }
+  },
+  "2": {
+   "nodes_reached": 167,
+   "received": {
+    "exact": "5473698953461804194904656406117/60964623269140767422400000000",
+    "decimal": "89.784840124363"
+   },
+   "kept_by_makers": {
+    "exact": "1250025838770355083434365410662483/19373202505526954980896000000000",
+    "decimal": "64.523448738727"
+   },
+   "positional_to_commons": {
+    "exact": "2820986817484909466443674110107/751546648921304288052000000000",
+    "decimal": "3.753575139393"
+   },
+   "no_record_to_commons": {
+    "exact": "8860731959578684233425955284929/1341221711921096883292800000000",
+    "decimal": "6.606463257210"
+   },
+   "below_floor_to_commons": {
+    "exact": "492452295441641/542250938829600",
+    "decimal": "0.908163103423"
+   }
+  },
+  "3": {
+   "nodes_reached": 77,
+   "received": {
+    "exact": "4447683322091439907907543937457/932400120586858795872000000000",
+    "decimal": "4.770144516168"
+   },
+   "kept_by_makers": {
+    "exact": "283463538165984827590589410739791/80419510400616571143960000000000",
+    "decimal": "3.524810543535"
+   },
+   "positional_to_commons": {
+    "exact": "2191471861576873007576690433269/31130133058303188829920000000000",
+    "decimal": "0.070397124788"
+   },
+   "no_record_to_commons": {
+    "exact": "13737208343368370867322695772907/18558348553988439494760000000000",
+    "decimal": "0.740217175219"
+   },
+   "below_floor_to_commons": {
+    "exact": "5639755657864858676176297/17659093192932931740000000",
+    "decimal": "0.319368361458"
+   }
+  },
+  "4": {
+   "nodes_reached": 2,
+   "received": {
+    "exact": "1040026/24310125",
+    "decimal": "0.042781598202"
+   },
+   "kept_by_makers": {
+    "exact": "26929136/850854375",
+    "decimal": "0.031649524045"
+   },
+   "positional_to_commons": {
+    "exact": "1486186/2552563125",
+    "decimal": "0.000582232810"
+   },
+   "no_record_to_commons": {
+    "exact": "114244/20420505",
+    "decimal": "0.005594572710"
+   },
+   "below_floor_to_commons": {
+    "exact": "7436/1500625",
+    "decimal": "0.004955268638"
+   }
+  }
+ },
+ "recipients": [
+  {
+   "node": "(entry work)",
+   "kept": {
+    "exact": "500",
+    "decimal": "500.000000000000"
+   },
+   "degree": 0,
+   "fan_in": 0
+  },
+  {
+   "node": "serde 1.0.228",
+   "kept": {
+    "exact": "30785099407535347883/3103343834532480000",
+    "decimal": "9.919976982561"
+   },
+   "degree": 1,
+   "fan_in": 30
+  },
+  {
+   "node": "libc 0.2.189",
+   "kept": {
+    "exact": "52511059863286851097297/6428355085817280000000",
+    "decimal": "8.168661992419"
+   },
+   "degree": 1,
+   "fan_in": 28
+  },
+  {
+   "node": "pin-project-lite 0.2.16",
+   "kept": {
+    "exact": "12494692679920627619/1586637313361100000",
+    "decimal": "7.874951997348"
+   },
+   "degree": 1,
+   "fan_in": 17
+  },
+  {
+   "node": "tokio 1.49.0",
+   "kept": {
+    "exact": "44614969431/5706883000",
+    "decimal": "7.817747346669"
+   },
+   "degree": 1,
+   "fan_in": 19
+  },
+  {
+   "node": "bytes 1.11.1",
+   "kept": {
+    "exact": "46165058705175017/6082966589700000",
+    "decimal": "7.589234302773"
+   },
+   "degree": 1,
+   "fan_in": 18
+  },
+  {
+   "node": "serde_bytes 0.11.19",
+   "kept": {
+    "exact": "5749503/779240",
+    "decimal": "7.378346850778"
+   },
+   "degree": 1,
+   "fan_in": 3
+  },
+  {
+   "node": "serde_json 1.0.149",
+   "kept": {
+    "exact": "2792418015253/389402576640",
+    "decimal": "7.171031171256"
+   },
+   "degree": 1,
+   "fan_in": 12
+  },
+  {
+   "node": "sha2 0.10.9",
+   "kept": {
+    "exact": "8065/1127",
+    "decimal": "7.156166814552"
+   },
+   "degree": 1,
+   "fan_in": 3
+  },
+  {
+   "node": "cid 0.11.2",
+   "kept": {
+    "exact": "677889/94864",
+    "decimal": "7.145903609378"
+   },
+   "degree": 1,
+   "fan_in": 2
+  },
+  {
+   "node": "tokio-stream 0.1.18",
+   "kept": {
+    "exact": "1395/196",
+    "decimal": "7.117346938776"
+   },
+   "degree": 1,
+   "fan_in": 2
+  },
+  {
+   "node": "rand_core 0.6.4",
+   "kept": {
+    "exact": "803095504/113246595",
+    "decimal": "7.091564245265"
+   },
+   "degree": 1,
+   "fan_in": 9
+  },
+  {
+   "node": "ipld-core 0.4.3",
+   "kept": {
+    "exact": "30105/4312",
+    "decimal": "6.981679035250"
+   },
+   "degree": 1,
+   "fan_in": 2
+  },
+  {
+   "node": "tracing 0.1.44",
+   "kept": {
+    "exact": "23772680319/3426962000",
+    "decimal": "6.936954748550"
+   },
+   "degree": 1,
+   "fan_in": 13
+  },
+  {
+   "node": "chrono 0.4.42",
+   "kept": {
+    "exact": "14877/2156",
+    "decimal": "6.900278293135"
+   },
+   "degree": 1,
+   "fan_in": 2
+  },
+  {
+   "node": "rustix 1.1.3",
+   "kept": {
+    "exact": "14877/2156",
+    "decimal": "6.900278293135"
+   },
+   "degree": 1,
+   "fan_in": 2
+  },
+  {
+   "node": "thiserror 1.0.69",
+   "kept": {
+    "exact": "14877/2156",
+    "decimal": "6.900278293135"
+   },
+   "degree": 1,
+   "fan_in": 2
+  },
+  {
+   "node": "getrandom 0.3.4",
+   "kept": {
+    "exact": "108947261/15806175",
+    "decimal": "6.892702440660"
+   },
+   "degree": 1,
+   "fan_in": 5
+  },
+  {
+   "node": "url 2.5.8",
+   "kept": {
+    "exact": "13312943492/1955704905",
+    "decimal": "6.807235313448"
+   },
+   "degree": 1,
+   "fan_in": 7
+  },
+  {
+   "node": "http 1.4.0",
+   "kept": {
+    "exact": "89633384321/13240535000",
+    "decimal": "6.769619529800"
+   },
+   "degree": 1,
+   "fan_in": 14
+  },
+  {
+   "node": "blake2b_simd 1.0.4",
+   "kept": {
+    "exact": "7263/1078",
+    "decimal": "6.737476808905"
+   },
+   "degree": 1,
+   "fan_in": 2
+  },
+  {
+   "node": "parking_lot 0.12.5",
+   "kept": {
+    "exact": "13836582775333/2054477880000",
+    "decimal": "6.734841445620"
+   },
+   "degree": 1,
+   "fan_in": 4
+  },
+  {
+   "node": "futures 0.3.31",
+   "kept": {
+    "exact": "100042/14973",
+    "decimal": "6.681493354705"
+   },
+   "degree": 1,
+   "fan_in": 3
+  },
+  {
+   "node": "thiserror 2.0.17",
+   "kept": {
+    "exact": "47834/7161",
+    "decimal": "6.679793324955"
+   },
+   "degree": 1,
+   "fan_in": 10
+  },
+  {
+   "node": "base64 0.22.1",
+   "kept": {
+    "exact": "424423/63580",
+    "decimal": "6.675416797735"
+   },
+   "degree": 1,
+   "fan_in": 5
+  },
+  {
+   "node": "reqwest 0.12.28",
+   "kept": {
+    "exact": "244485/36652",
+    "decimal": "6.670440903634"
+   },
+   "degree": 1,
+   "fan_in": 2
+  },
+  {
+   "node": "axum 0.7.9",
+   "kept": {
+    "exact": "325/49",
+    "decimal": "6.632653061224"
+   },
+   "degree": 1,
+   "fan_in": 1
+  },
+  {
+   "node": "axum 0.8.9",
+   "kept": {
+    "exact": "325/49",
+    "decimal": "6.632653061224"
+   },
+   "degree": 1,
+   "fan_in": 1
+  },
+  {
+   "node": "bs58 0.5.1",
+   "kept": {
+    "exact": "325/49",
+    "decimal": "6.632653061224"
+   },
+   "degree": 1,
+   "fan_in": 1
+  },
+  {
+   "node": "clap 4.5.60",
+   "kept": {
+    "exact": "325/49",
+    "decimal": "6.632653061224"
+   },
+   "degree": 1,
+   "fan_in": 1
+  },
+  {
+   "node": "dashmap 6.1.0",
+   "kept": {
+    "exact": "325/49",
+    "decimal": "6.632653061224"
+   },
+   "degree": 1,
+   "fan_in": 1
+  },
+  {
+   "node": "deno_core 0.339.0",
+   "kept": {
+    "exact": "325/49",
+    "decimal": "6.632653061224"
+   },
+   "degree": 1,
+   "fan_in": 1
+  },
+  {
+   "node": "ed25519-dalek 2.2.0",
+   "kept": {
+    "exact": "325/49",
+    "decimal": "6.632653061224"
+   },
+   "degree": 1,
+   "fan_in": 1
+  },
+  {
+   "node": "hex 0.4.3",
+   "kept": {
+    "exact": "325/49",
+    "decimal": "6.632653061224"
+   },
+   "degree": 1,
+   "fan_in": 1
+  },
+  {
+   "node": "jsonschema 0.28.3",
+   "kept": {
+    "exact": "325/49",
+    "decimal": "6.632653061224"
+   },
+   "degree": 1,
+   "fan_in": 1
+  },
+  {
+   "node": "llama-cpp-2 0.1.131",
+   "kept": {
+    "exact": "325/49",
+    "decimal": "6.632653061224"
+   },
+   "degree": 1,
+   "fan_in": 1
+  },
+  {
+   "node": "multihash-codetable 0.2.1",
+   "kept": {
+    "exact": "325/49",
+    "decimal": "6.632653061224"
+   },
+   "degree": 1,
+   "fan_in": 1
+  },
+  {
+   "node": "nix 0.31.3",
+   "kept": {
+    "exact": "325/49",
+    "decimal": "6.632653061224"
+   },
+   "degree": 1,
+   "fan_in": 1
+  },
+  {
+   "node": "p256 0.13.2",
+   "kept": {
+    "exact": "325/49",
+    "decimal": "6.632653061224"
+   },
+   "degree": 1,
+   "fan_in": 1
+  },
+  {
+   "node": "rusqlite 0.37.0",
+   "kept": {
+    "exact": "325/49",
+    "decimal": "6.632653061224"
+   },
+   "degree": 1,
+   "fan_in": 1
+  },
+  {
+   "node": "serde_ipld_dagcbor 0.6.4",
+   "kept": {
+    "exact": "325/49",
+    "decimal": "6.632653061224"
+   },
+   "degree": 1,
+   "fan_in": 1
+  },
+  {
+   "node": "serde_yaml 0.9.34+deprecated",
+   "kept": {
+    "exact": "325/49",
+    "decimal": "6.632653061224"
+   },
+   "degree": 1,
+   "fan_in": 1
+  },
+  {
+   "node": "tempfile 3.25.0",
+   "kept": {
+    "exact": "325/49",
+    "decimal": "6.632653061224"
+   },
+   "degree": 1,
+   "fan_in": 1
+  },
+  {
+   "node": "tokio-test 0.4.5",
+   "kept": {
+    "exact": "325/49",
+    "decimal": "6.632653061224"
+   },
+   "degree": 1,
+   "fan_in": 1
+  },
+  {
+   "node": "tracing-subscriber 0.3.23",
+   "kept": {
+    "exact": "325/49",
+    "decimal": "6.632653061224"
+   },
+   "degree": 1,
+   "fan_in": 1
+  },
+  {
+   "node": "ts-rs 10.1.0",
+   "kept": {
+    "exact": "325/49",
+    "decimal": "6.632653061224"
+   },
+   "degree": 1,
+   "fan_in": 1
+  },
+  {
+   "node": "unicode-normalization 0.1.25",
+   "kept": {
+    "exact": "325/49",
+    "decimal": "6.632653061224"
+   },
+   "degree": 1,
+   "fan_in": 1
+  },
+  {
+   "node": "wiremock 0.6.5",
+   "kept": {
+    "exact": "325/49",
+    "decimal": "6.632653061224"
+   },
+   "degree": 1,
+   "fan_in": 1
+  },
+  {
+   "node": "zip 2.4.2",
+   "kept": {
+    "exact": "325/49",
+    "decimal": "6.632653061224"
+   },
+   "degree": 1,
+   "fan_in": 1
+  },
+  {
+   "node": "anyhow 1.0.100",
+   "kept": {
+    "exact": "442935/66836",
+    "decimal": "6.627191932491"
+   },
+   "degree": 1,
+   "fan_in": 2
+  },
+  {
+   "node": "http-body-util 0.1.3",
+   "kept": {
+    "exact": "59697476/9012465",
+    "decimal": "6.623878816728"
+   },
+   "degree": 1,
+   "fan_in": 7
+  },
+  {
+   "node": "tower 0.5.3",
+   "kept": {
+    "exact": "102817503/15577100",
+    "decimal": "6.600554852957"
+   },
+   "degree": 1,
+   "fan_in": 5
+  },
+  {
+   "node": "async-trait 0.1.89",
+   "kept": {
+    "exact": "1060/161",
+    "decimal": "6.583850931677"
+   },
+   "degree": 1,
+   "fan_in": 3
+  },
+  {
+   "node": "rand 0.8.6",
+   "kept": {
+    "exact": "2025/308",
+    "decimal": "6.574675324675"
+   },
+   "degree": 1,
+   "fan_in": 2
+  },
+  {
+   "node": "uuid 1.19.0",
+   "kept": {
+    "exact": "1125902/172431",
+    "decimal": "6.529579947921"
+   },
+   "degree": 1,
+   "fan_in": 3
+  },
+  {
+   "node": "glob 0.3.3",
+   "kept": {
+    "exact": "4805677/740880",
+    "decimal": "6.486444498434"
+   },
+   "degree": 1,
+   "fan_in": 4
+  },
+  {
+   "node": "deno_error 0.5.7",
+   "kept": {
+    "exact": "9843/1519",
+    "decimal": "6.479921000658"
+   },
+   "degree": 1,
+   "fan_in": 5
+  },
+  {
+   "node": "tinyvec 1.10.0",
+   "kept": {
+    "exact": "520/161",
+    "decimal": "3.229813664596"
+   },
+   "degree": 2,
+   "fan_in": 3
+  },
+  {
+   "node": "serde_core 1.0.228",
+   "kept": {
+    "exact": "2359465057111428593/849400072012800000",
+    "decimal": "2.777801809600"
+   },
+   "degree": 2,
+   "fan_in": 8
+  },
+  {
+   "node": "serde_derive 1.0.228",
+   "kept": {
+    "exact": "2635552469310407528753/1189615136570784000000",
+    "decimal": "2.215466488521"
+   },
+   "degree": 2,
+   "fan_in": 3
+  },
+  {
+   "node": "futures-core 0.3.31",
+   "kept": {
+    "exact": "6987528118639934977/3581629070394375000",
+    "decimal": "1.950935728213"
+   },
+   "degree": 2,
+   "fan_in": 15
+  },
+  {
+   "node": "getrandom 0.2.17",
+   "kept": {
+    "exact": "1204643256/692062525",
+    "decimal": "1.740656678383"
+   },
+   "degree": 2,
+   "fan_in": 2
+  },
+  {
+   "node": "thiserror-impl 1.0.69",
+   "kept": {
+    "exact": "64467/37730",
+    "decimal": "1.708640339253"
+   },
+   "degree": 2,
+   "fan_in": 1
+  },
+  {
+   "node": "cfg-if 1.0.4",
+   "kept": {
+    "exact": "286810368100993181899787/170619257902733640000000",
+    "decimal": "1.680996457413"
+   },
+   "degree": 2,
+   "fan_in": 22
+  },
+  {
+   "node": "thiserror-impl 2.0.17",
+   "kept": {
+    "exact": "1243684/751905",
+    "decimal": "1.654044061417"
+   },
+   "degree": 2,
+   "fan_in": 1
+  },
+  {
+   "node": "itoa 1.0.17",
+   "kept": {
+    "exact": "794350684436762279/489395595427200000",
+    "decimal": "1.623125937093"
+   },
+   "degree": 2,
+   "fan_in": 10
+  },
+  {
+   "node": "proc-macro2 1.0.105",
+   "kept": {
+    "exact": "3098473148563069869738037/2346498926879184000000000",
+    "decimal": "1.320466467327"
+   },
+   "degree": 2,
+   "fan_in": 37
+  },
+  {
+   "node": "once_cell 1.21.3",
+   "kept": {
+    "exact": "303728976784445189521/256158362053440000000",
+    "decimal": "1.185707834598"
+   },
+   "degree": 2,
+   "fan_in": 16
+  },
+  {
+   "node": "wasm-bindgen 0.2.106",
+   "kept": {
+    "exact": "7371964957747635463/6249789666766800000",
+    "decimal": "1.179554089148"
+   },
+   "degree": 2,
+   "fan_in": 12
+  },
+  {
+   "node": "lock_api 0.4.14",
+   "kept": {
+    "exact": "7876626760857/7174367200000",
+    "decimal": "1.097884529922"
+   },
+   "degree": 2,
+   "fan_in": 2
+  },
+  {
+   "node": "parking_lot_core 0.9.12",
+   "kept": {
+    "exact": "7876626760857/7174367200000",
+    "decimal": "1.097884529922"
+   },
+   "degree": 2,
+   "fan_in": 2
+  },
+  {
+   "node": "quote 1.0.43",
+   "kept": {
+    "exact": "878671489891019813806309/808238519258385600000000",
+    "decimal": "1.087143793514"
+   },
+   "degree": 2,
+   "fan_in": 35
+  },
+  {
+   "node": "js-sys 0.3.83",
+   "kept": {
+    "exact": "1151689573152263/1085032928258125",
+    "decimal": "1.061432831353"
+   },
+   "degree": 2,
+   "fan_in": 11
+  },
+  {
+   "node": "syn 2.0.114",
+   "kept": {
+    "exact": "1011301148742494502682733/999276714719458560000000",
+    "decimal": "1.012033137414"
+   },
+   "degree": 2,
+   "fan_in": 36
+  },
+  {
+   "node": "bitflags 2.10.0",
+   "kept": {
+    "exact": "608156503760857/617815275000000",
+    "decimal": "0.984366247275"
+   },
+   "degree": 2,
+   "fan_in": 9
+  },
+  {
+   "node": "windows-sys 0.61.2",
+   "kept": {
+    "exact": "1184164711506379/1271208188250000",
+    "decimal": "0.931526969738"
+   },
+   "degree": 2,
+   "fan_in": 10
+  },
+  {
+   "node": "tracing-core 0.1.36",
+   "kept": {
+    "exact": "94636674634813/103631330880000",
+    "decimal": "0.913205242384"
+   },
+   "degree": 2,
+   "fan_in": 4
+  },
+  {
+   "node": "clap_builder 4.5.60",
+   "kept": {
+    "exact": "845/1029",
+    "decimal": "0.821185617104"
+   },
+   "degree": 2,
+   "fan_in": 1
+  },
+  {
+   "node": "clap_derive 4.5.55",
+   "kept": {
+    "exact": "845/1029",
+    "decimal": "0.821185617104"
+   },
+   "degree": 2,
+   "fan_in": 1
+  },
+  {
+   "node": "tinyvec_macros 0.1.1",
+   "kept": {
+    "exact": "2704/3381",
+    "decimal": "0.799763383614"
+   },
+   "degree": 3,
+   "fan_in": 1
+  },
+  {
+   "node": "percent-encoding 2.3.2",
+   "kept": {
+    "exact": "639126371470759/886772481210000",
+    "decimal": "0.720733203853"
+   },
+   "degree": 2,
+   "fan_in": 10
+  },
+  {
+   "node": "indexmap 2.13.0",
+   "kept": {
+    "exact": "7096028453653/9856752721200",
+    "decimal": "0.719915438113"
+   },
+   "degree": 2,
+   "fan_in": 7
+  },
+  {
+   "node": "scopeguard 1.2.0",
+   "kept": {
+    "exact": "3737077892801973/5524262744000000",
+    "decimal": "0.676484458829"
+   },
+   "degree": 2,
+   "fan_in": 2
+  },
+  {
+   "node": "digest 0.10.7",
+   "kept": {
+    "exact": "2729317/4417840",
+    "decimal": "0.617794442533"
+   },
+   "degree": 2,
+   "fan_in": 8
+  },
+  {
+   "node": "memchr 2.7.6",
+   "kept": {
+    "exact": "118732038282965474869/195067326742041600000",
+    "decimal": "0.608672094225"
+   },
+   "degree": 2,
+   "fan_in": 12
+  },
+  {
+   "node": "futures-util 0.3.31",
+   "kept": {
+    "exact": "1394874211921/2332359183000",
+    "decimal": "0.598052916587"
+   },
+   "degree": 2,
+   "fan_in": 11
+  },
+  {
+   "node": "log 0.4.29",
+   "kept": {
+    "exact": "14919654443279/25646137440000",
+    "decimal": "0.581750545406"
+   },
+   "degree": 2,
+   "fan_in": 8
+  },
+  {
+   "node": "cpufeatures 0.2.17",
+   "kept": {
+    "exact": "46777/81144",
+    "decimal": "0.576468993394"
+   },
+   "degree": 2,
+   "fan_in": 4
+  },
+  {
+   "node": "arrayref 0.3.9",
+   "kept": {
+    "exact": "312482/557865",
+    "decimal": "0.560139101754"
+   },
+   "degree": 2,
+   "fan_in": 3
+  },
+  {
+   "node": "arrayvec 0.7.6",
+   "kept": {
+    "exact": "312482/557865",
+    "decimal": "0.560139101754"
+   },
+   "degree": 2,
+   "fan_in": 3
+  },
+  {
+   "node": "constant_time_eq 0.4.2",
+   "kept": {
+    "exact": "312482/557865",
+    "decimal": "0.560139101754"
+   },
+   "degree": 2,
+   "fan_in": 3
+  },
+  {
+   "node": "smallvec 1.15.1",
+   "kept": {
+    "exact": "8329793237372843/15066171120000000",
+    "decimal": "0.552880567400"
+   },
+   "degree": 2,
+   "fan_in": 8
+  },
+  {
+   "node": "rand_chacha 0.3.1",
+   "kept": {
+    "exact": "585/1078",
+    "decimal": "0.542671614100"
+   },
+   "degree": 2,
+   "fan_in": 1
+  },
+  {
+   "node": "windows-link 0.2.1",
+   "kept": {
+    "exact": "46803856804007983/86288070960000000",
+    "decimal": "0.542413989365"
+   },
+   "degree": 2,
+   "fan_in": 8
+  },
+  {
+   "node": "elliptic-curve 0.13.8",
+   "kept": {
+    "exact": "754/1449",
+    "decimal": "0.520358868185"
+   },
+   "degree": 2,
+   "fan_in": 3
+  },
+  {
+   "node": "no_std_io2 0.8.1",
+   "kept": {
+    "exact": "10953654641/22539686400",
+    "decimal": "0.485971918447"
+   },
+   "degree": 2,
+   "fan_in": 4
+  },
+  {
+   "node": "http-body 1.0.1",
+   "kept": {
+    "exact": "177633989/371101500",
+    "decimal": "0.478666857989"
+   },
+   "degree": 2,
+   "fan_in": 9
+  },
+  {
+   "node": "idna 1.1.0",
+   "kept": {
+    "exact": "17128094117/39838433250",
+    "decimal": "0.429938948892"
+   },
+   "degree": 2,
+   "fan_in": 2
+  },
+  {
+   "node": "tracing-attributes 0.1.31",
+   "kept": {
+    "exact": "103014948049/239887340000",
+    "decimal": "0.429430532053"
+   },
+   "degree": 2,
+   "fan_in": 1
+  },
+  {
+   "node": "unicode-ident 1.0.22",
+   "kept": {
+    "exact": "123056462987247209303050091567/294576961174419674520000000000",
+    "decimal": "0.417739603588"
+   },
+   "degree": 3,
+   "fan_in": 3
+  },
+  {
+   "node": "cbor4ii 0.2.14",
+   "kept": {
+    "exact": "845/2058",
+    "decimal": "0.410592808552"
+   },
+   "degree": 2,
+   "fan_in": 1
+  },
+  {
+   "node": "ecdsa 0.16.9",
+   "kept": {
+    "exact": "845/2058",
+    "decimal": "0.410592808552"
+   },
+   "degree": 2,
+   "fan_in": 1
+  },
+  {
+   "node": "primeorder 0.13.6",
+   "kept": {
+    "exact": "845/2058",
+    "decimal": "0.410592808552"
+   },
+   "degree": 2,
+   "fan_in": 1
+  },
+  {
+   "node": "form_urlencoded 1.2.2",
+   "kept": {
+    "exact": "3005414641613/7389770676750",
+    "decimal": "0.406699310855"
+   },
+   "degree": 2,
+   "fan_in": 3
+  },
+  {
+   "node": "cfg_aliases 0.2.1",
+   "kept": {
+    "exact": "65/161",
+    "decimal": "0.403726708075"
+   },
+   "degree": 2,
+   "fan_in": 3
+  },
+  {
+   "node": "lazy_static 1.5.0",
+   "kept": {
+    "exact": "780767/2099160",
+    "decimal": "0.371942586558"
+   },
+   "degree": 2,
+   "fan_in": 4
+  },
+  {
+   "node": "sync_wrapper 1.0.2",
+   "kept": {
+    "exact": "5955645693/16200184000",
+    "decimal": "0.367628274654"
+   },
+   "degree": 2,
+   "fan_in": 6
+  },
+  {
+   "node": "errno 0.3.14",
+   "kept": {
+    "exact": "98382441239/271625681250",
+    "decimal": "0.362198599139"
+   },
+   "degree": 2,
+   "fan_in": 3
+  },
+  {
+   "node": "tower-service 0.3.3",
+   "kept": {
+    "exact": "192117603/531454000",
+    "decimal": "0.361494321239"
+   },
+   "degree": 2,
+   "fan_in": 9
+  },
+  {
+   "node": "crossbeam-utils 0.8.21",
+   "kept": {
+    "exact": "585/1694",
+    "decimal": "0.345336481700"
+   },
+   "degree": 2,
+   "fan_in": 2
+  },
+  {
+   "node": "linux-raw-sys 0.11.0",
+   "kept": {
+    "exact": "64467/188650",
+    "decimal": "0.341728067851"
+   },
+   "degree": 2,
+   "fan_in": 1
+  },
+  {
+   "node": "ryu 1.0.22",
+   "kept": {
+    "exact": "5301590589/15764025200",
+    "decimal": "0.336309446460"
+   },
+   "degree": 2,
+   "fan_in": 2
+  },
+  {
+   "node": "enumflags2 0.7.12",
+   "kept": {
+    "exact": "338/1029",
+    "decimal": "0.328474246842"
+   },
+   "degree": 2,
+   "fan_in": 1
+  },
+  {
+   "node": "fastrand 2.4.1",
+   "kept": {
+    "exact": "338/1029",
+    "decimal": "0.328474246842"
+   },
+   "degree": 2,
+   "fan_in": 1
+  },
+  {
+   "node": "llama-cpp-sys-2 0.1.131",
+   "kept": {
+    "exact": "338/1029",
+    "decimal": "0.328474246842"
+   },
+   "degree": 2,
+   "fan_in": 1
+  },
+  {
+   "node": "ts-rs-macros 10.1.0",
+   "kept": {
+    "exact": "338/1029",
+    "decimal": "0.328474246842"
+   },
+   "degree": 2,
+   "fan_in": 1
+  },
+  {
+   "node": "unsafe-libyaml 0.2.11",
+   "kept": {
+    "exact": "338/1029",
+    "decimal": "0.328474246842"
+   },
+   "degree": 2,
+   "fan_in": 1
+  },
+  {
+   "node": "getrandom 0.4.3",
+   "kept": {
+    "exact": "52/161",
+    "decimal": "0.322981366460"
+   },
+   "degree": 2,
+   "fan_in": 3
+  },
+  {
+   "node": "tower-layer 0.3.3",
+   "kept": {
+    "exact": "742534599/2314312000",
+    "decimal": "0.320844639357"
+   },
+   "degree": 2,
+   "fan_in": 6
+  },
+  {
+   "node": "unsigned-varint 0.8.0",
+   "kept": {
+    "exact": "5099801769/16069961600",
+    "decimal": "0.317349966101"
+   },
+   "degree": 2,
+   "fan_in": 2
+  },
+  {
+   "node": "multihash 0.19.4",
+   "kept": {
+    "exact": "44670111/146090560",
+    "decimal": "0.305770003209"
+   },
+   "degree": 2,
+   "fan_in": 2
+  },
+  {
+   "node": "zeroize 1.8.2",
+   "kept": {
+    "exact": "2024867/6694380",
+    "decimal": "0.302472671106"
+   },
+   "degree": 2,
+   "fan_in": 10
+  },
+  {
+   "node": "zmij 1.0.13",
+   "kept": {
+    "exact": "36301434198289/122661811641600",
+    "decimal": "0.295947318179"
+   },
+   "degree": 2,
+   "fan_in": 1
+  },
+  {
+   "node": "multibase 0.9.2",
+   "kept": {
+    "exact": "979173/3320240",
+    "decimal": "0.294910307689"
+   },
+   "degree": 2,
+   "fan_in": 1
+  },
+  {
+   "node": "futures-channel 0.3.31",
+   "kept": {
+    "exact": "111593133807/384117125000",
+    "decimal": "0.290518507362"
+   },
+   "degree": 2,
+   "fan_in": 5
+  },
+  {
+   "node": "iana-time-zone 0.1.64",
+   "kept": {
+    "exact": "21489/75460",
+    "decimal": "0.284773389875"
+   },
+   "degree": 2,
+   "fan_in": 1
+  },
+  {
+   "node": "r-efi 5.3.0",
+   "kept": {
+    "exact": "1416314393/4978945125",
+    "decimal": "0.284460735646"
+   },
+   "degree": 2,
+   "fan_in": 1
+  },
+  {
+   "node": "wasip2 1.0.1+wasi-0.2.4",
+   "kept": {
+    "exact": "1416314393/4978945125",
+    "decimal": "0.284460735646"
+   },
+   "degree": 2,
+   "fan_in": 1
+  },
+  {
+   "node": "futures-sink 0.3.31",
+   "kept": {
+    "exact": "2099781678129/7545157812500",
+    "decimal": "0.278295263043"
+   },
+   "degree": 2,
+   "fan_in": 5
+  },
+  {
+   "node": "hyper-util 0.1.19",
+   "kept": {
+    "exact": "618869/2225300",
+    "decimal": "0.278105873365"
+   },
+   "degree": 2,
+   "fan_in": 5
+  },
+  {
+   "node": "hyper 1.8.1",
+   "kept": {
+    "exact": "19184939/69429360",
+    "decimal": "0.276323143408"
+   },
+   "degree": 2,
+   "fan_in": 6
+  },
+  {
+   "node": "fallible-iterator 0.3.0",
+   "kept": {
+    "exact": "845/3087",
+    "decimal": "0.273728539035"
+   },
+   "degree": 2,
+   "fan_in": 1
+  },
+  {
+   "node": "fallible-streaming-iterator 0.1.9",
+   "kept": {
+    "exact": "845/3087",
+    "decimal": "0.273728539035"
+   },
+   "degree": 2,
+   "fan_in": 1
+  },
+  {
+   "node": "hashbrown 0.14.5",
+   "kept": {
+    "exact": "845/3087",
+    "decimal": "0.273728539035"
+   },
+   "degree": 2,
+   "fan_in": 1
+  },
+  {
+   "node": "hashlink 0.10.0",
+   "kept": {
+    "exact": "845/3087",
+    "decimal": "0.273728539035"
+   },
+   "degree": 2,
+   "fan_in": 1
+  },
+  {
+   "node": "libsqlite3-sys 0.35.0",
+   "kept": {
+    "exact": "845/3087",
+    "decimal": "0.273728539035"
+   },
+   "degree": 2,
+   "fan_in": 1
+  },
+  {
+   "node": "num-traits 0.2.19",
+   "kept": {
+    "exact": "2204/8085",
+    "decimal": "0.272603586889"
+   },
+   "degree": 2,
+   "fan_in": 7
+  },
+  {
+   "node": "subtle 2.6.1",
+   "kept": {
+    "exact": "2010617423/7497705600",
+    "decimal": "0.268164359908"
+   },
+   "degree": 2,
+   "fan_in": 10
+  },
+  {
+   "node": "deno_error_macro 0.5.7",
+   "kept": {
+    "exact": "42653/159495",
+    "decimal": "0.267425311138"
+   },
+   "degree": 2,
+   "fan_in": 1
+  },
+  {
+   "node": "futures-task 0.3.31",
+   "kept": {
+    "exact": "229452727183289/862139912287500",
+    "decimal": "0.266143260407"
+   },
+   "degree": 2,
+   "fan_in": 3
+  },
+  {
+   "node": "futures-io 0.3.31",
+   "kept": {
+    "exact": "9257173228143/37182537700000",
+    "decimal": "0.248965611299"
+   },
+   "degree": 2,
+   "fan_in": 2
+  },
+  {
+   "node": "digest 0.11.2",
+   "kept": {
+    "exact": "6292/25725",
+    "decimal": "0.244586977648"
+   },
+   "degree": 2,
+   "fan_in": 5
+  },
+  {
+   "node": "futures-executor 0.3.31",
+   "kept": {
+    "exact": "2601092/11005155",
+    "decimal": "0.236352145881"
+   },
+   "degree": 2,
+   "fan_in": 1
+  },
+  {
+   "node": "curve25519-dalek 4.1.3",
+   "kept": {
+    "exact": "1690/7203",
+    "decimal": "0.234624462030"
+   },
+   "degree": 2,
+   "fan_in": 1
+  },
+  {
+   "node": "ed25519 2.2.3",
+   "kept": {
+    "exact": "1690/7203",
+    "decimal": "0.234624462030"
+   },
+   "degree": 2,
+   "fan_in": 1
+  },
+  {
+   "node": "mio 1.1.1",
+   "kept": {
+    "exact": "14871656477/69141082500",
+    "decimal": "0.215091461390"
+   },
+   "degree": 2,
+   "fan_in": 1
+  },
+  {
+   "node": "signal-hook-registry 1.4.8",
+   "kept": {
+    "exact": "14871656477/69141082500",
+    "decimal": "0.215091461390"
+   },
+   "degree": 2,
+   "fan_in": 1
+  },
+  {
+   "node": "tokio-macros 2.6.0",
+   "kept": {
+    "exact": "14871656477/69141082500",
+    "decimal": "0.215091461390"
+   },
+   "degree": 2,
+   "fan_in": 1
+  },
+  {
+   "node": "socket2 0.6.1",
+   "kept": {
+    "exact": "431278037833/2054477880000",
+    "decimal": "0.209920993568"
+   },
+   "degree": 2,
+   "fan_in": 4
+  },
+  {
+   "node": "regex-automata 0.4.13",
+   "kept": {
+    "exact": "2616757/12594960",
+    "decimal": "0.207762231877"
+   },
+   "degree": 2,
+   "fan_in": 4
+  },
+  {
+   "node": "serde_urlencoded 0.7.1",
+   "kept": {
+    "exact": "893001/5118190",
+    "decimal": "0.174475937783"
+   },
+   "degree": 2,
+   "fan_in": 3
+  },
+  {
+   "node": "blake2s_simd 1.0.4",
+   "kept": {
+    "exact": "169/1029",
+    "decimal": "0.164237123421"
+   },
+   "degree": 2,
+   "fan_in": 1
+  },
+  {
+   "node": "blake3 1.8.4",
+   "kept": {
+    "exact": "169/1029",
+    "decimal": "0.164237123421"
+   },
+   "degree": 2,
+   "fan_in": 1
+  },
+  {
+   "node": "matchers 0.2.0",
+   "kept": {
+    "exact": "169/1029",
+    "decimal": "0.164237123421"
+   },
+   "degree": 2,
+   "fan_in": 1
+  },
+  {
+   "node": "multihash-derive 0.9.2",
+   "kept": {
+    "exact": "169/1029",
+    "decimal": "0.164237123421"
+   },
+   "degree": 2,
+   "fan_in": 1
+  },
+  {
+   "node": "nu-ansi-term 0.50.3",
+   "kept": {
+    "exact": "169/1029",
+    "decimal": "0.164237123421"
+   },
+   "degree": 2,
+   "fan_in": 1
+  },
+  {
+   "node": "ripemd 0.2.0",
+   "kept": {
+    "exact": "169/1029",
+    "decimal": "0.164237123421"
+   },
+   "degree": 2,
+   "fan_in": 1
+  },
+  {
+   "node": "sha1 0.11.0",
+   "kept": {
+    "exact": "169/1029",
+    "decimal": "0.164237123421"
+   },
+   "degree": 2,
+   "fan_in": 1
+  },
+  {
+   "node": "sha2 0.11.0",
+   "kept": {
+    "exact": "169/1029",
+    "decimal": "0.164237123421"
+   },
+   "degree": 2,
+   "fan_in": 1
+  },
+  {
+   "node": "sha3 0.11.0",
+   "kept": {
+    "exact": "169/1029",
+    "decimal": "0.164237123421"
+   },
+   "degree": 2,
+   "fan_in": 1
+  },
+  {
+   "node": "sharded-slab 0.1.7",
+   "kept": {
+    "exact": "169/1029",
+    "decimal": "0.164237123421"
+   },
+   "degree": 2,
+   "fan_in": 1
+  },
+  {
+   "node": "thread_local 1.1.10",
+   "kept": {
+    "exact": "169/1029",
+    "decimal": "0.164237123421"
+   },
+   "degree": 2,
+   "fan_in": 1
+  },
+  {
+   "node": "tracing-log 0.2.0",
+   "kept": {
+    "exact": "169/1029",
+    "decimal": "0.164237123421"
+   },
+   "degree": 2,
+   "fan_in": 1
+  },
+  {
+   "node": "serde_path_to_error 0.1.20",
+   "kept": {
+    "exact": "1377/10780",
+    "decimal": "0.127736549165"
+   },
+   "degree": 2,
+   "fan_in": 2
+  },
+  {
+   "node": "mime 0.3.17",
+   "kept": {
+    "exact": "493/3920",
+    "decimal": "0.125765306122"
+   },
+   "degree": 2,
+   "fan_in": 4
+  },
+  {
+   "node": "regex-syntax 0.8.8",
+   "kept": {
+    "exact": "10993697/92534400",
+    "decimal": "0.118806595169"
+   },
+   "degree": 2,
+   "fan_in": 4
+  },
+  {
+   "node": "rustversion 1.0.22",
+   "kept": {
+    "exact": "15343635451072635463/129305993105520000000",
+    "decimal": "0.118661440839"
+   },
+   "degree": 2,
+   "fan_in": 4
+  },
+  {
+   "node": "valuable 0.1.1",
+   "kept": {
+    "exact": "1230276770252569/10881289742400000",
+    "decimal": "0.113063506200"
+   },
+   "degree": 3,
+   "fan_in": 1
+  },
+  {
+   "node": "assert-json-diff 2.0.2",
+   "kept": {
+    "exact": "338/3087",
+    "decimal": "0.109491415614"
+   },
+   "degree": 2,
+   "fan_in": 1
+  },
+  {
+   "node": "deadpool 0.12.3",
+   "kept": {
+    "exact": "338/3087",
+    "decimal": "0.109491415614"
+   },
+   "degree": 2,
+   "fan_in": 1
+  },
+  {
+   "node": "regex 1.12.2",
+   "kept": {
+    "exact": "52/483",
+    "decimal": "0.107660455487"
+   },
+   "degree": 2,
+   "fan_in": 3
+  },
+  {
+   "node": "wasi 0.11.1+wasi-snapshot-preview1",
+   "kept": {
+    "exact": "7028142201761399/68202069776225000",
+    "decimal": "0.103048811053"
+   },
+   "degree": 3,
+   "fan_in": 2
+  },
+  {
+   "node": "bytecount 0.6.9",
+   "kept": {
+    "exact": "1690/17493",
+    "decimal": "0.096610072600"
+   },
+   "degree": 2,
+   "fan_in": 1
+  },
+  {
+   "node": "email_address 0.2.9",
+   "kept": {
+    "exact": "1690/17493",
+    "decimal": "0.096610072600"
+   },
+   "degree": 2,
+   "fan_in": 1
+  },
+  {
+   "node": "fancy-regex 0.14.0",
+   "kept": {
+    "exact": "1690/17493",
+    "decimal": "0.096610072600"
+   },
+   "degree": 2,
+   "fan_in": 1
+  },
+  {
+   "node": "fraction 0.15.3",
+   "kept": {
+    "exact": "1690/17493",
+    "decimal": "0.096610072600"
+   },
+   "degree": 2,
+   "fan_in": 1
+  },
+  {
+   "node": "num-cmp 0.1.0",
+   "kept": {
+    "exact": "1690/17493",
+    "decimal": "0.096610072600"
+   },
+   "degree": 2,
+   "fan_in": 1
+  },
+  {
+   "node": "referencing 0.28.3",
+   "kept": {
+    "exact": "1690/17493",
+    "decimal": "0.096610072600"
+   },
+   "degree": 2,
+   "fan_in": 1
+  },
+  {
+   "node": "uuid-simd 0.8.0",
+   "kept": {
+    "exact": "1690/17493",
+    "decimal": "0.096610072600"
+   },
+   "degree": 2,
+   "fan_in": 1
+  },
+  {
+   "node": "ahash 0.8.12",
+   "kept": {
+    "exact": "1755/18326",
+    "decimal": "0.095765578959"
+   },
+   "degree": 2,
+   "fan_in": 2
+  },
+  {
+   "node": "equivalent 1.0.2",
+   "kept": {
+    "exact": "92248369897489/1034959035726000",
+    "decimal": "0.089132387576"
+   },
+   "degree": 3,
+   "fan_in": 1
+  },
+  {
+   "node": "hashbrown 0.16.1",
+   "kept": {
+    "exact": "92248369897489/1034959035726000",
+    "decimal": "0.089132387576"
+   },
+   "degree": 3,
+   "fan_in": 1
+  },
+  {
+   "node": "hmac 0.12.1",
+   "kept": {
+    "exact": "3068/37191",
+    "decimal": "0.082493076282"
+   },
+   "degree": 2,
+   "fan_in": 3
+  },
+  {
+   "node": "crc32fast 1.5.0",
+   "kept": {
+    "exact": "22243/271656",
+    "decimal": "0.081879288512"
+   },
+   "degree": 2,
+   "fan_in": 4
+  },
+  {
+   "node": "enumflags2_derive 0.7.12",
+   "kept": {
+    "exact": "8788/108045",
+    "decimal": "0.081336480170"
+   },
+   "degree": 3,
+   "fan_in": 1
+  },
+  {
+   "node": "autocfg 1.5.0",
+   "kept": {
+    "exact": "761624/9607675",
+    "decimal": "0.079272456656"
+   },
+   "degree": 3,
+   "fan_in": 3
+  },
+  {
+   "node": "zeroize_derive 1.5.0",
+   "kept": {
+    "exact": "26323271/351454950",
+    "decimal": "0.074897994750"
+   },
+   "degree": 3,
+   "fan_in": 1
+  },
+  {
+   "node": "aes 0.8.4",
+   "kept": {
+    "exact": "845/11319",
+    "decimal": "0.074653237919"
+   },
+   "degree": 2,
+   "fan_in": 1
+  },
+  {
+   "node": "arbitrary 1.4.2",
+   "kept": {
+    "exact": "845/11319",
+    "decimal": "0.074653237919"
+   },
+   "degree": 2,
+   "fan_in": 1
+  },
+  {
+   "node": "bzip2 0.5.2",
+   "kept": {
+    "exact": "845/11319",
+    "decimal": "0.074653237919"
+   },
+   "degree": 2,
+   "fan_in": 1
+  },
+  {
+   "node": "constant_time_eq 0.3.1",
+   "kept": {
+    "exact": "845/11319",
+    "decimal": "0.074653237919"
+   },
+   "degree": 2,
+   "fan_in": 1
+  },
+  {
+   "node": "deflate64 0.1.12",
+   "kept": {
+    "exact": "845/11319",
+    "decimal": "0.074653237919"
+   },
+   "degree": 2,
+   "fan_in": 1
+  },
+  {
+   "node": "flate2 1.1.9",
+   "kept": {
+    "exact": "845/11319",
+    "decimal": "0.074653237919"
+   },
+   "degree": 2,
+   "fan_in": 1
+  },
+  {
+   "node": "lzma-rs 0.3.0",
+   "kept": {
+    "exact": "845/11319",
+    "decimal": "0.074653237919"
+   },
+   "degree": 2,
+   "fan_in": 1
+  },
+  {
+   "node": "pbkdf2 0.12.2",
+   "kept": {
+    "exact": "845/11319",
+    "decimal": "0.074653237919"
+   },
+   "degree": 2,
+   "fan_in": 1
+  },
+  {
+   "node": "sha1 0.10.6",
+   "kept": {
+    "exact": "845/11319",
+    "decimal": "0.074653237919"
+   },
+   "degree": 2,
+   "fan_in": 1
+  },
+  {
+   "node": "time 0.3.51",
+   "kept": {
+    "exact": "845/11319",
+    "decimal": "0.074653237919"
+   },
+   "degree": 2,
+   "fan_in": 1
+  },
+  {
+   "node": "xz2 0.1.7",
+   "kept": {
+    "exact": "845/11319",
+    "decimal": "0.074653237919"
+   },
+   "degree": 2,
+   "fan_in": 1
+  },
+  {
+   "node": "zopfli 0.8.3",
+   "kept": {
+    "exact": "845/11319",
+    "decimal": "0.074653237919"
+   },
+   "degree": 2,
+   "fan_in": 1
+  },
+  {
+   "node": "zstd 0.13.3",
+   "kept": {
+    "exact": "845/11319",
+    "decimal": "0.074653237919"
+   },
+   "degree": 2,
+   "fan_in": 1
+  },
+  {
+   "node": "displaydoc 0.2.5",
+   "kept": {
+    "exact": "155/2156",
+    "decimal": "0.071892393321"
+   },
+   "degree": 2,
+   "fan_in": 6
+  },
+  {
+   "node": "wit-bindgen 0.46.0",
+   "kept": {
+    "exact": "36824174218/522789238125",
+    "decimal": "0.070437896446"
+   },
+   "degree": 3,
+   "fan_in": 1
+  },
+  {
+   "node": "hashbrown 0.15.5",
+   "kept": {
+    "exact": "4394/64827",
+    "decimal": "0.067780400142"
+   },
+   "degree": 3,
+   "fan_in": 1
+  },
+  {
+   "node": "ppv-lite86 0.2.21",
+   "kept": {
+    "exact": "507/7546",
+    "decimal": "0.067187914127"
+   },
+   "degree": 3,
+   "fan_in": 1
+  },
+  {
+   "node": "axum-core 0.5.6",
+   "kept": {
+    "exact": "338/5145",
+    "decimal": "0.065694849368"
+   },
+   "degree": 2,
+   "fan_in": 1
+  },
+  {
+   "node": "matchit 0.8.4",
+   "kept": {
+    "exact": "338/5145",
+    "decimal": "0.065694849368"
+   },
+   "degree": 2,
+   "fan_in": 1
+  },
+  {
+   "node": "bit-vec 0.6.3",
+   "kept": {
+    "exact": "15327/233926",
+    "decimal": "0.065520720228"
+   },
+   "degree": 2,
+   "fan_in": 2
+  },
+  {
+   "node": "axum-core 0.4.5",
+   "kept": {
+    "exact": "65/1029",
+    "decimal": "0.063168124393"
+   },
+   "degree": 2,
+   "fan_in": 1
+  },
+  {
+   "node": "matchit 0.7.3",
+   "kept": {
+    "exact": "65/1029",
+    "decimal": "0.063168124393"
+   },
+   "degree": 2,
+   "fan_in": 1
+  },
+  {
+   "node": "wasm-bindgen-macro 0.2.106",
+   "kept": {
+    "exact": "95835544450719261019/1640569787526285000000",
+    "decimal": "0.058416012034"
+   },
+   "degree": 3,
+   "fan_in": 1
+  },
+  {
+   "node": "rustls-pki-types 1.13.2",
+   "kept": {
+    "exact": "207665559/3564040480",
+    "decimal": "0.058266891234"
+   },
+   "degree": 2,
+   "fan_in": 6
+  },
+  {
+   "node": "wasm-bindgen-shared 0.2.106",
+   "kept": {
+    "exact": "22115894873242906389/381931590746860000000",
+    "decimal": "0.057905382558"
+   },
+   "degree": 3,
+   "fan_in": 2
+  },
+  {
+   "node": "redox_syscall 0.5.18",
+   "kept": {
+    "exact": "2625542253619/48289010000000",
+    "decimal": "0.054371424339"
+   },
+   "degree": 3,
+   "fan_in": 1
+  },
+  {
+   "node": "az 1.3.0",
+   "kept": {
+    "exact": "1690/31899",
+    "decimal": "0.052979717233"
+   },
+   "degree": 2,
+   "fan_in": 1
+  },
+  {
+   "node": "bincode 1.3.3",
+   "kept": {
+    "exact": "1690/31899",
+    "decimal": "0.052979717233"
+   },
+   "degree": 2,
+   "fan_in": 1
+  },
+  {
+   "node": "bit-set 0.5.3",
+   "kept": {
+    "exact": "1690/31899",
+    "decimal": "0.052979717233"
+   },
+   "degree": 2,
+   "fan_in": 1
+  },
+  {
+   "node": "capacity_builder 0.1.3",
+   "kept": {
+    "exact": "1690/31899",
+    "decimal": "0.052979717233"
+   },
+   "degree": 2,
+   "fan_in": 1
+  },
+  {
+   "node": "cooked-waker 5.0.0",
+   "kept": {
+    "exact": "1690/31899",
+    "decimal": "0.052979717233"
+   },
+   "degree": 2,
+   "fan_in": 1
+  },
+  {
+   "node": "deno_core_icudata 0.74.0",
+   "kept": {
+    "exact": "1690/31899",
+    "decimal": "0.052979717233"
+   },
+   "degree": 2,
+   "fan_in": 1
+  },
+  {
+   "node": "deno_ops 0.215.0",
+   "kept": {
+    "exact": "1690/31899",
+    "decimal": "0.052979717233"
+   },
+   "degree": 2,
+   "fan_in": 1
+  },
+  {
+   "node": "deno_path_util 0.3.3",
+   "kept": {
+    "exact": "1690/31899",
+    "decimal": "0.052979717233"
+   },
+   "degree": 2,
+   "fan_in": 1
+  },
+  {
+   "node": "deno_unsync 0.4.4",
+   "kept": {
+    "exact": "1690/31899",
+    "decimal": "0.052979717233"
+   },
+   "degree": 2,
+   "fan_in": 1
+  },
+  {
+   "node": "memoffset 0.9.1",
+   "kept": {
+    "exact": "1690/31899",
+    "decimal": "0.052979717233"
+   },
+   "degree": 2,
+   "fan_in": 1
+  },
+  {
+   "node": "pin-project 1.1.12",
+   "kept": {
+    "exact": "1690/31899",
+    "decimal": "0.052979717233"
+   },
+   "degree": 2,
+   "fan_in": 1
+  },
+  {
+   "node": "serde_v8 0.248.0",
+   "kept": {
+    "exact": "1690/31899",
+    "decimal": "0.052979717233"
+   },
+   "degree": 2,
+   "fan_in": 1
+  },
+  {
+   "node": "sourcemap 8.0.1",
+   "kept": {
+    "exact": "1690/31899",
+    "decimal": "0.052979717233"
+   },
+   "degree": 2,
+   "fan_in": 1
+  },
+  {
+   "node": "static_assertions 1.1.0",
+   "kept": {
+    "exact": "1690/31899",
+    "decimal": "0.052979717233"
+   },
+   "degree": 2,
+   "fan_in": 1
+  },
+  {
+   "node": "wasm_dep_analyzer 0.2.0",
+   "kept": {
+    "exact": "1690/31899",
+    "decimal": "0.052979717233"
+   },
+   "degree": 2,
+   "fan_in": 1
+  },
+  {
+   "node": "v8 134.5.0",
+   "kept": {
+    "exact": "1755/33418",
+    "decimal": "0.052516607816"
+   },
+   "degree": 2,
+   "fan_in": 2
+  },
+  {
+   "node": "anstream 0.6.21",
+   "kept": {
+    "exact": "2197/43218",
+    "decimal": "0.050835300106"
+   },
+   "degree": 3,
+   "fan_in": 1
+  },
+  {
+   "node": "clap_lex 1.1.0",
+   "kept": {
+    "exact": "2197/43218",
+    "decimal": "0.050835300106"
+   },
+   "degree": 3,
+   "fan_in": 1
+  },
+  {
+   "node": "heck 0.5.0",
+   "kept": {
+    "exact": "2197/43218",
+    "decimal": "0.050835300106"
+   },
+   "degree": 3,
+   "fan_in": 1
+  },
+  {
+   "node": "strsim 0.11.1",
+   "kept": {
+    "exact": "2197/43218",
+    "decimal": "0.050835300106"
+   },
+   "degree": 3,
+   "fan_in": 1
+  },
+  {
+   "node": "anstyle 1.0.14",
+   "kept": {
+    "exact": "169/3381",
+    "decimal": "0.049985211476"
+   },
+   "degree": 3,
+   "fan_in": 3
+  },
+  {
+   "node": "hyper-rustls 0.27.7",
+   "kept": {
+    "exact": "211887/4361588",
+    "decimal": "0.048580241875"
+   },
+   "degree": 2,
+   "fan_in": 1
+  },
+  {
+   "node": "quinn 0.11.9",
+   "kept": {
+    "exact": "211887/4361588",
+    "decimal": "0.048580241875"
+   },
+   "degree": 2,
+   "fan_in": 1
+  },
+  {
+   "node": "tower-http 0.6.8",
+   "kept": {
+    "exact": "211887/4361588",
+    "decimal": "0.048580241875"
+   },
+   "degree": 2,
+   "fan_in": 1
+  },
+  {
+   "node": "wasm-streams 0.4.2",
+   "kept": {
+    "exact": "211887/4361588",
+    "decimal": "0.048580241875"
+   },
+   "degree": 2,
+   "fan_in": 1
+  },
+  {
+   "node": "tokio-rustls 0.26.4",
+   "kept": {
+    "exact": "1320219/27415696",
+    "decimal": "0.048155589411"
+   },
+   "degree": 2,
+   "fan_in": 2
+  },
+  {
+   "node": "tokio-util 0.7.18",
+   "kept": {
+    "exact": "1320219/27415696",
+    "decimal": "0.048155589411"
+   },
+   "degree": 2,
+   "fan_in": 2
+  },
+  {
+   "node": "wasm-bindgen-futures 0.4.56",
+   "kept": {
+    "exact": "1320219/27415696",
+    "decimal": "0.048155589411"
+   },
+   "degree": 2,
+   "fan_in": 2
+  },
+  {
+   "node": "webpki-roots 1.0.5",
+   "kept": {
+    "exact": "1320219/27415696",
+    "decimal": "0.048155589411"
+   },
+   "degree": 2,
+   "fan_in": 2
+  },
+  {
+   "node": "web-sys 0.3.83",
+   "kept": {
+    "exact": "48897/1023638",
+    "decimal": "0.047767863249"
+   },
+   "degree": 2,
+   "fan_in": 3
+  },
+  {
+   "node": "rustls 0.23.36",
+   "kept": {
+    "exact": "146691/3115420",
+    "decimal": "0.047085465202"
+   },
+   "degree": 2,
+   "fan_in": 5
+  },
+  {
+   "node": "block-buffer 0.10.4",
+   "kept": {
+    "exact": "35481121/927746400",
+    "decimal": "0.038244417871"
+   },
+   "degree": 3,
+   "fan_in": 1
+  },
+  {
+   "node": "const-oid 0.9.6",
+   "kept": {
+    "exact": "73691559/1943849600",
+    "decimal": "0.037910113519"
+   },
+   "degree": 3,
+   "fan_in": 2
+  },
+  {
+   "node": "crypto-common 0.1.7",
+   "kept": {
+    "exact": "73691559/1943849600",
+    "decimal": "0.037910113519"
+   },
+   "degree": 3,
+   "fan_in": 2
+  },
+  {
+   "node": "signature 2.2.0",
+   "kept": {
+    "exact": "7605/211288",
+    "decimal": "0.035993525425"
+   },
+   "degree": 3,
+   "fan_in": 2
+  },
+  {
+   "node": "idna_adapter 1.2.1",
+   "kept": {
+    "exact": "222665223521/6274553236875",
+    "decimal": "0.035487024353"
+   },
+   "degree": 3,
+   "fan_in": 1
+  },
+  {
+   "node": "utf8_iter 1.0.4",
+   "kept": {
+    "exact": "222665223521/6274553236875",
+    "decimal": "0.035487024353"
+   },
+   "degree": 3,
+   "fan_in": 1
+  },
+  {
+   "node": "cc 1.2.52",
+   "kept": {
+    "exact": "45968/1342845",
+    "decimal": "0.034231798905"
+   },
+   "degree": 3,
+   "fan_in": 9
+  },
+  {
+   "node": "pkcs8 0.10.2",
+   "kept": {
+    "exact": "2744768/89816265",
+    "decimal": "0.030559810074"
+   },
+   "degree": 3,
+   "fan_in": 3
+  },
+  {
+   "node": "block-buffer 0.12.0",
+   "kept": {
+    "exact": "81796/2701125",
+    "decimal": "0.030282197233"
+   },
+   "degree": 3,
+   "fan_in": 1
+  },
+  {
+   "node": "crypto-common 0.2.1",
+   "kept": {
+    "exact": "81796/2701125",
+    "decimal": "0.030282197233"
+   },
+   "degree": 3,
+   "fan_in": 1
+  },
+  {
+   "node": "cpufeatures 0.3.0",
+   "kept": {
+    "exact": "676/25725",
+    "decimal": "0.026277939747"
+   },
+   "degree": 3,
+   "fan_in": 5
+  },
+  {
+   "node": "windows-sys 0.60.2",
+   "kept": {
+    "exact": "1293834113499/50220570400000",
+    "decimal": "0.025763031029"
+   },
+   "degree": 3,
+   "fan_in": 2
+  },
+  {
+   "node": "vcpkg 0.2.15",
+   "kept": {
+    "exact": "4394/194481",
+    "decimal": "0.022593466714"
+   },
+   "degree": 3,
+   "fan_in": 1
+  },
+  {
+   "node": "pkg-config 0.3.33",
+   "kept": {
+    "exact": "4901/222264",
+    "decimal": "0.022050354533"
+   },
+   "degree": 3,
+   "fan_in": 4
+  },
+  {
+   "node": "generic-array 0.14.7",
+   "kept": {
+    "exact": "6245689691/306156312000",
+    "decimal": "0.020400329656"
+   },
+   "degree": 3,
+   "fan_in": 6
+  },
+  {
+   "node": "keccak 0.2.0",
+   "kept": {
+    "exact": "2197/108045",
+    "decimal": "0.020334120043"
+   },
+   "degree": 3,
+   "fan_in": 1
+  },
+  {
+   "node": "termcolor 1.4.1",
+   "kept": {
+    "exact": "2197/108045",
+    "decimal": "0.020334120043"
+   },
+   "degree": 3,
+   "fan_in": 1
+  },
+  {
+   "node": "bzip2-sys 0.1.13+1.0.8",
+   "kept": {
+    "exact": "4394/237699",
+    "decimal": "0.018485563675"
+   },
+   "degree": 3,
+   "fan_in": 1
+  },
+  {
+   "node": "derive_arbitrary 1.4.2",
+   "kept": {
+    "exact": "4394/237699",
+    "decimal": "0.018485563675"
+   },
+   "degree": 3,
+   "fan_in": 1
+  },
+  {
+   "node": "lzma-sys 0.1.20",
+   "kept": {
+    "exact": "4394/237699",
+    "decimal": "0.018485563675"
+   },
+   "degree": 3,
+   "fan_in": 1
+  },
+  {
+   "node": "zstd-safe 7.2.4",
+   "kept": {
+    "exact": "4394/237699",
+    "decimal": "0.018485563675"
+   },
+   "degree": 3,
+   "fan_in": 1
+  },
+  {
+   "node": "base-x 0.2.11",
+   "kept": {
+    "exact": "4243083/232416800",
+    "decimal": "0.018256352381"
+   },
+   "degree": 3,
+   "fan_in": 1
+  },
+  {
+   "node": "base256emoji 1.0.2",
+   "kept": {
+    "exact": "4243083/232416800",
+    "decimal": "0.018256352381"
+   },
+   "degree": 3,
+   "fan_in": 1
+  },
+  {
+   "node": "data-encoding-macro 0.1.19",
+   "kept": {
+    "exact": "4243083/232416800",
+    "decimal": "0.018256352381"
+   },
+   "degree": 3,
+   "fan_in": 1
+  },
+  {
+   "node": "data-encoding 2.10.0",
+   "kept": {
+    "exact": "9465339/531238400",
+    "decimal": "0.017817497756"
+   },
+   "degree": 3,
+   "fan_in": 4
+  },
+  {
+   "node": "aho-corasick 1.1.4",
+   "kept": {
+    "exact": "237887/13994400",
+    "decimal": "0.016998728063"
+   },
+   "degree": 3,
+   "fan_in": 2
+  },
+  {
+   "node": "rfc6979 0.4.0",
+   "kept": {
+    "exact": "2197/129654",
+    "decimal": "0.016945100035"
+   },
+   "degree": 3,
+   "fan_in": 1
+  },
+  {
+   "node": "spki 0.7.3",
+   "kept": {
+    "exact": "507/30184",
+    "decimal": "0.016796978532"
+   },
+   "degree": 3,
+   "fan_in": 2
+  },
+  {
+   "node": "foldhash 0.1.5",
+   "kept": {
+    "exact": "114244/6806835",
+    "decimal": "0.016783718130"
+   },
+   "degree": 4,
+   "fan_in": 1
+  },
+  {
+   "node": "der 0.7.10",
+   "kept": {
+    "exact": "4901/296352",
+    "decimal": "0.016537765900"
+   },
+   "degree": 3,
+   "fan_in": 4
+  },
+  {
+   "node": "zerocopy 0.8.33",
+   "kept": {
+    "exact": "13689/830060",
+    "decimal": "0.016491578922"
+   },
+   "degree": 3,
+   "fan_in": 2
+  },
+  {
+   "node": "hybrid-array 0.4.10",
+   "kept": {
+    "exact": "22308/1500625",
+    "decimal": "0.014865805914"
+   },
+   "degree": 4,
+   "fan_in": 2
+  },
+  {
+   "node": "futures-macro 0.3.31",
+   "kept": {
+    "exact": "18133364754973/1224488571075000",
+    "decimal": "0.014808929363"
+   },
+   "degree": 3,
+   "fan_in": 1
+  },
+  {
+   "node": "pin-utils 0.1.0",
+   "kept": {
+    "exact": "12553867907289/855198367100000",
+    "decimal": "0.014679480680"
+   },
+   "degree": 3,
+   "fan_in": 2
+  },
+  {
+   "node": "slab 0.4.11",
+   "kept": {
+    "exact": "1394874211921/95793323587500",
+    "decimal": "0.014561288404"
+   },
+   "degree": 3,
+   "fan_in": 3
+  },
+  {
+   "node": "bindgen 0.72.1",
+   "kept": {
+    "exact": "4394/324135",
+    "decimal": "0.013556080028"
+   },
+   "degree": 3,
+   "fan_in": 1
+  },
+  {
+   "node": "cmake 0.1.57",
+   "kept": {
+    "exact": "4394/324135",
+    "decimal": "0.013556080028"
+   },
+   "degree": 3,
+   "fan_in": 1
+  },
+  {
+   "node": "find_cuda_helper 0.2.0",
+   "kept": {
+    "exact": "4394/324135",
+    "decimal": "0.013556080028"
+   },
+   "degree": 3,
+   "fan_in": 1
+  },
+  {
+   "node": "multihash-derive-impl 0.1.2",
+   "kept": {
+    "exact": "4394/324135",
+    "decimal": "0.013556080028"
+   },
+   "degree": 3,
+   "fan_in": 1
+  },
+  {
+   "node": "walkdir 2.5.0",
+   "kept": {
+    "exact": "4394/324135",
+    "decimal": "0.013556080028"
+   },
+   "degree": 3,
+   "fan_in": 1
+  },
+  {
+   "node": "r-efi 6.0.0",
+   "kept": {
+    "exact": "676/50715",
+    "decimal": "0.013329389727"
+   },
+   "degree": 3,
+   "fan_in": 1
+  },
+  {
+   "node": "pin-project-internal 1.1.12",
+   "kept": {
+    "exact": "8788/669879",
+    "decimal": "0.013118787124"
+   },
+   "degree": 3,
+   "fan_in": 1
+  },
+  {
+   "node": "rand_core 0.10.1",
+   "kept": {
+    "exact": "377/28980",
+    "decimal": "0.013008971705"
+   },
+   "degree": 3,
+   "fan_in": 4
+  },
+  {
+   "node": "num 0.4.3",
+   "kept": {
+    "exact": "4394/367353",
+    "decimal": "0.011961247084"
+   },
+   "degree": 3,
+   "fan_in": 1
+  },
+  {
+   "node": "crypto-bigint 0.5.5",
+   "kept": {
+    "exact": "19604/1673595",
+    "decimal": "0.011713706124"
+   },
+   "degree": 3,
+   "fan_in": 1
+  },
+  {
+   "node": "group 0.13.0",
+   "kept": {
+    "exact": "19604/1673595",
+    "decimal": "0.011713706124"
+   },
+   "degree": 3,
+   "fan_in": 1
+  },
+  {
+   "node": "sec1 0.7.3",
+   "kept": {
+    "exact": "19604/1673595",
+    "decimal": "0.011713706124"
+   },
+   "degree": 3,
+   "fan_in": 1
+  },
+  {
+   "node": "base16ct 0.2.0",
+   "kept": {
+    "exact": "1131/97405",
+    "decimal": "0.011611313588"
+   },
+   "degree": 3,
+   "fan_in": 2
+  },
+  {
+   "node": "ff 0.13.1",
+   "kept": {
+    "exact": "1131/97405",
+    "decimal": "0.011611313588"
+   },
+   "degree": 3,
+   "fan_in": 2
+  },
+  {
+   "node": "android_system_properties 0.1.5",
+   "kept": {
+    "exact": "93119/9243850",
+    "decimal": "0.010073616513"
+   },
+   "degree": 3,
+   "fan_in": 1
+  },
+  {
+   "node": "core-foundation-sys 0.8.7",
+   "kept": {
+    "exact": "93119/9243850",
+    "decimal": "0.010073616513"
+   },
+   "degree": 3,
+   "fan_in": 1
+  },
+  {
+   "node": "iana-time-zone-haiku 0.1.2",
+   "kept": {
+    "exact": "93119/9243850",
+    "decimal": "0.010073616513"
+   },
+   "degree": 3,
+   "fan_in": 1
+  },
+  {
+   "node": "windows-core 0.62.2",
+   "kept": {
+    "exact": "93119/9243850",
+    "decimal": "0.010073616513"
+   },
+   "degree": 3,
+   "fan_in": 1
+  },
+  {
+   "node": "byteorder 1.5.0",
+   "kept": {
+    "exact": "2197/237699",
+    "decimal": "0.009242781838"
+   },
+   "degree": 3,
+   "fan_in": 1
+  },
+  {
+   "node": "crc 3.4.0",
+   "kept": {
+    "exact": "2197/237699",
+    "decimal": "0.009242781838"
+   },
+   "degree": 3,
+   "fan_in": 1
+  },
+  {
+   "node": "miniz_oxide 0.8.9",
+   "kept": {
+    "exact": "2197/237699",
+    "decimal": "0.009242781838"
+   },
+   "degree": 3,
+   "fan_in": 1
+  },
+  {
+   "node": "bit-set 0.8.0",
+   "kept": {
+    "exact": "8788/1102059",
+    "decimal": "0.007974164723"
+   },
+   "degree": 3,
+   "fan_in": 1
+  },
+  {
+   "node": "outref 0.5.2",
+   "kept": {
+    "exact": "8788/1102059",
+    "decimal": "0.007974164723"
+   },
+   "degree": 3,
+   "fan_in": 1
+  },
+  {
+   "node": "vsimd 0.8.0",
+   "kept": {
+    "exact": "8788/1102059",
+    "decimal": "0.007974164723"
+   },
+   "degree": 3,
+   "fan_in": 1
+  }
+ ],
+ "tiers": {
+  "rust-ecosystem-commons": {
+   "received": {
+    "exact": "21917119051523412632501958258246444761/464704582715404617984884640000000000",
+    "decimal": "47.163552645544"
+   },
+   "kept": {
+    "exact": "21917119051523412632501958258246444761/697056874073106926977326960000000000",
+    "decimal": "31.442368430362"
+   },
+   "passed_up": {
+    "exact": "21917119051523412632501958258246444761/1394113748146213853954653920000000000",
+    "decimal": "15.721184215181"
+   },
+   "kept_by_reason": {
+    "positional": {
+     "exact": "2777560411982262189717124411612447348799/190296526621958191064810260080000000000",
+     "decimal": "14.595959586273"
+    },
+    "no-record": {
+     "exact": "217818175672811502120905205414675418211/13592609044425585076057875720000000000",
+     "decimal": "16.024751021743"
+    },
+    "below-floor": {
+     "exact": "21764598086274237265675297/26488639789399397610000000",
+     "decimal": "0.821657822346"
+    }
+   }
+  },
+  "software-commons": {
+   "received": {
+    "exact": "21917119051523412632501958258246444761/1394113748146213853954653920000000000",
+    "decimal": "15.721184215181"
+   },
+   "kept": {
+    "exact": "21917119051523412632501958258246444761/2091170622219320780931980880000000000",
+    "decimal": "10.480789476787"
+   },
+   "passed_up": {
+    "exact": "21917119051523412632501958258246444761/4182341244438641561863961760000000000",
+    "decimal": "5.240394738394"
+   },
+   "kept_by_reason": {
+    "positional": {
+     "exact": "2777560411982262189717124411612447348799/570889579865874573194430780240000000000",
+     "decimal": "4.865319862091"
+    },
+    "no-record": {
+     "exact": "217818175672811502120905205414675418211/40777827133276755228173627160000000000",
+     "decimal": "5.341583673914"
+    },
+    "below-floor": {
+     "exact": "21764598086274237265675297/79465919368198192830000000",
+     "decimal": "0.273885940782"
+    }
+   }
+  },
+  "planetary-commons": {
+   "received": {
+    "exact": "21917119051523412632501958258246444761/4182341244438641561863961760000000000",
+    "decimal": "5.240394738394"
+   },
+   "kept": {
+    "exact": "21917119051523412632501958258246444761/4182341244438641561863961760000000000",
+    "decimal": "5.240394738394"
+   },
+   "passed_up": {
+    "exact": "0",
+    "decimal": "0.000000000000"
+   },
+   "kept_by_reason": {
+    "positional": {
+     "exact": "2777560411982262189717124411612447348799/1141779159731749146388861560480000000000",
+     "decimal": "2.432659931046"
+    },
+    "no-record": {
+     "exact": "217818175672811502120905205414675418211/81555654266553510456347254320000000000",
+     "decimal": "2.670791836957"
+    },
+    "below-floor": {
+     "exact": "21764598086274237265675297/158931838736396385660000000",
+     "decimal": "0.136942970391"
+    }
+   }
+  }
+ },
+ "unexplained_descent": [
+  {
+   "from": "hex 0.4.3",
+   "kind": "no-record",
+   "reason": "descent:hex 0.4.3 has no recorded reliance",
+   "amount": {
+    "exact": "325/147",
+    "decimal": "2.210884353741"
+   }
+  },
+  {
+   "from": "axum-core 0.4.5",
+   "kind": "below-floor",
+   "reason": "descent:axum-core 0.4.5->async-trait 0.1.89",
+   "amount": {
+    "exact": "5/3087",
+    "decimal": "0.001619695497"
+   }
+  },
+  {
+   "from": "axum-core 0.4.5",
+   "kind": "below-floor",
+   "reason": "descent:axum-core 0.4.5->bytes 1.11.1",
+   "amount": {
+    "exact": "5/3087",
+    "decimal": "0.001619695497"
+   }
+  },
+  {
+   "from": "axum-core 0.4.5",
+   "kind": "below-floor",
+   "reason": "descent:axum-core 0.4.5->futures-util 0.3.31",
+   "amount": {
+    "exact": "5/3087",
+    "decimal": "0.001619695497"
+   }
+  },
+  {
+   "from": "axum-core 0.4.5",
+   "kind": "below-floor",
+   "reason": "descent:axum-core 0.4.5->http 1.4.0",
+   "amount": {
+    "exact": "5/3087",
+    "decimal": "0.001619695497"
+   }
+  },
+  {
+   "from": "axum-core 0.4.5",
+   "kind": "below-floor",
+   "reason": "descent:axum-core 0.4.5->http-body 1.0.1",
+   "amount": {
+    "exact": "5/3087",
+    "decimal": "0.001619695497"
+   }
+  },
+  {
+   "from": "axum-core 0.4.5",
+   "kind": "below-floor",
+   "reason": "descent:axum-core 0.4.5->http-body-util 0.1.3",
+   "amount": {
+    "exact": "5/3087",
+    "decimal": "0.001619695497"
+   }
+  },
+  {
+   "from": "axum-core 0.4.5",
+   "kind": "below-floor",
+   "reason": "descent:axum-core 0.4.5->mime 0.3.17",
+   "amount": {
+    "exact": "5/3087",
+    "decimal": "0.001619695497"
+   }
+  },
+  {
+   "from": "axum-core 0.4.5",
+   "kind": "below-floor",
+   "reason": "descent:axum-core 0.4.5->pin-project-lite 0.2.16",
+   "amount": {
+    "exact": "5/3087",
+    "decimal": "0.001619695497"
+   }
+  },
+  {
+   "from": "axum-core 0.4.5",
+   "kind": "below-floor",
+   "reason": "descent:axum-core 0.4.5->rustversion 1.0.22",
+   "amount": {
+    "exact": "5/3087",
+    "decimal": "0.001619695497"
+   }
+  },
+  {
+   "from": "axum-core 0.4.5",
+   "kind": "below-floor",
+   "reason": "descent:axum-core 0.4.5->sync_wrapper 1.0.2",
+   "amount": {
+    "exact": "5/3087",
+    "decimal": "0.001619695497"
+   }
+  },
+  {
+   "from": "axum-core 0.4.5",
+   "kind": "below-floor",
+   "reason": "descent:axum-core 0.4.5->tower-layer 0.3.3",
+   "amount": {
+    "exact": "5/3087",
+    "decimal": "0.001619695497"
+   }
+  },
+  {
+   "from": "axum-core 0.4.5",
+   "kind": "below-floor",
+   "reason": "descent:axum-core 0.4.5->tower-service 0.3.3",
+   "amount": {
+    "exact": "5/3087",
+    "decimal": "0.001619695497"
+   }
+  },
+  {
+   "from": "axum-core 0.4.5",
+   "kind": "below-floor",
+   "reason": "descent:axum-core 0.4.5->tracing 0.1.44",
+   "amount": {
+    "exact": "5/3087",
+    "decimal": "0.001619695497"
+   }
+  },
+  {
+   "from": "matchit 0.7.3",
+   "kind": "no-record",
+   "reason": "descent:matchit 0.7.3 has no recorded reliance",
+   "amount": {
+    "exact": "65/3087",
+    "decimal": "0.021056041464"
+   }
+  },
+  {
+   "from": "axum-core 0.5.6",
+   "kind": "below-floor",
+   "reason": "descent:axum-core 0.5.6->bytes 1.11.1",
+   "amount": {
+    "exact": "338/169785",
+    "decimal": "0.001990753011"
+   }
+  },
+  {
+   "from": "axum-core 0.5.6",
+   "kind": "below-floor",
+   "reason": "descent:axum-core 0.5.6->futures-core 0.3.31",
+   "amount": {
+    "exact": "338/169785",
+    "decimal": "0.001990753011"
+   }
+  },
+  {
+   "from": "axum-core 0.5.6",
+   "kind": "below-floor",
+   "reason": "descent:axum-core 0.5.6->http 1.4.0",
+   "amount": {
+    "exact": "338/169785",
+    "decimal": "0.001990753011"
+   }
+  },
+  {
+   "from": "axum-core 0.5.6",
+   "kind": "below-floor",
+   "reason": "descent:axum-core 0.5.6->http-body 1.0.1",
+   "amount": {
+    "exact": "338/169785",
+    "decimal": "0.001990753011"
+   }
+  },
+  {
+   "from": "axum-core 0.5.6",
+   "kind": "below-floor",
+   "reason": "descent:axum-core 0.5.6->http-body-util 0.1.3",
+   "amount": {
+    "exact": "338/169785",
+    "decimal": "0.001990753011"
+   }
+  },
+  {
+   "from": "axum-core 0.5.6",
+   "kind": "below-floor",
+   "reason": "descent:axum-core 0.5.6->mime 0.3.17",
+   "amount": {
+    "exact": "338/169785",
+    "decimal": "0.001990753011"
+   }
+  },
+  {
+   "from": "axum-core 0.5.6",
+   "kind": "below-floor",
+   "reason": "descent:axum-core 0.5.6->pin-project-lite 0.2.16",
+   "amount": {
+    "exact": "338/169785",
+    "decimal": "0.001990753011"
+   }
+  },
+  {
+   "from": "axum-core 0.5.6",
+   "kind": "below-floor",
+   "reason": "descent:axum-core 0.5.6->sync_wrapper 1.0.2",
+   "amount": {
+    "exact": "338/169785",
+    "decimal": "0.001990753011"
+   }
+  },
+  {
+   "from": "axum-core 0.5.6",
+   "kind": "below-floor",
+   "reason": "descent:axum-core 0.5.6->tower-layer 0.3.3",
+   "amount": {
+    "exact": "338/169785",
+    "decimal": "0.001990753011"
+   }
+  },
+  {
+   "from": "axum-core 0.5.6",
+   "kind": "below-floor",
+   "reason": "descent:axum-core 0.5.6->tower-service 0.3.3",
+   "amount": {
+    "exact": "338/169785",
+    "decimal": "0.001990753011"
+   }
+  },
+  {
+   "from": "axum-core 0.5.6",
+   "kind": "below-floor",
+   "reason": "descent:axum-core 0.5.6->tracing 0.1.44",
+   "amount": {
+    "exact": "338/169785",
+    "decimal": "0.001990753011"
+   }
+  },
+  {
+   "from": "matchit 0.8.4",
+   "kind": "no-record",
+   "reason": "descent:matchit 0.8.4 has no recorded reliance",
+   "amount": {
+    "exact": "338/15435",
+    "decimal": "0.021898283123"
+   }
+  },
+  {
+   "from": "hashbrown 0.14.5",
+   "kind": "no-record",
+   "reason": "descent:hashbrown 0.14.5 has no recorded reliance",
+   "amount": {
+    "exact": "845/9261",
+    "decimal": "0.091242846345"
+   }
+  },
+  {
+   "from": "anyhow 1.0.100",
+   "kind": "no-record",
+   "reason": "descent:anyhow 1.0.100 has no recorded reliance",
+   "amount": {
+    "exact": "147645/66836",
+    "decimal": "2.209063977497"
+   }
+  },
+  {
+   "from": "az 1.3.0",
+   "kind": "no-record",
+   "reason": "descent:az 1.3.0 has no recorded reliance",
+   "amount": {
+    "exact": "1690/95697",
+    "decimal": "0.017659905744"
+   }
+  },
+  {
+   "from": "cooked-waker 5.0.0",
+   "kind": "no-record",
+   "reason": "descent:cooked-waker 5.0.0 has no recorded reliance",
+   "amount": {
+    "exact": "1690/95697",
+    "decimal": "0.017659905744"
+   }
+  },
+  {
+   "from": "deno_core_icudata 0.74.0",
+   "kind": "no-record",
+   "reason": "descent:deno_core_icudata 0.74.0 has no recorded reliance",
+   "amount": {
+    "exact": "1690/95697",
+    "decimal": "0.017659905744"
+   }
+  },
+  {
+   "from": "deno_ops 0.215.0",
+   "kind": "below-floor",
+   "reason": "descent:deno_ops 0.215.0->indexmap 2.13.0",
+   "amount": {
+    "exact": "1690/861273",
+    "decimal": "0.001962211749"
+   }
+  },
+  {
+   "from": "deno_ops 0.215.0",
+   "kind": "below-floor",
+   "reason": "descent:deno_ops 0.215.0->proc-macro-rules 0.4.0",
+   "amount": {
+    "exact": "1690/861273",
+    "decimal": "0.001962211749"
+   }
+  },
+  {
+   "from": "deno_ops 0.215.0",
+   "kind": "below-floor",
+   "reason": "descent:deno_ops 0.215.0->proc-macro2 1.0.105",
+   "amount": {
+    "exact": "1690/861273",
+    "decimal": "0.001962211749"
+   }
+  },
+  {
+   "from": "deno_ops 0.215.0",
+   "kind": "below-floor",
+   "reason": "descent:deno_ops 0.215.0->quote 1.0.43",
+   "amount": {
+    "exact": "1690/861273",
+    "decimal": "0.001962211749"
+   }
+  },
+  {
+   "from": "deno_ops 0.215.0",
+   "kind": "below-floor",
+   "reason": "descent:deno_ops 0.215.0->stringcase 0.3.0",
+   "amount": {
+    "exact": "1690/861273",
+    "decimal": "0.001962211749"
+   }
+  },
+  {
+   "from": "deno_ops 0.215.0",
+   "kind": "below-floor",
+   "reason": "descent:deno_ops 0.215.0->strum 0.25.0",
+   "amount": {
+    "exact": "1690/861273",
+    "decimal": "0.001962211749"
+   }
+  },
+  {
+   "from": "deno_ops 0.215.0",
+   "kind": "below-floor",
+   "reason": "descent:deno_ops 0.215.0->strum_macros 0.25.3",
+   "amount": {
+    "exact": "1690/861273",
+    "decimal": "0.001962211749"
+   }
+  },
+  {
+   "from": "deno_ops 0.215.0",
+   "kind": "below-floor",
+   "reason": "descent:deno_ops 0.215.0->syn 2.0.114",
+   "amount": {
+    "exact": "1690/861273",
+    "decimal": "0.001962211749"
+   }
+  },
+  {
+   "from": "deno_ops 0.215.0",
+   "kind": "below-floor",
+   "reason": "descent:deno_ops 0.215.0->thiserror 2.0.17",
+   "amount": {
+    "exact": "1690/861273",
+    "decimal": "0.001962211749"
+   }
+  },
+  {
+   "from": "deno_path_util 0.3.3",
+   "kind": "below-floor",
+   "reason": "descent:deno_path_util 0.3.3->deno_error 0.5.7",
+   "amount": {
+    "exact": "338/95697",
+    "decimal": "0.003531981149"
+   }
+  },
+  {
+   "from": "deno_path_util 0.3.3",
+   "kind": "below-floor",
+   "reason": "descent:deno_path_util 0.3.3->percent-encoding 2.3.2",
+   "amount": {
+    "exact": "338/95697",
+    "decimal": "0.003531981149"
+   }
+  },
+  {
+   "from": "deno_path_util 0.3.3",
+   "kind": "below-floor",
+   "reason": "descent:deno_path_util 0.3.3->sys_traits 0.1.27",
+   "amount": {
+    "exact": "338/95697",
+    "decimal": "0.003531981149"
+   }
+  },
+  {
+   "from": "deno_path_util 0.3.3",
+   "kind": "below-floor",
+   "reason": "descent:deno_path_util 0.3.3->thiserror 2.0.17",
+   "amount": {
+    "exact": "338/95697",
+    "decimal": "0.003531981149"
+   }
+  },
+  {
+   "from": "deno_path_util 0.3.3",
+   "kind": "below-floor",
+   "reason": "descent:deno_path_util 0.3.3->url 2.5.8",
+   "amount": {
+    "exact": "338/95697",
+    "decimal": "0.003531981149"
+   }
+  },
+  {
+   "from": "deno_unsync 0.4.4",
+   "kind": "below-floor",
+   "reason": "descent:deno_unsync 0.4.4->futures-util 0.3.31",
+   "amount": {
+    "exact": "1690/287091",
+    "decimal": "0.005886635248"
+   }
+  },
+  {
+   "from": "deno_unsync 0.4.4",
+   "kind": "below-floor",
+   "reason": "descent:deno_unsync 0.4.4->parking_lot 0.12.5",
+   "amount": {
+    "exact": "1690/287091",
+    "decimal": "0.005886635248"
+   }
+  },
+  {
+   "from": "deno_unsync 0.4.4",
+   "kind": "below-floor",
+   "reason": "descent:deno_unsync 0.4.4->tokio 1.49.0",
+   "amount": {
+    "exact": "1690/287091",
+    "decimal": "0.005886635248"
+   }
+  },
+  {
+   "from": "serde_v8 0.248.0",
+   "kind": "below-floor",
+   "reason": "descent:serde_v8 0.248.0->deno_error 0.5.7",
+   "amount": {
+    "exact": "845/287091",
+    "decimal": "0.002943317624"
+   }
+  },
+  {
+   "from": "serde_v8 0.248.0",
+   "kind": "below-floor",
+   "reason": "descent:serde_v8 0.248.0->num-bigint 0.4.6",
+   "amount": {
+    "exact": "845/287091",
+    "decimal": "0.002943317624"
+   }
+  },
+  {
+   "from": "serde_v8 0.248.0",
+   "kind": "below-floor",
+   "reason": "descent:serde_v8 0.248.0->serde 1.0.228",
+   "amount": {
+    "exact": "845/287091",
+    "decimal": "0.002943317624"
+   }
+  },
+  {
+   "from": "serde_v8 0.248.0",
+   "kind": "below-floor",
+   "reason": "descent:serde_v8 0.248.0->smallvec 1.15.1",
+   "amount": {
+    "exact": "845/287091",
+    "decimal": "0.002943317624"
+   }
+  },
+  {
+   "from": "serde_v8 0.248.0",
+   "kind": "below-floor",
+   "reason": "descent:serde_v8 0.248.0->thiserror 2.0.17",
+   "amount": {
+    "exact": "845/287091",
+    "decimal": "0.002943317624"
+   }
+  },
+  {
+   "from": "serde_v8 0.248.0",
+   "kind": "below-floor",
+   "reason": "descent:serde_v8 0.248.0->v8 134.5.0",
+   "amount": {
+    "exact": "845/287091",
+    "decimal": "0.002943317624"
+   }
+  },
+  {
+   "from": "sourcemap 8.0.1",
+   "kind": "below-floor",
+   "reason": "descent:sourcemap 8.0.1->base64-simd 0.7.0",
+   "amount": {
+    "exact": "1690/1052667",
+    "decimal": "0.001605445977"
+   }
+  },
+  {
+   "from": "sourcemap 8.0.1",
+   "kind": "below-floor",
+   "reason": "descent:sourcemap 8.0.1->bitvec 1.0.1",
+   "amount": {
+    "exact": "1690/1052667",
+    "decimal": "0.001605445977"
+   }
+  },
+  {
+   "from": "sourcemap 8.0.1",
+   "kind": "below-floor",
+   "reason": "descent:sourcemap 8.0.1->data-encoding 2.10.0",
+   "amount": {
+    "exact": "1690/1052667",
+    "decimal": "0.001605445977"
+   }
+  },
+  {
+   "from": "sourcemap 8.0.1",
+   "kind": "below-floor",
+   "reason": "descent:sourcemap 8.0.1->debugid 0.8.0",
+   "amount": {
+    "exact": "1690/1052667",
+    "decimal": "0.001605445977"
+   }
+  },
+  {
+   "from": "sourcemap 8.0.1",
+   "kind": "below-floor",
+   "reason": "descent:sourcemap 8.0.1->if_chain 1.0.3",
+   "amount": {
+    "exact": "1690/1052667",
+    "decimal": "0.001605445977"
+   }
+  },
+  {
+   "from": "sourcemap 8.0.1",
+   "kind": "below-floor",
+   "reason": "descent:sourcemap 8.0.1->rustc-hash 1.1.0",
+   "amount": {
+    "exact": "1690/1052667",
+    "decimal": "0.001605445977"
+   }
+  },
+  {
+   "from": "sourcemap 8.0.1",
+   "kind": "below-floor",
+   "reason": "descent:sourcemap 8.0.1->rustc_version 0.2.3",
+   "amount": {
+    "exact": "1690/1052667",
+    "decimal": "0.001605445977"
+   }
+  },
+  {
+   "from": "sourcemap 8.0.1",
+   "kind": "below-floor",
+   "reason": "descent:sourcemap 8.0.1->serde 1.0.228",
+   "amount": {
+    "exact": "1690/1052667",
+    "decimal": "0.001605445977"
+   }
+  },
+  {
+   "from": "sourcemap 8.0.1",
+   "kind": "below-floor",
+   "reason": "descent:sourcemap 8.0.1->serde_json 1.0.149",
+   "amount": {
+    "exact": "1690/1052667",
+    "decimal": "0.001605445977"
+   }
+  },
+  {
+   "from": "sourcemap 8.0.1",
+   "kind": "below-floor",
+   "reason": "descent:sourcemap 8.0.1->unicode-id-start 1.4.0",
+   "amount": {
+    "exact": "1690/1052667",
+    "decimal": "0.001605445977"
+   }
+  },
+  {
+   "from": "sourcemap 8.0.1",
+   "kind": "below-floor",
+   "reason": "descent:sourcemap 8.0.1->url 2.5.8",
+   "amount": {
+    "exact": "1690/1052667",
+    "decimal": "0.001605445977"
+   }
+  },
+  {
+   "from": "static_assertions 1.1.0",
+   "kind": "no-record",
+   "reason": "descent:static_assertions 1.1.0 has no recorded reliance",
+   "amount": {
+    "exact": "1690/95697",
+    "decimal": "0.017659905744"
+   }
+  },
+  {
+   "from": "wasm_dep_analyzer 0.2.0",
+   "kind": "below-floor",
+   "reason": "descent:wasm_dep_analyzer 0.2.0->deno_error 0.5.7",
+   "amount": {
+    "exact": "845/95697",
+    "decimal": "0.008829952872"
+   }
+  },
+  {
+   "from": "wasm_dep_analyzer 0.2.0",
+   "kind": "below-floor",
+   "reason": "descent:wasm_dep_analyzer 0.2.0->thiserror 2.0.17",
+   "amount": {
+    "exact": "845/95697",
+    "decimal": "0.008829952872"
+   }
+  },
+  {
+   "from": "curve25519-dalek 4.1.3",
+   "kind": "below-floor",
+   "reason": "descent:curve25519-dalek 4.1.3->cfg-if 1.0.4",
+   "amount": {
+    "exact": "845/86436",
+    "decimal": "0.009776019251"
+   }
+  },
+  {
+   "from": "curve25519-dalek 4.1.3",
+   "kind": "below-floor",
+   "reason": "descent:curve25519-dalek 4.1.3->cpufeatures 0.2.17",
+   "amount": {
+    "exact": "845/86436",
+    "decimal": "0.009776019251"
+   }
+  },
+  {
+   "from": "curve25519-dalek 4.1.3",
+   "kind": "below-floor",
+   "reason": "descent:curve25519-dalek 4.1.3->curve25519-dalek-derive 0.1.1",
+   "amount": {
+    "exact": "845/86436",
+    "decimal": "0.009776019251"
+   }
+  },
+  {
+   "from": "curve25519-dalek 4.1.3",
+   "kind": "below-floor",
+   "reason": "descent:curve25519-dalek 4.1.3->digest 0.10.7",
+   "amount": {
+    "exact": "845/86436",
+    "decimal": "0.009776019251"
+   }
+  },
+  {
+   "from": "curve25519-dalek 4.1.3",
+   "kind": "below-floor",
+   "reason": "descent:curve25519-dalek 4.1.3->fiat-crypto 0.2.9",
+   "amount": {
+    "exact": "845/86436",
+    "decimal": "0.009776019251"
+   }
+  },
+  {
+   "from": "curve25519-dalek 4.1.3",
+   "kind": "below-floor",
+   "reason": "descent:curve25519-dalek 4.1.3->rustc_version 0.4.1",
+   "amount": {
+    "exact": "845/86436",
+    "decimal": "0.009776019251"
+   }
+  },
+  {
+   "from": "curve25519-dalek 4.1.3",
+   "kind": "below-floor",
+   "reason": "descent:curve25519-dalek 4.1.3->subtle 2.6.1",
+   "amount": {
+    "exact": "845/86436",
+    "decimal": "0.009776019251"
+   }
+  },
+  {
+   "from": "curve25519-dalek 4.1.3",
+   "kind": "below-floor",
+   "reason": "descent:curve25519-dalek 4.1.3->zeroize 1.8.2",
+   "amount": {
+    "exact": "845/86436",
+    "decimal": "0.009776019251"
+   }
+  },
+  {
+   "from": "bytecount 0.6.9",
+   "kind": "no-record",
+   "reason": "descent:bytecount 0.6.9 has no recorded reliance",
+   "amount": {
+    "exact": "1690/52479",
+    "decimal": "0.032203357533"
+   }
+  },
+  {
+   "from": "num-cmp 0.1.0",
+   "kind": "no-record",
+   "reason": "descent:num-cmp 0.1.0 has no recorded reliance",
+   "amount": {
+    "exact": "1690/52479",
+    "decimal": "0.032203357533"
+   }
+  },
+  {
+   "from": "referencing 0.28.3",
+   "kind": "below-floor",
+   "reason": "descent:referencing 0.28.3->ahash 0.8.12",
+   "amount": {
+    "exact": "338/52479",
+    "decimal": "0.006440671507"
+   }
+  },
+  {
+   "from": "referencing 0.28.3",
+   "kind": "below-floor",
+   "reason": "descent:referencing 0.28.3->fluent-uri 0.3.2",
+   "amount": {
+    "exact": "338/52479",
+    "decimal": "0.006440671507"
+   }
+  },
+  {
+   "from": "referencing 0.28.3",
+   "kind": "below-floor",
+   "reason": "descent:referencing 0.28.3->once_cell 1.21.3",
+   "amount": {
+    "exact": "338/52479",
+    "decimal": "0.006440671507"
+   }
+  },
+  {
+   "from": "referencing 0.28.3",
+   "kind": "below-floor",
+   "reason": "descent:referencing 0.28.3->percent-encoding 2.3.2",
+   "amount": {
+    "exact": "338/52479",
+    "decimal": "0.006440671507"
+   }
+  },
+  {
+   "from": "referencing 0.28.3",
+   "kind": "below-floor",
+   "reason": "descent:referencing 0.28.3->serde_json 1.0.149",
+   "amount": {
+    "exact": "338/52479",
+    "decimal": "0.006440671507"
+   }
+  },
+  {
+   "from": "blake3 1.8.4",
+   "kind": "below-floor",
+   "reason": "descent:blake3 1.8.4->arrayref 0.3.9",
+   "amount": {
+    "exact": "169/18522",
+    "decimal": "0.009124284634"
+   }
+  },
+  {
+   "from": "blake3 1.8.4",
+   "kind": "below-floor",
+   "reason": "descent:blake3 1.8.4->arrayvec 0.7.6",
+   "amount": {
+    "exact": "169/18522",
+    "decimal": "0.009124284634"
+   }
+  },
+  {
+   "from": "blake3 1.8.4",
+   "kind": "below-floor",
+   "reason": "descent:blake3 1.8.4->cc 1.2.52",
+   "amount": {
+    "exact": "169/18522",
+    "decimal": "0.009124284634"
+   }
+  },
+  {
+   "from": "blake3 1.8.4",
+   "kind": "below-floor",
+   "reason": "descent:blake3 1.8.4->cfg-if 1.0.4",
+   "amount": {
+    "exact": "169/18522",
+    "decimal": "0.009124284634"
+   }
+  },
+  {
+   "from": "blake3 1.8.4",
+   "kind": "below-floor",
+   "reason": "descent:blake3 1.8.4->constant_time_eq 0.4.2",
+   "amount": {
+    "exact": "169/18522",
+    "decimal": "0.009124284634"
+   }
+  },
+  {
+   "from": "blake3 1.8.4",
+   "kind": "below-floor",
+   "reason": "descent:blake3 1.8.4->cpufeatures 0.3.0",
+   "amount": {
+    "exact": "169/18522",
+    "decimal": "0.009124284634"
+   }
+  },
+  {
+   "from": "fallible-iterator 0.3.0",
+   "kind": "no-record",
+   "reason": "descent:fallible-iterator 0.3.0 has no recorded reliance",
+   "amount": {
+    "exact": "845/9261",
+    "decimal": "0.091242846345"
+   }
+  },
+  {
+   "from": "fallible-streaming-iterator 0.1.9",
+   "kind": "no-record",
+   "reason": "descent:fallible-streaming-iterator 0.1.9 has no recorded reliance",
+   "amount": {
+    "exact": "845/9261",
+    "decimal": "0.091242846345"
+   }
+  },
+  {
+   "from": "unsafe-libyaml 0.2.11",
+   "kind": "no-record",
+   "reason": "descent:unsafe-libyaml 0.2.11 has no recorded reliance",
+   "amount": {
+    "exact": "338/3087",
+    "decimal": "0.109491415614"
+   }
+  },
+  {
+   "from": "fastrand 2.4.1",
+   "kind": "no-record",
+   "reason": "descent:fastrand 2.4.1 has no recorded reliance",
+   "amount": {
+    "exact": "338/3087",
+    "decimal": "0.109491415614"
+   }
+  },
+  {
+   "from": "deadpool 0.12.3",
+   "kind": "below-floor",
+   "reason": "descent:deadpool 0.12.3->deadpool-runtime 0.1.4",
+   "amount": {
+    "exact": "169/18522",
+    "decimal": "0.009124284634"
+   }
+  },
+  {
+   "from": "deadpool 0.12.3",
+   "kind": "below-floor",
+   "reason": "descent:deadpool 0.12.3->lazy_static 1.5.0",
+   "amount": {
+    "exact": "169/18522",
+    "decimal": "0.009124284634"
+   }
+  },
+  {
+   "from": "deadpool 0.12.3",
+   "kind": "below-floor",
+   "reason": "descent:deadpool 0.12.3->num_cpus 1.17.0",
+   "amount": {
+    "exact": "169/18522",
+    "decimal": "0.009124284634"
+   }
+  },
+  {
+   "from": "deadpool 0.12.3",
+   "kind": "below-floor",
+   "reason": "descent:deadpool 0.12.3->tokio 1.49.0",
+   "amount": {
+    "exact": "169/18522",
+    "decimal": "0.009124284634"
+   }
+  },
+  {
+   "from": "aes 0.8.4",
+   "kind": "below-floor",
+   "reason": "descent:aes 0.8.4->cfg-if 1.0.4",
+   "amount": {
+    "exact": "845/101871",
+    "decimal": "0.008294804213"
+   }
+  },
+  {
+   "from": "aes 0.8.4",
+   "kind": "below-floor",
+   "reason": "descent:aes 0.8.4->cipher 0.4.4",
+   "amount": {
+    "exact": "845/101871",
+    "decimal": "0.008294804213"
+   }
+  },
+  {
+   "from": "aes 0.8.4",
+   "kind": "below-floor",
+   "reason": "descent:aes 0.8.4->cpufeatures 0.2.17",
+   "amount": {
+    "exact": "845/101871",
+    "decimal": "0.008294804213"
+   }
+  },
+  {
+   "from": "constant_time_eq 0.3.1",
+   "kind": "no-record",
+   "reason": "descent:constant_time_eq 0.3.1 has no recorded reliance",
+   "amount": {
+    "exact": "845/33957",
+    "decimal": "0.024884412640"
+   }
+  },
+  {
+   "from": "crossbeam-utils 0.8.21",
+   "kind": "no-record",
+   "reason": "descent:crossbeam-utils 0.8.21 has no recorded reliance",
+   "amount": {
+    "exact": "195/1694",
+    "decimal": "0.115112160567"
+   }
+  },
+  {
+   "from": "deflate64 0.1.12",
+   "kind": "no-record",
+   "reason": "descent:deflate64 0.1.12 has no recorded reliance",
+   "amount": {
+    "exact": "845/33957",
+    "decimal": "0.024884412640"
+   }
+  },
+  {
+   "from": "sha1 0.10.6",
+   "kind": "below-floor",
+   "reason": "descent:sha1 0.10.6->cfg-if 1.0.4",
+   "amount": {
+    "exact": "845/101871",
+    "decimal": "0.008294804213"
+   }
+  },
+  {
+   "from": "sha1 0.10.6",
+   "kind": "below-floor",
+   "reason": "descent:sha1 0.10.6->cpufeatures 0.2.17",
+   "amount": {
+    "exact": "845/101871",
+    "decimal": "0.008294804213"
+   }
+  },
+  {
+   "from": "sha1 0.10.6",
+   "kind": "below-floor",
+   "reason": "descent:sha1 0.10.6->digest 0.10.7",
+   "amount": {
+    "exact": "845/101871",
+    "decimal": "0.008294804213"
+   }
+  },
+  {
+   "from": "time 0.3.51",
+   "kind": "below-floor",
+   "reason": "descent:time 0.3.51->deranged 0.5.8",
+   "amount": {
+    "exact": "169/33957",
+    "decimal": "0.004976882528"
+   }
+  },
+  {
+   "from": "time 0.3.51",
+   "kind": "below-floor",
+   "reason": "descent:time 0.3.51->num-conv 0.2.2",
+   "amount": {
+    "exact": "169/33957",
+    "decimal": "0.004976882528"
+   }
+  },
+  {
+   "from": "time 0.3.51",
+   "kind": "below-floor",
+   "reason": "descent:time 0.3.51->powerfmt 0.2.0",
+   "amount": {
+    "exact": "169/33957",
+    "decimal": "0.004976882528"
+   }
+  },
+  {
+   "from": "time 0.3.51",
+   "kind": "below-floor",
+   "reason": "descent:time 0.3.51->serde_core 1.0.228",
+   "amount": {
+    "exact": "169/33957",
+    "decimal": "0.004976882528"
+   }
+  },
+  {
+   "from": "time 0.3.51",
+   "kind": "below-floor",
+   "reason": "descent:time 0.3.51->time-core 0.1.9",
+   "amount": {
+    "exact": "169/33957",
+    "decimal": "0.004976882528"
+   }
+  },
+  {
+   "from": "zopfli 0.8.3",
+   "kind": "below-floor",
+   "reason": "descent:zopfli 0.8.3->bumpalo 3.19.1",
+   "amount": {
+    "exact": "845/135828",
+    "decimal": "0.006221103160"
+   }
+  },
+  {
+   "from": "zopfli 0.8.3",
+   "kind": "below-floor",
+   "reason": "descent:zopfli 0.8.3->crc32fast 1.5.0",
+   "amount": {
+    "exact": "845/135828",
+    "decimal": "0.006221103160"
+   }
+  },
+  {
+   "from": "zopfli 0.8.3",
+   "kind": "below-floor",
+   "reason": "descent:zopfli 0.8.3->log 0.4.29",
+   "amount": {
+    "exact": "845/135828",
+    "decimal": "0.006221103160"
+   }
+  },
+  {
+   "from": "zopfli 0.8.3",
+   "kind": "below-floor",
+   "reason": "descent:zopfli 0.8.3->simd-adler32 0.3.9",
+   "amount": {
+    "exact": "845/135828",
+    "decimal": "0.006221103160"
+   }
+  },
+  {
+   "from": "mime 0.3.17",
+   "kind": "no-record",
+   "reason": "descent:mime 0.3.17 has no recorded reliance",
+   "amount": {
+    "exact": "493/11760",
+    "decimal": "0.041921768707"
+   }
+  },
+  {
+   "from": "anstream 0.6.21",
+   "kind": "below-floor",
+   "reason": "descent:anstream 0.6.21->anstyle 1.0.14",
+   "amount": {
+    "exact": "2197/907578",
+    "decimal": "0.002420728576"
+   }
+  },
+  {
+   "from": "anstream 0.6.21",
+   "kind": "below-floor",
+   "reason": "descent:anstream 0.6.21->anstyle-parse 0.2.7",
+   "amount": {
+    "exact": "2197/907578",
+    "decimal": "0.002420728576"
+   }
+  },
+  {
+   "from": "anstream 0.6.21",
+   "kind": "below-floor",
+   "reason": "descent:anstream 0.6.21->anstyle-query 1.1.5",
+   "amount": {
+    "exact": "2197/907578",
+    "decimal": "0.002420728576"
+   }
+  },
+  {
+   "from": "anstream 0.6.21",
+   "kind": "below-floor",
+   "reason": "descent:anstream 0.6.21->anstyle-wincon 3.0.11",
+   "amount": {
+    "exact": "2197/907578",
+    "decimal": "0.002420728576"
+   }
+  },
+  {
+   "from": "anstream 0.6.21",
+   "kind": "below-floor",
+   "reason": "descent:anstream 0.6.21->colorchoice 1.0.5",
+   "amount": {
+    "exact": "2197/907578",
+    "decimal": "0.002420728576"
+   }
+  },
+  {
+   "from": "anstream 0.6.21",
+   "kind": "below-floor",
+   "reason": "descent:anstream 0.6.21->is_terminal_polyfill 1.70.2",
+   "amount": {
+    "exact": "2197/907578",
+    "decimal": "0.002420728576"
+   }
+  },
+  {
+   "from": "anstream 0.6.21",
+   "kind": "below-floor",
+   "reason": "descent:anstream 0.6.21->utf8parse 0.2.2",
+   "amount": {
+    "exact": "2197/907578",
+    "decimal": "0.002420728576"
+   }
+  },
+  {
+   "from": "clap_lex 1.1.0",
+   "kind": "no-record",
+   "reason": "descent:clap_lex 1.1.0 has no recorded reliance",
+   "amount": {
+    "exact": "2197/129654",
+    "decimal": "0.016945100035"
+   }
+  },
+  {
+   "from": "strsim 0.11.1",
+   "kind": "no-record",
+   "reason": "descent:strsim 0.11.1 has no recorded reliance",
+   "amount": {
+    "exact": "2197/129654",
+    "decimal": "0.016945100035"
+   }
+  },
+  {
+   "from": "heck 0.5.0",
+   "kind": "no-record",
+   "reason": "descent:heck 0.5.0 has no recorded reliance",
+   "amount": {
+    "exact": "2197/129654",
+    "decimal": "0.016945100035"
+   }
+  },
+  {
+   "from": "bit-vec 0.6.3",
+   "kind": "no-record",
+   "reason": "descent:bit-vec 0.6.3 has no recorded reliance",
+   "amount": {
+    "exact": "5109/233926",
+    "decimal": "0.021840240076"
+   }
+  },
+  {
+   "from": "pin-project-internal 1.1.12",
+   "kind": "below-floor",
+   "reason": "descent:pin-project-internal 1.1.12->proc-macro2 1.0.105",
+   "amount": {
+    "exact": "8788/6028911",
+    "decimal": "0.001457643014"
+   }
+  },
+  {
+   "from": "pin-project-internal 1.1.12",
+   "kind": "below-floor",
+   "reason": "descent:pin-project-internal 1.1.12->quote 1.0.43",
+   "amount": {
+    "exact": "8788/6028911",
+    "decimal": "0.001457643014"
+   }
+  },
+  {
+   "from": "pin-project-internal 1.1.12",
+   "kind": "below-floor",
+   "reason": "descent:pin-project-internal 1.1.12->syn 2.0.114",
+   "amount": {
+    "exact": "8788/6028911",
+    "decimal": "0.001457643014"
+   }
+  },
+  {
+   "from": "v8 134.5.0",
+   "kind": "below-floor",
+   "reason": "descent:v8 134.5.0->bindgen 0.70.1",
+   "amount": {
+    "exact": "65/33418",
+    "decimal": "0.001945059549"
+   }
+  },
+  {
+   "from": "v8 134.5.0",
+   "kind": "below-floor",
+   "reason": "descent:v8 134.5.0->bitflags 2.10.0",
+   "amount": {
+    "exact": "65/33418",
+    "decimal": "0.001945059549"
+   }
+  },
+  {
+   "from": "v8 134.5.0",
+   "kind": "below-floor",
+   "reason": "descent:v8 134.5.0->fslock 0.2.1",
+   "amount": {
+    "exact": "65/33418",
+    "decimal": "0.001945059549"
+   }
+  },
+  {
+   "from": "v8 134.5.0",
+   "kind": "below-floor",
+   "reason": "descent:v8 134.5.0->gzip-header 1.1.0",
+   "amount": {
+    "exact": "65/33418",
+    "decimal": "0.001945059549"
+   }
+  },
+  {
+   "from": "v8 134.5.0",
+   "kind": "below-floor",
+   "reason": "descent:v8 134.5.0->home 0.5.12",
+   "amount": {
+    "exact": "65/33418",
+    "decimal": "0.001945059549"
+   }
+  },
+  {
+   "from": "v8 134.5.0",
+   "kind": "below-floor",
+   "reason": "descent:v8 134.5.0->miniz_oxide 0.7.4",
+   "amount": {
+    "exact": "65/33418",
+    "decimal": "0.001945059549"
+   }
+  },
+  {
+   "from": "v8 134.5.0",
+   "kind": "below-floor",
+   "reason": "descent:v8 134.5.0->once_cell 1.21.3",
+   "amount": {
+    "exact": "65/33418",
+    "decimal": "0.001945059549"
+   }
+  },
+  {
+   "from": "v8 134.5.0",
+   "kind": "below-floor",
+   "reason": "descent:v8 134.5.0->paste 1.0.15",
+   "amount": {
+    "exact": "65/33418",
+    "decimal": "0.001945059549"
+   }
+  },
+  {
+   "from": "v8 134.5.0",
+   "kind": "below-floor",
+   "reason": "descent:v8 134.5.0->which 6.0.3",
+   "amount": {
+    "exact": "65/33418",
+    "decimal": "0.001945059549"
+   }
+  },
+  {
+   "from": "bit-set 0.8.0",
+   "kind": "below-floor",
+   "reason": "descent:bit-set 0.8.0->bit-vec 0.8.0",
+   "amount": {
+    "exact": "8788/3306177",
+    "decimal": "0.002658054908"
+   }
+  },
+  {
+   "from": "num 0.4.3",
+   "kind": "below-floor",
+   "reason": "descent:num 0.4.3->num-bigint 0.4.6",
+   "amount": {
+    "exact": "2197/3306177",
+    "decimal": "0.000664513727"
+   }
+  },
+  {
+   "from": "num 0.4.3",
+   "kind": "below-floor",
+   "reason": "descent:num 0.4.3->num-complex 0.4.6",
+   "amount": {
+    "exact": "2197/3306177",
+    "decimal": "0.000664513727"
+   }
+  },
+  {
+   "from": "num 0.4.3",
+   "kind": "below-floor",
+   "reason": "descent:num 0.4.3->num-integer 0.1.46",
+   "amount": {
+    "exact": "2197/3306177",
+    "decimal": "0.000664513727"
+   }
+  },
+  {
+   "from": "num 0.4.3",
+   "kind": "below-floor",
+   "reason": "descent:num 0.4.3->num-iter 0.1.45",
+   "amount": {
+    "exact": "2197/3306177",
+    "decimal": "0.000664513727"
+   }
+  },
+  {
+   "from": "num 0.4.3",
+   "kind": "below-floor",
+   "reason": "descent:num 0.4.3->num-rational 0.4.2",
+   "amount": {
+    "exact": "2197/3306177",
+    "decimal": "0.000664513727"
+   }
+  },
+  {
+   "from": "num 0.4.3",
+   "kind": "below-floor",
+   "reason": "descent:num 0.4.3->num-traits 0.2.19",
+   "amount": {
+    "exact": "2197/3306177",
+    "decimal": "0.000664513727"
+   }
+  },
+  {
+   "from": "ahash 0.8.12",
+   "kind": "below-floor",
+   "reason": "descent:ahash 0.8.12->cfg-if 1.0.4",
+   "amount": {
+    "exact": "195/36652",
+    "decimal": "0.005320309942"
+   }
+  },
+  {
+   "from": "ahash 0.8.12",
+   "kind": "below-floor",
+   "reason": "descent:ahash 0.8.12->getrandom 0.3.4",
+   "amount": {
+    "exact": "195/36652",
+    "decimal": "0.005320309942"
+   }
+  },
+  {
+   "from": "ahash 0.8.12",
+   "kind": "below-floor",
+   "reason": "descent:ahash 0.8.12->once_cell 1.21.3",
+   "amount": {
+    "exact": "195/36652",
+    "decimal": "0.005320309942"
+   }
+  },
+  {
+   "from": "ahash 0.8.12",
+   "kind": "below-floor",
+   "reason": "descent:ahash 0.8.12->serde 1.0.228",
+   "amount": {
+    "exact": "195/36652",
+    "decimal": "0.005320309942"
+   }
+  },
+  {
+   "from": "ahash 0.8.12",
+   "kind": "below-floor",
+   "reason": "descent:ahash 0.8.12->version_check 0.9.5",
+   "amount": {
+    "exact": "195/36652",
+    "decimal": "0.005320309942"
+   }
+  },
+  {
+   "from": "ahash 0.8.12",
+   "kind": "below-floor",
+   "reason": "descent:ahash 0.8.12->zerocopy 0.8.33",
+   "amount": {
+    "exact": "195/36652",
+    "decimal": "0.005320309942"
+   }
+  },
+  {
+   "from": "hyper-rustls 0.27.7",
+   "kind": "below-floor",
+   "reason": "descent:hyper-rustls 0.27.7->http 1.4.0",
+   "amount": {
+    "exact": "23543/13084764",
+    "decimal": "0.001799268218"
+   }
+  },
+  {
+   "from": "hyper-rustls 0.27.7",
+   "kind": "below-floor",
+   "reason": "descent:hyper-rustls 0.27.7->hyper 1.8.1",
+   "amount": {
+    "exact": "23543/13084764",
+    "decimal": "0.001799268218"
+   }
+  },
+  {
+   "from": "hyper-rustls 0.27.7",
+   "kind": "below-floor",
+   "reason": "descent:hyper-rustls 0.27.7->hyper-util 0.1.19",
+   "amount": {
+    "exact": "23543/13084764",
+    "decimal": "0.001799268218"
+   }
+  },
+  {
+   "from": "hyper-rustls 0.27.7",
+   "kind": "below-floor",
+   "reason": "descent:hyper-rustls 0.27.7->rustls 0.23.36",
+   "amount": {
+    "exact": "23543/13084764",
+    "decimal": "0.001799268218"
+   }
+  },
+  {
+   "from": "hyper-rustls 0.27.7",
+   "kind": "below-floor",
+   "reason": "descent:hyper-rustls 0.27.7->rustls-pki-types 1.13.2",
+   "amount": {
+    "exact": "23543/13084764",
+    "decimal": "0.001799268218"
+   }
+  },
+  {
+   "from": "hyper-rustls 0.27.7",
+   "kind": "below-floor",
+   "reason": "descent:hyper-rustls 0.27.7->tokio 1.49.0",
+   "amount": {
+    "exact": "23543/13084764",
+    "decimal": "0.001799268218"
+   }
+  },
+  {
+   "from": "hyper-rustls 0.27.7",
+   "kind": "below-floor",
+   "reason": "descent:hyper-rustls 0.27.7->tokio-rustls 0.26.4",
+   "amount": {
+    "exact": "23543/13084764",
+    "decimal": "0.001799268218"
+   }
+  },
+  {
+   "from": "hyper-rustls 0.27.7",
+   "kind": "below-floor",
+   "reason": "descent:hyper-rustls 0.27.7->tower-service 0.3.3",
+   "amount": {
+    "exact": "23543/13084764",
+    "decimal": "0.001799268218"
+   }
+  },
+  {
+   "from": "hyper-rustls 0.27.7",
+   "kind": "below-floor",
+   "reason": "descent:hyper-rustls 0.27.7->webpki-roots 1.0.5",
+   "amount": {
+    "exact": "23543/13084764",
+    "decimal": "0.001799268218"
+   }
+  },
+  {
+   "from": "quinn 0.11.9",
+   "kind": "below-floor",
+   "reason": "descent:quinn 0.11.9->bytes 1.11.1",
+   "amount": {
+    "exact": "23543/17446352",
+    "decimal": "0.001349451163"
+   }
+  },
+  {
+   "from": "quinn 0.11.9",
+   "kind": "below-floor",
+   "reason": "descent:quinn 0.11.9->cfg_aliases 0.2.1",
+   "amount": {
+    "exact": "23543/17446352",
+    "decimal": "0.001349451163"
+   }
+  },
+  {
+   "from": "quinn 0.11.9",
+   "kind": "below-floor",
+   "reason": "descent:quinn 0.11.9->pin-project-lite 0.2.16",
+   "amount": {
+    "exact": "23543/17446352",
+    "decimal": "0.001349451163"
+   }
+  },
+  {
+   "from": "quinn 0.11.9",
+   "kind": "below-floor",
+   "reason": "descent:quinn 0.11.9->quinn-proto 0.11.16",
+   "amount": {
+    "exact": "23543/17446352",
+    "decimal": "0.001349451163"
+   }
+  },
+  {
+   "from": "quinn 0.11.9",
+   "kind": "below-floor",
+   "reason": "descent:quinn 0.11.9->quinn-udp 0.5.14",
+   "amount": {
+    "exact": "23543/17446352",
+    "decimal": "0.001349451163"
+   }
+  },
+  {
+   "from": "quinn 0.11.9",
+   "kind": "below-floor",
+   "reason": "descent:quinn 0.11.9->rustc-hash 2.1.1",
+   "amount": {
+    "exact": "23543/17446352",
+    "decimal": "0.001349451163"
+   }
+  },
+  {
+   "from": "quinn 0.11.9",
+   "kind": "below-floor",
+   "reason": "descent:quinn 0.11.9->rustls 0.23.36",
+   "amount": {
+    "exact": "23543/17446352",
+    "decimal": "0.001349451163"
+   }
+  },
+  {
+   "from": "quinn 0.11.9",
+   "kind": "below-floor",
+   "reason": "descent:quinn 0.11.9->socket2 0.6.1",
+   "amount": {
+    "exact": "23543/17446352",
+    "decimal": "0.001349451163"
+   }
+  },
+  {
+   "from": "quinn 0.11.9",
+   "kind": "below-floor",
+   "reason": "descent:quinn 0.11.9->thiserror 2.0.17",
+   "amount": {
+    "exact": "23543/17446352",
+    "decimal": "0.001349451163"
+   }
+  },
+  {
+   "from": "quinn 0.11.9",
+   "kind": "below-floor",
+   "reason": "descent:quinn 0.11.9->tokio 1.49.0",
+   "amount": {
+    "exact": "23543/17446352",
+    "decimal": "0.001349451163"
+   }
+  },
+  {
+   "from": "quinn 0.11.9",
+   "kind": "below-floor",
+   "reason": "descent:quinn 0.11.9->tracing 0.1.44",
+   "amount": {
+    "exact": "23543/17446352",
+    "decimal": "0.001349451163"
+   }
+  },
+  {
+   "from": "quinn 0.11.9",
+   "kind": "below-floor",
+   "reason": "descent:quinn 0.11.9->web-time 1.1.0",
+   "amount": {
+    "exact": "23543/17446352",
+    "decimal": "0.001349451163"
+   }
+  },
+  {
+   "from": "tower-http 0.6.8",
+   "kind": "below-floor",
+   "reason": "descent:tower-http 0.6.8->bitflags 2.10.0",
+   "amount": {
+    "exact": "70629/43615880",
+    "decimal": "0.001619341396"
+   }
+  },
+  {
+   "from": "tower-http 0.6.8",
+   "kind": "below-floor",
+   "reason": "descent:tower-http 0.6.8->bytes 1.11.1",
+   "amount": {
+    "exact": "70629/43615880",
+    "decimal": "0.001619341396"
+   }
+  },
+  {
+   "from": "tower-http 0.6.8",
+   "kind": "below-floor",
+   "reason": "descent:tower-http 0.6.8->futures-util 0.3.31",
+   "amount": {
+    "exact": "70629/43615880",
+    "decimal": "0.001619341396"
+   }
+  },
+  {
+   "from": "tower-http 0.6.8",
+   "kind": "below-floor",
+   "reason": "descent:tower-http 0.6.8->http 1.4.0",
+   "amount": {
+    "exact": "70629/43615880",
+    "decimal": "0.001619341396"
+   }
+  },
+  {
+   "from": "tower-http 0.6.8",
+   "kind": "below-floor",
+   "reason": "descent:tower-http 0.6.8->http-body 1.0.1",
+   "amount": {
+    "exact": "70629/43615880",
+    "decimal": "0.001619341396"
+   }
+  },
+  {
+   "from": "tower-http 0.6.8",
+   "kind": "below-floor",
+   "reason": "descent:tower-http 0.6.8->iri-string 0.7.10",
+   "amount": {
+    "exact": "70629/43615880",
+    "decimal": "0.001619341396"
+   }
+  },
+  {
+   "from": "tower-http 0.6.8",
+   "kind": "below-floor",
+   "reason": "descent:tower-http 0.6.8->pin-project-lite 0.2.16",
+   "amount": {
+    "exact": "70629/43615880",
+    "decimal": "0.001619341396"
+   }
+  },
+  {
+   "from": "tower-http 0.6.8",
+   "kind": "below-floor",
+   "reason": "descent:tower-http 0.6.8->tower 0.5.3",
+   "amount": {
+    "exact": "70629/43615880",
+    "decimal": "0.001619341396"
+   }
+  },
+  {
+   "from": "tower-http 0.6.8",
+   "kind": "below-floor",
+   "reason": "descent:tower-http 0.6.8->tower-layer 0.3.3",
+   "amount": {
+    "exact": "70629/43615880",
+    "decimal": "0.001619341396"
+   }
+  },
+  {
+   "from": "tower-http 0.6.8",
+   "kind": "below-floor",
+   "reason": "descent:tower-http 0.6.8->tower-service 0.3.3",
+   "amount": {
+    "exact": "70629/43615880",
+    "decimal": "0.001619341396"
+   }
+  },
+  {
+   "from": "wasm-streams 0.4.2",
+   "kind": "below-floor",
+   "reason": "descent:wasm-streams 0.4.2->futures-util 0.3.31",
+   "amount": {
+    "exact": "70629/21807940",
+    "decimal": "0.003238682792"
+   }
+  },
+  {
+   "from": "wasm-streams 0.4.2",
+   "kind": "below-floor",
+   "reason": "descent:wasm-streams 0.4.2->js-sys 0.3.83",
+   "amount": {
+    "exact": "70629/21807940",
+    "decimal": "0.003238682792"
+   }
+  },
+  {
+   "from": "wasm-streams 0.4.2",
+   "kind": "below-floor",
+   "reason": "descent:wasm-streams 0.4.2->wasm-bindgen 0.2.106",
+   "amount": {
+    "exact": "70629/21807940",
+    "decimal": "0.003238682792"
+   }
+  },
+  {
+   "from": "wasm-streams 0.4.2",
+   "kind": "below-floor",
+   "reason": "descent:wasm-streams 0.4.2->wasm-bindgen-futures 0.4.56",
+   "amount": {
+    "exact": "70629/21807940",
+    "decimal": "0.003238682792"
+   }
+  },
+  {
+   "from": "wasm-streams 0.4.2",
+   "kind": "below-floor",
+   "reason": "descent:wasm-streams 0.4.2->web-sys 0.3.83",
+   "amount": {
+    "exact": "70629/21807940",
+    "decimal": "0.003238682792"
+   }
+  },
+  {
+   "from": "outref 0.5.2",
+   "kind": "no-record",
+   "reason": "descent:outref 0.5.2 has no recorded reliance",
+   "amount": {
+    "exact": "8788/3306177",
+    "decimal": "0.002658054908"
+   }
+  },
+  {
+   "from": "vsimd 0.8.0",
+   "kind": "no-record",
+   "reason": "descent:vsimd 0.8.0 has no recorded reliance",
+   "amount": {
+    "exact": "8788/3306177",
+    "decimal": "0.002658054908"
+   }
+  },
+  {
+   "from": "enumflags2_derive 0.7.12",
+   "kind": "below-floor",
+   "reason": "descent:enumflags2_derive 0.7.12->proc-macro2 1.0.105",
+   "amount": {
+    "exact": "8788/972405",
+    "decimal": "0.009037386686"
+   }
+  },
+  {
+   "from": "enumflags2_derive 0.7.12",
+   "kind": "below-floor",
+   "reason": "descent:enumflags2_derive 0.7.12->quote 1.0.43",
+   "amount": {
+    "exact": "8788/972405",
+    "decimal": "0.009037386686"
+   }
+  },
+  {
+   "from": "enumflags2_derive 0.7.12",
+   "kind": "below-floor",
+   "reason": "descent:enumflags2_derive 0.7.12->syn 2.0.114",
+   "amount": {
+    "exact": "8788/972405",
+    "decimal": "0.009037386686"
+   }
+  },
+  {
+   "from": "bindgen 0.72.1",
+   "kind": "below-floor",
+   "reason": "descent:bindgen 0.72.1->bitflags 2.10.0",
+   "amount": {
+    "exact": "2197/5834430",
+    "decimal": "0.000376557779"
+   }
+  },
+  {
+   "from": "bindgen 0.72.1",
+   "kind": "below-floor",
+   "reason": "descent:bindgen 0.72.1->cexpr 0.6.0",
+   "amount": {
+    "exact": "2197/5834430",
+    "decimal": "0.000376557779"
+   }
+  },
+  {
+   "from": "bindgen 0.72.1",
+   "kind": "below-floor",
+   "reason": "descent:bindgen 0.72.1->clang-sys 1.8.1",
+   "amount": {
+    "exact": "2197/5834430",
+    "decimal": "0.000376557779"
+   }
+  },
+  {
+   "from": "bindgen 0.72.1",
+   "kind": "below-floor",
+   "reason": "descent:bindgen 0.72.1->itertools 0.13.0",
+   "amount": {
+    "exact": "2197/5834430",
+    "decimal": "0.000376557779"
+   }
+  },
+  {
+   "from": "bindgen 0.72.1",
+   "kind": "below-floor",
+   "reason": "descent:bindgen 0.72.1->log 0.4.29",
+   "amount": {
+    "exact": "2197/5834430",
+    "decimal": "0.000376557779"
+   }
+  },
+  {
+   "from": "bindgen 0.72.1",
+   "kind": "below-floor",
+   "reason": "descent:bindgen 0.72.1->prettyplease 0.2.37",
+   "amount": {
+    "exact": "2197/5834430",
+    "decimal": "0.000376557779"
+   }
+  },
+  {
+   "from": "bindgen 0.72.1",
+   "kind": "below-floor",
+   "reason": "descent:bindgen 0.72.1->proc-macro2 1.0.105",
+   "amount": {
+    "exact": "2197/5834430",
+    "decimal": "0.000376557779"
+   }
+  },
+  {
+   "from": "bindgen 0.72.1",
+   "kind": "below-floor",
+   "reason": "descent:bindgen 0.72.1->quote 1.0.43",
+   "amount": {
+    "exact": "2197/5834430",
+    "decimal": "0.000376557779"
+   }
+  },
+  {
+   "from": "bindgen 0.72.1",
+   "kind": "below-floor",
+   "reason": "descent:bindgen 0.72.1->regex 1.12.2",
+   "amount": {
+    "exact": "2197/5834430",
+    "decimal": "0.000376557779"
+   }
+  },
+  {
+   "from": "bindgen 0.72.1",
+   "kind": "below-floor",
+   "reason": "descent:bindgen 0.72.1->rustc-hash 2.1.1",
+   "amount": {
+    "exact": "2197/5834430",
+    "decimal": "0.000376557779"
+   }
+  },
+  {
+   "from": "bindgen 0.72.1",
+   "kind": "below-floor",
+   "reason": "descent:bindgen 0.72.1->shlex 1.3.0",
+   "amount": {
+    "exact": "2197/5834430",
+    "decimal": "0.000376557779"
+   }
+  },
+  {
+   "from": "bindgen 0.72.1",
+   "kind": "below-floor",
+   "reason": "descent:bindgen 0.72.1->syn 2.0.114",
+   "amount": {
+    "exact": "2197/5834430",
+    "decimal": "0.000376557779"
+   }
+  },
+  {
+   "from": "cmake 0.1.57",
+   "kind": "below-floor",
+   "reason": "descent:cmake 0.1.57->cc 1.2.52",
+   "amount": {
+    "exact": "4394/972405",
+    "decimal": "0.004518693343"
+   }
+  },
+  {
+   "from": "find_cuda_helper 0.2.0",
+   "kind": "below-floor",
+   "reason": "descent:find_cuda_helper 0.2.0->glob 0.3.3",
+   "amount": {
+    "exact": "4394/972405",
+    "decimal": "0.004518693343"
+   }
+  },
+  {
+   "from": "walkdir 2.5.0",
+   "kind": "below-floor",
+   "reason": "descent:walkdir 2.5.0->same-file 1.0.6",
+   "amount": {
+    "exact": "2197/972405",
+    "decimal": "0.002259346671"
+   }
+  },
+  {
+   "from": "walkdir 2.5.0",
+   "kind": "below-floor",
+   "reason": "descent:walkdir 2.5.0->winapi-util 0.1.11",
+   "amount": {
+    "exact": "2197/972405",
+    "decimal": "0.002259346671"
+   }
+  },
+  {
+   "from": "arrayref 0.3.9",
+   "kind": "no-record",
+   "reason": "descent:arrayref 0.3.9 has no recorded reliance",
+   "amount": {
+    "exact": "312482/1673595",
+    "decimal": "0.186713033918"
+   }
+  },
+  {
+   "from": "arrayvec 0.7.6",
+   "kind": "no-record",
+   "reason": "descent:arrayvec 0.7.6 has no recorded reliance",
+   "amount": {
+    "exact": "312482/1673595",
+    "decimal": "0.186713033918"
+   }
+  },
+  {
+   "from": "constant_time_eq 0.4.2",
+   "kind": "no-record",
+   "reason": "descent:constant_time_eq 0.4.2 has no recorded reliance",
+   "amount": {
+    "exact": "312482/1673595",
+    "decimal": "0.186713033918"
+   }
+  },
+  {
+   "from": "multihash-derive-impl 0.1.2",
+   "kind": "below-floor",
+   "reason": "descent:multihash-derive-impl 0.1.2->proc-macro-crate 3.5.0",
+   "amount": {
+    "exact": "4394/4862025",
+    "decimal": "0.000903738669"
+   }
+  },
+  {
+   "from": "multihash-derive-impl 0.1.2",
+   "kind": "below-floor",
+   "reason": "descent:multihash-derive-impl 0.1.2->proc-macro2 1.0.105",
+   "amount": {
+    "exact": "4394/4862025",
+    "decimal": "0.000903738669"
+   }
+  },
+  {
+   "from": "multihash-derive-impl 0.1.2",
+   "kind": "below-floor",
+   "reason": "descent:multihash-derive-impl 0.1.2->quote 1.0.43",
+   "amount": {
+    "exact": "4394/4862025",
+    "decimal": "0.000903738669"
+   }
+  },
+  {
+   "from": "multihash-derive-impl 0.1.2",
+   "kind": "below-floor",
+   "reason": "descent:multihash-derive-impl 0.1.2->syn 2.0.114",
+   "amount": {
+    "exact": "4394/4862025",
+    "decimal": "0.000903738669"
+   }
+  },
+  {
+   "from": "multihash-derive-impl 0.1.2",
+   "kind": "below-floor",
+   "reason": "descent:multihash-derive-impl 0.1.2->synstructure 0.13.2",
+   "amount": {
+    "exact": "4394/4862025",
+    "decimal": "0.000903738669"
+   }
+  },
+  {
+   "from": "keccak 0.2.0",
+   "kind": "below-floor",
+   "reason": "descent:keccak 0.2.0->cfg-if 1.0.4",
+   "amount": {
+    "exact": "2197/648270",
+    "decimal": "0.003389020007"
+   }
+  },
+  {
+   "from": "keccak 0.2.0",
+   "kind": "below-floor",
+   "reason": "descent:keccak 0.2.0->cpufeatures 0.3.0",
+   "amount": {
+    "exact": "2197/648270",
+    "decimal": "0.003389020007"
+   }
+  },
+  {
+   "from": "rfc6979 0.4.0",
+   "kind": "below-floor",
+   "reason": "descent:rfc6979 0.4.0->hmac 0.12.1",
+   "amount": {
+    "exact": "2197/777924",
+    "decimal": "0.002824183339"
+   }
+  },
+  {
+   "from": "rfc6979 0.4.0",
+   "kind": "below-floor",
+   "reason": "descent:rfc6979 0.4.0->subtle 2.6.1",
+   "amount": {
+    "exact": "2197/777924",
+    "decimal": "0.002824183339"
+   }
+  },
+  {
+   "from": "signature 2.2.0",
+   "kind": "below-floor",
+   "reason": "descent:signature 2.2.0->digest 0.10.7",
+   "amount": {
+    "exact": "2535/422576",
+    "decimal": "0.005998920904"
+   }
+  },
+  {
+   "from": "signature 2.2.0",
+   "kind": "below-floor",
+   "reason": "descent:signature 2.2.0->rand_core 0.6.4",
+   "amount": {
+    "exact": "2535/422576",
+    "decimal": "0.005998920904"
+   }
+  },
+  {
+   "from": "vcpkg 0.2.15",
+   "kind": "no-record",
+   "reason": "descent:vcpkg 0.2.15 has no recorded reliance",
+   "amount": {
+    "exact": "4394/583443",
+    "decimal": "0.007531155571"
+   }
+  },
+  {
+   "from": "linux-raw-sys 0.11.0",
+   "kind": "no-record",
+   "reason": "descent:linux-raw-sys 0.11.0 has no recorded reliance",
+   "amount": {
+    "exact": "21489/188650",
+    "decimal": "0.113909355950"
+   }
+  },
+  {
+   "from": "termcolor 1.4.1",
+   "kind": "below-floor",
+   "reason": "descent:termcolor 1.4.1->winapi-util 0.1.11",
+   "amount": {
+    "exact": "2197/324135",
+    "decimal": "0.006778040014"
+   }
+  },
+  {
+   "from": "lazy_static 1.5.0",
+   "kind": "no-record",
+   "reason": "descent:lazy_static 1.5.0 has no recorded reliance",
+   "amount": {
+    "exact": "780767/6297480",
+    "decimal": "0.123980862186"
+   }
+  },
+  {
+   "from": "derive_arbitrary 1.4.2",
+   "kind": "below-floor",
+   "reason": "descent:derive_arbitrary 1.4.2->proc-macro2 1.0.105",
+   "amount": {
+    "exact": "4394/2139291",
+    "decimal": "0.002053951519"
+   }
+  },
+  {
+   "from": "derive_arbitrary 1.4.2",
+   "kind": "below-floor",
+   "reason": "descent:derive_arbitrary 1.4.2->quote 1.0.43",
+   "amount": {
+    "exact": "4394/2139291",
+    "decimal": "0.002053951519"
+   }
+  },
+  {
+   "from": "derive_arbitrary 1.4.2",
+   "kind": "below-floor",
+   "reason": "descent:derive_arbitrary 1.4.2->syn 2.0.114",
+   "amount": {
+    "exact": "4394/2139291",
+    "decimal": "0.002053951519"
+   }
+  },
+  {
+   "from": "bzip2-sys 0.1.13+1.0.8",
+   "kind": "below-floor",
+   "reason": "descent:bzip2-sys 0.1.13+1.0.8->cc 1.2.52",
+   "amount": {
+    "exact": "2197/713097",
+    "decimal": "0.003080927279"
+   }
+  },
+  {
+   "from": "bzip2-sys 0.1.13+1.0.8",
+   "kind": "below-floor",
+   "reason": "descent:bzip2-sys 0.1.13+1.0.8->pkg-config 0.3.33",
+   "amount": {
+    "exact": "2197/713097",
+    "decimal": "0.003080927279"
+   }
+  },
+  {
+   "from": "miniz_oxide 0.8.9",
+   "kind": "below-floor",
+   "reason": "descent:miniz_oxide 0.8.9->adler2 2.0.1",
+   "amount": {
+    "exact": "2197/1426194",
+    "decimal": "0.001540463640"
+   }
+  },
+  {
+   "from": "miniz_oxide 0.8.9",
+   "kind": "below-floor",
+   "reason": "descent:miniz_oxide 0.8.9->simd-adler32 0.3.9",
+   "amount": {
+    "exact": "2197/1426194",
+    "decimal": "0.001540463640"
+   }
+  },
+  {
+   "from": "byteorder 1.5.0",
+   "kind": "no-record",
+   "reason": "descent:byteorder 1.5.0 has no recorded reliance",
+   "amount": {
+    "exact": "2197/713097",
+    "decimal": "0.003080927279"
+   }
+  },
+  {
+   "from": "crc 3.4.0",
+   "kind": "below-floor",
+   "reason": "descent:crc 3.4.0->crc-catalog 2.5.0",
+   "amount": {
+    "exact": "2197/713097",
+    "decimal": "0.003080927279"
+   }
+  },
+  {
+   "from": "lzma-sys 0.1.20",
+   "kind": "below-floor",
+   "reason": "descent:lzma-sys 0.1.20->cc 1.2.52",
+   "amount": {
+    "exact": "4394/2139291",
+    "decimal": "0.002053951519"
+   }
+  },
+  {
+   "from": "lzma-sys 0.1.20",
+   "kind": "below-floor",
+   "reason": "descent:lzma-sys 0.1.20->libc 0.2.189",
+   "amount": {
+    "exact": "4394/2139291",
+    "decimal": "0.002053951519"
+   }
+  },
+  {
+   "from": "lzma-sys 0.1.20",
+   "kind": "below-floor",
+   "reason": "descent:lzma-sys 0.1.20->pkg-config 0.3.33",
+   "amount": {
+    "exact": "4394/2139291",
+    "decimal": "0.002053951519"
+   }
+  },
+  {
+   "from": "zstd-safe 7.2.4",
+   "kind": "below-floor",
+   "reason": "descent:zstd-safe 7.2.4->zstd-sys 2.0.16+zstd.1.5.7",
+   "amount": {
+    "exact": "4394/713097",
+    "decimal": "0.006161854558"
+   }
+  },
+  {
+   "from": "hyper-util 0.1.19",
+   "kind": "below-floor",
+   "reason": "descent:hyper-util 0.1.19->base64 0.22.1",
+   "amount": {
+    "exact": "618869/106814400",
+    "decimal": "0.005793872362"
+   }
+  },
+  {
+   "from": "hyper-util 0.1.19",
+   "kind": "below-floor",
+   "reason": "descent:hyper-util 0.1.19->bytes 1.11.1",
+   "amount": {
+    "exact": "618869/106814400",
+    "decimal": "0.005793872362"
+   }
+  },
+  {
+   "from": "hyper-util 0.1.19",
+   "kind": "below-floor",
+   "reason": "descent:hyper-util 0.1.19->futures-channel 0.3.31",
+   "amount": {
+    "exact": "618869/106814400",
+    "decimal": "0.005793872362"
+   }
+  },
+  {
+   "from": "hyper-util 0.1.19",
+   "kind": "below-floor",
+   "reason": "descent:hyper-util 0.1.19->futures-core 0.3.31",
+   "amount": {
+    "exact": "618869/106814400",
+    "decimal": "0.005793872362"
+   }
+  },
+  {
+   "from": "hyper-util 0.1.19",
+   "kind": "below-floor",
+   "reason": "descent:hyper-util 0.1.19->futures-util 0.3.31",
+   "amount": {
+    "exact": "618869/106814400",
+    "decimal": "0.005793872362"
+   }
+  },
+  {
+   "from": "hyper-util 0.1.19",
+   "kind": "below-floor",
+   "reason": "descent:hyper-util 0.1.19->http 1.4.0",
+   "amount": {
+    "exact": "618869/106814400",
+    "decimal": "0.005793872362"
+   }
+  },
+  {
+   "from": "hyper-util 0.1.19",
+   "kind": "below-floor",
+   "reason": "descent:hyper-util 0.1.19->http-body 1.0.1",
+   "amount": {
+    "exact": "618869/106814400",
+    "decimal": "0.005793872362"
+   }
+  },
+  {
+   "from": "hyper-util 0.1.19",
+   "kind": "below-floor",
+   "reason": "descent:hyper-util 0.1.19->hyper 1.8.1",
+   "amount": {
+    "exact": "618869/106814400",
+    "decimal": "0.005793872362"
+   }
+  },
+  {
+   "from": "hyper-util 0.1.19",
+   "kind": "below-floor",
+   "reason": "descent:hyper-util 0.1.19->ipnet 2.11.0",
+   "amount": {
+    "exact": "618869/106814400",
+    "decimal": "0.005793872362"
+   }
+  },
+  {
+   "from": "hyper-util 0.1.19",
+   "kind": "below-floor",
+   "reason": "descent:hyper-util 0.1.19->libc 0.2.189",
+   "amount": {
+    "exact": "618869/106814400",
+    "decimal": "0.005793872362"
+   }
+  },
+  {
+   "from": "hyper-util 0.1.19",
+   "kind": "below-floor",
+   "reason": "descent:hyper-util 0.1.19->percent-encoding 2.3.2",
+   "amount": {
+    "exact": "618869/106814400",
+    "decimal": "0.005793872362"
+   }
+  },
+  {
+   "from": "hyper-util 0.1.19",
+   "kind": "below-floor",
+   "reason": "descent:hyper-util 0.1.19->pin-project-lite 0.2.16",
+   "amount": {
+    "exact": "618869/106814400",
+    "decimal": "0.005793872362"
+   }
+  },
+  {
+   "from": "hyper-util 0.1.19",
+   "kind": "below-floor",
+   "reason": "descent:hyper-util 0.1.19->socket2 0.6.1",
+   "amount": {
+    "exact": "618869/106814400",
+    "decimal": "0.005793872362"
+   }
+  },
+  {
+   "from": "hyper-util 0.1.19",
+   "kind": "below-floor",
+   "reason": "descent:hyper-util 0.1.19->tokio 1.49.0",
+   "amount": {
+    "exact": "618869/106814400",
+    "decimal": "0.005793872362"
+   }
+  },
+  {
+   "from": "hyper-util 0.1.19",
+   "kind": "below-floor",
+   "reason": "descent:hyper-util 0.1.19->tower-service 0.3.3",
+   "amount": {
+    "exact": "618869/106814400",
+    "decimal": "0.005793872362"
+   }
+  },
+  {
+   "from": "hyper-util 0.1.19",
+   "kind": "below-floor",
+   "reason": "descent:hyper-util 0.1.19->tracing 0.1.44",
+   "amount": {
+    "exact": "618869/106814400",
+    "decimal": "0.005793872362"
+   }
+  },
+  {
+   "from": "tokio-rustls 0.26.4",
+   "kind": "below-floor",
+   "reason": "descent:tokio-rustls 0.26.4->rustls 0.23.36",
+   "amount": {
+    "exact": "440073/54831392",
+    "decimal": "0.008025931569"
+   }
+  },
+  {
+   "from": "tokio-rustls 0.26.4",
+   "kind": "below-floor",
+   "reason": "descent:tokio-rustls 0.26.4->tokio 1.49.0",
+   "amount": {
+    "exact": "440073/54831392",
+    "decimal": "0.008025931569"
+   }
+  },
+  {
+   "from": "ryu 1.0.22",
+   "kind": "no-record",
+   "reason": "descent:ryu 1.0.22 has no recorded reliance",
+   "amount": {
+    "exact": "1767196863/15764025200",
+    "decimal": "0.112103148820"
+   }
+  },
+  {
+   "from": "wasm-bindgen-futures 0.4.56",
+   "kind": "below-floor",
+   "reason": "descent:wasm-bindgen-futures 0.4.56->cfg-if 1.0.4",
+   "amount": {
+    "exact": "440073/137078480",
+    "decimal": "0.003210372627"
+   }
+  },
+  {
+   "from": "wasm-bindgen-futures 0.4.56",
+   "kind": "below-floor",
+   "reason": "descent:wasm-bindgen-futures 0.4.56->js-sys 0.3.83",
+   "amount": {
+    "exact": "440073/137078480",
+    "decimal": "0.003210372627"
+   }
+  },
+  {
+   "from": "wasm-bindgen-futures 0.4.56",
+   "kind": "below-floor",
+   "reason": "descent:wasm-bindgen-futures 0.4.56->once_cell 1.21.3",
+   "amount": {
+    "exact": "440073/137078480",
+    "decimal": "0.003210372627"
+   }
+  },
+  {
+   "from": "wasm-bindgen-futures 0.4.56",
+   "kind": "below-floor",
+   "reason": "descent:wasm-bindgen-futures 0.4.56->wasm-bindgen 0.2.106",
+   "amount": {
+    "exact": "440073/137078480",
+    "decimal": "0.003210372627"
+   }
+  },
+  {
+   "from": "wasm-bindgen-futures 0.4.56",
+   "kind": "below-floor",
+   "reason": "descent:wasm-bindgen-futures 0.4.56->web-sys 0.3.83",
+   "amount": {
+    "exact": "440073/137078480",
+    "decimal": "0.003210372627"
+   }
+  },
+  {
+   "from": "crypto-bigint 0.5.5",
+   "kind": "below-floor",
+   "reason": "descent:crypto-bigint 0.5.5->generic-array 0.14.7",
+   "amount": {
+    "exact": "4901/5020785",
+    "decimal": "0.000976142177"
+   }
+  },
+  {
+   "from": "crypto-bigint 0.5.5",
+   "kind": "below-floor",
+   "reason": "descent:crypto-bigint 0.5.5->rand_core 0.6.4",
+   "amount": {
+    "exact": "4901/5020785",
+    "decimal": "0.000976142177"
+   }
+  },
+  {
+   "from": "crypto-bigint 0.5.5",
+   "kind": "below-floor",
+   "reason": "descent:crypto-bigint 0.5.5->subtle 2.6.1",
+   "amount": {
+    "exact": "4901/5020785",
+    "decimal": "0.000976142177"
+   }
+  },
+  {
+   "from": "crypto-bigint 0.5.5",
+   "kind": "below-floor",
+   "reason": "descent:crypto-bigint 0.5.5->zeroize 1.8.2",
+   "amount": {
+    "exact": "4901/5020785",
+    "decimal": "0.000976142177"
+   }
+  },
+  {
+   "from": "group 0.13.0",
+   "kind": "below-floor",
+   "reason": "descent:group 0.13.0->ff 0.13.1",
+   "amount": {
+    "exact": "19604/15062355",
+    "decimal": "0.001301522903"
+   }
+  },
+  {
+   "from": "group 0.13.0",
+   "kind": "below-floor",
+   "reason": "descent:group 0.13.0->rand_core 0.6.4",
+   "amount": {
+    "exact": "19604/15062355",
+    "decimal": "0.001301522903"
+   }
+  },
+  {
+   "from": "group 0.13.0",
+   "kind": "below-floor",
+   "reason": "descent:group 0.13.0->subtle 2.6.1",
+   "amount": {
+    "exact": "19604/15062355",
+    "decimal": "0.001301522903"
+   }
+  },
+  {
+   "from": "sec1 0.7.3",
+   "kind": "below-floor",
+   "reason": "descent:sec1 0.7.3->base16ct 0.2.0",
+   "amount": {
+    "exact": "9802/15062355",
+    "decimal": "0.000650761451"
+   }
+  },
+  {
+   "from": "sec1 0.7.3",
+   "kind": "below-floor",
+   "reason": "descent:sec1 0.7.3->der 0.7.10",
+   "amount": {
+    "exact": "9802/15062355",
+    "decimal": "0.000650761451"
+   }
+  },
+  {
+   "from": "sec1 0.7.3",
+   "kind": "below-floor",
+   "reason": "descent:sec1 0.7.3->generic-array 0.14.7",
+   "amount": {
+    "exact": "9802/15062355",
+    "decimal": "0.000650761451"
+   }
+  },
+  {
+   "from": "sec1 0.7.3",
+   "kind": "below-floor",
+   "reason": "descent:sec1 0.7.3->pkcs8 0.10.2",
+   "amount": {
+    "exact": "9802/15062355",
+    "decimal": "0.000650761451"
+   }
+  },
+  {
+   "from": "sec1 0.7.3",
+   "kind": "below-floor",
+   "reason": "descent:sec1 0.7.3->subtle 2.6.1",
+   "amount": {
+    "exact": "9802/15062355",
+    "decimal": "0.000650761451"
+   }
+  },
+  {
+   "from": "sec1 0.7.3",
+   "kind": "below-floor",
+   "reason": "descent:sec1 0.7.3->zeroize 1.8.2",
+   "amount": {
+    "exact": "9802/15062355",
+    "decimal": "0.000650761451"
+   }
+  },
+  {
+   "from": "foldhash 0.1.5",
+   "kind": "no-record",
+   "reason": "descent:foldhash 0.1.5 has no recorded reliance",
+   "amount": {
+    "exact": "114244/20420505",
+    "decimal": "0.005594572710"
+   }
+  },
+  {
+   "from": "android_system_properties 0.1.5",
+   "kind": "below-floor",
+   "reason": "descent:android_system_properties 0.1.5->libc 0.2.189",
+   "amount": {
+    "exact": "93119/27731550",
+    "decimal": "0.003357872171"
+   }
+  },
+  {
+   "from": "core-foundation-sys 0.8.7",
+   "kind": "no-record",
+   "reason": "descent:core-foundation-sys 0.8.7 has no recorded reliance",
+   "amount": {
+    "exact": "93119/27731550",
+    "decimal": "0.003357872171"
+   }
+  },
+  {
+   "from": "iana-time-zone-haiku 0.1.2",
+   "kind": "below-floor",
+   "reason": "descent:iana-time-zone-haiku 0.1.2->cc 1.2.52",
+   "amount": {
+    "exact": "93119/27731550",
+    "decimal": "0.003357872171"
+   }
+  },
+  {
+   "from": "windows-core 0.62.2",
+   "kind": "below-floor",
+   "reason": "descent:windows-core 0.62.2->windows-implement 0.60.2",
+   "amount": {
+    "exact": "93119/138657750",
+    "decimal": "0.000671574434"
+   }
+  },
+  {
+   "from": "windows-core 0.62.2",
+   "kind": "below-floor",
+   "reason": "descent:windows-core 0.62.2->windows-interface 0.59.3",
+   "amount": {
+    "exact": "93119/138657750",
+    "decimal": "0.000671574434"
+   }
+  },
+  {
+   "from": "windows-core 0.62.2",
+   "kind": "below-floor",
+   "reason": "descent:windows-core 0.62.2->windows-link 0.2.1",
+   "amount": {
+    "exact": "93119/138657750",
+    "decimal": "0.000671574434"
+   }
+  },
+  {
+   "from": "windows-core 0.62.2",
+   "kind": "below-floor",
+   "reason": "descent:windows-core 0.62.2->windows-result 0.4.1",
+   "amount": {
+    "exact": "93119/138657750",
+    "decimal": "0.000671574434"
+   }
+  },
+  {
+   "from": "windows-core 0.62.2",
+   "kind": "below-floor",
+   "reason": "descent:windows-core 0.62.2->windows-strings 0.5.1",
+   "amount": {
+    "exact": "93119/138657750",
+    "decimal": "0.000671574434"
+   }
+  },
+  {
+   "from": "anstyle 1.0.14",
+   "kind": "no-record",
+   "reason": "descent:anstyle 1.0.14 has no recorded reliance",
+   "amount": {
+    "exact": "169/10143",
+    "decimal": "0.016661737159"
+   }
+  },
+  {
+   "from": "regex 1.12.2",
+   "kind": "below-floor",
+   "reason": "descent:regex 1.12.2->aho-corasick 1.1.4",
+   "amount": {
+    "exact": "13/1449",
+    "decimal": "0.008971704624"
+   }
+  },
+  {
+   "from": "regex 1.12.2",
+   "kind": "below-floor",
+   "reason": "descent:regex 1.12.2->memchr 2.7.6",
+   "amount": {
+    "exact": "13/1449",
+    "decimal": "0.008971704624"
+   }
+  },
+  {
+   "from": "regex 1.12.2",
+   "kind": "below-floor",
+   "reason": "descent:regex 1.12.2->regex-automata 0.4.13",
+   "amount": {
+    "exact": "13/1449",
+    "decimal": "0.008971704624"
+   }
+  },
+  {
+   "from": "regex 1.12.2",
+   "kind": "below-floor",
+   "reason": "descent:regex 1.12.2->regex-syntax 0.8.8",
+   "amount": {
+    "exact": "13/1449",
+    "decimal": "0.008971704624"
+   }
+  },
+  {
+   "from": "zmij 1.0.13",
+   "kind": "no-record",
+   "reason": "descent:zmij 1.0.13 has no recorded reliance",
+   "amount": {
+    "exact": "36301434198289/367985434924800",
+    "decimal": "0.098649106060"
+   }
+  },
+  {
+   "from": "base64 0.22.1",
+   "kind": "no-record",
+   "reason": "descent:base64 0.22.1 has no recorded reliance",
+   "amount": {
+    "exact": "424423/190740",
+    "decimal": "2.225138932578"
+   }
+  },
+  {
+   "from": "hyper 1.8.1",
+   "kind": "below-floor",
+   "reason": "descent:hyper 1.8.1->atomic-waker 1.1.2",
+   "amount": {
+    "exact": "19184939/3124321200",
+    "decimal": "0.006140514298"
+   }
+  },
+  {
+   "from": "hyper 1.8.1",
+   "kind": "below-floor",
+   "reason": "descent:hyper 1.8.1->bytes 1.11.1",
+   "amount": {
+    "exact": "19184939/3124321200",
+    "decimal": "0.006140514298"
+   }
+  },
+  {
+   "from": "hyper 1.8.1",
+   "kind": "below-floor",
+   "reason": "descent:hyper 1.8.1->futures-channel 0.3.31",
+   "amount": {
+    "exact": "19184939/3124321200",
+    "decimal": "0.006140514298"
+   }
+  },
+  {
+   "from": "hyper 1.8.1",
+   "kind": "below-floor",
+   "reason": "descent:hyper 1.8.1->futures-core 0.3.31",
+   "amount": {
+    "exact": "19184939/3124321200",
+    "decimal": "0.006140514298"
+   }
+  },
+  {
+   "from": "hyper 1.8.1",
+   "kind": "below-floor",
+   "reason": "descent:hyper 1.8.1->h2 0.4.13",
+   "amount": {
+    "exact": "19184939/3124321200",
+    "decimal": "0.006140514298"
+   }
+  },
+  {
+   "from": "hyper 1.8.1",
+   "kind": "below-floor",
+   "reason": "descent:hyper 1.8.1->http 1.4.0",
+   "amount": {
+    "exact": "19184939/3124321200",
+    "decimal": "0.006140514298"
+   }
+  },
+  {
+   "from": "hyper 1.8.1",
+   "kind": "below-floor",
+   "reason": "descent:hyper 1.8.1->http-body 1.0.1",
+   "amount": {
+    "exact": "19184939/3124321200",
+    "decimal": "0.006140514298"
+   }
+  },
+  {
+   "from": "hyper 1.8.1",
+   "kind": "below-floor",
+   "reason": "descent:hyper 1.8.1->httparse 1.10.1",
+   "amount": {
+    "exact": "19184939/3124321200",
+    "decimal": "0.006140514298"
+   }
+  },
+  {
+   "from": "hyper 1.8.1",
+   "kind": "below-floor",
+   "reason": "descent:hyper 1.8.1->httpdate 1.0.3",
+   "amount": {
+    "exact": "19184939/3124321200",
+    "decimal": "0.006140514298"
+   }
+  },
+  {
+   "from": "hyper 1.8.1",
+   "kind": "below-floor",
+   "reason": "descent:hyper 1.8.1->itoa 1.0.17",
+   "amount": {
+    "exact": "19184939/3124321200",
+    "decimal": "0.006140514298"
+   }
+  },
+  {
+   "from": "hyper 1.8.1",
+   "kind": "below-floor",
+   "reason": "descent:hyper 1.8.1->pin-project-lite 0.2.16",
+   "amount": {
+    "exact": "19184939/3124321200",
+    "decimal": "0.006140514298"
+   }
+  },
+  {
+   "from": "hyper 1.8.1",
+   "kind": "below-floor",
+   "reason": "descent:hyper 1.8.1->pin-utils 0.1.0",
+   "amount": {
+    "exact": "19184939/3124321200",
+    "decimal": "0.006140514298"
+   }
+  },
+  {
+   "from": "hyper 1.8.1",
+   "kind": "below-floor",
+   "reason": "descent:hyper 1.8.1->smallvec 1.15.1",
+   "amount": {
+    "exact": "19184939/3124321200",
+    "decimal": "0.006140514298"
+   }
+  },
+  {
+   "from": "hyper 1.8.1",
+   "kind": "below-floor",
+   "reason": "descent:hyper 1.8.1->tokio 1.49.0",
+   "amount": {
+    "exact": "19184939/3124321200",
+    "decimal": "0.006140514298"
+   }
+  },
+  {
+   "from": "hyper 1.8.1",
+   "kind": "below-floor",
+   "reason": "descent:hyper 1.8.1->want 0.3.1",
+   "amount": {
+    "exact": "19184939/3124321200",
+    "decimal": "0.006140514298"
+   }
+  },
+  {
+   "from": "rustls 0.23.36",
+   "kind": "below-floor",
+   "reason": "descent:rustls 0.23.36->once_cell 1.21.3",
+   "amount": {
+    "exact": "16299/6230840",
+    "decimal": "0.002615859178"
+   }
+  },
+  {
+   "from": "rustls 0.23.36",
+   "kind": "below-floor",
+   "reason": "descent:rustls 0.23.36->ring 0.17.14",
+   "amount": {
+    "exact": "16299/6230840",
+    "decimal": "0.002615859178"
+   }
+  },
+  {
+   "from": "rustls 0.23.36",
+   "kind": "below-floor",
+   "reason": "descent:rustls 0.23.36->rustls-pki-types 1.13.2",
+   "amount": {
+    "exact": "16299/6230840",
+    "decimal": "0.002615859178"
+   }
+  },
+  {
+   "from": "rustls 0.23.36",
+   "kind": "below-floor",
+   "reason": "descent:rustls 0.23.36->rustls-webpki 0.103.13",
+   "amount": {
+    "exact": "16299/6230840",
+    "decimal": "0.002615859178"
+   }
+  },
+  {
+   "from": "rustls 0.23.36",
+   "kind": "below-floor",
+   "reason": "descent:rustls 0.23.36->subtle 2.6.1",
+   "amount": {
+    "exact": "16299/6230840",
+    "decimal": "0.002615859178"
+   }
+  },
+  {
+   "from": "rustls 0.23.36",
+   "kind": "below-floor",
+   "reason": "descent:rustls 0.23.36->zeroize 1.8.2",
+   "amount": {
+    "exact": "16299/6230840",
+    "decimal": "0.002615859178"
+   }
+  },
+  {
+   "from": "cfg_aliases 0.2.1",
+   "kind": "no-record",
+   "reason": "descent:cfg_aliases 0.2.1 has no recorded reliance",
+   "amount": {
+    "exact": "65/483",
+    "decimal": "0.134575569358"
+   }
+  },
+  {
+   "from": "tower-layer 0.3.3",
+   "kind": "no-record",
+   "reason": "descent:tower-layer 0.3.3 has no recorded reliance",
+   "amount": {
+    "exact": "247511533/2314312000",
+    "decimal": "0.106948213119"
+   }
+  },
+  {
+   "from": "tower-service 0.3.3",
+   "kind": "no-record",
+   "reason": "descent:tower-service 0.3.3 has no recorded reliance",
+   "amount": {
+    "exact": "64039201/531454000",
+    "decimal": "0.120498107080"
+   }
+  },
+  {
+   "from": "web-sys 0.3.83",
+   "kind": "below-floor",
+   "reason": "descent:web-sys 0.3.83->js-sys 0.3.83",
+   "amount": {
+    "exact": "16299/2047276",
+    "decimal": "0.007961310541"
+   }
+  },
+  {
+   "from": "web-sys 0.3.83",
+   "kind": "below-floor",
+   "reason": "descent:web-sys 0.3.83->wasm-bindgen 0.2.106",
+   "amount": {
+    "exact": "16299/2047276",
+    "decimal": "0.007961310541"
+   }
+  },
+  {
+   "from": "hybrid-array 0.4.10",
+   "kind": "below-floor",
+   "reason": "descent:hybrid-array 0.4.10->typenum 1.19.0",
+   "amount": {
+    "exact": "7436/1500625",
+    "decimal": "0.004955268638"
+   }
+  },
+  {
+   "from": "ff 0.13.1",
+   "kind": "below-floor",
+   "reason": "descent:ff 0.13.1->rand_core 0.6.4",
+   "amount": {
+    "exact": "377/194810",
+    "decimal": "0.001935218931"
+   }
+  },
+  {
+   "from": "ff 0.13.1",
+   "kind": "below-floor",
+   "reason": "descent:ff 0.13.1->subtle 2.6.1",
+   "amount": {
+    "exact": "377/194810",
+    "decimal": "0.001935218931"
+   }
+  },
+  {
+   "from": "base16ct 0.2.0",
+   "kind": "no-record",
+   "reason": "descent:base16ct 0.2.0 has no recorded reliance",
+   "amount": {
+    "exact": "377/97405",
+    "decimal": "0.003870437863"
+   }
+  },
+  {
+   "from": "pkcs8 0.10.2",
+   "kind": "below-floor",
+   "reason": "descent:pkcs8 0.10.2->der 0.7.10",
+   "amount": {
+    "exact": "1372384/269448795",
+    "decimal": "0.005093301679"
+   }
+  },
+  {
+   "from": "pkcs8 0.10.2",
+   "kind": "below-floor",
+   "reason": "descent:pkcs8 0.10.2->spki 0.7.3",
+   "amount": {
+    "exact": "1372384/269448795",
+    "decimal": "0.005093301679"
+   }
+  },
+  {
+   "from": "base-x 0.2.11",
+   "kind": "no-record",
+   "reason": "descent:base-x 0.2.11 has no recorded reliance",
+   "amount": {
+    "exact": "1414361/232416800",
+    "decimal": "0.006085450794"
+   }
+  },
+  {
+   "from": "base256emoji 1.0.2",
+   "kind": "below-floor",
+   "reason": "descent:base256emoji 1.0.2->const-str 0.4.3",
+   "amount": {
+    "exact": "1414361/464833600",
+    "decimal": "0.003042725397"
+   }
+  },
+  {
+   "from": "base256emoji 1.0.2",
+   "kind": "below-floor",
+   "reason": "descent:base256emoji 1.0.2->match-lookup 0.1.2",
+   "amount": {
+    "exact": "1414361/464833600",
+    "decimal": "0.003042725397"
+   }
+  },
+  {
+   "from": "data-encoding-macro 0.1.19",
+   "kind": "below-floor",
+   "reason": "descent:data-encoding-macro 0.1.19->data-encoding 2.10.0",
+   "amount": {
+    "exact": "1414361/464833600",
+    "decimal": "0.003042725397"
+   }
+  },
+  {
+   "from": "data-encoding-macro 0.1.19",
+   "kind": "below-floor",
+   "reason": "descent:data-encoding-macro 0.1.19->data-encoding-macro-internal 0.1.17",
+   "amount": {
+    "exact": "1414361/464833600",
+    "decimal": "0.003042725397"
+   }
+  },
+  {
+   "from": "unsigned-varint 0.8.0",
+   "kind": "no-record",
+   "reason": "descent:unsigned-varint 0.8.0 has no recorded reliance",
+   "amount": {
+    "exact": "1699933923/16069961600",
+    "decimal": "0.105783322034"
+   }
+  },
+  {
+   "from": "pkg-config 0.3.33",
+   "kind": "no-record",
+   "reason": "descent:pkg-config 0.3.33 has no recorded reliance",
+   "amount": {
+    "exact": "4901/666792",
+    "decimal": "0.007350118178"
+   }
+  },
+  {
+   "from": "glob 0.3.3",
+   "kind": "no-record",
+   "reason": "descent:glob 0.3.3 has no recorded reliance",
+   "amount": {
+    "exact": "4805677/2222640",
+    "decimal": "2.162148166145"
+   }
+  },
+  {
+   "from": "percent-encoding 2.3.2",
+   "kind": "no-record",
+   "reason": "descent:percent-encoding 2.3.2 has no recorded reliance",
+   "amount": {
+    "exact": "639126371470759/2660317443630000",
+    "decimal": "0.240244401284"
+   }
+  },
+  {
+   "from": "idna_adapter 1.2.1",
+   "kind": "below-floor",
+   "reason": "descent:idna_adapter 1.2.1->icu_normalizer 2.1.1",
+   "amount": {
+    "exact": "222665223521/37647319421250",
+    "decimal": "0.005914504059"
+   }
+  },
+  {
+   "from": "idna_adapter 1.2.1",
+   "kind": "below-floor",
+   "reason": "descent:idna_adapter 1.2.1->icu_properties 2.1.2",
+   "amount": {
+    "exact": "222665223521/37647319421250",
+    "decimal": "0.005914504059"
+   }
+  },
+  {
+   "from": "utf8_iter 1.0.4",
+   "kind": "no-record",
+   "reason": "descent:utf8_iter 1.0.4 has no recorded reliance",
+   "amount": {
+    "exact": "222665223521/18823659710625",
+    "decimal": "0.011829008118"
+   }
+  },
+  {
+   "from": "tinyvec_macros 0.1.1",
+   "kind": "no-record",
+   "reason": "descent:tinyvec_macros 0.1.1 has no recorded reliance",
+   "amount": {
+    "exact": "2704/10143",
+    "decimal": "0.266587794538"
+   }
+  },
+  {
+   "from": "futures-io 0.3.31",
+   "kind": "no-record",
+   "reason": "descent:futures-io 0.3.31 has no recorded reliance",
+   "amount": {
+    "exact": "3085724409381/37182537700000",
+    "decimal": "0.082988537100"
+   }
+  },
+  {
+   "from": "futures-macro 0.3.31",
+   "kind": "below-floor",
+   "reason": "descent:futures-macro 0.3.31->proc-macro2 1.0.105",
+   "amount": {
+    "exact": "18133364754973/11020397139675000",
+    "decimal": "0.001645436596"
+   }
+  },
+  {
+   "from": "futures-macro 0.3.31",
+   "kind": "below-floor",
+   "reason": "descent:futures-macro 0.3.31->quote 1.0.43",
+   "amount": {
+    "exact": "18133364754973/11020397139675000",
+    "decimal": "0.001645436596"
+   }
+  },
+  {
+   "from": "futures-macro 0.3.31",
+   "kind": "below-floor",
+   "reason": "descent:futures-macro 0.3.31->syn 2.0.114",
+   "amount": {
+    "exact": "18133364754973/11020397139675000",
+    "decimal": "0.001645436596"
+   }
+  },
+  {
+   "from": "futures-task 0.3.31",
+   "kind": "no-record",
+   "reason": "descent:futures-task 0.3.31 has no recorded reliance",
+   "amount": {
+    "exact": "229452727183289/2586419736862500",
+    "decimal": "0.088714420136"
+   }
+  },
+  {
+   "from": "pin-utils 0.1.0",
+   "kind": "no-record",
+   "reason": "descent:pin-utils 0.1.0 has no recorded reliance",
+   "amount": {
+    "exact": "4184622635763/855198367100000",
+    "decimal": "0.004893160227"
+   }
+  },
+  {
+   "from": "crypto-common 0.1.7",
+   "kind": "below-floor",
+   "reason": "descent:crypto-common 0.1.7->generic-array 0.14.7",
+   "amount": {
+    "exact": "24563853/3887699200",
+    "decimal": "0.006318352253"
+   }
+  },
+  {
+   "from": "crypto-common 0.1.7",
+   "kind": "below-floor",
+   "reason": "descent:crypto-common 0.1.7->typenum 1.19.0",
+   "amount": {
+    "exact": "24563853/3887699200",
+    "decimal": "0.006318352253"
+   }
+  },
+  {
+   "from": "subtle 2.6.1",
+   "kind": "no-record",
+   "reason": "descent:subtle 2.6.1 has no recorded reliance",
+   "amount": {
+    "exact": "2010617423/22493116800",
+    "decimal": "0.089388119969"
+   }
+  },
+  {
+   "from": "spki 0.7.3",
+   "kind": "below-floor",
+   "reason": "descent:spki 0.7.3->base64ct 1.8.3",
+   "amount": {
+    "exact": "169/60368",
+    "decimal": "0.002799496422"
+   }
+  },
+  {
+   "from": "spki 0.7.3",
+   "kind": "below-floor",
+   "reason": "descent:spki 0.7.3->der 0.7.10",
+   "amount": {
+    "exact": "169/60368",
+    "decimal": "0.002799496422"
+   }
+  },
+  {
+   "from": "aho-corasick 1.1.4",
+   "kind": "below-floor",
+   "reason": "descent:aho-corasick 1.1.4->memchr 2.7.6",
+   "amount": {
+    "exact": "237887/41983200",
+    "decimal": "0.005666242688"
+   }
+  },
+  {
+   "from": "regex-syntax 0.8.8",
+   "kind": "no-record",
+   "reason": "descent:regex-syntax 0.8.8 has no recorded reliance",
+   "amount": {
+    "exact": "10993697/277603200",
+    "decimal": "0.039602198390"
+   }
+  },
+  {
+   "from": "slab 0.4.11",
+   "kind": "no-record",
+   "reason": "descent:slab 0.4.11 has no recorded reliance",
+   "amount": {
+    "exact": "1394874211921/287379970762500",
+    "decimal": "0.004853762801"
+   }
+  },
+  {
+   "from": "tokio-util 0.7.18",
+   "kind": "below-floor",
+   "reason": "descent:tokio-util 0.7.18->bytes 1.11.1",
+   "amount": {
+    "exact": "440073/137078480",
+    "decimal": "0.003210372627"
+   }
+  },
+  {
+   "from": "tokio-util 0.7.18",
+   "kind": "below-floor",
+   "reason": "descent:tokio-util 0.7.18->futures-core 0.3.31",
+   "amount": {
+    "exact": "440073/137078480",
+    "decimal": "0.003210372627"
+   }
+  },
+  {
+   "from": "tokio-util 0.7.18",
+   "kind": "below-floor",
+   "reason": "descent:tokio-util 0.7.18->futures-sink 0.3.31",
+   "amount": {
+    "exact": "440073/137078480",
+    "decimal": "0.003210372627"
+   }
+  },
+  {
+   "from": "tokio-util 0.7.18",
+   "kind": "below-floor",
+   "reason": "descent:tokio-util 0.7.18->pin-project-lite 0.2.16",
+   "amount": {
+    "exact": "440073/137078480",
+    "decimal": "0.003210372627"
+   }
+  },
+  {
+   "from": "tokio-util 0.7.18",
+   "kind": "below-floor",
+   "reason": "descent:tokio-util 0.7.18->tokio 1.49.0",
+   "amount": {
+    "exact": "440073/137078480",
+    "decimal": "0.003210372627"
+   }
+  },
+  {
+   "from": "cpufeatures 0.3.0",
+   "kind": "below-floor",
+   "reason": "descent:cpufeatures 0.3.0->libc 0.2.189",
+   "amount": {
+    "exact": "676/77175",
+    "decimal": "0.008759313249"
+   }
+  },
+  {
+   "from": "r-efi 6.0.0",
+   "kind": "no-record",
+   "reason": "descent:r-efi 6.0.0 has no recorded reliance",
+   "amount": {
+    "exact": "676/152145",
+    "decimal": "0.004443129909"
+   }
+  },
+  {
+   "from": "rand_core 0.10.1",
+   "kind": "no-record",
+   "reason": "descent:rand_core 0.10.1 has no recorded reliance",
+   "amount": {
+    "exact": "377/86940",
+    "decimal": "0.004336323902"
+   }
+  },
+  {
+   "from": "rustls-pki-types 1.13.2",
+   "kind": "below-floor",
+   "reason": "descent:rustls-pki-types 1.13.2->web-time 1.1.0",
+   "amount": {
+    "exact": "69221853/7128080960",
+    "decimal": "0.009711148539"
+   }
+  },
+  {
+   "from": "rustls-pki-types 1.13.2",
+   "kind": "below-floor",
+   "reason": "descent:rustls-pki-types 1.13.2->zeroize 1.8.2",
+   "amount": {
+    "exact": "69221853/7128080960",
+    "decimal": "0.009711148539"
+   }
+  },
+  {
+   "from": "generic-array 0.14.7",
+   "kind": "below-floor",
+   "reason": "descent:generic-array 0.14.7->typenum 1.19.0",
+   "amount": {
+    "exact": "6245689691/2755406808000",
+    "decimal": "0.002266703295"
+   }
+  },
+  {
+   "from": "generic-array 0.14.7",
+   "kind": "below-floor",
+   "reason": "descent:generic-array 0.14.7->version_check 0.9.5",
+   "amount": {
+    "exact": "6245689691/2755406808000",
+    "decimal": "0.002266703295"
+   }
+  },
+  {
+   "from": "generic-array 0.14.7",
+   "kind": "below-floor",
+   "reason": "descent:generic-array 0.14.7->zeroize 1.8.2",
+   "amount": {
+    "exact": "6245689691/2755406808000",
+    "decimal": "0.002266703295"
+   }
+  },
+  {
+   "from": "der 0.7.10",
+   "kind": "below-floor",
+   "reason": "descent:der 0.7.10->const-oid 0.9.6",
+   "amount": {
+    "exact": "4901/1778112",
+    "decimal": "0.002756294317"
+   }
+  },
+  {
+   "from": "der 0.7.10",
+   "kind": "below-floor",
+   "reason": "descent:der 0.7.10->zeroize 1.8.2",
+   "amount": {
+    "exact": "4901/1778112",
+    "decimal": "0.002756294317"
+   }
+  },
+  {
+   "from": "data-encoding 2.10.0",
+   "kind": "no-record",
+   "reason": "descent:data-encoding 2.10.0 has no recorded reliance",
+   "amount": {
+    "exact": "3155113/531238400",
+    "decimal": "0.005939165919"
+   }
+  },
+  {
+   "from": "autocfg 1.5.0",
+   "kind": "no-record",
+   "reason": "descent:autocfg 1.5.0 has no recorded reliance",
+   "amount": {
+    "exact": "761624/28823025",
+    "decimal": "0.026424152219"
+   }
+  },
+  {
+   "from": "equivalent 1.0.2",
+   "kind": "no-record",
+   "reason": "descent:equivalent 1.0.2 has no recorded reliance",
+   "amount": {
+    "exact": "92248369897489/3104877107178000",
+    "decimal": "0.029710795859"
+   }
+  },
+  {
+   "from": "hashbrown 0.16.1",
+   "kind": "no-record",
+   "reason": "descent:hashbrown 0.16.1 has no recorded reliance",
+   "amount": {
+    "exact": "92248369897489/3104877107178000",
+    "decimal": "0.029710795859"
+   }
+  },
+  {
+   "from": "futures-core 0.3.31",
+   "kind": "no-record",
+   "reason": "descent:futures-core 0.3.31 has no recorded reliance",
+   "amount": {
+    "exact": "6987528118639934977/10744887211183125000",
+    "decimal": "0.650311909404"
+   }
+  },
+  {
+   "from": "futures-sink 0.3.31",
+   "kind": "no-record",
+   "reason": "descent:futures-sink 0.3.31 has no recorded reliance",
+   "amount": {
+    "exact": "699927226043/7545157812500",
+    "decimal": "0.092765087681"
+   }
+  },
+  {
+   "from": "log 0.4.29",
+   "kind": "no-record",
+   "reason": "descent:log 0.4.29 has no recorded reliance",
+   "amount": {
+    "exact": "14919654443279/76938412320000",
+    "decimal": "0.193916848469"
+   }
+  },
+  {
+   "from": "itoa 1.0.17",
+   "kind": "no-record",
+   "reason": "descent:itoa 1.0.17 has no recorded reliance",
+   "amount": {
+    "exact": "794350684436762279/1468186786281600000",
+    "decimal": "0.541041979031"
+   }
+  },
+  {
+   "from": "cc 1.2.52",
+   "kind": "below-floor",
+   "reason": "descent:cc 1.2.52->find-msvc-tools 0.1.7",
+   "amount": {
+    "exact": "11492/4028535",
+    "decimal": "0.002852649909"
+   }
+  },
+  {
+   "from": "cc 1.2.52",
+   "kind": "below-floor",
+   "reason": "descent:cc 1.2.52->jobserver 0.1.34",
+   "amount": {
+    "exact": "11492/4028535",
+    "decimal": "0.002852649909"
+   }
+  },
+  {
+   "from": "cc 1.2.52",
+   "kind": "below-floor",
+   "reason": "descent:cc 1.2.52->libc 0.2.189",
+   "amount": {
+    "exact": "11492/4028535",
+    "decimal": "0.002852649909"
+   }
+  },
+  {
+   "from": "cc 1.2.52",
+   "kind": "below-floor",
+   "reason": "descent:cc 1.2.52->shlex 1.3.0",
+   "amount": {
+    "exact": "11492/4028535",
+    "decimal": "0.002852649909"
+   }
+  },
+  {
+   "from": "memchr 2.7.6",
+   "kind": "no-record",
+   "reason": "descent:memchr 2.7.6 has no recorded reliance",
+   "amount": {
+    "exact": "118732038282965474869/585201980226124800000",
+    "decimal": "0.202890698075"
+   }
+  },
+  {
+   "from": "const-oid 0.9.6",
+   "kind": "no-record",
+   "reason": "descent:const-oid 0.9.6 has no recorded reliance",
+   "amount": {
+    "exact": "24563853/1943849600",
+    "decimal": "0.012636704506"
+   }
+  },
+  {
+   "from": "zerocopy 0.8.33",
+   "kind": "below-floor",
+   "reason": "descent:zerocopy 0.8.33->zerocopy-derive 0.8.33",
+   "amount": {
+    "exact": "4563/830060",
+    "decimal": "0.005497192974"
+   }
+  },
+  {
+   "from": "bytes 1.11.1",
+   "kind": "no-record",
+   "reason": "descent:bytes 1.11.1 has no recorded reliance",
+   "amount": {
+    "exact": "46165058705175017/18248899769100000",
+    "decimal": "2.529744767591"
+   }
+  },
+  {
+   "from": "pin-project-lite 0.2.16",
+   "kind": "no-record",
+   "reason": "descent:pin-project-lite 0.2.16 has no recorded reliance",
+   "amount": {
+    "exact": "12494692679920627619/4759911940083300000",
+    "decimal": "2.624983999116"
+   }
+  },
+  {
+   "from": "valuable 0.1.1",
+   "kind": "no-record",
+   "reason": "descent:valuable 0.1.1 has no recorded reliance",
+   "amount": {
+    "exact": "1230276770252569/32643869227200000",
+    "decimal": "0.037687835400"
+   }
+  },
+  {
+   "from": "zeroize_derive 1.5.0",
+   "kind": "below-floor",
+   "reason": "descent:zeroize_derive 1.5.0->proc-macro2 1.0.105",
+   "amount": {
+    "exact": "26323271/3163094550",
+    "decimal": "0.008321999417"
+   }
+  },
+  {
+   "from": "zeroize_derive 1.5.0",
+   "kind": "below-floor",
+   "reason": "descent:zeroize_derive 1.5.0->quote 1.0.43",
+   "amount": {
+    "exact": "26323271/3163094550",
+    "decimal": "0.008321999417"
+   }
+  },
+  {
+   "from": "zeroize_derive 1.5.0",
+   "kind": "below-floor",
+   "reason": "descent:zeroize_derive 1.5.0->syn 2.0.114",
+   "amount": {
+    "exact": "26323271/3163094550",
+    "decimal": "0.008321999417"
+   }
+  },
+  {
+   "from": "wasi 0.11.1+wasi-snapshot-preview1",
+   "kind": "no-record",
+   "reason": "descent:wasi 0.11.1+wasi-snapshot-preview1 has no recorded reliance",
+   "amount": {
+    "exact": "7028142201761399/204606209328675000",
+    "decimal": "0.034349603684"
+   }
+  },
+  {
+   "from": "windows-sys 0.60.2",
+   "kind": "below-floor",
+   "reason": "descent:windows-sys 0.60.2->windows-targets 0.53.5",
+   "amount": {
+    "exact": "431278037833/50220570400000",
+    "decimal": "0.008587677010"
+   }
+  },
+  {
+   "from": "scopeguard 1.2.0",
+   "kind": "no-record",
+   "reason": "descent:scopeguard 1.2.0 has no recorded reliance",
+   "amount": {
+    "exact": "1245692630933991/5524262744000000",
+    "decimal": "0.225494819610"
+   }
+  },
+  {
+   "from": "smallvec 1.15.1",
+   "kind": "no-record",
+   "reason": "descent:smallvec 1.15.1 has no recorded reliance",
+   "amount": {
+    "exact": "8329793237372843/45198513360000000",
+    "decimal": "0.184293522467"
+   }
+  },
+  {
+   "from": "libc 0.2.189",
+   "kind": "no-record",
+   "reason": "descent:libc 0.2.189 has no recorded reliance",
+   "amount": {
+    "exact": "52511059863286851097297/19285065257451840000000",
+    "decimal": "2.722887330806"
+   }
+  },
+  {
+   "from": "r-efi 5.3.0",
+   "kind": "no-record",
+   "reason": "descent:r-efi 5.3.0 has no recorded reliance",
+   "amount": {
+    "exact": "1416314393/14936835375",
+    "decimal": "0.094820245215"
+   }
+  },
+  {
+   "from": "displaydoc 0.2.5",
+   "kind": "below-floor",
+   "reason": "descent:displaydoc 0.2.5->proc-macro2 1.0.105",
+   "amount": {
+    "exact": "155/19404",
+    "decimal": "0.007988043702"
+   }
+  },
+  {
+   "from": "displaydoc 0.2.5",
+   "kind": "below-floor",
+   "reason": "descent:displaydoc 0.2.5->quote 1.0.43",
+   "amount": {
+    "exact": "155/19404",
+    "decimal": "0.007988043702"
+   }
+  },
+  {
+   "from": "displaydoc 0.2.5",
+   "kind": "below-floor",
+   "reason": "descent:displaydoc 0.2.5->syn 2.0.114",
+   "amount": {
+    "exact": "155/19404",
+    "decimal": "0.007988043702"
+   }
+  },
+  {
+   "from": "bitflags 2.10.0",
+   "kind": "no-record",
+   "reason": "descent:bitflags 2.10.0 has no recorded reliance",
+   "amount": {
+    "exact": "608156503760857/1853445825000000",
+    "decimal": "0.328122082425"
+   }
+  },
+  {
+   "from": "windows-link 0.2.1",
+   "kind": "no-record",
+   "reason": "descent:windows-link 0.2.1 has no recorded reliance",
+   "amount": {
+    "exact": "46803856804007983/258864212880000000",
+    "decimal": "0.180804663122"
+   }
+  },
+  {
+   "from": "wit-bindgen 0.46.0",
+   "kind": "no-record",
+   "reason": "descent:wit-bindgen 0.46.0 has no recorded reliance",
+   "amount": {
+    "exact": "36824174218/1568367714375",
+    "decimal": "0.023479298815"
+   }
+  },
+  {
+   "from": "cfg-if 1.0.4",
+   "kind": "no-record",
+   "reason": "descent:cfg-if 1.0.4 has no recorded reliance",
+   "amount": {
+    "exact": "286810368100993181899787/511857773708200920000000",
+    "decimal": "0.560332152471"
+   }
+  },
+  {
+   "from": "once_cell 1.21.3",
+   "kind": "no-record",
+   "reason": "descent:once_cell 1.21.3 has no recorded reliance",
+   "amount": {
+    "exact": "303728976784445189521/768475086160320000000",
+    "decimal": "0.395235944866"
+   }
+  },
+  {
+   "from": "rustversion 1.0.22",
+   "kind": "no-record",
+   "reason": "descent:rustversion 1.0.22 has no recorded reliance",
+   "amount": {
+    "exact": "15343635451072635463/387917979316560000000",
+    "decimal": "0.039553813613"
+   }
+  },
+  {
+   "from": "wasm-bindgen-macro 0.2.106",
+   "kind": "below-floor",
+   "reason": "descent:wasm-bindgen-macro 0.2.106->quote 1.0.43",
+   "amount": {
+    "exact": "95835544450719261019/9843418725157710000000",
+    "decimal": "0.009736002006"
+   }
+  },
+  {
+   "from": "wasm-bindgen-macro 0.2.106",
+   "kind": "below-floor",
+   "reason": "descent:wasm-bindgen-macro 0.2.106->wasm-bindgen-macro-support 0.2.106",
+   "amount": {
+    "exact": "95835544450719261019/9843418725157710000000",
+    "decimal": "0.009736002006"
+   }
+  },
+  {
+   "from": "unicode-ident 1.0.22",
+   "kind": "no-record",
+   "reason": "descent:unicode-ident 1.0.22 has no recorded reliance",
+   "amount": {
+    "exact": "123056462987247209303050091567/883730883523259023560000000000",
+    "decimal": "0.139246534529"
+   }
+  }
+ ],
+ "work": {
+  "nodes_split": 303,
+  "ratio_lines_verified": 1647,
+  "ratio_tables_judged": 303,
+  "ratio_tables_reused": 0,
+  "max_amount_denominator_digits": 31,
+  "f64_splits_failing_exact_sum_check": 0,
+  "edges_sent": 635,
+  "edges_pooled_below_floor": 325,
+  "edges_touched": 960,
+  "naive_per_path_pushes": 67076,
+  "max_paths_to_one_node": 20906,
+  "max_paths_node": "unicode-ident 1.0.22",
+  "hot_spot": "proc-macro2 1.0.105",
+  "hot_spot_fan_in": 37,
+  "hot_spot_messages_this_window": 11
+ },
+ "conservation": {
+  "total": {
+   "exact": "1000",
+   "decimal": "1,000.000000000000"
+  },
+  "exact": true
+ },
+ "float_sums": {
+  "insertion_order": 1000.0,
+  "reversed": 1000.0,
+  "ascending": 1000.0,
+  "descending": 1000.0
+ },
+ "bridge": {
+  "with": "doorway/doorway-service/Cargo.lock",
+  "a_presences": 282,
+  "b_presences": 383,
+  "shared_presences": 235,
+  "a_to_shared": {
+   "exact": "1285293724211020359216080235553018386673/3252932079007832325894192480000000000",
+   "decimal": "395.118524762756"
+  },
+  "identity_shape": 170,
+  "needs_reconciliation": 65,
+  "only_a": 47,
+  "only_b": 148,
+  "b_to_shared": {
+   "exact": "3516833257280971512201646117543142510684066158263501940895147079619/11158627216681316322345187087293869719031157975000000000000000000",
+   "decimal": "315.167196554749"
+  },
+  "top_shared": [
+   {
+    "crate": "serde",
+    "from_a": {
+     "exact": "30785099407535347883/3103343834532480000",
+     "decimal": "9.919976982561"
+    },
+    "from_b": {
+     "exact": "180606088162832996664864424560878979437/16974802296941429985963793875000000000",
+     "decimal": "10.639657829498"
+    }
+   },
+   {
+    "crate": "thiserror",
+    "from_a": {
+     "exact": "2722913/200508",
+     "decimal": "13.580071618090"
+    },
+    "from_b": {
+     "exact": "12857427741970307357353/1346478114481500000000",
+     "decimal": "9.548931842031"
+    }
+   },
+   {
+    "crate": "tokio",
+    "from_a": {
+     "exact": "44614969431/5706883000",
+     "decimal": "7.817747346669"
+    },
+    "from_b": {
+     "exact": "975297900724260023/157032745878855000",
+     "decimal": "6.210793139137"
+    }
+   },
+   {
+    "crate": "pin-project-lite",
+    "from_a": {
+     "exact": "12494692679920627619/1586637313361100000",
+     "decimal": "7.874951997348"
+    },
+    "from_b": {
+     "exact": "50367525878261343775495447429/8674464345981406628906250000",
+     "decimal": "5.806413384083"
+    }
+   },
+   {
+    "crate": "bytes",
+    "from_a": {
+     "exact": "46165058705175017/6082966589700000",
+     "decimal": "7.589234302773"
+    },
+    "from_b": {
+     "exact": "1588306586693626536939407/281716746106665870000000",
+     "decimal": "5.637955885279"
+    }
+   },
+   {
+    "crate": "serde_bytes",
+    "from_a": {
+     "exact": "5749503/779240",
+     "decimal": "7.378346850778"
+    },
+    "from_b": {
+     "exact": "18002101799728804343791/3275566951575187500000",
+     "decimal": "5.495873558949"
+    }
+   },
+   {
+    "crate": "getrandom",
+    "from_a": {
+     "exact": "316115728169/35295188775",
+     "decimal": "8.956340485503"
+    },
+    "from_b": {
+     "exact": "685233581430893161646926717823147/131317989020459212096125000000000",
+     "decimal": "5.218124238288"
+    }
+   },
+   {
+    "crate": "serde_json",
+    "from_a": {
+     "exact": "2792418015253/389402576640",
+     "decimal": "7.171031171256"
+    },
+    "from_b": {
+     "exact": "16777299882509591273217863/3390435128990653734375000",
+     "decimal": "4.948420849894"
+    }
+   },
+   {
+    "crate": "cid",
+    "from_a": {
+     "exact": "677889/94864",
+     "decimal": "7.145903609378"
+    },
+    "from_b": {
+     "exact": "677889/138908",
+     "decimal": "4.880129294209"
+    }
+   },
+   {
+    "crate": "ipld-core",
+    "from_a": {
+     "exact": "30105/4312",
+     "decimal": "6.981679035250"
+    },
+    "from_b": {
+     "exact": "30105/6314",
+     "decimal": "4.767975926513"
+    }
+   }
+  ]
+ }
+}

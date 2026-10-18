@@ -8,6 +8,28 @@
   "primitive": "declared-head-over-DAG",
   "heads": [
     {
+      "id": "absolutes-guard",
+      "resolutionMode": "pinned",
+      "resolutionModeSource": "registry-default",
+      "head": {
+        "registry": "policies.yaml",
+        "version": 1,
+        "cid": "bafyreifeqctue4ysmu4unyxf2bc4axvpcepzadgehn7zxr5lulqqj5s74y",
+        "sha256Pin": "sha256:a480a7427312653946e2e5d045c05eaf111f900cc43b7f9bc7aba2e104f65fe6"
+      },
+      "tipBasis": "sole-active",
+      "competing": false,
+      "versions": [
+        {
+          "registry": "policies.yaml",
+          "version": 1,
+          "status": "active",
+          "cid": "bafyreifeqctue4ysmu4unyxf2bc4axvpcepzadgehn7zxr5lulqqj5s74y",
+          "supersededBy": null
+        }
+      ]
+    },
+    {
       "id": "archetype-resource-alignment",
       "resolutionMode": "pinned",
       "resolutionModeSource": "registry-default",

@@ -275,22 +275,32 @@ impl FlowStore for SidecarFlowTransaction {
 
     fn records(&self) -> Result<Vec<(Cid, FlowRecord)>> {
         let contents = self.log.contents()?;
-        let mut records = Vec::new();
-        for line in contents.lines().filter(|l| !l.trim().is_empty()) {
-            let parsed: SidecarLine =
-                serde_json::from_str(line).map_err(|e| FabricError::Decode(e.to_string()))?;
-            let computed = parsed.record.cid()?;
-            if computed.to_string() != parsed.cid {
-                return Err(FabricError::Integrity {
-                    stored: parsed.cid,
-                    computed: computed.to_string(),
-                });
-            }
-            records.push((computed, parsed.record));
-        }
+        let records = decode_flow_records(&contents)?;
         self.log.mark_validated();
         Ok(records)
     }
+}
+
+/// Decode and verify an already captured append-order log without filesystem access.
+#[cfg(feature = "sidecar")]
+pub fn decode_flow_records(contents: &str) -> Result<Vec<(Cid, FlowRecord)>> {
+    if !contents.is_empty() && !contents.ends_with('\n') {
+        return Err(FabricError::Decode("unterminated record log".into()));
+    }
+    let mut records = Vec::new();
+    for line in contents.lines().filter(|l| !l.trim().is_empty()) {
+        let parsed: SidecarLine =
+            serde_json::from_str(line).map_err(|e| FabricError::Decode(e.to_string()))?;
+        let computed = parsed.record.cid()?;
+        if computed.to_string() != parsed.cid {
+            return Err(FabricError::Integrity {
+                stored: parsed.cid,
+                computed: computed.to_string(),
+            });
+        }
+        records.push((computed, parsed.record));
+    }
+    Ok(records)
 }
 
 #[cfg(test)]

@@ -2,16 +2,17 @@
   "version": 1,
   "collective": {
     "path": ".epr-meta/collective.json",
-    "cid": "bafkreihcq3q7qgwncossxf6q7rowjsysgw3wqt2lpu2w6mnoosd7abmfku"
+    "cid": "bafkreihdh5j5y4mkjijuekeknoyspyjgv2u23e5ecmso67b3f5ehpbmtai"
   },
-  "author": "agent:integrator@claude-fable-5-1",
+  "author": "human:matthew",
   "steward": "repo:ethosengine/elohim",
   "scope": "repository",
   "reach": "repository",
   "concern": "k8s-is-not-the-architecture",
   "claim": "k8s models compute/hardware only; design lands in the peer-native DHT/REA home — k8s gaps aren't protocol gaps.",
   "uncertainty": [
-    "Imported verbatim from .claude/memory/feedback_k8s_is_not_the_architecture.md; the claim is the entry's own one-line description and the entry body is the pinned source, not restated here."
+    "Imported verbatim from .claude/memory/feedback_k8s_is_not_the_architecture.md; the claim is the entry's own one-line description and the entry body is the pinned source, not restated here.",
+    "authorship: steward-of-record — human:matthew stands for this entry; no agent author was witnessed writing it, and this record does not say human:matthew wrote it. Origin session: dda22ff0-818e-4f87-8398-38ed1ef4e174."
   ],
   "sources": [
     {

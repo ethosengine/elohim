@@ -40,6 +40,9 @@
 // Core traits for content types
 pub mod traits;
 
+/// Portable app contracts; runtime adapters are separate from client policy.
+pub mod lifecycle;
+
 // Content client with mode-aware resolution
 #[cfg(feature = "client")]
 pub mod client;

@@ -1,0 +1,39 @@
+{
+  "version": 1,
+  "purpose": "Orchard goals",
+  "sources": {
+    "items": {
+      "path": "goals",
+      "reader": "frontmatter",
+      "pattern": "*.md"
+    }
+  },
+  "subjects": "items",
+  "identity": "id",
+  "select": {
+    "op": "eq",
+    "field": "id",
+    "value": "harvest"
+  },
+  "fields": [
+    "title",
+    "status",
+    "conditions"
+  ],
+  "relationships": {},
+  "readings": {},
+  "bounds": {
+    "max_files": 100,
+    "max_bytes": 1048576,
+    "max_depth": 5
+  },
+  "capture": "selected",
+  "presentation": {
+    "titleField": "title",
+    "statusField": "status",
+    "columns": [],
+    "terminalValues": [],
+    "readings": [],
+    "reconciliationReading": null
+  }
+}

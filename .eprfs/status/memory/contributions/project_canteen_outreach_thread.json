@@ -2,16 +2,17 @@
   "version": 1,
   "collective": {
     "path": ".epr-meta/collective.json",
-    "cid": "bafkreihcq3q7qgwncossxf6q7rowjsysgw3wqt2lpu2w6mnoosd7abmfku"
+    "cid": "bafkreihdh5j5y4mkjijuekeknoyspyjgv2u23e5ecmso67b3f5ehpbmtai"
   },
-  "author": "agent:integrator@claude-fable-5-1",
+  "author": "human:matthew",
   "steward": "repo:ethosengine/elohim",
   "scope": "repository",
   "reach": "repository",
   "concern": "canteen-outreach-thread",
   "claim": "Creator-payments hackathon invite 2026-06-06 sparked the Beer arc; reply sent 2026-06-10 (engage, don't commit); Beer critique §6 = outreach phrasing source.",
   "uncertainty": [
-    "Imported verbatim from .claude/memory/project_canteen_outreach_thread.md; the claim is the entry's own one-line description and the entry body is the pinned source, not restated here."
+    "Imported verbatim from .claude/memory/project_canteen_outreach_thread.md; the claim is the entry's own one-line description and the entry body is the pinned source, not restated here.",
+    "authorship: steward-of-record — human:matthew stands for this entry; no agent author was witnessed writing it, and this record does not say human:matthew wrote it. Origin session: ccd90cc8-bafe-4d92-b7b6-2f55b64f63eb."
   ],
   "sources": [
     {

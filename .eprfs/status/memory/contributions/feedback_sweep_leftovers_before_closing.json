@@ -29,7 +29,7 @@
     "display": "Sweep side-findings into homes before closing a pass",
     "file": "feedback_sweep_leftovers_before_closing.md",
     "scopePath": ".claude/memory/feedback_sweep_leftovers_before_closing.md",
-    "gitName": "(untracked: no commit carries these bytes)",
+    "gitName": "Matthew Dowell",
     "entryType": "feedback",
     "indexed": true
   }

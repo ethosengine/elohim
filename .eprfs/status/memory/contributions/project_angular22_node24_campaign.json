@@ -2,16 +2,17 @@
   "version": 1,
   "collective": {
     "path": ".epr-meta/collective.json",
-    "cid": "bafkreihcq3q7qgwncossxf6q7rowjsysgw3wqt2lpu2w6mnoosd7abmfku"
+    "cid": "bafkreihdh5j5y4mkjijuekeknoyspyjgv2u23e5ecmso67b3f5ehpbmtai"
   },
-  "author": "agent:integrator@claude-fable-5-1",
+  "author": "human:matthew",
   "steward": "repo:ethosengine/elohim",
   "scope": "repository",
   "reach": "repository",
   "concern": "project_angular22_node24_campaign",
   "claim": "Angular22+Node24 landed on dev and deployed to alpha; SSR follow-ups settled (shim sort() stall, trust-scoped cache); OnPush/vitest-blindness lessons.",
   "uncertainty": [
-    "Imported verbatim from .claude/memory/project_angular22_node24_campaign.md; the claim is the entry's own one-line description and the entry body is the pinned source, not restated here."
+    "Imported verbatim from .claude/memory/project_angular22_node24_campaign.md; the claim is the entry's own one-line description and the entry body is the pinned source, not restated here.",
+    "authorship: steward-of-record — human:matthew stands for this entry; no agent author was witnessed writing it, and this record does not say human:matthew wrote it. Origin session: d37bdfc0-4d71-497c-ab53-9452e457b095."
   ],
   "sources": [
     {

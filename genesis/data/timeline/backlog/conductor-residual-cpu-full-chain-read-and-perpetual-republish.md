@@ -11,6 +11,8 @@ status: "open"
 priority: "high"
 severity: medium
 nodes: [alpha, household]
+relatedNodeIds:
+  - "habit:idle-is-free"
 tags: [conductor-fork, cpu, sqlite, publish, source-chain, dataplane-convergence, idle-is-free, performance, perf-cpu, perf-io, perf-scale, perf-latency, trustful-self, friction-verify, friction-mechanical, plane-notary, unit-history, unit-agent, custody-everyone, phase-steady, lane-borrowed, lane-interactive]
 cites:
   - genesis/a2o/reports/recovery/fleet-cpu-publish-livelock-2026-09-28.md

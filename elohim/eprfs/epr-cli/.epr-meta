@@ -9,6 +9,22 @@ purpose: >
   Its method and admission decisions are registered in seam-registry.yaml; local actor
   claims establish accountable attribution, not cryptographic peer authority.
 rules:
+  - id: developer-git-adapter-boundary
+    class: inject
+    when:
+      write: "*.rs"
+      contains-any: ["git::", "update-ref", "source_commit", "target_commit"]
+    dedupe-of: ".epr-meta/manifest.md (Native developer tooling — composition and authority)"
+    why: >
+      Keep Git interpretation in an explicit Brit-facing adapter. Reuse the existing
+      acceptance evaluator and records; revalidate exact source/target binding at the
+      mutation boundary. Do not move Git semantics into EPRFS core or create another
+      governance ledger. Update this crate's seam-registry.yaml and adapter journey
+      tests when that boundary changes. The monorepo root records the composition;
+      this advisory does not mechanically prove architectural separation.
+    retire-when: >
+      when dependency boundaries and executable adapter contracts enforce this ownership
+      without an authoring reminder
   - id: reconciliation-fitness-review
     class: inject
     when:
@@ -39,8 +55,19 @@ receiver verification and earned authority; an appointment in this checkout cann
 
 The native developer through-line reuses `epr flow` for intent, commitment, actor
 attribution, review, acceptance and gates. A developer journal in brit is an adapter
-to these existing records, not a second ledger. This crate does not interpret Git
-index/OIDs/worktrees or elect a release from storage possession.
+to these existing records, not a second ledger. Shared flow and reconciliation
+semantics do not interpret Git index/OIDs/worktrees or elect a release from storage
+possession. Repository-specific CLI adapters do interpret Git: the integration
+adapter being qualified binds existing acceptance to exact source/target revisions,
+runs gates and revalidates before an atomic ref update. Keep that interpretation
+in the adapter, outside shared governance and EPRFS core. Brit owns the developer
+journey even while delegating execution to installed `epr`; this arrangement does
+not yet deliver the one-executable target.
+
+The monorepo [composition contract](../../../.epr-meta/manifest.md#native-developer-tooling--composition-and-authority)
+links the independent owners and distinguishes authoring advisories, executable
+checks and review obligations. Changes to this adapter's boundary must keep that
+contract, this manifest and the existing decision registry coherent.
 
 `covers: subtree` claims the whole `elohim-epr-cli` crate: the `epr` sources under `src/` (where
 `src/.epr-meta` adds the recall-seam rule) and the integration tests under `tests/`. Those tests

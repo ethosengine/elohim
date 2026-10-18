@@ -7760,6 +7760,11 @@ async fn handle_request(
     addr: SocketAddr,
     req: Request<Incoming>,
 ) -> Result<Response<BoxBody>, hyper::Error> {
+    if req.uri().path() == "/api/local-views" || req.uri().path().starts_with("/api/local-views/") {
+        return Ok(super::local_peer::relay(req)
+            .await
+            .map(|body| body.map_err(|never| match never {}).boxed()));
+    }
     let method = req.method().clone();
     let method_str = method.to_string();
     let path = req.uri().path().to_string();

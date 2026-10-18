@@ -58,6 +58,17 @@ rules:
 
 # doorway/doorway-service/ — the web2 projection seam (atlas §3.9, Track 4)
 
+The [root application lifecycle map](../../../.epr-meta/manifest.md#application-lifecycle--authoritative-homes-and-composition)
+connects this projection to its authoritative producers. Compose peer-native services;
+do not author a doorway-only draft store, sync/admission model or publication decision.
+A hosted person's private draft belongs in their browser's shared client persistence;
+signing with a doorway-held key waits visibly for that host. Shared draft traffic may
+cross this projection only where its authorization and confidentiality contract permits
+the doorway to carry it. Web exposure does not widen reach or make a submitted head
+canonical. Qualify the peer-local path as well as its hosted projection. The existing
+`src/.epr-meta` web-seam placement rule routes peer app serving/rendering to the hub;
+the SDK and storage own reusable working-state behavior.
+
 A doorway is the "porch" of the P2P network: it makes substrate truth legible to browsers and the
 traditional internet, and is **not itself a P2P participant**. Almost nothing is authored here — routes
 are manifest-driven (a peer's storage declares them via `build_manifest()`, the registry compiles them,

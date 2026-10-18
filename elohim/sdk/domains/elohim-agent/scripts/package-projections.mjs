@@ -10,6 +10,7 @@ import {
   hookPackageFromSource,
   projectHook,
   verifyHookPackage,
+  mergeNativeRegistration,
 } from './hook-package.mjs';
 import {
   AGENT_DOC_KIND,
@@ -987,11 +988,11 @@ function packagePathFor(pkg) {
 }
 
 function projectionFixturePathsFor(pkg) {
-  // A hook has a SINGLE projected artifact (the code) and no codex target — the
-  // returned object has only a `claude` key, and the write/verify loops iterate
-  // Object.keys(...) so they naturally do the right thing for one or two runtimes.
+  // Hook code is byte-identical across explicitly declared runtime adapters.
   if (pkg.kind === HOOK_KIND) {
-    return { claude: resolve(PROJECTION_DIR, 'claude/hooks', `${pkg.metadata.id}.py`) };
+    return Object.fromEntries(Object.keys(pkg.projections).map((runtime) => [
+      runtime, resolve(PROJECTION_DIR, runtime, 'hooks', `${pkg.metadata.id}.py`),
+    ]));
   }
   if (pkg.kind === AGENT_DOC_KIND) {
     // An agent-doc has ONE projection for the plant case (its native runtime), but
@@ -1046,7 +1047,9 @@ function runtimePathsFor(pkg) {
     );
   }
   if (pkg.kind === HOOK_KIND) {
-    return { claude: resolve(REPO_ROOT, pkg.projections.claude.path) };
+    return Object.fromEntries(Object.entries(pkg.projections).map(([runtime, projection]) => [
+      runtime, resolve(REPO_ROOT, projection.path),
+    ]));
   }
   if (pkg.kind === AGENT_DOC_KIND) {
     const out = {};
@@ -1195,6 +1198,11 @@ async function writeRuntimeProjections(packages, packageCatalog = packages) {
     for (const runtime of Object.keys(paths)) {
       await writeText(paths[runtime], projectedTextFor(pkg, runtime, packageCatalog));
       await writeSkillAssets(pkg, runtime, { fixture: false });
+      if (pkg.kind === HOOK_KIND && pkg.registrations?.[runtime]) {
+        const configPath = resolve(REPO_ROOT, runtime === 'codex' ? '.codex/hooks.json' : '.claude/settings.json');
+        const config = JSON.parse((await readIfExists(configPath)) ?? '{}');
+        await writeText(configPath, `${JSON.stringify(mergeNativeRegistration(config, pkg, runtime), null, 2)}\n`);
+      }
     }
   }
 }
@@ -1334,9 +1342,17 @@ async function verifyPackage(pkg, validators, settings, packageCatalog, qualityB
       `${pkg.metadata.id} has metadata.governance.eprRef`,
     );
     // Byte-identity: the projected fixture and the runtime `.py` must equal
-    // source.body exactly (strict `===`, transform-free). Claude-only for hooks.
-    await verifyProjectionFixture(pkg, 'claude');
-    await verifyRuntimeProjectionIfPresent(pkg, 'claude');
+    // source.body exactly (strict `===`, transform-free) for every declared adapter.
+    for (const runtime of Object.keys(pkg.projections)) {
+      await verifyProjectionFixture(pkg, runtime);
+      await verifyRuntimeProjectionIfPresent(pkg, runtime);
+      if (pkg.registrations?.[runtime]) {
+        const configPath = resolve(REPO_ROOT, runtime === 'codex' ? '.codex/hooks.json' : '.claude/settings.json');
+        const config = JSON.parse((await readIfExists(configPath)) ?? '{}');
+        assert(JSON.stringify(mergeNativeRegistration(config, pkg, runtime)) === JSON.stringify(config),
+          `${pkg.metadata.id} ${runtime} registration is fresh (trust is runtime-owned)`);
+      }
+    }
     return;
   }
 

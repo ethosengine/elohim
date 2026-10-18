@@ -7670,12 +7670,6 @@
     },
     {
       "kind": "javascript-module",
-      "path": "src/contracts/omnibar.contract.ts",
-      "declarations": [],
-      "exports": []
-    },
-    {
-      "kind": "javascript-module",
       "path": "src/capability/certainty.ts",
       "declarations": [
         {
@@ -7946,6 +7940,360 @@
           "declaration": {
             "name": "satisfiesRequirement",
             "module": "src/capability/standing.ts"
+          }
+        }
+      ]
+    },
+    {
+      "kind": "javascript-module",
+      "path": "src/contracts/omnibar.contract.ts",
+      "declarations": [],
+      "exports": []
+    },
+    {
+      "kind": "javascript-module",
+      "path": "src/localize/locale-store.ts",
+      "declarations": [
+        {
+          "kind": "variable",
+          "name": "LOCALE_STORAGE_KEY",
+          "type": {
+            "text": "string"
+          },
+          "default": "'elohim-locale'"
+        },
+        {
+          "kind": "variable",
+          "name": "LOCALE_CHANGE_EVENT",
+          "type": {
+            "text": "string"
+          },
+          "default": "'elohim-locale-changed'"
+        },
+        {
+          "kind": "variable",
+          "name": "SUPPORTED_LOCALES",
+          "type": {
+            "text": "[sourceLocale, ...targetLocales]"
+          },
+          "default": "[sourceLocale, ...targetLocales]"
+        },
+        {
+          "kind": "variable",
+          "name": "LOCALE_LABELS",
+          "type": {
+            "text": "Readonly<Record<ElohimLocale, string>>"
+          },
+          "default": "{ en: 'English', es: 'Español', he: 'עברית', }",
+          "description": "Native-script labels — intentionally NOT localized (each language names itself)."
+        },
+        {
+          "kind": "function",
+          "name": "detectLocale",
+          "return": {
+            "type": {
+              "text": "ElohimLocale"
+            }
+          },
+          "description": "navigator.language 'es-MX' → 'es' when supported, else the en source locale."
+        },
+        {
+          "kind": "class",
+          "description": "",
+          "name": "LocaleStore",
+          "members": [
+            {
+              "kind": "field",
+              "name": "_locale",
+              "type": {
+                "text": "ElohimLocale"
+              },
+              "privacy": "private"
+            },
+            {
+              "kind": "field",
+              "name": "_destroyed",
+              "type": {
+                "text": "boolean"
+              },
+              "privacy": "private",
+              "default": "false"
+            },
+            {
+              "kind": "field",
+              "name": "subscribers",
+              "privacy": "private",
+              "readonly": true,
+              "default": "new Set<Subscriber>()"
+            },
+            {
+              "kind": "field",
+              "name": "_onStorage",
+              "type": {
+                "text": "(e: StorageEvent) => void"
+              },
+              "privacy": "private",
+              "readonly": true
+            },
+            {
+              "kind": "field",
+              "name": "_onLocaleChange",
+              "type": {
+                "text": "(e: Event) => void"
+              },
+              "privacy": "private",
+              "readonly": true
+            },
+            {
+              "kind": "method",
+              "name": "destroy",
+              "return": {
+                "type": {
+                  "text": "void"
+                }
+              },
+              "description": "Remove all window listeners and clear subscribers.\nCall from a web component's disconnectedCallback (or in tests) to avoid\nlistener accumulation on short-lived instances.\nThe module singleton (getLocaleStore()) is intentionally never destroyed."
+            },
+            {
+              "kind": "field",
+              "name": "locale",
+              "type": {
+                "text": "ElohimLocale"
+              },
+              "readonly": true
+            },
+            {
+              "kind": "method",
+              "name": "set",
+              "return": {
+                "type": {
+                  "text": "void"
+                }
+              },
+              "parameters": [
+                {
+                  "name": "locale",
+                  "type": {
+                    "text": "ElohimLocale"
+                  }
+                }
+              ]
+            },
+            {
+              "kind": "method",
+              "name": "subscribe",
+              "return": {
+                "type": {
+                  "text": "() => void"
+                }
+              },
+              "parameters": [
+                {
+                  "name": "fn",
+                  "type": {
+                    "text": "Subscriber"
+                  }
+                }
+              ],
+              "description": "Subscribe to locale changes. Returns an unsubscribe function."
+            },
+            {
+              "kind": "method",
+              "name": "adopt",
+              "privacy": "private",
+              "return": {
+                "type": {
+                  "text": "void"
+                }
+              },
+              "parameters": [
+                {
+                  "name": "locale",
+                  "type": {
+                    "text": "ElohimLocale"
+                  }
+                }
+              ],
+              "description": "External change (other tab/island): apply + notify, never re-persist/dispatch."
+            },
+            {
+              "kind": "method",
+              "name": "applyToDocument",
+              "privacy": "private",
+              "return": {
+                "type": {
+                  "text": "void"
+                }
+              },
+              "parameters": [
+                {
+                  "name": "locale",
+                  "type": {
+                    "text": "ElohimLocale"
+                  }
+                }
+              ]
+            },
+            {
+              "kind": "method",
+              "name": "load",
+              "privacy": "private",
+              "return": {
+                "type": {
+                  "text": "ElohimLocale | null"
+                }
+              }
+            }
+          ]
+        },
+        {
+          "kind": "function",
+          "name": "getLocaleStore",
+          "return": {
+            "type": {
+              "text": "LocaleStore"
+            }
+          },
+          "description": "Module-level singleton — all islands in a document share one store."
+        }
+      ],
+      "exports": [
+        {
+          "kind": "js",
+          "name": "LOCALE_STORAGE_KEY",
+          "declaration": {
+            "name": "LOCALE_STORAGE_KEY",
+            "module": "src/localize/locale-store.ts"
+          }
+        },
+        {
+          "kind": "js",
+          "name": "LOCALE_CHANGE_EVENT",
+          "declaration": {
+            "name": "LOCALE_CHANGE_EVENT",
+            "module": "src/localize/locale-store.ts"
+          }
+        },
+        {
+          "kind": "js",
+          "name": "SUPPORTED_LOCALES",
+          "declaration": {
+            "name": "SUPPORTED_LOCALES",
+            "module": "src/localize/locale-store.ts"
+          }
+        },
+        {
+          "kind": "js",
+          "name": "LOCALE_LABELS",
+          "declaration": {
+            "name": "LOCALE_LABELS",
+            "module": "src/localize/locale-store.ts"
+          }
+        },
+        {
+          "kind": "js",
+          "name": "detectLocale",
+          "declaration": {
+            "name": "detectLocale",
+            "module": "src/localize/locale-store.ts"
+          }
+        },
+        {
+          "kind": "js",
+          "name": "LocaleStore",
+          "declaration": {
+            "name": "LocaleStore",
+            "module": "src/localize/locale-store.ts"
+          }
+        },
+        {
+          "kind": "js",
+          "name": "getLocaleStore",
+          "declaration": {
+            "name": "getLocaleStore",
+            "module": "src/localize/locale-store.ts"
+          }
+        }
+      ]
+    },
+    {
+      "kind": "javascript-module",
+      "path": "src/localize/runtime.ts",
+      "declarations": [
+        {
+          "kind": "variable",
+          "name": "sourceLocale",
+          "type": {
+            "text": "string"
+          },
+          "default": "'en'"
+        },
+        {
+          "kind": "variable",
+          "name": "targetLocales",
+          "type": {
+            "text": "['es', 'he']"
+          },
+          "default": "['es', 'he']"
+        },
+        {
+          "kind": "variable",
+          "name": "{ getLocale, setLocale }",
+          "default": "(globalHost.__ELOHIM_CORE_LOCALIZE_RUNTIME__ ??= configureLocalization({ sourceLocale, targetLocales: [...targetLocales], loadLocale: async (locale: string) => { // eslint-disable-next-line @typescript-eslint/no-unsafe-return -- dynamic locale import; shape verified at runtime by lit-localize return import(`./generated/${locale}.js`); }, }))"
+        }
+      ],
+      "exports": [
+        {
+          "kind": "js",
+          "name": "sourceLocale",
+          "declaration": {
+            "name": "sourceLocale",
+            "module": "src/localize/runtime.ts"
+          }
+        },
+        {
+          "kind": "js",
+          "name": "targetLocales",
+          "declaration": {
+            "name": "targetLocales",
+            "module": "src/localize/runtime.ts"
+          }
+        },
+        {
+          "kind": "js",
+          "name": "{ getLocale, setLocale }",
+          "declaration": {
+            "name": "{ getLocale, setLocale }",
+            "module": "src/localize/runtime.ts"
+          }
+        }
+      ]
+    },
+    {
+      "kind": "javascript-module",
+      "path": "src/localize/source-locale.ts",
+      "declarations": [
+        {
+          "kind": "function",
+          "name": "smokeGreeting",
+          "parameters": [
+            {
+              "name": "name",
+              "type": {
+                "text": "string"
+              }
+            }
+          ],
+          "description": "Smoke-test source string — proves the localize pipeline is wired and provides\none entry for the xliff seed."
+        }
+      ],
+      "exports": [
+        {
+          "kind": "js",
+          "name": "smokeGreeting",
+          "declaration": {
+            "name": "smokeGreeting",
+            "module": "src/localize/source-locale.ts"
           }
         }
       ]
@@ -9163,354 +9511,6 @@
           "declaration": {
             "name": "getThemeStore",
             "module": "src/theme/theme-store.ts"
-          }
-        }
-      ]
-    },
-    {
-      "kind": "javascript-module",
-      "path": "src/localize/locale-store.ts",
-      "declarations": [
-        {
-          "kind": "variable",
-          "name": "LOCALE_STORAGE_KEY",
-          "type": {
-            "text": "string"
-          },
-          "default": "'elohim-locale'"
-        },
-        {
-          "kind": "variable",
-          "name": "LOCALE_CHANGE_EVENT",
-          "type": {
-            "text": "string"
-          },
-          "default": "'elohim-locale-changed'"
-        },
-        {
-          "kind": "variable",
-          "name": "SUPPORTED_LOCALES",
-          "type": {
-            "text": "[sourceLocale, ...targetLocales]"
-          },
-          "default": "[sourceLocale, ...targetLocales]"
-        },
-        {
-          "kind": "variable",
-          "name": "LOCALE_LABELS",
-          "type": {
-            "text": "Readonly<Record<ElohimLocale, string>>"
-          },
-          "default": "{ en: 'English', es: 'Español', he: 'עברית', }",
-          "description": "Native-script labels — intentionally NOT localized (each language names itself)."
-        },
-        {
-          "kind": "function",
-          "name": "detectLocale",
-          "return": {
-            "type": {
-              "text": "ElohimLocale"
-            }
-          },
-          "description": "navigator.language 'es-MX' → 'es' when supported, else the en source locale."
-        },
-        {
-          "kind": "class",
-          "description": "",
-          "name": "LocaleStore",
-          "members": [
-            {
-              "kind": "field",
-              "name": "_locale",
-              "type": {
-                "text": "ElohimLocale"
-              },
-              "privacy": "private"
-            },
-            {
-              "kind": "field",
-              "name": "_destroyed",
-              "type": {
-                "text": "boolean"
-              },
-              "privacy": "private",
-              "default": "false"
-            },
-            {
-              "kind": "field",
-              "name": "subscribers",
-              "privacy": "private",
-              "readonly": true,
-              "default": "new Set<Subscriber>()"
-            },
-            {
-              "kind": "field",
-              "name": "_onStorage",
-              "type": {
-                "text": "(e: StorageEvent) => void"
-              },
-              "privacy": "private",
-              "readonly": true
-            },
-            {
-              "kind": "field",
-              "name": "_onLocaleChange",
-              "type": {
-                "text": "(e: Event) => void"
-              },
-              "privacy": "private",
-              "readonly": true
-            },
-            {
-              "kind": "method",
-              "name": "destroy",
-              "return": {
-                "type": {
-                  "text": "void"
-                }
-              },
-              "description": "Remove all window listeners and clear subscribers.\nCall from a web component's disconnectedCallback (or in tests) to avoid\nlistener accumulation on short-lived instances.\nThe module singleton (getLocaleStore()) is intentionally never destroyed."
-            },
-            {
-              "kind": "field",
-              "name": "locale",
-              "type": {
-                "text": "ElohimLocale"
-              },
-              "readonly": true
-            },
-            {
-              "kind": "method",
-              "name": "set",
-              "return": {
-                "type": {
-                  "text": "void"
-                }
-              },
-              "parameters": [
-                {
-                  "name": "locale",
-                  "type": {
-                    "text": "ElohimLocale"
-                  }
-                }
-              ]
-            },
-            {
-              "kind": "method",
-              "name": "subscribe",
-              "return": {
-                "type": {
-                  "text": "() => void"
-                }
-              },
-              "parameters": [
-                {
-                  "name": "fn",
-                  "type": {
-                    "text": "Subscriber"
-                  }
-                }
-              ],
-              "description": "Subscribe to locale changes. Returns an unsubscribe function."
-            },
-            {
-              "kind": "method",
-              "name": "adopt",
-              "privacy": "private",
-              "return": {
-                "type": {
-                  "text": "void"
-                }
-              },
-              "parameters": [
-                {
-                  "name": "locale",
-                  "type": {
-                    "text": "ElohimLocale"
-                  }
-                }
-              ],
-              "description": "External change (other tab/island): apply + notify, never re-persist/dispatch."
-            },
-            {
-              "kind": "method",
-              "name": "applyToDocument",
-              "privacy": "private",
-              "return": {
-                "type": {
-                  "text": "void"
-                }
-              },
-              "parameters": [
-                {
-                  "name": "locale",
-                  "type": {
-                    "text": "ElohimLocale"
-                  }
-                }
-              ]
-            },
-            {
-              "kind": "method",
-              "name": "load",
-              "privacy": "private",
-              "return": {
-                "type": {
-                  "text": "ElohimLocale | null"
-                }
-              }
-            }
-          ]
-        },
-        {
-          "kind": "function",
-          "name": "getLocaleStore",
-          "return": {
-            "type": {
-              "text": "LocaleStore"
-            }
-          },
-          "description": "Module-level singleton — all islands in a document share one store."
-        }
-      ],
-      "exports": [
-        {
-          "kind": "js",
-          "name": "LOCALE_STORAGE_KEY",
-          "declaration": {
-            "name": "LOCALE_STORAGE_KEY",
-            "module": "src/localize/locale-store.ts"
-          }
-        },
-        {
-          "kind": "js",
-          "name": "LOCALE_CHANGE_EVENT",
-          "declaration": {
-            "name": "LOCALE_CHANGE_EVENT",
-            "module": "src/localize/locale-store.ts"
-          }
-        },
-        {
-          "kind": "js",
-          "name": "SUPPORTED_LOCALES",
-          "declaration": {
-            "name": "SUPPORTED_LOCALES",
-            "module": "src/localize/locale-store.ts"
-          }
-        },
-        {
-          "kind": "js",
-          "name": "LOCALE_LABELS",
-          "declaration": {
-            "name": "LOCALE_LABELS",
-            "module": "src/localize/locale-store.ts"
-          }
-        },
-        {
-          "kind": "js",
-          "name": "detectLocale",
-          "declaration": {
-            "name": "detectLocale",
-            "module": "src/localize/locale-store.ts"
-          }
-        },
-        {
-          "kind": "js",
-          "name": "LocaleStore",
-          "declaration": {
-            "name": "LocaleStore",
-            "module": "src/localize/locale-store.ts"
-          }
-        },
-        {
-          "kind": "js",
-          "name": "getLocaleStore",
-          "declaration": {
-            "name": "getLocaleStore",
-            "module": "src/localize/locale-store.ts"
-          }
-        }
-      ]
-    },
-    {
-      "kind": "javascript-module",
-      "path": "src/localize/runtime.ts",
-      "declarations": [
-        {
-          "kind": "variable",
-          "name": "sourceLocale",
-          "type": {
-            "text": "string"
-          },
-          "default": "'en'"
-        },
-        {
-          "kind": "variable",
-          "name": "targetLocales",
-          "type": {
-            "text": "['es', 'he']"
-          },
-          "default": "['es', 'he']"
-        },
-        {
-          "kind": "variable",
-          "name": "{ getLocale, setLocale }",
-          "default": "(globalHost.__ELOHIM_CORE_LOCALIZE_RUNTIME__ ??= configureLocalization({ sourceLocale, targetLocales: [...targetLocales], loadLocale: async (locale: string) => { // eslint-disable-next-line @typescript-eslint/no-unsafe-return -- dynamic locale import; shape verified at runtime by lit-localize return import(`./generated/${locale}.js`); }, }))"
-        }
-      ],
-      "exports": [
-        {
-          "kind": "js",
-          "name": "sourceLocale",
-          "declaration": {
-            "name": "sourceLocale",
-            "module": "src/localize/runtime.ts"
-          }
-        },
-        {
-          "kind": "js",
-          "name": "targetLocales",
-          "declaration": {
-            "name": "targetLocales",
-            "module": "src/localize/runtime.ts"
-          }
-        },
-        {
-          "kind": "js",
-          "name": "{ getLocale, setLocale }",
-          "declaration": {
-            "name": "{ getLocale, setLocale }",
-            "module": "src/localize/runtime.ts"
-          }
-        }
-      ]
-    },
-    {
-      "kind": "javascript-module",
-      "path": "src/localize/source-locale.ts",
-      "declarations": [
-        {
-          "kind": "function",
-          "name": "smokeGreeting",
-          "parameters": [
-            {
-              "name": "name",
-              "type": {
-                "text": "string"
-              }
-            }
-          ],
-          "description": "Smoke-test source string — proves the localize pipeline is wired and provides\none entry for the xliff seed."
-        }
-      ],
-      "exports": [
-        {
-          "kind": "js",
-          "name": "smokeGreeting",
-          "declaration": {
-            "name": "smokeGreeting",
-            "module": "src/localize/source-locale.ts"
           }
         }
       ]

@@ -2,22 +2,23 @@
   "version": 1,
   "collective": {
     "path": ".epr-meta/collective.json",
-    "cid": "bafkreihcq3q7qgwncossxf6q7rowjsysgw3wqt2lpu2w6mnoosd7abmfku"
+    "cid": "bafkreihdh5j5y4mkjijuekeknoyspyjgv2u23e5ecmso67b3f5ehpbmtai"
   },
-  "author": "agent:integrator@claude-fable-5-1",
+  "author": "human:matthew",
   "steward": "repo:ethosengine/elohim",
   "scope": "repository",
   "reach": "repository",
   "concern": "project_doorway_serving_path",
   "claim": "New 8080 routes need is_service_path; poisoned scope empties EprRouter; EPR GETs → SSR; /epr/{id} atom home.",
   "uncertainty": [
-    "Imported verbatim from .claude/memory/project_doorway_serving_path.md; the claim is the entry's own one-line description and the entry body is the pinned source, not restated here."
+    "Imported verbatim from .claude/memory/project_doorway_serving_path.md; the claim is the entry's own one-line description and the entry body is the pinned source, not restated here.",
+    "authorship: steward-of-record — human:matthew stands for this entry; no agent author was witnessed writing it, and this record does not say human:matthew wrote it. Origin session: none recorded."
   ],
   "sources": [
     {
       "resource": {
         "path": ".claude/memory/project_doorway_serving_path.md",
-        "cid": "bafkreiejh7hrqk2wkd7ib4croltmidtgsgur7s44d2xqs2khaczdlffylm"
+        "cid": "bafkreiebuwbfyfpohxuexfbke4hduvhq4q66aeucqgzvrxeomvl4lmdmje"
       },
       "reach": "repository"
     }

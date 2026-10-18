@@ -2,22 +2,23 @@
   "version": 1,
   "collective": {
     "path": ".epr-meta/collective.json",
-    "cid": "bafkreihcq3q7qgwncossxf6q7rowjsysgw3wqt2lpu2w6mnoosd7abmfku"
+    "cid": "bafkreihdh5j5y4mkjijuekeknoyspyjgv2u23e5ecmso67b3f5ehpbmtai"
   },
-  "author": "agent:integrator@claude-fable-5-1",
+  "author": "human:matthew",
   "steward": "repo:ethosengine/elohim",
   "scope": "repository",
   "reach": "repository",
   "concern": "feedback_editorial_loop_invents_design",
   "claim": "Blind-reader loops on spec/law/whitepaper do not converge; editors invent rules to close findings. Cap rounds, diff-based drift check, defer by name.",
   "uncertainty": [
-    "Imported verbatim from .claude/memory/feedback_editorial_loop_invents_design.md; the claim is the entry's own one-line description and the entry body is the pinned source, not restated here."
+    "Imported verbatim from .claude/memory/feedback_editorial_loop_invents_design.md; the claim is the entry's own one-line description and the entry body is the pinned source, not restated here.",
+    "authorship: steward-of-record — human:matthew stands for this entry; no agent author was witnessed writing it, and this record does not say human:matthew wrote it. Origin session: 5c45be19-a450-4d6a-b68d-bb9c809bb2f1."
   ],
   "sources": [
     {
       "resource": {
         "path": ".claude/memory/feedback_editorial_loop_invents_design.md",
-        "cid": "bafkreidspi4z2zqrs5kzj6zfgggcuvlawj674x6xxe36wfk7lkvbatxa5m"
+        "cid": "bafkreihvmkwc3fc3mkjqcybi6fhde54sp24s3ipnbv7ul2vtbe4xkjai4y"
       },
       "reach": "repository"
     }

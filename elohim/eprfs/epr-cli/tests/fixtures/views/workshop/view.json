@@ -1,0 +1,54 @@
+{
+  "version": 1,
+  "purpose": "Read locally declared work",
+  "sources": {
+    "items": {
+      "path": "tasks",
+      "reader": "frontmatter",
+      "pattern": "*.md"
+    },
+    "ledger": {
+      "path": "evidence/acts.jsonl",
+      "reader": "flows",
+      "optional": true
+    }
+  },
+  "subjects": "items",
+  "identity": "id",
+  "select": {
+    "op": "all",
+    "rules": [
+      {
+        "op": "eq",
+        "field": "kind",
+        "value": "task"
+      },
+      {
+        "op": "contains",
+        "field": "tags",
+        "value": "quiet"
+      }
+    ]
+  },
+  "fields": [
+    "status",
+    "tags"
+  ],
+  "relationships": {},
+  "readings": {
+    "experience": {
+      "reader": "reconciliation",
+      "input": "ledger"
+    },
+    "field measurements": {
+      "reader": "measurements",
+      "input": "ledger"
+    }
+  },
+  "bounds": {
+    "max_files": 100,
+    "max_bytes": 1048576,
+    "max_depth": 5
+  },
+  "capture": "selected"
+}

@@ -9,6 +9,27 @@
   "mirrors": "elohim/holochain/dna/mishpat/zomes/mishpat_integrity/src/lib.rs::Precedent",
   "standings": [
     {
+      "citesContentCid": "bafyreifeqctue4ysmu4unyxf2bc4axvpcepzadgehn7zxr5lulqqj5s74y",
+      "citesContentSha256": "sha256:a480a7427312653946e2e5d045c05eaf111f900cc43b7f9bc7aba2e104f65fe6",
+      "registry": "policies.yaml",
+      "precedent": {
+        "id": "absolutes-guard@1",
+        "title": "Absolutes guard — an absolute on a trust surface names its enforcer or says what holds",
+        "summary": "Absolutes guard — an absolute on a trust surface names its enforcer or says what holds",
+        "full_reasoning": "\"'always' is a serious word — it needs to really mean something, and a LOT of the time that's an anti-pattern in the Elohim Protocol\" (operator, 2026-10-15). The protocol is graduated, governed, revocable and plural: reach narrows, gates re-admit, stewards act under a StewardshipGrant for people who hold their rights through others, and trust lags delivery. Prose on a trust surface — genesis/docs/**, genesis/a2o/features/**, app/**/*.html, app/elohim-elements/**, the content chrome's omni-element.js — that says always, never, forever, guaranteed or no one can usually promises more than the system keeps, and there a false absolute is a trust defect. Scope is `*` because `when.write` matches basenames: the validator itself confines the guard to those surfaces and to prose (Markdown and Gherkin prose, template text nodes and visible attributes, UI string literals; never code comments or identifiers). Net-new only. Exempt: a resolving enforcer citation in the same sentence or line — `(enforced: <repo path | policy:<id>@<v> | seam:<id>>)` in prose, `// absolute: <ref>` or `<!-- absolute: <ref> -->` beside a UI string — testimony (the ontology atom's testimony_exempt, blockquotes, quoted speech). A negated capability (\"no one can …\") needs the same citation. Advisory `dispatch` (the sovereignty guard's @3 posture): a background review, never an ask or a deny. POST half: .claude/hooks/absolutes-guard-signal.py folds landings onto absolutes-landings@1.",
+        "binding": "binding-local",
+        "scope_json": "{\"scope\":{\"write\":\"*\"}}",
+        "citations": null,
+        "status": "active",
+        "established_by": "requested-operator-2026-10-15+agents",
+        "established_at": null,
+        "superseded_by": null,
+        "created_at": null,
+        "updated_at": null,
+        "metadata_json": "{\"enforcementClass\":\"dispatch\",\"registry\":\"policies.yaml\",\"resolutionMode\":\"pinned\",\"validator\":\"epr:validator-absolutes-guard\",\"version\":1}"
+      }
+    },
+    {
       "citesContentCid": "bafyreifgfr4oe3ebirrghyvwi6gulyi5r6ous2c4f2j6qll2d6mlkknxsu",
       "citesContentSha256": "sha256:a62c78e26c81446263e2b6478d45e11d8f9d49685c2e93e82d7a1f98b529b795",
       "registry": "policies.yaml",

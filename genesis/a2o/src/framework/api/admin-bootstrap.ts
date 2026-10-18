@@ -121,6 +121,10 @@ export async function mintAdminToken(doorwayUrl: string, key: string): Promise<s
     bio: 'Non-human a2o provisioning actor — lifts the fixture steward to Admin.',
     profileReach: 'private',
     adminBootstrapKey: key,
+    // Not a human, so not hosted: the device arm writes an account row and
+    // gives this actor no cell. Unset, the doorway defaulted to hosted and gave
+    // it a 5-cell agent on every doorway it touched (jessica's included).
+    agencyPhase: 'device',
   });
   if (reg.status !== 200 && reg.status !== 201 && reg.status !== 409) return null;
 

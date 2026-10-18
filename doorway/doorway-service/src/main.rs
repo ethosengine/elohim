@@ -125,6 +125,15 @@ fn main() -> anyhow::Result<()> {
 }
 
 async fn async_main(worker_threads: usize) -> anyhow::Result<()> {
+    let local_args: Vec<_> = std::env::args().collect();
+    if local_args.get(1).map(String::as_str) == Some("--local-view-relay") {
+        anyhow::ensure!(
+            local_args.len() == 3,
+            "--local-view-relay requires a loopback listen address"
+        );
+        return server::local_peer::serve(local_args[2].parse()?).await;
+    }
+
     // Parse command line arguments (.env already loaded in main()).
     let args = Args::parse();
 
@@ -484,12 +493,20 @@ async fn async_main(worker_threads: usize) -> anyhow::Result<()> {
         // Admin URL: an explicit --conductor-admin-url wins in the single-conductor
         // case, else port - 1 (socat convention: 8444=admin, 8445=app).
         let admin_url = args.admin_url_for(i, url, conductor_urls.len());
+        // A conductor outside DOORWAY_HOSTING_CONDUCTORS is a member's own
+        // device: it stays in the pool for projection and discovery, hosts no one.
+        let capacity_max = if args.conductor_hosts_agents(url) {
+            max_agents_per_conductor
+        } else {
+            0
+        };
+        info!(conductor = %conductor_id, url = %url, capacity_max, "Conductor registered");
         registry.register_conductor(ConductorInfo {
             conductor_id,
             conductor_url: url.clone(),
             admin_url,
             capacity_used: 0,
-            capacity_max: max_agents_per_conductor,
+            capacity_max,
         });
     }
 

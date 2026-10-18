@@ -1,0 +1,77 @@
+seamRegistryVersion: 1
+crate: browser-bridge
+crateRoot: bridges/browser
+seamLocus: Portable app foundation; operational contracts without runtime delivery claims.
+decisionPoints:
+  - name: origin
+    kind: verdict-fn
+    sourceLocation:
+      file: src/lib.rs
+      modulePath: browser_bridge::origin
+    concernIds:
+      - id: C0
+        status: answered
+        justification: External browser translation only.
+      - id: C1
+        status: n-a
+        justification: This operational predicate has no authority, publication, network
+          or identity effects in this concern.
+      - id: C2
+        status: n-a
+        justification: This operational predicate has no authority, publication, network
+          or identity effects in this concern.
+      - id: C3
+        status: n-a
+        justification: This operational predicate has no authority, publication, network
+          or identity effects in this concern.
+      - id: C4
+        status: answered
+        justification: Unsupported runtime remains unsupported after a matching origin.
+      - id: C5
+        status: n-a
+        justification: This operational predicate has no authority, publication, network
+          or identity effects in this concern.
+      - id: C6a
+        status: n-a
+        justification: This operational predicate has no authority, publication, network
+          or identity effects in this concern.
+      - id: C6b
+        status: n-a
+        justification: This operational predicate has no authority, publication, network
+          or identity effects in this concern.
+      - id: C7
+        status: n-a
+        justification: This operational predicate has no authority, publication, network
+          or identity effects in this concern.
+      - id: C8
+        status: n-a
+        justification: This operational predicate has no authority, publication, network
+          or identity effects in this concern.
+      - id: C9
+        status: n-a
+        justification: This operational predicate has no authority, publication, network
+          or identity effects in this concern.
+      - id: C10
+        status: n-a
+        justification: This operational predicate has no authority, publication, network
+          or identity effects in this concern.
+      - id: C11
+        status: n-a
+        justification: This operational predicate has no authority, publication, network
+          or identity effects in this concern.
+      - id: C12
+        status: partial
+        justification: Validates explicit HTTPS origin; session authentication and
+          resource grants remain host/runtime duties.
+      - id: C13
+        status: n-a
+        justification: This operational predicate has no authority, publication, network
+          or identity effects in this concern.
+      - id: C14
+        status: n-a
+        justification: This operational predicate has no authority, publication, network
+          or identity effects in this concern.
+    contractTests:
+      - path: bridges/browser/src/lib.rs
+        testName: admitted_origin_does_not_create_runtime_authority
+        kind: unit

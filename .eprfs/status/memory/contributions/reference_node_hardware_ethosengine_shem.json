@@ -2,16 +2,17 @@
   "version": 1,
   "collective": {
     "path": ".epr-meta/collective.json",
-    "cid": "bafkreihcq3q7qgwncossxf6q7rowjsysgw3wqt2lpu2w6mnoosd7abmfku"
+    "cid": "bafkreihdh5j5y4mkjijuekeknoyspyjgv2u23e5ecmso67b3f5ehpbmtai"
   },
-  "author": "agent:integrator@claude-fable-5-1",
+  "author": "human:matthew",
   "steward": "repo:ethosengine/elohim",
   "scope": "repository",
   "reach": "repository",
   "concern": "reference-node-hardware-ethosengine-shem",
   "claim": "ethosengine = X470D4U/3900X/64G, worn QLC mirror; shem = T7610 dual E5/135G/ZFS — before storage/reboot/placement.",
   "uncertainty": [
-    "Imported verbatim from .claude/memory/reference_node_hardware_ethosengine_shem.md; the claim is the entry's own one-line description and the entry body is the pinned source, not restated here."
+    "Imported verbatim from .claude/memory/reference_node_hardware_ethosengine_shem.md; the claim is the entry's own one-line description and the entry body is the pinned source, not restated here.",
+    "authorship: steward-of-record — human:matthew stands for this entry; no agent author was witnessed writing it, and this record does not say human:matthew wrote it. Origin session: 19a11573-749b-4c03-98f6-ce6c246c5400."
   ],
   "sources": [
     {

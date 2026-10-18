@@ -1,0 +1,77 @@
+seamRegistryVersion: 1
+crate: workspace-bridge
+crateRoot: bridges/workspace
+seamLocus: Portable app foundation; operational contracts without runtime delivery claims.
+decisionPoints:
+  - name: from_che_endpoints
+    kind: verdict-fn
+    sourceLocation:
+      file: src/lib.rs
+      modulePath: workspace_bridge::WorkspaceBridge::from_che_endpoints
+    concernIds:
+      - id: C0
+        status: answered
+        justification: Declared environment endpoints only, no ingress mutation.
+      - id: C1
+        status: n-a
+        justification: This operational predicate has no authority, publication, network
+          or identity effects in this concern.
+      - id: C2
+        status: n-a
+        justification: This operational predicate has no authority, publication, network
+          or identity effects in this concern.
+      - id: C3
+        status: n-a
+        justification: This operational predicate has no authority, publication, network
+          or identity effects in this concern.
+      - id: C4
+        status: n-a
+        justification: This operational predicate has no authority, publication, network
+          or identity effects in this concern.
+      - id: C5
+        status: n-a
+        justification: This operational predicate has no authority, publication, network
+          or identity effects in this concern.
+      - id: C6a
+        status: n-a
+        justification: This operational predicate has no authority, publication, network
+          or identity effects in this concern.
+      - id: C6b
+        status: n-a
+        justification: This operational predicate has no authority, publication, network
+          or identity effects in this concern.
+      - id: C7
+        status: answered
+        justification: Lookup makes no reachability claim.
+      - id: C8
+        status: n-a
+        justification: This operational predicate has no authority, publication, network
+          or identity effects in this concern.
+      - id: C9
+        status: n-a
+        justification: This operational predicate has no authority, publication, network
+          or identity effects in this concern.
+      - id: C10
+        status: n-a
+        justification: This operational predicate has no authority, publication, network
+          or identity effects in this concern.
+      - id: C11
+        status: n-a
+        justification: This operational predicate has no authority, publication, network
+          or identity effects in this concern.
+      - id: C12
+        status: partial
+        justification: Credential/query URLs refuse and lookups use configured names;
+          caller bounds configuration size and validates authority.
+      - id: C13
+        status: n-a
+        justification: This operational predicate has no authority, publication, network
+          or identity effects in this concern.
+      - id: C14
+        status: n-a
+        justification: This operational predicate has no authority, publication, network
+          or identity effects in this concern.
+    contractTests:
+      - path: bridges/workspace/src/lib.rs
+        testName: credential_urls_and_duplicate_service_names_refuse
+        kind: unit

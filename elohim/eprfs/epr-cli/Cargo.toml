@@ -17,6 +17,7 @@ name = "epr"
 path = "src/main.rs"
 
 [dependencies]
+ts-rs = { version = "10.1", features = ["serde-json-impl"] }
 eprfs-core = { path = "../eprfs-core" }
 eprfs-agent = { path = "../eprfs-agent" }
 eprfs-host = { path = "../eprfs-host" }

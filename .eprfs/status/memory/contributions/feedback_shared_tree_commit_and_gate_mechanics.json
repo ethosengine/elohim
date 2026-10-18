@@ -2,22 +2,23 @@
   "version": 1,
   "collective": {
     "path": ".epr-meta/collective.json",
-    "cid": "bafkreihcq3q7qgwncossxf6q7rowjsysgw3wqt2lpu2w6mnoosd7abmfku"
+    "cid": "bafkreihdh5j5y4mkjijuekeknoyspyjgv2u23e5ecmso67b3f5ehpbmtai"
   },
-  "author": "agent:integrator@claude-fable-5-1",
+  "author": "human:matthew",
   "steward": "repo:ethosengine/elohim",
   "scope": "repository",
   "reach": "repository",
   "concern": "feedback-shared-tree-commit-and-gate-mechanics",
   "claim": "Backticks in a Bash heredoc trip the destructive-token hook (Write the commit msg); gate a dirty shared crate from a git-archive export OUTSIDE the repo.",
   "uncertainty": [
-    "Imported verbatim from .claude/memory/feedback_shared_tree_commit_and_gate_mechanics.md; the claim is the entry's own one-line description and the entry body is the pinned source, not restated here."
+    "Imported verbatim from .claude/memory/feedback_shared_tree_commit_and_gate_mechanics.md; the claim is the entry's own one-line description and the entry body is the pinned source, not restated here.",
+    "authorship: steward-of-record — human:matthew stands for this entry; no agent author was witnessed writing it, and this record does not say human:matthew wrote it. Origin session: 81f8cba7-09d3-4cc0-83a9-af45293320fd."
   ],
   "sources": [
     {
       "resource": {
         "path": ".claude/memory/feedback_shared_tree_commit_and_gate_mechanics.md",
-        "cid": "bafkreihr7nkkzyw4yib5rhdehj7oajasdkrf76tfsptxgnahqwpxcurxhe"
+        "cid": "bafkreidwzlswhovhmfdzqjajfrzgmwwfw2cn4f6psaqqqyuxgjnivfifmy"
       },
       "reach": "repository"
     }

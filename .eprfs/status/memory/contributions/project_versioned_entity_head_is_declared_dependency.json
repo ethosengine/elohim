@@ -2,16 +2,17 @@
   "version": 1,
   "collective": {
     "path": ".epr-meta/collective.json",
-    "cid": "bafkreihcq3q7qgwncossxf6q7rowjsysgw3wqt2lpu2w6mnoosd7abmfku"
+    "cid": "bafkreihdh5j5y4mkjijuekeknoyspyjgv2u23e5ecmso67b3f5ehpbmtai"
   },
-  "author": "agent:integrator@claude-fable-5-1",
+  "author": "human:matthew",
   "steward": "repo:ethosengine/elohim",
   "scope": "repository",
   "reach": "repository",
   "concern": "versioned-entity-head-is-declared-dependency",
   "claim": "Which version applies is a DECLARED dependency (cid-pin=lockfile), not recency; versions are a DAG (fork/revert/merge); binding picks head, not the query layer.",
   "uncertainty": [
-    "Imported verbatim from .claude/memory/project_versioned_entity_head_is_declared_dependency.md; the claim is the entry's own one-line description and the entry body is the pinned source, not restated here."
+    "Imported verbatim from .claude/memory/project_versioned_entity_head_is_declared_dependency.md; the claim is the entry's own one-line description and the entry body is the pinned source, not restated here.",
+    "authorship: steward-of-record — human:matthew stands for this entry; no agent author was witnessed writing it, and this record does not say human:matthew wrote it. Origin session: 6e06fa79-220c-45d9-82d7-bb465649dc34."
   ],
   "sources": [
     {

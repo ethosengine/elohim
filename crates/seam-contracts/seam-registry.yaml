@@ -364,3 +364,76 @@ decisionPoints:
       operator-tunable policy. Making them a standing-policy manifest read is a real change with a
       real home (the ManifestStakesResolver that already owns the stage leg) and is not smuggled
       in as a default here.
+
+  - name: insert
+    kind: verdict-fn
+    sourceLocation:
+      file: src/demand.rs
+      modulePath: seam_contracts::demand::DemandLeases::insert
+    concernIds:
+      - id: C0
+        status: answered
+        justification: Operational bounded lease admission; no persisted observations or
+          execution authority.
+      - id: C1
+        status: n-a
+        justification: This operational predicate has no authority, publication, network
+          or identity effects in this concern.
+      - id: C2
+        status: n-a
+        justification: This operational predicate has no authority, publication, network
+          or identity effects in this concern.
+      - id: C3
+        status: partial
+        justification: Owners must release on completion/failure/cancellation; no
+          independent lease expiry.
+      - id: C4
+        status: n-a
+        justification: This operational predicate has no authority, publication, network
+          or identity effects in this concern.
+      - id: C5
+        status: n-a
+        justification: This operational predicate has no authority, publication, network
+          or identity effects in this concern.
+      - id: C6a
+        status: partial
+        justification: Concurrent lease count bounded; caller bounds key/target payload size.
+      - id: C6b
+        status: answered
+        justification: Separate consumer leases coalesce work keys and release
+          idempotently without deleting durable work.
+      - id: C7
+        status: answered
+        justification: Foreground is demand, not a claim of resource admission or
+          completed work.
+      - id: C8
+        status: answered
+        justification: DemandRefusal implements ReasonLabel with explicit capacity and
+          exhausted-handle reasons.
+      - id: C9
+        status: n-a
+        justification: This operational predicate has no authority, publication, network
+          or identity effects in this concern.
+      - id: C10
+        status: answered
+        justification: Handle exhaustion refuses rather than wrapping into another live lease.
+      - id: C11
+        status: n-a
+        justification: This operational predicate has no authority, publication, network
+          or identity effects in this concern.
+      - id: C12
+        status: n-a
+        justification: This operational predicate has no authority, publication, network
+          or identity effects in this concern.
+      - id: C13
+        status: n-a
+        justification: This operational predicate has no authority, publication, network
+          or identity effects in this concern.
+      - id: C14
+        status: n-a
+        justification: This operational predicate has no authority, publication, network
+          or identity effects in this concern.
+    contractTests:
+      - path: crates/seam-contracts/src/demand.rs
+        testName: leases_are_bounded_and_independent
+        kind: unit

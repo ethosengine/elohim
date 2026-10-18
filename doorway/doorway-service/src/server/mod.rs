@@ -5,3 +5,5 @@ pub mod membrane;
 pub mod websocket;
 
 pub use http::{run, AppState};
+
+pub mod local_peer;

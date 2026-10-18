@@ -2,9 +2,9 @@
 
 Runtime composition primitive for the Elohim Protocol's **hub layer**: the cluster of machines in one home or one collective that stewards its people's compute, federates with peer hubs, and takes on the aggregate-scale concerns that hyperscalers usually centralize. In plain terms: the code that turns several crates into one running service for a home or a collective.
 
-**This README is a placement guide and an architectural orientation for a crate that has no code yet.** It says where concerns belong; where the code differs, the code is expected to move. If you came here to decide where a piece of code goes, read "The web seam" as far as the heading "Rules of the seam" and stop there. It assumes you know Holochain (its DHT is the shared, validated record; its conductor is the process that runs a device's Holochain apps) and libp2p and iroh, the two peer-to-peer transports storage uses. On all of them a peer is addressed by its public key and proves it holds that key, which is what "address and verify a peer by key" means below. The placement test routes between three crates: `doorway-service` (`doorway/doorway-service/`, the gateway that serves browsers and other web2 clients), `elohim-storage` (`elohim/elohim-storage/`, a peer's storage and sync service) and `elohim-hub` (this directory). `elohim-node` (`steward/node/`) is the process that links storage and the hub on a peer.
+**This README is a placement guide and an architectural orientation for a crate whose first implementation serves private local projections.** It says where concerns belong; where the code differs, the code is expected to move. If you came here to decide where a piece of code goes, read "The web seam" as far as the heading "Rules of the seam" and stop there. It assumes you know Holochain (its DHT is the shared, validated record; its conductor is the process that runs a device's Holochain apps) and libp2p and iroh, the two peer-to-peer transports storage uses. On all of them a peer is addressed by its public key and proves it holds that key, which is what "address and verify a peer by key" means below. The placement test routes between three crates: `doorway-service` (`doorway/doorway-service/`, the gateway that serves browsers and other web2 clients), `elohim-storage` (`elohim/elohim-storage/`, a peer's storage and sync service) and `elohim-hub` (this directory). `elohim-node` (`steward/node/`) is the process that links storage and the hub on a peer.
 
-> **Status:** no code yet. This directory holds only this README; it reserves the name. The hub trait is sketched in `genesis/docs/content/elohim-protocol/architecture/2026-05-02-elohim-hub-boundaries-design.md`, and that document's section "Doorway / hub edge" is the live statement of the doorway/hub split. Hub cluster code lives in the `elohim-node` crate (`steward/node/`) until a second consumer (operator UI, fixtures crate) needs the trait independently. The web-level hub work that already exists is still in `elohim-storage` and `doorway-service`; the next section lists it as debt.
+> **Status:** `src/local_views.rs` serves configured declarations through `/api/local-views`, reusing `epr view` capture and verified immutable source objects. It records private observation history outside snapshot identity. `elohim-node --local-view <config>` composes it without starting conductors, swarms or agent services; doorway can relay the same requests. The launcher access adapter remains development tooling; verified signed-in identity and owner binding are follow-up work. See `elohim/eprfs/epr-cli/VIEW.md` for the contract, launcher and offline delivery instructions. The hub trait is sketched in `genesis/docs/content/elohim-protocol/architecture/2026-05-02-elohim-hub-boundaries-design.md`, and that document's section "Doorway / hub edge" is the live statement of the doorway/hub split. Hub cluster code lives in the `elohim-node` crate (`steward/node/`) until a second consumer (operator UI, fixtures crate) needs the trait independently. The web-level hub work that already exists is still in `elohim-storage` and `doorway-service`; the next section lists it as debt.
 
 Architecture documents named below by a dated filename live in `genesis/docs/content/elohim-protocol/architecture/`. Every other document is named by its full path. `genesis/` is the monorepo's root for documentation, stories and deployment data. In this README `elohim-hub` in code font is the crate, "a hub" is the box or cluster that runs it, and "the shell" is the person's own desktop app (the Tauri app in `steward/device/`).
 
@@ -33,9 +33,9 @@ Two cases the test settles that a "does it need DNS?" reading gets wrong:
 
 Bootstrap and signal are rendezvous points and are outside this test.
 
-**What to do with the answer.** This crate has no code yet, and the seam does not wait for it.
+**What to do with the answer.** The local projection service is implemented; the broader web seam remains to be composed.
 
-- New hub-side work goes in `elohim/elohim-hub/`. The first piece creates the crate: a `Cargo.toml` here, membership in the `elohim/Cargo.toml` workspace, and a gate project in the nearest `build-manifest.json`. Do not add it to `doorway-service`, and do not add it to `elohim-storage`, which is for bytes, heads, custody and reach.
+- New hub-side work goes in `elohim/elohim-hub/`. Extend the existing crate, its `elohim/Cargo.toml` workspace membership and its manifest-owned gate. Do not add it to `doorway-service`, and do not add it to `elohim-storage`, which is for bytes, heads, custody and reach.
 - A concern can straddle the seam. Split it: the part that needs a name stays in the doorway. The same holds between hub and storage: storage decides which release is a channel's head and holds the bytes (`elohim-storage/src/services/release_adoption/`), and the hub decides which held version to serve, such as the last one whose bytes can start.
 - A module in the debt table below stays where it is until it moves. If you change one, change it toward the seam: no new hostname or certificate reads in hub-side logic, and no new hub-side logic in the doorway.
 - When a module moves, delete its row.
@@ -68,7 +68,7 @@ The rules above say where things belong. This table lists what the code has not 
 | `elohim-node` is a binary with no library target (`steward/node/Cargo.toml`) | a shell that cannot spawn a child cannot link it | a library with a thin binary |
 | `elohim-node` is published by no pipeline (CI only gates it) and deployed by no manifest (`genesis/data/timeline/backlog/hub-enablement-dial-readiness-2026-06-21.md`), and calls itself the always-on runtime | no device runs it today | built and shipped wherever a peer runs; always-on only when its device is |
 | the desktop app's bundle declares no sidecar binary (`steward/device/src-tauri/tauri.conf.json`), though `storage.rs` looks for a bundled one | a packaged desktop app has no node to start | the node bundled with the shell |
-| `elohim-node`, which mounts only a minimal blob-serving storage HTTP server (`steward/node/CLAUDE.md`) | it cannot yet serve storage's routes and the hub's web routes as one surface | one HTTP surface per peer |
+| `elohim-node`, which in its normal runtime mounts only a minimal blob-serving storage HTTP server (the separate `--local-view` mode already serves declared projections) (`steward/node/CLAUDE.md`) | it cannot yet serve storage's routes and the hub's web routes as one surface | one HTTP surface per peer |
 | an anonymous render in `doorway-service/src/ssr.rs` | fetches on the doorway's own authority (`Ambient`) | rendered in the hub with an anonymous reader's authority |
 | renderers built from a bundle on disk named by `SSR_BUNDLE_PATH` (`elohim-storage/src/ssr.rs`, `doorway-service/src/render/registry.rs`) | when no bundle slug is set, a path and not a content address | built only from bytes verified against their content address |
 | a household's own certificate: issuing it, rotating it, and getting the household's devices to trust it | not built beyond the development mesh's local certificate authority (`MESH_DOORWAY_TLS=1`); `doorway-service/src/tls.rs` loads a pair made elsewhere | the doorway role |
@@ -132,7 +132,7 @@ The defense claim is a design thesis, not shipped code: "A pattern shaped like a
 
 ## Archetypes
 
-The hub has two archetypes. They share a trait surface and differ in **design attitude**. They are separate implementations on purpose, never one `Hub` with a setting, because "governance considerations do not degrade gracefully" (`2026-05-02-elohim-hub-boundaries-design.md`).
+The hub has two archetypes. The design gives them a shared trait surface; they differ in **design attitude**. They are planned as separate implementations on purpose, never one `Hub` with a setting, because "governance considerations do not degrade gracefully" (`2026-05-02-elohim-hub-boundaries-design.md`).
 
 ### DwellingHub (primary)
 
@@ -158,10 +158,9 @@ The doorway is one role a hub can take, not a mandatory layer. The doorway-side 
 
 ## What goes here, eventually
 
-This directory will hold the following. The web seam's first piece creates the crate, and the Hub trait joins it from `elohim-node` when a second consumer needs it:
+The crate currently contains `Cargo.toml`, `src/lib.rs`, the local projection handlers and their tests. The broader composition remains planned; the Hub trait joins from `elohim-node` when a second consumer needs it:
 
-- `Cargo.toml`: crate definition
-- `src/lib.rs`: the `Hub` trait and core types
+- `src/lib.rs`: future `Hub` trait and core types alongside the local projection module
 - `src/web/`: the web seam above (app serving, rendering, the deliverability verdict)
 - `src/dwelling/`: the `DwellingHub` implementation
 - `src/collective/`: the `CollectiveHub` implementation

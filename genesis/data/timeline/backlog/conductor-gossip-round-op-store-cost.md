@@ -11,6 +11,8 @@ status: "open"
 priority: "medium"
 severity: medium
 nodes: [alpha, household]
+relatedNodeIds:
+  - "habit:idle-is-free"
 tags: [conductor-fork, kitsune2, gossip, sqlite, cpu, performance, perf-cpu, perf-io, perf-scale, idle-is-free, dataplane-convergence, trustful-self, friction-verify, plane-notary, unit-peer, phase-steady, lane-background, custody-everyone]
 cites:
   - genesis/docs/superpowers/sprints/2026-10-11-idle-cpu-residual-sprint.md

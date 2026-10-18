@@ -2,22 +2,23 @@
   "version": 1,
   "collective": {
     "path": ".epr-meta/collective.json",
-    "cid": "bafkreihcq3q7qgwncossxf6q7rowjsysgw3wqt2lpu2w6mnoosd7abmfku"
+    "cid": "bafkreihdh5j5y4mkjijuekeknoyspyjgv2u23e5ecmso67b3f5ehpbmtai"
   },
-  "author": "agent:integrator@claude-fable-5-1",
+  "author": "human:matthew",
   "steward": "repo:ethosengine/elohim",
   "scope": "repository",
   "reach": "repository",
   "concern": "tiered-quilt-unblock-state",
   "claim": "Attestation consolidation (wave-0) LANDED — don't re-plan it; remaining = Stage-B rename + tier-substrate waves (unblocks weave-epic-arc #2).",
   "uncertainty": [
-    "Imported verbatim from .claude/memory/project_tiered_quilt_unblock_state.md; the claim is the entry's own one-line description and the entry body is the pinned source, not restated here."
+    "Imported verbatim from .claude/memory/project_tiered_quilt_unblock_state.md; the claim is the entry's own one-line description and the entry body is the pinned source, not restated here.",
+    "authorship: steward-of-record — human:matthew stands for this entry; no agent author was witnessed writing it, and this record does not say human:matthew wrote it. Origin session: 814f0995-0478-402e-89e7-00813f34980d."
   ],
   "sources": [
     {
       "resource": {
         "path": ".claude/memory/project_tiered_quilt_unblock_state.md",
-        "cid": "bafkreifbxh6vnekm23aixndzro2lisibarkjmbs6lec2sk3igffdekcbzi"
+        "cid": "bafkreibzx4g2cenu7a5ydchzt664mlnr23ciywp2ycxrkcad3uiamntszq"
       },
       "reach": "repository"
     }

@@ -350,6 +350,7 @@ dev action="status" profile="isolated" seed="false" build="false":
         esac
         exec "{{ app_dir }}/scripts/hc-start.sh" --conductor
         ;;
+      view) exec "{{ root }}/app/scripts/local-view-launcher.sh" "{{ profile }}" ;;
       app) cd "{{ app_dir }}"; exec pnpm start ;;
       package)
         package_app="{{ profile }}"
@@ -368,7 +369,7 @@ dev action="status" profile="isolated" seed="false" build="false":
         exec "{{ app_dir }}/scripts/hc-start.sh" --stop
         ;;
       status) just --justfile "{{ root }}/justfile" status runtime ;;
-      *) echo "dev action must be start|conductor|app|package|stop|status" >&2; exit 2 ;;
+      *) echo "dev action must be start|conductor|app|package|view|stop|status" >&2; exit 2 ;;
     esac
 
 # Manage or measure the local multi-peer mesh. Safe default: status.
@@ -761,3 +762,13 @@ measure *args:
     #!/usr/bin/env bash
     set -euo pipefail
     exec bash "{{ justfile_directory() }}/genesis/agentic/compute/measure.sh" {{ args }}
+
+# Private projection serving; the native capture evaluator remains in eprfs.
+_gate-elohim-hub:
+    cargo fmt --manifest-path elohim/Cargo.toml -p elohim-hub --check
+    cargo clippy --manifest-path elohim/Cargo.toml -p elohim-hub --all-targets -- -D warnings
+    cargo test --manifest-path elohim/Cargo.toml -p elohim-hub
+    cargo build --manifest-path elohim/Cargo.toml -p elohim-hub --example local-view
+    node app/scripts/local-view-contract.mjs "$CARGO_TARGET_DIR/debug/examples/local-view"
+    node --test app/scripts/local-view-launcher.test.mjs
+    node --test elohim/sdk/schemas/tests/work-composition.test.mjs elohim/rakia/work-composition/contract.test.mjs

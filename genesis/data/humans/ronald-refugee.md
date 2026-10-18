@@ -1,6 +1,7 @@
 ---
 id: "human-ronald-refugee"
 displayName: "Ronald"
+agencyPhase: "hosted"
 category: "newcomer"
 profileReach: "community"
 bio: "Fled conflict in my home country. Now rebuilding life here. Engineer by training, doing what work I can find."

@@ -244,6 +244,13 @@ RUST_ATOM_CIDS = {
     "epr:validator-ownership-ontology-guard":
         "bafyreif2f3eve4kg5skanqi4exvigznllxuqsy6r6w6t4pgibp2cybx2xe",
 }
+# Atoms bound to a Python-only validator (governance-validators.json `runtime: python`): the
+# native host loads and validates them like any atom but pins no literal, so the pin lives here
+# (and in that validator's own harness, absolutes_guard_test.py).
+PYTHON_ONLY_ATOM_CIDS = {
+    "epr:validator-absolutes-guard":
+        "bafyreifu5muluyfeiay74fvopftanyh4xvbs65iuxya55dpgevbwy7236u",
+}
 RUST_GOLDEN_CLASSIFICATION_CID = "bafyreifb4rgfeqi74y2ulv2hnijbu6n3fjrgap2y6fhmrqnpnazg6lmenm"
 SOV = "epr:validator-sovereignty-ontology-guard"
 
@@ -295,8 +302,9 @@ try:
         os.environ["CLAUDE_PROJECT_DIR"] = _td  # a hook-test project dir: no atoms
         check("without atoms under CLAUDE_PROJECT_DIR the loader falls back to the _lib repo",
               frame_atoms.repo_root() == REPO.resolve())
-        check("…and the fallback loads both atoms at their pinned CIDs",
-              {r: c for r, (_, c) in frame_atoms.load_frames().items()} == RUST_ATOM_CIDS)
+        check("…and the fallback loads every atom at its pinned CID",
+              {r: c for r, (_, c) in frame_atoms.load_frames().items()}
+              == {**RUST_ATOM_CIDS, **PYTHON_ONLY_ATOM_CIDS})
         (Path(_td) / frame_atoms.FRAMES_REL).mkdir(parents=True)
         check("a project dir that carries the frames dir is preferred",
               frame_atoms.repo_root() == Path(_td))

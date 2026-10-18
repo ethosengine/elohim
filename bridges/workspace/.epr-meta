@@ -1,0 +1,13 @@
+---
+epr-meta-version: 1
+id: workspace-lifecycle-bridge
+covers: subtree
+purpose: >
+  Translate declared workspace environment endpoints, initially Eclipse Che, for elohim-node.
+  Discovery is not route creation or authorization. Generic service attachment belongs to the
+  peer host and doorway ingress; this library never weakens loopback-only admission.
+---
+
+The local-view launcher's workspace origin is the working precedent. This adapter only reads
+explicitly provided configuration. It never reads arbitrary environment variables, invents an
+ingress, invokes kubectl or introduces a process supervisor. The host scopes the service map.

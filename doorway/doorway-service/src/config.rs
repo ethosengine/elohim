@@ -385,6 +385,15 @@ pub struct Args {
     #[arg(long, env = "CONDUCTOR_URLS")]
     pub conductor_urls: Option<String>,
 
+    /// Comma-separated subset of the conductor pool that HOSTS agents: the
+    /// doorway operators' conductors (matthew, adam). Every other conductor in
+    /// the pool keeps its projection subscriber, discovery and fallback role
+    /// but gets a hosted-agent ceiling of 0, so no hosted human is ever
+    /// installed on a member's own device. Unset: every pool conductor hosts.
+    /// Same URL form as CONDUCTOR_URLS.
+    #[arg(long, env = "DOORWAY_HOSTING_CONDUCTORS")]
+    pub hosting_conductors: Option<String>,
+
     /// Holochain installed app ID for projections and signal subscriptions
     #[arg(long, env = "INSTALLED_APP_ID", default_value = "elohim")]
     pub installed_app_id: String,
@@ -621,6 +630,15 @@ impl Args {
     /// dialled that dead socket forever: `Conductor connection failed: Admin
     /// WebSocket connect to ws://localhost:4443 failed: Connection refused`,
     /// climbing its own backoff ladder and never healing.
+    /// Whether the pool conductor at `app_url` may host agents (see
+    /// `hosting_conductors`). Matching ignores surrounding whitespace.
+    pub fn conductor_hosts_agents(&self, app_url: &str) -> bool {
+        match self.hosting_conductors.as_deref().map(str::trim) {
+            None | Some("") => true,
+            Some(list) => list.split(',').any(|u| u.trim() == app_url.trim()),
+        }
+    }
+
     pub fn conductor_url_list(&self) -> Vec<String> {
         if let Some(ref urls) = self.conductor_urls {
             urls.split(',')
@@ -755,6 +773,27 @@ mod conductor_url_convention_tests {
     /// The alpha convention: `--conductor-url ws://elohim-matthew-alpha:4445` is
     /// already an APP url. A URL inside the app-port range passes through
     /// untouched, so this fix cannot move a working deployment.
+    /// A member's own conductor sits in the pool for projection, never for
+    /// hosting: only the declared hosting set gets a non-zero ceiling.
+    #[test]
+    fn only_declared_hosting_conductors_host_agents() {
+        let args = args_with(&[
+            "--conductor-urls",
+            "ws://matthew:8445,ws://susan:8445,ws://adam:8445",
+            "--hosting-conductors",
+            "ws://matthew:8445, ws://adam:8445",
+        ]);
+        assert!(args.conductor_hosts_agents("ws://matthew:8445"));
+        assert!(args.conductor_hosts_agents("ws://adam:8445"));
+        assert!(!args.conductor_hosts_agents("ws://susan:8445"));
+    }
+
+    #[test]
+    fn with_no_hosting_set_every_pool_conductor_hosts() {
+        let args = args_with(&["--conductor-urls", "ws://matthew:8445,ws://susan:8445"]);
+        assert!(args.conductor_hosts_agents("ws://susan:8445"));
+    }
+
     #[test]
     fn an_app_conductor_url_passes_through_untouched() {
         let args = args_with(&["--conductor-url", "ws://elohim-matthew-alpha:4445"]);

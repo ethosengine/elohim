@@ -2,22 +2,23 @@
   "version": 1,
   "collective": {
     "path": ".epr-meta/collective.json",
-    "cid": "bafkreihcq3q7qgwncossxf6q7rowjsysgw3wqt2lpu2w6mnoosd7abmfku"
+    "cid": "bafkreihdh5j5y4mkjijuekeknoyspyjgv2u23e5ecmso67b3f5ehpbmtai"
   },
-  "author": "agent:integrator@claude-fable-5-1",
+  "author": "human:matthew",
   "steward": "repo:ethosengine/elohim",
   "scope": "repository",
   "reach": "repository",
   "concern": "feedback-decide-clear-calls-not-over-ask",
   "claim": "Decide obvious-default calls yourself; ask only on genuine forks whose trade-offs the user owns.",
   "uncertainty": [
-    "Imported verbatim from .claude/memory/feedback-decide-clear-calls-not-over-ask.md; the claim is the entry's own one-line description and the entry body is the pinned source, not restated here."
+    "Imported verbatim from .claude/memory/feedback-decide-clear-calls-not-over-ask.md; the claim is the entry's own one-line description and the entry body is the pinned source, not restated here.",
+    "authorship: steward-of-record — human:matthew stands for this entry; no agent author was witnessed writing it, and this record does not say human:matthew wrote it. Origin session: 32ed30bb-9c4a-4a71-9026-524a934f5f9e."
   ],
   "sources": [
     {
       "resource": {
         "path": ".claude/memory/feedback-decide-clear-calls-not-over-ask.md",
-        "cid": "bafkreig2zxuvhvm4r4yuzysh3664nxtd5z6duodeqnj4nquco7nnvbojp4"
+        "cid": "bafkreif77v5acgspbmxemruxoq7rachso76dt6qsetrbie225pwn633ami"
       },
       "reach": "repository"
     }

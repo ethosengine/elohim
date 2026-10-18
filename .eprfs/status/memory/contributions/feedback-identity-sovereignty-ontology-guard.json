@@ -2,22 +2,23 @@
   "version": 1,
   "collective": {
     "path": ".epr-meta/collective.json",
-    "cid": "bafkreihcq3q7qgwncossxf6q7rowjsysgw3wqt2lpu2w6mnoosd7abmfku"
+    "cid": "bafkreihdh5j5y4mkjijuekeknoyspyjgv2u23e5ecmso67b3f5ehpbmtai"
   },
-  "author": "agent:integrator@claude-fable-5-1",
+  "author": "human:matthew",
   "steward": "repo:ethosengine/elohim",
   "scope": "repository",
   "reach": "repository",
   "concern": "feedback-identity-sovereignty-ontology-guard",
   "claim": "\"Self-sovereign\" must never be the apex identity tier — community governance backstops individuals; AI agents re-leak the crypto framing at tier-naming.",
   "uncertainty": [
-    "Imported verbatim from .claude/memory/feedback-identity-sovereignty-ontology-guard.md; the claim is the entry's own one-line description and the entry body is the pinned source, not restated here."
+    "Imported verbatim from .claude/memory/feedback-identity-sovereignty-ontology-guard.md; the claim is the entry's own one-line description and the entry body is the pinned source, not restated here.",
+    "authorship: steward-of-record — human:matthew stands for this entry; no agent author was witnessed writing it, and this record does not say human:matthew wrote it. Origin session: 7e1a3c79-5f90-4dd9-9ee0-402703bd0a42."
   ],
   "sources": [
     {
       "resource": {
         "path": ".claude/memory/feedback-identity-sovereignty-ontology-guard.md",
-        "cid": "bafkreidzw3c7xsox4uyjoitwjxx5en4kfbo5p2rtr27bjftwifxo2xfdpy"
+        "cid": "bafkreib6u4eh2j5gcpspaq7ik7nlhp4rnio3wmffnje4o4uta42olurilq"
       },
       "reach": "repository"
     }

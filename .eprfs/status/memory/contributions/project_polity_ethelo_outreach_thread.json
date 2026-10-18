@@ -2,16 +2,17 @@
   "version": 1,
   "collective": {
     "path": ".epr-meta/collective.json",
-    "cid": "bafkreihcq3q7qgwncossxf6q7rowjsysgw3wqt2lpu2w6mnoosd7abmfku"
+    "cid": "bafkreihdh5j5y4mkjijuekeknoyspyjgv2u23e5ecmso67b3f5ehpbmtai"
   },
-  "author": "agent:integrator@claude-fable-5-1",
+  "author": "human:matthew",
   "steward": "repo:ethosengine/elohim",
   "scope": "repository",
   "reach": "repository",
   "concern": "project_polity_ethelo_outreach_thread",
   "claim": "Data-coop wanting Elohim as P2P-storage+provenance substrate; wallets→agent-scoped DHT, lake→projection+OPAL; coop model resolves the self-sovereign tension.",
   "uncertainty": [
-    "Imported verbatim from .claude/memory/project_polity_ethelo_outreach_thread.md; the claim is the entry's own one-line description and the entry body is the pinned source, not restated here."
+    "Imported verbatim from .claude/memory/project_polity_ethelo_outreach_thread.md; the claim is the entry's own one-line description and the entry body is the pinned source, not restated here.",
+    "authorship: steward-of-record — human:matthew stands for this entry; no agent author was witnessed writing it, and this record does not say human:matthew wrote it. Origin session: 5708b386-3421-4347-8ec0-0aa90dec1db5."
   ],
   "sources": [
     {

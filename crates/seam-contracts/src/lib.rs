@@ -82,6 +82,7 @@
 
 pub mod answer;
 pub mod canon;
+pub mod demand;
 pub mod election;
 pub mod freshness;
 #[cfg(feature = "harness")]

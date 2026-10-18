@@ -55,6 +55,19 @@ cites:
 ---
 # elohim-storage — governance package
 
+## Working state, publication projection and custody
+
+Follow the [root lifecycle map](../../../.epr-meta/manifest.md#application-lifecycle--authoritative-homes-and-composition)
+and its existing working-version/sync-state standards. This crate owns node-local
+document persistence, authorized document sync, verified published projections and
+byte custody. Automerge merges values; it cannot grant editor admission or elect a
+published head. Keep unpublished working documents separate from the projector's
+published documents, and enforce private-draft exclusion on listing, serving and sync
+before any client relies on it. The standard records gaps; a document prefix alone
+is not enforcement. Fix shared sync/authorization behavior here with boundary tests,
+not independently in each app or doorway route. Client persistence belongs in the SDK;
+notary authority belongs in DNA; peer app serving/rendering belongs in the hub.
+
 Habits declared here (`*.habit.md`) describe THIS crate's behaviour; their checks live wherever
 the evidence does — a2o scenarios, cargo tests, live fleet probes — because a habit is the
 practice and a suite is only ever evidence for it.
