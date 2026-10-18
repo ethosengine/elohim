@@ -314,10 +314,13 @@ async function assertRootCommitmentIsUnclaimed(
   doorwayId: string,
   deadline: number
 ): Promise<void> {
+  const terminalStates = ['cancelled', 'superseded'];
+  // The bound is for live claims; exclude terminal fixture history at the source.
+  const excludeStates = terminalStates.join(',');
   for (let page = 0; page < MAX_COMMITMENT_PAGES; page += 1) {
     const offset = page * COMMITMENT_PAGE_SIZE;
     const response = await fetch(
-      `${storageUrl}/api/v1/commitments?action=project-epr&limit=${COMMITMENT_PAGE_SIZE}&offset=${offset}`,
+      `${storageUrl}/api/v1/commitments?action=project-epr&limit=${COMMITMENT_PAGE_SIZE}&offset=${offset}&excludeStates=${excludeStates}`,
       { signal: AbortSignal.timeout(Math.max(1, deadline - Date.now())) }
     );
     if (!response.ok) {
@@ -330,7 +333,7 @@ async function assertRootCommitmentIsUnclaimed(
     assert.ok(
       !rows.some(
         row =>
-          !['cancelled', 'superseded'].includes(row.state) &&
+          !terminalStates.includes(row.state) &&
           row.metadata?.urlPath === '/' &&
           row.inScopeOf.some(scope => scope.startsWith(`doorway:${doorwayId}|`))
       ),
