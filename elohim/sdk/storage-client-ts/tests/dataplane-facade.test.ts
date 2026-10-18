@@ -52,6 +52,13 @@ describe('DataplaneApi', () => {
       payload: [],
     },
     {
+      name: 'commitments (excluded states)',
+      invoke: () =>
+        client.dataplane.listCommitments({ excludeStates: ['cancelled', 'superseded'] }),
+      path: '/api/v1/commitments?excludeStates=cancelled%2Csuperseded',
+      payload: [],
+    },
+    {
       name: 'economic events (no query)',
       invoke: () => client.dataplane.listEconomicEvents(),
       path: '/api/v1/economic-events',

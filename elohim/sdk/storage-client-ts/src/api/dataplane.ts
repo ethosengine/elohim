@@ -44,6 +44,8 @@ export interface InventoryParity {
  */
 export interface ReaCommitmentQuery {
   action?: string;
+  /** Comma-separated exact state strings to exclude (e.g. cancelled,superseded). Trimmed; empty items ignored; absent or empty excludes nothing; combinable with state. */
+  excludeStates?: string[];
   limit?: number;
 }
 
@@ -169,7 +171,11 @@ export class DataplaneApi {
    * rather than `unknown`.
    */
   async listCommitments(q: ReaCommitmentQuery = {}): Promise<ReaCommitmentView[]> {
-    const query = buildQuery({ action: q.action, limit: q.limit });
+    const query = buildQuery({
+      action: q.action,
+      excludeStates: q.excludeStates?.length ? q.excludeStates.join(',') : undefined,
+      limit: q.limit,
+    });
     return this.client.getJson<ReaCommitmentView[]>(`/api/v1/commitments${query}`);
   }
 
