@@ -167,17 +167,21 @@ impl CellProbe {
 #[derive(Debug, Default)]
 pub struct ProbeGate {
     roles: RwLock<BTreeMap<String, Arc<AtomicBool>>>,
+    /// Woken (every current waiter) each time ANY role's slot is released.
+    released: Arc<tokio::sync::Notify>,
 }
 
 /// Holds one role's probe slot. Releases on drop, so a panic or an early return
 /// inside a probe cannot wedge the role shut forever.
 pub struct ProbeSlot {
     flag: Arc<AtomicBool>,
+    released: Arc<tokio::sync::Notify>,
 }
 
 impl Drop for ProbeSlot {
     fn drop(&mut self) {
         self.flag.store(false, Ordering::SeqCst);
+        self.released.notify_waiters();
     }
 }
 
@@ -205,7 +209,19 @@ impl ProbeGate {
         let flag = self.flag(role);
         flag.compare_exchange(false, true, Ordering::SeqCst, Ordering::SeqCst)
             .ok()
-            .map(|_| ProbeSlot { flag })
+            .map(|_| ProbeSlot {
+                flag,
+                released: Arc::clone(&self.released),
+            })
+    }
+
+    /// Resolves when some role's slot is next released. For a caller that was
+    /// refused [`ProbeVerdict::AlreadyInFlight`] and wants its turn without
+    /// polling: arm the future ([`tokio::sync::futures::Notified::enable`])
+    /// BEFORE checking [`Self::in_flight`], or a release landing between the
+    /// two is missed. Wakes current waiters only — it stores nothing.
+    pub fn released(&self) -> &tokio::sync::Notify {
+        &self.released
     }
 
     /// Is a probe in flight for `role`? Observability and tests only.

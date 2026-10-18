@@ -93,7 +93,16 @@ pub(crate) trait PresenceConductor: Send + Sync {
     /// Ask `role`'s cell its one read-only question through `tended_by`'s
     /// client — [`crate::services::cell_probe::probe_cell`] in production, so a
     /// probe that returns lands in `record_role_success` like any zome call.
-    async fn probe_cell(&self, role: &'static str, tended_by: &'static str);
+    /// The verdict says whether a probe was ASKED at all: only an admitted
+    /// probe spends the role's presence run.
+    async fn probe_cell(
+        &self,
+        role: &'static str,
+        tended_by: &'static str,
+    ) -> crate::services::cell_probe::ProbeVerdict;
+    /// The gate [`Self::probe_cell`] admits through — whose release wakes an
+    /// opportunity that found the role's slot taken.
+    fn probe_gate(&self) -> &crate::services::cell_probe::ProbeGate;
 }
 
 #[async_trait::async_trait]
@@ -122,10 +131,19 @@ impl PresenceConductor for HcClientRegistry {
         })
     }
 
-    async fn probe_cell(&self, role: &'static str, tended_by: &'static str) {
-        if let Some(hc) = self.client(tended_by) {
-            HcClientRegistry::probe_the_cell(role, &hc).await;
+    async fn probe_cell(
+        &self,
+        role: &'static str,
+        tended_by: &'static str,
+    ) -> crate::services::cell_probe::ProbeVerdict {
+        match self.client(tended_by) {
+            Some(hc) => HcClientRegistry::probe_the_cell(role, &hc).await,
+            None => crate::services::cell_probe::ProbeVerdict::Unreachable,
         }
+    }
+
+    fn probe_gate(&self) -> &crate::services::cell_probe::ProbeGate {
+        crate::services::cell_probe::probe_gate()
     }
 }
 
@@ -139,12 +157,21 @@ pub struct PresencePass {
     pub probed: Vec<&'static str>,
 }
 
-/// A probe the driver offered, landing: which role, and under which re-mint
-/// epoch it was offered.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+/// A probe the driver offered, landing: which role, for which presence run,
+/// under which re-mint epoch, and what the gate and the conductor said.
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub(crate) struct Landed {
     pub role: &'static str,
+    pub run: u64,
     pub epoch: u64,
+    pub verdict: crate::services::cell_probe::ProbeVerdict,
+}
+
+/// One probe a pass offers: the role to ask, and the run it is asked for.
+#[derive(Debug, Clone)]
+pub(crate) struct Offer {
+    pub cell: ObservedCell,
+    pub run: u64,
 }
 
 /// The seam's bookkeeping, under ONE lock so no reader sees half a transition.
@@ -162,6 +189,10 @@ struct SeamState {
     probed: std::collections::BTreeMap<&'static str, u64>,
     /// Roles with a probe the driver offered and has not seen land.
     in_flight: std::collections::BTreeSet<&'static str>,
+    /// Roles whose offered probe found the gate already holding a probe of
+    /// theirs (the supervisor's): the opportunity is KEPT, and re-offered when
+    /// that probe releases the gate.
+    pending: std::collections::BTreeSet<&'static str>,
 }
 
 /// THE PRESENCE SEAM: when this node observes a conductor's cells present
@@ -214,7 +245,7 @@ struct SeamState {
 ///
 /// ## Not a probe storm
 ///
-/// ONE probe per role per PRESENCE RUN — an unbroken stretch of readings that
+/// ONE ADMITTED probe per role per PRESENCE RUN — an unbroken stretch of readings that
 /// show its cell running, identified by the reading that began it and recorded
 /// by the cache as each reading LANDS
 /// ([`crate::services::cell_membership::MembershipCache::presence_run_at`]),
@@ -224,7 +255,11 @@ struct SeamState {
 /// watch read. A reading that shows the cell absent, or a re-mint's revocation,
 /// ends the run — even when the driver never sees that reading because a later
 /// one coalesced it — so the next return of the cells earns exactly one more
-/// pass. A re-mint also forgets which runs were probed.
+/// pass. A re-mint also forgets which runs were probed. A run is spent only by
+/// a probe the [`crate::services::cell_probe::ProbeGate`] admitted: an offer
+/// that finds the supervisor's probe of the same role already in flight keeps
+/// the run, waits on the gate's release (no polling) and is re-offered then —
+/// so a supervisor probe that fails does not cost the run its own.
 pub struct PresenceRecovery {
     cadence: Duration,
     window: Duration,
@@ -274,6 +309,7 @@ impl PresenceRecovery {
             state.watch_until = Some(state.watch_until.map_or(until, |open| open.max(until)));
             state.epoch = state.epoch.wrapping_add(1);
             state.probed.clear();
+            state.pending.clear();
         }
         self.reopened.notify_one();
     }
@@ -307,7 +343,7 @@ impl PresenceRecovery {
         src: &dyn crate::services::cell_membership::RunningCellSource,
         cache: &crate::services::cell_membership::MembershipCache,
         at: crate::services::cell_membership::ObservedAt,
-    ) -> (u64, Vec<ObservedCell>) {
+    ) -> (u64, Vec<Offer>) {
         self.passes
             .fetch_add(1, std::sync::atomic::Ordering::SeqCst);
         let mut offered = Vec::new();
@@ -324,7 +360,9 @@ impl PresenceRecovery {
             }
             {
                 let state = self.state();
-                if state.in_flight.contains(cell.role) || state.probed.get(cell.role) == Some(&run)
+                if state.in_flight.contains(cell.role)
+                    || state.pending.contains(cell.role)
+                    || state.probed.get(cell.role) == Some(&run)
                 {
                     continue;
                 }
@@ -343,16 +381,23 @@ impl PresenceRecovery {
             let mut state = self.state();
             // Re-checked under the lock the claim is made in: the publish above
             // was an await.
-            if state.in_flight.contains(cell.role) || state.probed.get(cell.role) == Some(&run) {
+            if state.in_flight.contains(cell.role)
+                || state.pending.contains(cell.role)
+                || state.probed.get(cell.role) == Some(&run)
+            {
                 continue;
             }
-            state.probed.insert(cell.role, run);
+            // OFFERED, not spent: the run is spent by `settle`, and only if
+            // the gate admitted the probe.
             state.in_flight.insert(cell.role);
-            offered.push(cell.clone());
+            offered.push(Offer {
+                cell: cell.clone(),
+                run,
+            });
         }
         if !offered.is_empty() {
             info!(
-                roles = ?offered.iter().map(|c| c.role).collect::<Vec<_>>(),
+                roles = ?offered.iter().map(|o| o.cell.role).collect::<Vec<_>>(),
                 "cells present again on this conductor — probing every not-running role in ONE \
                  pass rather than on each role's next tick; a call that returns is still the \
                  only recovery"
@@ -367,7 +412,21 @@ impl PresenceRecovery {
     /// verdict is already recorded by the zome-call path — and frees its role;
     /// the run it was offered for ended with that re-mint, so the role is
     /// re-planned against the readings of the new conductor.
+    ///
+    /// What the verdict does to the run, current epoch only:
+    ///
+    /// * a probe was ASKED (`Served`, `Refused`, `EncodeFailed`) — the run is
+    ///   spent;
+    /// * nothing in this run can ask one (`NoProbeAvailable`, `Unreachable`) —
+    ///   the run is closed rather than re-offered, since re-offering would
+    ///   answer the same at once; a re-mint opens the next;
+    /// * the gate already holds a probe of this role (`AlreadyInFlight`, the
+    ///   supervisor's) — NOT spent: the role goes pending and is re-offered
+    ///   when that probe releases the gate, so if it fails this run still gets
+    ///   its own probe;
+    /// * the role is serving (`NotInEpisode`) — nothing is owed.
     pub(crate) fn settle(&self, landed: Landed) {
+        use crate::services::cell_probe::ProbeVerdict;
         let mut state = self.state();
         state.in_flight.remove(landed.role);
         if landed.epoch != state.epoch {
@@ -378,7 +437,34 @@ impl PresenceRecovery {
                 "a presence probe offered before the latest re-mint landed after it — its \
                  verdict stands; the role is re-planned against the new conductor's readings"
             );
+            return;
         }
+        match landed.verdict {
+            ProbeVerdict::Served
+            | ProbeVerdict::Refused { .. }
+            | ProbeVerdict::EncodeFailed { .. }
+            | ProbeVerdict::NoProbeAvailable
+            | ProbeVerdict::Unreachable => {
+                state.probed.insert(landed.role, landed.run);
+            }
+            ProbeVerdict::AlreadyInFlight => {
+                state.pending.insert(landed.role);
+            }
+            ProbeVerdict::NotInEpisode => {}
+        }
+    }
+
+    /// Release every pending role whose gate slot is free again; `true` when
+    /// any was. The caller arms the gate's release wake BEFORE calling this.
+    fn release_pending(&self, gate: &crate::services::cell_probe::ProbeGate) -> bool {
+        let mut state = self.state();
+        let before = state.pending.len();
+        state.pending.retain(|role| gate.in_flight(role));
+        state.pending.len() < before
+    }
+
+    fn has_pending(&self) -> bool {
+        !self.state().pending.is_empty()
     }
 
     /// [`Self::plan_at`], then every offered probe to completion, then
@@ -394,20 +480,22 @@ impl PresenceRecovery {
         conductor: &dyn PresenceConductor,
     ) -> PresencePass {
         let (epoch, offered) = self.plan_at(cells, src, cache, at).await;
-        futures_util::future::join_all(
+        let verdicts = futures_util::future::join_all(
             offered
                 .iter()
-                .map(|cell| conductor.probe_cell(cell.role, cell.tended_by)),
+                .map(|o| conductor.probe_cell(o.cell.role, o.cell.tended_by)),
         )
         .await;
-        for cell in &offered {
+        for (offer, verdict) in offered.iter().zip(verdicts) {
             self.settle(Landed {
-                role: cell.role,
+                role: offer.cell.role,
+                run: offer.run,
                 epoch,
+                verdict,
             });
         }
         PresencePass {
-            probed: offered.iter().map(|cell| cell.role).collect(),
+            probed: offered.iter().map(|o| o.cell.role).collect(),
         }
     }
 }
@@ -424,7 +512,9 @@ type OfferedProbe<'a> = std::pin::Pin<Box<dyn std::future::Future<Output = Lande
 /// The presence seam's driver.
 ///
 /// ONE `select!` over: a landed reading, a re-mint, the watch cadence (only
-/// while the watch is open), an offered probe landing, and shutdown. After any
+/// while the watch is open), the probe gate's release (only while a role is
+/// pending behind someone else's probe), an offered probe landing, and
+/// shutdown. After any
 /// of the first four it EVALUATES — if watching and some observed role is not
 /// running, read; then plan one pass and add its offered probes to the set the
 /// same `select!` polls. Nothing it awaits waits on a probe, so a slow cell
@@ -447,19 +537,31 @@ pub(crate) async fn drive_presence_recovery(
     mut shutdown: tokio::sync::broadcast::Receiver<()>,
 ) {
     use futures_util::stream::{FuturesUnordered, StreamExt};
+    let gate = conductor.probe_gate();
     let mut probes: FuturesUnordered<OfferedProbe<'_>> = FuturesUnordered::new();
     loop {
-        let watching = seam.watching_at(std::time::Instant::now());
-        tokio::select! {
-            _ = cache.read_landed().notified() => {}
-            _ = seam.reopened.notified() => {}
-            _ = tokio::time::sleep(seam.cadence), if watching => {}
-            Some(landed) = probes.next(), if !probes.is_empty() => seam.settle(landed),
-            _ = shutdown.recv() => {
-                while let Some(landed) = probes.next().await {
-                    seam.settle(landed);
+        // ARM the gate's release wake before looking at it, so a release that
+        // lands between the look and the `select!` is not missed. A pending
+        // role whose slot is already free is re-offered now; one still held
+        // waits for a release — never a poll.
+        let released = gate.released().notified();
+        tokio::pin!(released);
+        released.as_mut().enable();
+        if !seam.release_pending(gate) {
+            let watching = seam.watching_at(std::time::Instant::now());
+            let pending = seam.has_pending();
+            tokio::select! {
+                _ = cache.read_landed().notified() => {}
+                _ = seam.reopened.notified() => {}
+                _ = tokio::time::sleep(seam.cadence), if watching => {}
+                _ = &mut released, if pending => {}
+                Some(landed) = probes.next(), if !probes.is_empty() => seam.settle(landed),
+                _ = shutdown.recv() => {
+                    while let Some(landed) = probes.next().await {
+                        seam.settle(landed);
+                    }
+                    return;
                 }
-                return;
             }
         }
         let Some(src) = conductor.membership_source() else {
@@ -484,12 +586,16 @@ pub(crate) async fn drive_presence_recovery(
                 crate::services::cell_membership::ObservedAt::now(),
             )
             .await;
-        for cell in offered {
+        for offer in offered {
             probes.push(Box::pin(async move {
-                conductor.probe_cell(cell.role, cell.tended_by).await;
+                let verdict = conductor
+                    .probe_cell(offer.cell.role, offer.cell.tended_by)
+                    .await;
                 Landed {
-                    role: cell.role,
+                    role: offer.cell.role,
+                    run: offer.run,
                     epoch,
+                    verdict,
                 }
             }));
         }
@@ -546,7 +652,17 @@ mod presence_recovery_tests {
         /// cell a single uncancellable call can be.
         parked: Mutex<std::collections::BTreeMap<&'static str, Arc<tokio::sync::Semaphore>>>,
         landed: Mutex<Vec<&'static str>>,
+        /// The REAL gate production admits through, owned by this test.
+        gate: crate::services::cell_probe::ProbeGate,
     }
+
+    /// A probe that asks nothing real; the gate's admission is what is tested.
+    const TEST_PROBE: crate::services::cell_probe::CellProbe =
+        crate::services::cell_probe::CellProbe {
+            zome: "presence_test",
+            fn_name: "presence_test_probe",
+            payload: crate::services::cell_probe::ProbePayload::Unit,
+        };
 
     impl FakeConductor {
         fn new(cells: Vec<ObservedCell>, admin: Arc<FakeAdmin>, serves: bool) -> Self {
@@ -557,6 +673,7 @@ mod presence_recovery_tests {
                 probes: Mutex::new(Vec::new()),
                 parked: Mutex::new(std::collections::BTreeMap::new()),
                 landed: Mutex::new(Vec::new()),
+                gate: crate::services::cell_probe::ProbeGate::new(),
             }
         }
 
@@ -609,7 +726,17 @@ mod presence_recovery_tests {
             Some(Arc::clone(&self.admin) as Arc<dyn RunningCellSource>)
         }
 
-        async fn probe_cell(&self, role: &'static str, tended_by: &'static str) {
+        async fn probe_cell(
+            &self,
+            role: &'static str,
+            tended_by: &'static str,
+        ) -> crate::services::cell_probe::ProbeVerdict {
+            use crate::services::cell_probe::{probe_admission_with, ProbeVerdict};
+            // Through the REAL admission: never-while-healthy, then the gate.
+            let (_probe, _slot) = match probe_admission_with(role, Some(TEST_PROBE), &self.gate) {
+                Ok(admitted) => admitted,
+                Err(verdict) => return verdict,
+            };
             self.probes
                 .lock()
                 .unwrap_or_else(|e| e.into_inner())
@@ -623,13 +750,25 @@ mod presence_recovery_tests {
             if let Some(gate) = parked {
                 let _ = gate.acquire().await;
             }
-            if self.serves.load(Ordering::SeqCst) {
+            let served = self.serves.load(Ordering::SeqCst);
+            if served {
                 record_role_success(role);
             }
             self.landed
                 .lock()
                 .unwrap_or_else(|e| e.into_inner())
                 .push(role);
+            if served {
+                ProbeVerdict::Served
+            } else {
+                ProbeVerdict::Refused {
+                    msg: "CellDisabled (presence-seam test)".to_string(),
+                }
+            }
+        }
+
+        fn probe_gate(&self) -> &crate::services::cell_probe::ProbeGate {
+            &self.gate
         }
     }
 
@@ -1209,5 +1348,50 @@ mod presence_recovery_tests {
             .presence_run_at(&c, ObservedAt::now())
             .expect("running");
         assert!(third > second, "a revocation ended the run too");
+    }
+
+    /// FINDING 3 — an offer that collides with the supervisor's probe keeps
+    /// its run.
+    ///
+    /// The supervisor holds A's gate slot. The presence pass offers A, the gate
+    /// answers `AlreadyInFlight`, and NOTHING is spent: the driver waits on the
+    /// gate's release without polling (no passes while it waits), and when the
+    /// supervisor's probe ends without recovering A, A gets its own probe.
+    #[tokio::test]
+    async fn an_offer_refused_by_the_gate_waits_for_its_release_and_keeps_the_run() {
+        const A: &str = "test-presence-collision";
+        let c = cell(99);
+        let admin = Arc::new(FakeAdmin::new(Ok(vec![c.clone()])));
+        let conductor = Arc::new(FakeConductor::new(
+            vec![observed(A, A, &c)],
+            Arc::clone(&admin),
+            true,
+        ));
+        open_episode(A);
+        let supervisors_probe = conductor.gate.claim(A).expect("the supervisor's slot");
+        let seam = Arc::new(PresenceRecovery::new());
+        let cache = Arc::new(MembershipCache::new());
+        let (tx, handle) = spawn_driver(&seam, &cache, &conductor);
+
+        someone_reads(&cache, &admin).await;
+        until("the offer met the supervisor's probe", || {
+            seam.has_pending()
+        })
+        .await;
+        let passes = seam.passes();
+        tokio::time::sleep(Duration::from_millis(50)).await;
+        assert_eq!(
+            seam.passes(),
+            passes,
+            "pending waits on the gate — no spinning"
+        );
+        assert_eq!(conductor.probes_of(A), 0, "no probe was asked");
+
+        // The supervisor's probe ends and A is still not running.
+        drop(supervisors_probe);
+        until("A's own probe", || conductor.probes_of(A) == 1).await;
+        until("A recovered", || is_live(A)).await;
+        assert!(!seam.has_pending());
+        stop(tx, handle).await;
     }
 }

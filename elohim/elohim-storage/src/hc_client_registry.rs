@@ -1456,13 +1456,12 @@ impl HcClientRegistry {
     /// One read-only question to `role`'s own cell. Every bound on it lives in
     /// [`crate::services::cell_probe`]; awaited inline, so this task makes
     /// exactly one and cannot start a second before the first answers.
-    pub(crate) async fn probe_the_cell(role: &str, hc: &Arc<HcClient>) {
-        let _ = crate::services::cell_probe::probe_cell(
-            role,
-            hc,
-            crate::services::cell_probe::probe_gate(),
-        )
-        .await;
+    pub(crate) async fn probe_the_cell(
+        role: &str,
+        hc: &Arc<HcClient>,
+    ) -> crate::services::cell_probe::ProbeVerdict {
+        crate::services::cell_probe::probe_cell(role, hc, crate::services::cell_probe::probe_gate())
+            .await
     }
 
     /// One `enable_app` attempt, already paced by the caller's ladder rung.
