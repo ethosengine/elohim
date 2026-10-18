@@ -135,12 +135,22 @@ ledger) were not measured tonight.
 (7/7) and the proof `cucumber-mesh-20261018T135416Z-c31985cb` (4/4); CI confirmation of batch 2 was
 pending when this document closed — read `elohim-orchestrator/dev` for the verdict.
 
+**blob-durability flipped back to green** (15:48Z): the three chaos-peer-churn drills the 10-17 custody
+guard refused pass here (3/3, run 154019Z), and the habit's own `@concern:blob-durability` tag lane reads
+10 passed / 1 pending / 3 skipped / 0 failed (run 154413Z), the same pending and skipped set it carried
+before the flip; ruling recorded with `epr flow note`. The prologue's drill-custody leg now refuses by
+name instead of skipping with exit 0 (e42c7f453). Batch 3 (that fix + the flip, bbc88e689) is committed
+on dev but NOT pushed: orchestrator #2091 was still building batch 2 at close, and a push would supersede
+the edge deploy. Register at close: 14 green / 28 red / 5 unwired (13 / 29 / 5 at start).
+
 **Not done, by name.** The conductor fork branch is on the forge, unmerged and unpinned (no measured
-benefit at 85 cells). The household device ceremony needs a second approver before the convergence lane
-can run here. Stale hosted agents still block the hosted-human lanes. The admitted-member 403 after
-narrowing, jessica's 90 s catch-up after restart, the idle 17.9 CPU s/min, and blob-durability's custody
-seed are measured reds with named next cures, not cured. The time lost to a suspended session (~6.5 h)
-is the night's largest single cost.
+benefit at 85 cells). A person's first device on a single conductor has no approver under mishpat's
+new rule, so the household ceremony cannot produce the binding the convergence lane needs — recorded
+as a decision in the device-recognition cluster. Stale hosted agents still block the hosted-human
+lanes. The admitted-member 403 after narrowing, jessica's 90 s catch-up after restart and the idle
+17.9 CPU s/min are measured reds with named next cures, not cured. The `hc-dev-orchestrator` skill
+mirror of the prologue change is owed (package-projected surface). The time lost to a suspended
+session (~6.5 h) is the night's largest single cost.
 
 ## Operator items (only these need you)
 

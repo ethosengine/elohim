@@ -765,6 +765,25 @@ every peer with "signer mismatch". On a clean recast (2026-10-07T23:20Z) the pro
 leg green (`PROLOGUE_EXIT=0`): identities 3 created / 0 failed, hosted 13 registered, bindings 6
 written / 0 failed, household 3/3 affirmed.
 
+## Finding 2026-10-18 — a first device on a single conductor has no approver
+
+Measured on the Dowell household (autonomous sprint 2026-10-18): `genesis/a2o/scripts/household-device-ceremony.ts 4444 4445`
+bootstraps the authority and is then refused at `enroll_identity_device` by mishpat
+`classify_approvers` (`device_enrollment.rs:229-230`, "a device cannot approve its own joining"). The
+rule landed in 0b73bcd23 ("every device of a person speaks for them, and any may approve the next";
+coordinator-only, no script updated). The household script's device, operator and root controller
+are one key (`cells.mishpat[1]`), and `bootstrap_device_identity` fixes `controllers: [human.author]`
+with policy `self` — so for a person's FIRST device on a single conductor no distinct approver exists,
+and the rule as written has no path. `device-ceremony.ts`'s `enroll` phase is the two-party form
+(device signs possession, a separate `operator` conductor signs the controller proof) and is the
+template, but it presumes a second conductor holding the root key. Consequence tonight: the
+`federation-version-convergence` lane (the `dataplane-convergence` habit's Act I check) cannot run on a
+household whose binding predates 0b73bcd23, because the content_store mandate guard needs the binding.
+Decision owed (operator): either the bootstrap case admits the sole root controller as its own first
+approver (zome change, reverses part of 0b73bcd23's ruling), or the household fixture gains a second
+root-holding device and the ceremony becomes two-party (script + fixture change). Until then this row
+blocks the convergence lane on fresh households.
+
 ## shift_objective
 
 ```
