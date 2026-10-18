@@ -23,6 +23,21 @@ retire-when: >
   settings surface on a released steward build, with no developer-shaped tool in the path.
   The habit then describes a product, not a practice.
 ---
+DELTA 2026-10-18b (RED preserved; household verbs pass 3/3, but the effect station remains @wip and unmeasured).
+
+`features/dataplane/operator-commitment-gated-verbs.feature` on the household:
+3/3 scenarios, 19/19 steps passed, verified against
+`genesis/a2o/reports/sprint-report-household-20261018T000023Z-f3a7cb8e.md`
+and matching `cucumber-mesh-20261018T000023Z-f3a7cb8e.json` (hidden hooks excluded).
+Passing scenarios: "a commitment holder can drive a reconcile and the peer
+attests to it" (7 steps), "a caller without a commitment is refused" (6),
+and "a revoked commitment stops working immediately" (6).
+"A verb's success is a post-action observation, not the handler's word" and
+"a peer serves its own runtime telemetry" still carry scenario-level `@wip`.
+The 2026-08-18 drop removed the feature-level tag only; it did not remove
+these scenario tags. The effect-station check remains unmeasured, so status
+stays red. Removing its `@wip` is a story decision, not licensed by this pass.
+
 DELTA 2026-10-18a (check target corrected; Rust check measured, a2o checks outstanding).
 Measured 2026-10-18 ~00:02Z in this worktree at HEAD 065bba3fd,
 elohim-storage warm build, toolchain 1.96.1,

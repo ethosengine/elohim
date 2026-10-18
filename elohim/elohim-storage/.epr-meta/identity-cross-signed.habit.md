@@ -30,6 +30,21 @@ retire-when: >
   type itself carries the cross-signature — so no economic attribution can be constructed
   from a self-asserted one even by a caller trying to.
 ---
+DELTA 2026-10-18b (RED preserved; enforce series absent, so the alpha-fleet conjunction is unsatisfied).
+
+Operator-supplied alpha Prometheus measurement at ~00:00Z 2026-10-18:
+no `posture="enforce"` series exists for either
+`elohim_attribution_bindings_examined_total` or
+`elohim_attribution_unverified_bindings_total` on any pod over 24 h.
+No peer runs `ELOHIM_ATTRIBUTION_CROSS_SIGNED=enforce`. The conjunction's
+first side fails by ABSENCE, not by a measured zero.
+Under `posture="observe"`, unverified_bindings_total is 0 on all 14 pods
+(7 elohim-node + 7 conductor). bindings_examined_total exists only on
+elohim-matthew-alpha-0 at 0, while elohim_attribution_joins_total there is 1:
+a join reached no binding. These observe readings do not satisfy the enforce
+check. Cure: run one alpha peer in enforce posture, an operator decision.
+Status remains red; the Rust evidence in 2026-10-18a is unchanged.
+
 DELTA 2026-10-18a (check targets corrected; Rust checks measured, live check outstanding).
 Measured 2026-10-18 ~00:02Z in this worktree at HEAD 065bba3fd,
 elohim-storage warm build, toolchain 1.96.1,

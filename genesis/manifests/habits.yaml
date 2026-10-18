@@ -110,18 +110,32 @@ habits:
       - "a2o @concern:accountable-correction (genesis/a2o/features/dataplane/accountable-correction.feature — RED-FIRST 2026-09-06: a correction filed by one household peer against another's record converges to the SAME verdict on every peer, and only the record's root author can accept it or publish its successor. Contract: genesis/docs/superpowers/specs/2026-09-06-accountable-correction-contract.md; the coordinator + storage surface it binds to is documented in features/dataplane/README-accountable-correction.md. Born red: the eight stations have never run on the mesh)"
       - "a2o @concern:hub-carries-edit (genesis/a2o/features/dataplane/hub-carries-edit.feature — RED-FIRST 2026-09-22, runnable on the household mesh with A2O_ALLOW_DESTRUCTIVE=1: a write through doorway alpha reaches the peer that stays up within 5s and a stopped peer after restart with nothing written to it. Seam of the local-first shared-sheet vision, features/federation/local-first-shared-sheet.feature)"
     evidence: >
-      DELTA 2026-10-17g (RED preserved; channel isolation passes 18/18; transport-parity, sync_libp2p_convergence and the RED-FIRST checks remain unmeasured). NO status change.
+      DELTA 2026-10-18a (RED preserved; projection fallback passes, federation-deploy skips on household, and outstanding convergence checks remain unmeasured).
 
-      Two more storage waves after entry f closed the channel-isolation lane on the household: conductors `hc-fork-96bcd2bee215-proof`, content_store coordinator hot-swapped at 08:5xZ, storage rebuilt from the named source and restarted. Counts verified against the named sprint reports under `genesis/a2o/reports/` and matching cucumber-mesh JSON, excluding hidden hooks. Runtime diagnosis, landing time, gate result and counters are operator-supplied evidence.
+      `features/dataplane/epr-projection-fallback.feature` passed 2/2 scenarios,
+      6/6 steps on the household, verified against
+      `genesis/a2o/reports/sprint-report-household-20261017T225055Z-15f4e9bc.md`
+      and matching `cucumber-mesh-20261017T225055Z-15f4e9bc.json` (hidden hooks excluded).
+      `features/dataplane/federation-deploy.feature` RAN AND SKIPPED both scenarios:
+      0 passed, 0 failed, 2 skipped (11 skipped steps), verified against
+      `genesis/a2o/reports/sprint-report-household-20261017T225033Z-15f4e9bc.md`
+      and matching `cucumber-mesh-20261017T225033Z-15f4e9bc.json`.
+      The supplied @requires-gate evidence names alpha-cluster-6peer, apex-dns,
+      deploy-churn, dht-anchored-content, harbor-registry, jenkins, observability,
+      per-human-conductor and tls. This confirms the atom's Act II scoping;
+      a household skip is no federation-deploy measurement. Its measurement stays
+      the operator-reported validate-only edge build #1647, 2/2 federation-deploy.
 
-      Wave 4 (`17098a07c`, landed on dev 19:40Z) takes candidate-channel authority from the local election alone: present → staged with verified bytes or catching-up; absent → none; unavailable only when the election is unanswered or the conductor is missing. The projected-head equality guard from `701dbd3d7` stays on the head snapshot (`anchorMatchesHead`) and no longer gates candidate resolution. In `sprint-report-household-20261017T190818Z-17098a07`, the candidate name empties after promotion; 17/18 steps passed (one failed scenario). The remaining failure, `both doorways serve PUBLIC_NAME with artifact B`, became legible in `sprint-report-household-20261017T192720Z-dbc2e6e8` (also 17 passed / 1 failed): both peers' storage rows captured at timeout still held the previous earned head while the election already said B. The author's storage had logged `ordered ContentHeadDeclared did not resolve its exact canonical payload` once. The signal is emitted inside the authoring zome call, so first hydration can race commit visibility; the signal worker only warned and never retried.
-
-      Wave 5 (`577b8fc5`) retries an ordered declaration whose exact payload is not yet readable on a bounded schedule: 1 s, 3 s, 10 s, 30 s within 90 s, retryable errors only, at most 16 retries in flight as RAII-guarded tasks. Outcomes are counted on `content_head_declared_hydration_total`; a validation mismatch names its fields. Storage gate EXIT=0 (`hydration_retry_tests` 5/5).
-
-      `epr-app-channel-isolation.feature` passed 1/1 scenario, 18/18 steps (`sprint-report-household-20261017T210023Z-577b8fc5`): A stages and promotes, B stages beneath as the candidate, both names serve, the holon author promotes B, the candidate name answers 404 `no-candidate-staged`, and the public name follows B on both doorways. Matthew's counters after the run: retried 28, recovered 4, exhausted 6, mismatch 34, dropped 0. `epr-app-deliverability.feature` passed 7/7 scenarios, 135/135 steps (`sprint-report-household-20261017T210210Z-577b8fc5`). Across the day the channel-isolation check moved 4/18 → 12 → 16 → 17 → 18. Transport-parity, `sync_libp2p_convergence` and the RED-FIRST checks (`trust-priced-sync`, `accountable-correction`, `hub-carries-edit`) remain unmeasured; red is preserved.
-    evidence-fingerprint: sha256:9e00c609d5f107b8
-    evidence-bytes: 242935
-    evidence-entries: 154
+      Operator-supplied restart observation, 2026-10-17: after the full household
+      conductor restart at 22:38Z, the write path returned ~2.5 min later.
+      CellDisabled was quiet from 22:40:49Z; `ordered ContentHeadDeclared hydration recovered`
+      logged at 22:41:03Z — wave-5 retry working after a restart.
+      Transport-parity, `sync_libp2p_convergence` and the RED-FIRST checks
+      (`trust-priced-sync`, `accountable-correction`, `hub-carries-edit`) remain
+      unmeasured as recorded in 2026-10-17g. Status stays red.
+    evidence-fingerprint: sha256:5eb951fbb58de555
+    evidence-bytes: 244526
+    evidence-entries: 155
     guard: >
       Regression risk = the fleet-safety invariants in sync/projector.rs
       (empty-never-projects, reconcile-offers/events-assert, broadcast-tier reach
@@ -333,23 +347,23 @@ habits:
       - "cargo test --test rea binding_attribution_cut (elohim/elohim-storage — the same decision end-to-end through the projection: sentinel projects unverified, cross-signed projects cross_signed, Enforce admits only the proven peer and COUNTS the refusal, Observe is behaviour-preserving, a poisoned signature neither panics nor attributes, a lifted proof does not attach)"
       - "live: elohim_attribution_bindings_examined_total{posture=\"enforce\"} > 0 AND elohim_attribution_unverified_bindings_total{posture=\"enforce\"} == 0 on the alpha fleet — the flip-to-green measure, stated as a CONJUNCTION because the numerator alone cannot carry it. A bare zero is ambiguous between 'every binding examined was cross-signed' (the green) and 'no attribution join reached a binding' (silence), and MEASURED 2026-08-20 the live series is the second: max_over_time(...[7d]) == 0 across all 56 pod instances, and no posture=\"enforce\" series exists at all. Flipping the posture against the numerator alone would turn this habit green having verified nothing."
     evidence: >
-      DELTA 2026-10-18a (check targets corrected; Rust checks measured, live check outstanding).
-      Measured 2026-10-18 ~00:02Z in this worktree at HEAD 065bba3fd,
-      elohim-storage warm build, toolchain 1.96.1,
-      `CARGO_TARGET_DIR=/projects/.cargo-target-pool/family/land/elohim__elohim-storage/dev`.
-      Corrected both declared commands: binding_attribution_refuses_sentinel and
-      binding_attribution_cut are modules in `tests/rea/main.rs`, not standalone targets.
-      The combined run `cargo test --test rea binding_attribution` →
-      `test result: ok. 13 passed; 0 failed`
-      (binding_attribution_cut: 10; binding_attribution_refuses_sentinel: 3).
-      Both Rust checks are satisfied. This evidence does not measure the alpha-fleet
-      conjunction `elohim_attribution_bindings_examined_total{posture="enforce"} > 0`
-      AND `elohim_attribution_unverified_bindings_total{posture="enforce"} == 0`.
-      No status change; status remains red.
-      Log: `/tmp/claude-0/-projects-elohim/a405845c-b546-42b2-a18d-ce64c2ba0a50/scratchpad/hc-rea.log`.
-    evidence-fingerprint: sha256:200c529ad13dd2e6
-    evidence-bytes: 5823
-    evidence-entries: 4
+      DELTA 2026-10-18b (RED preserved; enforce series absent, so the alpha-fleet conjunction is unsatisfied).
+
+      Operator-supplied alpha Prometheus measurement at ~00:00Z 2026-10-18:
+      no `posture="enforce"` series exists for either
+      `elohim_attribution_bindings_examined_total` or
+      `elohim_attribution_unverified_bindings_total` on any pod over 24 h.
+      No peer runs `ELOHIM_ATTRIBUTION_CROSS_SIGNED=enforce`. The conjunction's
+      first side fails by ABSENCE, not by a measured zero.
+      Under `posture="observe"`, unverified_bindings_total is 0 on all 14 pods
+      (7 elohim-node + 7 conductor). bindings_examined_total exists only on
+      elohim-matthew-alpha-0 at 0, while elohim_attribution_joins_total there is 1:
+      a join reached no binding. These observe readings do not satisfy the enforce
+      check. Cure: run one alpha peer in enforce posture, an operator decision.
+      Status remains red; the Rust evidence in 2026-10-18a is unchanged.
+    evidence-fingerprint: sha256:7803be69042802ff
+    evidence-bytes: 6731
+    evidence-entries: 5
     first_move: >
       C2-S2 — the minting path. Storage signs the transport half locally (it
       owns the libp2p Keypair) and the agent half through the existing
@@ -384,23 +398,23 @@ habits:
       - "a2o @concern:operator-runtime-surface effect station (genesis/a2o/features/dataplane/operator-commitment-gated-verbs.feature — the scenario named A verb success is a post-action observation, not the handler word: an accepted reconcile has an infrastructure:operator-effect row of phase post whose event id equals the verb attestation event id and whose observer is the peer sampler; a verb with no post row is listed by the compute dashboard as unverified-effect; @wip)"
       - "cargo test --test api operator_verbs (elohim/elohim-storage — 9 tests: holder accepted + attestation names grant cid AND recorded event id; no-grant refused; revoked refused; no verified performer refused; loopless peer honest 503 with no phantom rate charge; accepted use recorded bounded_by the grant; refusals record nothing; rate_per_hour ceiling refuses the over-limit use)"
     evidence: >
-      DELTA 2026-10-18a (check target corrected; Rust check measured, a2o checks outstanding).
-      Measured 2026-10-18 ~00:02Z in this worktree at HEAD 065bba3fd,
-      elohim-storage warm build, toolchain 1.96.1,
-      `CARGO_TARGET_DIR=/projects/.cargo-target-pool/family/land/elohim__elohim-storage/dev`.
-      Corrected the declared command: operator_verbs is a module in
-      `tests/api/main.rs`, not a standalone test target.
-      `cargo test --test api operator_verbs` →
-      `test result: ok. 9 passed; 0 failed`.
-      The Rust check is satisfied. This evidence does not measure either declared a2o
-      check: `@concern:operator-runtime-surface` or its effect station,
-      "A verb success is a post-action observation, not the handler word".
-      Earlier concern-run evidence remains in the ledger; no effect-station pass is
-      established here. No status change; status remains red.
-      Log: `/tmp/claude-0/-projects-elohim/a405845c-b546-42b2-a18d-ce64c2ba0a50/scratchpad/hc-api.log`.
-    evidence-fingerprint: sha256:a8877c13192f3895
-    evidence-bytes: 18650
-    evidence-entries: 18
+      DELTA 2026-10-18b (RED preserved; household verbs pass 3/3, but the effect station remains @wip and unmeasured).
+
+      `features/dataplane/operator-commitment-gated-verbs.feature` on the household:
+      3/3 scenarios, 19/19 steps passed, verified against
+      `genesis/a2o/reports/sprint-report-household-20261018T000023Z-f3a7cb8e.md`
+      and matching `cucumber-mesh-20261018T000023Z-f3a7cb8e.json` (hidden hooks excluded).
+      Passing scenarios: "a commitment holder can drive a reconcile and the peer
+      attests to it" (7 steps), "a caller without a commitment is refused" (6),
+      and "a revoked commitment stops working immediately" (6).
+      "A verb's success is a post-action observation, not the handler's word" and
+      "a peer serves its own runtime telemetry" still carry scenario-level `@wip`.
+      The 2026-08-18 drop removed the feature-level tag only; it did not remove
+      these scenario tags. The effect-station check remains unmeasured, so status
+      stays red. Removing its `@wip` is a story decision, not licensed by this pass.
+    evidence-fingerprint: sha256:df749990eaa1539b
+    evidence-bytes: 19645
+    evidence-entries: 19
     refs:
       - "task #10 (operator directive 2026-07-02)"
       - "elohim/elohim-storage/src/api/operator_verbs.rs (verb handler + kick) · doorway src/server/http.rs op_gate_capability/effective_op_gate_mode (per-verb gate) · seam-registry rows in both crates"

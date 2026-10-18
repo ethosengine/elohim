@@ -74,6 +74,30 @@ retire-when: >
   converging is not a degraded version of this system, it is a different one — so this is
   watched permanently rather than until a milestone.
 ---
+DELTA 2026-10-18a (RED preserved; projection fallback passes, federation-deploy skips on household, and outstanding convergence checks remain unmeasured).
+
+`features/dataplane/epr-projection-fallback.feature` passed 2/2 scenarios,
+6/6 steps on the household, verified against
+`genesis/a2o/reports/sprint-report-household-20261017T225055Z-15f4e9bc.md`
+and matching `cucumber-mesh-20261017T225055Z-15f4e9bc.json` (hidden hooks excluded).
+`features/dataplane/federation-deploy.feature` RAN AND SKIPPED both scenarios:
+0 passed, 0 failed, 2 skipped (11 skipped steps), verified against
+`genesis/a2o/reports/sprint-report-household-20261017T225033Z-15f4e9bc.md`
+and matching `cucumber-mesh-20261017T225033Z-15f4e9bc.json`.
+The supplied @requires-gate evidence names alpha-cluster-6peer, apex-dns,
+deploy-churn, dht-anchored-content, harbor-registry, jenkins, observability,
+per-human-conductor and tls. This confirms the atom's Act II scoping;
+a household skip is no federation-deploy measurement. Its measurement stays
+the operator-reported validate-only edge build #1647, 2/2 federation-deploy.
+
+Operator-supplied restart observation, 2026-10-17: after the full household
+conductor restart at 22:38Z, the write path returned ~2.5 min later.
+CellDisabled was quiet from 22:40:49Z; `ordered ContentHeadDeclared hydration recovered`
+logged at 22:41:03Z — wave-5 retry working after a restart.
+Transport-parity, `sync_libp2p_convergence` and the RED-FIRST checks
+(`trust-priced-sync`, `accountable-correction`, `hub-carries-edit`) remain
+unmeasured as recorded in 2026-10-17g. Status stays red.
+
 DELTA 2026-10-17g (RED preserved; channel isolation passes 18/18; transport-parity, sync_libp2p_convergence and the RED-FIRST checks remain unmeasured). NO status change.
 
 Two more storage waves after entry f closed the channel-isolation lane on the household: conductors `hc-fork-96bcd2bee215-proof`, content_store coordinator hot-swapped at 08:5xZ, storage rebuilt from the named source and restarted. Counts verified against the named sprint reports under `genesis/a2o/reports/` and matching cucumber-mesh JSON, excluding hidden hooks. Runtime diagnosis, landing time, gate result and counters are operator-supplied evidence.
