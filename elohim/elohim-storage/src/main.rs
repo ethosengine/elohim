@@ -6696,12 +6696,19 @@ async fn async_main(
     }
     if let Some(handle) = presence_drain {
         let bound = elohim_storage::services::presence_recovery::PRESENCE_SHUTDOWN_DRAIN_BOUND;
-        if tokio::time::timeout(bound, handle).await.is_err() {
-            warn!(
+        match tokio::time::timeout(bound, handle).await {
+            Ok(Ok(())) => {}
+            Ok(Err(join_error)) => warn!(
+                error = %join_error,
+                panicked = join_error.is_panic(),
+                "presence recovery driver task ended abnormally (panic or cancellation) before \
+                 finishing its shutdown drain — any cell probes it had offered were abandoned"
+            ),
+            Err(_) => warn!(
                 bound_secs = bound.as_secs(),
                 "presence recovery did not finish draining its offered cell probes within the \
                  shutdown bound — abandoning them; the conductor may still be running those calls"
-            );
+            ),
         }
     }
 
