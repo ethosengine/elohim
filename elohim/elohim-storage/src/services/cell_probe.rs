@@ -53,6 +53,15 @@
 //! path. Never while the role is healthy — a probe is evidence-gathering about an
 //! episode, and a role with no episode has nothing to gather.
 //!
+//! Where membership says the cell IS running the probe is owed off the ladder,
+//! from exactly two drivers: the role's supervisor tick (`ProbeNow`, once per
+//! `BRIDGE_PROBE_INTERVAL`), and the presence pass
+//! (`hc_client_registry::PresenceRecovery`), which probes every not-running role
+//! of the conductor ONCE per presence run — the stretch of readings that show its
+//! cell running — so a membership reading that finds the cells back ends every
+//! role's episode in that reading's wake. Both go through [`ProbeGate`], so
+//! together they still hold at most one probe in flight per role.
+//!
 //! ## Why these externs, and what would make the choice wrong
 //!
 //! Each name below is an EXISTING extern in the shipped coordinator zome. No

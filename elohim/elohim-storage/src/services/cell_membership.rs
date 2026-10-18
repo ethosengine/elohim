@@ -50,7 +50,13 @@
 //!   (15s), process-wide, across every role that asks. Five supervisor tasks on
 //!   a 20s tick therefore cost roughly ONE admin read per 15–20s between them,
 //!   not five: the gate is on the CACHE, not on the caller, so it holds no
-//!   matter how many drivers appear.
+//!   matter how many drivers appear. The ONE exception is the presence watch
+//!   ([`crate::hc_client_registry::PresenceRecovery`]): for at most
+//!   [`crate::hc_client_registry::PRESENCE_WATCH_WINDOW`] after a bridge
+//!   re-mint, and only while an observed role is not running, it reads through
+//!   [`MembershipCache::refresh_if_older_than_at`] at most once per
+//!   [`crate::hc_client_registry::PRESENCE_WATCH_CADENCE`] — the same claim, the
+//!   same attempt-pacing, a shorter window.
 //! * **Concurrency budget** — ONE refresh in flight, claimed atomically. The
 //!   window check and the window store used to be separate operations, so two
 //!   askers could both read "stale" before either stored its attempt and both
@@ -67,8 +73,12 @@
 //! * **Memory budget** — one `HashSet<CellId>` sized by the conductor's own
 //!   running-cell count (roles × hosted agents), replaced wholesale on each
 //!   read. Nothing accumulates.
-//! * No loop, no task and no timer of its own: the existing
-//!   `BRIDGE_PROBE_INTERVAL` tick stays the only pacing authority.
+//! * No loop, no task and no timer of its own. The supervisor's
+//!   `BRIDGE_PROBE_INTERVAL` tick is the steady pacing authority and the
+//!   presence watch the bounded post-re-mint one; both live in
+//!   [`crate::hc_client_registry`], and this cache only ANNOUNCES each reading
+//!   that lands ([`MembershipCache::read_landed`]) so the presence pass can act
+//!   on it without waiting for anyone's tick.
 //!
 //! ### Why a caller-side deadline is legitimate HERE
 //!
@@ -368,6 +378,9 @@ pub struct MembershipCache {
     last_error: RwLock<Option<String>>,
     reads: AtomicU64,
     failures: AtomicU64,
+    /// Fired (single permit, so a burst coalesces) every time a successful
+    /// reading is STORED — whoever asked for it. See [`Self::read_landed`].
+    read_landed: tokio::sync::Notify,
 }
 
 impl MembershipCache {
@@ -381,13 +394,19 @@ impl MembershipCache {
     /// step made `now_ms.saturating_sub(last)` answer `0` and suspended
     /// refreshing for about an hour plus the window.
     pub fn is_stale_at(&self, at: ObservedAt) -> bool {
+        self.is_older_than_at(at, MEMBERSHIP_REFRESH_INTERVAL)
+    }
+
+    /// Has at least `window` passed (monotonically) since the last attempt?
+    /// `true` before the first attempt.
+    fn is_older_than_at(&self, at: ObservedAt, window: Duration) -> bool {
         match *self
             .last_attempt_at
             .read()
             .unwrap_or_else(|e| e.into_inner())
         {
             None => true,
-            Some(last) => at.mono.saturating_duration_since(last) >= MEMBERSHIP_REFRESH_INTERVAL,
+            Some(last) => at.mono.saturating_duration_since(last) >= window,
         }
     }
 
@@ -403,10 +422,29 @@ impl MembershipCache {
         src: &dyn RunningCellSource,
         at: ObservedAt,
     ) -> RefreshOutcome {
-        if !self.is_stale_at(at) {
+        self.refresh_if_older_than_at(src, at, MEMBERSHIP_REFRESH_INTERVAL)
+            .await
+    }
+
+    /// [`Self::refresh_if_stale_at`] with the refresh window named by the
+    /// caller instead of [`MEMBERSHIP_REFRESH_INTERVAL`].
+    ///
+    /// Only the window changes. The single-flight claim, the recheck under it,
+    /// the attempt-pacing (a failed read advances the window exactly like a
+    /// successful one), the deadline and the never-rewind rule are the same
+    /// code — so a shorter window is a higher ceiling on admin reads and
+    /// nothing else. Its one production caller is the presence watch, whose
+    /// window is [`crate::hc_client_registry::PRESENCE_WATCH_CADENCE`].
+    pub async fn refresh_if_older_than_at(
+        &self,
+        src: &dyn RunningCellSource,
+        at: ObservedAt,
+        window: Duration,
+    ) -> RefreshOutcome {
+        if !self.is_older_than_at(at, window) {
             return RefreshOutcome::Cached;
         }
-        self.claim_and_refresh_at(src, at).await
+        self.claim_and_refresh_at(src, at, window).await
     }
 
     /// The half of [`Self::refresh_if_stale_at`] that runs AFTER a caller has
@@ -427,6 +465,7 @@ impl MembershipCache {
         &self,
         src: &dyn RunningCellSource,
         at: ObservedAt,
+        window: Duration,
     ) -> RefreshOutcome {
         // ONE in flight, whoever asks. Claimed BEFORE the window is stored so a
         // loser cannot mistake the winner's store for its own permission.
@@ -440,7 +479,7 @@ impl MembershipCache {
         let _claim = RefreshClaim(&self.refreshing);
         // RE-DECIDE UNDER THE CLAIM. Between the outer check and this line the
         // window may have been filled by a refresh that has already completed.
-        if !self.is_stale_at(at) {
+        if !self.is_older_than_at(at, window) {
             return RefreshOutcome::Cached;
         }
         self.last_attempt_ms.store(at.wall_ms, Ordering::Relaxed);
@@ -485,6 +524,9 @@ impl MembershipCache {
                 self.stored_seq.store(seq, Ordering::SeqCst);
                 *self.last_error.write().unwrap_or_else(|e| e.into_inner()) = None;
                 self.reads.fetch_add(1, Ordering::Relaxed);
+                // ANNOUNCED AFTER IT IS STORED, so whoever wakes reads this
+                // reading and not the one it replaced.
+                self.read_landed.notify_one();
                 RefreshOutcome::Read { running }
             }
             Err(msg) => {
@@ -664,6 +706,21 @@ impl MembershipCache {
             .read()
             .unwrap_or_else(|e| e.into_inner())
             .clone()
+    }
+
+    /// Resolves once a successful reading has been STORED since the last time
+    /// a waiter was released — whoever's refresh produced it (a supervisor
+    /// tick, the diagnostics handler, the presence watch).
+    ///
+    /// Single-permit ([`tokio::sync::Notify::notify_one`]): readings that land
+    /// while nobody is waiting coalesce into ONE wake, so a waiter that acts on
+    /// the CURRENT reading when it wakes can never be owed more than one pass
+    /// per wake. Its one production waiter is the presence pass in
+    /// [`crate::hc_client_registry`], which is how a cell that a read finds
+    /// running again is probed in that read's own wake instead of on some
+    /// role's next tick.
+    pub fn read_landed(&self) -> &tokio::sync::Notify {
+        &self.read_landed
     }
 
     /// Successful reads / failed reads since boot. Observability only.
@@ -1091,7 +1148,9 @@ mod tests {
         // A resumes INTO THE CLAIM, carrying its stale decision. The recheck
         // under the claim is what must refuse it.
         assert_eq!(
-            cache.claim_and_refresh_at(&admin, at(T0 + 1)).await,
+            cache
+                .claim_and_refresh_at(&admin, at(T0 + 1), MEMBERSHIP_REFRESH_INTERVAL)
+                .await,
             RefreshOutcome::Cached,
             "A's pre-claim staleness decision must be re-made under the claim"
         );
