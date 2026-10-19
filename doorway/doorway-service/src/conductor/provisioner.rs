@@ -2025,6 +2025,32 @@ impl AgentProvisioner {
         }
     }
 
+    /// Does a live record for EXACTLY `user_identifier` name `agent_pub_key` on
+    /// the conductor and app this doorway's registry maps that key to?
+    ///
+    /// The one piece of evidence that lets a node/device account whose key names
+    /// a hosted app log in (an operator's recovery re-bound it). Anything that
+    /// cannot be read is `false`: the login is refused, never waved through.
+    pub async fn records_agent_for(&self, user_identifier: &str, agent_pub_key: &str) -> bool {
+        let Some(entry) = self.registry.get_conductor_for_agent(agent_pub_key) else {
+            return false;
+        };
+        let canonical = super::agent_key::normalize_agent_key(agent_pub_key);
+        match self.registry.intents().get(user_identifier).await {
+            Ok(Some(intent)) => {
+                intent.is_live()
+                    && intent.conductor_id == entry.conductor_id
+                    && intent.installed_app_id == entry.app_id
+                    && intent
+                        .agent_pub_key
+                        .as_deref()
+                        .map(super::agent_key::normalize_agent_key)
+                        == Some(canonical)
+            }
+            _ => false,
+        }
+    }
+
     /// Forget this person's record — their account was closed. Best-effort: a
     /// record that could not be deleted is logged, and expires or is found
     /// stale; it holds an identifier, not an identity.
@@ -4665,6 +4691,31 @@ mod tests {
             Ok(None),
             "an abandoned record left nothing behind and speaks for nobody"
         );
+    }
+
+    /// A node/device login onto a hosted app is let through only by this
+    /// doorway's record for exactly that identifier naming that agent and app.
+    #[tokio::test]
+    async fn records_agent_for_needs_the_identifiers_own_record_naming_the_agent() {
+        let pool = Arc::new(FakePool::default());
+        let store = Arc::new(MemoryIntentStore::new());
+        let doorway = doorway_over(&pool, &store, A_FIRST).await;
+        let agent = doorway.provision_agent(USER).await.expect("provisions");
+
+        assert!(doorway.records_agent_for(USER, &agent.agent_pub_key).await);
+        assert!(
+            !doorway
+                .records_agent_for("someone-else@example.com", &agent.agent_pub_key)
+                .await,
+            "another identifier's record is not evidence"
+        );
+        assert!(
+            !doorway.records_agent_for(USER, "uhCAkunmapped").await,
+            "a key the registry does not map is not evidence"
+        );
+
+        doorway.forget(USER).await;
+        assert!(!doorway.records_agent_for(USER, &agent.agent_pub_key).await);
     }
 
     /// With the records empty at boot, "no record" is not "nobody": an

@@ -568,20 +568,22 @@ pub async fn handle_bind(
             .with_bundle_path(state.args.happ_bundle_path.clone());
         match provisioner.deprovision_agent(&verified.from_key).await {
             Ok(()) => {
-                info!(agent = %verified.from_key, "Hosted cell deprovisioned at node-key bind")
+                info!(agent = %verified.from_key, "Hosted cell deprovisioned at node-key bind");
+                // The cell is gone, so the record that remembered hosting it
+                // goes too (deprovision already forgets it; this is explicit).
+                provisioner.forget(&claims.identifier).await;
             }
+            // The cell may still be there. Its record truthfully names it, so
+            // it is KEPT: it is what an operator's recovery, the stale-intent
+            // gauges and a later deprovision find it by.
             Err(e) => warn!(
                 agent = %verified.from_key,
+                identifier = %claims.identifier,
                 error = %e,
-                "Failed to deprovision hosted cell at node-key bind (cleaned up later)"
+                "Failed to deprovision hosted cell at node-key bind — the cell may remain; \
+                 its provisioning record is kept"
             ),
         }
-        // The account no longer names a hosted agent, so the provisioning
-        // record that remembered hosting it must not outlive it. A successful
-        // deprovision already forgot it; forget it on a failed one too, as
-        // stewardship graduation does. Left live, it names an app the account
-        // has left, and a later provisioning call would re-send that install.
-        provisioner.forget(&claims.identifier).await;
     }
     CustodialKeyService::new().deactivate_all(&user.human_id);
 

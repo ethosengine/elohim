@@ -1249,6 +1249,23 @@ fn is_doorway_hosted_app(app_id: &str, installed_app_id: &str) -> bool {
     app_id != installed_app_id
 }
 
+/// The agent key a new account answers to: the provisioned cell's key for a
+/// hosted registrant who got one; the caller's own (resolved) key for a node or
+/// device registrant; otherwise the doorway-minted custodial key. The
+/// registration response and the stored row both take it from here.
+fn registration_agent_key(
+    agency_phase: &str,
+    provisioned: Option<&ProvisionedAgent>,
+    resolved_agent_key: &str,
+    custodial_public_key: &str,
+) -> String {
+    match provisioned {
+        Some(p) => p.agent_pub_key.clone(),
+        None if matches!(agency_phase, "node" | "device") => resolved_agent_key.to_string(),
+        None => custodial_public_key.to_string(),
+    }
+}
+
 fn agent_key_already_bound() -> Response<BoxBody> {
     json_response(
         StatusCode::FORBIDDEN,
@@ -2138,12 +2155,14 @@ async fn handle_register(
         }
     };
 
-    // Use conductor-generated key if provisioned, otherwise use custodial key
-    let actual_agent_pub_key = if let Some(ref p) = provisioned {
-        p.agent_pub_key.clone()
-    } else {
-        custodial_key.public_key.clone()
-    };
+    // The key this account answers to — returned in the registration response
+    // AND stored on the row, so the two can never disagree.
+    let actual_agent_pub_key = registration_agent_key(
+        agency_phase,
+        provisioned.as_ref(),
+        &agent_pub_key,
+        &custodial_key.public_key,
+    );
 
     // ── The hosted cell becomes a notarized promise (D2) ───────────────────
     //
@@ -2199,7 +2218,7 @@ async fn handle_register(
     // carries THAT key (looked up, or supplied by the caller), never the
     // doorway-minted custodial one.
     if matches!(agency_phase, "node" | "device") {
-        user.agent_pub_key = agent_pub_key.clone();
+        user.agent_pub_key = actual_agent_pub_key.clone();
     }
     if let Some(ref grant) = hosted_cell {
         user.hosted_cell_grant_cid = Some(grant.grant_cid.clone());
@@ -2729,14 +2748,30 @@ async fn handle_login(
     // A node/device account's key was the caller's word at registration. If it
     // names an app this doorway hosts, the session would carry that hosted
     // agent: refuse rather than mint it.
+    //
+    // One exemption: this doorway's own provisioning record for EXACTLY this
+    // identifier names that agent on that app (an account an operator's
+    // recovery re-bound to the app it was provisioned).
     if let Some(refusal) =
         node_device_login_refusal(&state, user.agency_phase.as_deref(), &user.agent_pub_key)
     {
-        warn!(
-            identifier = %body.identifier,
-            "Login refused: a node/device account's key names an agent this doorway hosts"
-        );
-        return refusal;
+        let recorded_for_this_account = match &state.conductor_registry {
+            Some(registry) => {
+                AgentProvisioner::new(Arc::clone(registry))
+                    .with_app_id(state.args.installed_app_id.clone())
+                    .records_agent_for(&user.identifier, &user.agent_pub_key)
+                    .await
+            }
+            None => false,
+        };
+        if !recorded_for_this_account {
+            warn!(
+                identifier = %body.identifier,
+                "Login refused: a node/device account's key names an agent this doorway \
+                 hosts, and no provisioning record for this identifier names it"
+            );
+            return refusal;
+        }
     }
 
     info!(
@@ -7217,6 +7252,33 @@ mod node_device_key_guard_tests {
             status,
             value["code"].as_str().unwrap_or_default().to_string(),
         )
+    }
+
+    #[test]
+    fn a_node_device_account_answers_to_the_callers_key_in_response_and_row() {
+        assert_eq!(
+            registration_agent_key("device", None, "uhCAkpeer", "uhCAkcustodial"),
+            "uhCAkpeer"
+        );
+        assert_eq!(
+            registration_agent_key("node", None, "uhCAkpeer", "uhCAkcustodial"),
+            "uhCAkpeer"
+        );
+        assert_eq!(
+            registration_agent_key("hosted", None, "uhCAkignored", "uhCAkcustodial"),
+            "uhCAkcustodial"
+        );
+        let provisioned = ProvisionedAgent {
+            agent_pub_key: "uhCAkcell".into(),
+            conductor_id: "conductor-0".into(),
+            conductor_url: "ws://c0:4445".into(),
+            admin_url: "ws://c0:4444".into(),
+            installed_app_id: "elohim-conductor-0-x".into(),
+        };
+        assert_eq!(
+            registration_agent_key("hosted", Some(&provisioned), "uhCAkx", "uhCAkcustodial"),
+            "uhCAkcell"
+        );
     }
 
     #[test]

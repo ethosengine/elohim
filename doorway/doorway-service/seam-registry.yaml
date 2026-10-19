@@ -5902,9 +5902,15 @@ decisionPoints:
       - path: doorway/doorway-service/src/conductor/provisioner.rs
         testName: hosted_here_keeps_unknown_apart_from_nobody
         kind: unit
+      - path: doorway/doorway-service/src/server/http.rs
+        testName: node_device_registration_answers_201_403_or_503_through_dispatch
+        kind: integration
     gapNote: >
-      The three answers are tested through AgentProvisioner. The register arm's mapping of them
-      to 201 / 403 / 503 is not driven by a route-level test.
+      The three answers are tested through AgentProvisioner, and the register arm's 201 / 403 / 503
+      through the real dispatch — on the dev-mode, no-Mongo path. The account-row half of the key
+      guard (another live account's key) needs Mongo and is not driven by a test. The key the caller
+      supplies is still unproven: a member's own pod key with no account here yet is claimable by the
+      first registrant (backlog doorway-identity-recovery-gate-residuals-2026-10-04 item 5).
 
   - name: operator_identity_recovery_authorized
     kind: pure-decision-predicate

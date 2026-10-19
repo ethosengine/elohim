@@ -79,7 +79,26 @@ Not yet confirmed by a live run: that the rebuilt doorway refuses the three requ
   only this doorway's record: nobody → the caller's own key; a live record → 403 `IDENTITY_RECOVERY_REFUSED`;
   unknown (log unreadable, store verdict wiped or unknown) → 503 with the provisioning code. Nothing is
   installed or adopted.
-- **Node-key bind forgets the record** (`routes/node_key_bind.rs`), as stewardship graduation does.
+- **Node-key bind forgets the record only when the deprovision succeeded** (`routes/node_key_bind.rs`). On a
+  failed uninstall the record is kept: it truthfully names the live cell.
+- **A node/device registration cannot claim a hosted or bound key** (codex review of 0a7c3f1a5). Registering a
+  fresh identifier as `device` with a victim's hosted agent key, then logging in, used to mint a session onto the
+  victim's cell: the key is stored with no proof of possession and login resolves it through the registry.
+  Registration now refuses (403 `AGENT_KEY_ALREADY_BOUND`) a key the registry maps to an app this doorway hosts,
+  or that another live account holds; login refuses (403 `ACCOUNT_KEY_HOSTED_HERE`) a node/device account whose
+  key resolves to a hosted app, unless this doorway's record for exactly that identifier names that agent and app.
+  The registration response and the stored row now carry the same key (the caller's).
+
+### 5. Proof of possession for a node/device key — the real cure
+
+The guards above refuse keys the doorway can SEE are taken. They cannot refuse a member's own pod key whose
+holder has no account here yet: the first registrant to name it gets an account (and, at login, routing) onto
+that pod agent. An already-minted JWT naming a key is also refreshed from its own claims and routed by the
+chaperone without re-asking whose key it is.
+
+Exit: a node/device registration (and `/auth/refresh`) carries a signature by the claimed agent key over a
+doorway-issued challenge naming this doorway and identifier — the same shape `routes/node_key_bind.rs` already
+verifies for a hosted person moving onto their node key — and the doorway refuses a key it has no signature for.
 
 ## What was reachable before the branch (the class, now closed)
 
