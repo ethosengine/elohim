@@ -115,11 +115,30 @@ def _render_degenerate(node, samples):
     cums = [c for c in (_cum_render(s) for s in win) if c is not None]
     if len(cums) < DEGEN_POLLS:
         return None
-    d_total = cums[-1][0] - cums[0][0]
-    d_degen = cums[-1][1] - cums[0][1]
+    # Sum the delta PER POLL TRANSITION, not last-minus-first. The counters are
+    # per-process, so a pod restart inside the window puts two processes' lifetimes
+    # in one ring buffer, and subtracting across the restart is arithmetic on
+    # unrelated numbers. Measured 2026-10-09 on alpha (fp da8bb3bdd7e1): the window
+    # ran total 3,3,4,5,23,25 | 5,19 and degenerate 1,1,1,1,2,3 | 2,6 (| = restart).
+    # Last-minus-first read "5/16 = 0.31" and fired; the endpoint-only reset guard
+    # (d_total <= 0 or d_degen < 0) could not see a restart whose post-restart
+    # counters had already grown past the window's first sample. What actually
+    # rendered in that window was 22 + 5 + 14 = 41 renders, 2 + 2 + 4 = 8 degenerate,
+    # 0.20 — under DEGEN_RATE.
+    #
+    # A transition where either counter went DOWN is a restart: everything the new
+    # process has counted happened since the previous poll, so its since-boot
+    # counters ARE that transition's delta.
+    d_total = d_degen = 0
+    for (a_total, a_degen), (b_total, b_degen) in zip(cums, cums[1:]):
+        if b_total < a_total or b_degen < a_degen:
+            d_total += b_total
+            d_degen += b_degen
+        else:
+            d_total += b_total - a_total
+            d_degen += b_degen - a_degen
     # d_total == 0: nothing rendered in the window — silence, not saturation.
-    # Either delta < 0: the counters reset (pod restart); the window refills.
-    if d_total <= 0 or d_degen < 0:
+    if d_total <= 0:
         return None
     # A RATE NEEDS A BASE. DEGEN_RATE is 0.25, so on a 4-render delta a SINGLE slow
     # fetch crossing the soft budget scores exactly at threshold — and on a 1-render

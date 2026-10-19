@@ -140,6 +140,20 @@ reset = _win("alpha", [_render(900, 300), _render(2, 1), _render(4, 2)])
 check("render-degenerate silent across a counter reset (pod restart)",
       not any(f["provenance"] == "render-degenerate" for f in rh.evaluate(reset)))
 
+# a restart INSIDE the window whose post-restart counters outgrew the first sample:
+# last-minus-first reads 5/16 = 0.31 across two processes; per-transition it is 8/41.
+# The measured alpha window of 2026-10-09 (fp da8bb3bdd7e1).
+mid_reset = _win("alpha", [_render(3, 1), _render(3, 1), _render(4, 1), _render(5, 1),
+                           _render(23, 2), _render(25, 3), _render(5, 2), _render(19, 6)])
+check("render-degenerate does not subtract across a mid-window restart",
+      not any(f["provenance"] == "render-degenerate" for f in rh.evaluate(mid_reset)))
+
+# ...and a restart does not blind it: renders counted by the new process are new.
+reset_then_storm = _win("alpha", [_render(900, 10), _render(902, 10), _render(6, 4)])
+storm_f = [f for f in rh.evaluate(reset_then_storm) if f["provenance"] == "render-degenerate"]
+check("render-degenerate counts a restarted process's renders as new",
+      len(storm_f) == 1 and "4/8 of NEW renders" in storm_f[0]["line"])
+
 # the smaller /admin/self-healing render sub-object ({total, degenerateRate}) still works
 sh_shape = _win("alpha", [{"render": {"total": 100, "degenerateRate": 0.10}},
                           {"render": {"total": 104, "degenerateRate": 0.125}},
