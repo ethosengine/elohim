@@ -51,6 +51,9 @@ if argv[:2] == ["actor", "current"]:
     body["session"] = session
     print(json.dumps(body))
     sys.exit(0)
+if argv[:2] == ["covenant", "offer"] and os.environ.get("STUB_OFFER"):
+    print(os.environ["STUB_OFFER"])
+    sys.exit(0)
 sys.exit(2)
 '''
 
@@ -128,13 +131,18 @@ class ParticipantStandingCase(unittest.TestCase):
         lines = self.lines(result)
         self.assertIn(len(lines), (1, 2), lines)
         if len(lines) == 2:
-            self.assertTrue(lines[1].startswith("steward of record: human:"), lines)
+            self.assertTrue(lines[1].startswith(("steward of record: human:", "COVENANT PENDING",
+                                                 "covenant: ")), lines)
         return lines[0]
 
     def calls(self) -> list[list[str]]:
         if not self.log.exists():
             return []
         return [json.loads(l) for l in self.log.read_text().splitlines() if l.strip()]
+
+    def actor_calls(self) -> list[list[str]]:
+        """The standing reads alone; the one `covenant offer` read is counted separately."""
+        return [argv for argv in self.calls() if argv[:2] == ["actor", "current"]]
 
     # ── the five named cases ─────────────────────────────────────────────────────────────────
     def test_prints_standing_line_from_current_json(self):
@@ -160,9 +168,10 @@ class ParticipantStandingCase(unittest.TestCase):
         self.line(self.run_hook({"session_id": "sess-d"},
                                 claimed={"sess-d": "agent:implementer@claude-opus-5-5"}))
         calls = self.calls()
-        self.assertTrue(calls, "the hook must read `epr actor current`")
+        self.assertTrue(self.actor_calls(), "the hook must read `epr actor current`")
         for argv in calls:
-            self.assertEqual(argv[:2], ["actor", "current"], argv)
+            # Reads only: the standing read, and the covenant offer — never `covenant record`.
+            self.assertIn(argv[:2], (["actor", "current"], ["covenant", "offer"]), argv)
             self.assertNotIn("witness", argv)
             self.assertNotIn("claim", argv)
             self.assertNotIn("contest", argv)
@@ -201,14 +210,14 @@ class ParticipantStandingCase(unittest.TestCase):
         r = self.run_hook({"session_id": "sess-g"}, current=STANDING,
                           claimed={"sess-g": "agent:implementer@claude-opus-5-5"})
         self.assertIn("participant: human:matthew (did:key:z…ta2doK, standing;", self.line(r))
-        self.assertEqual(len(self.calls()), 2)
+        self.assertEqual(len(self.actor_calls()), 2)
 
     def test_the_device_read_consults_no_claimable_session(self):
         # M8: the second read is `current --device` — no session label at all, so nothing anyone
         # can claim hides the device.
         self.line(self.run_hook({"session_id": "sess-k"}, current=STANDING,
                                 claimed={"sess-k": "agent:implementer@claude-opus-5-5"}))
-        first, second = self.calls()
+        first, second = self.actor_calls()
         self.assertIn("--session", first)
         self.assertIn("--device", second)
         self.assertNotIn("--session", second)
@@ -276,6 +285,50 @@ class ParticipantStandingCase(unittest.TestCase):
         line = self.line(r)
         self.assertTrue(line.startswith("participant: (unknown — "), line)
         self.assertIn("standing", line)
+
+
+    # ── the session covenant (operator, 2026-10-19): one bundle of asks, asked once ─────────
+    OFFER = {
+        "pending": [{"kind": "affirmsStewardOfRecord",
+                     "question": "Do you stand as steward of record for this session?"},
+                    {"kind": "declaresPurpose", "question": "What is this session's work?"}],
+        "variable": [{"rule": "a2o-story-blind-reader-review", "manifest": "genesis/a2o/.epr-meta",
+                      "floor": "one considered fresh read",
+                      "offeredWhen": "the purpose is authoring stories"}],
+        "held": [],
+    }
+
+    def test_a_pending_covenant_replaces_the_bare_steward_ask_with_one_bundle(self):
+        r = self.run_hook({"session_id": "sess-cv"}, claimed={"sess-cv": "human:matthew"},
+                          STUB_OFFER=json.dumps(self.OFFER))
+        lines = self.lines(r)
+        self.assertEqual(len(lines), 2, lines)
+        ask = lines[1]
+        self.assertTrue(ask.startswith("COVENANT PENDING (human:matthew, this session)"), ask)
+        self.assertIn("ONE AskUserQuestion", ask)
+        self.assertIn("BEFORE the first write", ask)
+        self.assertIn("Do you stand as steward of record", ask)
+        self.assertIn("`a2o-story-blind-reader-review`", ask)
+        self.assertIn("epr covenant record --session sess-cv", ask)
+        self.assertIn("Subagents never ask", ask)
+        self.assertNotIn("steward of record: human:matthew?", ask)
+
+    def test_a_settled_covenant_names_its_held_clauses(self):
+        settled = {"pending": [], "variable": [], "held": [{"cid": "bafyreia"}, {"cid": "bafyreib"}]}
+        r = self.run_hook({"session_id": "sess-cs"}, claimed={"sess-cs": "human:matthew"},
+                          STUB_OFFER=json.dumps(settled))
+        self.assertEqual(self.lines(r)[1],
+                         "covenant: 2 clause(s) held this session — epr covenant show --session sess-cs")
+
+    def test_an_unreadable_covenant_keeps_the_steward_ask(self):
+        # A stale `epr` without `covenant` must never silence the steward-of-record question.
+        r = self.run_hook({"session_id": "sess-cu"}, claimed={"sess-cu": "human:matthew"})
+        self.assertTrue(self.lines(r)[1].startswith("steward of record: human:matthew?"))
+
+    def test_no_covenant_ask_without_a_standing_human(self):
+        r = self.run_hook({"session_id": "sess-cn"}, current=UNWITNESSED,
+                          STUB_OFFER=json.dumps(self.OFFER))
+        self.assertEqual(len(self.lines(r)), 1)
 
 
 if __name__ == "__main__":

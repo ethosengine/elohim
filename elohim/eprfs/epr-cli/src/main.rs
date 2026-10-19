@@ -1,7 +1,7 @@
 use std::{env, path::PathBuf, process::ExitCode};
 
 use elohim_epr_cli::{
-    actor, canon_lift, check, device, doctor,
+    actor, canon_lift, check, covenant, device, doctor,
     error::{Error, Result},
     explain, flow, git,
     git::{ChangeKind, ChangedPath},
@@ -42,6 +42,18 @@ fn main() -> ExitCode {
             Ok(code) => code,
             Err(error) => {
                 eprintln!("epr actor: {error}");
+                ExitCode::from(2)
+            }
+        };
+    }
+    // `covenant` is the session covenant's authority half: it renders its own JSON payload. Its
+    // exit code means "could the covenant be read", never "was a clause held": a non-zero exit
+    // tells every caller to apply the full rule.
+    if raw.first().map(String::as_str) == Some("covenant") {
+        return match covenant::run(&raw[1..]) {
+            Ok(code) => code,
+            Err(error) => {
+                eprintln!("epr covenant: {error}");
                 ExitCode::from(2)
             }
         };
@@ -193,7 +205,7 @@ fn run() -> Result<(Report, bool)> {
 }
 
 /// Every top-level command, as a person types it.
-const COMMANDS: [&str; 11] = [
+const COMMANDS: [&str; 12] = [
     "setup",
     "doctor",
     "explain",
@@ -205,6 +217,7 @@ const COMMANDS: [&str; 11] = [
     "canon-lift",
     "device",
     "identity",
+    "covenant",
 ];
 
 fn global_args(args: Vec<String>) -> Result<(Option<PathBuf>, Vec<String>)> {
@@ -299,5 +312,5 @@ fn print_human(report: &Report) {
 }
 
 fn usage() -> &'static str {
-    "usage: epr [--repo PATH] [--json] <setup|doctor|explain PATH|check [PATH...]|govern --path REL ...|ready [--target REF] [--deep]|flow ...|actor <claim --as agent:<role>@<model> --session ID|current --session ID>|canon-lift [--check|--write]|device <ask|redeem|approve> ...|identity <begin|standing> ...>"
+    "usage: epr [--repo PATH] [--json] <setup|doctor|explain PATH|check [PATH...]|govern --path REL ...|ready [--target REF] [--deep]|flow ...|actor <claim --as agent:<role>@<model> --session ID|current --session ID>|canon-lift [--check|--write]|device <ask|redeem|approve> ...|identity <begin|standing> ...|covenant <offer|show|check|record> --session ID ...>"
 }

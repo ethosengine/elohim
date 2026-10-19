@@ -32,6 +32,13 @@ pub use validation::{
 };
 use validation::{bounded_text, version, Reader};
 
+/// Why `human` cannot stand as steward of record for this repository's root collective, or `None`
+/// when they can: the predicate `--steward-of-record` applies, shared with `epr covenant`.
+pub fn steward_of_record_refusal(root: &Path, human: &str) -> FlowResult<Option<String>> {
+    let governance = Reader::new(root)?.collective()?;
+    Ok(import::steward_refusal(&governance, human))
+}
+
 fn refused(message: impl Into<String>) -> FlowError {
     FlowError::InvalidArguments(format!("collective memory: {}", message.into()))
 }

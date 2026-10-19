@@ -64,6 +64,12 @@ reader. Repeat until the verdict is `READY`, or record the specific findings the
 chooses to defer. The `.epr-meta` rule `a2o-story-blind-reader-review` and its PostToolUse signal keep
 this obligation attached to the authoring surface.
 
+The full loop guards against a technical run leaking its context into a story it touched in
+passing. When a session's declared purpose *is* authoring the story, the steward of record can grant
+that session a covenant clause (`epr covenant`) that lowers the obligation to the rule's declared
+`variance` floor for the named paths: one considered fresh read, fix its correctness findings, close
+by judgment. The floor never applies without that clause, and an agent cannot grant it to itself.
+
 ## Watch-outs
 
 - **A gherkin parse error aborts the WHOLE E2E run, not one scenario.** An unescaped `/` inside a scenario name or step (read by the parser as an empty regex alternation), a bare continuation line the AST rejects, or a malformed table will abort the entire feature-file load — every scenario in the run is lost and the build surfaces as `UNSTABLE` with a **blank cucumber report body** (empty report → UNSTABLE with no failing-scenario detail). When that happens, READ THE RAW E2E LOG FIRST (the parse error is there, not in the empty report). Backlog: a pre-push gherkin/cucumber grammar linter (`gherkin-prepush-lint`) to catch empty-alternation + bare-continuation before AST-abort drops the whole suite.

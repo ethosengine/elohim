@@ -404,10 +404,25 @@ def main():
     # Soft-ceiling injects re-fire on EVERY edit of an over-soft file — debounce per (rule, path)
     # so the nudge informs once per working session instead of nagging each keystroke. Injected
     # into resolve_write (which stays pure otherwise) as the `verdict_filter` extension point.
+    # A variable inject held under this session's covenant (a clause the steward of record
+    # granted) is swapped for its floor line, never silenced: `epr covenant check` decides, the
+    # filter only routes. Unreadable covenant -> the full rule's advice stands.
+    held_floors: list[tuple[str, dict]] = []
+
     def _soft_filter(v, merged) -> bool:
         r = merged["rules"].get(v.rule_id, {})
-        return (v.cls == "inject" and "measure" in r
-                and _advice_debounced(root, f"loc-soft:{v.rule_id}:{fp}"))
+        if (v.cls == "inject" and "measure" in r
+                and _advice_debounced(root, f"loc-soft:{v.rule_id}:{fp}")):
+            return True
+        params = r.get("parameters") if isinstance(r.get("parameters"), dict) else {}
+        if v.cls == "inject" and isinstance(params.get("variance"), dict):
+            rel = str(Path(fp).resolve().relative_to(root)) if Path(fp).is_absolute() else fp
+            check = epr_client.covenant(root, "check", session_id, "--rule", v.rule_id,
+                                        "--path", rel)
+            if check.get("status") == "held":
+                held_floors.append((v.rule_id, check))
+                return True
+        return False
 
     # The governance correspondence spine: the SAME pure decision path the golden-vector parity
     # runner drives (cascade -> malformed check -> merge+expand policies -> evaluate -> combine ->
@@ -418,6 +433,12 @@ def main():
     result = epr_meta.resolve_write(target, write, root, verdict_filter=_soft_filter)
     advisories += result["advisories"]
     merged = result.get("merged")
+    for rule_id, check in held_floors:
+        advisories.append(
+            f"[.epr-meta] `{rule_id}` is held at its variance floor for this session under "
+            f"covenant clause {check.get('clause')} ({check.get('party')}): {check.get('floor')}.")
+        # Witnessed once per write, after it lands, by blind-reader-review (which also knows
+        # which agent wrote) — not here as well, so the ledger counts writes, not hook passes.
 
     # ── the native evaluator is the DECISION AUTHORITY ────────────────────────
     # Both hosts evaluate; `epr` decides. Running only one would delete the

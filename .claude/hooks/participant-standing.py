@@ -57,6 +57,7 @@ import subprocess
 import sys
 
 _READ_TIMEOUT = 0.8  # seconds per `epr actor current`; at most two reads
+_OFFER_TIMEOUT = 0.9  # the one `epr covenant offer` read; 2 x 0.8 + 0.9 fits the registered 3 s
 
 # The contested line, verbatim from `epr actor current` (actor.rs CONTESTED_ROOT_LINE).
 CONTESTED_LINE = "contested (roster root differs from this device's pin)"
@@ -174,6 +175,64 @@ def steward_prompt(line: str):
     )
 
 
+def covenant_offer(project_dir: str, session):
+    """`epr covenant offer --json` as a dict, or None when the covenant cannot be read.
+
+    The offer is native: `epr` decides what is pending (steward of record, purpose) and which
+    rules declare a variance floor. None — no binary, a stale `epr`, a timeout — falls back to the
+    bare steward-of-record ask, so a missing covenant never silences that question.
+    """
+    if not session:
+        return None
+    obs = _observation_module(project_dir)
+    binary = obs.resolve_bin() if obs else None
+    if not binary:
+        return None
+    try:
+        r = subprocess.run(
+            [binary, "covenant", "offer", "--repo", project_dir, "--session", session, "--json"],
+            capture_output=True, text=True, timeout=_OFFER_TIMEOUT, cwd=project_dir,
+        )
+        body = json.loads(r.stdout) if r.returncode == 0 else None
+    except Exception:
+        return None
+    return body if isinstance(body, dict) else None
+
+
+def covenant_line(line: str, offer: dict, session: str):
+    """The session-covenant ask that follows a standing human, or None.
+
+    One bundle, asked once (operator, 2026-10-19): every pending clause goes into ONE
+    AskUserQuestion after the operator's first prompt names the work and before the first write,
+    so the asks never arrive one stop at a time. The hook still only reads and names; recording is
+    the agent's act on the operator's own words.
+    """
+    prefix = "participant: human:"
+    if not line.startswith(prefix):
+        return None
+    subject = line[len("participant: "):].split(" ", 1)[0]
+    pending = [p for p in offer.get("pending") or [] if isinstance(p, dict)]
+    variable = [v for v in offer.get("variable") or [] if isinstance(v, dict)]
+    held = offer.get("held") or []
+    if not pending and not variable:
+        return (f"covenant: {len(held)} clause(s) held this session — "
+                f"epr covenant show --session {session}") if held else None
+    asks = "; ".join(p.get("question") or p.get("kind", "?") for p in pending) or "none"
+    rules = "; ".join(
+        f"`{v.get('rule')}` ({v.get('manifest')}) floor: {v.get('floor')} — offer when "
+        f"{v.get('offeredWhen')}" for v in variable) or "none"
+    return (
+        f"COVENANT PENDING ({subject}, this session) — after the operator's first prompt names the "
+        f"work and BEFORE the first write, ask every pending clause in ONE AskUserQuestion, plus any "
+        f"variable rule the declared work meets. For each, say what it changes, its scope, when it "
+        f"ends, and that the answer is signed into the repo (brit) and cited by commits this "
+        f"session lands. Record each answer in their words: epr covenant record --session "
+        f"{session} --kind <kind> --party {subject} --quote \"<their words>\" [--purpose … "
+        f"--write-set <glob>…] [--rule <id> --paths <glob>…]. Pending: {asks}. Variable rules: "
+        f"{rules}. Held: {len(held)}. Subagents never ask; they inherit."
+    )
+
+
 def main() -> None:
     try:
         raw = sys.stdin.read()
@@ -190,9 +249,10 @@ def main() -> None:
         line = participant_line(project_dir, session)
     except Exception as e:  # fail-open, but spoken
         line = f"participant: (unknown — {type(e).__name__})"
-    steward = steward_prompt(line)
-    if steward:
-        line = f"{line}\n{steward}"
+    offer = covenant_offer(project_dir, session)
+    ask = covenant_line(line, offer, session) if offer is not None else steward_prompt(line)
+    if ask:
+        line = f"{line}\n{ask}"
     print(json.dumps({
         "hookSpecificOutput": {"hookEventName": "SessionStart", "additionalContext": line}
     }))

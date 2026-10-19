@@ -13,7 +13,12 @@ rules:
     class: inject
     when: { write: "*.feature" }
     route-to: { dest: blind-reader }
-    parameters: { review-profile: a2o-story }
+    parameters:
+      review-profile: a2o-story
+      variance:
+        floor: one considered fresh read; fix its correctness findings; close by the author's judgment
+        requires: steward-of-record
+        offered-when: the session's declared purpose is authoring the stories in scope
     why: >
       After the authoring pass, dispatch a fresh-context blind-reader with ONLY the completed
       feature-file path and the `a2o-story` review profile. Do not provide the conversation, plan,
@@ -28,6 +33,10 @@ rules:
       The PostToolUse signal makes this deferred review obligation
       visible after writes; it is one review loop per completed authoring pass, not one subagent
       dispatch per edit.
+      The loop is owed when the writer's attention is elsewhere — a technical run that touches a
+      story in passing. A session whose declared purpose is the story itself discharges it at the
+      `variance` floor above, and only under a session-covenant clause the steward of record granted
+      for that session and those paths (`epr covenant`); an agent never grants itself the floor.
   - id: new-feature-subdir-needs-meta
     class: dispatch
     when: { write: "*.feature", new: true }

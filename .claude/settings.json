@@ -17,7 +17,7 @@
           {
             "type": "command",
             "command": "python3 \"$CLAUDE_PROJECT_DIR/.claude/hooks/participant-standing.py\"",
-            "timeout": 2
+            "timeout": 3
           },
           {
             "type": "command",
@@ -175,6 +175,11 @@
             "type": "command",
             "command": "python3 \"$CLAUDE_PROJECT_DIR/.claude/hooks/claude-md-structural-signal.py\"",
             "timeout": 2
+          },
+          {
+            "type": "command",
+            "command": "python3 \"$CLAUDE_PROJECT_DIR/.claude/hooks/covenant-subagent-stamp.py\"",
+            "timeout": 3
           }
         ]
       },
@@ -317,6 +322,17 @@
             "type": "command",
             "command": "python3 \"$CLAUDE_PROJECT_DIR/.claude/hooks/ram-guard.py\" --event posttool",
             "timeout": 5
+          }
+        ]
+      }
+    ],
+    "SubagentStart": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python3 \"$CLAUDE_PROJECT_DIR/.claude/hooks/covenant-subagent-stamp.py\"",
+            "timeout": 3
           }
         ]
       }

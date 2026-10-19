@@ -1284,6 +1284,34 @@ fn steward_of_record_line(human: &str, origin: Option<String>) -> String {
     )
 }
 
+/// Why `human` cannot stand as steward of record under `governance`, or `None` when they can:
+/// an active, NON-fixture Steward of the collective of record. The one predicate shared by
+/// `--steward-of-record` and `epr covenant`.
+pub(super) fn steward_refusal(
+    governance: &super::validation::Governance,
+    human: &str,
+) -> Option<String> {
+    use eprfs_agent::memory::AffiliationStanding;
+    let Some((_, affiliation)) = governance
+        .affiliation_of(human)
+        .filter(|(_, a)| a.is_active_steward())
+    else {
+        return Some(format!(
+            "{human} is not an active Steward of {} ({}); only a Steward on record can stand for \
+             its fruit",
+            governance.declaration.id, governance.reference.path
+        ));
+    };
+    if affiliation.standing == AffiliationStanding::Fixture {
+        return Some(format!(
+            "{human} is a FIXTURE Steward of {} — a test human at Bootstrap stakes cannot stand \
+             for real fruit as steward of record",
+            governance.declaration.id
+        ));
+    }
+    None
+}
+
 /// Admit `--steward-of-record`, or refuse naming why. Returns the standing human's handle and
 /// each entry's origin session (for the authorship slot).
 ///
@@ -1304,7 +1332,6 @@ fn steward_of_record(
     governance: &super::validation::Governance,
     evidence: &super::attribution::Evidence,
 ) -> FlowResult<(String, Vec<Option<String>>)> {
-    use eprfs_agent::memory::AffiliationStanding;
     if opts.as_of.is_some() {
         return Err(refused(
             "--steward-of-record stands NOW for entries no one authored; --as-of belongs to an \
@@ -1332,22 +1359,8 @@ fn steward_of_record(
              for what no one was witnessed writing"
         )));
     }
-    let Some((_, affiliation)) = governance
-        .affiliation_of(&human)
-        .filter(|(_, a)| a.is_active_steward())
-    else {
-        return Err(refused(format!(
-            "{human} is not an active Steward of {} ({}); only a Steward on record can stand for \
-             its fruit",
-            governance.declaration.id, governance.reference.path
-        )));
-    };
-    if affiliation.standing == AffiliationStanding::Fixture {
-        return Err(refused(format!(
-            "{human} is a FIXTURE Steward of {} — a test human at Bootstrap stakes cannot stand \
-             for real fruit as steward of record",
-            governance.declaration.id
-        )));
+    if let Some(reason) = steward_refusal(governance, &human) {
+        return Err(refused(reason));
     }
     let mut origins = Vec::new();
     for rel in rels {

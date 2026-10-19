@@ -144,6 +144,41 @@ def disagreement(py_result: dict, rs_payload: dict) -> str | None:
     )
 
 
+def covenant(root: Path, verb: str, session: str | None, *args: str) -> dict:
+    """`epr covenant <verb> --repo R --session S … --json`, the session covenant's native reader.
+
+    Transport only: whether a clause is honoured (standing, paths, expiry, revocation, the rule's
+    current bytes) is decided by `epr`, never re-derived here. An absent binary, a stale `epr`
+    without the subcommand, a timeout or unparseable output all return
+    `{"status": "unavailable", "reason": …}`, and callers apply the full rule: a covenant that
+    cannot be read never lowers an obligation.
+    """
+    if not session:
+        return {"status": "unavailable", "reason": "no session id"}
+    binary = resolve_binary()
+    if not binary:
+        return {"status": "unavailable", "reason": "`epr` not found"}
+    argv = [binary, "covenant", verb, "--repo", str(root), "--session", session, *args, "--json"]
+    try:
+        proc = subprocess.run(argv, capture_output=True, text=True,
+                              timeout=_COVENANT_TIMEOUT_SECONDS)
+    except Exception as e:  # noqa: BLE001 — timeout / spawn failure is an absence
+        return {"status": "unavailable", "reason": type(e).__name__}
+    if proc.returncode != 0:
+        first = (proc.stderr or proc.stdout).strip().splitlines()[:1]
+        return {"status": "unavailable", "reason": first[0][:160] if first else f"exit {proc.returncode}"}
+    try:
+        body = json.loads(proc.stdout)
+    except Exception:  # noqa: BLE001
+        return {"status": "unavailable", "reason": "unparseable `epr covenant` output"}
+    return body if isinstance(body, dict) else {"status": "unavailable", "reason": "non-object output"}
+
+
+# Covenant reads sit on the author's keystroke and on SessionStart/SubagentStart, beside the 0.8 s
+# actor read — not on govern's 10 s budget.
+_COVENANT_TIMEOUT_SECONDS = 1.5
+
+
 DEGRADED_NOTICE = (
     "[.epr-meta] the native evaluator (`epr`) could not be resolved — this decision came from "
     "the Python evaluator alone, so the cross-host check did not run. Build it "

@@ -9,6 +9,7 @@ pub mod approver;
 pub mod authority;
 pub mod canon_lift;
 pub mod check;
+pub mod covenant;
 pub mod device;
 pub mod device_key;
 pub mod doctor;

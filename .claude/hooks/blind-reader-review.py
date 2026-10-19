@@ -33,7 +33,7 @@ def _target_path(file_path: str, repo: Path) -> Path:
     return target.resolve()
 
 
-def _matching_reviews(target: Path, repo: Path) -> list[tuple[str, str]]:
+def _matching_reviews(target: Path, repo: Path) -> list[tuple[str, str, dict]]:
     try:
         target.relative_to(repo)
     except ValueError:
@@ -57,7 +57,7 @@ def _matching_reviews(target: Path, repo: Path) -> list[tuple[str, str]]:
     except (ImportError, OSError):
         return []
 
-    reviews: list[tuple[str, str]] = []
+    reviews: list[tuple[str, str, dict]] = []
     rules = result.get("merged", {}).get("rules", {})
     for rule_id, rule in rules.items():
         if not isinstance(rule, dict):
@@ -67,17 +67,21 @@ def _matching_reviews(target: Path, repo: Path) -> list[tuple[str, str]]:
             continue
         parameters = rule.get("parameters", {})
         profile = parameters.get("review-profile", "general")
-        reviews.append((rule_id, profile))
+        reviews.append((rule_id, profile, parameters.get("variance") or {}))
     return reviews
 
 
-def _context(target: Path, repo: Path, reviews: list[tuple[str, str]]) -> str:
+def _display(target: Path, repo: Path):
     try:
-        display_path = target.relative_to(repo)
+        return target.relative_to(repo)
     except ValueError:
-        display_path = target
-    rules = ", ".join(f"`{rule_id}`" for rule_id, _ in reviews)
-    profiles = ", ".join(f"`{profile}`" for _, profile in reviews)
+        return target
+
+
+def _context(target: Path, repo: Path, reviews: list[tuple[str, str, dict]]) -> str:
+    display_path = _display(target, repo)
+    rules = ", ".join(f"`{rule_id}`" for rule_id, _, _ in reviews)
+    profiles = ", ".join(f"`{profile}`" for _, profile, _ in reviews)
     return (
         f"[BLIND-READER REVIEW] `{display_path}` carries .epr-meta rule(s) {rules}. "
         f"After this authoring pass is complete, dispatch a NEW fresh-context `{AGENT_ID}` with "
@@ -87,6 +91,54 @@ def _context(target: Path, repo: Path, reviews: list[tuple[str, str]]) -> str:
         "READY, or name findings the operator explicitly defers. Defer dispatch until the "
         "completed authoring pass; do not spawn one per edit."
     )
+
+
+def _floor_context(target: Path, repo: Path, held: list[tuple[str, str, dict]]) -> str:
+    """The obligation at the rule's declared floor, for a write a covenant clause holds."""
+    display_path = _display(target, repo)
+    lines = []
+    for rule_id, profile, check in held:
+        lines.append(
+            f"[BLIND-READER REVIEW · COVENANT] `{display_path}`: rule `{rule_id}` is held at its "
+            f"variance floor under covenant clause {check.get('clause')} (granted by "
+            f"{check.get('party') or 'the steward of record'} for this session and these paths). "
+            f"Owed: {check.get('floor')}. The read is still a NEW fresh-context `{AGENT_ID}` with "
+            f"only this path and profile `{profile}`. Be careful: the floor trusts this session's "
+            "declared purpose, so keep implementation detail out of the story. Record the read's "
+            "per-class counts and the clause id where the work reports."
+        )
+    return "\n".join(lines)
+
+
+def _owed_suffix(check: dict, in_subagent: bool) -> str:
+    """What to say about a variable rule whose floor is NOT held for this write."""
+    if check.get("status") == "unavailable":
+        return f" (Covenant unreadable: {check.get('reason')}. The full rule applies.)"
+    if in_subagent:
+        return ""
+    return (" This rule declares a variance floor. If this session's declared purpose is authoring "
+            "these stories, offer the steward of record that floor as ONE question (`epr covenant "
+            "offer` lists it) and record their answer; never take the floor yourself.")
+
+
+def _witness_floor(repo: Path, target: Path, rule_id: str, check: dict,
+                   agent_type: str | None, agent_id: str | None) -> None:
+    """A lowered obligation is counted, not felt: one ledger row per write held at a floor."""
+    try:
+        from _lib.epr_meta import witness
+
+        # COVENANT_WITNESS_ROOT exists for the hook's tests, so fixtures never land in the
+        # tracked ledger; in a session it is unset and rows go to this repository's ledger.
+        ledger_root = Path(os.environ.get("COVENANT_WITNESS_ROOT") or repo)
+        witness(ledger_root, runtime="claude-code", gate="blind-reader-review",
+                subject=str(_display(target, repo)), decision="permit", cls="inject",
+                rule_id=rule_id,
+                checks=[f"variance: {check.get('clause')}",
+                        f"party: {check.get('party')}",
+                        f"agent: {agent_type or 'main-session'}"
+                        + (f" {agent_id}" if agent_id else "")])
+    except Exception:  # noqa: BLE001 — witnessing must never break the hook
+        pass
 
 
 def main() -> int:
@@ -105,12 +157,40 @@ def main() -> int:
     if not reviews:
         return 0
 
+    # A rule that declares a variance asks this session's covenant (`epr covenant check`, keyed by
+    # the session id a subagent inherits) whether the steward of record granted its floor here.
+    session = payload.get("session_id") or os.environ.get("CLAUDE_CODE_SESSION_ID")
+    agent_id = payload.get("agent_id")
+    agent_type = payload.get("agent_type")
+    held: list[tuple[str, str, dict]] = []
+    owed: list[tuple[str, str, dict]] = []
+    suffixes: list[str] = []
+    for rule_id, profile, variance in reviews:
+        if not variance:
+            owed.append((rule_id, profile, variance))
+            continue
+        from _lib import epr_client
+
+        check = epr_client.covenant(repo, "check", session, "--rule", rule_id,
+                                    "--path", str(_display(target, repo)))
+        if check.get("status") == "held":
+            held.append((rule_id, profile, check))
+            _witness_floor(repo, target, rule_id, check, agent_type, agent_id)
+        else:
+            owed.append((rule_id, profile, variance))
+            suffixes.append(_owed_suffix(check, in_subagent=bool(agent_id)))
+
+    parts = []
+    if owed:
+        parts.append(_context(target, repo, owed) + "".join(dict.fromkeys(suffixes)))
+    if held:
+        parts.append(_floor_context(target, repo, held))
     print(
         json.dumps(
             {
                 "hookSpecificOutput": {
                     "hookEventName": "PostToolUse",
-                    "additionalContext": _context(target, repo, reviews),
+                    "additionalContext": "\n".join(parts),
                 }
             }
         )

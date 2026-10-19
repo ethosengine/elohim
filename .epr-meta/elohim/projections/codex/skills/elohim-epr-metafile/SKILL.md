@@ -156,6 +156,34 @@ currently fire on nothing.** Treat them as documentation of intent, not enforcem
 > also the interruption budget: routine judgment belongs in dispatch, and a new pilot stop must name
 > the consequential authority it protects.
 
+**Variance: a rule may declare a floor its obligation can be lowered to.** A rule should be blind to
+who is writing when the writer's own judgment is the thing it cannot trust. That is right by default,
+and wasteful when a session's declared purpose already discharges the rule's concern. For that case,
+an `inject` or `dispatch` rule may declare its own floor under `parameters`:
+
+```yaml
+parameters:
+  variance:
+    floor: one considered fresh read; fix its correctness findings; close by the author's judgment
+    requires: steward-of-record
+    offered-when: the session's declared purpose is authoring the stories in scope
+```
+
+The floor applies only under a **session-covenant clause**: the steward of record grants it in their
+own words for one session and named paths. The clause is recorded by `epr covenant record` and signed
+into brit refs. A clause can only select the declared floor and narrow the paths. It never widens
+either, and an edit to the manifest voids every clause granted over the old bytes.
+
+- Hooks ask `epr covenant check` per write. A held floor replaces the rule's advice with a floor
+  line and a witness row; it never silences the rule.
+- An unreadable covenant lowers nothing.
+- Spawned agents are told what is held (a `SubagentStart` stamp) and cannot record a clause
+  themselves.
+- `ask`/`deny` rules cannot declare a variance; lowering them is a policy change, not a session's
+  grant.
+- Declare a floor only where a purposeful session really does discharge the concern. Spec:
+  `genesis/docs/superpowers/specs/2026-10-19-session-covenant-epr-design.md`.
+
 ## The policy registry — define once, bind many
 
 A rule wanted in more than one directory (or one that is really a repo-wide norm) is a **policy**,
