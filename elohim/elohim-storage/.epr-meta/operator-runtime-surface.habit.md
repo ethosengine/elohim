@@ -282,3 +282,20 @@ explicit `"maxRuns": null` dies in `ipld-core` `serialize_unit`; the expiry fixt
 `maxRuns: 1` instead). Habit status unchanged (green): this measures the compute-authority
 station on owned household substrate; the shem/Adam leg and worker packaging remain
 unmeasured.
+
+DELTA 2026-10-19 (CI runner as sponsored service agent; code + unit evidence, no flip):
+Jenkins becomes `agent:ci-runner-jenkins-matthew`, a hosted cell on its sponsor's pool peer
+under a `hosted-cell` grant (G1) plus per-provider `measure-stage` grants (G2) — never a device,
+never a human record. Landed locally (dev 335502100, unpushed):
+- doorway service-agent registration (`routes/service_agent.rs`), `/hc/connect` grants that
+  are function-listed;
+- storage custody of compute payloads under the hosting promise (`api/hosted_custody.rs`, 11
+  tests);
+- the runner client (`genesis/a2o/scripts/compute-runner.ts`, 10 tests);
+- `runner-preflight.sh`, wired informational into genesis/Jenkinsfile;
+- adam's worker token `per-render`.
+
+Gates: doorway EXIT=0 (1830); storage 4766 passed with 2 rakia-submodule-absent failures in
+the agent worktree; genesis-a2o EXIT=0. The story `features/compute/ci-runner-stewarded.feature`
+stays @wip. Status unchanged: no live household or alpha run yet. The adam leg is blocked on
+`rakia-executor/` upstream.

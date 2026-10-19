@@ -371,23 +371,25 @@ habits:
       - "a2o @concern:operator-runtime-surface effect station (genesis/a2o/features/dataplane/operator-commitment-gated-verbs.feature — the scenario named A verb success is a post-action observation, not the handler word: an accepted reconcile has an infrastructure:operator-effect row of phase post whose event id equals the verb attestation event id and whose observer is the peer sampler; a verb with no post row is listed by the compute dashboard as unverified-effect; @wip)"
       - "cargo test --test api operator_verbs (elohim/elohim-storage — 9 tests: holder accepted + attestation names grant cid AND recorded event id; no-grant refused; revoked refused; no verified performer refused; loopless peer honest 503 with no phantom rate charge; accepted use recorded bounded_by the grant; refusals record nothing; rate_per_hour ceiling refuses the over-limit use)"
     evidence: >
-      DELTA 2026-10-18b (RED preserved; household verbs pass 3/3, but the effect station remains @wip and unmeasured).
+      DELTA 2026-10-19 (CI runner as sponsored service agent; code + unit evidence, no flip):
+      Jenkins becomes `agent:ci-runner-jenkins-matthew`, a hosted cell on its sponsor's pool peer
+      under a `hosted-cell` grant (G1) plus per-provider `measure-stage` grants (G2) — never a device,
+      never a human record. Landed locally (dev 335502100, unpushed):
+      - doorway service-agent registration (`routes/service_agent.rs`), `/hc/connect` grants that
+        are function-listed;
+      - storage custody of compute payloads under the hosting promise (`api/hosted_custody.rs`, 11
+        tests);
+      - the runner client (`genesis/a2o/scripts/compute-runner.ts`, 10 tests);
+      - `runner-preflight.sh`, wired informational into genesis/Jenkinsfile;
+      - adam's worker token `per-render`.
 
-      `features/dataplane/operator-commitment-gated-verbs.feature` on the household:
-      3/3 scenarios, 19/19 steps passed, verified against
-      `genesis/a2o/reports/sprint-report-household-20261018T000023Z-f3a7cb8e.md`
-      and matching `cucumber-mesh-20261018T000023Z-f3a7cb8e.json` (hidden hooks excluded).
-      Passing scenarios: "a commitment holder can drive a reconcile and the peer
-      attests to it" (7 steps), "a caller without a commitment is refused" (6),
-      and "a revoked commitment stops working immediately" (6).
-      "A verb's success is a post-action observation, not the handler's word" and
-      "a peer serves its own runtime telemetry" still carry scenario-level `@wip`.
-      The 2026-08-18 drop removed the feature-level tag only; it did not remove
-      these scenario tags. The effect-station check remains unmeasured, so status
-      stays red. Removing its `@wip` is a story decision, not licensed by this pass.
-    evidence-fingerprint: sha256:df749990eaa1539b
-    evidence-bytes: 19645
-    evidence-entries: 19
+      Gates: doorway EXIT=0 (1830); storage 4766 passed with 2 rakia-submodule-absent failures in
+      the agent worktree; genesis-a2o EXIT=0. The story `features/compute/ci-runner-stewarded.feature`
+      stays @wip. Status unchanged: no live household or alpha run yet. The adam leg is blocked on
+      `rakia-executor/` upstream.
+    evidence-fingerprint: sha256:070af5eceb6d70ed
+    evidence-bytes: 20698
+    evidence-entries: 20
     refs:
       - "task #10 (operator directive 2026-07-02)"
       - "elohim/elohim-storage/src/api/operator_verbs.rs (verb handler + kick) · doorway src/server/http.rs op_gate_capability/effective_op_gate_mode (per-verb gate) · seam-registry rows in both crates"
@@ -1018,28 +1020,18 @@ habits:
       - "cd elohim/eprfs && just gate eprfs: `service:` is provenance-only; it cannot claim, author, attest or approve, and a Steward can't approve an offer they authored"
       - "jenkins-bridge drift over the latest observed edge build prints no `undisclosed capability` against the ACTIVE offer (the declared-vs-observed gap; checked only once the offer is active)"
     evidence: >
-      DELTA 2026-10-15 (FLIPPED RED on check 3; the offer was re-addressed, not edited):
-      An offer's address now binds its whole declaration, not only its body
-      (`OfferDeclaration::intent` in elohim/epr-rea/src/external.rs: a `declaration:<CID>` slot over
-      every term and disclosure, never the author, and a `supersedes:<CID>` slot naming the address
-      the same text had under the body-only rule). Before, an inflow, held capability or externality
-      could change in the frontmatter while the address, and so the approval, stayed the same. The
-      Jenkins offer's text is unchanged, but its address moved from
-      bafyreibkpfcowvdxtxzpyomqfeqawbo4dh4uhjsmpo5q7vpnvl3xvvwsxe to
-      bafyreiaqf6nf4vockvs5kznuen2mzmiglojodj2nnlnh433mihgogwl5eq
-      (`jenkins-bridge offer status` at this commit). Records scoped to the old address still resolve
-      and the new Intent names it (test
-      `records_scoped_to_a_legacy_offer_address_still_resolve_and_are_superseded`), but an approval
-      never carries over. Check 3 reads drift "against the ACTIVE offer", and the new address has no
-      Steward's approval yet, so it is red until a Steward who did not author it re-approves:
-      `jenkins-bridge offer mint`, then `epr flow note --on
-      bafyreiaqf6nf4vockvs5kznuen2mzmiglojodj2nnlnh433mihgogwl5eq --kind verdict --verdict approved`.
-      No store in this workspace holds the 2026-09-26 approval, so nothing here was orphaned. Checks 1
-      and 2: `just gate jenkins-bridge` EXIT=0 with the legacy-resolution test and the stage-event
-      goldens reproduced against the legacy address; `just gate eprfs` re-run for the epr-cli change.
-    evidence-fingerprint: sha256:36ec003bd9bb3b7c
-    evidence-bytes: 4486
-    evidence-entries: 4
+      DELTA 2026-10-19 (guard risk (1) addressed in design, not yet measured): Jenkins's next rung
+      — sending Act I stages to providers — takes no control. The runner is a stewarded service
+      agent with bounded, revocable `delegates-compute` grants: G1 hosting from any sponsoring
+      steward, G2 capacity from any provider. It is never a device that speaks for a person (canon
+      row: genesis/docs/architecture/rea-compute-commitment-primitive.md §5). Its `/hc/connect`
+      session is function-listed: no identity cell, so no `create_human` and no device approval.
+      It reads only its own task outputs, and it verifies completions itself; the sponsor writes no
+      fulfilment on its behalf. Story: genesis/a2o/features/compute/ci-runner-stewarded.feature
+      (@wip). Status unchanged (red on check 3, the offer re-approval).
+    evidence-fingerprint: sha256:2781d73c02853593
+    evidence-bytes: 5288
+    evidence-entries: 5
     refs:
       - "canon: bridges/CLAUDE.md §Consuming apps: served, never in control (five rules)"
       - "atlas: genesis/docs/content/elohim-protocol/architecture/2026-06-21-elohim-seam-map-concern-routing.md §3.6 (consuming apps)"

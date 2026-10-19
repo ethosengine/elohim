@@ -94,3 +94,13 @@ bafyreiaqf6nf4vockvs5kznuen2mzmiglojodj2nnlnh433mihgogwl5eq --kind verdict --ver
 No store in this workspace holds the 2026-09-26 approval, so nothing here was orphaned. Checks 1
 and 2: `just gate jenkins-bridge` EXIT=0 with the legacy-resolution test and the stage-event
 goldens reproduced against the legacy address; `just gate eprfs` re-run for the epr-cli change.
+
+DELTA 2026-10-19 (guard risk (1) addressed in design, not yet measured): Jenkins's next rung
+— sending Act I stages to providers — takes no control. The runner is a stewarded service
+agent with bounded, revocable `delegates-compute` grants: G1 hosting from any sponsoring
+steward, G2 capacity from any provider. It is never a device that speaks for a person (canon
+row: genesis/docs/architecture/rea-compute-commitment-primitive.md §5). Its `/hc/connect`
+session is function-listed: no identity cell, so no `create_human` and no device approval.
+It reads only its own task outputs, and it verifies completions itself; the sponsor writes no
+fulfilment on its behalf. Story: genesis/a2o/features/compute/ci-runner-stewarded.feature
+(@wip). Status unchanged (red on check 3, the offer re-approval).
