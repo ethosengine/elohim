@@ -38,8 +38,14 @@ evidence: >
   green; test-fast (windows-11-arm) and test-fixtures-windows red on one test of mine
   (git_dir linked-worktree: `git worktree add` refuses a canonicalized `\\?\` path), fixed in
   8627773c9 (unpushed); cargo-deny-advisories red on rustls advisories in existing dependencies,
-  not a `Tests pass` need. `just gate eprfs` EXIT=0 (75 test binaries ok). Red until brit CI is
-  green on the fix, the pin carries it, and the LIVE check runs once.
+  not a `Tests pass` need. `just gate eprfs` EXIT=0 (75 test binaries ok).
+  DELTA 2026-10-19b: independent review (code-reviewer) found three ways `check` could hold an
+  ungranted clause (`..`/symlink/outside-repo spellings; a nearer same-id manifest; same-tick
+  revocation ordering), fixed in 32e317832 with two new tests (covenant 18 ok). brit CI run
+  39333130342 on 8627773c9 (fix pushed with --no-verify, operator's second ruling): `Tests pass`
+  success, only cargo-deny-advisories red. Landed on dev at e3e0af5cb (pre-push ALL CLEAR).
+  Still red: the brit pin does not carry feat/session-covenant yet (batch with the pending
+  evidence pin move), and the LIVE check has not run.
 refs:
   - "genesis/docs/superpowers/specs/2026-10-19-session-covenant-epr-design.md — the authority half (offer, record, check, show)"
   - "elohim/brit/docs/specs/2026-10-19-session-covenant-design.md (branch feat/session-covenant) — the mechanism half: a Layer 2 blessing over the rule's manifest CID"
