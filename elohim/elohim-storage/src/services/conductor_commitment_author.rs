@@ -370,13 +370,16 @@ impl CommitmentAuthor for ConductorCommitmentAuthor {
             &valid_until,
             DEFAULT_RATE_PER_MINUTE,
         );
-        let new_cid = conductor_writes::create_commitment_returning_cid(
-            &self.hc,
-            CreateMishpatCommitmentInput {
-                action: "replicates-commons".to_string(),
-                payload_json,
-                signed_at: valid_from.clone(),
-            },
+        let new_cid = crate::chain_write_gate::as_writer(
+            crate::chain_write_gate::WriterKind::Provide,
+            conductor_writes::create_commitment_returning_cid(
+                &self.hc,
+                CreateMishpatCommitmentInput {
+                    action: "replicates-commons".to_string(),
+                    payload_json,
+                    signed_at: valid_from.clone(),
+                },
+            ),
         )
         .await?;
 
@@ -418,14 +421,17 @@ impl CommitmentAuthor for ConductorCommitmentAuthor {
         // failure so the reconciler rolls the latch back and retries next tick.
         // The commitment IS notarised regardless — the next tick finds it live
         // in the projection and does NOT re-author (logical-key dedup).
-        economic_event_emit_service::emit(&emit_input, &self.hc, &fetcher, &rate)
-            .await
-            .map_err(|e| {
-                StorageError::Internal(format!(
-                    "ProvideAnnounce emit failed for {} (commitment {} notarised): {e}",
-                    req.head_ref, new_cid
-                ))
-            })?;
+        crate::chain_write_gate::as_writer(
+            crate::chain_write_gate::WriterKind::Provide,
+            economic_event_emit_service::emit(&emit_input, &self.hc, &fetcher, &rate),
+        )
+        .await
+        .map_err(|e| {
+            StorageError::Internal(format!(
+                "ProvideAnnounce emit failed for {} (commitment {} notarised): {e}",
+                req.head_ref, new_cid
+            ))
+        })?;
 
         Ok(new_cid)
     }
@@ -433,13 +439,16 @@ impl CommitmentAuthor for ConductorCommitmentAuthor {
     async fn revoke_commons(&self, req: &ProvideRevokeRequest) -> Result<(), StorageError> {
         let signed_at = chrono::Utc::now().to_rfc3339();
         let payload_json = build_revoke_payload(&req.target_cid, &signed_at);
-        conductor_writes::call_create_commitment(
-            &self.hc,
-            CreateMishpatCommitmentInput {
-                action: "revokes-commitment".to_string(),
-                payload_json,
-                signed_at,
-            },
+        crate::chain_write_gate::as_writer(
+            crate::chain_write_gate::WriterKind::Provide,
+            conductor_writes::call_create_commitment(
+                &self.hc,
+                CreateMishpatCommitmentInput {
+                    action: "revokes-commitment".to_string(),
+                    payload_json,
+                    signed_at,
+                },
+            ),
         )
         .await?;
         Ok(())

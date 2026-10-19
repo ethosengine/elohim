@@ -121,4 +121,30 @@ pub enum StorageError {
     /// does not verify under that key. The EPR is rejected and NOT persisted.
     #[error("EPR signature verification failed: {reason}")]
     VerifyFailed { reason: String },
+
+    /// A chain write refused by the plane rule, before it was offered to the
+    /// conductor (`elohim-storage`'s `chain_write_gate`).
+    ///
+    /// Storage signs as the steward's own agent, so every chain write is a
+    /// permanent statement in the PERSON's voice. Two shapes are refused: a
+    /// machine writing on a timer (`voice = "machine"`, `trigger = "timer"`),
+    /// and a writer that never named itself (`voice`/`trigger` =
+    /// `"undeclared"`). Nothing was committed, and re-offering the same call
+    /// will be refused again: this is a defect in the write site, not a
+    /// transient failure, so it maps to no retryable status.
+    ///
+    /// The text is deliberately short and stable — it can reach an HTTP
+    /// response body. The rule in full, and where it is ruled, is logged by the
+    /// gate at the refusal.
+    #[error(
+        "plane_violation: chain write `{zome}::{fn_name}` refused before the conductor \
+         (writer={writer}, voice={voice}, trigger={trigger})"
+    )]
+    PlaneViolation {
+        writer: String,
+        voice: String,
+        trigger: String,
+        zome: String,
+        fn_name: String,
+    },
 }

@@ -81,14 +81,16 @@ impl NodeRegistryApi {
             StorageError::Internal(format!("Failed to serialize ShardAssignment: {}", e))
         })?;
 
-        client
-            .call_zome_timed(
+        crate::chain_write_gate::as_writer(
+            crate::chain_write_gate::WriterKind::ShardRegistration,
+            client.call_zome_timed(
                 "node_registry_coordinator",
                 "create_shard_assignment",
                 payload,
                 AdmissionClass::Background,
-            )
-            .await
-            .map(|(bytes, _timing)| bytes)
+            ),
+        )
+        .await
+        .map(|(bytes, _timing)| bytes)
     }
 }

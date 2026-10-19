@@ -112,7 +112,23 @@ pub async fn pass(cell: &dyn ControllerCell, now_ms: i64) -> Pass {
     let due_total = read.to_affirm(&me, usize::MAX).len();
     let mut out = Pass::default();
     for device in read.to_affirm(&me, AFFIRM_PER_PASS) {
-        match cell.affirm(device).await {
+        // WHY NOW. This pass runs on a clock, so the clock cannot be the reason
+        // it writes: the affirmation carries the read it answers, this device's
+        // own affirmation looked for on the joining record and not found. A
+        // device the read already shows affirmed by this one yields no witness,
+        // and its write would reach the gate as a machine on a timer (refused:
+        // device affirmation is not declared debt).
+        let mine = device.affirmed_by.iter().find(|k| **k == me);
+        let unaffirmed = crate::chain_write_gate::ChangeWitness::absent(
+            "this device's affirmation of the joining record was read and is absent",
+            mine,
+        );
+        let affirmed = crate::chain_write_gate::as_writer(
+            crate::chain_write_gate::WriterKind::DeviceAffirm,
+            crate::chain_write_gate::with_change(unaffirmed, cell.affirm(device)),
+        )
+        .await;
+        match affirmed {
             Ok(()) => {
                 out.affirmed += 1;
                 info!(

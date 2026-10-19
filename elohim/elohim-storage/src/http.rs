@@ -8649,10 +8649,16 @@ impl HttpServer {
         // The author roots what it registers before announcing it, when its
         // conductor is attached (see `ContentService::bulk_create_and_notarize`).
         let lamad_hc = self.hc_registry.as_ref().and_then(|r| r.lamad_client());
-        match services
-            .content
-            .bulk_create_and_notarize(lamad_hc.as_ref(), items)
-            .await
+        // The operator's (or app registration's) POST is the act: each
+        // inline root it notarizes speaks in that caller's voice, as the
+        // single-row PATCH does.
+        match crate::chain_write_gate::as_writer(
+            crate::chain_write_gate::WriterKind::HttpAuthor,
+            services
+                .content
+                .bulk_create_and_notarize(lamad_hc.as_ref(), items),
+        )
+        .await
         {
             Ok(result) => {
                 // EPR Head publishing is handled by the drain loop
@@ -10899,20 +10905,21 @@ impl HttpServer {
 
                 let update_result = match (needs_conductor, lamad_hc) {
                     (true, Some(hc)) => {
-                        services
-                            .content
+                        crate::chain_write_gate::as_writer(
+                            crate::chain_write_gate::WriterKind::HttpAuthor,
                             // DECLARE: this is a request-borne re-notarization —
                             // a deploy PATCHing {blobHash, reach} IS the
                             // head-declaration act, and it must keep moving the
                             // head deliberately. The heal-class re-author sweeps
                             // preserve instead; see `HeadElection`.
-                            .update_via_conductor(
+                            services.content.update_via_conductor(
                                 &hc,
                                 content_id,
                                 view,
                                 db::content_diesel::HeadElection::Declare,
-                            )
-                            .await
+                            ),
+                        )
+                        .await
                     }
                     (true, None) => {
                         // A notarized change (blob_hash/reach) needs the
@@ -14265,7 +14272,13 @@ impl HttpServer {
         let cell = marked.as_ref().map(|c| c as &dyn ControllerCell);
         let names = self.identifier_source();
         let answer = if bootstrap {
-            bootstrap_identity(cell, &names, signed_in).await
+            // The person, at their own node, records their identity's
+            // authority: a person's act at an authenticated door.
+            crate::chain_write_gate::as_writer(
+                crate::chain_write_gate::WriterKind::HttpAuthor,
+                bootstrap_identity(cell, &names, signed_in),
+            )
+            .await
         } else {
             identity_standing(cell, &names, signed_in).await
         };
@@ -14380,7 +14393,12 @@ impl HttpServer {
         let marked = cell
             .as_ref()
             .map(|c| crate::services::device_consent::MarkedCell::new(c));
-        let begun = begin_identity(marked.as_ref().map(|c| c as &dyn ControllerCell), &body).await;
+        // The person begins their identity on their own node: a person's act.
+        let begun = crate::chain_write_gate::as_writer(
+            crate::chain_write_gate::WriterKind::HttpAuthor,
+            begin_identity(marked.as_ref().map(|c| c as &dyn ControllerCell), &body),
+        )
+        .await;
         // Read before anything after it can fail: the session and the sign-in
         // secret are this node's own, and standing is already written.
         let status = match &begun {
@@ -14525,7 +14543,15 @@ impl HttpServer {
                 continue;
             };
             let marked = crate::services::device_consent::MarkedCell::new(&cell);
-            let outcome = reconcile(&marked, &declaration).await;
+            // The person's declaration, written on their own node's disk, is
+            // the act; this reconcile carries it out only when the file changed
+            // (or the last attempt could not reach the node) and writes only
+            // while no identity exists.
+            let outcome = crate::chain_write_gate::as_writer(
+                crate::chain_write_gate::WriterKind::IdentityDeclaration,
+                reconcile(&marked, &declaration),
+            )
+            .await;
             // A reconcile that wrote, applied or failed after, owes one read,
             // made here unless one that began after the write has landed. One
             // applied with nothing written reads, as it always did.
@@ -15392,7 +15418,13 @@ impl HttpServer {
             .map_err(|e| StorageError::Internal(format!("Failed to read body: {e}")))?
             .to_bytes();
         let marked = cell.map(crate::services::device_consent::MarkedDevice::new);
-        let answer = device_enroll(marked.as_ref().map(|c| c as &dyn DeviceCell), &body).await;
+        // A caller on this machine enrolls this device with the consent its
+        // person gave: a person's act at their own device's door.
+        let answer = crate::chain_write_gate::as_writer(
+            crate::chain_write_gate::WriterKind::HttpAuthor,
+            device_enroll(marked.as_ref().map(|c| c as &dyn DeviceCell), &body),
+        )
+        .await;
         self.read_speaks_after_write(
             answer.status().as_u16(),
             marked.as_ref().is_some_and(|m| m.wrote()),
@@ -17835,8 +17867,11 @@ impl HttpServer {
                 payload_json,
                 signed_at,
             };
-            if let Err(e) =
-                crate::services::conductor_writes::call_create_commitment(&hc, input).await
+            if let Err(e) = crate::chain_write_gate::as_writer(
+                crate::chain_write_gate::WriterKind::HttpAuthor,
+                crate::services::conductor_writes::call_create_commitment(&hc, input),
+            )
+            .await
             {
                 tracing::warn!(
                     target: "elohim_storage::provide",
@@ -22025,6 +22060,9 @@ mod request_future_size_tests {
         );
         let server = HttpServer::new(blob_store, "127.0.0.1:0".parse().unwrap());
         let size = returned_future_size(&|req: Request<Incoming>| server.handle_request(req));
+        // Printed so a change on the request path can report its cost as a number
+        // (`-- --nocapture`), not only as pass/fail against the budget.
+        println!("handle_request future: {size} bytes (budget {REQUEST_FUTURE_BUDGET})");
         assert!(
             size <= REQUEST_FUTURE_BUDGET,
             "HttpServer::handle_request future is {size} bytes (budget {REQUEST_FUTURE_BUDGET}); \

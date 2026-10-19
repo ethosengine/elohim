@@ -543,12 +543,31 @@ impl RotationAuthor for ConductorRotationAuthor {
 
         tokio::task::block_in_place(|| {
             handle.block_on(async move {
+                // WHO IS SPEAKING, AND WHY NOW: the node, on the rotation
+                // tick. A tick is not a reason to write, so each write carries
+                // the change it answers, built from what was READ a moment
+                // ago: no successor commitment exists for the blob the content
+                // now points at; the successor's state is not yet `active`.
+                // Without that evidence the gate refuses the write — custody
+                // rotation is not declared debt.
+                use crate::chain_write_gate::{as_writer, with_change, ChangeWitness, WriterKind};
                 if existing.is_none() {
                     // custody-blob is a CONDUCTOR_SOFT_ACTION: with a bridge
                     // present this routes to create_via_conductor →
                     // conductor_writes::call_create_rea_commitment (NOTARIZED),
                     // and eagerly projects the row with its dht_anchor_hash.
-                    ReaCommitmentService::create(conn, ctx, input, None, Some(&hc)).await?;
+                    let absent = ChangeWitness::absent(
+                        "custody successor for the rotated blob",
+                        existing.as_ref(),
+                    );
+                    as_writer(
+                        WriterKind::CustodyRotation,
+                        with_change(
+                            absent,
+                            ReaCommitmentService::create(conn, ctx, input, None, Some(&hc)),
+                        ),
+                    )
+                    .await?;
                 }
                 if existing.as_deref() != Some("active") {
                     let activate = UpdateReaCommitmentState {
@@ -556,13 +575,24 @@ impl RotationAuthor for ConductorRotationAuthor {
                         finished: None,
                         metadata_json: None,
                     };
-                    ReaCommitmentService::update_state(
-                        conn,
-                        ctx,
-                        &successor_id,
-                        &activate,
-                        None,
-                        Some(&hc),
+                    let activates = ChangeWitness::value_moves(
+                        "custody successor state",
+                        existing.as_deref(),
+                        "active",
+                    );
+                    as_writer(
+                        WriterKind::CustodyRotation,
+                        with_change(
+                            activates,
+                            ReaCommitmentService::update_state(
+                                conn,
+                                ctx,
+                                &successor_id,
+                                &activate,
+                                None,
+                                Some(&hc),
+                            ),
+                        ),
                     )
                     .await?;
                 }

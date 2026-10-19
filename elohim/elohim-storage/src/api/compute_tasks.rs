@@ -183,9 +183,11 @@ async fn call(hc: &HcClient, input: &Value) -> Result<Value, StorageError> {
     let payload =
         rmp_serde::to_vec_named(input).map_err(|e| StorageError::Serialization(e.to_string()))?;
     // Work is bounded in WASM: fifty requests/page, sixteen events/request.
-    let output = hc
-        .call_zome("content_store", "compute_task", payload)
-        .await?;
+    let output = crate::chain_write_gate::as_writer(
+        crate::chain_write_gate::WriterKind::ComputeDelegate,
+        hc.call_zome("content_store", "compute_task", payload),
+    )
+    .await?;
     let result: Value =
         rmp_serde::from_slice(&output).map_err(|e| StorageError::Serialization(e.to_string()))?;
     if let Some(tasks) = result["tasks"].as_array() {

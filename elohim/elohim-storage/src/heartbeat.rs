@@ -307,9 +307,18 @@ impl Publisher for ZomeCallPublisher {
             )
         })?;
 
-        hc.call_zome("infrastructure", "record_peer_status", payload)
-            .await
-            .map_err(|e| anyhow::anyhow!("record_peer_status zome call failed: {e}"))?;
+        // WHO IS SPEAKING: the node, on a 60 s clock, whether or not anything
+        // changed — a machine write on a timer in the steward's voice. That is
+        // the anti-pattern the plane guard refuses; this writer is carried as
+        // declared debt (`chain_write_gate::PLANE_DEBT`) and counted on every
+        // tick until plane-separation §5.5 moves its readers to substrate
+        // liveness. Do not change the writer before the readers.
+        crate::chain_write_gate::as_writer(
+            crate::chain_write_gate::WriterKind::Heartbeat,
+            hc.call_zome("infrastructure", "record_peer_status", payload),
+        )
+        .await
+        .map_err(|e| anyhow::anyhow!("record_peer_status zome call failed: {e}"))?;
         Ok(())
     }
 }

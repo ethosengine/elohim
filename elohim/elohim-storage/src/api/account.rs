@@ -611,7 +611,12 @@ where
 {
     let payload = rmp_serde::to_vec_named(input)
         .map_err(|e| StorageError::Conductor(format!("encode {fn_name} input: {e}")))?;
-    let bytes = hc.call_zome("imagodei", fn_name, payload).await?;
+    // Every forward here is a person's account act arriving at the HTTP door.
+    let bytes = crate::chain_write_gate::as_writer(
+        crate::chain_write_gate::WriterKind::HttpAuthor,
+        hc.call_zome("imagodei", fn_name, payload),
+    )
+    .await?;
     let output: O = rmp_serde::from_slice(&bytes)
         .map_err(|e| StorageError::Conductor(format!("decode {fn_name} output: {e}")))?;
     Ok(output)

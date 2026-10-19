@@ -198,12 +198,11 @@ pub async fn emit<F: CommitmentFetcher, R: RateHistory>(
 
     // Step 3 — validation passed; build the conductor input and emit.
     let conductor_input = build_event_input(input);
-    crate::chain_write_gate::as_writer(
-        crate::chain_write_gate::WriterKind::ReaSignal,
-        conductor_writes::call_create_rea_economic_event(hc, &conductor_input),
-    )
-    .await
-    .map_err(EmitError::Conductor)
+    // No writer label here: the event speaks in its caller's voice (today the
+    // provide author, which names itself).
+    conductor_writes::call_create_rea_economic_event(hc, &conductor_input)
+        .await
+        .map_err(EmitError::Conductor)
 }
 
 // ---------------------------------------------------------------------------

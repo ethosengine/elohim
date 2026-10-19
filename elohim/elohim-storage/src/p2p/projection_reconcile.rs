@@ -3651,17 +3651,33 @@ async fn witness_ghost_anchors(
                 server_blob_hash: None,
                 p2p_published_at: None,
             };
-            match content_service
-                // PRESERVE: replacing an unresolvable anchor with one this node
-                // can prove is a heal. It must not also re-crown the row — that
-                // is what un-adopted a peer's canonical head on every restart.
-                .update_via_conductor(
-                    hc,
-                    id,
-                    empty_patch,
-                    crate::db::content_diesel::HeadElection::PreserveExistingDeclaration,
-                )
-                .await
+            // WHY NOW. This sweep's whole population is rows the own conductor
+            // answered EMPTY for, and it re-authors PRESERVING the existing
+            // declaration — so nothing here shows that a successful re-author
+            // changes that answer. The FIRST re-author against the observation
+            // carries a witness; it is deliberately never settled, so a repeat
+            // for the same id reaches the gate as a machine on a timer and is
+            // counted as declared debt until the loop is shown to terminate.
+            let first_reauthor = crate::chain_write_gate::ChangeWitness::first_observation(
+                "own conductor answered empty for an anchored row",
+                id,
+            );
+            match crate::chain_write_gate::as_writer(
+                crate::chain_write_gate::WriterKind::SweepReauthor,
+                crate::chain_write_gate::with_change(
+                    first_reauthor,
+                    // PRESERVE: replacing an unresolvable anchor with one this node
+                    // can prove is a heal. It must not also re-crown the row — that
+                    // is what un-adopted a peer's canonical head on every restart.
+                    content_service.update_via_conductor(
+                        hc,
+                        id,
+                        empty_patch,
+                        crate::db::content_diesel::HeadElection::PreserveExistingDeclaration,
+                    ),
+                ),
+            )
+            .await
             {
                 Ok(_) => {
                     authored += 1;
@@ -3678,14 +3694,17 @@ async fn witness_ghost_anchors(
                     // AUTHOR-THEN-ADOPT, second half: the conductor now has a
                     // local chain, so the declaration it refused can land.
                     if let Some((head_action_hash, carried_record, peer_id)) = pending_adopt {
-                        if crate::services::head_adoption::finish_author_then_adopt(
-                            hc,
-                            pool,
-                            &ghost_ctx,
-                            id,
-                            &head_action_hash,
-                            carried_record,
-                            &peer_id,
+                        if crate::chain_write_gate::as_writer(
+                            crate::chain_write_gate::WriterKind::SweepReauthor,
+                            crate::services::head_adoption::finish_author_then_adopt(
+                                hc,
+                                pool,
+                                &ghost_ctx,
+                                id,
+                                &head_action_hash,
+                                carried_record,
+                                &peer_id,
+                            ),
                         )
                         .await
                             == crate::services::head_adoption::AdoptOutcome::Adopted

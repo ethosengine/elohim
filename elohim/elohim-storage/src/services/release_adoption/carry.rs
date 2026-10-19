@@ -404,10 +404,12 @@ pub async fn call_carry_from(
     input: CarryInput,
 ) -> Result<CarryReceipt, String> {
     let payload = rmp_serde::to_vec_named(&input).map_err(|e| format!("encode CarryInput: {e}"))?;
-    let bytes = client
-        .call_zome(CARRY_ZOME, CARRY_FN, payload)
-        .await
-        .map_err(|e| e.to_string())?;
+    let bytes = crate::chain_write_gate::as_writer(
+        crate::chain_write_gate::WriterKind::ReleaseAdoption,
+        client.call_zome(CARRY_ZOME, CARRY_FN, payload),
+    )
+    .await
+    .map_err(|e| e.to_string())?;
     rmp_serde::from_slice(&bytes).map_err(|e| format!("decode CarryReceipt: {e}"))
 }
 

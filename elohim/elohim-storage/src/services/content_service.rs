@@ -663,15 +663,17 @@ impl ContentService {
         id: &str,
         action: &str,
     ) -> AuthorElection {
-        let declared = crate::chain_write_gate::as_writer(
-            crate::chain_write_gate::WriterKind::HttpAuthor,
-            conductor_writes::call_declare_canonical_content_head(
-                hc,
-                id,
-                action.to_string(),
-                None,
-                false,
-            ),
+        // No label here: this declare speaks in whatever voice the CALLER of
+        // `update_via_conductor` / the create path declared (an operator's
+        // PATCH, the sweep's re-author, the re-anchor backfill). Naming it
+        // `HttpAuthor` at this depth made a machine's declare read as a
+        // person's act.
+        let declared = conductor_writes::call_declare_canonical_content_head(
+            hc,
+            id,
+            action.to_string(),
+            None,
+            false,
         )
         .await;
         let declared = match declared {

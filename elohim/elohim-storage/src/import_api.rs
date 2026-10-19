@@ -1029,9 +1029,11 @@ impl ImportApiProcessor {
             "📝 QUEUE_IMPORT: Creating batch entry in zome (signed call)"
         );
 
-        match hc_client
-            .call_zome(&self.config.zome_name, "queue_import", queue_payload_bytes)
-            .await
+        match crate::chain_write_gate::as_writer(
+            crate::chain_write_gate::WriterKind::Import,
+            hc_client.call_zome(&self.config.zome_name, "queue_import", queue_payload_bytes),
+        )
+        .await
         {
             Ok(response) => {
                 info!(
@@ -1147,10 +1149,13 @@ impl ImportApiProcessor {
             for attempt in 1..=self.config.zome_call_retries {
                 match tokio::time::timeout(
                     self.config.zome_call_timeout,
-                    hc_client.call_zome(
-                        &self.config.zome_name,
-                        "process_import_chunk",
-                        payload_bytes.clone(),
+                    crate::chain_write_gate::as_writer(
+                        crate::chain_write_gate::WriterKind::Import,
+                        hc_client.call_zome(
+                            &self.config.zome_name,
+                            "process_import_chunk",
+                            payload_bytes.clone(),
+                        ),
                     ),
                 )
                 .await

@@ -705,11 +705,13 @@ pub async fn author_soak_attestation(
     let payload = rmp_serde::to_vec_named(&input).map_err(|e| {
         TypedRefusal::WireDecodeFailed(format!("encode IssueAttestationInput: {e}"))
     })?;
-    let bytes = ctx
-        .hc
-        .call_zome(ZOME_NAME, "issue_attestation", payload)
-        .await
-        .map_err(|e| TypedRefusal::ConductorRefused(e.to_string()))?;
+    // The node speaks, once, because a declared soak window closed.
+    let bytes = crate::chain_write_gate::as_writer(
+        crate::chain_write_gate::WriterKind::ReleaseSoak,
+        ctx.hc.call_zome(ZOME_NAME, "issue_attestation", payload),
+    )
+    .await
+    .map_err(|e| TypedRefusal::ConductorRefused(e.to_string()))?;
     let out: AttestationOutputWire = rmp_serde::from_slice(&bytes)
         .map_err(|e| TypedRefusal::WireDecodeFailed(format!("decode AttestationOutput: {e}")))?;
     tracing::info!(
@@ -960,25 +962,31 @@ pub async fn count_qualifying_attestations(
     }
     for issuer in &resolvable {
         let id = attestation_content_id(RIDDEN_ATTESTATION_KIND, issuer, release_cid);
-        let resolved =
-            match crate::services::conductor_writes::get_content_by_id(&ctx.hc, &id).await {
-                Ok(Some(out)) => Some(ResolvedEntry::from_metadata(
-                    out.content.author_id.clone(),
-                    &out.content.metadata_json,
-                )),
-                Ok(None) => None,
-                Err(e) => {
-                    // A single unreadable entry deflates the count; it must never
-                    // fail the whole sweep, or one cold entry blocks every release.
-                    tracing::warn!(
-                        release_cid = %release_cid,
-                        issuer = %issuer,
-                        error = %e,
-                        "release attestation entry unreadable — counted as unresolved"
-                    );
-                    None
-                }
-            };
+        // `get_content_by_id` is classified a WRITE: its healing fallback commits
+        // an id link on a v2 miss. Here that commit is release adoption's.
+        let resolved = match crate::chain_write_gate::as_writer(
+            crate::chain_write_gate::WriterKind::ReleaseAdoption,
+            crate::services::conductor_writes::get_content_by_id(&ctx.hc, &id),
+        )
+        .await
+        {
+            Ok(Some(out)) => Some(ResolvedEntry::from_metadata(
+                out.content.author_id.clone(),
+                &out.content.metadata_json,
+            )),
+            Ok(None) => None,
+            Err(e) => {
+                // A single unreadable entry deflates the count; it must never
+                // fail the whole sweep, or one cold entry blocks every release.
+                tracing::warn!(
+                    release_cid = %release_cid,
+                    issuer = %issuer,
+                    error = %e,
+                    "release attestation entry unreadable — counted as unresolved"
+                );
+                None
+            }
+        };
         verdicts.push(classify(issuer, resolved.as_ref(), release_cid, discipline));
     }
 
