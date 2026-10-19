@@ -5618,3 +5618,36 @@ decisionPoints:
       - path: doorway/doorway-service/src/conductor/typed_admin.rs
         testName: listed_functions_names_exactly_the_given_pairs
         kind: unit
+
+  - name: compute_payload_performer
+    kind: verdict-fn
+    sourceLocation:
+      file: src/server/http.rs
+      modulePath: server::http::compute_payload_performer
+      line: 1776
+    summary: >
+      The performer the doorway carries on /api/v1/compute/payloads/* (selected by
+      is_compute_payload_path, line 1767): the verified session's AGENT KEY only, never the
+      human_id fallback the op-gate tolerates, and nothing without a verified session. The
+      dispatch arm strips any client-supplied x-elohim-verified-performer first; this is the
+      ONE prefix besides allowed operator verbs on which a performer is re-injected. The
+      forwarder carries the custody headers (x-compute-owner, x-compute-retain-seconds,
+      x-compute-request — storage_proxy::compute_payload_forward_headers) on that prefix only,
+      and never the node-local x-elohim-compute-token. Storage authorizes for itself
+      (elohim-storage api/hosted_custody.rs::authorize_custody); the doorway carries WHO, not
+      MAY.
+    concernIds:
+      - { id: C0, status: answered, justification: "No doorway route, state or decision about authority: header carriage on a manifest-declared storage route." }
+      - { id: C1, status: n-a, justification: "No candidate selection." }
+      - { id: C4, status: answered, justification: "No session or an empty agent key yields no performer, and storage then refuses (local-compute-capability-required) — absence is never read as permission." }
+      - { id: C5, status: answered, justification: "The carried performer is a claim storage re-verifies against its own notarized hosted-cell grant; the doorway's word is never the authority." }
+      - { id: C10, status: answered, justification: "Additive: three request headers forwarded on one prefix; every other route's forwarded header set is unchanged (pinned)." }
+      - { id: C12, status: answered, justification: "The node-local capability token is never forwarded, so a doorway-forwarded call cannot act under it; the performer comes from the verified JWT only." }
+      - { id: C13, status: n-a, justification: "No authority tier at the doorway." }
+    contractTests:
+      - path: doorway/doorway-service/src/server/http.rs
+        testName: compute_payload_performer_is_scoped_to_its_prefix_and_the_agent_key
+        kind: unit
+      - path: doorway/doorway-service/src/routes/storage_proxy.rs
+        testName: compute_payload_headers_are_forwarded_on_that_prefix_only
+        kind: unit

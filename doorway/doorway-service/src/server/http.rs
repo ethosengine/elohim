@@ -1759,6 +1759,27 @@ fn is_operator_verb_path(path: &str) -> bool {
     path.starts_with("/api/v1/operator/")
 }
 
+/// Compute-payload custody under the hosting promise (storage
+/// `api/hosted_custody.rs`). The ONE prefix besides allowed operator verbs on
+/// which the doorway carries a verified performer: storage authorizes for
+/// itself against the hosted-cell grant it issued; the doorway carries only
+/// WHO, from the verified JWT. Pure.
+pub(crate) fn is_compute_payload_path(path: &str) -> bool {
+    path.starts_with("/api/v1/compute/payloads/")
+}
+
+/// The performer a compute-payload request carries: the verified session's
+/// AGENT KEY only (a hosted-cell grant names an agent key as recipient), never
+/// the `human_id` fallback the op-gate tolerates. `None` = no verified session
+/// = no performer, and storage then refuses (the node-local token is never
+/// forwarded). Pure.
+pub(crate) fn compute_payload_performer(verified_agent_key: Option<&str>) -> Option<String> {
+    verified_agent_key
+        .map(str::trim)
+        .filter(|k| !k.is_empty())
+        .map(str::to_string)
+}
+
 /// The gate mode that actually governs `path`: operator verbs force `Enforce`;
 /// everything else uses the configured mode.
 fn effective_op_gate_mode(configured: &OpGateMode, path: &str) -> OpGateMode {
@@ -2064,6 +2085,29 @@ fn root_unavailable_response(
             federation_peers,
         ))))
         .expect("infallible root-unavailable response")
+}
+
+#[cfg(test)]
+mod compute_payload_performer_tests {
+    use super::*;
+
+    /// The verified performer rides the compute-payload prefix only, and only
+    /// as the session's agent key — no session, no performer.
+    #[test]
+    fn compute_payload_performer_is_scoped_to_its_prefix_and_the_agent_key() {
+        assert!(is_compute_payload_path(
+            "/api/v1/compute/payloads/bafkreiabc"
+        ));
+        assert!(!is_compute_payload_path("/api/v1/compute/tasks"));
+        assert!(!is_compute_payload_path("/api/v1/compute/grants"));
+        assert!(!is_compute_payload_path("/api/v1/compute/payloads"));
+        assert_eq!(
+            compute_payload_performer(Some("uhCAkRunner")),
+            Some("uhCAkRunner".to_string())
+        );
+        assert_eq!(compute_payload_performer(Some("  ")), None);
+        assert_eq!(compute_payload_performer(None), None);
+    }
 }
 
 #[cfg(test)]
@@ -9555,6 +9599,16 @@ async fn handle_request(
                         }
                     }
                     // ── end op-gate ───────────────────────────────────────────
+
+                    // Compute-payload custody: carry the verified session's
+                    // agent key so storage can check its own hosted-cell
+                    // promise. This prefix only; never a client header.
+                    if is_compute_payload_path(p) {
+                        let claims = resolve_verified_claims_from_request(&state, &req);
+                        verified_performer_for_forward = compute_payload_performer(
+                            claims.as_ref().map(|c| c.agent_pub_key.as_str()),
+                        );
+                    }
 
                     // Strip the internal-hop performer header from every inbound
                     // request (a client-supplied value must never reach storage).

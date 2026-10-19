@@ -54,6 +54,25 @@ pub const STORAGE_PROXY_REQUEST_TIMEOUT_SECS: u64 = 12;
 /// below the publication's shared 75-second acceptance deadline.
 const CONTENT_PATCH_TIMEOUT_SECS: u64 = 60;
 
+/// The request headers the compute-payload custody protocol needs on the
+/// internal hop: the client's lease owner (a task CID), its retention, and the
+/// task whose outputs it reads back. Never the node-local capability token.
+const COMPUTE_PAYLOAD_HEADERS: [&str; 3] = [
+    "x-compute-owner",
+    "x-compute-retain-seconds",
+    "x-compute-request",
+];
+
+/// Which extra headers to carry for `path`. Pure. Only the compute-payload
+/// prefix gets any; every other route's forwarded header set is unchanged.
+fn compute_payload_forward_headers(path: &str) -> &'static [&'static str] {
+    if crate::server::http::is_compute_payload_path(path) {
+        &COMPUTE_PAYLOAD_HEADERS
+    } else {
+        &[]
+    }
+}
+
 fn is_content_patch(method: &Method, path: &str) -> bool {
     *method == Method::PATCH
         && path
@@ -640,6 +659,15 @@ where
     if let Some(schema_version) = req.headers().get("x-schema-version") {
         if let Ok(sv_str) = schema_version.to_str() {
             builder = builder.header("X-Schema-Version", sv_str);
+        }
+    }
+
+    // Compute-payload custody headers (storage api/hosted_custody.rs), on that
+    // prefix only. The node-local capability header (x-elohim-compute-token)
+    // is deliberately NOT among them: a forwarded call must never act under it.
+    for name in compute_payload_forward_headers(path) {
+        if let Some(value) = req.headers().get(*name).and_then(|v| v.to_str().ok()) {
+            builder = builder.header(*name, value);
         }
     }
 
@@ -1337,6 +1365,30 @@ mod tests {
     use crate::cache::CacheConfig;
     use http_body_util::Empty;
     use hyper::server::conn::http1;
+
+    /// The custody headers ride only the compute-payload prefix, and the
+    /// node-local capability token never rides at all.
+    #[test]
+    fn compute_payload_headers_are_forwarded_on_that_prefix_only() {
+        let headers = compute_payload_forward_headers("/api/v1/compute/payloads/bafkreiabc");
+        assert_eq!(
+            headers,
+            &[
+                "x-compute-owner",
+                "x-compute-retain-seconds",
+                "x-compute-request"
+            ]
+        );
+        assert!(!headers.contains(&"x-elohim-compute-token"));
+        for other in [
+            "/api/v1/compute/tasks",
+            "/api/v1/compute/grants",
+            "/db/content",
+            "/blob/x",
+        ] {
+            assert!(compute_payload_forward_headers(other).is_empty(), "{other}");
+        }
+    }
     use hyper::service::service_fn;
     use hyper::StatusCode;
     use hyper_util::rt::TokioIo;
