@@ -35,8 +35,9 @@ use crate::routes::hosted_cell::{
     issue_hosted_cell_grant, pool_compute_config, revoke_hosted_cell_grant, HostedCellGrant,
 };
 use crate::routes::service_agent::{
-    bootstrap_key_promotes_to_admin, phase_authors_human_record, provision_service_agent,
-    service_agent_permission_level, unwind_service_agent, SERVICE_AGENT_PHASE,
+    bootstrap_key_promotes_to_admin, human_id_is_reserved, phase_authors_human_record,
+    provision_service_agent, service_agent_permission_level, unwind_service_agent,
+    SERVICE_AGENT_PHASE,
 };
 use crate::routes::zome_helpers::{
     call_create_human, call_create_human_on_conductor, call_get_my_human, get_agent_pub_key,
@@ -1207,6 +1208,15 @@ async fn handle_register(
                 code: Some("VISITOR_NO_REGISTER".into()),
             },
         );
+    }
+    // `agent:` ids are reserved for service agents: /hc/connect scopes on them.
+    if human_id_is_reserved(agency_phase, &body.human_id) {
+        let r = crate::routes::service_agent::ServiceAgentRefusal::ReservedHumanId;
+        let body = ErrorResponse {
+            error: r.message().into(),
+            code: Some(r.code().into()),
+        };
+        return json_response(r.status(), &body);
     }
 
     // ── PRE-VALIDATION ─────────────────────────────────────────────────────────

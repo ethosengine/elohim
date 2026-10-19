@@ -41,9 +41,11 @@ use tracing::{debug, error, info, warn};
 use crate::auth::{extract_token_from_header, TokenInput};
 use crate::conductor::decode_key_bytes;
 use crate::conductor::grant_memory::{grant_memory, GrantDecision, GrantMemory};
-use crate::conductor::typed_admin::{AppInfoDetailed, TypedAdminClient};
+use crate::conductor::typed_admin::{listed_functions, AppInfoDetailed, TypedAdminClient};
 use crate::conductor::AgentProvisioner;
+use crate::routes::service_agent::{session_grant_scope, SessionGrantScope};
 use crate::server::http::AppState;
+use holochain_client::GrantedFunctions;
 
 /// Request body for `POST /hc/connect`.
 #[derive(Debug, Deserialize)]
@@ -434,6 +436,19 @@ pub async fn handle_hc_connect(
             continue;
         }
         let role = role_name.clone();
+        // A stewarded runner's capability is FUNCTION-LISTED per role, and no
+        // grant at all is authored on a role it may not call (its identity
+        // cell above all). A human session's grant is All, exactly as before.
+        // Keyed on the signed `human_id` claim — see `session_grant_scope`.
+        let functions = match session_grant_scope(&claims.human_id, &role) {
+            SessionGrantScope::All => GrantedFunctions::All,
+            SessionGrantScope::Listed(fns) => listed_functions(fns),
+            SessionGrantScope::NoGrant => {
+                cells_skipped += 1;
+                debug!(role = %role, "Chaperone: service-agent session — no grant on this role");
+                continue;
+            }
+        };
         let tag = format!("chaperone-{role}");
         let dna = dna_hash.clone();
         let agent = agent_key.clone();
@@ -484,10 +499,17 @@ pub async fn handle_hc_connect(
                 let cs = cs.clone();
                 let sk = sk.clone();
                 let tag = tag.clone();
+                let functions = functions.clone();
                 async move {
                     let client = TypedAdminClient::connect(&url).await?;
                     client
-                        .grant_zome_call_capability((&dna, &agent), &cs, &sk, &tag)
+                        .grant_zome_call_capability_scoped(
+                            (&dna, &agent),
+                            &cs,
+                            &sk,
+                            &tag,
+                            functions,
+                        )
                         .await
                 }
             },
@@ -525,7 +547,13 @@ pub async fn handle_hc_connect(
                     let retry_result = match TypedAdminClient::connect(admin.admin_url()).await {
                         Ok(retry_admin) => {
                             retry_admin
-                                .grant_zome_call_capability((dna_hash, agent_key), &cs, &sk, &tag)
+                                .grant_zome_call_capability_scoped(
+                                    (dna_hash, agent_key),
+                                    &cs,
+                                    &sk,
+                                    &tag,
+                                    functions.clone(),
+                                )
                                 .await
                         }
                         Err(e) => Err(e),

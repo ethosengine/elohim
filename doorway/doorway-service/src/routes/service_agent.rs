@@ -82,6 +82,9 @@ pub enum ServiceAgentRefusal {
     /// The pool peer answered with a provider that is not the configured
     /// performer (or answered with none): the promise is not the one asked for.
     SponsorMismatch,
+    /// A HUMAN registration named an `agent:` id: that namespace is reserved
+    /// for service agents, because `/hc/connect` scopes on it.
+    ReservedHumanId,
 }
 
 impl ServiceAgentRefusal {
@@ -96,6 +99,7 @@ impl ServiceAgentRefusal {
             Self::NoSponsor => "SERVICE_AGENT_NO_SPONSOR",
             Self::SelfSponsorship => "SERVICE_AGENT_SELF_SPONSORSHIP",
             Self::SponsorMismatch => "SERVICE_AGENT_SPONSOR_MISMATCH",
+            Self::ReservedHumanId => "HUMAN_ID_RESERVED",
         }
     }
 
@@ -124,6 +128,9 @@ impl ServiceAgentRefusal {
             Self::SponsorMismatch => {
                 "The pool peer's hosting promise did not name the expected sponsor"
             }
+            Self::ReservedHumanId => {
+                "humanId values beginning 'agent:' are reserved for service agents"
+            }
         }
     }
 
@@ -138,7 +145,8 @@ impl ServiceAgentRefusal {
             Self::IdMissing
             | Self::IdMalformed
             | Self::HumanIdForbidden
-            | Self::AgentKeyForbidden => StatusCode::BAD_REQUEST,
+            | Self::AgentKeyForbidden
+            | Self::ReservedHumanId => StatusCode::BAD_REQUEST,
             Self::NoCredentialStore | Self::NoConductorPool | Self::NoSponsor => {
                 StatusCode::SERVICE_UNAVAILABLE
             }
@@ -255,6 +263,78 @@ pub fn service_agent_permission_level() -> PermissionLevel {
 /// service agent.
 pub fn phase_authors_human_record(agency_phase: &str) -> bool {
     agency_phase != SERVICE_AGENT_PHASE
+}
+
+// =============================================================================
+// The runner's /hc/connect capability: function-listed, never All
+// =============================================================================
+
+/// Is this session a stewarded runner's? Pure, keyed on the SIGNED `human_id`
+/// claim, which for a service agent is its `agent:<slug>` id (stored as the
+/// row's `human_id` at registration and carried by every token minted from
+/// that row). No I/O, so `/hc/connect` decides without a credential-store read
+/// and cannot fail open on one. The namespace is reserved: a human
+/// registration naming an `agent:` id is refused ([`human_id_is_reserved`]),
+/// so a human can never be mistaken for a runner — and a runner, whose id is
+/// always prefixed, can never be mistaken for a human.
+pub fn is_service_agent_session(human_id_claim: &str) -> bool {
+    human_id_claim.starts_with(SERVICE_AGENT_ID_PREFIX)
+}
+
+/// Whether a HUMAN registration's caller-supplied `humanId` falls in the
+/// service-agent namespace (and must be refused). Pure.
+pub fn human_id_is_reserved(agency_phase: &str, human_id: &str) -> bool {
+    agency_phase != SERVICE_AGENT_PHASE && is_service_agent_session(human_id.trim())
+}
+
+/// What one role cell's `/hc/connect` capability may call.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum SessionGrantScope {
+    /// Every function: a human's own hosted cell. Unchanged.
+    All,
+    /// Exactly these `(zome, function)` pairs.
+    Listed(&'static [(&'static str, &'static str)]),
+    /// Author no grant on this cell at all: a permanent chain action that
+    /// could call nothing is not worth writing.
+    NoGrant,
+}
+
+/// The runner's whole callable surface on its `lamad` (content) cell: submit
+/// and follow a compute task it requests. `compute_task` is ONE extern with an
+/// `operation` field (`submit`/`get`/`list`, plus provider-only
+/// `accept`/`complete`/`decline` that the zome refuses unless the caller IS
+/// the task's provider — `content_store/src/compute_task.rs`). Derived from the
+/// requester flow in `genesis/agentic/compute/workspace.mjs` (submit → POST
+/// tasks; poll → GET tasks/{hash}), which the storage adapter maps onto exactly
+/// this extern (`elohim-storage/src/api/compute_tasks.rs` `call`).
+pub const RUNNER_CONTENT_CELL_FUNCTIONS: &[(&str, &str)] = &[("content_store", "compute_task")];
+
+/// The runner's reads on its `mishpat` (governance) cell: the two the
+/// requester-side completion check uses to verify the grant it spends — the
+/// exact signed grant record and its authority/withdrawal links
+/// (`compute_tasks.rs` `fetch_authenticated_grant`, `observe`). Read-only;
+/// no commitment authoring, so the runner cannot issue or accept a grant.
+pub const RUNNER_GOVERNANCE_CELL_FUNCTIONS: &[(&str, &str)] = &[
+    ("mishpat", "get_commitment_record"),
+    ("mishpat", "get_commitment_authority_links"),
+];
+
+/// The capability a session gets on one role cell. Pure.
+///
+/// Human sessions: `All` on every cell, exactly as before. Runner sessions:
+/// `lamad` and `mishpat` are function-listed; every other role — `imagodei`
+/// (identity: `create_human`, device approval, recovery), `infrastructure`,
+/// `node_registry`, and any clone cell — gets NO grant. Fail closed: an
+/// unknown role is never widened for a runner.
+pub fn session_grant_scope(human_id_claim: &str, role: &str) -> SessionGrantScope {
+    if !is_service_agent_session(human_id_claim) {
+        return SessionGrantScope::All;
+    }
+    match role {
+        "lamad" => SessionGrantScope::Listed(RUNNER_CONTENT_CELL_FUNCTIONS),
+        "mishpat" => SessionGrantScope::Listed(RUNNER_GOVERNANCE_CELL_FUNCTIONS),
+        _ => SessionGrantScope::NoGrant,
+    }
 }
 
 // =============================================================================
@@ -650,6 +730,116 @@ mod tests {
         assert_eq!(human.service_agent_id, None);
     }
 
+    /// Every role a hosted cell carries today (elohim `workdir/happ.yaml`).
+    const ROLES: [&str; 5] = [
+        "lamad",
+        "infrastructure",
+        "imagodei",
+        "mishpat",
+        "node_registry",
+    ];
+
+    fn runner_surface() -> Vec<(&'static str, &'static str)> {
+        ROLES
+            .iter()
+            .flat_map(
+                |role| match session_grant_scope("agent:ci-runner-jenkins-matthew", role) {
+                    SessionGrantScope::Listed(fns) => fns.to_vec(),
+                    SessionGrantScope::NoGrant => Vec::new(),
+                    SessionGrantScope::All => {
+                        panic!("a runner got an all-function grant on {role}")
+                    }
+                },
+            )
+            .collect()
+    }
+
+    /// C12: the runner's capability is function-listed and holds exactly what
+    /// submitting and following its own compute task needs.
+    #[test]
+    fn a_runner_grant_is_function_listed_and_includes_compute_task() {
+        assert_eq!(
+            session_grant_scope("agent:r1", "lamad"),
+            SessionGrantScope::Listed(&[("content_store", "compute_task")])
+        );
+        assert_eq!(
+            session_grant_scope("agent:r1", "mishpat"),
+            SessionGrantScope::Listed(&[
+                ("mishpat", "get_commitment_record"),
+                ("mishpat", "get_commitment_authority_links"),
+            ])
+        );
+        assert!(runner_surface().contains(&("content_store", "compute_task")));
+    }
+
+    /// The runner cannot author a human record, approve a device, run
+    /// recovery, or issue/accept a commitment: none of those functions — nor
+    /// any identity-cell function at all — is in its capability.
+    #[test]
+    fn a_runner_grant_excludes_human_authoring_and_device_approval() {
+        let surface = runner_surface();
+        for (zome, function) in [
+            ("imagodei", "create_human"),
+            ("imagodei", "update_human"),
+            ("imagodei", "create_hosted_agent_binding"),
+            ("imagodei", "create_self_revocation"),
+            ("mishpat", "create_commitment"),
+            ("mishpat", "create_mishpat_commitment"),
+        ] {
+            assert!(
+                !surface.contains(&(zome, function)),
+                "runner must not hold {zome}::{function}"
+            );
+        }
+        assert!(
+            surface.iter().all(|(zome, _)| *zome != "imagodei"),
+            "no identity-cell function at all"
+        );
+        assert_eq!(
+            session_grant_scope("agent:r1", "imagodei"),
+            SessionGrantScope::NoGrant,
+            "no grant is even authored on the identity cell"
+        );
+        assert_eq!(
+            session_grant_scope("agent:r1", "lamad.fixtures"),
+            SessionGrantScope::NoGrant,
+            "an unknown or clone role is never widened for a runner"
+        );
+        assert!(
+            surface
+                .iter()
+                .all(|(_, f)| f.starts_with("get_") || *f == "compute_task"),
+            "beyond compute_task the runner holds reads only"
+        );
+    }
+
+    /// Human sessions keep today's grant: All, on every role.
+    #[test]
+    fn a_human_session_grant_is_unchanged() {
+        for human_id in ["human-matthew", "3f1c0e7e-uuid", "uhCHkabc", ""] {
+            for role in ROLES {
+                assert_eq!(session_grant_scope(human_id, role), SessionGrantScope::All);
+            }
+        }
+    }
+
+    /// The `agent:` namespace the scope keys on is reserved: a human
+    /// registration may not claim it, so a human is never down-scoped by
+    /// accident and never passes as a runner.
+    #[test]
+    fn the_service_agent_namespace_is_reserved_from_human_registration() {
+        assert!(human_id_is_reserved("hosted", "agent:x"));
+        assert!(human_id_is_reserved("doorway", " agent:x"));
+        assert!(human_id_is_reserved("node", "agent:x"));
+        assert!(!human_id_is_reserved("hosted", "human-matthew"));
+        assert!(!human_id_is_reserved("hosted", ""));
+        assert!(!human_id_is_reserved(SERVICE_AGENT_PHASE, "agent:x"));
+        assert_eq!(
+            ServiceAgentRefusal::ReservedHumanId.status(),
+            hyper::StatusCode::BAD_REQUEST
+        );
+    }
+
     #[test]
     fn refusal_statuses_separate_request_shape_from_capability() {
         use hyper::StatusCode;
@@ -684,6 +874,7 @@ mod tests {
             ServiceAgentRefusal::NoSponsor,
             ServiceAgentRefusal::SelfSponsorship,
             ServiceAgentRefusal::SponsorMismatch,
+            ServiceAgentRefusal::ReservedHumanId,
         ];
         let codes: std::collections::HashSet<_> = all.iter().map(|r| r.code()).collect();
         assert_eq!(codes.len(), all.len());
