@@ -350,3 +350,30 @@ operator surface brought one habit, born red; no flips were claimed in this pass
 fulfilled nothing in the ledger's unit, which is §5.1 again. It did discharge the operator's
 three named steps, and it turned one stranded wave into dev. Velocity (§9) is unchanged:
 nothing in this pass moved a red with proof.
+
+## 11. Addendum, 2026-10-19 (later): the overnight shift, scored on §9's three lines
+
+Written by the controller of the overnight shift `2026-10-19T03-25-finish-integration-2026-10-18` (claude-opus-5-5, for human:matthew). Its objective was to land the stranded branches that §10 judged still needed, each with a fresh household receipt.
+
+**What landed.** Three branches reached dev through the full pre-push gate, with no bypass. Each has a household receipt on its own source:
+
+| branch | dev | gate | receipt |
+|---|---|---|---|
+| retired-pin readmit backoff | `d37d467e4` | storage tests | deliverability 135/135 |
+| SSR self-heal + `c9f9f8ea0` | `c41e075a8` | doorway 1816/0 | deliverability 135/135 |
+| plane-violation write guard | `7d0e3089e` | storage 5692/0 | deliverability 135/135, name-routing 25/25, app-delivery-refuses-fast 50/50 |
+
+The household ran the write guard in refuse mode and it refused nothing. CI deployed all three to the alpha fleet (edge #1660, #1662 and #1664), including adam-alpha, which serves elohim.host. Hosted-provisioning stop-damage is gated (1927/0 and 1930/0) but held for the operator: `backlog/hosted-provisioning-stop-damage-held-for-operator`. Every other open branch has a next act and an owner in `backlog/stranded-branches-after-2026-10-18-power-loss`.
+
+**§9's three lines.**
+1. **Reds moved with proof: 0.** dataplane-convergence stays red; DELTA 10-19a records the landings and claims no flip. The register reads 14 green / 29 red / 5 unwired of 48, the same as in §10.
+2. **Commitments fulfilled in the ledger's unit: 0.** `epr flow stocks --window 2026-10-18..2026-10-20` reports 0 produced and 0 consumed. This is §5.1 again. This time the register agrees with the ledger: there was no flip for S2 to count.
+3. **Ratio: worse by two.** Two backlog rows were born (the hosted hold and the stranded-branch table) and none were closed.
+
+**The one red CI kept showing.** Every validate-only run (edge #1661, #1663, #1665) failed on one step: elohim.host never reports caught up, at `divergentAnchor=151` across five hours. Its public `/db/p2p/conductor-diagnostics` names the cause:
+- doorway-alpha's conductor has blocked all 4 034 344 messages from adam's conductor.
+- Four of adam's six peers have sent it nothing.
+
+That is DELTA 10-10a's chain-fork exile, still in force nine days on. No push cures it, and waiting does not either. It reaches the fleet through D1 (S8). The shift first reported it as prod fleet state and asked the operator to read it. That was wrong: the read is public HTTP, and this shift has since taken it (`backlog/ci-edge-inventory-convergence-caughtup-sawtooth-flap`, SEEN AGAIN 2026-10-19).
+
+**What this means for the next sprint.** The landings removed obstacles; they did not cure anything. The reds nearest a proven flip are blocked by named decisions, not by unlanded code. The exile on alpha (dataplane-convergence and every validate-only run) waits on D1/S8. Fresh-household version convergence waits on the Adam binding (§10, 2b). The ledger will read 0 of 0 for any sprint until S2 joins it to the register. So the next sprint's highest-leverage hour is the operator's rulings on D1, S2 and the Adam binding, not more agent hours.
