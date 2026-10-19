@@ -18,6 +18,22 @@
 //! doorway mints at most **one grant per cell per process**, plus at most one
 //! bounded heal.
 //!
+//! # Mint for the cell being called, not for the app (2026-10-03)
+//!
+//! Reuse bounded the count per process, but a first connect still authored a
+//! grant on EVERY role cell — five on the elohim hApp — to make a call on one.
+//! Each mint is a zome init plus two write transactions on the conductor, the
+//! conductor does not cancel them when the doorway gives up, and the connect
+//! aborted on the first one that outran the per-call deadline. A hosted
+//! registration calls `create_human` on `imagodei` alone and paid for all five.
+//!
+//! So the connect no longer mints anything. [`SigningCredentialCache::ensure`]
+//! is called on the call path for the ONE role the call targets; every other
+//! role is minted on its own first use through the same decide / lease / cache
+//! path. The ceiling is unchanged — at most one grant per (conductor, app,
+//! role) per process — and the floor drops from "every role" to "the roles
+//! actually called".
+//!
 //! # The discipline, ported from `elohim-storage`'s closed-chain fence
 //!
 //! `elohim-storage/src/closed_chain_fence.rs` solved the same problem for the
@@ -31,10 +47,10 @@
 //! # Concurrency: the mint is serialized PER CELL
 //!
 //! `decide` and `add_credentials` straddle the `authorize_signing_credentials`
-//! round trip. Two `connect_endpoint` runs for one endpoint overlap in
-//! practice — a primary connect racing a half-open re-probe, startup fan-out,
-//! or two provisions of the same hosted app — and without serialization both
-//! would observe `Mint` and both would author a `CapGrant`.
+//! round trip. Two first calls to one role of one endpoint overlap in
+//! practice — a primary call racing a half-open re-probe, startup fan-out,
+//! or two temporary callers for the same hosted app — and without
+//! serialization both would observe `Mint` and both would author a `CapGrant`.
 //!
 //! [`SigningCredentialCache::lease`] takes a per-(conductor, app, role) async
 //! lock ([`crate::keyed_lock`]) that the caller holds across `decide` → mint →
@@ -42,6 +58,35 @@
 //! one slow conductor cannot stall another's connect. The wait is bounded by
 //! the same per-conductor-call deadline every other step uses; on expiry the
 //! caller proceeds UNSERIALIZED, which is exactly the pre-lock behaviour.
+//!
+//! # A mint the doorway stopped waiting for
+//!
+//! `authorize_signing_credentials` is not cancelled when its caller gives up.
+//! A mint that times out (or whose socket drops after the request was written)
+//! may still author its `CapGrant` — one the doorway holds no credential for,
+//! because the secret is generated per request and came back on the answer it
+//! never read. Minting again straight away authors a SECOND grant, and on a
+//! slow conductor every retry does the same.
+//!
+//! Two bounds, neither of which touches the per-call deadline:
+//!
+//! - **Cool-down.** After a mint of unknown outcome, no mint is attempted for
+//!   that (conductor, app, role) until [`mint_cooldown`] has passed. Calls in
+//!   between fail `Unavailable`, honestly, without touching the conductor. The
+//!   cool-down is the conductor's own websocket request timeout, read from the
+//!   library; it paces retries to the conductor's clock, it does not prove the
+//!   abandoned mint finished.
+//! - **The lease wait covers the worst-case mint.** A waiter is given as long
+//!   as a mint can take (the caller passes that), so waiters no longer fall
+//!   through the lease and mint in parallel with the holder.
+//!
+//! Each abandoned mint is counted (`doorway_signing_mints_abandoned_total`).
+//!
+//! THIS IS A BOUND, NOT THE CURE. The durable cure is the ruled idempotent
+//! grant plus a derived credential (plane-separation §3.3–3.4): a grant the
+//! conductor recognises as already issued and a secret both sides can derive,
+//! so a mint whose answer was lost costs nothing to repeat. That is conductor
+//! fork work and a follow-up, not this module.
 //!
 //! # The heal, and why it is bounded
 //!
@@ -56,8 +101,9 @@
 //! unbounded heal would be the per-connect minting we are removing, wearing a
 //! different hat.
 
-use holochain_client::{AgentSigner, CellId, ClientAgentSigner};
+use holochain_client::{AgentSigner, CellId, ClientAgentSigner, SigningCredentials};
 use std::collections::{HashMap, HashSet};
+use std::future::Future;
 use std::sync::{Arc, Mutex, OnceLock};
 use std::time::Duration;
 
@@ -103,6 +149,57 @@ pub enum CredentialDecision {
     /// No cached credential for this cell, or a heal discarded it.
     /// Authorize ONCE, then cache.
     Mint,
+}
+
+/// What [`SigningCredentialCache::ensure`] did for one cell.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct EnsuredCredential {
+    /// `Reuse` authored nothing; `Mint` authored exactly one `CapGrant`.
+    pub decision: CredentialDecision,
+    /// Whether the per-cell lease was held across decide → mint → cache.
+    /// `false` means the previous holder outlived the deadline and this run
+    /// proceeded unserialized (the pre-lease behaviour).
+    pub serialized: bool,
+}
+
+/// Why a mint did not produce a credential.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct MintError {
+    pub message: String,
+    /// The request was written and its outcome is not known (it timed out, or
+    /// the socket dropped after the write): a `CapGrant` may exist that the
+    /// doorway holds no credential for. `false` = nothing was authored (the
+    /// conductor refused, or the request was never sent).
+    pub outcome_unknown: bool,
+}
+
+impl MintError {
+    /// Nothing was authored.
+    pub fn refused(message: impl Into<String>) -> Self {
+        Self {
+            message: message.into(),
+            outcome_unknown: false,
+        }
+    }
+
+    /// A grant may have been authored and its credential lost.
+    pub fn abandoned(message: impl Into<String>) -> Self {
+        Self {
+            message: message.into(),
+            outcome_unknown: true,
+        }
+    }
+}
+
+/// How long after a mint of unknown outcome before another is attempted for
+/// the same (conductor, app, role).
+///
+/// The conductor's own websocket request timeout
+/// (`holochain_websocket::WebsocketConfig::LISTENER_DEFAULT` — the config a
+/// conductor's admin interface listens with), read from the library rather
+/// than restated.
+pub fn mint_cooldown() -> Duration {
+    holochain_websocket::WebsocketConfig::LISTENER_DEFAULT.default_request_timeout
 }
 
 /// The whole policy, as a pure function of two facts.
@@ -187,6 +284,9 @@ pub struct SigningCredentialCache {
     /// never cleared: the bound is per-process on purpose, so a genuine repair
     /// survives a restart while a rejection LOOP cannot.
     healed: Mutex<HashSet<String>>,
+    /// `role_key` → when a mint may next be attempted, after one of unknown
+    /// outcome. See the module header.
+    cooling: Mutex<HashMap<String, tokio::time::Instant>>,
 }
 
 impl SigningCredentialCache {
@@ -249,6 +349,105 @@ impl SigningCredentialCache {
             .unwrap_or_else(|e| e.into_inner())
             .remove(&role_key(endpoint_key, role_name));
         decide_credential(signer.get_provenance(cell).is_some(), marked)
+    }
+
+    /// Make sure ONE cell has a signing credential: lease → decide → mint →
+    /// cache, as one unit.
+    ///
+    /// This is the only place a credential is minted. It runs on the call path
+    /// for the role a zome call actually targets, never for a whole app, so a
+    /// call on one role of a five-role app authors one grant, not five.
+    ///
+    /// `mint` is the conductor round trip (`authorize_signing_credentials`). It
+    /// is invoked AT MOST once, and only when the decision is `Mint`; on
+    /// `Reuse` it is never polled and nothing is authored. A failed mint caches
+    /// nothing and returns the error, so a later caller decides `Mint` again —
+    /// the lease must never convert a failure into a permanent skip.
+    ///
+    /// `lease_wait` must cover the worst-case duration of `mint`, so a waiter
+    /// is still waiting when the holder finishes instead of falling through and
+    /// minting beside it. `cooldown` is how long a mint of unknown outcome
+    /// ([`MintError::outcome_unknown`]) holds off the next one for this cell;
+    /// while it runs, a call that would need to mint fails without touching the
+    /// conductor.
+    ///
+    /// Passing the mint as a closure is what lets every test drive THIS
+    /// function with a counting stub instead of a conductor.
+    #[allow(clippy::too_many_arguments)]
+    pub async fn ensure<F, Fut>(
+        &self,
+        signer: &ClientAgentSigner,
+        endpoint_key: &str,
+        role_name: &str,
+        cell: &CellId,
+        lease_wait: Duration,
+        cooldown: Duration,
+        mint: F,
+    ) -> Result<EnsuredCredential, String>
+    where
+        F: FnOnce() -> Fut,
+        Fut: Future<Output = Result<SigningCredentials, MintError>>,
+    {
+        // SERIALIZE THIS CELL'S MINT. `decide` … authorize … `add_credentials`
+        // straddles a conductor round trip, and two first calls to one role
+        // genuinely overlap. The lease makes the trio atomic per cell; the
+        // second caller waits, re-decides, and sees `Reuse`. Distinct cells and
+        // conductors never contend. `None` = the holder outlived even the
+        // worst-case mint, so we behave exactly as before the lease existed.
+        let lease = self.lease(endpoint_key, role_name, lease_wait).await;
+        let serialized = lease.is_some();
+        let key = role_key(endpoint_key, role_name);
+
+        // A mint would be needed, and one of unknown outcome is still cooling:
+        // do not author another grant on top of it. Checked BEFORE `decide`,
+        // which would otherwise consume a pending heal mark for nothing.
+        let needs_mint =
+            signer.get_provenance(cell).is_none() || self.remint_pending(endpoint_key, role_name);
+        if needs_mint {
+            if let Some(remaining) = self.cooling_for(&key) {
+                return Err(format!(
+                    "signing credential for role '{role_name}' is cooling down for {}s after a \
+                     mint whose outcome is unknown; not minting again yet",
+                    remaining.as_secs().max(1)
+                ));
+            }
+        }
+
+        let decision = self.decide(signer, endpoint_key, role_name, cell);
+        if decision == CredentialDecision::Mint {
+            match mint().await {
+                Ok(credentials) => signer.add_credentials(cell.clone(), credentials),
+                Err(error) => {
+                    if error.outcome_unknown {
+                        self.cooling
+                            .lock()
+                            .unwrap_or_else(|e| e.into_inner())
+                            .insert(key, tokio::time::Instant::now() + cooldown);
+                        crate::metrics::inc_signing_mint_abandoned();
+                    }
+                    return Err(error.message);
+                }
+            }
+        }
+        drop(lease);
+
+        Ok(EnsuredCredential {
+            decision,
+            serialized,
+        })
+    }
+
+    /// How much longer mints for `role_key` are held off, if at all.
+    fn cooling_for(&self, role_key: &str) -> Option<Duration> {
+        let mut cooling = self.cooling.lock().unwrap_or_else(|e| e.into_inner());
+        let until = *cooling.get(role_key)?;
+        let now = tokio::time::Instant::now();
+        if now >= until {
+            cooling.remove(role_key);
+            None
+        } else {
+            Some(until - now)
+        }
     }
 
     /// A zome call on `role_name` was refused in a way that says the conductor
@@ -514,8 +713,9 @@ mod tests {
         serialized: bool,
     }
 
-    /// One cell of one `connect_endpoint` run, in the exact order the real loop
-    /// uses: lease → decide → authorize → add_credentials.
+    /// One first call to one cell, through the PRODUCTION
+    /// [`SigningCredentialCache::ensure`] — lease → decide → authorize →
+    /// add_credentials — with the stub standing in for the conductor.
     async fn connect_cell(
         cache: Arc<SigningCredentialCache>,
         signer: Arc<ClientAgentSigner>,
@@ -525,21 +725,27 @@ mod tests {
         deadline: Duration,
         stub: MintStub,
     ) -> CellRun {
-        let lease = cache.lease(&ep_key, &role, deadline).await;
-        let serialized = lease.is_some();
-        let decision = cache.decide(&signer, &ep_key, &role, &cell);
-        let mut minted = false;
-        if decision == CredentialDecision::Mint {
-            if let Some(credentials) = stub.authorize().await {
-                signer.add_credentials(cell.clone(), credentials);
-                minted = true;
-            }
-        }
-        drop(lease);
-        CellRun {
-            decision,
-            minted,
-            serialized,
+        let ensured = cache
+            .ensure(&signer, &ep_key, &role, &cell, deadline, LONG, || async {
+                stub.authorize()
+                    .await
+                    .ok_or_else(|| MintError::refused("stub mint failed"))
+            })
+            .await;
+        match ensured {
+            Ok(done) => CellRun {
+                decision: done.decision,
+                minted: done.decision == CredentialDecision::Mint,
+                serialized: done.serialized,
+            },
+            // Only a `Mint` decision can fail: `Reuse` never polls the mint.
+            // `serialized` is not reported on the error path and no test reads
+            // it there.
+            Err(_) => CellRun {
+                decision: CredentialDecision::Mint,
+                minted: false,
+                serialized: false,
+            },
         }
     }
 
@@ -826,5 +1032,185 @@ mod tests {
                 "must NOT be read as a stale grant: {message}"
             );
         }
+    }
+
+    // ── a mint the doorway stopped waiting for ──────────────────────────────
+
+    /// A mint that timed out may have authored its grant. The next call must
+    /// not author another one on top of it: it fails, without minting, until
+    /// the cool-down has passed — and then exactly one mint is attempted.
+    #[tokio::test(start_paused = true)]
+    async fn a_mint_of_unknown_outcome_is_not_repeated_until_the_cooldown_passes() {
+        let cache = SigningCredentialCache::new();
+        let signer = ClientAgentSigner::default();
+        let key = endpoint_key("cooldown:4444", "elohim");
+        let cooldown = Duration::from_secs(60);
+        let mints = AtomicUsize::new(0);
+        let timed_out = || async {
+            mints.fetch_add(1, Ordering::SeqCst);
+            Err(MintError::abandoned(
+                "authorize_signing_credentials timed out after 10000ms for role 'imagodei'",
+            ))
+        };
+
+        let first = cache
+            .ensure(
+                &signer,
+                &key,
+                "imagodei",
+                &cell(1),
+                LONG,
+                cooldown,
+                timed_out,
+            )
+            .await;
+        assert!(first.unwrap_err().contains("timed out"));
+        assert_eq!(mints.load(Ordering::SeqCst), 1);
+
+        // Inside the cool-down: refused honestly, nothing sent.
+        for _ in 0..3 {
+            tokio::time::advance(Duration::from_secs(10)).await;
+            let held = cache
+                .ensure(
+                    &signer,
+                    &key,
+                    "imagodei",
+                    &cell(1),
+                    LONG,
+                    cooldown,
+                    timed_out,
+                )
+                .await;
+            assert!(held.unwrap_err().contains("cooling down"));
+        }
+        assert_eq!(
+            mints.load(Ordering::SeqCst),
+            1,
+            "a second grant was authored while the first mint's outcome was unknown"
+        );
+
+        // A different role is not held by this one's cool-down.
+        cache
+            .ensure(&signer, &key, "lamad", &cell(2), LONG, cooldown, || async {
+                Ok(fake_credentials(2))
+            })
+            .await
+            .expect("another cell mints freely");
+
+        // Past it: one mint, and the credential is cached.
+        tokio::time::advance(Duration::from_secs(31)).await;
+        let minted = cache
+            .ensure(
+                &signer,
+                &key,
+                "imagodei",
+                &cell(1),
+                LONG,
+                cooldown,
+                || async {
+                    mints.fetch_add(1, Ordering::SeqCst);
+                    Ok(fake_credentials(1))
+                },
+            )
+            .await
+            .expect("the cool-down has passed");
+        assert_eq!(minted.decision, CredentialDecision::Mint);
+        assert_eq!(mints.load(Ordering::SeqCst), 2);
+        assert_eq!(cache.live_leases(), 0);
+    }
+
+    /// A REFUSED mint authored nothing, so nothing is cooling: the next call
+    /// may mint at once (the existing no-lost-mint guarantee).
+    #[tokio::test(start_paused = true)]
+    async fn a_refused_mint_does_not_cool_down() {
+        let cache = SigningCredentialCache::new();
+        let signer = ClientAgentSigner::default();
+        let key = endpoint_key("no-cooldown:4444", "elohim");
+
+        let refused = cache
+            .ensure(
+                &signer,
+                &key,
+                "imagodei",
+                &cell(1),
+                LONG,
+                Duration::from_secs(60),
+                || async { Err(MintError::refused("source chain head has moved")) },
+            )
+            .await;
+        assert!(refused.is_err());
+
+        cache
+            .ensure(
+                &signer,
+                &key,
+                "imagodei",
+                &cell(1),
+                LONG,
+                Duration::from_secs(60),
+                || async { Ok(fake_credentials(1)) },
+            )
+            .await
+            .expect("a refusal leaves nothing to wait for");
+    }
+
+    /// A cached credential keeps working through a cool-down on its own role:
+    /// the cool-down gates MINTING, never reuse.
+    #[tokio::test(start_paused = true)]
+    async fn a_cooldown_never_blocks_reuse() {
+        let cache = SigningCredentialCache::new();
+        let signer = ClientAgentSigner::default();
+        let key = endpoint_key("reuse-through-cooldown:4444", "elohim");
+        let cooldown = Duration::from_secs(60);
+        cache
+            .ensure(
+                &signer,
+                &key,
+                "imagodei",
+                &cell(1),
+                LONG,
+                cooldown,
+                || async { Ok(fake_credentials(1)) },
+            )
+            .await
+            .unwrap();
+        // A heal attempt on the same role times out…
+        assert!(cache.mark_for_remint(&key, "imagodei"));
+        let _ = cache
+            .ensure(
+                &signer,
+                &key,
+                "imagodei",
+                &cell(1),
+                LONG,
+                cooldown,
+                || async { Err(MintError::abandoned("timed out")) },
+            )
+            .await;
+
+        // …and with no heal pending, the credential it still holds is reused.
+        let reused = cache
+            .ensure(
+                &signer,
+                &key,
+                "imagodei",
+                &cell(1),
+                LONG,
+                cooldown,
+                || async { Err(MintError::refused("reuse must not mint")) },
+            )
+            .await
+            .expect("reuse is not gated by the cool-down");
+        assert_eq!(reused.decision, CredentialDecision::Reuse);
+    }
+
+    /// The cool-down is the conductor-side websocket request timeout, read from
+    /// the library — not a number written here.
+    #[test]
+    fn the_mint_cooldown_is_the_conductors_websocket_request_timeout() {
+        assert_eq!(
+            mint_cooldown(),
+            holochain_websocket::WebsocketConfig::LISTENER_DEFAULT.default_request_timeout
+        );
     }
 }

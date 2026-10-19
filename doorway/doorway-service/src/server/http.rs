@@ -3184,6 +3184,9 @@ mod shakeout_tests {
         // never shadow the admin surface. (It is POST-only, so the GET-only EPR
         // router would not shadow it regardless — this locks the coverage.)
         assert!(is_service_path("/admin/ssr-bundle/refresh"));
+        // The GET half of the provisioning recovery route must not be shadowed
+        // by the EPR router into the SPA bundle.
+        assert!(is_service_path("/admin/provisioning/recover"));
     }
     #[test]
     fn shakeout_service_path_identity_narrowed_to_did() {
@@ -8630,6 +8633,19 @@ async fn handle_request(
             ));
         }
 
+        // Provisioning recovery — operator-only: the handler checks the admin
+        // credential, and the POST also passes the operator-actuator gate above.
+        // GET reads the intent log's state; POST rebuilds records and mappings
+        // from the conductors. Covered by is_service_path via "/admin".
+        (Method::GET, "/admin/provisioning/recover") => {
+            to_boxed(routes::handle_provisioning_status(&req, Arc::clone(&state)).await)
+        }
+        (Method::POST, "/admin/provisioning/recover") => {
+            return Ok(to_boxed(
+                routes::handle_provisioning_recover(req, Arc::clone(&state)).await,
+            ));
+        }
+
         // Hosted users — list users with conductor assignments
         (Method::GET, "/admin/hosted-users") => {
             to_boxed(routes::handle_list_hosted_users(Arc::clone(&state)).await)
@@ -12622,6 +12638,7 @@ mod root_projection_shadow_regression_tests {
             ("POST", "/admin/federation/peers/refresh"),
             ("POST", "/admin/steward-peers/refresh"),
             ("POST", "/admin/ssr-bundle/refresh"),
+            ("POST", "/admin/provisioning/recover"),
         ] {
             assert_eq!(send_actuator(addr, m, p, None).await, 401, "{m} {p} anon");
             assert_eq!(

@@ -20,8 +20,11 @@ use chrono::{DateTime, Utc};
 use dashmap::DashMap;
 use serde::{Deserialize, Serialize};
 use std::collections::{HashMap, HashSet};
+use std::sync::{Arc, Mutex};
 
 use super::agent_key::{is_agent_key_form, normalize_agent_key};
+use super::provision_intent::{IntentStore, MemoryIntentStore};
+use crate::keyed_lock::KeyedLock;
 use tracing::{info, warn};
 
 /// Count DISTINCT hosted agents per conductor from `(conductor_id, agent_key)` rows.
@@ -78,6 +81,123 @@ pub struct ConductorRegistry {
     conductors: DashMap<String, ConductorInfo>,
     /// MongoDB collection for persistent backing (None = memory-only)
     db: Option<mongodb::Collection<bson::Document>>,
+    /// The provisioning intent log — what this doorway asked a conductor to do
+    /// for each person. Lives beside the mappings above (same database when
+    /// Mongo is configured, process memory otherwise). See
+    /// [`super::provision_intent`].
+    intents: Arc<dyn IntentStore>,
+    /// One provisioning call at a time per identifier, in this process. The
+    /// intent log's compare-and-set is what is correct across processes; this
+    /// only spares a second in-process call a wasted key generation.
+    provision_locks: KeyedLock,
+    /// How many agent mappings were loaded from Mongo at construction. Zero on
+    /// a doorway whose database was empty at boot.
+    persisted_mappings_at_boot: usize,
+    /// What the doorway knows about whether its records were lost. `None` =
+    /// not tracked: a doorway with no Mongo persists nothing by declaration.
+    store_loss: Mutex<Option<StoreLossTracking>>,
+}
+
+/// The facts the wiped-store verdict is computed from.
+#[derive(Debug, Clone, Default)]
+struct StoreLossTracking {
+    /// Intent records in the log at boot. `None` = the log could not be read.
+    intent_records_at_boot: Option<u64>,
+    /// Conductors SUCCESSFULLY walked since boot → hosted apps each reported.
+    /// A conductor that could not be reached is absent, not zero.
+    walked: HashMap<String, usize>,
+    /// An operator's recovery walked every conductor and rebuilt the records.
+    recovered: bool,
+}
+
+/// Were this doorway's records lost while its conductors kept their people?
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum StoreVerdict {
+    /// Not established yet: the store was empty at boot and some conductor in
+    /// the pool has not been successfully asked what it hosts. "I could not
+    /// reach the conductor" is NOT "the conductor holds nothing".
+    Unknown,
+    /// The store had records at boot, or it was empty and EVERY conductor has
+    /// answered that it hosts nobody (a new deployment), or an operator's
+    /// recovery has completed.
+    NotWiped,
+    /// The store was empty at boot and a conductor hosts apps: the records are
+    /// gone and the people are still there. Every returning person would look
+    /// new. Cleared only by a complete operator recovery.
+    Wiped,
+}
+
+impl StoreVerdict {
+    pub fn as_str(self) -> &'static str {
+        match self {
+            Self::Unknown => "unknown",
+            Self::NotWiped => "not_wiped",
+            Self::Wiped => "wiped",
+        }
+    }
+
+    pub const ALL: [StoreVerdict; 3] = [Self::Unknown, Self::NotWiped, Self::Wiped];
+}
+
+/// The verdict, with what it rests on.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct StoreState {
+    pub verdict: StoreVerdict,
+    /// Pool conductors not yet successfully walked since boot, sorted.
+    pub unwalked: Vec<String>,
+    /// Hosted apps reported by the conductors walked so far.
+    pub hosted_apps_seen: usize,
+}
+
+/// The wiped-store verdict, as a pure function of counted facts.
+///
+/// - `store_records_at_boot` — agent mappings loaded from the database plus
+///   intent records in the log, or `None` if the log could not be read.
+/// - `walked` — conductors successfully asked since boot, with the hosted apps
+///   each reported. A conductor that was NOT reached is not in this map; it is
+///   never counted as "hosts nothing".
+///
+/// The rule:
+///
+/// - records at boot → `NotWiped`. A store that has records is not the wiped
+///   shape, whatever any conductor says, so a conductor that is down at boot
+///   does not stop anyone registering (alpha rolls conductors for hours).
+/// - no records, some walked conductor hosts apps → `Wiped`, at once: it
+///   cannot become less true when the rest are walked.
+/// - no records, nothing hosted so far, some conductor unwalked → `Unknown`.
+/// - no records, every conductor walked, nothing hosted → `NotWiped` (new).
+/// - the log unreadable → `Unknown`.
+/// - a completed operator recovery → `NotWiped`.
+pub fn store_verdict(
+    pool: &[String],
+    walked: &HashMap<String, usize>,
+    store_records_at_boot: Option<u64>,
+    recovered: bool,
+) -> StoreState {
+    let mut unwalked: Vec<String> = pool
+        .iter()
+        .filter(|id| !walked.contains_key(*id))
+        .cloned()
+        .collect();
+    unwalked.sort();
+    let hosted_apps_seen: usize = walked.values().sum();
+
+    let verdict = if recovered {
+        StoreVerdict::NotWiped
+    } else {
+        match store_records_at_boot {
+            None => StoreVerdict::Unknown,
+            Some(records) if records > 0 => StoreVerdict::NotWiped,
+            Some(_) if hosted_apps_seen > 0 => StoreVerdict::Wiped,
+            Some(_) if unwalked.is_empty() => StoreVerdict::NotWiped,
+            Some(_) => StoreVerdict::Unknown,
+        }
+    };
+    StoreState {
+        verdict,
+        unwalked,
+        hosted_apps_seen,
+    }
 }
 
 /// An agent's assignment to a conductor
@@ -111,10 +231,14 @@ pub struct ConductorInfo {
 impl ConductorRegistry {
     /// Create a new registry with optional MongoDB backing
     pub async fn new(db: Option<mongodb::Collection<bson::Document>>) -> Self {
-        let registry = Self {
+        let mut registry = Self {
             agents: DashMap::new(),
             conductors: DashMap::new(),
             db,
+            intents: Arc::new(MemoryIntentStore::new()),
+            provision_locks: KeyedLock::new(),
+            persisted_mappings_at_boot: 0,
+            store_loss: Mutex::new(None),
         };
 
         // Load persisted agent mappings if MongoDB is available
@@ -123,8 +247,105 @@ impl ConductorRegistry {
                 warn!("Failed to load conductor registry from MongoDB: {}", e);
             }
         }
+        registry.persisted_mappings_at_boot = registry.agents.len();
 
         registry
+    }
+
+    /// Back the provisioning intent log with `store` instead of process memory.
+    pub fn with_intent_store(mut self, store: Arc<dyn IntentStore>) -> Self {
+        self.intents = store;
+        self
+    }
+
+    /// The provisioning intent log.
+    pub fn intents(&self) -> &Arc<dyn IntentStore> {
+        &self.intents
+    }
+
+    /// Per-identifier provisioning serialization for this process.
+    pub fn provision_locks(&self) -> &KeyedLock {
+        &self.provision_locks
+    }
+
+    /// Agent mappings loaded from the database when this registry was built.
+    pub fn persisted_mappings_at_boot(&self) -> usize {
+        self.persisted_mappings_at_boot
+    }
+
+    /// Start tracking whether this doorway's records were lost. Called once at
+    /// boot by a doorway that PERSISTS (Mongo configured), with the number of
+    /// intent records then in the log (`None` if it could not be read).
+    ///
+    /// From here the verdict is `Unknown` until the conductors have been
+    /// walked — see [`store_verdict`].
+    pub fn track_store_loss(&self, intent_records_at_boot: Option<u64>) {
+        *self.store_loss.lock().unwrap_or_else(|e| e.into_inner()) = Some(StoreLossTracking {
+            intent_records_at_boot,
+            walked: HashMap::new(),
+            recovered: false,
+        });
+    }
+
+    /// A conductor ANSWERED what it hosts. Only a successful listing is
+    /// recorded; an unreachable conductor stays unwalked.
+    pub fn mark_walked(&self, conductor_id: &str, hosted_apps: usize) {
+        if let Some(tracking) = self
+            .store_loss
+            .lock()
+            .unwrap_or_else(|e| e.into_inner())
+            .as_mut()
+        {
+            tracking
+                .walked
+                .insert(conductor_id.to_string(), hosted_apps);
+        }
+    }
+
+    /// An operator's recovery walked every conductor and rebuilt the records.
+    pub fn mark_recovered(&self) {
+        if let Some(tracking) = self
+            .store_loss
+            .lock()
+            .unwrap_or_else(|e| e.into_inner())
+            .as_mut()
+        {
+            tracking.recovered = true;
+        }
+    }
+
+    /// The wiped-store verdict now, over the CURRENT pool — so a conductor
+    /// added to the pool later is unwalked until it has answered.
+    pub fn store_state(&self) -> StoreState {
+        let mut pool: Vec<String> = self.conductors.iter().map(|c| c.key().clone()).collect();
+        pool.sort();
+        match self
+            .store_loss
+            .lock()
+            .unwrap_or_else(|e| e.into_inner())
+            .as_ref()
+        {
+            Some(tracking) => store_verdict(
+                &pool,
+                &tracking.walked,
+                tracking
+                    .intent_records_at_boot
+                    .map(|n| n + self.persisted_mappings_at_boot as u64),
+                tracking.recovered,
+            ),
+            // Not tracked: nothing here persists, so nothing can have been lost.
+            None => StoreState {
+                verdict: StoreVerdict::NotWiped,
+                unwalked: Vec::new(),
+                hosted_apps_seen: 0,
+            },
+        }
+    }
+
+    /// Whether an operator must run recovery before this doorway may treat a
+    /// person it has no record of as new.
+    pub fn recovery_required(&self) -> bool {
+        self.store_state().verdict == StoreVerdict::Wiped
     }
 
     /// Load agent→conductor mappings from MongoDB
@@ -1102,5 +1323,117 @@ mod tests {
             info.capacity_used >= info.capacity_max,
             "a cap at the seeded population must gate further provisioning"
         );
+    }
+
+    fn pool() -> Vec<String> {
+        vec!["conductor-a".to_string(), "conductor-b".to_string()]
+    }
+
+    fn walked(entries: &[(&str, usize)]) -> HashMap<String, usize> {
+        entries.iter().map(|(id, n)| (id.to_string(), *n)).collect()
+    }
+
+    /// THE LIVE DEFECT. A conductor that could not be reached is not a
+    /// conductor that hosts nobody. With an empty store and a conductor not
+    /// yet asked, the verdict is Unknown — never NotWiped.
+    #[test]
+    fn an_unreached_conductor_is_unknown_not_empty() {
+        let none_reached = store_verdict(&pool(), &walked(&[]), Some(0), false);
+        assert_eq!(none_reached.verdict, StoreVerdict::Unknown);
+        assert_eq!(none_reached.unwalked, pool());
+
+        // One answered "nobody"; the other has not answered at all.
+        let one_reached = store_verdict(&pool(), &walked(&[("conductor-a", 0)]), Some(0), false);
+        assert_eq!(one_reached.verdict, StoreVerdict::Unknown);
+        assert_eq!(one_reached.unwalked, vec!["conductor-b".to_string()]);
+    }
+
+    /// Unknown settles one way or the other once the conductors answer.
+    #[test]
+    fn the_verdict_settles_when_the_conductors_answer() {
+        // Hosted apps over an empty store: wiped — at once, even with another
+        // conductor still unwalked.
+        let wiped = store_verdict(&pool(), &walked(&[("conductor-a", 12)]), Some(0), false);
+        assert_eq!(wiped.verdict, StoreVerdict::Wiped);
+        assert_eq!(wiped.hosted_apps_seen, 12);
+        assert_eq!(wiped.unwalked, vec!["conductor-b".to_string()]);
+
+        // Every conductor answered "nobody": a new deployment.
+        let new = store_verdict(
+            &pool(),
+            &walked(&[("conductor-a", 0), ("conductor-b", 0)]),
+            Some(0),
+            false,
+        );
+        assert_eq!(new.verdict, StoreVerdict::NotWiped);
+        assert!(new.unwalked.is_empty());
+    }
+
+    /// A store that has records is not the wiped shape, whatever is reachable:
+    /// a conductor that is down at boot must not stop anyone registering.
+    #[test]
+    fn a_store_with_records_is_not_wiped_even_with_conductors_unwalked() {
+        let state = store_verdict(&pool(), &walked(&[]), Some(3), false);
+        assert_eq!(state.verdict, StoreVerdict::NotWiped);
+        assert_eq!(state.unwalked, pool(), "still reported as unwalked");
+    }
+
+    /// A log that could not be read is not a log that is empty.
+    #[test]
+    fn an_unreadable_log_is_unknown() {
+        let state = store_verdict(
+            &pool(),
+            &walked(&[("conductor-a", 0), ("conductor-b", 0)]),
+            None,
+            false,
+        );
+        assert_eq!(state.verdict, StoreVerdict::Unknown);
+    }
+
+    /// Only a completed operator recovery clears Wiped.
+    #[test]
+    fn a_completed_recovery_clears_wiped() {
+        let before = store_verdict(&pool(), &walked(&[("conductor-a", 12)]), Some(0), false);
+        assert_eq!(before.verdict, StoreVerdict::Wiped);
+        let after = store_verdict(
+            &pool(),
+            &walked(&[("conductor-a", 12), ("conductor-b", 0)]),
+            Some(0),
+            true,
+        );
+        assert_eq!(after.verdict, StoreVerdict::NotWiped);
+    }
+
+    /// A conductor added to the pool later is unwalked until it answers, and
+    /// the registry's verdict is over the pool as it is NOW.
+    #[tokio::test]
+    async fn a_conductor_that_joins_the_pool_later_reopens_the_question() {
+        let registry = ConductorRegistry::new(None).await;
+        registry.track_store_loss(Some(0));
+        let conductor = |id: &str| ConductorInfo {
+            conductor_id: id.to_string(),
+            conductor_url: format!("ws://{id}:8888"),
+            admin_url: format!("ws://{id}:4444"),
+            capacity_used: 0,
+            capacity_max: 10,
+        };
+        registry.register_conductor(conductor("conductor-a"));
+        registry.mark_walked("conductor-a", 0);
+        assert_eq!(registry.store_state().verdict, StoreVerdict::NotWiped);
+
+        registry.register_conductor(conductor("conductor-b"));
+        let state = registry.store_state();
+        assert_eq!(state.verdict, StoreVerdict::Unknown);
+        assert_eq!(state.unwalked, vec!["conductor-b".to_string()]);
+    }
+
+    /// A doorway that persists nothing (no Mongo) tracks nothing and is never
+    /// "wiped".
+    #[tokio::test]
+    async fn a_doorway_that_persists_nothing_is_never_wiped() {
+        let registry = ConductorRegistry::new(None).await;
+        registry.mark_walked("conductor-a", 40);
+        assert_eq!(registry.store_state().verdict, StoreVerdict::NotWiped);
+        assert!(!registry.recovery_required());
     }
 }

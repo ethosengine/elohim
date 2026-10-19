@@ -8,6 +8,7 @@ pub mod agent_key;
 pub mod chaperone;
 pub mod grant_memory;
 pub mod pool_map;
+pub mod provision_intent;
 pub mod provisioner;
 pub mod registry;
 pub mod router;
@@ -24,10 +25,15 @@ pub use pool_map::{
     max_agents_per_conductor_from_env, ConductorPoolMap, ConductorPoolStatus,
     DEFAULT_MAX_AGENTS_PER_CONDUCTOR, MAX_AGENTS_PER_CONDUCTOR_ENV,
 };
-pub use provisioner::{AgentProvisioner, ProvisionedAgent};
-pub use registry::{ConductorEntry, ConductorInfo, ConductorRegistry};
+pub use provision_intent::{
+    IntentState, IntentStore, MemoryIntentStore, MongoIntentStore, ProvisionIntent, StuckReason,
+};
+pub use provisioner::{AgentProvisioner, Existence, ProvisionError, ProvisionedAgent};
+pub use registry::{
+    store_verdict, ConductorEntry, ConductorInfo, ConductorRegistry, StoreState, StoreVerdict,
+};
 pub use router::ConductorRouter;
-pub use typed_admin::TypedAdminClient;
+pub use typed_admin::{AdminFault, FaultClass, TypedAdminClient};
 pub use typed_app::TypedAppClient;
 
 use std::net::SocketAddr;
@@ -54,6 +60,11 @@ const CONDUCTOR_DNS_TIMEOUT_MS: u64 = 5_000;
 /// tokio's BLOCKING pool (not a core worker) and is `.await`-cancellable; handing
 /// the resulting `SocketAddr` to the connect makes the dep's `to_socket_addrs()`
 /// a no-op (the std impl for `SocketAddr` yields the address without a syscall).
+/// The bound [`resolve_host_port`] puts on one conductor DNS resolve.
+pub(crate) fn dns_resolve_timeout() -> Duration {
+    Duration::from_millis(CONDUCTOR_DNS_TIMEOUT_MS)
+}
+
 pub(crate) async fn resolve_host_port(addr: &str) -> Result<SocketAddr, String> {
     // Tolerate a ws://|wss:// prefix so every caller is safe whether it passes a
     // full URL or a bare host:port.

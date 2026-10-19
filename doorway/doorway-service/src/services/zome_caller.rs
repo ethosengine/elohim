@@ -6,10 +6,17 @@
 //! - Identity management (create_human via auth routes)
 //!
 //! ## Auth & Signing Flow
-//! 1. Connect to admin interface, list apps to find cell_id
-//! 2. Authorize signing credentials for the cell
-//! 3. Issue app auth token, connect AppWebsocket with signer
-//! 4. All zome calls are automatically signed by the client
+//! 1. Connect to admin interface, list apps to find each role's cell_id
+//! 2. Issue app auth token, connect AppWebsocket with the cached signer
+//! 3. On a call, make sure the ONE role being called has signing credentials
+//!    (reuse, or mint once) — see [`RoleCredentials::ensure`]
+//! 4. The zome call is signed by the client
+//!
+//! Connecting authors nothing. A credential is a `CapGrant` on the conductor's
+//! chain, and minting one runs zome init plus two write transactions that the
+//! conductor does not cancel when we stop waiting. Authorizing every role cell
+//! at connect made a call on one cell pay for five and fail if any one of them
+//! was slow (hosted registration's `create_human` on `imagodei`, 2026-10-03).
 //!
 //! ## Conductor failover (single-peer SPOF removal)
 //!
@@ -67,16 +74,21 @@
 //! first answering what a second author does to that entry's validation.
 
 use holochain_client::{
-    AdminWebsocket, AppWebsocket, AuthorizeSigningCredentialsPayload, ConductorApiError,
-    ZomeCallTarget,
+    AdminWebsocket, AppWebsocket, AuthorizeSigningCredentialsPayload, CellId, ClientAgentSigner,
+    ConductorApiError, SigningCredentials, ZomeCallTarget,
 };
 use holochain_types::prelude::ExternIO;
 
+use crate::conductor::typed_admin::{classify_request_error, FaultClass};
 use crate::services::signing_credentials::{
-    cache as credential_cache, endpoint_key, looks_like_a_rejected_cap_grant, CredentialDecision,
+    cache as credential_cache, endpoint_key, looks_like_a_rejected_cap_grant, mint_cooldown,
+    CredentialDecision, MintError, SigningCredentialCache,
 };
 use serde::{de::DeserializeOwned, Serialize};
+use std::collections::{HashMap, HashSet};
+use std::future::Future;
 use std::sync::atomic::{AtomicUsize, Ordering};
+use std::sync::Arc;
 use std::time::Duration;
 use tokio::sync::{Mutex, RwLock};
 use tracing::{debug, info, warn};
@@ -288,8 +300,8 @@ pub struct ZomeCaller {
     /// pre-failover implementation.
     fallbacks: Vec<ConductorEndpoint>,
     installed_app_id: String,
-    /// The connected AppWebsocket for [`Self::primary`] (lazily initialized)
-    app_ws: RwLock<Option<AppWebsocket>>,
+    /// The live connection to [`Self::primary`] (lazily initialized)
+    app_ws: RwLock<Option<Arc<Connection>>>,
     /// Lock to prevent concurrent connection attempts
     connecting: Mutex<()>,
     /// Lazily-established fallback connection, tagged with WHICH fallback it is.
@@ -298,7 +310,7 @@ pub struct ZomeCaller {
     /// re-issue `authorize_signing_credentials` — a conductor-side cap-grant
     /// write — on every federation poll for the whole duration of a primary
     /// outage, converting one sick peer into load on a healthy one.
-    fallback_ws: RwLock<Option<(usize, AppWebsocket)>>,
+    fallback_ws: RwLock<Option<(usize, Arc<Connection>)>>,
     /// Lock to prevent concurrent fallback connection attempts
     fallback_connecting: Mutex<()>,
     /// Which fallback to try first (round-robins away from a failing one).
@@ -387,10 +399,12 @@ impl ZomeCaller {
 
         let deadline = zome_call_timeout();
 
-        // Overall reconnect budget. The slow path runs up to 5 sequential
-        // conductor steps, each bounded by `deadline` — so the worst case is
-        // ~5×deadline (≈50s at the 10s default) while the `connecting` mutex is
-        // held. Under a full cluster NXDOMAIN every step times out in sequence,
+        // Overall reconnect budget, sized for 5 sequential conductor steps each
+        // bounded by `deadline` (~5×deadline, ≈50s at the 10s default) while
+        // the `connecting` mutex is held. The slow path now runs four (admin
+        // connect, list_apps, token, app connect) — the credential mint moved
+        // to the call path — and the budget is deliberately left unchanged.
+        // Under a full cluster NXDOMAIN every step times out in sequence,
         // and concurrent callers serialize behind this mutex for the whole
         // stretch. Bounding the entire body (additively to the per-step
         // timeouts) guarantees the mutex releases promptly so queued callers get
@@ -422,16 +436,17 @@ impl ZomeCaller {
         };
 
         let mut ws = self.app_ws.write().await;
-        *ws = Some(connected);
+        *ws = Some(Arc::new(connected));
         Ok(())
     }
 
     /// Ensure the cached fallback connection targets `idx`, connecting if not.
     ///
     /// Each fallback gets its own [`connect_endpoint`] run — i.e. its own
-    /// `ClientAgentSigner` and its own `authorize_signing_credentials` against
-    /// its own admin interface. A credential minted on the primary is worthless
-    /// here, and nothing in this path reuses one.
+    /// `ClientAgentSigner`, and (on the first call to a role) its own
+    /// `authorize_signing_credentials` against its own admin interface. A
+    /// credential minted on the primary is worthless here, and nothing in this
+    /// path reuses one.
     async fn ensure_fallback_connected(
         &self,
         idx: usize,
@@ -486,7 +501,7 @@ impl ZomeCaller {
         };
 
         let mut ws = self.fallback_ws.write().await;
-        *ws = Some((idx, connected));
+        *ws = Some((idx, Arc::new(connected)));
         Ok(())
     }
 
@@ -518,9 +533,11 @@ impl ZomeCaller {
         fn_name: &str,
         payload: Vec<u8>,
     ) -> Result<Vec<u8>, CallError> {
-        // Every connect/authorize/token failure is an availability failure: the
-        // conductor could not be brought to a usable state. Another peer may
-        // still answer, so this class is what triggers failover.
+        // Every connect/token failure is an availability failure: the conductor
+        // could not be brought to a usable state. Another peer may still
+        // answer, so this class is what triggers failover. (A failed credential
+        // mint for the role being called is the same class — see
+        // `call_on_connection`.)
         self.ensure_connected()
             .await
             .map_err(CallError::unavailable)?;
@@ -539,13 +556,26 @@ impl ZomeCaller {
         // The zome call is hard-bounded: a conductor that accepts the connection
         // but never answers (the `record_heartbeat` hang seen in the live freeze)
         // must surface as a timeout Err, not park the calling task forever.
-        let result = {
-            let ws = self.app_ws.read().await;
-            let app_ws = ws
-                .as_ref()
-                .ok_or_else(|| CallError::unavailable("Not connected"))?;
-            call_on_ws(app_ws, role_name, zome_name, fn_name, payload, deadline).await
-        };
+        //
+        // The read guard is held only long enough to CLONE the connection's
+        // `Arc`. A credential mint and the call both run without it: tokio's
+        // RwLock is write-preferring, so a writer queued behind a read guard
+        // held for the length of a mint would stall every later reader too.
+        let connection = self
+            .app_ws
+            .read()
+            .await
+            .clone()
+            .ok_or_else(|| CallError::unavailable("Not connected"))?;
+        let result = call_on_connection(
+            &connection,
+            role_name,
+            zome_name,
+            fn_name,
+            payload,
+            deadline,
+        )
+        .await;
 
         match result {
             Ok(bytes) => Ok(bytes),
@@ -561,14 +591,12 @@ impl ZomeCaller {
                         fn_name = %fn_name,
                         "Zome call unavailable, clearing connection: {}", e.message
                     );
-                    let mut ws = self.app_ws.write().await;
-                    *ws = None;
+                    self.clear_primary_if_current(&connection).await;
                 } else if self.heal_if_cap_grant_rejected(&self.primary, role_name, &e.message) {
                     // The one sanctioned clear on an application error — see
                     // `heal_if_cap_grant_rejected`. Bounded to once per
                     // (conductor, role) per process, so it cannot churn.
-                    let mut ws = self.app_ws.write().await;
-                    *ws = None;
+                    self.clear_primary_if_current(&connection).await;
                 } else {
                     warn!(
                         role_name = %role_name,
@@ -683,24 +711,26 @@ impl ZomeCaller {
                 continue;
             }
 
-            let result = {
-                let ws = self.fallback_ws.read().await;
-                match ws.as_ref() {
-                    Some((i, app_ws)) if *i == idx => {
-                        call_on_ws(
-                            app_ws,
-                            role_name,
-                            zome_name,
-                            fn_name,
-                            payload.clone(),
-                            deadline,
-                        )
-                        .await
-                    }
-                    // A concurrent caller rotated the slot out from under us.
-                    // Treat as unavailable and try the next endpoint.
-                    _ => Err(CallError::unavailable("fallback connection was replaced")),
+            // As on the primary: clone the `Arc` under the guard, call without it.
+            let fallback = match self.fallback_ws.read().await.as_ref() {
+                Some((i, connection)) if *i == idx => Some(Arc::clone(connection)),
+                _ => None,
+            };
+            let result = match fallback {
+                Some(connection) => {
+                    call_on_connection(
+                        &connection,
+                        role_name,
+                        zome_name,
+                        fn_name,
+                        payload.clone(),
+                        deadline,
+                    )
+                    .await
                 }
+                // A concurrent caller rotated the slot out from under us.
+                // Treat as unavailable and try the next endpoint.
+                None => Err(CallError::unavailable("fallback connection was replaced")),
             };
 
             match result {
@@ -745,6 +775,19 @@ impl ZomeCaller {
         }
 
         Err(last.unwrap_or_else(|| CallError::unavailable("no fallback conductors configured")))
+    }
+
+    /// Drop the primary connection — but only if it is still the one this call
+    /// used. With the read guard no longer held across the call, another caller
+    /// may already have replaced it with a healthy connection.
+    async fn clear_primary_if_current(&self, used: &Arc<Connection>) {
+        let mut ws = self.app_ws.write().await;
+        if ws
+            .as_ref()
+            .is_some_and(|current| Arc::ptr_eq(current, used))
+        {
+            *ws = None;
+        }
     }
 
     fn advance_fallback(&self, idx: usize, count: usize) {
@@ -866,31 +909,343 @@ impl ZomeCaller {
 
 /// Overall budget for one endpoint's connect handshake.
 ///
-/// The slow path runs up to 5 sequential conductor steps, each bounded by
-/// `deadline` — so the worst case is ~5×deadline (≈50s at the 10s default)
-/// while a `connecting` mutex is held. Bounding the entire body (additively to
-/// the per-step timeouts) guarantees the mutex releases promptly so queued
-/// callers get a fast `Err` instead of parking for the full stretch.
+/// Sized for five sequential conductor steps, each bounded by `deadline`
+/// (≈50s at the 10s default) while a `connecting` mutex is held. The connect
+/// now runs four — the credential mint moved to the call path — and the budget
+/// is deliberately unchanged. Bounding the entire body (additively to the
+/// per-step timeouts) guarantees the mutex releases promptly so queued callers
+/// get a fast `Err` instead of parking for the full stretch.
 fn reconnect_budget(deadline: Duration) -> Duration {
     deadline * 5 + Duration::from_secs(1)
 }
 
-/// Connect to ONE conductor and return a signing-capable AppWebsocket.
+/// The signing credentials of ONE connection, minted per role on first use.
+///
+/// Holds what a mint needs and nothing a mint has done: which cell each role
+/// resolves to, the process-cache signer for this (conductor, app), and which
+/// roles this connection has already settled. No socket lives here, so the
+/// "one call, one grant" behaviour is testable without a conductor.
+struct RoleCredentials {
+    installed_app_id: String,
+    /// The conductor admin address, for log lines.
+    admin_addr: String,
+    /// The process-cache key for this (conductor, app).
+    ep_key: String,
+    /// The process-cache signer for `ep_key` — the SAME `Arc` the
+    /// `AppWebsocket` signs with, so a credential added here after the socket
+    /// connected is seen by the very next call (`AppWebsocket::call_zome` reads
+    /// the signer per call).
+    signer: Arc<ClientAgentSigner>,
+    /// Role name → that role's provisioned cell on this conductor.
+    cells: HashMap<String, CellId>,
+    /// Roles this connection has already settled, so a steady-state call takes
+    /// no lease and logs nothing. Dies with the connection — which is what the
+    /// bounded heal relies on: it drops the socket, the next connection starts
+    /// with this set empty, and `ensure` consumes the heal mark.
+    ready: std::sync::Mutex<HashSet<String>>,
+}
+
+impl RoleCredentials {
+    fn new(
+        installed_app_id: &str,
+        admin_addr: &str,
+        signer: Arc<ClientAgentSigner>,
+        cells: HashMap<String, CellId>,
+    ) -> Self {
+        Self {
+            installed_app_id: installed_app_id.to_string(),
+            admin_addr: admin_addr.to_string(),
+            ep_key: endpoint_key(admin_addr, installed_app_id),
+            signer,
+            cells,
+            ready: std::sync::Mutex::new(HashSet::new()),
+        }
+    }
+
+    fn is_ready(&self, role_name: &str) -> bool {
+        self.ready
+            .lock()
+            .unwrap_or_else(|e| e.into_inner())
+            .contains(role_name)
+    }
+
+    /// Make sure the ONE role a call targets can be signed for — reuse the
+    /// process-cached credential, or mint it once.
+    ///
+    /// MINT ONLY FOR THE CELL BEING CALLED. This is what a connect used to do
+    /// for every role at once. `mint` is the conductor round trip; it is
+    /// invoked at most once and only when nothing is cached for this role.
+    ///
+    /// A role this app does not have is not an error HERE: the call goes ahead
+    /// and the client answers `CellNotFound`, exactly as it did when the
+    /// connect minted every role.
+    async fn ensure<F, Fut>(
+        &self,
+        cache: &SigningCredentialCache,
+        role_name: &str,
+        deadline: Duration,
+        mint: F,
+    ) -> Result<(), String>
+    where
+        F: FnOnce(CellId) -> Fut,
+        Fut: Future<Output = Result<SigningCredentials, MintError>>,
+    {
+        let Some(cell_id) = self.cells.get(role_name) else {
+            return Ok(());
+        };
+        if self.is_ready(role_name) {
+            return Ok(());
+        }
+
+        let ensured = cache
+            .ensure(
+                &self.signer,
+                &self.ep_key,
+                role_name,
+                cell_id,
+                worst_case_mint(deadline),
+                mint_cooldown(),
+                || mint(cell_id.clone()),
+            )
+            .await?;
+
+        self.ready
+            .lock()
+            .unwrap_or_else(|e| e.into_inner())
+            .insert(role_name.to_string());
+
+        // One line per (connection, role), with the same fields the per-connect
+        // line carried: `minted` is the number of CapGrants this authored (0 or
+        // 1), `reused` the number it avoided.
+        let minted = u32::from(ensured.decision == CredentialDecision::Mint);
+        info!(
+            app_id = %self.installed_app_id,
+            conductor = %self.admin_addr,
+            role = %role_name,
+            cells = 1u32,
+            minted,
+            reused = 1 - minted,
+            "Signing credentials ready"
+        );
+        Ok(())
+    }
+}
+
+/// The longest one credential mint can take: an authorize over the kept admin
+/// socket, then — if that socket was dead — a redial (one DNS resolve and one
+/// connect) and a second authorize, each bounded by `deadline`.
+///
+/// This is what a lease WAITER is given. It used to be given `deadline` alone,
+/// which is shorter than the mint it was waiting on, so waiters fell through
+/// the lease and minted in parallel with the holder. No deadline is changed:
+/// the same per-step bound, added up.
+fn worst_case_mint(deadline: Duration) -> Duration {
+    deadline * 3 + crate::conductor::dns_resolve_timeout()
+}
+
+/// The longest a fresh caller can take to make `calls` zome calls in a row: one
+/// connect handshake, one credential mint, and the calls — each at the
+/// per-call deadline. The bound a waiter on such a sequence is given.
+pub(crate) fn worst_case_first_calls(calls: u32) -> Duration {
+    let deadline = zome_call_timeout();
+    reconnect_budget(deadline) + worst_case_mint(deadline) + deadline * calls
+}
+
+/// One established connection to ONE conductor.
+struct Connection {
+    app_ws: AppWebsocket,
+    /// The admin socket the connect ran over, kept so the first call to a role
+    /// can mint that role's credential without a second handshake.
+    ///
+    /// On a long-lived caller it can be dead by the time a NEW role is first
+    /// called. If the mint reports the request was never written (the socket
+    /// was already torn down), [`mint_role_credential`] dials a fresh admin
+    /// socket, leaves it here, and mints over that — the call does not fail.
+    admin_ws: std::sync::Mutex<AdminWebsocket>,
+    /// Where to dial a replacement admin socket.
+    admin_addr: String,
+    roles: RoleCredentials,
+}
+
+impl Connection {
+    fn admin(&self) -> AdminWebsocket {
+        self.admin_ws
+            .lock()
+            .unwrap_or_else(|e| e.into_inner())
+            .clone()
+    }
+}
+
+/// Why minting one role's credential failed.
+#[derive(Debug)]
+enum MintFailure {
+    /// The admin client returned an error — typed, so it can be classed.
+    Conductor(ConductorApiError),
+    /// The authorize outran the per-call deadline.
+    TimedOut,
+    /// A replacement admin socket could not be dialled.
+    Redial(String),
+}
+
+/// Did this mint fail WITHOUT its request ever being written?
+///
+/// The typed test hosted provisioning uses ([`FaultClass::NotSent`]):
+/// `holochain_websocket` answers `Close("No connection")` when the socket was
+/// already torn down before the write — exactly what a kept-but-idle admin
+/// socket looks like once its peer has closed it.
+fn mint_never_written(failure: &MintFailure) -> bool {
+    matches!(
+        failure,
+        MintFailure::Conductor(error) if classify_request_error(error) == FaultClass::NotSent
+    )
+}
+
+/// Run `first`; if it failed without its request ever being written, run
+/// `redial_and_retry` ONCE instead of surfacing the failure.
+///
+/// Nothing reached the conductor in that case, so the retry cannot author a
+/// second `CapGrant`. Any other failure — a request that was written and then
+/// lost, a timeout, a refusal — is returned unchanged and never retried: its
+/// grant may exist.
+async fn retry_if_never_written<T, E, First, Retry, RetryFut>(
+    first: First,
+    never_written: impl Fn(&E) -> bool,
+    redial_and_retry: Retry,
+) -> Result<T, E>
+where
+    First: Future<Output = Result<T, E>>,
+    Retry: FnOnce() -> RetryFut,
+    RetryFut: Future<Output = Result<T, E>>,
+{
+    match first.await {
+        Err(failure) if never_written(&failure) => redial_and_retry().await,
+        outcome => outcome,
+    }
+}
+
+/// One `authorize_signing_credentials`, bounded by `deadline`.
+async fn authorize_once(
+    admin: &AdminWebsocket,
+    cell_id: CellId,
+    deadline: Duration,
+) -> Result<SigningCredentials, MintFailure> {
+    match tokio::time::timeout(
+        deadline,
+        admin.authorize_signing_credentials(AuthorizeSigningCredentialsPayload {
+            cell_id,
+            functions: None,
+        }),
+    )
+    .await
+    {
+        Err(_elapsed) => Err(MintFailure::TimedOut),
+        Ok(Err(error)) => Err(MintFailure::Conductor(error)),
+        Ok(Ok(credentials)) => Ok(credentials),
+    }
+}
+
+/// Mint ONE role's signing credential over the connection's admin socket,
+/// replacing that socket first if it turns out to be dead.
+///
+/// Each conductor step is bounded by `deadline`, the same per-call deadline as
+/// everywhere else in this module; none is extended.
+///
+/// The error says whether a grant may have been authored anyway
+/// ([`MintError::outcome_unknown`]): a timeout, or a request written to a
+/// socket that then dropped. The conductor does not cancel either.
+async fn mint_role_credential(
+    connection: &Connection,
+    role_name: &str,
+    cell_id: CellId,
+    deadline: Duration,
+) -> Result<SigningCredentials, MintError> {
+    let kept = connection.admin();
+    let minted = retry_if_never_written(
+        authorize_once(&kept, cell_id.clone(), deadline),
+        mint_never_written,
+        || async {
+            warn!(
+                conductor = %connection.admin_addr,
+                role = %role_name,
+                "Kept admin socket is dead — redialling it to mint this role's credential"
+            );
+            let fresh = redial_admin(&connection.admin_addr, deadline)
+                .await
+                .map_err(MintFailure::Redial)?;
+            *connection
+                .admin_ws
+                .lock()
+                .unwrap_or_else(|e| e.into_inner()) = fresh.clone();
+            authorize_once(&fresh, cell_id.clone(), deadline).await
+        },
+    )
+    .await;
+
+    match minted {
+        Ok(credentials) => {
+            info!(role = %role_name, "Authorized signing for cell (one CapGrant authored)");
+            Ok(credentials)
+        }
+        Err(failure) => Err(mint_error(role_name, deadline, failure)),
+    }
+}
+
+/// Render a mint failure, and say whether a grant may exist regardless.
+fn mint_error(role_name: &str, deadline: Duration, failure: MintFailure) -> MintError {
+    match failure {
+        MintFailure::TimedOut => MintError::abandoned(format!(
+            "authorize_signing_credentials timed out after {}ms for role '{role_name}'",
+            deadline.as_millis()
+        )),
+        MintFailure::Conductor(e) => {
+            let message =
+                format!("authorize_signing_credentials failed for role '{role_name}': {e}");
+            match classify_request_error(&e) {
+                FaultClass::SentOutcomeUnknown => MintError::abandoned(message),
+                FaultClass::NotSent | FaultClass::Refused => MintError::refused(message),
+            }
+        }
+        // The replacement socket could not be dialled: nothing was sent on it.
+        MintFailure::Redial(e) => MintError::refused(e),
+    }
+}
+
+/// Dial a fresh admin socket for an existing connection.
+async fn redial_admin(admin_addr: &str, deadline: Duration) -> Result<AdminWebsocket, String> {
+    let admin_socket = crate::conductor::resolve_host_port(admin_addr).await?;
+    tokio::time::timeout(
+        deadline,
+        AdminWebsocket::connect(admin_socket, Some(String::from("doorway-zome-caller"))),
+    )
+    .await
+    .map_err(|_| {
+        format!(
+            "Admin connect timed out after {}ms ({admin_addr})",
+            deadline.as_millis()
+        )
+    })?
+    .map_err(|e| format!("Admin connect failed: {e}"))
+}
+
+/// Connect to ONE conductor and return a signing-capable connection.
 ///
 /// THE PER-CONDUCTOR CREDENTIAL CRUX. Signing credentials are scoped to a
 /// conductor's cells and agent: `authorize_signing_credentials` issues a cap
 /// grant on THAT conductor, and only THAT conductor will verify the resulting
-/// signature. So this routine builds a FRESH [`ClientAgentSigner`] and
-/// authorizes against `endpoint.admin_addr` every time it runs — a fallback
-/// conductor never borrows the primary's credentials, because there is nothing
-/// to borrow: the signer is a local, per-connection value that dies with the
-/// socket. Both the primary and every fallback go through this one function so
-/// the invariant cannot drift apart between the two paths.
+/// signature. So the signer comes from the process cache under THIS endpoint's
+/// (admin address, app) key, and every mint runs against `endpoint.admin_addr`
+/// — a fallback conductor never borrows the primary's credentials. Both the
+/// primary and every fallback go through this one function so the invariant
+/// cannot drift apart between the two paths.
+///
+/// AUTHORS NOTHING. The connect resolves which cell each role maps to and
+/// stops; a role's credential is minted by [`call_on_connection`] the first
+/// time that role is called.
 async fn connect_endpoint(
     installed_app_id: &str,
     endpoint: &ConductorEndpoint,
     deadline: Duration,
-) -> Result<AppWebsocket, String> {
+) -> Result<Connection, String> {
     // Step 1: Connect to admin interface.
     // Hard-bounded: an unresolvable conductor host (cluster NXDOMAIN) must
     // resolve to an Err within `deadline`, never hang the caller forever.
@@ -917,7 +1272,7 @@ async fn connect_endpoint(
 
     info!("ZomeCaller connected to admin at {}", endpoint.admin_addr);
 
-    // Step 2: Find cell_id from app info
+    // Step 2: Find each role's cell_id from app info
     let apps = tokio::time::timeout(deadline, admin_ws.list_apps(None))
         .await
         .map_err(|_| format!("list_apps timed out after {}ms", deadline.as_millis()))?
@@ -928,87 +1283,32 @@ async fn connect_endpoint(
         .find(|a| a.installed_app_id == installed_app_id)
         .ok_or_else(|| format!("App '{installed_app_id}' not found"))?;
 
-    // Step 3: Signing credentials for ALL provisioned cells OF THIS CONDUCTOR.
-    //
-    // REUSE FIRST, MINT ONLY WHAT IS MISSING. `authorize_signing_credentials`
-    // is a chain write: it commits a `CapGrant` that is never revoked and that
-    // the conductor re-reads on every subsequent zome call. Authorizing every
-    // cell on every connect made reconnect churn an unbounded minter. The
-    // process cache holds one signer per (conductor, app) — the same
-    // `ClientAgentSigner` a previous connect populated — so a reconnect
-    // authorizes NOTHING, and a genuinely new cell authorizes exactly once.
-    let ep_key = endpoint_key(&endpoint.admin_addr, installed_app_id);
-    let signer = credential_cache().signer_for(&ep_key);
-    let mut cell_count = 0u32;
-    let mut minted = 0u32;
-    let mut reused = 0u32;
+    // Which cell each role resolves to — a READ. No credential is authorized
+    // here: `authorize_signing_credentials` is a chain write (a `CapGrant` that
+    // is never revoked, behind a zome init), and a call on one role must not
+    // pay for the other four.
+    let cells = provisioned_role_cells(
+        app_info
+            .cell_info
+            .iter()
+            .map(|(role_name, cells)| (role_name.as_str(), cells.as_slice())),
+    );
 
-    for (role_name, cells) in &app_info.cell_info {
-        for cell in cells {
-            if let holochain_client::CellInfo::Provisioned(p) = cell {
-                // SERIALIZE THIS CELL'S MINT. `decide` … authorize …
-                // `add_credentials` straddles a conductor round trip, and two
-                // connects to one endpoint genuinely overlap (a primary connect
-                // racing the half-open re-probe, startup fan-out, or two
-                // provisions of one hosted app). The lease makes the trio atomic
-                // per cell; the second connect waits, re-decides, and sees
-                // `Reuse`. Distinct cells and conductors never contend. `None`
-                // = the holder outlived the deadline, so we behave exactly as
-                // before the lease existed.
-                let _cell_lease = credential_cache().lease(&ep_key, role_name, deadline).await;
-
-                match credential_cache().decide(&signer, &ep_key, role_name, &p.cell_id) {
-                    CredentialDecision::Reuse => {
-                        reused += 1;
-                        debug!(role = %role_name, "Reusing cached signing credentials (no CapGrant authored)");
-                    }
-                    CredentialDecision::Mint => {
-                        let credentials = tokio::time::timeout(
-                            deadline,
-                            admin_ws.authorize_signing_credentials(
-                                AuthorizeSigningCredentialsPayload {
-                                    cell_id: p.cell_id.clone(),
-                                    functions: None,
-                                },
-                            ),
-                        )
-                        .await
-                        .map_err(|_| {
-                            format!(
-                                "authorize_signing_credentials timed out after {}ms for role '{role_name}'",
-                                deadline.as_millis()
-                            )
-                        })?
-                        .map_err(|e| {
-                            format!(
-                                "authorize_signing_credentials failed for role '{role_name}': {e}"
-                            )
-                        })?;
-
-                        signer.add_credentials(p.cell_id.clone(), credentials);
-                        minted += 1;
-                        info!(role = %role_name, "Authorized signing for cell (one CapGrant authored)");
-                    }
-                }
-                cell_count += 1;
-            }
-        }
-    }
-
-    if cell_count == 0 {
+    if cells.is_empty() {
         return Err("No provisioned cells found".to_string());
     }
 
-    info!(
-        app_id = %installed_app_id,
-        conductor = %endpoint.admin_addr,
-        cells = cell_count,
-        minted,
-        reused,
-        "Signing credentials ready"
+    // The process cache holds one signer per (conductor, app) — the same
+    // `ClientAgentSigner` a previous connection populated — so a reconnect
+    // finds every role it already minted and authorizes NOTHING.
+    let roles = RoleCredentials::new(
+        installed_app_id,
+        &endpoint.admin_addr,
+        credential_cache().signer_for(&endpoint_key(&endpoint.admin_addr, installed_app_id)),
+        cells,
     );
 
-    // Step 4: Issue app auth token
+    // Step 3: Issue app auth token
     let token = tokio::time::timeout(
         deadline,
         admin_ws.issue_app_auth_token(holochain_client::IssueAppAuthenticationTokenPayload {
@@ -1026,15 +1326,16 @@ async fn connect_endpoint(
     })?
     .map_err(|e| format!("issue_app_auth_token failed: {e}"))?;
 
-    // Step 5: Connect AppWebsocket with the cached signer.
+    // Step 4: Connect AppWebsocket with the cached signer.
     //
     // `ClientAgentSigner` is internally `Arc<RwLock<HashMap<CellId, _>>>`, so
     // handing the SAME signer to a second socket for the same conductor is
-    // safe and is precisely what makes a reconnect free.
+    // safe and is precisely what makes a reconnect free — and what lets a
+    // credential minted AFTER this connect be used by this socket.
     let app_socket = crate::conductor::resolve_host_port(&endpoint.app_addr).await?;
     let app_ws = tokio::time::timeout(
         deadline,
-        AppWebsocket::connect(app_socket, token.token, signer, None),
+        AppWebsocket::connect(app_socket, token.token, roles.signer.clone(), None),
     )
     .await
     .map_err(|_| {
@@ -1047,11 +1348,72 @@ async fn connect_endpoint(
     .map_err(|e| format!("App WebSocket connect failed: {e}"))?;
 
     info!(
-        "ZomeCaller connected to app interface at {} with signing",
+        app_id = %installed_app_id,
+        roles = roles.cells.len(),
+        "ZomeCaller connected to app interface at {} with signing (credentials are \
+         minted per role on first call)",
         endpoint.app_addr
     );
 
-    Ok(app_ws)
+    Ok(Connection {
+        app_ws,
+        admin_ws: std::sync::Mutex::new(admin_ws),
+        admin_addr: endpoint.admin_addr.clone(),
+        roles,
+    })
+}
+
+/// Role name → provisioned cell, from an app's cell listing.
+///
+/// Only `Provisioned` cells are callable by role name; clone and stem cells are
+/// skipped, as they always were.
+fn provisioned_role_cells<'a>(
+    cell_info: impl Iterator<Item = (&'a str, &'a [holochain_client::CellInfo])>,
+) -> HashMap<String, CellId> {
+    let mut out = HashMap::new();
+    for (role_name, cells) in cell_info {
+        for cell in cells {
+            if let holochain_client::CellInfo::Provisioned(p) = cell {
+                out.insert(role_name.to_string(), p.cell_id.clone());
+                break;
+            }
+        }
+    }
+    out
+}
+
+/// One zome call over an established connection: settle the signing credential
+/// for the ONE role being called, then issue the call.
+///
+/// A mint that fails or outruns `deadline` is an availability failure, the
+/// same class it was when it ran inside the connect: the conductor could not
+/// be brought to a usable state for this call, another peer may still answer,
+/// and the caller drops the connection.
+async fn call_on_connection(
+    connection: &Connection,
+    role_name: &str,
+    zome_name: &str,
+    fn_name: &str,
+    payload: Vec<u8>,
+    deadline: Duration,
+) -> Result<Vec<u8>, CallError> {
+    connection
+        .roles
+        .ensure(credential_cache(), role_name, deadline, |cell_id| {
+            mint_role_credential(connection, role_name, cell_id, deadline)
+        })
+        .await
+        .map_err(CallError::unavailable)?;
+
+    call_on_ws(
+        &connection.app_ws,
+        role_name,
+        zome_name,
+        fn_name,
+        payload,
+        deadline,
+    )
+    .await
 }
 
 /// Issue one bounded zome call over an established socket, classifying the
@@ -1734,5 +2096,542 @@ mod tests {
             waiter_done.is_ok(),
             "the connecting mutex must release promptly so queued callers proceed"
         );
+    }
+
+    // ── mint only for the cell being called (2026-10-03) ───────────────────
+    //
+    // A hosted registration calls `create_human` on `imagodei` alone. The
+    // connect used to author a `CapGrant` — a zome init and two write
+    // transactions the conductor never cancels — on every one of the app's five
+    // role cells first, and abort on the first slow one. These drive the
+    // production `RoleCredentials::ensure` (and through it the production
+    // `SigningCredentialCache::ensure`) with a counting stub in place of
+    // `authorize_signing_credentials`.
+
+    use crate::services::signing_credentials::SigningCredentialCache as Cache;
+    use holochain_client::AgentSigner;
+    use std::sync::atomic::AtomicU32;
+    use tokio::sync::Notify;
+
+    const FIVE_ROLES: [&str; 5] = [
+        "lamad",
+        "imagodei",
+        "infrastructure",
+        "node_registry",
+        "mishpat",
+    ];
+
+    const NO_WAIT_EXPECTED: Duration = Duration::from_secs(30);
+
+    fn role_cell(role: &str) -> holochain_client::CellId {
+        let index = FIVE_ROLES
+            .iter()
+            .position(|r| *r == role)
+            .expect("a role of the five-role app");
+        test_cell(40 + index as u8)
+    }
+
+    /// One connection's view of a five-role app, signing through `cache`'s
+    /// signer for that (conductor, app) — exactly how `connect_endpoint` builds
+    /// it. Two calls with the same `admin_addr` model two connections (a
+    /// reconnect, or two temporary callers) to one hosted app.
+    fn five_role_connection(cache: &Cache, admin_addr: &str) -> RoleCredentials {
+        let app = "elohim-conductor-0-ab12cd";
+        RoleCredentials::new(
+            app,
+            admin_addr,
+            cache.signer_for(&endpoint_key(admin_addr, app)),
+            FIVE_ROLES
+                .iter()
+                .map(|role| (role.to_string(), role_cell(role)))
+                .collect(),
+        )
+    }
+
+    fn fake_credentials(seed: u8) -> SigningCredentials {
+        use holochain_client::AgentPubKey;
+        use holochain_zome_types::prelude::CapSecret;
+        let cap_secret: CapSecret = [seed; 64]
+            .as_slice()
+            .try_into()
+            .expect("64-byte cap secret");
+        SigningCredentials {
+            signing_agent_key: AgentPubKey::from_raw_36(vec![seed; 36]),
+            keypair: ed25519_dalek::SigningKey::from_bytes(&[seed.max(1); 32]),
+            cap_secret,
+        }
+    }
+
+    /// Stands in for `authorize_signing_credentials`: every invocation is one
+    /// `CapGrant` authored on the conductor.
+    async fn counted_mint(grants: &AtomicU32) -> Result<SigningCredentials, MintError> {
+        grants.fetch_add(1, Ordering::SeqCst);
+        Ok(fake_credentials(7))
+    }
+
+    fn credentialed_roles(roles: &RoleCredentials) -> Vec<&'static str> {
+        FIVE_ROLES
+            .iter()
+            .copied()
+            .filter(|role| roles.signer.get_provenance(&role_cell(role)).is_some())
+            .collect()
+    }
+
+    /// THE CHANGE. A call to one role of a five-role app authors exactly ONE
+    /// grant — for that role's cell — and leaves the other four untouched.
+    #[tokio::test]
+    async fn a_call_to_one_role_of_a_five_role_app_authors_exactly_one_grant() {
+        let cache = Cache::new();
+        let connection = five_role_connection(&cache, "one-role-test:4444");
+        let grants = AtomicU32::new(0);
+
+        connection
+            .ensure(&cache, "imagodei", NO_WAIT_EXPECTED, |_cell| {
+                counted_mint(&grants)
+            })
+            .await
+            .expect("the mint succeeds");
+
+        assert_eq!(
+            grants.load(Ordering::SeqCst),
+            1,
+            "one call on one role must author ONE CapGrant, not one per role"
+        );
+        assert_eq!(
+            credentialed_roles(&connection),
+            vec!["imagodei"],
+            "only the role that was called may hold a credential"
+        );
+
+        // …and the second call on that role authors nothing.
+        connection
+            .ensure(&cache, "imagodei", NO_WAIT_EXPECTED, |_cell| {
+                counted_mint(&grants)
+            })
+            .await
+            .expect("reuse cannot fail");
+        assert_eq!(grants.load(Ordering::SeqCst), 1);
+    }
+
+    /// The mint is handed the cell of the role being called — not the first
+    /// role's, not every role's.
+    #[tokio::test]
+    async fn the_mint_is_asked_for_the_called_roles_own_cell() {
+        let cache = Cache::new();
+        let connection = five_role_connection(&cache, "own-cell-test:4444");
+        let asked: std::sync::Mutex<Vec<holochain_client::CellId>> =
+            std::sync::Mutex::new(Vec::new());
+
+        connection
+            .ensure(&cache, "mishpat", NO_WAIT_EXPECTED, |cell| {
+                asked.lock().unwrap().push(cell);
+                async { Ok(fake_credentials(3)) }
+            })
+            .await
+            .unwrap();
+
+        assert_eq!(*asked.lock().unwrap(), vec![role_cell("mishpat")]);
+    }
+
+    /// The other roles are not abandoned — each is minted on ITS first use,
+    /// exactly once, through the same path. And a later connection to the same
+    /// conductor+app (a reconnect, or the next temporary caller) reuses both.
+    #[tokio::test]
+    async fn a_later_call_to_another_role_authors_exactly_one_more() {
+        let cache = Cache::new();
+        let connection = five_role_connection(&cache, "second-role-test:4444");
+        let grants = AtomicU32::new(0);
+
+        connection
+            .ensure(&cache, "imagodei", NO_WAIT_EXPECTED, |_| {
+                counted_mint(&grants)
+            })
+            .await
+            .unwrap();
+        assert_eq!(grants.load(Ordering::SeqCst), 1);
+
+        connection
+            .ensure(&cache, "lamad", NO_WAIT_EXPECTED, |_| counted_mint(&grants))
+            .await
+            .unwrap();
+        assert_eq!(
+            grants.load(Ordering::SeqCst),
+            2,
+            "the second role's first call authors exactly one more grant"
+        );
+        let mut held = credentialed_roles(&connection);
+        held.sort_unstable();
+        assert_eq!(held, vec!["imagodei", "lamad"]);
+
+        // A NEW connection to the same conductor+app: the once-per-(conductor,
+        // app, role)-per-process ceiling still holds across connections.
+        let reconnected = five_role_connection(&cache, "second-role-test:4444");
+        for role in ["imagodei", "lamad"] {
+            reconnected
+                .ensure(&cache, role, NO_WAIT_EXPECTED, |_| counted_mint(&grants))
+                .await
+                .unwrap();
+        }
+        assert_eq!(
+            grants.load(Ordering::SeqCst),
+            2,
+            "a reconnect must author nothing for a role this process already minted"
+        );
+    }
+
+    /// THE RACE, at the call path. Two connections to one hosted app (two
+    /// temporary callers, or a primary call racing the half-open re-probe) make
+    /// their FIRST call to the same role at once. Exactly one grant is authored;
+    /// the second waits on the cell lease, re-decides, and reuses.
+    ///
+    /// Genuinely concurrent: the first mint PARKS inside the authorize window
+    /// until the test releases it, so both calls are provably in flight.
+    #[tokio::test]
+    async fn two_concurrent_first_calls_to_one_role_author_one_grant() {
+        let cache = Arc::new(Cache::new());
+        let first = Arc::new(five_role_connection(&cache, "race-test:4444"));
+        let second = Arc::new(five_role_connection(&cache, "race-test:4444"));
+        let grants = Arc::new(AtomicU32::new(0));
+        let entered = Arc::new(Notify::new());
+        let release = Arc::new(Notify::new());
+
+        let a = {
+            let (cache, connection, grants) =
+                (Arc::clone(&cache), Arc::clone(&first), Arc::clone(&grants));
+            let (entered, release) = (Arc::clone(&entered), Arc::clone(&release));
+            tokio::spawn(async move {
+                connection
+                    .ensure(&cache, "imagodei", NO_WAIT_EXPECTED, |_| async {
+                        grants.fetch_add(1, Ordering::SeqCst);
+                        entered.notify_one();
+                        release.notified().await;
+                        Ok(fake_credentials(1))
+                    })
+                    .await
+            })
+        };
+
+        // A is provably INSIDE the authorize window, holding the cell lease.
+        entered.notified().await;
+        assert_eq!(grants.load(Ordering::SeqCst), 1);
+
+        let b = {
+            let (cache, connection, grants) =
+                (Arc::clone(&cache), Arc::clone(&second), Arc::clone(&grants));
+            tokio::spawn(async move {
+                connection
+                    .ensure(&cache, "imagodei", NO_WAIT_EXPECTED, |_| async {
+                        grants.fetch_add(1, Ordering::SeqCst);
+                        Ok(fake_credentials(2))
+                    })
+                    .await
+            })
+        };
+
+        // B must be parked on the lease, not authorizing.
+        tokio::task::yield_now().await;
+        assert_eq!(
+            grants.load(Ordering::SeqCst),
+            1,
+            "the second call entered the authorize window while the first held the cell"
+        );
+
+        // `notify_one` stores a permit, so the release cannot be lost to
+        // scheduling order.
+        release.notify_one();
+        a.await.unwrap().expect("the first call mints");
+        b.await.unwrap().expect("the second call reuses");
+
+        assert_eq!(
+            grants.load(Ordering::SeqCst),
+            1,
+            "exactly ONE CapGrant may be authored for one role, however many first calls race"
+        );
+        assert_eq!(cache.live_leases(), 0, "the lease map must be reclaimed");
+    }
+
+    /// A failed mint settles nothing: the role is not marked ready, nothing is
+    /// cached, and the next call mints. (And the error is the caller's to see —
+    /// `call_on_connection` classes it `Unavailable`, as a failed connect was.)
+    #[tokio::test]
+    async fn a_failed_mint_leaves_the_role_unsettled_for_the_next_call() {
+        let cache = Cache::new();
+        let connection = five_role_connection(&cache, "failed-mint-test:4444");
+        let grants = AtomicU32::new(0);
+
+        let refused = connection
+            .ensure(&cache, "imagodei", NO_WAIT_EXPECTED, |_| async {
+                Err(MintError::refused(
+                    "authorize_signing_credentials failed for role 'imagodei': refused",
+                ))
+            })
+            .await;
+        assert!(refused.is_err());
+        assert!(!connection.is_ready("imagodei"));
+        assert!(credentialed_roles(&connection).is_empty());
+
+        connection
+            .ensure(&cache, "imagodei", NO_WAIT_EXPECTED, |_| {
+                counted_mint(&grants)
+            })
+            .await
+            .expect("the next call must be allowed to mint");
+        assert_eq!(grants.load(Ordering::SeqCst), 1);
+    }
+
+    /// A role the app does not have authors nothing and is not an error at this
+    /// layer — the call proceeds and the client reports `CellNotFound`, as it
+    /// did when the connect minted every role.
+    #[tokio::test]
+    async fn a_role_the_app_does_not_have_authors_nothing() {
+        let cache = Cache::new();
+        let connection = five_role_connection(&cache, "unknown-role-test:4444");
+        let grants = AtomicU32::new(0);
+
+        connection
+            .ensure(&cache, "no-such-role", NO_WAIT_EXPECTED, |_| {
+                counted_mint(&grants)
+            })
+            .await
+            .expect("an unknown role is the client's error to report, not the mint's");
+
+        assert_eq!(grants.load(Ordering::SeqCst), 0);
+        assert!(credentialed_roles(&connection).is_empty());
+    }
+
+    /// THE HEAL STILL WORKS. A cap-grant-shaped refusal marks the role and the
+    /// caller drops the connection; the NEXT connection's first call to that
+    /// role must author exactly one replacement — and only for that role.
+    #[tokio::test]
+    async fn a_heal_mark_buys_one_replacement_on_the_next_connection() {
+        let cache = Cache::new();
+        let admin = "heal-on-call-test:4444";
+        let connection = five_role_connection(&cache, admin);
+        let grants = AtomicU32::new(0);
+
+        connection
+            .ensure(&cache, "imagodei", NO_WAIT_EXPECTED, |_| {
+                counted_mint(&grants)
+            })
+            .await
+            .unwrap();
+        assert_eq!(grants.load(Ordering::SeqCst), 1);
+
+        assert!(cache.mark_for_remint(&connection.ep_key, "imagodei"));
+        drop(connection); // what clearing the socket does
+
+        let next = five_role_connection(&cache, admin);
+        next.ensure(&cache, "imagodei", NO_WAIT_EXPECTED, |_| {
+            counted_mint(&grants)
+        })
+        .await
+        .unwrap();
+        assert_eq!(
+            grants.load(Ordering::SeqCst),
+            2,
+            "the heal must mint exactly one replacement"
+        );
+
+        next.ensure(&cache, "imagodei", NO_WAIT_EXPECTED, |_| {
+            counted_mint(&grants)
+        })
+        .await
+        .unwrap();
+        assert_eq!(
+            grants.load(Ordering::SeqCst),
+            2,
+            "…and the mark is consumed"
+        );
+    }
+
+    // ── the kept admin socket (lazy mints on a long-lived caller) ───────────
+
+    fn never_written() -> MintFailure {
+        MintFailure::Conductor(ConductorApiError::WebsocketError(
+            holochain_websocket::WebsocketError::Close("No connection".to_string()),
+        ))
+    }
+
+    /// A long-lived caller's first use of a new role finds its kept admin
+    /// socket already torn down. Nothing was written, so the admin socket is
+    /// redialled and the mint goes ahead — the call does not fail.
+    #[tokio::test]
+    async fn a_dead_kept_admin_socket_is_redialled_instead_of_failing_the_call() {
+        let redials = AtomicU32::new(0);
+        let outcome = retry_if_never_written(
+            async { Err::<u8, _>(never_written()) },
+            mint_never_written,
+            || async {
+                redials.fetch_add(1, Ordering::SeqCst);
+                Ok(7u8)
+            },
+        )
+        .await;
+
+        assert_eq!(outcome.expect("the retry over a fresh socket succeeds"), 7);
+        assert_eq!(redials.load(Ordering::SeqCst), 1);
+    }
+
+    /// A mint whose request WAS written is never retried: the grant may exist,
+    /// and a second authorize would author a second one.
+    #[tokio::test]
+    async fn a_mint_that_was_written_is_never_retried() {
+        use std::io::{Error as IoError, ErrorKind};
+        for written in [
+            MintFailure::Conductor(ConductorApiError::WebsocketError(
+                holochain_websocket::WebsocketError::Close("ConnectionClosed".to_string()),
+            )),
+            MintFailure::Conductor(ConductorApiError::IoError(IoError::new(
+                ErrorKind::BrokenPipe,
+                "broken pipe",
+            ))),
+            MintFailure::Conductor(ConductorApiError::ExternalApiWireError(
+                holochain_conductor_api::ExternalApiWireError::InternalError(
+                    "source chain head has moved".to_string(),
+                ),
+            )),
+            MintFailure::TimedOut,
+            MintFailure::Redial("Admin connect failed".to_string()),
+        ] {
+            let redials = AtomicU32::new(0);
+            let rendered = format!("{written:?}");
+            let outcome = retry_if_never_written(
+                async { Err::<u8, _>(written) },
+                mint_never_written,
+                || async {
+                    redials.fetch_add(1, Ordering::SeqCst);
+                    Ok(7u8)
+                },
+            )
+            .await;
+
+            assert!(outcome.is_err(), "must surface unchanged: {rendered}");
+            assert_eq!(redials.load(Ordering::SeqCst), 0, "{rendered}");
+        }
+    }
+
+    /// The common case: a live socket mints and nothing is redialled.
+    #[tokio::test]
+    async fn a_live_admin_socket_is_not_redialled() {
+        let redials = AtomicU32::new(0);
+        let outcome = retry_if_never_written(
+            async { Ok::<u8, MintFailure>(1) },
+            mint_never_written,
+            || async {
+                redials.fetch_add(1, Ordering::SeqCst);
+                Ok(2u8)
+            },
+        )
+        .await;
+
+        assert_eq!(outcome.unwrap(), 1);
+        assert_eq!(redials.load(Ordering::SeqCst), 0);
+    }
+
+    /// One redial, not a loop: if the fresh socket also fails, that surfaces.
+    #[tokio::test]
+    async fn the_redial_is_attempted_once() {
+        let redials = AtomicU32::new(0);
+        let outcome = retry_if_never_written(
+            async { Err::<u8, _>(never_written()) },
+            mint_never_written,
+            || async {
+                redials.fetch_add(1, Ordering::SeqCst);
+                Err(never_written())
+            },
+        )
+        .await;
+
+        assert!(outcome.is_err());
+        assert_eq!(redials.load(Ordering::SeqCst), 1);
+    }
+
+    // ── a mint the doorway stopped waiting for (bounded, not cured) ─────────
+
+    /// A lease waiter must still be waiting when the slowest possible mint
+    /// finishes: authorize, redial (resolve + connect), authorize again.
+    #[test]
+    fn the_lease_wait_covers_the_worst_case_mint() {
+        let deadline = Duration::from_millis(DEFAULT_ZOME_CALL_TIMEOUT_MS);
+        let wait = worst_case_mint(deadline);
+        assert_eq!(
+            wait,
+            deadline + crate::conductor::dns_resolve_timeout() + deadline + deadline
+        );
+        assert!(
+            wait > deadline,
+            "a waiter given only one deadline falls through and mints beside the holder"
+        );
+    }
+
+    /// Which mint failures may have authored a grant anyway.
+    #[test]
+    fn a_timed_out_or_dropped_mint_is_abandoned_and_a_refused_one_is_not() {
+        let deadline = Duration::from_secs(10);
+        assert!(mint_error("imagodei", deadline, MintFailure::TimedOut).outcome_unknown);
+        assert!(
+            mint_error(
+                "imagodei",
+                deadline,
+                MintFailure::Conductor(ConductorApiError::WebsocketError(
+                    holochain_websocket::WebsocketError::Close("ConnectionClosed".to_string()),
+                )),
+            )
+            .outcome_unknown
+        );
+        for nothing_authored in [
+            never_written(),
+            MintFailure::Redial("Admin connect failed".to_string()),
+            MintFailure::Conductor(ConductorApiError::ExternalApiWireError(
+                holochain_conductor_api::ExternalApiWireError::InternalError(
+                    "source chain head has moved".to_string(),
+                ),
+            )),
+        ] {
+            let rendered = format!("{nothing_authored:?}");
+            assert!(
+                !mint_error("imagodei", deadline, nothing_authored).outcome_unknown,
+                "{rendered}"
+            );
+        }
+        assert_eq!(
+            mint_error("imagodei", deadline, MintFailure::TimedOut).message,
+            "authorize_signing_credentials timed out after 10000ms for role 'imagodei'"
+        );
+    }
+
+    /// End to end at the call path: a mint that times out is counted, and the
+    /// next call to that role fails honestly instead of authoring a second
+    /// grant.
+    #[tokio::test(start_paused = true)]
+    async fn a_timed_out_mint_is_not_repeated_by_the_next_call() {
+        let cache = Cache::new();
+        let connection = five_role_connection(&cache, "abandoned-mint-test:4444");
+        let grants = AtomicU32::new(0);
+
+        let first = connection
+            .ensure(&cache, "imagodei", NO_WAIT_EXPECTED, |_| async {
+                grants.fetch_add(1, Ordering::SeqCst);
+                Err(MintError::abandoned("timed out"))
+            })
+            .await;
+        assert!(first.is_err());
+
+        let second = connection
+            .ensure(&cache, "imagodei", NO_WAIT_EXPECTED, |_| {
+                counted_mint(&grants)
+            })
+            .await;
+        assert!(second.unwrap_err().contains("cooling down"));
+        assert_eq!(grants.load(Ordering::SeqCst), 1);
+
+        tokio::time::advance(mint_cooldown() + Duration::from_secs(1)).await;
+        connection
+            .ensure(&cache, "imagodei", NO_WAIT_EXPECTED, |_| {
+                counted_mint(&grants)
+            })
+            .await
+            .expect("after the cool-down, one mint");
+        assert_eq!(grants.load(Ordering::SeqCst), 2);
     }
 }

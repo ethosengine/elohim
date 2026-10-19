@@ -576,6 +576,12 @@ pub async fn handle_bind(
                 "Failed to deprovision hosted cell at node-key bind (cleaned up later)"
             ),
         }
+        // The account no longer names a hosted agent, so the provisioning
+        // record that remembered hosting it must not outlive it. A successful
+        // deprovision already forgot it; forget it on a failed one too, as
+        // stewardship graduation does. Left live, it names an app the account
+        // has left, and a later provisioning call would re-send that install.
+        provisioner.forget(&claims.identifier).await;
     }
     CustodialKeyService::new().deactivate_all(&user.human_id);
 

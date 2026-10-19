@@ -5440,3 +5440,578 @@ decisionPoints:
       - path: doorway/doorway-service/src/routes/node_key_bind.rs
         testName: binding_the_same_key_is_refused
         kind: unit
+  - name: classify_request_error
+    kind: pure-decision-predicate
+    sourceLocation:
+      file: src/conductor/typed_admin.rs
+      modulePath: conductor::typed_admin::classify_request_error
+      line: 131
+    summary: >
+      Classifies a failed admin request on an established conductor socket into FaultClass
+      (NotSent / SentOutcomeUnknown / Refused) from the typed ConductorApiError, at the client
+      boundary. The only place rendered error text is inspected (the library's "No connection"
+      close reason, and transport markers relayed inside a conductor answer), case-insensitively.
+      A connect failure is NotSent by construction (TypedAdminClient::connect_typed) and never
+      reaches this function. Replaces the substring matcher `is_transport_fault`. Also decides
+      whether a lazy credential mint may be retried over a redialled admin socket
+      (services::zome_caller::mint_never_written).
+    concernIds:
+      - id: C0
+        status: answered
+        justification: Ephemeral gateway classification of one admin call's failure; no entity, no authority, nothing persisted.
+      - id: C4
+        status: answered
+        justification: >
+          Never-sent, sent-with-unknown-outcome and refused are three distinct answers; a
+          transport fault the conductor relays inside an answer is not read as a refusal, and a
+          request on a socket already gone is not read as sent.
+      - id: C8
+        status: unbound
+        justification: The class reaches logs through the provisioner's messages only; no labeled counter per FaultClass exists.
+      - id: C10
+        status: partial
+        justification: >
+          Typed variants are matched exhaustively, so a new ConductorApiError variant fails the
+          build. The two string inspections depend on holochain_websocket's "No connection"
+          constant and on how a conductor renders a relayed transport error; an unrecognised
+          rendering falls to Refused (a verdict, never a re-offer).
+    contractTests:
+      - path: doorway/doorway-service/src/conductor/typed_admin.rs
+        testName: websocket_closed_connection_closed_is_sent_outcome_unknown
+        kind: unit
+      - path: doorway/doorway-service/src/conductor/typed_admin.rs
+        testName: a_request_on_a_socket_already_gone_is_not_sent
+        kind: unit
+      - path: doorway/doorway-service/src/conductor/typed_admin.rs
+        testName: the_two_build_1576_refusals_are_sent_outcome_unknown
+        kind: unit
+      - path: doorway/doorway-service/src/conductor/typed_admin.rs
+        testName: a_conductor_answer_is_refused
+        kind: unit
+    gapNote: >
+      Classes were derived from the holochain_client 0.9.0 / holochain_websocket 0.7.0 sources and
+      from error strings recorded on the fleet; none was observed against a live conductor by this
+      change.
+
+  - name: ProvisionError
+    kind: boundary-answer-type
+    sourceLocation:
+      file: src/conductor/provisioner.rs
+      modulePath: conductor::provisioner::ProvisionError
+      line: 114
+    summary: >
+      What AgentProvisioner::provision_agent answers when it produces no agent. Failed — nothing
+      was left on any conductor; retrying is a fresh start. Unresolved { conductors } — this
+      person may already have an app on the named conductor and the doorway could not settle
+      it there (or could not show it to be theirs); it refuses rather than provision elsewhere.
+      NotReady — the intent log cannot be read or written, so no attempt can be remembered and
+      nothing was asked of any conductor. `code()` gives the route its machine-readable code
+      (PROVISIONING_FAILED / PROVISIONING_UNRESOLVED / PROVISIONING_NOT_READY); only hosted
+      registration surfaces the code, other callers render the message.
+    concernIds:
+      - id: C0
+        status: answered
+        justification: Doorway-local response type for an operational request; carries no authority.
+      - id: C3
+        status: partial
+        justification: >
+          Unresolved always names the conductor to wait for and resolves on a later call once it
+          answers. A re-send refused with the app verifiably absent ends after
+          ABSENT_CHECKS_BEFORE_ABANDON checks. Records that stop for a reason the doorway cannot
+          cure (StuckReason) have no automatic exit by design — something may be on a conductor —
+          and exit through the operator's recovery route.
+      - id: C4
+        status: answered
+        justification: >
+          "Could not find out" (Unresolved) is a different answer from "nothing there" (Failed);
+          an unreachable or silent conductor is never reported as absence.
+      - id: C8
+        status: partial
+        justification: The code is a typed reason on the response and in the error log line; no counter per code.
+      - id: C14
+        status: partial
+        justification: >
+          The unresolved arm is witnessed in the intent log (a live record below `enabled`) and in
+          doorway_provision_intents_stale; no cross-node witness, and nothing acts on it.
+    contractTests:
+      - path: doorway/doorway-service/src/conductor/provisioner.rs
+        testName: an_unresolved_provision_has_its_own_code_and_names_the_conductor
+        kind: unit
+      - path: doorway/doorway-service/src/conductor/provisioner.rs
+        testName: an_install_sent_to_a_conductor_that_then_goes_dark_is_unresolved_not_reoffered
+        kind: unit
+      - path: doorway/doorway-service/src/conductor/provisioner.rs
+        testName: a_refused_install_is_a_verdict_and_is_not_reoffered
+        kind: unit
+
+  - name: before_install
+    kind: pure-decision-predicate
+    sourceLocation:
+      file: src/conductor/provisioner.rs
+      modulePath: conductor::provisioner::before_install
+      line: 244
+    summary: >
+      The re-offer rule. Each provisioning attempt generates a fresh agent key and the app id
+      embeds the conductor id, so an attempt may be offered to another conductor only when its
+      INSTALL was never written. This maps the class of a fault in a step before install_app
+      (connect, key generation) to what it establishes about the install: a refusal stays a
+      verdict; any transport fault means the install is NotSent. AgentProvisioner::offer then
+      acts on the install's class alone: NotSent re-offers (bounded at
+      PROVISION_TRANSPORT_ATTEMPTS, excluding the conductor that dropped),
+      SentOutcomeUnknown resolves on the same conductor, Refused stops.
+    concernIds:
+      - id: C0
+        status: answered
+        justification: Operational placement decision in the gateway; the identity it protects is authored on the conductor, not here.
+      - id: C6a
+        status: answered
+        justification: Re-offers are bounded at three distinct conductors per call; no retry of a sent install within a call.
+      - id: C6b
+        status: partial
+        justification: >
+          An install whose outcome is unknown is never re-offered and is re-sent only with the
+          same conductor, app id and recorded key, so a replay cannot create a second identity on
+          this doorway's records. A key generated for an attempt that is then re-offered is left
+          orphaned in that conductor's keystore. Two doorways on different databases are not
+          covered (see provision_from_record).
+      - id: C9
+        status: partial
+        justification: >
+          One agent key per person per doorway record is preserved across retries and restarts.
+          A doorway whose records were empty at boot over populated conductors refuses people
+          without a record until an operator has run recovery; a record lost any other way is
+          not detected.
+    contractTests:
+      - path: doorway/doorway-service/src/conductor/provisioner.rs
+        testName: a_fault_before_the_install_never_makes_the_install_unknown
+        kind: unit
+      - path: doorway/doorway-service/src/conductor/provisioner.rs
+        testName: a_key_generation_that_drops_is_reoffered_because_no_install_was_sent
+        kind: unit
+      - path: doorway/doorway-service/src/conductor/provisioner.rs
+        testName: an_install_sent_then_dropped_that_is_not_visible_is_unresolved_not_reoffered
+        kind: unit
+      - path: doorway/doorway-service/src/conductor/provisioner.rs
+        testName: a_connect_refused_before_anything_is_sent_is_reoffered
+        kind: unit
+
+  - name: provision_from_record
+    kind: state-transition
+    sourceLocation:
+      file: src/conductor/provisioner.rs
+      modulePath: conductor::provisioner::AgentProvisioner::provision_from_record
+      line: 401
+    summary: >
+      The provisioning intent log's transitions (conductor::provision_intent::IntentState:
+      intended → installed → enabled → human_created → account_recorded, or abandoned). The
+      doorway records its attempt before asking a conductor for anything and resolves every later
+      call from that record: a live record that may have landed is settled on the conductor it
+      names and no other (found and proven by the recorded agent key: finished forward;
+      unreachable: Unresolved naming it; sent, absent and older than install_in_flight_bound: the
+      same install re-sent with the recorded key); no record and no account mapping means the
+      person was never attempted and is provisioned on the least-loaded conductor without a pool
+      scan — unless the doorway's records were empty at boot over populated conductors, in which
+      case it answers Unresolved until an operator has run recovery. Writes are compare-and-set on a per-identifier
+      version (first writer wins; the loser resolves on the winner's conductor). The log is a
+      saga log, not an authority: cells exist if the conductor says so, a human exists if the DHT
+      says so. Stored in the doorway's own Mongo database (`provisioning_intents`, unique on
+      identifier) beside `conductor_registry`; process memory when no Mongo is configured.
+    concernIds:
+      - id: C0
+        status: answered
+        justification: Doorway-local operational record (Category C), rebuildable from the conductor and the DHT; no DHT entry, no route.
+      - id: C1
+        status: answered
+        justification: The record decides only where to ask. Whether an app exists is always the named conductor's answer, and a record the conductor contradicts gives way.
+      - id: C2
+        status: partial
+        justification: State only moves forward (or to abandoned) and each write is against the version it read; the version is a per-record counter, not a clock shared between doorways.
+      - id: C3
+        status: partial
+        justification: >
+          Every state has a move — finish forward, wait on a named conductor, re-send after the
+          bound, or start fresh over an abandoned record. A record naming a conductor that never
+          returns keeps that one person Unresolved until an operator runs the recovery scan or
+          removes the record.
+      - id: C4
+        status: answered
+        justification: An unreachable conductor is reported as Unresolved for the one identifier whose record names it and is not consulted for anyone else.
+      - id: C5
+        status: answered
+        justification: human_created and account_recorded are marks of what this doorway's own calls returned; nothing is decided on them.
+      - id: C6a
+        status: answered
+        justification: Re-reads after a lost compare-and-set are bounded at CLAIM_ROUNDS; the in-process serialization wait is bounded by install_in_flight_bound, which is the admin client's request timeout read from holochain_websocket.
+      - id: C6b
+        status: partial
+        justification: >
+          A retry during flight, after a restart, or from a second provisioner on the same
+          database yields one key and one install. doorway-alpha and doorway-alpha-b use different
+          databases on one Mongo server with the same conductor pool, so the log does not
+          serialize them.
+      - id: C8
+        status: partial
+        justification: doorway_provision_intents{state} and doorway_provision_intents_stale are refreshed after each provisioning call; per-transition counters do not exist.
+      - id: C9
+        status: partial
+        justification: The agent key is recorded before the install is sent, reused on re-send, and never overwritten from a conductor. A lost record is rebuilt only by the operator's recovery, from an account row whose agent key a conductor confirms.
+      - id: C10
+        status: partial
+        justification: Optional fields default on read; an unknown state string fails deserialization and surfaces as "intent log unavailable" rather than being defaulted. No compatibility test against stored bytes.
+      - id: C12
+        status: n-a
+        justification: Grants no permission; every existing auth gate, JWT check and conductor capability is unchanged and upstream of it.
+      - id: C14
+        status: partial
+        justification: Abandoned, stale and stuck records are counted (stuck by reason); abandoned records expire after ABANDONED_RECORD_TTL and a closed account's record is deleted. Nothing outside this doorway witnesses them.
+    contractTests:
+      - path: doorway/doorway-service/src/conductor/provisioner.rs
+        testName: a_retry_while_the_install_is_in_flight_yields_one_key_and_one_install
+        kind: unit
+      - path: doorway/doorway-service/src/conductor/provisioner.rs
+        testName: a_retry_after_a_doorway_restart_yields_one_key_and_one_install
+        kind: unit
+      - path: doorway/doorway-service/src/conductor/provisioner.rs
+        testName: an_unreachable_conductor_blocks_only_the_identifier_whose_intent_names_it
+        kind: unit
+      - path: doorway/doorway-service/src/conductor/provisioner.rs
+        testName: two_provisioner_instances_on_one_log_yield_one_intent
+        kind: unit
+      - path: doorway/doorway-service/src/conductor/provisioner.rs
+        testName: a_refused_install_abandons_the_intent_and_a_later_registration_starts_fresh
+        kind: unit
+      - path: doorway/doorway-service/src/conductor/provisioner.rs
+        testName: a_legacy_mapping_with_no_intent_resolves_on_the_mapped_conductor
+        kind: unit
+      - path: doorway/doorway-service/src/conductor/provisioner.rs
+        testName: a_stale_in_flight_install_is_resent_on_the_same_conductor_with_the_same_key
+        kind: unit
+    gapNote: >
+      The provisioner's tests drive the in-memory store. MongoIntentStore has its own tests
+      against a real mongod (run only when DOORWAY_TEST_MONGODB_URI is set). Nothing here was
+      exercised against a live conductor or mesh.
+
+  - name: finish_forward
+    kind: verdict-fn
+    sourceLocation:
+      file: src/conductor/provisioner.rs
+      modulePath: conductor::provisioner::AgentProvisioner::finish_forward
+      line: 1270
+    summary: >
+      The adoption verdict: whether an app found on a conductor under a record's id is this
+      person's. It is theirs only if the conductor's agent key for it EQUALS the agent key this
+      doorway recorded for the identifier; the app id proves nothing (it is computable from an
+      unauthenticated identifier, and under the old scheme was 24 bits wide). On a mismatch the
+      record is left unchanged — the recorded key is never overwritten with the conductor's — and
+      the answer is Unresolved. The same equality gates the refused-install path in provision_on
+      (an app already under the id on a first send is a conflict), resolve_account_mapping (the
+      account row's own key against the conductor's) and recover_by_pool_scan. Then: a disabled
+      app is enabled, any other non-running state is reported, cells are awaited. Never
+      uninstalls.
+    concernIds:
+      - id: C0
+        status: answered
+        justification: Gateway-local verdict over the doorway's own record and one conductor answer; authors nothing.
+      - id: C4
+        status: answered
+        justification: A key mismatch, an app with no recorded key, an unusable app and cells that never became ready are distinct named answers, none of them reported as absence or success.
+      - id: C5
+        status: answered
+        justification: The app id is a claim; the verdict re-derives from the agent key the doorway itself generated and recorded, compared with the conductor's.
+      - id: C9
+        status: answered
+        justification: A person is never handed an agent key other than the one recorded for their identifier, and a record's key is never replaced from a conductor.
+      - id: C12
+        status: partial
+        justification: >
+          It is the evidence a route needs before attaching an existing Human to a registration
+          (AgentProvisioner::provisioned_for). It verifies which key the doorway generated, not
+          that the caller controls it; a hosted human proves that by password at the account
+          layer.
+    contractTests:
+      - path: doorway/doorway-service/src/conductor/provisioner.rs
+        testName: a_recorded_key_that_differs_from_the_conductors_is_unresolved_and_unchanged
+        kind: unit
+      - path: doorway/doorway-service/src/conductor/provisioner.rs
+        testName: an_app_already_under_the_id_is_a_conflict_not_this_persons_app
+        kind: unit
+      - path: doorway/doorway-service/src/conductor/provisioner.rs
+        testName: a_short_hash_twin_never_resolves_to_the_others_app_through_an_agent_mapping
+        kind: unit
+      - path: doorway/doorway-service/src/conductor/provisioner.rs
+        testName: the_recovery_scan_never_adopts_an_app_on_its_id_alone
+        kind: unit
+      - path: doorway/doorway-service/src/conductor/provisioner.rs
+        testName: only_an_app_recorded_for_exactly_this_identifier_may_recover_its_existing_human
+        kind: unit
+
+  - name: StuckReason
+    kind: reason-outcome-enum
+    sourceLocation:
+      file: src/conductor/provision_intent.rs
+      modulePath: conductor::provision_intent::StuckReason
+      line: 161
+    summary: >
+      Why a LIVE provisioning record cannot be finished by the doorway on its own: key_mismatch,
+      app_conflict, conductor_not_in_pool, app_unusable, cells_not_ready, no_usable_key. Each is a
+      named place a record stops, counted on doorway_provision_intents_stuck{reason} and listed
+      by the operator's recovery route. None is abandoned automatically, because in every one
+      something may be on a conductor. The one automatic end is separate: a sent install a
+      reachable conductor reports absent at ABSENT_CHECKS_BEFORE_ABANDON checks, each at least
+      one in-flight bound apart, is abandoned (nothing landed).
+    concernIds:
+      - id: C3
+        status: partial
+        justification: Every stuck reason has an exit, but it is an operator's (the recovery route rebuilds or abandons); none resolves on its own.
+      - id: C4
+        status: answered
+        justification: Six distinct reasons in place of one indefinite PROVISIONING_UNRESOLVED.
+      - id: C6a
+        status: answered
+        justification: The automatic end is bounded at ABSENT_CHECKS_BEFORE_ABANDON verified absences; an unknown outcome never counts toward it.
+      - id: C8
+        status: answered
+        justification: doorway_provision_intents_stuck carries one series per reason, published by the periodic count; the wire names are pinned by a test.
+      - id: C14
+        status: partial
+        justification: A stuck record is retained and counted until an operator acts; no witness outside this doorway.
+    contractTests:
+      - path: doorway/doorway-service/src/conductor/provision_intent.rs
+        testName: stuck_records_are_counted_by_reason
+        kind: unit
+      - path: doorway/doorway-service/src/conductor/provision_intent.rs
+        testName: state_and_reason_names_are_stable
+        kind: unit
+      - path: doorway/doorway-service/src/conductor/provisioner.rs
+        testName: a_resend_refused_with_the_app_verifiably_absent_is_abandoned_after_a_bound
+        kind: unit
+      - path: doorway/doorway-service/src/conductor/provisioner.rs
+        testName: a_resend_of_unknown_outcome_never_counts_toward_abandonment
+        kind: unit
+      - path: doorway/doorway-service/src/conductor/provisioner.rs
+        testName: a_record_naming_a_conductor_outside_the_pool_is_stuck_by_name_not_abandoned
+        kind: unit
+
+  - name: store_verdict
+    kind: pure-decision-predicate
+    sourceLocation:
+      file: src/conductor/registry.rs
+      modulePath: conductor::registry::store_verdict
+      line: 171
+    summary: >
+      Whether this doorway's provisioning records were lost while its conductors kept their
+      people — three-valued. `unknown`: the store was empty at boot and some pool conductor has
+      not yet ANSWERED what it hosts (or the log could not be read). `wiped`: the store was empty
+      at boot and a conductor hosts apps. `not_wiped`: the store had records at boot, or every
+      conductor answered that it hosts nobody, or an operator's recovery completed. A conductor
+      that could not be reached is never counted as hosting nothing. While `unknown`, a person
+      with no record is answered PROVISIONING_NOT_READY naming the conductors not yet asked (it
+      clears by itself); while `wiped`, PROVISIONING_UNRESOLVED until an operator runs
+      POST /admin/provisioning/recover and the walk reaches every conductor. People with a
+      record or an account mapping are unaffected in both. The conductors are walked at boot and
+      then with backoff until each has answered; a conductor added to the pool later reopens the
+      question. Evaluated only when a MongoDB is configured. Surfaced on /health
+      (provisioning.storeVerdict, conductorsUnwalked), doorway_provisioning_store_verdict{verdict}
+      and doorway_provisioning_conductors_unwalked. A store with records is `not_wiped` even with
+      conductors unwalked, so a conductor that is down does not stop registration; partial loss is
+      reported (doorway_hosted_apps_unrecorded, the recovery report) and does not block.
+    concernIds:
+      - id: C0
+        status: answered
+        justification: Startup and periodic classification of the doorway's own store against conductor-reported facts.
+      - id: C3
+        status: partial
+        justification: Unknown settles by itself as conductors answer; a conductor that never answers over an empty store keeps registration of unrecorded people refused indefinitely, and wiped has one exit, an operator action.
+      - id: C4
+        status: answered
+        justification: Unreached is unknown, never empty; unknown, wiped and not-wiped are distinct answers with distinct codes and distinct health values.
+      - id: C6a
+        status: answered
+        justification: The walk retries with a backoff that doubles from one second and is capped at the counts period; each periodic pass is bounded by its period.
+      - id: C8
+        status: answered
+        justification: One gauge series per verdict, an unwalked count, hosted-app counts, the health block, and a log line each time a conductor is walked.
+      - id: C9
+        status: partial
+        justification: >
+          Catches the empty-store shape. A store that lost some records but not all is reported
+          as a count difference, not prevented: on a fleet upgraded to the intent log every
+          earlier hosted person has an app and no record, so blocking on it would stop all new
+          registration.
+    contractTests:
+      - path: doorway/doorway-service/src/conductor/registry.rs
+        testName: an_unreached_conductor_is_unknown_not_empty
+        kind: unit
+      - path: doorway/doorway-service/src/conductor/registry.rs
+        testName: the_verdict_settles_when_the_conductors_answer
+        kind: unit
+      - path: doorway/doorway-service/src/conductor/registry.rs
+        testName: a_store_with_records_is_not_wiped_even_with_conductors_unwalked
+        kind: unit
+      - path: doorway/doorway-service/src/conductor/provisioner.rs
+        testName: a_doorway_that_boots_before_its_conductors_does_not_treat_everyone_as_new
+        kind: unit
+      - path: doorway/doorway-service/src/conductor/provisioner.rs
+        testName: a_conductor_that_never_answers_keeps_the_verdict_unknown_and_is_named
+        kind: unit
+      - path: doorway/doorway-service/src/conductor/provisioner.rs
+        testName: recovery_cannot_clear_an_unknown_it_could_not_ask
+        kind: unit
+    gapNote: >
+      The verdict, the walk and the refusals are tested through AgentProvisioner with a scripted
+      pool. The two spawned tasks in main.rs that call the walk (the boot loop with backoff and
+      the periodic pass) are not driven by a test; a first version evaluated this once at boot,
+      read an unreachable conductor as empty, and a live run minted twelve new apps over it.
+
+  - name: hosted_here
+    kind: pure-decision-predicate
+    sourceLocation:
+      file: src/conductor/provisioner.rs
+      modulePath: conductor::provisioner::AgentProvisioner::hosted_here
+      line: 2014
+    summary: >
+      Whether THIS doorway hosts anyone under an identifier, asked by the node/device register
+      arms in place of a pool lookup. Answers from the doorway's own provisioning record only:
+      never dials a conductor, generates a key or sends an install, and never reads an app id as
+      a person. Three answers: nobody (records intact, no live record), a named conductor (a live
+      record), or unknown (the log is unreadable, or the store verdict is wiped or unknown — "no
+      record" is not "nobody" there). The arm never ADOPTS what it finds: nobody → the account
+      carries the caller's own key; someone → 403 IDENTITY_RECOVERY_REFUSED (a hosted identity
+      with no account cannot be claimed by an unauthenticated registration body); unknown → 503
+      with the provisioning code. Replaces dev's find_agent pool scan, which matched the
+      deterministic app id and handed a found hosted agent (key, conductor and routing claims)
+      to whoever registered the identifier as node/device.
+    concernIds:
+      - id: C4
+        status: answered
+        justification: Unknown is a distinct answer with its own code, never folded into nobody.
+      - id: C9
+        status: partial
+        justification: >
+          Closes adoption by identifier on the node/device arms. An identifier whose hosted record
+          was lost with the store is answered unknown only while the verdict is wiped or unknown;
+          after an operator recovery that rebuilt no record for it, a node/device registration
+          can still take the identifier (it never receives the hosted agent).
+      - id: C12
+        status: answered
+        justification: No hosted agent, conductor or routing claim is granted on an unauthenticated registration body; a live record refuses with 403.
+    contractTests:
+      - path: doorway/doorway-service/src/conductor/provisioner.rs
+        testName: hosted_here_answers_from_the_record_and_never_installs
+        kind: unit
+      - path: doorway/doorway-service/src/conductor/provisioner.rs
+        testName: hosted_here_keeps_unknown_apart_from_nobody
+        kind: unit
+    gapNote: >
+      The three answers are tested through AgentProvisioner. The register arm's mapping of them
+      to 201 / 403 / 503 is not driven by a route-level test.
+
+  - name: operator_identity_recovery_authorized
+    kind: pure-decision-predicate
+    sourceLocation:
+      file: src/routes/auth_routes.rs
+      modulePath: routes::auth_routes::operator_identity_recovery_authorized
+      line: 1026
+    summary: >
+      Whether a registration may be handed the Human that ALREADY EXISTS on the doorway's own
+      singleton conductor agent (`agencyPhase: "doorway"`, and `hosted` with no conductor pool).
+      The agency phase is read from the unauthenticated request body and that Human is the
+      operator's, so the recovery branch is allowed only when the request carries
+      adminBootstrapKey equal to a configured, non-empty API_KEY_ADMIN. Its hosted sibling,
+      hosted_identity_recovery_authorized, allows recovery on a provisioned app only when this
+      doorway's intent record shows it provisioned that agent for exactly that identifier.
+      Both are the EVIDENCE consulted by routes::human_binding::bind_human, which decides
+      whether a recovery is happening at all (see that row); this predicate does not.
+      Otherwise both answer 403 IDENTITY_RECOVERY_REFUSED (not 409, which registration reserves
+      for an existing account and the seeders answer by logging in).
+    concernIds:
+      - id: C0
+        status: answered
+        justification: Doorway-local authorization of one recovery branch; no entity or authority is created.
+      - id: C4
+        status: answered
+        justification: A refused recovery is its own 403 code, distinct from a conductor failure (503 IDENTITY_CREATION_FAILED) and from an existing account (409 USER_EXISTS).
+      - id: C12
+        status: partial
+        justification: >
+          Authority is the operator credential compared at the acting node, fail-closed when
+          unset or empty. It is a shared secret, not a proof of control of the operator's key,
+          and the comparison is the same non-constant-time equality the admin bootstrap check
+          beside it already uses.
+      - id: C13
+        status: partial
+        justification: Names its successor (a p2p proof of key control) in the predicate's doc; no gate enforces the graduation.
+    contractTests:
+      - path: doorway/doorway-service/src/routes/auth_routes.rs
+        testName: a_registration_cannot_recover_the_operators_human_without_the_operator_credential
+        kind: unit
+      - path: doorway/doorway-service/src/routes/auth_routes.rs
+        testName: an_identity_recovery_refusal_is_forbidden_not_an_existing_account
+        kind: unit
+    gapNote: >
+      The predicate and the refusal are tested, and bind_human (which calls them) is tested
+      against a fake held to the zome. handle_register is not driven end to end by any test.
+      A first version of this row described a gate on an error branch the zome cannot take; a
+      live run showed it never fired.
+
+  - name: bind_human
+    kind: verdict-fn
+    sourceLocation:
+      file: src/routes/human_binding.rs
+      modulePath: routes::human_binding::bind_human
+      line: 184
+    summary: >
+      Whether a registration CREATES the Human on its conductor agent or RECOVERS one that
+      already exists — decided by asking, not by catching. imagodei::create_human is idempotent
+      (it answers an existing Human with success), so the handler reads the agent's Human under a
+      per-agent lock BEFORE create_human. One exists: a recovery, allowed only with evidence (the
+      operator credential for the doorway's own agent; this doorway's provisioning record for a
+      hosted agent), otherwise RecoveryRefused and create_human is never called. None exists:
+      create, read again, and treat a Human whose hash or fields are not what this call sent as
+      a recovery too. A registration that cannot take the agent's lock is refused (Busy), not
+      run unserialised. Comparing the returned Human's id with a requested id is not evidence.
+      Called from every registration arm that creates or attaches a Human
+      (routes::auth_routes::bind_registration_human).
+    concernIds:
+      - id: C0
+        status: answered
+        justification: Gateway-local decision over two conductor reads and one write on a single agent's own chain.
+      - id: C4
+        status: answered
+        justification: Created, recovered, refused, busy and conductor-failed are five distinct outcomes; an existing Human is never reported as a creation.
+      - id: C5
+        status: answered
+        justification: A request's claimed human id is not believed; what exists is read from the agent, and what was created is checked against what was sent.
+      - id: C6a
+        status: answered
+        justification: The lock wait is the sum of the holder's worst-case conductor steps at the existing per-call deadline; no retry.
+      - id: C6b
+        status: partial
+        justification: >
+          Within one process a second registration on the same agent cannot create or be attached
+          without the gate. Two processes sharing one conductor agent that create byte-identical
+          Humans in the same instant are indistinguishable; the zome does not say whether a call
+          created or found the entry.
+      - id: C12
+        status: partial
+        justification: The evidence for the doorway's own agent is a shared operator secret, and the FIRST registration on an agent with no Human is not gated at all.
+    contractTests:
+      - path: doorway/doorway-service/src/routes/human_binding.rs
+        testName: a_registration_over_an_existing_human_without_evidence_is_refused
+        kind: unit
+      - path: doorway/doorway-service/src/routes/human_binding.rs
+        testName: supplying_the_existing_humans_id_is_not_evidence
+        kind: unit
+      - path: doorway/doorway-service/src/routes/human_binding.rs
+        testName: two_registrations_arriving_together_do_not_both_get_the_human
+        kind: unit
+      - path: doorway/doorway-service/src/routes/human_binding.rs
+        testName: a_human_that_is_not_the_one_this_call_sent_is_a_recovery
+        kind: unit
+      - path: doorway/doorway-service/src/routes/human_binding.rs
+        testName: the_fake_is_held_to_the_zome_create_human_is_idempotent
+        kind: unit
+    gapNote: >
+      Tested against a fake whose create_human is idempotent like the zome's, pinned by a test
+      that reads the zome source. No sweettest asserts the idempotency directly, and
+      handle_register is not driven end to end. Not yet confirmed by a live run.
