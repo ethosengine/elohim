@@ -128,3 +128,28 @@ brokered-conductor-surface task; closing it reverts the netpol + retires the ipB
 hazard) and bounded standing (Stage C delegates-compute, rails-gated). The 8444/8445 netpol revert is
 gated on hole #1, NOT licensed by this Stage-A landing.
 
+## The CI runner as a stewarded service agent (2026-10-19) — dev stakes, hardening owed
+
+Plan: Jenkins as a stewarded runner (`agent:ci-runner-jenkins-matthew`, steward of record
+human:matthew). Doorway now registers a **service agent** (`agencyPhase: "service-agent"`,
+`doorway/doorway-service/src/routes/service_agent.rs`): its cell is hosted on the sponsor's pool
+conductor under a REQUIRED `hosted-cell` promise (provider = the pool peer, recipient = the runner
+key), no Human record is authored, and it is never Admin — the bootstrap key only authorizes its
+creation. Credential: `genesis/scripts/ci/runner-ensure.sh` derives the runner's password from the
+existing bootstrap key (salt `:ci-runner`), like `jenkins-ci`. Not yet wired into a Jenkinsfile.
+
+**Dev stakes, on purpose (operator ruling 2026-10-19):** the runner's promise is 365 days,
+`rotation_ttl_days` 365, `rate_per_hour` 3600, `epr_scope ["*"]`, `reach_ceiling` commons
+(`RUNNER_TERMS` in `routes/hosted_cell.rs`, separate from the human `HOSTED_CELL_DAYS = 30`). The
+production hardening this section owns:
+- a witnessable secret mount (k8s Secret `elohim-ci-runner-jenkins`, read-only, `optional: true`)
+  instead of a password derived from the admin key;
+- a short window with explicit re-issue before expiry (never a silent renewal), and per-build tokens;
+- creation authorized by the sponsoring peer itself (a verb on its local compute API that mints the
+  runner and issues the promise), retiring the bootstrap-key creation scaffold.
+
+**Ontology defect, recorded not fixed:** `jenkins-ci` (the seed actor) registers through the HUMAN
+path, so it is a hosted Human record today and the bootstrap key both creates and promotes it to
+Admin. The service-agent path does not repeat either; migrating `jenkins-ci` onto it (and separating
+"may seed" from "is admin") is open.
+

@@ -5440,3 +5440,131 @@ decisionPoints:
       - path: doorway/doorway-service/src/routes/node_key_bind.rs
         testName: binding_the_same_key_is_refused
         kind: unit
+
+  # ── Service-agent registration: a stewarded runner, never a human (2026-10-19) ──
+  # agent:ci-runner-jenkins-matthew is the first instance (plan: Jenkins as a stewarded
+  # runner). One identity: an agent key whose cell is hosted on the sponsor's pool conductor
+  # under a REQUIRED hosted-cell promise. No Human entry, no humans-row binding, never Admin.
+
+  - name: provision_service_agent
+    kind: state-transition
+    sourceLocation:
+      file: src/routes/service_agent.rs
+      modulePath: routes::service_agent::provision_service_agent
+      line: 306
+    summary: >
+      The register handler's agencyPhase "service-agent" arm. Checks creation authority
+      (the doorway admin bootstrap key, via operator_registration_authority), request shape,
+      credential store, conductor pool and sponsor configuration BEFORE any side effect;
+      then provisions the runner's cell, checks C1 against the minted key, and asks the pool
+      peer for a hosted-cell promise under RUNNER_TERMS. Any failure after provisioning
+      withdraws the promise (if one was made) and deprovisions the cell: no create_human runs
+      on this path, so uninstalling cannot strand a Human, and a runner with no notarized
+      sponsor must not keep hosted compute. A duplicate-identifier race at the row insert
+      withdraws only this registration's promise and keeps the identifier-keyed cell the
+      winner shares (unwind_service_agent keep_cell).
+    concernIds:
+      - { id: C0, status: answered, justification: "No new entry type, scope or route. The cell is an existing hosted install; the authority is the existing hosted-cell delegates-compute Mishpat Commitment (A, DNA-hash-neutral); the account row is doorway-local Operational state." }
+      - { id: C1, status: answered, justification: "A runner cannot sponsor itself: sponsorship_is_not_self refuses before the promise is asked for, and sponsor_named_by_peer refuses after it if the peer named the runner. Structurally the grant surface writes the provider as its own cell actor, so the runner never authors its own standing." }
+      - { id: C2, status: n-a, justification: "No head ordering or authority clock; the promise window is stamped by the single formatter rfc3339_utc_secs." }
+      - { id: C3, status: partial, justification: "A retry re-finds the identifier-keyed app instead of minting a second key; an unwind that itself fails (revoke or deprovision unreachable) is logged, not retried." }
+      - { id: C4, status: answered, justification: "Every refusal carries a distinct machine code (ServiceAgentRefusal, plus PROVISIONING_FAILED / SERVICE_AGENT_SPONSOR_UNREACHABLE); unhostable, unsponsored and unauthorized are separate answers." }
+      - { id: C5, status: n-a, justification: "No receiver-side acceptance evidence is produced; the commitment is re-readable by CID from any peer." }
+      - { id: C6a, status: answered, justification: "The pool hop rides the existing bounded pool_client (3 s connect, 10 s total); provisioning keeps the provisioner's own bounded attempts." }
+      - { id: C6b, status: partial, justification: "Re-registering an existing identifier answers 409 before any side effect; a promise issued in a lost-response window may be duplicated on retry (two CIDs to one key), each bounded and separately revocable." }
+      - { id: C7, status: n-a, justification: "No advertised capability or serving selection." }
+      - { id: C8, status: partial, justification: "Structured tracing on success (sponsor, grant cid, valid_until) and on every unwind; no dedicated metric." }
+      - { id: C9, status: n-a, justification: "No key rotation or lineage; recovery is revoke and re-issue to a new agent (Z.D section 7)." }
+      - { id: C10, status: answered, justification: "Additive wire change only: optional serviceAgentId on the register body and a new agencyPhase value; old bodies parse unchanged and default to hosted." }
+      - { id: C11, status: n-a, justification: "Operator-initiated, one registration at a time; no backpressure surface." }
+      - { id: C12, status: answered, justification: "Two parties, two acts: only a bootstrap-key holder may CREATE a runner (doorway-side), and only the pool peer PROMISES the hosting. The grant surface refuses any performer that is not its own cell actor, and the doorway checks the named provider equals the configured performer. The doorway carries the message; it never promises." }
+      - { id: C13, status: partial, justification: "The creation gate is LABELED a scaffold at the gate site (SCAFFOLD comment in provision_service_agent) naming its successor (a sponsoring-peer operator verb that mints the runner and issues the promise at the acting node) and its trigger; the runner's reach_ceiling is fixed at commons. The successor is not built." }
+      - { id: C14, status: partial, justification: "The account row records the sponsor and the promise CID/valid_until; renewal before expiry is not yet automated (a lapse reads as lapsed, never silently renewed)." }
+    gapNote: >
+      Peer-side successor not built (C13); promise renewal not automated (C14); the handler-level
+      composition is exercised only through its pure parts, with no conductor-backed contract test.
+    contractTests:
+      - path: doorway/doorway-service/src/routes/service_agent.rs
+        testName: a_runner_cannot_sponsor_itself
+        kind: unit
+      - path: doorway/doorway-service/src/routes/service_agent.rs
+        testName: the_sponsor_recorded_is_the_pool_peer_that_promised
+        kind: unit
+      - path: doorway/doorway-service/src/routes/service_agent.rs
+        testName: a_service_agent_names_no_human_and_claims_no_key
+        kind: unit
+      - path: doorway/doorway-service/src/routes/service_agent.rs
+        testName: the_register_body_declares_the_service_agent_kind
+        kind: unit
+
+  - name: ServiceAgentRefusal
+    kind: reason-outcome-enum
+    sourceLocation:
+      file: src/routes/service_agent.rs
+      modulePath: routes::service_agent::ServiceAgentRefusal
+      line: 64
+    summary: >
+      Why a service-agent registration was refused, each with a distinct machine code and an
+      HTTP status that separates request shape (400), a doorway that cannot host or sponsor
+      (503), self-sponsorship (403) and a promise that did not name the asked-for sponsor (502).
+    concernIds:
+      - { id: C4, status: answered, justification: "refusal_statuses_separate_request_shape_from_capability pins every code distinct and the status classes, so a runner-ensure script branches on the reason rather than on prose." }
+      - { id: C1, status: answered, justification: "SelfSponsorship is its own variant, never folded into a generic failure." }
+      - { id: C13, status: n-a, justification: "A reason vocabulary; it grants no authority." }
+    contractTests:
+      - path: doorway/doorway-service/src/routes/service_agent.rs
+        testName: refusal_statuses_separate_request_shape_from_capability
+        kind: unit
+      - path: doorway/doorway-service/src/routes/service_agent.rs
+        testName: service_agent_id_must_be_a_prefixed_lowercase_slug
+        kind: unit
+
+  - name: bootstrap_key_promotes_to_admin
+    kind: verdict-fn
+    sourceLocation:
+      file: src/routes/service_agent.rs
+      modulePath: routes::service_agent::bootstrap_key_promotes_to_admin
+      line: 242
+    summary: >
+      Separates "may create a runner" from "is this doorway's admin". For every human phase a
+      matching bootstrap key still promotes (jenkins-ci provisioning unchanged in this slice);
+      for a service agent the key only authorized creation and the row is stored
+      Authenticated (service_agent_permission_level).
+    concernIds:
+      - { id: C12, status: answered, justification: "The runner's authority lives in its grants (hosted-cell from its sponsor, measure-stage from each provider), never on the doorway permission ladder." }
+      - { id: C13, status: answered, justification: "a_service_agent_is_never_admin pins that the creation credential never becomes standing; nothing here grants a tier." }
+      - { id: C1, status: n-a, justification: "No candidate selection." }
+    contractTests:
+      - path: doorway/doorway-service/src/routes/service_agent.rs
+        testName: a_service_agent_is_never_admin
+        kind: unit
+      - path: doorway/doorway-service/src/routes/service_agent.rs
+        testName: no_human_record_is_authored_for_a_service_agent
+        kind: unit
+      - path: doorway/doorway-service/src/routes/service_agent.rs
+        testName: the_service_agent_phase_is_never_treated_as_hosted
+        kind: unit
+
+  - name: runner_hosted_cell_grant_body
+    kind: pure-decision-predicate
+    sourceLocation:
+      file: src/routes/hosted_cell.rs
+      modulePath: routes::hosted_cell::runner_hosted_cell_grant_body
+      line: 210
+    summary: >
+      The exact body of a runner's hosted-cell promise: scope hosted-cell, recipient = the
+      runner's minted key, RUNNER_TERMS (365-day window, rotation_ttl_days 365, rate_per_hour
+      3600, epr_scope ["*"], reach_ceiling commons). Dev stakes on purpose, declared as named
+      constants separate from the human HOSTED_CELL_DAYS = 30; the hardening home is
+      genesis/data/timeline/backlog/security-ci-substrate-authorization-grant-coherence.md.
+    concernIds:
+      - { id: C6a, status: answered, justification: "runner_hosted_cell_grant_body_carries_the_runner_bounds pins every bound, including validUntil - validFrom <= rotation_ttl_days * 86400 across a leap day, which the grant surface enforces by refusing the whole request." }
+      - { id: C10, status: answered, justification: "Same scope and the same four accepted bound keys; the test pins exactly four." }
+      - { id: C13, status: partial, justification: "The generous window is a labeled dev-stakes scaffold pointing at its hardening home; the successor (short window, rotation, per-build tokens) is not built." }
+    contractTests:
+      - path: doorway/doorway-service/src/routes/hosted_cell.rs
+        testName: runner_hosted_cell_grant_body_carries_the_runner_bounds
+        kind: unit
+      - path: doorway/doorway-service/src/routes/hosted_cell.rs
+        testName: runner_terms_never_widen_the_human_promise
+        kind: unit

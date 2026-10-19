@@ -705,7 +705,7 @@ fn claims_are_foreign(claims_doorway_id: Option<&str>, self_doorway_id: Option<&
 /// `doorway`) runs its own. After a graduation (`/auth/node-key/bind`) the
 /// doorway is a router for that human, not their host. An absent phase is a
 /// pre-2026-10-15 row and keeps today's behavior.
-fn phase_forbids_auto_provision(agency_phase: Option<&str>) -> bool {
+pub(crate) fn phase_forbids_auto_provision(agency_phase: Option<&str>) -> bool {
     matches!(agency_phase, Some(p) if p != "hosted")
 }
 

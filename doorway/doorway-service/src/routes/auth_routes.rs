@@ -34,6 +34,10 @@ use crate::db::schemas::{
 use crate::routes::hosted_cell::{
     issue_hosted_cell_grant, pool_compute_config, revoke_hosted_cell_grant, HostedCellGrant,
 };
+use crate::routes::service_agent::{
+    bootstrap_key_promotes_to_admin, phase_authors_human_record, provision_service_agent,
+    service_agent_permission_level, unwind_service_agent, SERVICE_AGENT_PHASE,
+};
 use crate::routes::zome_helpers::{
     call_create_human, call_create_human_on_conductor, call_get_my_human, get_agent_pub_key,
     CreateHumanInput, CreateSelfRevocationInput, KeyRevocationOutput, ACCOUNT_CLOSED_REASON,
@@ -143,10 +147,16 @@ pub struct RegisterRequest {
     /// Must match the API_KEY_ADMIN environment variable.
     #[serde(default)]
     pub admin_bootstrap_key: Option<String>,
-    /// Agency phase for graduated stewardship: doorway, node, device, hosted, visitor.
+    /// Agency phase for graduated stewardship: doorway, node, device, hosted, visitor —
+    /// or `service-agent` for a stewarded runner (`routes::service_agent`).
     /// Determines registration flow — whether doorway creates identity or just DB record.
     #[serde(default)]
     pub agency_phase: Option<String>,
+    /// For `agencyPhase: "service-agent"` only: the runner's id, `agent:<slug>`
+    /// (e.g. `agent:ci-runner-jenkins-matthew`). Stored where a human row keeps
+    /// its human id, prefixed so it can never be mistaken for one.
+    #[serde(default)]
+    pub service_agent_id: Option<String>,
 }
 
 fn default_profile_reach() -> String {
@@ -1073,7 +1083,7 @@ pub(crate) enum OperatorAuthorityRefusal {
 }
 
 impl OperatorAuthorityRefusal {
-    fn code(self) -> &'static str {
+    pub(crate) fn code(self) -> &'static str {
         match self {
             Self::Unconfigured => "ADMIN_KEY_UNCONFIGURED",
             Self::Missing => "OPERATOR_KEY_REQUIRED",
@@ -1081,7 +1091,7 @@ impl OperatorAuthorityRefusal {
         }
     }
 
-    fn message(self) -> &'static str {
+    pub(crate) fn message(self) -> &'static str {
         match self {
             Self::Unconfigured => {
                 "This doorway has no admin key configured, so nobody can register as its operator"
@@ -1304,9 +1314,46 @@ async fn handle_register(
         None => None,
     };
 
+    // Set only by the service-agent arm: the runner's cell + sponsor promise.
+    let mut service_agent = None;
+
     // Branch registration flow by agency phase.
     // Returns (human_id, agent_pub_key, profile, provisioned).
     let (human_id, agent_pub_key, profile, provisioned) = match agency_phase {
+        // ── SERVICE AGENT ──────────────────────────────────────────────────────
+        // A stewarded runner (`routes::service_agent`): its cell is hosted on
+        // the pool conductor under a REQUIRED sponsor promise, and NO Human is
+        // authored. The bootstrap key authorizes creation; it never promotes.
+        SERVICE_AGENT_PHASE => match provision_service_agent(
+            &state,
+            &body.identifier,
+            body.service_agent_id.as_deref(),
+            &body.human_id,
+            &body.agent_pub_key,
+            body.admin_bootstrap_key.as_deref(),
+            user_collection.is_some(),
+        )
+        .await
+        {
+            Ok(sa) => {
+                let out = (
+                    sa.service_agent_id.clone(),
+                    sa.agent.agent_pub_key.clone(),
+                    None,
+                    Some(sa.agent.clone()),
+                );
+                service_agent = Some(sa);
+                out
+            }
+            Err(e) => {
+                let body = ErrorResponse {
+                    error: e.message,
+                    code: Some(e.code),
+                };
+                return json_response(e.status, &body);
+            }
+        },
+
         // ── DOORWAY ────────────────────────────────────────────────────────────
         // Operator bootstrap: use the singleton ZomeCaller targeting the
         // operator's conductor. No provisioning step — the doorway IS the
@@ -1968,6 +2015,8 @@ async fn handle_register(
                 }
             }
         }
+        // The runner's promise was REQUIRED and already notarized in its arm.
+        (SERVICE_AGENT_PHASE, _, _) => service_agent.as_ref().map(|sa| sa.grant.clone()),
         _ => None,
     };
 
@@ -1995,6 +2044,13 @@ async fn handle_register(
         // must never reach for the doorway's own identity in its place.
         user.hosted_cell_provider = grant.provider.clone();
     }
+    // A runner has ONE identity — its hosted cell's key — so the doorway holds
+    // no custodial key for it, and it records who sponsors it.
+    if let Some(ref sa) = service_agent {
+        user.custodial_key = None;
+        user.service_agent_sponsor = Some(sa.sponsor.clone());
+        user.permission_level = service_agent_permission_level();
+    }
 
     // If agent was provisioned on a conductor, set conductor_id and override agent key
     if let Some(ref p) = provisioned {
@@ -2011,8 +2067,14 @@ async fn handle_register(
     // failure where the operator could not distinguish "wrong key" from "key not
     // honoured" until a later /auth/me permission assertion. Reject explicitly
     // with a machine-readable code. The no-key path is unchanged: ordinary
-    // registrations never supply a bootstrap key and are unaffected.
-    if let Some(ref bootstrap_key) = body.admin_bootstrap_key {
+    // registrations never supply a bootstrap key and are unaffected. A service
+    // agent's key only AUTHORIZED its creation (checked in its arm) and never
+    // promotes: "may create a runner" is not "is this doorway's admin".
+    if let Some(bootstrap_key) = body
+        .admin_bootstrap_key
+        .as_ref()
+        .filter(|_| bootstrap_key_promotes_to_admin(agency_phase))
+    {
         match state.args.api_key_admin.as_ref() {
             Some(admin_key) if !admin_key.is_empty() && bootstrap_key == admin_key => {
                 user.permission_level = PermissionLevel::Admin;
@@ -2054,7 +2116,11 @@ async fn handle_register(
     if let Err(e) = collection.insert_one(user).await {
         // Check for duplicate key error (race condition)
         let error_str = e.to_string();
-        if error_str.contains("duplicate key") || error_str.contains("E11000") {
+        let duplicate = error_str.contains("duplicate key") || error_str.contains("E11000");
+        if let Some(ref sa) = service_agent {
+            unwind_service_agent(&state, sa, duplicate).await;
+        }
+        if duplicate {
             return json_response(
                 StatusCode::CONFLICT,
                 &ErrorResponse {
@@ -2082,7 +2148,10 @@ async fn handle_register(
     // been minted an agent key. Carry that key through to the projection row
     // that already bears the name, so the seeded persona and the hosted account
     // stop being two unlinked identities.
-    bind_human_projection_key(&state, &human_id, &actual_agent_pub_key, &body.human_id).await;
+    // A service agent binds no `humans` row: it is not a human record.
+    if phase_authors_human_record(agency_phase) {
+        bind_human_projection_key(&state, &human_id, &actual_agent_pub_key, &body.human_id).await;
+    }
 
     let (installed_app_id, conductor_id) =
         match registration_conductor_claims(provisioned.as_ref(), &actual_agent_pub_key) {
