@@ -1238,6 +1238,123 @@ pub(crate) fn should_provision(registry_configured: bool, dev_mode: bool) -> boo
     registry_configured
 }
 
+/// Is `app_id` an app this doorway provisioned for someone (a hosted cell), as
+/// opposed to a member's own pod app?
+///
+/// A pod runs the hApp under the doorway's configured `installed_app_id`; every
+/// app the doorway provisions carries a derived id (`{app}-{conductor}-{hash}`).
+/// The same split the conductor walk uses to count hosted apps. An app under any
+/// other id is treated as hosted: the refusals it feeds fail closed.
+fn is_doorway_hosted_app(app_id: &str, installed_app_id: &str) -> bool {
+    app_id != installed_app_id
+}
+
+fn agent_key_already_bound() -> Response<BoxBody> {
+    json_response(
+        StatusCode::FORBIDDEN,
+        &ErrorResponse {
+            error: "This agent key belongs to an agent this doorway hosts or to another \
+                    account; a node or device registration cannot claim it"
+                .into(),
+            code: Some("AGENT_KEY_ALREADY_BOUND".into()),
+        },
+    )
+}
+
+/// Why a node/device registration may NOT carry `agent_pub_key`, if it may not.
+///
+/// The key arrives in an unauthenticated body with no proof that the caller
+/// holds it. Stored, it is what login resolves to a conductor and app, and what
+/// the session names. So it is refused (403 `AGENT_KEY_ALREADY_BOUND`) when it:
+///
+/// - maps, in this doorway's registry, to an app this doorway hosts — someone
+///   else's hosted cell; or
+/// - is the key of another live account row (a member's own pod agent, a hosted
+///   person, the operator).
+///
+/// A member's own pod agent with no account yet is NOT refused: nothing here can
+/// tell its holder from anyone else without a signature by the key. That is the
+/// residual a proof-of-possession check closes.
+///
+/// An account lookup that fails is unknown, and refused as 503 rather than
+/// treated as "nobody holds it".
+async fn node_device_key_refusal(
+    state: &AppState,
+    users: Option<&crate::db::MongoCollection<UserDoc>>,
+    agent_pub_key: &str,
+) -> Option<Response<BoxBody>> {
+    if let Some(registry) = &state.conductor_registry {
+        if let Some(entry) = registry.get_conductor_for_agent(agent_pub_key) {
+            if is_doorway_hosted_app(&entry.app_id, &state.args.installed_app_id) {
+                warn!(
+                    agent = %agent_pub_key,
+                    conductor = %entry.conductor_id,
+                    "Node/device registration refused: the supplied key is an agent this \
+                     doorway hosts"
+                );
+                return Some(agent_key_already_bound());
+            }
+        }
+    }
+    if let Some(users) = users {
+        let forms = crate::conductor::agent_key::lookup_forms_of(agent_pub_key);
+        match users
+            .find_one(doc! { "agent_pub_key": { "$in": forms }, "is_active": true })
+            .await
+        {
+            Ok(Some(_)) => {
+                warn!(
+                    agent = %agent_pub_key,
+                    "Node/device registration refused: the supplied key is another account's"
+                );
+                return Some(agent_key_already_bound());
+            }
+            Ok(None) => {}
+            Err(e) => {
+                return Some(json_response(
+                    StatusCode::SERVICE_UNAVAILABLE,
+                    &ErrorResponse {
+                        error: format!("Could not check whether this agent key is taken: {e}"),
+                        code: Some("DB_ERROR".into()),
+                    },
+                ))
+            }
+        }
+    }
+    None
+}
+
+/// Refuse a login whose node/device account key names an app this doorway hosts.
+///
+/// A node/device account carries its own peer's key; a hosted app under it means
+/// the key was claimed without proof (before [`node_device_key_refusal`] existed,
+/// or by a path that skipped it). Hosted and legacy accounts are not judged here.
+fn node_device_login_refusal(
+    state: &AppState,
+    agency_phase: Option<&str>,
+    agent_pub_key: &str,
+) -> Option<Response<BoxBody>> {
+    if !matches!(agency_phase, Some("node" | "device")) {
+        return None;
+    }
+    let entry = state
+        .conductor_registry
+        .as_ref()?
+        .get_conductor_for_agent(agent_pub_key)?;
+    if !is_doorway_hosted_app(&entry.app_id, &state.args.installed_app_id) {
+        return None;
+    }
+    Some(json_response(
+        StatusCode::FORBIDDEN,
+        &ErrorResponse {
+            error: "This node or device account's key names an agent this doorway hosts, and \
+                    nothing shows it was hosted for this account"
+                .into(),
+            code: Some("ACCOUNT_KEY_HOSTED_HERE".into()),
+        },
+    ))
+}
+
 /// Carry the exact conductor/app provisioned for this registered agent into
 /// the browser session token. A provisioner result for a different agent is
 /// an invariant violation; do not mint a token with a mismatched routing pin.
@@ -1922,6 +2039,16 @@ async fn handle_register(
                 format!("uhCAk{}", hex::encode(&hash[..20]))
             };
 
+            // The key is the caller's word, with no proof of possession. Never
+            // let it name an agent this doorway hosts or another account holds:
+            // login would resolve it to that agent's app and mint a session
+            // naming it.
+            if let Some(refusal) =
+                node_device_key_refusal(&state, user_collection.as_ref(), &resolved_agent_key).await
+            {
+                return refusal;
+            }
+
             info!(
                 agency_phase = %agency_phase,
                 human_id = %resolved_human_id,
@@ -2598,6 +2725,19 @@ async fn handle_login(
                 .unwrap_or((None, user.conductor_id.clone()));
             (user.agent_pub_key.clone(), app_id, cid)
         };
+
+    // A node/device account's key was the caller's word at registration. If it
+    // names an app this doorway hosts, the session would carry that hosted
+    // agent: refuse rather than mint it.
+    if let Some(refusal) =
+        node_device_login_refusal(&state, user.agency_phase.as_deref(), &user.agent_pub_key)
+    {
+        warn!(
+            identifier = %body.identifier,
+            "Login refused: a node/device account's key names an agent this doorway hosts"
+        );
+        return refusal;
+    }
 
     info!(
         "Login successful: {} (permission: {:?})",
@@ -7041,5 +7181,87 @@ mod tests {
         // A real promise, but the peer never named itself: unnamed, not
         // "doorway-alpha" and not "alpha.elohim.host".
         assert_eq!(household_steward_key(Some("uhCEkHostedCell"), None), None);
+    }
+}
+
+#[cfg(test)]
+mod node_device_key_guard_tests {
+    use super::*;
+    use crate::conductor::ConductorRegistry;
+
+    const HOSTED: &str = "uhCAkhostedvictim";
+    const POD: &str = "uhCAkmemberpod";
+
+    async fn state_with_agents() -> AppState {
+        use clap::Parser;
+        let args = crate::config::Args::parse_from(["doorway", "--listen", "127.0.0.1:0"]);
+        let mut state = AppState::new(args);
+        let registry = ConductorRegistry::new(None).await;
+        registry
+            .register_agent(HOSTED, "conductor-0", "elohim-conductor-0-abcdef")
+            .await
+            .unwrap();
+        registry
+            .register_agent(POD, "conductor-1", "elohim")
+            .await
+            .unwrap();
+        state.conductor_registry = Some(Arc::new(registry));
+        state
+    }
+
+    async fn code_of(response: Response<BoxBody>) -> (u16, String) {
+        let status = response.status().as_u16();
+        let bytes = response.into_body().collect().await.unwrap().to_bytes();
+        let value: serde_json::Value = serde_json::from_slice(&bytes).unwrap();
+        (
+            status,
+            value["code"].as_str().unwrap_or_default().to_string(),
+        )
+    }
+
+    #[test]
+    fn only_the_installed_app_id_is_a_pod() {
+        assert!(!is_doorway_hosted_app("elohim", "elohim"));
+        assert!(is_doorway_hosted_app("elohim-conductor-0-abcdef", "elohim"));
+        assert!(is_doorway_hosted_app("something-else", "elohim"));
+    }
+
+    #[tokio::test]
+    async fn a_node_device_registration_cannot_carry_a_hosted_agents_key() {
+        let state = state_with_agents().await;
+        let refused = node_device_key_refusal(&state, None, HOSTED)
+            .await
+            .expect("a hosted agent's key is refused");
+        assert_eq!(
+            code_of(refused).await,
+            (403, "AGENT_KEY_ALREADY_BOUND".to_string())
+        );
+    }
+
+    #[tokio::test]
+    async fn a_members_own_pod_key_and_an_unknown_key_are_not_refused_here() {
+        let state = state_with_agents().await;
+        assert!(node_device_key_refusal(&state, None, POD).await.is_none());
+        assert!(node_device_key_refusal(&state, None, "uhCAkunknown")
+            .await
+            .is_none());
+    }
+
+    #[tokio::test]
+    async fn a_node_device_login_onto_a_hosted_app_is_refused() {
+        let state = state_with_agents().await;
+        for phase in ["node", "device"] {
+            let refused = node_device_login_refusal(&state, Some(phase), HOSTED).expect("refused");
+            assert_eq!(
+                code_of(refused).await,
+                (403, "ACCOUNT_KEY_HOSTED_HERE".to_string()),
+                "{phase}"
+            );
+            assert!(node_device_login_refusal(&state, Some(phase), POD).is_none());
+            assert!(node_device_login_refusal(&state, Some(phase), "uhCAkunknown").is_none());
+        }
+        // Hosted and legacy accounts are not judged by this guard.
+        assert!(node_device_login_refusal(&state, Some("hosted"), HOSTED).is_none());
+        assert!(node_device_login_refusal(&state, None, HOSTED).is_none());
     }
 }
