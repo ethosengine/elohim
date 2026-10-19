@@ -2,6 +2,7 @@
 title: "Retrospective — the 2026-10-12..18 marathon: 55 granted hours, 260 commits, and a delivery ledger that read 0 of 0"
 id: marathon-retrospective-20261018
 date: 2026-10-18
+revised: 2026-10-19
 status: complete
 author: "claude-fable-5-1 (controller of the 10-18 close), with read-only evidence from claude-haiku (sprint-doc and CI readers) and claude-sonnet (ci-investigator); for the operator, human:matthew"
 habits: [dev-system-equilibrium, push-delivers-within-budget, dataplane-convergence, blob-durability]
@@ -15,6 +16,10 @@ cites:
   - elohim/elohim-storage/.epr-meta/blob-durability.habit.md
   - genesis/data/timeline/backlog/conductor-startup-lifecycle-ownership.md
   - genesis/data/timeline/backlog/arch-device-recognition-backlog.md
+  - genesis/data/timeline/backlog/steward-key-chain-fork-warrant-exile.md
+  - genesis/data/timeline/backlog/doorway-ssr-late-adoption-tick-silent.md
+  - genesis/data/timeline/backlog/mesh-prologue-cast-and-env-gaps.md
+  - genesis/a2o/features/resilience/chain-fork-lost-tail.feature
 ---
 
 # Retrospective: the 2026-10-12..18 marathon
@@ -32,11 +37,13 @@ Prometheus; every number names its source so it can be re-read.
 | Window | 2026-10-12 → 10-17 22:43Z (last commit 15f4e9bcf) | 2026-10-18 02:38Z → 16:53Z |
 | Grant | orchestrated sprint, operator away | "15 hours no interruptions", push + fleet granted |
 | Commits | 242 (16 merges) | 18 (incl. the merge of shem's branch) |
-| Record of itself | **none in the repo** (its plan/journal lived in a per-workspace config dir and died with the workspace) | plan file Journal (hour-by-hour) + the 10-18 sprint record |
-| How it ended | node `shem` went Ready → Unknown between 00:27Z and 01:27Z on 10-18 (Prometheus `kube_node_status_condition`, hourly step); still Unknown at 17:27Z | planned close at h13.25; one wakeup to push, Jenkins still busy, batch 3 left local |
+| Record of itself | none on dev, but not lost: an 834-line journal (cycles C1–C16+) at `.worktrees/marathon-1016/genesis/local-dev/marathon-2026-10-16/STATE.md`, the charter in the workspace's plans dir, and an unpushed final wave (`land-1017`, 7 commits). *Corrected 2026-10-19; the first version said "none … died with the workspace".* | plan file Journal (hour-by-hour) + the 10-18 sprint record |
+| How it ended | **a power loss.** The household's conductors wrote their last log line at 00:37:37.755Z on 10-18, under SQLite `database is locked` contention; the journal's last write is ≈00:32Z; node `shem` went Ready → Unknown between 00:27Z and 01:27Z (Prometheus `kube_node_status_condition`, hourly step) | planned close at h13.25; one wakeup to push, Jenkins still busy, batch 3 left local |
 
-The "crashed with ~15 h to go" the operator reported has no timestamp in the repo. The node
-outage three hours after shem's last commit is the first dated evidence of it.
+The "crashed with ~15 h to go" the operator reported is now dated: the node lost power just
+after 00:37:37Z, two hours after shem's last commit (22:43Z). Shem's workspace came back on
+10-18 with its journal, its unlanded wave and a rescue snapshot of the uncommitted main tree;
+§10 records what was recovered and landed.
 
 ## 2. The numbers
 
@@ -163,9 +170,12 @@ hard watermark of 20; delivery-cost 2.23 pipeline-hours against 1; operator-surf
    took `pytest`), one was a hand edit of a generated file, and the per-project tree gates were
    only read at the end of a 50-minute run. A local `just gate` plus the parity check would have
    caught all of them in minutes.
-5. **Shem left no record.** Forty hours survive as commit subjects. The plan and journal live
-   outside the repo by design (per-workspace config) and died with the workspace. Its crash
-   cause had to be reconstructed from Prometheus twenty hours later.
+5. **Shem's record was not on dev.** *(Corrected 2026-10-19; the first version said shem left
+   no record.)* The journal and charter survived the power loss, but in the workspace's
+   gitignored campaign dir and config dir. Nobody could read them until the node came back, and
+   its final wave (7 commits) and 245 uncommitted files never reached dev. A controller reading
+   only the repo concluded "no record", and the retro repeated it. S1 below stands; its reason
+   is reach, not loss.
 6. **One node, four fingerprints, no sensor.** `shem` hosts four of seven alpha peers, doorway-b
    and a workspace. Its loss showed up as two UNSTABLE deploys, two UNSTABLE genesis runs and
    four "new" CI findings over 16 hours, and nothing said "node shem Unknown".
@@ -182,8 +192,8 @@ hard watermark of 20; delivery-cost 2.23 pipeline-hours against 1; operator-surf
 - Shem's household saw station-2 windows past 120 s; this one saw 43 s on the pin and 10 s
   after the cure. Store size and ~100 hosted cells are the suspected difference; it cannot be
   re-measured while shem is down.
-- Does the "15 h to go" crash equal the node outage? Timing fits (last commit 22:43, node
-  Unknown by 01:27). The operator can confirm from the machine.
+- ~~Does the "15 h to go" crash equal the node outage?~~ **Resolved 2026-10-19:** yes. The
+  operator reported a power loss, and the household's conductor log ends at 00:37:37.755Z (§1).
 - Who reads a sprint record? Six were written this month. The ratios above did not move.
 
 ## 7. Root causes
@@ -239,8 +249,10 @@ Each item has a done-when that can be read without asking anyone.
 
 **Operator-only** (unchanged from the sprint record, plus two): node `shem`'s health and the
 Terminating pods on it; `git stash drop stash@{0}`; the fork pin decision; the allow-rules
-script; three memory entries to claim; the first-device approver rule; `git push origin dev`
-for batch 3 (now four commits with this document) once Jenkins is idle.
+script; three memory entries to claim; the first-device approver rule. ~~`git push origin dev`
+for batch 3~~ (done: batch 3 and this document reached dev in the 2d1edf1ee lineage). Four more
+from §10: decision D1 (how a forked key returns), Adam's operator key on the household, the
+F1/F2 auth follow-ups, and re-triggering CI for b1e42ad82 once Jenkins is back.
 
 ## 9. Velocity, for planning the next one
 
@@ -252,3 +264,89 @@ one to three commitments fulfilled in the ledger's own unit, and a ratio that do
 worse. Judged that way, this marathon moved two reds with proof, fulfilled nothing the
 ledger could see, and let the ratio slip by one. The next one should be measured before it
 starts, on exactly those three lines.
+
+## 10. Addendum, 2026-10-19: the integration pass, wave 6 landed, and what verification found
+
+Written by the controller of the 10-18/19 integration pass on shem's recovered workspace
+(claude-opus-5-5, for human:matthew). The operator's sequence was integration pass, then land
+wave 6, then verify, then revisit this retro on the result. The campaign journal is
+`genesis/local-dev/integration-2026-10-18/STATE.md` (gitignored, on this workspace's PVC).
+
+**Integration pass.** Every stranded branch and worktree was read against dev and given a
+verdict:
+- **Still needed, next to land:** retired-pin-readmit-backoff; plane-violation-write-guard and
+  hosted-provisioning-stop-damage (both need a rebase; the second is security); the SSR phase
+  and ux-walk commits on perf/call-floor-2; brit-daily-driver.
+- **Parked by ruling:** provide-revoke-arm.
+- **Already on dev in another form:** vite-8 and agent-a37d55a.
+- **Needs its owner:** devfile-shem, the 245-file rescue branch, and wt-sw-preload.
+- **Authz gap found on dev:** eight doorway operator actuators accepted callers below Admin
+  (provision, deprovision, force-graduation, the federation actuators, both refreshes). The fix
+  branch rode with wave 6, by the operator's choice.
+
+**Landed:** `origin/dev 2d1edf1ee..b1e42ad82`, 14 commits through the full pre-push gate with
+no bypass:
+- wave 6: the pool-batch-on-empty-primary fix, `excludeStates` on commitments with its SDK sync,
+  and habit deltas
+- the operator-surface authz guard
+- one prologue fix found during verification
+
+The serving receipt was `epr-app-deliverability` at 135/135
+(`sprint-report-household-20261019T001729Z-2355e99d`).
+
+**What verification found.**
+
+1. **The power loss forked a chain, and the household exiled james from lamad.**
+   - At the cold restart (22:11Z), matthew and jessica authored chain-fork warrants against
+     james's agent for one action pair (22:17Z).
+   - From then on they dropped all of james's lamad traffic (221 069 of 601 060 messages, every
+     one on lamad) and left him out of their lamad peer stores.
+   - Deliverability could not pass, and a 30-minute "settle" wait measured nothing.
+   - Mechanism, consistent but not yet proven: the conductor commits at SQLite `synchronous=Normal`
+     in WAL mode, where a published action can roll back on a power loss but not on a process
+     crash.
+   - Under the current pin, no admin call lifts the warrant's block, so the operator authorized a
+     full re-cast of the household's identities. James's databases were preserved first for
+     dating the fork.
+   - It is the alpha adam/eve exile class (dataplane-convergence DELTA 10-10a/b) reproduced by an
+     honest crash.
+   - Recorded in `backlog/steward-key-chain-fork-warrant-exile` (reworked into C1a–C7 plus
+     decision D1), with a reproducible drill in `a2o/features/resilience/chain-fork-lost-tail.feature`.
+2. **The fresh household exposed three things a long-lived household had hidden.**
+   - (a) This landing's operator-binding seeder needs `OPERATOR_STEWARD_STORAGE_URL`, which the
+     prologue never passed. Fixed in b1e42ad82.
+   - (b) The same seeder now needs a real login for every operator, and the household does not
+     cast Adam, the apex primary. A fresh household therefore seeds no bindings at all. That is an
+     operator decision, recorded in `mesh-prologue-cast-and-env-gaps`.
+   - (c) A doorway that boots before its SSR heads are declared never adopts them: warmup reports
+     complete while `servedBundleHeads` stays `[]`. It predates this landing: restarting each
+     doorway on the same binary gave failover 41/41. Recorded in
+     `backlog/doorway-ssr-late-adoption-tick-silent`.
+   - Also surfaced: the 15 h sprint's first-device-no-approver finding, which now fails channel
+     isolation and version convergence on any freshly cast household.
+3. **CI could not be read.**
+   - Jenkins was down at landing time (`jenkins.ethosengine.com` 503), so no pipeline verdict
+     exists for b1e42ad82. Its webhook may have been lost.
+   - The fleet did not move: doorway-alpha was degraded before the push, with its storage-A
+     circuit open after 210 errors and shedding, while elohim.host was healthy.
+
+**What this changes in the reading above.**
+- §5.5 and §6 are corrected in place.
+- The lesson of §5.6 ("one node, four fingerprints, no sensor") repeats at the household scale.
+  An exiled peer reads exactly like a slow one from the storage side: pending grows, stuck sweeps
+  climb. The first `/db/p2p/conductor-diagnostics` read would have named it in seconds.
+- Under X3, waiting on "churn" without reading blocked-per-DNA counts is the household version
+  of the suspended-session loss.
+- Add to Start:
+
+| # | action | owner | done-when |
+|---|---|---|---|
+| S7 | Name exile where it bites: `just mesh status` and preflight print `EXILED <peer> <dna>` from blocked÷received per DNA, and the deliverability pointer step names an exiled peer instead of `<200>` | me (C2b of the exile item; no decision needed) | chain-fork-lost-tail scenario 3 passes |
+| S8 | Rule D1 (re-key with lineage, recommended, or operator unblock), so a forked key has a way back other than a re-cast | operator | the ruling is recorded in the exile item and its scenario 8 is rewritten or kept accordingly |
+| S9 | Commit authored actions durably before publishing (`synchronous=Full`, or a narrower authoring sync), measured for disk-write cost on the household first | me (measure), operator (pin/config roll) | chain-fork-lost-tail scenario 6 passes |
+
+**Numbers at this revision.** The register reads 14 green / 29 red / 5 unwired of 48. The
+operator surface brought one habit, born red; no flips were claimed in this pass. The landing
+fulfilled nothing in the ledger's unit, which is §5.1 again. It did discharge the operator's
+three named steps, and it turned one stranded wave into dev. Velocity (§9) is unchanged:
+nothing in this pass moved a red with proof.
