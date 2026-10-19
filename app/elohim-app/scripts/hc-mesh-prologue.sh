@@ -299,7 +299,11 @@ run_seed_leg "seed-base-corpus-via-B" hard \
 #    projections without seed-projections, which sheds `/`.
 # ---------------------------------------------------------------------------
 banner "2-3. operator bindings + projections"
-run_seed_leg "seed-operator-bindings" soft 'DOORWAY_URL="$DOORWAY_A_URL" npx tsx src/seed-operator-bindings.ts'
+# The seeder writes issuer-checked bindings through the steward of record's own
+# conductor-backed storage (matthew = peer 0) and refuses without it; unset, a
+# fresh household carries no operate-doorway binding and served-under-standing's
+# projecting-doorway credit has nothing to resolve.
+run_seed_leg "seed-operator-bindings" soft 'DOORWAY_URL="$DOORWAY_A_URL" OPERATOR_STEWARD_STORAGE_URL="http://localhost:$(http_port 0)" npx tsx src/seed-operator-bindings.ts'
 run_seed_leg "seed-projections"       soft 'DOORWAY_URL="$DOORWAY_A_URL" npx tsx src/seed-projections.ts'
 
 # ---------------------------------------------------------------------------
