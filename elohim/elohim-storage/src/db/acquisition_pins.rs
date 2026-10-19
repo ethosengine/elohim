@@ -256,7 +256,9 @@ pub fn set_commitment_cid(
 // below. Each runs in one IMMEDIATE transaction — the rows it decides on are
 // the rows it writes, and what it returns is exactly what committed (or, on an
 // error, nothing did) — and each takes `now` so the ladder is testable against
-// a clock. Every re-activation bumps `round`.
+// a clock. Only the hold pass opens a new `round`: when it settles a pin, and
+// when it re-admits one whose tracker is gone. A read, an inventory naming the
+// head and an explicit re-pin keep the round, as on dev.
 
 type Now = chrono::DateTime<chrono::Utc>;
 
@@ -265,8 +267,8 @@ type Now = chrono::DateTime<chrono::Utc>;
 ///
 /// `exhausted` pairs each pin id with the `round` whose retry budget was spent
 /// (`AcquisitionState::exhausted_pins`). A pin whose row is no longer `active`
-/// (un-pinned meanwhile), or whose `round` has moved on (re-pinned, or named by
-/// an inventory, since that exhaustion was measured), is left alone — a stale
+/// (un-pinned meanwhile), or whose `round` has moved on (the hold pass opened a
+/// new one since that exhaustion was measured), is left alone — a stale
 /// exhaustion says nothing about the round the pin is now in.
 ///
 /// Returns `(pin id, new consecutive_retirements)` for each pin retired.
@@ -357,10 +359,11 @@ pub struct HoldPass {
 /// not admitted ([`mark_read_since_retired`]) caps it at `retired_at` +
 /// [`PIN_READMIT_COOLDOWN`]. (An admitted read does not wait for this pass: it
 /// re-activates the pin in the read path, [`record_demand_pin`].) Every value
-/// is normalised UTC text in one format, so `readmit_after <= stamp(now)`
-/// compares as text. `stamp` drops `now`'s fraction of a second, so the
-/// comparison is inclusive: a pin due at `18:00:00Z` is admitted by a pass at
-/// `18:00:00.250Z`, as before the ladder. At rest two indexed existence checks on
+/// is normalised UTC text in whole seconds, compared as text against
+/// `stamp(now - 1 ns)` inclusively. For a whole-second deadline that is exactly
+/// `readmit_after < now` at full precision — dev's strict `now - retired_at >
+/// cooldown`: a pin due at `18:00:00Z` is not admitted by a pass at exactly
+/// `18:00:00Z` and is admitted by one at `18:00:00.250Z`. At rest two indexed existence checks on
 /// `idx_acquisition_pins_status_readmit_after` find nothing, and the pass
 /// opens no write transaction.
 ///
@@ -403,13 +406,15 @@ pub fn retired_hold_pass(
     tracked: &std::collections::HashSet<i32>,
 ) -> QueryResult<HoldPass> {
     let stamped = stamp(now);
+    // Due means `readmit_after < now` at full precision (see above).
+    let due_by = stamp(now - chrono::Duration::nanoseconds(1));
     let retired = || pins::acquisition_pins.filter(pins::status.eq("retired"));
     let undated: bool = diesel::select(diesel::dsl::exists(
         retired().filter(pins::readmit_after.is_null()),
     ))
     .get_result(conn)?;
     let due: bool = diesel::select(diesel::dsl::exists(
-        retired().filter(pins::readmit_after.le(&stamped)),
+        retired().filter(pins::readmit_after.le(&due_by)),
     ))
     .get_result(conn)?;
     if !undated && !due {
@@ -453,7 +458,7 @@ pub fn retired_hold_pass(
 
         let due: Vec<AcquisitionPin> = pins::acquisition_pins
             .filter(pins::status.eq("retired"))
-            .filter(pins::readmit_after.le(&stamped))
+            .filter(pins::readmit_after.le(&due_by))
             .order(pins::readmit_after.asc())
             .load(conn)?;
         let local = if due.is_empty() {
@@ -1560,8 +1565,11 @@ mod tests {
         let mut conn = pool.get().expect("conn");
         let pin = pin_for(&mut conn, "due-on-the-second");
         retire(&mut conn, pin.id, t0());
-        let due = t0() + PIN_READMIT_COOLDOWN + Duration::milliseconds(250);
-        let pass = hold_pass(&mut conn, due);
+        let deadline = t0() + PIN_READMIT_COOLDOWN;
+        // Exactly on the deadline is not past it: dev's comparison is strict.
+        assert!(hold_pass(&mut conn, deadline).readmitted.is_empty());
+        assert_eq!(reread(&mut conn, pin.id).status, "retired");
+        let pass = hold_pass(&mut conn, deadline + Duration::milliseconds(250));
         assert_eq!(pass.readmitted.len(), 1);
         assert_eq!(reread(&mut conn, pin.id).status, "active");
     }

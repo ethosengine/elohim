@@ -394,8 +394,9 @@ pub async fn inventory_received(
 
 /// Flip `exhausted` pins (from [`AcquisitionState::exhausted_pins`], each with
 /// the round it exhausted in) to [`PIN_STATUS_RETIRED`], one rung up the
-/// backoff ladder each, and republish the retired gauge. A pin re-activated
-/// since that exhaustion was measured is in a later round and is left alone.
+/// backoff ladder each, and republish the retired gauge. A pin the hold pass
+/// re-admitted into a new round since that exhaustion was measured is left
+/// alone.
 /// Returns how many were retired.
 pub fn retire_exhausted_pins(
     conn: &mut diesel::SqliteConnection,
@@ -706,9 +707,9 @@ struct AcquisitionInner {
     /// content id → pin ids wanting it (completion fan-out)
     wanted_by: HashMap<String, Vec<i32>>,
     /// pin row id → the row's `round` its tracker was built for. A pin that
-    /// comes back with a different round was re-activated (cooldown, demand,
-    /// inventory, explicit re-pin): its tracker — and the retry budget spent in
-    /// it — belongs to the round before and is discarded.
+    /// comes back with a different round was re-admitted by the hold pass
+    /// after its tracker was gone, or settled: any tracker — and the retry
+    /// budget spent in it — belongs to the round before and is discarded.
     rounds: HashMap<i32, i32>,
 }
 
@@ -934,12 +935,6 @@ impl AcquisitionState {
         Self::rollup_inner(&inner)
     }
 
-    /// Honest status boundary for `/p2p/status.pull`.
-    ///
-    /// `None` has exactly one provenance: no local acquisition reconcile has
-    /// completed since process start. Once initialized, `Some(total=0)` is a
-    /// positive observation that the active desired set is empty, never a
-    /// default standing in for unmeasured state.
     /// The pins that hold a tracker right now. The hold pass reads it so that
     /// a pin whose exhausted tracker was never evicted is not handed a fresh
     /// retry budget by its re-admission.
@@ -947,6 +942,12 @@ impl AcquisitionState {
         self.inner.read().await.trackers.keys().copied().collect()
     }
 
+    /// Honest status boundary for `/p2p/status.pull`.
+    ///
+    /// `None` has exactly one provenance: no local acquisition reconcile has
+    /// completed since process start. Once initialized, `Some(total=0)` is a
+    /// positive observation that the active desired set is empty, never a
+    /// default standing in for unmeasured state.
     pub async fn rollup_if_initialized(&self) -> Option<PullStatusInfo> {
         let inner = self.inner.read().await;
         inner.initialized.then(|| Self::rollup_inner(&inner))
