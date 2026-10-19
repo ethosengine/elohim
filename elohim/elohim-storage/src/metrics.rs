@@ -2135,6 +2135,76 @@ lazy_static! {
     .unwrap();
 }
 
+// The retired-pin backoff series sit in their own block: the first block is at
+// the crate's macro recursion limit.
+lazy_static! {
+    /// Backoff steps taken by retired acquisition pins. label: hold = the hold
+    /// the pin now serves, "6h" | "12h" | "24h"
+    /// (`db::acquisition_pins::pin_hold_label`). One per retirement.
+    ///
+    /// Mass on "24h" is the population of wants nobody can fill; mass that
+    /// stays on "6h" while `…_backoff_resets_total` rises is pins flapping
+    /// between a peer's advertisement and that peer's failure to serve.
+    pub static ref ACQUISITION_PIN_BACKOFF_STEPS: IntCounterVec = IntCounterVec::new(
+        Opts::new(
+            "elohim_acquisition_pin_backoff_steps_total",
+            "Retired acquisition pin backoff steps by the hold now served.",
+        ),
+        &["hold"],
+    )
+    .unwrap();
+
+    /// Backoff ladders reset to the first rung. label: reason = "fetched" (the
+    /// bytes arrived) | "inventory" (a peer advertised the head while the pin
+    /// was retired). See [`PinBackoffReset`].
+    pub static ref ACQUISITION_PIN_BACKOFF_RESETS: IntCounterVec = IntCounterVec::new(
+        Opts::new(
+            "elohim_acquisition_pin_backoff_resets_total",
+            "Acquisition pin backoff resets by reason.",
+        ),
+        &["reason"],
+    )
+    .unwrap();
+
+    /// Retired acquisition pins put back to `active`, by what ended the hold.
+    /// label: cause — see [`PinReadmitCause`]. The same events as
+    /// `elohim_acquisition_pin_retirements_total{reason="readmitted"}`, split.
+    pub static ref ACQUISITION_PIN_READMISSIONS: IntCounterVec = IntCounterVec::new(
+        Opts::new(
+            "elohim_acquisition_pin_readmissions_total",
+            "Retired acquisition pins re-activated, by cause.",
+        ),
+        &["cause"],
+    )
+    .unwrap();
+
+    /// Read-misses the demand auto-pin did not admit. label: reason — see
+    /// [`DemandDrop`]. Such a read authors nothing and re-admits nothing; if it
+    /// named a retired pin the row is marked
+    /// (`…_pin_hold_skips_total{reason="read_marked"}`).
+    pub static ref ACQUISITION_DEMAND_DROPPED: IntCounterVec = IntCounterVec::new(
+        Opts::new(
+            "elohim_acquisition_demand_dropped_total",
+            "Read-misses the demand auto-pin did not admit, by reason.",
+        ),
+        &["reason"],
+    )
+    .unwrap();
+
+    /// Decisions to leave a held acquisition pin held. label: reason — see
+    /// [`PinHoldSkip`]. The per-tick reasons count pin-ticks (a pin held for
+    /// three ticks counts three): "hold_not_elapsed" over ticks is the held
+    /// population.
+    pub static ref ACQUISITION_PIN_HOLD_SKIPS: IntCounterVec = IntCounterVec::new(
+        Opts::new(
+            "elohim_acquisition_pin_hold_skips_total",
+            "Held acquisition pins left held, by reason.",
+        ),
+        &["reason"],
+    )
+    .unwrap();
+}
+
 // A SEPARATE `lazy_static!` block, purely to stay under the macro's recursion
 // limit — the single block above was already at the edge of it, and one more
 // entry tips `__lazy_static_internal!` over. No other reason for the split;
@@ -3696,6 +3766,36 @@ pub fn register_all() {
         let _ = REGISTRY.register(Box::new(ACQUISITION_ACTIVE_PINS.clone()));
         let _ = REGISTRY.register(Box::new(ACQUISITION_PINS_RETIRED.clone()));
         let _ = REGISTRY.register(Box::new(ACQUISITION_PIN_RETIREMENTS.clone()));
+        let _ = REGISTRY.register(Box::new(ACQUISITION_PIN_BACKOFF_STEPS.clone()));
+        for hold in crate::db::acquisition_pins::PIN_HOLD_LABELS {
+            ACQUISITION_PIN_BACKOFF_STEPS
+                .with_label_values(&[hold])
+                .inc_by(0);
+        }
+        let _ = REGISTRY.register(Box::new(ACQUISITION_PIN_BACKOFF_RESETS.clone()));
+        for reason in PinBackoffReset::ALL {
+            ACQUISITION_PIN_BACKOFF_RESETS
+                .with_label_values(&[reason.label()])
+                .inc_by(0);
+        }
+        let _ = REGISTRY.register(Box::new(ACQUISITION_PIN_READMISSIONS.clone()));
+        for cause in PinReadmitCause::ALL {
+            ACQUISITION_PIN_READMISSIONS
+                .with_label_values(&[cause.label()])
+                .inc_by(0);
+        }
+        let _ = REGISTRY.register(Box::new(ACQUISITION_DEMAND_DROPPED.clone()));
+        for reason in DemandDrop::ALL {
+            ACQUISITION_DEMAND_DROPPED
+                .with_label_values(&[reason.label()])
+                .inc_by(0);
+        }
+        let _ = REGISTRY.register(Box::new(ACQUISITION_PIN_HOLD_SKIPS.clone()));
+        for reason in PinHoldSkip::ALL {
+            ACQUISITION_PIN_HOLD_SKIPS
+                .with_label_values(&[reason.label()])
+                .inc_by(0);
+        }
         let _ = REGISTRY.register(Box::new(SYNC_IN_SYNC_TOTAL.clone()));
         let _ = REGISTRY.register(Box::new(HEAD_BATCH_CALLS.clone()));
         let _ = REGISTRY.register(Box::new(HEAD_BATCH_IDS.clone()));
@@ -6254,6 +6354,157 @@ pub fn set_acquisition_pins_retired(count: u64) {
 pub fn inc_acquisition_pin_retirements(reason: &str, n: u64) {
     ACQUISITION_PIN_RETIREMENTS
         .with_label_values(&[reason])
+        .inc_by(n);
+}
+
+/// Why a retired pin's backoff ladder went back to the first rung.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum PinBackoffReset {
+    /// The wanted bytes are local.
+    Fetched,
+    /// A peer inventory named the head while the pin was retired.
+    Inventory,
+}
+
+impl PinBackoffReset {
+    pub const ALL: [PinBackoffReset; 2] = [PinBackoffReset::Fetched, PinBackoffReset::Inventory];
+
+    pub fn label(self) -> &'static str {
+        match self {
+            PinBackoffReset::Fetched => "fetched",
+            PinBackoffReset::Inventory => "inventory",
+        }
+    }
+}
+
+/// What ended a retired pin's hold.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum PinReadmitCause {
+    /// Its own hold elapsed (the backoff ladder).
+    Hold,
+    /// A read the demand auto-pin admitted re-activated it, in the read path.
+    Demand,
+    /// A read the auto-pin did not admit marked it, and the first rung passed.
+    Read,
+    /// A peer inventory named its head.
+    Inventory,
+    /// Its content became local while it was retired.
+    Fetched,
+}
+
+impl PinReadmitCause {
+    pub const ALL: [PinReadmitCause; 5] = [
+        PinReadmitCause::Hold,
+        PinReadmitCause::Demand,
+        PinReadmitCause::Read,
+        PinReadmitCause::Inventory,
+        PinReadmitCause::Fetched,
+    ];
+
+    pub fn label(self) -> &'static str {
+        match self {
+            PinReadmitCause::Hold => "hold",
+            PinReadmitCause::Demand => "demand",
+            PinReadmitCause::Read => "read",
+            PinReadmitCause::Inventory => "inventory",
+            PinReadmitCause::Fetched => "fetched",
+        }
+    }
+}
+
+/// Why a held pin was left held.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum PinHoldSkip {
+    /// Per tick: a retired pin whose hold has not ended.
+    HoldNotElapsed,
+    /// A retired pin with no readable retirement time: not re-admitted,
+    /// restarted on the first rung (once per pin).
+    ClockUnreadable,
+    /// A read-miss named a `removed` (or `paused`) pin: not revived.
+    DemandRemoved,
+    /// A read-miss the demand auto-pin did not admit named a `retired` pin:
+    /// left held, its hold capped at the first rung (once per pin per hold).
+    ReadMarked,
+}
+
+impl PinHoldSkip {
+    pub const ALL: [PinHoldSkip; 4] = [
+        PinHoldSkip::HoldNotElapsed,
+        PinHoldSkip::ClockUnreadable,
+        PinHoldSkip::DemandRemoved,
+        PinHoldSkip::ReadMarked,
+    ];
+
+    pub fn label(self) -> &'static str {
+        match self {
+            PinHoldSkip::HoldNotElapsed => "hold_not_elapsed",
+            PinHoldSkip::ClockUnreadable => "clock_unreadable",
+            PinHoldSkip::DemandRemoved => "demand_removed",
+            PinHoldSkip::ReadMarked => "read_marked",
+        }
+    }
+}
+
+/// Why the demand auto-pin did not admit a read-miss.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum DemandDrop {
+    /// The same head was sampled within the throttle window.
+    Throttled,
+    /// The window of distinct ids was full.
+    WindowFull,
+    /// The active set (with demand already recorded) was at its ceiling.
+    ActiveCeiling,
+}
+
+impl DemandDrop {
+    pub const ALL: [DemandDrop; 3] = [
+        DemandDrop::Throttled,
+        DemandDrop::WindowFull,
+        DemandDrop::ActiveCeiling,
+    ];
+
+    pub fn label(self) -> &'static str {
+        match self {
+            DemandDrop::Throttled => "throttled",
+            DemandDrop::WindowFull => "window_full",
+            DemandDrop::ActiveCeiling => "active_ceiling",
+        }
+    }
+}
+
+/// Record one read-miss the demand auto-pin did not admit, for `reason`.
+pub fn inc_acquisition_demand_dropped(reason: DemandDrop) {
+    ACQUISITION_DEMAND_DROPPED
+        .with_label_values(&[reason.label()])
+        .inc();
+}
+
+/// Record `n` retired pins re-activated for `cause`.
+pub fn inc_acquisition_pin_readmissions(cause: PinReadmitCause, n: u64) {
+    ACQUISITION_PIN_READMISSIONS
+        .with_label_values(&[cause.label()])
+        .inc_by(n);
+}
+
+/// Record one retirement's backoff step; `hold` is
+/// `db::acquisition_pins::pin_hold_label`.
+pub fn inc_acquisition_pin_backoff_step(hold: &str) {
+    ACQUISITION_PIN_BACKOFF_STEPS
+        .with_label_values(&[hold])
+        .inc();
+}
+
+/// Record `n` backoff ladders reset for `reason`.
+pub fn inc_acquisition_pin_backoff_resets(reason: PinBackoffReset, n: u64) {
+    ACQUISITION_PIN_BACKOFF_RESETS
+        .with_label_values(&[reason.label()])
+        .inc_by(n);
+}
+
+/// Record `n` held pins left held for `reason`.
+pub fn inc_acquisition_pin_hold_skips(reason: PinHoldSkip, n: u64) {
+    ACQUISITION_PIN_HOLD_SKIPS
+        .with_label_values(&[reason.label()])
         .inc_by(n);
 }
 

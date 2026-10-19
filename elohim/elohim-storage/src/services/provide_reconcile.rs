@@ -1109,6 +1109,12 @@ mod tests {
             created_at: "t".to_string(),
             updated_at: "t".to_string(),
             commitment_cid: None,
+            consecutive_retirements: 0,
+            last_outcome: None,
+            retired_at: None,
+            round: 0,
+            read_since_retired: 0,
+            readmit_after: None,
         };
         let pins = vec![
             pin(1, "epr:ready-eligible", "active"),
@@ -1163,6 +1169,12 @@ mod tests {
             created_at: "t".to_string(),
             updated_at: "t".to_string(),
             commitment_cid: None,
+            consecutive_retirements: 0,
+            last_outcome: None,
+            retired_at: None,
+            round: 0,
+            read_since_retired: 0,
+            readmit_after: None,
         };
         let caught: HashSet<String> = ["epr:no-reach-map"].iter().map(|s| s.to_string()).collect();
         let eligible = caught.clone();

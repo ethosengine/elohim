@@ -22,6 +22,39 @@ pub struct PinView {
     pub status: String,
     pub created_at: String,
     pub updated_at: String,
+    // The fields below were added after the first release of this view. A
+    // reader of an older node gets none of them, so they are optional on the
+    // wire (CONVENTIONS: additive fields never become required).
+    /// Retirements in a row with no fetch and no peer inventory naming the head
+    /// between them. Each one doubles the hold before the next re-probe.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[ts(optional)]
+    pub consecutive_retirements: Option<i32>,
+    /// When the pin was last retired (RFC 3339) — the clock its hold runs
+    /// from. Absent if it never has been.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[ts(optional)]
+    pub retired_at: Option<String>,
+    /// Earliest time a `retired` pin is re-admitted for a re-probe (RFC 3339,
+    /// UTC): `retiredAt` plus the hold for its rung (6 h, 12 h, then 24 h), or
+    /// `retiredAt` + 6 h if `readSinceRetired`. Every pin past it is
+    /// re-admitted by the next reconcile tick, so it is a maximum wait up to
+    /// one tick. Absent unless `status` is `retired`. A peer inventory naming
+    /// the head, or a read the demand auto-pin admits, re-activates it sooner.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[ts(optional)]
+    pub next_readmit_at: Option<String>,
+    /// True when a read-miss the demand auto-pin did not admit (throttled,
+    /// window full, ceiling) named the pin while it was retired: its hold is
+    /// capped at 6 h. Cleared on re-activation.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[ts(optional)]
+    pub read_since_retired: Option<bool>,
+    /// `exhausted` (the retry budget was spent and no peer asked supplied the
+    /// bytes), `fetched`, or absent when no round has concluded.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[ts(optional)]
+    pub last_outcome: Option<String>,
 }
 
 /// Input body for POST /api/v1/pins.

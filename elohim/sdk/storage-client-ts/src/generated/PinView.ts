@@ -11,4 +11,34 @@ export type PinView = { id: number, agentPubKey: string, headRef: string, kind: 
 /**
  * Parsed closure rule (null when not set).
  */
-closureRule: JsonValue | null, priority: number, status: string, createdAt: string, updatedAt: string, };
+closureRule: JsonValue | null, priority: number, status: string, createdAt: string, updatedAt: string, 
+/**
+ * Retirements in a row with no fetch and no peer inventory naming the head
+ * between them. Each one doubles the hold before the next re-probe.
+ */
+consecutiveRetirements?: number, 
+/**
+ * When the pin was last retired (RFC 3339) — the clock its hold runs
+ * from. Absent if it never has been.
+ */
+retiredAt?: string, 
+/**
+ * Earliest time a `retired` pin is re-admitted for a re-probe (RFC 3339,
+ * UTC): `retiredAt` plus the hold for its rung (6 h, 12 h, then 24 h), or
+ * `retiredAt` + 6 h if `readSinceRetired`. Every pin past it is
+ * re-admitted by the next reconcile tick, so it is a maximum wait up to
+ * one tick. Absent unless `status` is `retired`. A peer inventory naming
+ * the head, or a read the demand auto-pin admits, re-activates it sooner.
+ */
+nextReadmitAt?: string, 
+/**
+ * True when a read-miss the demand auto-pin did not admit (throttled,
+ * window full, ceiling) named the pin while it was retired: its hold is
+ * capped at 6 h. Cleared on re-activation.
+ */
+readSinceRetired?: boolean, 
+/**
+ * `exhausted` (the retry budget was spent and no peer asked supplied the
+ * bytes), `fetched`, or absent when no round has concluded.
+ */
+lastOutcome?: string, };

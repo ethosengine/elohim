@@ -10709,6 +10709,15 @@ impl HttpServer {
                 // hot path); the DOWNSTREAM provide-eligibility gate decides
                 // whether anything is ever provided, so we do NOT reach-gate
                 // here. Non-fatal: the read path continues regardless.
+                //
+                // A head whose pin is RETIRED: if the auto-pin admits this read
+                // the pin is re-activated here, as it always was (its rung is
+                // kept); if it does not (throttled, window full, ceiling) the
+                // row is only marked as read, which caps its hold at 6 h.
+                // A head whose pin was REMOVED stays removed: only an explicit
+                // re-pin (`POST /api/v1/pins`) restores a removed pin — an
+                // operator decision of 2026-10-14. This read then has only the
+                // P2P fallback below, which asks a single peer.
                 if self.demand_autopin.is_enabled() {
                     match self.demand_autopin.record_demand(&mut conn, content_id) {
                         Ok(Some(pin)) => {
@@ -18097,9 +18106,20 @@ fn pin_to_view(p: db::models::AcquisitionPin) -> elohim_views::acquisition::PinV
             .and_then(|s| serde_json::from_str::<serde_json::Value>(s).ok())
             .map(elohim_views::shared::JsonVal),
         priority: p.priority,
+        // Only a retired pin has a hold to end; its deadline is kept on the
+        // row (absent if an older build retired it and no pass has dated it).
+        next_readmit_at: if p.status == "retired" {
+            p.readmit_after.clone()
+        } else {
+            None
+        },
         status: p.status,
         created_at: p.created_at,
         updated_at: p.updated_at,
+        consecutive_retirements: Some(p.consecutive_retirements),
+        retired_at: p.retired_at,
+        read_since_retired: Some(p.read_since_retired != 0),
+        last_outcome: p.last_outcome,
     }
 }
 
@@ -23608,6 +23628,106 @@ mod session_exchange_tests {
         let server = test_server().await;
         let removed = server.test_handle_remove_pin("99999").await;
         assert_eq!(removed.status, 404, "removing an unknown pin must 404");
+    }
+
+    // GET /api/v1/pins names what a retired pin is waiting for: the rung it is
+    // on, when it retired, when its hold ends, what its last round concluded,
+    // and the demand counted against it meanwhile — which pulls the end of the
+    // hold in to the first rung.
+    #[tokio::test]
+    async fn listed_pin_carries_its_retirement_ledger() {
+        let server = test_server().await;
+        let created = server
+            .test_handle_create_pin_raw(r#"{"headRef":"epr:e2e-unfillable"}"#)
+            .await;
+        let created: serde_json::Value = serde_json::from_slice(&created.body).expect("json");
+        assert_eq!(created["consecutiveRetirements"], 0);
+        assert!(created["nextReadmitAt"].is_null());
+        assert!(created["retiredAt"].is_null());
+        assert!(created["lastOutcome"].is_null());
+        let id = created["id"].as_i64().expect("id") as i32;
+
+        let t0 = chrono::DateTime::parse_from_rfc3339("2026-10-13T12:00:00Z")
+            .expect("ts")
+            .with_timezone(&chrono::Utc);
+        let listed_pin = |server: &HttpServer| {
+            let mut conn = server.get_diesel_conn().expect("conn");
+            let p = db::acquisition_pins::get_pin_by_id(&mut conn, id)
+                .expect("query")
+                .expect("row");
+            serde_json::to_value(pin_to_view(p)).expect("view")
+        };
+        let retire = |server: &HttpServer, at: chrono::DateTime<chrono::Utc>| {
+            let mut conn = server.get_diesel_conn().expect("conn");
+            let round = db::acquisition_pins::get_pin_by_id(&mut conn, id)
+                .expect("query")
+                .expect("row")
+                .round;
+            db::acquisition_pins::retire_pin(&mut conn, id, round, at)
+                .expect("retire")
+                .expect("retired");
+        };
+        // Three retirements: the 24 h rung.
+        for hours in [0, 7, 20] {
+            retire(&server, t0 + chrono::Duration::hours(hours));
+            if hours < 20 {
+                let mut conn = server.get_diesel_conn().expect("conn");
+                crate::p2p::acquisition::run_hold_pass(
+                    &mut conn,
+                    t0 + chrono::Duration::hours(hours + 13),
+                    &std::collections::HashSet::new(),
+                );
+            }
+        }
+
+        let listed = server.test_handle_list_pins().await;
+        let body: serde_json::Value = serde_json::from_slice(&listed.body).expect("json");
+        let pin = &body["pins"][0];
+        assert_eq!(pin["status"], "retired");
+        assert_eq!(pin["consecutiveRetirements"], 3);
+        assert_eq!(pin["retiredAt"], "2026-10-14T08:00:00Z");
+        // 24 h on the third rung.
+        assert_eq!(pin["nextReadmitAt"], "2026-10-15T08:00:00Z");
+        assert_eq!(pin["lastOutcome"], "exhausted");
+        assert_eq!(pin["readSinceRetired"], false);
+
+        // A read the auto-pin did not admit: the hold is capped at 6 h.
+        {
+            let mut conn = server.get_diesel_conn().expect("conn");
+            assert!(db::acquisition_pins::mark_read_since_retired(
+                &mut conn,
+                "local-device",
+                "e2e-unfillable",
+                "item"
+            )
+            .expect("mark"));
+        }
+        let pin = listed_pin(&server);
+        assert_eq!(pin["readSinceRetired"], true);
+        assert_eq!(pin["nextReadmitAt"], "2026-10-14T14:00:00Z");
+
+        // An admitted read: re-activated at once, as before the ladder.
+        {
+            let mut conn = server.get_diesel_conn().expect("conn");
+            db::acquisition_pins::record_demand_pin(
+                &mut conn,
+                db::models::NewAcquisitionPin {
+                    agent_pub_key: "local-device".into(),
+                    head_ref: "e2e-unfillable".into(),
+                    kind: "item".into(),
+                    closure_rule_json: None,
+                    priority: 1,
+                },
+                t0 + chrono::Duration::hours(21),
+            )
+            .expect("demand");
+        }
+        let pin = listed_pin(&server);
+        assert_eq!(pin["status"], "active");
+        assert_eq!(pin["consecutiveRetirements"], 3, "the rung is kept");
+        assert_eq!(pin["retiredAt"], "2026-10-14T08:00:00Z");
+        // Only a retired pin has a deadline.
+        assert!(pin["nextReadmitAt"].is_null());
     }
 
     // The write path strips `epr:` (the reconcile loop joins on the bare content
