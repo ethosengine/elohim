@@ -5566,3 +5566,92 @@ decisionPoints:
       - { path: elohim/elohim-storage/src/services/account_bind.rs, testName: an_expired_challenge_is_refused_as_expired, kind: unit }
       - { path: elohim/elohim-storage/src/services/account_bind.rs, testName: a_challenge_more_than_ten_minutes_ahead_is_refused, kind: unit }
       - { path: elohim/elohim-storage/src/services/account_bind.rs, testName: only_a_proven_bound_session_goes_on, kind: unit }
+
+  # ── Compute-payload custody under the hosting promise (2026-10-19) ─────────────────────────
+  # A sponsored, HOSTED runner (agent:ci-runner-jenkins-matthew) has no storage peer; the pool
+  # peer that issued its hosted-cell grant holds its stage chunks. Wired in
+  # src/http_compute_payloads.rs (admit_hosted_custody); route declared in build_manifest.
+
+  - name: authorize_custody
+    kind: verdict-fn
+    sourceLocation:
+      file: src/api/hosted_custody.rs
+      modulePath: api::hosted_custody::authorize_custody
+      line: 227
+    summary: >
+      Admits a doorway-verified performer to /api/v1/compute/payloads/{cid} only when THIS peer
+      issued it an ACTIVE hosted-cell delegates-compute grant: projection lookup filtered to
+      provider == own cell key (find_active_delegates_compute_from_provider); the exact signed
+      record fetched by its action hash and authenticated as authored by this cell, whose policy
+      must name this peer, the performer and hosted-cell; the shared bounds validator over the
+      SIGNED policy (window, rotation, reach <= commons, rate counted from recorded custody uses);
+      provider-authored lifecycle links (an activation, no revoked/cancelled/sunset). Each
+      admitted use is recorded as an economic_events row bounded_by the grant CID before the act
+      (record_custody_use, emit-then-act), so rate_per_hour is a real ceiling on volume.
+    concernIds:
+      - { id: C0, status: answered, justification: "No new entry type, scope or route: the existing hosted-cell Mishpat Commitment authorizes; payload leases stay operational custody (C); the route already existed and is now manifest-declared." }
+      - { id: C1, status: answered, justification: "The authorizing grant must be authored by this cell (signed record pinned to own key; projection filtered provider == own key), so a runner can never authorize its own custody and another peer's promise never acts here." }
+      - { id: C2, status: n-a, justification: "No head ordering; the window is read from the signed policy." }
+      - { id: C4, status: answered, justification: "Internals-free codes per refusal (no-active-hosted-cell-grant, hosted-cell-grant-unverified, -mismatch, -withdrawn, and the bounds codes), never a silent allow." }
+      - { id: C5, status: answered, justification: "Evidence, not authority: the projection row only SELECTS a candidate; authority comes from the signed record re-authenticated at this node plus the provider-authored links. a_projection_the_signed_record_contradicts_is_refused pins it." }
+      - { id: C6a, status: answered, justification: "Three bounded native reads (record, links, and for output read-back one task read); no retry loop." }
+      - { id: C9, status: n-a, justification: "No key lineage." }
+      - { id: C11, status: answered, justification: "rate_per_hour from the signed policy bounds volume: every admitted use is recorded first and counted by the shared validator's rate check; the payload store's 1 MiB chunk, 128-lease and byte-budget limits still apply." }
+      - { id: C12, status: answered, justification: "Authority verified structurally at the acting node against a notarized grant this node issued, never inferred from the carried header; a present performer never consults the node-local token (classify_payload_caller)." }
+      - { id: C13, status: partial, justification: "Hosted custody is bounded (rate, 7-day lease ceiling hosted_retention, commons reach) but is granted to ANY recipient of this peer's hosted-cell promise — hosted humans included — not only service agents; narrowing by account kind is not a storage fact today." }
+      - { id: C14, status: partial, justification: "Each use is recorded as a bounded economic event (audit + rate); refusals are returned, not counted by a metric." }
+    gapNote: >
+      Hosted humans holding a hosted-cell grant are admitted too (C13); no metric counts refusals
+      (C14); no end-to-end test through a live conductor — the native reads ride the CustodyNative
+      seam and the HTTP arm composes tested pure parts.
+    contractTests:
+      - { path: elohim/elohim-storage/src/api/hosted_custody.rs, testName: an_active_hosted_cell_recipient_is_admitted, kind: unit }
+      - { path: elohim/elohim-storage/src/api/hosted_custody.rs, testName: a_withdrawn_grant_is_refused, kind: unit }
+      - { path: elohim/elohim-storage/src/api/hosted_custody.rs, testName: an_expired_grant_is_refused, kind: unit }
+      - { path: elohim/elohim-storage/src/api/hosted_custody.rs, testName: a_grant_issued_by_a_different_peer_is_refused, kind: unit }
+      - { path: elohim/elohim-storage/src/api/hosted_custody.rs, testName: a_projection_the_signed_record_contradicts_is_refused, kind: unit }
+      - { path: elohim/elohim-storage/src/api/hosted_custody.rs, testName: a_non_recipient_is_refused, kind: unit }
+      - { path: elohim/elohim-storage/src/api/hosted_custody.rs, testName: the_rate_bound_counts_recorded_uses, kind: unit }
+
+  - name: classify_payload_caller
+    kind: pure-decision-predicate
+    sourceLocation:
+      file: src/api/hosted_custody.rs
+      modulePath: api::hosted_custody::classify_payload_caller
+      line: 98
+    summary: >
+      Splits payload callers into two arms that never mix: the node-local capability token with
+      no performer (the operator's own workspace tools, unchanged), or a doorway-verified
+      performer (the hosted arm). A present performer always selects the hosted arm, so a
+      forwarded call never acts under the node-local token even if one rode along; neither ⇒
+      refused.
+    concernIds:
+      - { id: C12, status: answered, justification: "no_performer_is_refused_and_a_performer_never_uses_the_token pins that the token is not consulted once a performer is present." }
+      - { id: C4, status: answered, justification: "Refused is its own answer (local-compute-capability-required), never a fallthrough." }
+      - { id: C13, status: n-a, justification: "Selects an arm; grants nothing." }
+    contractTests:
+      - { path: elohim/elohim-storage/src/api/hosted_custody.rs, testName: no_performer_is_refused_and_a_performer_never_uses_the_token, kind: unit }
+
+  - name: task_output_admits
+    kind: pure-decision-predicate
+    sourceLocation:
+      file: src/api/hosted_custody.rs
+      modulePath: api::hosted_custody::task_output_admits
+      line: 124
+    summary: >
+      The one widening of a runner's lease isolation: drawing a chunk it does not lease is
+      allowed only when the chunk is listed in the completion receipt
+      (completion.receipt.logs[].chunks[].cid) of a task whose requester is the runner and whose
+      task CID is the named owner, the task named by its request action hash
+      (x-compute-request). Every other read is limited to the runner's own leases, which are
+      namespaced hosted:<performer>:<owner> (hosted_owner) so two runners never share one.
+    concernIds:
+      - { id: C1, status: n-a, justification: "No candidate selection." }
+      - { id: C5, status: answered, justification: "The task is read from this node's own conductor view of the provider-authored completion, not taken from the caller; the caller only names which task." }
+      - { id: C12, status: answered, justification: "a_runner_reads_back_only_its_own_tasks_outputs and two_runners_never_share_a_lease pin requester, owner and chunk membership; the blob race is never usable as a general fetch-anything oracle." }
+      - { id: C13, status: n-a, justification: "Grants no tier." }
+    contractTests:
+      - { path: elohim/elohim-storage/src/api/hosted_custody.rs, testName: a_runner_reads_back_only_its_own_tasks_outputs, kind: unit }
+      - { path: elohim/elohim-storage/src/api/hosted_custody.rs, testName: two_runners_never_share_a_lease, kind: unit }
+      - { path: elohim/elohim-storage/src/api/hosted_custody.rs, testName: hosted_custody_is_never_open_ended, kind: unit }
+      - { path: elohim/elohim-storage/src/http.rs, testName: build_manifest_declares_compute_payload_custody_but_not_tasks_or_grants, kind: unit }

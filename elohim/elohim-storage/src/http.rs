@@ -19409,6 +19409,34 @@ pub fn build_manifest() -> doorway_client::DoorwayRoutes {
                 .build(),
         )
         // =====================================================================
+        // /api/v1/compute/payloads/{cid} — compute-chunk custody under the
+        // hosting promise (api/hosted_custody.rs). Declared so a sponsored,
+        // HOSTED runner can stock and draw its stage chunks through the
+        // doorway; the doorway injects the verified performer for this prefix
+        // only and never forwards the node-local token. Admitted only for the
+        // recipient of an ACTIVE hosted-cell grant THIS peer issued. Never
+        // cached: per-runner custody. Tasks and grants stay off-manifest.
+        // =====================================================================
+        .route(
+            Route::get("/api/v1/compute/payloads/{cid}")
+                .handler("compute_payload_draw")
+                .auth_required()
+                .cache_ttl(0)
+                .build(),
+        )
+        .route(
+            Route::put("/api/v1/compute/payloads/{cid}")
+                .handler("compute_payload_stock")
+                .auth_required()
+                .build(),
+        )
+        .route(
+            Route::delete("/api/v1/compute/payloads/{cid}")
+                .handler("compute_payload_release")
+                .auth_required()
+                .build(),
+        )
+        // =====================================================================
         // /api/v1/flow-planning — Resource flow planning
         // =====================================================================
         .route(
@@ -22553,6 +22581,33 @@ mod auth_me_tests {
 
     /// Verify that build_manifest() includes the /auth/me route.
     /// This guards against accidental removal from the manifest.
+    #[test]
+    fn build_manifest_declares_compute_payload_custody_but_not_tasks_or_grants() {
+        let manifest = build_manifest();
+        let payload_methods: Vec<_> = manifest
+            .routes
+            .iter()
+            .filter(|r| r.path == "/api/v1/compute/payloads/{cid}")
+            .collect();
+        assert_eq!(payload_methods.len(), 3, "GET, PUT and DELETE are declared");
+        assert!(payload_methods.iter().all(|r| r.auth_required));
+        assert!(
+            payload_methods
+                .iter()
+                .filter(|r| r.method == doorway_client::HttpMethod::Get)
+                .all(|r| r.cache_ttl_secs == 0),
+            "per-runner custody is never cached at the doorway"
+        );
+        assert!(
+            !manifest
+                .routes
+                .iter()
+                .any(|r| r.path.starts_with("/api/v1/compute/tasks")
+                    || r.path == "/api/v1/compute/grants"),
+            "tasks and grants stay node-local: a hosted runner speaks to its own cell"
+        );
+    }
+
     #[test]
     fn build_manifest_includes_auth_me_route() {
         let manifest = build_manifest();

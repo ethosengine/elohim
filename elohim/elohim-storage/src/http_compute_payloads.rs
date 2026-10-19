@@ -10,24 +10,37 @@ impl HttpServer {
         req: Request<Incoming>,
         cid: &str,
     ) -> Result<Response<Full<Bytes>>, StorageError> {
+        use crate::api::hosted_custody::{classify_payload_caller, PayloadCaller};
         if std::env::var("ELOHIM_COMPUTE_LOCAL_API").as_deref() != Ok("1") {
             return Ok(response::not_found("compute local API disabled"));
         }
-        if !crate::api::compute_tasks::local_token_authorized(req.headers()) {
+        // Two arms that never mix: the node-local token (no performer), or a
+        // doorway-verified performer under this peer's hosted-cell promise.
+        // A present performer never consults the token.
+        let performer = req
+            .headers()
+            .get(crate::api::operator_verbs::VERIFIED_PERFORMER_HEADER)
+            .and_then(|v| v.to_str().ok())
+            .map(str::to_owned);
+        let caller = classify_payload_caller(
+            performer.as_deref(),
+            crate::api::compute_tasks::local_token_authorized(req.headers()),
+        );
+        if caller == PayloadCaller::Refused {
             return Ok(response::forbidden(
                 &serde_json::json!({"reason":"local-compute-capability-required"}),
             ));
         }
-        let owner = req
+        let client_owner = req
             .headers()
             .get("x-compute-owner")
             .and_then(|v| v.to_str().ok())
             .unwrap_or("")
             .to_owned();
-        if owner.is_empty() || owner.len() > 256 {
+        if client_owner.is_empty() || client_owner.len() > 256 {
             return Ok(response::bad_request("x-compute-owner required"));
         }
-        let ttl = match req.headers().get("x-compute-retain-seconds") {
+        let mut ttl = match req.headers().get("x-compute-retain-seconds") {
             Some(v) => match v.to_str().ok().and_then(|s| s.parse::<u64>().ok()) {
                 Some(t) => t,
                 _ => return Ok(response::bad_request("invalid payload retention seconds")),
@@ -39,6 +52,19 @@ impl HttpServer {
             _ => return Ok(response::bad_request("raw CID required")),
         };
         let root = self.blob_store.root_dir();
+        let owner = match caller {
+            PayloadCaller::Hosted(performer) => {
+                ttl = crate::api::hosted_custody::hosted_retention(ttl);
+                match self
+                    .admit_hosted_custody(&req, &performer, &client_owner, cid)
+                    .await
+                {
+                    Ok(owner) => owner,
+                    Err(refusal) => return Ok(refusal),
+                }
+            }
+            _ => client_owner,
+        };
         if req.method() == Method::DELETE {
             payload::release(root, cid, &owner).await?;
             return Ok(response::ok(&serde_json::json!({"released":true})));
@@ -88,6 +114,64 @@ impl HttpServer {
             .header(header::CACHE_CONTROL, "no-store")
             .body(Full::new(Bytes::from(bytes)))
             .unwrap())
+    }
+
+    /// The hosted arm (`api::hosted_custody`): admit a performer under THIS
+    /// peer's active `hosted-cell` grant, decide which lease it acts under, and
+    /// record the use before acting. Returns the runner-namespaced owner, or the
+    /// refusal response.
+    async fn admit_hosted_custody(
+        &self,
+        req: &Request<Incoming>,
+        performer: &str,
+        client_owner: &str,
+        cid: &str,
+    ) -> Result<String, Response<Full<Bytes>>> {
+        use crate::api::hosted_custody as custody;
+        let refuse = |reason: &str| response::forbidden(&serde_json::json!({ "reason": reason }));
+        let Some(pool) = self.db_pool.as_ref() else {
+            return Err(response::service_unavailable("db pool not available"));
+        };
+        let Some(hc) = self.hc_registry.as_ref().and_then(|r| r.lamad_client()) else {
+            return Err(response::service_unavailable("local conductor unavailable"));
+        };
+        let native = custody::HcCustodyNative(hc);
+        let now = chrono::Utc::now().to_rfc3339();
+        let grant_cid = custody::authorize_custody(pool, &native, performer, &now)
+            .await
+            .map_err(|r| refuse(r.reason()))?;
+        let owner = custody::hosted_owner(performer, client_owner)
+            .ok_or_else(|| response::bad_request("x-compute-owner too long for hosted custody"))?;
+        // A read of a chunk this runner does not lease is only ever its own
+        // task's OUTPUT, named by the task's request action hash.
+        if req.method() == Method::GET
+            && payload::owner_expiry(self.blob_store.root_dir(), cid, &owner)
+                .await
+                .is_none()
+        {
+            let request = req
+                .headers()
+                .get(custody::REQUEST_HEADER)
+                .and_then(|v| v.to_str().ok())
+                .filter(|r| !r.is_empty())
+                .ok_or_else(|| refuse("not-a-chunk-this-runner-holds"))?;
+            let task = custody::CustodyNative::task(&native, request)
+                .await
+                .map_err(|_| refuse("task-unreadable"))?;
+            if !custody::task_output_admits(&task, performer, client_owner, cid) {
+                return Err(refuse("not-an-output-of-this-runners-task"));
+            }
+        }
+        // Emit-then-act: an unrecorded use is never performed.
+        custody::record_custody_use(
+            pool,
+            &custody::CustodyNative::own_key(&native),
+            performer,
+            &grant_cid,
+            &now,
+        )
+        .map_err(|_| response::service_unavailable("custody use could not be recorded"))?;
+        Ok(owner)
     }
 
     async fn fetch_compute_chunk(&self, hash: &str) -> Option<Vec<u8>> {

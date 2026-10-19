@@ -35,7 +35,7 @@ fn token_matches(expected: &[u8], provided: &[u8]) -> bool {
         && bool::from(Sha256::digest(expected).ct_eq(&Sha256::digest(provided)))
 }
 
-struct VerifiedGrant(crate::services::commitment_fetcher::CommitmentRecord);
+pub(crate) struct VerifiedGrant(pub(crate) crate::services::commitment_fetcher::CommitmentRecord);
 #[async_trait::async_trait]
 impl crate::services::commitment_fetcher::CommitmentFetcher for VerifiedGrant {
     async fn fetch(
@@ -179,7 +179,7 @@ fn verify_status(task: &Value) -> Result<(), StorageError> {
     Ok(())
 }
 
-async fn call(hc: &HcClient, input: &Value) -> Result<Value, StorageError> {
+pub(crate) async fn call(hc: &HcClient, input: &Value) -> Result<Value, StorageError> {
     let payload =
         rmp_serde::to_vec_named(input).map_err(|e| StorageError::Serialization(e.to_string()))?;
     // Work is bounded in WASM: fifty requests/page, sixteen events/request.
@@ -206,21 +206,21 @@ fn same_actor(performer: Option<&str>, local: &str) -> bool {
 
 /// A `delegates-compute` grant whose signed Record was fetched by its exact
 /// action hash and verified against pinned author, action and entry hashes.
-struct AuthenticatedGrant {
+pub(crate) struct AuthenticatedGrant {
     /// The commitment's `entry_hash` — its CID, the `bounded_by` join key.
-    cid: String,
+    pub(crate) cid: String,
     /// The notarizing action — the projection's `dht_anchor_hash` only.
     action_hash: String,
     action: String,
     payload_json: String,
-    policy: Value,
+    pub(crate) policy: Value,
 }
 
 /// Fetch the grant the immutable request pins, and authenticate it as authored
 /// by `author`. The launch check pins `author` to this cell (the provider is
 /// the local agent); the requester-side observer pins it to the task's
 /// provider — the same verification, a different expected signer.
-async fn fetch_authenticated_grant(
+pub(crate) async fn fetch_authenticated_grant(
     hc: &HcClient,
     grant_action_hash: &str,
     author: holochain_types::prelude::AgentPubKey,
@@ -337,7 +337,7 @@ async fn authorize(
     Ok(cid)
 }
 
-fn grant_links_allow(
+pub(crate) fn grant_links_allow(
     states: &[crate::services::conductor_writes::CommitmentStateLink],
     provider: &str,
 ) -> bool {
