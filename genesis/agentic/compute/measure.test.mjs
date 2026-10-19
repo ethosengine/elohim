@@ -240,3 +240,39 @@ test("a runtime-config.toml reset to 0644 by the storage's rename-rewrite is nam
     rmSync(reports, { recursive: true, force: true });
   }
 });
+
+// B5 (2026-10-19) — `grant --recipient`: a provider grants measure-stage capacity to a
+// stewarded runner's own agent key (the CI runner's hosted key), not only to this household's
+// requester. compute_tasks' launch check is policy.recipient == task.requester, so the recipient
+// is who spends the grant. Default unchanged; a foreign recipient gets its OWN stored file so it
+// never replaces the requester's grant (which `measure <feature>` reads as COMPUTE_GRANT_ACTION).
+const RUNNER_KEY = "uhCAk" + "R".repeat(48);
+
+test("grant --recipient names the runner's agent key and stores it under its own file", () => {
+  const out = runDry(["grant", "--on", "jessica", "--recipient", RUNNER_KEY]);
+  assert.match(out, new RegExp(`recipient=${RUNNER_KEY} scope=measure-stage`));
+  assert.match(out, new RegExp(`grant-jessica-for-${RUNNER_KEY}\\.json`));
+});
+
+test("grant without --recipient keeps the requester and the original file (unchanged default)", () => {
+  const out = runDry(["grant", "--on", "jessica"]);
+  const performer = out.match(/^COMPUTE_PERFORMER=(.*)$/m)[1];
+  assert.ok(
+    out.includes(`/grant-jessica.json: recipient=${performer} scope=measure-stage`),
+    out,
+  );
+  assert.doesNotMatch(out, /grant-jessica-for-/);
+});
+
+test("grant --recipient refuses a value that is not an agent key", () => {
+  for (const bad of ["matthew", "uhCAk-short", "uhCEk" + "R".repeat(48)]) {
+    assert.throws(
+      () => runDry(["grant", "--on", "jessica", "--recipient", bad]),
+      (error) => {
+        assert.equal(error.status, 2);
+        assert.match(error.stderr.toString(), /--recipient must be a Holochain agent key/);
+        return true;
+      },
+    );
+  }
+});
