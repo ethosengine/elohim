@@ -3,9 +3,10 @@ id: "backlog-retired-pin-readmit-backoff-parked-after-six-reviews"
 kind: "backlog"
 contentType: "backlog-item"
 contentFormat: "markdown"
-title: "The retired-pin backoff is built on a branch and parked: six independent reviews, the last with three narrow blockers, under a bail rule set before the shift"
+title: "The retired-pin backoff, parked after six reviews, was unparked and rated SAFE in round 8; it lands on dev and waits for a measured ladder"
 slug: "retired-pin-readmit-backoff-parked-after-six-reviews"
 written: "2026-10-14"
+updated: "2026-10-19"
 author: "claude (overnight performance shift, operator-directed)"
 status: "open"
 priority: "medium"
@@ -58,6 +59,22 @@ the first draft, and change only what an unread pin does.
 **Decision for the operator.** Allow one more round on the three fixes above (each a few lines), or leave the branch
 parked. Landing it changes nothing on alpha until a deploy carries it; the fleet roll is the operator's call either
 way.
+
+**2026-10-19: unparked, rounds 7 and 8, landing.** The overnight shift `2026-10-19T03-25-finish-integration-2026-10-18`
+took the "one more round" (journal decision 2). Branch `land/pin-readmit-1019` merges the parked head onto dev and
+applies the three fix shapes:
+
+1. The due check uses full precision. Round 7 found the first fix (`<=` on whole seconds) admitted at the exact
+   deadline instant, where dev waits for strictly more than six hours. Both due queries now compare
+   `readmit_after <= stamp(now - 1 ns)`. That is dev's strict comparison for every whole-second deadline the code can
+   write.
+2. The hold pass reads the tracked pin ids first. It bumps the round only when no tracker for the pin survives.
+3. A throttled read's mark carries the `retired_at` it read. The UPDATE matches only that retirement.
+
+Codex round 7 was UNSAFE: one equality-instant blocker and two comment fixes. Round 8, scoped to that fix, was SAFE
+(`genesis/local-dev/integration-2026-10-18/codex-review-pin-readmit-{7,8}.md`). Three tests pin the cures: the exact
+deadline waits while +250 ms admits, a surviving tracker keeps its round, and a stalled mark cannot stamp an old
+deadline. The operator asked for one round; this took two, and the journal says why (decision 4).
 
 **Done when.** A node with unread, unfillable retired pins re-probes them on the ladder, measured on the household
 or the fleet, and reads, peers and re-pins are shown unchanged.
