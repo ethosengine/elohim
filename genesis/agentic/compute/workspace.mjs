@@ -3,14 +3,9 @@ import { readdir, mkdir, open, rm, readFile } from "node:fs/promises";
 import { dirname, join, resolve } from "node:path";
 import { pathToFileURL } from "node:url";
 import { spawn } from "node:child_process";
-import { randomUUID } from "node:crypto";
 import { api, delay, key, readJson, run, save, taskPath } from "./common.mjs";
-import {
-  leaseSeconds,
-  materialize,
-  payloadClient,
-  publishFile,
-} from "./payloads.mjs";
+import { leaseSeconds, materialize, payloadClient } from "./payloads.mjs";
+import { publishSubmission, submitRequest } from "./submission.mjs";
 import { cleanInbox } from "./retention.mjs";
 import { collectStageEvidence } from "./stage/collect-stage.mjs";
 
@@ -206,8 +201,6 @@ export async function main(argv = process.argv.slice(2)) {
   }
   if (verb === "submit") {
     const envelope = await readJson(file);
-    if (!envelope.invocation || argv.includes("--new-run"))
-      envelope.invocation = randomUUID();
     // S3a: a stage carries its own sidecar (build-stage-task.mjs's stage.json) beside its
     // task.json — when present, it rides into the inbox entry so the collector (pollInbox)
     // can act on it without re-deriving the stage's identity from the task envelope's
@@ -233,42 +226,25 @@ export async function main(argv = process.argv.slice(2)) {
     const payload = payloadClient(
       process.env.COMPUTE_API_URL || "http://127.0.0.1:8090",
     );
-    for (const [index, field] of ["binary", "dna"].entries()) {
-      const path = resolve(inputPaths[index]);
-      envelope[field] = await publishFile(path, envelope[field], {
-        payload: async () => {},
-        executor,
-        retention: 0,
-      });
-    }
-    const publishedTask = join(
-      root,
-      "submissions",
-      `${key(JSON.stringify(envelope))}.json`,
-    );
-    await save(publishedTask, envelope);
-    // Keep the nonce and immutable descriptors at the caller's path so a lost
-    // submit response can be retried without producing another execution.
-    await save(resolve(file), envelope);
-    if (Buffer.byteLength(JSON.stringify(envelope)) > 65536)
-      throw new Error(
-        "Compute envelope exceeds native 64 KiB limit; use a smaller prebuilt artifact",
-      );
-    const taskCid = (await run(executor, ["cid", publishedTask])).trim();
-    for (const [index, field] of ["binary", "dna"].entries()) {
-      await publishFile(resolve(inputPaths[index]), envelope[field], {
-        payload,
-        executor,
-        owner: taskCid,
-        retention: 0,
-      });
-    }
-    const status = await request("/api/v1/compute/tasks", {
-      taskCid,
-      provider: envelope.provider,
-      grantActionHash: process.env.COMPUTE_GRANT_ACTION,
+    // One shape for every requester (submission.mjs): the hosted CI runner
+    // publishes and submits through these same two functions.
+    const { taskCid } = await publishSubmission({
       envelope,
+      inputPaths,
+      file,
+      root,
+      executor,
+      payload,
+      newRun: argv.includes("--new-run"),
     });
+    const status = await request(
+      "/api/v1/compute/tasks",
+      submitRequest({
+        envelope,
+        taskCid,
+        grantActionHash: process.env.COMPUTE_GRANT_ACTION,
+      }),
+    );
     const entry = { requestActionHash: status.requestActionHash, status };
     if (stageJson) entry.stage = stageJson;
     if (gap) entry.gap = gap;
