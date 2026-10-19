@@ -3797,6 +3797,25 @@ pub struct AcquisitionPin {
     /// action_hash of the notarized replicates-commons Commitment the provide
     /// reconciler authored for this pin. NULL until authored (Slice 2b).
     pub commitment_cid: Option<String>,
+    /// Retirements in a row with no fetch and no peer inventory naming the head
+    /// between them — the rung of the re-admission backoff ladder
+    /// (`p2p::acquisition::pin_hold`). 0 = never retired, or reset.
+    pub consecutive_retirements: i32,
+    /// `exhausted` | `fetched` | NULL (no round has concluded yet).
+    pub last_outcome: Option<String>,
+    /// When the pin was last retired — the only clock a hold is computed from.
+    /// Written by retirement and nothing else.
+    pub retired_at: Option<String>,
+    /// Bumped at every (re-)activation; keys the in-memory retry state and
+    /// guards retirement against a stale exhaustion snapshot.
+    pub round: i32,
+    /// 1 when a read-miss the auto-pin did NOT admit named the pin while it
+    /// was retired: its hold is capped at the first rung. Cleared on
+    /// re-admission.
+    pub read_since_retired: i32,
+    /// When a retired pin is due back (RFC 3339): the end of its own hold,
+    /// pulled in by a read. The reconcile tick selects due rows by it.
+    pub readmit_after: Option<String>,
 }
 
 /// Insertable row for `acquisition_pins` (omits `id` — AUTOINCREMENT, and
