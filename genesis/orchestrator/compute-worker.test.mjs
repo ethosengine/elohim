@@ -171,6 +171,50 @@ test("a slice that fits renders the worker with the slice as limits and slice en
   assert.equal(worker.volumeMounts.length, 1);
 });
 
+test("the local token comes from the Secret by default, or is minted per render and shared by both containers", async (t) => {
+  const repoRoot = await writeFittingFixtureRepo();
+  t.after(() => rm(repoRoot, { recursive: true, force: true }));
+  const base = {
+    enabled: true,
+    image: `registry/worker@sha256:${"a".repeat(64)}`,
+    performer: "adam-key",
+    slice: { cpuMillis: 500, memoryBytes: 512 * 1024 * 1024 },
+  };
+  const tokenOf = async (config, overrides = {}) => {
+    const pod = YAML.parseAllDocuments(
+      await renderWorker(source, config, { repoRoot, ...overrides }),
+    )
+      .map((document) => document.toJS())
+      .find((doc) => doc?.kind === "StatefulSet").spec.template.spec;
+    const read = (container) =>
+      pod.containers
+        .find((c) => c.name === container)
+        .env.find((item) => item.name === "ELOHIM_COMPUTE_LOCAL_TOKEN");
+    return [read("elohim-node"), read("compute-worker")];
+  };
+  const [storageSecret, workerSecret] = await tokenOf(base);
+  assert.equal(storageSecret.valueFrom.secretKeyRef.key, "token");
+  assert.deepEqual(storageSecret, workerSecret);
+
+  const [storagePlain, workerPlain] = await tokenOf(
+    { ...base, localTokenSource: "per-render" },
+    { localToken: "fixed-for-test" },
+  );
+  assert.equal(storagePlain.value, "fixed-for-test");
+  assert.equal(workerPlain.value, "fixed-for-test");
+  assert.equal(storagePlain.valueFrom, undefined);
+
+  const [first] = await tokenOf({ ...base, localTokenSource: "per-render" });
+  const [second] = await tokenOf({ ...base, localTokenSource: "per-render" });
+  assert.match(first.value, /^[a-f0-9]{64}$/);
+  assert.notEqual(first.value, second.value);
+
+  await assert.rejects(
+    renderWorker(source, { ...base, localTokenSource: "file" }, { repoRoot }),
+    /unknown localTokenSource/,
+  );
+});
+
 test("deploy-only provisions the renderer owner before any human rollout", async () => {
   const edge = await readFile(
     new URL("../../elohim/holochain/Jenkinsfile", import.meta.url),

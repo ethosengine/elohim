@@ -90,6 +90,15 @@ resources:
   jenkins:
     role: a Jenkins build context — build numbers, archived artifacts, upstream causes
     available: true
+    note: >
+      Jenkins never owns substrate here (owned-substrate stays false on this shared fleet). From
+      2026-10-19 it participates as a sponsored service agent, agent:ci-runner-jenkins-matthew: a
+      hosted cell on its sponsor's pool peer, a hosting-cell grant from that sponsor, and
+      measure-stage grants from providers, through which Act I stages run on substrate the
+      provider owns. It holds no human standing and is not a device of anyone. Canon row:
+      genesis/docs/architecture/rea-compute-commitment-primitive.md §5 (CI / simulacra runner);
+      dev-stakes posture and hardening debt:
+      genesis/data/timeline/backlog/security-ci-substrate-authorization-grant-coherence.md.
 
   harbor-registry:
     role: CI image registry (harbor.ethosengine.com)

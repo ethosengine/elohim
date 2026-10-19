@@ -128,3 +128,36 @@ brokered-conductor-surface task; closing it reverts the netpol + retires the ipB
 hazard) and bounded standing (Stage C delegates-compute, rails-gated). The 8444/8445 netpol revert is
 gated on hole #1, NOT licensed by this Stage-A landing.
 
+
+## Stage C begins at dev stakes: the CI runner as a sponsored service agent (2026-10-19)
+
+Operator ruling (human:matthew, steward of record): Jenkins becomes a **stewarded service agent**,
+`agent:ci-runner-jenkins-matthew`, so it can send Act I stages to household providers and read real
+results for its own runs. It is not one of matthew's devices: a bound device speaks for its person
+with no scope or expiry and can approve the next device. The network holds the key root. Any peer
+can sponsor its own runner, so CI and simulacra for friends on diverse hardware are never locked to
+one steward. The shape is the Z.D deploy-svc-agent: "held by CI, no human standing, acts only
+inside its bounds". Plan: `/projects/.claude-config/plans/ok-lets-plan-b-sorted-spark.md`.
+
+- **G1 (sponsorship).** A `delegates-compute` grant scoped `hosted-cell`. The sponsor's pool peer is
+  the provider, and the runner's hosted cell is the recipient.
+- **G2 (capacity).** `measure-stage` grants from each provider peer, issued independently.
+
+### Dev-stakes posture taken on purpose (operator: "we're still in dev")
+
+Mounting secrets is a painful hop, so this slice chooses the low-touch shape. Each item below is
+production-hardening debt, owned by this entry:
+
+| Taken now (dev) | Why it is acceptable now | Hardening task (production) |
+|---|---|---|
+| The runner's password is **derived from `doorway-admin-bootstrap-key`** (the `doorway-seed-ensure.sh` pattern, salt `:ci-runner`). It is reusable, and there is no separate secret. | Zero operator hops. Anyone holding the admin key is already total-admin, so this adds no marginal exposure. | Give the runner its own credential in a witnessable store: a k8s Secret mounted read-only at `/var/run/elohim/runner/` (`optional: true`), never derived from an admin key. Rotate it independently of ADMIN_KEY. |
+| A **generous** grant window: 365 days, `rotation_ttl_days: 365`, `rate_per_hour: 3600`, `epr_scope: ["*"]` (`RUNNER_TERMS` in `doorway/doorway-service/src/routes/hosted_cell.rs`, separate from the human `HOSTED_CELL_DAYS = 30`). | Set and forget while the pipeline shape settles. `reach_ceiling: commons` still binds, so the worst case is spent compute, never escalated reach. | Shorten the window (≤30 days, like human hosted cells), narrow `epr_scope` to pinned stage task CIDs, and size the rate to measured use. The sponsor's pool peer re-issues before expiry as a recorded act. |
+| Renewal is **manual**: the sponsor re-issues once a year. | A lapse is loud: the per-build runner preflight prints REFUSED with days remaining. | Automated pre-expiry re-issue by the sponsor's pool peer, with a lapse alarm through the runtime-harvest channel. |
+| The existing `jenkins-ci` seed actor is registered as a **hosted human** (doorway register runs `create_human`) and holds Admin. | Predates the service-agent path. | Move `jenkins-ci` onto the service-agent registration (no human record), and replace its Admin bit with a bounded `seed-content` commitment (the Stage C named above). |
+| Runner creation is authorized by the **bootstrap key** (`routes/service_agent.rs`, which only authorizes creation and never promotes to Admin). | The doorway already holds the provisioner; this is labelled a scaffold in code. | The sponsoring peer itself mints the runner and issues the promise through a verb on its local compute API, retiring the doorway-side creation gate. |
+| The sponsor's pool peer holds a hosted runner's compute chunks in its **shared** payload budget (`ELOHIM_COMPUTE_PAYLOAD_BYTES`, 10 GiB by default; `elohim-storage/src/api/hosted_custody.rs`). Any recipient of this peer's `hosted-cell` grant is admitted, hosted humans included (seam-registry C13 partial). | Each grantee is bounded by its grant rate (3600 uses/hour for the runner, 60 for a hosted human), a 7-day lease ceiling and commons reach. Leases are namespaced per performer, and a runner can read back only chunks listed in its own task's completion receipt. | Give each grantee its own byte share of the budget, so one grantee cannot crowd out the operator's own stages. Narrow admission to service agents with a fact storage can read, such as a marker in the grant payload or a dedicated scope. |
+| adam's compute worker gets its node-local token **minted per render** (`"localTokenSource": "per-render"` in `genesis/orchestrator/data/adam-compute-worker.json`, read by `genesis/orchestrator/scripts/render-compute-worker.mjs`) and written as a plain env value in the storage and worker containers, not read from the `<pod>-compute-local` Secret. | Nothing is committed and there is no Secret to create. The value rotates on every deploy, and only the two containers in adam's pod read it; the doorway never forwards it. Anyone with read access to the rendered StatefulSet can see it. | Return to `"localTokenSource": "secret"` (the renderer's default) so the value never appears in the pod spec. |
+
+The runner is the first concrete row the canon's §5 table gains for CI and simulacra runners
+(`genesis/docs/architecture/rea-compute-commitment-primitive.md`). Hole #1 (8444/8445) is not
+closed by this; it stays gated on the brokered conductor surface.

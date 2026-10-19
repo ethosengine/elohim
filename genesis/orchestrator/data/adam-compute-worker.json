@@ -2,5 +2,6 @@
   "enabled": false,
   "image": "",
   "performer": "",
-  "storageClass": "openebs-hostpath"
+  "storageClass": "openebs-hostpath",
+  "localTokenSource": "per-render"
 }

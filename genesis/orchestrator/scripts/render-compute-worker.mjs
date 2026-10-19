@@ -1,5 +1,6 @@
 #!/usr/bin/env node
 // Packaging projection only: task/runtime code has no Kubernetes dependency.
+import { randomBytes } from "node:crypto";
 import { readFile, writeFile } from "node:fs/promises";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
@@ -94,6 +95,28 @@ function findStatefulSet(source, label) {
   return { docs, document };
 }
 
+// The node-local compute token adam's storage and its sibling worker share.
+// "secret" (default, the hardening target) reads `<pod>-compute-local`.
+// "per-render" (dev stakes, 2026-10-19) mints a fresh value on every render and
+// writes it as a plain env value in both containers: nothing committed, no
+// Secret to create, and it rotates with each deploy. Only the two containers
+// in this pod read it; the doorway never forwards it. Hardening debt:
+// genesis/data/timeline/backlog/security-ci-substrate-authorization-grant-coherence.md.
+function localTokenVariable(config, podName, overrides) {
+  const name = "ELOHIM_COMPUTE_LOCAL_TOKEN";
+  const source = config.localTokenSource ?? "secret";
+  if (source === "per-render") {
+    return { name, value: overrides.localToken ?? randomBytes(32).toString("hex") };
+  }
+  if (source !== "secret") {
+    throw new Error(`unknown localTokenSource: ${source} (secret | per-render)`);
+  }
+  return {
+    name,
+    valueFrom: { secretKeyRef: { name: `${podName}-compute-local`, key: "token" } },
+  };
+}
+
 export function renderWorker(source, config, overrides = {}) {
   if (!config.enabled) return source;
   if (
@@ -181,15 +204,7 @@ async function renderEnabled(source, config, overrides) {
     (container) => container.name === "elohim-node",
   );
   if (!storage) throw new Error("Adam storage container missing");
-  const localToken = {
-    name: "ELOHIM_COMPUTE_LOCAL_TOKEN",
-    valueFrom: {
-      secretKeyRef: {
-        name: `${manifest.metadata.name}-compute-local`,
-        key: "token",
-      },
-    },
-  };
+  const localToken = localTokenVariable(config, manifest.metadata.name, overrides);
   storage.env ??= [];
   storage.env = storage.env.filter(
     (variable) =>

@@ -99,6 +99,7 @@ The same `delegates-compute` shape, with different scopes and bounds, models nea
 | **Qahal moderation** | qahal collective | moderator-agent | `moderation-action` | qahal scope, action types, target reach class |
 | **Content authorship delegation** | original author | co-steward | `publish-revision` | content CID lineage, branch policy, scope |
 | **Compute lending (DePIN)** | node operator | requesting peer | `provide-cycles` | watts, wall-time, task class |
+| **CI / simulacra runner** | sponsoring steward's pool peer (any peer may sponsor), and separately each provider peer | runner-svc-agent (no human standing; never a device that speaks for its sponsor) | `hosted-cell` (sponsorship) + `measure-stage` (capacity) | reach ceiling, rate/hr, stage scope, rotation TTL; plural sponsors and providers so no one steward gates who may run checks |
 | **Recovery delegation (graduated)** | steward (pre-incident) | recovery quorum | `attest-recovery` | reach ceiling, quorum threshold, time window |
 | **Guardianship (ward → agent)** | guardian-steward | ward's agent | `act-on-behalf` | scope (school, health, social), age-bounded, capacity-conditional |
 | **End-of-life succession** | original steward | executor | `transition-stewardship` | testamentary, time-locked, witness-required |
