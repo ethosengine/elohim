@@ -21,7 +21,9 @@ Feature: A steward sponsors a runner, and the runner works only inside the promi
   someone has promised it in writing. Those written promises are called grants. Each grant names
   who is promising, who receives the promise, what kind of work it covers, how far anything the
   receiver publishes may travel, and until when. This story needs only one line on that scale: the
-  commons, the open, shared space anyone may read, against anything more private than it. Every
+  commons, the open, shared space anyone may read, against anything more private than it. The
+  scale has more private levels than that, but none of them matters here beyond being more
+  private than the commons. Every
   grant here keeps its reach at the commons. Publishing anything more private than the commons
   needs a person's own standing, which no runner has.
 
@@ -39,6 +41,11 @@ Feature: A steward sponsors a runner, and the runner works only inside the promi
 
   Any steward may sponsor a runner, and any peer may provide capacity to one. Nobody's runner can
   spend a promise that was made to someone else's runner.
+
+  The cast keeps the two roles apart. The two stewards who sponsor runners are "the first steward"
+  and "the second steward". The two who lend capacity are "the first provider" and "the second
+  provider". In this story no steward plays both roles, although nothing stops one person from
+  doing so.
 
   Background:
     Given a household with two stewards, each running their own peer
