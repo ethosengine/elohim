@@ -3,10 +3,10 @@ id: "backlog-self-heal-alpha-ssr-post-bundle-swap-cold-fetch-stall"
 kind: "backlog"
 contentType: "backlog-item"
 contentFormat: "markdown"
-title: "alpha's SSR renders stall at the 1200ms fetch soft budget in bursts: first seen as a ~15min window after a bundle-head swap, then (2026-10-02) sporadically for hours on a days-old head — the stalled fetches are named, storage never saw a slow request, so the time is lost before the request reaches storage"
+title: "alpha's SSR renders stall at the 1200ms fetch soft budget in bursts: first seen as a ~15min window after a bundle-head swap, then (2026-10-02) sporadically for hours on a days-old head — the stalled fetches are named, storage never saw a slow request, so the time is lost before the request reaches storage; (2026-10-16) the drop guards that name the phase at the cut are built, awaiting deploy"
 slug: "self-heal-alpha-ssr-post-bundle-swap-cold-fetch-stall"
 written: "2026-09-12"
-updated: "2026-10-13"
+updated: "2026-10-19"
 author: "runtime-triage"
 status: "wip"
 priority: "medium"
@@ -33,6 +33,7 @@ cites:
   - .claude/data/runtime-cursor.json
   - genesis/orchestrator/manifests/doorway/alpha.yaml
   - .claude/scripts/_lib/runtime_harvest.py
+  - .claude/scripts/_lib/__tests__/runtime_harvest_test.py
   - genesis/data/timeline/backlog/self-heal-render-degenerate-cumulative-counter-false-positive.md
   - genesis/data/timeline/backlog/self-heal-doorway-alpha-storage-breaker-matthew-rekey.md
   - elohim/elohim-storage/src/metrics.rs
@@ -566,6 +567,169 @@ last candidate") is currently paying 2 s for an answer of "unavailable". It has 
 
 ---
 
+# 2026-10-09: `da8bb3bdd7e1` fired a fourth time. The lookup instrument read out empty, and it could not have read otherwise
+
+## What is exhausted
+
+Ledger line (fp `da8bb3bdd7e1`, node **alpha**, filed poll 198, `2026-10-09T15:47:00+00:00`):
+
+```
+render degenerate 5/16 of NEW renders = 0.31 over 5 of the last 8 polls (SSR stalled/timedOut saturation)
+```
+
+Re-fetch at triage, `GET https://doorway-alpha.elohim.host/admin/render-stats` (15:48:07Z, HTTP 200):
+
+```json
+{"total": 19, "rendered": 13, "renderedEmpty": 0, "stalled": 6, "timedOut": 0,
+ "errored": 0, "avgWallMs": 499, "maxWallMs": 1274, "degenerateRate": 0.3158}
+```
+
+`/admin/self-healing` the same minute: `admission.shedTotal: 0`, upstream `circuit: closed`,
+`errorStreak: 0`, `projector.caughtUp: true` with `divergentAnchor: 33`, `warmup.completed: true`,
+`conductor.connectedWorkers: 4/4`, two of seven conductor peers `Degraded`. `elohim.host` (alpha-b)
+at the same time: `total: 14, stalled: 0, maxWallMs: 1004`.
+
+The re-encounter rule, applied: the `elohim-host-landing` head reads `updatedAt: 2026-10-06T21:30:37Z`,
+three days old. `/health` reports `uptime: 17061` s, so this doorway process (image `b4a3911`, built
+2026-10-09T10:21:07Z) started about 11:04Z. Same shape as 2026-10-02: sporadic stalls on a days-old
+head with no deploy nearby. **Same concern; this record still covers it.**
+
+## The stalls, from the 2026-09-28 instrument
+
+Loki, `{namespace="elohim-alpha"} |= "degenerate_fetches"`, 2026-10-09T10:30Z → 15:49Z: **6 lines**, all
+from pod `elohim-doorway-alpha-74fd78cbd-bbvc7`, all `path: "/"`, `terminal: "stalled"`, each preceded
+by a trace line reading `fetches: 29`. The three B-side doorway pods have none.
+
+| time (UTC) | `wall_ms` | fetches named, each `stalled 1200ms` |
+|---|---|---|
+| 11:32:19 | 1265 | epr-head/developers, resilience/developers, epr-head/communities, resilience/communities, epr-head/manifesto |
+| 11:38:05 | 1228 | resilience/know-thyself-path, epr-head/policymakers, resilience/policymakers, epr-head/developers, resilience/developers, +3 more |
+| 12:28:44 | 1271 | resilience/developers, epr-head/communities, resilience/communities, epr-head/manifesto |
+| 12:48:11 | 1274 | epr-head/communities, resilience/communities, epr-head/manifesto |
+| 14:46:24 | 1234 | resilience/policymakers, epr-head/developers, resilience/developers, epr-head/communities, resilience/communities, +1 more |
+| 15:16:20 | 1251 | resilience/developers, epr-head/communities, resilience/communities, epr-head/manifesto |
+
+The tail-suffix shape from 2026-10-02 holds in all six: the stalled fetches are a suffix of the same
+ordered sequence, 3 to 8 deep this time (11:38:05 reaches one step further up, to `know-thyself-path`).
+
+Storage is exonerated again by its own histogram. Prometheus, pod `elohim-matthew-alpha-0`,
+`elohim_http_request_duration_ms`, 10:30Z → 15:49Z in 5-minute steps: route class `api` has **zero**
+requests slower than 1000 ms in the whole range; `content` has one burst of about 90 in the
+11:05–11:10Z step (just after the process start, none near any stall) and zero elsewhere.
+`elohim_http_requests_in_flight` max: 2.
+
+## The 2026-10-02 instrument read out: zero lines, and that reading decides nothing
+
+`{namespace="elohim-alpha"} |= "doorway::ssr::dns"`, same range: **zero lines**, namespace-wide. The
+spelling is not the reason (`"target":"doorway::ssr::trace"` lines from the same pod match the same way),
+and the image carries the resolver (`7fe05122f` is an ancestor of `b4a3911`).
+
+The 2026-10-02 section said a stall with no `doorway::ssr::dns` line beside it "rules the lookup out".
+**That was wrong, and this pass does not draw that conclusion.** Reading the code path end to end:
+
+- `elohim/elohim-render/src/traced_fetcher.rs` cuts a slow fetch with
+  `tokio::time::timeout(soft, self.inner.fetch(request))`. On expiry the inner future is **dropped**.
+- That future is `ResolverFetcher::fetch` → `reqwest` `send()` → connect → `TimedDnsResolver::resolve`
+  (`doorway/doorway-service/src/ssr.rs`). The resolver logged only **after** `lookup_host(...).await`
+  returned. A lookup still pending at 1200 ms goes away with the fetch and never reaches either log arm.
+
+So the resolver could name a lookup of 250–1199 ms, and was silent by construction for any lookup of
+1200 ms or more: exactly the lookups that would produce a `stalled` fetch. Zero lines across six stalls
+is therefore consistent with two different worlds, and the instrument as shipped cannot tell them apart:
+
+1. every lookup answered in under 250 ms and the time is lost in the connect or on the render thread; or
+2. the lookups behind the stalled fetches hung past the cut (a resolver timeout is seconds, not
+   hundreds of milliseconds, so a hung lookup would skip the 250–1199 ms band entirely).
+
+What the zero does establish: no lookup on this client completed in the 250–1199 ms band in 5.3 hours.
+
+The abandoned-lookup reasoning is from reading the code, not from a reproduction: no test in this pass
+drives a real fetch through `reqwest` and cuts it mid-lookup.
+
+Seen in the same pod, named and not claimed as cause: between 13:33Z and 15:06Z the doorway logged
+`failed to lookup address information: Name or service not known` on targets
+`doorway::worker::conductor` and `doorway::projection::subscriber` (at least 100 lines; the query was
+capped). That is a failed lookup of a conductor host name on a different client. It shows name
+resolution in this pod is not uniformly healthy; it says nothing about how long the render client's
+lookups of the storage service name take.
+
+## Root-cause inventory (this pass)
+
+1. **`doorway/doorway-service/src/ssr.rs`, `TimedDnsResolver::resolve`**: the instrument blindness
+   above. Repaired this pass (below).
+2. **`.claude/scripts/_lib/runtime_harvest.py`, `_render_degenerate`**: the finding's "5/16" is
+   arithmetic across a pod restart. The stored window (`.claude/data/runtime-cursor.json`, poll 198) on
+   alpha runs `total` 3, 3, 4, 5, 23, 25, **5**, 19 and degenerate 1, 1, 1, 1, 2, 3, **2**, 6: the counters
+   reset between the sixth and seventh sample. The predicate subtracted first from last (19 − 3 = 16,
+   6 − 1 = 5), and its reset guard only looked at those two endpoints, so a restart whose new counters
+   had already grown past the first sample was invisible. Summed per transition the window holds
+   22 + 5 + 14 = 41 renders and 2 + 2 + 4 = 8 degenerate, **0.20, under the 0.25 threshold**. This
+   firing's number is a sensing error; the stalls underneath it are real (6 of 19 in the current
+   process, each one in Loki). Repaired this pass (below). It is a correctness repair to the delta and
+   does not loosen the predicate: a restarted process's renders are still counted as new.
+3. Items 1–3 of the 2026-10-02 inventory stand: the pool-free render client
+   (`doorway/doorway-service/src/server/http.rs`, `init_ssr_render_client`), the 3 s connect bound above
+   the 1200 ms soft budget (`doorway/doorway-service/src/routes/storage_proxy.rs`), and the traced
+   fetcher as messenger.
+4. **Still not established:** which of lookup, connect or render thread loses the time.
+
+## Fix path
+
+1. **Name the abandoned lookup (landed this pass).** `LookupInFlight` in
+   `doorway/doorway-service/src/ssr.rs` is a guard created when a lookup starts and stood down when it
+   answers. If it goes out of scope while still armed, it emits a `warn!` on target `doorway::ssr::dns`,
+   message `SSR render fetch: name lookup abandoned before it answered`, with `host` and `elapsed_ms`.
+   Resolution is unchanged. The reading now has three outcomes instead of one ambiguous silence:
+   - `abandoned` lines at about 1200 ms beside a `degenerate_fetches` line: the lookup is where the time goes.
+   - `slow name lookup` lines: same conclusion, milder.
+   - a stall with neither: every lookup answered in under 250 ms, and the lookup is ruled out for real.
+2. **Count the window per transition (landed this pass).** `_render_degenerate` sums deltas across
+   consecutive samples and treats a transition where a counter went down as a restart whose since-boot
+   counters are that transition's delta.
+3. **Then the cure, chosen by reading 1.** Unchanged from 2026-10-02: lookup slow → cache the resolved
+   address on the render client for a short TTL (one lookup per render, not 29); lookup clean → time the
+   connect, or re-examine the warm render against the tail-suffix shape.
+4. Unchanged refusals: do not widen the soft budget, do not raise `DEFAULT_SSR_RENDER_PERMITS`, do not
+   re-pool the render client. The address cache in 3 was deliberately NOT landed with the instrument:
+   shipped together, a fall in stalls could not be attributed, and the lookup has not been shown slow.
+
+## Current decision (supersedes 2026-10-02)
+
+**IN PROGRESS. The lookup question is still open. The instrument that was meant to close it was blind in
+the deciding case and is repaired. The cure waits on its first honest reading.**
+
+What the poller cites on re-encounter: this record. The condition is live and intermittent on alpha
+(6 stalls in 19 renders over 4.7 h). Expect the fingerprint to close by disappearance and re-file. On
+the next firing, check `/version` on doorway-alpha first:
+
+- image at or after the commit that carries `LookupInFlight`: run
+  `{namespace="elohim-alpha"} |= "doorway::ssr::dns"` beside `|= "degenerate_fetches"` over the firing
+  window and compare timestamps. That reading is the whole triage and selects the cure in fix path 3.
+- image `b4a3911` or older: there is nothing new to read. A zero from `doorway::ssr::dns` on those
+  images means nothing. Do not re-triage; cite this section.
+
+Both changes observe only after they are carried: the resolver by an edge deploy, the predicate by the
+commit reaching the checkout the poller runs from. Neither has been observed live.
+
+## Verification
+
+- 2026-10-09 15:48:07Z: `/admin/render-stats`, `/admin/self-healing`, `/health`, `/version` and the
+  landing head re-fetched on alpha, and `/admin/render-stats` on elohim.host (all HTTP 200, quoted
+  above). The cursor window was read from disk. **The condition is live, not cleared.**
+- Loki and Prometheus readings as quoted above (range 10:30Z → 15:49Z).
+- No cache-busted probe renders were issued this pass, so the triage added nothing to alpha's render
+  counters. It made one `/head` read on alpha (a 2 s conductor ask, see the 2026-10-02 observation).
+- `just gate doorway` (fmt-check, clippy `-D warnings`, test, `RUSTFLAGS=""`): EXIT=0. The lib suite
+  passed 1763, 0 failed, 2 ignored, including the 2 new `ssr::tests` for the guard
+  (`a_lookup_dropped_before_it_answers_is_named_as_abandoned`,
+  `a_lookup_that_answered_is_not_named_as_abandoned`). Those two test the guard itself; they do not
+  prove that `reqwest` lets go of the lookup future when a fetch is cut.
+- `python3 .claude/scripts/_lib/__tests__/runtime_harvest_test.py`: 71 assertions passed, including the
+  measured alpha window (silent) and a restart followed by a real storm (fires, `4/8`).
+- Closure: left to the poller, by disappearance. The ledger line is `triaged` and is not manually
+  removed: the stalls are real and unresolved, so a recurrence must be free to file.
+
+
 # 2026-10-13: `da8bb3bdd7e1` fired a fourth time; both instruments read out, and the name lookup is not where the time goes
 
 ## What is exhausted
@@ -751,3 +915,129 @@ needs no new triage until the phase guard is deployed; the reading in step 3 is 
   only), so this triage added nothing to either node counters. The landing head age was therefore not
   read; the process age (35 h) and the spread of the stalls carry the "not a cold window" reading.
 - Nothing was built, so nothing is claimed fixed. The ledger line is `blocked` and is not deleted.
+
+---
+
+# 2026-10-16: `da8bb3bdd7e1` fired a fifth time; the two guards this record owed are built
+
+## What is exhausted
+
+Ledger line (fp `da8bb3bdd7e1`, node **alpha**, filed poll 253, `2026-10-16T20:48:37+00:00`):
+
+```
+render degenerate 5/17 of NEW renders = 0.29 over 5 of the last 8 polls (SSR stalled/timedOut saturation)
+```
+
+Re-fetch at triage, `GET https://doorway-alpha.elohim.host/admin/render-stats` (21:20:04Z, HTTP 200):
+
+```json
+{"total": 29, "rendered": 22, "renderedEmpty": 0, "stalled": 7, "timedOut": 0,
+ "errored": 0, "avgWallMs": 374, "maxWallMs": 1256, "degenerateRate": 0.241}
+```
+
+`GET https://elohim.host/admin/render-stats` the same second: `total: 22, stalled: 1, maxWallMs: 1300`.
+Both doorways run image `77d9f9d` (built 2026-10-16T08:40:49Z); `/health` uptime 37658 s on alpha and
+37606 s on alpha-b, so both processes started at about 10:52Z today. `/admin/self-healing` on alpha
+(21:25:21Z): `admission.shedTotal: 0`, upstream `circuit: closed`, `errorStreak: 0`,
+`warmup.completed: true`, `conductor.connectedWorkers: 4/4`, `projector.caughtUp: true`.
+
+**The condition is live and has the 2026-10-13 shape:** a new process, a new image, and about one
+cold render in four stalled at the 1200 ms budget within ten hours. One new fact: **alpha-b shows a
+stall** (1 of 22). The 2026-10-13 pass recorded alpha-b at 0 of 50 and named "why not adam" as the
+open question; this is one event, below any floor, so it is noted and not read.
+
+## Re-encounter rule, applied
+
+The 2026-10-13 decision says a re-file needs no new triage until the phase guard is deployed. No
+guard had been built: `git log` on `doorway/doorway-service/src/ssr.rs` shows `7fe05122f` (the lookup
+timer) as the newest change. So this pass did the owed step 1 instead of re-reading the same evidence.
+
+## What was built (owed step 1)
+
+All in `doorway/doorway-service/src/ssr.rs`; no other file changes.
+
+1. **`LookupWatch`, the drop guard on the lookup.** `TimedDnsResolver::resolve` holds it across the
+   `lookup_host` await. If the lookup future is dropped before it answers (the soft-budget cut drops
+   the whole fetch), `Drop` emits `warn!(target: "doorway::ssr::dns", host, elapsed_ms,
+   "SSR render fetch: name lookup abandoned before it answered")`. This closes blind spot 2 of the
+   2026-10-13 inventory: after deploy, a stall with no `doorway::ssr::dns` line rules the lookup out.
+2. **`WatchedFetch` + `FetchProbe`, the phase guard on the fetch.** `ResolverFetcher::fetch` now runs
+   its body (`send_and_read`) inside a `WatchedFetch`. On drop before completion it emits one
+   `warn!(target: "doorway::ssr::fetch", path, phase, elapsed_ms, polls, max_poll_gap_ms,
+   max_wake_to_poll_ms, woken_unpolled_ms, "SSR render fetch abandoned before it answered")`.
+   A completed fetch logs nothing. `phase` is `sending` (lookup, connect, write, waiting for the
+   response head) or `body` (head received, reading the body).
+
+   **One refinement over the 2026-10-13 sketch.** A gap between polls cannot, by itself, tell
+   "waiting on the network" apart from "woken but the render thread did not come back": a future
+   with no wakeup is not polled either. So the guard also wraps the task waker
+   (`RecordingWaker`) and keeps the earliest wake since the last poll. `max_wake_to_poll_ms` is the
+   longest any wake waited for its poll; `woken_unpolled_ms` is set only when the fetch was woken
+   and then dropped before that wake was ever polled.
+
+## How to read the first lines after deploy
+
+Query: `{namespace="elohim-alpha"} |= "doorway::ssr::fetch"` beside `|= "degenerate_fetches"` and
+`|= "doorway::ssr::dns"`, matched by time to within 2 s.
+
+| Reading on the stalled fetches | Meaning | Cure direction (fix path item 3) |
+|---|---|---|
+| `woken_unpolled_ms` set, or `max_wake_to_poll_ms` in the hundreds | the render thread did not poll a fetch that was ready | drive render fetches from a runtime off the isolate thread |
+| `phase=sending`, no pending wake, small wake latencies, a `doorway::ssr::dns` "abandoned" line | the name lookup hung | short-TTL address cache / resolver config (`ndots`) |
+| `phase=sending`, no pending wake, no dns line | connect or request write never completed | bounded connect retry inside the budget; check the `10.1.58.42` observation |
+| `phase=body` | storage or transit after all (contradicts the histogram; re-read it) | storage side |
+
+## Current decision (supersedes 2026-10-13)
+
+**BLOCKED on deploy, not on design.** Step 1 is done and gated (see Verification). Still owed:
+
+1. An edge deploy that carries this commit (operator-initiated; this agent does not push or roll
+   the fleet; the integrator owns the push).
+2. One Loki read after the next few stalls, read with the table above. That reading is the next
+   triage, and it chooses the cure.
+3. Operator, optional: whether `10.1.58.42` is the doorway-alpha pod address (2026-10-13 item 5).
+
+What the poller cites on re-encounter: this record. A re-file before the deploy needs no triage.
+A re-file after the deploy means read the `doorway::ssr::fetch` lines; do not re-derive the
+evidence above. The fingerprint will not close by disappearance while the condition holds.
+Unchanged refusals: do not widen the soft budget, do not touch `_render_degenerate`, do not raise
+`DEFAULT_SSR_RENDER_PERMITS`, do not re-pool the render client.
+
+## Verification
+
+- 2026-10-16 21:20:04Z and 21:25:21Z: `/admin/render-stats`, `/admin/self-healing`, `/health`,
+  `/version` re-fetched (HTTP 200, quoted above). **The condition is live.** Nothing is claimed
+  fixed; the commit adds instruments only.
+- `just gate doorway/doorway-service` (2026-10-16, about 21:50Z, pool slot `family/perf`): `cargo fmt --check`,
+  `cargo clippy -- -D warnings` and `cargo test --lib --bins` all green, **1769 passed, 0 failed, 2 ignored**,
+  including the six new tests in `ssr::tests` (`a_completed_watched_fetch_reports_nothing`,
+  `a_parked_fetch_never_woken_reads_as_waiting_not_starved`, `a_wake_left_unpolled_at_the_cut_is_named`,
+  `a_late_poll_after_a_wake_is_measured_and_clears_the_pending_wake`, `the_phase_handle_moves_the_reading`,
+  `an_abandoned_lookup_watch_is_armed_and_an_answered_one_is_not`). The main tree held another session's
+  uncommitted doorway edits in other files at the time; the gate compiled them too, and only `ssr.rs`
+  is in this commit.
+- No cache-busted render probes were made this pass, so this triage added nothing to the node's
+  counters.
+
+# 2026-10-19: both owed instruments land, with the 2026-10-09 harvester fix
+
+The 2026-10-09 section above and the 2026-10-13 section were written on separate lines of work and
+met at the 2026-10-18 integration pass. The 2026-10-13 fix path's two instruments are now on dev:
+
+1. **The drop guard on the lookup** (fix path item 1) is `LookupWatch` in
+   `doorway/doorway-service/src/ssr.rs`, from c9f9f8ea0 (the 2026-10-16 section above), cherry-picked
+   from perf/call-floor-2: a lookup cut before it answers warns "name lookup abandoned before it
+   answered" with host and elapsed_ms. The 2026-10-09 commit 7e7b5d867 built the same guard
+   independently as `LookupInFlight`; the landing keeps one copy, `LookupWatch`.
+2. **The phase guard on the fetch** (fix path item 2) is `WatchedFetch`/`FetchProbe` from the same
+   commit: an abandoned fetch names the phase it reached and whether it was woken.
+
+The 2026-10-09 change to `_render_degenerate` lands with them. It sums the delta per poll transition, so
+a pod restart inside the window no longer subtracts one process's counters from another's. It leaves
+DEGEN_RATE, DEGEN_POLLS and DEGEN_MIN_EVENTS alone. Refusal 4 above ("do not touch
+`_render_degenerate`") guards against tuning the predicate to make the finding go away, and this change
+does not tune it.
+
+**Current decision:** still BLOCKED on fix path step 2, an edge deploy that carries both guards. The
+dev landing reaches alpha through the next edge build. Then do step 3, the Loki read beside
+`degenerate_fetches`.

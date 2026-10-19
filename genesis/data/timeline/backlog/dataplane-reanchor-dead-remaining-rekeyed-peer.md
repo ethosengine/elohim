@@ -6,11 +6,11 @@ contentFormat: "markdown"
 title: "Re-keyed dead anchors need a heal under the current key — dead_remaining survives a pod restart (mechanism corrected 2026-09-11: the rows are SETTLED-not-skipped, and nothing clears the dead verdict on a settled row)"
 slug: "dataplane-reanchor-dead-remaining-rekeyed-peer"
 written: "2026-09-06"
-updated: "2026-10-09"
+updated: "2026-10-19"
 author: "story-harvest; mechanism corrected 2026-09-11 (runtime-triage, endpoint-confirmed)"
 status: "backlog"
 priority: "high"
-self_heal_status: in-progress
+self_heal_status: blocked
 severity: medium
 fingerprints: [2b4761b2eaf6]
 nodes: [alpha-b]
@@ -27,7 +27,9 @@ cites:
   - genesis/data/timeline/backlog/alpha-adam-peer-meta-store-disk-io-error.md
   - genesis/data/timeline/backlog/reanchor-dead-remaining-stuck-vs-draining.md
   - .claude/scripts/runtime-harvest.py
-  - genesis/data/timeline/backlog/alpha-adam-peer-meta-store-disk-io-error.md
+  - https://elohim.host/admin/self-healing
+  - https://elohim.host/db/p2p/conductor-diagnostics
+  - https://doorway-alpha.elohim.host/p2p/status
 ---
 
 > **2026-09-11 — runtime-triage mechanism correction (endpoint-confirmed).** The
@@ -753,3 +755,121 @@ itself is still live as of 12:48Z. Local evidence: the unit test
 `elohim-storage` gate. Fleet read owed after the roll: `elohim.host/p2p/status
 .provideLoop.reanchorSweepsAbandoned` present, and either 0 beside a moving residue or non-zero
 beside a frozen one.
+
+## 2026-10-19 — re-filed at poll 213: the snapshot is current, the conductor answers, and three rows stay unhealed
+
+`2b4761b2eaf6` re-filed as a NEW ledger line (`seen 1, first_poll 213`, 2026-10-19T02:28Z). Same
+concern, same file; nothing forked.
+
+### What is exhausted
+
+Ledger line (node `alpha-b`, provenance `p2p-status:provide-loop`):
+`provideLoop.deadRemainingStuck reanchorDeadRemaining=5 reanchorPending=11 stuckSweeps=4 heldUnanswered=4 heldUnbacked=0 settledByDeclaration=0`.
+The line carries no `sweepsAbandoned=` suffix, so the verdict was fresh when the poller read it.
+
+`https://elohim.host/p2p/status .provideLoop`, polled once a minute from 03:23Z to 03:38Z (16
+reads). The first read, and the read after the verdict was earned again:
+
+```json
+03:23Z {"reanchorPending":10,"reanchorCompleted":9,"reanchorFailed":0,"reanchorDeadRemaining":5,
+        "stuckSweeps":2,"deadRemainingStuck":false,"reanchorHeldBackoff":4,
+        "reanchorHeldUnanswered":2,"deadSettledByDeclaration":2,"reanchorHeldUnbacked":0,
+        "reanchorAdopted":0,"reanchorSweepsAbandoned":0,"selfCidSource":"derived-libp2p-peer-id"}
+03:27Z {... "reanchorCompleted":10,"reanchorDeadRemaining":5,"stuckSweeps":4,"deadRemainingStuck":true,
+        "reanchorHeldBackoff":4,"reanchorHeldUnanswered":2,"deadSettledByDeclaration":2,
+        "reanchorSweepsAbandoned":0}
+```
+
+Sweeps published at about 03:25Z (`stuckSweeps` 3) and 03:27Z (4). Nothing published from 03:27Z
+to 03:35Z. At 03:35Z `reanchorSweepsAbandoned` went to 1, meaning one sweep ran out of its 120 s
+budget. The verdict came back with `reanchorSweepsAbandoned 0`, so it is a current reading, not
+an old one.
+
+At the same time:
+- `https://elohim.host/health`: `uptime 29856`, `pools_healthy 7/7`, `connected_workers 4/4`,
+  `p2p.caughtUp true`, `divergentAnchor 151`.
+- `https://elohim.host/admin/self-healing`: admission `shedTotal 0`, the one upstream (adam
+  storage) `circuit: "closed"`, `errorStreak 0`. All seven `conductor-N` peers read `Degraded`.
+  Warmup `lastError`: gertrude's storage `/api/v1/cache/stream` could not be reached.
+- `https://elohim.host/db/p2p/conductor-diagnostics`: membership is authoritative with 80
+  running cells and 0 failed reads. 3 of adam's 5 iroh connections have
+  `recv_message_count 0` even though they have sent 14k to 58k messages each.
+- `https://doorway-alpha.elohim.host/p2p/status .provideLoop` (matthew): `reanchorDeadRemaining 0`,
+  `deadRemainingStuck false`, `reanchorCaughtUp true`. doorway-alpha's upstream circuit to
+  matthew storage read `closed`, `errorStreak 0` at 03:23Z. The open-circuit, `errorStreak` ~210
+  state reported in the dispatch was no longer live at that read.
+
+### Reading
+
+This is the second outcome predicted by the 2026-10-09 decision: a sweep finishes,
+`reanchorSweepsAbandoned` reads 0, and rows are still held unanswered against a conductor that
+answers other calls (`reanchorFailed 0`, pools 7/7).
+
+- The population has shrunk: 16 dead rows (2026-10-09) down to 5, of which the F5 cure settled 2
+  by declaration (`deadSettledByDeclaration 2`). That leaves an unhealed residue of
+  `5 − 2 = 3` (`provide_loop_status::unhealed_dead_residue`).
+- Of those 3, two are `reanchorHeldUnanswered`: the adopt-before-author pre-flight asked and no
+  answer came back. For a backing-record read this is
+  `head_adoption.rs` `DeclarationBacking::Unanswered` (the
+  `"network backing-record read went unanswered"` arm). The third residue row is in no held
+  counter (`reanchorHeld 0`, `Unbacked 0`, `Failed 0`, both skip counters 0). Between the 03:23Z
+  and 03:25Z reads, `reanchorCompleted` rose by 1 while `reanchorDeadRemaining` stayed at 5.
+  Either one row is re-authored every sweep and then counted dead again, or a different row
+  revived while another went dead. The HTTP surface cannot tell these apart.
+- The detector is behaving as designed. `next_unchanged_sweeps` / `is_dead_remaining_stuck`
+  (`provide_loop_status.rs:196-216`) compare the residue across sweeps. The tests
+  `an_unsettled_residue_beside_settled_rows_still_reads_stuck` and
+  `a_fully_skip_guarded_sweep_publishes_the_stuck_shape` pin that a residue which does not move
+  reads as stuck, whatever the reason. Reading noted, not changed: the sweep cadence observed
+  here is about 2 min, not the 300 s that `REANCHOR_HELD_BACKOFF_SECONDS` = 900 s assumes
+  (`reanchor_backoff.rs:29`). An unanswered row therefore sits out roughly 7 sweeps before it is
+  asked again, and the verdict is earned after 3. Changing that is a decision about what "stuck"
+  means. It is not a threshold fix.
+
+### Root-cause inventory
+
+- `elohim/elohim-storage/src/services/head_adoption.rs` (`DeclarationBacking::Unanswered`,
+  `PreflightVerdict::held(HoldBasis::Unanswered)`): the two rows rest on network reads that
+  return no answer.
+- `elohim/elohim-storage/src/services/reanchor_backoff.rs:29`: the 900 s hold window is sized for
+  a 300 s cadence.
+- `elohim/elohim-storage/src/p2p/projection_reconcile.rs:181,3166-3240`: the witness sweep runs on
+  the reconcile tick with a 120 s budget. The 03:35Z sweep was abandoned.
+- `elohim/elohim-storage/src/services/provide_loop_status.rs:183-216`: residue and detector, as
+  designed.
+- Fleet: one-way iroh connections on adam's conductor, and gertrude's storage unreachable from
+  doorway B. Either would explain backing-record reads that are never answered.
+
+### Missing node (named, not built)
+
+Chain: `deadRemainingStuck` → (arm named by counters) → *which rows, and which read went
+unanswered* → cure owner. The middle node exists only in Loki: no HTTP surface lists the residue
+row ids or the read position (head, election or record) that went unanswered. This triage had no
+Loki access, so it could not name the three rows or explain the residue row that sits in no held
+counter. If this concern is reopened as a code task, a bounded observability addition is a
+capped list of residue row ids with their `HoldBasis` and unanswered read position on
+`/p2p/status` (or an admin read). That touches the view schema, the schema contract and the
+generated TS. Not built here: it is a wire change, and it belongs with whoever owns the
+dataplane-convergence habit, not a background lane.
+
+### Current decision — BLOCKED (2026-10-19) on fleet network health plus a Loki read
+
+No storage-code defect is indicated. The surface is fresh and the detector is correct. The
+residue is 2 network reads that go unanswered, plus 1 row the surface cannot classify, on a
+degraded alpha fleet. The cure has two parts:
+1. Restore the alpha network paths: adam's one-way iroh connections and gertrude's storage
+   reachability. This is operator or fleet work. No kubectl from this lane.
+2. Do a Loki read on `elohim-adam-alpha-0`, target `elohim_storage::services::head_adoption` /
+   `reanchor_backfill`, to name the 3 rows and the unanswered read position.
+
+Ledger `2b4761b2eaf6` (`first_poll 213`) is set to `status: blocked`,
+`backlog: dataplane-reanchor-dead-remaining-rekeyed-peer`. The poller will not dispatch again
+while the line is present. It closes the line by disappearance once a clean streak follows the
+residue draining.
+
+### Verification (what would close this)
+
+`elohim.host/p2p/status .provideLoop` reads `reanchorHeldUnanswered 0`. The unhealed residue
+(`reanchorDeadRemaining − deadSettledByDeclaration`) is 0, or it moves sweep to sweep, with
+`deadRemainingStuck false` and `reanchorSweepsAbandoned 0`. Not verified as of 03:38Z: the
+condition is live (`stuckSweeps 4`, `deadRemainingStuck true`).
