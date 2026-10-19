@@ -517,10 +517,12 @@ impl<'a> Covenant<'a> {
         self.clauses.iter().position(|c| c.cid == cid)
     }
 
-    /// The cid of a later `revokesClause` by the same party naming `index`'s clause.
+    /// The cid of a `revokesClause` by the same party naming `index`'s clause. Every clause is
+    /// scanned, not only later ones: a revocation names its target's CID, so it cannot precede it,
+    /// and timestamp order (ties, clock skew) must never let a revocation be missed.
     fn revoked_by(&self, index: usize) -> Option<&str> {
         let target = &self.clauses[index];
-        self.clauses[index + 1..]
+        self.clauses
             .iter()
             .find(|c| {
                 c.kind == REVOKES
@@ -821,24 +823,39 @@ fn show(root: &Path, session: &str) -> CovResult<Value> {
 // check
 // ---------------------------------------------------------------------------
 
-fn repo_relative(root: &Path, path: &str) -> String {
+/// `path` as a normalised repository-relative string, or `None` when it does not name a place
+/// inside the repository. The deepest existing ancestor is canonicalised (symlinks resolved) and
+/// the canonical root stripped; any `..`, `.` or root component left over is refused, so no
+/// spelling of a path outside a clause's directory can read as inside it.
+fn repo_relative(root: &Path, path: &str) -> Option<String> {
     let candidate = Path::new(path);
-    let relative = candidate
-        .strip_prefix(root)
-        .map(Path::to_path_buf)
-        .ok()
-        .or_else(|| {
-            let canonical = root.canonicalize().ok()?;
-            candidate
-                .strip_prefix(canonical)
-                .map(Path::to_path_buf)
-                .ok()
-        })
-        .unwrap_or_else(|| candidate.to_path_buf());
-    relative
-        .to_string_lossy()
-        .trim_start_matches("./")
-        .to_string()
+    let absolute = if candidate.is_absolute() {
+        candidate.to_path_buf()
+    } else {
+        root.join(candidate)
+    };
+    let canonical_root = root.canonicalize().ok()?;
+    let mut existing = absolute.as_path();
+    let mut tail: Vec<&std::ffi::OsStr> = Vec::new();
+    let resolved = loop {
+        if let Ok(canonical) = existing.canonicalize() {
+            let mut resolved = canonical;
+            for part in tail.iter().rev() {
+                resolved.push(part);
+            }
+            break resolved;
+        }
+        tail.push(existing.file_name()?);
+        existing = existing.parent()?;
+    };
+    let relative = resolved.strip_prefix(&canonical_root).ok()?;
+    if relative
+        .components()
+        .any(|c| !matches!(c, Component::Normal(_)))
+    {
+        return None;
+    }
+    Some(relative.to_string_lossy().into_owned())
 }
 
 fn not_held(variable: bool, reason: impl Into<String>) -> Value {
@@ -854,8 +871,14 @@ fn not_held(variable: bool, reason: impl Into<String>) -> Value {
 
 fn check(root: &Path, session: &str, args: &Args) -> CovResult<Value> {
     let rule_id = args.rule.as_deref().ok_or("check needs --rule ID")?;
-    let path = repo_relative(root, args.path.as_deref().ok_or("check needs --path P")?);
+    let raw_path = args.path.as_deref().ok_or("check needs --path P")?;
     let brit = Brit::resolve(root)?;
+    let Some(path) = repo_relative(root, raw_path) else {
+        return Ok(not_held(
+            true,
+            format!("{raw_path} does not name a normalised path inside the repository"),
+        ));
+    };
 
     // Does the rule that applies to this path declare a variance at all?
     let manifests = manifests_containing(root, rule_id)?;
@@ -865,12 +888,15 @@ fn check(root: &Path, session: &str, args: &Args) -> CovResult<Value> {
         .collect();
     // Nearest governing manifest first; one that governs elsewhere only as a fallback.
     declared.sort_by_key(|(m, _)| (!governs(&m.dir, &path), std::cmp::Reverse(m.dir.len())));
-    let Some((_, rule)) = declared.first() else {
+    let Some((governing, rule)) = declared.first() else {
         return Ok(not_held(
             false,
             format!("rule `{rule_id}` is declared in no .epr-meta manifest"),
         ));
     };
+    // A clause attenuates the bytes of ONE manifest. It holds only where that manifest is the
+    // nearest one declaring the rule for this path; a same-id rule elsewhere is not what was granted.
+    let governing_rel = governs(&governing.dir, &path).then(|| governing.rel.clone());
     if rule.variance.is_none() {
         return Ok(not_held(
             false,
@@ -886,7 +912,16 @@ fn check(root: &Path, session: &str, args: &Args) -> CovResult<Value> {
             continue;
         }
         let on_path = covers(&clause.strings("paths"), &path);
-        let verdict = covenant.verdict_at(index, true)?;
+        let mut verdict = covenant.verdict_at(index, true)?;
+        if verdict.honoured && clause.field("manifestPath") != governing_rel.as_deref() {
+            verdict = Verdict::no(format!(
+                "clause {} was granted over {}, but the manifest governing {path} for `{rule_id}` \
+                 is {}",
+                clause.cid,
+                clause.field("manifestPath").unwrap_or("?"),
+                governing_rel.as_deref().unwrap_or("none")
+            ));
+        }
         if on_path && verdict.honoured {
             return Ok(json!({
                 "status": "held",

@@ -612,6 +612,74 @@ fn check_holds_a_variance_on_its_paths_only() {
 }
 
 #[test]
+fn check_refuses_every_spelling_of_a_path_outside_the_clause() {
+    // Review finding 2026-10-19: `..`, a symlink and a path outside the repository must never
+    // match a granted glob by their spelling.
+    let f = Fixture::new();
+    f.stand(MATTHEW);
+    f.affirm();
+    f.vary(&[]);
+    write(f.root(), "elsewhere/x.feature", "Feature: x\n");
+
+    let dotted = f.check("area/features/../../elsewhere/x.feature");
+    assert_eq!(dotted["status"], "not-held", "{dotted}");
+    let dotted_abs = f.check(
+        f.root()
+            .join("area/features/../../elsewhere/x.feature")
+            .to_str()
+            .unwrap(),
+    );
+    assert_eq!(dotted_abs["status"], "not-held", "{dotted_abs}");
+    let missing_dotted = f.check("area/features/nope/../../../elsewhere/y.feature");
+    assert_eq!(missing_dotted["status"], "not-held", "{missing_dotted}");
+
+    #[cfg(unix)]
+    {
+        std::os::unix::fs::symlink(
+            f.root().join("elsewhere/x.feature"),
+            f.root().join("area/features/link.feature"),
+        )
+        .unwrap();
+        let linked = f.check("area/features/link.feature");
+        assert_eq!(linked["status"], "not-held", "{linked}");
+    }
+
+    let outside = TempDir::new().unwrap();
+    let foreign = outside.path().join("area/features/a.feature");
+    write(outside.path(), "area/features/a.feature", "Feature: a\n");
+    let out = f.check(foreign.to_str().unwrap());
+    assert_eq!(out["status"], "not-held", "{out}");
+    assert!(
+        out["reason"]
+            .as_str()
+            .unwrap()
+            .contains("inside the repository"),
+        "{out}"
+    );
+}
+
+#[test]
+fn check_holds_only_where_the_granted_manifest_governs() {
+    // Review finding 2026-10-19: a clause attenuates ONE manifest's bytes. A nearer manifest that
+    // later declares the same rule id is not what the steward granted, even with A unchanged.
+    let f = Fixture::new();
+    f.stand(MATTHEW);
+    f.affirm();
+    f.vary(&[]);
+    assert_eq!(f.check("area/features/a.feature")["status"], "held");
+    write(f.root(), "area/features/.epr-meta", MANIFEST_TEXT);
+    let shadowed = f.check("area/features/a.feature");
+    assert_eq!(shadowed["status"], "not-held", "{shadowed}");
+    assert!(
+        shadowed["reason"]
+            .as_str()
+            .unwrap()
+            .contains("was granted over"),
+        "{shadowed}"
+    );
+}
+
+#[test]
 fn check_is_not_held_after_revocation() {
     let f = Fixture::new();
     f.stand(MATTHEW);
