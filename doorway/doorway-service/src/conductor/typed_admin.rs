@@ -230,13 +230,34 @@ impl TypedAdminClient {
     /// Grant zome call capability for a cell.
     ///
     /// Allows the given `signing_key` to make zome calls on `cell_id`
-    /// using the provided `cap_secret`.
+    /// using the provided `cap_secret`. All functions — the human session's
+    /// grant, unchanged. A stewarded runner's session uses
+    /// [`Self::grant_zome_call_capability_scoped`] with a listed set.
     pub async fn grant_zome_call_capability(
         &self,
         cell_id: (&[u8], &[u8]),
         cap_secret: &[u8],
         signing_key: &[u8],
         tag: &str,
+    ) -> Result<(), String> {
+        self.grant_zome_call_capability_scoped(
+            cell_id,
+            cap_secret,
+            signing_key,
+            tag,
+            GrantedFunctions::All,
+        )
+        .await
+    }
+
+    /// Grant zome call capability for a cell, limited to `functions`.
+    pub async fn grant_zome_call_capability_scoped(
+        &self,
+        cell_id: (&[u8], &[u8]),
+        cap_secret: &[u8],
+        signing_key: &[u8],
+        tag: &str,
+        functions: GrantedFunctions,
     ) -> Result<(), String> {
         use holochain_client::CellId as HcCellId;
 
@@ -260,7 +281,7 @@ impl TypedAdminClient {
         let cap_grant = ZomeCallCapGrant {
             tag: tag.to_string(),
             access: CapAccess::Assigned { secret, assignees },
-            functions: GrantedFunctions::All,
+            functions,
         };
 
         self.admin_ws
@@ -396,9 +417,40 @@ fn strip_ws_prefix(url: &str) -> String {
     }
 }
 
+/// A function-listed capability over exactly `pairs` (`(zome, function)`).
+/// Pure. An empty slice yields an empty listed set — a grant that can call
+/// nothing — which callers avoid authoring at all.
+pub fn listed_functions(pairs: &[(&str, &str)]) -> GrantedFunctions {
+    use holochain_zome_types::prelude::{FunctionName, ZomeName};
+    GrantedFunctions::Listed(
+        pairs
+            .iter()
+            .map(|(zome, function)| (ZomeName::from(*zome), FunctionName::from(*function)))
+            .collect(),
+    )
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn listed_functions_names_exactly_the_given_pairs() {
+        use holochain_zome_types::prelude::{FunctionName, ZomeName};
+        let GrantedFunctions::Listed(set) = listed_functions(&[("content_store", "compute_task")])
+        else {
+            panic!("a listed grant must never become All");
+        };
+        assert_eq!(set.len(), 1);
+        assert!(set.contains(&(
+            ZomeName::from("content_store"),
+            FunctionName::from("compute_task")
+        )));
+        assert!(!set.contains(&(
+            ZomeName::from("imagodei"),
+            FunctionName::from("create_human")
+        )));
+    }
 
     #[test]
     fn test_strip_ws_prefix() {

@@ -45,6 +45,7 @@ pub mod governance;
 pub mod governance_actions;
 pub mod graph_views;
 pub mod hazards;
+pub mod hosted_custody; // compute-payload custody under the hosting promise (service-agent runners)
 pub mod hub_capacity;
 pub mod identity;
 pub mod lamad;

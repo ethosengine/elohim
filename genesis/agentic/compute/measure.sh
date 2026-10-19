@@ -31,7 +31,7 @@ BUILD_STAGE_MJS="$HERE/stage/build-stage-task.mjs"
 
 usage() {
   cat >&2 <<'USAGE'
-usage: measure.sh grant  --on jessica|adam [--renew]
+usage: measure.sh grant  --on jessica|adam [--renew] [--recipient <agent key>]
        measure.sh worker --on jessica|adam
        measure.sh <feature-path> [--on jessica|adam] [--gap <id>]
        measure.sh status
@@ -42,6 +42,10 @@ grant refuses to reissue while a stored grant file is already on record for
 the provider — pass --renew to replace it deliberately. The validity window
 always equals the rotation lifetime (MEASURE_GRANT_DAYS, default 1 day) —
 never wider, or elohim-storage's compute_grants API refuses the grant.
+--recipient names the agent key the capacity is granted TO (default: this
+household's requester, $COMPUTE_PERFORMER). A stewarded runner (e.g. the CI
+runner's hosted agent key) is granted under its own stored file
+(grant-jessica-for-<key>.json), so it never replaces the requester's grant.
 
 <feature-path> accepts either grammar: relative to genesis/a2o (e.g.
 'features/dataplane/x.feature', the `just test mesh` form) or prefixed with
@@ -214,22 +218,33 @@ ENV
 # refuses any window longer than `rotation_ttl_days * 86400`. Both are computed from one
 # variable (MEASURE_GRANT_DAYS, default 1) so they cannot drift apart again.
 cmd_grant() {
-  local on="" renew=0
+  local on="" renew=0 recipient=""
   while [ $# -gt 0 ]; do
     case "$1" in
       --on) on="$2"; shift 2 ;;
       --renew) renew=1; shift ;;
+      --recipient) recipient="${2:-}"; shift 2 ;;
       *) refuse 2 "grant: unknown argument $1" ;;
     esac
   done
-  [ -n "$on" ] || refuse 2 "usage: measure.sh grant --on jessica|adam [--renew]"
+  [ -n "$on" ] || refuse 2 "usage: measure.sh grant --on jessica|adam [--renew] [--recipient <agent key>]"
   require_known_provider "$on" "grant issuance"
+  # The recipient is who SPENDS the capacity (compute_tasks authorize: policy.recipient ==
+  # task.requester). Default unchanged: this household's requester.
+  local grant_stem="grant-jessica"
+  if [ -z "$recipient" ]; then
+    recipient="$COMPUTE_PERFORMER"
+  elif [ "$recipient" != "$COMPUTE_PERFORMER" ]; then
+    [[ "$recipient" =~ ^uhCAk[A-Za-z0-9_-]{48,}$ ]] \
+      || refuse 2 "grant: --recipient must be a Holochain agent key (uhCAk…), got '$recipient'"
+    grant_stem="grant-jessica-for-$recipient"
+  fi
 
   local api_port index grant_dir grant_file grant_days now_iso until_iso
   api_port="$(provider_field jessica api)" || refuse 2 "providers.json has no jessica.api"
   index="$(provider_field jessica index)" || refuse 2 "providers.json has no jessica.index"
   grant_dir="$MESH_DIR/compute"
-  grant_file="$grant_dir/grant-jessica.json"
+  grant_file="$grant_dir/$grant_stem.json"
   grant_days="${MEASURE_GRANT_DAYS:-1}"
   now_iso="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
   until_iso="$(date -u -d "+${grant_days} days" +%Y-%m-%dT%H:%M:%SZ 2>/dev/null || date -u -v+"${grant_days}"d +%Y-%m-%dT%H:%M:%SZ)"
@@ -237,7 +252,7 @@ cmd_grant() {
   if dry_run; then
     print_env_block
     echo "[dry-run] mkdir -p $grant_dir"
-    echo "[dry-run] write $grant_file: recipient=$COMPUTE_PERFORMER scope=measure-stage rate_per_hour=8 rotation_ttl_days=$grant_days window=$now_iso..$until_iso"
+    echo "[dry-run] write $grant_file: recipient=$recipient scope=measure-stage rate_per_hour=8 rotation_ttl_days=$grant_days window=$now_iso..$until_iso"
     echo "[dry-run] COMPUTE_API_URL=http://127.0.0.1:$api_port COMPUTE_PERFORMER=\$(peer_agent_key $index jessica) node $WORKSPACE_MJS grant $grant_file"
     return 0
   fi
@@ -249,7 +264,7 @@ cmd_grant() {
   mkdir -p "$grant_dir"
   cat > "$grant_file" <<JSON
 {
-  "recipient": "$COMPUTE_PERFORMER",
+  "recipient": "$recipient",
   "scope": "measure-stage",
   "validFrom": "$now_iso",
   "validUntil": "$until_iso",
@@ -269,7 +284,7 @@ JSON
   echo "$grant_output"
   grant_action_hash="$(node -e 'const o=JSON.parse(process.argv[1]||"{}"); process.stdout.write(o.grantActionHash||"")' "$grant_output")"
   if [ -n "$grant_action_hash" ]; then
-    printf '%s' "$grant_action_hash" > "$grant_dir/grant-jessica.action-hash"
+    printf '%s' "$grant_action_hash" > "$grant_dir/$grant_stem.action-hash"
   fi
 }
 

@@ -1190,6 +1190,30 @@ def resolveSeedDoorwayToken() {
     return token
 }
 
+/**
+ * CI runner preflight (plan B step 5): one ok/REFUSED line each for the runner's
+ * standing as a sponsored service agent (agent:ci-runner-jenkins-matthew, its
+ * sponsor's hosting promise and days remaining) and for each provider's capacity
+ * grant. Body: genesis/scripts/ci/runner-preflight.sh. Informational until the
+ * runner sends stages: a REFUSED line never fails the build. ADMIN_KEY reaches the
+ * script via withEnv, never argv. Dev-stakes posture and hardening debt:
+ * genesis/data/timeline/backlog/security-ci-substrate-authorization-grant-coherence.md.
+ */
+def runnerPreflight() {
+    try {
+        withCredentials([string(credentialsId: 'doorway-admin-bootstrap-key', variable: 'ADMIN_KEY')]) {
+            withEnv(["DOORWAY_URL=http://${env.INTERNAL_DOORWAY_URL}"]) {
+                def status = sh(script: "bash '${env.WORKSPACE}/genesis/scripts/ci/runner-preflight.sh'", returnStatus: true)
+                if (status != 0) {
+                    echo "runner preflight: REFUSED line(s) above, each naming its cure (informational; the build continues)"
+                }
+            }
+        }
+    } catch (e) {
+        echo "runner preflight skipped: doorway-admin-bootstrap-key not visible (${e})"
+    }
+}
+
 def uploadBlobContentStage() {
     def seedToken = resolveSeedDoorwayToken()
     catchError(buildResult: 'UNSTABLE', stageResult: 'UNSTABLE') {
@@ -2060,6 +2084,9 @@ Seed IDs: ${params.SEED_IDS ?: '(all)'}
                         dir('genesis/a2o') {
                             sh 'pnpm install --frozen-lockfile 2>/dev/null || pnpm install'
                         }
+
+                        // The CI runner's standing and grants, before any stage is sent.
+                        runnerPreflight()
 
                         // Always run API-level tests (@e2e tag, fast, no browser)
                         catchError(buildResult: 'UNSTABLE', stageResult: 'UNSTABLE') {

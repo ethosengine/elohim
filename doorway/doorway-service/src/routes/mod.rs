@@ -39,6 +39,7 @@ pub mod pkarr_resolver;
 pub mod receipt;
 pub mod seed;
 pub mod self_healing;
+pub mod service_agent;
 pub mod status;
 pub mod storage_proxy;
 pub mod stream;

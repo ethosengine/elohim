@@ -263,11 +263,24 @@ pub struct UserDoc {
     pub closed_identifier: Option<String>,
 
     /// The agency phase this account registered under: `hosted`, `doorway`,
-    /// `node` or `device`. Only a `hosted` account may be given a cell by this
-    /// doorway; the others run their own. Absent on rows written before
-    /// 2026-10-15; such a row is never given a cell (see `may_be_hosted`).
+    /// `node` or `device` for a human, or `service-agent` for a stewarded
+    /// runner (`routes::service_agent`). Only a `hosted` account may be given a
+    /// cell by this doorway after registration; the others run their own, and a
+    /// service agent's cell is installed once, at registration. Absent on rows
+    /// written before 2026-10-15; such a row is never given a cell (see
+    /// `may_be_hosted`).
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub agency_phase: Option<String>,
+
+    /// For a `service-agent` account only: the steward agent key of the pool
+    /// peer that SPONSORS it — the provider the peer itself named on the
+    /// runner's `hosted-cell` promise, checked against the configured performer
+    /// and never the runner's own key (`routes::service_agent::sponsor_named_by_peer`).
+    /// Recorded explicitly, not inferred from `hosted_cell_provider`, so "which
+    /// runners does this peer sponsor" is answerable even after the promise is
+    /// re-issued. Absent on every human row.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub service_agent_sponsor: Option<String>,
 
     /// When this human bound the account onto their own node's key
     /// (`POST /auth/node-key/bind`). Absent on an account that never graduated.
@@ -329,6 +342,7 @@ impl UserDoc {
             closed_at: None,
             closed_identifier: None,
             agency_phase: None,
+            service_agent_sponsor: None,
             node_key_bound_at: None,
             previous_agent_pub_key: None,
         }

@@ -218,6 +218,28 @@ pub fn find_active_delegates_compute(
         .optional()
 }
 
+/// Like [`find_active_delegates_compute`], but only a grant THIS `provider`
+/// issued. The multi-party case: a grant another peer issued to the same
+/// recipient must never authorize an act on this node (hosted-cell custody).
+pub fn find_active_delegates_compute_from_provider(
+    conn: &mut SqliteConnection,
+    recipient_cid: &str,
+    capability: &str,
+    provider: &str,
+) -> Result<Option<MishpatCommitment>, diesel::result::Error> {
+    mc::mishpat_commitments
+        .filter(mc::action.eq("delegates-compute"))
+        .filter(mc::recipient.eq(recipient_cid))
+        .filter(mc::scope.eq(capability))
+        .filter(mc::provider.eq(provider))
+        .filter(mc::state.eq("active"))
+        .filter(mc::revoked_at.is_null())
+        .filter(mc::dht_anchor_hash.is_not_null())
+        .order(mc::created_at.desc())
+        .first::<MishpatCommitment>(conn)
+        .optional()
+}
+
 /// Load this provider's live (non-revoked) `replicates-commons` commitments.
 ///
 /// "Live" = `action == "replicates-commons"` AND `provider == self` AND

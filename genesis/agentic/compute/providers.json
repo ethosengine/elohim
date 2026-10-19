@@ -1,7 +1,8 @@
 {
   "jessica": {
     "api": 8091,
-    "index": 1
+    "index": 1,
+    "runnerGrant": null
   },
   "adam": {
     "agentKey": null,

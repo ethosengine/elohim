@@ -77,6 +77,53 @@ const RATE_PER_HOUR: u64 = 60;
 const ROTATION_TTL_DAYS: u64 = 30;
 const REACH_CEILING: &str = "commons";
 
+/// How long one hosted-cell promise to a stewarded RUNNER (a service agent,
+/// e.g. `agent:ci-runner-jenkins-matthew`) runs before it must be re-issued.
+///
+/// DEV STAKES, ON PURPOSE (operator ruling 2026-10-19). A runner is a CI or
+/// simulacra job host whose credential lives where a build can read it;
+/// mounting and rotating a fresh secret every 30 days is the painful hop the
+/// operator chose not to take yet. So the runner's window is generous —
+/// 365 days, a wide rate — and deliberately a SEPARATE constant from the
+/// human [`HOSTED_CELL_DAYS`], so the generosity never leaks into the promise a
+/// household makes to a person. Every bound is still stated: the window is
+/// finite, `reach_ceiling` stays `commons` (the blast radius is bounded
+/// compute-spend, never reach), and renewal is an explicit re-issue, never a
+/// silent extension. The production hardening (a short window, rotation,
+/// per-build tokens, a witnessable secret mount) is recorded in
+/// `genesis/data/timeline/backlog/security-ci-substrate-authorization-grant-coherence.md`.
+pub const RUNNER_HOSTED_CELL_DAYS: i64 = 365;
+/// The runner's rotation lifetime. The grant surface refuses a window longer
+/// than `rotation_ttl_days * 86400` (`compute_grants.rs` window check), so this
+/// must never be smaller than [`RUNNER_HOSTED_CELL_DAYS`].
+const RUNNER_ROTATION_TTL_DAYS: u64 = 365;
+/// Wide on purpose: a CI build fans out many stage submissions per hour.
+const RUNNER_RATE_PER_HOUR: u64 = 3600;
+
+/// The terms one hosted-cell promise is issued under. Two named instances
+/// exist — [`HUMAN_TERMS`] and [`RUNNER_TERMS`] — and no caller invents a
+/// third: a promise's bounds are declared here, where they can be read.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct HostedCellTerms {
+    pub window_days: i64,
+    pub rate_per_hour: u64,
+    pub rotation_ttl_days: u64,
+}
+
+/// The promise a household makes to a hosted HUMAN (D2).
+pub const HUMAN_TERMS: HostedCellTerms = HostedCellTerms {
+    window_days: HOSTED_CELL_DAYS,
+    rate_per_hour: RATE_PER_HOUR,
+    rotation_ttl_days: ROTATION_TTL_DAYS,
+};
+
+/// The promise a sponsoring pool peer makes to a stewarded runner.
+pub const RUNNER_TERMS: HostedCellTerms = HostedCellTerms {
+    window_days: RUNNER_HOSTED_CELL_DAYS,
+    rate_per_hour: RUNNER_RATE_PER_HOUR,
+    rotation_ttl_days: RUNNER_ROTATION_TTL_DAYS,
+};
+
 /// Where this doorway's pool peer answers, and the credentials to speak to it.
 ///
 /// All three parts are required together. The performer key is not optional
@@ -152,7 +199,24 @@ pub fn rfc3339_utc_secs(at: DateTime<Utc>) -> String {
 /// `rotation_ttl_days * 86400`. Sending a body that violates any of them is a
 /// refusal, not a partial grant.
 pub fn hosted_cell_grant_body(recipient: &str, now: DateTime<Utc>) -> (Value, String) {
-    let valid_until = rfc3339_utc_secs(now + chrono::Duration::days(HOSTED_CELL_DAYS));
+    grant_body_under(recipient, now, HUMAN_TERMS)
+}
+
+/// The exact body that issues one hosted-cell promise to a stewarded RUNNER.
+///
+/// Same scope, same route, same validator as [`hosted_cell_grant_body`] — a
+/// runner's hosting is the identical promise under [`RUNNER_TERMS`]. Pure, and
+/// pinned by `runner_hosted_cell_grant_body_carries_the_runner_bounds`.
+pub fn runner_hosted_cell_grant_body(recipient: &str, now: DateTime<Utc>) -> (Value, String) {
+    grant_body_under(recipient, now, RUNNER_TERMS)
+}
+
+fn grant_body_under(
+    recipient: &str,
+    now: DateTime<Utc>,
+    terms: HostedCellTerms,
+) -> (Value, String) {
+    let valid_until = rfc3339_utc_secs(now + chrono::Duration::days(terms.window_days));
     let stamp = rfc3339_utc_secs(now);
     let body = json!({
         "recipient": recipient,
@@ -163,8 +227,8 @@ pub fn hosted_cell_grant_body(recipient: &str, now: DateTime<Utc>) -> (Value, St
         "bounds": {
             "epr_scope": ["*"],
             "reach_ceiling": REACH_CEILING,
-            "rate_per_hour": RATE_PER_HOUR,
-            "rotation_ttl_days": ROTATION_TTL_DAYS,
+            "rate_per_hour": terms.rate_per_hour,
+            "rotation_ttl_days": terms.rotation_ttl_days,
         }
     });
     (body, valid_until)
@@ -202,7 +266,30 @@ pub async fn issue_hosted_cell_grant(
     recipient_agent_pub_key: &str,
     now: DateTime<Utc>,
 ) -> Result<HostedCellGrant, String> {
-    let (body, valid_until) = hosted_cell_grant_body(recipient_agent_pub_key, now);
+    issue_under(cfg, recipient_agent_pub_key, now, HUMAN_TERMS).await
+}
+
+/// Issue the hosted-cell promise for a freshly provisioned stewarded RUNNER,
+/// under [`RUNNER_TERMS`].
+///
+/// Unlike the human leg, every caller treats `Err` as "no runner": an
+/// unsponsored runner would be hosted compute nobody promised, which is exactly
+/// the silent favour the hosted-cell commitment exists to retire.
+pub async fn issue_runner_hosted_cell_grant(
+    cfg: &PoolComputeConfig,
+    recipient_agent_pub_key: &str,
+    now: DateTime<Utc>,
+) -> Result<HostedCellGrant, String> {
+    issue_under(cfg, recipient_agent_pub_key, now, RUNNER_TERMS).await
+}
+
+async fn issue_under(
+    cfg: &PoolComputeConfig,
+    recipient_agent_pub_key: &str,
+    now: DateTime<Utc>,
+    terms: HostedCellTerms,
+) -> Result<HostedCellGrant, String> {
+    let (body, valid_until) = grant_body_under(recipient_agent_pub_key, now, terms);
     let value = post_grant(cfg, &body).await?;
     let grant_cid = value
         .get("grantCid")
@@ -401,6 +488,10 @@ pub fn live_hosted_cell_filter(now: DateTime<Utc>) -> Document {
     doc! {
         "is_active": true,
         "metadata.is_deleted": { "$ne": true },
+        // A stewarded runner carries a hosted-cell promise too, but it is not a
+        // HUMAN this doorway serves: counting it would inflate humansServed
+        // with CI capacity. `$ne` also matches rows that recorded no phase.
+        "agency_phase": { "$ne": crate::routes::service_agent::SERVICE_AGENT_PHASE },
         "hosted_cell_grant_cid": { "$nin": [bson::Bson::Null, bson::Bson::String(String::new())] },
         "hosted_cell_valid_until": { "$gt": rfc3339_utc_secs(now) },
     }
@@ -526,6 +617,61 @@ mod tests {
         // surface refuses the whole request rather than trimming it.
         let window = at(valid_until.as_str()) - at("2026-09-11T09:00:00Z");
         assert!(window.num_seconds() <= (ROTATION_TTL_DAYS as i64) * 86_400);
+    }
+
+    /// The runner's promise, pinned the way the human one is. Same scope and
+    /// route; the generous dev-stakes terms live in their own named constants
+    /// and must still satisfy every check the grant surface runs — in
+    /// particular `validUntil - validFrom <= rotation_ttl_days * 86400`
+    /// (`elohim-storage/src/api/compute_grants.rs`), which is a refusal of the
+    /// whole request, not a trim. The fixture window crosses 2028-02-29 so a
+    /// leap year cannot sneak an extra day past the bound.
+    #[test]
+    fn runner_hosted_cell_grant_body_carries_the_runner_bounds() {
+        let now = at("2027-06-01T09:00:00Z");
+        let (body, valid_until) = runner_hosted_cell_grant_body("uhCAkRunner", now);
+        assert_eq!(
+            body["scope"], HOSTED_CELL_SCOPE,
+            "no new scope for a runner"
+        );
+        assert_eq!(body["recipient"], "uhCAkRunner");
+        assert_eq!(body["issuedAt"], "2027-06-01T09:00:00Z");
+        assert_eq!(body["validFrom"], "2027-06-01T09:00:00Z");
+        assert_eq!(body["validUntil"], "2028-05-31T09:00:00Z");
+        assert_eq!(valid_until, "2028-05-31T09:00:00Z");
+        assert_eq!(body["bounds"]["reach_ceiling"], "commons");
+        assert_eq!(body["bounds"]["rate_per_hour"], 3600);
+        assert_eq!(body["bounds"]["rotation_ttl_days"], 365);
+        assert_eq!(body["bounds"]["epr_scope"], json!(["*"]));
+        let keys: Vec<&String> = body["bounds"]
+            .as_object()
+            .expect("bounds object")
+            .keys()
+            .collect();
+        assert_eq!(
+            keys.len(),
+            4,
+            "the grant surface refuses any bound outside its four accepted keys"
+        );
+        let window = at(valid_until.as_str()) - now;
+        assert!(
+            window.num_seconds() <= (RUNNER_TERMS.rotation_ttl_days as i64) * 86_400,
+            "the runner window must fit inside its rotation lifetime"
+        );
+        assert!(RUNNER_TERMS.rate_per_hour > 0);
+    }
+
+    /// The runner's generosity must never leak into the promise made to a
+    /// person: the two term sets are distinct named constants.
+    #[test]
+    fn runner_terms_never_widen_the_human_promise() {
+        assert_eq!(HOSTED_CELL_DAYS, 30, "the human window is unchanged");
+        assert_eq!(HUMAN_TERMS.window_days, HOSTED_CELL_DAYS);
+        assert_eq!(RUNNER_TERMS.window_days, RUNNER_HOSTED_CELL_DAYS);
+        assert_ne!(HUMAN_TERMS, RUNNER_TERMS);
+        let (human, _) = hosted_cell_grant_body("uhCAkPerson", at("2026-09-11T09:00:00Z"));
+        assert_eq!(human["bounds"]["rotation_ttl_days"], ROTATION_TTL_DAYS);
+        assert_eq!(human["bounds"]["rate_per_hour"], RATE_PER_HOUR);
     }
 
     #[test]
@@ -814,6 +960,14 @@ mod tests {
                 .ok(),
             Some("2026-09-11T09:00:00Z".to_string()),
             "an expired promise is not a live one"
+        );
+        assert_eq!(
+            filter
+                .get_document("agency_phase")
+                .and_then(|d| d.get_str("$ne").map(str::to_owned))
+                .ok(),
+            Some(crate::routes::service_agent::SERVICE_AGENT_PHASE.to_string()),
+            "a stewarded runner holds a hosted-cell promise but is not a human served"
         );
     }
 
