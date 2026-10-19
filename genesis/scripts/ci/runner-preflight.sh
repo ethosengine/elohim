@@ -4,7 +4,7 @@
 # One line per check, in the `just mesh preflight` idiom:
 #   ok <name>: <what holds>
 #   REFUSED <name>: <why> — <cure>
-# Exit 1 if any line is REFUSED, 0 otherwise. Not yet wired into any Jenkinsfile.
+# Exit 1 if any line is REFUSED, 0 otherwise. Called (informational) by genesis/Jenkinsfile runnerPreflight().
 #
 # Checks:
 #   standing           the runner is a service agent on this doorway, never Admin, under a

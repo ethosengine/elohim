@@ -33,7 +33,7 @@
 # piped too (-H @-). ADMIN_KEY, the derived password and the JWT are never echoed to
 # stderr; only the JWT is printed, to stdout, on success.
 #
-# Not yet wired into any Jenkinsfile.
+# Called by runner-preflight.sh (genesis/Jenkinsfile runnerPreflight()).
 #
 # Env:
 #   ADMIN_KEY                 admin bootstrap key (= doorway API_KEY_ADMIN). Empty/unset ⇒
