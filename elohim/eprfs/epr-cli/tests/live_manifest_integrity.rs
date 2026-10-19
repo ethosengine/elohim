@@ -29,7 +29,10 @@ const SKIP_DIRS: [&str; 5] = [".git", "node_modules", "target", ".angular", "dis
 
 /// Repo-relative subtrees excluded by path (not by bare name, which would prune
 /// any directory that happened to share it).
-const SKIP_REL: [&str; 1] = [".claude/worktrees"];
+/// `.worktrees` is where sibling checkouts live now (CLAUDE.md "Keep Git worktrees under
+/// /projects/elohim/.worktrees/"); walking it validated ~87% other branches' manifests (gate-cycle
+/// review 2026-10-19, ~40 s of this binary's 45 s).
+const SKIP_REL: [&str; 2] = [".claude/worktrees", ".worktrees"];
 
 fn walk(root: &Path, dir: &Path, out: &mut Vec<PathBuf>) {
     let Ok(entries) = std::fs::read_dir(dir) else {
