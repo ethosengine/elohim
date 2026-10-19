@@ -357,8 +357,10 @@ pub struct HoldPass {
 /// not admitted ([`mark_read_since_retired`]) caps it at `retired_at` +
 /// [`PIN_READMIT_COOLDOWN`]. (An admitted read does not wait for this pass: it
 /// re-activates the pin in the read path, [`record_demand_pin`].) Every value
-/// is normalised UTC text in one format, so `readmit_after < now` compares as
-/// text. At rest two indexed existence checks on
+/// is normalised UTC text in one format, so `readmit_after <= stamp(now)`
+/// compares as text. `stamp` drops `now`'s fraction of a second, so the
+/// comparison is inclusive: a pin due at `18:00:00Z` is admitted by a pass at
+/// `18:00:00.250Z`, as before the ladder. At rest two indexed existence checks on
 /// `idx_acquisition_pins_status_readmit_after` find nothing, and the pass
 /// opens no write transaction.
 ///
@@ -387,10 +389,18 @@ pub struct HoldPass {
 /// from its `retired_at` here; if `retired_at` is missing or unreadable too it
 /// is NOT re-admitted: `retired_at` becomes `now` and it drops to the first
 /// rung, holding [`PIN_READMIT_COOLDOWN`] from here — fail closed, once.
+///
+/// `tracked` names the pins that still hold an acquisition tracker. A re-probe
+/// opens a new `round` (a fresh retry budget) only for a pin whose tracker is
+/// gone. One that survived the hold — the process was suspended through it, or
+/// every reconcile stopped before tracker maintenance — keeps its round and so
+/// its exhausted tracker, dispatches nothing and is retired again, as before
+/// the ladder.
 pub fn retired_hold_pass(
     conn: &mut SqliteConnection,
     app_ctx: &crate::db::AppContext,
     now: Now,
+    tracked: &std::collections::HashSet<i32>,
 ) -> QueryResult<HoldPass> {
     let stamped = stamp(now);
     let retired = || pins::acquisition_pins.filter(pins::status.eq("retired"));
@@ -399,7 +409,7 @@ pub fn retired_hold_pass(
     ))
     .get_result(conn)?;
     let due: bool = diesel::select(diesel::dsl::exists(
-        retired().filter(pins::readmit_after.lt(&stamped)),
+        retired().filter(pins::readmit_after.le(&stamped)),
     ))
     .get_result(conn)?;
     if !undated && !due {
@@ -443,7 +453,7 @@ pub fn retired_hold_pass(
 
         let due: Vec<AcquisitionPin> = pins::acquisition_pins
             .filter(pins::status.eq("retired"))
-            .filter(pins::readmit_after.lt(&stamped))
+            .filter(pins::readmit_after.le(&stamped))
             .order(pins::readmit_after.asc())
             .load(conn)?;
         let local = if due.is_empty() {
@@ -487,11 +497,16 @@ pub fn retired_hold_pass(
             } else {
                 ReadmitCause::Hold
             };
+            let round = if tracked.contains(&pin.id) {
+                pin.round
+            } else {
+                pin.round + 1
+            };
             diesel::update(retired_row(pin.id))
                 .set((
                     pins::status.eq("active"),
                     pins::read_since_retired.eq(0),
-                    pins::round.eq(pins::round + 1),
+                    pins::round.eq(round),
                     pins::updated_at.eq(&stamped),
                 ))
                 .execute(conn)?;
@@ -729,20 +744,30 @@ pub fn mark_read_since_retired(
     kind: &str,
 ) -> QueryResult<bool> {
     match unmarked_retired_row(conn, agent_pub_key, head_ref, kind)? {
-        Some((pin_id, deadline)) => mark_row_read(conn, pin_id, deadline),
+        Some(seen) => mark_row_read(conn, &seen),
         None => Ok(false),
     }
 }
 
-/// The read half of [`mark_read_since_retired`]: the id of the head's pin if
-/// it is retired and not yet marked, with the deadline marking it should give
-/// it.
+/// A retired, unmarked row as [`unmarked_retired_row`] read it: the deadline
+/// marking should give it, and the retirement that deadline was computed from.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub(crate) struct UnmarkedRetired {
+    pub id: i32,
+    /// `retired_at` as read. The write applies only while the row still holds
+    /// this retirement, so a deadline is never stamped onto a later one.
+    pub retired_at: Option<String>,
+    pub deadline: Option<String>,
+}
+
+/// The read half of [`mark_read_since_retired`]: the head's pin if it is
+/// retired and not yet marked, with the deadline marking it should give it.
 pub(crate) fn unmarked_retired_row(
     conn: &mut SqliteConnection,
     agent_pub_key: &str,
     head_ref: &str,
     kind: &str,
-) -> QueryResult<Option<(i32, Option<String>)>> {
+) -> QueryResult<Option<UnmarkedRetired>> {
     let row: Option<(i32, Option<String>, Option<String>)> = pins::acquisition_pins
         .filter(pins::agent_pub_key.eq(agent_pub_key))
         .filter(pins::head_ref.eq(head_ref))
@@ -760,29 +785,46 @@ pub(crate) fn unmarked_retired_row(
             (Some(own), Some(cap)) => Some(own.min(cap)),
             (own, cap) => cap.or(own),
         };
-        (id, deadline)
+        UnmarkedRetired {
+            id,
+            retired_at,
+            deadline,
+        }
     }))
 }
 
 /// The write half of [`mark_read_since_retired`], guarded on every predicate
-/// the read checked, so it marks a row at most once per hold whoever races.
+/// the read checked — the same retirement included — so it marks a row at
+/// most once per hold whoever races, and a read that stalled across a
+/// re-activation and a new retirement marks nothing: it was not a read of the
+/// new hold.
 pub(crate) fn mark_row_read(
     conn: &mut SqliteConnection,
-    pin_id: i32,
-    deadline: Option<String>,
+    seen: &UnmarkedRetired,
 ) -> QueryResult<bool> {
     let row = pins::acquisition_pins
-        .filter(pins::id.eq(pin_id))
+        .filter(pins::id.eq(seen.id))
         .filter(pins::status.eq("retired"))
         .filter(pins::read_since_retired.eq(0));
-    let marked = match deadline {
-        Some(deadline) => diesel::update(row)
+    let marked = match (&seen.retired_at, &seen.deadline) {
+        (Some(retired_at), Some(deadline)) => {
+            diesel::update(row.filter(pins::retired_at.eq(retired_at)))
+                .set((
+                    pins::read_since_retired.eq(1),
+                    pins::readmit_after.eq(deadline),
+                ))
+                .execute(conn)?
+        }
+        (Some(retired_at), None) => diesel::update(row.filter(pins::retired_at.eq(retired_at)))
+            .set(pins::read_since_retired.eq(1))
+            .execute(conn)?,
+        (None, Some(deadline)) => diesel::update(row.filter(pins::retired_at.is_null()))
             .set((
                 pins::read_since_retired.eq(1),
                 pins::readmit_after.eq(deadline),
             ))
             .execute(conn)?,
-        None => diesel::update(row)
+        (None, None) => diesel::update(row.filter(pins::retired_at.is_null()))
             .set(pins::read_since_retired.eq(1))
             .execute(conn)?,
     };
@@ -1012,7 +1054,13 @@ mod tests {
     }
 
     fn hold_pass(conn: &mut SqliteConnection, now: chrono::DateTime<Utc>) -> HoldPass {
-        retired_hold_pass(conn, &crate::db::AppContext::default_lamad(), now).expect("hold pass")
+        retired_hold_pass(
+            conn,
+            &crate::db::AppContext::default_lamad(),
+            now,
+            &std::collections::HashSet::new(),
+        )
+        .expect("hold pass")
     }
 
     /// An admitted read-miss for `head` at `at`.
@@ -1464,10 +1512,10 @@ mod tests {
             .expect("read b")
             .expect("unmarked");
         assert_eq!(seen_a, seen_b);
-        assert_eq!(seen_a.1.as_deref(), Some("2026-10-13T18:00:00Z"));
-        assert!(mark_row_read(&mut a, seen_a.0, seen_a.1).expect("write a"));
+        assert_eq!(seen_a.deadline.as_deref(), Some("2026-10-13T18:00:00Z"));
+        assert!(mark_row_read(&mut a, &seen_a).expect("write a"));
         assert!(
-            !mark_row_read(&mut b, seen_b.0, seen_b.1).expect("write b"),
+            !mark_row_read(&mut b, &seen_b).expect("write b"),
             "the second write finds the row already marked"
         );
         // An admitted read that re-activated it first also stops a mark.
@@ -1477,7 +1525,73 @@ mod tests {
             .expect("read")
             .expect("unmarked");
         read_miss(&mut b, "demanded-then-read", t0());
-        assert!(!mark_row_read(&mut a, seen.0, seen.1).expect("write"));
+        assert!(!mark_row_read(&mut a, &seen).expect("write"));
+    }
+
+    /// A read that stalled between its read and its write, across a
+    /// re-activation and a new retirement, marks nothing: the deadline it
+    /// computed belongs to the old hold.
+    #[test]
+    fn a_stalled_mark_does_not_stamp_an_old_deadline_on_a_new_retirement() {
+        let pool = crate::test_util::test_pool();
+        let mut conn = pool.get().expect("conn");
+        let pin = pin_for(&mut conn, "stalled-read");
+        retire(&mut conn, pin.id, t0());
+        let seen = unmarked_retired_row(&mut conn, "local-device", "stalled-read", "item")
+            .expect("read")
+            .expect("unmarked");
+        // Inventory re-activates it, a fresh round exhausts, it retires again.
+        let advertised: std::collections::HashSet<&str> = ["stalled-read"].into_iter().collect();
+        inventory_named_pins(&mut conn, &advertised, t0() + Duration::hours(1)).expect("named");
+        retire(&mut conn, pin.id, t0() + Duration::hours(2));
+        let before = reread(&mut conn, pin.id);
+        assert!(!mark_row_read(&mut conn, &seen).expect("write"));
+        let after = reread(&mut conn, pin.id);
+        assert_eq!(after.read_since_retired, 0);
+        assert_eq!(after.readmit_after, before.readmit_after);
+        assert_eq!(after.readmit_after.as_deref(), Some("2026-10-13T20:00:00Z"));
+    }
+
+    /// The due check keeps whole seconds; a pass a fraction of a second past
+    /// the deadline admits the pin, as dev's `now - retired_at > 6h` did.
+    #[test]
+    fn a_pass_within_the_deadline_second_admits_the_pin() {
+        let pool = crate::test_util::test_pool();
+        let mut conn = pool.get().expect("conn");
+        let pin = pin_for(&mut conn, "due-on-the-second");
+        retire(&mut conn, pin.id, t0());
+        let due = t0() + PIN_READMIT_COOLDOWN + Duration::milliseconds(250);
+        let pass = hold_pass(&mut conn, due);
+        assert_eq!(pass.readmitted.len(), 1);
+        assert_eq!(reread(&mut conn, pin.id).status, "active");
+    }
+
+    /// A due pin whose tracker survived the hold keeps its round, so the
+    /// tracker — and its spent budget — is kept; one without a tracker opens a
+    /// new round.
+    #[test]
+    fn a_surviving_tracker_keeps_its_round_through_readmission() {
+        let pool = crate::test_util::test_pool();
+        let mut conn = pool.get().expect("conn");
+        let kept = pin_for(&mut conn, "tracker-survived");
+        let fresh = pin_for(&mut conn, "tracker-evicted");
+        retire(&mut conn, kept.id, t0());
+        retire(&mut conn, fresh.id, t0());
+        let (kept_round, fresh_round) = (
+            reread(&mut conn, kept.id).round,
+            reread(&mut conn, fresh.id).round,
+        );
+        let tracked: std::collections::HashSet<i32> = [kept.id].into_iter().collect();
+        let pass = retired_hold_pass(
+            &mut conn,
+            &crate::db::AppContext::default_lamad(),
+            t0() + Duration::hours(7),
+            &tracked,
+        )
+        .expect("hold pass");
+        assert_eq!(pass.readmitted.len(), 2);
+        assert_eq!(reread(&mut conn, kept.id).round, kept_round);
+        assert_eq!(reread(&mut conn, fresh.id).round, fresh_round + 1);
     }
 
     /// The pass touches only due rows, checks their presence in chunks far

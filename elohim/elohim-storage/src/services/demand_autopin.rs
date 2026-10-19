@@ -199,9 +199,9 @@ impl DemandAutoPin {
     /// - **Admitted** — the id is past its throttle, the window of distinct ids
     ///   has room, and the active set is under its ceiling: exactly the reads
     ///   that authored or re-activated a pin before retirement had a ladder.
-    ///   A head with no pin gets one. A head whose pin is `retired` has the
-    ///   demand recorded and is re-admitted by the next reconcile tick — at
-    ///   most one tick later than re-activating it here would be. A `removed`
+    ///   A head with no pin gets one. A head whose pin is `retired` is
+    ///   re-activated here, in the read path, at once — the next reconcile's
+    ///   census includes it, with its rung and round kept. A `removed`
     ///   pin is counted and left removed: only an explicit re-pin restores it
     ///   (operator decision, 2026-10-14).
     /// - **Not admitted** — throttled, window full, or at the ceiling: counted

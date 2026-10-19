@@ -23675,6 +23675,7 @@ mod session_exchange_tests {
                 crate::p2p::acquisition::run_hold_pass(
                     &mut conn,
                     t0 + chrono::Duration::hours(hours + 13),
+                    &std::collections::HashSet::new(),
                 );
             }
         }

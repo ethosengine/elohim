@@ -237,12 +237,20 @@ pub fn publish_retired_pin_gauge(conn: &mut diesel::SqliteConnection) {
 ///
 /// bounded-work: one indexed read of the due rows (none at rest), one chunked
 /// presence query over them, one write per due row.
-pub fn run_hold_pass(conn: &mut diesel::SqliteConnection, now: Now) -> HoldPass {
+///
+/// `tracked` is [`AcquisitionState::tracked_pin_ids`] read before the pass: a
+/// due pin whose tracker survived its hold keeps its round.
+pub fn run_hold_pass(
+    conn: &mut diesel::SqliteConnection,
+    now: Now,
+    tracked: &HashSet<i32>,
+) -> HoldPass {
     let pass = match crate::db::acquisition_pins::retired_hold_pass(
         conn,
         // Slice 1: all pinned content lives in the lamad app.
         &crate::db::AppContext::default_lamad(),
         now,
+        tracked,
     ) {
         Ok(pass) => pass,
         // A failed pass leaves every retired pin exactly where it was — never
@@ -320,9 +328,10 @@ fn readmit_cause(cause: ReadmitCause) -> PinReadmitCause {
 /// Primary re-admission arm, shared by both transports: a peer's content
 /// inventory naming a RETIRED pin's `head_ref` is fresh evidence that the bytes
 /// exist somewhere, so the pin goes straight back to `active` with its backoff
-/// ladder reset and a new round (a fresh retry budget on the next reconcile).
-/// A named pin that is already active keeps its round and loses any retained
-/// retirement count.
+/// ladder reset. It keeps its round, as on dev: a tracker that survived its
+/// retirement is kept, and one that was evicted is rebuilt with a fresh budget
+/// on the next reconcile. A named pin that is already active keeps its round
+/// and loses any retained retirement count.
 pub fn readmit_pins_named_by_inventory(
     conn: &mut diesel::SqliteConnection,
     remote_ids: &[String],
@@ -504,6 +513,8 @@ pub async fn reconcile_tick(
     use crate::metrics::AcquisitionReconcileOutcome;
 
     let first_pass = state.rollup_if_initialized().await.is_none();
+    // Read before the hold pass, which runs ahead of tracker maintenance.
+    let tracked = state.tracked_pin_ids().await;
     let mut conn = pool.get().map_err(|e| {
         tracing::warn!(
             target: "elohim_storage::acquisition",
@@ -518,7 +529,7 @@ pub async fn reconcile_tick(
     // content turned up some other way is settled, and a pin whose hold has
     // ended is re-admitted for a re-probe — every due pin, in this pass. The
     // primary re-admission arm is inventory-driven (`inventory_received`).
-    let hold = run_hold_pass(&mut conn, now);
+    let hold = run_hold_pass(&mut conn, now, &tracked);
 
     let pins = crate::db::acquisition_pins::list_active_pins(&mut conn).map_err(|e| {
         tracing::warn!(
@@ -747,10 +758,12 @@ impl AcquisitionState {
     /// items that were exhausted against a smaller one.
     ///
     /// A pin whose round differs from the one its tracker was built for starts
-    /// with a fresh tracker. That is what makes a re-activation real when no
-    /// reconcile ran between the retirement and it (an inventory naming the
-    /// head in the same minute): without it the pin would come back holding
-    /// its exhausted tracker, dispatch nothing, and be retired again at once.
+    /// with a fresh tracker. Only the hold pass opens a new round, and only for
+    /// a pin whose tracker is already gone ([`Self::tracked_pin_ids`]); every
+    /// other re-activation — a read, an inventory naming the head, an explicit
+    /// re-pin — keeps the round, so a pin re-activated before its exhausted
+    /// tracker was evicted keeps that tracker, dispatches nothing and is
+    /// retired again, as on dev.
     pub async fn reconcile_rounds(
         &self,
         pin_wants: Vec<(i32, i32, Vec<String>)>,
@@ -927,6 +940,13 @@ impl AcquisitionState {
     /// completed since process start. Once initialized, `Some(total=0)` is a
     /// positive observation that the active desired set is empty, never a
     /// default standing in for unmeasured state.
+    /// The pins that hold a tracker right now. The hold pass reads it so that
+    /// a pin whose exhausted tracker was never evicted is not handed a fresh
+    /// retry budget by its re-admission.
+    pub async fn tracked_pin_ids(&self) -> HashSet<i32> {
+        self.inner.read().await.trackers.keys().copied().collect()
+    }
+
     pub async fn rollup_if_initialized(&self) -> Option<PullStatusInfo> {
         let inner = self.inner.read().await;
         inner.initialized.then(|| Self::rollup_inner(&inner))
@@ -1749,7 +1769,11 @@ mod tests {
             retire_now(&pool, read.id, at);
             retire_now(&pool, unread.id, at);
             if i < 2 {
-                run_hold_pass(&mut pool.get().expect("conn"), at + Duration::hours(13));
+                run_hold_pass(
+                    &mut pool.get().expect("conn"),
+                    at + Duration::hours(13),
+                    &HashSet::new(),
+                );
             }
         }
         let retired_at = t0() + Duration::hours(30);
