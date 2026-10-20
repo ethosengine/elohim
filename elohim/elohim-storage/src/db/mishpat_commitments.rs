@@ -240,6 +240,30 @@ pub fn find_active_delegates_compute_from_provider(
         .optional()
 }
 
+/// Every `delegates-compute` grant THIS `provider` issued, in any state,
+/// newest first, optionally narrowed to one recipient and one scope. The
+/// provider's own read of what it has promised — withdrawn and lapsed rows
+/// included, so a reader can tell "never granted" from "granted, then
+/// withdrawn".
+pub fn list_delegates_compute_from_provider(
+    conn: &mut SqliteConnection,
+    provider: &str,
+    recipient_cid: Option<&str>,
+    capability: Option<&str>,
+) -> QueryResult<Vec<MishpatCommitment>> {
+    let mut query = mc::mishpat_commitments
+        .filter(mc::action.eq("delegates-compute"))
+        .filter(mc::provider.eq(provider))
+        .into_boxed();
+    if let Some(recipient) = recipient_cid {
+        query = query.filter(mc::recipient.eq(recipient));
+    }
+    if let Some(scope) = capability {
+        query = query.filter(mc::scope.eq(scope));
+    }
+    query.order(mc::created_at.desc()).load(conn)
+}
+
 /// Load this provider's live (non-revoked) `replicates-commons` commitments.
 ///
 /// "Live" = `action == "replicates-commons"` AND `provider == self` AND

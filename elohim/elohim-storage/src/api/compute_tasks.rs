@@ -674,6 +674,10 @@ pub async fn handle(
             &json!({"reason":"local-cell-actor-required"}),
         ));
     }
+    if grant_request && method == Method::GET {
+        return super::compute_grants::list(&hc.agent_key_uhcak(), pool, &query)
+            .map(|v| response::ok(&v));
+    }
     if grant_request && method != Method::POST {
         return Ok(response::method_not_allowed());
     }

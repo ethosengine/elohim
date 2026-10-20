@@ -55,12 +55,15 @@ pub const STORAGE_PROXY_REQUEST_TIMEOUT_SECS: u64 = 12;
 const CONTENT_PATCH_TIMEOUT_SECS: u64 = 60;
 
 /// The request headers the compute-payload custody protocol needs on the
-/// internal hop: the client's lease owner (a task CID), its retention, and the
-/// task whose outputs it reads back. Never the node-local capability token.
-const COMPUTE_PAYLOAD_HEADERS: [&str; 3] = [
+/// internal hop: the client's lease owner (a task CID), its retention, the
+/// task whose outputs it reads back, and the reach it declares for the bytes
+/// (the sponsor's custody refuses one narrower than its hosting grant). Never
+/// the node-local capability token.
+const COMPUTE_PAYLOAD_HEADERS: [&str; 4] = [
     "x-compute-owner",
     "x-compute-retain-seconds",
     "x-compute-request",
+    "x-compute-reach",
 ];
 
 /// Which extra headers to carry for `path`. Pure. Only the compute-payload
@@ -1376,7 +1379,8 @@ mod tests {
             &[
                 "x-compute-owner",
                 "x-compute-retain-seconds",
-                "x-compute-request"
+                "x-compute-request",
+                "x-compute-reach"
             ]
         );
         assert!(!headers.contains(&"x-elohim-compute-token"));

@@ -129,6 +129,13 @@ impl HttpServer {
     ) -> Result<String, Response<Full<Bytes>>> {
         use crate::api::hosted_custody as custody;
         let refuse = |reason: &str| response::forbidden(&serde_json::json!({ "reason": reason }));
+        // The reach the runner declares for the bytes it stocks; absent ⇒ the
+        // hosting grant's own reach.
+        let declared_reach = req
+            .headers()
+            .get("x-compute-reach")
+            .and_then(|v| v.to_str().ok())
+            .map(str::to_owned);
         let Some(pool) = self.db_pool.as_ref() else {
             return Err(response::service_unavailable("db pool not available"));
         };
@@ -137,9 +144,15 @@ impl HttpServer {
         };
         let native = custody::HcCustodyNative(hc);
         let now = chrono::Utc::now().to_rfc3339();
-        let grant_cid = custody::authorize_custody(pool, &native, performer, &now)
-            .await
-            .map_err(|r| refuse(r.reason()))?;
+        let grant_cid =
+            custody::authorize_custody(pool, &native, performer, &now, declared_reach.as_deref())
+                .await
+                .map_err(|r| match r.grant_reach() {
+                    Some(reach) => response::forbidden(
+                        &serde_json::json!({ "reason": r.reason(), "grantReach": reach }),
+                    ),
+                    None => refuse(r.reason()),
+                })?;
         let owner = custody::hosted_owner(performer, client_owner)
             .ok_or_else(|| response::bad_request("x-compute-owner too long for hosted custody"))?;
         // A read of a chunk this runner does not lease is only ever its own

@@ -152,6 +152,11 @@ pub enum CustodyRefusal {
     Bounds(&'static str),
     /// A provider-authored withdrawal, or no provider-authored activation.
     Withdrawn,
+    /// The caller declared a reach narrower than the one the hosting grant
+    /// names (carried here). A runner's bytes travel at its sponsor's promised
+    /// reach; anything more private needs a person to be private to, and a
+    /// hosting grant names none.
+    ReachNarrowerThanGrant(String),
 }
 
 impl CustodyRefusal {
@@ -162,6 +167,15 @@ impl CustodyRefusal {
             Self::PolicyMismatch => "hosted-cell-grant-mismatch",
             Self::Bounds(code) => code,
             Self::Withdrawn => "hosted-cell-grant-withdrawn",
+            Self::ReachNarrowerThanGrant(_) => "reach-narrower-than-hosting-grant",
+        }
+    }
+
+    /// The reach the grant names, when the refusal is about reach.
+    pub fn grant_reach(&self) -> Option<&str> {
+        match self {
+            Self::ReachNarrowerThanGrant(reach) => Some(reach),
+            _ => None,
         }
     }
 }
@@ -221,27 +235,51 @@ impl CustodyNative for HcCustodyNative {
 /// 2. the exact signed record, authenticated as authored by this cell, and its
 ///    policy naming this peer, the performer and `hosted-cell` — the
 ///    projection only SELECTS, it never authorizes (C5);
-/// 3. the shared bounds validator over the signed policy (window, rotation,
-///    reach ≤ commons, rate counted from recorded uses);
+/// 3. the declared reach (`declared_reach`, default: the grant's own) is not
+///    narrower than the grant's `reach_ceiling`, then the shared bounds
+///    validator over the signed policy (window, rotation, reach ≤ ceiling, rate
+///    counted from recorded uses);
 /// 4. provider-authored lifecycle links: an activation, and no withdrawal.
 pub async fn authorize_custody<N: CustodyNative + ?Sized>(
     pool: &DbPool,
     native: &N,
     performer: &str,
     signed_at: &str,
+    declared_reach: Option<&str>,
 ) -> Result<String, CustodyRefusal> {
     let own = native.own_key();
     let anchor = {
         let mut conn = pool.get().map_err(|_| CustodyRefusal::NoActiveGrant)?;
-        crate::db::mishpat_commitments::find_active_delegates_compute_from_provider(
+        let active = crate::db::mishpat_commitments::find_active_delegates_compute_from_provider(
             &mut conn,
             performer,
             HOSTED_CELL_SCOPE,
             &own,
         )
         .map_err(|_| CustodyRefusal::NoActiveGrant)?
-        .and_then(|row| row.dht_anchor_hash)
-        .ok_or(CustodyRefusal::NoActiveGrant)?
+        .and_then(|row| row.dht_anchor_hash);
+        match active {
+            Some(anchor) => anchor,
+            // No live promise: say whether this peer once made one and withdrew
+            // it, so the runner learns its sponsor stopped hosting rather than
+            // that it was never sponsored here.
+            None => {
+                let withdrawn =
+                    crate::db::mishpat_commitments::list_delegates_compute_from_provider(
+                        &mut conn,
+                        &own,
+                        Some(performer),
+                        Some(HOSTED_CELL_SCOPE),
+                    )
+                    .map(|rows| rows.iter().any(|row| row.revoked_at.is_some()))
+                    .unwrap_or(false);
+                return Err(if withdrawn {
+                    CustodyRefusal::Withdrawn
+                } else {
+                    CustodyRefusal::NoActiveGrant
+                });
+            }
+        }
     };
     let (cid, policy) = native
         .own_grant(&anchor)
@@ -253,6 +291,19 @@ pub async fn authorize_custody<N: CustodyNative + ?Sized>(
         || policy["action"].as_str() != Some("delegates-compute")
     {
         return Err(CustodyRefusal::PolicyMismatch);
+    }
+    let grant_reach = policy["bounds"]["reach_ceiling"]
+        .as_str()
+        .unwrap_or("")
+        .to_owned();
+    let reach = declared_reach.unwrap_or(&grant_reach).to_owned();
+    if let (Some(asked), Some(granted)) = (
+        crate::services::bounds_validator::reach_rank(&reach),
+        crate::services::bounds_validator::reach_rank(&grant_reach),
+    ) {
+        if asked < granted {
+            return Err(CustodyRefusal::ReachNarrowerThanGrant(grant_reach));
+        }
     }
     use crate::services::commitment_fetcher::CommitmentRecord;
     let fetcher = super::compute_tasks::VerifiedGrant(CommitmentRecord {
@@ -272,7 +323,7 @@ pub async fn authorize_custody<N: CustodyNative + ?Sized>(
             performer: performer.to_owned(),
             bounded_by: cid.clone(),
             target_epr_id: "*".into(),
-            reach: "commons".into(),
+            reach,
             signed_at: signed_at.to_owned(),
         },
         &fetcher,
@@ -421,8 +472,51 @@ mod tests {
     async fn an_active_hosted_cell_recipient_is_admitted() {
         let (pool, native) = sponsored(3600);
         assert_eq!(
-            authorize_custody(&pool, &native, RUNNER, NOW).await,
+            authorize_custody(&pool, &native, RUNNER, NOW, None).await,
             Ok("uhCEk-grant".to_string())
+        );
+    }
+
+    /// A runner's bytes travel at the reach its sponsor promised: declaring
+    /// that reach (or none) is admitted; anything more private is refused,
+    /// naming the grant's reach.
+    #[tokio::test]
+    async fn a_reach_more_private_than_the_hosting_grant_is_refused() {
+        let (pool, native) = sponsored(3600);
+        assert_eq!(
+            authorize_custody(&pool, &native, RUNNER, NOW, Some("commons")).await,
+            Ok("uhCEk-grant".to_string())
+        );
+        for narrower in ["private", "intimate", "community"] {
+            let refusal = authorize_custody(&pool, &native, RUNNER, NOW, Some(narrower))
+                .await
+                .unwrap_err();
+            assert_eq!(
+                refusal,
+                CustodyRefusal::ReachNarrowerThanGrant("commons".into())
+            );
+            assert_eq!(refusal.grant_reach(), Some("commons"));
+            assert_eq!(refusal.reason(), "reach-narrower-than-hosting-grant");
+        }
+    }
+
+    /// Once the projection records the sponsor's withdrawal, the runner is told
+    /// its promise was withdrawn — not that it was never sponsored here.
+    #[tokio::test]
+    async fn a_projected_withdrawal_names_the_withdrawn_promise() {
+        let (pool, native) = sponsored(3600);
+        {
+            let mut conn = pool.get().expect("conn");
+            mishpat_commitments::set_revoked_at(&mut conn, "uhCEk-grant", NOW).expect("revoke");
+        }
+        assert_eq!(
+            authorize_custody(&pool, &native, RUNNER, NOW, None).await,
+            Err(CustodyRefusal::Withdrawn)
+        );
+        assert_eq!(
+            authorize_custody(&pool, &native, RUNNER_B, NOW, None).await,
+            Err(CustodyRefusal::NoActiveGrant),
+            "a runner this peer never sponsored is still simply unsponsored"
         );
     }
 
@@ -435,7 +529,7 @@ mod tests {
             ..active_link()
         });
         assert_eq!(
-            authorize_custody(&pool, &native, RUNNER, NOW).await,
+            authorize_custody(&pool, &native, RUNNER, NOW, None).await,
             Err(CustodyRefusal::Withdrawn)
         );
         // A withdrawal authored by anyone OTHER than the provider is not one —
@@ -445,7 +539,7 @@ mod tests {
             ..active_link()
         }];
         assert_eq!(
-            authorize_custody(&pool, &native, RUNNER, NOW).await,
+            authorize_custody(&pool, &native, RUNNER, NOW, None).await,
             Err(CustodyRefusal::Withdrawn)
         );
     }
@@ -454,7 +548,7 @@ mod tests {
     async fn an_expired_grant_is_refused() {
         let (pool, native) = sponsored(3600);
         assert_eq!(
-            authorize_custody(&pool, &native, RUNNER, "2027-10-19T12:00:00+00:00").await,
+            authorize_custody(&pool, &native, RUNNER, "2027-10-19T12:00:00+00:00", None).await,
             Err(CustodyRefusal::Bounds("commitment-inactive"))
         );
     }
@@ -473,7 +567,7 @@ mod tests {
             task: Value::Null,
         };
         assert_eq!(
-            authorize_custody(&pool, &native, RUNNER, NOW).await,
+            authorize_custody(&pool, &native, RUNNER, NOW, None).await,
             Err(CustodyRefusal::NoActiveGrant),
             "another peer's promise never authorizes custody on this node"
         );
@@ -489,12 +583,12 @@ mod tests {
             ("uhCEk-grant".into(), policy(OTHER_PEER, RUNNER, 3600)),
         );
         assert_eq!(
-            authorize_custody(&pool, &native, RUNNER, NOW).await,
+            authorize_custody(&pool, &native, RUNNER, NOW, None).await,
             Err(CustodyRefusal::PolicyMismatch)
         );
         native.grants.clear();
         assert_eq!(
-            authorize_custody(&pool, &native, RUNNER, NOW).await,
+            authorize_custody(&pool, &native, RUNNER, NOW, None).await,
             Err(CustodyRefusal::RecordUnverified)
         );
     }
@@ -503,11 +597,11 @@ mod tests {
     async fn a_non_recipient_is_refused() {
         let (pool, native) = sponsored(3600);
         assert_eq!(
-            authorize_custody(&pool, &native, RUNNER_B, NOW).await,
+            authorize_custody(&pool, &native, RUNNER_B, NOW, None).await,
             Err(CustodyRefusal::NoActiveGrant)
         );
         assert_eq!(
-            authorize_custody(&pool, &native, POOL, NOW).await,
+            authorize_custody(&pool, &native, POOL, NOW, None).await,
             Err(CustodyRefusal::NoActiveGrant),
             "the provider is not its own recipient"
         );
@@ -532,17 +626,17 @@ mod tests {
     async fn the_rate_bound_counts_recorded_uses() {
         let (pool, native) = sponsored(2);
         for _ in 0..2 {
-            let cid = authorize_custody(&pool, &native, RUNNER, NOW)
+            let cid = authorize_custody(&pool, &native, RUNNER, NOW, None)
                 .await
                 .expect("within the rate");
             record_custody_use(&pool, POOL, RUNNER, &cid, NOW).expect("recorded");
         }
         assert_eq!(
-            authorize_custody(&pool, &native, RUNNER, NOW).await,
+            authorize_custody(&pool, &native, RUNNER, NOW, None).await,
             Err(CustodyRefusal::Bounds("rate-limit-exceeded"))
         );
         assert_eq!(
-            authorize_custody(&pool, &native, RUNNER, "2026-10-19T13:30:00+00:00").await,
+            authorize_custody(&pool, &native, RUNNER, "2026-10-19T13:30:00+00:00", None).await,
             Ok("uhCEk-grant".to_string()),
             "the window slides: an hour later the uses no longer count"
         );

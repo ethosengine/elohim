@@ -122,31 +122,37 @@ impl TypedAdminClient {
         Ok(agent_key.get_raw_39().to_vec())
     }
 
-    /// Install an app on the conductor with the given agent key.
-    pub async fn install_app(
+    /// Install an app and let the conductor mint its agent key; returns the raw
+    /// 39-byte key it minted.
+    ///
+    /// Why not `install_app` with a key from `generate_agent_pub_key`: a supplied key
+    /// makes the conductor confirm it is in the keystore by listing EVERY seed lair
+    /// holds (`conductor.rs` `list_public_keys`), in one lair frame capped at 8 KiB
+    /// (`lair_keystore_api` `sodium_secretstream` `MAX_FRAME`). Uninstalling a hosted
+    /// cell never deletes its seed, so a hosting conductor's seed count only grows,
+    /// and past roughly a hundred seeds every keyed install fails with lair
+    /// `ConnectionAborted` (household, 2026-10-20). A key the conductor mints itself
+    /// skips that listing.
+    pub async fn install_app_minting_key(
         &self,
         installed_app_id: &str,
-        agent_key: &[u8],
         bundle_path: &str,
-    ) -> Result<(), String> {
-        let agent: AgentPubKey = checked_hash("agent_key", agent_key)?;
-
+    ) -> Result<Vec<u8>, String> {
         let payload = InstallAppPayload {
             source: AppBundleSource::Path(std::path::PathBuf::from(bundle_path)),
-            agent_key: Some(agent),
+            agent_key: None,
             installed_app_id: Some(installed_app_id.to_string()),
             roles_settings: None,
             network_seed: None,
             ignore_genesis_failure: false,
             restore_from_dht: false,
         };
-
-        self.admin_ws
+        let info = self
+            .admin_ws
             .install_app(payload)
             .await
             .map_err(|e| format!("Admin error (install_app): {e}"))?;
-
-        Ok(())
+        Ok(info.agent_pub_key.get_raw_39().to_vec())
     }
 
     /// Enable an installed app on the conductor.

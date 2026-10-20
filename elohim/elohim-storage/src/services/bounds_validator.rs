@@ -330,7 +330,7 @@ pub async fn validate<F: CommitmentFetcher, R: RateHistory>(
 /// The 8 levels form a strict total order from narrowest (`private = 0`) to
 /// widest (`commons = 7`).  Returns `None` for any unrecognised string so
 /// unknown values are rejected rather than silently accepted or promoted.
-fn reach_rank(s: &str) -> Option<u8> {
+pub(crate) fn reach_rank(s: &str) -> Option<u8> {
     match s {
         "private" => Some(0),
         "self" => Some(1),

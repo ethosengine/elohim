@@ -236,26 +236,24 @@ impl AgentProvisioner {
             "Provisioning new agent on conductor"
         );
 
-        // 3. Generate agent key
-        let agent_key = admin.generate_agent_pub_key().await.map_err(|e| {
-            format!(
-                "Failed to generate agent key on {}: {}",
-                conductor.conductor_id, e
-            )
-        })?;
-
-        let agent_pub_key_b64 = provisioned_agent_key(&agent_key);
-
-        // 4. Install app
-        if let Err(e) = admin
-            .install_app(&installed_app_id, &agent_key, &self.bundle_path)
+        // 3+4. Install the app, letting the conductor mint the agent key. A key minted
+        // here and handed in would make the conductor list every seed its keystore
+        // holds, which fails once a hosting conductor has churned enough agents
+        // (`TypedAdminClient::install_app_minting_key`).
+        let agent_key = match admin
+            .install_app_minting_key(&installed_app_id, &self.bundle_path)
             .await
         {
-            return Err(format!(
-                "Failed to install app on {}: {}",
-                conductor.conductor_id, e
-            ));
-        }
+            Ok(key) => key,
+            Err(e) => {
+                return Err(format!(
+                    "Failed to install app on {}: {}",
+                    conductor.conductor_id, e
+                ));
+            }
+        };
+
+        let agent_pub_key_b64 = provisioned_agent_key(&agent_key);
 
         // 5. Enable app
         if let Err(e) = admin.enable_app(&installed_app_id).await {
@@ -482,12 +480,28 @@ impl AgentProvisioner {
                     entry.conductor_id, e
                 )
             })?;
-        admin.uninstall_app(&entry.app_id).await.map_err(|e| {
-            format!(
-                "Failed to uninstall app {} on {}: {}",
-                entry.app_id, entry.conductor_id, e
-            )
-        })?;
+        if let Err(e) = admin.uninstall_app(&entry.app_id).await {
+            // A busy conductor (just restarted, re-syncing) can finish an uninstall after the
+            // admin call has timed out. Ask it what is installed before calling this a failure:
+            // keeping a gone app registered pins its capacity slot until the doorway restarts,
+            // and the pool then refuses hosting at a ceiling it is not at.
+            let installed = match TypedAdminClient::connect(&conductor.admin_url).await {
+                Ok(fresh) => fresh.list_apps().await.ok(),
+                Err(_) => None,
+            };
+            if !uninstall_settled(&entry.app_id, installed.as_deref()) {
+                return Err(format!(
+                    "Failed to uninstall app {} on {}: {}",
+                    entry.app_id, entry.conductor_id, e
+                ));
+            }
+            warn!(
+                conductor = %entry.conductor_id,
+                app_id = %entry.app_id,
+                error = %e,
+                "uninstall answered with an error but the conductor no longer lists the app"
+            );
+        }
 
         // Remove from registry
         self.registry.unregister_agent(agent_pub_key);
@@ -516,9 +530,41 @@ fn generate_app_id(app_id: &str, conductor_id: &str, user_identifier: &str) -> S
     format!("{app_id}-{conductor_id}-{short_hash}")
 }
 
+/// Did an uninstall that answered with an error actually take effect? Pure. Only a
+/// successful `list_apps` that no longer names the app says yes; an unreadable conductor
+/// (`None`) leaves the app counted, because a still-installed cell must keep its slot.
+pub(crate) fn uninstall_settled(
+    app_id: &str,
+    installed: Option<&[super::typed_admin::InstalledAppInfo]>,
+) -> bool {
+    installed.is_some_and(|apps| apps.iter().all(|app| app.installed_app_id != app_id))
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// An uninstall that timed out is settled only when the conductor, asked afresh, no
+    /// longer lists the app; an unreadable conductor keeps the slot counted.
+    #[test]
+    fn a_late_uninstall_settles_only_on_a_listing_without_the_app() {
+        use super::super::typed_admin::InstalledAppInfo;
+        let app = |id: &str| InstalledAppInfo {
+            installed_app_id: id.to_string(),
+            agent_pub_key: vec![0; 39],
+        };
+        let others = [app("elohim"), app("elohim-conductor-0-aaaaaa")];
+        assert!(uninstall_settled(
+            "elohim-conductor-0-bbbbbb",
+            Some(&others)
+        ));
+        assert!(!uninstall_settled(
+            "elohim-conductor-0-aaaaaa",
+            Some(&others)
+        ));
+        assert!(!uninstall_settled("elohim-conductor-0-bbbbbb", None));
+        assert!(uninstall_settled("elohim-conductor-0-bbbbbb", Some(&[])));
+    }
 
     /// The two error strings `elohim-genesis/dev` #1576 put in front of a human
     /// as `503 PROVISIONING_FAILED`, verbatim from the build log. Both must

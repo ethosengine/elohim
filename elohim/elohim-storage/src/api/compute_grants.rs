@@ -472,6 +472,55 @@ pub async fn revoke(
         "alreadyWithdrawn":matches!(verdict, RevokeVerdict::AlreadyWithdrawn { .. })}))
 }
 
+/// What this peer has promised: `GET /api/v1/compute/grants[?recipient=&scope=]`
+/// on the local compute API, the read twin of [`issue`] and [`revoke`]. Every
+/// `delegates-compute` grant this node's own cell issued, in any state, from the
+/// projection — `withdrawn` when a revocation is projected, else the row's state
+/// (a lapsed window still reads its state; `validUntil` says when it ends). A
+/// scope outside [`GRANT_SCOPES`] is refused, never matched against free text.
+pub fn list(provider: &str, pool: &DbPool, query: &str) -> Result<Value, StorageError> {
+    let params: std::collections::HashMap<String, String> =
+        url::form_urlencoded::parse(query.as_bytes())
+            .into_owned()
+            .collect();
+    let scope = match params.get("scope") {
+        Some(named) => Some(
+            GRANT_SCOPES
+                .into_iter()
+                .find(|known| known == named)
+                .ok_or_else(|| invalid("unknown grant scope"))?,
+        ),
+        None => None,
+    };
+    let mut conn = pool.get().map_err(|e| invalid(&e.to_string()))?;
+    let rows = crate::db::mishpat_commitments::list_delegates_compute_from_provider(
+        &mut conn,
+        provider,
+        params.get("recipient").map(String::as_str),
+        scope,
+    )?;
+    Ok(json!({"provider": provider, "grants": rows.iter().map(grant_view).collect::<Vec<_>>()}))
+}
+
+fn grant_view(row: &crate::db::models::MishpatCommitment) -> Value {
+    let state = if row.revoked_at.is_some() {
+        "withdrawn"
+    } else {
+        row.state.as_str()
+    };
+    json!({
+        "grantCid": row.cid,
+        "scope": row.scope,
+        "provider": row.provider,
+        "recipient": row.recipient,
+        "state": state,
+        "validFrom": row.valid_from,
+        "validUntil": row.valid_until,
+        "revokedAt": row.revoked_at,
+        "bounds": serde_json::from_str::<Value>(&row.bounds_json).unwrap_or(Value::Null),
+    })
+}
+
 fn verify_consent(
     bytes: &[u8],
     output: &shefa_types::ReaEconomicEventOutput,
