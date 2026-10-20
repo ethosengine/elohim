@@ -8,11 +8,26 @@ slug: "rakia-executor-untracked-in-submodule-pin"
 written: "2026-09-07"
 author: "overnight shift 2026-09-07"
 status: "open"
-priority: "high"
+priority: "critical"
 jobs: [rakia, elohim-edge]
 cluster: "arch-dataplane-refactor-backlog"
 tags: [rakia, submodule, delegated-compute, ci]
 ---
+
+**2026-10-20 — the source is now LOST, not just untracked.** No `rakia-executor/` exists in
+`elohim/rakia` (pin `720c132`), in any `.worktrees/*` or `.claude/worktrees/*` copy, in rakia's
+object store (`git fsck --unreachable` finds nothing), on `origin` (branches: main,
+feat/app-bundle-class, feat/build-plan-fingerprints-param, feat/gate-run-attested), or as a built
+`compute-executor`/`ark` anywhere under `/projects` (the cargo pool family dirs for
+`elohim__rakia` and `elohim/dev` are gone). So no peer in this workspace can RUN a stage until the
+executor is rewritten or recovered from wherever the operator kept a copy. What still works without
+it: naming a stage (`genesis/agentic/compute/cid-executor.mjs`, whose task CID storage's own
+`content_cid` accepts — verified 2026-10-20 against the household) and a provider deciding
+admission (`POST …/tasks/{ref}/accept`). The scenarios that need a stage to run are held by the new
+`compute-executor` cap (all three cluster-state files, `available: false`). **Updated cure:** the
+operator recovers the executor source (or it is rewritten against `genesis/agentic/compute/
+worker.mjs`'s calls: `artifact`, `cid`, `receipt-path`, `run`, `cleanup`), commits it upstream,
+moves the pin, then flips `compute-executor` in all three cluster-state files.
 
 **Evidence (2026-09-07 05:4xZ, compute-leg prep):** `git -C elohim/rakia status` shows `rakia-executor/` untracked; the superproject pin is `13cb31dddb…` (heads/main). The binary at `/projects/.cargo-target-pool/family/dev/elohim__rakia/dev/debug/compute-executor` was built from that uncommitted work. `scripts/ci/build-compute-worker.sh` and `genesis/agentic/compute/operations.md` both require it. **Cure (operator-owned, the submodule is theirs):** commit `rakia-executor/` in the rakia repo, push, bump the pin in elohim. **Done when:** a fresh `git submodule update --init elohim/rakia` contains `rakia-executor/Cargo.toml` and `just gate rakia` builds `compute-executor`.
 

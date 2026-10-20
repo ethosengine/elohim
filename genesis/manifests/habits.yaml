@@ -371,25 +371,10 @@ habits:
       - "a2o @concern:operator-runtime-surface effect station (genesis/a2o/features/dataplane/operator-commitment-gated-verbs.feature — the scenario named A verb success is a post-action observation, not the handler word: an accepted reconcile has an infrastructure:operator-effect row of phase post whose event id equals the verb attestation event id and whose observer is the peer sampler; a verb with no post row is listed by the compute dashboard as unverified-effect; @wip)"
       - "cargo test --test api operator_verbs (elohim/elohim-storage — 9 tests: holder accepted + attestation names grant cid AND recorded event id; no-grant refused; revoked refused; no verified performer refused; loopless peer honest 503 with no phantom rate charge; accepted use recorded bounded_by the grant; refusals record nothing; rate_per_hour ceiling refuses the over-limit use)"
     evidence: >
-      DELTA 2026-10-19 (CI runner as sponsored service agent; code + unit evidence, no flip):
-      Jenkins becomes `agent:ci-runner-jenkins-matthew`, a hosted cell on its sponsor's pool peer
-      under a `hosted-cell` grant (G1) plus per-provider `measure-stage` grants (G2) — never a device,
-      never a human record. Landed locally (dev 335502100, unpushed):
-      - doorway service-agent registration (`routes/service_agent.rs`), `/hc/connect` grants that
-        are function-listed;
-      - storage custody of compute payloads under the hosting promise (`api/hosted_custody.rs`, 11
-        tests);
-      - the runner client (`genesis/a2o/scripts/compute-runner.ts`, 10 tests);
-      - `runner-preflight.sh`, wired informational into genesis/Jenkinsfile;
-      - adam's worker token `per-render`.
-
-      Gates: doorway EXIT=0 (1830); storage 4766 passed with 2 rakia-submodule-absent failures in
-      the agent worktree; genesis-a2o EXIT=0. The story `features/compute/ci-runner-stewarded.feature`
-      stays @wip. Status unchanged: no live household or alpha run yet. The adam leg is blocked on
-      `rakia-executor/` upstream.
-    evidence-fingerprint: sha256:070af5eceb6d70ed
-    evidence-bytes: 20698
-    evidence-entries: 20
+      DELTA 2026-10-20 (RED preserved; the ci-runner story is green at its ceiling, no flip — the effect station stays @wip). `features/compute/ci-runner-stewarded.feature` lost `@wip`: 4 of 5 scenarios pass live on the household twice in a row (`genesis/local-dev/ci-runner-shift/reports/cucumber-20261020T070905Z.json` and `…T071127Z.json`, `npx cucumber-js -p ci-runner` with the runner-fixture cast matthew/james sponsoring, jessica/orpah providing); the fifth (a stage RUNS and its report comes back) is held by the new `compute-executor` cap — the rakia executor's source is lost (backlog rakia-executor-untracked-in-submodule-pin, now critical). Substrate changes this proof forced: hosted custody refuses a declared reach narrower than the hosting grant (`x-compute-reach`, `grantReach` in the refusal) and names a projected withdrawal as withdrawn; `GET /api/v1/compute/grants` reads what a peer has promised; the doorway lets the conductor mint hosted agent keys (a supplied key made the conductor list every lair seed in one 8 KiB frame — matthew's conductor could not host anyone after tonight's churn; backlog hosting-conductor-keystore-listing-overflows-lair-frame) and settles a timed-out uninstall against `list_apps`. Alpha: doorway 1b2deee refuses the Jenkins runner `SERVICE_AGENT_NO_SPONSOR` — no fleet POOL_COMPUTE_* (backlog alpha-doorways-record-no-hosting-promise).
+    evidence-fingerprint: sha256:ef362e3afe181559
+    evidence-bytes: 22092
+    evidence-entries: 21
     refs:
       - "task #10 (operator directive 2026-07-02)"
       - "elohim/elohim-storage/src/api/operator_verbs.rs (verb handler + kick) · doorway src/server/http.rs op_gate_capability/effective_op_gate_mode (per-verb gate) · seam-registry rows in both crates"
