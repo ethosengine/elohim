@@ -6,14 +6,14 @@ invariant: >
   own words, for one session and named paths, to a floor the rule itself declares. Every agent the
   session spawns carries what is held, and none can grant, extend or record one. An unreadable
   covenant lowers nothing, and an edited rule voids the variances granted over its old bytes.
-status: red
+status: green
 active: false
 checks:
   - "cargo test -p elohim-epr-cli --test covenant — the authority half: record refusals (no standing, no affirmation, no declared variance, ask/deny class, paths outside the manifest, another party's revocation), check across paths, window, revocation and edited manifest bytes, offer and show. Stub brit."
   - "python3 -m unittest discover -s .claude/hooks/__tests__ -p 'covenant_hooks_test.py' — the hook legs: loop vs floor line, an unreadable covenant keeps the full rule and says so, a subagent is not told to ask, the SubagentStart stamp (blind-reader never stamped), and a subagent's record attempt is refused."
   - "python3 -m unittest discover -s .claude/hooks/__tests__ -p 'participant_standing_test.py' — the bundled ask: a pending covenant replaces the bare steward-of-record ask with ONE AskUserQuestion bundle; an unreadable covenant keeps the steward ask."
   - "brit CI on run-ci/session-covenant (ethosengine/brit ci.yml) — clause node, append-only refs, `brit-build-ref covenant put|list|show`, the linked-worktree agent-key path."
-  - "LIVE (unwired until brit lands at the pin): a session records its covenant through `epr covenant record` against the real brit-build-ref, a spawned agent's scoped `.feature` write receives the floor line, and `git for-each-ref refs/notes/brit/covenant/` lists the clauses."
+  - "LIVE (brit-build-ref and a covenant-aware epr on PATH): a session records its covenant through `epr covenant record` against the real brit-build-ref, a spawned agent's scoped `.feature` write receives the floor line, and `git for-each-ref refs/notes/brit/covenant/` lists the clauses."
 guard: >
   Risk 1 — a self-granted floor. Rung 1 signs a clause with the repository's brit key, not the
   human's, and anything with a shell on this device can write one straight into brit; `epr` re-tests
@@ -46,6 +46,19 @@ evidence: >
   success, only cargo-deny-advisories red. Landed on dev at e3e0af5cb (pre-push ALL CLEAR).
   Still red: the brit pin does not carry feat/session-covenant yet (batch with the pending
   evidence pin move), and the LIVE check has not run.
+  DELTA 2026-10-20 (GREEN). brit main fast-forwarded to 76ba95d8a (operator: "yes push to main
+  please"); pin moved on dev at 1b2deee4c (pre-push: attested `Tests pass` success). LIVE, session
+  182f26d8: brit-build-ref built --locked at the pin against the Nexus crates and put on PATH; the
+  steward's three answers recorded (affirmation bafyreibtyq4…, purpose bafyreieu2kus…, variance
+  bafyreidktlxh… over the probe path only, manifestCid bafkreihhv5zo…). `epr covenant check`
+  held on the probe path, not-held one file outside it; `git for-each-ref
+  refs/notes/brit/covenant/` lists all three. A spawned general-purpose agent carried the
+  [SESSION COVENANT] stamp; its in-scope `.feature` write got the resolver advisory and the
+  [BLIND-READER REVIEW · COVENANT] floor line, its out-of-scope write got the full loop, and its
+  `epr covenant record` was refused by the subagent guard. governance-findings.jsonl row 11945
+  carries `variance:`, `party: human:matthew`, `agent: general-purpose`. Probe files deleted;
+  the covenant refs stay local (pushing them is the named frontier). Risk 1 stands: rung 1 is a
+  recorded promise, not a proof.
 refs:
   - "genesis/docs/superpowers/specs/2026-10-19-session-covenant-epr-design.md — the authority half (offer, record, check, show)"
   - "elohim/brit/docs/specs/2026-10-19-session-covenant-design.md (branch feat/session-covenant) — the mechanism half: a Layer 2 blessing over the rule's manifest CID"
