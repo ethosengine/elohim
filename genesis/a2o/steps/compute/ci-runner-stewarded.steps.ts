@@ -445,33 +445,36 @@ function assertStatesReachAndEnd(grant: GrantView, label: string) {
 // Background
 // ---------------------------------------------------------------------------------------
 
-Given('a household with two stewards, each running their own peer', async function () {
-  const file = process.env.CI_RUNNER_A2O_CONFIG;
-  if (!file) return 'pending';
-  const config = JSON.parse(await readFile(file, 'utf8')) as Config;
-  assert.equal(config.sponsors?.length, 2, 'the fixture must name two sponsoring stewards');
-  const [a, b] = config.sponsors;
-  assert.notEqual(a.performer, b.performer, 'the two stewards must run two different peers');
-  for (const sponsor of config.sponsors) {
-    const health = await fetch(new URL('/health', sponsor.doorway), {
-      signal: AbortSignal.timeout(10000),
-    });
-    assert.equal(health.status, 200, `${sponsor.name}'s doorway is not up`);
-    await grantsIssued(sponsor.poolApi, sponsor.performer, config.localToken, {
-      scope: 'hosted-cell',
+Given(
+  'a household with two stewards, the first steward and the second steward, each running their own peer',
+  async function () {
+    const file = process.env.CI_RUNNER_A2O_CONFIG;
+    if (!file) return 'pending';
+    const config = JSON.parse(await readFile(file, 'utf8')) as Config;
+    assert.equal(config.sponsors?.length, 2, 'the fixture must name two sponsoring stewards');
+    const [a, b] = config.sponsors;
+    assert.notEqual(a.performer, b.performer, 'the two stewards must run two different peers');
+    for (const sponsor of config.sponsors) {
+      const health = await fetch(new URL('/health', sponsor.doorway), {
+        signal: AbortSignal.timeout(10000),
+      });
+      assert.equal(health.status, 200, `${sponsor.name}'s doorway is not up`);
+      await grantsIssued(sponsor.poolApi, sponsor.performer, config.localToken, {
+        scope: 'hosted-cell',
+      });
+    }
+    states.set(this, {
+      config,
+      runners: { first: undefined, second: undefined },
+      grants: [],
+      submissions: [],
+      scratch: [],
     });
   }
-  states.set(this, {
-    config,
-    runners: { first: undefined, second: undefined },
-    grants: [],
-    submissions: [],
-    scratch: [],
-  });
-});
+);
 
 Given(
-  'two more stewards, each running a peer, who will provide capacity and sponsor no runner',
+  'two more stewards, the first provider and the second provider, each running a peer, who will provide capacity and sponsor no runner',
   async function () {
     const st = state(this);
     const { providers, sponsors } = st.config;
