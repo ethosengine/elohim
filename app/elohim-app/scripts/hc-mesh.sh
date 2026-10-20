@@ -4203,6 +4203,20 @@ join_peer() { # <fresh-peer-name>
     echo "join-peer: $name serves but exposes no iroh NodeId; the late-join receipt requires dual/iroh" >&2
     return 1
   fi
+  # A joiner installs whatever bundle is at $HAPP_PATH NOW; the incumbents run the one they
+  # were installed from. A changed integrity zome is a different DNA hash — a different DHT —
+  # and the joiner serves happily on an island nobody else is on (2026-10-20: the household ran
+  # a worktree bundle from 10-17, the default path held a 10-11 build, and the joiner's lamad
+  # never saw one record). Compare against the first incumbent and refuse loudly.
+  local joined_dnas incumbent_dnas
+  joined_dnas="$(curl -fsS -m 5 "http://localhost:$(http_port "$index")/health" 2>/dev/null | jq -cS '.dhtParticipation.dnaHashes // {}' 2>/dev/null)"
+  incumbent_dnas="$(curl -fsS -m 5 "http://localhost:$(http_port 0)/health" 2>/dev/null | jq -cS '.dhtParticipation.dnaHashes // {}' 2>/dev/null)"
+  if [ -n "$incumbent_dnas" ] && [ "$incumbent_dnas" != "{}" ] && [ "$joined_dnas" != "$incumbent_dnas" ]; then
+    local started_with
+    started_with="$(sed -n 's/^hApp bundle: \([^ ,]*\).*/\1/p' "$LOGDIR/start.log" 2>/dev/null | tail -1)"
+    echo "REFUSED join-peer: $name installed DNAs $joined_dnas but ${PEERS[0]} runs $incumbent_dnas — $HAPP_PATH is not the bundle the household was installed from; the joiner is on its own DHT. Stage a fresh name with MESH_HAPP_PATH=${started_with:-<the bundle the household started with>}" >&2
+    return 1
+  fi
   echo "JOINED_PEER name=$name index=$index http=http://localhost:$(http_port "$index") irohNodeId=$node_id"
 }
 
@@ -4787,10 +4801,14 @@ EOF
     # and close again within one scenario = 14. The 25 before it was sized to a cast that
     # defaulted undeclared personas to hosted and put 20 agents on matthew's conductor.
     #
-    # Only a doorway OPERATOR's conductor hosts (matthew here; adam on the fleet). Doorways
-    # B and C sit on jessica's and james's own conductors, which carry their own human and
-    # nobody else, so their ceiling is 0.
+    # Only a doorway OPERATOR's conductor hosts HUMANS (matthew here; adam on the fleet).
+    # Doorways B and C sit on jessica's and james's own conductors, which carry their own
+    # human and nobody else, so their ceiling is 0.
     # MESH_DOORWAY_MAX_AGENTS overrides doorway A for a convergence experiment.
+    # MESH_DOORWAY_C_MAX_AGENTS (default 0) lets james SPONSOR a runner on his own conductor:
+    # any peer may sponsor a CI/simulacra runner (a service agent, never a human), and the
+    # ci-runner-stewarded story's second steward is james. The ceiling is the conductor's,
+    # so it admits whatever registers through C — set it only for that lane.
     #
     # NO COMMENT LINES INSIDE THE ASSIGNMENT LIST BELOW: a comment ends the backslash
     # continuation, so everything above it becomes a plain shell assignment that the
@@ -4973,7 +4991,7 @@ EOF
     POOL_COMPUTE_URL="http://127.0.0.1:$(http_port 2)" \
     POOL_COMPUTE_TOKEN="$MESH_COMPUTE_LOCAL_TOKEN" \
     POOL_COMPUTE_PERFORMER="$(peer_agent_key 2 "${PEERS[2]}")" \
-    DOORWAY_MAX_AGENTS_PER_CONDUCTOR=0 \
+    DOORWAY_MAX_AGENTS_PER_CONDUCTOR="${MESH_DOORWAY_C_MAX_AGENTS:-0}" \
     nohup "$DOORWAY_BIN" --dev-mode --dev-signal-subscriber --listen "0.0.0.0:$DOORWAY_C_PORT" \
       --conductor-url "ws://localhost:$(admin_port 2)" \
       --app-port-min "$(app_port 2)" \
@@ -5304,7 +5322,7 @@ stop_storage() { # <peer>
 reconcile_doorway_pool_performer() {
   [ "$MESH_DOORWAYS_EFFECTIVE" = "1" ] || return 0
   local spec name idx want pid have
-  for spec in a:0 b:1; do
+  for spec in a:0 b:1 c:2; do
     name="${spec%%:*}"; idx="${spec##*:}"
     [ "${#PEERS[@]}" -gt "$idx" ] || continue
     want="$(peer_agent_key "$idx" "${PEERS[$idx]}")"
