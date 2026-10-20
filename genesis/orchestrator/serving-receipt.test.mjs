@@ -149,7 +149,14 @@ test("storage service alone cannot bypass mandatory receipt; caller file survive
           "--reports",
           dir,
         ],
-        { cwd: root, encoding: "utf8" },
+        // Report files only: the real repo may hold a signed household attestation for the
+        // current source (brit-build-ref on PATH writes one per receipt lane), which would
+        // admit these paths and hide the refusal under test.
+        {
+          cwd: root,
+          encoding: "utf8",
+          env: { ...process.env, SERVING_RECEIPT_ATTESTATIONS: "0" },
+        },
       );
       assert.equal(result.status, 1, path);
       assert.match(result.stderr, /NO-SERVING-RECEIPT/);
