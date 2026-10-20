@@ -341,3 +341,44 @@ a completion it verifies the chain on the requester's own task record (`observed
 chain in `summary.peer`, a `sprint-report-peer-stage-*.json`, fulfils the gap, and appends the DELTA
 to the habit that owns the feature's `@concern:` — labelled `rung H (household stand-in, no offload
 proven)` when the provider is a household peer. `MEASURE_DRY_RUN=1` prints everything and runs nothing.
+
+## A sponsored runner, proven on the household
+
+`genesis/a2o/features/compute/ci-runner-stewarded.feature` (steps
+`genesis/a2o/steps/compute/ci-runner-stewarded.steps.ts`) is the household proof of the CI
+runner's standing: a steward sponsors a runner through their doorway, providers lend it
+capacity, and nobody's runner spends a promise made to someone else's. The cast is four
+stewards, no one in two roles — matthew and james sponsor (doorways A and C), jessica and a
+fourth peer provide. Staging it:
+
+```
+just mesh join-peer <fresh-name>      # the second provider; note the index it prints
+MESH_DOORWAY_ENV_SET=$'DOORWAY_MAX_AGENTS_PER_CONDUCTOR=2\nPOOL_COMPUTE_PERFORMER=<james key>' \
+  just mesh doorway-restart c        # james may now host a runner he sponsors
+bash genesis/agentic/compute/runner-fixture.sh --second-provider <fresh-name>:<index>
+cd genesis/a2o && CI_RUNNER_A2O_CONFIG=<printed path> \
+  ELOHIM_CLUSTER_STATE_PATH_OVERRIDE=../manifests/cluster-state.act1-household.yaml \
+  npx cucumber-js -p ci-runner
+```
+
+It runs from the requester's desk, not under `just test mesh`: a stage the runner submits
+claims the household lease for its guest. `runner-fixture.sh` refuses, naming the cure, when
+doorway C cannot sponsor or the fourth peer is absent.
+
+Two things the steps do that a provider's worker would otherwise do. They ask a provider's
+storage to accept each task (`POST …/tasks/{ref}/accept`, the worker's own first call) and
+record its decline on a refusal; the admission decision is the provider storage's
+(`api/compute_tasks.rs` `authorize`). And they name stages with `cid-executor.mjs`, the
+`artifact` and `cid` halves of the compute-executor, because the executor itself is
+unavailable (its source is lost: `genesis/data/timeline/backlog/rakia-executor-untracked-in-submodule-pin.md`).
+Storage re-derives every CID it is handed, so a naming drift is refused, not accepted. The
+scenario that reads a RUN stage's report back carries `@requires:compute-executor` and is
+held until the executor returns.
+
+What the runner's own surfaces refuse, live: a hosting promise its sponsor withdrew
+(custody answers `hosted-cell-grant-withdrawn`), a capacity grant made to another runner or
+withdrawn by its provider (`compute-grant-refused`), any identity-cell call (no capability on
+`imagodei`), and stocking bytes at a reach more private than its hosting grant names
+(`x-compute-reach` → `reach-narrower-than-hosting-grant`, with `grantReach`). A provider and a
+sponsor read what they have promised with `GET /api/v1/compute/grants[?recipient=&scope=]` on
+their own local compute API.

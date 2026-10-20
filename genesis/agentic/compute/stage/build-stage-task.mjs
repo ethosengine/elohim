@@ -239,6 +239,10 @@ export async function buildStageTask({
   timeoutSeconds = 1800,
   env = process.env,
   execute = run,
+  // false only for a requester that can NAME a stage but holds no executor to parse it with
+  // (cid-executor.mjs): the envelope is then checked by the provider at admission, and the
+  // result says the run-parser probe was skipped rather than passed.
+  probeRun = true,
 }) {
   if (!feature || !requester || !provider || !out)
     throw new Error(
@@ -377,7 +381,9 @@ export async function buildStageTask({
 
   // 7. validate with `run`'s parser, not `cid`'s (§4 constraint 1, §9 task 1's single most
   // valuable check): the probe must reach PAST task parsing to the runtime-image check.
-  const probe = await probeRunParser({ taskPath, executor, execute });
+  const probe = probeRun
+    ? await probeRunParser({ taskPath, executor, execute })
+    : { ok: false, skipped: "no executor to parse the envelope with" };
 
   return {
     envelope,

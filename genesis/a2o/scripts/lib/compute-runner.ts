@@ -76,7 +76,9 @@ export interface RunnerEnv {
   doorway: string;
   jwt: string;
   adminKey: string;
-  appId: string;
+  /** Override for the hosted app id; unset ⇒ the one the doorway's /hc/connect receipt names
+   * (a hosted cell's app is installed per agent, never under the shared `elohim` id). */
+  appId?: string;
   executor?: string;
   root: string;
 }
@@ -120,7 +122,7 @@ export function readRunnerEnv(env: NodeJS.ProcessEnv = process.env): RunnerEnv {
     doorway: origin.origin,
     jwt,
     adminKey,
-    appId: nonEmpty(env.RUNNER_APP_ID) ?? 'elohim',
+    appId: nonEmpty(env.RUNNER_APP_ID),
     executor: nonEmpty(env.COMPUTE_EXECUTOR),
     root: nonEmpty(env.RUNNER_ROOT) ?? 'genesis/a2o/reports/compute-runner',
   };
@@ -195,6 +197,8 @@ export function payloadHeaders(input: {
   owner: string;
   retention: number;
   request?: string;
+  /** The reach the runner declares for the bytes; absent ⇒ its hosting grant's own. */
+  reach?: string;
 }): Record<string, string> {
   const headers: Record<string, string> = {
     authorization: `Bearer ${input.jwt}`,
@@ -203,6 +207,7 @@ export function payloadHeaders(input: {
     'x-compute-retain-seconds': String(input.retention),
   };
   if (input.request) headers['x-compute-request'] = input.request;
+  if (input.reach) headers['x-compute-reach'] = input.reach;
   return headers;
 }
 
@@ -233,6 +238,12 @@ export function payloadRefusal(status: number, body: string): RunnerRefusal {
       'payload',
       `${why}: the sponsor's hosting promise is missing, unverified or withdrawn`,
       'ask the sponsor to re-issue the runner hosted-cell grant (re-register via runner-ensure.sh)'
+    );
+  if (reason === 'reach-narrower-than-hosting-grant')
+    return new RunnerRefusal(
+      'payload',
+      `${why}: a runner's bytes travel at the reach its hosting grant names`,
+      'declare that reach, or none; anything more private needs a person to be private to'
     );
   if (reason === 'rate-limit-exceeded')
     return new RunnerRefusal(
@@ -267,6 +278,7 @@ export function doorwayPayload(input: {
   doorway: string;
   jwt: string;
   request?: string;
+  reach?: string;
   fetcher?: typeof fetch;
 }): Payload {
   const fetcher = input.fetcher ?? fetch;
@@ -284,6 +296,7 @@ export function doorwayPayload(input: {
           owner,
           retention,
           request: method === 'GET' ? input.request : undefined,
+          reach: input.reach,
         }),
       }
     );
@@ -454,7 +467,7 @@ export class RunnerSession {
       // doorway's /hc/app/{port}); present only because the options type requires them.
       adminWs: 'ws://unused.invalid',
       appWs: 'ws://unused.invalid',
-      appId: this.options.env.appId,
+      appId: this.options.env.appId ?? this.receipt!.installedAppId,
       role,
       zome,
       signingCredentialsDir: dir,

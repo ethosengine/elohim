@@ -1,6 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { execFile } from "node:child_process";
+import { existsSync } from "node:fs";
 import { mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { createHash } from "node:crypto";
@@ -21,6 +22,10 @@ const execFileP = promisify(execFile);
 const EXECUTOR =
   process.env.COMPUTE_EXECUTOR ||
   "/projects/.cargo-target-pool/family/dev/elohim__rakia/debug/compute-executor"; // = measure.sh PINNED_EXECUTOR
+// The real executor is unavailable while its source is lost
+// (genesis/data/timeline/backlog/rakia-executor-untracked-in-submodule-pin.md): the tests that
+// exercise it skip, saying why, rather than fail on a missing binary or pass without it.
+const NO_EXECUTOR = !existsSync(EXECUTOR) && `compute-executor not found at ${EXECUTOR}`;
 const FEATURE = "features/dataplane/federation-version-convergence.feature";
 const REQUESTER = "uhCAkTestRequesterKey";
 const PROVIDER = "uhCAkTestProviderKey";
@@ -50,7 +55,7 @@ function stubExecute() {
   };
 }
 
-test("build-stage-task builds a valid single-scenario stage envelope", async (t) => {
+test("build-stage-task builds a valid single-scenario stage envelope", { skip: NO_EXECUTOR }, async (t) => {
   const out = await mkdtemp(join(tmpdir(), "stage-build-"));
   t.after(() => rm(out, { recursive: true, force: true }));
 
@@ -221,6 +226,27 @@ test("inner household publication is disabled and the inner berth claim is attri
   assert.ok(postReportIndex > 0 && justTestIndex > postReportIndex);
 });
 
+test("probeRun: false names a stage without asking an executor to parse it", async (t) => {
+  const out = await mkdtemp(join(tmpdir(), "stage-build-noprobe-"));
+  t.after(() => rm(out, { recursive: true, force: true }));
+  const execute = stubExecute();
+  const result = await buildStageTask({
+    feature: FEATURE,
+    requester: REQUESTER,
+    provider: PROVIDER,
+    out,
+    executor: "cid-executor",
+    runtimeImage: `sha256:${"0".repeat(64)}`,
+    execute: async (program, args) => {
+      assert.notEqual(args[0], "run", "no run probe without an executor");
+      return execute(program, args);
+    },
+    probeRun: false,
+  });
+  assert.deepEqual(result.probe, { ok: false, skipped: "no executor to parse the envelope with" });
+  assert.equal(result.envelope.requester, REQUESTER);
+});
+
 test("--repo-root lands in the rendered runner", async (t) => {
   const out = await mkdtemp(join(tmpdir(), "stage-build-reporoot-"));
   t.after(() => rm(out, { recursive: true, force: true }));
@@ -342,7 +368,7 @@ test("a provider whose tree has drifted from the pinned sut refuses STAGE-PRECON
 // the frame stopped at exactly 73728 bytes (72 KiB) with no END sentinel, and the requester
 // read "stdout.log did not carry a framed ELOHIM STAGE REPORT". A report well past 72 KiB must
 // round-trip byte-for-byte, END marker and summary line included, through a real pipe.
-test("a >72 KiB cucumber report round-trips through the framed stage report with its END marker", async (t) => {
+test("a >72 KiB cucumber report round-trips through the framed stage report with its END marker", { skip: NO_EXECUTOR }, async (t) => {
   const out = await mkdtemp(join(tmpdir(), "stage-build-bigframe-"));
   t.after(() => rm(out, { recursive: true, force: true }));
   const scratch = await mkdtemp(join(tmpdir(), "stage-build-bigframe-tmp-"));

@@ -85,6 +85,19 @@ resources:
           post-fix and got 200 + `event: endpoint` (was 403 "forbidden: host not allowed" minutes
           earlier, verified degraded 2026-07-11 before the fix landed).
 
+  compute-executor:
+    role: the rakia compute-executor — the binary a provider's worker RUNS a pinned stage with
+    available: false
+    note: >
+      False since 2026-10-20 because the executor itself is gone, not because a lane withholds it:
+      its source (elohim/rakia/rakia-executor) was never committed upstream, and no disk this
+      workspace reaches still holds the source or a build. Requesters still NAME stages
+      (genesis/agentic/compute/cid-executor.mjs) and providers still decide admission, so only
+      scenarios that read back what a stage RAN are held. Cure and owner:
+      genesis/data/timeline/backlog/rakia-executor-untracked-in-submodule-pin.md. Flip in all three
+      cluster-state files together once a rebuilt executor is on the pin; a run may assert it with
+      ELOHIM_CAP_COMPUTE_EXECUTOR_STATUS=available.
+
 # requires_env vocabulary used by tests/stories/gates (declare on the artifact):
 #   shem               — needs the shem multi-tenant canvas (cross-node)
 #   alpha-cluster-6peer— needs the stable 6-peer alpha soak cluster

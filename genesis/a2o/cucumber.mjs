@@ -75,6 +75,17 @@ export default function () {
     // write event that re-churns the mesh being measured (2026-08-16 Q10
     // finding). Measure saga with `--profile saga`, never bare CLI paths.
     saga: { ...base, paths: ['features/dataplane/resiliency-saga/**/*.feature'] },
+    // The sponsored CI runner's story, run from the requester's desk against the household with
+    // CI_RUNNER_A2O_CONFIG (genesis/agentic/compute/runner-fixture.sh) and
+    // ELOHIM_CLUSTER_STATE_PATH_OVERRIDE=genesis/manifests/cluster-state.act1-household.yaml. Not a
+    // `just test mesh` lane: a stage this story submits claims the household lease for its guest,
+    // so the requester must not hold it while the stage runs.
+    'ci-runner': {
+      ...base,
+      paths: ['features/compute/ci-runner-stewarded.feature'],
+      worldParameters: { env: 'mesh' },
+      tags: '@e2e and not @wip',
+    },
     // Act I — THE HOUSEHOLD. Runs against a mesh this run OWNS (`just mesh start` + `just mesh
     // prologue`, or the CI mesh stage). `paths` is the whole tree on purpose: an act is declared by
     // TAG, not by directory — Act I scenarios live in features/dataplane, features/auth,

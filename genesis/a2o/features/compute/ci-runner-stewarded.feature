@@ -1,12 +1,13 @@
 # @concern:operator-runtime-surface joins this proof to the habit register's checks: entry — the
 # identifier CI, this feature, and the habit register share.
-# @wip until the service-agent provisioning path and its step definitions land (plan:
-# /projects/.claude-config/plans/ok-lets-plan-b-sorted-spark.md, step 2).
 # @act:i: this story belongs to Act I, the household chapter of the test suite.
 # @requires:household-nodes: the feature needs a running household mesh. @requires:owned-substrate
 # on each scenario: the scenario writes and withdraws real grants, so it runs only on a mesh this
 # run owns outright, never on a shared fleet other people are using.
-@e2e @act:i @compute @concern:operator-runtime-surface @requires:household-nodes @wip
+# Fixture: CI_RUNNER_A2O_CONFIG, written by genesis/agentic/compute/runner-fixture.sh (absent ⇒
+# every step is pending). Run it from the requester's desk, NOT under `just test mesh`: a stage's
+# guest claims the household lease itself, so a lane holding it would refuse its own stage.
+@e2e @act:i @compute @concern:operator-runtime-surface @requires:household-nodes
 Feature: A steward sponsors a runner, and the runner works only inside the promises made to it
 
   A household here is a small group of people and the machines they run together: each person
@@ -61,7 +62,9 @@ Feature: A steward sponsors a runner, and the runner works only inside the promi
     And exactly one hosting grant names the first steward's peer as provider and the runner as recipient
     And the hosting grant states its reach and when it ends
 
-  @requires:owned-substrate
+  # @requires:compute-executor: the stage must actually RUN for its report to come back, and the
+  # executor that runs it is unavailable (cluster-state compute-executor note).
+  @requires:owned-substrate @requires:compute-executor
   Scenario: A provider lends capacity, and the runner's stage runs and reports back
     Given the first steward has sponsored a runner
     When the first provider grants the runner capacity to run stages

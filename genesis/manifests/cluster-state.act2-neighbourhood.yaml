@@ -144,6 +144,19 @@ resources:
           cluster-state.yaml (true as of 2026-08-20). Act II is the neighbourhood; the commons is Act III.
           Flip this only if the operator decides the alpha lane should also run Act III.
 
+  compute-executor:
+    role: the rakia compute-executor — the binary a provider's worker RUNS a pinned stage with
+    available: false
+    note: >
+      False since 2026-10-20 because the executor itself is gone, not because a lane withholds it:
+      its source (elohim/rakia/rakia-executor) was never committed upstream, and no disk this
+      workspace reaches still holds the source or a build. Requesters still NAME stages
+      (genesis/agentic/compute/cid-executor.mjs) and providers still decide admission, so only
+      scenarios that read back what a stage RAN are held. Cure and owner:
+      genesis/data/timeline/backlog/rakia-executor-untracked-in-submodule-pin.md. Flip in all three
+      cluster-state files together once a rebuilt executor is on the pin; a run may assert it with
+      ELOHIM_CAP_COMPUTE_EXECUTOR_STATUS=available.
+
 # Cap vocabulary must stay in sync across cluster-state.yaml, cluster-state.act1-household.yaml and this
 # file. A cap declared in one and missing from another silently demotes to a fixture precondition in the
 # file that lacks it (substrate-scope.ts fails open on unknown caps).

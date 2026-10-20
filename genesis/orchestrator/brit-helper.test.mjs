@@ -210,7 +210,9 @@ test('a failing unified plan remains warn-only, and pre-push supplies --since', 
 
 test('attest without brit-build-ref warns and exits 0', () => {
   const { dir, graphPath } = workspace();
-  const r = helper(['attest', graphPath], { REPO_ROOT: dir });
+  // An explicit, absent binary keeps this hermetic: a brit-build-ref on PATH (installed on the
+  // workspace 2026-10-20) would otherwise be found and run.
+  const r = helper(['attest', graphPath], { REPO_ROOT: dir, BRIT_BUILD_REF_BIN: join(dir, 'absent') });
   assert.equal(r.status, 0);
   assert.match(r.stderr, /brit-build-ref not installed; build attestations skipped/);
 });

@@ -342,6 +342,14 @@ it('payloadHeaders sends exactly the custody headers', () => {
       'x-compute-request': 'uhCkkR',
     }
   );
+  // A declared reach rides only when the runner names one; absent ⇒ its grant's own.
+  assert.equal(
+    payloadHeaders({ jwt: 'J', owner: 'bafyT', retention: 0, reach: 'intimate' })[
+      'x-compute-reach'
+    ],
+    'intimate'
+  );
+  assert.ok(!('x-compute-reach' in payloadHeaders({ jwt: 'J', owner: 'bafyT', retention: 0 })));
 });
 
 // ---------------------------------------------------------------------------
@@ -440,6 +448,12 @@ it('refusals name their cure', async () => {
   for (const [status, body, cure] of [
     [403, '{"reason":"no-active-hosted-cell-grant"}', /re-issue the runner hosted-cell grant/],
     [403, '{"reason":"rate-limit-exceeded"}', /hour window/],
+    [403, '{"reason":"hosted-cell-grant-withdrawn"}', /re-issue the runner hosted-cell grant/],
+    [
+      403,
+      '{"reason":"reach-narrower-than-hosting-grant","grantReach":"commons"}',
+      /needs a person to be private to/,
+    ],
     [403, '{"reason":"local-compute-capability-required"}', /session agent key/],
     [401, '', /runner-ensure\.sh/],
     [404, '', /hosted custody/],
