@@ -302,6 +302,8 @@ cached to disk because the doorways boot BEFORE the conductors and cannot
 know it on a cold start (`reconcile_doorway_pool_performer` corrects and
 restarts the one doorway that booted wrong, once storage answers).
 
+**Provider-owned fixture ports.** `MESH_STORAGE_BASE_PORT`, `MESH_CONDUCTOR_BASE_PORT`, `MESH_P2P_BASE_PORT` and `MESH_METRICS_BASE_PORT` isolate storage, conductor, P2P and metric listeners; their household defaults remain 8090, 4444, 9701 and 9464. The initial Adam CI worker uses 18090, 14444, 19701 and 19464, with separately declared doorway/relay/Mongo ports and persistent `MESH_DIR`. Mongo places its Unix socket beside its database, so this profile works with a read-only root filesystem. See `genesis/agentic/compute/operations.md`: Matthew is the accountable steward, Adam the fixture provider, and Jenkins a sponsored service agent. Its native grant/report proof is distinct from the new placement runtime and from household T2 evidence. The `just gate orchestrator` lane owns worker bootstrap, activation and runner preflight checks.
+
 **Cast scope (`MESH_HOSTED_CAST=lane|all`).** `seed-humans.ts`'s
 `HOUSEHOLD_HOSTED_CAST` allow-list (14 names — the humans some household-lane
 a2o scenario actually signs in as) is the default cast once `DOORWAY_URL` is
