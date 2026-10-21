@@ -356,7 +356,7 @@ export async function buildStageTask({
       maxPayloadBytes: 8388608,
       timeoutSeconds,
     },
-    // Never an explicit JSON null (§4 constraint 2) — compute-executor cid dies on Unit.
+    // Retain only the bounded number/age of attempts declared for this stage.
     retention: { maxAgeSeconds: 86400, maxRuns: 5, expireWhen: "either" },
   };
   const taskPath = join(out, "task.json");

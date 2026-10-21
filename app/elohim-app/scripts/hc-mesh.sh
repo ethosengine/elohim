@@ -4735,6 +4735,7 @@ EOF
     if ! (exec 3<>"/dev/tcp/127.0.0.1/$MONGO_PORT") 2>/dev/null; then
       mkdir -p "$MONGO_DIR"
       "$MONGOD_BIN" --dbpath "$MONGO_DIR" --bind_ip 127.0.0.1 --port "$MONGO_PORT" \
+        --unixSocketPrefix "$MONGO_DIR" \
         --fork --logpath "$LOGDIR/mongod.log" >/dev/null 2>&1 \
         || { echo "REFUSED mesh start: the declared doorway archive failed to start (see $LOGDIR/mongod.log)" >&2; return 1; }
       for _ in $(seq 1 20); do

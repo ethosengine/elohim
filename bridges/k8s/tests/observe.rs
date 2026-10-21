@@ -97,6 +97,18 @@ fn canned_promotion_changes_only_observed_fields() {
             bundle["memory_Mi"] = json!(mem);
         }
     }
+    // Edge observations are canned too: do not inherit the latest live ledger's
+    // node allocations or aggregate (including its different sub-Mi remainder).
+    let edge = &mut expected["cluster"]["nodeTypes"]["edge"];
+    let nodes = edge["nodes"].as_array_mut().unwrap();
+    assert_eq!(nodes.len(), 3);
+    for node in nodes {
+        node["ready"] = json!(true);
+        node["allocatable"]["cpu_m"] = json!(4000);
+        node["allocatable"]["memory_Mi"] = json!(7731);
+    }
+    edge["totals"]["cpu_m"] = json!(12000);
+    edge["totals"]["memory_Mi"] = json!(23193);
     assert_eq!(l, expected);
     let mut replay = original;
     for change in &changes {

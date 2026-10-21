@@ -62,6 +62,7 @@ RUN cd elohim/rakia \
 RUN pnpm --filter @elohim/a2o... install --frozen-lockfile --ignore-scripts \
     && pnpm --filter @elohim/storage-client build \
     && pnpm --filter @elohim/a2o exec tsx --version \
+    && node genesis/a2o/scripts/smoke-peer-stage-loader.mjs \
     && node --version && just --version \
     && /out/ark --version && /out/compute-executor --version
 

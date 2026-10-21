@@ -171,6 +171,14 @@ if [ -z "$grant" ]; then
   exit 1
 fi
 
+# Public activation identity only. Reject malformed values before putting them in
+# the log line that runner-preflight forwards; bearer stdout stays unchanged.
+runner_key="$(printf '%s' "$acct" | jq -r '.agentPubKey // empty')"
+if [[ ! "$runner_key" =~ ^uhCAk[A-Za-z0-9_-]{48}$ ]]; then
+  echo "runner-ensure: REFUSED — account has no canonical runner agent key" >&2
+  exit 1
+fi
+
 days="?"
 if [ -n "$until" ]; then
   until_s="$(date -u -d "$until" +%s 2>/dev/null || echo "")"
@@ -182,6 +190,6 @@ if [ -n "$until" ]; then
     fi
   fi
 fi
-echo "runner-ensure: ok — $SERVICE_AGENT_ID sponsored under $grant, ${days} days remaining (until ${until:-unknown})" >&2
+echo "runner-ensure: ok — $SERVICE_AGENT_ID sponsored under $grant, ${days} days remaining; runner agent key $runner_key (until ${until:-unknown})" >&2
 
 printf '%s' "$token"

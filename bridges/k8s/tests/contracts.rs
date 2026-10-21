@@ -325,7 +325,7 @@ fn cli_missing_pin_refuses() {
 }
 
 #[test]
-fn every_current_runtime_render_is_byte_identical_to_the_pre_change_snapshot() {
+fn native_runtime_budgets_keep_the_snapshot_when_adam_adds_delegated_capacity() {
     let golden: BTreeMap<String, String> =
         serde_json::from_str(include_str!("runtime-envelope-golden.json")).unwrap();
     let mut rendered_names = BTreeSet::new();
@@ -339,12 +339,34 @@ fn every_current_runtime_render_is_byte_identical_to_the_pre_change_snapshot() {
             continue;
         }
         let manifest = RuntimeManifest::from_json(&fs::read_to_string(&path).unwrap()).unwrap();
-        assert!(manifest
-            .processes
-            .iter()
-            .all(|child| child.kind != ProcessKind::Delegated));
-        let actual = serde_json::to_string(&render_envelope(&manifest).unwrap()).unwrap();
-        assert_eq!(actual, golden[name], "{name}");
+        let rendered = render_envelope(&manifest).unwrap();
+        if name == "adam.manifest.json" {
+            assert_eq!(rendered.delegated.len(), 2);
+            let slices: BTreeMap<_, _> = rendered
+                .delegated
+                .iter()
+                .map(|slice| (slice.name.as_str(), (slice.memory_bytes, slice.cpu_millis)))
+                .collect();
+            assert_eq!(slices["compute-worker"], (24 * GIB, 8_000));
+            assert_eq!(slices["ws-proxy"], (64 * 1024 * 1024, 200));
+            let mut native = serde_json::to_value(&rendered).unwrap();
+            native.as_object_mut().unwrap().remove("delegated");
+            let expected: Value = serde_json::from_str(&golden[name]).unwrap();
+            assert_eq!(
+                native, expected,
+                "Adam's native budget must remain unchanged"
+            );
+        } else {
+            assert!(manifest
+                .processes
+                .iter()
+                .all(|child| child.kind != ProcessKind::Delegated));
+            assert_eq!(
+                serde_json::to_string(&rendered).unwrap(),
+                golden[name],
+                "{name}"
+            );
+        }
         rendered_names.insert(name.to_string());
     }
 

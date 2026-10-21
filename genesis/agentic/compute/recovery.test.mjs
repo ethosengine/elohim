@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { mkdtemp, rm } from "node:fs/promises";
+import { mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
@@ -13,6 +13,72 @@ const descriptor = (cid) => ({
   bytes: 1,
   sha256: "digest",
   chunks: [{ cid: `${cid}-chunk`, bytes: 1, sha256: "digest" }],
+});
+
+test("a lost launch response consumes admission without launching or inventing completion", async (t) => {
+  const root = await mkdtemp(join(tmpdir(), "compute-lost-launch-"));
+  t.after(() => rm(root, { recursive: true, force: true }));
+  const admission = join(root, "provider-admission.json");
+  const runtimePath = join(root, "runs", key("request"), "receipt.json");
+  const attempts = [];
+  let admissions = 0;
+  let launches = 0;
+  let completions = 0;
+  const options = {
+    root,
+    artifactBase: "http://localhost",
+    status: {
+      requestActionHash: "request",
+      taskCid: "task-cid",
+      grantActionHash: "grant",
+      envelope: { binary: descriptor("binary"), dna: descriptor("dna") },
+    },
+    fetchInput: async () => {},
+    execute: async (_program, args) => {
+      if (args[0] === "receipt-path") return runtimePath;
+      if (args[0] === "cid") return "task-cid";
+      launches++;
+      assert.fail("a consumed but unanswered admission must never launch");
+    },
+    request: async (path, body) => {
+      if (path.endsWith("/accept")) {
+        attempts.push(body.attemptId);
+        return {};
+      }
+      if (path.endsWith("/authorize-launch")) {
+        // The provider commits its unique admission before sending the response.
+        // Retrying the same request cannot insert another admission, even with
+        // a reconstructed worker invocation and no runtime receipt yet.
+        try {
+          await writeFile(admission, JSON.stringify(body), { flag: "wx" });
+        } catch (error) {
+          if (error.code === "EEXIST")
+            throw new Error("Compute API 409: admission consumed");
+          throw error;
+        }
+        admissions++;
+        throw new Error("connection lost after admission committed");
+      }
+      completions++;
+      assert.fail(`unexpected provider write ${path}`);
+    },
+  };
+  await assert.rejects(
+    executeTask(options),
+    /connection lost after admission committed/,
+  );
+  await assert.rejects(executeTask({ ...options }), /admission consumed/);
+  assert.equal(admissions, 1);
+  assert.equal(attempts.length, 2);
+  assert.equal(attempts[0], attempts[1]);
+  assert.equal((await readJson(admission)).attemptId, attempts[0]);
+  assert.equal(launches, 0);
+  assert.equal(completions, 0);
+  const state = await readJson(
+    join(root, "jobs", key("request"), "state.json"),
+  );
+  assert.equal(state.receipt, undefined);
+  assert.notEqual(state.completed, true);
 });
 
 test("a denied accept never launches the runtime", async (t) => {
