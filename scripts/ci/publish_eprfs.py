@@ -1,4 +1,4 @@
-"""Publish the fixed eprfs library set with verified immutable Nexus receipts.
+"""Publish seam-contracts and the eprfs libraries with immutable Nexus receipts.
 
 Publication is dependency ordered but not atomic. A rerun succeeds for an
 existing version only when its downloaded payload matches the local package.
@@ -24,7 +24,14 @@ from urllib.parse import urlsplit
 from urllib.request import HTTPRedirectHandler, build_opener
 
 
-CRATES = ("eprfs-core", "eprfs-host", "eprfs-storage", "eprfs-meta", "eprfs-local")
+CRATES = (
+    "elohim-seam-contracts",
+    "eprfs-core",
+    "eprfs-host",
+    "eprfs-storage",
+    "eprfs-meta",
+    "eprfs-local",
+)
 PINNED_INDEX = "https://nexus.ethosengine.com/repository/cargo-internal"
 MAX_ARCHIVE = 128 * 1024 * 1024
 MAX_UNPACKED = 512 * 1024 * 1024
@@ -329,9 +336,9 @@ def cargo(workspace: Path, arguments: list[str], env: dict[str, str]) -> bool:
 
 
 def run(repo: Path, publish: bool) -> None:
-    workspace = repo / "elohim/eprfs"
-    manifest = tomllib.loads((workspace / "Cargo.toml").read_text())
-    version = manifest["workspace"]["package"]["version"]
+    eprfs_workspace = repo / "elohim/eprfs"
+    manifest = tomllib.loads((eprfs_workspace / "Cargo.toml").read_text())
+    eprfs_version = manifest["workspace"]["package"]["version"]
     target = os.environ.get("CARGO_TARGET_DIR")
     if not target or not Path(target).is_absolute() or Path(target).resolve().is_relative_to(repo.resolve()):
         raise PublishError("CARGO_TARGET_DIR must be an absolute slot outside the source checkout")
@@ -344,8 +351,17 @@ def run(repo: Path, publish: bool) -> None:
         CARGO_REGISTRY_GLOBAL_CREDENTIAL_PROVIDERS="cargo:token",
         CARGO_REGISTRIES_ELOHIM_INDEX="sparse+" + index_base + "/",
     )
-    print(f"eprfs library target version: {version}", flush=True)
+    print(f"eprfs library target version: {eprfs_version}", flush=True)
     for name in CRATES:
+        # The leaf prerequisite has its own workspace, lockfile and package version.
+        # Publishing verifies its registry receipt before packaging any eprfs dependent.
+        if name == "elohim-seam-contracts":
+            workspace = repo / "crates/seam-contracts"
+            manifest = tomllib.loads((workspace / "Cargo.toml").read_text())
+            version = manifest["package"]["version"]
+        else:
+            workspace = eprfs_workspace
+            version = eprfs_version
         package_args = ["package", "--locked", "--registry", "elohim", "--no-verify", "-p", name]
         if not cargo(workspace, package_args, env):
             raise PublishError(f"{name} {version}: locked packaging failed")

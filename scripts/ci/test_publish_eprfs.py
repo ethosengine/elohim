@@ -317,5 +317,116 @@ class PublicationTests(unittest.TestCase):
             self.assertFalse(publisher.cargo(Path("/tmp"), ["package"], {}))
 
 
+class PrerequisitePublicationTests(unittest.TestCase):
+    def setUp(self):
+        self.root = Path(self.enterContext(tempfile.TemporaryDirectory()))
+        self.target = Path(self.enterContext(tempfile.TemporaryDirectory()))
+        self.seam = self.root / "crates/seam-contracts"
+        self.eprfs = self.root / "elohim/eprfs"
+        self.seam.mkdir(parents=True)
+        self.eprfs.mkdir(parents=True)
+        (self.seam / "Cargo.toml").write_text(
+            '[workspace]\n[package]\nname="elohim-seam-contracts"\nversion="0.1.0"\n'
+        )
+        (self.eprfs / "Cargo.toml").write_text('[workspace.package]\nversion="0.2.0"\n')
+        (self.target / "package").mkdir()
+        self.names = (
+            "elohim-seam-contracts", "eprfs-core", "eprfs-host",
+            "eprfs-storage", "eprfs-meta", "eprfs-local",
+        )
+        for name in self.names:
+            version = "0.1.0" if name == "elohim-seam-contracts" else "0.2.0"
+            stream = io.BytesIO()
+            with tarfile.open(fileobj=stream, mode="w:gz") as tar:
+                contents = f'[package]\nname="{name}"\nversion="{version}"\n'.encode()
+                info = tarfile.TarInfo(f"{name}-{version}/Cargo.toml")
+                info.mode = 0o644
+                info.size = len(contents)
+                tar.addfile(info, io.BytesIO(contents))
+            (self.target / "package" / f"{name}-{version}.crate").write_bytes(stream.getvalue())
+        self.enterContext(mock.patch.dict(os.environ, {
+            "CARGO_TARGET_DIR": str(self.target),
+            "CARGO_REGISTRIES_ELOHIM_TOKEN": "secret-token",
+        }, clear=True))
+        self.enterContext(mock.patch.object(publisher, "registry_base", return_value=BASE))
+        self.enterContext(mock.patch.object(publisher, "download_base", return_value=BASE + "/crates"))
+        self.enterContext(mock.patch.object(publisher.time, "sleep"))
+        self.events = []
+
+        def cargo(workspace, arguments, env):
+            self.events.append((arguments[0], arguments[-1]))
+            return True
+
+        self.cargo = self.enterContext(mock.patch.object(publisher, "cargo", side_effect=cargo))
+        self.receipts = self.enterContext(mock.patch.object(publisher, "verify_existing"))
+
+    def test_prerequisite_is_verified_before_dependents_use_their_own_version(self):
+        pending = iter([False, False, True] + [False, True] * 5)
+
+        def receipt(index, download, name, version, payload):
+            result = next(pending)
+            self.events.append(("receipt", name, version, result))
+            return result
+
+        self.receipts.side_effect = receipt
+        publisher.run(self.root, publish=True)
+        self.assertEqual(self.events[:6], [
+            ("package", "elohim-seam-contracts"),
+            ("receipt", "elohim-seam-contracts", "0.1.0", False),
+            ("publish", "elohim-seam-contracts"),
+            ("receipt", "elohim-seam-contracts", "0.1.0", False),
+            ("receipt", "elohim-seam-contracts", "0.1.0", True),
+            ("package", "eprfs-core"),
+        ])
+        self.assertEqual(len(self.cargo.call_args_list), 12)
+        for position, name in enumerate(self.names):
+            workspace = self.seam if position == 0 else self.eprfs
+            package_calls = self.cargo.call_args_list[position * 2:position * 2 + 2]
+            for command, call in zip(("package", "publish"), package_calls):
+                self.assertEqual(call.args[0], workspace)
+                self.assertEqual(call.args[1], [
+                    command, "--locked", "--registry", "elohim", "--no-verify", "-p", name,
+                ])
+        for call in self.receipts.call_args_list:
+            name, version = call.args[2:4]
+            self.assertEqual(version, "0.1.0" if name == self.names[0] else "0.2.0")
+
+    def test_verified_existing_prerequisite_is_not_uploaded_again(self):
+        self.receipts.side_effect = [True] + [False, True] * 5
+        publisher.run(self.root, publish=True)
+        self.assertEqual(self.events[:2], [
+            ("package", "elohim-seam-contracts"), ("package", "eprfs-core"),
+        ])
+        self.assertNotIn(("publish", "elohim-seam-contracts"), self.events)
+        self.assertEqual(len(self.cargo.call_args_list), 11)
+
+    def test_failed_prerequisite_upload_stops_before_dependent_packaging(self):
+        self.cargo.side_effect = [True, False]
+        self.receipts.side_effect = [False, False]
+        with self.assertRaisesRegex(
+            publisher.PublishError, "elohim-seam-contracts 0.1.0: upload failed"
+        ):
+            publisher.run(self.root, publish=True)
+        self.assertEqual(len(self.cargo.call_args_list), 2)
+        for call in self.cargo.call_args_list:
+            self.assertEqual(call.args[0], self.seam)
+            self.assertEqual(call.args[1][-1], "elohim-seam-contracts")
+
+    def test_prerequisite_collision_stops_before_any_upload_or_dependent(self):
+        self.receipts.side_effect = publisher.PublishError(
+            "immutable version collision; bump the version"
+        )
+        with self.assertRaisesRegex(publisher.PublishError, "immutable version collision"):
+            publisher.run(self.root, publish=True)
+        self.assertEqual(self.events, [("package", "elohim-seam-contracts")])
+
+    def test_check_packages_both_workspaces_without_uploading(self):
+        self.receipts.return_value = False
+        publisher.run(self.root, publish=False)
+        self.assertEqual(self.events, [("package", name) for name in self.names])
+        self.assertEqual(self.cargo.call_args_list[0].args[0], self.seam)
+        self.assertEqual(self.cargo.call_args_list[1].args[0], self.eprfs)
+
+
 if __name__ == "__main__":
     unittest.main()
