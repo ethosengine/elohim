@@ -289,6 +289,18 @@ spec:
               value: "ws://elohim-matthew-alpha-conductor:4444"
             - name: STORAGE_URL
               value: "http://elohim-matthew-alpha.elohim-alpha.svc.cluster.local:8090"
+            # Dev-stakes sponsorship: reuse this doorway's existing bootstrap
+            # credential with a domain suffix. This is not additional entropy.
+            # The pool's own lamad actor is discovered from its /health response.
+            - name: POOL_COMPUTE_URL
+              value: "$(STORAGE_URL)"
+            - name: POOL_COMPUTE_BOOTSTRAP_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: elohim-doorway-alpha-secrets
+                  key: api-key-admin
+            - name: POOL_COMPUTE_TOKEN
+              value: "$(POOL_COMPUTE_BOOTSTRAP_KEY):elohim-pool-compute"
             - name: STORAGE_URLS
               value: "STORAGE_URLS_PLACEHOLDER"
             # Auto-register doorway's storage as a publisher of html5-app

@@ -3164,17 +3164,17 @@ decisionPoints:
       function's absence as the defect. With the stamp landed, that guard becomes a
       belt-and-braces rail rather than the thing holding the page up.
 
-  - name: pool_compute_config
-    kind: pure-decision-predicate
+  - name: resolve_pool_compute_config
+    kind: verdict-fn
     sourceLocation:
       file: src/routes/hosted_cell.rs
-      modulePath: routes::hosted_cell::pool_compute_config
-      line: 99
+      modulePath: routes::hosted_cell::resolve_pool_compute_config
+      line: 164
     summary: >
-      Whether this doorway notarizes the cells its pool hosts. All three parts —
-      pool URL, local capability token, and the peer's own cell-actor key — are required
-      together, because the grant surface refuses a request missing any of them; "not all
-      three" therefore answers None (skip the leg), never a partial attempt.
+      Resolves the URL, local token and pool actor required to notarize hosting.
+      An explicit actor wins; when omitted, only the configured pool health response's
+      canonical lamad cell key is accepted. Missing or malformed identity refuses the
+      leg; discovery never grants authority and storage still checks token and actor.
     concernIds:
       - id: C4
         status: answered
@@ -3187,13 +3187,19 @@ decisionPoints:
       - id: C12
         status: answered
         justification: >
-          The performer key is carried explicitly rather than inferred, so the provider of
-          the promise is structurally the pool peer acting for itself. A doorway cannot
+          The performer key is explicit or read from the configured pool's own lamad cell
+          identity, so the provider is structurally the pool peer acting for itself. A doorway cannot
           promise compute it does not own; the grant surface's same_actor check is what
           enforces it and this config is what satisfies it honestly.
     contractTests:
       - path: doorway/doorway-service/src/routes/hosted_cell.rs
         testName: hosted_register_without_pool_compute_config_still_registers
+        kind: unit
+      - path: doorway/doorway-service/src/routes/hosted_cell.rs
+        testName: pool_actor_discovery_uses_only_the_configured_peers_lamad_cell
+        kind: unit
+      - path: doorway/doorway-service/src/routes/hosted_cell.rs
+        testName: pool_actor_discovery_refuses_absent_malformed_or_failed_health
         kind: unit
 
   - name: hosted_cell_grant_body

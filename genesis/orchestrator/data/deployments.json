@@ -14,7 +14,8 @@
       "hostsAgents": true,
       "$hostsAgentsComment": "2026-10-14: a doorway OPERATOR's conductor (matthew, adam) is the only one that hosts agents. The doorway pools every conductor for projection and discovery, but DOORWAY_HOSTING_CONDUCTORS (rendered from this flag) gives every other conductor a hosted-agent ceiling of 0, so a hosted human never lands on a member's own device. Hosted is a declared stage on the fixture (agencyPhase), never a default.",
       "conductorStorage": "20Gi",
-      "runtimeManifest": {"cid": "bafyreiapd5vu2vnk3tontaccwwvrtgziljpgfwmmudypi3pp2x76guzrta", "path": "genesis/orchestrator/manifests/runtime/adam.manifest.json"},
+      "runtimeManifest": {"cid": "bafyreiahsppuqbxie2hcw3zmj3p6fvvz2ufw7zis46du46jgoeykskg2ri", "path": "genesis/orchestrator/manifests/runtime/adam.manifest.json"},
+      "$computeWorkerCapacityComment": "2026-10-21: operator authorized additional shem capacity for attestable CI work. The runtime envelope reserves a separate 24Gi/8000m delegated compute-worker slice and accounts for the existing ws-proxy (64Mi/200m); the original storage/conductor 8Gi/8000m total below remains unchanged. Worker capacity is declared, not deployed: adam-compute-worker.json stays disabled until its immutable image, provider identity and owned mesh are proven. One worker executes one stage at a time; measure completed BDD coverage, wall time and footprint before increasing concurrency.",
       "resourceOverride": {
         "cpuLimit": "8000m",
         "justification": "Genesis anchor + doorway-B backend + seed target; renders from adam-firstman.yaml so these edgenode* fields are render-inert mirrors. Conductor db read pool = max(2*cpus,8), so 8000m lifts max_readers to 16. See $resourceBudgetComment."

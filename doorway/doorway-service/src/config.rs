@@ -328,11 +328,8 @@ pub struct Args {
 
     // ── Pool compute: notarizing the cells this doorway's pool hosts (D2) ────
     //
-    // All three are required TOGETHER. The grant surface refuses any request
-    // that is missing the capability token or whose verified performer is not
-    // the storage peer's own cell actor, so a partly-configured doorway would
-    // fail on every registration rather than skip the leg. `pool_compute_config`
-    // treats "not all three" as "not configured" for exactly that reason.
+    // URL and token enable this leg. An omitted performer is discovered from
+    // that same peer's /health lamad cell key; an explicit performer wins.
     /// URL of the pool peer's elohim-storage, which NOTARIZES the hosted cells
     /// this doorway provisions (`POST /api/v1/compute/grants`). Unset means
     /// hosted registration proceeds exactly as before, with no promise recorded.
@@ -346,7 +343,8 @@ pub struct Args {
     pub pool_compute_token: Option<String>,
 
     /// The pool peer's OWN cell actor key (`uhCAk…`), sent as the verified
-    /// performer. The grant surface refuses anything else, which is what makes
+    /// performer. Omit to discover it from the pool peer health response.
+    /// The grant surface refuses anything else, which is what makes
     /// the household's steward — not the doorway — the provider of the promise.
     #[arg(long, env = "POOL_COMPUTE_PERFORMER")]
     pub pool_compute_performer: Option<String>,

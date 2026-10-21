@@ -6,6 +6,7 @@ import { mkdtemp, mkdir, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import YAML from "yaml";
+import { renderPoolCompute } from "./scripts/render-pool-compute.mjs";
 import { quantity, renderWorker } from "./scripts/render-compute-worker.mjs";
 
 const source = await readFile(
@@ -37,20 +38,48 @@ test("enabled worker without a declared slice refuses, naming S4a2", async () =>
   );
 });
 
-test("enabled worker at today's hardcoded numbers refuses the Σ envelope bound", async () => {
-  const image = `registry/worker@sha256:${"a".repeat(64)}`;
-  await assert.rejects(
-    renderWorker(source, {
-      enabled: true,
-      image,
-      performer: "adam-key",
-      // The worker's own resources.requests/limits before S4a1 (2000m/4Gi, 8000m/8Gi) —
-      // reproduced here as the slice to prove the refusal names the pod's real, already
-      // over-budget totals (R6/rung-A finding: 16448Mi limits > 8192Mi bound).
-      slice: { cpuMillis: 8000, memoryBytes: 8 * 1024 * 1024 * 1024 },
-    }),
-    /Σ limits 16448Mi > envelope\.bound 8192Mi/,
+test("a synthetic undersized envelope refuses the worker", async (t) => {
+  const repoRoot = await writeFittingFixtureRepo();
+  t.after(() => rm(repoRoot, { recursive: true, force: true }));
+  const file = join(
+    repoRoot,
+    "genesis/orchestrator/manifests/runtime/adam.manifest.json",
   );
+  const manifest = JSON.parse(await readFile(file, "utf8"));
+  manifest.envelope.bound.memory_bytes = 1024;
+  await writeFile(file, JSON.stringify(manifest));
+  await assert.rejects(
+    renderWorker(
+      source,
+      {
+        enabled: true,
+        image: `registry/worker@sha256:${"a".repeat(64)}`,
+        performer: "adam-key",
+        slice: { cpuMillis: 500, memoryBytes: 512 * 1024 * 1024 },
+      },
+      { repoRoot },
+    ),
+    /Σ limits .* > envelope.bound/,
+  );
+});
+
+test("the declared Adam 24Gi worker fits its current full envelope", async () => {
+  const config = JSON.parse(
+    await readFile(
+      new URL("./data/adam-compute-worker.json", import.meta.url),
+      "utf8",
+    ),
+  );
+  const output = await renderWorker(
+    renderPoolCompute(source, "adam", "alpha"),
+    {
+      ...config,
+      enabled: true,
+      image: `registry/worker@sha256:${"a".repeat(64)}`,
+      performer: "adam-key",
+    },
+  );
+  assert.match(output, /memory: 24576Mi/);
 });
 
 test("quantity() mirrors bridges/k8s/src/lib.rs's parser over the same examples", () => {
@@ -100,6 +129,13 @@ async function writeFittingFixtureRepo() {
   await writeFile(
     join(orchestratorDir, "manifests", "runtime", "adam.manifest.json"),
     JSON.stringify({
+      processes: [
+        {
+          name: "compute-worker",
+          kind: "delegated",
+          quota: { memory_max_bytes: 512 * 1024 * 1024, cpu_share_millis: 500 },
+        },
+      ],
       envelope: {
         bound: { memory_bytes: 100 * 1024 * 1024 * 1024, cpu_millis: 100000 },
       },
@@ -256,4 +292,171 @@ test("the deploy renderer CLI reads its YAML dependency and preserves disabled f
   } finally {
     await rm(dir, { recursive: true, force: true });
   }
+});
+
+test("pool sponsorship is alpha-only and shares doorway token inputs in order", async () => {
+  for (const [human, doorway] of [
+    ["matthew", "alpha"],
+    ["adam", "alpha-b"],
+  ]) {
+    const output = renderPoolCompute(source, human, "alpha");
+    const storage = YAML.parseAllDocuments(output)
+      .map((d) => d.toJS())
+      .find((d) => d?.kind === "StatefulSet")
+      .spec.template.spec.containers.find((c) => c.name === "elohim-node");
+    const env = storage.env;
+    const bootstrap = env.find((v) => v.name === "POOL_COMPUTE_BOOTSTRAP_KEY");
+    const token = env.find((v) => v.name === "ELOHIM_COMPUTE_LOCAL_TOKEN");
+    const doorwayDocs = YAML.parseAllDocuments(
+      await readFile(
+        new URL(`./manifests/doorway/${doorway}.yaml`, import.meta.url),
+        "utf8",
+      ),
+    ).map((d) => d.toJS());
+    const doorwayEnv = doorwayDocs
+      .find((d) => d?.kind === "Deployment")
+      .spec.template.spec.containers.find((c) =>
+        c.env?.some((v) => v.name === "POOL_COMPUTE_TOKEN"),
+      ).env;
+    assert.deepEqual(
+      bootstrap.valueFrom,
+      doorwayEnv.find((v) => v.name === "POOL_COMPUTE_BOOTSTRAP_KEY").valueFrom,
+    );
+    assert.equal(
+      token.value,
+      doorwayEnv.find((v) => v.name === "POOL_COMPUTE_TOKEN").value,
+    );
+    assert.ok(env.indexOf(bootstrap) < env.indexOf(token));
+    assert.equal(
+      env.find((v) => v.name === "ELOHIM_COMPUTE_LOCAL_API").value,
+      "1",
+    );
+  }
+  assert.equal(renderPoolCompute(source, "adam", "prod"), source);
+  assert.equal(renderPoolCompute(source, "jessica", "alpha"), source);
+});
+
+test("worker retains the storage token dependency and opts in to a pinned private mesh", async (t) => {
+  const repoRoot = await writeFittingFixtureRepo();
+  t.after(() => rm(repoRoot, { recursive: true, force: true }));
+  const config = {
+    enabled: true,
+    image: `registry/worker@sha256:${"a".repeat(64)}`,
+    performer: "adam-key",
+    slice: { cpuMillis: 500, memoryBytes: 512 * 1024 * 1024 },
+    localTokenSource: "storage",
+    privateMesh: true,
+    sourceCommit: "b".repeat(40),
+  };
+  const render = async (input, settings) =>
+    YAML.parseAllDocuments(await renderWorker(input, settings, { repoRoot }))
+      .map((d) => d.toJS())
+      .find((d) => d?.kind === "StatefulSet").spec.template.spec.containers;
+  const containers = await render(
+    renderPoolCompute(source, "adam", "alpha"),
+    config,
+  );
+  const worker = containers.find((c) => c.name === "compute-worker");
+  const storage = containers.find((c) => c.name === "elohim-node");
+  assert.deepEqual(worker.command, ["bash", "/opt/compute/worker-start.sh"]);
+  assert.equal(
+    worker.env.find((v) => v.name === "COMPUTE_PRIVATE_MESH").value,
+    "1",
+  );
+  assert.equal(
+    worker.env.find((v) => v.name === "COMPUTE_SOURCE_COMMIT").value,
+    config.sourceCommit,
+  );
+  const input = worker.env.find((v) => v.name === "POOL_COMPUTE_BOOTSTRAP_KEY");
+  const token = worker.env.find((v) => v.name === "ELOHIM_COMPUTE_LOCAL_TOKEN");
+  assert.deepEqual(
+    input,
+    storage.env.find((v) => v.name === input.name),
+  );
+  assert.deepEqual(
+    token,
+    storage.env.find((v) => v.name === token.name),
+  );
+  assert.ok(worker.env.indexOf(input) < worker.env.indexOf(token));
+  await assert.rejects(render(source, config), /storage compute token missing/);
+  await assert.rejects(
+    render(source, {
+      ...config,
+      slice: { cpuMillis: 999, memoryBytes: 512 * 1024 * 1024 },
+    }),
+    /delegated quota/,
+  );
+  await assert.rejects(
+    render(source, { ...config, sourceCommit: "dev" }),
+    /immutable git commit/,
+  );
+  const ordinary = await render(source, {
+    ...config,
+    privateMesh: false,
+    sourceCommit: undefined,
+    localTokenSource: "secret",
+  });
+  assert.equal(
+    ordinary
+      .find((c) => c.name === "compute-worker")
+      .env.some((v) => v.name === "COMPUTE_PRIVATE_MESH"),
+    false,
+  );
+});
+
+test("only explicit reviewed runner grants reach the provider bootstrap environment", async (t) => {
+  const repoRoot = await writeFittingFixtureRepo();
+  t.after(() => rm(repoRoot, { recursive: true, force: true }));
+  const provider = "uhCAk" + "a".repeat(48),
+    recipient = "uhCAk" + "b".repeat(48);
+  const from = new Date(Date.now() - 60000).toISOString();
+  const until = new Date(Date.now() + 3600000).toISOString();
+  const runnerGrant = {
+    enabled: true,
+    stewardOfRecord: "human:matthew",
+    fixtureProvider: "adam",
+    provider,
+    recipient,
+    grant: {
+      recipient,
+      scope: "measure-stage",
+      issuedAt: from,
+      validFrom: from,
+      validUntil: until,
+      bounds: {
+        epr_scope: ["*"],
+        reach_ceiling: "commons",
+        rate_per_hour: 8,
+        rotation_ttl_days: 1,
+      },
+    },
+  };
+  const config = {
+    enabled: true,
+    image: `registry/worker@sha256:${"a".repeat(64)}`,
+    performer: provider,
+    slice: { cpuMillis: 500, memoryBytes: 512 * 1024 * 1024 },
+    runnerGrant,
+  };
+  const output = await renderWorker(source, config, { repoRoot });
+  const worker = YAML.parseAllDocuments(output)
+    .map((d) => d.toJS())
+    .find((d) => d?.kind === "StatefulSet")
+    .spec.template.spec.containers.find((c) => c.name === "compute-worker");
+  assert.deepEqual(
+    JSON.parse(
+      worker.env.find((v) => v.name === "COMPUTE_RUNNER_GRANT_JSON").value,
+    ),
+    runnerGrant,
+  );
+  await assert.rejects(
+    renderWorker(source, { ...config, performer: recipient }, { repoRoot }),
+    /grant provider differs/,
+  );
+  const disabled = await renderWorker(
+    source,
+    { ...config, runnerGrant: { enabled: false } },
+    { repoRoot },
+  );
+  assert.ok(!disabled.includes("COMPUTE_RUNNER_GRANT_JSON"));
 });

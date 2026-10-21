@@ -5,6 +5,7 @@ import { readFile, writeFile } from "node:fs/promises";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import YAML from "yaml";
+import { validateGrantDeclaration } from "../../agentic/compute/grant-bootstrap.mjs";
 
 const SCRIPT_DIR = dirname(fileURLToPath(import.meta.url));
 // genesis/orchestrator/scripts -> repo root, three levels up.
@@ -81,7 +82,8 @@ function accumulate(pod, totals) {
   for (const container of pod.containers ?? []) {
     const requests = container.resources?.requests ?? {};
     const limits = container.resources?.limits ?? {};
-    if (requests.memory) totals.requestsMemory += quantity(requests.memory, "memory");
+    if (requests.memory)
+      totals.requestsMemory += quantity(requests.memory, "memory");
     if (requests.cpu) totals.requestsCpu += quantity(requests.cpu, "cpu");
     if (limits.memory) totals.limitsMemory += quantity(limits.memory, "memory");
     if (limits.cpu) totals.limitsCpu += quantity(limits.cpu, "cpu");
@@ -102,18 +104,33 @@ function findStatefulSet(source, label) {
 // Secret to create, and it rotates with each deploy. Only the two containers
 // in this pod read it; the doorway never forwards it. Hardening debt:
 // genesis/data/timeline/backlog/security-ci-substrate-authorization-grant-coherence.md.
-function localTokenVariable(config, podName, overrides) {
+function localTokenVariable(config, podName, overrides, storage) {
   const name = "ELOHIM_COMPUTE_LOCAL_TOKEN";
   const source = config.localTokenSource ?? "secret";
+  if (source === "storage") {
+    const token = storage.env?.find((v) => v.name === name);
+    if (!token)
+      throw new Error(
+        "storage compute token missing: render pool sponsorship first",
+      );
+    return token;
+  }
   if (source === "per-render") {
-    return { name, value: overrides.localToken ?? randomBytes(32).toString("hex") };
+    return {
+      name,
+      value: overrides.localToken ?? randomBytes(32).toString("hex"),
+    };
   }
   if (source !== "secret") {
-    throw new Error(`unknown localTokenSource: ${source} (secret | per-render)`);
+    throw new Error(
+      `unknown localTokenSource: ${source} (secret | per-render | storage)`,
+    );
   }
   return {
     name,
-    valueFrom: { secretKeyRef: { name: `${podName}-compute-local`, key: "token" } },
+    valueFrom: {
+      secretKeyRef: { name: `${podName}-compute-local`, key: "token" },
+    },
   };
 }
 
@@ -154,9 +171,14 @@ async function renderEnabled(source, config, overrides) {
   // and every sibling container's rendered/declared resources (storage StatefulSet =
   // `source` itself; conductor StatefulSet = adam.conductorManifest), never hardcoded.
   const repoRoot = overrides.repoRoot ?? DEFAULT_REPO_ROOT;
-  const deploymentsPath = resolve(repoRoot, "genesis/orchestrator/data/deployments.json");
+  const deploymentsPath = resolve(
+    repoRoot,
+    "genesis/orchestrator/data/deployments.json",
+  );
   const deployments = JSON.parse(await readFile(deploymentsPath, "utf8"));
-  const adam = (deployments.humans ?? []).find((human) => human.name === "adam");
+  const adam = (deployments.humans ?? []).find(
+    (human) => human.name === "adam",
+  );
   if (!adam) throw new Error(`adam entry missing from ${deploymentsPath}`);
   if (!adam.runtimeManifest?.path) {
     throw new Error(`${deploymentsPath}: adam.runtimeManifest.path missing`);
@@ -165,21 +187,44 @@ async function renderEnabled(source, config, overrides) {
     throw new Error(`${deploymentsPath}: adam.conductorManifest missing`);
   }
   const runtimeManifestPath = resolve(repoRoot, adam.runtimeManifest.path);
-  const runtimeManifest = JSON.parse(await readFile(runtimeManifestPath, "utf8"));
+  const runtimeManifest = JSON.parse(
+    await readFile(runtimeManifestPath, "utf8"),
+  );
+  const quota = runtimeManifest.processes?.find(
+    (p) => p.name === "compute-worker" && p.kind === "delegated",
+  )?.quota;
+  if (
+    !quota ||
+    quota.memory_max_bytes !== config.slice.memoryBytes ||
+    quota.cpu_share_millis !== config.slice.cpuMillis
+  ) {
+    throw new Error(
+      "config.slice must equal the runtime manifest compute-worker delegated quota",
+    );
+  }
   const bound = runtimeManifest.envelope?.bound;
   if (
     !bound ||
     typeof bound.memory_bytes !== "number" ||
     typeof bound.cpu_millis !== "number"
   ) {
-    throw new Error(`${runtimeManifestPath}: envelope.bound missing memory_bytes/cpu_millis`);
+    throw new Error(
+      `${runtimeManifestPath}: envelope.bound missing memory_bytes/cpu_millis`,
+    );
   }
   const conductorManifestPath = resolve(repoRoot, adam.conductorManifest);
   const conductorSource = await readFile(conductorManifestPath, "utf8");
-  const conductorPod = findStatefulSet(conductorSource, "Adam conductor").document.toJS()
-    .spec.template.spec;
+  const conductorPod = findStatefulSet(
+    conductorSource,
+    "Adam conductor",
+  ).document.toJS().spec.template.spec;
 
-  const totals = { requestsMemory: 0, requestsCpu: 0, limitsMemory: 0, limitsCpu: 0 };
+  const totals = {
+    requestsMemory: 0,
+    requestsCpu: 0,
+    limitsMemory: 0,
+    limitsCpu: 0,
+  };
   accumulate(pod, totals); // storage: elohim-node (compute-worker not pushed yet)
   accumulate(conductorPod, totals); // conductor: elohim-conductor + ws-proxy
   totals.requestsMemory += config.slice.memoryBytes;
@@ -199,12 +244,29 @@ async function renderEnabled(source, config, overrides) {
   refuse("requests", totals.requestsMemory, bound.memory_bytes, displayMi);
   refuse("requests", totals.requestsCpu, bound.cpu_millis, (v) => `${v}m`);
 
+  if (
+    config.sourceCommit !== undefined &&
+    !/^[a-f0-9]{40}$/.test(config.sourceCommit)
+  ) {
+    throw new Error("sourceCommit must be a full immutable git commit");
+  }
+  if (config.runnerGrant?.enabled === true) {
+    validateGrantDeclaration(config.runnerGrant);
+    if (config.runnerGrant.provider !== config.performer) {
+      throw new Error("approved grant provider differs from worker performer");
+    }
+  }
   pod.automountServiceAccountToken = false;
   const storage = pod.containers.find(
     (container) => container.name === "elohim-node",
   );
   if (!storage) throw new Error("Adam storage container missing");
-  const localToken = localTokenVariable(config, manifest.metadata.name, overrides);
+  const localToken = localTokenVariable(
+    config,
+    manifest.metadata.name,
+    overrides,
+    storage,
+  );
   storage.env ??= [];
   storage.env = storage.env.filter(
     (variable) =>
@@ -224,16 +286,40 @@ async function renderEnabled(source, config, overrides) {
   pod.containers.push({
     name: "compute-worker",
     image: config.image,
-    command: ["node", "/opt/compute/worker.mjs"],
+    command: ["bash", "/opt/compute/worker-start.sh"],
     env: [
+      // Kubernetes expands env references in order; carry the token's input too.
+      ...(config.localTokenSource === "storage"
+        ? storage.env.filter((v) => v.name === "POOL_COMPUTE_BOOTSTRAP_KEY")
+        : []),
       localToken,
+      ...(config.privateMesh === true
+        ? [{ name: "COMPUTE_PRIVATE_MESH", value: "1" }]
+        : []),
+      ...(config.sourceCommit
+        ? [{ name: "COMPUTE_SOURCE_COMMIT", value: config.sourceCommit }]
+        : []),
+      ...(config.runnerGrant?.enabled === true
+        ? [
+            {
+              name: "COMPUTE_RUNNER_GRANT_JSON",
+              value: JSON.stringify(config.runnerGrant),
+            },
+          ]
+        : []),
       { name: "COMPUTE_API_URL", value: "http://127.0.0.1:8090" },
       { name: "COMPUTE_PERFORMER", value: config.performer },
       { name: "COMPUTE_RUNTIME_IMAGE", value: config.image.split("@")[1] },
       { name: "COMPUTE_WORKER_ROOT", value: "/var/lib/compute" },
       { name: "TMPDIR", value: "/var/lib/compute/tmp" },
-      { name: "COMPUTE_SLICE_CPU_MILLIS", value: String(config.slice.cpuMillis) },
-      { name: "COMPUTE_SLICE_MEMORY_BYTES", value: String(config.slice.memoryBytes) },
+      {
+        name: "COMPUTE_SLICE_CPU_MILLIS",
+        value: String(config.slice.cpuMillis),
+      },
+      {
+        name: "COMPUTE_SLICE_MEMORY_BYTES",
+        value: String(config.slice.memoryBytes),
+      },
     ],
     resources: {
       requests: { cpu: sliceCpu, memory: sliceMemory },
@@ -243,7 +329,12 @@ async function renderEnabled(source, config, overrides) {
       allowPrivilegeEscalation: false,
       readOnlyRootFilesystem: true,
       runAsUser: 0,
-      capabilities: { drop: ["ALL"], add: ["SETUID", "SETGID", "CHOWN"] },
+      // Trusted controller traverses retained guest scratch and enforces deadlines.
+      // Guest children drop to UID/GID 65534 with no capabilities and no_new_privs.
+      capabilities: {
+        drop: ["ALL"],
+        add: ["SETUID", "SETGID", "CHOWN", "KILL", "DAC_OVERRIDE"],
+      },
     },
     volumeMounts: [{ name: "compute-work", mountPath: "/var/lib/compute" }],
   });

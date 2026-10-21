@@ -39,20 +39,40 @@
           "grace_ms": 20000
         }
       }
+    },
+    {
+      "name": "compute-worker",
+      "kind": "delegated",
+      "artifact": { "channel": { "channel_id": "runtime:compute-worker:adam" } },
+      "argv": ["bash", "/opt/compute/worker-start.sh"],
+      "quota": {
+        "memory_max_bytes": 25769803776,
+        "cpu_share_millis": 8000
+      }
+    },
+    {
+      "name": "ws-proxy",
+      "kind": "delegated",
+      "artifact": { "channel": { "channel_id": "runtime:conductor-ws-proxy:adam" } },
+      "argv": ["socat"],
+      "quota": {
+        "memory_max_bytes": 67108864,
+        "cpu_share_millis": 200
+      }
     }
   ],
   "archetype": "device-family-node-base",
   "envelope": {
     "bound": {
-      "memory_bytes": 8589934592,
-      "cpu_millis": 8000
+      "memory_bytes": 34426847232,
+      "cpu_millis": 16200
     },
     "headroom_bytes": 0,
     "measure": "committed",
     "protected": [
       "conductor"
     ],
-    "shed_order": []
+    "shed_order": ["compute-worker"]
   },
-  "supersedes": "bafyreiaaebz37gnblcarqiwmr7a7znlwom2cc24whm7z327ivx4ze7w7vu"
+  "supersedes": "bafyreiapd5vu2vnk3tontaccwwvrtgziljpgfwmmudypi3pp2x76guzrta"
 }

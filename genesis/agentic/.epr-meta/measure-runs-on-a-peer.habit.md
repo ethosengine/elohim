@@ -48,3 +48,5 @@ delta and is never inferred from rung H alone. A `matthew -> adam` `trusted-frie
 fixture edge was added the same delta in `genesis/data/humans/humans.json` so the relationship
 this habit's eventual rung-A run rides is declared where relationships live (imagodei), per R7/R10
 of the plan — no pricing shortcut is taken from it.
+
+DELTA 2026-10-21 (status stays RED; provider deployment pending): rebuilt native executor passes 10/10 tests under the exact five controller capabilities, with zero guest capabilities; bootstrap/grant/render tests pass 24/24, source publication tests 9/9, and the clean household peer-mesh lane passes 3 scenarios / 11 steps (genesis/local-dev/jenkins-native-bdd/{executor-production-caps-tests.log,final-bootstrap-grant-tests.log,clean-peer-mesh-live.log}). Adam capacity is declared as one 24Gi/8000m worker; image activation and off-host receipt remain unmeasured. Matthew is the accountable steward; Adam models the fixture provider and Jenkins the delegated requester. That stewardship is an operator declaration, not a separately notarized Matthew-to-Adam relationship.

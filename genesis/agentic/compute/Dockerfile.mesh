@@ -1,0 +1,22 @@
+# syntax=docker/dockerfile:1.7
+# Every input image is resolved to a digest by publish-compute-worker.sh.
+ARG COMPUTE_TOOLS_IMAGE
+ARG STORAGE_IMAGE
+ARG DOORWAY_IMAGE
+ARG RELAY_IMAGE
+ARG BEACON_IMAGE
+FROM ${STORAGE_IMAGE} AS storage
+FROM ${DOORWAY_IMAGE} AS doorway
+FROM ${RELAY_IMAGE} AS relay
+FROM ${BEACON_IMAGE} AS beacon
+FROM ${COMPUTE_TOOLS_IMAGE}
+USER 0:0
+COPY --from=storage /usr/local/bin/elohim-storage /opt/compute/mesh-bin/
+COPY --from=doorway /usr/local/bin/doorway /opt/compute/mesh-bin/
+COPY --from=relay /usr/local/bin/iroh-relay /opt/compute/mesh-bin/
+COPY --from=beacon /usr/local/bin/relay-addr-beacon /opt/compute/mesh-bin/
+COPY elohim.happ inputs.json /opt/compute/
+RUN /usr/local/bin/mongod --version
+RUN set -eu; for binary in elohim-storage doorway holochain hc iroh-relay relay-addr-beacon; do \
+      /opt/compute/mesh-bin/$binary --version; \
+    done

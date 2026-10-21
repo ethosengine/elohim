@@ -32,7 +32,7 @@ use crate::db::schemas::{
     OAUTH_SESSION_COLLECTION, USER_COLLECTION,
 };
 use crate::routes::hosted_cell::{
-    issue_hosted_cell_grant, pool_compute_config, revoke_hosted_cell_grant, HostedCellGrant,
+    issue_hosted_cell_grant, resolve_pool_compute_config, revoke_hosted_cell_grant, HostedCellGrant,
 };
 use crate::routes::service_agent::{
     bootstrap_key_promotes_to_admin, human_id_is_reserved, phase_authors_human_record,
@@ -2002,7 +2002,7 @@ async fn handle_register(
     let hosted_cell = match (
         agency_phase,
         provisioned.as_ref(),
-        pool_compute_config(&state.args),
+        resolve_pool_compute_config(&state.args).await,
     ) {
         ("hosted", Some(p), Some(cfg)) => {
             match issue_hosted_cell_grant(&cfg, &p.agent_pub_key, chrono::Utc::now()).await {
@@ -3207,7 +3207,7 @@ async fn handle_close_account(
     // terminal and idempotent, so an already-withdrawn grant is a success.
     let mut hosted_cell_grant_revoked = false;
     if let Some(cid) = user.hosted_cell_grant_cid.as_deref() {
-        match pool_compute_config(&state.args) {
+        match resolve_pool_compute_config(&state.args).await {
             Some(cfg) => match revoke_hosted_cell_grant(&cfg, cid).await {
                 Ok(already) => {
                     hosted_cell_grant_revoked = true;

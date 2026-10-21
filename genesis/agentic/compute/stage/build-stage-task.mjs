@@ -230,6 +230,8 @@ export async function buildStageTask({
   runtimeImage,
   executor = process.env.COMPUTE_EXECUTOR || "compute-executor",
   repoRoot = REPO_ROOT,
+  // The requester pins its own checkout; the generated runner uses the provider's path.
+  sourceRepoRoot = repoRoot,
   a2oDir = A2O_DIR,
   nodeBin,
   justBin,
@@ -276,7 +278,7 @@ export async function buildStageTask({
   // S3.0 — the honest artifact: this requester's own source-under-test identity, the same
   // computation the household lane's receipts use (lib/sut.ts), embedded so the provider can
   // refuse a drifted tree before it runs anything.
-  const sutProbe = createSutProbe(repoRoot, env);
+  const sutProbe = createSutProbe(sourceRepoRoot, env);
   const { sut, sutParts } = computeSut(sutProbe);
 
   // `feature` is relative to genesis/a2o (e.g. "features/dataplane/<name>.feature") — the
@@ -457,7 +459,7 @@ export async function probeRunParser({ taskPath, executor, execute = run }) {
         `envelope rejected before reaching the runtime-image gate: ${message}`,
       );
     }
-    if (/runtime image identity unavailable or mismatched|artifact mismatch/.test(message)) {
+    if (/runtime image (?:identity unavailable or mismatched|incompatible)|artifact mismatch/.test(message)) {
       return { ok: true, message };
     }
     throw new Error(`unexpected compute-executor run probe result: ${message}`);

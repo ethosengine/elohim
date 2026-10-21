@@ -103,6 +103,7 @@ test("probeRunParser accepts the image gate AND the rebuilt executor's artifact-
   const image = await runProbe("runtime image identity unavailable or mismatched");
   assert.equal(image.ok, true);
   assert.match(image.message, /runtime image identity unavailable or mismatched/);
+  assert.equal((await runProbe("runtime image incompatible: identity unavailable or different")).ok, true);
 
   // The executor rebuilt from the rakia stash checks quota, then artifact identity, BEFORE
   // the runtime-image gate — a throwaway probe binary/dna now fails there first, but that is

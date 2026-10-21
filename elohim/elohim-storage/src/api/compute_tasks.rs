@@ -88,8 +88,10 @@ fn grant_policy_matches(policy: &Value, task: &Value, scope: &str) -> bool {
 static MUTATIONS: OnceLock<tokio::sync::Mutex<()>> = OnceLock::new();
 
 fn content_cid(value: &Value) -> Result<String, StorageError> {
-    let ipld =
-        ipld_core::serde::to_ipld(value).map_err(|e| StorageError::Serialization(e.to_string()))?;
+    // JSON null is meaningful for interrupted exit codes and optional retention bounds.
+    // Serialize-to-IPLD treats it as unsupported unit; deserialize preserves IPLD null.
+    let ipld: ipld_core::ipld::Ipld = serde_json::from_value(value.clone())
+        .map_err(|e| StorageError::Serialization(e.to_string()))?;
     let bytes =
         elohim_epr::cbor::encode(&ipld).map_err(|e| StorageError::Serialization(e.to_string()))?;
     Ok(elohim_epr::cid::compute_cid(&bytes).to_string())
@@ -810,6 +812,19 @@ pub async fn handle(
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[test]
+    fn nullable_compute_evidence_matches_requester_canonical_cid() {
+        // Independent @ipld/dag-cbor + multiformats SHA-256 fixture, also pinned by
+        // the executor. Failed runs must be publishable with null fields intact.
+        assert_eq!(
+            content_cid(&json!({"z": null, "a": 1})).unwrap(),
+            "bafyreidvhedt7d4rhrdns4o7oikmijkfqylvpawru7vcpvorzbjsi3moyi"
+        );
+        assert_ne!(
+            content_cid(&json!({"exitCode": null})).unwrap(),
+            content_cid(&json!({"exitCode": 0})).unwrap()
+        );
+    }
     #[test]
     fn accepted_attempt_cannot_launch_after_either_terminal_outcome() {
         let mut task = json!({"acceptance":{"attemptId":"attempt"}});

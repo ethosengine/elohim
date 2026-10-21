@@ -1943,6 +1943,9 @@ def deployHumanManifest(Map humanConfig, String envFile, List allHumans) {
     def outputFile = "genesis/orchestrator/manifests/humans/${humanConfig.resourcePrefix}-rendered.yaml"
     sh "sed ${sedArgs} ${sourceFile} > ${outputFile}"
 
+    // Sponsorship configuration precedes the worker so both share one token.
+    sh "node genesis/orchestrator/scripts/render-pool-compute.mjs '${outputFile}' '${humanConfig.name}' '${humanConfig.env}'"
+
     // Optional sibling executor: shares only Adam's local storage interface;
     // has its own compute cgroup and PVC. Disabled config is byte-identical.
     if (humanConfig.name == 'adam') {
@@ -2251,6 +2254,20 @@ def skipBuildStage() {
     (params.DEPLOY_ONLY == true) || isValidateOnly()
 }
 
+// Cold fork/tool compilation is paid only when the operator requests an image.
+// push-delivers-within-budget owns its cost; ordinary edge rolls do not rebuild it.
+def publishComputeWorkerIfRequested() {
+    def message = sh(script: 'git log -1 --format=%B', returnStdout: true).trim()
+    if (!(params.BUILD_COMPUTE_WORKER ?: false) && !message.contains('[compute-worker:build]')) { return }
+    timeout(time: 90, unit: 'MINUTES') {
+        if (!fetchEdgeHapp("${env.WORKSPACE}/compute-worker-happ/elohim.happ")) {
+            error('Compute worker image requires the packaged hApp')
+        }
+        sh "bash '${env.WORKSPACE}/scripts/ci/publish-compute-worker.sh' '${env.WORKSPACE}/compute-worker-happ/elohim.happ'"
+        archiveArtifacts artifacts: 'compute-worker-image/*.json', fingerprint: true
+    }
+}
+
 pipeline {
     agent {
         kubernetes {
@@ -2417,6 +2434,7 @@ spec:
         )
         string(name: 'DNA_RUN_ID', defaultValue: '', description: 'Orchestrator-set DNA run; the deploy waits for its verdict')
         string(name: 'HAPP_CANDIDATE_TAG', defaultValue: '', description: 'Orchestrator-set hApp candidate tag this run packages')
+        booleanParam(name: 'BUILD_COMPUTE_WORKER', defaultValue: false, description: 'Build and publish the pinned Adam worker image and its mesh tools. Also selected by [compute-worker:build]. Activation and grants remain separately declared.')
     }
 
     options {
@@ -2972,6 +2990,7 @@ BRANCH_NAME=${env.BRANCH_NAME}"""
                                 if (env.BRANCH_NAME == 'dev') {
                                     sh "bash '${env.WORKSPACE}/scripts/ci/push-harbor-dev-latest-aliases.sh'"
                                 }
+                                publishComputeWorkerIfRequested()
                             }
                         }
                     }

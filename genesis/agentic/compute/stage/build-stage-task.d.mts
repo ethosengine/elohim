@@ -7,6 +7,7 @@ export interface BuildStageTaskInput {
   runtimeImage?: string;
   executor?: string;
   repoRoot?: string;
+  sourceRepoRoot?: string;
   a2oDir?: string;
   nodeBin?: string;
   justBin?: string;

@@ -2,6 +2,15 @@
   "enabled": false,
   "image": "",
   "performer": "",
+  "slice": {
+    "cpuMillis": 8000,
+    "memoryBytes": 25769803776
+  },
   "storageClass": "openebs-hostpath",
-  "localTokenSource": "per-render"
+  "localTokenSource": "storage",
+  "runnerGrant": {
+    "enabled": false,
+    "stewardOfRecord": "human:matthew",
+    "fixtureProvider": "adam"
+  }
 }
