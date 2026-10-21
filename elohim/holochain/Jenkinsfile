@@ -371,6 +371,7 @@ def runStorageQualityGate() {
             sh "bash '${env.WORKSPACE}/scripts/ci/storage-quality-gate.sh'"
         }
     } catch (Exception e) {
+        if (isGateOnly()) { throw e }
         echo "Quality Gate: Storage - failures (non-blocking while stabilizing): ${e.message}"
         unstable('Storage quality gate failed')
     }
@@ -388,6 +389,7 @@ def runDoorwayQualityGate() {
             sh "bash '${env.WORKSPACE}/scripts/ci/doorway-quality-gate.sh'"
         }
     } catch (Exception e) {
+        if (isGateOnly()) { throw e }
         echo "Quality Gate: Doorway - issues found (non-blocking): ${e.message}"
         unstable('Doorway quality gate has warnings')
     }
@@ -2231,6 +2233,11 @@ def computeValidateOnly() {
     env.EDGE_VALIDATE_ONLY = ((params.VALIDATE_ONLY ?: false) ||
         runClass == 'verify' || runClass == 'measure' || runClass == 'profile' ||
         commitMsg.contains('[edge:validate-only]')) ? 'true' : 'false'
+    // Fail closed: a gate-only tagged non-dev commit without the GATE_ONLY
+    // parameter (dropped param, old orchestrator) must not fall through to a deploy.
+    if (commitMsg.toLowerCase().contains('[edge:gate-only]') && env.BRANCH_NAME != 'dev' && params.GATE_ONLY != true) {
+        error('[edge:gate-only] commit but GATE_ONLY was not set; refusing to build/publish')
+    }
     if (env.EDGE_VALIDATE_ONLY == 'true') {
         echo "VALIDATE_ONLY (RUN_CLASS=${runClass}) — skipping build/deploy stages; running Dataplane Validation only"
     }
@@ -2251,11 +2258,32 @@ def skipBuildStage() {
     (params.DEPLOY_ONLY == true) || isValidateOnly()
 }
 
-pipeline {
-    agent {
-        kubernetes {
-            cloud 'kubernetes'
-            yaml '''
+// [edge:gate-only] (non-dev PR branches): quality gates + builds run, nothing is
+// published or deployed. The parameter is sent only by the orchestrator; the
+// dev branch can never be gate-only.
+def isGateOnly() {
+    params.GATE_ONLY == true && env.BRANCH_NAME != 'dev'
+}
+
+def deploysNothing() {
+    isValidateOnly() || isGateOnly()
+}
+
+def skipPublishStage() {
+    skipBuildStage() || isGateOnly()
+}
+
+// Side-effect order of owesValidationToSibling is preserved (short-circuit).
+def dataplaneValidationDue(String rc) {
+    !isGateOnly() && (isValidateOnly() || !owesValidationToSibling(rc))
+}
+
+// Builder pod spec. Top-level def (own CPS method) so the ~3.6KB YAML does not
+// count against the pipeline{} block. The default sizing is byte-identical to the
+// historical literal; [edge:gate-only] runs (isGateOnly) get a larger pod because
+// the cargo quality gates compile inside buildkitd.
+def edgePodYaml() {
+    String yaml = '''
 apiVersion: v1
 kind: Pod
 spec:
@@ -2313,12 +2341,12 @@ spec:
       tty: true
       resources:
         requests:
-          memory: "4Gi"
-          cpu: "1"
+          memory: "@BREQ_MEM@"
+          cpu: "@BREQ_CPU@"
           ephemeral-storage: "5Gi"
         limits:
-          memory: "8Gi"
-          cpu: "4"
+          memory: "@BLIM_MEM@"
+          cpu: "@BLIM_CPU@"
           ephemeral-storage: "10Gi"
       volumeMounts:
         - name: containerd-sock
@@ -2333,11 +2361,11 @@ spec:
         privileged: true
       resources:
         requests:
-          memory: "256Mi"
-          cpu: "100m"
+          memory: "@KREQ_MEM@"
+          cpu: "@KREQ_CPU@"
         limits:
-          memory: "1Gi"
-          cpu: "1"
+          memory: "@KLIM_MEM@"
+          cpu: "@KLIM_CPU@"
       args:
         - --addr
         - unix:///run/buildkit/buildkitd.sock
@@ -2349,6 +2377,19 @@ spec:
         - name: buildkit-run
           mountPath: /run/buildkit
 '''
+    boolean g = isGateOnly()
+    return yaml
+        .replace('@BREQ_MEM@', g ? '6Gi' : '4Gi').replace('@BREQ_CPU@', g ? '2' : '1')
+        .replace('@BLIM_MEM@', g ? '12Gi' : '8Gi').replace('@BLIM_CPU@', g ? '6' : '4')
+        .replace('@KREQ_MEM@', g ? '6Gi' : '256Mi').replace('@KREQ_CPU@', g ? '2' : '100m')
+        .replace('@KLIM_MEM@', g ? '16Gi' : '1Gi').replace('@KLIM_CPU@', g ? '6' : '1')
+}
+
+pipeline {
+    agent {
+        kubernetes {
+            cloud 'kubernetes'
+            yaml edgePodYaml()
         }
     }
 
@@ -2404,6 +2445,11 @@ spec:
             name: 'CONDUCTOR_ROLL',
             defaultValue: false,
             description: 'Force the per-human conductor StatefulSets to adopt this build\'s storage image. Conductors normally HOLD their image across storage rolls (rung 2: storage/doorway deploys must not restart conductors); they advance on a conductor submodule bump, a hApp digest move, this flag, or a [conductor-roll] commit tag. Costs a full-arc re-gossip surge per peer — use deliberately.'
+        )
+        booleanParam(
+            name: 'GATE_ONLY',
+            defaultValue: false,
+            description: 'Run quality gates and builds only; publish and deploy nothing. Sent by the orchestrator for [edge:gate-only] on non-dev PR branches.'
         )
         booleanParam(
             name: 'VALIDATE_ONLY',
@@ -2487,6 +2533,7 @@ spec:
                         // (#1179 died "git-remote-https signal 15" at ~10:15).
                         // honorRefspec keeps fetch to single branch (orchestrator #787 spent
                         // 27min on +refs/heads/* even at depth:200).
+                        if (env.CHANGE_ID) { checkout scm } else {
                         checkout([
                             $class: 'GitSCM',
                             branches: [[name: "*/${env.BRANCH_NAME ?: 'dev'}"]],
@@ -2500,6 +2547,7 @@ spec:
                                 refspec: "+refs/heads/${env.BRANCH_NAME ?: 'dev'}:refs/remotes/origin/${env.BRANCH_NAME ?: 'dev'}"
                             ]]
                         ])
+                        }
                         sh 'git clean -fdx'
                         sh 'git reset --hard HEAD'
 
@@ -2910,7 +2958,7 @@ BRANCH_NAME=${env.BRANCH_NAME}"""
         stage('Push to Harbor') {
             when { allOf {
                 expression { env.PIPELINE_SKIPPED != 'true' }
-                expression { !skipBuildStage() }
+                expression { !skipPublishStage() }
             }}
             steps {
                 container('builder') {
@@ -2983,7 +3031,7 @@ BRANCH_NAME=${env.BRANCH_NAME}"""
             when {
                 allOf {
                     expression { env.PIPELINE_SKIPPED != 'true' }
-                    expression { !isValidateOnly() }
+                    expression { !deploysNothing() }
                     anyOf {
                         branch 'dev'
                         allOf {
@@ -3198,7 +3246,7 @@ AGENT_SDK_TAG=${AGENT_SDK_TAG}
                         expression { params.FORCE_BUILD }
                         expression { isValidateOnly() }
                     }
-                    expression { isValidateOnly() || !owesValidationToSibling(params.RUN_CLASS) }
+                    expression { dataplaneValidationDue(params.RUN_CLASS) }
                 }
             }
             steps {
@@ -3217,7 +3265,7 @@ AGENT_SDK_TAG=${AGENT_SDK_TAG}
             when {
                 allOf {
                     expression { env.PIPELINE_SKIPPED != 'true' }
-                    expression { !isValidateOnly() }
+                    expression { !deploysNothing() }
                     anyOf {
                         branch 'staging'
                         expression { env.BRANCH_NAME ==~ /staging-.+/ }
@@ -3282,7 +3330,7 @@ AGENT_SDK_TAG=${AGENT_SDK_TAG}
             when {
                 allOf {
                     expression { env.PIPELINE_SKIPPED != 'true' }
-                    expression { !isValidateOnly() }
+                    expression { !deploysNothing() }
                     anyOf {
                         branch 'main'
                         allOf {
