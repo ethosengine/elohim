@@ -53,6 +53,107 @@ test("a denied accept never launches the runtime", async (t) => {
   assert.equal(fetched, 0);
 });
 
+test("an interrupted attempt seals evidence after revocation without renewed launch authority", async (t) => {
+  const root = await mkdtemp(join(tmpdir(), "compute-recovery-interrupted-"));
+  t.after(() => rm(root, { recursive: true, force: true }));
+  const runtimePath = join(root, "runs", key("request"), "receipt.json");
+  await save(join(root, "runs", key("request"), "started.json"), {
+    taskCid: "task-cid",
+    grantAction: "grant",
+    requestAction: "request",
+    startedAt: 1,
+  });
+  const receipt = {
+    taskCid: "task-cid",
+    grantAction: "grant",
+    requestAction: "request",
+    status: "interrupted",
+    logs: [],
+  };
+  const calls = [];
+  let recoveries = 0;
+  await executeTask({
+    root,
+    status: {
+      requestActionHash: "request",
+      taskCid: "task-cid",
+      grantActionHash: "grant",
+      envelope: {},
+    },
+    fetchInput: async () => {
+      assert.fail("recovery must not download inputs");
+    },
+    execute: async (_program, args) => {
+      if (args[0] === "receipt-path") return runtimePath;
+      if (args[0] === "run") {
+        assert.ok(
+          args.includes("--recover-only"),
+          "recovery must never authorize a new launch",
+        );
+        recoveries++;
+        return JSON.stringify(receipt);
+      }
+      return args[1].endsWith("task.json") ? "task-cid" : "receipt-cid";
+    },
+    request: async (path, body) => {
+      calls.push(path);
+      if (path.endsWith("/accept") || path.endsWith("/authorize-launch"))
+        throw new Error("Compute API 403: grant revoked");
+      assert.deepEqual(body.receipt, receipt);
+      return {};
+    },
+  });
+  assert.equal(recoveries, 1);
+  assert.equal(calls.length, 1);
+  assert.match(calls[0], /\/complete$/);
+  assert.equal(
+    (await readJson(join(root, "jobs", key("request"), "state.json")))
+      .completed,
+    true,
+  );
+});
+
+test("a missing authoritative attempt cannot turn a stale marker into launch authority", async (t) => {
+  const root = await mkdtemp(join(tmpdir(), "compute-recovery-stale-"));
+  t.after(() => rm(root, { recursive: true, force: true }));
+  const runtimePath = join(root, "runs", key("request"), "receipt.json");
+  await save(join(root, "runs", key("request"), "started.json"), {});
+  let recoveries = 0;
+  await assert.rejects(
+    executeTask({
+      root,
+      status: {
+        requestActionHash: "request",
+        taskCid: "task-cid",
+        grantActionHash: "grant",
+        envelope: {},
+      },
+      fetchInput: async () => {
+        assert.fail("a denied launch must not download inputs");
+      },
+      execute: async (_program, args) => {
+        if (args[0] === "receipt-path") return runtimePath;
+        if (args[0] === "run") {
+          assert.ok(args.includes("--recover-only"));
+          recoveries++;
+          return "null";
+        }
+        return "task-cid";
+      },
+      request: async (path) => {
+        assert.match(path, /\/accept$/);
+        throw new Error("Compute API 403: grant revoked");
+      },
+    }),
+    /403/,
+  );
+  assert.equal(recoveries, 1);
+  assert.equal(
+    (await readJson(join(root, "jobs", key("request"), "state.json"))).receipt,
+    undefined,
+  );
+});
+
 test("signed refusal cleanup releases both input leases", async (t) => {
   const root = await mkdtemp(join(tmpdir(), "compute-recovery-refusal-"));
   t.after(() => rm(root, { recursive: true, force: true }));

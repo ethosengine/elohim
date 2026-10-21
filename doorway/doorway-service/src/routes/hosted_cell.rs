@@ -157,6 +157,61 @@ pub fn pool_compute_config(args: &Args) -> Option<PoolComputeConfig> {
     })
 }
 
+/// Resolve the pool's own lamad actor from its existing health projection when
+/// no explicit performer is configured. A transport id or another role's key
+/// never substitutes for this actor. Storage still checks the token and actor
+/// on every grant: discovery conveys identity, not authority.
+pub async fn resolve_pool_compute_config(args: &Args) -> Option<PoolComputeConfig> {
+    if let Some(config) = pool_compute_config(args) {
+        return Some(config);
+    }
+    let url = args
+        .pool_compute_url
+        .as_deref()?
+        .trim()
+        .trim_end_matches('/');
+    let token = args.pool_compute_token.as_deref()?.trim();
+    if url.is_empty() || token.is_empty() {
+        return None;
+    }
+    // A malformed explicit setting is never silently replaced by discovery.
+    if args.pool_compute_performer.is_some() {
+        return None;
+    }
+    match discover_pool_performer(url).await {
+        Ok(performer) => Some(PoolComputeConfig {
+            url: url.to_string(),
+            token: token.to_string(),
+            performer,
+        }),
+        Err(error) => {
+            warn!(%error, "Pool compute actor discovery failed; hosting promise unavailable");
+            None
+        }
+    }
+}
+
+async fn discover_pool_performer(url: &str) -> Result<String, String> {
+    let response = pool_client()
+        .get(format!("{url}/health"))
+        .send()
+        .await
+        .map_err(|_| "pool health could not be reached".to_string())?
+        .error_for_status()
+        .map_err(|_| "pool health refused the read".to_string())?;
+    let health: Value = response
+        .json()
+        .await
+        .map_err(|_| "pool health is not JSON".to_string())?;
+    let key = health
+        .pointer("/dhtParticipation/agentKeys/lamad")
+        .and_then(Value::as_str)
+        .ok_or("pool health has no lamad cell actor")?;
+    holo_hash::AgentPubKey::try_from(key)
+        .map_err(|_| "pool health lamad actor is not a canonical agent key".to_string())?;
+    Ok(key.to_string())
+}
+
 /// A hosted-cell promise, as the doorway records it.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct HostedCellGrant {
@@ -696,6 +751,55 @@ mod tests {
         assert_eq!(pool_compute_config(&args), None, "blank is not configured");
         args.pool_compute_performer = Some("uhCAkPoolPeer".into());
         assert_eq!(pool_compute_config(&args), Some(cfg()));
+    }
+
+    #[tokio::test]
+    async fn pool_actor_discovery_uses_only_the_configured_peers_lamad_cell() {
+        use wiremock::matchers::{method, path};
+        use wiremock::{Mock, MockServer, ResponseTemplate};
+        let server = MockServer::start().await;
+        let key = crate::conductor::agent_key::canonical_agent_key(&raw_agent_key());
+        Mock::given(method("GET"))
+            .and(path("/health"))
+            .respond_with(ResponseTemplate::new(200).set_body_json(json!({
+                "dhtParticipation": {"agentKeys": {"lamad": key, "imagodei": "wrong-role"}}
+            })))
+            .mount(&server)
+            .await;
+        let mut args = Args::parse_from(["doorway", "--listen", "127.0.0.1:0"]);
+        args.pool_compute_url = Some(server.uri());
+        args.pool_compute_token = Some("t".repeat(40));
+        args.pool_compute_performer = None;
+        let resolved = resolve_pool_compute_config(&args).await.unwrap();
+        assert_eq!(resolved.performer, key);
+        assert_eq!(resolved.url, server.uri());
+        args.pool_compute_performer = Some("uhCAkExplicitOverride".into());
+        assert_eq!(
+            resolve_pool_compute_config(&args).await.unwrap().performer,
+            "uhCAkExplicitOverride"
+        );
+    }
+
+    #[tokio::test]
+    async fn pool_actor_discovery_refuses_absent_malformed_or_failed_health() {
+        use wiremock::matchers::{method, path};
+        use wiremock::{Mock, MockServer, ResponseTemplate};
+        for response in [
+            ResponseTemplate::new(503),
+            ResponseTemplate::new(200)
+                .set_body_json(json!({"dhtParticipation":{"agentKeys":{"imagodei":"other-role"}}})),
+            ResponseTemplate::new(200).set_body_json(
+                json!({"dhtParticipation":{"agentKeys":{"lamad":"12D3KooTransport"}}}),
+            ),
+        ] {
+            let server = MockServer::start().await;
+            Mock::given(method("GET"))
+                .and(path("/health"))
+                .respond_with(response)
+                .mount(&server)
+                .await;
+            assert!(discover_pool_performer(&server.uri()).await.is_err());
+        }
     }
 
     #[tokio::test]

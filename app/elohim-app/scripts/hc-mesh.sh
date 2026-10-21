@@ -262,6 +262,20 @@ MESH_DIR_WAS_EXPLICIT=0
 [ -n "${MESH_DIR:-}" ] && MESH_DIR_WAS_EXPLICIT=1
 MESH_DIR="${MESH_DIR:-$REPO_ROOT/genesis/local-dev/household-dowell}"
 export MESH_DIR
+# A provider may run an owned test mesh beside its own storage process. Keep its
+# test storage listeners separate from the provider's node-local compute API.
+MESH_STORAGE_BASE_PORT="${MESH_STORAGE_BASE_PORT:-8090}"
+MESH_CONDUCTOR_BASE_PORT="${MESH_CONDUCTOR_BASE_PORT:-4444}"
+MESH_P2P_BASE_PORT="${MESH_P2P_BASE_PORT:-9701}"
+MESH_METRICS_BASE_PORT="${MESH_METRICS_BASE_PORT:-9464}"
+for mesh_port_var in MESH_STORAGE_BASE_PORT MESH_CONDUCTOR_BASE_PORT MESH_P2P_BASE_PORT MESH_METRICS_BASE_PORT; do
+  if ! [[ "${!mesh_port_var}" =~ ^[1-9][0-9]{0,4}$ ]] || [ "${!mesh_port_var}" -gt 65535 ]; then
+    echo "REFUSED $mesh_port_var: expected an integer port in 1..65535" >&2
+    if [ "${BASH_SOURCE[0]}" != "$0" ]; then return 2; else exit 2; fi
+  fi
+  export "$mesh_port_var"
+done
+unset mesh_port_var
 LEGACY_MESH_DIR="${LEGACY_MESH_DIR:-/tmp/elohim-local-mesh}"
 INTERIM_MESH_DIR="$REPO_ROOT/genesis/local-dev/household"
 CANONICAL_HUMANS_PATH="$REPO_ROOT/genesis/data/humans/humans.json"
@@ -581,17 +595,25 @@ PY
   done
 }
 
-admin_port() { echo $((4444 + 10 * $1)); }
-app_port()   { echo $((4445 + 10 * $1)); }
-http_port()  { echo $((8090 + $1)); }
-p2p_port()   { echo $((9701 + $1)); }
+mesh_peer_port() {
+  local port=$(($1 + $2))
+  if [ "$port" -gt 65535 ] || [ "$port" -lt 1 ]; then
+    echo "REFUSED mesh port: base $1 + offset $2 is outside 1..65535" >&2
+    return 2
+  fi
+  echo "$port"
+}
+admin_port() { mesh_peer_port "$MESH_CONDUCTOR_BASE_PORT" "$((10 * $1))"; }
+app_port()   { mesh_peer_port "$MESH_CONDUCTOR_BASE_PORT" "$((10 * $1 + 1))"; }
+http_port()  { mesh_peer_port "$MESH_STORAGE_BASE_PORT" "$1"; }
+p2p_port()   { mesh_peer_port "$MESH_P2P_BASE_PORT" "$1"; }
 # Conductor Prometheus exposition (fork pin >= 61565f320 lineage:
 # HOLOCHAIN_PROMETHEUS_LISTEN → GET /metrics). One port per CONDUCTOR PROCESS,
 # so it is exported only by the per-process launch modes (`direct`, `ark`);
 # the default `hc sandbox run` supervisor runs every conductor from one
 # environment and cannot give each its own listener. Same numbering shape as
 # p2p_port: 9464 = matthew, 9465 = jessica, 9466 = james.
-conductor_metrics_port() { echo $((9464 + $1)); }
+conductor_metrics_port() { mesh_peer_port "$MESH_METRICS_BASE_PORT" "$1"; }
 conductor_metrics_ports_apply() { # -> 0 when this launch mode exposes per-conductor metrics
   case "${MESH_CONDUCTOR_LAUNCH:-hc}" in direct|ark) return 0 ;; *) return 1 ;; esac
 }

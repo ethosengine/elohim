@@ -392,7 +392,7 @@ pub async fn provision_service_agent(
     admin_bootstrap_key: Option<&str>,
     credential_store_present: bool,
 ) -> Result<ProvisionedServiceAgent, ServiceAgentError> {
-    use crate::routes::hosted_cell::{issue_runner_hosted_cell_grant, pool_compute_config};
+    use crate::routes::hosted_cell::{issue_runner_hosted_cell_grant, resolve_pool_compute_config};
 
     // SCAFFOLD (C13 graduated authority). Today's creation criterion is the
     // doorway admin bootstrap key — the same trust class that provisions
@@ -429,7 +429,9 @@ pub async fn provision_service_agent(
         .conductor_registry
         .as_ref()
         .ok_or(ServiceAgentRefusal::NoConductorPool)?;
-    let cfg = pool_compute_config(&state.args).ok_or(ServiceAgentRefusal::NoSponsor)?;
+    let cfg = resolve_pool_compute_config(&state.args)
+        .await
+        .ok_or(ServiceAgentRefusal::NoSponsor)?;
 
     let provisioner = crate::conductor::AgentProvisioner::new(std::sync::Arc::clone(registry))
         .with_app_id(state.args.installed_app_id.clone())

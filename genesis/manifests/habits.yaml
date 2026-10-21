@@ -371,10 +371,10 @@ habits:
       - "a2o @concern:operator-runtime-surface effect station (genesis/a2o/features/dataplane/operator-commitment-gated-verbs.feature — the scenario named A verb success is a post-action observation, not the handler word: an accepted reconcile has an infrastructure:operator-effect row of phase post whose event id equals the verb attestation event id and whose observer is the peer sampler; a verb with no post row is listed by the compute dashboard as unverified-effect; @wip)"
       - "cargo test --test api operator_verbs (elohim/elohim-storage — 9 tests: holder accepted + attestation names grant cid AND recorded event id; no-grant refused; revoked refused; no verified performer refused; loopless peer honest 503 with no phantom rate charge; accepted use recorded bounded_by the grant; refusals record nothing; rate_per_hour ceiling refuses the over-limit use)"
     evidence: >
-      DELTA 2026-10-20 (RED preserved; the ci-runner story is green at its ceiling, no flip — the effect station stays @wip). `features/compute/ci-runner-stewarded.feature` lost `@wip`: 4 of 5 scenarios pass live on the household twice in a row (`genesis/local-dev/ci-runner-shift/reports/cucumber-20261020T070905Z.json` and `…T071127Z.json`, `npx cucumber-js -p ci-runner` with the runner-fixture cast matthew/james sponsoring, jessica/orpah providing); the fifth (a stage RUNS and its report comes back) is held by the new `compute-executor` cap — the rakia executor's source is lost (backlog rakia-executor-untracked-in-submodule-pin, now critical). Substrate changes this proof forced: hosted custody refuses a declared reach narrower than the hosting grant (`x-compute-reach`, `grantReach` in the refusal) and names a projected withdrawal as withdrawn; `GET /api/v1/compute/grants` reads what a peer has promised; the doorway lets the conductor mint hosted agent keys (a supplied key made the conductor list every lair seed in one 8 KiB frame — matthew's conductor could not host anyone after tonight's churn; backlog hosting-conductor-keystore-listing-overflows-lair-frame) and settles a timed-out uninstall against `list_apps`. Alpha: doorway 1b2deee refuses the Jenkins runner `SERVICE_AGENT_NO_SPONSOR` — no fleet POOL_COMPUTE_* (backlog alpha-doorways-record-no-hosting-promise).
-    evidence-fingerprint: sha256:ef362e3afe181559
-    evidence-bytes: 22092
-    evidence-entries: 21
+      DELTA 2026-10-21 (status unchanged; CI compute stations): executor interruption/recovery and null-bearing canonical receipts pass 10/10 production-capability tests; storage nullable compute evidence passes the 16-test compute-task unit leg; hosted-cell pool identity discovery passes 22/22 focused doorway tests. Chain: provider launch -> interruption -> durable receipt now recovers before checking a renewed grant, and recovery-only never launches; missing/null/partial Cucumber evidence remains red. Bootstrap/grant/render tests pass 24/24; Matthew stewardship is explicitly declared while native provider/requester attribution remains Adam/Jenkins. Live Adam deployment and Jenkins report are still pending; local evidence is not an offload claim. Evidence: genesis/local-dev/jenkins-native-bdd/{executor-production-caps-tests.log,doorway-hosting-tests.log,final-bootstrap-grant-tests.log}.
+    evidence-fingerprint: sha256:a34d599c040d560c
+    evidence-bytes: 22988
+    evidence-entries: 22
     refs:
       - "task #10 (operator directive 2026-07-02)"
       - "elohim/elohim-storage/src/api/operator_verbs.rs (verb handler + kick) · doorway src/server/http.rs op_gate_capability/effective_op_gate_mode (per-verb gate) · seam-registry rows in both crates"
@@ -2001,10 +2001,10 @@ habits:
       - "a2o @concern:measure-runs-on-a-peer (genesis/a2o/features/compute/measure-on-a-peer.feature; default profile: cd genesis/a2o && npx cucumber-js --tags '@concern:measure-runs-on-a-peer')"
       - "python3 -m unittest genesis.agentic.berth_test (the --class measure refusal case: a measure-class claim on the dev berth is refused exit 3, naming just measure as the alternative — landing in parallel under lane D1)"
     evidence: >
-      DELTA 2026-10-16 (status stays RED; unit leg passes): at origin/dev@42941449e, `python3 -m unittest genesis.agentic.berth_test` reported `Ran 44 tests in 13.888s` and `OK`, exit 0; red holds pending the a2o measure-on-a-peer leg.
-    evidence-fingerprint: sha256:6ebdb477fd68cc06
-    evidence-bytes: 5159
-    evidence-entries: 5
+      DELTA 2026-10-21 (status stays RED; provider deployment pending): rebuilt native executor passes 10/10 tests under the exact five controller capabilities, with zero guest capabilities; bootstrap/grant/render tests pass 24/24, source publication tests 9/9, and the clean household peer-mesh lane passes 3 scenarios / 11 steps (genesis/local-dev/jenkins-native-bdd/{executor-production-caps-tests.log,final-bootstrap-grant-tests.log,clean-peer-mesh-live.log}). Adam capacity is declared as one 24Gi/8000m worker; image activation and off-host receipt remain unmeasured. Matthew is the accountable steward; Adam models the fixture provider and Jenkins the delegated requester. That stewardship is an operator declaration, not a separately notarized Matthew-to-Adam relationship.
+    evidence-fingerprint: sha256:1f870b219374d51a
+    evidence-bytes: 5936
+    evidence-entries: 6
     guard: >
       Regression risks: (1) a RUN_CLASSES vocabulary that drifts from `pipeline-registry.mjs:45`
       (`build|deploy|verify|measure|profile`) — the berth `--class` flag and this habit's checks

@@ -1297,6 +1297,8 @@ spec:
             description: 'Reset storage databases before seeding (deletes content.db and restarts pods to run fresh migrations)'
         )
         string(name: 'STEPS', defaultValue: 'all', description: 'Comma-separated build steps to run. "all" runs everything.')
+        string(name: 'PEER_STAGE_FEATURE', defaultValue: '', description: 'Override: one features/...feature to execute on a granted provider. Empty uses the checked-in jenkins-peer-stage.json enabled/feature declaration.')
+        string(name: 'PEER_STAGE_CONFIG', defaultValue: '', description: 'Reviewed provider JSON path: provider, runnerGrant, repoRoot, nodeBin, justBin, writablePaths, runtimeImage, cpuMillis, memoryBytes, timeoutSeconds. Requires a running worker; never grants capacity automatically.')
         booleanParam(
             name: 'DEPLOY_ONLY',
             defaultValue: false,
@@ -2071,6 +2073,7 @@ Seed IDs: ${params.SEED_IDS ?: '(all)'}
             steps {
                 container('builder') {
                     script {
+                        sh "rm -f '${env.WORKSPACE}/genesis/a2o/reports/cucumber-report-peer-stage.json'"
                         def doorwayHost = env.RESOLVED_DOORWAY_HOST
 
                         // Same dev admin key as the doorway pod's Secret (see helper).
@@ -2087,6 +2090,26 @@ Seed IDs: ${params.SEED_IDS ?: '(all)'}
 
                         // The CI runner's standing and grants, before any stage is sent.
                         runnerPreflight()
+
+                        // A real provider completion is mandatory when this lane is requested.
+                        // Keep the report cleanup outside the opt-in so reused workspaces cannot
+                        // publish an earlier build's peer result when this build did not run it.
+                        def peerStageConfigPath = params.PEER_STAGE_CONFIG?.trim() ?: 'genesis/orchestrator/data/jenkins-peer-stage.json'
+                        def peerStageConfig = fileExists(peerStageConfigPath) ? readJSON(file: peerStageConfigPath) : [:]
+                        def peerStageFeature = params.PEER_STAGE_FEATURE?.trim() ?: (peerStageConfig.enabled == true ? peerStageConfig.feature : '')
+                        if (peerStageFeature) {
+                            catchError(buildResult: 'FAILURE', stageResult: 'FAILURE') {
+                                withCredentials([string(credentialsId: 'doorway-admin-bootstrap-key', variable: 'ADMIN_KEY')]) {
+                                    withEnv(["DOORWAY_URL=http://${env.INTERNAL_DOORWAY_URL}",
+                                             "RUNNER_STAGE_FEATURE=${peerStageFeature}",
+                                             "RUNNER_STAGE_CONFIG=${peerStageConfigPath}"]) {
+                                        timeout(time: 75, unit: 'MINUTES') {
+                                            sh "'${env.WORKSPACE}/genesis/a2o/node_modules/.bin/tsx' '${env.WORKSPACE}/genesis/scripts/ci/runner-stage.mjs'"
+                                        }
+                                    }
+                                }
+                            }
+                        }
 
                         // Always run API-level tests (@e2e tag, fast, no browser)
                         catchError(buildResult: 'UNSTABLE', stageResult: 'UNSTABLE') {
@@ -2153,7 +2176,8 @@ Seed IDs: ${params.SEED_IDS ?: '(all)'}
                         // Publish cucumber reports through the Jenkins plugin so the
                         // build sidebar gets the "Cucumber Reports" link.
                         //
-                        // The glob consumes EXACTLY the two per-stage snapshots and
+                        // The glob consumes the per-stage snapshots (including the optional
+                        // verified peer-stage report) and
                         // never the generic reports/cucumber-report.json. cucumber.mjs's
                         // base config writes that generic file on EVERY run, so after the
                         // browser stage it is a SECOND copy of a stage's report — and the
@@ -2166,7 +2190,8 @@ Seed IDs: ${params.SEED_IDS ?: '(all)'}
                         // Snapshots: e2e-verify-api.sh (api) and e2e-verify-browser.sh
                         // (browser, which also clears the generic leftover).
                         if (fileExists('genesis/a2o/reports/cucumber-report-api.json') ||
-                            fileExists('genesis/a2o/reports/cucumber-report-browser.json')) {
+                            fileExists('genesis/a2o/reports/cucumber-report-browser.json') ||
+                            fileExists('genesis/a2o/reports/cucumber-report-peer-stage.json')) {
                             cucumber([
                                 reportTitle: 'A2O E2E Reports',
                                 fileIncludePattern: 'cucumber-report-*.json',

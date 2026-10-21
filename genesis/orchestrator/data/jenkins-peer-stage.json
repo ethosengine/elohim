@@ -1,0 +1,14 @@
+{
+  "enabled": false,
+  "feature": "features/dataplane/peer-mesh.feature",
+  "provider": "",
+  "runnerGrant": "",
+  "repoRoot": "",
+  "nodeBin": "/usr/local/bin/node",
+  "justBin": "/opt/compute/mesh-just.sh",
+  "runtimeImage": "",
+  "writablePaths": [],
+  "cpuMillis": 8000,
+  "memoryBytes": 25769803776,
+  "timeoutSeconds": 1800
+}

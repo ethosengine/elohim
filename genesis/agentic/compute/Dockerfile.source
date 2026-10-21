@@ -1,0 +1,86 @@
+# syntax=docker/dockerfile:1.7
+# The source snapshot contains only committed files and sanitized shallow git metadata.
+# Native tools are compiled in the same pinned userspace in which they will run.
+ARG WORKER_BASE_IMAGE
+FROM ${WORKER_BASE_IMAGE} AS fork-tools
+USER 0:0
+ARG CONDUCTOR_COMMIT
+ENV RUSTFLAGS="-C force-frame-pointers=yes" RUSTC_WRAPPER="" CARGO_BUILD_JOBS=1 \
+    CFLAGS="-fno-omit-frame-pointer" CXXFLAGS="-fno-omit-frame-pointer" \
+    CARGO_PROFILE_RELEASE_DEBUG=line-tables-only \
+    CARGO_TARGET_DIR=/var/cache/compute-fork-target
+WORKDIR /src/holochain-conductor
+COPY repo/elohim/holochain-conductor/ /src/holochain-conductor/
+RUN test "$(git rev-parse HEAD)" = "$CONDUCTOR_COMMIT" \
+    && test -z "$(git remote)" \
+    && test "$(sed -n 's/^channel = "\([^"]*\)"/\1/p' rust-toolchain.toml)" = 1.96.1 \
+    && rustup toolchain install 1.96.1 --profile minimal
+# Match the proven household production conductor recipe; hc is built from this
+# same committed fork, so the image cannot silently pair it with a stock CLI.
+RUN cargo +1.96.1 build --release --locked --no-default-features \
+      --features encryption,wasmer-sys-cranelift,jemalloc -p holochain --bin holochain \
+    && cargo +1.96.1 build --release --locked --no-default-features \
+      --features wasmer-sys-cranelift -p holochain_cli --bin hc \
+    && install -D -m 755 "$CARGO_TARGET_DIR/release/holochain" /out/holochain \
+    && install -D -m 755 "$CARGO_TARGET_DIR/release/hc" /out/hc \
+    && /out/holochain --version && /out/hc --version \
+    && { printf 'fork commit: %s\n' "$CONDUCTOR_COMMIT"; \
+         printf 'conductor features: encryption,wasmer-sys-cranelift,jemalloc\nhc features: wasmer-sys-cranelift\n'; \
+         rustc +1.96.1 --version; sha256sum /out/holochain /out/hc; } > /out/FORK_BUILD_RECEIPT.txt
+
+FROM ${WORKER_BASE_IMAGE} AS tools
+USER 0:0
+ARG SOURCE_COMMIT
+ARG RAKIA_COMMIT
+ENV RUSTFLAGS="" RUSTC_WRAPPER="" CARGO_BUILD_JOBS=1 \
+    CARGO_TARGET_DIR=/var/cache/compute-native-target \
+    CARGO_REGISTRY_GLOBAL_CREDENTIAL_PROVIDERS=cargo:token \
+    CARGO_REGISTRIES_ELOHIM_TOKEN=anonymous
+WORKDIR /src
+COPY repo/ /src/
+RUN test "$(git rev-parse HEAD)" = "$SOURCE_COMMIT" \
+    && test "$(git -C elohim/rakia rev-parse HEAD)" = "$RAKIA_COMMIT" \
+    && test -z "$(git remote)" \
+    && test -z "$(git -C elohim/rakia remote)"
+# The standalone executor carries an SDK schema snapshot; refuse drift at its consumer.
+RUN set -eu; for schema in compute-task compute-receipt; do \
+      cmp "elohim/rakia/rakia-executor/schemas/$schema.schema.json" "elohim/sdk/schemas/v1/$schema.schema.json"; \
+    done
+# Pin follows elohim/epr/rust-toolchain.toml; refusal prevents an independent build pin.
+RUN test "$(sed -n 's/^channel = "\([^"]*\)"/\1/p' elohim/epr/rust-toolchain.toml)" = 1.96.1 \
+    && rustup toolchain install 1.96.1 --profile minimal
+RUN cargo +1.96.1 build --locked --manifest-path elohim/Cargo.toml -p elohim-ark --bin ark \
+    && install -D -m 755 "$CARGO_TARGET_DIR/debug/ark" /out/ark
+# rakia's library workspace does not commit Cargo.lock. Its published canonical codec
+# dependency is version-pinned; this leg follows that workspace's dependency policy.
+RUN cd elohim/rakia \
+    && cargo +1.96.1 build -p rakia-executor --bin compute-executor \
+    && cargo +1.96.1 test -p rakia-executor \
+    && install -D -m 755 "$CARGO_TARGET_DIR/debug/compute-executor" /out/compute-executor
+# Keep source/SUT identity and a2o's package closure available to provider bootstrap.
+# No project install scripts run; stages do not inherit package-registry credentials.
+RUN pnpm --filter @elohim/a2o... install --frozen-lockfile --ignore-scripts \
+    && pnpm --filter @elohim/storage-client build \
+    && pnpm --filter @elohim/a2o exec tsx --version \
+    && node --version && just --version \
+    && /out/ark --version && /out/compute-executor --version
+
+FROM ${WORKER_BASE_IMAGE}
+USER 0:0
+ARG SOURCE_COMMIT
+ARG RAKIA_COMMIT
+LABEL org.opencontainers.image.revision=$SOURCE_COMMIT \
+    org.elohim.rakia.revision=$RAKIA_COMMIT
+COPY --from=tools /out/ark /out/compute-executor /usr/local/bin/
+COPY --from=fork-tools /out/ /opt/compute/mesh-bin/
+COPY --from=tools /src/ /opt/compute/repo/
+COPY --from=tools /src/genesis/agentic/compute/*.mjs /opt/compute/
+COPY --chmod=755 --from=tools /src/genesis/agentic/compute/*.sh /opt/compute/
+RUN for tool in node just; do \
+      if [ ! -x "/usr/local/bin/$tool" ]; then ln -s "$(command -v "$tool")" "/usr/local/bin/$tool"; fi; \
+    done \
+    && /usr/local/bin/node --version && /usr/local/bin/just --version \
+    && /usr/local/bin/ark --version && /usr/local/bin/compute-executor --version \
+    && /usr/local/bin/mongod --version
+WORKDIR /opt/compute
+ENTRYPOINT ["bash", "/opt/compute/worker-start.sh"]

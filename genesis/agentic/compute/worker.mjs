@@ -127,21 +127,31 @@ export async function executeTask({
       )
     ).trim();
     try {
-      await readJson(runtimePath); // Existence only; lock-protected runtime owns the authoritative read.
+      // Existence only; the lock-protected executor validates the authoritative
+      // bindings. Interrupted evidence can be sealed even after a grant revocation.
+      try {
+        await readJson(runtimePath);
+      } catch (error) {
+        if (error.code !== "ENOENT") throw error;
+        await readJson(join(dirname(runtimePath), "started.json"));
+      }
       const recovered = JSON.parse(
-        await execute(executor, runtimeArgs, {
+        await execute(executor, [...runtimeArgs, "--recover-only"], {
           env: guestEnvironment(env),
           timeoutMs: (task.resources?.timeoutSeconds || 3600) * 1000 + 120000,
         }),
       );
       if (
-        recovered.taskCid !== status.taskCid ||
-        recovered.grantAction !== status.grantActionHash
+        recovered &&
+        (recovered.taskCid !== status.taskCid ||
+          recovered.grantAction !== status.grantActionHash)
       ) {
         throw new Error("Recovered runtime receipt binding mismatch");
       }
-      state.receipt = recovered;
-      await save(stateFile, state);
+      if (recovered) {
+        state.receipt = recovered;
+        await save(stateFile, state);
+      }
     } catch (error) {
       if (error.code !== "ENOENT") throw error;
     }
