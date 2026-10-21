@@ -2,8 +2,8 @@
   "version": "1.0",
   "$schemaVersion": "rakia-steward-commitment-1.0",
   "description": "Operator-authored ledger of cluster compute commitments. Genesis devops artifact (Category C). Derived from compute-capacity-snapshot.json (live kubectl snapshot).",
-  "snapshotTimestamp": "2026-09-05T18:54:00Z",
-  "snapshotMethod": "Allocatable + readiness re-observed 2026-09-05 from Prometheus kube-state-metrics (kube_node_status_allocatable, kube_node_status_condition) via the observability MCP: 7/7 nodes Ready, shem back in the fleet (24 cores / 128751 Mi), cluster allocatable 70000m / 246980 Mi. Promoted by the integrator session at the operator's direction during the 2026-09-05 integration push, because the 2026-05-04 envelope (46000m, shem cordoned) made every deployments.json write fail test-bench-aggregate-capacity on a portfolio the live cluster schedules with headroom. Per-node commitments (requests/limits), actuals and ephemeral storage are still the 2026-05-04 live-kubectl snapshot hand-curated by the operator (audit trail: genesis/data/rakia/snapshots/2026-05-04/snapshot.json, narrative in .../REVIEW.md); a full re-promotion runs genesis/orchestrator/scripts/snapshot-capacity.sh.",
+  "snapshotTimestamp": "2026-10-21T20:38:29Z",
+  "snapshotMethod": "k8s-bridge observe from Prometheus host kube-prom-stack-kube-prome-prometheus.observability.svc.cluster.local using kube_node_status_allocatable (CPU cores and memory bytes) and kube_node_status_condition (Ready) at 2026-10-21T20:38:29Z; commitments/actuals/ephemeral storage retained from 2026-09-05T18:54:00Z.",
   "cluster": {
     "ratifications": [
       {
@@ -22,7 +22,7 @@
     "notReadyNodes": [],
     "totalAllocatable": {
       "cpu_m": 70000,
-      "memory_Mi": 246980,
+      "memory_Mi": 227532,
       "ephemeralStorage_Gi": 6943
     },
     "totalCommitted": {
@@ -31,7 +31,7 @@
     },
     "totalHeadroom": {
       "cpu_m": 58820,
-      "memory_Mi": 223838
+      "memory_Mi": 204390
     },
     "actuals": {
       "ethosengine": {
@@ -74,7 +74,7 @@
         "note": "transient Jenkins build storm"
       },
       "shem": {
-        "status": "Ready again (observed 2026-09-05 via Prometheus); utilization not re-sampled in this promotion"
+        "status": "Ready (observed 2026-10-21T20:38:29Z via Prometheus); utilization not re-sampled in this promotion"
       }
     },
     "nodeTypes": {
@@ -86,7 +86,7 @@
             "role": "control-plane",
             "allocatable": {
               "cpu_m": 24000,
-              "memory_Mi": 64126,
+              "memory_Mi": 60768,
               "ephemeralStorage_Gi": 909
             },
             "committed": {
@@ -113,7 +113,7 @@
         ],
         "totals": {
           "cpu_m": 24000,
-          "memory_Mi": 64126,
+          "memory_Mi": 60768,
           "ephemeralStorage_Gi": 909
         }
       },
@@ -253,7 +253,7 @@
         ],
         "totals": {
           "cpu_m": 12000,
-          "memory_Mi": 23193,
+          "memory_Mi": 23194,
           "ephemeralStorage_Gi": 1380
         }
       },
@@ -305,7 +305,7 @@
             "role": "worker",
             "allocatable": {
               "cpu_m": 24000,
-              "memory_Mi": 128751,
+              "memory_Mi": 112622,
               "ephemeralStorage_Gi": 294
             },
             "committed": {
@@ -329,7 +329,7 @@
         ],
         "totals": {
           "cpu_m": 24000,
-          "memory_Mi": 128751,
+          "memory_Mi": 112622,
           "ephemeralStorage_Gi": 294
         }
       }

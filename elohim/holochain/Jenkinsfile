@@ -605,6 +605,32 @@ def waitForRolloutWithEvidence(String resourceType, String resourceName, String 
     }
 }
 
+// Read-only G2 evidence after both provider halves have rolled. Kubernetes Ready
+// alone does not prove the private mesh and native grant bootstrap completed.
+def captureEnabledComputeWorkerGrant(List humans, Map outcomes) {
+    def adam = humans.find { it.name == 'adam' }
+    if (adam == null) { return }
+    def worker = readJSON(file: 'genesis/orchestrator/data/adam-compute-worker.json')
+    if (worker.enabled != true || outcomes[adam.resourcePrefix] != true) { return }
+    outcomes[adam.resourcePrefix] = false
+    catchError(buildResult: 'UNSTABLE', stageResult: 'UNSTABLE', message: 'Adam compute worker activation unproven — see compute-worker-evidence') {
+        withEnv([
+            'COMPUTE_WORKER_ENABLED=true',
+            "COMPUTE_WORKER_GRANT_ENABLED=${worker.runnerGrant?.enabled == true}",
+            "COMPUTE_WORKER_PROVIDER=${worker.runnerGrant?.provider ?: ''}",
+            "COMPUTE_WORKER_RECIPIENT=${worker.runnerGrant?.recipient ?: ''}",
+            "COMPUTE_WORKER_IMAGE=${worker.image ?: ''}",
+            "COMPUTE_WORKER_CPU_MILLIS=${worker.slice?.cpuMillis ?: ''}",
+            "COMPUTE_WORKER_MEMORY_BYTES=${worker.slice?.memoryBytes ?: ''}",
+            "COMPUTE_WORKER_STARTUP_SECS=${worker.startupBudgetSeconds ?: 900}",
+        ]) {
+            sh "bash '${env.WORKSPACE}/scripts/ci/capture-compute-worker-grant.sh' '${adam.resourcePrefix}' '${adam.namespace}'"
+        }
+        outcomes[adam.resourcePrefix] = true
+    }
+    archiveArtifacts artifacts: "compute-worker-evidence/${adam.namespace}--${adam.resourcePrefix}/activation.json,compute-worker-evidence/${adam.namespace}--${adam.resourcePrefix}/status.txt", allowEmptyArchive: true, fingerprint: true
+}
+
 /**
  * Deploy edge node using environment manifest for per-component tags.
  * Reads tag values from envFile, substitutes named placeholders in the manifest template,
@@ -1098,6 +1124,7 @@ def deployHumansInParallel(List humans, String envFile, List allHumans) {
     }
     echo "─── sequenced conductor roll summary (peer|outcome|spent|readings) ───"
     sh "cat '${stateFile}.summary' 2>/dev/null || echo '(no gate ran — nothing restarted, or ROLL_SEQUENCED=0)'"
+    captureEnabledComputeWorkerGrant(humans, outcomes)
     emitDeployJunit((humans[0]?.env ?: 'unknown'), humans, outcomes)
 }
 

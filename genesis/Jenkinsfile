@@ -1200,9 +1200,11 @@ def resolveSeedDoorwayToken() {
  * genesis/data/timeline/backlog/security-ci-substrate-authorization-grant-coherence.md.
  */
 def runnerPreflight() {
+    def provider = getHumanStorageUrls('').find { h -> h.humanId == 'human-adam-firstman' }
+    def providerIdentityEnv = provider ? ["COMPUTE_PROVIDER_HEALTH_URL=http://${provider.storageUrl}/health", "COMPUTE_PROVIDER_NAME=adam"] : []
     try {
         withCredentials([string(credentialsId: 'doorway-admin-bootstrap-key', variable: 'ADMIN_KEY')]) {
-            withEnv(["DOORWAY_URL=http://${env.INTERNAL_DOORWAY_URL}"]) {
+            withEnv(["DOORWAY_URL=http://${env.INTERNAL_DOORWAY_URL}"] + providerIdentityEnv) {
                 def status = sh(script: "bash '${env.WORKSPACE}/genesis/scripts/ci/runner-preflight.sh'", returnStatus: true)
                 if (status != 0) {
                     echo "runner preflight: REFUSED line(s) above, each naming its cure (informational; the build continues)"

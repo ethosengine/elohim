@@ -1,5 +1,60 @@
 # Delegated feedback sweettest operation
 
+## Jenkins and the Adam fixture
+
+Matthew is the accountable steward of this deployment. Adam is a test-fixture human
+playing the provider role, and `agent:ci-runner-jenkins-matthew` is the delegated
+service agent. The native grant and completion retain the actual provider/requester
+keys. `runnerGrant.stewardOfRecord` records Matthew's deployment authorization; it is
+not a separately notarized human-to-fixture stewardship relationship.
+
+This delivery's milestone is native delegated CI: sponsored runner, provider grant,
+bounded execution, authenticated completion and the verified report consumed by
+Jenkins. The landed Ark task and berth contracts are pure interfaces. Connecting
+their admission decisions to materialization and launch is a separate runtime
+milestone; this worker does not establish placement-controller graduation.
+
+The edge pipeline builds the source worker when `BUILD_COMPUTE_WORKER=true` or the
+commit carries `[compute-worker:build]`. `compute-worker-image/image.json` records
+the immutable worker digest, source commit, component digests and hApp hash. Activate
+only that image in `genesis/orchestrator/data/adam-compute-worker.json`, with its
+actual provider key, `privateMesh: true`, and matching `sourceCommit`. The declared
+slice is 24 GiB / 8000m, one stage at a time; the runtime manifest accounts for it
+alongside storage, conductor and proxy. It does not increase their individual caps.
+These are declared limits until a live worker demonstrates its cgroup ceilings and
+measured footprint, including its private mesh. A grant does not reserve resources.
+
+Bootstrap retains its private household under `/var/lib/compute/mesh` and pins its
+checkout under `/var/lib/compute/repos/<sourceCommit>`. Its storage, conductor,
+P2P, metrics and Mongo port bases are 18090, 14444, 19701, 19464 and 37017.
+Doorways use 18888/18889; their health ports are 18079/18089, and relay uses 13340.
+The mesh launcher supports `MESH_STORAGE_BASE_PORT`, `MESH_CONDUCTOR_BASE_PORT`,
+`MESH_P2P_BASE_PORT` and `MESH_METRICS_BASE_PORT`; ordinary household defaults remain
+8090, 4444, 9701 and 9464. Mongo's Unix socket lives with its persistent database,
+so the worker's read-only root filesystem requires no writable `/tmp`.
+
+G1 is the sponsor's hosted-cell grant. G2 is issued on the provider's loopback API
+from the explicit `runnerGrant` declaration: actual provider and runner public keys,
+fixed issuance/validity timestamps, `measure-stage` scope and finite bounds.
+Bootstrap verifies the live provider and native response, and keeps
+`/var/lib/compute/runner-grant.json`. It refuses on mismatched parties or invalid
+authority. It never invents keys or grants, and a restart reuses the fixed declaration.
+
+Enable `genesis/orchestrator/data/jenkins-peer-stage.json` only after recording the
+native G2 action hash and image digest. The initial profile permits exactly
+`features/dataplane/peer-mesh.feature`; it casts no hosted people. The runner compares
+source identity, exact scenario inventory, receipt bindings and log hashes before
+publishing the real Cucumber report. Process readiness does not prove convergence:
+an unconverged mesh produces a failed BDD result. A local run proves the household
+lane; only an Adam completion and Jenkins report prove offload. Before broadening
+the profile, measure completed scenarios, elapsed time and footprint against the
+additional capacity. For a DNA change, also require matching successful DNA-build
+evidence for the packaged hApp.
+Keep refusal and retry evidence beside that successful run: another runner cannot
+spend the grant, withdrawal refuses the next launch, and an indeterminate launch
+response cannot create a duplicate run. Withdrawal does not promise cancellation
+of an already-running stage. Peer evidence does not replace a household T2 receipt.
+
 The workspace and Adam each talk only to their own loopback storage adapter.
 Requests, acceptance and completion use their respective conductor identities;
 discovery is DHT-backed. Input bytes enter the workspace BlobStore, and Adam's

@@ -19,6 +19,8 @@
 #   COMPUTE_RUNNER              how to invoke compute-runner (default: tsx in genesis/a2o)
 #   PROVIDERS_JSON              default genesis/agentic/compute/providers.json
 #   RUNNER_ENSURE               default this directory's runner-ensure.sh
+#   COMPUTE_PROVIDER_HEALTH_URL optional exact topology-selected storage /health URL
+#   COMPUTE_PROVIDER_NAME       fixture label for that public actor (default adam)
 set -uo pipefail
 
 HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -51,6 +53,24 @@ else
   cure="$(grep -E 'cure' "$ensure_log" | tail -n 1)"
   refuse standing "${why:-runner-ensure.sh failed (exit $ensure_exit)}" \
     "${cure:-follow the cause runner-ensure.sh names}"
+fi
+
+# Optional read-only activation identity from the exact topology-selected provider.
+# No bearer, node token, redirect, curlrc or hosted-cell guessing is involved.
+if [ -n "${COMPUTE_PROVIDER_HEALTH_URL:-}" ]; then
+  provider_name="${COMPUTE_PROVIDER_NAME:-adam}"
+  if [[ ! "$provider_name" =~ ^[a-z][a-z0-9-]*$ ]]; then
+    refuse provider-identity "invalid fixture provider name" "use the reviewed topology fixture name"
+  elif health="$(curl -q --fail --silent --show-error --max-time 15 --proto '=http,https' "$COMPUTE_PROVIDER_HEALTH_URL" 2>/dev/null)"; then
+    actor="$(printf '%s' "$health" | jq -r '.dhtParticipation.agentKeys.lamad // empty' 2>/dev/null)"
+    if [[ "$actor" =~ ^uhCAk[A-Za-z0-9_-]{48}$ ]]; then
+      ok "provider-identity:$provider_name" "lamad agent key $actor"
+    else
+      refuse "provider-identity:$provider_name" "health has no canonical lamad actor" "restore the provider's lamad conductor connection; never substitute a hosted-cell key"
+    fi
+  else
+    refuse "provider-identity:$provider_name" "provider health unavailable within 15 seconds" "check the topology-selected storage health endpoint"
+  fi
 fi
 
 # ---- 2. one line per provider grant -------------------------------------------------------
