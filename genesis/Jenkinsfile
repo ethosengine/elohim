@@ -2090,6 +2090,25 @@ Seed IDs: ${params.SEED_IDS ?: '(all)'}
                             sh 'pnpm install --frozen-lockfile 2>/dev/null || pnpm install'
                         }
 
+                        // Explicit bounded authority proof; no retry and no normal-deploy grants.
+                        def authorityMessage = sh(script: 'git log -1 --format=%B', returnStdout: true)
+                        if (authorityMessage.contains('[build:genesis]') && authorityMessage.contains('[adam-authority:probe]')) {
+                            stage('Adam authority refusal proof') {
+                                def adam = getHumanStorageUrls('').find { it.humanId == 'human-adam-firstman' }
+                                if (!adam) { error('Adam provider absent from declared topology') }
+                                withCredentials([string(credentialsId: 'doorway-admin-bootstrap-key', variable: 'ADMIN_KEY')]) {
+                                    withEnv(['RUN_ADAM_AUTHORITY_PROBE=true',
+                                             "DOORWAY_URL=http://${env.INTERNAL_DOORWAY_URL}",
+                                             "PROBE_WORKLOAD=${adam.service}", "PROBE_NAMESPACE=${adam.namespace}"]) {
+                                        timeout(time: 15, unit: 'MINUTES') {
+                                            sh "'${env.WORKSPACE}/genesis/a2o/node_modules/.bin/tsx' '${env.WORKSPACE}/genesis/scripts/ci/runner-authority-ci.mjs'"
+                                        }
+                                    }
+                                }
+                                archiveArtifacts(artifacts: 'adam-authority-probe.json', allowEmptyArchive: false, fingerprint: true)
+                            }
+                        }
+
                         // The CI runner's standing and grants, before any stage is sent.
                         runnerPreflight()
 

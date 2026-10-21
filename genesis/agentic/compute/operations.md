@@ -55,6 +55,24 @@ spend the grant, withdrawal refuses the next launch, and an indeterminate launch
 response cannot create a duplicate run. Withdrawal does not promise cancellation
 of an already-running stage. Peer evidence does not replace a household T2 receipt.
 
+After activation, one fresh commit carrying both `[build:genesis]` and
+`[adam-authority:probe]` runs the bounded authority probe. Fill the reviewed peer
+profile's provider, image, paths and capacity first; it may remain disabled while
+the probe reads the production grant hash from live activation evidence. A separate
+service agent tests disposable wrong-recipient and already-withdrawn grants against
+Adam's acceptance and launch endpoints. The probe verifies no acceptance, completion
+or admission event, withdraws its disposable grants, and checks that the production
+grant remains active. Jenkins archives only `adam-authority-probe.json` on success.
+This proves those refusal cases, not revocation after acceptance, cancellation or
+live lost-response recovery. The latter still needs its own execution evidence.
+
+The probe has a 15-minute deadline and no automatic retry. Its private journal lives
+only in the current Jenkins pod; do not replay the tagged build or archive that
+journal. If the pod disappears, remaining temporary grants expire within 15 minutes
+of issuance. Wait for that window before a new explicitly tagged attempt. Same-pod
+recovery retains the original denial timestamps and rechecks task/admission state;
+it cannot turn an expired grant or an old observation into a fresh refusal proof.
+
 The workspace and Adam each talk only to their own loopback storage adapter.
 Requests, acceptance and completion use their respective conductor identities;
 discovery is DHT-backed. Input bytes enter the workspace BlobStore, and Adam's
