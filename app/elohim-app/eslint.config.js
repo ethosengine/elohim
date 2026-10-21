@@ -11,6 +11,44 @@ const sonarjs = require("eslint-plugin-sonarjs");
 const unicorn = require("eslint-plugin-unicorn").default;
 const boundaries = require("eslint-plugin-boundaries");
 
+// SSR-SAFETY selectors: browser globals absent in the V8/deno_core Angular SSR render runtime
+// (root cause of the 2026-07-05 empty-landing incident). Named once so a file-scoped block that
+// adds its own `no-restricted-syntax` entries (flat config replaces a rule's options, never merges
+// them) keeps these too.
+const SSR_RESTRICTED_SYNTAX = [
+  { "selector": "MemberExpression[object.name='document']", "message": "SSR-unsafe: global `document` is undefined in the V8 SSR render runtime (2026-07-05 empty-render root cause). Inject Angular's DOCUMENT token (`inject(DOCUMENT)` → `this.doc`) or guard with `isPlatformBrowser(inject(PLATFORM_ID))`. If already guarded / provably browser-only, add `// eslint-disable-next-line no-restricted-syntax -- SSR-safe: <reason>`." },
+  { "selector": "MemberExpression[object.name='window']", "message": "SSR-unsafe: global `window` is undefined in the V8 SSR runtime. Guard with isPlatformBrowser / inject DOCUMENT.defaultView. If guarded/browser-only, disable with a justification." },
+  { "selector": "MemberExpression[object.name='localStorage']", "message": "SSR-unsafe: `localStorage` is undefined in the SSR runtime. Guard with isPlatformBrowser. A try/catch is not enough for the linter — add a justified disable if guarded." },
+  { "selector": "MemberExpression[object.name='sessionStorage']", "message": "SSR-unsafe: `sessionStorage` is undefined in the SSR runtime. Guard with isPlatformBrowser or add a justified disable." },
+  { "selector": "MemberExpression[object.name='navigator']", "message": "SSR-unsafe: `navigator` is undefined in the SSR runtime. Guard with isPlatformBrowser or add a justified disable." },
+  { "selector": "MemberExpression[object.name='globalThis'][property.name=/^(document|window|matchMedia|addEventListener|removeEventListener|dispatchEvent|localStorage|sessionStorage|navigator|location|innerWidth|innerHeight|scrollY|scrollX|scrollTo|getComputedStyle|open|alert|confirm|prompt)$/]", "message": "SSR-unsafe: this `globalThis.*` browser API is undefined in the V8 SSR runtime. Guard with isPlatformBrowser or add a justified disable." },
+  { "selector": "CallExpression[callee.name='matchMedia']", "message": "SSR-unsafe: bare `matchMedia` is undefined in the SSR runtime. Guard with `typeof globalThis.matchMedia === 'function'` or isPlatformBrowser." },
+  { "selector": "NewExpression[callee.name=/^(IntersectionObserver|ResizeObserver|MutationObserver)$/]", "message": "SSR-unsafe: IntersectionObserver/ResizeObserver/MutationObserver are undefined in the SSR runtime. Guard with isPlatformBrowser or add a justified disable." }
+];
+
+// Rail R-T2 (placement interfaces spec §1.3, §H.3): the apps service worker caches only verified
+// bytes. Every Cache Storage write in apps-sw.ts goes through one of three writers:
+// `CacheTier.put` (verifies against the CID), the head memory writer `rememberHead`, and
+// `ArchiveWriter.put`, which only `extractZip` constructs and calls, after the whole archive
+// verified (H1). A lint cannot stop a same-origin page writing Cache Storage, so `CacheTier` also
+// verifies every hit (H5).
+const SW_CACHE_WRITERS = [
+  "ClassDeclaration[id.name='CacheTier'] MethodDefinition[key.name='put'] CallExpression",
+  "ClassDeclaration[id.name='ArchiveWriter'] MethodDefinition[key.name='put'] CallExpression",
+  "FunctionDeclaration[id.name='rememberHead'] CallExpression",
+  "FunctionDeclaration[id.name='extractZip'] CallExpression[callee.object.name='archive']",
+];
+const SW_VERIFIED_WRITES_ONLY = [
+  {
+    "selector": `CallExpression[callee.type='MemberExpression'][callee.property.name=/^(put|add|addAll)$/]:not(${SW_CACHE_WRITERS.join(", ")})`,
+    "message": "R-T2: the service worker caches only verified bytes. Write through CacheTier.put (verifies against its CID), rememberHead, or ArchiveWriter.put inside extractZip after the archive verified.",
+  },
+  {
+    "selector": "NewExpression[callee.name='ArchiveWriter']:not(FunctionDeclaration[id.name='extractZip'] NewExpression)",
+    "message": "R-T2: ArchiveWriter is constructed only by extractZip, after verifyRawSha256 passed on the whole archive (H1).",
+  },
+];
+
 module.exports = tseslint.config(
   {
     // Global ignores
@@ -205,17 +243,7 @@ module.exports = tseslint.config(
       // Browser globals absent in the V8/deno_core Angular SSR render
       // runtime (root cause of the 2026-07-05 empty-landing incident).
       // ============================================================
-      "no-restricted-syntax": [
-        "error",
-        { "selector": "MemberExpression[object.name='document']", "message": "SSR-unsafe: global `document` is undefined in the V8 SSR render runtime (2026-07-05 empty-render root cause). Inject Angular's DOCUMENT token (`inject(DOCUMENT)` → `this.doc`) or guard with `isPlatformBrowser(inject(PLATFORM_ID))`. If already guarded / provably browser-only, add `// eslint-disable-next-line no-restricted-syntax -- SSR-safe: <reason>`." },
-        { "selector": "MemberExpression[object.name='window']", "message": "SSR-unsafe: global `window` is undefined in the V8 SSR runtime. Guard with isPlatformBrowser / inject DOCUMENT.defaultView. If guarded/browser-only, disable with a justification." },
-        { "selector": "MemberExpression[object.name='localStorage']", "message": "SSR-unsafe: `localStorage` is undefined in the SSR runtime. Guard with isPlatformBrowser. A try/catch is not enough for the linter — add a justified disable if guarded." },
-        { "selector": "MemberExpression[object.name='sessionStorage']", "message": "SSR-unsafe: `sessionStorage` is undefined in the SSR runtime. Guard with isPlatformBrowser or add a justified disable." },
-        { "selector": "MemberExpression[object.name='navigator']", "message": "SSR-unsafe: `navigator` is undefined in the SSR runtime. Guard with isPlatformBrowser or add a justified disable." },
-        { "selector": "MemberExpression[object.name='globalThis'][property.name=/^(document|window|matchMedia|addEventListener|removeEventListener|dispatchEvent|localStorage|sessionStorage|navigator|location|innerWidth|innerHeight|scrollY|scrollX|scrollTo|getComputedStyle|open|alert|confirm|prompt)$/]", "message": "SSR-unsafe: this `globalThis.*` browser API is undefined in the V8 SSR runtime. Guard with isPlatformBrowser or add a justified disable." },
-        { "selector": "CallExpression[callee.name='matchMedia']", "message": "SSR-unsafe: bare `matchMedia` is undefined in the SSR runtime. Guard with `typeof globalThis.matchMedia === 'function'` or isPlatformBrowser." },
-        { "selector": "NewExpression[callee.name=/^(IntersectionObserver|ResizeObserver|MutationObserver)$/]", "message": "SSR-unsafe: IntersectionObserver/ResizeObserver/MutationObserver are undefined in the SSR runtime. Guard with isPlatformBrowser or add a justified disable." }
-      ],
+      "no-restricted-syntax": ["error", ...SSR_RESTRICTED_SYNTAX],
 
       // ============================================================
       // GENERAL BEST PRACTICES
@@ -471,6 +499,18 @@ module.exports = tseslint.config(
       "sonarjs/no-duplicate-string": "off",
       "sonarjs/redundant-type-aliases": "off",
       "import/order": "off",
+    },
+  },
+
+  // ============================================================
+  // APPS SERVICE WORKER (src/apps-sw.ts) — rail R-T2
+  // ============================================================
+  // Only verified bytes reach Cache Storage (see SW_VERIFIED_WRITES_ONLY above).
+  //
+  {
+    files: ["src/apps-sw.ts"],
+    rules: {
+      "no-restricted-syntax": ["error", ...SSR_RESTRICTED_SYNTAX, ...SW_VERIFIED_WRITES_ONLY],
     },
   }
 );

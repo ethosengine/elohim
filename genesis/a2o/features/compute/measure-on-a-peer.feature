@@ -71,3 +71,15 @@ Feature: A long check finds its way to a neighbour's peer instead of holding the
     When the developer sends the same long check to Adam
     Then the developer's desk holds no lease on the household mesh at any point while Adam runs it
     And the developer's desk is free to run its own ordinary verification at the same time
+
+  # Held: no peer yet keeps its own witnessed record of work it carried for someone else, so
+  # this scenario cannot pass until that exists. @wip: no step has a definition yet.
+  @wip @requires:household-nodes
+  Scenario: the household compute provider's own record that it ran the check is kept by other peers, not only on the developer's desk
+    Given the household compute provider has run the developer's long check to completion
+    When a third peer on the same household mesh, which neither sent the check nor ran it, looks up the provider's record of that run
+    Then it finds a record of the run signed by the provider itself, not by the developer
+    And that record was checked and kept by peers other than the provider, so neither the provider nor the developer can quietly change or withdraw it later
+    And the record names the developer's request it fulfils and the grant the run was made under
+    And the record names the check only by a fingerprint of its exact bytes and the two parties only by their keys, and carries nothing the run read or found
+    And the developer's own record of the neighbour's capacity as spent points to that same provider record

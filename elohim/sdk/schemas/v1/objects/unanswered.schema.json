@@ -1,0 +1,177 @@
+{
+  "$id": "epr:schema:object:unanswered",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Unanswered",
+  "description": "Ruling 7's one shape for every refusal, absence or 'not carried' across the placement seams: why (the seam's own typed reason), when to come back, and what can be done meanwhile, plus an escalation on a repeat ask. The base envelope leaves `why` unconstrained on purpose, as objects/answer leaves `value`: a per-seam envelope narrows it with `allOf` to that seam's reason (objects/item-absence `$defs.UnansweredItemAbsence`, views/placement-explanation-view's refusals), so the wire stays monomorphic and no TypeScript generic is needed (CONVENTIONS rule 11). Serialization: `comeBack` is internally tagged by `when`, `meanwhile` by `local`, kebab-case tags and camelCase fields; `escalation` is always written and is null when this is not a repeat ask (one provenance: null means 'not a repeat', never 'unknown'). Wire shape: this schema is the source of record; Rust mirror seam_contracts::Unanswered<R> / ComeBack / Meanwhile / Escalation (crates/seam-contracts/src/unanswered.rs). That module calls its `serde` derives (feature `serde`) the internal convenience form, yet they carry the same tags and field names, and a seam adapter that writes this envelope from them must serialize to this schema; no test pins the two yet (follow-on: a seam-contracts contract test that serializes every ComeBack, Meanwhile and Escalation form and validates it here). Source of truth: the seam that answered, per request (Category C): a wire envelope for an answer, never persisted as an entity of its own.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "why",
+    "comeBack",
+    "meanwhile",
+    "escalation"
+  ],
+  "properties": {
+    "why": {
+      "description": "The seam's own typed reason. Unconstrained in the base envelope; a per-seam envelope narrows it.",
+      "tsType": "unknown"
+    },
+    "comeBack": {
+      "title": "ComeBack",
+      "description": "When the answer can change: a time a tier or gate gave (`at`), or an event after which it can change (`on-event`, e.g. tier-reachable, posture-changed, parameters-declared, berth-offered). The core never reads it from a local clock: the time is supplied by whoever gave it.",
+      "oneOf": [
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "title": "ComeBackAt",
+          "required": [
+            "when",
+            "epochSecs"
+          ],
+          "properties": {
+            "when": {
+              "const": "at"
+            },
+            "epochSecs": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 9007199254740991,
+              "description": "The time to come back, in seconds since the Unix epoch. A u64 in Rust, bounded here to 9007199254740991 (2^53 - 1, the largest integer every JSON reader, JavaScript included, holds exactly); a larger value is refused, never rounded."
+            }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "title": "ComeBackOnEvent",
+          "required": [
+            "when",
+            "event"
+          ],
+          "properties": {
+            "when": {
+              "const": "on-event"
+            },
+            "event": {
+              "type": "string",
+              "minLength": 1,
+              "description": "The event's name, kebab-case."
+            }
+          }
+        }
+      ]
+    },
+    "meanwhile": {
+      "title": "Meanwhile",
+      "description": "What the asker can do locally while the request is unanswered. `nothing` must say why, so 'nothing' is a statement and never a gap.",
+      "oneOf": [
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "title": "MeanwhileUseHeld",
+          "required": [
+            "local",
+            "what"
+          ],
+          "properties": {
+            "local": {
+              "const": "use-held"
+            },
+            "what": {
+              "type": "string",
+              "minLength": 1,
+              "description": "What is already local, named."
+            }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "title": "MeanwhileRunHere",
+          "description": "The device can do it itself.",
+          "required": [
+            "local"
+          ],
+          "properties": {
+            "local": {
+              "const": "run-here"
+            }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "title": "MeanwhileBuiltInInForce",
+          "description": "A built-in default is answering in its place.",
+          "required": [
+            "local"
+          ],
+          "properties": {
+            "local": {
+              "const": "built-in-in-force"
+            }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "title": "MeanwhileNothing",
+          "required": [
+            "local",
+            "because"
+          ],
+          "properties": {
+            "local": {
+              "const": "nothing"
+            },
+            "because": {
+              "type": "string",
+              "minLength": 1,
+              "description": "Why nothing can be done locally."
+            }
+          }
+        }
+      ]
+    },
+    "escalation": {
+      "oneOf": [
+        {
+          "type": "null"
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "title": "Escalation",
+          "description": "Set on a repeat ask before come-back: the answer escalates rather than repeats.",
+          "required": [
+            "asked",
+            "changed",
+            "whoCanBeAsked"
+          ],
+          "properties": {
+            "asked": {
+              "type": "integer",
+              "minimum": 2,
+              "maximum": 4294967295,
+              "description": "How many times the request has been asked, this ask included, so the first escalation is 2 (`Unanswered::escalate`)."
+            },
+            "changed": {
+              "type": "string",
+              "description": "What changed since the last answer, said even when it is \"nothing\".",
+              "minLength": 1
+            },
+            "whoCanBeAsked": {
+              "type": "array",
+              "items": {
+                "type": "string",
+                "minLength": 1
+              },
+              "description": "Who else can be asked."
+            }
+          }
+        }
+      ],
+      "description": "Null unless this is a repeat ask before come-back."
+    }
+  }
+}

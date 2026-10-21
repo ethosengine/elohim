@@ -29,7 +29,7 @@
 <epr:vocab#verdictClosure> a rdfs:Datatype ;
   rdfs:comment "Posture of an axis VERDICT layer toward absence: closed = absence of a permit is a refusal." .
 
-# =============== vocabularies (46) ===============
+# =============== vocabularies (61) ===============
 
 <epr:schema:enum:aggregation-lane> a skos:ConceptScheme ;
   skos:prefLabel "AggregationLane" ;
@@ -654,6 +654,32 @@
   skos:prefLabel "non-depletable" ;
   skos:notation "non-depletable" .
 
+<epr:schema:enum:depth> a skos:ConceptScheme ;
+  skos:prefLabel "Depth" ;
+  dct:description "How much of a view's bytes a device holds (spec §12.2). `query`: nothing is held; each read is answered by a tier. `sparse`: the whole view's bytes are here, so it works offline. `on-read`: only what was read is here. `kept`: pinned by residency, which satisfies every offline requirement; eprfs reads it from the residency pin and never writes it. There is deliberately NO `_ordinal`: depth does not order offline capability (`sparse` and `on-read` are not comparable to each other; each satisfies itself and `query`; finding B14). Not to be confused with the deprecated `MaterializationPolicy::Sparse`, which is `FetchPolicy::LocalOnly` plus sparse markers. Source of truth: this schema; Rust mirrors `eprfs_core::Depth` (walk.rs, kebab-case serde, no Ord) and `placement_core::Depth`, which ark-core maps 1:1. TypeScript constants only: `_codegen` (no `rust` key, so codegen-rs writes nothing) and never `_dna`, so no constant reaches content_store_integrity and no DNA hash moves (interfaces spec §2.G, G11). placement-core's schema_contract test reads this file with include_str! and compares it, in order, with the variants of `placement_core::Depth` written out by hand inside that test. It catches a value changed here, but a variant added to the Rust enum without editing the test still passes: nothing ties the test's list to the enum (follow-on: an `ALL` const in need.rs held to the enum by an exhaustive match, read by the test). Separately, `eprfs_core::Depth` is not yet pinned by any test (follow-on: a case in a test crate that depends on eprfs-core, such as eprfs-serve's tests)." ;
+  <epr:vocab#ordered> false ;
+  skos:hasTopConcept <epr:schema:enum:depth#query>, <epr:schema:enum:depth#sparse>, <epr:schema:enum:depth#on-read>, <epr:schema:enum:depth#kept> .
+
+<epr:schema:enum:depth#query> a skos:Concept ;
+  skos:inScheme <epr:schema:enum:depth> ;
+  skos:prefLabel "query" ;
+  skos:notation "query" .
+
+<epr:schema:enum:depth#sparse> a skos:Concept ;
+  skos:inScheme <epr:schema:enum:depth> ;
+  skos:prefLabel "sparse" ;
+  skos:notation "sparse" .
+
+<epr:schema:enum:depth#on-read> a skos:Concept ;
+  skos:inScheme <epr:schema:enum:depth> ;
+  skos:prefLabel "on-read" ;
+  skos:notation "on-read" .
+
+<epr:schema:enum:depth#kept> a skos:Concept ;
+  skos:inScheme <epr:schema:enum:depth> ;
+  skos:prefLabel "kept" ;
+  skos:notation "kept" .
+
 <epr:schema:enum:device-archetype> a skos:ConceptScheme ;
   skos:prefLabel "DeviceArchetype" ;
   dct:description "Hardware/deployment archetype of the device presenting an AgentPeerBinding. Source of truth: DHT (Notarized, Category A — imagodei integrity zome). DNA-notarized as part of the AgentPeerBinding entry type. Values: 'node' = dedicated elohim-node server/blade; 'desktop' = Tauri desktop app (workstation or laptop); 'mobile' = mobile client (phone or tablet); 'steward' = steward process managing collective infrastructure." ;
@@ -679,6 +705,27 @@
   skos:inScheme <epr:schema:enum:device-archetype> ;
   skos:prefLabel "steward" ;
   skos:notation "steward" .
+
+<epr:schema:enum:disclosure> a skos:ConceptScheme ;
+  skos:prefLabel "Disclosure" ;
+  dct:description "Who may read a probe reading, as the three forms of the disclosure (interfaces spec §I, I5): `holder` (the holder alone; such a reading reaches only a holder sink, and its numbers leave only as an explicit declassification), `parties` (the parties named by role, see enums/party-role), or `at-reach` (anyone at a reach, carried as `Reach::openness()`'s ordinal). These are the values of the `disclosure` tag in objects/probe-reading's `disclosure` object; the forms that carry data (`parties.roles`, `at-reach.openness`) are shaped there. Source of truth: this schema; Rust mirror `seam_contracts::probe::Disclosure` (crates/seam-contracts/src/probe.rs, serde tag `disclosure`, kebab-case). TypeScript constants only: `_codegen` (no `rust` key, so codegen-rs writes nothing) and never `_dna`, so no constant reaches content_store_integrity and no DNA hash moves (interfaces spec §2.G, G11). Not yet pinned: no test holds the tags of `seam_contracts::probe::Disclosure` equal to this list (follow-on: a case in placement-core's schema_contract test, which already depends on seam-contracts, or in seam-contracts' own tests)." ;
+  <epr:vocab#ordered> false ;
+  skos:hasTopConcept <epr:schema:enum:disclosure#holder>, <epr:schema:enum:disclosure#parties>, <epr:schema:enum:disclosure#at-reach> .
+
+<epr:schema:enum:disclosure#holder> a skos:Concept ;
+  skos:inScheme <epr:schema:enum:disclosure> ;
+  skos:prefLabel "holder" ;
+  skos:notation "holder" .
+
+<epr:schema:enum:disclosure#parties> a skos:Concept ;
+  skos:inScheme <epr:schema:enum:disclosure> ;
+  skos:prefLabel "parties" ;
+  skos:notation "parties" .
+
+<epr:schema:enum:disclosure#at-reach> a skos:Concept ;
+  skos:inScheme <epr:schema:enum:disclosure> ;
+  skos:prefLabel "at-reach" ;
+  skos:notation "at-reach" .
 
 <epr:schema:enum:elohim-skill> a skos:ConceptScheme ;
   skos:prefLabel "ElohimSkill" ;
@@ -1197,6 +1244,22 @@
   skos:prefLabel "Delegation" ;
   skos:notation "Delegation" .
 
+<epr:schema:enum:evidence-stage> a skos:ConceptScheme ;
+  skos:prefLabel "EvidenceStage" ;
+  dct:description "Whether an observation came from a fixture or from a real run, so evidence can only descend (fixture never settles what real evidence must). Named `evidenceStage` on the wire to avoid colliding with the one existing `evidence_class` field (attestation/subtypes/challenge-support-metadata, a kind of challenge evidence, a different thing). Landed as the first move of the `unwired` habit evidence-class-descends (elohim/elohim-storage/.epr-meta/evidence-class-descends.habit.md), so the observation and attestation schemas take the same `$ref` (interfaces spec finding 16, I10). A settling fulfilment draft requires `real`: placement-core's `RealEvidence::from_readings` refuses a `fixture` reading (§D.6, I9). Source of truth: this schema; Rust mirror `seam_contracts::probe::EvidenceStage` (crates/seam-contracts/src/probe.rs, kebab-case serde). TypeScript constants only: `_codegen` (no `rust` key, so codegen-rs writes nothing) and never `_dna`, so no constant reaches content_store_integrity and no DNA hash moves (interfaces spec §2.G, G11). Not yet pinned: no test holds `seam_contracts::probe::EvidenceStage` equal to this list (follow-on: a case in placement-core's schema_contract test, which already depends on seam-contracts, or in seam-contracts' own tests)." ;
+  <epr:vocab#ordered> false ;
+  skos:hasTopConcept <epr:schema:enum:evidence-stage#fixture>, <epr:schema:enum:evidence-stage#real> .
+
+<epr:schema:enum:evidence-stage#fixture> a skos:Concept ;
+  skos:inScheme <epr:schema:enum:evidence-stage> ;
+  skos:prefLabel "fixture" ;
+  skos:notation "fixture" .
+
+<epr:schema:enum:evidence-stage#real> a skos:Concept ;
+  skos:inScheme <epr:schema:enum:evidence-stage> ;
+  skos:prefLabel "real" ;
+  skos:notation "real" .
+
 <epr:schema:enum:excludability> a skos:ConceptScheme ;
   skos:prefLabel "Excludability" ;
   dct:description "Whether access can be restricted. excludable=fenced land, non-excludable=clean air, conditionally-excludable=commons with Ostrom rules." ;
@@ -1218,6 +1281,32 @@
   skos:prefLabel "conditionally-excludable" ;
   skos:notation "conditionally-excludable" .
 
+<epr:schema:enum:expresser-kind> a skos:ConceptScheme ;
+  skos:prefLabel "ExpresserKind" ;
+  dct:description "Who expressed a placement need: an app (by its manifest CID), a person, a space's charter, or an agent (by agent key). There is deliberately no `device` value: a device's own needs never leave the device and exist only as private needs (interfaces spec §D.2). Source of truth: this schema; Rust mirror `placement_core::ExpresserKind` (need.rs). Not named in §2.G's enum list; added because intents/placement-need's `expressedBy.by` needs a referenced vocabulary (CONVENTIONS rule 7). Carries neither `_dna` nor `_codegen`: it is a field vocabulary for the placement wire schemas, generated only as a TypeScript union where those schemas inline it, and adds no constant to schema-enums.ts. Not yet pinned: no test holds the Rust enum equal to this list (follow-on: a case in placement-core's schema_contract test)." ;
+  <epr:vocab#ordered> false ;
+  skos:hasTopConcept <epr:schema:enum:expresser-kind#app>, <epr:schema:enum:expresser-kind#person>, <epr:schema:enum:expresser-kind#charter>, <epr:schema:enum:expresser-kind#agent> .
+
+<epr:schema:enum:expresser-kind#app> a skos:Concept ;
+  skos:inScheme <epr:schema:enum:expresser-kind> ;
+  skos:prefLabel "app" ;
+  skos:notation "app" .
+
+<epr:schema:enum:expresser-kind#person> a skos:Concept ;
+  skos:inScheme <epr:schema:enum:expresser-kind> ;
+  skos:prefLabel "person" ;
+  skos:notation "person" .
+
+<epr:schema:enum:expresser-kind#charter> a skos:Concept ;
+  skos:inScheme <epr:schema:enum:expresser-kind> ;
+  skos:prefLabel "charter" ;
+  skos:notation "charter" .
+
+<epr:schema:enum:expresser-kind#agent> a skos:Concept ;
+  skos:inScheme <epr:schema:enum:expresser-kind> ;
+  skos:prefLabel "agent" ;
+  skos:notation "agent" .
+
 <epr:schema:enum:fungibility> a skos:ConceptScheme ;
   skos:prefLabel "Fungibility" ;
   dct:description "Whether units are interchangeable. fungible=kWh, non-fungible=land parcel, class-fungible=Grade A eggs." ;
@@ -1238,6 +1327,27 @@
   skos:inScheme <epr:schema:enum:fungibility> ;
   skos:prefLabel "class-fungible" ;
   skos:notation "class-fungible" .
+
+<epr:schema:enum:grant-scope> a skos:ConceptScheme ;
+  skos:prefLabel "GrantScope" ;
+  dct:description "The compute-grant scopes: what a delegates-compute grant lets its recipient spend on the grantor's behalf, and so what a task-shaped placement kind consumes when it touches another person (R3: a grant is consent and eligibility). This is a CLOSED SUBSET of delegates-compute's own `scope`, which stays an open string by design (its schema and tests use `republish-epr`, `serve-url-projection`); the two are not one vocabulary (interfaces spec finding 12, G10). Today the list is a private const, `GRANT_SCOPES` in elohim/elohim-storage/src/api/compute_grants.rs, duplicated as `hosted-cell` constants in doorway-service/src/routes/hosted_cell.rs and elohim-storage/src/api/hosted_custody.rs; an elohim-storage test holds those equal to this list (named follow-on). Source of truth: this schema; Rust mirror `placement_core::GrantScope` (kind.rs, `#[non_exhaustive]`). Adding a scope is a coordinator-side change and moves no DNA hash. TypeScript constants only: `_codegen` (no `rust` key, so codegen-rs writes nothing) and never `_dna`, so no constant reaches content_store_integrity and no DNA hash moves (interfaces spec §2.G, G11). placement-core's schema_contract test reads this file with include_str! and compares it, in order, with `GrantScope::ALL`, a list kept by hand in kind.rs. It catches a value changed here, but a variant added to `GrantScope` without extending `ALL` still passes: no exhaustive match ties `ALL` to the enum, and the enum is `#[non_exhaustive]` (follow-on: a guard in kind.rs that matches every variant against its index in `ALL`)." ;
+  <epr:vocab#ordered> false ;
+  skos:hasTopConcept <epr:schema:enum:grant-scope#sweettest-feedback>, <epr:schema:enum:grant-scope#hosted-cell>, <epr:schema:enum:grant-scope#measure-stage> .
+
+<epr:schema:enum:grant-scope#sweettest-feedback> a skos:Concept ;
+  skos:inScheme <epr:schema:enum:grant-scope> ;
+  skos:prefLabel "sweettest-feedback" ;
+  skos:notation "sweettest-feedback" .
+
+<epr:schema:enum:grant-scope#hosted-cell> a skos:Concept ;
+  skos:inScheme <epr:schema:enum:grant-scope> ;
+  skos:prefLabel "hosted-cell" ;
+  skos:notation "hosted-cell" .
+
+<epr:schema:enum:grant-scope#measure-stage> a skos:Concept ;
+  skos:inScheme <epr:schema:enum:grant-scope> ;
+  skos:prefLabel "measure-stage" ;
+  skos:notation "measure-stage" .
 
 <epr:schema:enum:inference-source> a skos:ConceptScheme ;
   skos:prefLabel "InferenceSource" ;
@@ -1305,6 +1415,58 @@
   skos:inScheme <epr:schema:enum:instrument-archetype> ;
   skos:prefLabel "community-report" ;
   skos:notation "community-report" .
+
+<epr:schema:enum:isolation> a skos:ConceptScheme ;
+  skos:prefLabel "Isolation" ;
+  dct:description "The isolation ladder a berth's process runs under, weakest first. A need names the weakest isolation it accepts (`Requirements.isolation`); an offer names the isolation it provides, and a task kind refuses an offer weaker than the need's (`Kind { label: \"isolation\" }`). placement-core's own copy of ark's ladder: ark-core maps `passport::EffectiveTier` onto it 1:1, and a berth offer's isolation is the weakest effective tier across its passport's processes (interfaces spec §D.2, §F, F6, F7). Ordered weakest to strongest (the Rust enum derives Ord); there is no `_ordinal` because it is not a reach. Source of truth: this schema; Rust mirror `placement_core::Isolation` (need.rs). TypeScript constants only: `_codegen` (no `rust` key, so codegen-rs writes nothing) and never `_dna`, so no constant reaches content_store_integrity and no DNA hash moves (interfaces spec §2.G, G11). placement-core's schema_contract test reads this file with include_str! and compares it, in order, with the variants of `placement_core::Isolation` written out by hand inside that test. It catches a value changed here, but a variant added to the Rust enum without editing the test still passes: nothing ties the test's list to the enum (follow-on: an `ALL` const in need.rs held to the enum by an exhaustive match, read by the test)." ;
+  <epr:vocab#ordered> false ;
+  skos:hasTopConcept <epr:schema:enum:isolation#none>, <epr:schema:enum:isolation#intrinsic>, <epr:schema:enum:isolation#delegated>, <epr:schema:enum:isolation#bounded>, <epr:schema:enum:isolation#enforced> .
+
+<epr:schema:enum:isolation#none> a skos:Concept ;
+  skos:inScheme <epr:schema:enum:isolation> ;
+  skos:prefLabel "none" ;
+  skos:notation "none" .
+
+<epr:schema:enum:isolation#intrinsic> a skos:Concept ;
+  skos:inScheme <epr:schema:enum:isolation> ;
+  skos:prefLabel "intrinsic" ;
+  skos:notation "intrinsic" .
+
+<epr:schema:enum:isolation#delegated> a skos:Concept ;
+  skos:inScheme <epr:schema:enum:isolation> ;
+  skos:prefLabel "delegated" ;
+  skos:notation "delegated" .
+
+<epr:schema:enum:isolation#bounded> a skos:Concept ;
+  skos:inScheme <epr:schema:enum:isolation> ;
+  skos:prefLabel "bounded" ;
+  skos:notation "bounded" .
+
+<epr:schema:enum:isolation#enforced> a skos:Concept ;
+  skos:inScheme <epr:schema:enum:isolation> ;
+  skos:prefLabel "enforced" ;
+  skos:notation "enforced" .
+
+<epr:schema:enum:loss-domain> a skos:ConceptScheme ;
+  skos:prefLabel "LossDomain" ;
+  dct:description "The loss a content type must survive: losing one device, one household, or one region. An app manifest declares it per content type (`needs.loss`, a demand rule, not a need); the space's charter resolves it to holders and failure domains (`Charter::resolve`, never below the charter's holding floor), so joining a space with a stricter charter changes placement without changing the app (interfaces spec §D.7, §G worked example). Ordered from the narrowest loss to the widest; it is not a reach and carries no `_ordinal`. Source of truth: this schema; Rust mirror `placement_core::LossDomain` (decide.rs). TypeScript constants only: `_codegen` (no `rust` key, so codegen-rs writes nothing) and never `_dna`, so no constant reaches content_store_integrity and no DNA hash moves (interfaces spec §2.G, G11). placement-core's schema_contract test reads this file with include_str! and compares it, in order, with the variants of `placement_core::LossDomain` written out by hand inside that test. It catches a value changed here, but a variant added to the Rust enum without editing the test still passes: nothing ties the test's list to the enum (follow-on: an `ALL` const in decide.rs held to the enum by an exhaustive match, read by the test)." ;
+  <epr:vocab#ordered> false ;
+  skos:hasTopConcept <epr:schema:enum:loss-domain#device>, <epr:schema:enum:loss-domain#household>, <epr:schema:enum:loss-domain#region> .
+
+<epr:schema:enum:loss-domain#device> a skos:Concept ;
+  skos:inScheme <epr:schema:enum:loss-domain> ;
+  skos:prefLabel "device" ;
+  skos:notation "device" .
+
+<epr:schema:enum:loss-domain#household> a skos:Concept ;
+  skos:inScheme <epr:schema:enum:loss-domain> ;
+  skos:prefLabel "household" ;
+  skos:notation "household" .
+
+<epr:schema:enum:loss-domain#region> a skos:Concept ;
+  skos:inScheme <epr:schema:enum:loss-domain> ;
+  skos:prefLabel "region" ;
+  skos:notation "region" .
 
 <epr:schema:enum:mastery-level> a skos:ConceptScheme ;
   skos:prefLabel "MasteryLevel" ;
@@ -1409,6 +1571,32 @@
   skos:prefLabel "private" ;
   skos:notation "private" .
 
+<epr:schema:enum:need-class> a skos:ConceptScheme ;
+  skos:prefLabel "NeedClass" ;
+  dct:description "The serve-order classes a space's charter ranks needs by when capacity is scarce: a need is taken in (charter serve-order position of its class, need id) order within one pass (interfaces spec §D.2, §D.7). The order listed here is the vocabulary's, not a serve order: the charter declares the order, and an empty `serve_order` is the built-in order, said so in the explanation. Source of truth: this schema; Rust mirror `placement_core::NeedClass` (need.rs, `#[non_exhaustive]`). TypeScript constants only: `_codegen` (no `rust` key, so codegen-rs writes nothing) and never `_dna`, so no constant reaches content_store_integrity and no DNA hash moves (interfaces spec §2.G, G11). placement-core's schema_contract test reads this file with include_str! and compares it, in order, with `NeedClass::BUILTIN_ORDER`, a list kept by hand in need.rs. It catches a value changed here, but a variant added to `NeedClass` without extending `BUILTIN_ORDER` still passes: no exhaustive match ties `BUILTIN_ORDER` to the enum, and the enum is `#[non_exhaustive]` (follow-on: a guard in need.rs that matches every variant against its index in `BUILTIN_ORDER`)." ;
+  <epr:vocab#ordered> false ;
+  skos:hasTopConcept <epr:schema:enum:need-class#care>, <epr:schema:enum:need-class#member>, <epr:schema:enum:need-class#agent>, <epr:schema:enum:need-class#commons> .
+
+<epr:schema:enum:need-class#care> a skos:Concept ;
+  skos:inScheme <epr:schema:enum:need-class> ;
+  skos:prefLabel "care" ;
+  skos:notation "care" .
+
+<epr:schema:enum:need-class#member> a skos:Concept ;
+  skos:inScheme <epr:schema:enum:need-class> ;
+  skos:prefLabel "member" ;
+  skos:notation "member" .
+
+<epr:schema:enum:need-class#agent> a skos:Concept ;
+  skos:inScheme <epr:schema:enum:need-class> ;
+  skos:prefLabel "agent" ;
+  skos:notation "agent" .
+
+<epr:schema:enum:need-class#commons> a skos:Concept ;
+  skos:inScheme <epr:schema:enum:need-class> ;
+  skos:prefLabel "commons" ;
+  skos:notation "commons" .
+
 <epr:schema:enum:observation-polarity> a skos:ConceptScheme ;
   skos:prefLabel "ObservationPolarity" ;
   dct:description "Polarity of a feedback observation. Positive observations extend claim validity horizons. Negative observations shorten them. The protocol requires at least one negative-polarity observation per manifest — systems cannot ship positive-only feedback." ;
@@ -1445,6 +1633,63 @@
   skos:inScheme <epr:schema:enum:osm-element-type> ;
   skos:prefLabel "relation" ;
   skos:notation "relation" .
+
+<epr:schema:enum:param-fallback> a skos:ConceptScheme ;
+  skos:prefLabel "ParamFallback" ;
+  dct:description "Which parameter set an explanation reports as answering when the declared placement parameter head could not be verified (interfaces spec §E, E10): `built-in` (the floor's own set for the kind) or `last-verified` (the last set this floor verified for the scope and kind). Source of truth: this schema; Rust mirror placement_core::ParamFallback (elohim/placement/core/src/params.rs, kebab-case serde). Not named in §2.G's enum list; added because views/placement-explanation-view's `fallback` needs a referenced vocabulary (CONVENTIONS rule 7). Carries neither `_dna` nor `_codegen`: it is a field vocabulary for the placement wire schemas, generated only as a TypeScript union where those schemas inline it, and adds no constant to schema-enums.ts. Not yet pinned: no test holds the Rust enum equal to this list (follow-on: a case in placement-core's schema_contract test)." ;
+  <epr:vocab#ordered> false ;
+  skos:hasTopConcept <epr:schema:enum:param-fallback#built-in>, <epr:schema:enum:param-fallback#last-verified> .
+
+<epr:schema:enum:param-fallback#built-in> a skos:Concept ;
+  skos:inScheme <epr:schema:enum:param-fallback> ;
+  skos:prefLabel "built-in" ;
+  skos:notation "built-in" .
+
+<epr:schema:enum:param-fallback#last-verified> a skos:Concept ;
+  skos:inScheme <epr:schema:enum:param-fallback> ;
+  skos:prefLabel "last-verified" ;
+  skos:notation "last-verified" .
+
+<epr:schema:enum:party-role> a skos:ConceptScheme ;
+  skos:prefLabel "PartyRole" ;
+  dct:description "A party a probe reading may be disclosed to, by role (spec §9's rows: carrier and carried-for, grantor, custodians, the leaver and each holder, settlement); the `roles` of a `parties` disclosure in objects/probe-reading. Source of truth: this schema; Rust mirror `seam_contracts::probe::PartyRole` (crates/seam-contracts/src/probe.rs, kebab-case serde). Not named in interfaces spec §2.G's enum list; added because `Disclosure::Parties { roles }` needs a referenced vocabulary (CONVENTIONS rule 7). Carries neither `_dna` nor `_codegen`: it is a field vocabulary for the placement wire schemas, generated only as a TypeScript union where those schemas inline it, and adds no constant to schema-enums.ts. Not yet pinned: no test holds the Rust enum equal to this list (follow-on: a case in placement-core's schema_contract test or in seam-contracts' own tests)." ;
+  <epr:vocab#ordered> false ;
+  skos:hasTopConcept <epr:schema:enum:party-role#carrier>, <epr:schema:enum:party-role#carried-for>, <epr:schema:enum:party-role#grantor>, <epr:schema:enum:party-role#custodian>, <epr:schema:enum:party-role#leaver>, <epr:schema:enum:party-role#holder>, <epr:schema:enum:party-role#settlement> .
+
+<epr:schema:enum:party-role#carrier> a skos:Concept ;
+  skos:inScheme <epr:schema:enum:party-role> ;
+  skos:prefLabel "carrier" ;
+  skos:notation "carrier" .
+
+<epr:schema:enum:party-role#carried-for> a skos:Concept ;
+  skos:inScheme <epr:schema:enum:party-role> ;
+  skos:prefLabel "carried-for" ;
+  skos:notation "carried-for" .
+
+<epr:schema:enum:party-role#grantor> a skos:Concept ;
+  skos:inScheme <epr:schema:enum:party-role> ;
+  skos:prefLabel "grantor" ;
+  skos:notation "grantor" .
+
+<epr:schema:enum:party-role#custodian> a skos:Concept ;
+  skos:inScheme <epr:schema:enum:party-role> ;
+  skos:prefLabel "custodian" ;
+  skos:notation "custodian" .
+
+<epr:schema:enum:party-role#leaver> a skos:Concept ;
+  skos:inScheme <epr:schema:enum:party-role> ;
+  skos:prefLabel "leaver" ;
+  skos:notation "leaver" .
+
+<epr:schema:enum:party-role#holder> a skos:Concept ;
+  skos:inScheme <epr:schema:enum:party-role> ;
+  skos:prefLabel "holder" ;
+  skos:notation "holder" .
+
+<epr:schema:enum:party-role#settlement> a skos:Concept ;
+  skos:inScheme <epr:schema:enum:party-role> ;
+  skos:prefLabel "settlement" ;
+  skos:notation "settlement" .
 
 <epr:schema:enum:path-visibility> a skos:ConceptScheme ;
   skos:prefLabel "PathVisibility" ;
@@ -1553,6 +1798,109 @@
   skos:inScheme <epr:schema:enum:place-type> ;
   skos:prefLabel "custom" ;
   skos:notation "custom" .
+
+<epr:schema:enum:placement-factor> a skos:ConceptScheme ;
+  skos:prefLabel "PlacementFactor" ;
+  dct:description "The factors a placement ranking method may read, and so the only keys a parameter set's `weights` may carry (`propertyNames` of objects/placement-parameter-set). There is no reach or consent factor and none can be added: eligibility is decided before ranking and takes no parameters, so a tuning can never widen who is eligible (interfaces spec §D.4, §D.5, R-P5). Each method declares the factors it reads (`Ranking::factors`); a weight on any other factor is refused by `within_band` (E2). Any member added here lands in `placement_core::Factor` in the same change (G12). Source of truth: this schema; Rust mirror `placement_core::Factor` (rank.rs, `#[non_exhaustive]`). TypeScript constants only: `_codegen` (no `rust` key, so codegen-rs writes nothing) and never `_dna`, so no constant reaches content_store_integrity and no DNA hash moves (interfaces spec §2.G, G11). placement-core's schema_contract test reads this file with include_str! and compares it, in order, with `Factor::ALL`, a list kept by hand in rank.rs. It catches a value changed here, but a variant added to `Factor` without extending `ALL` still passes: no exhaustive match ties `ALL` to the enum, and the enum is `#[non_exhaustive]` (follow-on: a guard in rank.rs that matches every variant against its index in `ALL`)." ;
+  <epr:vocab#ordered> false ;
+  skos:hasTopConcept <epr:schema:enum:placement-factor#distance>, <epr:schema:enum:placement-factor#domain-spread>, <epr:schema:enum:placement-factor#spare-capacity>, <epr:schema:enum:placement-factor#near-bytes>, <epr:schema:enum:placement-factor#always-on> .
+
+<epr:schema:enum:placement-factor#distance> a skos:Concept ;
+  skos:inScheme <epr:schema:enum:placement-factor> ;
+  skos:prefLabel "distance" ;
+  skos:notation "distance" .
+
+<epr:schema:enum:placement-factor#domain-spread> a skos:Concept ;
+  skos:inScheme <epr:schema:enum:placement-factor> ;
+  skos:prefLabel "domain-spread" ;
+  skos:notation "domain-spread" .
+
+<epr:schema:enum:placement-factor#spare-capacity> a skos:Concept ;
+  skos:inScheme <epr:schema:enum:placement-factor> ;
+  skos:prefLabel "spare-capacity" ;
+  skos:notation "spare-capacity" .
+
+<epr:schema:enum:placement-factor#near-bytes> a skos:Concept ;
+  skos:inScheme <epr:schema:enum:placement-factor> ;
+  skos:prefLabel "near-bytes" ;
+  skos:notation "near-bytes" .
+
+<epr:schema:enum:placement-factor#always-on> a skos:Concept ;
+  skos:inScheme <epr:schema:enum:placement-factor> ;
+  skos:prefLabel "always-on" ;
+  skos:notation "always-on" .
+
+<epr:schema:enum:placement-kind> a skos:ConceptScheme ;
+  skos:prefLabel "PlacementKind" ;
+  dct:description "The closed list of placement kinds: what a need asks to have carried and what a posture offers to carry. One deterministic `decide` pass covers every kind, so a carrier's capacity is charged across kinds in the charter's serve order (interfaces spec §D.1). A new kind is four coupled steps landed together: a variant here and in `placement_core::KindId`, a `PlacementKind` implementation in the crate that owns the carrier, a `grant-scope` entry if it spends compute, and a probe (§D.1 'Extension'). Closed rather than open because the compute-grant scopes a kind consumes are a closed list. Source of truth: this schema; Rust mirror `placement_core::KindId` (elohim/placement/core/src/kind.rs, `#[non_exhaustive]`, kebab-case serde). TypeScript constants only: `_codegen` (no `rust` key, so codegen-rs writes nothing) and never `_dna`, so no constant reaches content_store_integrity and no DNA hash moves (interfaces spec §2.G, G11). placement-core's schema_contract test reads this file with include_str! and compares it, in order, with `KindId::ALL`, a list kept by hand in kind.rs. It catches a value changed here, but a variant added to `KindId` without extending `ALL` still passes: no exhaustive match ties `ALL` to the enum, and the enum is `#[non_exhaustive]` (follow-on: a guard in kind.rs that matches every variant against its index in `ALL`)." ;
+  <epr:vocab#ordered> false ;
+  skos:hasTopConcept <epr:schema:enum:placement-kind#custody-blob>, <epr:schema:enum:placement-kind#custody-root>, <epr:schema:enum:placement-kind#live-session>, <epr:schema:enum:placement-kind#relay>, <epr:schema:enum:placement-kind#wake-ingress>, <epr:schema:enum:placement-kind#hub-runtime>, <epr:schema:enum:placement-kind#inference>, <epr:schema:enum:placement-kind#index-fold>, <epr:schema:enum:placement-kind#task> .
+
+<epr:schema:enum:placement-kind#custody-blob> a skos:Concept ;
+  skos:inScheme <epr:schema:enum:placement-kind> ;
+  skos:prefLabel "custody-blob" ;
+  skos:notation "custody-blob" .
+
+<epr:schema:enum:placement-kind#custody-root> a skos:Concept ;
+  skos:inScheme <epr:schema:enum:placement-kind> ;
+  skos:prefLabel "custody-root" ;
+  skos:notation "custody-root" .
+
+<epr:schema:enum:placement-kind#live-session> a skos:Concept ;
+  skos:inScheme <epr:schema:enum:placement-kind> ;
+  skos:prefLabel "live-session" ;
+  skos:notation "live-session" .
+
+<epr:schema:enum:placement-kind#relay> a skos:Concept ;
+  skos:inScheme <epr:schema:enum:placement-kind> ;
+  skos:prefLabel "relay" ;
+  skos:notation "relay" .
+
+<epr:schema:enum:placement-kind#wake-ingress> a skos:Concept ;
+  skos:inScheme <epr:schema:enum:placement-kind> ;
+  skos:prefLabel "wake-ingress" ;
+  skos:notation "wake-ingress" .
+
+<epr:schema:enum:placement-kind#hub-runtime> a skos:Concept ;
+  skos:inScheme <epr:schema:enum:placement-kind> ;
+  skos:prefLabel "hub-runtime" ;
+  skos:notation "hub-runtime" .
+
+<epr:schema:enum:placement-kind#inference> a skos:Concept ;
+  skos:inScheme <epr:schema:enum:placement-kind> ;
+  skos:prefLabel "inference" ;
+  skos:notation "inference" .
+
+<epr:schema:enum:placement-kind#index-fold> a skos:Concept ;
+  skos:inScheme <epr:schema:enum:placement-kind> ;
+  skos:prefLabel "index-fold" ;
+  skos:notation "index-fold" .
+
+<epr:schema:enum:placement-kind#task> a skos:Concept ;
+  skos:inScheme <epr:schema:enum:placement-kind> ;
+  skos:prefLabel "task" ;
+  skos:notation "task" .
+
+<epr:schema:enum:ratification-kind> a skos:ConceptScheme ;
+  skos:prefLabel "RatificationKind" ;
+  dct:description "How a placement parameter set came to be in force (interfaces spec §E). `built-in`: the floor's own content-addressed set for a kind, shipped with the floor; nobody put it in force, it runs when nothing has been, explanations say 'no tuning chosen', and it is exempt from ratification. `charter`: a set the space's charter itself names (`Charter::genesis_params`); the charter's adoption ratified it. `ratified`: a tuning ratified under the charter's tuning rule (the household default is each touched member's consent). The floor checks `built-in` and `charter` itself; only `ratified` is handed to the adapter's `RatificationCheck` (E9). Source of truth: this schema; Rust mirror `placement_core::RatificationKind` (params.rs). Not named in §2.G's enum list; added because objects/placement-parameter-head's `ratification.by` needs a referenced vocabulary (CONVENTIONS rule 7). Carries neither `_dna` nor `_codegen`: it is a field vocabulary for the placement wire schemas, generated only as a TypeScript union where those schemas inline it, and adds no constant to schema-enums.ts. Not yet pinned: no test holds the Rust enum equal to this list (follow-on: a case in placement-core's schema_contract test)." ;
+  <epr:vocab#ordered> false ;
+  skos:hasTopConcept <epr:schema:enum:ratification-kind#built-in>, <epr:schema:enum:ratification-kind#charter>, <epr:schema:enum:ratification-kind#ratified> .
+
+<epr:schema:enum:ratification-kind#built-in> a skos:Concept ;
+  skos:inScheme <epr:schema:enum:ratification-kind> ;
+  skos:prefLabel "built-in" ;
+  skos:notation "built-in" .
+
+<epr:schema:enum:ratification-kind#charter> a skos:Concept ;
+  skos:inScheme <epr:schema:enum:ratification-kind> ;
+  skos:prefLabel "charter" ;
+  skos:notation "charter" .
+
+<epr:schema:enum:ratification-kind#ratified> a skos:Concept ;
+  skos:inScheme <epr:schema:enum:ratification-kind> ;
+  skos:prefLabel "ratified" ;
+  skos:notation "ratified" .
 
 <epr:schema:enum:rea-action> a skos:ConceptScheme ;
   skos:prefLabel "ReaAction" ;
@@ -1694,6 +2042,37 @@
   skos:inScheme <epr:schema:enum:rea-action> ;
   skos:prefLabel "dismiss" ;
   skos:notation "dismiss" .
+
+<epr:schema:enum:reach-reason> a skos:ConceptScheme ;
+  skos:prefLabel "ReachReason" ;
+  dct:description "Why a tier refused to serve an object under a root (interfaces spec §A.3). To a requester outside reach, a missing object and a private one get the same refusal, naming the requester's missing standing and not the object (spec §12.3 rule 2). `not-under-root` is said only for a path proved absent in a held node; `no-record` means the tier holds no reach record for the root and refused rather than fetching one; there is no admit-on-error path. Source of truth: this schema; Rust mirror `eprfs_core::ReachReason` (eprfs-core/src/reach.rs, kebab-case serde). Not named in §2.G's enum list; added because objects/item-absence's `refused.refusal.reason` needs a referenced vocabulary (CONVENTIONS rule 7). Carries neither `_dna` nor `_codegen`: it is a field vocabulary for the placement wire schemas, generated only as a TypeScript union where those schemas inline it, and adds no constant to schema-enums.ts. Not yet pinned: no test holds the Rust enum equal to this list (follow-on: a case in a test crate that depends on eprfs-core, such as eprfs-serve's tests)." ;
+  <epr:vocab#ordered> false ;
+  skos:hasTopConcept <epr:schema:enum:reach-reason#outside-standing>, <epr:schema:enum:reach-reason#no-record>, <epr:schema:enum:reach-reason#not-under-root>, <epr:schema:enum:reach-reason#identity-required>, <epr:schema:enum:reach-reason#authorizer-unavailable> .
+
+<epr:schema:enum:reach-reason#outside-standing> a skos:Concept ;
+  skos:inScheme <epr:schema:enum:reach-reason> ;
+  skos:prefLabel "outside-standing" ;
+  skos:notation "outside-standing" .
+
+<epr:schema:enum:reach-reason#no-record> a skos:Concept ;
+  skos:inScheme <epr:schema:enum:reach-reason> ;
+  skos:prefLabel "no-record" ;
+  skos:notation "no-record" .
+
+<epr:schema:enum:reach-reason#not-under-root> a skos:Concept ;
+  skos:inScheme <epr:schema:enum:reach-reason> ;
+  skos:prefLabel "not-under-root" ;
+  skos:notation "not-under-root" .
+
+<epr:schema:enum:reach-reason#identity-required> a skos:Concept ;
+  skos:inScheme <epr:schema:enum:reach-reason> ;
+  skos:prefLabel "identity-required" ;
+  skos:notation "identity-required" .
+
+<epr:schema:enum:reach-reason#authorizer-unavailable> a skos:Concept ;
+  skos:inScheme <epr:schema:enum:reach-reason> ;
+  skos:prefLabel "authorizer-unavailable" ;
+  skos:notation "authorizer-unavailable" .
 
 <epr:schema:enum:reach> a skos:ConceptScheme ;
   skos:prefLabel "Reach" ;
@@ -2094,6 +2473,52 @@
   skos:prefLabel "resource" ;
   skos:notation "resource" .
 
+<epr:schema:enum:tier-class> a skos:ConceptScheme ;
+  skos:prefLabel "TierClass" ;
+  dct:description "The class of a storage tier a requester may ask for bytes, narrowest first: the requester's own store, another device of the same person, the household, a hub, a holon hub, a pool, a peer named by a doorway, a doorway. A class conflict between two records for the same tier keeps the narrower class (`TierRecord::merge`), and the default tier order compares class first (interfaces spec §A.2). A new kind of carrier is a new variant here, which is a spec change. Source of truth: this schema; Rust mirror `eprfs_core::TierClass` (eprfs-core/src/tier.rs, kebab-case serde, Ord in this order). Not named in §2.G's enum list; added because objects/tier-record's `class` needs a referenced vocabulary (CONVENTIONS rule 7). Carries neither `_dna` nor `_codegen`: it is a field vocabulary for the placement wire schemas, generated only as a TypeScript union where those schemas inline it, and adds no constant to schema-enums.ts. Not yet pinned: no test holds the Rust enum equal to this list (follow-on: a case in a test crate that depends on eprfs-core, such as eprfs-serve's tests)." ;
+  <epr:vocab#ordered> false ;
+  skos:hasTopConcept <epr:schema:enum:tier-class#own>, <epr:schema:enum:tier-class#person-device>, <epr:schema:enum:tier-class#household>, <epr:schema:enum:tier-class#hub>, <epr:schema:enum:tier-class#holon-hub>, <epr:schema:enum:tier-class#pool>, <epr:schema:enum:tier-class#doorway-peer>, <epr:schema:enum:tier-class#doorway> .
+
+<epr:schema:enum:tier-class#own> a skos:Concept ;
+  skos:inScheme <epr:schema:enum:tier-class> ;
+  skos:prefLabel "own" ;
+  skos:notation "own" .
+
+<epr:schema:enum:tier-class#person-device> a skos:Concept ;
+  skos:inScheme <epr:schema:enum:tier-class> ;
+  skos:prefLabel "person-device" ;
+  skos:notation "person-device" .
+
+<epr:schema:enum:tier-class#household> a skos:Concept ;
+  skos:inScheme <epr:schema:enum:tier-class> ;
+  skos:prefLabel "household" ;
+  skos:notation "household" .
+
+<epr:schema:enum:tier-class#hub> a skos:Concept ;
+  skos:inScheme <epr:schema:enum:tier-class> ;
+  skos:prefLabel "hub" ;
+  skos:notation "hub" .
+
+<epr:schema:enum:tier-class#holon-hub> a skos:Concept ;
+  skos:inScheme <epr:schema:enum:tier-class> ;
+  skos:prefLabel "holon-hub" ;
+  skos:notation "holon-hub" .
+
+<epr:schema:enum:tier-class#pool> a skos:Concept ;
+  skos:inScheme <epr:schema:enum:tier-class> ;
+  skos:prefLabel "pool" ;
+  skos:notation "pool" .
+
+<epr:schema:enum:tier-class#doorway-peer> a skos:Concept ;
+  skos:inScheme <epr:schema:enum:tier-class> ;
+  skos:prefLabel "doorway-peer" ;
+  skos:notation "doorway-peer" .
+
+<epr:schema:enum:tier-class#doorway> a skos:Concept ;
+  skos:inScheme <epr:schema:enum:tier-class> ;
+  skos:prefLabel "doorway" ;
+  skos:notation "doorway" .
+
 <epr:schema:enum:validation-status> a skos:ConceptScheme ;
   skos:prefLabel "ValidationStatus" ;
   dct:description "Schema migration status for records. Defined in views.rs." ;
@@ -2145,4 +2570,4 @@
   <epr:vocab#orthogonalTo> "retention (the temporal half of the same disclosure gradient — not yet carded)" ;
   <epr:vocab#verdictClosure> "closed" .
 
-# 46 vocabularies · 361 concepts · 2 axes
+# 61 vocabularies · 428 concepts · 2 axes

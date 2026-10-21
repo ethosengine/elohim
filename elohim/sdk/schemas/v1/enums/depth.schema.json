@@ -1,0 +1,16 @@
+{
+  "$id": "epr:schema:enum:depth",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Depth",
+  "description": "How much of a view's bytes a device holds (spec §12.2). `query`: nothing is held; each read is answered by a tier. `sparse`: the whole view's bytes are here, so it works offline. `on-read`: only what was read is here. `kept`: pinned by residency, which satisfies every offline requirement; eprfs reads it from the residency pin and never writes it. There is deliberately NO `_ordinal`: depth does not order offline capability (`sparse` and `on-read` are not comparable to each other; each satisfies itself and `query`; finding B14). Not to be confused with the deprecated `MaterializationPolicy::Sparse`, which is `FetchPolicy::LocalOnly` plus sparse markers. Source of truth: this schema; Rust mirrors `eprfs_core::Depth` (walk.rs, kebab-case serde, no Ord) and `placement_core::Depth`, which ark-core maps 1:1. TypeScript constants only: `_codegen` (no `rust` key, so codegen-rs writes nothing) and never `_dna`, so no constant reaches content_store_integrity and no DNA hash moves (interfaces spec §2.G, G11). placement-core's schema_contract test reads this file with include_str! and compares it, in order, with the variants of `placement_core::Depth` written out by hand inside that test. It catches a value changed here, but a variant added to the Rust enum without editing the test still passes: nothing ties the test's list to the enum (follow-on: an `ALL` const in need.rs held to the enum by an exhaustive match, read by the test). Separately, `eprfs_core::Depth` is not yet pinned by any test (follow-on: a case in a test crate that depends on eprfs-core, such as eprfs-serve's tests).",
+  "type": "string",
+  "enum": [
+    "query",
+    "sparse",
+    "on-read",
+    "kept"
+  ],
+  "_codegen": {
+    "constant": "DEPTHS"
+  }
+}

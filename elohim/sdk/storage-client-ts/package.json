@@ -14,6 +14,10 @@
       "types": "./dist/generated/index.d.ts",
       "default": "./dist/generated/index.js"
     },
+    "./generated/*": {
+      "types": "./dist/generated/*.d.ts",
+      "default": "./dist/generated/*.js"
+    },
     "./wire-types": {
       "types": "./dist/wire-types/index.d.ts",
       "default": "./dist/wire-types/index.js"
@@ -25,13 +29,23 @@
     "./graphql": {
       "types": "./dist/graphql/index.d.ts",
       "default": "./dist/graphql/index.js"
+    },
+    "./placement": {
+      "types": "./dist/placement.d.ts",
+      "default": "./dist/placement.js"
+    },
+    "./tiers/http-tier": {
+      "types": "./dist/tiers/http-tier.d.ts",
+      "default": "./dist/tiers/http-tier.js"
     }
   },
   "files": [
     "dist"
   ],
   "scripts": {
+    "prebuild": "pnpm --filter @elohim/eprfs build",
     "build": "tsc",
+    "typecheck": "tsc -p tsconfig.typecheck.json",
     "clean": "rm -rf dist",
     "prepublishOnly": "pnpm run clean && pnpm run build",
     "generate:transformers": "tsx scripts/generate-transformers.ts",
@@ -48,6 +62,8 @@
   "author": "Elohim Protocol",
   "license": "AGPL-3.0",
   "dependencies": {
+    "@elohim/epr": "workspace:*",
+    "@elohim/eprfs": "workspace:*",
     "@automerge/automerge": "^3.0.0",
     "multiformats": "^13.4.1",
     "zod": "^3.22.4"

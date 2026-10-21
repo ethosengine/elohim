@@ -15,6 +15,8 @@
  */
 import { CID } from 'multiformats/cid';
 
+import { addressForm, verifyAddress } from '@elohim/epr';
+
 const RAW_CODEC = 0x55;
 const SHA2_256_CODE = 0x12;
 const SHA256_BYTES = 32;
@@ -59,9 +61,6 @@ export async function verifyRawSha256(
   bytes: ArrayBuffer | Uint8Array,
   address: string
 ): Promise<boolean> {
-  const expected = expectedSha256Hex(address);
-  if (expected === null) return false;
-  const view = ArrayBuffer.isView(bytes) ? bytes : new Uint8Array(bytes);
-  const digest = await crypto.subtle.digest('SHA-256', view as Uint8Array<ArrayBuffer>);
-  return toHex(new Uint8Array(digest)) === expected;
+  const form = addressForm(address);
+  return (form === 'raw' || form === 'legacy') && verifyAddress(address, bytes);
 }

@@ -1,0 +1,14 @@
+{
+  "$id": "epr:schema:enum:evidence-stage",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "EvidenceStage",
+  "description": "Whether an observation came from a fixture or from a real run, so evidence can only descend (fixture never settles what real evidence must). Named `evidenceStage` on the wire to avoid colliding with the one existing `evidence_class` field (attestation/subtypes/challenge-support-metadata, a kind of challenge evidence, a different thing). Landed as the first move of the `unwired` habit evidence-class-descends (elohim/elohim-storage/.epr-meta/evidence-class-descends.habit.md), so the observation and attestation schemas take the same `$ref` (interfaces spec finding 16, I10). A settling fulfilment draft requires `real`: placement-core's `RealEvidence::from_readings` refuses a `fixture` reading (§D.6, I9). Source of truth: this schema; Rust mirror `seam_contracts::probe::EvidenceStage` (crates/seam-contracts/src/probe.rs, kebab-case serde). TypeScript constants only: `_codegen` (no `rust` key, so codegen-rs writes nothing) and never `_dna`, so no constant reaches content_store_integrity and no DNA hash moves (interfaces spec §2.G, G11). Not yet pinned: no test holds `seam_contracts::probe::EvidenceStage` equal to this list (follow-on: a case in placement-core's schema_contract test, which already depends on seam-contracts, or in seam-contracts' own tests).",
+  "type": "string",
+  "enum": [
+    "fixture",
+    "real"
+  ],
+  "_codegen": {
+    "constant": "EVIDENCE_STAGES"
+  }
+}

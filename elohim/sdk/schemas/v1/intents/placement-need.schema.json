@@ -1,0 +1,230 @@
+{
+  "$id": "epr:schema:intent:placement-need",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "PlacementNeed",
+  "description": "A placement need: an intent to receive (spec §7.1, VF Intent with the receiver named), item S3. What kind of carrying, under which key, how many holders across how many failure domains, what a carrier must provide, the kind's terms, the reach it was expressed at (it crosses no wider, spec §7.2), the one receiver it is carried for, who expressed it, its serve-order class, and the space whose membrane it was expressed in. Its identity is content-derived: `Need::id` is the atom CID of the canonical DAG-CBOR encoding, the key explanations and carrying records join on (D10); a JSON form decoded and re-encoded to DAG-CBOR gives the same id as one built in Rust (G1 contract vector). A device's own needs never take this shape: they exist only as private needs on the device (R6). Sources: the app manifest's `needs` reader (§G), a person's keep intents, a TaskSpec (§F). Wire shape: this schema is the source of record; placement_core::Need (elohim/placement/core/src/need.rs; serde camelCase, deny_unknown_fields; every CID a string in JSON) is its Rust mirror, not yet pinned to it by a test (follow-on: a placement-core schema_contract case that validates one serialized Need per NeedTerms and NeedKey form here). The Rust codec is the authority only for the canonical DAG-CBOR bytes and `Need::id`. Source of truth: the need's source, from which it is derived each pass (Category C); it is never notarized itself; what is recorded is the carrier's commitment (Category A above public reach, household-local below, R2).",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "kind",
+    "key",
+    "demand",
+    "requires",
+    "terms",
+    "reach",
+    "receiver",
+    "expressedBy",
+    "class",
+    "inScopeOf"
+  ],
+  "properties": {
+    "kind": {
+      "$ref": "../enums/placement-kind.schema.json"
+    },
+    "key": {
+      "$ref": "../objects/need-key.schema.json"
+    },
+    "demand": {
+      "title": "Demand",
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "holders",
+        "domains"
+      ],
+      "description": "How many honored holders across how many distinct failure domains, resolved by the space's charter from the content type's declared loss (Charter::resolve). `domains` is at most `holders`; JSON Schema cannot compare the two, and the Rust constructor and the charter hold it.",
+      "properties": {
+        "holders": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 65535,
+          "description": "Honored holders wanted."
+        },
+        "domains": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 65535,
+          "description": "Distinct failure domains wanted among them."
+        }
+      }
+    },
+    "requires": {
+      "title": "Requirements",
+      "description": "What a carrier must provide. Every field is always written; a null means the need sets no bound on that dimension (one provenance).",
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "alwaysOn",
+        "bytes",
+        "memoryBytes",
+        "cpuMillis",
+        "pids",
+        "isolation",
+        "carriers"
+      ],
+      "properties": {
+        "alwaysOn": {
+          "type": "boolean",
+          "description": "Whether the carrier must be always on."
+        },
+        "bytes": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "minimum": 0,
+          "maximum": 9007199254740991,
+          "description": "For a task: disk bytes plus the materialized view's size (F16). A u64 in Rust, bounded here to 9007199254740991 (2^53 - 1, the largest integer every JSON reader, JavaScript included, holds exactly); a larger value is refused, never rounded."
+        },
+        "memoryBytes": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "minimum": 0,
+          "maximum": 9007199254740991,
+          "description": "A u64 in Rust, bounded here to 9007199254740991 (2^53 - 1, the largest integer every JSON reader, JavaScript included, holds exactly); a larger value is refused, never rounded."
+        },
+        "cpuMillis": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "minimum": 0,
+          "maximum": 4294967295
+        },
+        "pids": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "minimum": 0,
+          "maximum": 4294967295,
+          "description": "Process ids (D20, F16)."
+        },
+        "isolation": {
+          "oneOf": [
+            {
+              "type": "null"
+            },
+            {
+              "$ref": "../enums/isolation.schema.json"
+            }
+          ],
+          "description": "The weakest isolation the need accepts (F6); null accepts any."
+        },
+        "carriers": {
+          "oneOf": [
+            {
+              "type": "null"
+            },
+            {
+              "type": "array",
+              "uniqueItems": true,
+              "items": {
+                "type": "string",
+                "pattern": "^uhCAk[A-Za-z0-9_-]+$",
+                "description": "An agent key (`uhCAk…`), the canonical agent identity (elohim_epr_rea::model::AgentRef / AgentRefKey, a string newtype). Never a transport id and never a CID."
+              }
+            }
+          ],
+          "description": "A narrowing every peer's admit sees (`--on`, F14): only these agents may carry. Null: any carrier. A set, sorted in the canonical encoding."
+        }
+      }
+    },
+    "terms": {
+      "title": "NeedTerms",
+      "description": "Kind-specific terms inside the need's canonical encoding (F4), internally tagged by `terms`.",
+      "oneOf": [
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "title": "NeedTermsNone",
+          "required": [
+            "terms"
+          ],
+          "properties": {
+            "terms": {
+              "const": "none"
+            }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "title": "NeedTermsTask",
+          "required": [
+            "terms",
+            "inputRoot",
+            "scope",
+            "baseRoot"
+          ],
+          "properties": {
+            "terms": {
+              "const": "task"
+            },
+            "inputRoot": {
+              "type": "string",
+              "pattern": "^bafyrei[a-z2-7]{52}$",
+              "description": "The task's input tree root."
+            },
+            "scope": {
+              "$ref": "../enums/grant-scope.schema.json",
+              "description": "The compute-grant scope derived one way from the method (F1), never written by the requester."
+            },
+            "baseRoot": {
+              "oneOf": [
+                {
+                  "type": "null"
+                },
+                {
+                  "type": "string",
+                  "pattern": "^bafyrei[a-z2-7]{52}$",
+                  "description": "A root the requester believes a berth holds, so only the delta is fetched (F9)."
+                }
+              ],
+              "description": "Null when the requester names no base root."
+            }
+          }
+        }
+      ]
+    },
+    "reach": {
+      "$ref": "../enums/reach.schema.json",
+      "description": "The reach the need was expressed at; it crosses no wider. Below public, placement is household-local and not notarized (R2)."
+    },
+    "receiver": {
+      "type": "string",
+      "pattern": "^uhCAk[A-Za-z0-9_-]+$",
+      "description": "Carried for whom: one receiver per need. An agent key (`uhCAk…`), the canonical agent identity (elohim_epr_rea::model::AgentRef / AgentRefKey, a string newtype). Never a transport id and never a CID."
+    },
+    "expressedBy": {
+      "title": "Expresser",
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "by",
+        "id"
+      ],
+      "description": "Who expressed the need. A struct with a `by` field rather than an internally tagged enum, so the JSON and DAG-CBOR forms are both honest (G1). There is no device expresser.",
+      "properties": {
+        "by": {
+          "$ref": "../enums/expresser-kind.schema.json"
+        },
+        "id": {
+          "type": "string",
+          "minLength": 1,
+          "description": "The manifest or charter CID string, or the person's or agent's key."
+        }
+      }
+    },
+    "class": {
+      "$ref": "../enums/need-class.schema.json"
+    },
+    "inScopeOf": {
+      "type": "string",
+      "pattern": "^baf[ky]rei[a-z2-7]{52}$",
+      "description": "The space whose membrane the need was expressed in (VF in_scope_of), a CID string. The legacy custody scope is the raw-codec CID of the name elohim:placement:legacy-custody-scope@1."
+    }
+  }
+}

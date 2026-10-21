@@ -1,7 +1,7 @@
 import { CID } from 'multiformats/cid';
-import { encodeCanonical } from './cbor';
-import type { Envelope } from './generated/Envelope';
-import type { Coupling } from './generated/Coupling';
+import { encodeCanonical } from './cbor.js';
+import type { Envelope } from './generated/Envelope.js';
+import type { Coupling } from './generated/Coupling.js';
 
 /**
  * Parse a CID that may arrive as:

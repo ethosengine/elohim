@@ -71,7 +71,17 @@ decisionPoints:
       - path: elohim/eprfs/eprfs-storage/src/lib.rs
         testName: directory_store_refuses_public_existing_root_and_object
         kind: unit
+      - path: elohim/eprfs/eprfs-storage/tests/tier_chain.rs
+        testName: offloaded_directory_passes_the_leaf_contract_on_a_multi_thread_runtime
+        kind: integration
+      - path: elohim/eprfs/eprfs-storage/tests/walk_directory_storage.rs
+        testName: directory_storage_corrupt_spine_object_refuses
+        kind: integration
     notes: >
+      A stored object that fails its address is the typed EprfsError::Corrupt, which every walk
+      reads as integrity. OffloadedDirectory is the same store with each read and write on
+      tokio's blocking pool, for a TierChain on a multi-thread runtime and every serving
+      adapter (interfaces spec section 4, Blocking I/O).
       This adapter creates no DHT entry, coordinator, route, or release linkage;
       expected head-plane cost is zero at seed and one year. Directory ancestry
       is caller-owned and trusted against concurrent local path replacement.

@@ -11,6 +11,17 @@ license = "AGPL-3.0"
 elohim-epr = { path = "../epr" }
 elohim-ark-core = { path = "../ark/core" }
 
+# The placement contract (interfaces spec §1.1, L1): `reconcile/placement.rs`'s
+# `PlacementStrategy` is a shim over its `Ranking` (rail R-P8). Pure: no I/O, no async, no
+# clock. Already in the graph through elohim-ark-core with the same features.
+elohim-placement-core = { path = "../placement/core" }
+# The eprfs tier and reach traits (interfaces spec §2.A): `eprfs_tier::BlobStoreTier`
+# implements `EprfsStorage` over the BlobStore and `eprfs_tier::RootReachGate` implements
+# `ReachGate`. A pure value crate (rail R-E1). Rail R-E3: this crate may depend on
+# eprfs-core and eprfs-serve, never on eprfs-storage or eprfs-local
+# (`boundary::eprfs_direction`, src/boundary.rs). Approved by the operator, 2026-10-20.
+eprfs-core = { version = "0.2.0", path = "../eprfs/eprfs-core" }
+
 # The pure parts of an EPR index (post-station-4 sprint, Lane S, ruling R-S1): the declared
 # chunk rule, the FTS5 fold store keyed by an opaque unit id, rank fusion and the fold
 # attestation — shared with the recall executor. Its rusqlite carries NO features, so the
@@ -447,6 +458,9 @@ criterion = { version = "0.5", features = ["html_reports"] }
 elohim-seam-contracts = { version = "0.1.0", path = "../../crates/seam-contracts", features = [
     "harness",
 ] }
+# The tier contract harness (interfaces spec §A.4, A19): `assert_leaf_contract` runs against
+# `eprfs_tier::BlobStoreTier`. Dev-only, as rail R-E3 allows.
+eprfs-serve = { path = "../eprfs/eprfs-serve", features = ["testing"] }
 
 [[bench]]
 name = "graph_traversal"

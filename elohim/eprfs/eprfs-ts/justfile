@@ -1,0 +1,10 @@
+# Pure browser/runtime tree SDK. The gate is registered in build-manifest.json.
+gate:
+    #!/usr/bin/env bash
+    set -uo pipefail
+    for step in build typecheck lint test; do
+        pnpm run "$step"
+        result=$?
+        echo EXIT=$result
+        [ "$result" -eq 0 ] || exit "$result"
+    done

@@ -1,0 +1,37 @@
+{
+  "manifestVersion": "1.0",
+  "pipeline": "elohim-placement",
+  "description": "placement — the placement contract's pure core (elohim-placement-core): floor and ceiling interfaces, decide(), explain, and the R-P rails",
+  "steps": {
+    "gate-placement": {
+      "description": "fmt + clippy -D warnings + tests (all features, compile_fail doctests included) for elohim-placement-core, and elohim-compute's default-features-off build that it depends on",
+      "inputs": {
+        "sources": [
+          "elohim/placement/**",
+          "elohim/Cargo.toml",
+          "elohim/Cargo.lock",
+          "elohim/epr/**",
+          "elohim/epr-rea/**",
+          "elohim/elohim-compute/**",
+          "crates/seam-contracts/**",
+          "elohim/sdk/schemas/v1/enums/**",
+          "elohim/sdk/schemas/v1/manifest/app-manifest.schema.json"
+        ],
+        "buildProcess": []
+      },
+      "outputs": { "artifacts": [], "verify": null },
+      "depends": [],
+      "executor": { "stage": "Gate Placement", "function": null }
+    }
+  },
+  "gate": {
+    "projects": {
+      "elohim-placement": {
+        "dir": "elohim/placement",
+        "steps": ["gate-placement"],
+        "run": { "kind": "just", "recipe": "gate", "cargo": { "workspace": "elohim", "profile": "dev", "rustflags": "" } }
+      }
+    }
+  },
+  "deployment": {}
+}

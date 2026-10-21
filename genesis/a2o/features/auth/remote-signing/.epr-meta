@@ -1,0 +1,29 @@
+---
+epr-meta-version: 1
+id: a2o-auth-remote-signing
+covers: subtree
+purpose: >
+  The remote-signing series: stories of a person whose cell runs on a machine they do not hold, a
+  household hub, while the key that signs for that cell stays on a device they do hold. It sits
+  between the hosted-human series (../hosted-human/), where a hub or a doorway's pool holds the
+  person's key and the person is told so, and the graduation series (../graduation/), where the
+  person's own node holds it. Station 01 is the floor of the claim: a device signs, the hub runs,
+  and the hub holds no key material, so the hub cannot write in the person's name on its own.
+  It serves the proposed concern device-key-remote-cell (placement-contract design §15, "device
+  key to remote cell"; held until §17 slice 10, the runtime redesign). No habit declares that
+  concern yet.
+cites:
+  - genesis/docs/superpowers/specs/2026-10-20-what-every-app-inherits-placement-contract-design.md
+  - genesis/a2o/features/auth/hosted-human/README.md
+  - genesis/a2o/features/auth/graduation/01-onto-my-own-node.feature
+---
+# remote-signing/ — the hub runs, the device signs
+
+Series discipline follows the graduation series, with one addition: **where the key is, is the
+claim.** A station here asserts both what the person's device signed and what the hub can be
+shown not to hold, and it reads the second from peers that are not the hub. A station that could
+pass with the key sitting on the hub is not a remote-signing station.
+
+**Considered, no enforcing rule beyond the parent's.** This manifest satisfies the parent
+`genesis/a2o/.epr-meta` no-orphan-subtree rule (`new-feature-subdir-needs-meta`) and claims
+coverage so the walk terminates here; the blind-reader obligation is inherited.

@@ -137,6 +137,15 @@ COPY elohim/epr-rea ./epr-rea
 # content search fold. From /app/epr-index its deps resolve as ../epr and ../epr-rea (both
 # COPYd above); it uses workspace inheritance, inlined below.
 COPY elohim/epr-index ./epr-index
+# elohim-placement-core + eprfs-core (2026-10-20, placement contract items C2-C5): non-optional
+# path-deps of elohim-ark-core (task.rs) and of elohim-storage itself (the PlacementStrategy shim,
+# the eprfs tier adapters). Flattened layout: from /app/ark/core they resolve as
+# ../../placement/core → /app/placement/core and ../../eprfs/eprfs-core → /app/eprfs/eprfs-core.
+# eprfs-serve is a dev-dependency only (the tier contract harness the `check` stage's
+# `cargo test --lib` runs). All three use workspace inheritance; inlined below.
+COPY elohim/placement/core ./placement/core
+COPY elohim/eprfs/eprfs-core ./eprfs/eprfs-core
+COPY elohim/eprfs/eprfs-serve ./eprfs/eprfs-serve
 # Wave 3 — valueflows bridge crates (hREA / VF-GraphQL interop) are
 # unconditional path-deps in Cargo.toml; copy them in so the
 # build-context contains their source.
@@ -198,6 +207,9 @@ RUN sed -i 's|path = "../../crates/doorway-client"|path = "crates/doorway-client
     sed -i 's|path = "../epr-rea"|path = "epr-rea"|' Cargo.toml && \
     sed -i 's|path = "../epr-index"|path = "epr-index"|' Cargo.toml && \
     sed -i 's|path = "../ark/core"|path = "ark/core"|' Cargo.toml && \
+    sed -i 's|path = "../placement/core"|path = "placement/core"|' Cargo.toml && \
+    sed -i 's|path = "../eprfs/eprfs-core"|path = "eprfs/eprfs-core"|' Cargo.toml && \
+    sed -i 's|path = "../eprfs/eprfs-serve"|path = "eprfs/eprfs-serve"|' Cargo.toml && \
     sed -i 's|path = "../../bridges/valueflows/valueflows-bridge"|path = "bridges/valueflows/valueflows-bridge"|' Cargo.toml && \
     sed -i 's|path = "../../bridges/valueflows/valueflows-types"|path = "bridges/valueflows/valueflows-types"|' Cargo.toml && \
     sed -i 's|path = "../../bridges/did/did-bridge"|path = "bridges/did/did-bridge"|' Cargo.toml && \
@@ -244,12 +256,17 @@ RUN sed -i \
     -e 's|hex.workspace = true|hex = "0.4"|' \
     epr/Cargo.toml
 
-# elohim-compute crate uses workspace inheritance too — inline the values.
+# elohim-compute crate uses workspace inheritance too — inline the values. Its `runtime` feature
+# (2026-10-20, placement item C2) made serde_json, dashmap and chrono optional, so both forms are
+# inlined.
 RUN sed -i \
     -e 's|serde = { workspace = true }|serde = { version = "1.0", features = ["derive"] }|' \
     -e 's|serde_json = { workspace = true }|serde_json = "1.0"|' \
     -e 's|dashmap = { workspace = true }|dashmap = "6.1"|' \
     -e 's|chrono = { workspace = true }|chrono = { version = "0.4", features = ["serde"] }|' \
+    -e 's|serde_json = { workspace = true, optional = true }|serde_json = { version = "1.0", optional = true }|' \
+    -e 's|dashmap = { workspace = true, optional = true }|dashmap = { version = "6.1", optional = true }|' \
+    -e 's|chrono = { workspace = true, optional = true }|chrono = { version = "0.4", features = ["serde"], optional = true }|' \
     elohim-compute/Cargo.toml
 
 # elohim-render crate uses workspace inheritance too — inline the values.
@@ -307,6 +324,39 @@ RUN sed -i \
     -e 's|serde_json.workspace = true|serde_json = "1.0"|' \
     -e 's|thiserror.workspace = true|thiserror = "2.0"|' \
     epr-rea/Cargo.toml
+
+# elohim-placement-core inherits the same [workspace.dependencies] forms as ark-core (versions =
+# elohim/Cargo.toml); its seam-contracts path needs one fewer `../` in the flattened layout.
+RUN sed -i \
+    -e 's|path = "../../../crates/seam-contracts"|path = "../../crates/seam-contracts"|' \
+    -e 's|serde = { workspace = true }|serde = { version = "1.0", features = ["derive"] }|' \
+    -e 's|serde_json = { workspace = true }|serde_json = "1.0"|' \
+    -e 's|serde_ipld_dagcbor = { workspace = true }|serde_ipld_dagcbor = "0.6"|' \
+    -e 's|cid = { workspace = true }|cid = { version = "0.11", features = ["serde-codec"] }|' \
+    -e 's|thiserror = { workspace = true }|thiserror = "2.0"|' \
+    -e 's|sha2 = { workspace = true }|sha2 = "0.10"|' \
+    placement/core/Cargo.toml
+
+# eprfs-core + eprfs-serve inherit from elohim/eprfs/Cargo.toml's [workspace.package] and
+# [workspace.dependencies] — inline them. Their `registry = "elohim"` keys name the publish
+# registry, which is configured only in the repo's .cargo/config.toml (not in this context), so
+# they are dropped; the path wins for an in-tree build either way.
+RUN sed -i \
+    -e 's|version.workspace = true|version = "0.2.0"|' \
+    -e 's|edition.workspace = true|edition = "2021"|' \
+    -e 's|license.workspace = true|license = "Apache-2.0"|' \
+    -e 's|authors.workspace = true|authors = ["Elohim Protocol"]|' \
+    -e 's|repository.workspace = true|repository = "https://github.com/ethosengine/elohim"|' \
+    -e 's|async-trait.workspace = true|async-trait = "0.1"|' \
+    -e 's|bytes.workspace = true|bytes = "1"|' \
+    -e 's|serde.workspace = true|serde = { version = "1", features = ["derive"] }|' \
+    -e 's|serde_json.workspace = true|serde_json = "1"|' \
+    -e 's|serde_json = { workspace = true, optional = true }|serde_json = { version = "1", optional = true }|' \
+    -e 's|thiserror.workspace = true|thiserror = "2"|' \
+    -e 's|tokio.workspace = true|tokio = { version = "1", features = ["macros", "rt-multi-thread"] }|' \
+    -e 's|path = "../../../crates/seam-contracts"|path = "../../crates/seam-contracts"|' \
+    -e 's|, registry = "elohim"||' \
+    eprfs/eprfs-core/Cargo.toml eprfs/eprfs-serve/Cargo.toml
 
 # elohim-epr-index inherits its dependency versions from elohim/Cargo.toml's
 # [workspace.dependencies] — inline them (its rusqlite stays feature-less: the one SQLite in

@@ -21,6 +21,9 @@ thiserror.workspace = true
 # (no crypto/ts-rs from the full atom codec) while making BlobCid a real, verifiable fingerprint.
 cid = { version = "0.11", features = ["serde-codec"] }
 multihash-codetable = { version = "0.2", features = ["sha2"] }
+# Ruling 7's shared `Unanswered<R>` (interfaces spec §2.0). A std/alloc leaf with zero
+# first-party dependencies, admitted by rail R-E1 (`boundary::frozen_dependency_set`).
+elohim-seam-contracts = { version = "0.1.0", path = "../../../crates/seam-contracts", registry = "elohim", features = ["serde"] }
 
 [dev-dependencies]
 serde_ipld_dagcbor = "0.6"

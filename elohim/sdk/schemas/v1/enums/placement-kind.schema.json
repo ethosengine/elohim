@@ -1,0 +1,21 @@
+{
+  "$id": "epr:schema:enum:placement-kind",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "PlacementKind",
+  "description": "The closed list of placement kinds: what a need asks to have carried and what a posture offers to carry. One deterministic `decide` pass covers every kind, so a carrier's capacity is charged across kinds in the charter's serve order (interfaces spec §D.1). A new kind is four coupled steps landed together: a variant here and in `placement_core::KindId`, a `PlacementKind` implementation in the crate that owns the carrier, a `grant-scope` entry if it spends compute, and a probe (§D.1 'Extension'). Closed rather than open because the compute-grant scopes a kind consumes are a closed list. Source of truth: this schema; Rust mirror `placement_core::KindId` (elohim/placement/core/src/kind.rs, `#[non_exhaustive]`, kebab-case serde). TypeScript constants only: `_codegen` (no `rust` key, so codegen-rs writes nothing) and never `_dna`, so no constant reaches content_store_integrity and no DNA hash moves (interfaces spec §2.G, G11). placement-core's schema_contract test reads this file with include_str! and compares it, in order, with `KindId::ALL`, a list kept by hand in kind.rs. It catches a value changed here, but a variant added to `KindId` without extending `ALL` still passes: no exhaustive match ties `ALL` to the enum, and the enum is `#[non_exhaustive]` (follow-on: a guard in kind.rs that matches every variant against its index in `ALL`).",
+  "type": "string",
+  "enum": [
+    "custody-blob",
+    "custody-root",
+    "live-session",
+    "relay",
+    "wake-ingress",
+    "hub-runtime",
+    "inference",
+    "index-fold",
+    "task"
+  ],
+  "_codegen": {
+    "constant": "PLACEMENT_KINDS"
+  }
+}

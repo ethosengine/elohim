@@ -62,3 +62,27 @@ Feature: A household at rest is quiet
       | average conductor calls per peer per minute |  6 |
       | refused conductor permits per peer           |  0 |
       | average household CPU seconds per minute     | 10 |
+
+  @wip
+  Scenario: With every node's posture declared and nothing to do, the nodes still do almost nothing
+    A posture is a signed record a node keeps of what it is willing to do for the other nodes. A
+    node can offer two roles. A node that hosts live sessions, whenever a session is open, passes
+    along to everyone in that session who has the shared document open and where each person's
+    cursor is. A node that carries content stores copies of the other nodes' content and hands a
+    copy to any node that asks for one. Each role is real work, but only while someone uses it: an
+    open session to pass messages for, or a node asking for a copy. A node takes on a role only when
+    its person declares it, and its posture is rewritten only when that choice changes, never on a
+    timer. A node that offers a role nobody is using must cost no more than a node that offers
+    nothing, so the budgets are the same as when no posture is declared.
+    Given Matthew has declared in his node's signed posture that it will host live sessions for the household and carry content for the other nodes
+    And Jessica has declared in her node's signed posture that it will carry content for the other nodes
+    And James has declared in his node's signed posture that it offers nothing to the other nodes
+    And no live session is open on any node
+    And Matthew, Jessica and James each leave that declared choice unchanged for the 300 seconds
+    When no person or external client authors, reads or syncs for 300 seconds
+    Then the quiet household stayed within the same resource budgets as a household with no posture declared, because a role nobody uses costs nothing:
+      | average conductor calls per peer per minute |  6 |
+      | refused conductor permits per peer           |  0 |
+      | average household CPU seconds per minute     | 10 |
+    And no node rewrote its posture during the 300 seconds, because a posture changes only when its person's choice changes
+    And no node sent a live-session message during the 300 seconds

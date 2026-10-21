@@ -1,0 +1,53 @@
+[package]
+name = "elohim-placement-core"
+version = "0.1.0"
+edition = "2021"
+license = "Apache-2.0"
+authors = ["Elohim Protocol"]
+description = "placement-core — the pure placement contract: needs, postures, eligibility, ranking, adoption, the charter and decide(), the explanation, and the parameter-set ceiling. Pure functions over a snapshot; no I/O, no async, no clock. The dependency set is a test (rail R-P1)."
+
+[lib]
+name = "placement_core"
+path = "src/lib.rs"
+
+[features]
+# The ranking contract (`rank::contract::assert_ranking_contract`) and the shared test kinds, for
+# implementors' dev-dependencies. It turns on seam-contracts' property harnesses, which the
+# contract is built on; it adds no package to the dependency graph.
+testing = ["elohim-seam-contracts/harness"]
+
+# The exact set rail R-P1 (`boundary::exact_dependency_set` in src/lib.rs) reads. Adding a line here
+# fails the build until the rail and the interfaces spec's §1.3 row are revised together.
+[dependencies]
+elohim-epr = { path = "../../epr" }
+elohim-epr-rea = { path = "../../epr-rea", default-features = false }
+elohim-compute = { path = "../../elohim-compute", default-features = false }
+elohim-seam-contracts = { path = "../../../crates/seam-contracts", features = ["serde"] }
+serde = { workspace = true }
+serde_ipld_dagcbor = { workspace = true }
+cid = { workspace = true }
+sha2 = { workspace = true }
+thiserror = { workspace = true }
+
+[dev-dependencies]
+serde_json = { workspace = true }
+# The view-schema validation of every `Explanation` outcome (floor_contract.rs, Codex review 1). Already
+# in the lockfile through elohim-epr and elohim-storage; no network or file resolver is used, the test
+# supplies its own retriever over the in-tree schemas.
+jsonschema = { version = "0.28", default-features = false }
+elohim-seam-contracts = { path = "../../../crates/seam-contracts", features = ["serde", "harness"] }
+
+# The contract suites use the `testing` surface; the gate runs them with `--all-features`.
+[[test]]
+name = "floor_contract"
+path = "tests/floor_contract.rs"
+required-features = ["testing"]
+
+[[test]]
+name = "ceiling_contract"
+path = "tests/ceiling_contract.rs"
+required-features = ["testing"]
+
+[[test]]
+name = "schema_contract"
+path = "tests/schema_contract.rs"

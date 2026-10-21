@@ -364,3 +364,197 @@ decisionPoints:
       operator-tunable policy. Making them a standing-policy manifest read is a real change with a
       real home (the ManifestStakesResolver that already owns the stage leg) and is not smuggled
       in as a default here.
+
+  - name: Unanswered
+    kind: boundary-answer-type
+    sourceLocation:
+      file: src/unanswered.rs
+      modulePath: seam_contracts::unanswered::Unanswered
+      line: 61
+    summary: >
+      Ruling 7 of the placement contract as a type: every refusal, absence or "not carried" a
+      seam returns carries `why` (the seam's own reason), `come_back` (a time or an event) and
+      `meanwhile` (what can be done locally, or `Nothing` with a stated `because`), plus an
+      `escalation` on a repeat ask before the come-back. Its status channel is `PendingStatus`
+      pulled through `StatusCursor`, whose only terminal states are `Answered` and `Withdrawn`.
+    concernIds:
+      - id: C4
+        status: answered
+        justification: >
+          "Not carried" cannot be silent: `come_back` and `meanwhile` are required fields, not
+          Options, so a constructor that omits either does not compile, and "nothing can be done"
+          is `Meanwhile::Nothing { because }`, said rather than implied. `Withdrawn` is a distinct
+          terminal from `Answered` (withdrawal_is_terminal_and_never_read_as_answered), so a
+          withdrawn need is never read as met.
+      - id: C3
+        status: answered
+        justification: >
+          Every unanswered request names the event or time after which it can move, and the
+          terminal set is closed (only_answered_and_withdrawn_are_terminal). The channel's
+          mechanism is the crate's own: `Changes<S>` is the StatusCursor over a seam's pure
+          `StatusSource`, and it reports only a changed status and nothing after Answered or
+          Withdrawn by construction (a_cursor_whose_inputs_did_not_change_returns_none,
+          a_cursor_reaches_a_terminal_state_only_through_answered_or_withdrawn, both over
+          `Changes`). A seam that writes its own cursor runs
+          `harness::status::check_status_cursor` over it with the status its inputs hold at
+          each step (`expected`), which catches a cursor that stays silent when that status
+          changed (silent_after_change, so an always-None cursor fails at its first step:
+          a_cursor_that_never_speaks_is_caught, a_missed_answer_is_caught), a status other than
+          the inputs hold, a re-poll that speaks without a change, an unchanged status reported
+          twice and a status after a terminal one (src/harness/status.rs). The harness is only
+          as good as the `expected` the seam's test supplies; for a seam with a pure
+          `StatusSource` that is the source itself. Answered for the channel's contract;
+          whether a seam's status function moves after its `come_back` is that seam's own row.
+      - id: C8
+        status: partial
+        justification: >
+          The struct puts no bound on `R`, because seam reasons such as an absence carrying its
+          path hold data; `Unanswered::label` exists only where `R: ReasonLabel`. A seam with a
+          data-bearing reason must expose a fieldless ReasonLabel face (eprfs-serve's
+          `ItemAbsenceLabel` is the named first one) for its counts.
+    contractTests:
+      - path: crates/seam-contracts/src/unanswered.rs
+        testName: escalate_counts_asks_and_keeps_the_three_parts
+        kind: unit
+      - path: crates/seam-contracts/src/unanswered.rs
+        testName: map_why_keeps_the_other_parts
+        kind: unit
+      - path: crates/seam-contracts/src/unanswered.rs
+        testName: only_answered_and_withdrawn_are_terminal
+        kind: unit
+      - path: crates/seam-contracts/tests/unanswered.rs
+        testName: every_reason_type_used_in_unanswered_is_a_conformant_reason_label
+        kind: unit
+      - path: crates/seam-contracts/tests/unanswered.rs
+        testName: a_cursor_whose_inputs_did_not_change_returns_none
+        kind: unit
+      - path: crates/seam-contracts/tests/unanswered.rs
+        testName: a_cursor_reaches_a_terminal_state_only_through_answered_or_withdrawn
+        kind: unit
+      - path: crates/seam-contracts/tests/unanswered.rs
+        testName: withdrawal_is_terminal_and_never_read_as_answered
+        kind: unit
+      - path: crates/seam-contracts/tests/unanswered.rs
+        testName: changes_over_a_seam_source_passes_the_status_harness
+        kind: unit
+      - path: crates/seam-contracts/src/harness/status.rs
+        testName: changes_passes_the_harness
+        kind: unit
+      - path: crates/seam-contracts/src/harness/status.rs
+        testName: spoke_after_terminal_is_caught
+        kind: unit
+      - path: crates/seam-contracts/src/harness/status.rs
+        testName: a_cursor_that_never_speaks_is_caught
+        kind: unit
+      - path: crates/seam-contracts/src/harness/status.rs
+        testName: a_missed_answer_is_caught
+        kind: unit
+    notes: >
+      BIRTH-RULE JUSTIFICATION. Cross-cutting by construction: the interfaces spec
+      (genesis/docs/superpowers/specs/2026-10-20-placement-contract-interfaces-design.md §2.0)
+      names one shared type for seams A-I across eprfs-core, placement-core, ark-core and the
+      TypeScript SDK, and R-E1 admits this leaf to eprfs-core for exactly that reason. The wire
+      form is objects/unanswered.schema.json (lane S); the serde derives here are convenience.
+
+  - name: ProbeAnswer
+    kind: boundary-answer-type
+    sourceLocation:
+      file: src/probe.rs
+      modulePath: seam_contracts::probe::ProbeAnswer
+      line: 133
+    summary: >
+      The answer inside a probe `Reading<T>`: `Present(T)`, `Absent` (implying observed_absent),
+      or `Unreachable(UnreachableReason)`, where `UnreachableReason` is a private-field newtype
+      over `AnswerReason` that refuses `ObservedAbsent`. Unmeasured is `Probe::read` returning
+      `None`, outside the reading.
+    concernIds:
+      - id: C4
+        status: answered
+        justification: >
+          Present-with-reason, Unreachable-without-reason and Unreachable-with-observed_absent are
+          all unwritable: the first two by the variant shapes, the third because
+          `UnreachableReason`'s field is private and its constructor, `TryFrom` and serde
+          `try_from` all refuse ObservedAbsent (unreachable_reason_refuses_observed_absent).
+          `reason().state() == state()` holds for every variant (probe_answer_states_and_reasons_pair).
+      - id: C5
+        status: answered
+        justification: >
+          `evidence: EvidenceStage` is a required argument of `Reading::new` with no default, so
+          every reading states its stage; the settling half (only Real readings build
+          `RealEvidence`) lives in placement-core and is pinned there. Every field is private
+          and read through getters. Compile-fail doctests refuse in-place evidence promotion,
+          answer replacement and struct-update relabelling; placement-core consumes the getters.
+          A producer still declares the provenance of each new reading it constructs.
+      - id: C8
+        status: answered
+        justification: >
+          `ProbeAnswer::reason` yields the AnswerReason to count; EvidenceStage and PartyRole are
+          ReasonLabel vocabularies with golden label sets equal to their schema values
+          (evidence_stage_labels_are_stable, party_role_labels_are_stable).
+    contractTests:
+      - path: crates/seam-contracts/src/probe.rs
+        testName: unreachable_reason_refuses_observed_absent
+        kind: unit
+        mirrorRisk: false
+      - path: crates/seam-contracts/src/probe.rs
+        testName: probe_answer_states_and_reasons_pair
+        kind: unit
+      - path: crates/seam-contracts/src/probe.rs
+        testName: evidence_stage_labels_are_stable
+        kind: unit
+      - path: crates/seam-contracts/src/probe.rs
+        testName: unreachable_reason_labels_are_answer_reason_labels
+        kind: unit
+      - path: crates/seam-contracts/tests/probe.rs
+        testName: a_probe_with_nothing_to_read_returns_none
+        kind: unit
+      - path: crates/seam-contracts/tests/probe.rs
+        testName: an_unreachable_answer_always_carries_a_transport_reason
+        kind: unit
+      - path: crates/seam-contracts/src/probe.rs
+        testName: route_sorts_by_disclosure
+        kind: unit
+      - path: crates/seam-contracts/src/probe.rs
+        testName: declassified_comes_only_from_a_holder_reading
+        kind: unit
+      - path: crates/seam-contracts/tests/probe.rs
+        testName: holder_readings_reach_only_a_holder_sink
+        kind: unit
+      - path: crates/seam-contracts/src/probe.rs
+        testName: deliver_compares_the_reach_with_the_audience
+        kind: unit
+      - path: crates/seam-contracts/src/probe.rs
+        testName: share_refusal_labels_are_stable
+        kind: unit
+      - path: crates/seam-contracts/tests/probe.rs
+        testName: a_shared_reading_reaches_only_a_sink_inside_its_reach
+        kind: unit
+      - path: crates/seam-contracts/tests/probe.rs
+        testName: openness_ordinals_match_the_reach_schema
+        kind: unit
+    notes: >
+      BIRTH-RULE JUSTIFICATION. Cross-cutting: one probe envelope for every served promise of
+      spec §9 (materialization, agreement, parameters, reach, compute, doorways), produced by
+      eprfs-core, placement-core and elohim-storage. `Reading<T>` stays internal; the wire is
+      objects/probe-reading.schema.json plus one monomorphic view per promise in elohim-views.
+      Who may read a reading is routed by the disclosure it was built with. The disclosure is
+      fixed at construction: `Reading.disclosure` is private, set only by `Reading::new` and
+      read by `Reading::disclosure()`, so an existing reading cannot be relabelled by a struct
+      update from a clone or in place; `Reading` serializes but does not deserialize, so it
+      cannot be relabelled through a serialize-edit-deserialize round trip either (compile_fail
+      doctests on Reading). `Reading::route` sorts a reading into a HolderReading, PartyReading
+      or SharedReading (private-field newtypes only `route` builds), HolderSink takes only a
+      HolderReading, and SharedSink takes only an `Admitted`, which only
+      `SharedReading::deliver` builds after comparing the reading's reach with the sink's
+      declared `audience_openness()`: a sink whose readers are more open than the reach, or an
+      openness outside 1..=8, is refused with a `ShareRefusal` label. So a reading built
+      holder-only or party-scoped cannot be handed to a public writer, and a trusted-reach one
+      is refused by it (compile_fail doctests on HolderReading, SharedSink and Admitted); the
+      ordinals are pinned to reach.schema.json (openness_ordinals_match_the_reach_schema). A
+      Declassified is built only by HolderReading::declassify. The test doubles in tests/probe.rs implement the
+      crate's sink traits; the routing they exercise is the crate's. Outside what a type can
+      hold: a producer that builds a new reading with `Reading::new` from fields copied out of
+      another declares a new disclosure, and nothing here checks a disclosure against the
+      promise's row in spec §9; a sink's `audience_openness()` is its own declaration; a writer
+      that copies fields out of `reading()` into another channel, or forwards an `Admitted` it
+      was handed to a second sink, is likewise outside it.

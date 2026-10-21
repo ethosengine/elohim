@@ -70,6 +70,7 @@ pub mod epr_atom_service;
 pub mod epr_codec;
 pub mod epr_head;
 pub mod epr_service;
+pub mod eprfs_tier; // eprfs tier adapters: BlobStoreTier (EprfsStorage) and RootReachGate (ReachGate), interfaces spec §2.A
 pub mod error;
 pub mod graduation; // Graduation evaluator — observations to attestations/events
 pub mod private_reach; // Custody-scoped read gate for `private` rows on the shard replication plane
@@ -246,6 +247,11 @@ pub mod test_util;
 // admission predicates live in `p2p::projection_reconcile`.
 #[cfg(all(test, feature = "p2p"))]
 mod liveness_contract;
+
+// Build rails over this crate's own source and manifest: R-P8 (one ranking home, placement-core)
+// and the storage half of R-E3 (the eprfs dependency direction). Interfaces spec §1.3.
+#[cfg(test)]
+mod boundary;
 
 // Re-exports
 pub use blob_store::BlobStore;

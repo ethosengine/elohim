@@ -1,0 +1,158 @@
+# The serving side of an eprfs tier: reach- and membership-checked answers to another party.
+seamRegistryVersion: 1
+crate: eprfs-serve
+crateRoot: elohim/eprfs/eprfs-serve
+seamLocus: "The door through which another party reads tree objects: reach is judged per root per batch, membership per item, and every answer is stamped with the serving tier's own id."
+decisionPoints:
+  - name: serve_batch
+    kind: verdict-fn
+    sourceLocation:
+      file: src/lib.rs
+      modulePath: eprfs_serve::TierEndpoint::serve_batch
+      line: 211
+    summary: "Answer another party's batch under one root: refuse a batch past max_pending_entries, judge the requester's reach once per batch, prove each item's membership at its path through eprfs-core's check_membership (resolve_links, read by Membership::of) over held (or upstream-fetched, on the requester's behalf) spine nodes, then serve from the own store or forward through the upstream chain, stamping every answer with the endpoint's own id."
+    concernIds:
+      - id: C0
+        status: answered
+        justification: "Reach is judged on the root before any byte is read; a stranger gets the same refusal for held, missing and unknown roots. Gate diagnostics and standing labels stay local; batch/read/list/diff expose only OutsideStanding without a standing label."
+      - id: C1
+        status: n-a
+        justification: "No election."
+      - id: C2
+        status: n-a
+        justification: "No head order."
+      - id: C3
+        status: answered
+        justification: "One pass per batch, one fetch_blobs per spine level; a spine this tier cannot establish is MembershipUnknown, which the requester's chain advances past."
+      - id: C4
+        status: answered
+        justification: "Each verdict is eprfs-core's Membership::of, and its answer eprfs-core's Membership::absence (presence: Membership::presence), which this tier only sends: NotUnderRoot only for a path proved absent (or proved to be something else) in a held node; a corrupt spine node is this tier's Integrity statement, which a requester's chain reads as absence not established; this tier's own store failing is Unreachable; MembershipUnknown otherwise."
+      - id: C5
+        status: answered
+        justification: "Every spine node is verified before it is decoded; forwarded bytes are verified by the chain, and bytes from the endpoint's own store are verified before they are served, whatever that store's fetch_blobs does. After the requester's Stop nothing more is served."
+      - id: C6a
+        status: partial
+        justification: "Items per batch are bounded by max_pending_entries; spine nodes are decoded once per batch under one Budget; spine fetches and forwards are charged to the requester's budget at the upstream chain's gate."
+      - id: C6b
+        status: answered
+        justification: "Read-only except the chain's verified, idempotent write-back."
+      - id: C7
+        status: answered
+        justification: "It forwards only to the requester's remaining tiers (opts.via)."
+      - id: C8
+        status: answered
+        justification: "ServeCounters keep refused batches, not-under-root and membership-unknown apart."
+      - id: C9
+        status: n-a
+        justification: "The requester is as the transport authenticated it; no lineage is read."
+      - id: C10
+        status: answered
+        justification: "A new crate; its answers use ItemAbsence's pinned wire form."
+      - id: C11
+        status: answered
+        justification: "No fan-out beyond the upstream chain's strict order."
+      - id: C12
+        status: answered
+        justification: "Serving is gated by the injected ReachGate; there is no admit-on-error path."
+      - id: C13
+        status: n-a
+        justification: "The same at every stage."
+      - id: C14
+        status: partial
+        justification: "Refusals are counted; durable witnesses are the host's."
+    contractTests:
+      - path: elohim/eprfs/eprfs-serve/tests/endpoint.rs
+        testName: an_unadmitted_requester_cannot_distinguish_private_and_unknown_roots
+        kind: integration
+      - path: elohim/eprfs/eprfs-serve/tests/endpoint.rs
+        testName: a_stranger_under_an_intimate_root_is_refused_the_same_whether_or_not_the_object_exists
+        kind: integration
+      - path: elohim/eprfs/eprfs-serve/tests/endpoint.rs
+        testName: a_member_is_served_and_a_cid_not_at_its_path_is_not_under_root_even_when_public
+        kind: integration
+      - path: elohim/eprfs/eprfs-serve/tests/endpoint.rs
+        testName: a_cold_forwarding_tier_resolves_the_spine_through_its_upstream_and_serves
+        kind: integration
+      - path: elohim/eprfs/eprfs-serve/tests/endpoint.rs
+        testName: worked_example_phone_reads_through_the_laptop_and_the_hub
+        kind: integration
+      - path: elohim/eprfs/eprfs-serve/tests/endpoint.rs
+        testName: a_batch_past_the_pending_entries_bound_is_not_answered
+        kind: integration
+      - path: elohim/eprfs/eprfs-serve/tests/endpoint.rs
+        testName: a_corrupt_held_spine_node_is_integrity_not_membership_unknown
+        kind: integration
+      - path: elohim/eprfs/eprfs-serve/tests/endpoint.rs
+        testName: depth_zero_reads_forward_on_the_requesters_behalf_and_only_to_its_via
+        kind: integration
+      - path: elohim/eprfs/eprfs-serve/tests/endpoint.rs
+        testName: an_endpoint_served_tier_passes_the_outer_tier_contract
+        kind: integration
+      - path: elohim/eprfs/eprfs-serve/tests/endpoint.rs
+        testName: a_tier_serving_unverified_bytes_fails_the_outer_tier_contract
+        kind: integration
+    notes: "Interfaces spec \u00a7A.5. elohim-storage hosts it for POST /eprfs/v1/blobs (follow-on)."
+  - name: presence
+    kind: verdict-fn
+    sourceLocation:
+      file: src/lib.rs
+      modulePath: eprfs_serve::TierEndpoint::presence
+      line: 418
+    summary: "Answer another party's presence question for the object at a path under a root: Missing unless the requester may read the root and the path is proved, from what this tier holds, to lead to that object; Unknown when this tier does not hold the spine; else the store's own presence."
+    concernIds:
+      - id: C0
+        status: answered
+        justification: "The named root is reach-gated and its path must prove membership before presence is read. This does not enforce an independent per-object reach restriction; the cross-root inclusion policy remains open."
+      - id: C1
+        status: n-a
+        justification: "No election."
+      - id: C2
+        status: n-a
+        justification: "No head order."
+      - id: C3
+        status: answered
+        justification: "Local only: membership is never forwarded for a presence question."
+      - id: C4
+        status: answered
+        justification: "Missing for a path proved not to lead to the object, Unknown when the spine is not held or fails its address, Local only for a proved member."
+      - id: C5
+        status: answered
+        justification: "Membership comes from eprfs-core's resolve_links, which rehashes every spine node."
+      - id: C6a
+        status: answered
+        justification: "One path under resolve_links' Budget."
+      - id: C6b
+        status: answered
+        justification: "Read-only."
+      - id: C7
+        status: n-a
+        justification: "No other tier is asked."
+      - id: C8
+        status: partial
+        justification: "Not counted separately; refusals look like Missing by design."
+      - id: C9
+        status: n-a
+        justification: "No lineage."
+      - id: C10
+        status: answered
+        justification: "New in this crate; the path parameter is a revision of spec \u00a7A.5."
+      - id: C11
+        status: n-a
+        justification: "No fan-out."
+      - id: C12
+        status: answered
+        justification: "Gated by the injected ReachGate; no admit-on-error path."
+      - id: C13
+        status: n-a
+        justification: "The same at every stage."
+      - id: C14
+        status: partial
+        justification: "Witnesses are the host's."
+    contractTests:
+      - path: elohim/eprfs/eprfs-serve/tests/endpoint.rs
+        testName: presence_never_confirms_an_object_outside_the_admitted_root
+        kind: integration
+      - path: elohim/eprfs/eprfs-serve/tests/endpoint.rs
+        testName: serve_diff_refuses_a_stranger_when_either_root_is_beyond_reach
+        kind: integration
+    notes: "Interfaces spec \u00a7A.5; takes the object's path, as a batch item does, so membership can be proved (fix round 1)."

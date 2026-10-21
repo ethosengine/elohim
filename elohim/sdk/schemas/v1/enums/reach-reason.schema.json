@@ -1,0 +1,14 @@
+{
+  "$id": "epr:schema:enum:reach-reason",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "ReachReason",
+  "description": "Why a tier refused to serve an object under a root (interfaces spec §A.3). To a requester outside reach, a missing object and a private one get the same refusal, naming the requester's missing standing and not the object (spec §12.3 rule 2). `not-under-root` is said only for a path proved absent in a held node; `no-record` means the tier holds no reach record for the root and refused rather than fetching one; there is no admit-on-error path. Source of truth: this schema; Rust mirror `eprfs_core::ReachReason` (eprfs-core/src/reach.rs, kebab-case serde). Not named in §2.G's enum list; added because objects/item-absence's `refused.refusal.reason` needs a referenced vocabulary (CONVENTIONS rule 7). Carries neither `_dna` nor `_codegen`: it is a field vocabulary for the placement wire schemas, generated only as a TypeScript union where those schemas inline it, and adds no constant to schema-enums.ts. Not yet pinned: no test holds the Rust enum equal to this list (follow-on: a case in a test crate that depends on eprfs-core, such as eprfs-serve's tests).",
+  "type": "string",
+  "enum": [
+    "outside-standing",
+    "no-record",
+    "not-under-root",
+    "identity-required",
+    "authorizer-unavailable"
+  ]
+}

@@ -658,6 +658,23 @@ mod tests {
         assert_eq!(payload["scope"], "sweettest-feedback");
     }
 
+    /// Interfaces spec §0 finding 12: `GRANT_SCOPES` and placement-core's closed `GrantScope`
+    /// (which mirrors `enums/grant-scope.schema.json`) are one list, in one order, and the hosted
+    /// custody arm's constant is one of its labels.
+    #[test]
+    fn grant_scopes_equal_placement_cores_grant_scope() {
+        let placement: Vec<&str> = placement_core::GrantScope::ALL
+            .iter()
+            .map(|s| s.label())
+            .collect();
+        assert_eq!(GRANT_SCOPES.to_vec(), placement);
+        assert!(GRANT_SCOPES.contains(&crate::api::hosted_custody::HOSTED_CELL_SCOPE));
+        assert_eq!(
+            placement_core::required_scope(Some("a2o-stage:x")).label(),
+            MEASURE_STAGE_SCOPE
+        );
+    }
+
     #[test]
     fn the_measure_stage_scope_is_named_without_moving_the_default() {
         assert_eq!(GRANT_SCOPES[0], "sweettest-feedback");

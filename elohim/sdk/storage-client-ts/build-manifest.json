@@ -1,0 +1,46 @@
+{
+  "manifestVersion": "1.0",
+  "pipeline": "storage-client-ts",
+  "description": "Gate-only: the @elohim/storage-client public build, typecheck, package tests and plain Node ESM export smoke (no CI dispatch)",
+  "steps": {
+    "gate-storage-client-ts": {
+      "description": "tsc build, tsc -p tsconfig.typecheck.json (tiers/ and placement.ts included), vitest",
+      "inputs": {
+        "sources": [
+          "elohim/sdk/storage-client-ts/**",
+          "elohim/sdk/epr-ts/**",
+          "elohim/eprfs/eprfs-ts/**",
+          "elohim/sdk/schemas/v1/enums/answer-reason.schema.json",
+          "elohim/sdk/schemas/v1/views/placement-explanation-view.schema.json"
+        ],
+        "buildProcess": [
+          "elohim/sdk/schemas/scripts/codegen-ts.mjs",
+          "pnpm-workspace.yaml",
+          "pnpm-lock.yaml"
+        ]
+      },
+      "outputs": {
+        "artifacts": [],
+        "verify": null
+      },
+      "depends": [],
+      "executor": {
+        "stage": "Gate storage-client-ts",
+        "function": null
+      }
+    }
+  },
+  "gate": {
+    "projects": {
+      "storage-client-ts": {
+        "dir": "elohim/sdk/storage-client-ts",
+        "steps": ["gate-storage-client-ts"],
+        "run": {
+          "kind": "just",
+          "recipe": "gate"
+        }
+      }
+    }
+  },
+  "deployment": {}
+}

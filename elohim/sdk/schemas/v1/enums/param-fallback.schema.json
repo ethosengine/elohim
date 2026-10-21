@@ -1,0 +1,11 @@
+{
+  "$id": "epr:schema:enum:param-fallback",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "ParamFallback",
+  "description": "Which parameter set an explanation reports as answering when the declared placement parameter head could not be verified (interfaces spec §E, E10): `built-in` (the floor's own set for the kind) or `last-verified` (the last set this floor verified for the scope and kind). Source of truth: this schema; Rust mirror placement_core::ParamFallback (elohim/placement/core/src/params.rs, kebab-case serde). Not named in §2.G's enum list; added because views/placement-explanation-view's `fallback` needs a referenced vocabulary (CONVENTIONS rule 7). Carries neither `_dna` nor `_codegen`: it is a field vocabulary for the placement wire schemas, generated only as a TypeScript union where those schemas inline it, and adds no constant to schema-enums.ts. Not yet pinned: no test holds the Rust enum equal to this list (follow-on: a case in placement-core's schema_contract test).",
+  "type": "string",
+  "enum": [
+    "built-in",
+    "last-verified"
+  ]
+}

@@ -13,6 +13,8 @@ pub enum AttestationKind {
     Custody,
     Read,
     Write,
+    /// A derivation record over an adopted head (interfaces spec §C, C7).
+    Derivation,
 }
 
 /// Unsigned attestation intent produced by a projection consumer.

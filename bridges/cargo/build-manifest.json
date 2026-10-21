@@ -14,6 +14,7 @@
           "elohim/epr/**",
           "elohim/epr-rea/**",
           "elohim/eprfs/**",
+          "crates/seam-contracts/**",
           "bridges/did/did-bridge/**",
           "bridges/did/Cargo.toml",
           "bridges/did/did-types/**",

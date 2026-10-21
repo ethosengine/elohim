@@ -8,12 +8,13 @@ members = [
     "eprfs-host",
     "eprfs-local",
     "eprfs-meta",
+    "eprfs-serve",
     "eprfs-storage",
     "../sdk/domains/elohim-agent/adapter",
 ]
 
 [workspace.package]
-version = "0.1.2"
+version = "0.2.0"
 edition = "2021"
 license = "Apache-2.0"
 authors = ["Elohim Protocol"]

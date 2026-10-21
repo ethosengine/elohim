@@ -1,0 +1,15 @@
+{
+  "$id": "epr:schema:enum:disclosure",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Disclosure",
+  "description": "Who may read a probe reading, as the three forms of the disclosure (interfaces spec §I, I5): `holder` (the holder alone; such a reading reaches only a holder sink, and its numbers leave only as an explicit declassification), `parties` (the parties named by role, see enums/party-role), or `at-reach` (anyone at a reach, carried as `Reach::openness()`'s ordinal). These are the values of the `disclosure` tag in objects/probe-reading's `disclosure` object; the forms that carry data (`parties.roles`, `at-reach.openness`) are shaped there. Source of truth: this schema; Rust mirror `seam_contracts::probe::Disclosure` (crates/seam-contracts/src/probe.rs, serde tag `disclosure`, kebab-case). TypeScript constants only: `_codegen` (no `rust` key, so codegen-rs writes nothing) and never `_dna`, so no constant reaches content_store_integrity and no DNA hash moves (interfaces spec §2.G, G11). Not yet pinned: no test holds the tags of `seam_contracts::probe::Disclosure` equal to this list (follow-on: a case in placement-core's schema_contract test, which already depends on seam-contracts, or in seam-contracts' own tests).",
+  "type": "string",
+  "enum": [
+    "holder",
+    "parties",
+    "at-reach"
+  ],
+  "_codegen": {
+    "constant": "DISCLOSURES"
+  }
+}

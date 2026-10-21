@@ -1,0 +1,96 @@
+{
+  "$id": "epr:schema:intent:berth-offer",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "BerthOffer",
+  "description": "The public projection of a local berth (ark): which blade offers it, the berth, its manifest and incarnation, the isolation its processes run under, the capacity it offers, the roots it keeps with their reach, and the compute-grant scopes it will spend, item S3. Built only by `BerthOffer::from_berth`, which copies no data root, port, artifact path or passphrase (R6). Its posture offers the task kind and lists only holds whose own reach is no narrower than the posture's (F8). Wire shape: this schema is the source of record; ark_core::task::BerthOffer (elohim/ark/core/src/task.rs, a follow-on not yet written; serde camelCase, deny_unknown_fields) is to be its Rust mirror, pinned to this schema by a test in the same change. Source of truth: the local berth it projects. Category A when published: written as an REA intent through ark-core's rea.rs projection (RuntimeScope::from_berth, as_rea_intent), its existing home; no new DHT entry type. Never ark-core's write-ahead `Intent` (finding 9).",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "blade",
+    "berth",
+    "manifest",
+    "incarnation",
+    "isolation",
+    "capacity",
+    "holds",
+    "scopes"
+  ],
+  "properties": {
+    "blade": {
+      "type": "string",
+      "pattern": "^uhCAk[A-Za-z0-9_-]+$",
+      "description": "The blade (host) offering the berth. An agent key (`uhCAk…`), the canonical agent identity (elohim_epr_rea::model::AgentRef / AgentRefKey, a string newtype). Never a transport id and never a CID."
+    },
+    "berth": {
+      "type": "string",
+      "pattern": "^baf[ky]rei[a-z2-7]{52}$",
+      "description": "The berth's CID (CandidateContent.berth), a CID string."
+    },
+    "manifest": {
+      "type": "string",
+      "minLength": 1,
+      "description": "The berth's runtime manifest, as named in its berth record."
+    },
+    "incarnation": {
+      "type": "integer",
+      "minimum": 0,
+      "maximum": 9007199254740991,
+      "description": "The berth's incarnation counter. A u64 in Rust, bounded here to 9007199254740991 (2^53 - 1, the largest integer every JSON reader, JavaScript included, holds exactly); a larger value is refused, never rounded."
+    },
+    "isolation": {
+      "oneOf": [
+        {
+          "type": "null"
+        },
+        {
+          "$ref": "../enums/isolation.schema.json"
+        }
+      ],
+      "description": "The weakest effective tier across the passport's processes (F7); null for a berth with no process yet."
+    },
+    "capacity": {
+      "$ref": "../objects/placement-capacity.schema.json",
+      "description": "From the manifest's envelope bound; null fields when it declares no envelope."
+    },
+    "holds": {
+      "type": "array",
+      "maxItems": 64,
+      "items": {
+        "type": "array",
+        "prefixItems": [
+          {
+            "type": "string",
+            "pattern": "^bafyrei[a-z2-7]{52}$",
+            "description": "A root kept at depth 3."
+          },
+          {
+            "$ref": "../enums/reach.schema.json"
+          }
+        ],
+        "items": {
+          "anyOf": [
+            {
+              "type": "string",
+              "pattern": "^bafyrei[a-z2-7]{52}$",
+              "description": "A root kept at depth 3."
+            },
+            {
+              "$ref": "../enums/reach.schema.json"
+            }
+          ]
+        },
+        "minItems": 2,
+        "maxItems": 2,
+        "description": "A (root, reach) pair: the root and its own reach. A Rust tuple, so a two-element array; `prefixItems` fixes the positions, and `items` (which can match nothing past the second position, given maxItems 2) carries the element union for the TypeScript generator, which reads `items` and not `prefixItems`."
+      },
+      "description": "At most 64 roots kept at depth 3, each with its own reach, sorted (F8)."
+    },
+    "scopes": {
+      "type": "array",
+      "uniqueItems": true,
+      "items": {
+        "$ref": "../enums/grant-scope.schema.json"
+      }
+    }
+  }
+}

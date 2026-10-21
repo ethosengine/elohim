@@ -1,0 +1,17 @@
+# Invoked through the manifest gate runner (`just gate elohim-placement`), which resolves the
+# elohim workspace's cargo-pool slot and clears RUSTFLAGS. Each step echoes its own EXIT line.
+gate:
+    #!/usr/bin/env bash
+    set -uo pipefail
+    step() {
+        "$@"
+        result=$?
+        echo "EXIT=$result  ($*)"
+        [ "$result" -eq 0 ] || exit "$result"
+    }
+    step cargo fmt --check -p elohim-placement-core
+    step cargo clippy -p elohim-placement-core --all-targets --all-features -- -D warnings
+    step cargo test -p elohim-placement-core --all-features
+    # The `runtime` split this crate relies on: elohim-compute's actuation contract alone.
+    step cargo test -p elohim-compute --no-default-features
+    step cargo clippy -p elohim-compute --no-default-features --all-targets -- -D warnings

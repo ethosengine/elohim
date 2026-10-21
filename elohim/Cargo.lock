@@ -1135,13 +1135,16 @@ dependencies = [
  "elohim-compute",
  "elohim-epr",
  "elohim-epr-rea",
+ "elohim-placement-core",
  "elohim-seam-contracts",
+ "eprfs-core",
  "hex",
  "serde",
  "serde_ipld_dagcbor",
  "serde_json",
  "sha2 0.10.9",
  "thiserror 2.0.17",
+ "toml_edit",
 ]
 
 [[package]]
@@ -1247,6 +1250,23 @@ name = "elohim-peer-fabric"
 version = "0.1.0"
 
 [[package]]
+name = "elohim-placement-core"
+version = "0.1.0"
+dependencies = [
+ "cid",
+ "elohim-compute",
+ "elohim-epr",
+ "elohim-epr-rea",
+ "elohim-seam-contracts",
+ "jsonschema",
+ "serde",
+ "serde_ipld_dagcbor",
+ "serde_json",
+ "sha2 0.10.9",
+ "thiserror 2.0.17",
+]
+
+[[package]]
 name = "elohim-render"
 version = "0.1.0"
 dependencies = [
@@ -1271,6 +1291,9 @@ dependencies = [
 [[package]]
 name = "elohim-seam-contracts"
 version = "0.1.0"
+dependencies = [
+ "serde",
+]
 
 [[package]]
 name = "elohim-token"
@@ -1306,6 +1329,22 @@ dependencies = [
  "proc-macro2",
  "quote",
  "syn",
+]
+
+[[package]]
+name = "eprfs-core"
+version = "0.2.0"
+dependencies = [
+ "async-trait",
+ "bytes",
+ "cid",
+ "elohim-seam-contracts",
+ "multihash-codetable",
+ "serde",
+ "serde_bytes",
+ "serde_ipld_dagcbor",
+ "serde_json",
+ "thiserror 2.0.17",
 ]
 
 [[package]]

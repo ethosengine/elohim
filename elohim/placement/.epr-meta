@@ -1,0 +1,30 @@
+---
+epr-meta-version: 1
+id: placement-pure-core
+covers: subtree
+purpose: >
+  The placement crate family decides where things are carried as pure functions over a snapshot;
+  adapters in the crates that own carriers translate rows into its types and apply its plans.
+rules:
+  - id: decisions-live-only-in-core
+    class: inject
+    when:
+      write: "*.rs"
+      contains-any: ["impl Ranking for", "fn decide", "fn admit", "PlacementStrategy"]
+    dedupe-of: "genesis/docs/superpowers/specs/2026-10-20-placement-contract-interfaces-design.md §1.1 (decisions live only in L1) + rail R-P8"
+    why: >
+      A placement, reach or ranking decision belongs in elohim-placement-core and nowhere else; an
+      adapter never decides on its own. Every Ranking runs assert_ranking_contract (R-P7), eligibility
+      takes no parameter set, and no draft converts to InForce (R-P6). A new ranking is a new MethodId
+      with a version, never an edit to a built-in's behaviour.
+---
+
+# placement — the placement contract's pure core
+
+`covers: subtree` claims `core/` (`elohim-placement-core`, library `placement_core`). The purity
+boundary is structural rather than edit-time, as in `elohim/ark`: `boundary::exact_dependency_set`
+(rail R-P1) reads the crate's own `Cargo.toml` and refuses any dependency outside the exact set the
+interfaces spec §1.3 names; `boundary::no_clock` (R-P2), `boundary::no_io_or_async`,
+`boundary::no_floats_in_ranking` (R-P3) and `boundary::every_ranking_runs_the_contract` (R-P7) scan
+the crate's own sources; R-P4, R-P5 and R-P6 are `compile_fail` doctests. A violation fails
+`just gate elohim-placement`.

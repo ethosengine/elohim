@@ -29,6 +29,7 @@ use crate::{
     passport::Passport,
     sample::ProcessSample,
     tally::DeathTally,
+    task::BerthOffer,
     verdict::{BoundedBy, GiveUpReason, RestartGrant},
     witness::{DeathWitness, Incident, IncidentClose},
 };
@@ -47,6 +48,18 @@ pub const RUNTIME_TAG_GIVE_UP: &str = "runtime:give-up";
 pub const RUNTIME_TAG_DEATH: &str = "runtime:death";
 /// `classified_as` tag for the terminal outcome of an incident.
 pub const RUNTIME_TAG_INCIDENT_CLOSED: &str = "runtime:incident-closed";
+
+/// `classified_as` tag for a berth's public offer to carry tasks (interfaces spec §2.F).
+pub const RUNTIME_TAG_BERTH_OFFER: &str = "runtime:berth-offer";
+
+/// Unit of an offered disk bound (`ResourceQuota.disk_bytes`, the offer's `capacity.bytes`).
+pub const UNIT_DISK_BYTES: &str = "disk-bytes";
+/// Unit of an offered memory bound.
+pub const UNIT_MEMORY_BYTES: &str = "memory-bytes";
+/// Unit of an offered CPU bound, in thousandths of a core.
+pub const UNIT_CPU_MILLIS: &str = "cpu-millis";
+/// Unit of an offered process-count bound.
+pub const UNIT_PIDS: &str = "pids";
 
 /// Unit of the quantity a death event carries: how much process-time was consumed.
 pub const UNIT_PROCESS_MS: &str = "process-ms";
@@ -184,6 +197,62 @@ impl Intent {
             in_scope_of: scope.scope,
             raised_by: scope.agent(),
         }
+    }
+}
+
+impl BerthOffer {
+    /// Projects this offer as the VF offers it already is (interfaces spec §2.F, first instances):
+    /// one [`ReaIntent`] per resource the berth declares it can lend, raised by the berth's blade,
+    /// in scope of the manifest occupying the berth.
+    ///
+    /// The verb is [`ReaVerb::Use`]: a task uses the berth's capacity for a while and gives it
+    /// back, it neither consumes nor produces it. The `classified_as` slots are the module's
+    /// two-slot convention, tag first and subject second: `["runtime:berth-offer", <berth CID>]`.
+    /// Each declared capacity component is its own intent with its own unit ([`UNIT_DISK_BYTES`],
+    /// [`UNIT_MEMORY_BYTES`], [`UNIT_CPU_MILLIS`], [`UNIT_PIDS`]), because a VF intent carries one
+    /// quantity. A berth with no declared envelope declares no amount, so it projects one intent
+    /// with no quantity, as [`Intent::as_rea_intent`] does: an offer to carry, honestly unmeasured.
+    ///
+    /// The capacity is a declaration, not enforcement or a measurement (`elohim/ark/.epr-meta`).
+    /// Holds, scopes and isolation are the posture's business ([`BerthOffer::posture`]), not
+    /// resources offered, so they are not projected here.
+    pub fn as_rea_intents(&self) -> Result<Vec<ReaIntent>, ReaProjectionError> {
+        let in_scope_of = parse_cid(&self.manifest)?;
+        let classified_as = vec![
+            RUNTIME_TAG_BERTH_OFFER.to_string(),
+            self.berth.as_str().to_string(),
+        ];
+        let intent = |quantity: Option<Magnitude>| ReaIntent {
+            action: ReaVerb::Use,
+            resource_spec: ResourceSpec {
+                classified_as: classified_as.clone(),
+                quantity,
+            },
+            in_scope_of,
+            raised_by: self.blade.clone(),
+        };
+        let capacity = &self.capacity;
+        let offered: Vec<ReaIntent> = [
+            (capacity.bytes, UNIT_DISK_BYTES),
+            (capacity.memory_bytes, UNIT_MEMORY_BYTES),
+            (capacity.cpu_millis.map(u64::from), UNIT_CPU_MILLIS),
+            (capacity.pids.map(u64::from), UNIT_PIDS),
+        ]
+        .into_iter()
+        .filter_map(|(amount, unit)| {
+            amount.map(|value| {
+                intent(Some(Magnitude::Count {
+                    value: value as f64,
+                    unit: unit.to_string(),
+                }))
+            })
+        })
+        .collect();
+        Ok(if offered.is_empty() {
+            vec![intent(None)]
+        } else {
+            offered
+        })
     }
 }
 

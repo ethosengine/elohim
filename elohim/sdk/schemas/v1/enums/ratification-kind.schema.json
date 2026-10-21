@@ -1,0 +1,12 @@
+{
+  "$id": "epr:schema:enum:ratification-kind",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "RatificationKind",
+  "description": "How a placement parameter set came to be in force (interfaces spec §E). `built-in`: the floor's own content-addressed set for a kind, shipped with the floor; nobody put it in force, it runs when nothing has been, explanations say 'no tuning chosen', and it is exempt from ratification. `charter`: a set the space's charter itself names (`Charter::genesis_params`); the charter's adoption ratified it. `ratified`: a tuning ratified under the charter's tuning rule (the household default is each touched member's consent). The floor checks `built-in` and `charter` itself; only `ratified` is handed to the adapter's `RatificationCheck` (E9). Source of truth: this schema; Rust mirror `placement_core::RatificationKind` (params.rs). Not named in §2.G's enum list; added because objects/placement-parameter-head's `ratification.by` needs a referenced vocabulary (CONVENTIONS rule 7). Carries neither `_dna` nor `_codegen`: it is a field vocabulary for the placement wire schemas, generated only as a TypeScript union where those schemas inline it, and adds no constant to schema-enums.ts. Not yet pinned: no test holds the Rust enum equal to this list (follow-on: a case in placement-core's schema_contract test).",
+  "type": "string",
+  "enum": [
+    "built-in",
+    "charter",
+    "ratified"
+  ]
+}

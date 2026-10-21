@@ -6,9 +6,22 @@ license = "Apache-2.0"
 authors = ["Elohim Protocol"]
 description = "Shared compute reporting types and traits for the Elohim fleet"
 
+# `runtime` (default-on) carries the fleet-reporting modules: health, peers, counters, report and
+# resources, and with them chrono, dashmap, parking_lot and serde_json. `actuation`, `build_info`
+# and `detail_level` need serde only, so a pure consumer (elohim-placement-core, whose dependency
+# set is a test) takes this crate with `default-features = false` and gets the Governor contract
+# without a clock or a concurrent map. Every existing consumer keeps the default and is unchanged.
+[features]
+default = ["runtime"]
+runtime = ["dep:serde_json", "dep:dashmap", "dep:chrono", "dep:parking_lot"]
+
 [dependencies]
 serde = { workspace = true }
+serde_json = { workspace = true, optional = true }
+dashmap = { workspace = true, optional = true }
+chrono = { workspace = true, optional = true }
+parking_lot = { version = "0.12", optional = true }
+
+[dev-dependencies]
+# actuation's wire-form test reads JSON with default features off as well.
 serde_json = { workspace = true }
-dashmap = { workspace = true }
-chrono = { workspace = true }
-parking_lot = "0.12"

@@ -1,0 +1,17 @@
+{
+  "$id": "epr:schema:enum:placement-factor",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "PlacementFactor",
+  "description": "The factors a placement ranking method may read, and so the only keys a parameter set's `weights` may carry (`propertyNames` of objects/placement-parameter-set). There is no reach or consent factor and none can be added: eligibility is decided before ranking and takes no parameters, so a tuning can never widen who is eligible (interfaces spec §D.4, §D.5, R-P5). Each method declares the factors it reads (`Ranking::factors`); a weight on any other factor is refused by `within_band` (E2). Any member added here lands in `placement_core::Factor` in the same change (G12). Source of truth: this schema; Rust mirror `placement_core::Factor` (rank.rs, `#[non_exhaustive]`). TypeScript constants only: `_codegen` (no `rust` key, so codegen-rs writes nothing) and never `_dna`, so no constant reaches content_store_integrity and no DNA hash moves (interfaces spec §2.G, G11). placement-core's schema_contract test reads this file with include_str! and compares it, in order, with `Factor::ALL`, a list kept by hand in rank.rs. It catches a value changed here, but a variant added to `Factor` without extending `ALL` still passes: no exhaustive match ties `ALL` to the enum, and the enum is `#[non_exhaustive]` (follow-on: a guard in rank.rs that matches every variant against its index in `ALL`).",
+  "type": "string",
+  "enum": [
+    "distance",
+    "domain-spread",
+    "spare-capacity",
+    "near-bytes",
+    "always-on"
+  ],
+  "_codegen": {
+    "constant": "PLACEMENT_FACTORS"
+  }
+}

@@ -228,6 +228,10 @@
     "ownsUniversalRoute": {
       "type": "boolean",
       "description": "This bundle owns the universal /epr/{id} route (the shell posture). At most one manifest may declare true (enforced by the route-claims codegen)."
+    },
+    "needs": {
+      "$ref": "#/$defs/ManifestNeeds",
+      "description": "Optional. What the app needs from the space it runs in (spec §6), resolved by the space. Additive: an existing manifest without `needs` validates exactly as before."
     }
   },
   "additionalProperties": false,
@@ -799,6 +803,184 @@
       "type": "string",
       "pattern": "^[0-9]+(ms|s|m|h|d)$",
       "description": "Compact duration literal: non-negative integer + unit (ms|s|m|h|d), e.g. \"5m\", \"30d\", \"2s\"."
+    },
+    "ManifestNeeds": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {},
+      "description": "What an app needs from the space it runs in, declared as NEEDS and resolved by the space (spec §6, item S2; operator ruling 2026-10-20: the app declares closure, loss and signing as needs and the space resolves each). Placement-neutral as written (spec §6): no field shaped here names a device, host, hub, doorway, peer, node or URL, and none takes a URI. No build checks this yet. Rail R-G1, a scan of property names and `format: uri` over this definition and every `$ref` it reaches, is the named follow-on scripts/test-manifest-needs.mjs; until it lands, a field that broke neutrality would pass every gate. Each field's shape is fixed now in this definition's own `$defs`, and each field becomes declarable ONLY when its first reader lands (spec §17 slice 9, §20; interfaces spec §2.G, decision 15): until then `properties` does not reference it, and `additionalProperties: false` makes it undeclarable, so no manifest can declare a need nothing reads. Today `properties` is empty: `needs` may be omitted or written as `{}`, and nothing else validates. Landing order and first readers: `closure`, `runtimes`, `worksOffline` with the residency pin-to-bytes node; `channels` with head following; `loss` with the custody-floor need source; `signing` with the signing design (spec §19 Q4); `compute` with the task need source (§F); `projectable` with the projection reader; `indexed` with the search fold; `passing`, `notify`, `witness` and `outward` with their own designs, which shape them. Rust mirror: placement_core::manifest::ManifestNeeds, hand-written, holding only the fields placement reads. placement/core/tests/schema_contract.rs checks that the StartSet, WorksOffline, Loss and Compute definitions exist, compares their `$ref` strings, and checks the mirror's serde. It does not validate any document against these `$defs`, and it does not resolve their cross-file `$ref`s. No build does either yet (follow-on: an AJV test beside scripts/test-manifest-schema.mjs that registers depth, loss-domain, grant-scope, reach and tree-view under their `epr:` keys and asserts accept and refuse cases for each entry here, with `needs: {}` accepted and `needs: {closure: [\"\"]}` refused).",
+      "$defs": {
+        "StartSet": {
+          "$ref": "../objects/tree-view.schema.json#/$defs/ViewPaths",
+          "title": "StartSet",
+          "description": "Shape of `closure`: the bytes an app needs present to run, as view paths under the release root (`[\"\"]` is the whole bundle). Paths only: the release record binds the root (finding 8), so a `root` key is refused (this is an array, and an object fails it). Not enums/closure, the open | closed posture toward silence (finding 7)."
+        },
+        "Runtimes": {
+          "title": "Runtimes",
+          "type": "array",
+          "uniqueItems": true,
+          "description": "Shape of `runtimes`: the runtime channels the app needs to run.",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "channel"
+            ],
+            "properties": {
+              "channel": {
+                "type": "string",
+                "minLength": 1,
+                "description": "A runtime channel name."
+              }
+            }
+          }
+        },
+        "WorksOffline": {
+          "title": "WorksOffline",
+          "description": "Shape of `worksOffline`: how much of the closure must be held for the app to work offline, as a depth. `query` holds no bytes and so cannot mean 'works offline'; it is refused (G7). Absent with a declared `closure` means `kept`.",
+          "allOf": [
+            {
+              "$ref": "../enums/depth.schema.json"
+            },
+            {
+              "not": {
+                "const": "query"
+              }
+            }
+          ]
+        },
+        "Channels": {
+          "title": "Channels",
+          "type": "array",
+          "uniqueItems": true,
+          "items": {
+            "type": "string",
+            "minLength": 1
+          },
+          "description": "Shape of `channels`: the head channels the app follows. Read by head following, which is not placement."
+        },
+        "Loss": {
+          "title": "Loss",
+          "type": "object",
+          "propertyNames": {
+            "minLength": 1
+          },
+          "additionalProperties": {
+            "$ref": "../enums/loss-domain.schema.json"
+          },
+          "description": "Shape of `loss`: per content type, the loss its content must survive. A per-content-type demand rule, not a need (G3): the custody need source resolves it through the space's charter for each content root it holds, so joining a space with a stricter charter changes placement without changing the app."
+        },
+        "Signing": {
+          "title": "Signing",
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "present",
+            "delegable"
+          ],
+          "description": "Shape of `signing` (spec §19 Q4): the `present` and `delegable` lists, whose meaning the signing design fixes when it lands as this field's reader.",
+          "properties": {
+            "present": {
+              "type": "array",
+              "uniqueItems": true,
+              "items": {
+                "type": "string",
+                "minLength": 1
+              }
+            },
+            "delegable": {
+              "type": "array",
+              "uniqueItems": true,
+              "items": {
+                "type": "string",
+                "minLength": 1
+              }
+            }
+          }
+        },
+        "Compute": {
+          "title": "Compute",
+          "type": "array",
+          "description": "Shape of `compute`: standing delegates-compute grant requests, not task needs (G3, G10); a task need comes only from a TaskSpec.",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "scope",
+              "bounds"
+            ],
+            "properties": {
+              "scope": {
+                "$ref": "../enums/grant-scope.schema.json"
+              },
+              "bounds": {
+                "type": "object",
+                "additionalProperties": false,
+                "properties": {
+                  "ratePerHour": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "maximum": 4294967295,
+                    "description": "Maps 1:1 onto delegates-compute's `rate_per_hour` bound. Omitted: no rate bound requested."
+                  }
+                }
+              }
+            }
+          }
+        },
+        "Projectable": {
+          "title": "Projectable",
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "reach"
+          ],
+          "description": "Shape of `projectable`, read by the projection reader: a required reach (one of the eight SDK reach values) and an optional retention floor in days.",
+          "properties": {
+            "reach": {
+              "$ref": "../enums/reach.schema.json"
+            },
+            "retentionFloorDays": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 4294967295,
+              "description": "Days. Its reader has not landed, so no Rust width is fixed yet; bounded to u32, the width of its sibling bound ratePerHour."
+            }
+          }
+        },
+        "Indexed": {
+          "title": "Indexed",
+          "type": "array",
+          "description": "Shape of `indexed`: per content type, the index measure the search fold applies (G14).",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "contentType",
+              "measure"
+            ],
+            "properties": {
+              "contentType": {
+                "type": "string",
+                "minLength": 1
+              },
+              "measure": {
+                "description": "The IndexMeasure declaration's CID (IndexMeasure::cid(), dag-cbor, bafyrei) or a PinnedRef `id@version`; never a placement MethodId.",
+                "oneOf": [
+                  {
+                    "type": "string",
+                    "pattern": "^bafyrei[a-z2-7]{52}$"
+                  },
+                  {
+                    "type": "string",
+                    "pattern": "^[^@\\s]+@[^@\\s]+$"
+                  }
+                ]
+              }
+            }
+          }
+        }
+      }
     }
   }
 }

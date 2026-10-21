@@ -313,3 +313,590 @@ decisionPoints:
       This closes the serialized traversal bypass only. Existing symlink ancestors
       and filesystem races can still redirect writes; symlink replacement and
       complete-tree promotion are not atomic in this slice.
+  - name: walk
+    kind: pure-decision-predicate
+    sourceLocation:
+      file: src/walk.rs
+      modulePath: eprfs_core::walk::walk
+      line: 867
+    summary: "Walk a root under a view, fetching only the spine to each view path and the nodes below it, each verified against its parent's link and bounded by TreeLimits on what it visits; an object no tier gave is a named absence and the walk continues."
+    concernIds:
+      - id: C0
+        status: answered
+        justification: "Byte custody of a tree whose root the reader holds; reach is the tier side's, injected."
+      - id: C1
+        status: n-a
+        justification: "No candidate or release head is elected."
+      - id: C2
+        status: n-a
+        justification: "A root CID imposes no head order or clock."
+      - id: C3
+        status: answered
+        justification: "One bounded pull cursor: every frame is visited once, and a missing node ends its branch with a named absence, never a retry loop."
+      - id: C4
+        status: answered
+        justification: "NotHeld only when every tier asked observed it absent; Withheld for refused, over budget, unreachable or membership unknown; NotFound and ThroughLeaf for a held tree; integrity is an error, never an absence."
+      - id: C5
+        status: partial
+        justification: "Every node is rehashed against its link; signatures and standing are not authenticated here."
+      - id: C6a
+        status: answered
+        justification: "Depth, entries, path bytes, pending frontier, node bytes, expanded bytes and kept result paths are charged against TreeLimits before descent."
+      - id: C6b
+        status: answered
+        justification: "Immutable CIDs make a repeated walk deterministic; nothing is written."
+      - id: C7
+        status: partial
+        justification: "External boundaries are reported and never followed; remote delivery is the tier's."
+      - id: C8
+        status: partial
+        justification: "WalkStats counts nodes fetched, reused, bytes and entries; per-tier counters live in the chain."
+      - id: C9
+        status: n-a
+        justification: "No agent or key lineage is read."
+      - id: C10
+        status: partial
+        justification: "The slice-1 names are renamed under decision 12 (Placement to Coverage), a 0.2.0 break recorded beside TreeError's non_exhaustive mark."
+      - id: C11
+        status: n-a
+        justification: "No listener or background retry."
+      - id: C12
+        status: n-a
+        justification: "Walking authorizes nothing."
+      - id: C13
+        status: n-a
+        justification: "The walk is the same at every network stage."
+      - id: C14
+        status: partial
+        justification: "Absences carry ruling 7's three parts; durable witnesses are the caller's."
+    contractTests:
+      - path: elohim/eprfs/eprfs-core/src/walk.rs
+        testName: walk_ten_thousand_entries_three_path_view_fetches_only_spine
+        kind: unit
+      - path: elohim/eprfs/eprfs-core/src/walk.rs
+        testName: walk_missing_subtree_is_named_not_held_and_walk_continues
+        kind: unit
+      - path: elohim/eprfs/eprfs-core/src/tier.rs
+        testName: refused_or_unreachable_tiers_yield_withheld_and_the_walk_continues
+        kind: unit
+      - path: elohim/eprfs/eprfs-core/src/walk.rs
+        testName: absences_of_a_shared_subtrees_missing_children_are_metered
+        kind: unit
+      - path: elohim/eprfs/eprfs-core/src/walk.rs
+        testName: an_absence_cannot_name_one_reason_and_carry_another
+        kind: unit
+    notes: "The headline check of habit materialize-what-is-read. walk_batched shares this walk's matching and budget through walk.rs expand. walk_collect charges every kept node and absence to result path bytes as it keeps it."
+  - name: walk_batched
+    kind: pure-decision-predicate
+    sourceLocation:
+      file: src/level_walk.rs
+      modulePath: eprfs_core::level_walk::walk_batched
+      line: 277
+    summary: "Drive the sans-I/O LevelWalk with one fetch_blobs per tree level chunk, re-sending unseen items once; its result equals the depth-first walk's on every view."
+    concernIds:
+      - id: C0
+        status: answered
+        justification: "As walk: byte custody under a root the reader holds."
+      - id: C1
+        status: n-a
+        justification: "No election."
+      - id: C2
+        status: n-a
+        justification: "No head order."
+      - id: C3
+        status: answered
+        justification: "Each level chunk is asked at most twice, then an unseen item is named Unreachable by the tier asked (LevelWalk::unanswered): Withheld from a remote tier, never NotHeld, so a silent tier cannot stall the walk; the own store's silence is an error, as in walk."
+      - id: C4
+        status: answered
+        justification: "The same absence vocabulary as walk; an own-store storage failure and integrity are errors."
+      - id: C5
+        status: partial
+        justification: "Every offered node is rehashed against its link before decoding."
+      - id: C6a
+        status: answered
+        justification: "Level chunks are bounded by max_pending_entries; a whole queued level is charged its retained size (path bytes, a fixed per-component and per-frame charge, no ancestor list) to pending path bytes; what the result keeps is charged as it is kept; bytes and entries as walk. Answers are offered to the walk as they arrive, matched through a hash set; an unrequested or repeated answer is dropped before it is kept, and the tier is stopped once the chunk is answered or it overruns it."
+      - id: C6b
+        status: answered
+        justification: "Order-invariant within a level; deterministic over immutable CIDs."
+      - id: C7
+        status: partial
+        justification: "It asks one tier interface; which tiers exist is the chain's."
+      - id: C8
+        status: partial
+        justification: "WalkStats equal to the depth-first walk's."
+      - id: C9
+        status: n-a
+        justification: "No lineage."
+      - id: C10
+        status: answered
+        justification: "New in this release; additive."
+      - id: C11
+        status: answered
+        justification: "Depth plus one round trips; no background retry beyond the one re-send."
+      - id: C12
+        status: n-a
+        justification: "Authorizes nothing."
+      - id: C13
+        status: n-a
+        justification: "The same at every stage."
+      - id: C14
+        status: partial
+        justification: "Absences carry the three parts; witnesses are the caller's."
+    contractTests:
+      - path: elohim/eprfs/eprfs-core/src/level_walk.rs
+        testName: level_equivalence_on_the_slice_one_views
+        kind: unit
+      - path: elohim/eprfs/eprfs-core/src/level_walk.rs
+        testName: level_batching_costs_one_fetch_blobs_per_level_for_the_headline_view
+        kind: unit
+      - path: elohim/eprfs/eprfs-core/src/level_walk.rs
+        testName: an_item_never_answered_is_withheld_unreachable_never_not_held
+        kind: unit
+      - path: elohim/eprfs/eprfs-core/src/level_walk.rs
+        testName: the_own_store_leaving_an_item_unanswered_is_an_error_not_an_absence
+        kind: unit
+      - path: elohim/eprfs/eprfs-core/src/tier.rs
+        testName: a_tampering_outer_tier_is_an_integrity_error_in_every_walk
+        kind: unit
+      - path: elohim/eprfs/eprfs-core/src/tier.rs
+        testName: the_own_store_failing_a_read_is_a_storage_error_in_every_walk
+        kind: unit
+      - path: elohim/eprfs/eprfs-core/src/walk.rs
+        testName: the_level_walk_meters_the_paths_it_keeps_as_it_keeps_them
+        kind: unit
+      - path: elohim/eprfs/eprfs-core/src/walk.rs
+        testName: queued_frame_charge_covers_the_frame
+        kind: unit
+    notes: "Interfaces spec \u00a7B.1. The level-batched twin of the headline walk: 3 calls for the 7 spine nodes."
+  - name: ItemAbsence
+    kind: boundary-answer-type
+    sourceLocation:
+      file: src/tier.rs
+      modulePath: eprfs_core::tier::ItemAbsence
+      line: 280
+    summary: "The typed reason a tier gives for an item it did not deliver: observed not held (with every tier tried), refused by reach, over budget, unreachable, membership unknown, or failed integrity; always inside Unanswered with when to come back and what is local meanwhile."
+    concernIds:
+      - id: C0
+        status: answered
+        justification: "Names who answered by TierId, never as attribution; reach refusals carry no reach value."
+      - id: C1
+        status: n-a
+        justification: "No election."
+      - id: C2
+        status: n-a
+        justification: "No head order; the come-back time is the gate's."
+      - id: C3
+        status: answered
+        justification: "Every absence names its come-back event or time."
+      - id: C4
+        status: answered
+        justification: "Only BlobNotFound or BlobNotLocal map to NotHeld; I/O and storage failures are Unreachable, a corrupt object Integrity."
+      - id: C5
+        status: n-a
+        justification: "A reason, not a verification."
+      - id: C6a
+        status: n-a
+        justification: "A value type."
+      - id: C6b
+        status: n-a
+        justification: "A value type."
+      - id: C7
+        status: answered
+        justification: "NotHeld.tried lists every tier asked, in order, by the dialled ids."
+      - id: C8
+        status: answered
+        justification: "eprfs-serve's ItemAbsenceLabel face passes check_reason_labels, one label per variant."
+      - id: C9
+        status: n-a
+        justification: "A tier id is never read as attribution."
+      - id: C10
+        status: answered
+        justification: "Kind-tagged kebab-case with camelCase fields, pinned by the shared vectors; non_exhaustive."
+      - id: C11
+        status: n-a
+        justification: "No load is scheduled."
+      - id: C12
+        status: n-a
+        justification: "Authorizes nothing."
+      - id: C13
+        status: n-a
+        justification: "The same at every stage."
+      - id: C14
+        status: partial
+        justification: "The three parts are carried; witnesses are the caller's."
+    contractTests:
+      - path: elohim/eprfs/eprfs-core/src/tier.rs
+        testName: item_absence_wire_form_is_kind_tagged_camel_case
+        kind: unit
+      - path: elohim/eprfs/eprfs-core/src/tier.rs
+        testName: from_error_maps_only_not_found_to_not_held
+        kind: unit
+      - path: elohim/eprfs/eprfs-serve/src/labels.rs
+        testName: every_known_item_absence_has_its_own_label_equal_to_its_wire_tag
+        kind: unit
+    notes: "The wire form is provisional until lane S lands objects/item-absence.schema.json."
+  - name: forward_blobs
+    kind: verdict-fn
+    sourceLocation:
+      file: src/tier.rs
+      modulePath: eprfs_core::tier::TierChain::forward_blobs
+      line: 771
+    summary: "The tier chain's decision of which tier is asked for which item: own store first without has_blob; local-only stays local; only tiers the injected AskPolicy admits for the root, strictly in order, within the injected ForwardGate; every byte verified and written back before it is returned."
+    concernIds:
+      - id: C0
+        status: answered
+        justification: "Reach is injected: a private root's miss never leaves the tiers its reach admits."
+      - id: C1
+        status: n-a
+        justification: "No election."
+      - id: C2
+        status: n-a
+        justification: "No head order."
+      - id: C3
+        status: answered
+        justification: "Each admitted tier is asked each item at most once per call, whatever it answered; a forwarded via is normalized first (repeats and ids outside the outer set dropped), so a wire list can never make the chain ask a tier twice or grow past its outer set. A tier named in NotHeld.tried is never re-asked, and a forwarder's tried counts only the tiers the chain handed it as via."
+      - id: C4
+        status: answered
+        justification: "Refused and OverBudget are final; Unreachable and MembershipUnknown advance; NotHeld only when every tier asked observed it absent."
+      - id: C5
+        status: answered
+        justification: "Bytes are accepted only when they verify against the requested CID; bad bytes are Integrity and never stored, and a later tier's silence never degrades an Integrity or own-store failure to a mere absence."
+      - id: C6a
+        status: answered
+        justification: "The ForwardGate bounds forwards per requester; a refusal names its rule and come-back time. A tier's answers stream through the chain: each is matched by a hash index, verified and delivered on arrival, so the caller's Stop stops the tier; unrequested, repeated or failing answers are never kept, and a tier that sends more unwanted answers than it was asked for is stopped. Each ask carries at most ChainLimits::max_request_items CIDs (the bound a serving endpoint enforces, one default), and verified objects wait for write-back only up to ChainLimits::max_write_back_bytes: past it the chain stops the tier, stores what it holds and asks again for the rest, so the chain holds at most that bound plus one object. The gate gets no byte hint: no item's size is known before it arrives."
+      - id: C6b
+        status: answered
+        justification: "Write-back is verified and idempotent; a failed write-back still delivers."
+      - id: C7
+        status: answered
+        justification: "Tier records keep every source that named a tier, held records and doorways alike (R6a)."
+      - id: C8
+        status: partial
+        justification: "ChainStats counts per dialled tier; there is no metric exporter here."
+      - id: C9
+        status: n-a
+        justification: "Counts are never attribution."
+      - id: C10
+        status: answered
+        justification: "New in this release."
+      - id: C11
+        status: answered
+        justification: "No fan-out: strict order, one tier at a time, bounded by the gate."
+      - id: C12
+        status: n-a
+        justification: "Forwarding authorizes nothing; the serving endpoint judged the requester."
+      - id: C13
+        status: n-a
+        justification: "The same at every stage."
+      - id: C14
+        status: partial
+        justification: "Absences carry the three parts; witnesses are the caller's."
+    contractTests:
+      - path: elohim/eprfs/eprfs-storage/tests/tier_chain.rs
+        testName: tier_chain_passes_the_tier_contract
+        kind: integration
+      - path: elohim/eprfs/eprfs-core/src/tier.rs
+        testName: walk_over_chain_fetches_each_node_from_the_outer_tier_once
+        kind: unit
+      - path: elohim/eprfs/eprfs-core/src/tier.rs
+        testName: local_only_walk_over_chain_names_not_held_and_never_dials
+        kind: unit
+      - path: elohim/eprfs/eprfs-core/src/tier.rs
+        testName: forwarded_tried_counts_only_the_tiers_the_chain_delegated
+        kind: unit
+      - path: elohim/eprfs/eprfs-core/src/tier.rs
+        testName: on_behalf_gates_for_the_requester_and_dials_only_its_via
+        kind: unit
+      - path: elohim/eprfs/eprfs-core/src/tier.rs
+        testName: a_flooding_outer_tier_is_cut_off_and_nothing_unrequested_is_kept
+        kind: unit
+      - path: elohim/eprfs/eprfs-core/src/tier.rs
+        testName: the_callers_stop_reaches_the_outer_tier_at_once
+        kind: unit
+      - path: elohim/eprfs/eprfs-core/src/tier.rs
+        testName: integrity_outranks_a_later_refusal_and_the_gate_refusing_the_next_dial
+        kind: unit
+      - path: elohim/eprfs/eprfs-core/src/tier.rs
+        testName: a_remote_integrity_statement_is_withheld_not_a_walk_error
+        kind: unit
+      - path: elohim/eprfs/eprfs-serve/tests/endpoint.rs
+        testName: a_chain_asks_an_endpoint_in_rounds_its_bound_admits
+        kind: integration
+      - path: elohim/eprfs/eprfs-serve/tests/endpoint.rs
+        testName: a_repeated_via_asks_each_upstream_once
+        kind: integration
+      - path: elohim/eprfs/eprfs-serve/tests/endpoint.rs
+        testName: the_chain_writes_back_between_rounds_within_its_byte_bound
+        kind: integration
+      - path: elohim/eprfs/eprfs-serve/tests/endpoint.rs
+        testName: a_chain_orders_its_tiers_for_the_root_asked
+        kind: integration
+    notes: "Tiers are ordered per request with the chain's TierOrder, for the root asked: warmth is per root, and a serving tier's long-lived upstream chain serves every root. The same rules serve TierChain's own fetch_blobs (requester side), forward_blobs (serving side, restricted to opts.via) and TierChain::on_behalf (the chain bound to one inbound requester, which a serving tier's membership check and depth-0 queries read through). The root's reach rides only in BatchOptions::root_reach, which a serving tier fills from ReachGate::root_level, never from the wire. The harness lives in eprfs-serve's testing feature."
+  - name: resolve_links
+    kind: verdict-fn
+    sourceLocation:
+      file: src/level_walk.rs
+      modulePath: eprfs_core::level_walk::resolve_links
+      line: 331
+    summary: "Resolve many paths under one root to the links at them, level by level: spine nodes the paths share are fetched in one fetch_blobs per chunk and decoded once, under one Budget, with the walk's verifier and name matcher. It is the membership check a serving tier runs for a batch, so the serving side makes no tree decision of its own."
+    concernIds:
+      - id: C0
+        status: answered
+        justification: "Byte custody under a root; reach is judged by the caller before it asks."
+      - id: C1
+        status: n-a
+        justification: "No election."
+      - id: C2
+        status: n-a
+        justification: "No head order."
+      - id: C3
+        status: answered
+        justification: "Depth plus one fetch_blobs per chunk; a tier's silence is named Unreachable by the tier asked, never awaited."
+      - id: C4
+        status: answered
+        justification: "Each path gets the single-path resolver's answer, through the same steps (descend, link_of) and the same node acceptance (accept_node): PathNotFound, NotADirectory and ExternalBoundary are proofs from held nodes; Unanswered leaves membership unestablished; Integrity, Invalid and an own-store Storage failure are errors (B4). Membership::of reads them."
+      - id: C5
+        status: answered
+        justification: "Every spine node is rehashed against its link before it is decoded."
+      - id: C6a
+        status: answered
+        justification: "Path bytes, depth, node bytes, total bytes and total entries share one Budget for the whole call; chunks are bounded by max_pending_entries. Spine nodes are verified, charged and decoded as they arrive, through a hash index; unrequested or repeated answers are never kept, and the tier is stopped once the chunk is answered or it overruns it."
+      - id: C6b
+        status: answered
+        justification: "Read-only; deterministic over immutable CIDs."
+      - id: C7
+        status: partial
+        justification: "It asks one tier interface; which tiers exist is the chain's (or OnBehalf's)."
+      - id: C8
+        status: n-a
+        justification: "No counters; the serving caller counts."
+      - id: C9
+        status: n-a
+        justification: "No lineage."
+      - id: C10
+        status: answered
+        justification: "New in this release; additive."
+      - id: C11
+        status: answered
+        justification: "No fan-out beyond the tier it is given."
+      - id: C12
+        status: n-a
+        justification: "Authorizes nothing; a link is a proof of place, not of reach."
+      - id: C13
+        status: n-a
+        justification: "The same at every stage."
+      - id: C14
+        status: partial
+        justification: "Errors are typed per path; witnesses are the caller's."
+    contractTests:
+      - path: elohim/eprfs/eprfs-core/src/tier.rs
+        testName: a_tampering_outer_tier_is_an_integrity_error_in_every_walk
+        kind: unit
+      - path: elohim/eprfs/eprfs-serve/tests/endpoint.rs
+        testName: a_member_is_served_and_a_cid_not_at_its_path_is_not_under_root_even_when_public
+        kind: integration
+      - path: elohim/eprfs/eprfs-serve/tests/endpoint.rs
+        testName: a_corrupt_held_spine_node_is_integrity_not_membership_unknown
+        kind: integration
+      - path: elohim/eprfs/eprfs-core/src/level_walk.rs
+        testName: the_level_walk_and_the_resolver_keep_only_what_they_asked_for
+        kind: unit
+      - path: elohim/eprfs/eprfs-core/src/level_walk.rs
+        testName: resolve_links_agrees_with_the_single_path_resolver_on_every_path
+        kind: unit
+    notes: "Interfaces spec \u00a7A.5 step 2 (A3). Replaces the serving endpoint's own traversal (fix round 1)."
+  - name: TreeView
+    kind: boundary-answer-type
+    sourceLocation:
+      file: src/view_decl.rs
+      modulePath: eprfs_core::view_decl::TreeView
+      line: 25
+    summary: "A tree root and the view a reader declares, in one canonical form whose CID is the need key: decoding refuses an empty, unsorted or covered path list, so the CID is a function of the view."
+    concernIds:
+      - id: C0
+        status: answered
+        justification: "A declaration of what is read; it carries no reach or standing."
+      - id: C1
+        status: n-a
+        justification: "No election."
+      - id: C2
+        status: n-a
+        justification: "No head order."
+      - id: C3
+        status: n-a
+        justification: "A value type."
+      - id: C4
+        status: answered
+        justification: "A non-UTF-8 path refuses in JSON rather than decoding lossily."
+      - id: C5
+        status: n-a
+        justification: "A declaration, not a verification."
+      - id: C6a
+        status: partial
+        justification: "Paths are validated names; the enclosing document's size is the caller's to bound."
+      - id: C6b
+        status: answered
+        justification: "Normalized form, so equal views give equal CIDs."
+      - id: C7
+        status: n-a
+        justification: "Advertises nothing."
+      - id: C8
+        status: n-a
+        justification: "No metric."
+      - id: C9
+        status: n-a
+        justification: "No lineage."
+      - id: C10
+        status: answered
+        justification: "Two forms as BlobLink: a tag-42 root and byte components in DAG-CBOR, strings in JSON; pinned by the shared vectors."
+      - id: C11
+        status: n-a
+        justification: "No load."
+      - id: C12
+        status: n-a
+        justification: "Authorizes nothing."
+      - id: C13
+        status: n-a
+        justification: "The same at every stage."
+      - id: C14
+        status: n-a
+        justification: "No refusal witness."
+    contractTests:
+      - path: elohim/eprfs/eprfs-core/src/view_decl.rs
+        testName: decode_refuses_unsorted_covered_and_empty_path_lists
+        kind: unit
+      - path: elohim/eprfs/eprfs-core/src/view_decl.rs
+        testName: canonical_form_keeps_non_utf8_names_and_cid_is_a_function_of_the_view
+        kind: unit
+    notes: "The Rust twin of the SDK tree-view object (lane S); eprfs-ts computes the same CID."
+  - name: Membership
+    kind: verdict-fn
+    sourceLocation:
+      file: src/level_walk.rs
+      modulePath: eprfs_core::level_walk::Membership
+      line: 440
+    summary: "Classify what one requested object's path under a root proves (Member, NotUnderRoot, Unknown, Integrity, OwnFailed) from resolve_links' answer, exhaustively over TreeError inside this crate, and name the serving answer for each verdict (Membership::absence) and what a presence question may say (Membership::presence), both exhaustive here, so a serving tier only calls them and makes no tree or reach decision of its own; check_membership runs it for a whole batch."
+    concernIds:
+      - id: C0
+        status: answered
+        justification: "NotUnderRoot is final for the requester (Refused NotUnderRoot), so only proofs from held, verified nodes reach it: a path leading elsewhere, PathNotFound, NotADirectory, ExternalBoundary."
+      - id: C1
+        status: n-a
+        justification: "No election."
+      - id: C2
+        status: n-a
+        justification: "No head order."
+      - id: C3
+        status: answered
+        justification: "Unknown (not held, unanswered, budget spent, no tree) is not final; the requester's chain advances past it."
+      - id: C4
+        status: answered
+        justification: "The classification is one exhaustive match beside the resolver whose errors it reads; a TreeError variant added later must be classified here before the crate compiles, and NotALeaf, which the resolver never yields, proves nothing. The verdict's serving answer and presence answer are exhaustive matches here too, so a Membership variant added later is named before the crate compiles and the serving boundary (eprfs-serve) has no wildcard arm."
+      - id: C5
+        status: answered
+        justification: "Integrity and Invalid for a spine node are Integrity, never Unknown."
+      - id: C6a
+        status: answered
+        justification: "Bounded by resolve_links' one Budget per batch."
+      - id: C6b
+        status: answered
+        justification: "Pure over immutable CIDs."
+      - id: C7
+        status: n-a
+        justification: "Which tiers are asked is the caller's chain."
+      - id: C8
+        status: n-a
+        justification: "The serving caller counts each verdict."
+      - id: C9
+        status: n-a
+        justification: "No lineage."
+      - id: C10
+        status: answered
+        justification: "New in this release; additive, non-exhaustive."
+      - id: C11
+        status: n-a
+        justification: "No fan-out."
+      - id: C12
+        status: answered
+        justification: "A verdict of place, never of reach: reach is the ReachGate's, judged before it."
+      - id: C13
+        status: n-a
+        justification: "The same at every stage."
+      - id: C14
+        status: partial
+        justification: "Typed verdicts; witnesses are the caller's."
+    contractTests:
+      - path: elohim/eprfs/eprfs-serve/tests/endpoint.rs
+        testName: a_member_is_served_and_a_cid_not_at_its_path_is_not_under_root_even_when_public
+        kind: integration
+      - path: elohim/eprfs/eprfs-serve/tests/endpoint.rs
+        testName: a_corrupt_held_spine_node_is_integrity_not_membership_unknown
+        kind: integration
+      - path: elohim/eprfs/eprfs-serve/tests/endpoint.rs
+        testName: presence_never_confirms_an_object_outside_the_admitted_root
+        kind: integration
+    notes: "Moved from eprfs-serve's TierEndpoint (C4 Codex review 1, finding 12): interfaces spec \u00a71.1, no adapter decides reach or tree membership."
+  - name: OpennessAsk
+    kind: verdict-fn
+    sourceLocation:
+      file: src/reach.rs
+      modulePath: eprfs_core::reach::OpennessAsk
+      line: 137
+    summary: "The one requester-side ask rule (interfaces spec \u00a7A.6 ReachStandingAsk), parameterized by the household and public openness levels so eprfs-core names no reach value: ask a tier only if the root's openness is at least its standing (defaulted by class), and with the root's reach unknown only the close classes."
+    concernIds:
+      - id: C0
+        status: answered
+        justification: "A private root's misses never leave the tiers its reach admits: the read pattern is itself a signal (spec \u00a712.3 rule 2)."
+      - id: C1
+        status: n-a
+        justification: "No election."
+      - id: C2
+        status: n-a
+        justification: "No head order."
+      - id: C3
+        status: answered
+        justification: "A refused ask is zero calls, never a wait."
+      - id: C4
+        status: answered
+        justification: "Unknown root reach asks only own, person-device and household; an unknown standing defaults by class."
+      - id: C5
+        status: n-a
+        justification: "Moves no bytes."
+      - id: C6a
+        status: n-a
+        justification: "Constant work per tier."
+      - id: C6b
+        status: answered
+        justification: "Pure."
+      - id: C7
+        status: answered
+        justification: "It narrows which held tiers the chain may ask; the chain's order is unchanged."
+      - id: C8
+        status: n-a
+        justification: "The chain counts asks."
+      - id: C9
+        status: n-a
+        justification: "No lineage."
+      - id: C10
+        status: answered
+        justification: "New in this release; the TypeScript standingPolicy is pinned to it by the shared vectors' ask section."
+      - id: C11
+        status: answered
+        justification: "Fan-out is bounded to the admitted tiers."
+      - id: C12
+        status: answered
+        justification: "It authorizes no read: a serving tier still judges the requester with its ReachGate."
+      - id: C13
+        status: n-a
+        justification: "The same at every stage."
+      - id: C14
+        status: n-a
+        justification: "No refusal is produced here; an unasked tier is simply not dialled."
+    contractTests:
+      - path: elohim/eprfs/eprfs-core/tests/vectors.rs
+        testName: shared_vectors_match_what_this_crate_computes
+        kind: integration
+      - path: elohim/eprfs/eprfs-storage/tests/tier_chain.rs
+        testName: tier_chain_passes_the_tier_contract
+        kind: integration
+    notes: "Was a test double in eprfs-serve's testing feature and a separate production export in eprfs-ts (C4 Codex review 1, finding 13); the future elohim-storage host uses this one."

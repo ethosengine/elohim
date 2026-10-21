@@ -109,3 +109,36 @@ Feature: A steward sponsors a runner, and the runner works only inside the promi
     Then the approval is refused
     When the runner tries to publish something more private than the commons
     Then the publication is refused, naming the grant's reach
+
+  # Added 2026-10-20 from the placement-contract design
+  # (genesis/docs/superpowers/specs/2026-10-20-what-every-app-inherits-placement-contract-design.md,
+  # §16 agents row; the rule is §12.3 rule 2, "reach before bytes"). Held (@wip): no tier yet checks
+  # a tree's reach before it serves the files under it. That lands in the design's §17 slice 2,
+  # the remote tier, and the scenario stays held until it does.
+  @wip @requires:owned-substrate
+  Scenario: A runner cannot fetch files more private than its grant's reach
+    The scenarios above are about what a runner may do; this one is about what it may read, and
+    it defines two terms that no other scenario uses. A tree is a set of files the household
+    keeps, named by a fingerprint of its contents the way a stage is pinned. A tree's reach is a
+    level the household declares on that tree, taken from the same scale as a grant's reach,
+    saying how far the files under it may travel. So in this scenario reach appears in two
+    places: on the runner's grant, and on each tree. Before a stage runs, the files it reads are
+    fetched onto the provider's machine: the stage names a tree and the paths under it that it
+    needs, and only those files are fetched. The rule
+    this scenario proves is that a runner may fetch from a tree only when the tree's declared
+    reach is no more private than the reach its grant states; here every grant is at the
+    commons, so the runner may fetch from a commons tree and from nothing more private. A runner
+    asking for a tree it may not read is refused in the same words whether or not that tree
+    exists, so a refusal tells it nothing it could not already see.
+    This scenario is held for now: no part of the household yet checks a tree's reach before
+    serving the files under it, so it is not run until that check exists.
+    Given the first steward has sponsored a runner
+    And the first provider has granted the runner capacity to run stages
+    And the household keeps one tree of files at the commons and another more private than the commons
+    When the runner's stage asks the first provider to fetch a path under the more private tree
+    Then the fetch is refused, naming the grant's reach
+    And no file from the more private tree is written to the first provider's machine for that stage
+    When the runner's stage asks the first provider to fetch a path under a tree the household does not keep
+    Then the refusal reads the same as the one before, naming the grant's reach and not whether the tree exists
+    When the runner's stage asks the first provider to fetch a path under the commons tree
+    Then the files under that path arrive on the first provider's machine, each checked by the first provider against the fingerprint of its contents

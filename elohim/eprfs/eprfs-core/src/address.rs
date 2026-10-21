@@ -53,7 +53,11 @@ const RAW_CODEC: u64 = 0x55;
 /// CID string ([`BlobCid::parse`]). There is deliberately no `From<&str>`/`new` that would let an
 /// arbitrary non-CID string masquerade as a fingerprint — that stringly-typed placeholder is the
 /// drift this type replaces. Wire form is the canonical base32 CID string, validated on deserialize.
-#[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
+///
+/// `PartialOrd`/`Ord` follow `cid::Cid`'s own order (interfaces spec §0 finding 3): keys such as
+/// `DerivationKey` and the `BTreeMap`s keyed by CID need a total order, and the order carries no
+/// meaning beyond being stable.
+#[derive(Debug, Clone, PartialEq, Eq, Hash, PartialOrd, Ord, Serialize, Deserialize)]
 #[serde(into = "String", try_from = "String")]
 pub struct BlobCid(Cid);
 

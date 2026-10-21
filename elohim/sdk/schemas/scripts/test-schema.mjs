@@ -270,6 +270,8 @@ async function main() {
       validationStatus: 'valid',
       createdAt: '2026-03-17T00:00:00Z',
       updatedAt: '2026-03-17T00:00:00Z',
+      trust: 'unconfirmed',
+      tags: [],
     }),
     'ContentView accepts valid record',
   );
@@ -295,6 +297,8 @@ async function main() {
       validationStatus: 'valid',
       createdAt: '2026-03-17',
       updatedAt: '2026-03-17',
+      trust: 'unconfirmed',
+      tags: [],
       description: null,
       blobHash: null,
       dhtAnchorHash: null,

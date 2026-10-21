@@ -1,0 +1,17 @@
+{
+  "$id": "epr:schema:enum:tier-class",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "TierClass",
+  "description": "The class of a storage tier a requester may ask for bytes, narrowest first: the requester's own store, another device of the same person, the household, a hub, a holon hub, a pool, a peer named by a doorway, a doorway. A class conflict between two records for the same tier keeps the narrower class (`TierRecord::merge`), and the default tier order compares class first (interfaces spec §A.2). A new kind of carrier is a new variant here, which is a spec change. Source of truth: this schema; Rust mirror `eprfs_core::TierClass` (eprfs-core/src/tier.rs, kebab-case serde, Ord in this order). Not named in §2.G's enum list; added because objects/tier-record's `class` needs a referenced vocabulary (CONVENTIONS rule 7). Carries neither `_dna` nor `_codegen`: it is a field vocabulary for the placement wire schemas, generated only as a TypeScript union where those schemas inline it, and adds no constant to schema-enums.ts. Not yet pinned: no test holds the Rust enum equal to this list (follow-on: a case in a test crate that depends on eprfs-core, such as eprfs-serve's tests).",
+  "type": "string",
+  "enum": [
+    "own",
+    "person-device",
+    "household",
+    "hub",
+    "holon-hub",
+    "pool",
+    "doorway-peer",
+    "doorway"
+  ]
+}

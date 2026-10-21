@@ -16,6 +16,9 @@ use eprfs_core::{
 };
 use tokio::sync::RwLock;
 
+pub mod budget;
+pub use budget::{BudgetScope, SemaphoreGate};
+
 /// Adapter configuration for a future elohim-storage HTTP-backed client.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct StorageEndpoint {
@@ -96,9 +99,7 @@ impl EprfsStorage for MemoryStorage {
         let mut blobs = self.blobs.write().await;
         if let Some(existing) = blobs.get(cid) {
             if !cid.verifies(existing) {
-                return Err(EprfsError::Storage(format!(
-                    "existing blob is corrupt for {cid}"
-                )));
+                return Err(EprfsError::Corrupt(cid.clone()));
             }
         }
         blobs.insert(cid.clone(), bytes);
@@ -185,68 +186,7 @@ impl DirectoryStorage {
         self.root.join(cid.to_string())
     }
 
-    fn read_object(&self, cid: &BlobCid) -> Result<Bytes> {
-        let path = self.object_path(cid);
-        let metadata = std::fs::symlink_metadata(&path).map_err(|source| {
-            if source.kind() == std::io::ErrorKind::NotFound {
-                EprfsError::BlobNotFound(cid.clone())
-            } else {
-                EprfsError::Io {
-                    path: path.clone(),
-                    source,
-                }
-            }
-        })?;
-        if !metadata.file_type().is_file() || metadata.file_type().is_symlink() {
-            return Err(EprfsError::Storage(format!(
-                "content object is not a regular file: {cid}"
-            )));
-        }
-        #[cfg(unix)]
-        {
-            use std::os::unix::fs::PermissionsExt;
-            if metadata.permissions().mode() & 0o077 != 0 {
-                return Err(EprfsError::Storage(format!(
-                    "content object permits group/other access: {cid}"
-                )));
-            }
-        }
-        if metadata.len() > self.max_blob_bytes as u64 {
-            return Err(EprfsError::Storage(format!(
-                "content object exceeds byte limit: {cid}"
-            )));
-        }
-        let file = std::fs::File::open(&path).map_err(|source| EprfsError::Io {
-            path: path.clone(),
-            source,
-        })?;
-        let mut bytes = Vec::new();
-        file.take((self.max_blob_bytes as u64).saturating_add(1))
-            .read_to_end(&mut bytes)
-            .map_err(|source| EprfsError::Io { path, source })?;
-        if bytes.len() > self.max_blob_bytes {
-            return Err(EprfsError::Storage(format!(
-                "content object exceeds byte limit: {cid}"
-            )));
-        }
-        if !cid.verifies(&bytes) {
-            return Err(EprfsError::Storage(format!(
-                "existing content object is corrupt: {cid}"
-            )));
-        }
-        Ok(Bytes::from(bytes))
-    }
-}
-
-#[async_trait]
-impl EprfsStorage for DirectoryStorage {
-    async fn resolve_epr(&self, _reference: &EprRef) -> Result<EprRecord> {
-        Err(EprfsError::Storage(
-            "directory content store cannot resolve EPRs".into(),
-        ))
-    }
-
-    async fn has_blob(&self, cid: &BlobCid) -> Result<BlobPresence> {
+    fn has_object(&self, cid: &BlobCid) -> Result<BlobPresence> {
         let path = self.object_path(cid);
         match std::fs::symlink_metadata(&path) {
             Ok(_) => {
@@ -258,20 +198,7 @@ impl EprfsStorage for DirectoryStorage {
         }
     }
 
-    async fn fetch_blob(&self, cid: &BlobCid, _policy: FetchPolicy) -> Result<BlobHandle> {
-        Ok(BlobHandle {
-            cid: cid.clone(),
-            bytes: self.read_object(cid)?,
-        })
-    }
-
-    async fn put_blob(&self, bytes: Bytes) -> Result<BlobCid> {
-        let cid = BlobCid::compute(&bytes);
-        self.put_blob_verified(&cid, bytes).await?;
-        Ok(cid)
-    }
-
-    async fn put_blob_verified(&self, cid: &BlobCid, bytes: Bytes) -> Result<()> {
+    fn put_object(&self, cid: &BlobCid, bytes: Bytes) -> Result<()> {
         if bytes.len() > self.max_blob_bytes {
             return Err(EprfsError::Storage(format!(
                 "content object exceeds byte limit: {cid}"
@@ -322,10 +249,168 @@ impl EprfsStorage for DirectoryStorage {
         }
     }
 
+    fn read_object(&self, cid: &BlobCid) -> Result<Bytes> {
+        let path = self.object_path(cid);
+        let metadata = std::fs::symlink_metadata(&path).map_err(|source| {
+            if source.kind() == std::io::ErrorKind::NotFound {
+                EprfsError::BlobNotFound(cid.clone())
+            } else {
+                EprfsError::Io {
+                    path: path.clone(),
+                    source,
+                }
+            }
+        })?;
+        if !metadata.file_type().is_file() || metadata.file_type().is_symlink() {
+            return Err(EprfsError::Storage(format!(
+                "content object is not a regular file: {cid}"
+            )));
+        }
+        #[cfg(unix)]
+        {
+            use std::os::unix::fs::PermissionsExt;
+            if metadata.permissions().mode() & 0o077 != 0 {
+                return Err(EprfsError::Storage(format!(
+                    "content object permits group/other access: {cid}"
+                )));
+            }
+        }
+        if metadata.len() > self.max_blob_bytes as u64 {
+            return Err(EprfsError::Storage(format!(
+                "content object exceeds byte limit: {cid}"
+            )));
+        }
+        let file = std::fs::File::open(&path).map_err(|source| EprfsError::Io {
+            path: path.clone(),
+            source,
+        })?;
+        let mut bytes = Vec::new();
+        file.take((self.max_blob_bytes as u64).saturating_add(1))
+            .read_to_end(&mut bytes)
+            .map_err(|source| EprfsError::Io { path, source })?;
+        if bytes.len() > self.max_blob_bytes {
+            return Err(EprfsError::Storage(format!(
+                "content object exceeds byte limit: {cid}"
+            )));
+        }
+        if !cid.verifies(&bytes) {
+            return Err(EprfsError::Corrupt(cid.clone()));
+        }
+        Ok(Bytes::from(bytes))
+    }
+}
+
+#[async_trait]
+impl EprfsStorage for DirectoryStorage {
+    async fn resolve_epr(&self, _reference: &EprRef) -> Result<EprRecord> {
+        Err(EprfsError::Storage(
+            "directory content store cannot resolve EPRs".into(),
+        ))
+    }
+
+    async fn has_blob(&self, cid: &BlobCid) -> Result<BlobPresence> {
+        self.has_object(cid)
+    }
+
+    async fn fetch_blob(&self, cid: &BlobCid, _policy: FetchPolicy) -> Result<BlobHandle> {
+        Ok(BlobHandle {
+            cid: cid.clone(),
+            bytes: self.read_object(cid)?,
+        })
+    }
+
+    async fn put_blob(&self, bytes: Bytes) -> Result<BlobCid> {
+        let cid = BlobCid::compute(&bytes);
+        self.put_blob_verified(&cid, bytes).await?;
+        Ok(cid)
+    }
+
+    async fn put_blob_verified(&self, cid: &BlobCid, bytes: Bytes) -> Result<()> {
+        self.put_object(cid, bytes)
+    }
+
     async fn publish_attestation(&self, _draft: AttestationDraft) -> Result<EprRef> {
         Err(EprfsError::Storage(
             "directory content store cannot publish attestations".into(),
         ))
+    }
+}
+
+/// [`DirectoryStorage`] with every object read and write run on tokio's blocking pool
+/// (interfaces spec §4, Blocking I/O). `DirectoryStorage` calls blocking `std::fs` inside its
+/// `async fn`s, which stalls a runtime worker for the length of each read; a `TierChain` on a
+/// multi-thread runtime, and every serving adapter, use this wrapper as the own store instead.
+/// eprfs-core never spawns (R-E2): the offload lives here, in the adapter that does the I/O.
+///
+/// It needs a tokio runtime with a blocking pool (any tokio runtime has one). The answers are
+/// `DirectoryStorage`'s own, unchanged; a blocking task that fails to run is a storage error.
+#[derive(Debug, Clone)]
+pub struct OffloadedDirectory {
+    inner: std::sync::Arc<DirectoryStorage>,
+}
+
+impl OffloadedDirectory {
+    pub fn new(store: DirectoryStorage) -> Self {
+        Self {
+            inner: std::sync::Arc::new(store),
+        }
+    }
+
+    pub fn inner(&self) -> &DirectoryStorage {
+        &self.inner
+    }
+
+    async fn offload<T: Send + 'static>(
+        &self,
+        work: impl FnOnce(&DirectoryStorage) -> Result<T> + Send + 'static,
+    ) -> Result<T> {
+        let store = self.inner.clone();
+        tokio::task::spawn_blocking(move || work(&store))
+            .await
+            .map_err(|error| EprfsError::Storage(format!("blocking store task failed: {error}")))?
+    }
+}
+
+#[async_trait]
+impl EprfsStorage for OffloadedDirectory {
+    async fn resolve_epr(&self, reference: &EprRef) -> Result<EprRecord> {
+        self.inner.resolve_epr(reference).await
+    }
+
+    async fn has_blob(&self, cid: &BlobCid) -> Result<BlobPresence> {
+        let cid = cid.clone();
+        self.offload(move |store| store.has_object(&cid)).await
+    }
+
+    async fn fetch_blob(&self, cid: &BlobCid, _policy: FetchPolicy) -> Result<BlobHandle> {
+        let cid = cid.clone();
+        self.offload(move |store| {
+            Ok(BlobHandle {
+                bytes: store.read_object(&cid)?,
+                cid,
+            })
+        })
+        .await
+    }
+
+    async fn put_blob(&self, bytes: Bytes) -> Result<BlobCid> {
+        let cid = BlobCid::compute(&bytes);
+        self.put_blob_verified(&cid, bytes).await?;
+        Ok(cid)
+    }
+
+    async fn put_blob_verified(&self, cid: &BlobCid, bytes: Bytes) -> Result<()> {
+        let cid = cid.clone();
+        self.offload(move |store| store.put_object(&cid, bytes))
+            .await
+    }
+
+    async fn publish_attestation(&self, draft: AttestationDraft) -> Result<EprRef> {
+        self.inner.publish_attestation(draft).await
+    }
+
+    fn tier_id(&self) -> eprfs_core::TierId {
+        self.inner.tier_id()
     }
 }
 

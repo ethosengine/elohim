@@ -20,6 +20,11 @@
 //! | C3 liveness | [`harness::liveness`] — every reachable non-terminal state has an automated move |
 //! | C14 witnessed residual | [`residual::ResidualWitness`] — the capsule an unclassified outcome is witnessed as |
 //! | C13 graduated authority + C4 honest absence | [`freshness::verdict`] — freshness graded by declared stakes, with never-stage-priced floor rows |
+//! | C4 + C3 (ruling 7: why, when to come back, what meanwhile) | [`unanswered::Unanswered`] + the status channel ([`unanswered::PendingStatus`], [`unanswered::StatusCursor`], and [`unanswered::Changes`], the cursor over a seam's pure [`unanswered::StatusSource`]) |
+//! | C3 + C6a (the status channel's contract) | [`harness::status::check_status_cursor`] — quiet at rest, a changed status reported at the next poll, changes only, nothing after terminal |
+//! | C4 + C5 (the probe shape) | [`probe::Reading`] — a [`probe::ProbeAnswer`] that pairs each state with the reason it may carry, plus evidence stage and disclosure; private fields and read-only getters preserve the observation and provenance fixed at construction |
+//! | C1 + C7 (who may read a reading) | [`probe::Reading::route`] — a [`probe::Routed`] reading reaches only the sink allowed by the disclosure it was built with ([`probe::HolderSink`], [`probe::SharedSink`]); a shared reading reaches a sink only through [`probe::SharedReading::deliver`], which refuses a sink whose readers are more open than the reading's reach |
+//! | C2 monotonic authority, list form | [`harness::arbitrated::check_ordering`] — a whole ranked list is invariant under input order |
 //!
 //! Plus the **cross-repo canon surface** ([`canon`]): [`CONCERN_CANON_VERSION`] and one
 //! [`PolicyPin`] per class, with `#[deprecated]` on superseded pins — so an external peer
@@ -86,8 +91,10 @@ pub mod election;
 pub mod freshness;
 #[cfg(feature = "harness")]
 pub mod harness;
+pub mod probe;
 pub mod reason;
 pub mod residual;
+pub mod unanswered;
 
 pub use answer::{Answer, AnswerReason, AnswerState};
 pub use canon::{PolicyPin, ALL_PINS, CONCERN_CANON_VERSION};
@@ -95,12 +102,20 @@ pub use election::{select_arbitrated_winner, ArbitrationKey};
 pub use freshness::{
     requirement, verdict, Available, FreshnessVerdict, NetworkStage, ReadClass, Requirement,
 };
+pub use probe::{
+    Admitted, Declassified, Disclosure, EvidenceStage, HolderReading, HolderSink, PartyReading,
+    PartyRole, Probe, ProbeAnswer, Reading, Routed, ShareRefusal, SharedReading, SharedSink,
+    UnreachableReason, OPENNESS_MAX, OPENNESS_MIN, PUBLIC_OPENNESS,
+};
 pub use reason::{
     assert_reason_labels_conformant, assert_reason_labels_discriminating,
     assert_reason_labels_stable, check_reason_labels, ReasonLabel, ReasonLabelViolation,
     ReasonLabelViolationClass,
 };
 pub use residual::{ContextEntry, ContextKind, DecisionState, ResidualWitness};
+pub use unanswered::{
+    Changes, ComeBack, Escalation, Meanwhile, PendingStatus, StatusCursor, StatusSource, Unanswered,
+};
 
 #[cfg(test)]
 mod boundary_tests {

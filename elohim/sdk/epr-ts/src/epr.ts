@@ -1,7 +1,7 @@
-import type { Envelope } from './generated/Envelope';
-import { canonicalEnvelopeBytes } from './envelope';
-import { computeCid } from './cid';
-import { verifyEd25519 } from './proof';
+import type { Envelope } from './generated/Envelope.js';
+import { canonicalEnvelopeBytes } from './envelope.js';
+import { computeCid } from './cid.js';
+import { verifyEd25519 } from './proof.js';
 import { CID } from 'multiformats/cid';
 
 export interface Epr {

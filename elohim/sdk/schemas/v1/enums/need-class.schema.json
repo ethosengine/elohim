@@ -1,0 +1,16 @@
+{
+  "$id": "epr:schema:enum:need-class",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "NeedClass",
+  "description": "The serve-order classes a space's charter ranks needs by when capacity is scarce: a need is taken in (charter serve-order position of its class, need id) order within one pass (interfaces spec §D.2, §D.7). The order listed here is the vocabulary's, not a serve order: the charter declares the order, and an empty `serve_order` is the built-in order, said so in the explanation. Source of truth: this schema; Rust mirror `placement_core::NeedClass` (need.rs, `#[non_exhaustive]`). TypeScript constants only: `_codegen` (no `rust` key, so codegen-rs writes nothing) and never `_dna`, so no constant reaches content_store_integrity and no DNA hash moves (interfaces spec §2.G, G11). placement-core's schema_contract test reads this file with include_str! and compares it, in order, with `NeedClass::BUILTIN_ORDER`, a list kept by hand in need.rs. It catches a value changed here, but a variant added to `NeedClass` without extending `BUILTIN_ORDER` still passes: no exhaustive match ties `BUILTIN_ORDER` to the enum, and the enum is `#[non_exhaustive]` (follow-on: a guard in need.rs that matches every variant against its index in `BUILTIN_ORDER`).",
+  "type": "string",
+  "enum": [
+    "care",
+    "member",
+    "agent",
+    "commons"
+  ],
+  "_codegen": {
+    "constant": "NEED_CLASSES"
+  }
+}

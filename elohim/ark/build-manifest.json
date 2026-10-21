@@ -8,6 +8,10 @@
       "inputs": {
         "sources": [
           "elohim/ark/**",
+          "elohim/ark/cli/**",
+          "elohim/placement/core/**",
+          "elohim/eprfs/Cargo.toml",
+          "elohim/eprfs/eprfs-core/**",
           "elohim/Cargo.toml",
           "elohim/Cargo.lock",
           "elohim/epr/**",

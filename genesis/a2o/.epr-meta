@@ -26,8 +26,13 @@ rules:
       coherence findings, then repeat with a new blind reader until the story is READY or the operator
       explicitly defers named findings.
       Each finding carries a class (correctness | interpretability | preference); the loop closes when a
-      fresh reader returns no correctness or interpretability finding, and preference findings never
-      reopen it. Record the loop's cost where the work already reports — the commit message or the
+      fresh reader returns READY with no correctness finding. Interpretability findings still open at
+      close are recorded in the report, named, never dropped; preference findings never reopen it.
+      (Ruled by the steward of record 2026-10-20 after measuring the stricter "no correctness or
+      interpretability finding" close on 42 stories: blocking findings per round across all files ran
+      224, 198, 210, 179, 189, 190 over six rounds, because each fresh reader finds a different few
+      interpretability gaps, so that close has no fixed point. Evidence:
+      genesis/docs/superpowers/plans/task-placement-stories-t1-report.md through -t7-report.md.) Record the loop's cost where the work already reports — the commit message or the
       owning habit delta — as rounds, per-class counts per round, and findings resolved, so review
       efficiency is measured rather than felt. Every round still uses a new reader.
       The PostToolUse signal makes this deferred review obligation

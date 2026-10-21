@@ -79,3 +79,37 @@ Feature: A small group edits one spreadsheet together, from a laptop at home and
     When Dana's browser reopens the sheet through a different doorway that also serves the small group
     Then Dana sees the sheet at the same version Rachel's laptop holds
     And editing and cursors resume with no step asked of Rachel
+
+  @wip @concern:live-session-plane @requires:household-nodes
+  Scenario: Rachel and Dana still see each other when one of the two hosts carrying their presence goes down
+    Presence is the live layer of the sheet that is never saved: who has it open right now and
+    where each of their cursors is, passed along as it happens and stored by no one. The scenarios
+    above speak only of household hubs; this one adds a host, which is a different thing. A
+    household hub is an always-on box at home that keeps a copy of the sheet. A host is a role, not
+    a kind of machine: a hub that takes it on forwards presence between the people who have the
+    sheet open and keeps none of it. A hub keeps its copy whether or not it is also a host. A hub
+    becomes a host only when its own person offers it to the small group and the group agrees,
+    never by being always on. Presence is sealed the way edits are, with the small group's key: the
+    one key every change to the sheet is sealed with, held by each member and by no doorway and no
+    host. So a doorway or a host forwards sealed presence without being able to read it. Each
+    person sends their presence to both hosts, so either host alone is enough to carry it.
+    The tags on this scenario name two things. "live-session-plane" is the name this live, unsaved
+    presence layer is tracked under across the project's checks. "household-nodes" says the scenario
+    can only be staged on several real machines networked together as one test household, because
+    it needs two hubs in two homes, one of which loses power, where the Background needs only one.
+
+    Given Grace is another member of the small group, and her own household hub sits in a different home from Rachel's
+    And Rachel and Grace each offered their own household hub to the small group as a host
+    And the small group agreed that both hubs may be its hosts
+    And Rachel has "Meal rota" open on her laptop and Dana has it open in her browser
+    And every member of the small group holds the small group's key, and no doorway and no host holds it
+    And Rachel's laptop and Dana's browser each send their presence, sealed with the small group's key, to both hosts
+    And Dana's sealed presence reaches the hosts through her doorway, as her sealed edits do
+    When Grace's household hub loses power
+    And Rachel moves her cursor to cell D2
+    Then Dana's browser shows Rachel's cursor on cell D2 within 1 second
+    When Dana moves her cursor to cell C5
+    Then Rachel's laptop shows Dana's cursor on cell C5 within 1 second
+    And at no point after Grace's hub lost power did either of them see the other as gone or unknown
+    And neither Rachel nor Dana was asked to do anything
+    And once both of them leave the sheet, Rachel's household hub holds no record of who had it open

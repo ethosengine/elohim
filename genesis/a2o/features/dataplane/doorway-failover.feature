@@ -233,3 +233,37 @@ Feature: Doorway failover — two doorways, one name, one truth
     # saw a healthy doorway that was refusing everything.
     Then doorway "alpha-A" cannot look healthy on its startup page while it is actually shedding
     And doorway "elohim.host" cannot look healthy on its startup page while it is actually shedding
+
+  # @wip: no step definitions yet. The behaviour needs no new slice of the placement
+  # contract (spec genesis/docs/superpowers/specs/2026-10-20-what-every-app-inherits-placement-contract-design.md,
+  # §5.6 web publication); it is held only until its steps are wired.
+  @requires:owned-substrate @wip
+  Scenario Outline: A published page stays readable through the loss of one of the two doorways
+    The HOUSEHOLD is the group of people that runs both doorways and the storage peers behind
+    them. The landing page is a published page: the household has published it to the web at
+    commons reach, meaning it is open to anyone, and both doorways serve it. Doorways are
+    plural so that losing one is an ordinary event a visitor need not notice. Losing a doorway
+    is not shedding: a lost doorway answers nothing at all, neither its root page nor its
+    health check, so it cannot say that it is behind; it classifies as dead. Here the
+    household stops one of them on purpose and brings it back afterwards; as with the blob
+    fault, the harness registers that restoration before stopping it, so it happens even when
+    an assertion fails.
+    The visitor's client is given both doorways' addresses, "alpha-A" first, and asks them in
+    that order, keeping the first that answers. This scenario proves the page stays readable at
+    a surviving doorway's own address. Whether the apex name itself keeps answering while a
+    doorway is lost, rather than shedding, is not proved here or in
+    doorway-apex-transition.feature, which induces only a shed.
+
+    Given both doorways "alpha-A" and "elohim.host" serve content "elohim-host-landing" at one declared head
+    And a visitor has read content "elohim-host-landing" and recorded its declared head
+    When the household stops doorway "<lost>" entirely
+    Then doorway "<lost>" classifies as dead
+    And doorway "<survivor>" classifies as serving
+    And within 10 seconds of asking, the visitor's client reads content "elohim-host-landing" from doorway "<survivor>" at the recorded head
+    And the household did not republish content "elohim-host-landing" or change its publication while doorway "<lost>" was stopped
+    And the household restores doorway "<lost>", and it serves content "elohim-host-landing" at the recorded head again
+
+    Examples:
+      | lost        | survivor    |
+      | alpha-A     | elohim.host |
+      | elohim.host | alpha-A     |

@@ -36,6 +36,10 @@ pub enum LimitOwner {
     Commitment,
     /// The operator / runtime default.
     Operator,
+    /// A space's own charter: its membrane (who it admits, at which reach) and the rules its
+    /// members ratified. Neither the person's limit nor an operator veto, so a refusal on it is
+    /// never reported as `Operator` (placement's `OutsideReach`).
+    Charter,
     /// The reserved, unbuilt place — left empty for the faith no architecture
     /// may crowd out. The only `LimitOwner` that is not a lever.
     Faith,
@@ -312,5 +316,20 @@ mod tests {
             serde_json::to_string(&LimitOwner::Faith).unwrap(),
             "\"faith\""
         );
+        assert_eq!(
+            serde_json::to_string(&LimitOwner::Charter).unwrap(),
+            "\"charter\""
+        );
+    }
+
+    #[test]
+    fn a_charter_refusal_is_neither_self_sovereign_nor_an_operator_veto() {
+        let r = Refusal::gate(
+            LimitOwner::Charter,
+            "outside-reach",
+            "the space admits it wider",
+        );
+        assert!(!r.is_self_sovereign());
+        assert_ne!(r.limit_owner, LimitOwner::Operator);
     }
 }

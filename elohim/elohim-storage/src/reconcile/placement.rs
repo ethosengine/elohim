@@ -1,4 +1,4 @@
-//! Blob placement strategy seam (Phase 3).
+//! Blob placement strategy seam (Phase 3), now a shim over placement-core's ranking.
 //!
 //! The DURABLE artifact is the [`PlacementStrategy`] trait + [`PlacementCandidate`]
 //! — NOT the XOR heuristic. XOR-distance ([`XorDistanceStrategy`]) is the MVP
@@ -8,6 +8,20 @@
 //! WITHOUT reworking salvage. See
 //! `genesis/docs/superpowers/specs/2026-06-24-blob-custody-phase3-xor-salvage-placement-design.md`
 //! and backlog `intentional-placement-strategy-beyond-xor.md` (the P3-8 door).
+//!
+//! # One ranking home (rail R-P8)
+//!
+//! The rankings themselves live in `elohim-placement-core` (`placement_core::rank`):
+//! `XorDistanceStrategy` is [`placement_core::XorDistance`] and
+//! `DiversityAwarePlacementStrategy` is [`placement_core::DiversityAware`], moved there
+//! byte for byte and pinned by golden tests on both sides (interfaces spec §D.5,
+//! `rank::tests::matches_storage_strategy_vectors`; this file's own tests, unchanged). This
+//! file keeps the old trait as a thin shim so no caller and no existing placement moves: it
+//! builds the snapshot the ranking reads (one public `NeedKey::Blob` need, every candidate
+//! admitted through `placement_core::admit`, unique by carrier keeping the smallest failure
+//! domain, D12), asks the ranking for its total order and truncates it to `target_n`. No
+//! ranking, no XOR helper and no diversity pass is written here any more; the
+//! `boundary::one_ranking_home` test (`src/boundary.rs`) fails the build if one comes back.
 //!
 //! Identity namespace is `agent_cid` throughout — the canonical join key
 //! (commitments + `shard_locations` use it). The XOR metric NEVER crosses
@@ -25,6 +39,18 @@
 //!
 //! Our arc factor IS a distance input. Keep it on the authority plane; do not let
 //! it become the storage plane's retention rule.
+
+use std::collections::BTreeMap;
+
+use elohim_epr::Reach;
+use elohim_epr_rea::AgentRef;
+use placement_core::{
+    admit, AgentRefKey, Candidate, Capacity, Charge, Demand, DiversityAware, Eligible, Expresser,
+    ExpresserKind, FailureDomain, GrantScope, IneligibleReason, KindId, MethodId, MishpatAction,
+    Need, NeedClass, NeedKey, NeedTerms, OfferTerms, PlacementKind, Posture, RankInput, Ranking,
+    Requirements, Scratch, Weights, XorDistance,
+};
+use seam_contracts::Answer;
 
 /// A candidate holder for blob placement. Carries the context intentional
 /// strategies weigh; the MVP [`XorDistanceStrategy`] reads ONLY `agent_cid`.
@@ -63,6 +89,10 @@ impl PlacementCandidate {
 /// - empty candidates → empty output;
 /// - **agreement**: independent of candidate input order (coordination-free
 ///   self-selection depends on this).
+///
+/// Implemented only by the two shims below, over placement-core's rankings (R-P8). A new
+/// behaviour is a new `placement_core::Ranking` with its own `MethodId`, registered in
+/// placement-core's `MethodRegistry`, never a new impl of this trait.
 pub trait PlacementStrategy {
     fn rank(
         &self,
@@ -75,31 +105,10 @@ pub trait PlacementStrategy {
 /// MVP strategy: rank by XOR distance between `sha256(blob_marker)` and
 /// `sha256(agent_cid)` in a 256-bit space. Uniform spread; blind to household,
 /// capacity, affinity, standing (the cost of MVP convenience — see the seam doc).
+///
+/// A shim over [`placement_core::XorDistance`].
 #[derive(Debug, Clone, Default)]
 pub struct XorDistanceStrategy;
-
-/// Hash an arbitrary identifier into the 256-bit distance space. Used for both
-/// the blob marker and each `agent_cid` so they live in one comparable space
-/// (standard Kademlia "hash the key into the ID space").
-fn hash_into_keyspace(input: &[u8]) -> [u8; 32] {
-    use sha2::{Digest, Sha256};
-    let mut hasher = Sha256::new();
-    hasher.update(input);
-    let digest = hasher.finalize();
-    let mut out = [0u8; 32];
-    out.copy_from_slice(&digest);
-    out
-}
-
-/// Byte-wise XOR of two 256-bit keys. The result compares (big-endian, via the
-/// derived array `Ord`) as the Kademlia distance magnitude.
-fn xor_distance(a: &[u8; 32], b: &[u8; 32]) -> [u8; 32] {
-    let mut out = [0u8; 32];
-    for (o, (x, y)) in out.iter_mut().zip(a.iter().zip(b.iter())) {
-        *o = x ^ y;
-    }
-    out
-}
 
 impl PlacementStrategy for XorDistanceStrategy {
     fn rank(
@@ -108,26 +117,7 @@ impl PlacementStrategy for XorDistanceStrategy {
         candidates: &[PlacementCandidate],
         target_n: usize,
     ) -> Vec<String> {
-        let blob_key = hash_into_keyspace(blob_marker.as_bytes());
-        let mut scored: Vec<([u8; 32], &str)> = candidates
-            .iter()
-            .map(|c| {
-                let agent_key = hash_into_keyspace(c.agent_cid.as_bytes());
-                (xor_distance(&blob_key, &agent_key), c.agent_cid.as_str())
-            })
-            .collect();
-        // Total order: nearest distance first, then agent_cid for an unambiguous,
-        // input-order-independent tie-break (the "agreement" property every peer
-        // relies on for coordination-free self-selection).
-        scored.sort_by(|a, b| a.0.cmp(&b.0).then_with(|| a.1.cmp(b.1)));
-        // No duplicate agent_cids: after the sort, repeats are adjacent (identical
-        // distance + identical cid), so a consecutive dedup keeps the first.
-        scored.dedup_by(|a, b| a.1 == b.1);
-        scored
-            .into_iter()
-            .take(target_n)
-            .map(|(_, cid)| cid.to_string())
-            .collect()
+        rank_through(&XorDistance, blob_marker, candidates, target_n)
     }
 }
 
@@ -136,35 +126,21 @@ impl PlacementStrategy for XorDistanceStrategy {
 /// tiebreak. This is what keeps *salvage* re-placement from silently re-converging
 /// replicas into one household: XOR-closest can co-locate multiple replicas in one
 /// household (the spec's "sharpest blind spot"), eroding the diversity ingest
-/// established. The ingest selector (`services/peer_selection.rs`) already enforces
-/// this household-first discipline; this brings salvage onto the same footing.
+/// established.
 ///
 /// **Failure domain** = `household_id` when known; a candidate whose `household_id`
 /// is `None` is treated as its OWN distinct domain — we have no evidence of
-/// co-location, so we neither claim nor penalize diversity for it (and unknown
-/// candidates must never collapse into one bucket, which would starve selection
-/// against the not-yet-`household`-populated salvage pool). A consequence worth
+/// co-location, so we neither claim nor penalize diversity for it. A consequence worth
 /// stating: a pool with NO household data degrades **exactly** to
 /// [`XorDistanceStrategy`] — same output, candidate-for-candidate.
 ///
-/// Still a **pure, deterministic** function of the candidate set (no per-peer
-/// mutable state, no network, no capacity/standing weighting), so it preserves the
-/// **agreement** property and stays inside the coordination-free self-selection
-/// model — it does NOT cross into the spec's "coordinated-authoring" fork.
+/// Still a **pure, deterministic** function of the candidate set, so it preserves the
+/// **agreement** property and stays inside the coordination-free self-selection model.
+///
+/// A shim over [`placement_core::DiversityAware`], whose multi-pass greedy is
+/// `placement_core::diversify`.
 #[derive(Debug, Clone, Default)]
 pub struct DiversityAwarePlacementStrategy;
-
-impl DiversityAwarePlacementStrategy {
-    /// The failure-domain key: the known household (prefixed to avoid colliding
-    /// with the unknown sentinel), else a per-candidate unique sentinel keyed by
-    /// `agent_cid` so unknown-household candidates each form their own domain.
-    fn failure_domain(c: &PlacementCandidate) -> String {
-        match &c.household_id {
-            Some(h) => format!("hh:{h}"),
-            None => format!("cid:{}", c.agent_cid),
-        }
-    }
-}
 
 impl PlacementStrategy for DiversityAwarePlacementStrategy {
     fn rank(
@@ -173,70 +149,168 @@ impl PlacementStrategy for DiversityAwarePlacementStrategy {
         candidates: &[PlacementCandidate],
         target_n: usize,
     ) -> Vec<String> {
-        let blob_key = hash_into_keyspace(blob_marker.as_bytes());
-        // Same (distance, agent_cid) RANKING as XorDistanceStrategy, with
-        // failure_domain appended as a FINAL tiebreak. That last key matters only
-        // when the SAME agent_cid arrives twice with CONFLICTING household
-        // enrichment — reachable, because the salvage candidate set is assembled
-        // from partial / in-flux multi-source data. Without it, two equal
-        // (distance, cid) entries carrying different domains keep their INPUT order
-        // under the stable sort, and the dedup below would retain an
-        // input-order-dependent domain — silently breaking the agreement property
-        // the coordination-free self-selection rests on. With it, dedup keeps the
-        // lexicographically-smallest domain, fully independent of input order.
-        let mut scored: Vec<([u8; 32], &str, String)> = candidates
-            .iter()
-            .map(|c| {
-                let agent_key = hash_into_keyspace(c.agent_cid.as_bytes());
-                (
-                    xor_distance(&blob_key, &agent_key),
-                    c.agent_cid.as_str(),
-                    Self::failure_domain(c),
-                )
-            })
-            .collect();
-        scored.sort_by(|a, b| {
-            a.0.cmp(&b.0)
-                .then_with(|| a.1.cmp(b.1))
-                .then_with(|| a.2.cmp(&b.2))
-        });
-        // No duplicate agent_cids: repeats are adjacent after the sort (keep first —
-        // now the deterministic lexicographically-smallest domain).
-        scored.dedup_by(|a, b| a.1 == b.1);
-
-        // Diversity-first multi-pass greedy over the XOR-sorted list. Each pass
-        // takes at most one candidate per not-yet-used failure domain, so the first
-        // `target_n` picks come from DISTINCT domains whenever enough domains exist;
-        // when more slots than domains remain, later passes fill from the leftovers
-        // in XOR order. With every candidate in its own domain this reduces to a
-        // single pass in pure XOR order == XorDistanceStrategy.
-        let mut picked: Vec<String> = Vec::with_capacity(target_n.min(scored.len()));
-        let mut taken = vec![false; scored.len()];
-        while picked.len() < target_n {
-            let mut used_domains: std::collections::HashSet<&str> =
-                std::collections::HashSet::new();
-            let mut progressed = false;
-            for i in 0..scored.len() {
-                if picked.len() >= target_n {
-                    break;
-                }
-                if taken[i] {
-                    continue;
-                }
-                if used_domains.insert(scored[i].2.as_str()) {
-                    picked.push(scored[i].1.to_string());
-                    taken[i] = true;
-                    progressed = true;
-                }
-            }
-            // No untaken candidate found this pass → pool exhausted; stop (also
-            // guards against an infinite loop when target_n exceeds the pool).
-            if !progressed {
-                break;
-            }
-        }
-        picked
+        rank_through(&DiversityAware, blob_marker, candidates, target_n)
     }
+}
+
+/// The legacy custody kind the shim admits through. Custody-shaped (the receiver never carries
+/// its own need), no grant scope (a declared posture suffices, R3), and no charge: the legacy
+/// strategies never weighed capacity. The full custody kinds with their `Ports` are
+/// `reconcile/custody_floor.rs`'s (a follow-on); this one exists only so the shim reaches the
+/// ranking through `admit`, the one constructor of `Eligible` (R-P5).
+struct LegacyCustodyBlob;
+
+impl PlacementKind for LegacyCustodyBlob {
+    fn id(&self) -> KindId {
+        KindId::CustodyBlob
+    }
+    fn action(&self, _need: &Need) -> MishpatAction {
+        MishpatAction::CustodyBlob
+    }
+    fn scope(&self, _need: &Need) -> Option<GrantScope> {
+        None
+    }
+    fn receiver_may_carry(&self) -> bool {
+        false
+    }
+    fn fits(
+        &self,
+        _need: &Need,
+        _candidate: &Candidate,
+        _offer: &OfferTerms,
+        _remaining: &Capacity,
+    ) -> Result<Charge, IneligibleReason> {
+        Ok(Charge::default())
+    }
+    fn default_method(&self) -> MethodId {
+        XorDistance.method()
+    }
+}
+
+/// The legacy scope every shimmed need is expressed in (interfaces spec §D.2, the legacy custody
+/// mapping): one named CID, the same on every peer.
+const LEGACY_SCOPE: &str = "elohim:placement:legacy-custody-scope@1";
+
+/// The receiver of a shimmed need. The legacy strategies had no receiver, so the shim names one
+/// no agent key can equal (a NUL byte never occurs in a `uhCAk…` key or a transport id).
+const NO_RECEIVER: &str = "\u{0}legacy-placement-shim";
+
+/// The shimmed need: one public `NeedKey::Blob(blob_marker)`. Its `rank_bytes` are the marker's
+/// UTF-8 bytes, which is exactly what `hash_into_keyspace(blob_marker)` hashed.
+fn legacy_need(blob_marker: &str, target_n: usize) -> Need {
+    let holders = u16::try_from(target_n).unwrap_or(u16::MAX);
+    Need {
+        kind: KindId::CustodyBlob,
+        key: NeedKey::Blob(blob_marker.to_string()),
+        demand: Demand {
+            holders,
+            domains: holders.min(1),
+        },
+        requires: Requirements::default(),
+        terms: NeedTerms::None,
+        reach: Reach::Public,
+        receiver: AgentRef(NO_RECEIVER.to_string()),
+        expressed_by: Expresser {
+            by: ExpresserKind::Agent,
+            id: NO_RECEIVER.to_string(),
+        },
+        class: NeedClass::Member,
+        in_scope_of: *MethodId::named(LEGACY_SCOPE).cid(),
+    }
+}
+
+/// The snapshot's candidates: unique by carrier, keeping the smallest failure domain (D12), so a
+/// duplicate carrier with conflicting household enrichment resolves the same way whatever the
+/// input order. Every candidate is live, admitted at `public` for the shim's receiver, and offers
+/// the legacy custody kind with no stated capacity.
+fn legacy_candidates(candidates: &[PlacementCandidate], receiver: &AgentRef) -> Vec<Candidate> {
+    let receiver = AgentRefKey::of(receiver);
+    let mut by_agent: BTreeMap<&str, Candidate> = BTreeMap::new();
+    for c in candidates {
+        let carrier = AgentRef(c.agent_cid.clone());
+        let domain = FailureDomain::of(c.household_id.as_deref(), &carrier);
+        if by_agent
+            .get(c.agent_cid.as_str())
+            .is_some_and(|kept| kept.domain <= domain)
+        {
+            continue;
+        }
+        let mut offers = BTreeMap::new();
+        offers.insert(KindId::CustodyBlob, OfferTerms::default());
+        let mut admitted = BTreeMap::new();
+        admitted.insert(receiver.clone(), Answer::Present(Reach::Public));
+        by_agent.insert(
+            c.agent_cid.as_str(),
+            Candidate {
+                posture: Posture {
+                    carrier,
+                    offers,
+                    reach: Reach::Public,
+                    written_at: 0,
+                },
+                domain,
+                live: Answer::Present(true),
+                admitted,
+                consent: BTreeMap::new(),
+            },
+        );
+    }
+    by_agent.into_values().collect()
+}
+
+/// Rank `candidates` for `blob_marker` through a placement-core ranking: every candidate
+/// eligible, no incumbents, default weights, the order truncated to `target_n`.
+fn rank_through(
+    ranking: &dyn Ranking,
+    blob_marker: &str,
+    candidates: &[PlacementCandidate],
+    target_n: usize,
+) -> Vec<String> {
+    if target_n == 0 || candidates.is_empty() {
+        return Vec::new();
+    }
+    let need = legacy_need(blob_marker, target_n);
+    let pool = legacy_candidates(candidates, &need.receiver);
+    let kind = LegacyCustodyBlob;
+    let remaining = Capacity::default();
+    let eligible: Vec<Eligible<'_>> = pool
+        .iter()
+        .filter_map(|c| match admit(&kind, &need, c, None, &remaining, 0) {
+            Ok(e) => Some(e),
+            // Unreachable for a well-formed agent key: the shim's need admits every live
+            // public candidate. A candidate refused here (one whose key equals the shim's
+            // NUL-prefixed receiver) is said, never silently ranked.
+            Err(refused) => {
+                tracing::warn!(
+                    agent = %c.agent().0,
+                    reason = ?refused.why.why,
+                    "legacy placement shim: candidate not admitted"
+                );
+                None
+            }
+        })
+        .collect();
+    let mut scratch = Scratch::default();
+    scratch.prepare(eligible.iter().map(|e| e.agent().0.as_str()));
+    let input = RankInput {
+        need: &need,
+        receiver_domain: None,
+        input_root: None,
+    };
+    let mut order = Vec::with_capacity(eligible.len());
+    ranking.rank(
+        &input,
+        &eligible,
+        &vec![false; eligible.len()],
+        &Weights::new(),
+        &scratch,
+        &mut order,
+    );
+    order.truncate(target_n);
+    order
+        .into_iter()
+        .map(|i| eligible[i].agent().0.clone())
+        .collect()
 }
 
 #[cfg(test)]

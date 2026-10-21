@@ -382,3 +382,65 @@ Feature: Observable + contract-aware auto-distribute
     # Constraint: the 3-state contract — present-N (short), present-0 (graph branch
     # measured the floor met), ABSENT (relational household_resilience path, not computed).
     # A consumer MUST distinguish "measured: met" (0) from "not computed" (absent).
+
+  # --- The trust under every count above: a holder's word, read back --------
+  # Every scenario above counts copies, collectives and shortfalls from what each holder says it
+  # holds. The two below check that word, so they are the ground the counts stand on, not an appendix.
+  # HELD: both scenarios below wait on the holding check, a missing node of the placement-contract
+  # design (genesis/docs/superpowers/specs/2026-10-20-what-every-app-inherits-placement-contract-design.md,
+  # section 15, "Claimed, then held"). No numbered slice of that design's section 17 names it; the
+  # floor controller (slice 5) is the slice whose honoured count it corrects. Today a holder counts as
+  # keeping a copy whenever its own list of holdings names it. Every step is undefined.
+
+  @wip @act:i @requires:household-nodes @requires:owned-substrate
+  Scenario: Jessica's peer shows what it promised to keep against what it holds, and a lost copy is not counted as kept
+    Everything this feature shows so far (where a copy lives, how many collectives keep it, how far
+    short of its floor it is) is only as true as each holder's word that it has the copy. These last
+    two scenarios check that word, and they serve the people whose copies are kept as well as the
+    operator: each person sees whether what was promised to them is really held.
+
+    The holding check these two scenarios need is not built yet, so both wait until it is. Until
+    then a holder is counted as keeping a copy whenever its own list of holdings names it, so a
+    copy lost from its disk is still counted as kept, and every count above inherits that gap.
+
+    Matthew, Jessica and James Dowell share a household, and each keeps a peer named after them: an
+    always-on machine at home that holds their data. A peer that keeps a copy of someone's things
+    signs a commitment, a promise saying "this peer holds this copy for this person". The commitment
+    is a promise; whether the bytes are on the peer's disk is a fact. The peer's own list of what it
+    holds is only its claim about that fact. A holding check turns the claim into proof: it asks the
+    holder a question about the copy that only someone who has its exact bytes can answer. What a
+    holder promised is shown to that holder's person and to the person the copy is kept for, and to
+    no one else. This scenario deletes a copy from the disk directly, which is why it runs only on
+    a mesh this run owns outright.
+
+    Both scenarios run in Act I: the Dowell household's own mesh, with no other household joined.
+    On that mesh the doorway "alpha" and the storage that the feature's Background requires are
+    Matthew's peer's. For these two scenarios the Background is a liveness check and nothing more:
+    it proves the household is up, and no step below reads anything through the doorway or that
+    storage. Each person's view here comes from that person's own peer, because a peer's list of
+    what it holds stays on that peer.
+
+    Given the household's peers "matthew", "jessica" and "james" are running
+    And peer "jessica" has signed commitments to keep a copy of Matthew's "Tax papers 2025" and a copy of James's "Coursework"
+    And peer "jessica" holds both copies
+    When the copy of "Coursework" is deleted from peer "jessica"'s disk, while its list of holdings still names it
+    And the holding check runs against peer "jessica"
+    Then Jessica is shown "Tax papers 2025" as promised and held
+    And Jessica is shown "Coursework" as promised and not held
+    And peer "jessica" is not counted as an honoured holder of "Coursework"
+    And James is shown that the copy of "Coursework" on peer "jessica" failed its holding check
+    And Matthew is shown nothing about James's "Coursework"
+
+  @wip @act:i @requires:household-nodes
+  Scenario: A promise no holding check has read yet is shown as unproven, not as kept
+    A holder's own claim is not proof. Until a holding check has run against a copy, the copy is
+    shown as unproven: neither kept nor lost. Unlike the scenario before it, this one only reads:
+    it deletes nothing from any disk, so it runs on any household mesh, not only one this run owns.
+
+    Given the household's peers "matthew", "jessica" and "james" are running
+    And peer "james" has signed a commitment to keep a copy of Jessica's "Garden plans"
+    And peer "james" lists that copy among what it holds
+    And no holding check has yet run against peer "james"
+    When Jessica opens what is kept for her "Garden plans"
+    Then the copy on peer "james" is shown as promised and unproven
+    And it is not shown as kept

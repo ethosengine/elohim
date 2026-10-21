@@ -1,0 +1,16 @@
+{
+  "$id": "epr:schema:enum:party-role",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "PartyRole",
+  "description": "A party a probe reading may be disclosed to, by role (spec §9's rows: carrier and carried-for, grantor, custodians, the leaver and each holder, settlement); the `roles` of a `parties` disclosure in objects/probe-reading. Source of truth: this schema; Rust mirror `seam_contracts::probe::PartyRole` (crates/seam-contracts/src/probe.rs, kebab-case serde). Not named in interfaces spec §2.G's enum list; added because `Disclosure::Parties { roles }` needs a referenced vocabulary (CONVENTIONS rule 7). Carries neither `_dna` nor `_codegen`: it is a field vocabulary for the placement wire schemas, generated only as a TypeScript union where those schemas inline it, and adds no constant to schema-enums.ts. Not yet pinned: no test holds the Rust enum equal to this list (follow-on: a case in placement-core's schema_contract test or in seam-contracts' own tests).",
+  "type": "string",
+  "enum": [
+    "carrier",
+    "carried-for",
+    "grantor",
+    "custodian",
+    "leaver",
+    "holder",
+    "settlement"
+  ]
+}

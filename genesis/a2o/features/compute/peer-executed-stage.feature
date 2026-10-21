@@ -49,3 +49,28 @@ Feature: A peer runs one of the household's CI stages and the household can chec
     When the requester submits the identical stage a second time
     Then the same request is recovered and the provider runs nothing new
     And exactly one admission event exists for that stage
+
+  # Held until slice 6 of the placement-contract design ("task to berth", §17 of
+  # genesis/docs/superpowers/specs/2026-10-20-what-every-app-inherits-placement-contract-design.md),
+  # which sends a task to the peer that already holds its inputs. @wip: no step has a definition yet.
+  # These two scenarios use a build stage: a CI stage that builds the household's software from its
+  # source files rather than checking it, and that is too heavy for the requester's own machine.
+  @wip @requires:owned-substrate
+  Scenario: a heavy build stage runs on the peer that already holds its inputs, and only its outputs come back
+    Given a build stage whose input files all sit in one tree, named by the fingerprint of the tree's exact contents
+    And the provider's peer already holds that whole tree, and the requester's machine holds none of it
+    When the requester asks for the build by naming only its pinned build script, the tree's fingerprint and the paths in the tree the build reads
+    Then no input file travels from the requester to the provider
+    And the provider runs the build on its own peer, under the compute grant that names this requester, inside a sandbox that keeps the build away from the rest of that peer
+    And the requester receives the fingerprint of the build's output and a record of which script and which input tree produced it
+    And the requester downloads only the output files it opens, and none of the others
+
+  @wip @requires:owned-substrate
+  Scenario: a heavy build stage with nowhere to run is kept and shown as not carried, not lost
+    Given a build stage too heavy for the requester's own machine to run
+    And the provider's peer is switched off, and no other peer holds a compute grant for this requester
+    When the requester asks for the build
+    Then the request is kept on the requester's machine and shown as not carried, waiting for a provider
+    And the build does not start on the requester's own machine unless the requester chooses to run it there
+    When the provider's peer is switched on again
+    Then the provider runs the kept build, and only its outputs come back to the requester

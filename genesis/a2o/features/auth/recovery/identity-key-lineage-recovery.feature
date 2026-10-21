@@ -71,3 +71,58 @@ Feature: A recovered identity keeps its contribution, standing, and claims throu
     Then the rotation is refused
     And the chain-root cid of Grandma's identity is unchanged
     And Grandma's current head key does not resolve to "key-attacker"
+
+  # Added 2026-10-20: the two scenarios below cover the identity row of the placement-contract
+  # design (genesis/docs/superpowers/specs/2026-10-20-what-every-app-inherits-placement-contract-design.md).
+  @wip @concern:identity-lineage-recovery
+  Scenario: Grandma has lost every device she had, and a new tablet opens none of her documents but tells her how to ask her quorum to stand for her
+    The chain-root above is the network's name for Grandma, her identity root, and the network
+    holds it, not any one device. Its cid is its content identifier: a name computed from the
+    first node of her identity lineage, so it never changes when a key does. A device is enrolled
+    under it when it holds the current key of her identity head, the key her lineage names as
+    acting for her now: that is "key-original" from the Background, and her phone and her laptop
+    both hold it. The other peers of the mesh hold copies of the
+    documents she keeps, which is how her data outlives her devices. Copies surviving is not
+    the same as getting back in: without a device enrolled under her chain-root, she cannot
+    open them, and nobody else can open them for her. This scenario is written ahead of its
+    implementation and is expected to fail until the app can tell an enrolled device from one
+    that is not.
+    Given Grandma's phone and her laptop are the only devices enrolled under her chain-root
+    And Grandma's phone and her laptop both hold "key-original", the current key of her identity head
+    And the other peers of the mesh hold copies of the documents Grandma keeps
+    When Grandma loses her phone and her laptop
+    And with them Grandma has lost access to "key-original"
+    And Grandma starts the app on a new tablet that has never been enrolled under her chain-root
+    Then the app on the tablet opens none of her documents, because the tablet is not enrolled under her chain-root, although the other peers of the mesh still hold copies of them
+    And the app on the tablet tells her how to ask her community-recovery quorum to stand for her
+
+  @wip @concern:identity-lineage-recovery
+  Scenario: Grandma's quorum enrolls her new tablet, and the app on it opens what was hers, as herself
+    This continues the scenario above: Grandma has lost her phone and her laptop, and the app on
+    her new tablet has opened nothing yet. Enrolling the tablet is a key rotation, the same kind
+    the first scenario walks: her community-recovery quorum authorizes a new key, "key-tablet",
+    held on the tablet, as the new current key of her identity head in place of "key-original",
+    the key the lost phone and laptop held. That
+    needs the KeyRotation mint path, which is not built yet, so this scenario is written ahead of
+    it and is expected to fail until it lands. Her claimed contributor presence is the network's
+    record that the content she contributed is
+    hers, claimed under her chain-root rather than under any one key; it is what has to keep
+    recognizing her after the rotation. Each copy the peers hold is named by a fingerprint
+    computed from its contents, so a copy that anyone has altered no longer matches its name;
+    that is how the tablet knows that what it fetches from other peers is what she kept.
+    Given Grandma's phone and her laptop are the only devices enrolled under her chain-root
+    And Grandma's phone and her laptop both hold "key-original", the current key of her identity head
+    And the other peers of the mesh hold copies of the documents Grandma keeps
+    And each copy the peers hold is named by a fingerprint computed from its contents
+    And Grandma has lost her phone and her laptop, and with them her access to "key-original"
+    And Grandma has started the app on a new tablet that has never been enrolled under her chain-root
+    And the app on the tablet has opened none of her documents, because the tablet is not enrolled under her chain-root
+    When the community-recovery quorum authorizes a rotation to a new key "key-tablet" held on the new tablet
+    Then a KeyRotation version node is appended to Grandma's identity lineage
+    And the chain-root cid of Grandma's identity is unchanged
+    And Grandma's current head key resolves to "key-tablet"
+    And the new tablet is enrolled under Grandma's chain-root
+    And the phone and the laptop are no longer enrolled, so anything newly signed with "key-original" is refused
+    And the app on the tablet opens Grandma's documents, fetched from the other peers of the mesh, each checked against the fingerprint that names it
+    And each document reads the same as it did before she lost her devices
+    And Grandma's claimed contributor presence still resolves through the chain-root

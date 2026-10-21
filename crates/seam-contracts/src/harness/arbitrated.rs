@@ -308,6 +308,243 @@ fn permutation_violation<C: core::fmt::Debug>(
     }
 }
 
+/// Why an ordering (list-form) property failed.
+///
+/// **Concerns:** C2 (monotonic authority — two peers holding the same candidates must produce the
+/// same ORDER, not only the same first element), C8 (the harness's own outcomes are reason-labeled).
+///
+/// **Forcing incident:** interfaces spec §2.D.5 (2026-10-20): a placement ranking returns an ordered
+/// list of carriers, and [`check_arbitration`] returns one winner, so a ranking that agreed on the
+/// first carrier and disagreed on the second passed it. Independently, `elohim-peer-fabric`'s
+/// `score.rs` sorts floats with `partial_cmp(..).unwrap_or(Equal)`, so ties keep input order — the
+/// list-form version of the 2026-07-10 arrival-order defect.
+///
+/// **Contract test:** `ordering_violation_class_is_conformant`.
+///
+/// A separate enum rather than new [`ArbitrationViolationClass`] variants, because that published
+/// enum is exhaustive and a new variant would break every downstream `match`.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
+pub enum OrderingViolationClass {
+    /// The order changed when the candidates were reordered.
+    PermutationDependent,
+    /// The order differed between calls on byte-identical input.
+    Nondeterministic,
+    /// The output named a candidate that was not in the input.
+    Foreign,
+    /// The output named a candidate more times than the input held it.
+    Duplicated,
+    /// An empty input produced a non-empty output.
+    NotEmptyFromEmpty,
+}
+
+impl ReasonLabel for OrderingViolationClass {
+    const ALL: &'static [Self] = &[
+        OrderingViolationClass::PermutationDependent,
+        OrderingViolationClass::Nondeterministic,
+        OrderingViolationClass::Foreign,
+        OrderingViolationClass::Duplicated,
+        OrderingViolationClass::NotEmptyFromEmpty,
+    ];
+
+    fn label(&self) -> &'static str {
+        match self {
+            OrderingViolationClass::PermutationDependent => "permutation_dependent",
+            OrderingViolationClass::Nondeterministic => "nondeterministic",
+            OrderingViolationClass::Foreign => "foreign",
+            OrderingViolationClass::Duplicated => "duplicated",
+            OrderingViolationClass::NotEmptyFromEmpty => "not_empty_from_empty",
+        }
+    }
+}
+
+/// A failed ordering property: typed class + capsule.
+///
+/// **Concerns:** C2, C8, C14 (the `detail` capsule carries the reproducing ordering).
+///
+/// **Contract test:** `ordering_permutation_dependent_is_caught`.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct OrderingViolation {
+    /// The typed failure class.
+    pub class: OrderingViolationClass,
+    /// Human-readable reproduction context.
+    pub detail: String,
+}
+
+impl core::fmt::Display for OrderingViolation {
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+        write!(f, "[{}] {}", self.class.label(), self.detail)
+    }
+}
+
+impl std::error::Error for OrderingViolation {}
+
+/// The list form of the arbitration harness, with the default budget.
+///
+/// **Concerns:** C2.
+///
+/// **Contract test:** `total_ordering_passes`, `ordering_permutation_dependent_is_caught`,
+/// `ordering_nondeterministic_is_caught`, `ordering_foreign_is_caught`,
+/// `ordering_duplicated_is_caught`, `ordering_not_empty_from_empty_is_caught`.
+///
+/// `order` receives the candidates in some order and returns them ranked, best first, possibly
+/// truncated. It must be pure. Checked: empty in gives empty out; the output is a sub-multiset of
+/// the input (nothing foreign, nothing repeated beyond its input count); identical input gives an
+/// identical output; and every ordering of the input gives the same output sequence. The last is
+/// what makes the order total: a comparator with ties resolved by arrival fails it.
+pub fn check_ordering<C, S>(
+    candidates: &[C],
+    order: S,
+) -> Result<ArbitrationReport, OrderingViolation>
+where
+    C: Clone + PartialEq + core::fmt::Debug,
+    S: Fn(&[C]) -> Vec<C>,
+{
+    check_ordering_with(candidates, order, ArbitrationBudget::default())
+}
+
+/// [`check_ordering`] against an explicit budget.
+///
+/// **Concerns:** C2, C6a.
+///
+/// **Contract test:** `ordering_budget_caps_the_walk`.
+pub fn check_ordering_with<C, S>(
+    candidates: &[C],
+    order: S,
+    budget: ArbitrationBudget,
+) -> Result<ArbitrationReport, OrderingViolation>
+where
+    C: Clone + PartialEq + core::fmt::Debug,
+    S: Fn(&[C]) -> Vec<C>,
+{
+    // 1. Empty in, empty out.
+    let from_empty = order(&[]);
+    if !from_empty.is_empty() {
+        return Err(OrderingViolation {
+            class: OrderingViolationClass::NotEmptyFromEmpty,
+            detail: format!(
+                "an empty candidate set produced {from_empty:?} — an ordering may only rank what \
+                 it was given"
+            ),
+        });
+    }
+
+    // 2. Output is a sub-multiset of the input.
+    let reference = order(candidates);
+    check_sub_multiset(&reference, candidates)?;
+
+    // 3. Call determinism on the identical input.
+    for call in 1..budget.repeat_calls {
+        let again = order(candidates);
+        if again != reference {
+            return Err(OrderingViolation {
+                class: OrderingViolationClass::Nondeterministic,
+                detail: format!(
+                    "call #{call} on byte-identical input returned {again:?}, first call returned \
+                     {reference:?} — the ordering reads state that is not in its arguments"
+                ),
+            });
+        }
+    }
+
+    // 4. Permutation-invariance of the whole sequence.
+    let n = candidates.len();
+    let exhaustive = factorial_fits(n, budget.max_permutations);
+    let mut checked = 0usize;
+    let mut violation = None;
+    let mut check_one = |ordering: &[C]| -> bool {
+        let got = order(ordering);
+        if got == reference {
+            true
+        } else {
+            violation = Some(OrderingViolation {
+                class: OrderingViolationClass::PermutationDependent,
+                detail: format!(
+                    "input ordering {ordering:?} ranked {got:?}, but input ordering \
+                     {candidates:?} ranked {reference:?}. The order is a function of arrival, \
+                     not of the candidate set — two peers holding the same candidates will rank \
+                     them differently. The cure is a TOTAL key with a deterministic tiebreak."
+                ),
+            });
+            false
+        }
+    };
+
+    if exhaustive {
+        for_each_permutation(candidates, budget.max_permutations, |ordering| {
+            checked += 1;
+            check_one(ordering)
+        });
+    } else {
+        let mut state = budget.sample_seed | 1;
+        let mut scratch = candidates.to_vec();
+        checked = 1;
+        while checked < budget.max_permutations {
+            shuffle(&mut scratch, &mut state);
+            checked += 1;
+            if !check_one(&scratch) {
+                break;
+            }
+        }
+    }
+
+    match violation {
+        Some(v) => Err(v),
+        None => Ok(ArbitrationReport {
+            permutations_checked: checked,
+            exhaustive,
+            repeat_calls: budget.repeat_calls.max(1),
+        }),
+    }
+}
+
+/// Panicking form of [`check_ordering`], for use inside `#[test]`.
+///
+/// **Concerns:** C2.
+///
+/// **Contract test:** `ordering_assert_form_panics_on_violation`.
+///
+/// # Panics
+///
+/// If any ordering property fails.
+pub fn assert_ordering<C, S>(candidates: &[C], order: S)
+where
+    C: Clone + PartialEq + core::fmt::Debug,
+    S: Fn(&[C]) -> Vec<C>,
+{
+    if let Err(v) = check_ordering(candidates, order) {
+        panic!("ordering contract (C2) failed: {v}");
+    }
+}
+
+fn check_sub_multiset<C: PartialEq + core::fmt::Debug>(
+    output: &[C],
+    input: &[C],
+) -> Result<(), OrderingViolation> {
+    for item in output {
+        let held = input.iter().filter(|c| *c == item).count();
+        let named = output.iter().filter(|c| *c == item).count();
+        if held == 0 {
+            return Err(OrderingViolation {
+                class: OrderingViolationClass::Foreign,
+                detail: format!(
+                    "the output {output:?} names {item:?}, which is not among the input \
+                     {input:?} — an ordering may only rank what it was given"
+                ),
+            });
+        }
+        if named > held {
+            return Err(OrderingViolation {
+                class: OrderingViolationClass::Duplicated,
+                detail: format!(
+                    "the output {output:?} names {item:?} {named}× but the input {input:?} \
+                     holds it {held}× — one carrier counted twice"
+                ),
+            });
+        }
+    }
+    Ok(())
+}
+
 /// `true` iff `n!` is computable and ≤ `limit`.
 fn factorial_fits(n: usize, limit: usize) -> bool {
     let mut acc: u128 = 1;
@@ -544,6 +781,155 @@ mod arbitrated_tests {
         crate::assert_reason_labels_stable::<ArbitrationViolationClass>(&[
             "permutation_dependent",
             "nondeterministic",
+        ]);
+    }
+
+    // ---- the list form ----
+
+    fn key(c: &Candidate) -> (u8, u64, u8) {
+        (c.tier, c.clock, c.hash)
+    }
+
+    /// Total order, best first, truncated to 3.
+    fn order_total(candidates: &[Candidate]) -> Vec<Candidate> {
+        let mut v = candidates.to_vec();
+        v.sort_by_key(|c| core::cmp::Reverse(key(c)));
+        v.truncate(3);
+        v
+    }
+
+    /// Stable sort on (tier, clock) only: ties keep arrival order.
+    fn order_no_tiebreak(candidates: &[Candidate]) -> Vec<Candidate> {
+        let mut v = candidates.to_vec();
+        v.sort_by_key(|c| core::cmp::Reverse((c.tier, c.clock)));
+        v
+    }
+
+    /// A set whose top candidate is unique but whose second and third tie on (tier, clock): the
+    /// single-winner harness cannot see the defect.
+    fn second_place_tie() -> Vec<Candidate> {
+        vec![c(2, 1, 9), c(1, 5, 2), c(1, 5, 3), c(0, 99, 4)]
+    }
+
+    #[test]
+    fn total_ordering_passes() {
+        let report = check_ordering(&second_place_tie(), order_total).expect("total order");
+        assert!(report.exhaustive);
+        assert_eq!(report.permutations_checked, 24);
+        let empty: Vec<Candidate> = vec![];
+        check_ordering(&empty, order_total).expect("empty set");
+    }
+
+    #[test]
+    fn ordering_permutation_dependent_is_caught() {
+        // The single-winner form passes: the winner (tier 2) is unique.
+        check_arbitration(&second_place_tie(), |cs: &[Candidate]| {
+            order_no_tiebreak(cs).into_iter().next()
+        })
+        .expect("the winner alone is invariant");
+        // The list form sees the tie in second place.
+        let err = check_ordering(&second_place_tie(), order_no_tiebreak)
+            .expect_err("ties resolved by arrival order");
+        assert_eq!(err.class, OrderingViolationClass::PermutationDependent);
+        assert!(err.to_string().contains("permutation_dependent"));
+    }
+
+    #[test]
+    fn ordering_nondeterministic_is_caught() {
+        use std::cell::Cell;
+        let calls = Cell::new(0u32);
+        let err = check_ordering(&second_place_tie(), |cs: &[Candidate]| {
+            calls.set(calls.get() + 1);
+            let mut v = order_total(cs);
+            if calls.get() % 2 == 0 {
+                v.reverse();
+            }
+            v
+        })
+        .expect_err("a counter decides the order");
+        assert_eq!(err.class, OrderingViolationClass::Nondeterministic);
+    }
+
+    #[test]
+    fn ordering_foreign_is_caught() {
+        let err = check_ordering(&second_place_tie(), |cs: &[Candidate]| {
+            let mut v = order_total(cs);
+            if !cs.is_empty() {
+                v.push(c(9, 9, 9));
+            }
+            v
+        })
+        .expect_err("an invented candidate");
+        assert_eq!(err.class, OrderingViolationClass::Foreign);
+    }
+
+    #[test]
+    fn ordering_duplicated_is_caught() {
+        let err = check_ordering(&second_place_tie(), |cs: &[Candidate]| {
+            let mut v = order_total(cs);
+            if let Some(first) = v.first().cloned() {
+                v.push(first);
+            }
+            v
+        })
+        .expect_err("one carrier counted twice");
+        assert_eq!(err.class, OrderingViolationClass::Duplicated);
+
+        // An input that genuinely holds a candidate twice may rank it twice.
+        let twice = vec![c(1, 1, 1), c(1, 1, 1)];
+        check_ordering(&twice, order_total).expect("input multiplicity is respected");
+    }
+
+    #[test]
+    fn ordering_not_empty_from_empty_is_caught() {
+        let err = check_ordering(&second_place_tie(), |cs: &[Candidate]| {
+            if cs.is_empty() {
+                vec![c(0, 0, 0)]
+            } else {
+                order_total(cs)
+            }
+        })
+        .expect_err("a default carrier from nothing");
+        assert_eq!(err.class, OrderingViolationClass::NotEmptyFromEmpty);
+    }
+
+    #[test]
+    fn ordering_budget_caps_the_walk() {
+        let budget = ArbitrationBudget {
+            max_permutations: 10,
+            ..ArbitrationBudget::default()
+        };
+        let report =
+            check_ordering_with(&second_place_tie(), order_total, budget).expect("total order");
+        assert!(!report.exhaustive);
+        assert_eq!(report.permutations_checked, 10);
+
+        // Sampled runs still find a tie, reproducibly.
+        let mut many: Vec<Candidate> = (0..6u8).map(|i| c(0, u64::from(i), i)).collect();
+        many.push(c(1, 9, 21));
+        many.push(c(1, 9, 22));
+        let a = check_ordering(&many, order_no_tiebreak);
+        let b = check_ordering(&many, order_no_tiebreak);
+        assert!(a.is_err());
+        assert_eq!(a, b);
+    }
+
+    #[test]
+    #[should_panic(expected = "ordering contract (C2) failed")]
+    fn ordering_assert_form_panics_on_violation() {
+        assert_ordering(&second_place_tie(), order_no_tiebreak);
+    }
+
+    #[test]
+    fn ordering_violation_class_is_conformant() {
+        crate::assert_reason_labels_conformant::<OrderingViolationClass>();
+        crate::assert_reason_labels_discriminating::<OrderingViolationClass>();
+        crate::assert_reason_labels_stable::<OrderingViolationClass>(&[
+            "permutation_dependent",
+            "nondeterministic",
+            "foreign",
+            "duplicated",
+            "not_empty_from_empty",
         ]);
     }
 

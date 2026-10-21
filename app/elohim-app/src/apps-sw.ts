@@ -10,9 +10,23 @@ declare const self: ServiceWorkerGlobalScope;
 
 import JSZip from 'jszip';
 
+import { verifyAddress } from '@elohim/epr';
+import { absence } from '@elohim/eprfs';
+
 import { verifyRawSha256 } from './app/elohim/utils/raw-cid-verify';
 
+import type {
+  BatchItem,
+  ItemAbsence,
+  NamedAbsence,
+  TierAnswer,
+  TierRecord,
+  TierSink,
+  Unanswered,
+  WritableTier,
+} from '@elohim/eprfs';
 import type { DeliveryPeer } from '@elohim/storage-client/generated';
+import type { CID } from 'multiformats/cid';
 
 // Bumped v1→v2 (2026-05-30): the prior cache held a stale index.html keyed to an
 // old bundle hash (zip-non-determinism rotated the blobHash), which referenced new
@@ -41,6 +55,125 @@ async function recallHead(cache: Cache, slug: string): Promise<string> {
   return remembered ? (await remembered.text()).trim() : '';
 }
 
+/**
+ * The head memory writer: one of the three writers rail R-T2 admits. Called by `extractZip` only
+ * once every entry of a verified archive is in the cache, so a recalled head names a complete,
+ * verified bundle.
+ */
+async function rememberHead(cache: Cache, slug: string, blobHash: string): Promise<void> {
+  await cache.put(
+    headKey(slug),
+    new Response(blobHash, { headers: { 'Content-Type': 'text/plain; charset=utf-8' } })
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Verified writers (rail R-T2: the worker caches only verified bytes)
+// ---------------------------------------------------------------------------
+
+/**
+ * The cache `CacheTier` keeps, outside activate's `apps-*` purge: CID-keyed bytes that verify
+ * never need a version bump, so a worker update that bumps `CACHE_NAME` leaves them in place (H19).
+ */
+export const EPRFS_CACHE_NAME = 'eprfs-objects';
+
+/** The caches activate drops: older `apps-*` caches. `CacheTier`'s own cache is never one. */
+export function staleAppCaches(names: readonly string[]): string[] {
+  return names.filter(name => name.startsWith('apps-') && name !== CACHE_NAME);
+}
+
+/**
+ * The zip path's writer for bundles that are not yet trees (interfaces spec §H.3, H1). Only
+ * `extractZip` constructs and calls it, after `verifyRawSha256` passed on the whole archive; the
+ * R-T2 lint rule keeps every other `cache.put` out of this file.
+ */
+export class ArchiveWriter {
+  constructor(
+    private readonly cache: Cache,
+    private readonly origin: string
+  ) {}
+
+  async put(prefix: string, path: string, response: Response): Promise<void> {
+    await this.cache.put(new Request(`${this.origin}/apps/${prefix}/${path}`), response);
+  }
+}
+
+function absentItem(item: BatchItem, unanswered: Unanswered<ItemAbsence>): NamedAbsence {
+  return { kind: 'absent', cid: item.cid.toString(), path: item.path, unanswered };
+}
+
+/**
+ * The browser's own tier (interfaces spec §H.3): CID-keyed objects under
+ * `${origin}/_eprfs/<cid>`, in their own cache, immutable and untouched by `invalidate`.
+ *
+ * Cache Storage is shared by the whole origin, and html5-app iframes run allow-same-origin, so a
+ * page can write a forged entry under a CID key. `fetchAt` therefore verifies EVERY hit with
+ * `verifyAddress`; a mismatch is `integrity`, the entry is deleted, and it is never served (H5).
+ * `put` verifies too, so this worker caches only bytes that verified (R-T2, the §H.3 contract)
+ * whoever calls it: one hash per write-back, cheap against the fetch that produced the bytes.
+ */
+export class CacheTier implements WritableTier {
+  readonly record: TierRecord = {
+    id: 'own',
+    class: 'own',
+    sources: [{ source: 'held-record', record: EPRFS_CACHE_NAME }],
+    endpoint: null,
+    standing: null,
+    proximity: null,
+  };
+
+  constructor(
+    private readonly cache: Cache,
+    private readonly origin: string
+  ) {}
+
+  private key(cid: CID): Request {
+    return new Request(`${this.origin}/_eprfs/${cid.toString()}`);
+  }
+
+  async fetchAt(_root: CID, item: BatchItem, _via: readonly string[]): Promise<TierAnswer> {
+    const key = this.key(item.cid);
+    try {
+      const hit = await this.cache.match(key);
+      if (!hit) return absentItem(item, absence.notHeld([]));
+      const bytes = new Uint8Array(await hit.arrayBuffer());
+      if (await verifyAddress(item.cid, bytes)) return bytes;
+    } catch {
+      return absentItem(item, absence.unreachable('own'));
+    }
+    console.warn(`[apps-sw] eprfs-integrity: ${item.cid.toString()} did not verify — deleted`);
+    await this.cache.delete(key).catch(() => false);
+    return absentItem(item, absence.integrity('own'));
+  }
+
+  /** Per item over `fetchAt`. */
+  async fetchBlobs(
+    root: CID,
+    items: readonly BatchItem[],
+    via: readonly string[],
+    sink: TierSink
+  ): Promise<void> {
+    for (const item of items) sink(item, await this.fetchAt(root, item, via));
+  }
+
+  /**
+   * With `rememberHead` and `ArchiveWriter.put`, the only `cache.put` in this worker (R-T2).
+   * Verifies `bytes` against `cid` first and throws on a mismatch, writing nothing; `TierChain`
+   * catches a failed write-back and still delivers (contract 7).
+   */
+  async put(cid: CID, bytes: Uint8Array): Promise<void> {
+    if (!(await verifyAddress(cid, bytes))) {
+      throw new Error(`eprfs-integrity: ${cid.toString()} did not verify — not cached`);
+    }
+    await this.cache.put(
+      this.key(cid),
+      new Response(bytes as Uint8Array<ArrayBuffer>, {
+        headers: { 'Content-Type': 'application/octet-stream' },
+      })
+    );
+  }
+}
+
 // ---------------------------------------------------------------------------
 // Lifecycle events
 // ---------------------------------------------------------------------------
@@ -56,11 +189,7 @@ self.addEventListener('activate', event => {
   event.waitUntil(
     (async () => {
       const names = await caches.keys();
-      await Promise.all(
-        names
-          .filter(name => name.startsWith('apps-') && name !== CACHE_NAME)
-          .map(name => caches.delete(name))
-      );
+      await Promise.all(staleAppCaches(names).map(name => caches.delete(name)));
       await self.clients.claim();
     })()
   );
@@ -472,6 +601,8 @@ async function extractZip(cache: Cache, slug: string, blobHash: string): Promise
   const entries = Object.entries(zip.files).filter(([, file]) => !file.dir);
   const root = sharedRootDir(entries.map(([path]) => path));
 
+  // The archive verified above, so its entries may be written (H1).
+  const archive = new ArchiveWriter(cache, self.location.origin);
   for (const [entryPath, file] of entries) {
     const path = entryPath.slice(root.length);
     const content = await file.async('arraybuffer');
@@ -479,17 +610,14 @@ async function extractZip(cache: Cache, slug: string, blobHash: string): Promise
     const response = new Response(content, {
       headers: { 'Content-Type': contentType },
     });
-    await cache.put(new Request(`${self.location.origin}/apps/${cachePrefix}/${path}`), response);
+    await archive.put(cachePrefix, path, response);
     console.log(`[apps-sw] cache-put: ${cachePrefix}/${path} type=${contentType}`);
   }
 
   // Remember the head only once every entry is in the cache: a recalled head then names
   // a complete, verified bundle. A request made by CID has no slug to remember.
   if (slug !== blobHash) {
-    await cache.put(
-      headKey(slug),
-      new Response(blobHash, { headers: { 'Content-Type': 'text/plain; charset=utf-8' } })
-    );
+    await rememberHead(cache, slug, blobHash);
     console.log(`[apps-sw] head-remembered: ${slug} → ${blobHash}`);
   }
 }

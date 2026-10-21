@@ -29,8 +29,11 @@ use crate::projection::ProjectionSource;
 /// The relation a [`DerivationEdge`] asserts between two content-addressed blobs.
 /// Extensible: a domain adapter chooses the kind that fits its derivation; core
 /// never enumerates every possible relation exhaustively.
+///
+/// Non-exhaustive from `0.2.0` (C17), the release that adds [`DerivationKind::Derivation`].
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "kebab-case")]
+#[non_exhaustive]
 pub enum DerivationKind {
     /// `derived` is a projection/materialization of `source` (e.g. a runtime
     /// file grown from a native package).
@@ -41,6 +44,9 @@ pub enum DerivationKind {
     Attestation,
     /// Any other adapter-defined relation.
     Other,
+    /// `derived` is the output of a method run over the view-projected `source`
+    /// (interfaces spec §C, `DerivationRecord::to_edge`).
+    Derivation,
 }
 
 /// A content-addressed artifact in a composition graph: the blob's fingerprint,

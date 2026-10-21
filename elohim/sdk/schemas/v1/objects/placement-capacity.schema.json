@@ -1,0 +1,50 @@
+{
+  "$id": "epr:schema:object:placement-capacity",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "PlacementCapacity",
+  "description": "What a carrier offers to spend, or has left to spend, as optional ceilings: bytes, memory bytes, CPU milliseconds and process ids. Each field is always written and is null when that dimension is not offered or not bounded (one provenance: a berth whose manifest declares no envelope has null fields; nothing is null because it could not be asked). Integers, never floats (rail R-P3 covers ranking; capacity is charged in whole units). Lives in objects/ because two intents carry it (a posture's offer terms and a berth offer) and the TypeScript codegen resolves cross-file references into objects/ but not into intents/. Wire shape: this schema is the source of record; placement_core::Capacity (elohim/placement/core/src/offer.rs) is its Rust mirror, not yet pinned to it by a test; ark-core maps ResourceQuota onto it (disk_bytes to bytes). Source of truth: the carrier that offers it (Category C as a value); it travels inside a posture or berth offer.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "bytes",
+    "memoryBytes",
+    "cpuMillis",
+    "pids"
+  ],
+  "properties": {
+    "bytes": {
+      "type": [
+        "integer",
+        "null"
+      ],
+      "minimum": 0,
+      "maximum": 9007199254740991,
+      "description": "Disk bytes. A u64 in Rust, bounded here to 9007199254740991 (2^53 - 1, the largest integer every JSON reader, JavaScript included, holds exactly); a larger value is refused, never rounded."
+    },
+    "memoryBytes": {
+      "type": [
+        "integer",
+        "null"
+      ],
+      "minimum": 0,
+      "maximum": 9007199254740991,
+      "description": "A u64 in Rust, bounded here to 9007199254740991 (2^53 - 1, the largest integer every JSON reader, JavaScript included, holds exactly); a larger value is refused, never rounded."
+    },
+    "cpuMillis": {
+      "type": [
+        "integer",
+        "null"
+      ],
+      "minimum": 0,
+      "maximum": 4294967295
+    },
+    "pids": {
+      "type": [
+        "integer",
+        "null"
+      ],
+      "minimum": 0,
+      "maximum": 4294967295
+    }
+  }
+}

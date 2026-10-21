@@ -1803,7 +1803,9 @@ dependencies = [
  "elohim-compute",
  "elohim-epr",
  "elohim-epr-rea",
+ "elohim-placement-core",
  "elohim-seam-contracts",
+ "eprfs-core",
  "hex",
  "serde",
  "serde_ipld_dagcbor",
@@ -1994,6 +1996,21 @@ name = "elohim-peer-fabric"
 version = "0.1.0"
 
 [[package]]
+name = "elohim-placement-core"
+version = "0.1.0"
+dependencies = [
+ "cid",
+ "elohim-compute",
+ "elohim-epr",
+ "elohim-epr-rea",
+ "elohim-seam-contracts",
+ "serde",
+ "serde_ipld_dagcbor",
+ "sha2 0.10.9",
+ "thiserror 2.0.17",
+]
+
+[[package]]
 name = "elohim-sdk"
 version = "0.1.0"
 dependencies = [
@@ -2013,6 +2030,9 @@ dependencies = [
 [[package]]
 name = "elohim-seam-contracts"
 version = "0.1.0"
+dependencies = [
+ "serde",
+]
 
 [[package]]
 name = "elohim-settings"
@@ -2062,10 +2082,12 @@ dependencies = [
  "elohim-error",
  "elohim-facings",
  "elohim-peer-fabric",
+ "elohim-placement-core",
  "elohim-sdk",
  "elohim-seam-contracts",
  "elohim-settings",
  "elohim-views",
+ "eprfs-core",
  "flate2",
  "fs4",
  "futures",
@@ -2192,6 +2214,22 @@ checksum = "b2daee4ea451f429a58296525ddf28b45a3b64f1acf6587e2067437bb11e218d"
 dependencies = [
  "env_filter",
  "log",
+]
+
+[[package]]
+name = "eprfs-core"
+version = "0.2.0"
+dependencies = [
+ "async-trait",
+ "bytes",
+ "cid",
+ "elohim-seam-contracts",
+ "multihash-codetable",
+ "serde",
+ "serde_bytes",
+ "serde_ipld_dagcbor",
+ "serde_json",
+ "thiserror 2.0.17",
 ]
 
 [[package]]

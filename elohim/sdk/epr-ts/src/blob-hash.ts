@@ -81,6 +81,11 @@ export function sha256BlobHash(bytes: Uint8Array): string {
 /**
  * Check bytes a peer handed us against the content address the row declared.
  *
+ * This is the three-answer READER, not the admission verifier (rail R-T3): it accepts forms
+ * `verifyAddress` refuses (bare and uppercase hex, the double-wrapped `sha256-<CID>` seed defect)
+ * so it can report on rows as they are, and it answers `unverifiable` where a verifier would only
+ * say no. Bytes that are admitted, cached or served are checked with `verifyAddress`.
+ *
  * `expected` is whatever the row carried — including `null`/`undefined` for a
  * row with no blob hash at all, which is `unverifiable`, never `mismatch`.
  */

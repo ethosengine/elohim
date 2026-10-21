@@ -1,0 +1,15 @@
+{
+  "$id": "epr:schema:enum:grant-scope",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "GrantScope",
+  "description": "The compute-grant scopes: what a delegates-compute grant lets its recipient spend on the grantor's behalf, and so what a task-shaped placement kind consumes when it touches another person (R3: a grant is consent and eligibility). This is a CLOSED SUBSET of delegates-compute's own `scope`, which stays an open string by design (its schema and tests use `republish-epr`, `serve-url-projection`); the two are not one vocabulary (interfaces spec finding 12, G10). Today the list is a private const, `GRANT_SCOPES` in elohim/elohim-storage/src/api/compute_grants.rs, duplicated as `hosted-cell` constants in doorway-service/src/routes/hosted_cell.rs and elohim-storage/src/api/hosted_custody.rs; an elohim-storage test holds those equal to this list (named follow-on). Source of truth: this schema; Rust mirror `placement_core::GrantScope` (kind.rs, `#[non_exhaustive]`). Adding a scope is a coordinator-side change and moves no DNA hash. TypeScript constants only: `_codegen` (no `rust` key, so codegen-rs writes nothing) and never `_dna`, so no constant reaches content_store_integrity and no DNA hash moves (interfaces spec §2.G, G11). placement-core's schema_contract test reads this file with include_str! and compares it, in order, with `GrantScope::ALL`, a list kept by hand in kind.rs. It catches a value changed here, but a variant added to `GrantScope` without extending `ALL` still passes: no exhaustive match ties `ALL` to the enum, and the enum is `#[non_exhaustive]` (follow-on: a guard in kind.rs that matches every variant against its index in `ALL`).",
+  "type": "string",
+  "enum": [
+    "sweettest-feedback",
+    "hosted-cell",
+    "measure-stage"
+  ],
+  "_codegen": {
+    "constant": "GRANT_SCOPES"
+  }
+}

@@ -1,0 +1,13 @@
+{
+  "$id": "epr:schema:enum:expresser-kind",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "ExpresserKind",
+  "description": "Who expressed a placement need: an app (by its manifest CID), a person, a space's charter, or an agent (by agent key). There is deliberately no `device` value: a device's own needs never leave the device and exist only as private needs (interfaces spec §D.2). Source of truth: this schema; Rust mirror `placement_core::ExpresserKind` (need.rs). Not named in §2.G's enum list; added because intents/placement-need's `expressedBy.by` needs a referenced vocabulary (CONVENTIONS rule 7). Carries neither `_dna` nor `_codegen`: it is a field vocabulary for the placement wire schemas, generated only as a TypeScript union where those schemas inline it, and adds no constant to schema-enums.ts. Not yet pinned: no test holds the Rust enum equal to this list (follow-on: a case in placement-core's schema_contract test).",
+  "type": "string",
+  "enum": [
+    "app",
+    "person",
+    "charter",
+    "agent"
+  ]
+}

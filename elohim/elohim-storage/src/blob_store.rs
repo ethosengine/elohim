@@ -517,9 +517,13 @@ impl BlobStore {
     pub async fn get(&self, hash: &str) -> Result<Vec<u8>, StorageError> {
         let blob_path = self.blob_path(hash);
 
-        // Check if file exists
-        if fs::metadata(&blob_path).await.is_err() {
-            return crate::compute_payload_store::get(&self.root_dir, hash).await;
+        match fs::metadata(&blob_path).await {
+            Ok(_) => {}
+            Err(error) if error.kind() == std::io::ErrorKind::NotFound => {
+                return crate::compute_payload_store::get(&self.root_dir, hash).await;
+            }
+            // A failed read probe is not evidence that this store lacks the object.
+            Err(error) => return Err(error.into()),
         }
 
         // Check if chunked

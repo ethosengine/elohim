@@ -103,7 +103,9 @@ Feature: A new build of an app reaches every peer by election, not by being writ
   joining by its own act. The eighth names a stage that is not built yet: a
   doorway's answer saying on whose authority it serves the app and where the
   bytes came from, so that a visitor (or a test) can tell a stale peer from a
-  stale doorway without reading either one's insides. The last stands alone,
+  stale doorway without reading either one's insides. The ninth, also not
+  built yet, follows a peer that is not a canary through three releases it
+  was away for, back to the channel's earned head by itself. The last stands alone,
   as a guard against a build that cannot boot.
 
   Three people share this house. matthew stewards the channel and runs the
@@ -198,6 +200,34 @@ Feature: A new build of an app reaches every peer by election, not by being writ
     Then the answer names this run's release channel and the release the first app's record is bound to on matthew's peer
     And the answer names matthew's peer as the one whose record it read, and the release's browser bundle as the bytes it served
     And asking a doorway that reads jessica's peer instead names jessica's peer and the same channel, release and bundle
+
+  # From the placement design,
+  # genesis/docs/superpowers/specs/2026-10-20-what-every-app-inherits-placement-contract-design.md
+  # (§5.3 head and version: heads are elected, not "latest"; §16 "a peer offline through three releases").
+  @wip
+  Scenario: A peer that is not a canary, away through three releases, returns to the channel's earned head alone, never the release before it or the candidate after it
+    This scenario sits between the eighth and the last and guards a third case: a peer that runs
+    only earned heads, away while the channel moves on, returning to the right release by itself.
+    A channel has at most one staging candidate at a time: of the releases staged beneath the earned
+    head, the newest is the candidate, and an older staged release stops being one the moment a newer
+    one is published or a later release is promoted past it. The scenario runs in two arcs, each a
+    When followed by its Thens: first while james's peer is cut off, then after it reconnects.
+    Given the household from the Background, except that james's peer follows the channel without being a canary, so the release it should run is always the earned head and never a staging candidate
+    And a doorway in this household reads james's peer for every app it serves
+    And james's peer has taken up the channel's earned head and is then cut off: it keeps running, but it can neither reach nor be reached by any other peer or any doorway
+    When matthew publishes two new releases of both apps, one after the other: the first and the second
+    And the second, being newer, replaces the first as the channel's one staging candidate
+    And matthew promotes the second on an attestation from jessica's peer, so the first, now older than the earned head, is no candidate at all
+    And matthew then publishes a third, which stays a staging candidate beneath the second
+    Then matthew's and jessica's peers, which are canaries, run the third release, the staging candidate
+    And while james's peer is cut off, its records keep naming the release it last took up
+    And the second release's adoption measure lists james's peer as not answering
+    When james's peer reconnects, so it can reach and be reached by the other peers and the doorways again
+    Then within five minutes james's peer's record for each app names the second release's browser bundle and its server bundle
+    And james's peer never named the first or the third release for either app
+    And within 75 seconds the doorway that reads james's peer serves each app's page naming the second release's entry script
+    And the second release's adoption measure lists james's peer as naming the second release, while the canaries name the newer staging candidate, as canaries do
+    And nothing was written onto james's peer's app records from outside
 
   Scenario: A build that cannot start is refused by every peer, and nothing moves
     Given every household peer has taken up the channel's earned head

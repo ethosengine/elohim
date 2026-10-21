@@ -69,7 +69,7 @@ pub enum IndexError {
 /// Not applied to [`RankingMethod::Fused`]'s `recipe`: serde's internally-tagged enum
 /// serializer reports `is_human_readable() == true` whatever format it wraps, so the helper
 /// there would write a CID into canonical dag-cbor as text and re-address every fused measure.
-mod cid_serde {
+pub mod cid_serde {
     use cid::Cid;
     use serde::{Deserialize, Deserializer, Serialize, Serializer};
 

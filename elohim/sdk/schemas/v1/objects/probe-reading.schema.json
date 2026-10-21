@@ -1,0 +1,108 @@
+{
+  "$id": "epr:schema:object:probe-reading",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "ProbeReading",
+  "description": "The wire envelope of one probe reading: which promise it reads, the @concern: tag that joins it to its a2o scenario and habit, what was observed, the answer, whether the evidence is a fixture or real, who may read it, and when it was observed (interfaces spec §I). `answer` is objects/answer's three-branch envelope (Present takes no reason, Absent only `observed_absent`, Unreachable always a reason), with `value` left unconstrained here: each served promise has ONE monomorphic wire struct in elohim/elohim-views (e.g. MaterializationReadingView) that narrows `answer.value` and is pinned to this schema by its schema_contract test (G6, I8), so no TypeScript generic is needed. A probe with nothing to read emits no reading at all (rendered unmeasured), never a Present answer (spec §9, CONVENTIONS rule 11). The generic seam_contracts::probe::Reading<T> stays internal to Rust; its own serde form (ProbeAnswer externally tagged, a field named `evidence`) is not this wire form. Wire shape: this schema is the source of record; seam_contracts::probe::Reading / EvidenceStage / Disclosure / PartyRole (crates/seam-contracts/src/probe.rs) supply the values, not the wire form, and no test pins them to this schema yet (follow-on: each monomorphic wire struct's schema_contract test in elohim/elohim-views). Source of truth: the probe's own observation (Category C), recomputed by its probe and never persisted as an entity; a holder reading never leaves its holder.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "promise",
+    "concern",
+    "subject",
+    "answer",
+    "evidenceStage",
+    "disclosure",
+    "observedAt"
+  ],
+  "properties": {
+    "promise": {
+      "type": "string",
+      "pattern": "^[a-z0-9-]+@[1-9][0-9]*$",
+      "description": "The promise kind (spec §9), versioned, e.g. bytes-layer-reads-only-what-is-read@1."
+    },
+    "concern": {
+      "type": "string",
+      "minLength": 1,
+      "description": "The @concern: tag joining the reading to its a2o scenario and habit."
+    },
+    "subject": {
+      "type": "string",
+      "minLength": 1,
+      "description": "What was observed: a root CID, a need key, an app id."
+    },
+    "answer": {
+      "$ref": "./answer.schema.json",
+      "description": "The answer envelope; a per-promise wire view narrows `value`."
+    },
+    "evidenceStage": {
+      "$ref": "../enums/evidence-stage.schema.json",
+      "description": "Fixture or real (finding 16: named evidenceStage on the wire)."
+    },
+    "disclosure": {
+      "title": "ProbeDisclosure",
+      "description": "Who may read the reading, internally tagged by `disclosure` (values from enums/disclosure). A `holder` reading reaches only a holder sink (the .eprfs/status writer, loopback-only admin routes, loopback-scraped gauges, a worker-local store) and its numbers leave only as an explicit declassification of counts (I7).",
+      "oneOf": [
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "title": "DisclosureHolder",
+          "required": [
+            "disclosure"
+          ],
+          "properties": {
+            "disclosure": {
+              "const": "holder"
+            }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "title": "DisclosureParties",
+          "required": [
+            "disclosure",
+            "roles"
+          ],
+          "properties": {
+            "disclosure": {
+              "const": "parties"
+            },
+            "roles": {
+              "type": "array",
+              "minItems": 1,
+              "uniqueItems": true,
+              "items": {
+                "$ref": "../enums/party-role.schema.json"
+              }
+            }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "title": "DisclosureAtReach",
+          "required": [
+            "disclosure",
+            "openness"
+          ],
+          "properties": {
+            "disclosure": {
+              "const": "at-reach"
+            },
+            "openness": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 8,
+              "description": "Reach::openness() of the reach it may be read at (the order of enums/reach)."
+            }
+          }
+        }
+      ]
+    },
+    "observedAt": {
+      "type": "string",
+      "format": "date-time",
+      "description": "Caller-supplied RFC 3339; the probe reads no clock of its own (I12)."
+    }
+  }
+}

@@ -54,6 +54,8 @@
     "@elohim/rea-runtime": "workspace:*",
     "@elohim/service": "workspace:*",
     "@elohim/storage-client": "workspace:*",
+    "@elohim/epr": "workspace:*",
+    "@elohim/eprfs": "workspace:*",
     "@fontsource-variable/dm-sans": "^5.2.8",
     "@fontsource-variable/fraunces": "^5.2.9",
     "@fontsource-variable/jetbrains-mono": "^5.2.8",

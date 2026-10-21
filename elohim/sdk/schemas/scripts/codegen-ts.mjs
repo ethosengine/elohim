@@ -75,6 +75,17 @@ const ENUM_OUTPUT_PATHS = GENERATED_OUTPUT_DIRS.map((d) => join(d, 'schema-enums
 
 // Interface files to distribute alongside schema-enums.ts
 const INTERFACE_FILES = [
+  // Publish placement shapes inside the framework-free SDK through the same freshness check.
+  {
+    src: 'enums/answer-reason.ts',
+    dest: 'answer-reason.ts',
+    dirs: [resolve(REPO_ROOT, 'elohim/sdk/storage-client-ts/src/generated/placement')],
+  },
+  {
+    src: 'views/placement-explanation-view.ts',
+    dest: 'placement-explanation-view.ts',
+    dirs: [resolve(REPO_ROOT, 'elohim/sdk/storage-client-ts/src/generated/placement')],
+  },
   { src: 'inputs/create-content-input.ts', dest: 'create-content-input.ts' },
   { src: 'inputs/create-relationship-input.ts', dest: 'create-relationship-input.ts' },
   { src: 'inputs/create-economic-event-input.ts', dest: 'create-economic-event-input.ts' },
@@ -692,10 +703,10 @@ async function main() {
 
   // --- Part 3: Interface file distribution ---
   // Read canonical interface files from generated-ts/
-  const interfaceContents = new Map();
-  for (const { src, dest } of INTERFACE_FILES) {
+  const interfaceOutputs = new Map();
+  for (const { src, dest, dirs = GENERATED_OUTPUT_DIRS } of INTERFACE_FILES) {
     const content = await readFile(join(OUTPUT_DIR, src), 'utf8');
-    interfaceContents.set(dest, content);
+    for (const dir of dirs) interfaceOutputs.set(join(dir, dest), content);
   }
 
   if (VERIFY) {
@@ -722,26 +733,23 @@ async function main() {
       }
     }
 
-    // Verify interface files
-    for (const dir of GENERATED_OUTPUT_DIRS) {
-      for (const [dest, content] of interfaceContents) {
-        const outPath = join(dir, dest);
-        let existing;
-        try {
-          existing = await readFile(outPath, 'utf8');
-        } catch {
-          if (isGitIgnored(outPath)) {
-            skippedCache += 1;
-            continue;
-          }
-          console.error(`FAIL: Generated file does not exist: ${outPath}`);
-          hasFailure = true;
+    // Verify interface files, including package-specific distributions.
+    for (const [outPath, content] of interfaceOutputs) {
+      let existing;
+      try {
+        existing = await readFile(outPath, 'utf8');
+      } catch {
+        if (isGitIgnored(outPath)) {
+          skippedCache += 1;
           continue;
         }
-        if (existing !== content) {
-          console.error(`FAIL: ${outPath} is stale. Run: pnpm run schema:codegen:ts`);
-          hasFailure = true;
-        }
+        console.error(`FAIL: Generated file does not exist: ${outPath}`);
+        hasFailure = true;
+        continue;
+      }
+      if (existing !== content) {
+        console.error(`FAIL: ${outPath} is stale. Run: pnpm run schema:codegen:ts`);
+        hasFailure = true;
       }
     }
 
@@ -766,13 +774,10 @@ async function main() {
   }
 
   // Distribute interface files
-  for (const dir of GENERATED_OUTPUT_DIRS) {
-    await mkdir(dir, { recursive: true });
-    for (const [dest, content] of interfaceContents) {
-      const outPath = join(dir, dest);
-      await writeFile(outPath, content);
-      console.log(`Distributed: ${outPath}`);
-    }
+  for (const [outPath, content] of interfaceOutputs) {
+    await mkdir(dirname(outPath), { recursive: true });
+    await writeFile(outPath, content);
+    console.log(`Distributed: ${outPath}`);
   }
 
   console.log('TypeScript generation and distribution complete.');

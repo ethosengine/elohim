@@ -1,0 +1,179 @@
+{
+  "$id": "epr:schema:object:item-absence",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "ItemAbsence",
+  "description": "Why one requested object did not arrive from a tier batch (`fetch_blobs`, `POST /eprfs/v1/blobs`, `/elohim/eprfs-blobs/1`): the typed reason inside `Unanswered<ItemAbsence>`, internally tagged by `kind` (kebab-case values, camelCase fields). `not-held` is an OBSERVED absence: with an empty `tried` it is a leaf store's own miss, with no tier dialled (B2); otherwise it is an absence at every tier listed in `tried`, in the order asked; `unreachable` and `membership-unknown` establish no absence (the chain advances to the next tier, and the walk reads them as withheld, never as not held); `refused` and `over-budget` are final for the item (a refusal does not fan out the read pattern; over budget is answered with its come-back time, not routed around); `integrity` means bytes failed their address and were never stored. In the batch route's absent trailer each entry is `{cid, path, unanswered}` with `unanswered` shaped by `$defs.UnansweredItemAbsence` (interfaces spec §A.6). Wire shape: this schema is the source of record; Rust mirror eprfs_core::ItemAbsence (elohim/eprfs/eprfs-core/src/tier.rs, `#[non_exhaustive]`), with eprfs_core::ReachRefusal (reach.rs) for `refused`. That mirror's serde (tag `kind`, kebab-case tags, camelCase fields) is the encoding a TierEndpoint writes on the batch route, so it must serialize to this schema; no test pins the two yet (follow-on: an eprfs-serve contract test that serializes every variant and validates it here). Source of truth: the tier's answer to one batch request (Category C), never persisted.",
+  "oneOf": [
+    {
+      "type": "object",
+      "additionalProperties": false,
+      "title": "ItemAbsenceNotHeld",
+      "required": [
+        "kind",
+        "tried"
+      ],
+      "properties": {
+        "kind": {
+          "const": "not-held"
+        },
+        "tried": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "pattern": "^(agent|transport):.+$",
+            "description": "A tier identity: `agent:<agent key>` when a cross-signed binding resolves one, else `transport:<peer id>` (the transport id the tier was dialled by). The indexical `own` is never serialized: eprfs-core's Serialize refuses it, every serving adapter stamps its own id, and a requester-side adapter rewrites a remote `own` to the dialled record's id (A2). Decides where to dial and what to count, never whom to credit (A11)."
+          },
+          "description": "Every tier asked, in order, by the ids the requester dialled. Empty for a leaf store's own miss, when no tier was dialled (B2; `ItemAbsence::not_held(vec![])`)."
+        }
+      }
+    },
+    {
+      "type": "object",
+      "additionalProperties": false,
+      "title": "ItemAbsenceRefused",
+      "required": [
+        "kind",
+        "by",
+        "refusal"
+      ],
+      "properties": {
+        "kind": {
+          "const": "refused"
+        },
+        "by": {
+          "type": "string",
+          "pattern": "^(agent|transport):.+$",
+          "description": "A tier identity: `agent:<agent key>` when a cross-signed binding resolves one, else `transport:<peer id>` (the transport id the tier was dialled by). The indexical `own` is never serialized: eprfs-core's Serialize refuses it, every serving adapter stamps its own id, and a requester-side adapter rewrites a remote `own` to the dialled record's id (A2). Decides where to dial and what to count, never whom to credit (A11)."
+        },
+        "refusal": {
+          "type": "object",
+          "additionalProperties": false,
+          "title": "ReachRefusal",
+          "description": "Reach said no, by name. To a requester outside reach, a missing object and a private one get the same refusal.",
+          "required": [
+            "reason",
+            "needsStanding"
+          ],
+          "properties": {
+            "reason": {
+              "$ref": "../enums/reach-reason.schema.json"
+            },
+            "needsStanding": {
+              "type": [
+                "string",
+                "null"
+              ],
+              "description": "The standing the requester lacks, opaque to eprfs; null when the refusing gate names none (one provenance)."
+            }
+          }
+        }
+      }
+    },
+    {
+      "type": "object",
+      "additionalProperties": false,
+      "title": "ItemAbsenceOverBudget",
+      "required": [
+        "kind",
+        "by",
+        "rule"
+      ],
+      "properties": {
+        "kind": {
+          "const": "over-budget"
+        },
+        "by": {
+          "type": "string",
+          "pattern": "^(agent|transport):.+$",
+          "description": "A tier identity: `agent:<agent key>` when a cross-signed binding resolves one, else `transport:<peer id>` (the transport id the tier was dialled by). The indexical `own` is never serialized: eprfs-core's Serialize refuses it, every serving adapter stamps its own id, and a requester-side adapter rewrites a remote `own` to the dialled record's id (A2). Decides where to dial and what to count, never whom to credit (A11)."
+        },
+        "rule": {
+          "type": "string",
+          "minLength": 1,
+          "description": "The forwarding rule that bounded the request; its retry time rides in the come-back."
+        }
+      }
+    },
+    {
+      "type": "object",
+      "additionalProperties": false,
+      "title": "ItemAbsenceUnreachable",
+      "description": "No answer arrived: absence NOT established.",
+      "required": [
+        "kind",
+        "tier"
+      ],
+      "properties": {
+        "kind": {
+          "const": "unreachable"
+        },
+        "tier": {
+          "type": "string",
+          "pattern": "^(agent|transport):.+$",
+          "description": "A tier identity: `agent:<agent key>` when a cross-signed binding resolves one, else `transport:<peer id>` (the transport id the tier was dialled by). The indexical `own` is never serialized: eprfs-core's Serialize refuses it, every serving adapter stamps its own id, and a requester-side adapter rewrites a remote `own` to the dialled record's id (A2). Decides where to dial and what to count, never whom to credit (A11)."
+        }
+      }
+    },
+    {
+      "type": "object",
+      "additionalProperties": false,
+      "title": "ItemAbsenceMembershipUnknown",
+      "description": "The tier could not establish the path's membership under the root; not final, the chain advances (A3).",
+      "required": [
+        "kind",
+        "by"
+      ],
+      "properties": {
+        "kind": {
+          "const": "membership-unknown"
+        },
+        "by": {
+          "type": "string",
+          "pattern": "^(agent|transport):.+$",
+          "description": "A tier identity: `agent:<agent key>` when a cross-signed binding resolves one, else `transport:<peer id>` (the transport id the tier was dialled by). The indexical `own` is never serialized: eprfs-core's Serialize refuses it, every serving adapter stamps its own id, and a requester-side adapter rewrites a remote `own` to the dialled record's id (A2). Decides where to dial and what to count, never whom to credit (A11)."
+        }
+      }
+    },
+    {
+      "type": "object",
+      "additionalProperties": false,
+      "title": "ItemAbsenceIntegrity",
+      "description": "Bytes failed their address; never stored, counted against the dialled tier.",
+      "required": [
+        "kind",
+        "from"
+      ],
+      "properties": {
+        "kind": {
+          "const": "integrity"
+        },
+        "from": {
+          "type": "string",
+          "pattern": "^(agent|transport):.+$",
+          "description": "A tier identity: `agent:<agent key>` when a cross-signed binding resolves one, else `transport:<peer id>` (the transport id the tier was dialled by). The indexical `own` is never serialized: eprfs-core's Serialize refuses it, every serving adapter stamps its own id, and a requester-side adapter rewrites a remote `own` to the dialled record's id (A2). Decides where to dial and what to count, never whom to credit (A11)."
+        }
+      }
+    }
+  ],
+  "$defs": {
+    "UnansweredItemAbsence": {
+      "title": "UnansweredItemAbsence",
+      "description": "objects/unanswered narrowed to this seam: `why` is an ItemAbsence.",
+      "allOf": [
+        {
+          "$ref": "./unanswered.schema.json"
+        },
+        {
+          "properties": {
+            "why": {
+              "$ref": "#"
+            }
+          },
+          "required": [
+            "why"
+          ]
+        }
+      ]
+    }
+  }
+}

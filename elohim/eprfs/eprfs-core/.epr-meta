@@ -4,12 +4,13 @@ id: eprfs-core-tree-boundary
 purpose: >
   Artifact-neutral addressing and filesystem tree contracts. The shared tree is an
   immutable, versioned content-addressed value; local projection state remains rebuildable.
+  The view-scoped walk and the tier chain read that tree through one storage interface.
 rules:
   - id: immutable-tree-is-not-projection-manifest
     class: inject
     when:
       write: "*.rs"
-      contains-any: ["TreeNode", "TreeEntry", "ProjectionManifest", "ProjectionEntry"]
+      contains-any: ["TreeNode", "TreeEntry", "ProjectionManifest", "ProjectionEntry", "TreeWalk", "LevelWalk", "TierChain", "fetch_blobs", "fetch_at", "AbsentReason", "ItemAbsence", "Membership", "AskPolicy"]
     dedupe-of: "elohim/eprfs/eprfs-core/src/projection.rs (existing mutable local view)"
     why: >
       Reuse tree.rs and address.rs in eprfs-core for immutable,
@@ -22,6 +23,31 @@ rules:
       hApp/Cargo packaging belong in rakia adapters. Migrate brit's BritCid
       through eprfs-core's explicit tag-42 BlobLink only with byte/CID conformance;
       a direct BlobCid alias can change serialized bytes. Preserve EprMeta v1 bytes.
+      The view-walk seam reads the same tree: walk.rs (depth first) and level_walk.rs
+      (one fetch_blobs per level, and `resolve_links` for many paths) share walk.rs's
+      `expand`, its single-path steps `descend` and `link_of`, and tree.rs's `fetch_checked`,
+      `accept_node` (verify, size, charge, decode) and `Budget`, so a new traversal adds no
+      second verifier, matcher, step or budget. Every node and leaf fetch carries its root and
+      path (`fetch_at`, `fetch_blobs`), so a forwarding tier can judge reach and membership. A
+      tier's answer is `ItemAbsence` with ruling 7's three parts: `NotHeld` only when
+      observed, `Withheld` for every other absence, and integrity is never degraded to
+      absence: bytes this side verified and found bad, and a store's typed
+      `EprfsError::Corrupt`, are errors in every walk and outrank a later refusal, while a
+      remote tier's mere statement of integrity is an absence not established. Reach stays
+      injected (`ReachGate`, `AskPolicy`; tier.rs and reach.rs): eprfs-core names no reach
+      value, only the `ReachLevel` ordinal, and the tree and reach decisions a serving tier
+      would otherwise make itself live here once (`Membership::of` and its exhaustive
+      `absence` and `presence` answers, `check_membership`, `ReachLevel::narrower`, the parameterized `OpennessAsk` that every host and the
+      TypeScript `standingPolicy` share through the vectors' `ask` section). A chain asks an
+      outer tier in rounds of `ChainLimits::max_request_items`, the per-request bound a serving
+      tier enforces (one default), and holds verified bytes for write-back only up to
+      `ChainLimits::max_write_back_bytes`; it orders its tiers per request, for the root asked.
+      Each kind of `impl EprfsStorage` runs its own
+      eprfs-serve harness: a requester's composition (`TierChain`, a host's own) runs
+      `assert_tier_contract`; an outer tier (an HTTP, blob-store or peer-transport tier, a
+      loopback over a `TierEndpoint`) runs `assert_outer_tier_contract`; a leaf store runs
+      `assert_leaf_contract`. A new tier class is a spec change. No I/O,
+      runtime or clock in this crate (lib.rs `boundary`, rails R-E1 and R-E2).
 ---
 
 # eprfs-core — portable tree contract
@@ -35,3 +61,13 @@ version-1 shared tree and bounded verified closure loader; it does not reinterpr
 presence is not proof that a standalone consumer can resolve it. Its bytes must
 be stable across artifact adapters. A CID proves bytes, not publication standing or
 which release head was elected; those decisions remain with content governance.
+
+The view-walk seam (interfaces spec `placement-contract-interfaces-design` §A–§B):
+`walk.rs` holds `View`, `TreePath`, `Coverage` and the depth-first walk with its three
+queries; `level_walk.rs` the sans-I/O level-batched walk; `tier.rs` the tier identity,
+records, absences, forwarding gate and `TierChain`; `reach.rs` the injected reach
+policies; `view_decl.rs` the serializable `TreeView`; `derive.rs` the slice-4 derivation
+types and ports. The serving side (`TierEndpoint`) and the tier contract harness live in
+`eprfs-serve`, so a host can depend on them without depending on eprfs's adapters (R-E3).
+Byte compatibility with `@elohim/eprfs` is pinned by `elohim/eprfs/fixtures/tree-vectors.json`,
+which `tests/vectors.rs` recomputes.

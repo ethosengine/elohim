@@ -1,0 +1,704 @@
+{
+  "about": "Shared vectors for eprfs-core (Rust) and @elohim/eprfs (TypeScript). Inputs are written by hand; every computed field is written by eprfs-core/tests/vectors.rs (EPRFS_WRITE_VECTORS=1) and checked by both suites.",
+  "ask": {
+    "cases": [
+      {
+        "class": "household",
+        "expect": true,
+        "rootReach": null,
+        "standing": null
+      },
+      {
+        "class": "hub",
+        "expect": false,
+        "rootReach": null,
+        "standing": null
+      },
+      {
+        "class": "hub",
+        "expect": true,
+        "rootReach": 4,
+        "standing": null
+      },
+      {
+        "class": "hub",
+        "expect": false,
+        "rootReach": 2,
+        "standing": null
+      },
+      {
+        "class": "person-device",
+        "expect": true,
+        "rootReach": 2,
+        "standing": null
+      },
+      {
+        "class": "person-device",
+        "expect": false,
+        "rootReach": 1,
+        "standing": null
+      },
+      {
+        "class": "doorway",
+        "expect": true,
+        "rootReach": 1,
+        "standing": 1
+      },
+      {
+        "class": "household",
+        "expect": false,
+        "rootReach": 2,
+        "standing": 4
+      },
+      {
+        "class": "pool",
+        "expect": false,
+        "rootReach": null,
+        "standing": 3
+      },
+      {
+        "class": "own",
+        "expect": true,
+        "rootReach": null,
+        "standing": null
+      }
+    ],
+    "levels": {
+      "household": 2,
+      "public": 4
+    }
+  },
+  "diff": [
+    {
+      "expect": [
+        {
+          "new": {
+            "file": {
+              "blob": "bafkreicoa5aikyv63ofwbtqfyhpm7y5nc23semewpxqb6zalpzdstne7zy",
+              "executable": false
+            }
+          },
+          "old": {
+            "file": {
+              "blob": "bafkreiguonpdujs6c3xoap2zogfzwxidagoapwfwyupzbwr2mzxoye5lgu",
+              "executable": false
+            }
+          },
+          "path": "a/y"
+        },
+        {
+          "new": {
+            "file": {
+              "blob": "bafkreiclej3xpvg5d7dby34ij5egihicwtisdu75gkglbc2vgh6kzwv7ri",
+              "executable": false
+            }
+          },
+          "old": null,
+          "path": "a/z"
+        },
+        {
+          "new": null,
+          "old": {
+            "file": {
+              "blob": "bafkreib6epubmabzlffdhckpmvsodmjuro6xuaei2qwevs3t52xnlhaatu",
+              "executable": false
+            }
+          },
+          "path": "b"
+        },
+        {
+          "new": {
+            "directory": {
+              "tree": "bafyreicogxu3gzo6msrwxsyyupp2xkqtqbf3xfwmx6cgzjejtzro4m32ia"
+            }
+          },
+          "old": null,
+          "path": "c"
+        }
+      ],
+      "name": "whole view",
+      "new": {
+        "a": {
+          "x": "1",
+          "y": "3",
+          "z": "4"
+        },
+        "c": {
+          "d": "d"
+        }
+      },
+      "old": {
+        "a": {
+          "x": "1",
+          "y": "2"
+        },
+        "b": "b"
+      },
+      "view": [
+        ""
+      ]
+    },
+    {
+      "expect": [
+        {
+          "new": {
+            "file": {
+              "blob": "bafkreicoa5aikyv63ofwbtqfyhpm7y5nc23semewpxqb6zalpzdstne7zy",
+              "executable": false
+            }
+          },
+          "old": {
+            "file": {
+              "blob": "bafkreiguonpdujs6c3xoap2zogfzwxidagoapwfwyupzbwr2mzxoye5lgu",
+              "executable": false
+            }
+          },
+          "path": "a/y"
+        }
+      ],
+      "name": "one path",
+      "new": {
+        "a": {
+          "x": "1",
+          "y": "3",
+          "z": "4"
+        },
+        "c": {
+          "d": "d"
+        }
+      },
+      "old": {
+        "a": {
+          "x": "1",
+          "y": "2"
+        },
+        "b": "b"
+      },
+      "view": [
+        "a/y"
+      ]
+    }
+  ],
+  "link": {
+    "cid": "bafkreifzjut3te2nhyekklss27nh3k72ysco7y32koao5eei66wof36n5e",
+    "dagCborHex": "d82a58250001551220b94d27b9934d3e08a52e52d7da7dabfac484efe37a5380ee9088f7ace2efcde9"
+  },
+  "order": {
+    "about": "ProximityOrder across two roots: warmth is per root, so one set of records orders differently for each. Inputs are `rootSeeds` and `tiers`; `roots`, `records` and `expect` are computed by eprfs-core.",
+    "expect": [
+      [
+        "agent:uhCAkorder-d",
+        "agent:uhCAkorder-a",
+        "agent:uhCAkorder-c",
+        "agent:uhCAkorder-b"
+      ],
+      [
+        "agent:uhCAkorder-d",
+        "agent:uhCAkorder-b",
+        "agent:uhCAkorder-c",
+        "agent:uhCAkorder-a"
+      ]
+    ],
+    "records": [
+      {
+        "class": "hub",
+        "endpoint": null,
+        "id": "agent:uhCAkorder-a",
+        "proximity": {
+          "lastSeenMs": null,
+          "networkRank": 1,
+          "rttMs": 30,
+          "servesExtracted": false,
+          "warmRoots": [
+            "bafyreih7xgpafzgvushlp37ok2fggwq3gu75zdb6vllgni3a7lb7bvzfly"
+          ]
+        },
+        "sources": [
+          {
+            "record": "vectors",
+            "source": "held-record"
+          }
+        ],
+        "standing": null
+      },
+      {
+        "class": "hub",
+        "endpoint": null,
+        "id": "agent:uhCAkorder-b",
+        "proximity": {
+          "lastSeenMs": null,
+          "networkRank": 0,
+          "rttMs": 5,
+          "servesExtracted": false,
+          "warmRoots": [
+            "bafyreidlfue44o77i56fakmy7kiewvmbogpqbw7dv37e4axmb2r6jczo2y"
+          ]
+        },
+        "sources": [
+          {
+            "record": "vectors",
+            "source": "held-record"
+          }
+        ],
+        "standing": null
+      },
+      {
+        "class": "hub",
+        "endpoint": null,
+        "id": "agent:uhCAkorder-c",
+        "proximity": {
+          "lastSeenMs": null,
+          "networkRank": 0,
+          "rttMs": 1,
+          "servesExtracted": false,
+          "warmRoots": []
+        },
+        "sources": [
+          {
+            "record": "vectors",
+            "source": "held-record"
+          }
+        ],
+        "standing": null
+      },
+      {
+        "class": "household",
+        "endpoint": null,
+        "id": "agent:uhCAkorder-d",
+        "proximity": {
+          "lastSeenMs": null,
+          "networkRank": 2,
+          "rttMs": null,
+          "servesExtracted": false,
+          "warmRoots": []
+        },
+        "sources": [
+          {
+            "record": "vectors",
+            "source": "held-record"
+          }
+        ],
+        "standing": null
+      }
+    ],
+    "rootSeeds": [
+      "order root one",
+      "order root two"
+    ],
+    "roots": [
+      "bafyreih7xgpafzgvushlp37ok2fggwq3gu75zdb6vllgni3a7lb7bvzfly",
+      "bafyreidlfue44o77i56fakmy7kiewvmbogpqbw7dv37e4axmb2r6jczo2y"
+    ],
+    "tiers": [
+      {
+        "class": "hub",
+        "id": "agent:uhCAkorder-a",
+        "networkRank": 1,
+        "rttMs": 30,
+        "warm": [
+          0
+        ]
+      },
+      {
+        "class": "hub",
+        "id": "agent:uhCAkorder-b",
+        "networkRank": 0,
+        "rttMs": 5,
+        "warm": [
+          1
+        ]
+      },
+      {
+        "class": "hub",
+        "id": "agent:uhCAkorder-c",
+        "networkRank": 0,
+        "rttMs": 1,
+        "warm": []
+      },
+      {
+        "class": "household",
+        "id": "agent:uhCAkorder-d",
+        "networkRank": 2,
+        "rttMs": null,
+        "warm": []
+      }
+    ]
+  },
+  "treeView": {
+    "cid": "bafyreidfywl6b6crw3mc5q65cjthr7faedj4mp5kqy24znjwyuaznsrfme",
+    "dagCborHex": "a264726f6f74d82a582500017112201f289ddfb754f44df670f8678f7fa466d8be607c2865142767a2b9d19954215965706174687381814161",
+    "declared": [
+      "a",
+      "a/b"
+    ],
+    "normalized": {
+      "paths": [
+        "a"
+      ],
+      "root": "bafyreia7fco57n2u6rg7m4hym6hx7jdg3c7ga7bimukcoz5cxhizsvbble"
+    },
+    "root": "bafyreia7fco57n2u6rg7m4hym6hx7jdg3c7ga7bimukcoz5cxhizsvbble"
+  },
+  "trees": [
+    {
+      "bytesHex": "a267656e7472696573806776657273696f6e01",
+      "cid": "bafyreia7fco57n2u6rg7m4hym6hx7jdg3c7ga7bimukcoz5cxhizsvbble",
+      "name": "empty",
+      "tree": {}
+    },
+    {
+      "bytesHex": "a267656e747269657381a2646b696e64a16466696c65a264626c6f62d82a58250001551220b94d27b9934d3e08a52e52d7da7dabfac484efe37a5380ee9088f7ace2efcde96a65786563757461626c65f4646e616d6541ff6776657273696f6e01",
+      "cid": "bafyreihedxqhkuhibpz2uhoknm5ov2p4ubsjr5csvg4tdajfdapsyotrou",
+      "name": "non-utf8-name",
+      "tree": {
+        "hex:ff": "hello world"
+      }
+    }
+  ],
+  "walk": {
+    "cases": [
+      {
+        "expect": {
+          "absent": [],
+          "boundaries": [],
+          "nodes": [
+            {
+              "coverage": "spine",
+              "path": ""
+            },
+            {
+              "coverage": "in-view",
+              "path": "docs"
+            },
+            {
+              "coverage": "spine",
+              "path": "src"
+            },
+            {
+              "coverage": "spine",
+              "path": "src/lib"
+            }
+          ]
+        },
+        "missing": [],
+        "name": "two paths",
+        "view": [
+          "src/lib/a.rs",
+          "docs"
+        ]
+      },
+      {
+        "expect": {
+          "absent": [
+            {
+              "cid": "bafyreihhiw27ipuoiqub5m5nyat5ukcmgimk47uracokcwyl7xdl7xqx7a",
+              "kind": "absent",
+              "path": "src/lib",
+              "unanswered": {
+                "comeBack": {
+                  "event": "tier-reachable",
+                  "when": "on-event"
+                },
+                "escalation": null,
+                "meanwhile": {
+                  "because": "the object is not held here and no tier was asked",
+                  "local": "nothing"
+                },
+                "why": {
+                  "kind": "not-held",
+                  "tried": []
+                }
+              },
+              "viewPath": ""
+            }
+          ],
+          "boundaries": [
+            {
+              "coverage": "in-view",
+              "kind": "git-submodule",
+              "path": "src/vendor"
+            }
+          ],
+          "nodes": [
+            {
+              "coverage": "in-view",
+              "path": ""
+            },
+            {
+              "coverage": "in-view",
+              "path": "docs"
+            },
+            {
+              "coverage": "in-view",
+              "path": "empty"
+            },
+            {
+              "coverage": "in-view",
+              "path": "src"
+            },
+            {
+              "coverage": "in-view",
+              "path": "src2"
+            }
+          ]
+        },
+        "missing": [
+          "src/lib"
+        ],
+        "name": "whole view, one subtree not held",
+        "view": [
+          ""
+        ]
+      },
+      {
+        "expect": {
+          "absent": [
+            {
+              "kind": "through-leaf",
+              "leaf": "README",
+              "viewPath": "README/x"
+            },
+            {
+              "kind": "not-found",
+              "path": "nope",
+              "viewPath": "nope"
+            },
+            {
+              "kind": "not-found",
+              "path": "src/lib/zzz",
+              "viewPath": "src/lib/zzz"
+            }
+          ],
+          "boundaries": [
+            {
+              "coverage": "spine",
+              "kind": "git-submodule",
+              "path": "src/vendor"
+            }
+          ],
+          "nodes": [
+            {
+              "coverage": "spine",
+              "path": ""
+            },
+            {
+              "coverage": "spine",
+              "path": "src"
+            },
+            {
+              "coverage": "spine",
+              "path": "src/lib"
+            }
+          ]
+        },
+        "missing": [],
+        "name": "boundary, through a leaf, not found",
+        "view": [
+          "src/vendor/deep",
+          "README/x",
+          "nope",
+          "src/lib/zzz"
+        ]
+      },
+      {
+        "expect": {
+          "absent": [],
+          "boundaries": [],
+          "nodes": [
+            {
+              "coverage": "spine",
+              "path": ""
+            },
+            {
+              "coverage": "spine",
+              "path": "docs"
+            }
+          ]
+        },
+        "missing": [],
+        "name": "non-UTF-8 name",
+        "view": [
+          "docs/hex:ff"
+        ]
+      },
+      {
+        "expect": {
+          "absent": [
+            {
+              "cid": "bafyreig27cjjtzgzcdnkihxpprxndq6sgnyhu6nsm4jkhirjsvwb27ioym",
+              "kind": "absent",
+              "path": "src",
+              "unanswered": {
+                "comeBack": {
+                  "event": "tier-reachable",
+                  "when": "on-event"
+                },
+                "escalation": null,
+                "meanwhile": {
+                  "because": "the object is not held here and no tier was asked",
+                  "local": "nothing"
+                },
+                "why": {
+                  "kind": "not-held",
+                  "tried": []
+                }
+              },
+              "viewPath": "src"
+            }
+          ],
+          "boundaries": [],
+          "nodes": [
+            {
+              "coverage": "spine",
+              "path": ""
+            }
+          ]
+        },
+        "missing": [
+          "src"
+        ],
+        "name": "an in-view directory not held",
+        "view": [
+          "src"
+        ]
+      },
+      {
+        "expect": {
+          "absent": [],
+          "boundaries": [],
+          "nodes": [
+            {
+              "coverage": "spine",
+              "path": ""
+            },
+            {
+              "coverage": "in-view",
+              "path": "src2"
+            }
+          ]
+        },
+        "missing": [],
+        "name": "component-wise prefix",
+        "view": [
+          "src2"
+        ]
+      }
+    ],
+    "root": "bafyreifr5zjdjg3qmen47uxyfccqxqysr7sgdyrx5xx6ajb4kpfpa33e5u",
+    "tree": {
+      "README": "readme",
+      "docs": {
+        "guide.md": "guide",
+        "hex:ff": "odd"
+      },
+      "empty": {},
+      "link": {
+        "$symlink": "src/main.rs"
+      },
+      "src": {
+        "lib": {
+          "a.rs": "a",
+          "b.rs": "b"
+        },
+        "main.rs": "fn main() {}",
+        "vendor": {
+          "$external": {
+            "kind": "git-submodule",
+            "referenceHex": "00ff"
+          }
+        }
+      },
+      "src2": {
+        "x": "x"
+      }
+    }
+  },
+  "wire": {
+    "itemAbsences": [
+      {
+        "kind": "not-held",
+        "tried": [
+          "agent:uhCAkhub",
+          "transport:12D3KooWpeer"
+        ]
+      },
+      {
+        "by": "agent:uhCAkhub",
+        "kind": "refused",
+        "refusal": {
+          "needsStanding": "household",
+          "reason": "outside-standing"
+        }
+      },
+      {
+        "by": "agent:uhCAkhub",
+        "kind": "over-budget",
+        "rule": "household-forward"
+      },
+      {
+        "kind": "unreachable",
+        "tier": "agent:uhCAkhub"
+      },
+      {
+        "by": "agent:uhCAkhub",
+        "kind": "membership-unknown"
+      },
+      {
+        "from": "agent:uhCAkhub",
+        "kind": "integrity"
+      }
+    ],
+    "keyCustody": "doorway-held",
+    "tierRecord": {
+      "class": "hub",
+      "endpoint": {
+        "base": "https://hub.dowell.example",
+        "form": "url"
+      },
+      "id": "agent:uhCAkhub",
+      "proximity": {
+        "lastSeenMs": null,
+        "networkRank": 0,
+        "rttMs": 4,
+        "servesExtracted": true,
+        "warmRoots": [
+          "bafyreifr5zjdjg3qmen47uxyfccqxqysr7sgdyrx5xx6ajb4kpfpa33e5u"
+        ]
+      },
+      "sources": [
+        {
+          "record": "household-roster",
+          "source": "held-record"
+        },
+        {
+          "doorway": "agent:uhCAkdoorway-w1",
+          "source": "doorway"
+        }
+      ],
+      "standing": 2
+    },
+    "unanswered": {
+      "comeBack": {
+        "event": "tier-reachable",
+        "when": "on-event"
+      },
+      "escalation": {
+        "asked": 2,
+        "changed": "nothing",
+        "whoCanBeAsked": [
+          "uhCAkjessica"
+        ]
+      },
+      "meanwhile": {
+        "because": "no tier asked holds it",
+        "local": "nothing"
+      },
+      "why": {
+        "kind": "not-held",
+        "tried": [
+          "agent:uhCAkhub"
+        ]
+      }
+    }
+  }
+}

@@ -9,6 +9,9 @@
         "sources": [
           "bridges/k8s/**",
           "elohim/ark/core/**",
+          "elohim/placement/core/**",
+          "elohim/eprfs/Cargo.toml",
+          "elohim/eprfs/eprfs-core/**",
           "elohim/epr/**",
           "elohim/epr-rea/**",
           "elohim/elohim-compute/**",

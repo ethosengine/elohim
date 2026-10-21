@@ -218,7 +218,7 @@ pub enum ProcessKind {
 /// `id@version` (a declared dependency, resolved by a registry), whereas an artifact is pinned
 /// by content digest — a strictly stronger and differently-checkable claim, verified against
 /// the bytes on disk before spawn.
-#[derive(Serialize, Deserialize, Clone, Debug, PartialEq)]
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq)]
 #[serde(rename_all = "snake_case")]
 pub enum ArtifactRef {
     /// A mutable channel, resolved in a later slice.
@@ -250,7 +250,7 @@ impl Default for ArtifactRef {
 }
 
 /// Source connected to a child's standard input.
-#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Default)]
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq, Default)]
 #[serde(rename_all = "snake_case")]
 pub enum StdinSource {
     /// Connect a null input source.
@@ -265,7 +265,7 @@ pub enum StdinSource {
 /// KEPT rather than projected onto [`elohim_epr_rea::model::ValidatorRef`]: a validator names
 /// a conformance mechanism already enforcing a recipe edge elsewhere, while a probe is a local
 /// wait with a patience budget that decides nothing about conformance.
-#[derive(Serialize, Deserialize, Clone, Debug, PartialEq)]
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq)]
 #[serde(rename_all = "snake_case")]
 pub enum Probe {
     /// Verify the running native executable against this child's pinned artifact.

@@ -63,6 +63,15 @@
       "epr-ts": {
         "dir": "elohim/sdk/epr-ts",
         "steps": ["ts-test"],
+        "inputs": {
+          "sources": [
+            "elohim/sdk/epr-ts/**",
+            "elohim/eprfs/eprfs-ts/src/**",
+            "elohim/sdk/storage-client-ts/src/**",
+            "app/elohim-app/src/**"
+          ],
+          "buildProcess": ["elohim/epr/Jenkinsfile"]
+        },
         "run": { "kind": "root-just", "recipe": "_gate-epr-ts" }
       },
       "seam-contracts": {

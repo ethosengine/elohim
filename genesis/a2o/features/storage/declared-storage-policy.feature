@@ -49,3 +49,40 @@ Feature: Content keeps the promises its app declared — cheap to keep, ready wh
     When the app asks to keep 10 hours of video warm
     Then the household grants only what the pledge can carry
     And the app is told how much was granted
+
+  # Traceability only: the Rule below traces to
+  # genesis/docs/superpowers/specs/2026-10-20-what-every-app-inherits-placement-contract-design.md
+  # (§5.1, §6, §7.2, §16; build order §17 slices 9 and 5).
+  Rule: How much loss content must survive is a separate promise from how quickly it plays
+
+    Both scenarios under this rule wait on two things that are not built yet: apps
+    declaring how much loss their content must survive, and the placement rules
+    that every one of the family's devices runs to decide where copies are held.
+
+    Background:
+      Given Maria is a parent in the family whose videos and photo albums the family app keeps
+      And family videos are kept under the "streaming-media-library" storage policy: resting in deep storage no lower than "shelved", first playback within 2 seconds, and warm for 2 hours after someone watches
+      And besides how quickly each kind of content plays, the family app declares how much loss it must survive: the loss of one device, or the loss of the whole home, as in a fire
+      And surviving the loss of one device means copies on two of the family's own devices
+      And surviving the loss of the whole home means a copy in at least one other household
+      And another household holds the family's content only after someone in that household has offered to set aside room on its own devices for the family's copies
+      And a household that has not made that offer is never asked to hold the family's content
+      And the family app declares that family videos must survive the loss of the whole home
+
+    @wip @concern:blob-durability
+    Scenario: How much loss each kind of content must survive decides how many households hold it
+      Given the family app declares that photo albums must survive the loss of any one device
+      And two other households the family trusts have each offered to hold copies for Maria's family
+      When Maria's household saves a new family video and a new photo album
+      Then the video is held in Maria's household and in at least one of the two households that offered
+      And the album is held on two of Maria's household's own devices and in no other household
+      And the video still rests in deep storage, as the "streaming-media-library" storage policy says
+      And resting the video in deep storage did not lower the number of copies that surviving the loss of the whole home needs
+
+    @wip @concern:blob-durability
+    Scenario: When no other household has offered, the video is kept at home and the shortfall is named
+      Given the family knows other households and can reach them, but none of them has offered to hold copies for Maria's family
+      When Maria's household saves a new family video
+      Then the video is held on Maria's household's own devices and plays as usual
+      And the household dashboard shows the video as not yet held outside the home, waiting for another household to offer
+      And no other household was asked to hold it or told that the family is short

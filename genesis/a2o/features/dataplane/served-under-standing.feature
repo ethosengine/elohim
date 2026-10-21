@@ -152,3 +152,53 @@ Feature: Doorway visitors can trace access decisions, contributions and response
     And the challenge deadline is between submission plus 72 hours minus five minutes and submission plus 72 hours plus five minutes
     And James retrieves the challenge record with his written objection, the collective that owes a response and its due date through beta using that identifier
     And doorway "beta" did not answer the challenge on the collective's behalf
+
+  # Held (@wip) until spec slice 2's two reach preconditions land: the doorway's reach gates
+  # read the protocol's own reach scale, and the bytes-by-address route refuses whenever it
+  # cannot look up the reach of what it is asked for (spec
+  # genesis/docs/superpowers/specs/2026-10-20-what-every-app-inherits-placement-contract-design.md,
+  # §17 slice 2 and §18).
+  @wip
+  Scenario Outline: An anonymous visitor sees the commons resource and nothing narrower, by page or by bytes
+    Reach is read on one scale, from the most private level to the most open: private, self,
+    intimate, trusted, familiar, community, public, commons. Commons is the open, shared level
+    that anyone may read without saying who they are. Public is the other level open to anyone;
+    no example narrows to it, and nothing checked here depends on what separates it from commons.
+    Where the scenarios above speak of public permission, they mean an anonymous visitor's access
+    at commons reach, not the public level of this scale. An anonymous visitor brings no standing: no identity or relationship
+    evidence for the doorway to consider. Each level in the examples names a group of people
+    smaller than everyone, so a stranger is not in it, and an anonymous visitor is refused the resource at that level
+    whichever doorway they ask and however they ask. The levels that name a single person,
+    self and private, are not among the examples; the private-reach scenario above covers
+    private.
+    A visitor can ask for the resource by name, or ask for its bytes directly by their content
+    address: the fingerprint computed from those exact bytes. The address proves which bytes
+    they are, not who may read them. Beta holds no contract of its own: what it serves it relays
+    from alpha, the holder, and it names alpha when it does. Both doorways have served the
+    resource at commons before the change, so either may still keep its bytes ready to send;
+    keeping bytes ready is not permission to send them.
+    Alpha's refusal is checked within the fixture's reconcile window plus 15 seconds, the time
+    one request or poll needs to be observed; beta is checked once its own poll shows the change.
+    Polling beta without a refresh instruction means the test repeats the same anonymous request
+    at beta until beta refuses it, and never asks beta to re-read the contract; beta must notice
+    the changed reach by itself.
+
+    Given an anonymous visitor at doorway "alpha" is served "community-garden-club" at commons reach
+    And an anonymous visitor at doorway "beta" is served "community-garden-club" at commons reach
+    And doorway "beta" names alpha as the live holder that supplied the bytes
+    And the content address of the served "community-garden-club" bytes is recorded
+    When the Dowell household decision recorded through alpha sets <reach> reach for "community-garden-club"
+    And within 75 seconds beta is polled without a refresh instruction until it enforces and references the changed reach on the same contract
+    Then within the fixture window plus 15 seconds of observation allowance an anonymous visitor at doorway "alpha" is refused "community-garden-club"
+    And an anonymous visitor at doorway "beta" is refused "community-garden-club"
+    And an anonymous request at doorway "alpha" for the recorded content address is refused, and no bytes are sent
+    And an anonymous request at doorway "beta" for the recorded content address is refused, and no bytes are sent
+    And each of those four HTTP 403 refusals names reach as the failed term, not absence or a service error
+    And following the refusal's declaration reference at doorway "beta" returns that same contract identifier with the changed reach and deciding collective
+
+    Examples:
+      | reach     |
+      | community |
+      | familiar  |
+      | trusted   |
+      | intimate  |

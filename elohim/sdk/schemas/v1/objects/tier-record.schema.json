@@ -1,0 +1,195 @@
+{
+  "$id": "epr:schema:object:tier-record",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "TierRecord",
+  "description": "One storage tier a requester may ask for objects under a root: who it is, its class, every source that named it, where to dial it, the widest reach it is admitted to read, and its proximity (interfaces spec §A.2, H2). Duplicates by id merge: sources are unioned, and a class conflict keeps the narrower class. Wire shape: this schema is the source of record; eprfs_core::TierRecord (elohim/eprfs/eprfs-core/src/tier.rs) is its Rust mirror, not yet pinned to it by a test (follow-on: an eprfs-serve contract test that serializes a TierRecord and validates it here). Source of truth: the host's held records and what its doorways supplied (Operational, Category C): built by the host from what it holds (roster, commitments, the person's devices, spaces) and what its doorways supplied (`tier_records(held, doorways)` from DeliveryPeer); never asked of the network as a policy and never read as attribution.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "id",
+    "class",
+    "sources",
+    "endpoint",
+    "standing",
+    "proximity"
+  ],
+  "properties": {
+    "id": {
+      "type": "string",
+      "pattern": "^(agent|transport):.+$",
+      "description": "A tier identity: `agent:<agent key>` when a cross-signed binding resolves one, else `transport:<peer id>` (the transport id the tier was dialled by). The indexical `own` is never serialized: eprfs-core's Serialize refuses it, every serving adapter stamps its own id, and a requester-side adapter rewrites a remote `own` to the dialled record's id (A2). Decides where to dial and what to count, never whom to credit (A11)."
+    },
+    "class": {
+      "$ref": "../enums/tier-class.schema.json"
+    },
+    "sources": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "title": "TierSource",
+        "description": "Where the requester learned of the tier. Both sources are legitimate (R6a): held records and the doorways the requester ingresses through, which are plural participants.",
+        "oneOf": [
+          {
+            "type": "object",
+            "additionalProperties": false,
+            "title": "TierSourceHeldRecord",
+            "required": [
+              "source",
+              "record"
+            ],
+            "properties": {
+              "source": {
+                "const": "held-record"
+              },
+              "record": {
+                "type": "string",
+                "minLength": 1,
+                "description": "The held record that named the tier (roster, commitment, the person's devices, a space)."
+              }
+            }
+          },
+          {
+            "type": "object",
+            "additionalProperties": false,
+            "title": "TierSourceDoorway",
+            "required": [
+              "source",
+              "doorway"
+            ],
+            "properties": {
+              "source": {
+                "const": "doorway"
+              },
+              "doorway": {
+                "type": "string",
+                "pattern": "^(agent|transport):.+$",
+                "description": "A tier identity: `agent:<agent key>` when a cross-signed binding resolves one, else `transport:<peer id>` (the transport id the tier was dialled by). The indexical `own` is never serialized: eprfs-core's Serialize refuses it, every serving adapter stamps its own id, and a requester-side adapter rewrites a remote `own` to the dialled record's id (A2). Decides where to dial and what to count, never whom to credit (A11)."
+              }
+            }
+          }
+        ]
+      },
+      "description": "Every source that named this tier; non-empty by construction (A14), and kept plural so a probe can count distinct doorways."
+    },
+    "endpoint": {
+      "oneOf": [
+        {
+          "type": "null"
+        },
+        {
+          "title": "TierAddress",
+          "description": "A dial hint, never identity.",
+          "oneOf": [
+            {
+              "type": "object",
+              "additionalProperties": false,
+              "title": "TierAddressUrl",
+              "required": [
+                "form",
+                "base"
+              ],
+              "properties": {
+                "form": {
+                  "const": "url"
+                },
+                "base": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "A base URL."
+                }
+              }
+            },
+            {
+              "type": "object",
+              "additionalProperties": false,
+              "title": "TierAddressMultiaddr",
+              "required": [
+                "form",
+                "addr"
+              ],
+              "properties": {
+                "form": {
+                  "const": "multiaddr"
+                },
+                "addr": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "A multiaddr."
+                }
+              }
+            }
+          ]
+        }
+      ],
+      "description": "Where to dial; null when no dial hint is held (one provenance)."
+    },
+    "standing": {
+      "type": [
+        "integer",
+        "null"
+      ],
+      "minimum": 1,
+      "maximum": 8,
+      "description": "The widest reach this tier is admitted to read, as `Reach::openness()` (1 most restrictive to 8 commons, the order of enums/reach), from a held record or the doorway entry; eprfs names no reach value. Null = unknown, and the ask policy then defaults by class (A5, H7)."
+    },
+    "proximity": {
+      "oneOf": [
+        {
+          "type": "null"
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "title": "Proximity",
+          "description": "Ordering inputs only; the default ProximityOrder compares class, then warmth for the root, network rank, rtt (unknown last), recency, id. No Ord on the Rust struct: the comparator is explicit (A15).",
+          "required": [
+            "networkRank",
+            "warmRoots",
+            "servesExtracted",
+            "rttMs",
+            "lastSeenMs"
+          ],
+          "properties": {
+            "networkRank": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 255,
+              "description": "lan 0, wan 1, relay 2."
+            },
+            "warmRoots": {
+              "type": "array",
+              "items": {
+                "type": "string",
+                "pattern": "^bafyrei[a-z2-7]{52}$",
+                "description": "A root this tier declared warm (per content, not per tier)."
+              },
+              "description": "Roots this tier declared warm."
+            },
+            "servesExtracted": {
+              "type": "boolean"
+            },
+            "rttMs": {
+              "type": [
+                "integer",
+                "null"
+              ],
+              "minimum": 0,
+              "maximum": 4294967295,
+              "description": "Measured round-trip time; null = not measured (one provenance)."
+            },
+            "lastSeenMs": {
+              "type": [
+                "integer",
+                "null"
+              ],
+              "minimum": 0,
+              "maximum": 9007199254740991,
+              "description": "Last seen, milliseconds since the Unix epoch; null = never seen. A u64 in Rust, bounded here to 9007199254740991 (2^53 - 1, the largest integer every JSON reader, JavaScript included, holds exactly); a larger value is refused, never rounded."
+            }
+          }
+        }
+      ],
+      "description": "Null when nothing is known of the tier's proximity."
+    }
+  }
+}

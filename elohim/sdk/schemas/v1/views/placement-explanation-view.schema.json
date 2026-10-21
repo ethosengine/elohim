@@ -1,0 +1,515 @@
+{
+  "$id": "epr:schema:view:placement-explanation",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "PlacementExplanationView",
+  "description": "Why a need is placed where it is, recomputed rather than stored (spec §7.4, interfaces spec §D.9, G13): the need, its key and kind, the ranking method, the parameter set in force by CID and what ratified it, which fallback applied when one did, the inputs digest the commitment carries, the asker's own devices' refusals listed, other members' refusals COUNTED by label and never listed, how many candidates were eligible, who was chosen (each named only at the reach its posture declared), the outcome, and whether the recomputed digest matches the commitment's. Asking why re-runs the pure ranking for one need over the inputs the peer holds; once those are gone, the outcome is `inputs-gone` and the three committed fields are what remain: `method`, `parameterSet` and `inputsDigest`. Revision of interfaces spec §D.9: its prose names these three fields, while its `Explanation` struct has no parameter-set CID; placement_core::Explanation follows the struct and does not carry `parameterSet` yet (follow-on, with the spec seat). Wire shape: this schema is the source of record; placement_core::Explanation (elohim/placement/core/src/explain.rs; `inputsDigest` as 64 hex characters, CIDs as strings) is its Rust mirror, not yet pinned to it by a test (follow-on: a placement-core schema_contract case that validates one Explanation per Outcome form, and one Ineligible, here). Source of truth: the peer's own snapshot of the placement inputs, recomputed per request (Operational, Category C). Not persisted.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "need",
+    "key",
+    "kind",
+    "method",
+    "parameters",
+    "parameterSet",
+    "fallback",
+    "inputsDigest",
+    "ownRefusals",
+    "othersRefused",
+    "eligible",
+    "chosen",
+    "outcome",
+    "digestMatchesCommitment"
+  ],
+  "properties": {
+    "need": {
+      "type": "string",
+      "pattern": "^bafyrei[a-z2-7]{52}$",
+      "description": "Need::id, the need's content-derived CID."
+    },
+    "key": {
+      "$ref": "../objects/need-key.schema.json"
+    },
+    "kind": {
+      "$ref": "../enums/placement-kind.schema.json"
+    },
+    "method": {
+      "type": "string",
+      "pattern": "^bafkrei[a-z2-7]{52}$",
+      "description": "The ranking method in force (MethodId, raw codec)."
+    },
+    "parameters": {
+      "$ref": "../objects/placement-parameter-head.schema.json#/$defs/RatificationRef",
+      "description": "What put the parameter set in force (who or what ratified it, not which set: that is `parameterSet`); `built-in` reads as 'no tuning chosen'."
+    },
+    "parameterSet": {
+      "type": "string",
+      "pattern": "^bafyrei[a-z2-7]{52}$",
+      "description": "The parameter set in force for this need's kind, by its CID (ParameterSet::cid, dag-cbor). It names WHICH set was in force; `parameters` names what ratified it. It is one of the three fields a commitment carries (method, parameter-set CID, inputs digest, spec §7.4 and §D.9), so it is written for every outcome, `inputs-gone` included."
+    },
+    "fallback": {
+      "oneOf": [
+        {
+          "type": "null"
+        },
+        {
+          "$ref": "../enums/param-fallback.schema.json"
+        }
+      ],
+      "description": "Which fallback applied when the declared head could not be verified (E10). Null when the declared head was in force (one provenance)."
+    },
+    "inputsDigest": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$",
+      "description": "The sha-256 inputs digest, 64 lower-case hex characters (G13)."
+    },
+    "ownRefusals": {
+      "type": "array",
+      "items": {
+        "title": "Ineligible",
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "agent",
+          "why"
+        ],
+        "properties": {
+          "agent": {
+            "type": "string",
+            "pattern": "^uhCAk[A-Za-z0-9_-]+$",
+            "description": "An agent key (`uhCAk…`)."
+          },
+          "why": {
+            "$ref": "#/$defs/UnansweredIneligible"
+          }
+        }
+      },
+      "description": "The asker's own devices' refusals, listed with R7's three parts."
+    },
+    "othersRefused": {
+      "type": "object",
+      "additionalProperties": {
+        "type": "integer",
+        "minimum": 0,
+        "maximum": 4294967295,
+        "description": "A u32 in Rust; bounded to its width."
+      },
+      "description": "Other members' refusals, counted by IneligibleReason label (the `reason` tag), never listed."
+    },
+    "eligible": {
+      "type": "integer",
+      "minimum": 0,
+      "maximum": 4294967295,
+      "description": "How many candidates were eligible."
+    },
+    "chosen": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "pattern": "^uhCAk[A-Za-z0-9_-]+$",
+        "description": "An agent key (`uhCAk…`)."
+      },
+      "description": "The chosen carriers, each named only at the reach its posture declared."
+    },
+    "outcome": {
+      "title": "Outcome",
+      "description": "What happened to the need, internally tagged by `outcome`: carried by the asker, held by others, not carried (with R7's three parts), or the inputs are gone, so only the commitment's method, parameter-set CID and inputs digest remain (spec §7.4). Inputs gone has one form only: outcome `inputs-gone` with reason `inputs-gone`; outcome `not-carried` refuses that reason, and outcome `inputs-gone` refuses every other. The Rust mirror's types admit both forms (Outcome::NotCarried can hold NotCarriedReason::InputsGone, and Outcome::InputsGone any reason); placement_core::explain never builds either today, and narrowing the Rust types is a named follow-on.",
+      "oneOf": [
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "title": "OutcomeCarried",
+          "required": [
+            "outcome"
+          ],
+          "properties": {
+            "outcome": {
+              "const": "carried"
+            }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "title": "OutcomeHeld",
+          "required": [
+            "outcome"
+          ],
+          "properties": {
+            "outcome": {
+              "const": "held"
+            }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "title": "OutcomeNotCarried",
+          "required": [
+            "outcome",
+            "why"
+          ],
+          "properties": {
+            "outcome": {
+              "const": "not-carried"
+            },
+            "why": {
+              "$ref": "#/$defs/UnansweredNotCarried"
+            }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "title": "OutcomeInputsGone",
+          "required": [
+            "outcome",
+            "why"
+          ],
+          "properties": {
+            "outcome": {
+              "const": "inputs-gone"
+            },
+            "why": {
+              "$ref": "#/$defs/UnansweredInputsGone"
+            }
+          }
+        }
+      ]
+    },
+    "digestMatchesCommitment": {
+      "type": [
+        "boolean",
+        "null"
+      ],
+      "description": "Whether the recomputed inputs digest equals the commitment's; null when there is no commitment to compare (one provenance)."
+    }
+  },
+  "$defs": {
+    "IneligibleReason": {
+      "title": "IneligibleReason",
+      "description": "Why a candidate could not carry a need, internally tagged by `reason`. Eligibility takes no parameters, so no parameter set can reach any of these (D contract 8). `unknown` names a fact the floor does not hold, which is never read as a default (spec §7.2).",
+      "oneOf": [
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "title": "IneligibleNoPosture",
+          "required": [
+            "reason"
+          ],
+          "properties": {
+            "reason": {
+              "const": "no-posture"
+            }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "title": "IneligibleUnknown",
+          "required": [
+            "reason",
+            "input"
+          ],
+          "properties": {
+            "reason": {
+              "const": "unknown"
+            },
+            "input": {
+              "type": "string",
+              "minLength": 1,
+              "description": "The missing input, e.g. liveness, reach, consent."
+            }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "title": "IneligibleOutsideReach",
+          "required": [
+            "reason",
+            "need",
+            "admitted"
+          ],
+          "properties": {
+            "reason": {
+              "const": "outside-reach"
+            },
+            "need": {
+              "$ref": "../enums/reach.schema.json"
+            },
+            "admitted": {
+              "$ref": "../enums/reach.schema.json"
+            }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "title": "IneligibleOverCapacity",
+          "required": [
+            "reason"
+          ],
+          "properties": {
+            "reason": {
+              "const": "over-capacity"
+            }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "title": "IneligibleNoConsent",
+          "required": [
+            "reason"
+          ],
+          "properties": {
+            "reason": {
+              "const": "no-consent"
+            }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "title": "IneligibleConsentExpired",
+          "required": [
+            "reason"
+          ],
+          "properties": {
+            "reason": {
+              "const": "consent-expired"
+            }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "title": "IneligibleIsReceiver",
+          "required": [
+            "reason"
+          ],
+          "properties": {
+            "reason": {
+              "const": "is-receiver"
+            }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "title": "IneligibleNotNamed",
+          "required": [
+            "reason"
+          ],
+          "properties": {
+            "reason": {
+              "const": "not-named"
+            }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "title": "IneligibleCrossHouseholdBelowPublic",
+          "required": [
+            "reason"
+          ],
+          "properties": {
+            "reason": {
+              "const": "cross-household-below-public"
+            }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "title": "IneligibleKind",
+          "required": [
+            "reason",
+            "label"
+          ],
+          "properties": {
+            "reason": {
+              "const": "kind"
+            },
+            "label": {
+              "type": "string",
+              "minLength": 1,
+              "description": "The kind's own refusal label, e.g. scope, isolation."
+            }
+          }
+        }
+      ]
+    },
+    "NotCarriedReason": {
+      "title": "NotCarriedReason",
+      "description": "Why a need is not carried, internally tagged by `reason`. An unmet need is named, never dropped. This is the whole vocabulary (placement_core::NotCarriedReason); `inputs-gone` is written in an explanation only as outcome `inputs-gone`, never under outcome `not-carried` (see UnansweredNotCarried and UnansweredInputsGone).",
+      "oneOf": [
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "title": "NotCarriedNoEligible",
+          "required": [
+            "reason"
+          ],
+          "properties": {
+            "reason": {
+              "const": "no-eligible"
+            }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "title": "NotCarriedDomainShort",
+          "required": [
+            "reason",
+            "have",
+            "need"
+          ],
+          "properties": {
+            "reason": {
+              "const": "domain-short"
+            },
+            "have": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 65535,
+              "description": "Honored distinct domains."
+            },
+            "need": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 65535,
+              "description": "Domains wanted."
+            }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "title": "NotCarriedServedFirst",
+          "required": [
+            "reason",
+            "class"
+          ],
+          "properties": {
+            "reason": {
+              "const": "served-first"
+            },
+            "class": {
+              "$ref": "../enums/need-class.schema.json"
+            }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "title": "NotCarriedNoPriorityChosen",
+          "required": [
+            "reason"
+          ],
+          "properties": {
+            "reason": {
+              "const": "no-priority-chosen"
+            }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "title": "NotCarriedMethodNotRun",
+          "required": [
+            "reason"
+          ],
+          "properties": {
+            "reason": {
+              "const": "method-not-run"
+            }
+          }
+        },
+        {
+          "$ref": "#/$defs/NotCarriedInputsGone"
+        }
+      ]
+    },
+    "UnansweredIneligible": {
+      "allOf": [
+        {
+          "$ref": "../objects/unanswered.schema.json"
+        },
+        {
+          "properties": {
+            "why": {
+              "$ref": "#/$defs/IneligibleReason"
+            }
+          },
+          "required": [
+            "why"
+          ]
+        }
+      ],
+      "title": "UnansweredIneligible"
+    },
+    "UnansweredNotCarried": {
+      "allOf": [
+        {
+          "$ref": "../objects/unanswered.schema.json"
+        },
+        {
+          "properties": {
+            "why": {
+              "allOf": [
+                {
+                  "$ref": "#/$defs/NotCarriedReason"
+                },
+                {
+                  "not": {
+                    "$ref": "#/$defs/NotCarriedInputsGone"
+                  }
+                }
+              ],
+              "description": "Any NotCarriedReason except `inputs-gone`, which has its own outcome."
+            }
+          },
+          "required": [
+            "why"
+          ]
+        }
+      ],
+      "title": "UnansweredNotCarried"
+    },
+    "NotCarriedInputsGone": {
+      "type": "object",
+      "additionalProperties": false,
+      "title": "NotCarriedInputsGone",
+      "required": [
+        "reason"
+      ],
+      "properties": {
+        "reason": {
+          "const": "inputs-gone"
+        }
+      }
+    },
+    "UnansweredInputsGone": {
+      "allOf": [
+        {
+          "$ref": "../objects/unanswered.schema.json"
+        },
+        {
+          "properties": {
+            "why": {
+              "$ref": "#/$defs/NotCarriedInputsGone"
+            }
+          },
+          "required": [
+            "why"
+          ]
+        }
+      ],
+      "title": "UnansweredInputsGone"
+    }
+  }
+}

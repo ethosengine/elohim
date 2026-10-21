@@ -1,0 +1,47 @@
+{
+  "$id": "epr:schema:object:placement-parameter-set",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "PlacementParameterSet",
+  "description": "The placement ceiling's declared, versioned input to the floor for one kind (item S4): which ranking method, its factor weights, and how many carriers may move per event. Scope-free, so a built-in set has one CID everywhere and ships with the floor (E1); where a set is in force is the head's fact (objects/placement-parameter-head). Its CID (`ParameterSet::cid`) is the atom CID of the canonical DAG-CBOR encoding over all five fields; its incumbency key (`ranking_cid`) is over kind, method and weights only, so republishing a set at another reach or move cap does not reset incumbency (E5). A tuning may only reweight: same kind and method, the same weight keys, each a factor the method reads, each weight at least 1, and a move cap inside the charter's range (`within_band`, E2, E6). No parameter set can make an ineligible carrier eligible: eligibility takes no parameters (§D.4). Wire shape: this schema is the source of record; placement_core::ParameterSet (elohim/placement/core/src/params.rs; serde camelCase, deny_unknown_fields) is its Rust mirror, not yet pinned to it by a test (follow-on: a placement-core schema_contract case that validates a serialized ParameterSet here). The Rust codec is the authority only for the canonical DAG-CBOR bytes and the CIDs (`ParameterSet::cid`, `ranking_cid`). Source of truth: the declarer's record, or the floor's own constant for a built-in set. Category A2 when published: a household-local record below public reach (R2) and an EPR head declaration's referent at collective or commons reach; no new DHT entry type. A built-in set is a constant of the floor, never published.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema",
+    "kind",
+    "method",
+    "weights",
+    "maxMovesPerEvent"
+  ],
+  "properties": {
+    "schema": {
+      "const": 1,
+      "description": "The version of this struct's canonical encoding: 1 for the fields below, bumped only when a field is added, removed or reinterpreted. Not a protocol version. Part of `cid()`, not of `ranking_cid()`. A floor refuses a value it does not know as ParamRefusal::Unverifiable { input: \"schema\" }; this schema file shapes version 1 only."
+    },
+    "kind": {
+      "$ref": "../enums/placement-kind.schema.json"
+    },
+    "method": {
+      "type": "string",
+      "pattern": "^bafkrei[a-z2-7]{52}$",
+      "description": "The ranking method's id (MethodId): a CIDv1 with the raw codec (0x55) over sha2-256 of the UTF-8 method name `<namespace>:<area>:<name>@<version>`, e.g. elohim:placement:xor-distance@1; the `elohim` namespace is reserved for built-ins, and a method whose behaviour changes takes a new version and so a new id. Raw codec, so the string begins `bafkrei`."
+    },
+    "weights": {
+      "type": "object",
+      "propertyNames": {
+        "$ref": "../enums/placement-factor.schema.json"
+      },
+      "additionalProperties": {
+        "type": "integer",
+        "minimum": 1,
+        "maximum": 2147483647
+      },
+      "description": "Factor weights in integer basis points (no floats, rail R-P3), each at least 1 (E6). Only factors the method reads may appear; a method that reads none (xor-distance) carries an empty object."
+    },
+    "maxMovesPerEvent": {
+      "type": "integer",
+      "minimum": 0,
+      "maximum": 65535,
+      "description": "Make-before-break cap: at most this many carrier moves per event (concern C6a), inside the charter's declared range."
+    }
+  }
+}

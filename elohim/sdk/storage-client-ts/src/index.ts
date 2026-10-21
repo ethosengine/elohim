@@ -79,3 +79,7 @@ export * from './zome-wire-types.js';
 export * from './epr-head.model.js';
 export * from './source-chain.model.js';
 export type { IIntegrityAnchor } from './integrity-anchor.interface';
+
+// Placement contract: tier transport and app-author need status.
+export * from './tiers/http-tier.js';
+export * from './placement.js';

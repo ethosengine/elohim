@@ -19,9 +19,10 @@
 //!
 //! | Module | Concern | Property |
 //! |---|---|---|
-//! | [`arbitrated`] | C2 monotonic authority | permutation-invariance + tiebreak determinism |
+//! | [`arbitrated`] | C2 monotonic authority | permutation-invariance + tiebreak determinism, for one winner (`check_arbitration`) or a whole ranked list (`check_ordering`) |
 //! | [`quiescent`] | C6b idempotent effect | replay against settled state mints nothing |
 //! | [`liveness`] | C3 liveness | every reachable non-terminal state has an automated move |
+//! | [`status`] | C3 liveness + C6a bounded work | a status cursor is quiet at rest, reports only changes, and says nothing after a terminal status |
 //!
 //! [`liveness`] is a **table** harness rather than a property harness: the
 //! caller enumerates the state space as plain data and the check is exhaustive
@@ -34,10 +35,12 @@
 pub mod arbitrated;
 pub mod liveness;
 pub mod quiescent;
+pub mod status;
 
 pub use arbitrated::{
-    assert_arbitration, check_arbitration, check_arbitration_with, ArbitrationBudget,
-    ArbitrationReport, ArbitrationViolation, ArbitrationViolationClass,
+    assert_arbitration, assert_ordering, check_arbitration, check_arbitration_with, check_ordering,
+    check_ordering_with, ArbitrationBudget, ArbitrationReport, ArbitrationViolation,
+    ArbitrationViolationClass, OrderingViolation, OrderingViolationClass,
 };
 pub use liveness::{
     assert_liveness, check_liveness, check_liveness_with, Agency, LivenessBudget, LivenessFailure,
@@ -47,4 +50,8 @@ pub use liveness::{
 pub use quiescent::{
     assert_quiescent, check_quiescence, check_quiescence_with, QuiescenceBudget, QuiescenceReport,
     QuiescenceViolation, QuiescenceViolationClass,
+};
+pub use status::{
+    assert_status_cursor, check_status_cursor, StatusCursorReport, StatusCursorViolation,
+    StatusCursorViolationClass,
 };

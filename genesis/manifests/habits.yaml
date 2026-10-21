@@ -1598,6 +1598,31 @@ habits:
       attention-witnessed-privately's retire-when — a row that cannot be appended unsigned leaves
       nothing to say "absent" about.
 
+  - id: materialize-what-is-read
+    declared: elohim/eprfs/.epr-meta/materialize-what-is-read.habit.md
+    invariant: >
+      A reader that names a tree root and a view of what it intends to do holds afterwards the bytes
+      that act read, the tree nodes on their paths, and what a device pin names, and no more; it gets
+      them through one storage interface whichever tier held them, each object verified against its
+      address, and a requester outside the root's reach is refused by name.
+    status: red
+    active: false
+    checks:
+      - "just gate eprfs: the headline walk `walk_ten_thousand_entries_three_path_view_fetches_only_spine` (eprfs-core/src/walk.rs — a 10,000-file tree under a three-path view fetches exactly the 7 spine nodes and no leaf), with its level-batched twin `level_batching_costs_one_fetch_blobs_per_level_for_the_headline_view` (eprfs-core/src/level_walk.rs — 3 `fetch_blobs` calls whose items total those 7 nodes), the tier contract `tier_chain_passes_the_tier_contract` (eprfs-storage/tests/tier_chain.rs), the outer-tier contract `an_endpoint_served_tier_passes_the_outer_tier_contract` and `an_unadmitted_requester_cannot_distinguish_private_and_unknown_roots` (eprfs-serve/tests/endpoint.rs — identical complete refusal envelopes across read/list/diff/batch, denied presence and zero store reads)"
+      - "just gate eprfs-ts: build, typecheck, rail R-T1 purity lint and the TypeScript half of the shared tree/tier vectors, registered by elohim/eprfs/eprfs-ts/build-manifest.json"
+      - "just gate storage-client-ts: built package exports, HttpTier and placement contracts, including the plain Node ESM public-package consumer smoke"
+    evidence: >
+      DELTA 2026-10-21 (H1, Codex integration): still red and inactive. The view-spine and level-batch contracts, uniform private/unknown root refusals with zero reads, storage error/absence distinction and TypeScript public-package tier contracts now pass on final sources: eprfs 1,326 tests, storage 5,728 (59 existing ignored), eprfs-ts 27 and storage-client-ts 131 plus Node consumer; the app gate also passes 4,717 tests and the standalone worker typecheck. No live materialization or runtime adoption is claimed; per-object reach inclusion and release/licensing decisions remain open. Evidence: genesis/docs/superpowers/plans/task-placement-integration-report.md and its durable gate receipts; the earlier intermittent eprfs attribution failure is retained there without claiming a fix.
+    evidence-fingerprint: sha256:b488930e2f3a05ec
+    evidence-bytes: 4257
+    evidence-entries: 7
+    refs:
+      - genesis/docs/superpowers/specs/2026-10-20-what-every-app-inherits-placement-contract-design.md
+      - genesis/docs/superpowers/specs/2026-10-20-placement-contract-interfaces-design.md
+    retire-when: >
+      when a view-scoped walk through one tier list is the only fetch path brit, rakia, lvi and app
+      delivery use, and the household proof of the design's graduation trigger runs in the eprfs gate
+
   - id: happ-lineage-migration
     declared: elohim/holochain/.epr-meta/happ-lineage-migration.habit.md
     invariant: >

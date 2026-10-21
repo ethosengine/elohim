@@ -110,10 +110,20 @@ export const ALL_CONTENT_TYPES = [
 export const CONTENT_TYPES = ALL_CONTENT_TYPES;
 export type ContentType = (typeof ALL_CONTENT_TYPES)[number];
 
+export const CORE_DEPTHS = ['query', 'sparse', 'on-read', 'kept'] as const;
+export const ALL_DEPTHS = ['query', 'sparse', 'on-read', 'kept'] as const;
+export const DEPTHS = ALL_DEPTHS;
+export type Depth = (typeof ALL_DEPTHS)[number];
+
 export const CORE_DEVICE_ARCHETYPES = ['node', 'desktop', 'mobile', 'steward'] as const;
 export const ALL_DEVICE_ARCHETYPES = ['node', 'desktop', 'mobile', 'steward'] as const;
 export const DEVICE_ARCHETYPES = ALL_DEVICE_ARCHETYPES;
 export type DeviceArchetype = (typeof ALL_DEVICE_ARCHETYPES)[number];
+
+export const CORE_DISCLOSURES = ['holder', 'parties', 'at-reach'] as const;
+export const ALL_DISCLOSURES = ['holder', 'parties', 'at-reach'] as const;
+export const DISCLOSURES = ALL_DISCLOSURES;
+export type Disclosure = (typeof ALL_DISCLOSURES)[number];
 
 export const CORE_ELOHIM_SKILLS = [
   'content-safety-review',
@@ -249,6 +259,16 @@ export const ALL_ENGAGEMENT_TYPES = [
 export const ENGAGEMENT_TYPES = ALL_ENGAGEMENT_TYPES;
 export type EngagementType = (typeof ALL_ENGAGEMENT_TYPES)[number];
 
+export const CORE_EVIDENCE_STAGES = ['fixture', 'real'] as const;
+export const ALL_EVIDENCE_STAGES = ['fixture', 'real'] as const;
+export const EVIDENCE_STAGES = ALL_EVIDENCE_STAGES;
+export type EvidenceStage = (typeof ALL_EVIDENCE_STAGES)[number];
+
+export const CORE_GRANT_SCOPES = ['sweettest-feedback', 'hosted-cell', 'measure-stage'] as const;
+export const ALL_GRANT_SCOPES = ['sweettest-feedback', 'hosted-cell', 'measure-stage'] as const;
+export const GRANT_SCOPES = ALL_GRANT_SCOPES;
+export type GrantScope = (typeof ALL_GRANT_SCOPES)[number];
+
 export const CORE_INFERENCE_SOURCES = ['explicit', 'path', 'tag', 'semantic'] as const;
 export const ALL_INFERENCE_SOURCES = ['explicit', 'path', 'tag', 'semantic', 'system'] as const;
 export const INFERENCE_SOURCES = ALL_INFERENCE_SOURCES;
@@ -272,6 +292,28 @@ export const ALL_INSTRUMENT_ARCHETYPES = [
 ] as const;
 export const INSTRUMENT_ARCHETYPES = ALL_INSTRUMENT_ARCHETYPES;
 export type InstrumentArchetype = (typeof ALL_INSTRUMENT_ARCHETYPES)[number];
+
+export const CORE_ISOLATION_LEVELS = [
+  'none',
+  'intrinsic',
+  'delegated',
+  'bounded',
+  'enforced',
+] as const;
+export const ALL_ISOLATION_LEVELS = [
+  'none',
+  'intrinsic',
+  'delegated',
+  'bounded',
+  'enforced',
+] as const;
+export const ISOLATION_LEVELS = ALL_ISOLATION_LEVELS;
+export type Isolation = (typeof ALL_ISOLATION_LEVELS)[number];
+
+export const CORE_LOSS_DOMAINS = ['device', 'household', 'region'] as const;
+export const ALL_LOSS_DOMAINS = ['device', 'household', 'region'] as const;
+export const LOSS_DOMAINS = ALL_LOSS_DOMAINS;
+export type LossDomain = (typeof ALL_LOSS_DOMAINS)[number];
 
 export const CORE_MASTERY_LEVELS = [
   'not_started',
@@ -299,6 +341,11 @@ export const ALL_MASTERY_LEVELS = [
 export const MASTERY_LEVELS = ALL_MASTERY_LEVELS;
 export type MasteryLevel = (typeof ALL_MASTERY_LEVELS)[number];
 
+export const CORE_NEED_CLASSES = ['care', 'member', 'agent', 'commons'] as const;
+export const ALL_NEED_CLASSES = ['care', 'member', 'agent', 'commons'] as const;
+export const NEED_CLASSES = ALL_NEED_CLASSES;
+export type NeedClass = (typeof ALL_NEED_CLASSES)[number];
+
 export const CORE_OBSERVATION_POLARITIES = ['positive', 'negative'] as const;
 export const ALL_OBSERVATION_POLARITIES = ['positive', 'negative'] as const;
 export const OBSERVATION_POLARITIES = ALL_OBSERVATION_POLARITIES;
@@ -315,6 +362,48 @@ export const ALL_PATH_VISIBILITIES = [
 ] as const;
 export const PATH_VISIBILITIES = ALL_PATH_VISIBILITIES;
 export type PathVisibility = (typeof ALL_PATH_VISIBILITIES)[number];
+
+export const CORE_PLACEMENT_FACTORS = [
+  'distance',
+  'domain-spread',
+  'spare-capacity',
+  'near-bytes',
+  'always-on',
+] as const;
+export const ALL_PLACEMENT_FACTORS = [
+  'distance',
+  'domain-spread',
+  'spare-capacity',
+  'near-bytes',
+  'always-on',
+] as const;
+export const PLACEMENT_FACTORS = ALL_PLACEMENT_FACTORS;
+export type PlacementFactor = (typeof ALL_PLACEMENT_FACTORS)[number];
+
+export const CORE_PLACEMENT_KINDS = [
+  'custody-blob',
+  'custody-root',
+  'live-session',
+  'relay',
+  'wake-ingress',
+  'hub-runtime',
+  'inference',
+  'index-fold',
+  'task',
+] as const;
+export const ALL_PLACEMENT_KINDS = [
+  'custody-blob',
+  'custody-root',
+  'live-session',
+  'relay',
+  'wake-ingress',
+  'hub-runtime',
+  'inference',
+  'index-fold',
+  'task',
+] as const;
+export const PLACEMENT_KINDS = ALL_PLACEMENT_KINDS;
+export type PlacementKind = (typeof ALL_PLACEMENT_KINDS)[number];
 
 export const CORE_REA_ACTIONS = [
   'use',

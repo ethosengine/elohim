@@ -1,0 +1,84 @@
+{
+  "$id": "epr:schema:object:need-key",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "NeedKey",
+  "description": "The key a placement need is ranked and carried under: adjacently tagged, `form` (kebab-case) beside `id`. `blob` is the legacy custody marker (`sha256-<hex>`) until the custody rows migrate, ranked over the marker's UTF-8 bytes so the XOR key is byte-identical to elohim-storage's reconcile/placement.rs hash_into_keyspace; `tree-view` is objects/tree-view's CID (R1: per tree root and view, never per blob); `task` is a TaskSpec's CID (§F); `session` a live session's CID. Every CID is a string in JSON (cid_serde's human-readable branch, G1). Lives in objects/ rather than inside intents/placement-need because two schemas carry it (the need and the explanation view) and the TypeScript codegen resolves cross-file references into objects/ but not into intents/ (scripts/codegen-ts.mjs loadRefMap). Wire shape: this schema is the source of record; placement_core::NeedKey (elohim/placement/core/src/need.rs) is its Rust mirror, not yet pinned to it by a test (follow-on: a placement-core schema_contract case that serializes each form and validates it here). Source of truth: the thing it keys, from which it is derived (Category C): a key, content-derived except the legacy blob marker.",
+  "oneOf": [
+    {
+      "type": "object",
+      "additionalProperties": false,
+      "title": "NeedKeyBlob",
+      "required": [
+        "form",
+        "id"
+      ],
+      "properties": {
+        "form": {
+          "const": "blob"
+        },
+        "id": {
+          "type": "string",
+          "pattern": "^sha256-[0-9a-f]{64}$",
+          "description": "The legacy custody marker."
+        }
+      }
+    },
+    {
+      "type": "object",
+      "additionalProperties": false,
+      "title": "NeedKeyTreeView",
+      "required": [
+        "form",
+        "id"
+      ],
+      "properties": {
+        "form": {
+          "const": "tree-view"
+        },
+        "id": {
+          "type": "string",
+          "pattern": "^bafyrei[a-z2-7]{52}$",
+          "description": "TreeView::cid(): the dag-cbor CID of a tree root plus view."
+        }
+      }
+    },
+    {
+      "type": "object",
+      "additionalProperties": false,
+      "title": "NeedKeyTask",
+      "required": [
+        "form",
+        "id"
+      ],
+      "properties": {
+        "form": {
+          "const": "task"
+        },
+        "id": {
+          "type": "string",
+          "pattern": "^bafyrei[a-z2-7]{52}$",
+          "description": "The TaskSpec's canonical dag-cbor CID."
+        }
+      }
+    },
+    {
+      "type": "object",
+      "additionalProperties": false,
+      "title": "NeedKeySession",
+      "required": [
+        "form",
+        "id"
+      ],
+      "properties": {
+        "form": {
+          "const": "session"
+        },
+        "id": {
+          "type": "string",
+          "pattern": "^baf[ky]rei[a-z2-7]{52}$",
+          "description": "The session's CID."
+        }
+      }
+    }
+  ]
+}

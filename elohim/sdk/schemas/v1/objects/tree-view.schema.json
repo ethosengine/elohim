@@ -1,0 +1,39 @@
+{
+  "$id": "epr:schema:object:tree-view",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "TreeView",
+  "description": "A tree root plus the view read under it: the serializable form of what a reader reads (interfaces spec §B.3, item S1). Its CID (`TreeView::cid`, the dag-cbor CID of the canonical encoding) is the placement need key for a tree (`NeedKey::TreeView`, R1: per tree root and view, never per blob). Two encodings, the BlobLink rule: in DAG-CBOR the root is tag 42 and each path an array of byte-string components (the root path is the empty array); in JSON, shaped here, the root is the CID string and each path is slash-joined UTF-8 with \"\" for the root. Wire shape: this schema is the source of record; eprfs_core::TreeView (elohim/eprfs/eprfs-core/src/view_decl.rs) is its Rust mirror, not yet pinned to it by a test (follow-on: an eprfs-serve contract test that serializes TreeView values and validates them here). The Rust codec is the authority only for the canonical DAG-CBOR bytes and the CID (`TreeView::cid`). Source of truth: the reader's request, from which it is derived per read; a value object with no entry type of its own (Category C as a wire value; its identity is content-derived, never a slug). Not to be confused with enums/closure (the open | closed posture toward silence, finding 7).",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "root",
+    "paths"
+  ],
+  "properties": {
+    "root": {
+      "type": "string",
+      "pattern": "^bafyrei[a-z2-7]{52}$",
+      "description": "The tree root: a CIDv1 over sha2-256 with the dag-cbor codec (a tree node), base32 lower case. In JSON a string; in DAG-CBOR tag 42 (BlobLink)."
+    },
+    "paths": {
+      "$ref": "#/$defs/ViewPaths"
+    }
+  },
+  "$defs": {
+    "ViewPaths": {
+      "title": "ViewPaths",
+      "type": "array",
+      "minItems": 1,
+      "uniqueItems": true,
+      "items": {
+        "type": "string",
+        "pattern": "^$|^[^/\\u0000]+(/[^/\\u0000]+)*$",
+        "not": {
+          "pattern": "(^|/)\\.\\.?(/|$)"
+        },
+        "description": "One view path: slash-joined UTF-8 path components under the root, or \"\" for the root itself. No leading or trailing slash, no empty component, no NUL, and no `.` or `..` component (refused per component by the `not`). A non-UTF-8 component cannot be spelled in JSON at all; the canonical DAG-CBOR form carries components as byte strings, and the Rust decoder refuses a non-UTF-8 path in the human-readable form with TreeError::InvalidView."
+      },
+      "description": "A view: the path prefixes under a tree root that a reader reads, the paths alone (no root). `[\"\"]` is the whole tree (`View::whole()`). The canonical form is the NORMALIZED view: sorted component-wise (not by the slash-joined string: '-' 0x2d sorts before '/' 0x2f) and an antichain (no path covered by another), so that `TreeView::cid` is a function of the view (finding B7). JSON Schema cannot express component-wise order or the antichain rule; the Rust and TypeScript decoders refuse a non-canonical list (TreeError::InvalidView), and the shared vector in eprfs-core's fixtures/tree-vectors.json pins [\"a\",\"a/b\"] as refused on decode and as normalizing to [\"a\"] through TreeView::new with the same cid. Referenced by the app manifest's `needs` block as the shape of `closure` (titled StartSet there), which carries paths only: the release record binds the root."
+    }
+  }
+}

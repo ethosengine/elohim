@@ -634,6 +634,7 @@ _gate-elohim-live-session:
 
 _gate-elohim-ark:
     cd elohim && cargo fmt --check -p elohim-ark-core -p elohim-ark-supervisor -p elohim-ark && cargo clippy -p elohim-ark-core -p elohim-ark-supervisor -p elohim-ark -- -D warnings && cargo test -p elohim-ark-core -p elohim-ark-supervisor -p elohim-ark --all-targets
+    cd elohim && cargo test -p elohim-ark-core --doc
 
 # `pnpm build` first: @elohim/epr ships no dist/ in the tree, so a consumer's
 # import fails at module resolution rather than at type-check. Testing a package

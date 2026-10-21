@@ -1,0 +1,124 @@
+{
+  "$id": "epr:schema:intent:posture",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Posture",
+  "description": "A carrier's posture: an intent to provide (spec §7.1), item S3. Per kind, the terms it offers, at the reach the posture is visible. Written when it changes, with hysteresis, never on a timer; its liveness is read by the observer from presence or inventory freshness, never assumed from the posture (D3). Self is a candidate only through its own posture as it arrived from the same shared source every peer reads (guarded self-candidacy, R4, spec §7.2). Built on the device by DeviceFacts::posture, the device facts' only way off the device. Wire shape: this schema is the source of record; placement_core::Posture and OfferTerms (elohim/placement/core/src/offer.rs; serde camelCase, deny_unknown_fields on the posture) are its Rust mirror, not yet pinned to it by a test (follow-on: a placement-core schema_contract case that validates a serialized Posture here). Source of truth: the carrier's own posture record. Category A at or above public reach as a record every peer reads; below public a household-local record (R2); no new DHT entry type. The custody instance today is elohim-storage's salvage_capacity rows.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "carrier",
+    "offers",
+    "reach",
+    "writtenAt"
+  ],
+  "properties": {
+    "carrier": {
+      "type": "string",
+      "pattern": "^uhCAk[A-Za-z0-9_-]+$",
+      "description": "The carrier. An agent key (`uhCAk…`), the canonical agent identity (elohim_epr_rea::model::AgentRef / AgentRefKey, a string newtype). Never a transport id and never a CID."
+    },
+    "offers": {
+      "type": "object",
+      "propertyNames": {
+        "$ref": "../enums/placement-kind.schema.json"
+      },
+      "additionalProperties": {
+        "title": "OfferTerms",
+        "description": "What a carrier offers for one kind. Device facts never appear here: battery, metered link and budget cross only as their effect, a narrowed, deferred or withdrawn offer (R6, rail R-P4).",
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "spareBytes",
+          "compute",
+          "holds",
+          "reachCeiling",
+          "scopes",
+          "isolation",
+          "deferred",
+          "householdOnly"
+        ],
+        "properties": {
+          "spareBytes": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "minimum": 0,
+            "maximum": 9007199254740991,
+            "description": "Bytes offered; null when the kind spends none. A u64 in Rust, bounded here to 9007199254740991 (2^53 - 1, the largest integer every JSON reader, JavaScript included, holds exactly); a larger value is refused, never rounded."
+          },
+          "compute": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "../objects/placement-capacity.schema.json"
+              }
+            ],
+            "description": "Compute offered; null when the kind spends none."
+          },
+          "holds": {
+            "type": "array",
+            "uniqueItems": true,
+            "items": {
+              "type": "string",
+              "pattern": "^bafyrei[a-z2-7]{52}$",
+              "description": "A root kept at depth 3 (kept)."
+            },
+            "description": "Roots kept at depth 3, each listed only when its own reach is no narrower than the posture's (F8): a posture never names a root below its own reach."
+          },
+          "reachCeiling": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "../enums/reach.schema.json"
+              }
+            ],
+            "description": "The widest reach the carrier will carry for; null sets no ceiling."
+          },
+          "scopes": {
+            "type": "array",
+            "uniqueItems": true,
+            "items": {
+              "$ref": "../enums/grant-scope.schema.json"
+            },
+            "description": "What a task offer will spend (F6)."
+          },
+          "isolation": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "../enums/isolation.schema.json"
+              }
+            ],
+            "description": "The isolation the offer provides (F6); null when the kind runs no process."
+          },
+          "deferred": {
+            "type": "boolean",
+            "description": "Held only in a charging or unmetered window (D11): eligible, charged as a lag, never as an ineligibility."
+          },
+          "householdOnly": {
+            "type": "boolean",
+            "description": "Offered to its own household's needs only. A phone on battery keeps its own-household custody offer, household-only and deferred, so a two-phone household with no hub still holds its own bytes."
+          }
+        }
+      },
+      "description": "Per kind, what is offered. A kind not listed is not offered."
+    },
+    "reach": {
+      "$ref": "../enums/reach.schema.json",
+      "description": "How far the posture is visible."
+    },
+    "writtenAt": {
+      "type": "integer",
+      "minimum": 0,
+      "maximum": 9007199254740991,
+      "description": "When the carrier wrote it, seconds since the Unix epoch. A u64 in Rust, bounded here to 9007199254740991 (2^53 - 1, the largest integer every JSON reader, JavaScript included, holds exactly); a larger value is refused, never rounded."
+    }
+  }
+}

@@ -455,7 +455,7 @@ dependencies = [
 
 [[package]]
 name = "elohim-agent-adapter"
-version = "0.1.2"
+version = "0.2.0"
 dependencies = [
  "bytes",
  "eprfs-core",
@@ -501,7 +501,7 @@ dependencies = [
 
 [[package]]
 name = "elohim-epr-cli"
-version = "0.1.2"
+version = "0.2.0"
 dependencies = [
  "base64",
  "chrono",
@@ -557,8 +557,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "elohim-seam-contracts"
+version = "0.1.0"
+dependencies = [
+ "serde",
+]
+
+[[package]]
 name = "eprfs-agent"
-version = "0.1.2"
+version = "0.2.0"
 dependencies = [
  "bytes",
  "eprfs-core",
@@ -574,18 +581,19 @@ dependencies = [
 
 [[package]]
 name = "eprfs-cli"
-version = "0.1.2"
+version = "0.2.0"
 dependencies = [
  "eprfs-core",
 ]
 
 [[package]]
 name = "eprfs-core"
-version = "0.1.2"
+version = "0.2.0"
 dependencies = [
  "async-trait",
  "bytes",
  "cid",
+ "elohim-seam-contracts",
  "multihash-codetable",
  "serde",
  "serde_bytes",
@@ -597,14 +605,14 @@ dependencies = [
 
 [[package]]
 name = "eprfs-host"
-version = "0.1.2"
+version = "0.2.0"
 dependencies = [
  "serde",
 ]
 
 [[package]]
 name = "eprfs-local"
-version = "0.1.2"
+version = "0.2.0"
 dependencies = [
  "async-trait",
  "bytes",
@@ -620,7 +628,7 @@ dependencies = [
 
 [[package]]
 name = "eprfs-meta"
-version = "0.1.2"
+version = "0.2.0"
 dependencies = [
  "eprfs-core",
  "serde",
@@ -632,12 +640,26 @@ dependencies = [
 ]
 
 [[package]]
+name = "eprfs-serve"
+version = "0.2.0"
+dependencies = [
+ "async-trait",
+ "bytes",
+ "elohim-seam-contracts",
+ "eprfs-core",
+ "eprfs-serve",
+ "serde_json",
+ "tokio",
+]
+
+[[package]]
 name = "eprfs-storage"
-version = "0.1.2"
+version = "0.2.0"
 dependencies = [
  "async-trait",
  "bytes",
  "eprfs-core",
+ "eprfs-serve",
  "serde",
  "serde_json",
  "tempfile",

@@ -1,0 +1,31 @@
+{
+  "manifestVersion": "1.0",
+  "pipeline": "eprfs-ts",
+  "description": "Gate-only: build, typecheck, purity lint and shared contract vectors for @elohim/eprfs",
+  "steps": {
+    "gate-eprfs-ts": {
+      "description": "Built public package and shared TypeScript tree/tier contracts",
+      "inputs": {
+        "sources": [
+          "elohim/eprfs/eprfs-ts/**",
+          "elohim/sdk/epr-ts/**",
+          "elohim/eprfs/fixtures/**"
+        ],
+        "buildProcess": ["pnpm-workspace.yaml", "pnpm-lock.yaml"]
+      },
+      "outputs": { "artifacts": [], "verify": null },
+      "depends": [],
+      "executor": { "stage": "Gate eprfs-ts", "function": null }
+    }
+  },
+  "gate": {
+    "projects": {
+      "eprfs-ts": {
+        "dir": "elohim/eprfs/eprfs-ts",
+        "steps": ["gate-eprfs-ts"],
+        "run": { "kind": "just", "recipe": "gate" }
+      }
+    }
+  },
+  "deployment": {}
+}

@@ -20,7 +20,10 @@ elohim-epr = { path = "../../epr" }
 # drops the crate's `sidecar` feature, which is its only filesystem surface — the pure core
 # speaks the model, never opens a store (`boundary::no_fs_in_pure_core`).
 elohim-epr-rea = { path = "../../epr-rea", default-features = false }
-elohim-compute = { path = "../../elohim-compute" }
+# The actuation contract alone (Governor, Refusal, LimitOwner): `default-features = false` drops
+# compute's `runtime` feature (its reporting modules, chrono's clock, dashmap, parking_lot), so the
+# pure core's graph never enables that surface (`boundary::compute_runtime_is_unreachable`).
+elohim-compute = { path = "../../elohim-compute", default-features = false }
 elohim-seam-contracts = { path = "../../../crates/seam-contracts" }
 serde = { workspace = true }
 serde_json = { workspace = true }
@@ -30,3 +33,20 @@ chrono = { workspace = true }
 thiserror = { workspace = true }
 sha2 = { workspace = true }
 hex = { workspace = true }
+# §2.F (task.rs): a task names its input as an eprfs `TreeView` and its method as an eprfs
+# `MethodDescriptor`, and is placed through placement-core's floor as a `PlacementKind`. Both are
+# pure L1 cores (no runtime, no I/O, no clock); rail R-A1 (`boundary::no_runtime_or_io_deps`) reads
+# their own `[dependencies]` too, one hop down, so a runtime arriving through either fails here.
+eprfs-core = { path = "../../eprfs/eprfs-core" }
+elohim-placement-core = { path = "../../placement/core" }
+
+[dev-dependencies]
+# The task contract suite (tests/task_contract.rs): placement-core's kind contract
+# (`kind::testing::assert_scope_is_derived`) and seam-contracts' arbitration harness.
+elohim-placement-core = { path = "../../placement/core", features = ["testing"] }
+elohim-seam-contracts = { path = "../../../crates/seam-contracts", features = ["harness"] }
+# The purity rails' manifest reader (`boundary` in src/lib.rs): rail R-A1 reads dependency tables
+# structurally, so a commented header or a single-quoted `package` rename cannot hide a denied
+# package (Codex review 2). Test-only, so it never reaches a consumer; `parse` alone is the reader,
+# and 0.25 is the version the workspace lock already carries (through proc-macro-crate).
+toml_edit = { version = "0.25", default-features = false, features = ["parse"] }

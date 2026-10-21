@@ -1,0 +1,21 @@
+# Invoked through the manifest gate runner (`just gate storage-client-ts`). Dependencies build
+# through package prebuild hooks; tests consume their built public exports without source aliases.
+gate:
+    #!/usr/bin/env bash
+    set -uo pipefail
+    pnpm run build
+    result=$?
+    echo EXIT=$result
+    [ "$result" -eq 0 ] || exit "$result"
+    pnpm run typecheck
+    result=$?
+    echo EXIT=$result
+    [ "$result" -eq 0 ] || exit "$result"
+    pnpm run test
+    result=$?
+    echo EXIT=$result
+    [ "$result" -eq 0 ] || exit "$result"
+    node --test tests/public-api.node.mjs
+    result=$?
+    echo EXIT=$result
+    exit "$result"
