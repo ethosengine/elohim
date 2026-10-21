@@ -8,6 +8,7 @@
   "exports": {
     ".": {
       "types": "./dist/index.d.ts",
+      "require": "./dist/index.cjs",
       "default": "./dist/index.js"
     },
     "./generated": {
@@ -44,7 +45,7 @@
   ],
   "scripts": {
     "prebuild": "pnpm --filter @elohim/eprfs build",
-    "build": "tsc",
+    "build": "tsc && node scripts/build-cjs.mjs",
     "typecheck": "tsc -p tsconfig.typecheck.json",
     "clean": "rm -rf dist",
     "prepublishOnly": "pnpm run clean && pnpm run build",
@@ -74,7 +75,8 @@
     "ts-morph": "^21.0.0",
     "@typescript-eslint/parser": "^8.50.1",
     "tsx": "^4.7.0",
-    "vitest": "^3.2.6"
+    "vitest": "^3.2.6",
+    "esbuild": "0.28.1"
   },
   "engines": {
     "node": ">=18.0.0"
