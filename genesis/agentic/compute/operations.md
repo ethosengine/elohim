@@ -161,13 +161,16 @@ from renewing them while another task retains identical bytes.
 The optional packaging projection lives in
 `genesis/orchestrator/data/adam-compute-worker.json` and starts disabled. Enabling
 requires an immutable worker image digest and Adam's actual agent key. The
-node-local token comes from `localTokenSource`: `per-render` (today's dev-stakes
-setting) mints a fresh value on each render and writes it into both containers;
+node-local token comes from `localTokenSource`: `storage` (the Adam declaration)
+reuses the pool sponsorship token already rendered into storage; `per-render`
+mints a fresh value on each render and writes it into both containers;
 `secret` (the renderer's default and the hardening target) reads an
 operator-provisioned `<Adam storage resource name>-compute-local` Secret with
-key `token`. The projection adds a sibling container to Adam's storage pod,
-with its own 2 CPU/4 GiB request, 8 CPU/8 GiB limit and separate 24 GiB PVC.
-It preserves storage/conductor allocations and mounts no service-account token.
+key `token`. The projection adds a sibling container to Adam's storage pod
+with a separate 24 GiB PVC.
+Its request and limit both equal `config.slice`: currently 8 CPU / 24 GiB for
+Adam's private mesh and one stage. It preserves storage/conductor allocations
+and mounts no service-account token.
 No task or runtime component knows this packaging exists. The image packaging
 script is `scripts/ci/build-compute-worker.sh`; its base must already contain
 Node and the compatible prebuilt sweettest runtime libraries. Enablement and

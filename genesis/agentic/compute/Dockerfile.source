@@ -38,6 +38,9 @@ ENV RUSTFLAGS="" RUSTC_WRAPPER="" CARGO_BUILD_JOBS=1 \
     CARGO_REGISTRIES_ELOHIM_TOKEN=anonymous
 WORKDIR /src
 COPY repo/ /src/
+RUN npm install --global --ignore-scripts --registry=https://registry.npmjs.org/ pnpm@10.30.3 \
+    && test "$(node -p 'require("./package.json").packageManager')" = "pnpm@10.30.3" \
+    && test "$(pnpm --version)" = 10.30.3
 RUN test "$(git rev-parse HEAD)" = "$SOURCE_COMMIT" \
     && test "$(git -C elohim/rakia rev-parse HEAD)" = "$RAKIA_COMMIT" \
     && test -z "$(git remote)" \
