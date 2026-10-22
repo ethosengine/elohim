@@ -6,17 +6,17 @@ Feature: Content-sync plane convergence
   CRDT document, and the libp2p sync engine gossips it to the other peers. If the plane
   stalls, two people on two peers read two different libraries and neither can tell.
 
-  These scenarios ask the peers themselves whether that is holding right now: is the plane
-  producing documents at all, does a real document carry committed changes, and does a
+  These scenarios ask the peers themselves what evidence they hold: has the plane
+  produced documents, does a real document carry committed changes, and does a
   second peer hold that same document at the same point in its change history.
 
   (Producer path, for the reader who needs to fix it: EventBus → project_content_doc →
   apply_changes writes each authored node under hAppId="elohim"; lit 2026-06-27.)
 
-  The author-then-converge variant is @wip until the dataplane test runner receives an
-  explicit operator write grant for POST /db/content (see a2o/CLAUDE.md "Authorized writes
-  on shared alpha"). Until then the live scenarios ask a peer which documents it holds
-  instead of naming one. A document id is scoped to the deployment that created it, so an
+  The author-then-propagate variant requires an owned test substrate where the operator
+  authorizes content writes. It must not write to shared alpha without an explicit write
+  grant. The read-only scenarios ask a peer which documents it holds instead of naming
+  one. A document id is scoped to the deployment that created it, so an
   id copied from one deployment simply does not exist in another — and "no such document"
   and "the producer is dead" answer the heads probe identically. Letting the peer name the
   document keeps the claim honest on whichever substrate the suite is pointed at.
@@ -32,19 +32,28 @@ Feature: Content-sync plane convergence
 
   @act:i
   Scenario: The sync plane has produced at least one document on alpha-A
-    # Confirms the content-projection producer is running and the sync table is non-empty.
+    # Confirms the sync table is non-empty; it does not prove the producer is running now.
     # A total >= 1 means at least one content node has been authored and projected into
-    # an Automerge document — the minimum evidence that the sync plane is live.
+    # an Automerge document — evidence of prior content production.
     Then /sync/v1/elohim/docs list on peer "alpha-A" has at least 1 document
 
   @act:i
   Scenario: A content node named by alpha-A has committed changes there
     # Diagnostic rung between "the table is non-empty" and "it reached the other peer":
-    # this exercises the PER-DOCUMENT heads surface, so a failure here indicts the
-    # producer on alpha-A and clears the gossip layer of suspicion. Non-empty heads mean
-    # that Automerge document has at least one committed change, not merely a row.
+    # this exercises the PER-DOCUMENT heads surface. Here "is present" requires a
+    # non-empty committed-head set, not merely a row. A failure identifies an unreadable
+    # or uncommitted source document; it does not by itself isolate the cause.
     When a content sync doc is selected from peer "alpha-A"
     Then the selected sync doc is present on peer "alpha-A"
+
+  @act:i @regression @sync-document-id-roundtrip @concern:dataplane-convergence
+  Scenario: A household reader can open a seeded document whose identifier contains spaces
+    # A document visible in the library must remain readable when a client encodes its URL.
+    # Read existing value-scanner seed content directly from storage; absent seeds or a
+    # missing direct-storage URL fail with a named prerequisite error, never a skipped pass.
+    Given storage peer "alpha-A" lists a seeded content sync doc with spaces and committed heads
+    When I read the selected sync doc through its encoded URL on storage peer "alpha-A"
+    Then the selected sync document and heads retain their listed identity on storage peer "alpha-A"
 
   @act:i
   Scenario: The same content doc has converged onto elohim.host
@@ -56,14 +65,10 @@ Feature: Content-sync plane convergence
     Then the selected sync doc has converged onto peer "elohim.host"
 
   @act:i @requires:owned-substrate
-  Scenario: Author a content node and confirm it converges on a second peer within 30 s
-    # Blocked: POST /db/content in API mode requires an explicit operator write grant.
-    # See a2o/CLAUDE.md "Authorized writes on shared alpha". Until the dataplane runner
-    # receives that grant, convergence is validated against documents the peers already
-    # hold (see the non-@wip scenarios above) rather than one this suite authored.
-    #
-    # When unblocked: create fixture content as Matthew, poll alpha-A /sync heads until
-    # present, then poll elohim.host to confirm cross-peer propagation within 30 s.
+  Scenario: Fresh content reaches a second peer during a 30 s destination observation window
+    # Runs only on an owned test substrate with operator-authorized fixture writes.
+    # This checks fresh production and propagation; equal-head convergence is a separate
+    # assertion in "The same content doc has converged onto elohim.host" above.
     #
     # Doorway "alpha" and peer "alpha-A" are the same deployment seen from two sides: a
     # human logs in at the DOORWAY (the gateway that fronts a storage peer), and the sync
@@ -75,7 +80,7 @@ Feature: Content-sync plane convergence
     And /sync doc matching the created content id is present on peer "elohim.host" within 30 s
 
   @wip @requires:shem @act:iii
-  Scenario: Cross-tenant content doc converges via shem relay within 60 s
+  Scenario: Cross-tenant content doc reaches a remote peer within 60 s
     # "shem" is the remote multi-tenant cluster — peers belonging to households OTHER than
     # the one alpha-A serves. Its P2P network is a separate island, so a document only
     # crosses when a relay peer bridges the two.

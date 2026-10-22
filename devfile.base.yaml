@@ -420,6 +420,15 @@ commands:
         # device's own fold indexes it and nothing tracked ever carries it.
         bash genesis/agentic/bin/device-memory-sync || true
 
+  - id: recover-authorized-shifts
+    exec:
+      component: tools
+      workingDir: /projects/elohim
+      commandLine: |
+        # Git's retained-worktree registry owns discovery. Recovery preserves original
+        # authority/deadlines and refuses stopped, expired, corrupt or legacy shifts.
+        python3 genesis/agentic/shift.py recover
+
   # On demand only: serving this device is an operator action, never workspace arrival.
   - id: peer-serve
     exec:
@@ -440,4 +449,5 @@ events:
     - setup-claude-mcp
     - setup-embed-model
     - setup-device-memory
+    - recover-authorized-shifts
  #   - setup-mempalace

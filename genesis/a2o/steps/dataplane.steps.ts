@@ -75,6 +75,7 @@ import {
   CATCHUP_RIDE_TIMEOUT_MS,
   CATCHUP_RIDE_STEP_TIMEOUT_MS,
   type ParsedMetrics,
+  type SyncDocEntry,
 } from '../src/framework/dataplane/surfaces.js';
 import { householdMeshDir } from '../src/framework/fixtures/household-mesh.js';
 import { E2EWorld } from '../src/framework/world.js';
@@ -107,6 +108,7 @@ interface SelectedSyncDoc {
   heads: string[];
 }
 const selectedSyncDoc = new WeakMap<E2EWorld, SelectedSyncDoc>();
+const encodedSyncReads = new WeakMap<E2EWorld, Record<string, unknown>[]>();
 
 /** Last generic surface query: surface path + parsed JSON body */
 interface SurfaceCapture {
@@ -730,7 +732,88 @@ When(
   }
 );
 
-/** Read back the document chosen by "a content sync doc is selected from peer". */
+/** Select an existing seed projection without writing through the route under test. */
+Given(
+  'storage peer {string} lists a seeded content sync doc with spaces and committed heads',
+  async function (this: E2EWorld, peerName: string) {
+    const url = resolveStorageUrl(peerName);
+    assert.ok(
+      url,
+      `SYNC-DOCUMENT-ID-STORAGE-MISSING: direct storage URL for ${peerName} is required`
+    );
+    // Read existing seed projections only. The seed's value-scanner IDs contain spaces;
+    // do not manufacture a document via the same HTTP route being tested.
+    // The list API's prefix selects the document namespace, not an arbitrary ID prefix.
+    const seedPrefix = 'node:scenario-value-scanner-';
+    const deadline = Date.now() + 20_000;
+    let scanned = 0;
+    for (let offset = 0; offset < 5000 && Date.now() < deadline; offset += 100) {
+      const response = await getRaw(
+        `${url}/sync/v1/elohim/docs?prefix=node&offset=${offset}&limit=100`,
+        { timeoutMs: Math.min(5000, deadline - Date.now()) }
+      );
+      assert.equal(response.status, 200, `sync seed list on ${peerName}: ${response.text}`);
+      const body = JSON.parse(response.text) as { documents: SyncDocEntry[]; total: number };
+      assert.ok(Array.isArray(body.documents), 'sync seed list must return documents');
+      scanned += body.documents.length;
+      const seeded = body.documents.find(
+        doc =>
+          doc.docId.startsWith(seedPrefix) &&
+          doc.docId.includes(' ') &&
+          Array.isArray(doc.heads) &&
+          doc.heads.length > 0
+      );
+      if (seeded) {
+        selectedSyncDoc.set(this, { peerName, docId: seeded.docId, heads: [...seeded.heads] });
+        return;
+      }
+      if (body.documents.length === 0 || offset + body.documents.length >= body.total) break;
+    }
+    assert.fail(
+      `SYNC-DOCUMENT-ID-SEED-MISSING: ${peerName} has no listed value-scanner seed document ` +
+        `with spaces and committed heads (${scanned} inspected); run the household content prologue`
+    );
+  }
+);
+
+When(
+  'I read the selected sync doc through its encoded URL on storage peer {string}',
+  async function (this: E2EWorld, peerName: string) {
+    const selected = requireSelectedSyncDoc(this);
+    const url = resolveStorageUrl(peerName);
+    assert.ok(
+      url,
+      `SYNC-DOCUMENT-ID-STORAGE-MISSING: direct storage URL for ${peerName} is required`
+    );
+    const path = `${url}/sync/v1/elohim/docs/${encodeURIComponent(selected.docId)}`;
+    const reads: Record<string, unknown>[] = [];
+    for (const suffix of ['', '/heads', '/changes']) {
+      const response = await getRaw(`${path}${suffix}`);
+      assert.equal(response.status, 200, `${selected.docId}${suffix}: ${response.text}`);
+      reads.push(JSON.parse(response.text) as Record<string, unknown>);
+    }
+    encodedSyncReads.set(this, reads);
+  }
+);
+
+Then(
+  'the selected sync document and heads retain their listed identity on storage peer {string}',
+  function (this: E2EWorld, peerName: string) {
+    const selected = requireSelectedSyncDoc(this);
+    assert.equal(selected.peerName, peerName, 'compare against the peer that listed the document');
+    const reads = encodedSyncReads.get(this);
+    assert.ok(reads?.length === 3, 'read the encoded document, heads, and changes first');
+    for (const body of reads) {
+      assert.equal(body['docId'], selected.docId, 'encoding must preserve the listed logical ID');
+      const heads = body['heads'] ?? body['newHeads'];
+      assert.ok(Array.isArray(heads) && heads.every(head => typeof head === 'string'));
+      assert.ok(sameHeadSet(heads, selected.heads), 'heads must match the seed listing');
+    }
+    assert.ok(Array.isArray(reads[2]['changes']) && reads[2]['changes'].length > 0);
+  }
+);
+
+/** Read back the document chosen by the sync-document selection steps. */
 function requireSelectedSyncDoc(world: E2EWorld): SelectedSyncDoc {
   const selected = selectedSyncDoc.get(world);
   assert.ok(

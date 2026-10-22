@@ -1,0 +1,146 @@
+{
+  "id": "replace-with-task-id",
+  "mode": "delivery",
+  "worktree": "/absolute/retained/worktree",
+  "landing_worktree": "/absolute/dev/checkout",
+  "objective_path": ".claude/shifts/replace-with-task-id/objective-input.yaml",
+  "started_at": "2026-10-22T01:01:35Z",
+  "deadline": "2026-10-23T17:01:35Z",
+  "intent": "replace-with-native-intent-cid",
+  "commitment": "replace-with-native-commitment-cid",
+  "scope_cid": "preserve-the-intents-existing-scope-cid",
+  "habit": "dataplane-convergence",
+  "authority": {
+    "path": ".claude/shifts/replace-with-task-id/authorization.json",
+    "revocation": ".claude/shifts/replace-with-task-id/revocation.json"
+  },
+  "ark": "/absolute/pool/slot/debug/ark",
+  "measurement_resource": "cargo",
+  "input_files": [
+    ".claude/shifts/replace-with-task-id/measure.py",
+    ".claude/shifts/replace-with-task-id/run-household-oracle.py",
+    ".claude/shifts/replace-with-task-id/inspect-ci.py",
+    ".claude/shifts/replace-with-task-id/await-acceptance.py"
+  ],
+  "allowed_tools": [
+    "Read",
+    "Edit",
+    "Write",
+    "Bash(pwd)",
+    "Bash(rg *)",
+    "Bash(git diff*)"
+  ],
+  "workload_env": { "MESH_DIR": "/absolute/retained/household" },
+  "verification": [
+    "agentic-shift",
+    "elohim-storage",
+    "genesis-a2o",
+    "orchestrator"
+  ],
+  "downstream": ["replace-with-required-pipeline"],
+  "steps": [
+    {
+      "id": "implement",
+      "kind": "agent",
+      "prompt": "Implement the frozen task using its measured failure; preserve scope and existing flow references."
+    },
+    {
+      "id": "commit",
+      "kind": "commit",
+      "message": "fix: replace with bounded task description"
+    },
+    { "id": "launcher-gate", "kind": "gate", "project": "agentic-shift" },
+    {
+      "id": "storage-gate",
+      "kind": "gate",
+      "project": "elohim-storage",
+      "resource": "cargo"
+    },
+    { "id": "a2o-gate", "kind": "gate", "project": "genesis-a2o" },
+    { "id": "orchestration-gate", "kind": "gate", "project": "orchestrator" },
+    {
+      "id": "measure-one",
+      "kind": "measure",
+      "objective": true,
+      "readonly": true,
+      "resource": "cargo"
+    },
+    {
+      "id": "measure-two",
+      "kind": "measure",
+      "objective": true,
+      "readonly": true,
+      "resource": "cargo"
+    },
+    {
+      "id": "build-storage",
+      "kind": "measure",
+      "argv": ["just", "mesh", "build", "storage"],
+      "artifact": "/absolute/pool/mesh-bin/elohim-storage",
+      "resource": "cargo"
+    },
+    {
+      "id": "restart-storage",
+      "kind": "lifecycle",
+      "argv": ["just", "mesh", "storage-restart", "matthew"],
+      "resource": "mesh"
+    },
+    {
+      "id": "household",
+      "kind": "household",
+      "argv": [
+        "python3",
+        ".claude/shifts/replace-with-task-id/run-household-oracle.py"
+      ],
+      "oracle": "just test mesh '@sync-document-id-roundtrip'",
+      "proof": ".claude/shifts/replace-with-task-id/household-proof.json",
+      "binary": {
+        "build_operation": "build-storage",
+        "pid_file": "/absolute/retained/household/pids/storage-matthew"
+      },
+      "resource": "mesh"
+    },
+    {
+      "id": "record-delivery",
+      "kind": "agent",
+      "prompt": "Write the immutable implementation report at the declared original-report.md path. Include the exact revision and evidence. Do not fulfill or self-accept; the host records fulfillment and an independent appointed seat accepts."
+    },
+    {
+      "id": "fulfill",
+      "kind": "native",
+      "commit_revision": true,
+      "argv": [
+        "epr",
+        "flow",
+        "fulfill",
+        "--on",
+        "replace-with-native-commitment-cid",
+        "--report",
+        ".claude/shifts/replace-with-task-id/original-report.md",
+        "--status",
+        "DONE",
+        "--as",
+        "replace-with-claimed-implementer",
+        "--session",
+        "replace-with-task-id"
+      ]
+    },
+    {
+      "id": "await-acceptance",
+      "kind": "measure",
+      "readonly": true,
+      "argv": [
+        "python3",
+        ".claude/shifts/replace-with-task-id/await-acceptance.py"
+      ]
+    },
+    { "id": "land", "kind": "land" },
+    { "id": "push", "kind": "push" },
+    {
+      "id": "inspect-ci",
+      "kind": "ci",
+      "argv": ["python3", ".claude/shifts/replace-with-task-id/inspect-ci.py"],
+      "proof": ".claude/shifts/replace-with-task-id/ci-proof.json"
+    }
+  ]
+}

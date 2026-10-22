@@ -217,3 +217,15 @@ so a workspace inits itself. No new verb. Coupled context synced: root `CLAUDE.m
 workspace work; the `hc-dev-orchestrator` skill is a package projection and is updated through its package (not
 touched here). Spec: `elohim/lvi/docs/specs/2026-10-10-workspace-arrival-as-declared-device.md`; habit
 `workspace-device-arrival`.
+
+## 2026-10-22 shared delivery shift surface
+
+Added `just dev shift start|resume|status|stop|recover` under the existing `dev`
+verb, backed by `genesis/agentic/shift.py`. No new npm-script family. The
+`agentic-shift` manifest gate selects objective validation, real namespace/ark
+recovery tests, and berth delegation checks. Root gospel, hc-dev-orchestrator,
+agentic-developer and `/shift` remain package-authoritative and are projected
+together. Startup recovery scans retained Git worktrees; adoption by an existing
+Che workspace still requires its normal configuration update.
+
+The seed verb accepts an optional final logical ID: `just seed apply mesh content '' '<logical-id>'`. It selects existing `--ids` plus `--content-only` behavior for a bounded prerequisite; omitted targeting preserves the existing seed command. Set `SKIP_BLOB_SYNC=true` when the prerequisite must also omit global blob sync.

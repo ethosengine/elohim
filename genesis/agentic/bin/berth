@@ -1765,6 +1765,19 @@ def main(argv):
     """Exit 4 when this invocation cannot open its store — e.g. the stage runner's guest (UID 65534,
     BERTH_DIR stripped) meeting the host's root-owned berth.lock: the lane proceeds unleased and says
     so, rather than dying with a traceback the wrapper would propagate."""
+    if any(name in os.environ for name in ('ELOHIM_SHIFT_BERTH_ADDRESS', 'ELOHIM_SHIFT_BERTH_TOKEN')):
+        # A contained shift cannot interpret host PID incarnations through its
+        # private /proc. Only its authenticated host guardian may inspect leases.
+        sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.realpath(__file__))))
+        try:
+            from shift_lease import proxy_request
+            result = proxy_request(list(argv[1:]))
+        except (ImportError, OSError, ValueError, TypeError) as error:
+            print(f"berth: shift lease REFUSED — proxy unavailable: {error}", file=sys.stderr)
+            return 3
+        sys.stdout.write(result['stdout'])
+        sys.stderr.write(result['stderr'])
+        return result['exit']
     store = store_dir()
     try:
         return _main(argv)
