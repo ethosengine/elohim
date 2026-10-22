@@ -1,5 +1,5 @@
 {
-  "sourceCommit": "6b06b6c6bf1c9818287e0e259c1d5ee50ba38929",
+  "sourceCommit": "b8d1f8295a52654ca965b3c70b15e528b49586ad",
   "storage": "harbor.ethosengine.com/ethosengine/elohim-storage@sha256:ca2a0959e28f79e18aa5456e9a4e9ffeb3f3b60f7125db4f6eb62c083c43a2a1",
   "doorway": "harbor.ethosengine.com/ethosengine/elohim-doorway@sha256:a0f455bae90487954a9372325db67b6ab954d731d7acf4e29a7f0e7f8ed16515",
   "relay": "harbor.ethosengine.com/ethosengine/iroh-relay@sha256:6a4ac201568f1500ae68f3f7437e1b614d6c7ca05b255832b0fe2c1d5a0ae717",
