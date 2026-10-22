@@ -1,5 +1,6 @@
 // CI-only read wrapper: bind a bootstrap receipt to the current reviewed grant window.
 import assert from "node:assert/strict";
+import { withClusterTransport } from "./runner-cluster-transport.mjs";
 import { execFileSync } from "node:child_process";
 import {
   readFileSync,
@@ -339,44 +340,70 @@ if (
   process.argv[1] &&
   import.meta.url === pathToFileURL(resolve(process.argv[1])).href
 ) {
-  try {
-    const [workload, namespace, output, extra] = process.argv.slice(2);
-    assert(!extra);
-    captureActivation({
-      root: resolve(process.env.WORKSPACE || "."),
-      workload,
-      namespace,
-      output,
-    });
-    console.log(
-      "compute worker receipt: READY; current declaration window verified, native status checked separately",
-    );
-  } catch (error) {
+  const [workload, namespace, output = "compute-worker-evidence", extra] =
+    process.argv.slice(2);
+  assert(
+    !extra &&
+      /^[a-z0-9][a-z0-9-]*$/.test(workload) &&
+      /^[a-z0-9][a-z0-9-]*$/.test(namespace),
+  );
+  const evidenceDirectory = resolve(
+    process.env.WORKSPACE || ".",
+    output,
+    `${namespace}--${workload}`,
+  );
+  for (const name of ["activation.json", "status.txt"])
+    rmSync(join(evidenceDirectory, name), { force: true });
+  await withClusterTransport(async (env) => {
     try {
-      const [workload, namespace] = process.argv.slice(2);
-      const diagnosticDirectory = captureDiagnostics({
-        root: resolve(process.env.WORKSPACE || "."),
+      captureActivation({
+        root: resolve(env.WORKSPACE || "."),
+        env,
         workload,
         namespace,
-        reason: error.activationReason,
+        output,
       });
-      for (const name of [
-        "status.txt",
-        "state.txt",
-        "current.log",
-        "previous.log",
-        "mesh-startup.log",
-      ]) {
-        console.error(
-          `compute worker diagnostic ${name}:\n${readFileSync(join(diagnosticDirectory, name), "utf8")}`,
-        );
+      console.log(
+        "compute worker receipt: READY; current declaration window verified, native status checked separately",
+      );
+    } catch (error) {
+      try {
+        const diagnosticDirectory = captureDiagnostics({
+          root: resolve(env.WORKSPACE || "."),
+          env,
+          workload,
+          namespace,
+          reason: error.activationReason,
+        });
+        for (const name of [
+          "status.txt",
+          "state.txt",
+          "current.log",
+          "previous.log",
+          "mesh-startup.log",
+        ]) {
+          console.error(
+            `compute worker diagnostic ${name}:\n${readFileSync(join(diagnosticDirectory, name), "utf8")}`,
+          );
+        }
+      } catch {
+        /* Diagnostic failure never replaces the original refusal. */
       }
-    } catch {
-      /* Diagnostic failure never replaces the original refusal. */
+      console.error(
+        "REFUSED compute worker activation: declaration window or incarnation unproven",
+      );
+      process.exitCode = 1;
     }
+  }).catch(() => {
+    mkdirSync(evidenceDirectory, { recursive: true, mode: 0o755 });
+    writeFileSync(
+      join(evidenceDirectory, "status.txt"),
+      "REFUSED: projected-cluster-transport-unavailable\n",
+      { mode: 0o644 },
+    );
     console.error(
-      "REFUSED compute worker activation: declaration window or incarnation unproven",
+      "REFUSED compute worker activation: projected cluster transport unavailable",
     );
     process.exitCode = 1;
-  }
+  });
 }

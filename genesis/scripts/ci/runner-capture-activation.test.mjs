@@ -137,6 +137,7 @@ for (const mode of [
     chmodSync(statusFile, 0o600);
     let reads = 0;
     const execute = (cmd, args, options) => {
+      assert.equal(options.env.KUBECONFIG, "/private/selected-context");
       if (cmd === "kubectl" && args.at(-1) === "name") {
         assert.equal(options.timeout, 20000);
         if (mode === "transport-failure")
@@ -179,6 +180,7 @@ for (const mode of [
         root,
         workload: "adam",
         namespace: "ns",
+        env: { KUBECONFIG: "/private/selected-context" },
         execute,
         now: () =>
           mode === "late-expiry" && reads++ > 0
@@ -300,5 +302,40 @@ test("diagnostic read failure retains redacted stderr without greening activatio
   assert.equal(
     content,
     "diagnostic read unavailable (exit 1)\nForbidden request [REDACTED]",
+  );
+});
+
+test("CLI transport refusal removes stale activation and READY before any cluster command", (t) => {
+  const root = mkdtempSync(join(tmpdir(), "capture-transport-refusal-"));
+  t.after(() => rmSync(root, { recursive: true, force: true }));
+  const directory = join(
+    root,
+    "compute-worker-evidence/elohim-alpha--elohim-adam-alpha",
+  );
+  mkdirSync(directory, { recursive: true });
+  writeFileSync(join(directory, "activation.json"), '{"state":"active"}');
+  writeFileSync(join(directory, "status.txt"), "READY");
+  assert.throws(() =>
+    execFileSync(
+      process.execPath,
+      [
+        new URL("./runner-capture-activation.mjs", import.meta.url).pathname,
+        "elohim-adam-alpha",
+        "elohim-alpha",
+      ],
+      {
+        env: {
+          ...process.env,
+          WORKSPACE: root,
+          KUBECONFIG: join(root, "missing-explicit-config"),
+        },
+        stdio: "pipe",
+      },
+    ),
+  );
+  assert(!existsSync(join(directory, "activation.json")));
+  assert.match(
+    readFileSync(join(directory, "status.txt"), "utf8"),
+    /^REFUSED:/,
   );
 });
