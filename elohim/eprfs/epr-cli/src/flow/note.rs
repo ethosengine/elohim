@@ -312,10 +312,6 @@ fn resolve_closes(kind: NoteKind, closes: Option<&str>) -> FlowResult<Option<Str
 /// tag, subject, `reason:`, optional `switched-to:`, optional `verdict:`, optional `steward:`
 /// LAST. The order is ADDITIVE — a note that carries no verdict emits the same vector it always
 /// did, which is what keeps every existing note's content address where it is.
-#[allow(
-    clippy::too_many_arguments,
-    reason = "The positional persisted note slots are assembled in one function to preserve their ordering"
-)]
 fn note_slots(
     kind: NoteKind,
     subject: &str,
