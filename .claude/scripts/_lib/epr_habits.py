@@ -172,6 +172,17 @@ def validate(habit: dict, label: str) -> list[str]:
         errs.append(f"{label}: `checks` must be a non-empty list of runnable checks (a habit is "
                     f"bound to evidence, never to intention) — or `status: unwired`, which is the "
                     f"honest declaration that no check exists yet")
+    rea = habit.get("rea")
+    if rea is not None:
+        # The habit's composition of the REA primitives (spec 2026-10-22-habit-progress-scalar).
+        # The native evaluator reads it; this census only guards what would escape into routing:
+        # ci-harvest routes a habit by EVERY `@concern:` tag anywhere in its projected block, so a
+        # tag written inside `rea:` would mint a route no check declared.
+        if not isinstance(rea, dict):
+            errs.append(f"{label}: `rea` must be a mapping (composition, budget, parts)")
+        elif "@concern:" in str(rea):
+            errs.append(f"{label}: `rea` may not carry an `@concern:` tag — a part names its "
+                        f"concern by `part:`; the tag belongs in `checks`, where routing reads it")
     rw = habit.get("retire-when")
     if not isinstance(rw, str) or not rw.strip():
         errs.append(f"{label}: missing `retire-when` — an exit condition, not a date. A habit "

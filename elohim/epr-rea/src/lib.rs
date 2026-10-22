@@ -71,6 +71,7 @@ pub mod fold;
 pub mod index;
 pub mod model;
 pub mod participants;
+pub mod progress;
 pub mod scope;
 #[cfg(feature = "sidecar")]
 mod sidecar;
@@ -94,7 +95,7 @@ pub use external::{
     Disclosure, ExternalClaim, Externalities, HeldCapability, Inflow, OfferDeclaration,
     OfferDocument, RecipePin, SignatureStatus, Terms,
 };
-pub use fold::{fulfillment, resource_state, FulfillmentStatus, ResourceState};
+pub use fold::{fulfillment, level_evidence, resource_state, FulfillmentStatus, ResourceState};
 pub use index::{
     ArcRange, FoldAttestation, FoldState, IndexError, IndexMeasure, ModelPin, RankingMethod,
     ReachBound, Retention, ShardManifest, SurfaceRule, VectorMetric, PRIVATE_CHAIN_KINDS,
@@ -111,10 +112,11 @@ pub use participants::{
 };
 #[cfg(feature = "sidecar")]
 pub use participants::{RosterTransaction, SidecarRoster};
+pub use progress::{compose, recurring_return, Composed, Part, ProgressError};
 pub use scope::{Containers, Scopes};
 pub use stock::{
-    respite_response, stock_over_window, stock_over_window_within, Stock, StockError, Window,
-    Within,
+    coverage_time, respite_response, stock_over_window, stock_over_window_within, Stock,
+    StockError, Window, Within,
 };
 #[cfg(feature = "sidecar")]
 pub use store::SidecarFlowStore;

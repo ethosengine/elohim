@@ -557,6 +557,33 @@ pub enum ClaimKind {
     Imputed,
 }
 
+impl ClaimKind {
+    /// Strength rank, strongest first (`Witnessed` = 0 … `Imputed` = 4). Injective over the five
+    /// kinds, so no two distinct claims tie and a min over ranks is order-independent.
+    ///
+    /// One definition: every fold that reduces claims — a stock's net change and quotients, the
+    /// uncertainty fold, a progress reading's recurrence — ranks with this rather than its own
+    /// copy, so a sixth kind cannot be ranked one way in one fold and another in the next.
+    pub const fn rank(self) -> u8 {
+        match self {
+            ClaimKind::Witnessed => 0,
+            ClaimKind::InstrumentMeasured => 1,
+            ClaimKind::Estimated => 2,
+            ClaimKind::Modelled => 3,
+            ClaimKind::Imputed => 4,
+        }
+    }
+
+    /// The weaker of two claims — what a quantity derived from both may honestly assert.
+    pub const fn weaker(self, other: ClaimKind) -> ClaimKind {
+        if self.rank() >= other.rank() {
+            self
+        } else {
+            other
+        }
+    }
+}
+
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct Confidence {
     pub claim: ClaimKind,

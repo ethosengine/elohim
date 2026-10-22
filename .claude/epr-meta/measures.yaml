@@ -1485,6 +1485,65 @@ measures:
     env-sensitivity: [measure, class]
     default-authority: observation
     established_by: sense-organ-2026-10-22
+  # ── The habit plane (spec genesis/docs/superpowers/specs/2026-10-22-habit-progress-scalar-design.md).
+  # Derived middot (§6 of the middot spec): each composes other readings with its own record, unit and
+  # recompute path, and each renders its parts beside it — never an unlabeled sum.
+  - id: habit-progress
+    version: 1
+    family: habit
+    unit: fraction-of-green
+    procedure: >
+      epr flow stocks --window START..END --per week --stock red-mass --json → stocks[].habits.rows[].state.composed —
+      each habit's declared parts (its @concern checks plus its atom's `rea.parts`) read in their own shape
+      (passed/declared, a gauge from baseline to target, pass/fail) and composed by the habit's declared
+      `rea.composition` (sum = equal shares, min, harmonic). `floor` counts unmeasured parts as not yet moved;
+      `overMeasured` + measured/declared is the coverage beside it.
+    provenance: "marathon retrospective 2026-10-18 §5.1 — 15→14 green and 0 of 0 while reds moved 1/4→3/4"
+    default-authority: observation
+    status: active
+    env-sensitivity: []
+    established_by: habit-progress-scalar-20261022
+    why: >
+      A red habit three-quarters of the way to green and a red habit nobody touched read the same, so a sprint
+      that moved five reds most of the way read as a sprint that did nothing. Status stays human-owned; this is
+      the grain under it.
+
+  - id: red-mass
+    version: 1
+    family: habit
+    unit: habit-equivalent
+    procedure: >
+      epr flow stocks --window START..END --per week --stock red-mass — a stock folded from the habit atoms'
+      first-parent history (committer dates, clamped non-decreasing): Produce on birth red, flip red, regression
+      and rescope up; Consume on progress, flip green and retirement. Level = Σ over non-green habits of
+      (1 − progress floor); DRAINING when outflow ≥ inflow over the window.
+    provenance: "marathon retrospective 2026-10-18 §9 — 'one or two reds moved with proof … and a ratio that does not get worse'"
+    default-authority: observation
+    status: active
+    env-sensitivity: []
+    established_by: habit-progress-scalar-20261022
+    why: >
+      The register's own unit for the retro's ratio line: discovery (new reds, regressions) against discharge
+      (progress, flips), read per window and re-derivable from git by anyone.
+
+  - id: habit-hours
+    version: 1
+    family: habit
+    unit: hours
+    procedure: >
+      epr flow habit spend --habit <id> --hours <h> --meter pipeline|gate|session|other --evidence <ref> appends one
+      Consume of the time resource scoped to the habit; epr flow stocks --stock red-mass reads hours spent per
+      window and per open episode (judged against the episode's declared `rea.budget` Bound), hours per week
+      returned by recurring time gauges (`unit` + `per_week`), and payback = spent ÷ returned (coverage_time).
+    provenance: "operator 2026-10-22 — wall clock is a cost, savings in relation to the habit; REA should support time-banking"
+    default-authority: observation
+    status: active
+    env-sensitivity: []
+    established_by: habit-progress-scalar-20261022
+    why: >
+      Performance wins (a 43 s wait cut to 10 s, forty times a week) return time every week whether or not the
+      habit is green yet. Witness, don't pay: an account of hours, never a credit. Session time is estimated —
+      advisory forever; pipeline and gate meters are instrument readings by the spender's claim.
 
 lenses:
   - id: resource-limit-raise-recurrence

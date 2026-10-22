@@ -718,6 +718,12 @@ pub enum StockName {
     /// inflow and no outflow to compare, and the question it answers is not "is the drain
     /// adequate" but "is the level admissible" — which is what a bound is for.
     ActiveHabits,
+    /// The register's red mass: every non-green habit's distance from green, in habit-equivalents
+    /// (spec `2026-10-22-habit-progress-scalar-design`). A FOLDED stock like `commitments` — its
+    /// events are derived from the habit atoms' first-parent history — so it has real inflow
+    /// (regressions, new reds, rescopes up) and real outflow (progress, flips, retirements), and the
+    /// same `DRAINING`/`FILLING` verdict reads the register in its own unit.
+    RedMass,
 }
 
 impl StockName {
@@ -725,8 +731,9 @@ impl StockName {
         match raw.trim() {
             "commitments" => Ok(StockName::Commitments),
             "active-habits" => Ok(StockName::ActiveHabits),
+            "red-mass" => Ok(StockName::RedMass),
             other => Err(FlowError::InvalidArguments(format!(
-                "unknown stock `{other}` — the set is: commitments|active-habits"
+                "unknown stock `{other}` — the set is: commitments|active-habits|red-mass"
             ))),
         }
     }
@@ -735,6 +742,7 @@ impl StockName {
         match self {
             StockName::Commitments => "commitments",
             StockName::ActiveHabits => "active-habits",
+            StockName::RedMass => "red-mass",
         }
     }
 
@@ -742,6 +750,7 @@ impl StockName {
         match self {
             StockName::Commitments => COMMITMENT_UNIT,
             StockName::ActiveHabits => WIP_FENCE_UNIT,
+            StockName::RedMass => super::habits::RED_MASS_UNIT,
         }
     }
 }
@@ -801,6 +810,10 @@ pub struct StockReport {
     /// emitted before bounded stocks existed.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub bound: Option<BoundReading>,
+    /// Per-habit progress, cost and return behind the red-mass stock. `None` for every other
+    /// stock, and skipped on the wire so their payloads are byte-identical to before.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub habits: Option<super::habits::HabitsReading>,
 }
 
 /// A level read from a register, and the band it was judged in.
@@ -846,7 +859,9 @@ impl StocksOutcome {
             println!("  stock: {} (unit \"{}\")", stock.stock, stock.unit);
             match &stock.measures {
                 Some(m) => {
-                    println!("    level:    {:.0} {}", m.level, stock.unit);
+                    // A count of commitments is whole; a red mass is a sum of fractions.
+                    let places = if stock.habits.is_some() { 2 } else { 0 };
+                    println!("    level:    {:.places$} {}", m.level, stock.unit);
                     println!("    inflow:   {:.3} per {}", m.inflow, self.window.per);
                     println!("    outflow:  {:.3} per {}", m.outflow, self.window.per);
                     match m.net {
@@ -872,10 +887,12 @@ impl StocksOutcome {
                         "    observed in window: {} · excluded by unit: {}",
                         stock.observed_in_window, stock.excluded_by_unit
                     );
-                    println!(
-                        "    outflow arm: fulfillment only — Dismiss is a regression marker \
-                         (empty `fulfills`) and no path mints a Revoked commitment"
-                    );
+                    if stock.stock == StockName::Commitments.label() {
+                        println!(
+                            "    outflow arm: fulfillment only — Dismiss is a regression marker \
+                             (empty `fulfills`) and no path mints a Revoked commitment"
+                        );
+                    }
                 }
                 None => {
                     println!("    verdict:  {}", stock.verdict.word());
@@ -911,6 +928,9 @@ impl StocksOutcome {
                 }
                 println!("    bound:    {}", bound.bound_ref);
                 println!("    basis:    {}", bound.level_basis);
+            }
+            if let Some(habits) = &stock.habits {
+                habits.render();
             }
         }
         println!("  {}", self.equilibrium_line());
@@ -1001,6 +1021,7 @@ pub fn stocks(root: &Path, window: &Window, names: &[StockName]) -> FlowResult<S
             // Not folded. Its level is read, and the window is irrelevant to it — which the
             // reading says out loud rather than leaving a reader to infer from a missing rate.
             StockName::ActiveHabits => active_habits_report(root, &records),
+            StockName::RedMass => red_mass_report(root, &records, window),
         };
         reports.push(report);
     }
@@ -1044,6 +1065,7 @@ fn active_habits_report(root: &Path, records: &[(Cid, FlowRecord)]) -> StockRepo
         discharges_of_unheld: 0,
         redundant_discharges: 0,
         bound: None,
+        habits: None,
     };
 
     let habits = match super::registers::read_habits(root) {
@@ -1130,6 +1152,96 @@ fn active_habits_report(root: &Path, records: &[(Cid, FlowRecord)]) -> StockRepo
                 super::registers::HABITS_REGISTER_REL
             ),
         }),
+        habits: None,
+    }
+}
+
+/// The register's red mass over `window`: the habit events folded as one stock, with the
+/// per-habit reading (progress, hours spent, hours returned, payback) beside it.
+///
+/// The events are derived from git on every read rather than from the sidecar, so the reading is
+/// never staler than the tree: `epr flow project` appends the same records for the ledger, and
+/// both derive them by one function. Each habit's events are against its own resource (the habit
+/// IS the resource; red mass is its state); the register's stock re-addresses them to one
+/// synthetic resource in memory, the same move the commitments stock makes.
+///
+/// `observed_in_window` counts EVENTS admitted, not quantity — a 0.0625 drain is one movement,
+/// and rounding a quantity into a count is how a real drain reads as `REFUSED`.
+fn red_mass_report(root: &Path, records: &[(Cid, FlowRecord)], window: &Window) -> StockReport {
+    let name = StockName::RedMass;
+    let refused = |kind: &'static str, error: String| StockReport {
+        stock: name.label().to_string(),
+        unit: name.unit().to_string(),
+        verdict: EquilibriumVerdict::Refused {
+            reason: RefusalReason::FoldRefused { kind, error },
+        },
+        measures: None,
+        observed_in_window: 0,
+        excluded_by_unit: 0,
+        undated_mints: 0,
+        undated_discharges: 0,
+        discharges_of_unheld: 0,
+        redundant_discharges: 0,
+        bound: None,
+        habits: None,
+    };
+    let history = match super::habits::walk_history(root) {
+        Ok(history) => history,
+        Err(error) => {
+            return refused(
+                "history-unreadable",
+                format!("{error} — an unreadable history is not a register with no red mass"),
+            )
+        }
+    };
+    let (register, reading) = match (
+        super::habits::register_resource(),
+        super::habits::reading(&history, records, window),
+    ) {
+        (Ok(register), Ok(reading)) => (register, reading),
+        (Err(error), _) | (_, Err(error)) => return refused("habit-reading", error.to_string()),
+    };
+    let unit = name.unit();
+    let events: Vec<FlowEvent> = history
+        .events
+        .iter()
+        .filter(|e| matches!(&e.quantity, Magnitude::Count { unit: u, .. } if u == unit))
+        .map(|e| FlowEvent {
+            resource: register,
+            ..e.clone()
+        })
+        .collect();
+    let observed_in_window = events
+        .iter()
+        .filter(|e| window.contains(&e.occurred_at))
+        .count();
+    let folded = stock_over_window_within(&register, Within::Anywhere, &events, window, unit);
+    let verdict = equilibrium_verdict(&folded, observed_in_window);
+    let measures = folded.ok().map(|stock| StockMeasures {
+        level: stock.level.value,
+        inflow: stock.inflow.value,
+        outflow: stock.outflow.value,
+        net: stock.net_change().ok().map(|q| q.value),
+        level_basis: stock.level.confidence.basis.clone(),
+        inflow_basis: stock.inflow.confidence.basis.clone(),
+        outflow_basis: stock.outflow.confidence.basis.clone(),
+        // A red mass has no "turnover": it is a distance from green, not a store that cycles.
+        turnover_time: None,
+        turnover_basis: None,
+    });
+    StockReport {
+        stock: name.label().to_string(),
+        unit: unit.to_string(),
+        verdict,
+        measures,
+        observed_in_window,
+        excluded_by_unit: 0,
+        undated_mints: 0,
+        undated_discharges: 0,
+        discharges_of_unheld: 0,
+        redundant_discharges: 0,
+        bound: None,
+        habits: Some(reading),
     }
 }
 
@@ -1200,6 +1312,7 @@ pub fn report(name: StockName, view: &DerivedView, window: &Window, unit: &str) 
         redundant_discharges: view.redundant_discharges,
         // A folded stock is judged by its rates, not by a declared ceiling.
         bound: None,
+        habits: None,
     }
 }
 

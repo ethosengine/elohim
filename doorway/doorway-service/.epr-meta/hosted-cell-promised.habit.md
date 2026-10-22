@@ -18,6 +18,17 @@ refs:
   - "doorway/doorway-service/src/routes/hosted_cell.rs · elohim/elohim-storage/src/api/compute_grants.rs · elohim/elohim-storage/src/services/commitment_read_fallback.rs"
   - "genesis/data/timeline/backlog/arch-scale-risk-backlog.md row 7 (786 MB conductor heap per hosted human)"
   - "genesis/data/timeline/backlog/doorway-hosted-cell-grant-minted-before-row-insert-2026-09-11.md · commitment-read-fallback-created-at-is-projection-time-2026-09-11.md"
+rea:
+  composition: sum
+  parts:
+    - part: hosted-compute-contracted
+      reading: 0/3
+      at: 2026-10-18
+      evidence: sprint-report-household-20261018T114946Z-80db9208 (every registration refused at conductor capacity 17/14; DELTA 2026-10-18)
+    - part: humans-served
+      reading: 0/4
+      at: 2026-10-18
+      evidence: sprint-report-household-20261018T114956Z-80db9208 (humansServed=14 vs 3 live promises; DELTA 2026-10-18)
 retire-when: >
   when hosted provisioning is itself a substrate act — the pool peer mints the promise as part
   of installing the cell and the doorway only relays it — so a hosted cell without a notarized

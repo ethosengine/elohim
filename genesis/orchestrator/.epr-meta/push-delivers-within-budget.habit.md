@@ -20,6 +20,21 @@ refs:
   - "genesis/data/timeline/backlog/ci-edge-a2o-steps-glob-redeploys-fleet.md (no-op fleet rolls)"
   - "genesis/data/timeline/backlog/fleet-standing-celldisabled-one-third-party-cell.md (why every roll costs hours)"
   - "genesis/data/timeline/backlog/upgrade-propagation-p2p-design-arc.md (change-class delivery vehicles)"
+rea:
+  composition: sum
+  parts:
+    - part: push-delivers-within-budget
+      reading: 4/4
+      at: 2026-10-18
+      evidence: cucumber-mesh-20261018T133316Z-6e260987 (household, 50/50 steps; DELTA 2026-10-18)
+    - part: delivery-series
+    - part: budget-arithmetic
+      reading: pass
+      at: 2026-10-16
+      evidence: node --test genesis/orchestrator/pipeline-budget.test.mjs pass 1 exit 0 at origin/dev@42941449e (DELTA 2026-10-16)
+    - part: measurement-liveness
+    - part: no-op-rolls
+    - part: ledger
 retire-when: >
   upgrades propagate peer to peer by change class without a CI fleet roll, so a push's delivery
   no longer waits on a serial pipeline chain. The orchestrator then only builds and publishes,

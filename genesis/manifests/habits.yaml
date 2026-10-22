@@ -300,6 +300,17 @@ habits:
     refs:
       - "genesis/data/timeline/backlog/http-reach-enforcement-gap.md"
       - "memory: project_reach_enum_drift_reconciliation (3 vocabularies — unify, but not as a precondition for enforcement)"
+    rea:
+      composition: sum
+      parts:                      # the invariant's five egress planes; HTTP is the one wired today
+        - part: reach-enforced-http
+          reading: 3/3
+          at: 2026-10-18
+          evidence: sprint-report-household-20261018T114938Z-80db9208 (24/24 steps on dev 80db9208b; DELTA 2026-10-18)
+        - part: crdt-sync-plane
+        - part: shard-plane
+        - part: dht-plane
+        - part: doorway-plane
     retire-when: >
       when every egress plane derives authorization from one shared verifier it cannot bypass
       by construction — so a NEW plane is enforced the moment it exists, rather than after
@@ -1156,6 +1167,17 @@ habits:
       - "doorway/doorway-service/src/routes/hosted_cell.rs · elohim/elohim-storage/src/api/compute_grants.rs · elohim/elohim-storage/src/services/commitment_read_fallback.rs"
       - "genesis/data/timeline/backlog/arch-scale-risk-backlog.md row 7 (786 MB conductor heap per hosted human)"
       - "genesis/data/timeline/backlog/doorway-hosted-cell-grant-minted-before-row-insert-2026-09-11.md · commitment-read-fallback-created-at-is-projection-time-2026-09-11.md"
+    rea:
+      composition: sum
+      parts:
+        - part: hosted-compute-contracted
+          reading: 0/3
+          at: 2026-10-18
+          evidence: sprint-report-household-20261018T114946Z-80db9208 (every registration refused at conductor capacity 17/14; DELTA 2026-10-18)
+        - part: humans-served
+          reading: 0/4
+          at: 2026-10-18
+          evidence: sprint-report-household-20261018T114956Z-80db9208 (humansServed=14 vs 3 live promises; DELTA 2026-10-18)
     retire-when: >
       when hosted provisioning is itself a substrate act — the pool peer mints the promise as part
       of installing the cell and the doorway only relays it — so a hosted cell without a notarized
@@ -2305,6 +2327,21 @@ habits:
       - "genesis/data/timeline/backlog/ci-edge-a2o-steps-glob-redeploys-fleet.md (no-op fleet rolls)"
       - "genesis/data/timeline/backlog/fleet-standing-celldisabled-one-third-party-cell.md (why every roll costs hours)"
       - "genesis/data/timeline/backlog/upgrade-propagation-p2p-design-arc.md (change-class delivery vehicles)"
+    rea:
+      composition: sum
+      parts:
+        - part: push-delivers-within-budget
+          reading: 4/4
+          at: 2026-10-18
+          evidence: cucumber-mesh-20261018T133316Z-6e260987 (household, 50/50 steps; DELTA 2026-10-18)
+        - part: delivery-series
+        - part: budget-arithmetic
+          reading: pass
+          at: 2026-10-16
+          evidence: node --test genesis/orchestrator/pipeline-budget.test.mjs pass 1 exit 0 at origin/dev@42941449e (DELTA 2026-10-16)
+        - part: measurement-liveness
+        - part: no-op-rolls
+        - part: ledger
     retire-when: >
       upgrades propagate peer to peer by change class without a CI fleet roll, so a push's delivery
       no longer waits on a serial pipeline chain. The orchestrator then only builds and publishes,
