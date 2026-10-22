@@ -1,7 +1,10 @@
 import test from "node:test";
+import { execFileSync } from "node:child_process";
 import assert from "node:assert/strict";
 import {
   mkdtempSync,
+  chmodSync,
+  statSync,
   mkdirSync,
   writeFileSync,
   readFileSync,
@@ -128,6 +131,9 @@ for (const mode of [
       "compute-worker-evidence/ns--adam/status.txt",
     );
     writeFileSync(statusFile, "READY stale");
+    chmodSync(join(root, "compute-worker-evidence"), 0o700);
+    chmodSync(join(root, "compute-worker-evidence/ns--adam"), 0o700);
+    chmodSync(statusFile, 0o600);
     let reads = 0;
     const execute = (cmd, args, options) => {
       if (cmd === "bash") {
@@ -174,6 +180,16 @@ for (const mode of [
       });
     if (mode === "success") {
       go();
+      assert.equal(statSync(artifact).mode & 0o777, 0o644);
+      assert.equal(statSync(statusFile).mode & 0o777, 0o644);
+      if (process.getuid?.() === 0) {
+        chmodSync(root, 0o755);
+        execFileSync(
+          process.execPath,
+          ["-e", "require('node:fs').readFileSync(process.argv[1])", artifact],
+          { uid: 65534, gid: 65534 },
+        );
+      }
       assert.equal(
         JSON.parse(readFileSync(artifact)).nativeStatusChecked,
         false,
@@ -194,6 +210,12 @@ test("failure diagnostics are bounded read-only worker observations and redact c
   const root = mkdtempSync(join(tmpdir(), "activation-diagnostics-"));
   t.after(() => rmSync(root, { recursive: true, force: true }));
   const calls = [];
+  const oldDirectory = join(
+    root,
+    "rollout-evidence/alpha--compute-worker--adam",
+  );
+  mkdirSync(oldDirectory, { recursive: true, mode: 0o700 });
+  writeFileSync(join(oldDirectory, "current.log"), "old", { mode: 0o600 });
   captureDiagnostics({
     root,
     workload: "adam",
@@ -231,6 +253,16 @@ test("failure diagnostics are bounded read-only worker observations and redact c
     assert(!content.includes("private-bootstrap-value"));
     assert(!content.includes("eyJabc"));
     assert(content.includes("bootstrap failed"));
+    const file = join(oldDirectory, name);
+    assert.equal(statSync(file).mode & 0o777, 0o644);
+    if (process.getuid?.() === 0) {
+      chmodSync(root, 0o755);
+      execFileSync(
+        process.execPath,
+        ["-e", "require('node:fs').readFileSync(process.argv[1])", file],
+        { uid: 65534, gid: 65534 },
+      );
+    }
   }
   assert(
     !existsSync(

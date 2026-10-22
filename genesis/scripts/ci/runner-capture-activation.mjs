@@ -1,7 +1,13 @@
 // CI-only read wrapper: bind a bootstrap receipt to the current reviewed grant window.
 import assert from "node:assert/strict";
 import { execFileSync } from "node:child_process";
-import { readFileSync, writeFileSync, rmSync, mkdirSync } from "node:fs";
+import {
+  readFileSync,
+  writeFileSync,
+  rmSync,
+  mkdirSync,
+  chmodSync,
+} from "node:fs";
 import { resolve, join } from "node:path";
 import { pathToFileURL } from "node:url";
 import { validateGrantDeclaration } from "../../agentic/compute/grant-bootstrap.mjs";
@@ -135,14 +141,19 @@ export function captureActivation({
     );
     assert.equal(image, worker.image);
     assert.equal(worker.performer, declaration.provider);
+    // Selected public proof must be readable by Jenkins' separate agent UID.
+    chmodSync(resolve(root, output), 0o755);
+    chmodSync(join(resolve(root, output), `${namespace}--${workload}`), 0o755);
     writeFileSync(artifact, JSON.stringify(result, null, 2) + "\n", {
-      mode: 0o600,
+      mode: 0o644,
     });
+    chmodSync(artifact, 0o644);
     writeFileSync(
       statusFile,
       "READY: current declaration window verified; native status checked separately\n",
-      { mode: 0o600 },
+      { mode: 0o644 },
     );
+    chmodSync(statusFile, 0o644);
     return result;
   } catch (error) {
     let reason = "declaration-window-or-incarnation-unproven";
@@ -193,7 +204,9 @@ export function captureDiagnostics({
     "rollout-evidence",
     `${namespace}--compute-worker--${workload}`,
   );
-  mkdirSync(directory, { recursive: true, mode: 0o700 });
+  mkdirSync(directory, { recursive: true, mode: 0o755 });
+  chmodSync(join(root, "rollout-evidence"), 0o755);
+  chmodSync(directory, 0o755);
   const knownReasons = new Set([
     "activation-unproven",
     "declaration-window-or-incarnation-unproven",
@@ -204,8 +217,9 @@ export function captureDiagnostics({
   writeFileSync(
     join(directory, "status.txt"),
     `REFUSED: ${knownReasons.has(reason) ? reason : "activation-unproven"}\n`,
-    { mode: 0o600 },
+    { mode: 0o644 },
   );
+  chmodSync(join(directory, "status.txt"), 0o644);
   const redact = (input) => {
     let text = String(input || "").slice(-65536);
     for (const [name, value] of Object.entries(env)) {
@@ -289,8 +303,10 @@ for (const path of paths) {
     } catch (error) {
       output = `diagnostic read unavailable (exit ${Number.isInteger(error.status) ? error.status : "unknown"})\n${error.stdout || ""}`;
     }
-    writeFileSync(join(directory, file), redact(output), { mode: 0o600 });
+    writeFileSync(join(directory, file), redact(output), { mode: 0o644 });
+    chmodSync(join(directory, file), 0o644);
   }
+  return directory;
 }
 if (
   process.argv[1] &&
@@ -311,12 +327,23 @@ if (
   } catch (error) {
     try {
       const [workload, namespace] = process.argv.slice(2);
-      captureDiagnostics({
+      const diagnosticDirectory = captureDiagnostics({
         root: resolve(process.env.WORKSPACE || "."),
         workload,
         namespace,
         reason: error.activationReason,
       });
+      for (const name of [
+        "status.txt",
+        "state.txt",
+        "current.log",
+        "previous.log",
+        "mesh-startup.log",
+      ]) {
+        console.error(
+          `compute worker diagnostic ${name}:\n${readFileSync(join(diagnosticDirectory, name), "utf8")}`,
+        );
+      }
     } catch {
       /* Diagnostic failure never replaces the original refusal. */
     }
