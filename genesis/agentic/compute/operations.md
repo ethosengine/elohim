@@ -468,3 +468,32 @@ withdrawn by its provider (`compute-grant-refused`), any identity-cell call (no 
 (`x-compute-reach` → `reach-narrower-than-hosting-grant`, with `grantReach`). A provider and a
 sponsor read what they have promised with `GET /api/v1/compute/grants[?recipient=&scope=]` on
 their own local compute API.
+
+## Adam commissioning window (2026-10-22)
+
+The reviewed `genesis/orchestrator/data/adam-compute-worker.json` enables a finite
+commissioning grant from the actual Adam lamad provider to the Jenkins service agent.
+Genesis #1672 observed both public identities and the runner's native hosting grant;
+Edge #1674 published the pinned worker from source `04ef84c0798e63d5e0a3e95b55f4a75c71077ac5`
+with assembly commit `3f4ca731541d9ae50473f1ed8c7c4e19e102474b`.
+Matthew is the declared accountable steward; Adam is a fixture provider. This declaration
+does not claim a separately notarized Matthew-to-Adam relationship.
+
+The G2 declaration permits `measure-stage` at commons reach, four runs/hour, from
+**2026-10-22 04:54:39 UTC through 2026-10-29 04:54:39 UTC**. Its task scope is `*` because
+each stage has a fresh nonce/CID; the enabled Jenkins profile separately fixes the
+three-scenario `features/dataplane/peer-mesh.feature` lane. The profile remains disabled
+until CI captures the actual native grant action hash and live worker evidence.
+
+There is **no automatic renewal**. Before expiry, either disable the Jenkins profile
+and worker through a reviewed deploy-only commit, or explicitly review and replace the
+finite declaration, deploy, capture the new native action hash, then update the profile.
+An expired enabled declaration refuses manifest rendering and worker restart; a running
+worker's native admission and the runner's signed pre/post status checks also refuse it.
+Do not advance timestamps just to make a gate pass.
+
+CI captures the exact running declaration, its current window and pod incarnation along
+with PID1/cgroup evidence. `stateEvidence` identifies the persisted bootstrap receipt;
+only the runner's separate signed grant-status read establishes fresh native status.
+The post-stage capture is a second whole-worker snapshot: cgroup `memory.peak` is a
+lifetime peak, not memory attributable solely to the BDD stage.

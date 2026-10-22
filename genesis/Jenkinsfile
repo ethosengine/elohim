@@ -1199,6 +1199,18 @@ def resolveSeedDoorwayToken() {
  * script via withEnv, never argv. Dev-stakes posture and hardening debt:
  * genesis/data/timeline/backlog/security-ci-substrate-authorization-grant-coherence.md.
  */
+// Whole-worker snapshot after verified Adam completion; lifetime peak is not stage peak.
+def captureAdamAfterPeerStage(Map peerStageConfig) {
+    def worker = readJSON(file: 'genesis/orchestrator/data/adam-compute-worker.json')
+    if (worker.enabled != true || worker.performer != peerStageConfig.provider) { return }
+    def provider = getHumanStorageUrls('').find { it.humanId == 'human-adam-firstman' }
+    if (!provider) { error('Adam provider absent from declared topology') }
+    withEnv(['COMPUTE_WORKER_STARTUP_SECS=60']) {
+        sh "node '${env.WORKSPACE}/genesis/scripts/ci/runner-capture-activation.mjs' '${provider.service}' '${provider.namespace}' 'compute-worker-after-stage'"
+    }
+    archiveArtifacts(artifacts: 'compute-worker-after-stage/**/activation.json', allowEmptyArchive: false, fingerprint: true)
+}
+
 def runnerPreflight() {
     def provider = getHumanStorageUrls('').find { h -> h.humanId == 'human-adam-firstman' }
     def providerIdentityEnv = provider ? ["COMPUTE_PROVIDER_HEALTH_URL=http://${provider.storageUrl}/health", "COMPUTE_PROVIDER_NAME=adam"] : []
@@ -2126,6 +2138,7 @@ Seed IDs: ${params.SEED_IDS ?: '(all)'}
                                              "RUNNER_STAGE_CONFIG=${peerStageConfigPath}"]) {
                                         timeout(time: 75, unit: 'MINUTES') {
                                             sh "'${env.WORKSPACE}/genesis/a2o/node_modules/.bin/tsx' '${env.WORKSPACE}/genesis/scripts/ci/runner-stage.mjs'"
+                                            captureAdamAfterPeerStage(peerStageConfig)
                                         }
                                     }
                                 }

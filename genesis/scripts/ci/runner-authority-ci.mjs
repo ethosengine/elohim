@@ -66,9 +66,9 @@ async function main() {
   const campaign = mkdtempSync(join(home, "attempt-")); // No cross-build resume or automatic retry.
   const capture = join(campaign, "capture");
   execFileSync(
-    "bash",
+    process.execPath,
     [
-      join(root, "scripts/ci/capture-compute-worker-grant.sh"),
+      join(root, "genesis/scripts/ci/runner-capture-activation.mjs"),
       env.PROBE_WORKLOAD,
       env.PROBE_NAMESPACE,
       capture,

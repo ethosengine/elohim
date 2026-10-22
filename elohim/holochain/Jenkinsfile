@@ -624,7 +624,7 @@ def captureEnabledComputeWorkerGrant(List humans, Map outcomes) {
             "COMPUTE_WORKER_MEMORY_BYTES=${worker.slice?.memoryBytes ?: ''}",
             "COMPUTE_WORKER_STARTUP_SECS=${worker.startupBudgetSeconds ?: 900}",
         ]) {
-            sh "bash '${env.WORKSPACE}/scripts/ci/capture-compute-worker-grant.sh' '${adam.resourcePrefix}' '${adam.namespace}'"
+            sh "node '${env.WORKSPACE}/genesis/scripts/ci/runner-capture-activation.mjs' '${adam.resourcePrefix}' '${adam.namespace}'"
         }
         outcomes[adam.resourcePrefix] = true
     }

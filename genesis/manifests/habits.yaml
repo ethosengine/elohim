@@ -2001,10 +2001,10 @@ habits:
       - "a2o @concern:measure-runs-on-a-peer (genesis/a2o/features/compute/measure-on-a-peer.feature; default profile: cd genesis/a2o && npx cucumber-js --tags '@concern:measure-runs-on-a-peer')"
       - "python3 -m unittest genesis.agentic.berth_test (the --class measure refusal case: a measure-class claim on the dev berth is refused exit 3, naming just measure as the alternative — landing in parallel under lane D1)"
     evidence: >
-      DELTA 2026-10-22 (status stays RED; recovery source check): Edge #1673 reached the packaging-only path but the Jenkins client could not mount host containerd snapshots for `nerdctl run`; no image was published or deployment attempted. Embedded checkout verification now runs inside the BuildKit-owned image snapshot, using the same declared inputs.json in both publication paths. Eleven focused checks pass, including actual Git HEAD match/mismatch execution; independent cross-caller review passes. Final assembly, native grant and off-host BDD remain unproven.
-    evidence-fingerprint: sha256:e7429c2edba05c40
-    evidence-bytes: 7853
-    evidence-entries: 9
+      DELTA 2026-10-22 (status stays RED; commissioning activation): Edge #1674 SUCCESS published the source04ef worker at sha256:f12646f889ccac01d62a0b11ec2142a16e9a7aa8b0b9d6614c63b072eb94e1c6 and deployed sponsorship without conductor churn. Genesis #1672 observed the native Jenkins hosting grant and exact Adam lamad identity (campaign live-evidence/identities.json). A reviewed seven-day, four-runs/hour G2 declaration expires 2026-10-29T04:54:39Z with no automatic renewal; the Jenkins stage profile remains disabled pending actual native grant/worker capture. Ten capture checks and full Orchestrator/Genesis gates prove expiry/incarnation refusal locally, not live execution.
+    evidence-fingerprint: sha256:1b9e42c8e824695f
+    evidence-bytes: 8533
+    evidence-entries: 10
     guard: >
       Regression risks: (1) a RUN_CLASSES vocabulary that drifts from `pipeline-registry.mjs:45`
       (`build|deploy|verify|measure|profile`) — the berth `--class` flag and this habit's checks

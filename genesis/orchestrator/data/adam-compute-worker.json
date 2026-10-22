@@ -1,7 +1,7 @@
 {
-  "enabled": false,
-  "image": "",
-  "performer": "",
+  "enabled": true,
+  "image": "harbor.ethosengine.com/ethosengine/elohim-compute-worker@sha256:f12646f889ccac01d62a0b11ec2142a16e9a7aa8b0b9d6614c63b072eb94e1c6",
+  "performer": "uhCAkCUzKl3Y1B2af9NJmO-Ov-sGPFIzUpAWuMMiWvoGTV16BX9Un",
   "slice": {
     "cpuMillis": 8000,
     "memoryBytes": 25769803776
@@ -9,8 +9,27 @@
   "storageClass": "openebs-hostpath",
   "localTokenSource": "storage",
   "runnerGrant": {
-    "enabled": false,
+    "enabled": true,
     "stewardOfRecord": "human:matthew",
-    "fixtureProvider": "adam"
-  }
+    "fixtureProvider": "adam",
+    "provider": "uhCAkCUzKl3Y1B2af9NJmO-Ov-sGPFIzUpAWuMMiWvoGTV16BX9Un",
+    "recipient": "uhCAkjxGE9wOMFIuQWeXHSgSwrLH1yy7vCSfwA-OSe6Fy0LFSZNJS",
+    "grant": {
+      "recipient": "uhCAkjxGE9wOMFIuQWeXHSgSwrLH1yy7vCSfwA-OSe6Fy0LFSZNJS",
+      "scope": "measure-stage",
+      "issuedAt": "2026-10-22T04:54:39Z",
+      "validFrom": "2026-10-22T04:54:39Z",
+      "validUntil": "2026-10-29T04:54:39Z",
+      "bounds": {
+        "epr_scope": [
+          "*"
+        ],
+        "reach_ceiling": "commons",
+        "rate_per_hour": 4,
+        "rotation_ttl_days": 7
+      }
+    }
+  },
+  "privateMesh": true,
+  "sourceCommit": "04ef84c0798e63d5e0a3e95b55f4a75c71077ac5"
 }

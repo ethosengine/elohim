@@ -75,8 +75,8 @@ test("the declared Adam 24Gi worker fits its current full envelope", async () =>
     {
       ...config,
       enabled: true,
-      image: `registry/worker@sha256:${"a".repeat(64)}`,
-      performer: "adam-key",
+      image: config.image || `registry/worker@sha256:${"a".repeat(64)}`,
+      performer: config.performer || "adam-key",
     },
   );
   assert.match(output, /memory: 24576Mi/);
@@ -100,8 +100,7 @@ test("quantity() mirrors bridges/k8s/src/lib.rs's parser over the same examples"
 
 async function writeFittingFixtureRepo() {
   // A synthetic repo tree with a generous envelope bound and an empty-container
-  // conductor manifest, isolating the "a slice that fits" success path from the real
-  // adam pod's already-over-budget totals (named in the refusal test above).
+  // conductor manifest, isolating renderer invariants from the deployed configuration.
   const root = await mkdtemp(join(tmpdir(), "compute-worker-fixture-"));
   const orchestratorDir = join(root, "genesis", "orchestrator");
   await mkdir(join(orchestratorDir, "data"), { recursive: true });
