@@ -24,6 +24,16 @@ alongside storage, conductor and proxy. It does not increase their individual ca
 These are declared limits until a live worker demonstrates its cgroup ceilings and
 measured footprint, including its private mesh. A grant does not reserve resources.
 
+Edge #1672 published the tools and fleet images but failed the final worker assembly:
+storage and doorway implement `--help`, not `--version`. The assembly now checks all
+six binaries with bounded `--help` calls. Recovery uses the recorded immutable inputs
+in `genesis/scripts/ci/edge-1672-inputs.json` via `[compute-worker:package]`, paired
+with `[deploy-only] [build:edge]` to deploy the already-published sponsor fix, or
+`[edge:validate-only]` to package alone. It does not rebuild the fork. The helper
+verifies the embedded tools checkout and records both its original `sourceCommit`
+and the new `assemblyCommit`; activation uses the original source commit. An automatic
+validation sibling still measures normally and does not repeat packaging.
+
 Bootstrap retains its private household under `/var/lib/compute/mesh` and pins its
 checkout under `/var/lib/compute/repos/<sourceCommit>`. Its storage, conductor,
 P2P, metrics and Mongo port bases are 18090, 14444, 19701, 19464 and 37017.

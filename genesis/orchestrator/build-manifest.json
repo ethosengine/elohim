@@ -41,6 +41,8 @@
             "**/build-manifest.json",
             "scripts/ci/*compute-worker*",
             "genesis/scripts/ci/runner-*",
+            "genesis/scripts/ci/package-compute-worker*",
+            "genesis/scripts/ci/edge-1672-inputs.json",
             "app/elohim-app/scripts/hc-mesh.sh",
             "app/elohim-app/scripts/__tests__/hc-mesh-storage-port.test.sh"
           ],

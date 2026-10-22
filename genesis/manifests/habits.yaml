@@ -2001,10 +2001,10 @@ habits:
       - "a2o @concern:measure-runs-on-a-peer (genesis/a2o/features/compute/measure-on-a-peer.feature; default profile: cd genesis/a2o && npx cucumber-js --tags '@concern:measure-runs-on-a-peer')"
       - "python3 -m unittest genesis.agentic.berth_test (the --class measure refusal case: a measure-class claim on the dev berth is refused exit 3, naming just measure as the alternative — landing in parallel under lane D1)"
     evidence: >
-      DELTA 2026-10-21 (status stays RED; refusal proof prepared, not live): explicit-tag Genesis probe for disposable wrong-recipient and already-withdrawn grants passes 19/19 local checks with independent review; both `just gate orchestrator` and `just gate genesis` pass (genesis/local-dev/jenkins-native-bdd/refusal-{orchestrator,genesis}-gate.log). It pins the live worker, preserves denial timestamps, rejects expired refusal attempts, and verifies no task acceptance/completion or native admission. Its private journal is same-pod only; no automatic retry, cross-build recovery or live Adam refusal is claimed. Edge #1672 is building the first worker image; activation and successful off-host BDD remain pending.
-    evidence-fingerprint: sha256:b8580ad9b13f984c
-    evidence-bytes: 6651
-    evidence-entries: 7
+      DELTA 2026-10-22 (status stays RED; packaging recovery): Edge #1672 published source tools 04ef84c0798e63d5e0a3e95b55f4a75c71077ac5 at sha256:33d11def5d2982b42fa00ca9138eb78ae5643307ebc4b79822404fc63ec510ef, then failed final assembly because storage rejects --version; deployment never ran. All six actual binaries pass bounded --help checks locally. Assembly recovery pins the published component and hApp digests, verifies the embedded checkout, and passes 11/11 subprocess-fixture checks; independent review caught and fixed validation-sibling dispatch. Neither a final worker image nor live Adam execution is claimed by this delta.
+    evidence-fingerprint: sha256:e6e1df30aea9abea
+    evidence-bytes: 7289
+    evidence-entries: 8
     guard: >
       Regression risks: (1) a RUN_CLASSES vocabulary that drifts from `pipeline-registry.mjs:45`
       (`build|deploy|verify|measure|profile`) — the berth `--class` flag and this habit's checks

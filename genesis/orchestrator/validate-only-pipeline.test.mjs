@@ -111,6 +111,7 @@ function assertEdgeStageContract(text) {
   const allowed = new Set([
     "Check Trigger",
     "Checkout",
+    "Package Compute Worker",
     "Dataplane Validation",
     "Cleanup",
   ]);
@@ -226,6 +227,54 @@ describe("orchestrator graph-derived validate-only (a2o-only change)", () => {
 
 describe("edge validate-only stage allowlist", () => {
   const stages = assertEdgeStageContract(edge);
+
+  test("automatic verification of a packaging commit still measures the deployment", () => {
+    const expression = edge.match(/env\.EDGE_PACKAGE_REQUESTED = ([\s\S]+?) \? 'true' : 'false'/)?.[1];
+    assert.ok(expression, "packaging dispatch expression is missing");
+    // Evaluate the actual boolean guard, whose syntax is shared by Groovy and JS.
+    const selected = new Function("packageTag", "commitMsg", "params",
+      `return ${expression.replaceAll(".contains(", ".includes(")}`);
+    const combined = "[deploy-only] [build:edge] [compute-worker:package]";
+    assert.equal(selected(true, combined, { DEPLOY_ONLY: true }), true);
+    assert.equal(selected(true, combined, { DEPLOY_ONLY: false, VALIDATE_ONLY: true, RUN_CLASS: "verify" }), false);
+    assert.equal(selected(true, "[edge:validate-only] [compute-worker:package]", { DEPLOY_ONLY: false }), true);
+    assert.equal(selected(false, "[build:edge]", { DEPLOY_ONLY: true }), false);
+  });
+
+  test("worker assembly is opt-in, skips cold builds and preserves combined deploy-only", () => {
+    assert.match(
+      stages.get("Package Compute Worker"),
+      /EDGE_PACKAGE_REQUESTED == 'true'/,
+    );
+    assert.match(
+      stages.get("Package Compute Worker"),
+      /PIPELINE_SKIPPED != 'true'/,
+    );
+    assert.match(
+      stages.get("Package Compute Worker"),
+      /package-compute-worker\.sh/,
+    );
+    assert.doesNotMatch(
+      stages.get("Package Compute Worker"),
+      /publish-compute-worker|build-compute-worker|fetchEdgeHapp/,
+    );
+    assert.match(
+      edge,
+      /packageTag && !isValidateOnly\(\) && params\.DEPLOY_ONLY != true/,
+    );
+    assert.match(
+      edge,
+      /EDGE_PACKAGE_REQUESTED = \(packageTag &&\s*\(commitMsg\.contains\('\[edge:validate-only\]'\) \|\| params\.DEPLOY_ONLY == true\)\)/,
+    );
+    assert.match(
+      edge,
+      /\(params\.DEPLOY_ONLY == true\) \|\| isValidateOnly\(\)/,
+    );
+    assert.match(
+      stages.get("Dataplane Validation"),
+      /!\(isValidateOnly\(\) && env\.EDGE_PACKAGE_REQUESTED == 'true'\)/,
+    );
+  });
 
   test("every non-allowlisted static stage carries a validate-only gate", () => {
     assertEdgeStageContract(edge);

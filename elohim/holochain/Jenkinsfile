@@ -2220,7 +2220,7 @@ def deployOnlyEnvFilePreflight(String envFile, String targetEnv) {
         ['elohim-doorway', doorwayCheckRef],
         ['elohim-storage', existing.STORAGE_TAG],
         ['elohim-happ-installer', existing.HAPP_INSTALLER_TAG],
-        ['elohim-doorway-app', existing.DOORWAY_APP_TAG],
+        ['doorway-app', existing.DOORWAY_APP_TAG],
     ]
     def missing = []
     checks.each { repo, tag ->
@@ -2261,6 +2261,14 @@ def computeValidateOnly() {
     env.EDGE_VALIDATE_ONLY = ((params.VALIDATE_ONLY ?: false) ||
         runClass == 'verify' || runClass == 'measure' || runClass == 'profile' ||
         commitMsg.contains('[edge:validate-only]')) ? 'true' : 'false'
+    boolean packageTag = commitMsg.contains('[compute-worker:package]')
+    // The automatic verify sibling sees the same HEAD. It must measure, not
+    // package again: only a literal isolated tag or deploy-only selects assembly.
+    env.EDGE_PACKAGE_REQUESTED = (packageTag &&
+        (commitMsg.contains('[edge:validate-only]') || params.DEPLOY_ONLY == true)) ? 'true' : 'false'
+    if (packageTag && !isValidateOnly() && params.DEPLOY_ONLY != true) {
+        error('Compute worker packaging requires [edge:validate-only] or [deploy-only]')
+    }
     if (env.EDGE_VALIDATE_ONLY == 'true') {
         echo "VALIDATE_ONLY (RUN_CLASS=${runClass}) — skipping build/deploy stages; running Dataplane Validation only"
     }
@@ -2268,6 +2276,17 @@ def computeValidateOnly() {
 
 def isValidateOnly() {
     env.EDGE_VALIDATE_ONLY == 'true'
+}
+
+// Recovery assembles already-published immutable inputs. It never recompiles
+// tools or runs the worker; deployment still follows the normal deploy-only gate.
+def packageComputeWorker() {
+    timeout(time: 30, unit: 'MINUTES') {
+        withCredentials([usernamePassword(credentialsId: 'harbor-robot-registry', passwordVariable: 'HARBOR_PASSWORD', usernameVariable: 'HARBOR_USERNAME')]) {
+            sh "bash '${env.WORKSPACE}/genesis/scripts/ci/package-compute-worker.sh'"
+        }
+    }
+    archiveArtifacts artifacts: 'compute-worker-image/*.json', fingerprint: true
 }
 
 // Every build-only stage already gates on `params.DEPLOY_ONLY != true`
@@ -2588,6 +2607,18 @@ spec:
 
                         echo "Building Holochain infrastructure for branch: ${env.BRANCH_NAME}"
                     }
+                }
+            }
+        }
+
+        stage('Package Compute Worker') {
+            when { allOf {
+                expression { env.PIPELINE_SKIPPED != 'true' }
+                expression { env.EDGE_PACKAGE_REQUESTED == 'true' }
+            }}
+            steps {
+                container('builder') {
+                    packageComputeWorker()
                 }
             }
         }
@@ -3225,6 +3256,7 @@ AGENT_SDK_TAG=${AGENT_SDK_TAG}
         stage('Dataplane Validation') {
             when {
                 allOf {
+                    expression { !(isValidateOnly() && env.EDGE_PACKAGE_REQUESTED == 'true') }
                     expression { env.PIPELINE_SKIPPED != 'true' }
                     expression { env.DEPLOY_REFUSED != 'true' }
                     anyOf {

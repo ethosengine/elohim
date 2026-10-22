@@ -17,6 +17,9 @@ COPY --from=relay /usr/local/bin/iroh-relay /opt/compute/mesh-bin/
 COPY --from=beacon /usr/local/bin/relay-addr-beacon /opt/compute/mesh-bin/
 COPY elohim.happ inputs.json /opt/compute/
 RUN /usr/local/bin/mongod --version
+# Loading the CLI exercises runtime linkage without starting services. Storage
+# and doorway expose --help but do not declare clap's optional --version flag.
 RUN set -eu; for binary in elohim-storage doorway holochain hc iroh-relay relay-addr-beacon; do \
-      /opt/compute/mesh-bin/$binary --version; \
+      echo "Checking $binary --help"; \
+      timeout 15 /opt/compute/mesh-bin/$binary --help >/dev/null; \
     done
