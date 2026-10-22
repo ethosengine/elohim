@@ -243,6 +243,14 @@ def native_context(contract):
     promises = [c for c in assertions[0]['commitments'] if c['commitment'] == contract['commitment']]
     if len(promises) != 1:
         raise Refused('exact native commitment missing or ambiguous')
+    attribution = promises[0].get('attribution')
+    if not isinstance(attribution, dict) or not {'eligible', 'actor_claim', 'witness', 'issues'} <= attribution.keys():
+        raise Refused('native attribution eligibility unavailable; update epr before starting this shift')
+    if (attribution['eligible'] is not True or attribution['issues'] != []
+            or not isinstance(attribution['actor_claim'], str) or not attribution['actor_claim']
+            or (attribution['witness'] is not None and
+                (not isinstance(attribution['witness'], str) or not attribution['witness']))):
+        raise Refused(f"native commitment attribution is not acceptance-eligible: {attribution['issues']}")
     return context, promises[0]
 
 

@@ -1239,6 +1239,7 @@ pub fn note_usage() -> String {
      PROSE arm (--on names the target):\n    \
      --on <commitment-cid|gap-id|path>   what the note is about\n    \
      --reason <text>                     the authored body (required)\n    \
+     --bind-actor <actor-claim-cid>       attribution-only ruling on an exact commitment CID;\n                                        requires explicit --session and original provider identity\n    \
      --switched-to <text>                the consequence, on --kind failed-approach\n    \
      --closes <correction-cid>           the correction this note discharges; refused on\n                                        \
      --kind failed-approach\n    \
@@ -1348,7 +1349,19 @@ fn run_note(args: &[String]) -> FlowResult<ExitCode> {
         println!("{}", note_usage());
         return Ok(ExitCode::SUCCESS);
     }
+    let bind_actor = take_opt(&rest, "--bind-actor")?;
+    let explicit_session = take_opt(&rest, "--session")?;
+    if bind_actor.is_some() && explicit_session.is_none() {
+        return Err(FlowError::InvalidArguments(
+            "actor binding requires an explicit registered --session".into(),
+        ));
+    }
     if let Some(measure) = take_opt(&rest, "--measure")? {
+        if bind_actor.is_some() {
+            return Err(FlowError::InvalidArguments(
+                "actor binding cannot be combined with a measurement".into(),
+            ));
+        }
         return run_observation(&opts, &rest, &measure);
     }
     let on = take_opt(&rest, "--on")?.ok_or_else(|| {
@@ -1368,9 +1381,10 @@ fn run_note(args: &[String]) -> FlowResult<ExitCode> {
     let verdict = take_opt(&rest, "--verdict")?;
     let actor = note::NoteActor {
         as_ref: take_opt(&rest, "--as")?,
-        session: resolve_session(take_opt(&rest, "--session")?),
+        session: resolve_session(explicit_session),
     };
     let acceptance = acceptance::AcceptanceOptions {
+        bind_actor,
         appoint: take_opt(&rest, "--appoint")?,
         purpose: take_opt(&rest, "--purpose")?,
         appointment: take_opt(&rest, "--appointment")?,
@@ -1682,6 +1696,7 @@ fn usage() -> String {
      --reason <text> [--switched-to <text>] [--closes <correction-cid>] \
      [--verdict approved|changes-requested (required by --kind verdict, refused on every other kind)] \
      [--appoint <actor-claim-cid> (ruling only)] \
+     [--bind-actor <actor-claim-cid> --session <id> (attribution ruling only)] \
      [--purpose acceptance --appointment <ruling-cid> --fulfillment <event-cid> \
      --review <technical-verdict-cid> --report <json-path> [--supersedes <acceptance-cid>]] \
      [--as agent:<role>@<model>] [--session <id>] [--json] [--root DIR] \

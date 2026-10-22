@@ -34,6 +34,45 @@ publication authority.
 branch name or conversation ID is never a substitute. The journal may evolve;
 the objective, execution contract and original authorization are frozen.
 
+Register the implementer before making a commitment that needs appointed
+acceptance, then claim through that registered session:
+
+```bash
+epr actor claim --as <actor> --session <session>
+epr flow claim --on <gap> --session <session> --brief <brief> --serves <habit>
+epr flow context <original-scope-cid> --json
+```
+
+Do not add `--as` to that flow claim. Explicit named attribution intentionally
+takes precedence over `--session`; it records the provider but does not pin the
+registered actor claim. Direct named claims remain valid existing records, but
+that name alone is insufficient for appointed acceptance. Readiness requires
+native attribution eligibility for the exact commitment, including its exact
+registered claim and original provider, before baseline or agent dispatch.
+Absent native support, missing binding, corrupt records, or conflicts refuse.
+Inspect `reconciliation.assertions[].commitments[].attribution` on that exact
+commitment: `eligible` must be true, `actor_claim` names the registered claim,
+`witness` names the binding ruling when one was needed, and `issues` must be
+empty. These are native resolver results; never fill missing fields by inferring
+identity from matching names.
+
+For an existing unbound commitment, an explicit native ruling can bind its
+original provider to an exact registered claim:
+
+```bash
+epr flow note --on <exact-commitment-cid> --kind ruling --bind-actor <exact-registered-actor-claim-cid> --session <registered-session> --reason <text>
+```
+
+The named claim must be the session's current claim and its provider must match
+the commitment exactly. This path cannot override an existing direct actor pin
+or choose among conflicting witnesses. Preserve the original commitment and
+fulfillment bytes and CIDs: the ruling adds attribution only, with no stock or
+discharge change. Never replace the promise or fabricate fulfillment to repair
+attribution. A fresh independent appointment pins the exact binding ruling CID;
+a later ruling cannot rehabilitate an earlier invalid appointment or acceptance.
+Binding grants no build, landing, or push authority and cannot clear a stop
+marker or extend a deadline.
+
 List private executable dependencies in `input_files`, including the objective
 helper, household/CI wrappers and their private imports. `start` freezes their
 SHA-256 hashes. Missing or changed bytes refuse readiness, dispatch, recovery and
@@ -169,6 +208,18 @@ flow observations. Distinguish authority and acceptance refusals from mechanical
 fixture friction: useful pain exposes an unmet obligation; unnecessary friction
 calls for a scoped repair with evidence. Never weaken checks for comfort. Retain
 baseline CI fault diagnoses and remaining obligations when inspection completes.
+
+The actor-binding lesson is exercised through the real claim CLI followed by
+independent appointment: `--as` plus `--session` exposes the missing pin,
+session-only claiming pins it, and an explicit legacy binding permits a fresh
+appointment without changing the original promise. Keep this integration proof
+in `elohim/eprfs/epr-cli/tests/flow_attribution.rs`
+(`named_session_claim_needs_explicit_binding_before_independent_appointment`);
+a hand-built pinned commitment misses the instruction defect. The proposed
+four delivery loops to one learning loop
+remains operating guidance, not a quota or another register. Use existing
+receipts and observations to retain the measured pain, repair, and successor
+safeguard within the original scope and deadline.
 
 Closure follows claim → immutable implementation report/fulfillment → technical
 review → appointed independent acceptance → native reconciliation. The acceptor

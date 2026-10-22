@@ -34,6 +34,7 @@ pub struct Assertion {
 #[derive(Debug, Serialize)]
 pub struct CommitmentEvidence {
     pub commitment: String,
+    pub attribution: acceptance::AttributionEligibility,
     pub fulfillments: Vec<String>,
     pub technical_reviews: Vec<String>,
     pub acceptance_records: Vec<String>,
@@ -259,6 +260,13 @@ fn commitment_evidence(
         if e.resource != *id {
             continue;
         }
+        if slot(e, "bind-actor:").is_some() {
+            if let Err(error) = acceptance::validate_record(root, records, e) {
+                unrecognized_records.push(cid.to_string());
+                issues.push(format!("invalid attribution witness {cid}: {error}"));
+            }
+            continue;
+        }
         let purpose = slot(e, "purpose:");
         let acceptance_metadata = [
             "appointment:",
@@ -402,6 +410,7 @@ fn commitment_evidence(
     acceptance_records.sort();
     CommitmentEvidence {
         commitment: id.to_string(),
+        attribution: acceptance::attribution_eligibility(root, records, id),
         fulfillments,
         technical_reviews,
         acceptance_records,

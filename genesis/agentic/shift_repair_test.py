@@ -25,7 +25,8 @@ class RepairLoop(unittest.TestCase):
         self.bin = self.directory / 'bin'; self.bin.mkdir()
         self.context_path = self.directory / 'native.json'
         self.native = {'reconciliation': {'scope_cid': 'scope-existing', 'assertions': [{
-            'intent': 'intent-existing', 'commitments': [{'commitment': 'promise-existing', 'fulfillments': []}]}]}}
+            'intent': 'intent-existing', 'commitments': [{'commitment': 'promise-existing', 'fulfillments': [],
+                'attribution': {'eligible': True, 'actor_claim': 'fixture-actor-claim', 'witness': None, 'issues': []}}]}]}}
         state.atomic(self.context_path, self.native)
         self.executable('epr', f'from pathlib import Path\nprint(Path({str(self.context_path)!r}).read_text())\n')
         adapter = '''import json,os,sys,uuid

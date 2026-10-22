@@ -46,7 +46,8 @@ class ProcessRecovery(unittest.TestCase):
         self.bin = self.directory / 'fixture-bin'
         self.bin.mkdir()
         context = {'reconciliation': {'scope_cid': 'scope-existing', 'assertions': [{
-            'intent': 'intent-existing', 'commitments': [{'commitment': 'promise-existing'}]}]}}
+            'intent': 'intent-existing', 'commitments': [{'commitment': 'promise-existing',
+                'attribution': {'eligible': True, 'actor_claim': 'fixture-actor-claim', 'witness': None, 'issues': []}}]}]}}
         self.executable('epr', f'print({json.dumps(json.dumps(context))})\n')
         adapter = '''import json, os, sys, time, uuid
 args = sys.argv[1:]

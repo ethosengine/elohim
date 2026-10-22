@@ -75,6 +75,7 @@ def preflight(spec, directory, *, checks=None):
     remaining = lambda: initialization_remaining(directory)
     if remaining() <= 0:
         raise Refused('deadline expired before readiness')
+    native_context(spec)  # Fail attribution before paid canaries, leases, or baseline measurement.
     directory.mkdir(parents=True, exist_ok=True, mode=0o700)
     checks = checks or directory / 'readiness'
     checks.mkdir(parents=True, exist_ok=True)

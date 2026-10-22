@@ -108,6 +108,7 @@ class ShiftLease(unittest.TestCase):
                 patch.object(launcher, 'initialization_remaining', return_value=3000), \
                 patch.object(launcher, 'session_from', return_value='fixture-session'), \
                 patch.object(launcher, 'completed', return_value=True), \
+                patch.object(launcher, 'native_context'), \
                 patch.object(launcher, 'bounded', side_effect=bounded), \
                 patch.object(launcher, 'run', return_value='fixture\tfixture'), \
                 patch.object(launcher, 'host_berth', return_value='null') as inspect, \

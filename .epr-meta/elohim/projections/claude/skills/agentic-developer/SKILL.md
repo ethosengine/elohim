@@ -24,11 +24,30 @@ Objective, path scope, original native intent and commitment, original scope CID
 served habit, baseline revision/evidence, verification commands, and absolute UTC
 deadline. The objective ceiling is 2,400 minutes; downtime never extends it.
 
-Use `epr flow claim --on <gap> --as <actor> --session <session> --brief <brief>
---serves <habit>` and preserve the resulting native references. Do not substitute
-a sprint or conversation ID for the intent's existing scope CID. Classify private
-execution records under the existing shift convention; do not create a second
-acceptance or stock ledger.
+Register the implementer before claiming acceptance-capable work:
+
+```bash
+epr actor claim --as <actor> --session <session>
+epr flow claim --on <gap> --session <session> --brief <brief> --serves <habit>
+```
+
+Omit `--as` from the flow claim: explicit named attribution takes precedence over
+`--session` and does not pin the registered actor claim. It remains valid for
+legacy named attribution, but that name alone cannot support appointed acceptance.
+Inspect `epr flow context <original-scope-cid> --json`; readiness must resolve the
+exact commitment's native actor binding to the registered claim and original
+provider before baseline or agent dispatch. Missing native support or an absent,
+corrupt, or conflicting binding refuses. Preserve the returned intent, commitment
+and actor-claim CIDs. Never substitute a sprint or conversation ID for the intent's
+existing scope CID.
+
+For an existing unbound commitment, use only the explicit native `--bind-actor`
+ruling described in `genesis/agentic/SHIFT.md`, with the same original provider and
+exact registered claim. It adds attribution evidence without rewriting the
+commitment or fulfillment, creating a replacement promise, or granting acceptance.
+A fresh independent appointment must pin that ruling; an earlier invalid
+appointment cannot become valid retroactively. Private execution records stay in
+the existing shift convention, never a second acceptance or stock ledger.
 
 The launcher checks tools, actual runtime authentication, Linux PID namespaces,
 resource leases, manifest-selected gates, the measured baseline, and successful
@@ -83,6 +102,13 @@ investigate. Use `gradient-reading` when deciding whether a cost is owed or can 
 compressed. Preserve verification and revocation checks; relief is not a weaker
 gate. A successor rehearsal should prove what became easier as well as which
 regression was caught. Unmeasured costs remain unknown, never reported as zero.
+
+The claim-to-appointment integration is one such lesson: a real claim CLI call
+with both `--as` and `--session` must reproduce missing actor binding, while a
+session-only claim and the explicit legacy binding path must reach independent
+appointment. Preserve this executable check with the native acceptance tests;
+constructing an already pinned commitment by hand cannot catch the instruction
+that caused this refusal.
 
 ## Delivery and learning
 
