@@ -353,3 +353,43 @@ and after readiness. Its unresolved attempt refuses replay. Probe:
 `hc-mesh-initialization-continuation.test.sh` plus actual provider before/after identity
 and readiness evidence. Current live state **RED**: focused fixtures verify the repair,
 but live continuation, G2 and the native three-scenario completion remain unproven.
+
+Two further stations were exposed before that live attempt:
+
+- Chain `measure-runs-on-a-peer`, between retained conductor state and the
+  before/after identity comparison: interpret the pinned executable's actual
+  identity output. `hc client call --port <admin-port> list-apps` converts native tuple cell IDs to
+  `{dna_hash, agent_pub_key}` objects; a fixture modeled on the raw websocket
+  response incorrectly passed the earlier parser tests. Probe the actual helper
+  with the pinned `hc`, plus malformed-cell, agent-mismatch and DNA-change
+  refusal fixtures. Source `b8d1f8295` passes those checks and a read-only call
+  against three local conductors, five provisioned cells each. The private
+  `continuation-local-app-identities.jsonl` receipt records that local evidence.
+  Current state: **GREEN locally; live Adam continuation unmeasured**. Source
+  `6b06b6c6` is barred from activation despite its successful mocked checks.
+- Chain `measure-runs-on-a-peer`, between a source correction and publication
+  of its execution flavor: make the cost of rebuilding unchanged native inputs
+  observable. Edge **1692**, observed at 20:54 UTC, cached the base image but
+  reran the fork COPY, toolchain installation and native compilation with the
+  same conductor pin `96bcd2bee215` and base digest as Edge 1685. This delayed
+  the corrected source behind a superseded assembly. Probe two assemblies
+  whose complete native build inputs match, recording cache hits/misses,
+  compilation time and resulting artifact provenance; changed inputs must
+  invalidate reuse. Current state: **RED for observed reuse**, with final
+  Edge 1692 duration still unmeasured. Edge 1685's saved log measures the fork
+  build RUN alone at **2773.3 seconds** (the conductor release build reports
+  35m31s, the CLI build 10m39s); this is one cold build, not a general benchmark
+  or total pipeline duration. The saved pod declaration gives the OCI BuildKit
+  worker no persistent state mount, and the packer supplies no cache import or
+  export; the base check earlier in the same pod explains the cached base.
+  Separately, a tiny reproduction of the packer's Git snapshot steps produces
+  different `.git/index` and `.git/logs/HEAD` bytes for identical pinned source
+  and tracked-file timestamps (private receipt:
+  `genesis/local-dev/jenkins-native-bdd/cache-snapshot-variance.json`). Both files enter the fork COPY. Cross-pod cache
+  retention and stable input bytes therefore need separate probes; making only
+  one reliable cannot establish a warm path. Reusing an artifact still requires
+  compatible target runtime evidence and current task authority.
+
+These are refinement inputs for the existing stories, not additional executable
+coverage. Keep compile/reuse, artifact fetch/cache, on-target compatibility and
+authorized execution as separately measured costs in the same performance work.
