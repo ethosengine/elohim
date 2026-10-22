@@ -29,10 +29,22 @@ storage and doorway implement `--help`, not `--version`. The assembly now checks
 six binaries with bounded `--help` calls. Recovery uses the recorded immutable inputs
 in `genesis/scripts/ci/edge-1672-inputs.json` via `[compute-worker:package]`, paired
 with `[deploy-only] [build:edge]` to deploy the already-published sponsor fix, or
-`[edge:validate-only]` to package alone. It does not rebuild the fork. The helper
+`[edge:validate-only]` to package alone. A `tools` digest reuses the compiled tools;
+an explicit `toolsBase` instead rebuilds the complete native tool set from the
+fixed source commit on that immutable base. The helper
 verifies the embedded tools checkout and records both its original `sourceCommit`
 and the new `assemblyCommit`; activation uses the original source commit. An automatic
 validation sibling still measures normally and does not repeat packaging.
+
+Edge #1683 proved the operator's Adam log grant works and exposed a CPU mismatch:
+the UBI10 base refused Sandy Bridge with `CPU does not support x86-64-v3`.
+The exact published conductor also failed with SIGILL when tested on the E5-2667
+workspace using compatible AlmaLinux libraries. Recovery therefore rebuilds the
+fork pair, Ark and executor on the existing v2 UDI base pinned in `toolsBase`;
+it does not transplant those native binaries. Original source04ef, fleet component
+and hApp inputs remain fixed. Normal Jenkins worker publication selects the same
+reviewed compatible base. A successful build is still not live worker proof;
+activation requires the new image digest, actual bootstrap and native grant evidence.
 
 Bootstrap retains its private household under `/var/lib/compute/mesh` and pins its
 checkout under `/var/lib/compute/repos/<sourceCommit>`. Its storage, conductor,

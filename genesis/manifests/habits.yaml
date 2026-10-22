@@ -2002,8 +2002,10 @@ habits:
       - "python3 -m unittest genesis.agentic.berth_test (the --class measure refusal case: a measure-class claim on the dev berth is refused exit 3, naming just measure as the alternative — landing in parallel under lane D1)"
     evidence: >
       DELTA 2026-10-22 (status stays RED; external grant identified): Edge #1681 proves Adam compute-worker CrashLoopBackOff while storage and conductor are Ready; its archived log read says jenkins:jenkins-deployer is forbidden pods/log in elohim-alpha. The existing operator-owned supplemental Role now proposes logs/get and exec/get+create scoped only to elohim-adam-alpha-0 for the existing evidence/native probe. No cluster grant was applied, no native G2 observed, and the pipeline profile remains disabled.
-    evidence-fingerprint: sha256:2486ec088b0e1631
-    evidence-bytes: 10480
+
+      - 2026-10-22 DELTA: Edge #1683 independently read Adam worker logs after the operator RBAC grant; bootstrap fails at UBI10 x86-64-v3 loader. Exact published conductor also SIGILLs on the Sandy Bridge workspace with v2 libraries. Recovery now declares a complete native tools rebuild on the pinned owned v2 UDI base, preserving source04ef and fleet/hApp inputs. Habit remains RED: native G2 and peer execution are not yet observed.
+    evidence-fingerprint: sha256:65340aafc8a9b3c6
+    evidence-bytes: 10912
     evidence-entries: 14
     guard: >
       Regression risks: (1) a RUN_CLASSES vocabulary that drifts from `pipeline-registry.mjs:45`
