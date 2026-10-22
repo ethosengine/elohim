@@ -250,6 +250,15 @@ async function renderEnabled(source, config, overrides) {
   ) {
     throw new Error("sourceCommit must be a full immutable git commit");
   }
+  if (
+    config.resumeInitializationLogSha256 !== undefined &&
+    (config.privateMesh !== true ||
+      !/^[a-f0-9]{64}$/.test(config.resumeInitializationLogSha256))
+  ) {
+    throw new Error(
+      "resumeInitializationLogSha256 requires privateMesh and an exact reviewed log digest",
+    );
+  }
   if (config.runnerGrant?.enabled === true) {
     validateGrantDeclaration(config.runnerGrant);
     if (config.runnerGrant.provider !== config.performer) {
@@ -298,6 +307,14 @@ async function renderEnabled(source, config, overrides) {
         : []),
       ...(config.sourceCommit
         ? [{ name: "COMPUTE_SOURCE_COMMIT", value: config.sourceCommit }]
+        : []),
+      ...(config.resumeInitializationLogSha256
+        ? [
+            {
+              name: "COMPUTE_CONTINUE_INITIALIZATION_LOG_SHA256",
+              value: config.resumeInitializationLogSha256,
+            },
+          ]
         : []),
       ...(config.runnerGrant?.enabled === true
         ? [

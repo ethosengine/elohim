@@ -27,7 +27,7 @@ export MESH_COMPUTE_LOCAL_TOKEN=provider-private-mesh-fixture-local-only
 export E2E_DOORWAY_ALPHA=http://localhost:18888
 export E2E_DOORWAY_B=http://localhost:18889 E2E_DOORWAY_BETA=http://localhost:18889
 export E2E_STORAGE_URL=http://localhost:18090 E2E_STORAGE_B=http://localhost:18091
-export PATH="$compute_image_root/mesh-bin:/usr/local/bin:/usr/bin:/bin"
+export PATH="$compute_image_root/mesh-bin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin"
 unset MESH_DOORWAY_ENV_SET MESH_KEEP_DOORWAY_DB MESH_PEER_TRANSPORTS MESH_HOLOCHAIN_BIN_EXPLICIT
 unset MESH_ALLOW_STALE_BINARY MESH_ALLOW_STALE_HAPP MESH_ALLOW_TOOLCHAIN_SKEW
 unset E2E_DOORWAY_GAMMA E2E_SHEM_HOST

@@ -37,6 +37,9 @@ DNA/WASM builds remain in-tree because `hc dna pack` requires `./target`.
 
 ## Multi-peer mesh
 
+**Interrupted first initialization.** After reviewing the retained `logs/start.log` and diagnosing the failure, `MESH_CONTINUE_INITIALIZATION_LOG_SHA256=<reviewed-sha256> just mesh start` permits one continuation with complete stopped conductor/archive state, no storage directories, and no evidence of prior storage. Ordinary partial-state startup still refuses. Actual startup reserves a private `initialization-continuation/` record and preserves the reviewed log before replacing `logs/start.log`; preflight only inspects. The continuation reuses the existing conductors, checks enabled installed apps and their agent/cell identities before initializing storage, and verifies those identities again after durable storage becomes healthy. An interrupted attempt refuses automatic replay and requires review of the retained evidence. Keep the original identities and evidence intact.
+
+
 The alpha-shaped local topology is two doorways (A `:8888` alpha stand-in,
 bootstrap+signal owner; B `:8889` apex/elohim.host stand-in, jessica-primary)
 plus N conductor/storage peers (default matthew, jessica, james), all on
@@ -249,7 +252,7 @@ the first that serves) instead of through a hardcoded doorway port, which the fe
 preamble refuses as certification. `mesh stop` reaps the legs by recorded pid, `mesh status`
 prints the currently-eligible set plus each leg's liveness, and `mesh preflight` REFUSES
 without the binary (`cd doorway/relay-addr-beacon && just gate`, or `BEACON_BIN=<path>`).
-`MESH_MEMBERSHIP=0` stages nothing — and the absence is honest: the apex-transition scenarios
+`MESH_MEMBERSHIP=0` unsets optional doorway membership variables, including inherited values, so an empty path cannot fail doorway argument parsing. It stages no membership authority — and the absence is honest: the apex-transition scenarios
 then fail naming a household that owns no membership authority, rather than reading a set
 nothing maintains. WAN ingress continuity remains a separate prerequisite: the document proves
 the routing decision, never that the resolved address is reachable.

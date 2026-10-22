@@ -339,3 +339,17 @@ where instrumented. Distinguish human-blocking local work from background waits.
 Reuse valid verification evidence where its binding still holds, without skipping
 required authorization, signatures or current revocation checks. These are costs
 to measure, not benchmark results or a claim of support for all architectures.
+
+### Interrupted fixture initialization station (2026-10-22)
+
+Chain `measure-runs-on-a-peer`, between compatible worker startup and ready private
+household: an interrupted first initialization must continue without replacing existing
+conductor identities or treating lost storage as never-created storage. Edge #1690
+retrieved the original log: `ss` was hidden by sanitized PATH, and disabled membership
+passed an empty optional path to doorway; conductor sandboxes existed, storage had not
+reached its first directory creation. The byte-bound continuation checks the retained
+log, rejects prior-storage witnesses, and compares installed agent/cell identities before
+and after readiness. Its unresolved attempt refuses replay. Probe:
+`hc-mesh-initialization-continuation.test.sh` plus actual provider before/after identity
+and readiness evidence. Current live state **RED**: focused fixtures verify the repair,
+but live continuation, G2 and the native three-scenario completion remain unproven.

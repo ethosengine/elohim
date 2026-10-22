@@ -2,7 +2,14 @@
 import assert from "node:assert/strict";
 import { withClusterTransport } from "./runner-cluster-transport.mjs";
 import { execFileSync } from "node:child_process";
-import { readFileSync, mkdirSync, mkdtempSync, rmSync } from "node:fs";
+import {
+  readFileSync,
+  writeFileSync,
+  chmodSync,
+  mkdirSync,
+  mkdtempSync,
+  rmSync,
+} from "node:fs";
 import { resolve, join } from "node:path";
 import { pathToFileURL } from "node:url";
 
@@ -42,7 +49,11 @@ async function main() {
   process.umask(0o077);
   const root = resolve(process.env.WORKSPACE || ".");
   const publicFile = join(root, "adam-authority-probe.json");
+  const publicActivation = join(root, "adam-authority-activation.json");
   rmSync(publicFile, { force: true });
+  rmSync(publicActivation, { force: true });
+  const publicStatus = join(root, "adam-authority-status.txt");
+  rmSync(publicStatus, { force: true });
   const worker = JSON.parse(
     readFileSync(
       join(root, "genesis/orchestrator/data/adam-compute-worker.json"),
@@ -88,6 +99,13 @@ async function main() {
         { ...profile, runnerGrant: activation.grantActionHash },
         profile.feature,
       );
+      // This capture contains selected public evidence only, never the private journal.
+      writeFileSync(
+        publicActivation,
+        JSON.stringify(activation, null, 2) + "\n",
+        { mode: 0o644 },
+      );
+      chmodSync(publicActivation, 0o644); // Parent deliberately uses private umask077.
       // Suppress child errors as well as stdout: failed subprocess objects can include secrets.
       env.RUNNER_JWT = execFileSync(
         "bash",
@@ -106,6 +124,10 @@ async function main() {
         ],
         { env, stdio: ["ignore", "inherit", "inherit"] },
       );
+      writeFileSync(publicStatus, "READY: authority refusal probe verified\n", {
+        mode: 0o644,
+      });
+      chmodSync(publicStatus, 0o644);
     },
     { env: approvedEnv },
   );
@@ -115,6 +137,20 @@ if (
   import.meta.url === pathToFileURL(resolve(process.argv[1])).href
 ) {
   main().catch(() => {
+    try {
+      const status = resolve(
+        process.env.WORKSPACE || ".",
+        "adam-authority-status.txt",
+      );
+      writeFileSync(
+        status,
+        "REFUSED: authority proof incomplete; no automatic retry\n",
+        { mode: 0o644 },
+      );
+      chmodSync(status, 0o644);
+    } catch {
+      /* Preserve original failure if the workspace is unavailable. */
+    }
     console.error(
       "Authority proof refused or failed. No automatic retry; interrupted temporary grants expire after 15 minutes. A new attempt requires a fresh explicit tagged push.",
     );

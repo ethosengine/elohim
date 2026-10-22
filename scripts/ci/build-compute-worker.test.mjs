@@ -8,7 +8,7 @@ import {
 } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { fileURLToPath } from "node:url";
+import { fileURLToPath, pathToFileURL } from "node:url";
 import { spawnSync } from "node:child_process";
 import test from "node:test";
 
@@ -16,6 +16,11 @@ const script = fileURLToPath(
   new URL("./build-compute-worker.sh", import.meta.url),
 );
 const base = `registry.example/runtime@sha256:${"a".repeat(64)}`;
+const nativePaths = [
+  "elohim/elohim-storage/src",
+  "doorway/doorway-service/src",
+];
+const initialEpoch = 1700000000;
 function git(directory, ...args) {
   const result = spawnSync(
     "git",
@@ -32,6 +37,32 @@ function git(directory, ...args) {
   );
   assert.equal(result.status, 0, result.stderr);
   return result.stdout.trim();
+}
+function commitAt(directory, message, epoch) {
+  const result = spawnSync(
+    "git",
+    [
+      "-C",
+      directory,
+      "-c",
+      "user.name=Fixture",
+      "-c",
+      "user.email=fixture@example.invalid",
+      "commit",
+      "-qm",
+      message,
+    ],
+    {
+      encoding: "utf8",
+      env: {
+        ...process.env,
+        GIT_AUTHOR_DATE: `${epoch} +0000`,
+        GIT_COMMITTER_DATE: `${epoch} +0000`,
+      },
+    },
+  );
+  assert.equal(result.status, 0, result.stderr);
+  return git(directory, "rev-parse", "HEAD");
 }
 function fixture(t, executor = true) {
   const root = mkdtempSync(join(tmpdir(), "compute-build-"));
@@ -86,12 +117,17 @@ function fixture(t, executor = true) {
     "FROM scratch\n",
   );
   writeFileSync(join(root, "source.txt"), "committed source\n");
+  for (const path of nativePaths) {
+    mkdirSync(join(root, path), { recursive: true });
+    writeFileSync(join(root, path, "lib.rs"), "// committed native source\n");
+  }
   git(
     root,
     "add",
     ".gitmodules",
     "source.txt",
     "genesis/agentic/compute/Dockerfile.source",
+    ...nativePaths,
   );
   git(
     root,
@@ -100,8 +136,7 @@ function fixture(t, executor = true) {
     "--cacheinfo",
     `160000,${pin},elohim/rakia`,
   );
-  git(root, "commit", "-qm", "fixture root");
-  const commit = git(root, "rev-parse", "HEAD");
+  const commit = commitAt(root, "fixture root", initialEpoch);
   writeFileSync(join(root, "source.txt"), "dirty source must not ship\n");
   writeFileSync(join(root, "private-token"), "must not ship\n");
   git(
@@ -120,7 +155,9 @@ const fs=require('node:fs'); const cp=require('node:child_process'); const p=req
 const args=process.argv.slice(2); const context=args.at(-1); const repo=p.join(context,'repo');
 const git=(where,...cmd)=>cp.execFileSync('git',['-C',where,...cmd],{encoding:'utf8'}).trim();
 const fork=p.join(repo,'elohim/holochain-conductor');
-fs.writeFileSync(process.env.BUILD_OBSERVATION,JSON.stringify({args,source:fs.readFileSync(p.join(repo,'source.txt'),'utf8'),privateFile:fs.existsSync(p.join(repo,'private-token')),root:git(repo,'rev-parse','HEAD'),rakia:git(p.join(repo,'elohim/rakia'),'rev-parse','HEAD'),remotes:git(repo,'remote'),config:fs.readFileSync(p.join(repo,'.git/config'),'utf8'),shallow:git(repo,'rev-parse','--is-shallow-repository'),sourceMtime:Math.floor(fs.statSync(p.join(repo,'source.txt')).mtimeMs/1000),commitTime:Number(git(repo,'show','-s','--format=%ct','HEAD')),fork:git(fork,'rev-parse','HEAD'),forkConfig:fs.readFileSync(p.join(fork,'.git/config'),'utf8'),forkSource:fs.readFileSync(p.join(fork,'crates/hc/Cargo.toml'),'utf8'),forkPrivate:fs.existsSync(p.join(fork,'private-token'))}));
+const times=JSON.parse(fs.readFileSync(p.join(repo,'.compute-source-times.json'),'utf8'));
+const native=times.sources.map(entry=>({...entry,mtime:Math.floor(fs.statSync(p.join(repo,entry.path,'lib.rs')).mtimeMs/1000),source:fs.readFileSync(p.join(repo,entry.path,'lib.rs'),'utf8')}));
+fs.writeFileSync(process.env.BUILD_OBSERVATION,JSON.stringify({args,times,native,source:fs.readFileSync(p.join(repo,'source.txt'),'utf8'),privateFile:fs.existsSync(p.join(repo,'private-token')),root:git(repo,'rev-parse','HEAD'),rakia:git(p.join(repo,'elohim/rakia'),'rev-parse','HEAD'),remotes:git(repo,'remote'),config:fs.readFileSync(p.join(repo,'.git/config'),'utf8'),shallow:git(repo,'rev-parse','--is-shallow-repository'),sourceMtime:Math.floor(fs.statSync(p.join(repo,'source.txt')).mtimeMs/1000),commitTime:Number(git(repo,'show','-s','--format=%ct','HEAD')),fork:git(fork,'rev-parse','HEAD'),forkConfig:fs.readFileSync(p.join(fork,'.git/config'),'utf8'),forkSource:fs.readFileSync(p.join(fork,'crates/hc/Cargo.toml'),'utf8'),forkPrivate:fs.existsSync(p.join(fork,'private-token'))}));
 `,
     { mode: 0o755 },
   );
@@ -172,6 +209,112 @@ test("source build refuses a pin without the executor before building", (t) => {
     result.stderr,
     /Pinned rakia does not contain the compute executor/,
   );
+});
+
+test("a later harness commit retains verified native tree times and committed bytes", (t) => {
+  const f = fixture(t);
+  writeFileSync(join(f.root, "source.txt"), "later harness\n");
+  git(f.root, "add", "source.txt");
+  const commit = commitAt(f.root, "harness only", initialEpoch + 100);
+  writeFileSync(
+    join(f.root, nativePaths[0], "lib.rs"),
+    "// dirty native source\n",
+  );
+  const result = build(f, ["--source", base, "compute-worker:test", commit]);
+  assert.equal(result.status, 0, result.stderr);
+  const observation = JSON.parse(
+    readFileSync(join(f.root, "observed.json"), "utf8"),
+  );
+  assert.equal(observation.times.sourceCommit, commit);
+  assert.equal(observation.sourceMtime, initialEpoch + 100);
+  assert.deepEqual(
+    observation.native.map((entry) => entry.path),
+    nativePaths,
+  );
+  for (const entry of observation.native) {
+    assert.equal(
+      entry.tree,
+      git(f.root, "rev-parse", `${commit}:${entry.path}`),
+    );
+    assert.equal(entry.lastChangeCommit, f.commit);
+    assert.equal(entry.epoch, initialEpoch);
+    assert.equal(entry.mtime, initialEpoch);
+    assert.equal(entry.source, "// committed native source\n");
+  }
+});
+
+test("a real native change advances only its source time even after later harness work", (t) => {
+  const f = fixture(t);
+  writeFileSync(join(f.root, nativePaths[0], "lib.rs"), "// native change\n");
+  git(f.root, "add", nativePaths[0]);
+  const nativeCommit = commitAt(f.root, "native change", initialEpoch + 200);
+  writeFileSync(join(f.root, "source.txt"), "later harness\n");
+  git(f.root, "add", "source.txt");
+  const commit = commitAt(f.root, "harness only", initialEpoch + 300);
+  const result = build(f, ["--source", base, "compute-worker:test", commit]);
+  assert.equal(result.status, 0, result.stderr);
+  const observation = JSON.parse(
+    readFileSync(join(f.root, "observed.json"), "utf8"),
+  );
+  assert.equal(observation.sourceMtime, initialEpoch + 300);
+  assert.equal(observation.native[0].lastChangeCommit, nativeCommit);
+  assert.equal(observation.native[0].mtime, initialEpoch + 200);
+  assert.equal(observation.native[0].source, "// native change\n");
+  assert.equal(observation.native[1].lastChangeCommit, f.commit);
+  assert.equal(observation.native[1].mtime, initialEpoch);
+});
+
+test("an ambiguous shallow history boundary refuses before the image builder", (t) => {
+  const f = fixture(t);
+  for (const offset of [100, 200]) {
+    writeFileSync(join(f.root, "source.txt"), `harness ${offset}\n`);
+    git(f.root, "add", "source.txt");
+    commitAt(f.root, "harness only", initialEpoch + offset);
+  }
+  const shallow = join(f.root, "shallow-checkout");
+  git(f.root, "clone", "--depth=2", "-q", pathToFileURL(f.root).href, shallow);
+  assert.equal(git(shallow, "rev-parse", "--is-shallow-repository"), "true");
+  const result = build({ ...f, root: shallow }, [
+    "--source",
+    base,
+    "compute-worker:test",
+  ]);
+  assert.equal(result.status, 2, result.stderr);
+  assert.match(
+    result.stderr,
+    /native source time: .*shallow history boundary; deepen the checkout/,
+  );
+  assert.throws(() => readFileSync(join(shallow, "observed.json")), {
+    code: "ENOENT",
+  });
+});
+
+test("bounded shallow history is sufficient when native changes are inside its boundary", (t) => {
+  const f = fixture(t);
+  for (const path of nativePaths) {
+    writeFileSync(join(f.root, path, "lib.rs"), "// native change\n");
+  }
+  git(f.root, "add", ...nativePaths);
+  const nativeCommit = commitAt(f.root, "native changes", initialEpoch + 100);
+  writeFileSync(join(f.root, "source.txt"), "later harness\n");
+  git(f.root, "add", "source.txt");
+  commitAt(f.root, "harness only", initialEpoch + 200);
+  const shallow = join(f.root, "shallow-checkout");
+  git(f.root, "clone", "--depth=3", "-q", pathToFileURL(f.root).href, shallow);
+  assert.equal(git(shallow, "rev-parse", "--is-shallow-repository"), "true");
+  const result = build({ ...f, root: shallow }, [
+    "--source",
+    base,
+    "compute-worker:test",
+  ]);
+  assert.equal(result.status, 0, result.stderr);
+  const observation = JSON.parse(
+    readFileSync(join(shallow, "observed.json"), "utf8"),
+  );
+  for (const entry of observation.native) {
+    assert.equal(entry.lastChangeCommit, nativeCommit);
+    assert.equal(entry.mtime, initialEpoch + 100);
+  }
 });
 
 test("uninitialized submodules fetch exact pins using only committed URLs", (t) => {
@@ -238,4 +381,25 @@ test("dry run prepares and validates immutable sources without invoking builder"
   });
   assert.equal(result.status, 0, result.stderr);
   assert.match(result.stdout, /compute worker build: nerdctl -n k8s.io build/);
+});
+
+test("source image RUN bodies parse before a costly native build", () => {
+  const dockerfile = fileURLToPath(
+    new URL("../../genesis/agentic/compute/Dockerfile.source", import.meta.url),
+  );
+  const lines = readFileSync(dockerfile, "utf8").split("\n");
+  let checked = 0;
+  for (let i = 0; i < lines.length; i++) {
+    if (!lines[i].startsWith("RUN ")) continue;
+    let body = lines[i].slice(4);
+    while (body.endsWith("\\")) body = body.slice(0, -1) + " " + lines[++i];
+    const result = spawnSync("bash", ["-n"], {
+      input: body,
+      encoding: "utf8",
+      timeout: 5000,
+    });
+    assert.equal(result.status, 0, result.stderr);
+    checked++;
+  }
+  assert(checked > 0);
 });

@@ -346,6 +346,7 @@ test("worker retains the storage token dependency and opts in to a pinned privat
     localTokenSource: "storage",
     privateMesh: true,
     sourceCommit: "b".repeat(40),
+    resumeInitializationLogSha256: "c".repeat(64),
   };
   const render = async (input, settings) =>
     YAML.parseAllDocuments(await renderWorker(input, settings, { repoRoot }))
@@ -365,6 +366,23 @@ test("worker retains the storage token dependency and opts in to a pinned privat
   assert.equal(
     worker.env.find((v) => v.name === "COMPUTE_SOURCE_COMMIT").value,
     config.sourceCommit,
+  );
+  assert.equal(
+    worker.env.find(
+      (v) => v.name === "COMPUTE_CONTINUE_INITIALIZATION_LOG_SHA256",
+    ).value,
+    config.resumeInitializationLogSha256,
+  );
+  await assert.rejects(
+    render(source, {
+      ...config,
+      resumeInitializationLogSha256: "unreviewed",
+    }),
+    /reviewed log digest/,
+  );
+  await assert.rejects(
+    render(source, { ...config, privateMesh: false }),
+    /reviewed log digest/,
   );
   const input = worker.env.find((v) => v.name === "POOL_COMPUTE_BOOTSTRAP_KEY");
   const token = worker.env.find((v) => v.name === "ELOHIM_COMPUTE_LOCAL_TOKEN");
@@ -393,6 +411,7 @@ test("worker retains the storage token dependency and opts in to a pinned privat
     ...config,
     privateMesh: false,
     sourceCommit: undefined,
+    resumeInitializationLogSha256: undefined,
     localTokenSource: "secret",
   });
   assert.equal(

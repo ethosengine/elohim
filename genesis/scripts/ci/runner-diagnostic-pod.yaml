@@ -1,0 +1,20 @@
+# Short-lived Genesis diagnostics only; native authority remains the runner JWT.
+apiVersion: v1
+kind: Pod
+spec:
+  serviceAccountName: jenkins-deployer
+  nodeSelector:
+    node-type: edge
+  containers:
+    - name: builder
+      image: harbor.ethosengine.com/ethosengine/ci-builder:latest
+      imagePullPolicy: Always
+      command: [cat]
+      tty: true
+      resources:
+        requests:
+          ephemeral-storage: "2Gi"
+          memory: "2Gi"
+        limits:
+          ephemeral-storage: "5Gi"
+          memory: "4Gi"

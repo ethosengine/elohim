@@ -60,6 +60,7 @@ test ! -e /proc/$$/fd/9 || { echo 'worker lock leaked to mesh'; exit 99; }
 test "$MONGOD_BIN" = /usr/local/bin/mongod
 test "$MONGO_PORT" = 37017
 mkdir -p "$MESH_DIR"
+printf '%s' "${"$"}{MESH_CONTINUE_INITIALIZATION_LOG_SHA256:-}" > "$MESH_DIR/continuation-digest"
 printf '%s %s %s %s %s %s %s %s\\n' "$1" "$MESH_STORAGE_BASE_PORT" "$MESH_CONDUCTOR_BASE_PORT" "$MESH_P2P_BASE_PORT" "$MESH_METRICS_BASE_PORT" "$MESH_RESET" "$MESH_PORTAL" "${"$"}{PROVIDER_TEST_TOKEN:-scrubbed}" >> "$MESH_DIR/events"
 if [ "$1" = start ]; then
   for peer in matthew jessica james; do
@@ -157,8 +158,13 @@ test(
   { skip: rootOnly },
   (t) => {
     const f = fixture(t);
+    f.env.COMPUTE_CONTINUE_INITIALIZATION_LOG_SHA256 = "d".repeat(64);
     let run = f.run();
     assert.equal(run.status, 0, run.stderr);
+    assert.equal(
+      readFileSync(join(f.state, "mesh/continuation-digest"), "utf8"),
+      "d".repeat(64),
+    );
     const key = join(f.state, "mesh/matthew/identity.key");
     assert.equal(statSync(key).mode & 0o777, 0o600);
     assert.equal(statSync(join(f.repo, "genesis/a2o/reports")).uid, 65534);
@@ -320,3 +326,27 @@ test(
     );
   },
 );
+
+test("sanitized private mesh PATH retains system network diagnostics", (t) => {
+  if (!existsSync("/usr/sbin/ss") && !existsSync("/sbin/ss")) {
+    t.skip(
+      "host has no sbin ss; final image smoke checks the pinned runtime base",
+    );
+    return;
+  }
+  const result = execFileSync(
+    "bash",
+    [
+      "-c",
+      'source "$1"; command -v ss; ss --version',
+      "fixture",
+      join(here, "mesh-env.sh"),
+    ],
+    {
+      encoding: "utf8",
+      env: { PATH: "/usr/bin:/bin" },
+      timeout: 10000,
+    },
+  );
+  assert.match(result, /ss utility/);
+});

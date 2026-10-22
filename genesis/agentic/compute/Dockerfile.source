@@ -85,6 +85,10 @@ RUN for tool in node just; do \
     done \
     && /usr/local/bin/node --version && /usr/local/bin/just --version \
     && /usr/local/bin/ark --version && /usr/local/bin/compute-executor --version \
-    && /usr/local/bin/mongod --version
+    && /usr/local/bin/mongod --version \
+    && smoke_home=$(mktemp -d) \
+    && env -i HOME="$smoke_home" TMPDIR="$smoke_home" PATH=/usr/local/bin:/usr/bin:/bin \
+       bash /opt/compute/mesh-env.sh bash -c 'set -eu; for tool in ss curl jq python3 setsid flock setpriv timeout; do command -v "$tool"; done; ss --version; python3 -c "import yaml"' \
+    && rm -rf "$smoke_home"
 WORKDIR /opt/compute
 ENTRYPOINT ["bash", "/opt/compute/worker-start.sh"]

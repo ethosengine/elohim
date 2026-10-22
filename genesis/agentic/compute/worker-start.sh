@@ -61,6 +61,7 @@ echo "provider bootstrap: source $commit; persistent mesh $state/mesh; sequentia
 mesh_run() {
   env -i HOME="$state/private-home" TMPDIR="$state/tmp" PATH=/usr/local/bin:/usr/bin:/bin \
     COMPUTE_IMAGE_ROOT="$image" COMPUTE_STATE_ROOT="$state" \
+    MESH_CONTINUE_INITIALIZATION_LOG_SHA256="${COMPUTE_CONTINUE_INITIALIZATION_LOG_SHA256:-}" \
     bash "$here/mesh-env.sh" bash "$mesh_script" "$@" 9>&-
 }
 mesh_run start

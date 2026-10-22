@@ -974,7 +974,132 @@ print_household_state_gaps() {
   fi
 }
 
+# Private, one-shot continuation of a reviewed interrupted first initialization.
+# The retained log hash is operator consent, not evidence that an app is usable.
+initialization_continuation_ready() {
+  local dir="$MESH_DIR/initialization-continuation" digest path
+  [ -e "$dir" ] || [ -L "$dir" ] || return 0
+  [ -d "$dir" ] && [ ! -L "$dir" ] || return 1
+  for path in complete start.log apps-before.jsonl apps-after.jsonl; do
+    [ -s "$dir/$path" ] && [ ! -L "$dir/$path" ] || return 1
+  done
+  digest="$(cat "$dir/complete")"
+  [[ "$digest" =~ ^[a-f0-9]{64}$ ]] || return 1
+  [ "$(sha256sum "$dir/start.log" | cut -d' ' -f1)" = "$digest" ] || return 1
+  [ -z "${MESH_CONTINUE_INITIALIZATION_LOG_SHA256:-}" ] ||
+    [ "$MESH_CONTINUE_INITIALIZATION_LOG_SHA256" = "$digest" ] || return 1
+  cmp -s "$dir/apps-before.jsonl" "$dir/apps-after.jsonl"
+}
+
+initialization_continuation_check() {
+  local dir="$MESH_DIR/initialization-continuation" log="$LOGDIR/start.log" name
+  local expected="${MESH_CONTINUE_INITIALIZATION_LOG_SHA256:-}"
+  [ ! -L "$dir" ] || return 1
+  [ ! -e "$dir" ] || [ -d "$dir" ] || return 1
+  if [ -d "$dir" ]; then
+    if [ -s "$dir/complete" ]; then
+      initialization_continuation_ready || {
+        echo 'REFUSED initialization continuation: completed proof is inconsistent' >&2; return 1;
+      }
+      return 2
+    fi
+    if [ -n "${MESH_INITIALIZATION_INVOCATION:-}" ] &&
+       [ ! -e "$dir/consumed" ] &&
+       [ "$(cat "$dir/invocation" 2>/dev/null)" = "$MESH_INITIALIZATION_INVOCATION" ]; then
+      log="$dir/start.log"
+    else
+      echo 'REFUSED initialization continuation: prior attempt is unresolved; inspect retained evidence' >&2
+      return 1
+    fi
+  elif [ -z "$expected" ]; then
+    return 2
+  fi
+  [[ "$expected" =~ ^[a-f0-9]{64}$ ]] || return 1
+  [ -f "$log" ] && [ ! -L "$log" ] &&
+    [ "$(sha256sum "$log" | cut -d' ' -f1)" = "$expected" ] || {
+    echo 'REFUSED initialization continuation: retained start log differs from reviewed SHA256' >&2; return 1;
+  }
+  [ "$(conductor_state_kind)" = complete ] &&
+    [ "$(archive_state_kind_at "$MESH_DIR")" = complete ] || return 1
+  for name in "${PEERS[@]}"; do
+    [ ! -e "$MESH_DIR/$name" ] && [ ! -L "$MESH_DIR/$name" ] || return 1
+    [ ! -e "$LOGDIR/$name.log" ] && [ ! -L "$LOGDIR/$name.log" ] || return 1
+  done
+  # Even stale PID/env/log witnesses mean storage might previously have existed.
+  if compgen -G "$PID_DIR/storage-*" >/dev/null ||
+     compgen -G "$LOGDIR/storage*" >/dev/null ||
+     [ -e "$MESH_DIR/storage-restart" ] || [ -L "$MESH_DIR/storage-restart" ] ||
+     [ -e "$MESH_DIR/.provider-mesh-ready" ] || [ -L "$MESH_DIR/.provider-mesh-ready" ] ||
+     [ -e "$MESH_DIR/household-fixture.json" ] || [ -L "$MESH_DIR/household-fixture.json" ] ||
+     [ -e "$MESH_DIR/prologue-hosted-humans.json" ] || [ -L "$MESH_DIR/prologue-hosted-humans.json" ]; then
+    echo 'REFUSED initialization continuation: prior storage witness exists' >&2; return 1
+  fi
+  [ -z "$(live_pids_in_registry "$PID_DIR")" ] && ! mesh_ports_busy &&
+    assert_no_live_peer_processes initialization-continuation || return 1
+}
+
+reserve_initialization_continuation() {
+  initialization_continuation_check || return 1
+  local dir="$MESH_DIR/initialization-continuation"
+  (umask 077; mkdir "$dir") || return 1
+  cp "$LOGDIR/start.log" "$dir/start.log" || return 1
+  chmod 600 "$dir/start.log" || return 1
+  [ "$(sha256sum "$dir/start.log" | cut -d' ' -f1)" = "$MESH_CONTINUE_INITIALIZATION_LOG_SHA256" ] || return 1
+  MESH_INITIALIZATION_INVOCATION="$(cat /proc/sys/kernel/random/uuid)"
+  export MESH_INITIALIZATION_INVOCATION
+  printf '%s\n' "$MESH_INITIALIZATION_INVOCATION" > "$dir/invocation"
+}
+
+initialization_app_identities() {
+  local i=0 name apps
+  for name in "${PEERS[@]}"; do
+    apps="$(timeout --kill-after=5s 30s hc client call --port "$(admin_port "$i")" list-apps)" || return 1
+    printf '%s' "$apps" | STEWARD_APP_ID="$STEWARD_APP_ID" MESH_IDENTITY_PEER="$name" python3 -c '
+import json, os, sys
+apps = json.load(sys.stdin)
+selected = [a for a in apps if a.get("installed_app_id") == os.environ["STEWARD_APP_ID"]]
+assert len(selected) == 1, "expected exactly one installed steward app"
+a = selected[0]
+assert a.get("status", {}).get("type") == "enabled", "steward app must be enabled"
+agent = a.get("agent_pub_key")
+assert isinstance(agent, str) and agent.startswith("uhCAk"), "missing steward agent"
+cells = a.get("cell_info")
+assert isinstance(cells, dict) and cells, "missing installed cells"
+identities = {}
+for role, entries in cells.items():
+    identities[role] = []
+    assert entries, "role has no cells"
+    for entry in entries:
+        assert entry.get("type") == "provisioned", "expected provisioned cell"
+        cell = entry.get("value", {}).get("cell_id")
+        assert isinstance(cell, list) and len(cell) == 2, "expected provisioned cell"
+        assert isinstance(cell[0], str) and cell[0].startswith("uhC0k"), "missing DNA hash"
+        assert cell[1] == agent, "cell agent differs from app agent"
+        identities[role].append(cell)
+print(json.dumps({"peer": os.environ["MESH_IDENTITY_PEER"], "agent": agent, "cells": identities}, sort_keys=True, separators=(",", ":")))
+' || return 1
+    i=$((i+1))
+  done
+}
+
+finish_initialization_continuation() {
+  [ "$(storage_state_kind)" = complete ] || {
+    echo 'REFUSED initialization continuation: storage identities incomplete' >&2; return 1;
+  }
+  initialization_app_identities > "$MESH_DIR/initialization-continuation/apps-after.jsonl" || return 1
+  cmp -s "$MESH_DIR/initialization-continuation/apps-before.jsonl" \
+    "$MESH_DIR/initialization-continuation/apps-after.jsonl" || {
+    echo 'REFUSED initialization continuation: installed identities changed' >&2; return 1;
+  }
+  printf '%s\n' "$MESH_CONTINUE_INITIALIZATION_LOG_SHA256" > "$MESH_DIR/initialization-continuation/complete.tmp" || return 1
+  mv "$MESH_DIR/initialization-continuation/complete.tmp" "$MESH_DIR/initialization-continuation/complete"
+}
+
 household_start_mode() { # running | fresh | resume | reset; refuses incoherent state
+  local continuation_rc=0
+  initialization_continuation_check || continuation_rc=$?
+  if [ "$continuation_rc" = 0 ]; then echo continue-initialization; return 0; fi
+  [ "$continuation_rc" = 2 ] || return 1
   if [ "$MESH_RESET" = "1" ]; then
     echo reset
     return 0
@@ -2503,6 +2628,16 @@ membership_names() {
 # ONE DOCUMENT NAMES ONE PUBLIC NAME. This is the path relay-addr-beacon's file
 # sink derives for a lane from the directory-shaped --membership-file below
 # (membership_path_for: <dir>/<public-name>.json), so the two cannot drift.
+# Optional clap path values must be absent, not empty, when authority is disabled.
+# Clear inherited settings before applying this household's explicit declaration.
+doorway_membership_env() {
+  printf '%s\n' -u DOORWAY_MEMBERSHIP_DIR -u DOORWAY_PUBLIC_NAMES
+  if [ "$MESH_MEMBERSHIP" = "1" ]; then
+    printf '%s\n' "DOORWAY_MEMBERSHIP_DIR=$MESH_DIR/membership" \
+      "DOORWAY_PUBLIC_NAMES=$(membership_names | paste -sd, -)"
+  fi
+}
+
 membership_file_path() { echo "$MESH_DIR/membership/${1:-$MESH_MEMBERSHIP_NAME}.json"; }
 
 # What the household's public-name authority currently SAYS, read from the
@@ -4523,6 +4658,9 @@ start_detached() {
   preflight || return 1
   mkdir -p "$MESH_DIR" "$LOGDIR"
   local logfile="$LOGDIR/start.log"
+  if [ "$(household_start_mode)" = continue-initialization ]; then
+    reserve_initialization_continuation || return 1
+  fi
   : > "$logfile"
   local -a launch=(bash "$0" __start_all_inner)
   # MESH_DIR is exported for scenario consumers. Preserve the default-selection
@@ -4601,7 +4739,11 @@ wait_all() { # [--timeout N]
       j=$((j+1))
     done
 
-    if [ "$mongo_ok" = 1 ] && [ "$relay_ok" = 1 ] && [ "$doorway_a_ok" = 1 ] \
+    # Service sockets can be healthy while the detached launcher is still
+    # comparing installed identities. Never admit the worker before its seal.
+    local initialization_ok=1
+    initialization_continuation_ready || initialization_ok=0
+    if [ "$initialization_ok" = 1 ] && [ "$mongo_ok" = 1 ] && [ "$relay_ok" = 1 ] && [ "$doorway_a_ok" = 1 ] \
       && [ "$doorway_b_ok" = 1 ] && [ "$doorway_c_ok" = 1 ] && [ "$portal_ok" = 1 ] \
       && [ "$conductors_ok" = 1 ] && [ "$storage_ok" = 1 ]; then
       echo "ready in ${elapsed}s"
@@ -4609,7 +4751,7 @@ wait_all() { # [--timeout N]
     fi
 
     if [ "$elapsed" -ge "$timeout" ]; then
-      echo "wait: timed out after ${elapsed}s (mongo=$mongo_ok relay=$relay_ok doorwayA=$doorway_a_ok doorwayB=$doorway_b_ok doorwayC=$doorway_c_ok portal=$portal_ok conductors=$conductors_ok storage=$storage_ok)" >&2
+      echo "wait: timed out after ${elapsed}s (mongo=$mongo_ok relay=$relay_ok doorwayA=$doorway_a_ok doorwayB=$doorway_b_ok doorwayC=$doorway_c_ok portal=$portal_ok conductors=$conductors_ok storage=$storage_ok initialization=$initialization_ok)" >&2
       return 1
     fi
     sleep 2
@@ -4628,6 +4770,14 @@ start_all() {
   # and it is made in the same place, for the same reason.
   assert_launch_prerequisites || return 1
   start_mode="$(household_start_mode)" || return 1
+  if [ "$start_mode" = continue-initialization ]; then
+    if [ -z "${MESH_INITIALIZATION_INVOCATION:-}" ]; then
+      reserve_initialization_continuation || return 1
+    fi
+    initialization_continuation_check || return 1
+    mkdir "$MESH_DIR/initialization-continuation/consumed" || return 1
+    unset MESH_INITIALIZATION_INVOCATION
+  fi
   if [ "$start_mode" = reset ]; then
     reset_household_state || return 1
   fi
@@ -4671,7 +4821,7 @@ start_all() {
         rm -f "$MESH_DIR/prologue-hosted-humans.json"
       fi
     fi
-  elif [ "$start_mode" = resume ]; then
+  elif [ "$start_mode" = resume ] || [ "$start_mode" = continue-initialization ]; then
     MESH_RESUME=1
     archive_mode="$(archive_mode_at "$MESH_DIR")"
   else
@@ -4864,11 +5014,11 @@ EOF
     # dir degrades exactly like the fleet does (renderer-less until reconcile
     # adopts the declared head).
     mkdir -p "$MESH_DIR/doorway-a/ssr"
-    env "${gw_a[@]}" "${tls_a[@]}" \
+    local membership_a=()
+    mapfile -t membership_a < <(doorway_membership_env)
+    env "${membership_a[@]}" "${gw_a[@]}" "${tls_a[@]}" \
     DOORWAY_ID="${DOORWAY_ID:-alpha-elohim-host}" \
     DOORWAY_HEALTH_PORT="$DOORWAY_A_HEALTH_PORT" \
-    DOORWAY_MEMBERSHIP_DIR="$([ "$MESH_MEMBERSHIP" = "1" ] && echo "$MESH_DIR/membership")" \
-    DOORWAY_PUBLIC_NAMES="$([ "$MESH_MEMBERSHIP" = "1" ] && membership_names | paste -sd, -)" \
     DOORWAY_NODE_KEY_FILE="$MESH_DIR/doorway-a-node.key" \
     MONGODB_URI="mongodb://127.0.0.1:$MONGO_PORT" MONGODB_DB="doorway-a" \
     ELOHIM_NETWORK_STAKES="$ELOHIM_NETWORK_STAKES" \
@@ -4922,11 +5072,11 @@ EOF
       )
     fi
     mkdir -p "$MESH_DIR/doorway-b/ssr"
-    env "${gw_b[@]}" "${tls_b[@]}" \
+    local membership_b=()
+    mapfile -t membership_b < <(doorway_membership_env)
+    env "${membership_b[@]}" "${gw_b[@]}" "${tls_b[@]}" \
     DOORWAY_ID="${DOORWAY_B_ID:-apex-elohim-host}" \
     DOORWAY_HEALTH_PORT="$DOORWAY_B_HEALTH_PORT" \
-    DOORWAY_MEMBERSHIP_DIR="$([ "$MESH_MEMBERSHIP" = "1" ] && echo "$MESH_DIR/membership")" \
-    DOORWAY_PUBLIC_NAMES="$([ "$MESH_MEMBERSHIP" = "1" ] && membership_names | paste -sd, -)" \
     DOORWAY_NODE_KEY_FILE="$MESH_DIR/doorway-b-node.key" \
     MONGODB_URI="mongodb://127.0.0.1:$MONGO_PORT" MONGODB_DB="doorway-b" \
     ELOHIM_NETWORK_STAKES="$ELOHIM_NETWORK_STAKES" \
@@ -4994,10 +5144,11 @@ EOF
       )
     fi
     mkdir -p "$MESH_DIR/doorway-c/ssr"
-    env "${gw_c[@]}" "${tls_c[@]}" \
+    local membership_c=()
+    mapfile -t membership_c < <(doorway_membership_env)
+    env "${membership_c[@]}" "${gw_c[@]}" "${tls_c[@]}" \
     DOORWAY_ID="${DOORWAY_C_ID:-gamma-elohim-host}" \
     DOORWAY_HEALTH_PORT="$DOORWAY_C_HEALTH_PORT" \
-    DOORWAY_MEMBERSHIP_DIR="$([ "$MESH_MEMBERSHIP" = "1" ] && echo "$MESH_DIR/membership")" \
     DOORWAY_NODE_KEY_FILE="$MESH_DIR/doorway-c-node.key" \
     MONGODB_URI="mongodb://127.0.0.1:$MONGO_PORT" MONGODB_DB="doorway-c" \
     ELOHIM_NETWORK_STAKES="$ELOHIM_NETWORK_STAKES" \
@@ -5153,6 +5304,12 @@ EOF
     echo "conductors already up"
   fi
 
+  if [ "$start_mode" = continue-initialization ]; then
+    initialization_app_identities > "$MESH_DIR/initialization-continuation/apps-before.jsonl" || {
+      echo 'REFUSED initialization continuation: installed app identity verification failed' >&2; return 1;
+    }
+  fi
+
   # 3. Storage peers: one per conductor, agent key read from its conductor.
   local i=0
   for name in "${PEERS[@]}"; do
@@ -5168,6 +5325,12 @@ EOF
     [ "$ok" -ge ${#PEERS[@]} ] && break; sleep 2
   done
 
+  if [ "$start_mode" = continue-initialization ]; then
+    [ "$ok" -ge ${#PEERS[@]} ] || {
+      echo 'REFUSED initialization continuation: storage readiness incomplete' >&2; return 1;
+    }
+    finish_initialization_continuation || return 1
+  fi
   refresh_mesh_pidfiles
   reconcile_doorway_pool_performer
 

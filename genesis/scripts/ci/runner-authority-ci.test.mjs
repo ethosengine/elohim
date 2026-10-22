@@ -59,3 +59,52 @@ test("refuses before effects for missing opt-in, wrong stewardship, aliases and 
   ])
     assert.throws(() => captureEnv(w, e));
 });
+
+test("CLI refusal replaces stale public success without exposing secrets across Jenkins UIDs", async (t) => {
+  const {
+    mkdtempSync,
+    mkdirSync,
+    writeFileSync,
+    readFileSync,
+    statSync,
+    existsSync,
+    rmSync,
+  } = await import("node:fs");
+  const { tmpdir } = await import("node:os");
+  const { join } = await import("node:path");
+  const { execFileSync } = await import("node:child_process");
+  const root = mkdtempSync(join(tmpdir(), "authority-public-refusal-"));
+  t.after(() => rmSync(root, { recursive: true, force: true }));
+  mkdirSync(join(root, "genesis/orchestrator/data"), { recursive: true });
+  writeFileSync(
+    join(root, "genesis/orchestrator/data/adam-compute-worker.json"),
+    JSON.stringify(worker),
+  );
+  for (const name of [
+    "adam-authority-probe.json",
+    "adam-authority-activation.json",
+    "adam-authority-status.txt",
+  ])
+    writeFileSync(join(root, name), "READY stale");
+  assert.throws(() =>
+    execFileSync(
+      process.execPath,
+      [new URL("./runner-authority-ci.mjs", import.meta.url).pathname],
+      {
+        env: {
+          ...process.env,
+          WORKSPACE: root,
+          RUN_ADAM_AUTHORITY_PROBE: "false",
+          ADMIN_KEY: "secret-sentinel",
+        },
+        stdio: "pipe",
+      },
+    ),
+  );
+  assert(!existsSync(join(root, "adam-authority-probe.json")));
+  assert(!existsSync(join(root, "adam-authority-activation.json")));
+  const status = join(root, "adam-authority-status.txt");
+  assert.match(readFileSync(status, "utf8"), /^REFUSED:/);
+  assert(!readFileSync(status, "utf8").includes("secret-sentinel"));
+  assert.equal(statSync(status).mode & 0o777, 0o644);
+});
