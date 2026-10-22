@@ -7,6 +7,7 @@ const rebuildInput = JSON.parse(
 );
 const input = {
   ...rebuildInput,
+  sourceCommit: "04ef84c0798e63d5e0a3e95b55f4a75c71077ac5",
   tools:
     "harbor.ethosengine.com/ethosengine/elohim-compute-worker@sha256:33d11def5d2982b42fa00ca9138eb78ae5643307ebc4b79822404fc63ec510ef",
 };
@@ -16,6 +17,18 @@ test("all recovered inputs are immutable; source remains original tools checkout
     validateInputs(input).sourceCommit,
     "04ef84c0798e63d5e0a3e95b55f4a75c71077ac5",
   ));
+test("reviewed rebuild pins an existing immutable source commit", () => {
+  const selected = validateInputs(rebuildInput);
+  assert.match(selected.sourceCommit, /^[0-9a-f]{40}$/);
+  assert.equal(
+    execFileSync("git", ["cat-file", "-t", selected.sourceCommit], {
+      cwd: fileURLToPath(new URL("../../..", import.meta.url)),
+      encoding: "utf8",
+    }).trim(),
+    "commit",
+  );
+  assert.ok(selected.toolsBase);
+});
 test("refuses floating input or wrong repository before any subprocess", () => {
   for (const key of [
     "tools",
@@ -80,7 +93,7 @@ const op=a[2];
 if(op==='run')process.exit(99);
 if(op==='image'){
  const built=a[4].includes(':package-');
- console.log(JSON.stringify([{Config:{Labels:{'org.opencontainers.image.revision':mode==='label'&&!built?'wrong':'${input.sourceCommit}','org.elohim.assembly.revision':'${assembly}'}},RepoDigests:['${finalImage}']}])); process.exit(0);
+ console.log(JSON.stringify([{Config:{Labels:{'org.opencontainers.image.revision':mode==='label'&&!built?'wrong':'${typeof config === "object" ? config.sourceCommit : input.sourceCommit}','org.elohim.assembly.revision':'${assembly}'}},RepoDigests:['${finalImage}']}])); process.exit(0);
 }
 if(op==='build'){
  if(fs.existsSync(path.join(a.at(-1),'inputs.json'))) fs.copyFileSync(path.join(a.at(-1),'inputs.json'),path.join(root,'build-inputs.json'));
