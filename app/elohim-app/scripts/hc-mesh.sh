@@ -1072,10 +1072,13 @@ for role, entries in cells.items():
     for entry in entries:
         assert entry.get("type") == "provisioned", "expected provisioned cell"
         cell = entry.get("value", {}).get("cell_id")
-        assert isinstance(cell, list) and len(cell) == 2, "expected provisioned cell"
-        assert isinstance(cell[0], str) and cell[0].startswith("uhC0k"), "missing DNA hash"
-        assert cell[1] == agent, "cell agent differs from app agent"
-        identities[role].append(cell)
+        # hc client converts native tuple CellId into CellIdJson (calls.rs),
+        # unlike the raw conductor websocket response.
+        assert isinstance(cell, dict), "expected hc client CellIdJson object"
+        dna = cell.get("dna_hash")
+        assert isinstance(dna, str) and dna.startswith("uhC0k"), "missing DNA hash"
+        assert cell.get("agent_pub_key") == agent, "cell agent differs from app agent"
+        identities[role].append({"dna_hash": dna, "agent_pub_key": agent})
 print(json.dumps({"peer": os.environ["MESH_IDENTITY_PEER"], "agent": agent, "cells": identities}, sort_keys=True, separators=(",", ":")))
 ' || return 1
     i=$((i+1))

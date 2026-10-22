@@ -59,9 +59,10 @@ unset MESH_INITIALIZATION_INVOCATION
 refuses household_start_mode
 echo 'ok retained log survives truncation; consumed or interrupted attempt cannot replay'
 # JSON shape is the pinned hc client app_info_to_base64_json contract:
-# AppStatus and CellInfo use serde type/value tagged enums.
+# AppStatus and CellInfo use serde type/value tagged enums; the CLI converts
+# native tuple CellId into {dna_hash,agent_pub_key} (hc_client calls.rs:625).
 hc() { cat <<'JSON'
-[{"installed_app_id":"elohim","status":{"type":"enabled"},"agent_pub_key":"uhCAk-test","cell_info":{"role":[{"type":"provisioned","value":{"cell_id":["uhC0k-test","uhCAk-test"]}}]}}]
+[{"installed_app_id":"elohim","status":{"type":"enabled"},"agent_pub_key":"uhCAk-test","cell_info":{"role":[{"type":"provisioned","value":{"cell_id":{"dna_hash":"uhC0k-test","agent_pub_key":"uhCAk-test"}}}]}}]
 JSON
 }
 timeout() {
@@ -73,6 +74,15 @@ STEWARD_APP_ID=elohim
 initialization_app_identities > "$tmp/before"
 initialization_app_identities > "$tmp/after"
 cmp "$tmp/before" "$tmp/after"
+# Exercise malformed raw-API tuple, missing DNA, and mismatched cell agent.
+hc() { cat "$tmp/cli-app.json"; }
+for cell in '["uhC0k-test","uhCAk-test"]' '{"agent_pub_key":"uhCAk-test"}' '{"dna_hash":"uhC0k-test","agent_pub_key":"uhCAk-other"}'; do
+  printf '[{"installed_app_id":"elohim","status":{"type":"enabled"},"agent_pub_key":"uhCAk-test","cell_info":{"role":[{"type":"provisioned","value":{"cell_id":%s}}]}}]' "$cell" > "$tmp/cli-app.json"
+  refuses initialization_app_identities
+done
+printf '%s' '[{"installed_app_id":"elohim","status":{"type":"enabled"},"agent_pub_key":"uhCAk-test","cell_info":{"role":[{"type":"provisioned","value":{"cell_id":{"dna_hash":"uhC0k-changed","agent_pub_key":"uhCAk-test"}}}]}}]' > "$tmp/cli-app.json"
+initialization_app_identities > "$tmp/dna-drift"
+refuses cmp -s "$tmp/before" "$tmp/dna-drift"
 hc() { printf '%s' '[{"installed_app_id":"elohim","status":{"type":"enabled"},"agent_pub_key":"uhCAk-test","cell_info":{}}]'; }
 refuses initialization_app_identities
 hc() { printf '%s' '[{"installed_app_id":"elohim","status":{"type":"disabled"}}]'; }
@@ -87,7 +97,7 @@ storage_state_kind() { echo partial; }
 refuses finish_initialization_continuation
 [ ! -e "$MESH_DIR/initialization-continuation/complete" ]
 storage_state_kind() { echo complete; }
-printf 'changed agent or DNA\n' > "$tmp/after"
+cp "$tmp/dna-drift" "$tmp/after"
 refuses finish_initialization_continuation
 [ ! -e "$MESH_DIR/initialization-continuation/complete" ]
 cp "$tmp/before" "$tmp/after"
