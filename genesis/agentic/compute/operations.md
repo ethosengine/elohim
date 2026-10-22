@@ -497,3 +497,24 @@ with PID1/cgroup evidence. `stateEvidence` identifies the persisted bootstrap re
 only the runner's separate signed grant-status read establishes fresh native status.
 The post-stage capture is a second whole-worker snapshot: cgroup `memory.peak` is a
 lifetime peak, not memory attributable solely to the BDD stage.
+
+Adam commissioning is currently blocked on the external cluster grant: Edge #1681
+reported `jenkins:jenkins-deployer` forbidden to get `pods/log` in `elohim-alpha`.
+The existing supplemental Role now declares log reads and exec only for
+`elohim-adam-alpha-0`. Exec supports the current receipt/cgroup capture and native
+refusal probe; Kubernetes cannot restrict that privilege to a particular command
+or container within this pod. It neither issues nor substitutes for native G2.
+
+The namespace's authorized RBAC operator must apply the reviewed manifest:
+
+```bash
+kubectl apply -f genesis/orchestrator/manifests/rbac/jenkins-deployer-elohim-alpha.yaml
+```
+
+This requires an identity authorized to grant the listed namespace permissions,
+such as the cluster administrator; the Jenkins deployer cannot grant itself new
+permissions. Applying this file is an operator action, not a workspace-agent or
+pipeline step. Afterwards, a fresh `[deploy-only] [build:edge]` push captures the
+actual worker failure through Jenkins. Preserve its PVC, identities and fixed
+commissioning timestamps while diagnosing; keep the peer-stage profile disabled
+until the native action hash and running worker evidence are proven.

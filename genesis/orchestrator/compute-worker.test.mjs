@@ -459,3 +459,36 @@ test("only explicit reviewed runner grants reach the provider bootstrap environm
   );
   assert.ok(!disabled.includes("COMPUTE_RUNNER_GRANT_JSON"));
 });
+
+test("CI worker observation and native probe permissions are scoped to Adam's exact pod", async () => {
+  const documents = YAML.parseAllDocuments(
+    await readFile(
+      new URL(
+        "./manifests/rbac/jenkins-deployer-elohim-alpha.yaml",
+        import.meta.url,
+      ),
+      "utf8",
+    ),
+  ).map((doc) => doc.toJS());
+  const role = documents.find((doc) => doc.kind === "Role");
+  const binding = documents.find((doc) => doc.kind === "RoleBinding");
+  assert.equal(role.metadata.namespace, "elohim-alpha");
+  assert.deepEqual(binding.subjects, [
+    { kind: "ServiceAccount", name: "jenkins-deployer", namespace: "jenkins" },
+  ]);
+  assert.equal(binding.roleRef.name, role.metadata.name);
+  const podRules = role.rules.filter((rule) =>
+    rule.resources.some((name) => name.startsWith("pods/")),
+  );
+  assert.equal(podRules.length, 2);
+  for (const rule of podRules) {
+    assert.deepEqual(rule.apiGroups, [""]);
+    assert.deepEqual(rule.resourceNames, ["elohim-adam-alpha-0"]);
+    assert.deepEqual(
+      rule.verbs,
+      rule.resources[0] === "pods/log" ? ["get"] : ["get", "create"],
+    );
+    assert(["pods/log", "pods/exec"].includes(rule.resources[0]));
+    assert.equal(rule.resources.length, 1);
+  }
+});

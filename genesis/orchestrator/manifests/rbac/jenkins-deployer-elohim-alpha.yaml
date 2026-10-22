@@ -4,7 +4,7 @@
 # (5 recurrences: 2026-04-27, 2026-05-04, 2026-05-26, 2026-07-06, 2026-08-05).
 # The jenkins-deployer ServiceAccount (namespace `jenkins`) already holds
 # whatever base permissions let it apply Deployments/Services/PVCs/Ingress —
-# this Role grants ONLY the two permission classes that have been observed
+# this Role grants ONLY the supplemental permission classes that have been observed
 # Forbidden in this namespace, additively, without touching the operator-side
 # base grant. It is deliberately scoped narrow (least-privilege) rather than
 # re-declaring the SA's full permission set, which is not visible from the
@@ -27,6 +27,14 @@
 # scripts/ci/apply-doorway-manifest.sh until this grant lands; the RBAC DRIFT
 # banner it prints is the verification signal that this manifest was applied.
 #
+# Grant 3 — Adam commissioning evidence and native grant probe (Edge #1681).
+# The deployer cannot get pods/log, hiding the compute worker's CrashLoop reason.
+# The existing capture/refusal helpers also require pods/exec for a bounded public
+# receipt/cgroup read and provider-local native grant calls. Scope to Adam's exact
+# StatefulSet pod, never other humans or namespaces. Kubernetes cannot restrict
+# exec to one container or command: this grants trusted CI execution within any
+# container of that one Adam pod. It does not grant native measure-stage authority.
+#
 # APPLY IS OPERATOR-OWNED. This file is a ready-to-apply artifact only — no
 # agent may run kubectl against the live cluster (CLAUDE.md, "Cluster ops are
 # operator-owned"). Operator applies via:
@@ -47,6 +55,14 @@ rules:
   - apiGroups: ["monitoring.coreos.com"]
     resources: ["podmonitors"]
     verbs: ["get", "create", "patch"]
+  - apiGroups: [""]
+    resources: ["pods/log"]
+    resourceNames: ["elohim-adam-alpha-0"]
+    verbs: ["get"]
+  - apiGroups: [""]
+    resources: ["pods/exec"]
+    resourceNames: ["elohim-adam-alpha-0"]
+    verbs: ["get", "create"]
 ---
 apiVersion: rbac.authorization.k8s.io/v1
 kind: RoleBinding
