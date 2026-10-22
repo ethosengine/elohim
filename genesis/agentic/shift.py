@@ -15,6 +15,7 @@ import time
 
 from shift_ops import execute, validate_steps
 from shift_inputs import normalize_inputs, verify_inputs
+from shift_lease import host_berth, resources
 from shift_runtime import command, completed, session_from
 from shift_state import (Refused, alive, atomic, authority, check_clock, digest, finite_number, home, incarnation,
                          load, lock, native_context, read, revision, run, signal_handle,
@@ -93,16 +94,23 @@ def preflight(spec, directory, *, checks=None):
     if not spec['verification'] or not set(spec['verification']) <= available:
         raise Refused('required gates absent from manifest-selected registry')
     measurement_resource = spec.get('measurement_resource')
-    for resource in ({s.get('resource') for s in spec['steps']} | {measurement_resource}) - {None}:
-        holder = run([str(root / 'genesis/agentic/bin/berth'), 'who', resource], root)
+    required_resources = set(resources(measurement_resource))
+    for step in spec['steps']:
+        required_resources.update(resources(step.get('resource')))
+    for resource in sorted(required_resources):
+        holder = host_berth(spec, 'who', resource)
         if holder and holder != 'null':
             raise Refused(f'resource lease unavailable: {resource}: {holder}')
     remaining()
+    measurement_started = time.monotonic()
     lease(spec, measurement_resource)
+    def measurement_remaining():
+        left = remaining()
+        return min(left, 1800 - (time.monotonic() - measurement_started)) if 'mesh' in resources(measurement_resource) else left
     try:
         bounded(['node', 'genesis/agentic/readiness.mjs', '--objective', str(directory / 'objective.json'),
                  '--worktree', str(root), '--deadline', spec['deadline'], '--preserve-observers'],
-                 root, remaining(), checks / 'baseline.json', env=environment, check=remaining)
+                root, measurement_remaining(), checks / 'baseline.json', env=environment, check=measurement_remaining)
     finally:
         lease(spec, measurement_resource, release=True)
     baseline = read(checks / 'baseline.json')
@@ -175,9 +183,10 @@ def start(path, runtime):
     if digest(path) != declaration_sha256 or digest(objective_path) != objective_source_sha256:
         raise Refused('initialization input changed while being read')
     spec.update(version=1, worktree=str(root), objective=objective)
+    spec.setdefault('ci_policy', 'success')
     spec['input_files'] = normalize_inputs(root, spec.get('input_files', []))
     verify_inputs(spec)
-    # These five generated hook ledgers are operational state, never a source-clean
+    # These six generated hook ledgers are operational state, never a source-clean
     # exemption selected by an agent. Pin their exact set into the frozen contract.
     spec['observer_paths'] = read(Path(__file__).with_name('shift-observer-paths.json'))
     if spec.get('mode') not in {'delivery', 'rehearsal'}:

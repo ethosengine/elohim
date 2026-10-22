@@ -14,10 +14,12 @@ import struct
 import subprocess
 import sys
 import time
+import traceback
 import uuid
 
 from shift_ops import (execute, next_operation, op_dir, prepare, receipts, require_delivery_evidence)
 from shift_evidence import binary_observation
+from shift_lease import host_berth, resources
 from shift_state import (Refused, alive, atomic, authority, checkpoint, digest,
                          incarnation, load, lock, native_context, read, revision,
                          run, signal_handle)
@@ -38,6 +40,31 @@ def read_message(connection):
     if not isinstance(message, dict):
         raise ValueError('guardian message must be an object')
     return message
+
+
+def reply(connection, payload):
+    """A departed local peer loses its reply, not the guardian-owned operation."""
+    try:
+        connection.sendall(payload)
+        return True
+    except (ConnectionError, socket.timeout):
+        return False
+
+
+def controller_status(handle):
+    """Observe only the saved incarnation; exit/reaping can race the liveness check."""
+    if not alive(handle):
+        return None
+    try:
+        record = Path(f"/proc/{handle['pid']}/stat").read_text()
+    except (FileNotFoundError, ProcessLookupError):
+        return None
+    fields = record.rsplit(')', 1)[-1].split()
+    if len(fields) < 20:
+        raise Refused('malformed controller process status')
+    if fields[19] != handle['start'] or fields[0] in {'Z', 'X'}:
+        return None
+    return fields[0]
 
 
 def contained(argv):
@@ -121,22 +148,39 @@ def ark_declarations(directory, contract, address, token):
 
 
 def lease(contract, resource, release=False):
-    if resource is None:
+    selected = resources(resource)
+    if not selected:
         return
-    if resource not in {'cargo', 'mesh', 'disk-heavy'}:
-        raise Refused('unknown resource lease')
-    binary = str(Path(contract['worktree']) / 'genesis/agentic/bin/berth')
     session = f"shift-{contract['id']}"
+    def release_all(owned):
+        failures = []
+        for name in reversed(owned):
+            try:
+                host_berth(contract, 'release', name, '--session', session)
+            except (Refused, OSError, subprocess.SubprocessError) as error:
+                failures.append(f'{name}: {error}')
+        if failures:
+            raise Refused('resource release unresolved: ' + '; '.join(failures))
     if release:
-        run([binary, 'release', resource, '--session', session], contract['worktree'])
+        release_all(selected)
     else:
-        # This function runs ONLY in the host guardian: --pid is a host process handle.
-        run([binary, 'moor', '--session', session, '--runtime', 'shift', '--pid', str(os.getpid()),
-             '--task', contract['id']], contract['worktree'])
-        argv = [binary, 'claim', resource, '--session', session]
-        if resource == 'mesh':
-            argv += ['--class', 'verify', '--ttl', '1800']
-        run(argv, contract['worktree'])
+        # Host guardian/readiness owner: one mooring, never namespace-local PIDs.
+        host_berth(contract, 'moor', '--session', session, '--runtime', 'shift', '--pid', str(os.getpid()),
+                   '--task', contract['id'])
+        attempted = []
+        try:
+            for name in selected:
+                attempted.append(name)  # A lost claim response may already have acquired it.
+                argv = ['claim', name, '--session', session]
+                if name == 'mesh':
+                    argv += ['--class', 'verify', '--ttl', '1800']
+                host_berth(contract, *argv)
+        except BaseException as error:
+            try:
+                release_all(attempted)  # Releases only our session; another holder is untouched.
+            except Refused as cleanup:
+                raise Refused(f'{error}; rollback failed: {cleanup}') from error
+            raise
 
 
 def guardian(directory):
@@ -161,7 +205,7 @@ def _guard(directory):
     wrapper = None
     worker = None
     active_step = None
-    held_resource = None
+    held_resources = []
     lease_started = None
     lease_touched = None
     controller_handle = None
@@ -170,27 +214,49 @@ def _guard(directory):
     launched = 0
     handshake_started = time.monotonic()
     guardian_handle = incarnation(os.getpid())
-    checkpoint(directory, guardian=guardian_handle, phase='handshake')
+    termination_requested = False
+    def kill_children():
+        for process in (worker, wrapper):
+            try:
+                if process is not None and process.poll() is None:
+                    process.kill()
+            except OSError:
+                # An owned child may exit between poll and kill. Reaping belongs
+                # to finally, never a signal handler interrupting that reap.
+                pass
     def terminate(_sig, _frame):
-        raise Refused('guardian termination requested')
+        nonlocal termination_requested
+        termination_requested = True
+        # Stop contained execution immediately even while a host call is blocked.
+        # Never raise asynchronously through refusal persistence or cleanup.
+        kill_children()
+    def check_termination():
+        if termination_requested:
+            kill_children()  # also covers a signal during spawn, before assignment
+            raise Refused('guardian termination requested')
     signal.signal(signal.SIGTERM, terminate)
     signal.signal(signal.SIGINT, terminate)
     signal.signal(signal.SIGALRM, terminate)
-    signal.setitimer(signal.ITIMER_REAL, authority(directory, contract, state))
     try:
+        checkpoint(directory, guardian=guardian_handle, phase='handshake')
+        signal.setitimer(signal.ITIMER_REAL, authority(directory, contract, state))
         while True:
+            check_termination()
             contract, state = load(directory)
             remaining = authority(directory, contract, state)
             if wrapper is None or wrapper.poll() is not None:
                 launched += 1
                 if launched > 3:
                     raise Refused('contained supervisor restart budget exhausted')
+                check_termination()
                 with open(directory / 'ark.log', 'ab', buffering=0) as output:
                     wrapper = spawn_owned(contained([
                         contract['ark'], 'run', '--manifest', str(directory / 'ark-manifest.json'),
                         '--berth', str(directory / 'ark-berth.json'),
                     ]), stdout=output, stderr=subprocess.STDOUT, stdin=subprocess.DEVNULL)
+                check_termination()
                 controller_handle, last_heartbeat = None, None
+                stopped_since = None
                 handshake_started = time.monotonic()
                 checkpoint(directory, wrapper=incarnation(wrapper.pid), phase='handshake')
             tick = False
@@ -203,60 +269,59 @@ def _guard(directory):
                         message = read_message(connection)
                     except (OSError, ValueError):
                         # A malformed local client cannot tear down authorized execution.
-                        try:
-                            connection.sendall(b'refused\n')
-                        except OSError:
-                            pass
+                        reply(connection, b'refused\n')
                         continue
                     if message.get('kind') == 'berth':
                         if (message.get('token') != token or uid != os.getuid() or worker is None
                                 or worker.poll() is not None or not descendant(pid, worker.pid)):
-                            reply = {'exit': 3, 'stdout': '', 'stderr': 'berth: shift delegation refused\n'}
+                            response = {'exit': 3, 'stdout': '', 'stderr': 'berth: shift delegation refused\n'}
                         else:
                             from shift_lease import handle_request
-                            reply = handle_request(contract, held_resource, lease_started, message.get('argv'))
-                        connection.sendall(json.dumps(reply).encode() + b'\n')
+                            response = handle_request(contract, held_resources, lease_started, message.get('argv'))
+                        reply(connection, json.dumps(response).encode() + b'\n')
                         continue
                     if message != {'token': token} or uid != os.getuid() or not descendant(pid, wrapper.pid):
-                        connection.sendall(b'refused\n')
+                        reply(connection, b'refused\n')
                         continue
-                    controller_handle = incarnation(pid)
-                    last_heartbeat = time.monotonic()
-                    checkpoint(directory, controller=controller_handle, heartbeat=time.time(), phase='running')
-                    connection.sendall(b'ack\n')
-                    tick = True
-                    atomic(directory / 'guardian-ready.json', {'guardian': guardian_handle, 'controller': controller_handle})
+                    candidate = incarnation(pid)
+                    checkpoint(directory, controller=candidate, heartbeat=time.time(), phase='running')
+                    if reply(connection, b'ack\n'):
+                        if candidate != controller_handle:
+                            stopped_since = None
+                        controller_handle = candidate
+                        last_heartbeat = time.monotonic()
+                        tick = True
+                        atomic(directory / 'guardian-ready.json', {'guardian': guardian_handle, 'controller': controller_handle})
             except socket.timeout:
                 pass
+            check_termination()
             if controller_handle is None and time.monotonic() - handshake_started > 25:
                 raise Refused('contained controller never completed launch handshake')
-            if controller_handle and alive(controller_handle):
-                status = Path(f"/proc/{controller_handle['pid']}/stat").read_text().rsplit(')', 1)[1].split()[0]
-                if status in {'T', 't'}:
-                    stopped_since = stopped_since or time.monotonic()
-                    if time.monotonic() - stopped_since >= STOPPED_RECOVERY:
-                        signal_handle(controller_handle, signal.SIGKILL)
-                        stopped_since = None
-                else:
+            status = controller_status(controller_handle)
+            if status in {'T', 't'}:
+                stopped_since = stopped_since or time.monotonic()
+                if time.monotonic() - stopped_since >= STOPPED_RECOVERY:
+                    signal_handle(controller_handle, signal.SIGKILL)
                     stopped_since = None
+            else:
+                stopped_since = None
             # Persist wall-clock floor while quiet builds run; transcript silence is not a stall.
             if time.time() - state['last_wall'] >= 1:
                 checkpoint(directory)
             if worker and worker.poll() is not None:
                 if active_step['kind'] == 'household':
                     binary_observation(directory, contract, active_step, 'after')
-                if held_resource:
-                    lease(contract, held_resource, release=True)
-                    held_resource = None
+                if held_resources:
+                    lease(contract, held_resources, release=True)
+                    held_resources = []
                 worker = None
                 tick = bool(last_heartbeat and time.monotonic() - last_heartbeat < 2 * HEARTBEAT)
-            if worker is not None and held_resource:
-                if held_resource == 'mesh' and time.monotonic() - lease_started >= 1800:
+            if worker is not None and held_resources:
+                if 'mesh' in held_resources and time.monotonic() - lease_started >= 1800:
                     raise Refused('household verify lease expired; scope the lane down or use just measure')
                 if time.monotonic() - lease_touched >= HEARTBEAT:
                     # Touch the host guardian's mooring; never reset the lease's original TTL.
-                    run([str(Path(contract['worktree']) / 'genesis/agentic/bin/berth'), 'touch',
-                         '--session', f"shift-{contract['id']}", '--pid', str(os.getpid())], contract['worktree'])
+                    host_berth(contract, 'touch', '--session', f"shift-{contract['id']}", '--pid', str(os.getpid()))
                     lease_touched = time.monotonic()
             if worker is not None or not tick:
                 continue
@@ -272,6 +337,7 @@ def _guard(directory):
                     # observation must still name the exact original live process.
                     binary_observation(directory, contract, observed, 'after')
             step = next_operation(directory, contract, state)
+            check_termination()
             if step is None:
                 if contract['mode'] == 'delivery':
                     require_delivery_evidence(directory, contract, revision(contract['worktree']), published=True)
@@ -281,9 +347,12 @@ def _guard(directory):
                 raise Refused('no remaining execution time')
             prepare(directory, contract, state, step)
             checkpoint(directory, pending=step['id'])
-            held_resource = step.get('resource')
-            lease(contract, held_resource)
-            lease_started = lease_touched = time.monotonic()
+            selected = resources(step.get('resource'))
+            lease_started = time.monotonic()  # Acquiring another resource never extends an earlier TTL.
+            lease(contract, selected)
+            held_resources = selected  # Expose only the fully acquired set to authenticated workers.
+            lease_touched = time.monotonic()
+            check_termination()
             active_step = step
             if step['kind'] == 'household':
                 binary_observation(directory, contract, step, 'before')
@@ -291,23 +360,28 @@ def _guard(directory):
             # Household lifecycle is explicitly host-owned; its intended services outlive this command.
             argv = ['setpriv', '--pdeathsig', 'KILL', *argv] if step['kind'] == 'lifecycle' else contained(argv)
             with open(directory / 'worker-errors.log', 'ab') as errors:
+                check_termination()
                 worker = spawn_owned(argv, stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL,
                                      stderr=errors, env={**os.environ, **contract.get('workload_env', {}),
                                                         'BERTH_SESSION': f"shift-{contract['id']}",
                                                         'ELOHIM_SHIFT_BERTH_ADDRESS': advertised,
                                                         'ELOHIM_SHIFT_BERTH_TOKEN': token})
+            check_termination()
             checkpoint(directory, worker=incarnation(worker.pid))
     except (Refused, OSError, ValueError, KeyError) as error:
         # Refusal evidence is append-only and does not repair or recreate corrupt authority/state.
-        atomic(directory / f'refusal-{time.time_ns()}.json', {'reason': str(error), 'at': time.time()})
+        atomic(directory / f'refusal-{time.time_ns()}.json', {
+            'reason': str(error), 'at': time.time(), 'exception_type': type(error).__name__,
+            'traceback': traceback.format_exc(),
+        })
         return 3
     finally:
-        for process in (worker, wrapper):
-            if process is not None and process.poll() is None:
-                # These are Popen handles owned by this guardian, never namespace-local PIDs.
-                process.kill()
-                process.wait()
-        if held_resource:
-            lease(contract, held_resource, release=True)
-        server.close()
         signal.setitimer(signal.ITIMER_REAL, 0)
+        kill_children()
+        for process in (worker, wrapper):
+            if process is not None:
+                # These are Popen handles owned by this guardian, never namespace-local PIDs.
+                process.wait()
+        if held_resources:
+            lease(contract, held_resources, release=True)
+        server.close()

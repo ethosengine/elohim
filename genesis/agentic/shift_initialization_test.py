@@ -82,13 +82,27 @@ class Initialization(unittest.TestCase):
         self.assertEqual(contract['deadline'], self.deadline)
         self.assertEqual(contract['scope_cid'], 'original-scope')
         self.assertEqual(contract['baseline']['checks'], str(self.attempts[1]))
+        self.assertEqual(contract['ci_policy'], 'success')
+        self.assertEqual(json.loads(initialized)['spec']['ci_policy'], 'success')
+
+    def test_explicit_inspection_policy_is_frozen_and_invalid_values_refuse(self):
+        for policy in [None, True, '', 'ignore', [], {}]:
+            state.atomic(self.declaration, {**self.spec, 'ci_policy': policy})
+            with self.subTest(policy=policy), self.assertRaisesRegex(state.Refused, 'ci_policy'):
+                shift.start(self.declaration, 'codex')
+        self.assertEqual(self.attempts, [])
+        state.atomic(self.declaration, {**self.spec, 'ci_policy': 'inspect'})
+        self.ready = True
+        contract = shift.start(self.declaration, 'codex')
+        self.assertEqual(contract['ci_policy'], 'inspect')
+        self.assertEqual(state.read(self.directory / 'initialization.json')['spec']['ci_policy'], 'inspect')
 
     def test_changed_scope_authority_or_deadline_cannot_restart_readiness(self):
         self.fail_readiness()
         declaration = self.declaration.read_bytes()
         authorization = self.authority.read_bytes()
         original = self.objective.read_bytes()
-        for change in ['scope', 'authority', 'deadline', 'objective', 'formatting']:
+        for change in ['scope', 'authority', 'deadline', 'objective', 'formatting', 'ci_policy']:
             with self.subTest(change=change):
                 self.declaration.write_bytes(declaration)
                 self.authority.write_bytes(authorization)
@@ -109,6 +123,10 @@ class Initialization(unittest.TestCase):
                     altered = state.read(self.objective)
                     altered['scope']['paths'] = ['**']
                     state.atomic(self.objective, altered)
+                elif change == 'ci_policy':
+                    altered = state.read(self.declaration)
+                    altered['ci_policy'] = 'inspect'
+                    state.atomic(self.declaration, altered)
                 else:
                     self.declaration.write_bytes(declaration + b'\n')
                 with self.assertRaises(state.Refused):

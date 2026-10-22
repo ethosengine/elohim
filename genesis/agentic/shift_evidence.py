@@ -3,7 +3,22 @@ from pathlib import Path
 import math
 import time
 
-from shift_state import Refused, atomic, digest, finite_number, incarnation, read, revision, under
+from shift_state import Refused, atomic, ci_policy, digest, finite_number, incarnation, read, revision, under
+
+
+CI_EXECUTION_STATES = {'SUCCESS': 'completed', 'FAILURE': 'completed', 'UNSTABLE': 'completed',
+                       'ABORTED': 'interrupted', 'NOT_BUILT': 'not_executed'}
+
+
+def require_ci_findings(build):
+    if build.get('result') == 'SUCCESS':
+        return
+    obligations = build.get('remaining_obligations')
+    if (not isinstance(build.get('diagnosis'), str) or not build['diagnosis'].strip()
+            or not isinstance(obligations, list) or not obligations
+            or not all(isinstance(item, str) and item.strip() for item in obligations)
+            or not isinstance(build.get('diagnosis_evidence'), list) or not build['diagnosis_evidence']):
+        raise Refused('non-SUCCESS downstream inspection requires diagnosis, evidence and remaining obligations')
 
 
 def satisfies(value, predicate):
@@ -49,14 +64,30 @@ def oracle_proof(contract, step, delivered, pending):
                 or counts.get('skipped') != 0 or proof.get('oracle') != step['oracle']):
             raise Refused('household oracle is absent, failed, skipped, or differs from declaration')
     else:
+        policy = ci_policy(contract)
+        if proof.get('ci_policy') != policy:
+            raise Refused('CI proof policy differs from frozen contract')
         builds = proof.get('builds', [])
         required = set(contract['downstream'])
         selected = {name: [b for b in builds if b.get('pipeline') == name] for name in required}
-        if not required or any(len(rows) != 1 for rows in selected.values()):
+        if not required or len(builds) != len(required) or any(len(rows) != 1 for rows in selected.values()):
             raise Refused('downstream proof has missing or conflicting selected builds')
-        if not all(rows[0].get('revision') == delivered and rows[0].get('result') == 'SUCCESS'
-                   and rows[0].get('url', '').startswith('https://') and rows[0].get('number')
+        if not all(rows[0].get('revision') == delivered and rows[0].get('building') is False
+                   and rows[0].get('result') in CI_EXECUTION_STATES
+                   and rows[0].get('execution_state') == CI_EXECUTION_STATES[rows[0]['result']]
+                   and rows[0].get('url', '').startswith('https://')
+                   and type(rows[0].get('number')) is int and rows[0]['number'] > 0
                    for rows in selected.values()):
+            raise Refused('terminal downstream build and execution state at the delivered revision are unestablished')
+        all_succeeded = all(build['result'] == 'SUCCESS' for build in builds)
+        if proof.get('all_succeeded') is not all_succeeded:
+            raise Refused('CI proof aggregate conflicts with actual build outcomes')
+        for build in builds:
+            require_ci_findings(build)
+            sources = [build.get('evidence'), *build.get('diagnosis_evidence', [])]
+            if any(not isinstance(source, dict) or source not in proof['evidence'] for source in sources):
+                raise Refused('downstream build or diagnosis lacks retained raw evidence')
+        if policy == 'success' and not all_succeeded:
             raise Refused('downstream success at the delivered revision is unestablished')
     return proof
 

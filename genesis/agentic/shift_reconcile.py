@@ -7,6 +7,21 @@ import time
 from shift_state import Refused, atomic, authority, digest, native_context, read, revision, run, under
 
 
+def commit_argv(contract, step, attempt, *, legacy=False):
+    identity = f"{contract['id']}/{step['id']}" + ('' if legacy else f'/{attempt}')
+    return ['git', 'commit', '-m', step['message'], '-m', f'Shift-Operation: {identity}']
+
+
+def commit_identity(contract, step, pending, dispatch):
+    attempt = pending['attempt']
+    expected = commit_argv(contract, step, attempt)
+    if dispatch.get('argv') == expected:
+        return f"{contract['id']}/{step['id']}/{attempt}"
+    if attempt == 1 and dispatch.get('argv') == commit_argv(contract, step, attempt, legacy=True):
+        return f"{contract['id']}/{step['id']}"
+    raise Refused('commit dispatch changed or lacks its unique attempt identity')
+
+
 def native_argv(step, delivered):
     argv = list(step['argv'])
     if step.get('commit_revision') is True:
@@ -109,7 +124,7 @@ def observe_effect(directory, contract, checkpoint, step, pending, dispatch):
     kind = step['kind']
     context = None
     if kind == 'commit':
-        expected = f"{contract['id']}/{step['id']}"
+        expected = commit_identity(contract, step, pending, dispatch)
         candidates = []
         for sha in run(['git', 'rev-list', f"{contract['baseline_revision']}..HEAD"], root).splitlines():
             trailers = run(['git', 'show', '-s', '--format=%(trailers:key=Shift-Operation,valueonly)', sha], root).splitlines()

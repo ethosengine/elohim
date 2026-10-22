@@ -2,7 +2,7 @@
 
 The guardian authenticates the socket peer before calling handle_request. This
 module never claims, renews, releases, or changes that lease: a nested command
-can only use the resource the guardian currently holds for this operation.
+can only use a resource the guardian currently holds for this operation.
 """
 import datetime as dt
 import fcntl
@@ -15,6 +15,8 @@ import subprocess
 import sys
 import time
 
+from shift_state import Refused
+
 
 PROXY_ENV = ('ELOHIM_SHIFT_BERTH_ADDRESS', 'ELOHIM_SHIFT_BERTH_TOKEN')
 MAX_MESSAGE = 16384
@@ -26,6 +28,17 @@ OPTIONS = {
 }
 
 
+def resources(value):
+    """One frozen resource or an explicit unique list, in stable acquisition order."""
+    if value is None:
+        return []
+    values = [value] if isinstance(value, str) else value
+    if (not isinstance(values, list) or not all(isinstance(item, str) for item in values)
+            or len(values) != len(set(values)) or not set(values) <= {'cargo', 'mesh', 'disk-heavy'}):
+        raise Refused('resource must name cargo, mesh, disk-heavy, or a unique list of those leases')
+    return sorted(values)
+
+
 def refused(reason):
     return {'exit': 3, 'stdout': '', 'stderr': f'berth: shift lease REFUSED — {reason}\n'}
 
@@ -33,6 +46,16 @@ def refused(reason):
 def host_environment():
     """Host inspection must not recursively call the contained-worker proxy."""
     return {key: value for key, value in os.environ.items() if key not in PROXY_ENV}
+
+
+def host_berth(contract, *argv):
+    """Only host-side ownership calls may bypass the contained worker's proxy."""
+    binary = str(Path(contract['worktree']) / 'genesis/agentic/bin/berth')
+    result = subprocess.run([binary, *argv], cwd=contract['worktree'], env=host_environment(),
+                            text=True, capture_output=True, timeout=30)
+    if result.returncode:
+        raise Refused(f'host berth {argv[0]} exited {result.returncode}: {result.stderr[-1500:]}')
+    return result.stdout.strip()
 
 
 def proxy_request(argv, environ=None):
@@ -81,8 +104,8 @@ def parse_request(argv, resource, session):
             or not all(isinstance(arg, str) for arg in argv)):
         raise ValueError('invalid berth arguments')
     command, requested, *tail = argv
-    if command not in OPTIONS or requested != resource:
-        raise ValueError('only checks on the currently held resource are delegated')
+    if command not in OPTIONS or requested not in resources(resource):
+        raise ValueError('only checks on currently held resources are delegated')
     options = {}
     while tail:
         option = tail.pop(0)
@@ -102,10 +125,12 @@ timestamp supplied by the requester. A nested claim reports "renewed" so the
 existing just wrappers retain the outer lease instead of releasing it.
 """
     try:
-        if held_resource not in {'cargo', 'mesh', 'disk-heavy'}:
+        held = resources(held_resource)
+        if not held:
             raise ValueError('the guardian holds no delegated resource')
         session = f"shift-{contract['id']}"
-        command, options = parse_request(argv, held_resource, session)
+        command, options = parse_request(argv, held, session)
+        requested_resource = argv[1]
         elapsed = time.monotonic() - lease_started
         if not math.isfinite(elapsed) or elapsed < 0:
             raise ValueError('invalid guardian lease clock')
@@ -119,7 +144,7 @@ existing just wrappers retain the outer lease instead of releasing it.
         # refuse; neither a new mooring nor an unleased fallback is permissible.
         with open(store / 'berth.lock', 'rb') as ownership:
             fcntl.flock(ownership, fcntl.LOCK_SH | fcntl.LOCK_NB)
-            result = subprocess.run([sys.executable, str(binary), 'who', held_resource],
+            result = subprocess.run([sys.executable, str(binary), 'who', requested_resource],
                                     cwd=contract['worktree'], env=env, text=True,
                                     capture_output=True, timeout=5)
             if result.returncode:
@@ -150,7 +175,7 @@ existing just wrappers retain the outer lease instead of releasing it.
                 output = json.dumps(lease) + '\n'
             else:
                 verb = {'claim': 'renewed', 'release': 'retained', 'owner-check': 'owned'}[command]
-                output = f'{held_resource}: {verb} by {session} (guardian lease unchanged)\n'
+                output = f'{requested_resource}: {verb} by {session} (guardian lease unchanged)\n'
             return {'exit': 0, 'stdout': output, 'stderr': ''}
-    except (OSError, ValueError, TypeError, KeyError, AttributeError, subprocess.SubprocessError) as error:
+    except (Refused, OSError, ValueError, TypeError, KeyError, AttributeError, subprocess.SubprocessError) as error:
         return refused(str(error))

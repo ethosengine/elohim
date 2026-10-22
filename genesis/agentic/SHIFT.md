@@ -49,7 +49,7 @@ flags are used. Each failed initialization retains its own evidence directory.
 Retrying `start` with the identical input is allowed only before publication of
 execution state. Changed input, corrupt state or an expired deadline refuses.
 
-The exact five generated SessionStart observer ledgers in
+The exact six generated session and governance-gate observer ledgers in
 `shift-observer-paths.json` may remain modified and unstaged. Their set is pinned
 in the contract. Their bytes are preserved; they are never staged with source.
 All other source changes make readiness unclean, as do staged observer edits.
@@ -70,11 +70,16 @@ Each operation has a frozen ID and arguments. Available kinds are:
 | `land`, `push` | Current native acceptance, exact-revision evidence, separate authority, clean landing checkout on `dev` |
 | `ci` | Frozen read-only inspection command and structured `proof` for declared `downstream` pipelines |
 
-Declare `resource: cargo|mesh|disk-heavy` on operations that use those leases,
-and `measurement_resource` for the readiness baseline. Baseline execution claims
-and releases that lease on the host, including failed readiness attempts.
-Nested commands in the PID namespace delegate checks to the guardian's live host
-lease; they cannot renew its TTL, release it, change class, or use another resource.
+Declare `resource: cargo|mesh|disk-heavy` on operations that use one lease, or an
+explicit list such as `resource: [cargo, mesh]` when a storage build also checks
+household ownership. `measurement_resource` accepts the same forms for the
+readiness baseline; omitted/null or an empty list means no lease. Names must be
+known and unique. The host claims the set in sorted order, rolls back its own
+claims if acquisition fails, and releases every held resource after the operation,
+including failed readiness attempts. Nested commands in the PID namespace
+delegate checks only for a requested member of that held set, validated against
+its current host lease; they cannot renew its TTL, release it, change class, or
+expand to another resource.
 The household verify lease retains its original 1,800-second limit. The only
 persisted workload environment overrides are `MESH_DIR`, `MESH_TRANSPORT_BACKEND`,
 and `CARGO_TARGET_POOL_FAMILY`; runtime authentication remains in the runtime's own
@@ -94,8 +99,20 @@ declaration names `build_operation` and the absolute `pid_file` written by the
 mesh (`<host-pid> <start-ticks>`). The guardian checks the running executable
 against the build receipt before and after the oracle. A CI proof has `builds`
 with exactly one selected build per required pipeline: `pipeline`, `number`,
-HTTPS `url`, `revision`, and `result: "SUCCESS"`. Conflicting builds, stale proof,
-skipped scenarios and a command that merely exits zero do not establish delivery.
+HTTPS `url`, `revision`, `building: false`, actual `result`, and an `evidence`
+reference also present in the proof's retained raw evidence list. The frozen
+`ci_policy` defaults to `success`, requiring every build to succeed. Explicit
+`inspect` accepts terminal build records with their actual outcome. Every build
+also declares `execution_state`: `completed` for `SUCCESS`, `FAILURE`, or `UNSTABLE`;
+`interrupted` for `ABORTED`; `not_executed` for `NOT_BUILT`. Each non-success build
+must include a nonempty `diagnosis`, `remaining_obligations` list, and
+`diagnosis_evidence` references to retained raw artifacts. Missing build records
+or running builds do not establish completed inspection. The proof repeats `ci_policy` and reports
+`all_succeeded` from the actual outcomes. Its `success` means the frozen policy
+was satisfied; inspection does not turn a failed pipeline green. Required local
+gates, native acceptance, household proof and exact revision checks still apply.
+Conflicting builds, stale proof, skipped scenarios and a command that merely
+exits zero do not establish delivery.
 
 The guardian runs outside contained PID namespaces and owns the execution flock,
 original deadline and operation children. Ark restarts the contained controller
@@ -129,6 +146,29 @@ receipt; a later uncertain dispatch cannot hide behind an older successful recei
 Objective stability reads every attempt in completion order. A failed or invalid
 sample resets the consecutive-success count; an explicitly read-only objective
 can be measured again within its original attempt budget to establish stability.
+
+An optional frozen `repair: {agent, commit, prompt}` names an existing writable
+agent and later host commit. An executed gate failure or read-only objective
+failure then returns to that agent with the failed receipt's exact operation,
+attempt, revision and hash. Same-runtime repair resumes its saved session;
+switching runtimes starts fresh from that evidence. Successful repair must change
+scoped source. If a commit already preceded the failure, a new host commit must
+finish before verification retries; otherwise normal operation order reaches the
+first commit. Every stale gate and read-only measurement refreshes at the new
+revision. Agent, commit and verification attempts consume the original iteration
+budget; a no-change repair leaves an explicit unfinished frontier. Commit trailers
+include the attempt so interruption after a second commit cannot duplicate it.
+Failed receipts remain immutable. Repair closes after any household artifact,
+lifecycle, household oracle, fulfillment or publication dispatch, including an
+uncertain effect, and after current native fulfillment. Authority or acceptance
+refusals never become repair instructions. No repair expands scope or deadline.
+
+Each loop records its agedonic signal (pain or relief), response, cost or operator
+intervention, and evidence of relief in the existing receipts, journal, or native
+flow observations. Distinguish authority and acceptance refusals from mechanical
+fixture friction: useful pain exposes an unmet obligation; unnecessary friction
+calls for a scoped repair with evidence. Never weaken checks for comfort. Retain
+baseline CI fault diagnoses and remaining obligations when inspection completes.
 
 Closure follows claim → immutable implementation report/fulfillment → technical
 review → appointed independent acceptance → native reconciliation. The acceptor

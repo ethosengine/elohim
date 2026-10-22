@@ -111,8 +111,10 @@ class OracleProofTests(EvidenceFixture):
             self.check_proof()
 
     def ci_proof(self):
-        return {**self.proof, 'operation': self.ci['id'], 'builds': [
+        return {**self.proof, 'operation': self.ci['id'], 'ci_policy': self.contract.get('ci_policy', 'success'),
+                'all_succeeded': True, 'builds': [
             {'pipeline': name, 'revision': self.delivered, 'result': 'SUCCESS',
+             'building': False, 'execution_state': 'completed', 'evidence': self.proof['evidence'][0],
              'number': number, 'url': f'https://ci.example.invalid/{name}/{number}/'}
             for number, name in enumerate(self.contract['downstream'], 1)
         ]}
@@ -125,13 +127,72 @@ class OracleProofTests(EvidenceFixture):
             with self.subTest(changed=changed):
                 invalid = copy.deepcopy(proof)
                 invalid['builds'][0].update(changed)
-                with self.assertRaisesRegex(state.Refused, 'downstream success'):
+                with self.assertRaises(state.Refused):
                     self.check_proof(invalid, self.ci)
+
+    def inspected_failure(self):
+        proof = self.ci_proof()
+        proof['all_succeeded'] = False
+        proof['builds'][0].update(result='FAILURE', diagnosis='Fixture compiler error retained in raw log.',
+                                  remaining_obligations=['Repair compiler error in storage pipeline.'],
+                                  diagnosis_evidence=proof['evidence'])
+        return proof
+
+    def test_inspect_preserves_actual_failure_and_named_remaining_obligations(self):
+        self.contract['ci_policy'] = 'inspect'
+        for result, execution_state in [('FAILURE', 'completed'), ('UNSTABLE', 'completed'),
+                                        ('ABORTED', 'interrupted'), ('NOT_BUILT', 'not_executed')]:
+            proof = self.inspected_failure()
+            proof['builds'][0]['result'] = result
+            proof['builds'][0]['execution_state'] = execution_state
+            checked = self.check_proof(proof, self.ci)
+            self.assertFalse(checked['all_succeeded'])
+            self.assertEqual(checked['builds'][0]['result'], result)
+            self.assertEqual(checked['builds'][0]['execution_state'], execution_state)
+            self.assertEqual(len(checked['builds'][0]['remaining_obligations']), 1)
+
+    def test_default_policy_remains_strict_even_with_complete_failure_diagnosis(self):
+        for result, execution_state in [('FAILURE', 'completed'), ('UNSTABLE', 'completed'),
+                                        ('ABORTED', 'interrupted'), ('NOT_BUILT', 'not_executed')]:
+            proof = self.inspected_failure()
+            proof['builds'][0].update(result=result, execution_state=execution_state)
+            with self.subTest(result=result), self.assertRaisesRegex(state.Refused, 'downstream success'):
+                self.check_proof(proof, self.ci)
+
+    def test_missing_invalid_or_conflicting_proof_policy_and_spoofed_green_refuse(self):
+        proof = self.ci_proof()
+        for policy in [None, '', 'ignore', 'inspect', True]:
+            with self.subTest(policy=policy), self.assertRaisesRegex(state.Refused, 'policy'):
+                self.check_proof({**proof, 'ci_policy': policy}, self.ci)
+        del proof['ci_policy']
+        with self.assertRaisesRegex(state.Refused, 'policy'):
+            self.check_proof(proof, self.ci)
+        self.contract['ci_policy'] = 'inspect'
+        failure = self.inspected_failure()
+        failure['all_succeeded'] = True
+        with self.assertRaisesRegex(state.Refused, 'aggregate'):
+            self.check_proof(failure, self.ci)
+
+    def test_inspect_requires_findings_raw_evidence_and_actual_terminal_execution(self):
+        self.contract['ci_policy'] = 'inspect'
+        proof = self.inspected_failure()
+        for changed in [{'diagnosis': ''}, {'remaining_obligations': []},
+                        {'remaining_obligations': [' ']}, {'diagnosis_evidence': []},
+                        {'diagnosis_evidence': [{'path': 'unretained', 'sha256': 'missing'}]},
+                        {'evidence': None}, {'building': True}, {'execution_state': None},
+                        {'execution_state': 'not_executed'}, {'result': 'ABORTED'}, {'result': 'NOT_BUILT'}]:
+            bad = copy.deepcopy(proof)
+            bad['builds'][0].update(changed)
+            with self.subTest(changed=changed), self.assertRaises(state.Refused):
+                self.check_proof(bad, self.ci)
+        with self.assertRaisesRegex(state.Refused, 'stale'):
+            self.check_proof({**proof, 'observed_at': self.pending['prepared_at'] - 1}, self.ci)
 
     def test_ci_missing_duplicate_and_conflicting_selected_builds_refuse(self):
         proof = self.ci_proof()
         for builds in [proof['builds'][:1],
                        proof['builds'] + [proof['builds'][0]],
+                       proof['builds'] + [{**proof['builds'][0], 'pipeline': 'undeclared'}],
                        proof['builds'] + [{**proof['builds'][0], 'result': 'FAILURE', 'number': 99}]]:
             with self.subTest(builds=builds):
                 with self.assertRaisesRegex(state.Refused, 'missing or conflicting'):

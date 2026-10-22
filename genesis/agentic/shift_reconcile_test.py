@@ -388,6 +388,7 @@ class ReadinessResourceTests(unittest.TestCase):
                     patch.object(launcher, 'completed', return_value=True), \
                     patch.object(launcher, 'bounded', side_effect=bounded), \
                     patch.object(launcher, 'run', side_effect=run), \
+                    patch.object(launcher, 'host_berth', return_value='null'), \
                     patch.object(launcher, 'lease') as lease:
                 with self.assertRaisesRegex(state.Refused, 'baseline failed'):
                     launcher.preflight(spec, directory)

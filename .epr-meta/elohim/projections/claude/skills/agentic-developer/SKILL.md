@@ -60,7 +60,40 @@ recovery cannot clear. `recover` scans Git's registered retained worktrees and
 refuses stopped, expired, corrupt, or unauthorized execution. Startup configuration
 adoption is separate from exercising this command; never call that a host reboot.
 
+Declare the bounded repair edge when host verification can discover a source defect:
+`repair` names the existing implementation agent step, host commit step, and frozen
+repair prompt. A failed local gate or objective oracle returns its immutable
+receipt to that agent, then the host commits a scoped correction and verifies the
+new revision. The original attempt budget and deadline still bound the cycle.
+A no-change repair is an unresolved frontier, not a reason to burn more identical
+checks. Source repair stops once household or fulfillment/publication work has
+begun; those effects need independent reconciliation. Authority and acceptance
+refusals never become implementation-repair permission.
+
+## Read the pain and relief of each loop
+
+Dogfood the protocol while delivering. For readiness, implementation, recovery,
+acceptance, and publication, name the signal, the response it caused, its measured
+cost or operator intervention, and the evidence that the burden was relieved.
+Use existing operation receipts and `epr flow note --kind observation --on <commitment>`;
+keep the changing account in the shift journal. Do not create another register.
+A missing or conflicting authority/acceptance witness is useful refusal; repeated
+reconstruction, leaked fixture state, and redundant verification are friction to
+investigate. Use `gradient-reading` when deciding whether a cost is owed or can be
+compressed. Preserve verification and revocation checks; relief is not a weaker
+gate. A successor rehearsal should prove what became easier as well as which
+regression was caught. Unmeasured costs remain unknown, never reported as zero.
+
 ## Delivery and learning
+
+When the operator adopts the proposed 4:1 learning cadence, follow four pragmatic
+delivery loops with one deliberate dogfood, experiment, refactor, or spike. Use
+existing shift evidence to count the loops; do not invent historical counts or a
+second ledger. The learning loop declares its question, bounded time, retained
+result, and the safeguard or practice its successor can exercise. An experiment
+can teach through failure without establishing product acceptance. Treat the
+cadence as operating guidance, not a global ratified quota; it never expands an
+authorized scope or deadline.
 
 Agents implement within the frozen scope. Deterministic host operations own scoped
 commit, ff-only landing, push, household lifecycle, and verification. No blanket

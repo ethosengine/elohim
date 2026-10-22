@@ -9,9 +9,12 @@ import time
 import uuid
 
 from shift_runtime import command, completed, prompt, session_from
+from shift_lease import resources
 from shift_evidence import oracle_proof, require_binary_evidence, require_measurements, satisfies
-from shift_reconcile import dispatch_binding, native_argv, native_effect, observe_effect
-from shift_state import (Refused, atomic, authority, digest, load, lock, native_context,
+from shift_reconcile import commit_argv, commit_identity, dispatch_binding, native_argv, native_effect, observe_effect
+from shift_repair import (eligible as repair_eligible, fingerprint, next_repair, validate_pending,
+                          validate_reference, validate_spec)
+from shift_state import (Refused, atomic, authority, ci_policy, digest, load, lock, native_context,
                          read, require_acceptance, revision, run, under)
 
 
@@ -19,14 +22,16 @@ KINDS = {'agent', 'measure', 'gate', 'household', 'lifecycle', 'native', 'commit
 
 
 def validate_steps(spec):
-    if spec.get('measurement_resource') not in (None, 'cargo', 'mesh', 'disk-heavy'):
-        raise Refused('unknown readiness measurement resource lease')
+    ci_policy(spec)
+    validate_spec(spec)
+    resources(spec.get('measurement_resource'))
     env = spec.get('workload_env', {})
     if (not isinstance(env, dict) or not set(env) <= {'MESH_DIR', 'MESH_TRANSPORT_BACKEND', 'CARGO_TARGET_POOL_FAMILY'}
             or not all(isinstance(v, str) for v in env.values())):
         raise Refused('workload environment may only pin mesh root/transport and cargo family')
     seen = set()
     for step in spec['steps']:
+        resources(step.get('resource'))
         ident = step.get('id', '')
         if not ident or not ident.replace('-', '').isalnum() or ident in seen:
             raise Refused('step ids must be unique alphanumeric/hyphen identifiers')
@@ -78,6 +83,8 @@ def receipt_history(directory, contract, step):
         for source in value['evidence']:
             if digest(under(contract['worktree'], source['path'])) != source['sha256']:
                 raise Refused(f"changed receipt evidence: {source['path']}")
+        if value.get('repair_for') is not None:
+            validate_reference(directory, contract, value['repair_for'])
         attempt = value.get('attempt')
         if attempt is None:
             # Read the original receipt format, without rewriting its bytes.
@@ -150,6 +157,9 @@ def stability_retry(directory, contract, delivered):
 def next_operation(directory, contract, checkpoint):
     """Select only a new operation, proven completion, or bounded safe retry."""
     authority(directory, contract, checkpoint)
+    repair = next_repair(directory, contract, checkpoint)
+    if repair:
+        return repair
     current = revision(contract['worktree'])
     for step in contract['steps']:
         if step['kind'] in {'land', 'push'}:
@@ -251,7 +261,8 @@ def host_argv(directory, contract, state, step):
         if not staged <= set(paths):
             raise Refused('index contains paths outside this scoped commit')
         run(['git', 'add', '--', *paths], root)
-        return ['git', 'commit', '-m', step['message'], '-m', f"Shift-Operation: {contract['id']}/{step['id']}"]
+        pending = read(op_dir(directory, step) / 'pending.json')
+        return commit_argv(contract, step, pending['attempt'])
     if kind in {'land', 'push'}:
         delivered = revision(root)
         scoped_changes(contract)
@@ -280,6 +291,7 @@ def reconcile_operation(directory, contract, step, checkpoint=None):
     authority(directory, contract, checkpoint, publication=step['kind'] in {'land', 'push'})
     if pending['contract_sha256'] != digest(directory / 'contract.json'):
         raise Refused('pending operation contract changed')
+    validate_pending(directory, contract, checkpoint, step, pending)
     if step['kind'] == 'agent':
         runtime = pending['runtime']
         session = session_from(runtime, operation / pending['log']) or pending.get('resume_session')
@@ -290,6 +302,8 @@ def reconcile_operation(directory, contract, step, checkpoint=None):
         raise Refused('agent dispatch uncertain with no durable session id; inspect runtime records')
     dispatch_path = operation / f"dispatch-{pending['attempt']}.json"
     dispatch = read(dispatch_path)
+    if dispatch.get('repair_for') != pending.get('repair_for'):
+        raise Refused('repair dispatch identity conflicts with its prepared failure reference')
     if step['kind'] not in {'commit', 'land', 'push'} and not (
             step['kind'] == 'native' and dispatch.get('argv', [])[:3] == ['epr', 'flow', 'fulfill']):
         raise Refused(f"unresolved side effect: {step['id']}; inspect evidence before any retry")
@@ -300,8 +314,8 @@ def reconcile_operation(directory, contract, step, checkpoint=None):
         if dispatch.get('argv') != expected:
             raise Refused('publication dispatch changed')
     if step['kind'] == 'commit':
-        expected = ['git', 'commit', '-m', step['message'], '-m', f"Shift-Operation: {contract['id']}/{step['id']}"]
-        if dispatch.get('argv') != expected or not clean(contract['worktree'], contract):
+        commit_identity(contract, step, pending, dispatch)
+        if not clean(contract['worktree'], contract):
             raise Refused('commit dispatch changed or source tree is dirty')
         scoped_changes(contract)
     witness = observe_effect(directory, contract, checkpoint, step, pending, dispatch)
@@ -321,6 +335,8 @@ def reconcile_operation(directory, contract, step, checkpoint=None):
               'started': pending['prepared_at'], 'finished': time.time(), 'session': None,
               'recovered': True, 'evidence': [
                   {'path': str(path.relative_to(contract['worktree'])), 'sha256': digest(path)} for path in sources]}
+    if pending.get('repair_for'):
+        result['repair_for'] = pending['repair_for']
     save_receipt(operation, result)
     return 'receipt'
 
@@ -333,6 +349,11 @@ def execute(directory, step_id):
     pending = read(operation / 'pending.json')
     if pending['contract_sha256'] != digest(directory / 'contract.json'):
         raise Refused('pending operation contract changed')
+    validate_pending(directory, contract, state, step, pending)
+    if pending.get('repair_for'):
+        selected = next_repair(directory, contract, state)
+        if selected is None or selected['id'] != step_id or selected.get('repair_for') != pending['repair_for']:
+            raise Refused('pending repair is not the current authorized failure response')
     before = revision(contract['worktree'])
     is_clean = clean(contract['worktree'], contract)
     if step['kind'] == 'agent':
@@ -340,6 +361,9 @@ def execute(directory, step_id):
                        fresh_id=pending.get('session'), tools=contract['allowed_tools'],
                        readonly=step.get('readonly', False))
         text = prompt(contract, step, directory)
+        if pending.get('repair_for'):
+            text += '\n\nFrozen repair instruction: ' + contract['repair']['prompt']
+            text += '\nInspect this failed verification receipt and its raw evidence: ' + json.dumps(pending['repair_for'])
     else:
         argv = host_argv(directory, contract, state, step)
         text = None
@@ -348,6 +372,7 @@ def execute(directory, step_id):
         'argv': argv, 'operation': step_id, 'revision': before, 'time': time.time(),
         'contract_sha256': pending['contract_sha256'], 'attempt': pending['attempt'],
         'native_binding': dispatch_binding(contract, step, argv),
+        'repair_for': pending.get('repair_for'),
     }
     dispatch_path = operation / f"dispatch-{pending['attempt']}.json"
     atomic(dispatch_path, dispatch, exclusive=True)
@@ -376,6 +401,10 @@ def execute(directory, step_id):
         'evidence': [{'path': str((operation / pending['log']).relative_to(contract['worktree'])),
                       'sha256': digest(operation / pending['log'])}],
     }
+    if pending.get('repair_for'):
+        result['repair_for'] = pending['repair_for']
+        if step['kind'] == 'agent':
+            result['changed_source'] = fingerprint(contract) != pending['source_before']
     if step.get('artifact') and exit_code == 0:
         result['artifact'] = {'path': step['artifact'], 'sha256': digest(step['artifact'])}
     if dispatch['native_binding'] is not None and exit_code == 0:
@@ -409,11 +438,19 @@ def execute(directory, step_id):
             result['evidence'].extend(proof['evidence'])
         except (Refused, OSError, ValueError, KeyError) as error:
             result.update(exit=125, refusal=str(error))
+    if repair_eligible(step) and result['exit'] != 0:
+        result['verification_failure'] = True
     save_receipt(operation, result)
 
 
 def prepare(directory, contract, state, step):
     authority(directory, contract, state)
+    repair_target = step.get('repair_for')
+    if repair_target is not None:
+        validate_pending(directory, contract, state, step, {'repair_for': repair_target}, prepared=False)
+        expected = next_repair(directory, contract, state)
+        if expected is None or expected['id'] != step['id'] or expected.get('repair_for') != repair_target:
+            raise Refused('repair edge is not the current authorized failure response')
     operation = op_dir(directory, step)
     operation.mkdir(parents=True, exist_ok=True)
     pending_file = operation / 'pending.json'
@@ -423,10 +460,13 @@ def prepare(directory, contract, state, step):
     if prior:
         if prior['contract_sha256'] != digest(directory / 'contract.json'):
             raise Refused('pending operation contract changed')
+        validate_pending(directory, contract, state, step, prior)
         if not (operation / f"dispatch-{prior['attempt']}.json").exists():
             # Preparation is not dispatch. A controller can die before a worker ever
             # reaches Popen; do not resume a Claude UUID that was only reserved locally.
             if prior['runtime'] == state['runtime']:
+                if prior.get('repair_for') != repair_target:
+                    raise Refused('pending repair identity differs from selected edge')
                 if prior['attempt'] > 1:
                     retry_budget(contract, prior['attempt'])
                 return prior
@@ -447,7 +487,9 @@ def prepare(directory, contract, state, step):
             stale = completed_attempt['revision'] != revision(contract['worktree']) and step['kind'] != 'agent'
             repeat = (step.get('objective') is True and step.get('readonly') is True
                       and needs_stability(directory, contract, revision(contract['worktree'])))
-            if not retryable(step) or (completed_attempt['exit'] == 0 and not stale and not repeat):
+            repairing = repair_target is not None and completed_attempt.get('repair_for') != repair_target
+            if (not retryable(step) and not (step['kind'] == 'commit' and repairing)) or (
+                    completed_attempt['exit'] == 0 and not stale and not repeat and not repairing):
                 raise Refused('completed operation cannot be replayed')
         elif step['kind'] != 'agent':
             reconcile_operation(directory, contract, step, state)
@@ -467,6 +509,11 @@ def prepare(directory, contract, state, step):
         'revision': revision(contract['worktree']), 'prepared_at': time.time(),
         'log': f'{runtime}-{attempt}.jsonl' if step['kind'] == 'agent' else f'host-{attempt}.log',
     }
+    if repair_target is not None:
+        pending['repair_for'] = repair_target
+        if step['kind'] == 'agent':
+            pending['source_before'] = (prior['source_before'] if prior and prior.get('repair_for') == repair_target
+                                        else fingerprint(contract))
     if prior:
         archive = operation / f'prior-{attempt - 1}.json'
         if archive.exists():

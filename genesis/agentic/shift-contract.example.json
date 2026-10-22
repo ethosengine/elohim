@@ -38,6 +38,12 @@
     "orchestrator"
   ],
   "downstream": ["replace-with-required-pipeline"],
+  "ci_policy": "success",
+  "repair": {
+    "agent": "implement",
+    "commit": "commit",
+    "prompt": "Inspect the failed verification receipt and raw evidence. Repair only the frozen task scope; preserve every original report and receipt."
+  },
   "steps": [
     {
       "id": "implement",

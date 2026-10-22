@@ -14,6 +14,7 @@ import subprocess
 import sys
 import time
 import unittest
+from unittest.mock import patch
 
 import shift_test
 from shift_test import iso
@@ -90,17 +91,19 @@ print(json.dumps({'type':'turn.completed'} if runtime == 'codex' else {'type':'r
     def checkpoint(self):
         return state.read(self.directory / 'checkpoint.json')
 
-    def launch(self, runtime='codex'):
+    def launch(self, runtime='codex', *, instrumentation='', wait_for_controller=True):
         cp = self.checkpoint()
         cp['runtime'] = runtime
         state.atomic(self.directory / 'checkpoint.json', cp)
         output = open(self.directory / 'guardian.log', 'ab')
         process = subprocess.Popen([sys.executable, '-c',
-            'import sys; from pathlib import Path; from shift_supervisor import guardian; sys.exit(guardian(Path(sys.argv[1])))',
+            'import os,signal,sys; from pathlib import Path; import shift_supervisor as supervisor\n'
+            + instrumentation + '\nsys.exit(supervisor.guardian(Path(sys.argv[1])))',
             str(self.directory)], cwd=self.driver, env=self.env, stdout=output, stderr=subprocess.STDOUT)
         output.close()
         self.processes.append(process)
-        self.wait_for(lambda: self.checkpoint().get('controller'))
+        if wait_for_controller:
+            self.wait_for(lambda: self.checkpoint().get('controller'))
         return process
 
     def tearDown(self):
@@ -147,6 +150,214 @@ print(json.dumps({'type':'turn.completed'} if runtime == 'codex' else {'type':'r
         process.wait(timeout=15)
         self.assertEqual(process.returncode, 0)
         self.assertEqual(marker.read_text(), 'measured')
+
+    def assert_controller_disconnect_at_ack(self, stage, runtime):
+        self.env['FIXTURE_AGENT_SECONDS'] = '2' if stage == 'active-worker' else '0.25'
+        instrumentation = f'''
+import time
+directory=Path(sys.argv[1]); stage={stage!r}; injected=False
+original_checkpoint=supervisor.checkpoint
+receipt=directory/'operations/implement/receipt.json'
+def checkpoint_before_ack(path, **updates):
+    global injected
+    result=original_checkpoint(path, **updates)
+    if stage=='completed-worker' and updates.get('worker'):
+        expires=time.monotonic()+5
+        while not receipt.exists() and time.monotonic()<expires:
+            time.sleep(.005)
+        if not receipt.exists():
+            raise RuntimeError('fixture worker did not persist its receipt')
+    candidate=updates.get('controller')
+    worker=supervisor.read(directory/'checkpoint.json').get('worker')
+    ready=(stage=='before-dispatch' or
+           (stage=='active-worker' and supervisor.alive(worker)) or
+           (stage=='completed-worker' and receipt.exists()))
+    if candidate and not injected and ready:
+        injected=True
+        supervisor.atomic(directory/'ack-disconnect-injection.json',{{
+            'stage':stage,'controller':candidate,'worker':worker,
+            'ready_existed':(directory/'guardian-ready.json').exists(),
+            'dispatches':len(list((directory/'operations').glob('*/dispatch-*.json'))),
+            'receipt_sha256':supervisor.digest(receipt) if receipt.exists() else None,
+        }})
+        supervisor.signal_handle(candidate,signal.SIGKILL)
+        expires=time.monotonic()+3
+        while supervisor.alive(candidate) and time.monotonic()<expires:
+            time.sleep(.005)
+        if supervisor.alive(candidate):
+            raise RuntimeError('fixture controller did not die before ACK')
+    return result
+supervisor.checkpoint=checkpoint_before_ack
+'''
+        process = self.launch(runtime, instrumentation=instrumentation)
+        process.wait(timeout=15)
+        self.assertEqual(process.returncode, 0, [state.read(p) for p in self.directory.glob('refusal-*.json')])
+        injection = state.read(self.directory/'ack-disconnect-injection.json')
+        operation = self.directory/'operations/implement'
+        receipt = operation/'receipt.json'
+        self.assertEqual(state.read(receipt)['exit'], 0)
+        self.assertEqual(len(list(operation.glob('dispatch-*.json'))), 1)
+        self.assertNotEqual(state.read(self.directory/'guardian-ready.json')['controller'], injection['controller'])
+        self.assertFalse(list(self.directory.glob('refusal-*.json')))
+        if stage == 'before-dispatch':
+            self.assertFalse(injection['ready_existed'])
+            self.assertEqual(injection['dispatches'], 0)
+        else:
+            self.assertIsNotNone(injection['worker'])
+            self.wait_for(lambda: not state.alive(injection['worker']))
+        if stage == 'completed-worker':
+            self.assertEqual(state.digest(receipt), injection['receipt_sha256'])
+
+    def test_initial_controller_death_before_ack_never_authorizes_early_dispatch(self):
+        self.assert_controller_disconnect_at_ack('before-dispatch', 'claude')
+
+    def test_controller_ack_disconnect_preserves_active_worker(self):
+        self.assert_controller_disconnect_at_ack('active-worker', 'codex')
+
+    def test_controller_ack_disconnect_preserves_completed_worker_receipt(self):
+        self.assert_controller_disconnect_at_ack('completed-worker', 'claude')
+
+    def assert_controller_disappears_after_alive(self, stage, runtime):
+        self.env['FIXTURE_AGENT_SECONDS'] = '2'
+        instrumentation = f'''
+import time
+directory=Path(sys.argv[1]); stage={stage!r}; injected=False
+original_alive=supervisor.alive
+def alive_before_controller_disappears(handle):
+    global injected
+    result=original_alive(handle)
+    saved=supervisor.read(directory/'checkpoint.json')
+    worker=saved.get('worker')
+    dispatches=len(list((directory/'operations').glob('*/dispatch-*.json')))
+    ready=stage=='before-dispatch' or (original_alive(worker) and dispatches>0)
+    if result and handle and saved.get('controller')==handle and ready and not injected:
+        injected=True
+        supervisor.atomic(directory/'stat-disappearance-injection.json',{{
+            'controller':handle,'worker':worker,'stage':stage,
+            'dispatches':dispatches,
+        }})
+        supervisor.signal_handle(handle,signal.SIGKILL)
+        expires=time.monotonic()+3
+        stat=Path('/proc/'+str(handle['pid'])+'/stat')
+        while stat.exists() and time.monotonic()<expires:
+            time.sleep(.005)
+        if stat.exists():
+            raise RuntimeError('fixture controller was not reaped before status read')
+    return result
+supervisor.alive=alive_before_controller_disappears
+'''
+        process=self.launch(runtime, instrumentation=instrumentation)
+        process.wait(timeout=15)
+        self.assertEqual(process.returncode,0,[state.read(p) for p in self.directory.glob('refusal-*.json')])
+        injection=state.read(self.directory/'stat-disappearance-injection.json')
+        operation=self.directory/'operations/implement'
+        self.assertEqual(state.read(operation/'receipt.json')['exit'],0)
+        self.assertEqual(len(list(operation.glob('dispatch-*.json'))),1)
+        self.assertNotEqual(state.read(self.directory/'guardian-ready.json')['controller'],injection['controller'])
+        self.assertFalse(list(self.directory.glob('refusal-*.json')))
+        self.assertEqual(injection['dispatches'],0 if stage=='before-dispatch' else 1)
+        if stage=='active-worker':
+            self.assertIsNotNone(injection['worker'])
+            self.wait_for(lambda:not state.alive(injection['worker']))
+
+    def test_controller_disappearance_after_alive_recovers_before_dispatch(self):
+        self.assert_controller_disappears_after_alive('before-dispatch','claude')
+
+    def test_controller_disappearance_after_alive_preserves_active_worker(self):
+        self.assert_controller_disappears_after_alive('active-worker','codex')
+
+    def test_controller_status_requires_matching_incarnation_and_live_phase(self):
+        handle=state.incarnation(os.getpid())
+        record=Path(f"/proc/{handle['pid']}/stat").read_text()
+        prefix,tail=record.rsplit(')',1)
+        fields=tail.split()
+        with patch.object(supervisor,'alive',return_value=True):
+            for phase in ['R','T','t','Z','X']:
+                with self.subTest(phase=phase):
+                    fields[0]=phase
+                    with patch.object(Path,'read_text',return_value=prefix+') '+' '.join(fields)):
+                        self.assertEqual(supervisor.controller_status(handle),None if phase in {'Z','X'} else phase)
+            fields[0]='T'
+            fields[19]=str(int(handle['start'])+1)
+            with patch.object(Path,'read_text',return_value=prefix+') '+' '.join(fields)):
+                self.assertIsNone(supervisor.controller_status(handle))
+
+    def test_controller_status_tolerates_only_departed_process_read_errors(self):
+        handle=state.incarnation(os.getpid())
+        with patch.object(supervisor,'alive',return_value=True):
+            for error in [FileNotFoundError('departed'),ProcessLookupError('departed')]:
+                with patch.object(Path,'read_text',side_effect=error):
+                    self.assertIsNone(supervisor.controller_status(handle))
+            with patch.object(Path,'read_text',side_effect=OSError('host status I/O failure')):
+                with self.assertRaisesRegex(OSError,'host status I/O failure'):
+                    supervisor.controller_status(handle)
+            with patch.object(Path,'read_text',return_value='malformed'):
+                with self.assertRaisesRegex(state.Refused,'malformed controller process status'):
+                    supervisor.controller_status(handle)
+
+    def test_controller_status_io_failure_retains_refusal_and_traceback(self):
+        instrumentation='''
+import errno
+original_alive=supervisor.alive; original_read=Path.read_text; fail_path=None
+def alive_before_status_io_failure(handle):
+    global fail_path
+    result=original_alive(handle)
+    if result and supervisor.read(Path(sys.argv[1])/'checkpoint.json').get('controller')==handle:
+        fail_path=Path('/proc/'+str(handle['pid'])+'/stat')
+    return result
+def status_io_failure(path,*args,**kwargs):
+    global fail_path
+    if path==fail_path:
+        fail_path=None
+        raise OSError(errno.EIO,'fixture controller status I/O failure')
+    return original_read(path,*args,**kwargs)
+supervisor.alive=alive_before_status_io_failure
+Path.read_text=status_io_failure
+'''
+        process=self.launch(instrumentation=instrumentation)
+        process.wait(timeout=8)
+        self.assertEqual(process.returncode,3)
+        refusals=list(self.directory.glob('refusal-*.json'))
+        self.assertEqual(len(refusals),1)
+        refusal=state.read(refusals[0])
+        self.assertEqual(refusal['exception_type'],'OSError')
+        self.assertIn('fixture controller status I/O failure',refusal['reason'])
+        self.assertIn('controller_status',refusal['traceback'])
+        self.assertFalse(list((self.directory/'operations').glob('*/dispatch-*.json')))
+
+    def test_unexpected_checkpoint_io_error_retains_exception_type_and_traceback(self):
+        instrumentation = '''
+import errno
+original_checkpoint=supervisor.checkpoint
+def host_checkpoint_failure(path, **updates):
+    if updates.get('controller'):
+        raise OSError(errno.EIO,'fixture host checkpoint I/O failure')
+    return original_checkpoint(path, **updates)
+supervisor.checkpoint=host_checkpoint_failure
+'''
+        process=self.launch(instrumentation=instrumentation, wait_for_controller=False)
+        process.wait(timeout=8)
+        self.assertEqual(process.returncode,3)
+        refusals=list(self.directory.glob('refusal-*.json'))
+        self.assertEqual(len(refusals),1)
+        refusal=state.read(refusals[0])
+        self.assertEqual(refusal['exception_type'],'OSError')
+        self.assertIn('fixture host checkpoint I/O failure',refusal['reason'])
+        self.assertIn('host_checkpoint_failure',refusal['traceback'])
+        self.assertFalse((self.directory/'guardian-ready.json').exists())
+
+    def test_reply_tolerates_departed_peers_but_propagates_other_socket_errors(self):
+        left,right=socket.socketpair()
+        with left:
+            right.close()
+            self.assertFalse(supervisor.reply(left,b'ack\n'))
+        class Fault:
+            def __init__(self,error): self.error=error
+            def sendall(self,_payload): raise self.error
+        for error in [ConnectionResetError('peer reset'),socket.timeout('peer stalled')]:
+            self.assertFalse(supervisor.reply(Fault(error),b'refused\n'))
+        with self.assertRaisesRegex(OSError,'unrelated socket failure'):
+            supervisor.reply(Fault(OSError('unrelated socket failure')),b'ack\n')
 
     def test_guardian_kill_reaps_daemonized_agent_descendant(self):
         name = 'shift-test-'+str(os.getpid())+'-'+str(time.time_ns())
@@ -224,6 +435,89 @@ print(json.dumps({'type':'turn.completed'} if runtime == 'codex' else {'type':'r
         recovered = shift.recover(self.root)
         self.assertIn('stop marker', recovered[0]['refused'])
         self.assertTrue((self.directory / 'stop.json').exists())
+
+    def assert_signal_during_refusal(self, stage):
+        import shift
+        self.env['FIXTURE_AGENT_SECONDS'] = '120'
+        instrumentation = f'''
+directory = Path(sys.argv[1])
+stage = {stage!r}
+original_atomic = supervisor.atomic
+original_wait = supervisor.subprocess.Popen.wait
+refusal_written = False
+injected = False
+def inject():
+    global injected
+    if injected:
+        return
+    injected = True
+    original_atomic(directory / 'signal-injection.json',
+                    {{'stage': stage, 'timer_remaining': signal.getitimer(signal.ITIMER_REAL)[0]}})
+    os.kill(os.getpid(), signal.SIGTERM)
+    os.kill(os.getpid(), signal.SIGINT)
+def observe_atomic(path, value, **kwargs):
+    global refusal_written
+    result = original_atomic(path, value, **kwargs)
+    if Path(path).name.startswith('refusal-'):
+        refusal_written = True
+        if stage == 'after-refusal':
+            inject()
+    return result
+def observe_wait(process, *args, **kwargs):
+    if refusal_written and stage == 'during-reap':
+        inject()
+    return original_wait(process, *args, **kwargs)
+supervisor.atomic = observe_atomic
+supervisor.subprocess.Popen.wait = observe_wait
+'''
+        process = self.launch(instrumentation=instrumentation)
+        worker = self.wait_for(lambda: self.checkpoint().get('worker'))
+        wrapper = self.checkpoint()['wrapper']
+        # The stop marker is real. Delay only its signal until the child reaches
+        # the exact persistence/reap boundary; there is no timing-based injection.
+        with patch.object(shift, 'signal_handle', return_value=False):
+            shift.stop(self.directory)
+        original_stop = (self.directory / 'stop.json').read_bytes()
+        process.wait(timeout=8)
+        self.assertEqual(process.returncode, 3, (self.directory / 'guardian.log').read_text())
+        self.wait_for(lambda: not state.alive(worker) and not state.alive(wrapper))
+        self.assertEqual((self.directory / 'stop.json').read_bytes(), original_stop)
+        refusals = list(self.directory.glob('refusal-*.json'))
+        self.assertEqual(len(refusals), 1)
+        self.assertIn('stop marker', state.read(refusals[0])['reason'])
+        injection = state.read(self.directory / 'signal-injection.json')
+        self.assertEqual(injection['stage'], stage)
+        if stage == 'during-reap':
+            self.assertEqual(injection['timer_remaining'], 0)
+        self.assertNotIn('Traceback', (self.directory / 'guardian.log').read_text())
+
+    def test_late_termination_cannot_interrupt_durable_refusal(self):
+        self.assert_signal_during_refusal('after-refusal')
+
+    def test_late_termination_cannot_interrupt_child_reaping(self):
+        self.assert_signal_during_refusal('during-reap')
+
+    def test_stop_between_handshake_checkpoint_and_timer_is_recorded_without_dispatch(self):
+        instrumentation = '''
+directory = Path(sys.argv[1])
+original_checkpoint = supervisor.checkpoint
+def stop_after_checkpoint(path, **updates):
+    result = original_checkpoint(path, **updates)
+    if updates.get('phase') == 'handshake':
+        supervisor.atomic(directory / 'stop.json', {'reason': 'fixture pre-loop stop'})
+    return result
+supervisor.checkpoint = stop_after_checkpoint
+'''
+        process = self.launch(instrumentation=instrumentation, wait_for_controller=False)
+        process.wait(timeout=8)
+        self.assertEqual(process.returncode, 3, (self.directory / 'guardian.log').read_text())
+        refusals = list(self.directory.glob('refusal-*.json'))
+        self.assertEqual(len(refusals), 1)
+        self.assertIn('stop marker', state.read(refusals[0])['reason'])
+        self.assertTrue((self.directory / 'stop.json').exists())
+        self.assertIsNone(self.checkpoint().get('worker'))
+        self.assertIsNone(self.checkpoint().get('controller'))
+        self.assertFalse((self.directory / 'guardian-ready.json').exists())
 
     def test_expired_boot_recovery_never_launches(self):
         import shift

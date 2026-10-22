@@ -21,6 +21,13 @@ class Refused(RuntimeError):
     pass
 
 
+def ci_policy(contract):
+    policy = contract.get('ci_policy', 'success')
+    if policy not in ('success', 'inspect'):
+        raise Refused('ci_policy must be success or inspect')
+    return policy
+
+
 def digest(path):
     value = hashlib.sha256()
     with open(path, 'rb') as stream:
