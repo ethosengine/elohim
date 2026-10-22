@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 import assert from "node:assert/strict";
-import { readFile, writeFile, mkdir, rm } from "node:fs/promises";
+import { readFile, writeFile, chmod, mkdir, rm } from "node:fs/promises";
 import { resolve, join } from "node:path";
 import { pathToFileURL } from "node:url";
 import { probeAuthority } from "./runner-authority-probe.mjs";
@@ -94,8 +94,9 @@ try {
       null,
       2,
     ),
-    { mode: 0o600 },
+    { mode: 0o644 },
   );
+  await chmod(evidencePath, 0o644); // Public whitelist must cross Jenkins container UIDs despite umask077.
   console.log("Adam authority refusal probe passed; public evidence written");
 } catch {
   // Never echo a child error/response that may contain credentials.

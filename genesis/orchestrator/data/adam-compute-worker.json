@@ -1,6 +1,6 @@
 {
   "enabled": true,
-  "image": "harbor.ethosengine.com/ethosengine/elohim-compute-worker@sha256:f12646f889ccac01d62a0b11ec2142a16e9a7aa8b0b9d6614c63b072eb94e1c6",
+  "image": "harbor.ethosengine.com/ethosengine/elohim-compute-worker@sha256:742f3ded663a429fcec704e63954fd0bd68476cdd72f83a0673c0724a99c5a32",
   "performer": "uhCAkCUzKl3Y1B2af9NJmO-Ov-sGPFIzUpAWuMMiWvoGTV16BX9Un",
   "slice": {
     "cpuMillis": 8000,

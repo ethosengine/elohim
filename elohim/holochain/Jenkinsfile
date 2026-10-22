@@ -2278,10 +2278,10 @@ def isValidateOnly() {
     env.EDGE_VALIDATE_ONLY == 'true'
 }
 
-// Recovery assembles already-published immutable inputs. It never recompiles
-// tools or runs the worker; deployment still follows the normal deploy-only gate.
+// Recovery reuses immutable fleet inputs. Explicit toolsBase rebuilds only the
+// pinned source tools; deployment still follows the normal deploy-only gate.
 def packageComputeWorker() {
-    timeout(time: 30, unit: 'MINUTES') {
+    timeout(time: 90, unit: 'MINUTES') {
         withCredentials([usernamePassword(credentialsId: 'harbor-robot-registry', passwordVariable: 'HARBOR_PASSWORD', usernameVariable: 'HARBOR_USERNAME')]) {
             sh "bash '${env.WORKSPACE}/genesis/scripts/ci/package-compute-worker.sh'"
         }
@@ -2309,7 +2309,13 @@ def publishComputeWorkerIfRequested() {
         if (!fetchEdgeHapp("${env.WORKSPACE}/compute-worker-happ/elohim.happ")) {
             error('Compute worker image requires the packaged hApp')
         }
-        sh "bash '${env.WORKSPACE}/scripts/ci/publish-compute-worker.sh' '${env.WORKSPACE}/compute-worker-happ/elohim.happ'"
+        def workerInputs = readJSON file: 'genesis/scripts/ci/edge-1672-inputs.json'
+        if (!(workerInputs.toolsBase ==~ /harbor\.ethosengine\.com\/devspaces\/udi-plus-mem-rust-nix@sha256:[a-f0-9]{64}/)) {
+            error('Compute worker requires the reviewed CPU-compatible immutable tools base')
+        }
+        withEnv(["COMPUTE_WORKER_BASE_IMAGE=${workerInputs.toolsBase}"]) {
+            sh "bash '${env.WORKSPACE}/scripts/ci/publish-compute-worker.sh' '${env.WORKSPACE}/compute-worker-happ/elohim.happ'"
+        }
         archiveArtifacts artifacts: 'compute-worker-image/*.json', fingerprint: true
     }
 }

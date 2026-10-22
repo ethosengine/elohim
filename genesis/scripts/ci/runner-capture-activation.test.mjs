@@ -16,6 +16,7 @@ import { join } from "node:path";
 import {
   captureActivation,
   captureDiagnostics,
+  readPersistedLogs,
   verifyDeclaration,
 } from "./runner-capture-activation.mjs";
 const now = Date.parse("2026-10-22T04:00:00Z");
@@ -137,6 +138,7 @@ for (const mode of [
     chmodSync(statusFile, 0o600);
     let reads = 0;
     const execute = (cmd, args, options) => {
+      assert.equal(options.env.KUBECONFIG, "/private/selected-context");
       if (cmd === "kubectl" && args.at(-1) === "name") {
         assert.equal(options.timeout, 20000);
         if (mode === "transport-failure")
@@ -179,6 +181,7 @@ for (const mode of [
         root,
         workload: "adam",
         namespace: "ns",
+        env: { KUBECONFIG: "/private/selected-context" },
         execute,
         now: () =>
           mode === "late-expiry" && reads++ > 0
@@ -213,7 +216,7 @@ for (const mode of [
     }
   });
 
-test("failure diagnostics are bounded read-only worker observations and redact credentials", (t) => {
+test("failure diagnostics are bounded read-only worker observations and redact credentials", async (t) => {
   const root = mkdtempSync(join(tmpdir(), "activation-diagnostics-"));
   t.after(() => rmSync(root, { recursive: true, force: true }));
   const calls = [];
@@ -223,7 +226,7 @@ test("failure diagnostics are bounded read-only worker observations and redact c
   );
   mkdirSync(oldDirectory, { recursive: true, mode: 0o700 });
   writeFileSync(join(oldDirectory, "current.log"), "old", { mode: 0o600 });
-  captureDiagnostics({
+  await captureDiagnostics({
     root,
     workload: "adam",
     namespace: "alpha",
@@ -278,10 +281,10 @@ test("failure diagnostics are bounded read-only worker observations and redact c
   );
 });
 
-test("diagnostic read failure retains redacted stderr without greening activation", (t) => {
+test("diagnostic read failure retains redacted stderr without greening activation", async (t) => {
   const root = mkdtempSync(join(tmpdir(), "activation-diagnostics-"));
   t.after(() => rmSync(root, { recursive: true, force: true }));
-  captureDiagnostics({
+  await captureDiagnostics({
     root,
     workload: "adam",
     namespace: "alpha",
@@ -301,4 +304,169 @@ test("diagnostic read failure retains redacted stderr without greening activatio
     content,
     "diagnostic read unavailable (exit 1)\nForbidden request [REDACTED]",
   );
+});
+
+test("CLI transport refusal removes stale activation and READY before any cluster command", (t) => {
+  const root = mkdtempSync(join(tmpdir(), "capture-transport-refusal-"));
+  t.after(() => rmSync(root, { recursive: true, force: true }));
+  const directory = join(
+    root,
+    "compute-worker-evidence/elohim-alpha--elohim-adam-alpha",
+  );
+  mkdirSync(directory, { recursive: true });
+  writeFileSync(join(directory, "activation.json"), '{"state":"active"}');
+  writeFileSync(join(directory, "status.txt"), "READY");
+  assert.throws(() =>
+    execFileSync(
+      process.execPath,
+      [
+        new URL("./runner-capture-activation.mjs", import.meta.url).pathname,
+        "elohim-adam-alpha",
+        "elohim-alpha",
+      ],
+      {
+        env: {
+          ...process.env,
+          WORKSPACE: root,
+          KUBECONFIG: join(root, "missing-explicit-config"),
+        },
+        stdio: "pipe",
+      },
+    ),
+  );
+  assert(!existsSync(join(directory, "activation.json")));
+  assert.match(
+    readFileSync(join(directory, "status.txt"), "utf8"),
+    /^REFUSED:/,
+  );
+});
+
+function logObserver(overrides = {}) {
+  let time = 0;
+  const calls = [];
+  const image = "registry/worker@sha256:" + "a".repeat(64);
+  return {
+    calls,
+    image,
+    options: {
+      args: [
+        "exec",
+        "adam-0",
+        "-n",
+        "alpha",
+        "-c",
+        "compute-worker",
+        "--",
+        "node",
+        "-e",
+        "fixed",
+      ],
+      options: {},
+      pod: "adam-0",
+      namespace: "alpha",
+      expectedImage: image,
+      expectedUid: "uid",
+      now: () => time,
+      pause: async (ms) => {
+        time += ms;
+      },
+      budgetMs: 5000,
+      execute: (_command, args, options) => {
+        calls.push({ args, options });
+        return args.includes("get")
+          ? `uid\n${image}\nstarted\n3\ncontainer`
+          : "size=3 mtime=2026-10-22T00:00:00Z\nlog\nunavailable";
+      },
+      ...overrides,
+    },
+  };
+}
+test("persisted log retry observes running without requiring Ready and survives exec race", async () => {
+  const f = logObserver();
+  let observations = 0,
+    execs = 0;
+  f.options.execute = (_cmd, args) => {
+    if (args.includes("get"))
+      return `uid\n${f.image}\n${++observations > 1 ? "started" : ""}\n3\ncontainer`;
+    if (++execs === 1)
+      throw Object.assign(new Error("race"), {
+        stderr: 'container not found ("compute-worker")',
+      });
+    return "size=3 mtime=2026-10-22T00:00:00Z\nlog\nunavailable";
+  };
+  const result = await readPersistedLogs(f.options);
+  assert.equal(execs, 2);
+  assert.match(result, /diagnostic observation only.*restartCount=3/);
+  assert.match(result, /mtime=.*\nlog\nunavailable/);
+});
+test("persisted log retry respects deadline and request limits", async () => {
+  const f = logObserver({ budgetMs: 2500 });
+  f.options.execute = (_cmd, args, options) => {
+    f.calls.push(options.timeout);
+    return `uid\n${f.image}\n\n3\ncontainer`;
+  };
+  await assert.rejects(readPersistedLogs(f.options), /deadline/);
+  assert.deepEqual(f.calls, [2500, 1500, 500]);
+});
+for (const failure of ["Forbidden", "Unauthorized", "configuration missing"]) {
+  test(`persisted log ${failure} refuses immediately`, async () => {
+    let calls = 0;
+    const f = logObserver({
+      execute() {
+        calls++;
+        throw new Error(failure);
+      },
+    });
+    await assert.rejects(readPersistedLogs(f.options), new RegExp(failure));
+    assert.equal(calls, 1);
+  });
+}
+for (const field of ["uid", "image"]) {
+  test(`persisted log ${field} change refuses`, async () => {
+    const f = logObserver();
+    let calls = 0;
+    f.options.execute = () => {
+      calls++;
+      return `${calls > 1 && field === "uid" ? "replacement" : "uid"}\n${calls > 1 && field === "image" ? "different" : f.image}\n\n3\ncontainer`;
+    };
+    await assert.rejects(readPersistedLogs(f.options), /changed/);
+    assert.equal(calls, 2);
+  });
+}
+
+test("persisted logs refuse replacement during exec before publishing output", async () => {
+  const f = logObserver();
+  let gets = 0;
+  f.options.execute = (_cmd, args) =>
+    args.includes("get")
+      ? `${++gets > 1 ? "replacement" : "uid"}\n${f.image}\nstarted\n3\ncontainer`
+      : "must not publish";
+  await assert.rejects(readPersistedLogs(f.options), /changed during read/);
+});
+
+test("diagnostics passes its original observed pod identity to persisted reader", async (t) => {
+  const root = mkdtempSync(join(tmpdir(), "diagnostic-binding-"));
+  t.after(() => rmSync(root, { recursive: true, force: true }));
+  const f = logObserver();
+  let gets = 0;
+  const directory = await captureDiagnostics({
+    root,
+    workload: "adam",
+    namespace: "alpha",
+    retryLogs: true,
+    expectedImage: f.image,
+    execute(_cmd, args) {
+      if (args.includes("get"))
+        return ++gets === 1
+          ? "original\nRunning"
+          : `replacement\n${f.image}\nstarted\n3\ncontainer`;
+      assert(!args.includes("exec"));
+      return "logs";
+    },
+  });
+  assert.match(
+    readFileSync(join(directory, "mesh-startup.log"), "utf8"),
+    /identity changed/,
+  );
+  assert.match(readFileSync(join(directory, "status.txt"), "utf8"), /^REFUSED/);
 });

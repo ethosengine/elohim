@@ -150,3 +150,206 @@ Feature: A test peer respects the envelope its host lent it
 
 **Readiness.** (a) is a one-session scripts change, verifiable on the local mesh. (b)–(c) wait
 on (a)'s evidence and on the seed leg for `delegates-compute` being exercised in the Prologue.
+
+## 2026-10-22 harvest — a consenting peer also needs a compatible execution flavor
+
+This adds stations before `measure-runs-on-a-peer`'s existing finish line: a real
+peer executes the authorized feature and returns verifiable results. It does not
+replace that finish line with a successful image build, change rung (a) above, or
+claim Rakia already selects deployment flavors. Adam's fixture-provider native identity issues the provider grant. Matthew's
+accountability as steward is operator-declared; this is not a separately
+notarized Matthew-to-Adam grant.
+
+The concern-routing atlas (§3.1–3.3) separates hardware capability, OS/packaging,
+and runtime composition from network participation. A task needs independently
+satisfied constraints: CPU instructions; loader/library ABI; enforced memory,
+CPU and deadline bounds; current authority; and the protocol contract required
+by its peers. Spare RAM cannot satisfy missing instructions. A compatible ELF
+cannot authorize a task. A successful task cannot establish interoperability
+with a different flavor unless that interaction was measured.
+
+### Evidence and its boundary
+
+- Edge **1683** exposed `Fatal glibc error: CPU does not support x86-64-v3`
+  before worker bootstrap in the UBI10-derived image. The exact old published
+  `holochain` binary also raised SIGILL on an Intel Xeon E5-2667 Sandy Bridge
+  host (x86-64-v2, AVX present, AVX2 absent). Merely rebasing the image while
+  retaining those native binaries was therefore insufficient.
+- The missing diagnostic observation became available after an operator applied
+  narrow Jenkins RBAC: `pods/log get` and `pods/exec get/create` for only
+  `elohim-adam-alpha-0` in `elohim-alpha`. This enabled startup evidence; it did
+  not create native `measure-stage` authority. Exec permission still covers any
+  container/command in that pod, as the owning RBAC manifest documents.
+- Edge **1685 SUCCESS** rebuilt the forked `holochain`/`hc` pair, Ark and executor
+  from source `04ef84c0798e63d5e0a3e95b55f4a75c71077ac5` on the existing owned
+  x86-64-v2 base digest
+  `67c1a73215731295a1c5f8c91b0d993981eae6c302241da946a075f13aca4a30`.
+  Final image digest:
+  `742f3ded663a429fcec704e63954fd0bd68476cdd72f83a0673c0724a99c5a32`.
+  The hApp and source identity remained pinned while runtime bytes changed.
+- **52 exact-published-binary CLI/ELF checks passed on the observed host using
+  its userspace**, recorded in the private campaign receipt
+  `genesis/local-dev/jenkins-native-bdd/live-evidence/cpu-0724a99c5a32/proof.json`.
+  This proves those sampled binaries/checks on that CPU and host userspace;
+  it does not prove startup of the full target image, all runtime code paths,
+  native G2, or an executed BDD job on Adam.
+- At this harvest, actual target-image bootstrap/native G2, automatic flavor
+  selection, and mixed-flavor peer interaction remain **unmeasured**. Different
+  runtime digests with unchanged source/hApp illustrate a packaging distinction,
+  not a successful cross-peer protocol test.
+
+### Missing stations ready for story refinement
+
+All four rows belong to the `measure-runs-on-a-peer` chain. They preserve the
+existing completion assertion and make its prerequisites observable.
+
+| Between existing truths | Missing node and its probe | Current evidence |
+|---|---|---|
+| Provider offers capacity → task is admitted for launch | Select a digest-pinned flavor whose ISA and ABI requirements fit observed provider capabilities; refuse unsupported or unknown compatibility before guest launch. Probe incompatible-v3/compatible-v2 candidates on the same v2 peer and record the selection/refusal. | The incompatibility and compatible build/host CLI checks are observed; Rakia selection/refusal behavior is unmeasured. |
+| Compatible flavor → authorized bounded execution | Independently verify current grant, enforced resource envelope and task deadline; reject a resource or authority mismatch even with compatible binaries. Probe each failure independently. | Existing authority/resource mechanisms are separate; this joint heterogeneous-peer scenario is unmeasured. |
+| Image published → peer completion accepted | Observe the exact target image bootstrapping on Adam, then execute one authorized feature and verify its native request/completion/receipt/report binding. Probe the real worker and exact returned Cucumber artifact. | Publication and host-userspace checks pass; target bootstrap/G2 and job execution remain pending. |
+| Each flavor can run → diverse peers participate together | Exercise the declared common protocol across v2 and v3 deployment flavors without changing identities or weakening content verification. Probe both directions and compare returned content identity/bytes. | Mixed-flavor interoperability is unmeasured; common source/hApp alone is insufficient. |
+
+These are prose skeletons, not executable coverage or a new schema/API proposal.
+At pickup, refine into the existing delegated-compute stories
+`ci-runner-stewarded` / `peer-executed-stage` and the dataplane peer stories,
+through the required a2o blind-reader loop. Reuse existing native task/grant and
+receipt contracts before proposing new capability fields or selection machinery.
+
+```gherkin
+@wip @regression @concern:measure-runs-on-a-peer
+Scenario: A capable older host is not given an unsupported execution flavor
+  Given Matthew delegates a bounded job to the Adam fixture provider
+  And the observed provider CPU supports x86-64-v2 with AVX but without AVX2
+  And one pinned flavor requires x86-64-v3 while another fits its ISA and ABI
+  When Rakia evaluates the job's execution candidates
+  Then the v3 candidate is refused before guest launch with the unmet constraint
+  And any selected candidate is bound to the compatible immutable runtime digest
+  And missing compatibility evidence produces refusal rather than a guessed match
+  # Constraint: CPU family, ISA and runtime ABI are distinct from spare capacity.
+  # Parameters: E5-2667/Sandy Bridge; x86-64-v2; AVX present; AVX2 absent.
+
+@wip @concern:measure-runs-on-a-peer
+Scenario Outline: Compatible packaging does not bypass independent admission bounds
+  Given Adam has an execution flavor compatible with its observed ISA and ABI
+  And Matthew's reviewed job requests 8000 millicores and 25769803776 bytes
+  But <constraint> is not satisfied at launch
+  When the job is considered for execution
+  Then no guest launches and the refusal names <constraint>
+  And no successful completion is invented
+  Examples:
+    | constraint                     |
+    | current native grant authority |
+    | enforced resource envelope     |
+    | task deadline                  |
+  # These resource values are the commissioning slice, not every peer's minimum.
+
+@wip @concern:measure-runs-on-a-peer
+Scenario: The published compatible flavor executes the actual job on Adam
+  Given Adam has bootstrapped the exact reviewed runtime image on its own host
+  And Matthew is the accountable steward by operator declaration
+  And Adam's finite native grant authorizes the Jenkins runner and this task
+  When Jenkins submits the pinned peer-mesh feature to Adam
+  Then Adam executes the task within its enforced resource and time bounds
+  And Jenkins verifies the native completion and executor receipt against the request
+  And Jenkins publishes exactly the returned Cucumber report with its real verdict
+  # CLI/build checks cannot substitute for this on-target execution station.
+
+@wip @concern:measure-runs-on-a-peer
+Scenario: Different deployment flavors preserve the shared participation contract
+  Given one participating peer runs a pinned x86-64-v2 flavor
+  And another runs a pinned x86-64-v3 flavor of the same declared protocol
+  And their identities and authorized participation are retained
+  When they exchange the same declared content in both directions
+  Then each verifies the other's content identity and bytes under that protocol
+  And the evidence records both runtime digests and each observed direction
+  # CPU/ABI flavor differences do not justify re-keying or weakening verification.
+```
+
+Operational pickup: capture observed CPU features and the target runtime's
+loader/library requirements alongside existing immutable source/image evidence;
+retain refusal reasons and startup diagnostics without exporting credentials.
+Flavor compatibility, protocol compatibility and resource/authority admission
+must remain separately measurable. This harvest authorizes no new placement
+runtime and marks no habit green; the active frozen-source commissioning proof
+continues unchanged.
+
+**Next bounded task after native BDD commissioning:** establish a repeatable
+x86-64-v2 / x86-64-v3 flavor pair using existing capability and build contracts.
+Acceptance requires (1) explicit architecture, required ISA/optional hardware
+features and runtime ABI constraints for each candidate; (2) evidenced compatible
+variant selection, including refusal of unsupported or unknown combinations;
+(3) actual bounded job execution on representative peers for both variants; and
+(4) measured mixed-variant protocol exchange in both directions. Preserve source
+identity separately from runtime digest/ABI evidence and from protocol/version
+and interaction evidence. The four stations above are the initial slice, not a
+claim that all architectures work. ARM and other optional-feature combinations
+are extension points requiring their own observed build, execution and
+interoperability proofs. Current work still finishes only when the native BDD
+request executes on Adam and its authentic results return to Jenkins.
+
+**Human acceptance for that next task (requirements, not implemented claims).**
+Arks and berths should make the initial v2/v3 slice usable across consumer
+hardware without making people manage routine ISA selectors. Establish compatible
+local execution before launch. Selecting a compatible variant must retain the
+human's identity, local data, drafts and progress; it must not require a new
+identity or a doorway for functions the person's own node can already perform.
+Verify locally held published bytes before use, including offline use. Retain
+prepared local job intent while execution on a particular peer is waiting.
+Where a hosted key must sign, show that signing is waiting honestly; a visitor
+session must not imply durable local persistence it does not provide.
+
+An authorized other device or peer adds capacity and learns only the declared
+task payload and metadata. It must not become a new dependency for previously
+local functions. Losing that peer preserves local work and exposes a meaningful
+waiting, unsupported or unknown remote outcome state, never a fabricated completion.
+Retain the original task identity for receipt reconciliation through existing
+recovery contracts; losing contact does not authorize an automatic rerun. Acceptance checks
+must exercise those transitions alongside variant choice, without weakening the
+initial v2/v3 execution and mixed-protocol proof requirements. Doorway-independent
+local use does not mean a remote provider can execute while unreachable, nor does
+local intent preparation replace required native signing or consent.
+
+Build selection itself has no human draft editor or visitor persistence policy;
+these requirements apply where selection, Ark/berth launch and execution results
+meet existing human workflows. A build-time flavor check therefore cannot prove
+local-first UX. Reuse existing identity, intent, task and receipt contracts at
+pickup; this harvest introduces no new state/schema entity. Any proposed data
+entity or capability-contract redesign must pass the P2P design gate then.
+
+**Future commons placement and performance acceptance for the same v2/v3 slice.**
+Peers may fetch and cache the compatible immutable artifacts they need instead
+of holding every variant. Artifact bytes are nonrival; the storage, bandwidth
+and maintenance facility is rival and remains subject to its existing member
+charter and provider consent. This is a requirement for existing commons work,
+not a new pool, schema or policy, and establishes no charter-gate pass without
+its declarations and probes.
+
+Fetch the compatible digest-pinned bytes, verify them, then use them locally.
+Pool loss must not remove already active or offline local capabilities. Keep a
+bounded subset whose placement has observed failure-domain independence; choose
+retention and redundancy from measured need rather than inventing a replica
+count or cache limit here. Authority to announce the latest release or withdraw
+an artifact remains separate from possession/reuse of immutable bytes. Public
+artifact reach does not make fetch history or reference metadata public.
+
+Measure cold and warm paths separately: bytes held and transferred; fetch,
+unpack, verification and startup latency; eviction/refetch cost; and energy
+where instrumented. Distinguish human-blocking local work from background waits.
+Reuse valid verification evidence where its binding still holds, without skipping
+required authorization, signatures or current revocation checks. These are costs
+to measure, not benchmark results or a claim of support for all architectures.
+
+### Interrupted fixture initialization station (2026-10-22)
+
+Chain `measure-runs-on-a-peer`, between compatible worker startup and ready private
+household: an interrupted first initialization must continue without replacing existing
+conductor identities or treating lost storage as never-created storage. Edge #1690
+retrieved the original log: `ss` was hidden by sanitized PATH, and disabled membership
+passed an empty optional path to doorway; conductor sandboxes existed, storage had not
+reached its first directory creation. The byte-bound continuation checks the retained
+log, rejects prior-storage witnesses, and compares installed agent/cell identities before
+and after readiness. Its unresolved attempt refuses replay. Probe:
+`hc-mesh-initialization-continuation.test.sh` plus actual provider before/after identity
+and readiness evidence. Current live state **RED**: focused fixtures verify the repair,
+but live continuation, G2 and the native three-scenario completion remain unproven.

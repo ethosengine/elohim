@@ -2051,8 +2051,12 @@ habits:
       - "python3 -m unittest genesis.agentic.berth_test (the --class measure refusal case: a measure-class claim on the dev berth is refused exit 3, naming just measure as the alternative — landing in parallel under lane D1)"
     evidence: >
       DELTA 2026-10-22 (status stays RED; external grant identified): Edge #1681 proves Adam compute-worker CrashLoopBackOff while storage and conductor are Ready; its archived log read says jenkins:jenkins-deployer is forbidden pods/log in elohim-alpha. The existing operator-owned supplemental Role now proposes logs/get and exec/get+create scoped only to elohim-adam-alpha-0 for the existing evidence/native probe. No cluster grant was applied, no native G2 observed, and the pipeline profile remains disabled.
-    evidence-fingerprint: sha256:2486ec088b0e1631
-    evidence-bytes: 10480
+
+      - 2026-10-22 DELTA: Edge #1683 independently read Adam worker logs after the operator RBAC grant; bootstrap fails at UBI10 x86-64-v3 loader. Exact published conductor also SIGILLs on the Sandy Bridge workspace with v2 libraries. Recovery now declares a complete native tools rebuild on the pinned owned v2 UDI base, preserving source04ef and fleet/hApp inputs. Habit remains RED: native G2 and peer execution are not yet observed.
+
+      - 2026-10-22 DELTA: Edge #1685 published worker sha256:742f3ded663a429fcec704e63954fd0bd68476cdd72f83a0673c0724a99c5a32 from original source04ef on the pinned v2 base. All 52 exact-image-binary CLI/ELF checks passed on the E5-2667 host using host libraries; this is distinct from full-image bootstrap proof. Adam activation now selects that digest without changing the fixed commissioning grant. Native G2 and peer-stage evidence remain unobserved; habit RED.
+    evidence-fingerprint: sha256:fbcb2ff3511ddb58
+    evidence-bytes: 11373
     evidence-entries: 14
     guard: >
       Regression risks: (1) a RUN_CLASSES vocabulary that drifts from `pipeline-registry.mjs:45`

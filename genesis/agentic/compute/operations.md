@@ -29,10 +29,22 @@ storage and doorway implement `--help`, not `--version`. The assembly now checks
 six binaries with bounded `--help` calls. Recovery uses the recorded immutable inputs
 in `genesis/scripts/ci/edge-1672-inputs.json` via `[compute-worker:package]`, paired
 with `[deploy-only] [build:edge]` to deploy the already-published sponsor fix, or
-`[edge:validate-only]` to package alone. It does not rebuild the fork. The helper
+`[edge:validate-only]` to package alone. A `tools` digest reuses the compiled tools;
+an explicit `toolsBase` instead rebuilds the complete native tool set from the
+fixed source commit on that immutable base. The helper
 verifies the embedded tools checkout and records both its original `sourceCommit`
 and the new `assemblyCommit`; activation uses the original source commit. An automatic
 validation sibling still measures normally and does not repeat packaging.
+
+Edge #1683 proved the operator's Adam log grant works and exposed a CPU mismatch:
+the UBI10 base refused Sandy Bridge with `CPU does not support x86-64-v3`.
+The exact published conductor also failed with SIGILL when tested on the E5-2667
+workspace using compatible AlmaLinux libraries. Recovery therefore rebuilds the
+fork pair, Ark and executor on the existing v2 UDI base pinned in `toolsBase`;
+it does not transplant those native binaries. Original source04ef, fleet component
+and hApp inputs remain fixed. Normal Jenkins worker publication selects the same
+reviewed compatible base. A successful build is still not live worker proof;
+activation requires the new image digest, actual bootstrap and native grant evidence.
 
 Bootstrap retains its private household under `/var/lib/compute/mesh` and pins its
 checkout under `/var/lib/compute/repos/<sourceCommit>`. Its storage, conductor,
@@ -498,7 +510,7 @@ only the runner's separate signed grant-status read establishes fresh native sta
 The post-stage capture is a second whole-worker snapshot: cgroup `memory.peak` is a
 lifetime peak, not memory attributable solely to the BDD stage.
 
-Adam commissioning is currently blocked on the external cluster grant: Edge #1681
+The earlier cluster grant blocker was resolved by the operator on 2026-10-22. Edge #1681
 reported `jenkins:jenkins-deployer` forbidden to get `pods/log` in `elohim-alpha`.
 The existing supplemental Role now declares log reads and exec only for
 `elohim-adam-alpha-0`. Exec supports the current receipt/cgroup capture and native
@@ -518,3 +530,33 @@ pipeline step. Afterwards, a fresh `[deploy-only] [build:edge]` push captures th
 actual worker failure through Jenkins. Preserve its PVC, identities and fixed
 commissioning timestamps while diagnosing; keep the peer-stage profile disabled
 until the native action hash and running worker evidence are proven.
+
+
+### Interrupted private initialization
+
+Edge #1690 retrieved the original first-start logs without resetting the household.
+The compatible worker had generated its conductor sandboxes, but startup stopped before
+creating storage directories: sanitized PATH omitted `/usr/sbin` (where the pinned base
+ships `ss`), and disabled membership passed an empty optional directory to doorway.
+The source repair restores the system diagnostic path and omits disabled membership
+arguments. The final image smoke uses the same sanitized environment as bootstrap.
+This changes the harness source: a replacement worker must name the new committed source;
+the earlier `04ef` report and image provenance remain historical.
+
+An explicitly reviewed `resumeInitializationLogSha256` in the private-worker configuration
+selects one continuation of this specific interrupted initialization. It projects to
+`COMPUTE_CONTINUE_INITIALIZATION_LOG_SHA256`, then the sanitized harness receives
+`MESH_CONTINUE_INITIALIZATION_LOG_SHA256`. The digest compares the complete retained
+`logs/start.log` bytes; it is not a content address or native grant. Ordinary incomplete
+state still refuses. All storage directories must be absent, conductor/archive state
+complete, and the household stopped, with no prior storage/prologue/ready witnesses.
+
+The harness preserves the reviewed log and reserves a private one-shot attempt before
+launch. It restarts existing conductors, verifies their installed steward app and
+provisioned agent/cell identities, then starts only the never-created storage peers.
+Completion requires storage readiness and unchanged conductor identities. It does not
+install applications, generate replacement keys, remove state, or change native G1/G2.
+An interrupted or ambiguous attempt refuses subsequent starts for review; do not delete
+its reservation to force retry. After successful continuation, remove the opt-in from the
+reviewed worker configuration at the next appropriate deployment. Keep the native stage
+disabled until the actual grant and live worker are independently captured.

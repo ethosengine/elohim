@@ -64,6 +64,36 @@ if [[ "$compute_source" == 1 ]]; then
   (cd "$compute_context/repo" && git ls-files -z | xargs -0 -r touch -h -d "@$compute_epoch" --)
   (cd "$compute_context/repo/elohim/rakia" && git ls-files -z | xargs -0 -r touch -h -d "@$compute_rakia_epoch" --)
   (cd "$compute_context/repo/elohim/holochain-conductor" && git ls-files -z | xargs -0 -r touch -h -d "@$compute_conductor_epoch" --)
+  # The mesh checks these two native source trees against the packaged binaries.
+  # A later harness-only commit must not make unchanged native source look newer.
+  # Read history from the original checkout: the sanitized snapshot is depth one.
+  compute_shallow=$(git -C "$compute_repo" rev-parse --path-format=absolute --git-path shallow)
+  compute_times="$compute_context/repo/.compute-source-times.json"
+  [[ ! -e "$compute_times" ]] || { echo 'Reserved source timestamp receipt already exists' >&2; exit 2; }
+  printf '{"sourceCommit":"%s","sources":[' "$compute_commit" > "$compute_times"
+  compute_separator=''
+  for compute_path in elohim/elohim-storage/src doorway/doorway-service/src; do
+    compute_tree=$(git -C "$compute_repo" rev-parse --verify "$compute_commit:$compute_path")
+    [[ "$(git -C "$compute_repo" cat-file -t "$compute_tree")" == tree ]] || { echo "Native source tree required: $compute_path" >&2; exit 2; }
+    # Read both fields from the path-scoped log; git show can inspect a dirty
+    # worktree .gitmodules even when asked only for commit metadata.
+    compute_change=$(git -C "$compute_repo" log -1 --format='%H %ct' "$compute_commit" -- "$compute_path")
+    read -r compute_last_change compute_native_epoch <<< "$compute_change"
+    [[ "$compute_last_change" =~ ^[a-f0-9]{40}$ ]] || { echo "Native source history required: $compute_path" >&2; exit 2; }
+    if [[ -f "$compute_shallow" ]] && grep -Fxq "$compute_last_change" "$compute_shallow"; then
+      echo "REFUSED native source time: $compute_path reaches a shallow history boundary; deepen the checkout" >&2
+      exit 2
+    fi
+    [[ "$(git -C "$compute_repo" rev-parse --verify "$compute_last_change:$compute_path")" == "$compute_tree" ]] || {
+      echo "REFUSED native source time: last-change tree differs for $compute_path" >&2; exit 2;
+    }
+    [[ "$compute_native_epoch" =~ ^[0-9]+$ ]] || { echo "Invalid native source time: $compute_path" >&2; exit 2; }
+    (cd "$compute_context/repo" && git ls-files -z -- "$compute_path" | xargs -0 -r touch -h -d "@$compute_native_epoch" --)
+    printf '%s{"path":"%s","tree":"%s","lastChangeCommit":"%s","epoch":%s}' \
+      "$compute_separator" "$compute_path" "$compute_tree" "$compute_last_change" "$compute_native_epoch" >> "$compute_times"
+    compute_separator=','
+  done
+  printf ']}\n' >> "$compute_times"
   compute_dockerfile="$compute_context/repo/genesis/agentic/compute/Dockerfile.source"
   [[ -f "$compute_dockerfile" ]] || { echo 'Committed source worker Dockerfile required' >&2; exit 2; }
   compute_args+=(--build-arg "SOURCE_COMMIT=$compute_commit" --build-arg "RAKIA_COMMIT=$compute_rakia" --build-arg "CONDUCTOR_COMMIT=$compute_conductor")

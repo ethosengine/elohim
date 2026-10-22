@@ -1,9 +1,9 @@
 {
-  "sourceCommit": "04ef84c0798e63d5e0a3e95b55f4a75c71077ac5",
-  "tools": "harbor.ethosengine.com/ethosengine/elohim-compute-worker@sha256:33d11def5d2982b42fa00ca9138eb78ae5643307ebc4b79822404fc63ec510ef",
+  "sourceCommit": "b8d1f8295a52654ca965b3c70b15e528b49586ad",
   "storage": "harbor.ethosengine.com/ethosengine/elohim-storage@sha256:ca2a0959e28f79e18aa5456e9a4e9ffeb3f3b60f7125db4f6eb62c083c43a2a1",
   "doorway": "harbor.ethosengine.com/ethosengine/elohim-doorway@sha256:a0f455bae90487954a9372325db67b6ab954d731d7acf4e29a7f0e7f8ed16515",
   "relay": "harbor.ethosengine.com/ethosengine/iroh-relay@sha256:6a4ac201568f1500ae68f3f7437e1b614d6c7ca05b255832b0fe2c1d5a0ae717",
   "beacon": "harbor.ethosengine.com/ethosengine/relay-addr-beacon@sha256:c07e4f8f553c5c68fabe9b20fa07a0a8c9bd478b6a99428bcdf6eee754036f3e",
-  "happArtifact": "harbor.ethosengine.com/ethosengine/elohim-happ@sha256:e96c27557680d91c276e0e04e7d03948242e001cd699c88cccc759af80923398"
+  "happArtifact": "harbor.ethosengine.com/ethosengine/elohim-happ@sha256:e96c27557680d91c276e0e04e7d03948242e001cd699c88cccc759af80923398",
+  "toolsBase": "harbor.ethosengine.com/devspaces/udi-plus-mem-rust-nix@sha256:67c1a73215731295a1c5f8c91b0d993981eae6c302241da946a075f13aca4a30"
 }

@@ -1,4 +1,4 @@
-// Assemble already-published immutable inputs without recompiling the worker.
+// Assemble immutable inputs; an explicit toolsBase rebuilds the pinned source tools.
 import assert from "node:assert/strict";
 import { execFileSync } from "node:child_process";
 import {
@@ -14,11 +14,12 @@ import { createHash } from "node:crypto";
 import { pathToFileURL } from "node:url";
 export function validateInputs(input) {
   assert(input && typeof input === "object" && !Array.isArray(input));
+  const rebuilding = Object.hasOwn(input, "toolsBase");
   assert.deepEqual(
     Object.keys(input).sort(),
     [
       "sourceCommit",
-      "tools",
+      rebuilding ? "toolsBase" : "tools",
       "storage",
       "doorway",
       "relay",
@@ -27,8 +28,14 @@ export function validateInputs(input) {
     ].sort(),
   );
   assert(/^[a-f0-9]{40}$/.test(input.sourceCommit));
+  if (rebuilding)
+    assert(
+      /^harbor\.ethosengine\.com\/devspaces\/udi-plus-mem-rust-nix@sha256:[a-f0-9]{64}$/.test(
+        input.toolsBase,
+      ),
+    );
   const repos = {
-    tools: "elohim-compute-worker",
+    ...(rebuilding ? {} : { tools: "elohim-compute-worker" }),
     storage: "elohim-storage",
     doorway: "elohim-doorway",
     relay: "iroh-relay",
@@ -57,12 +64,49 @@ function main() {
   rmSync(join(output, "image.json"), { force: true });
   const [flag, path, extra] = process.argv.slice(2);
   assert(flag === "--inputs" && path && !extra);
-  const inputs = validateInputs(JSON.parse(readFileSync(path)));
+  const requested = validateInputs(JSON.parse(readFileSync(path)));
+  const inputs = { ...requested };
   const assemblyCommit = read("git", ["rev-parse", "HEAD"]);
   assert(/^[a-f0-9]{40}$/.test(assemblyCommit));
   const ctx = mkdtempSync(join(output, ".package-"));
   const nc = (...args) => run("nerdctl", ["-n", "k8s.io", ...args]);
   try {
+    if (inputs.toolsBase) {
+      const base = inputs.toolsBase;
+      // Refuse a compiler whose default would recreate the target's SIGILL.
+      const baseCheck = join(ctx, "Dockerfile.base-check");
+      writeFileSync(
+        baseCheck,
+        `FROM ${base}\nUSER 0:0\nRUN bash --version && node --version && /usr/local/bin/mongod --version\nRUN set -eu; for compiler in gcc g++; do $compiler -Q --help=target | grep -E '^[[:space:]]+-march=[[:space:]]+x86-64(-v2)?[[:space:]]*$'; done\n`,
+      );
+      process.env.BUILDKIT_HOST ||= "unix:///run/buildkit/buildkitd.sock";
+      nc("build", "--file", baseCheck, ctx);
+      const toolsTag = `harbor.ethosengine.com/ethosengine/elohim-compute-worker:tools-rebuild-${assemblyCommit}`;
+      run("bash", [
+        join(root, "scripts/ci/build-compute-worker.sh"),
+        "--source",
+        base,
+        toolsTag,
+        inputs.sourceCommit,
+      ]);
+      nc("push", toolsTag);
+      nc("pull", toolsTag);
+      const rebuilt = JSON.parse(
+        read("nerdctl", ["-n", "k8s.io", "image", "inspect", toolsTag]),
+      )[0];
+      assert.equal(
+        rebuilt.Config.Labels["org.opencontainers.image.revision"],
+        inputs.sourceCommit,
+      );
+      inputs.tools = rebuilt.RepoDigests.find((ref) =>
+        /^harbor\.ethosengine\.com\/ethosengine\/elohim-compute-worker@sha256:[a-f0-9]{64}$/.test(
+          ref,
+        ),
+      );
+      assert(inputs.tools);
+      delete inputs.toolsBase;
+      inputs.base = base;
+    }
     nc("pull", inputs.tools);
     const info = JSON.parse(
       read("nerdctl", ["-n", "k8s.io", "image", "inspect", inputs.tools]),

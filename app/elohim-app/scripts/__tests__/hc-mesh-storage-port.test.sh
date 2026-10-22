@@ -25,3 +25,18 @@ if MESH_CONDUCTOR_BASE_PORT=65535 bash -c 'source "$MESH_SCRIPT"; app_port 0' >/
   exit 1
 fi
 echo 'ok owned mesh conductor, p2p, and metrics listeners can be isolated'
+# Run the real env projection with inherited stale options: disabled authority
+# must not become an empty clap PathBuf or leak an operator's membership names.
+for membership in 0 1; do
+  actual="$(MESH_MEMBERSHIP="$membership" DOORWAY_MEMBERSHIP_DIR=stale DOORWAY_PUBLIC_NAMES=stale bash -c '
+    source "$MESH_SCRIPT" >/dev/null
+    mapfile -t options < <(doorway_membership_env)
+    env "${options[@]}" python3 -c '\''import os; print(os.getenv("DOORWAY_MEMBERSHIP_DIR", "ABSENT")); print(os.getenv("DOORWAY_PUBLIC_NAMES", "ABSENT"))'\''
+  ')"
+  if [[ "$membership" == 0 ]]; then
+    [[ "$actual" == $'ABSENT\nABSENT' ]]
+  else
+    [[ "$actual" == *$'/membership\nelohim.local,alpha.elohim.local' ]]
+  fi
+done
+echo 'ok disabled membership omits optional values; enabled membership retains declared authority'

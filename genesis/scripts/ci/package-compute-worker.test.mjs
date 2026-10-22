@@ -2,14 +2,33 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { validateInputs } from "./package-compute-worker.mjs";
-const input = JSON.parse(
+const rebuildInput = JSON.parse(
   readFileSync(new URL("./edge-1672-inputs.json", import.meta.url)),
 );
+const input = {
+  ...rebuildInput,
+  sourceCommit: "04ef84c0798e63d5e0a3e95b55f4a75c71077ac5",
+  tools:
+    "harbor.ethosengine.com/ethosengine/elohim-compute-worker@sha256:33d11def5d2982b42fa00ca9138eb78ae5643307ebc4b79822404fc63ec510ef",
+};
+delete input.toolsBase;
 test("all recovered inputs are immutable; source remains original tools checkout", () =>
   assert.equal(
     validateInputs(input).sourceCommit,
     "04ef84c0798e63d5e0a3e95b55f4a75c71077ac5",
   ));
+test("reviewed rebuild pins an existing immutable source commit", () => {
+  const selected = validateInputs(rebuildInput);
+  assert.match(selected.sourceCommit, /^[0-9a-f]{40}$/);
+  assert.equal(
+    execFileSync("git", ["cat-file", "-t", selected.sourceCommit], {
+      cwd: fileURLToPath(new URL("../../..", import.meta.url)),
+      encoding: "utf8",
+    }).trim(),
+    "commit",
+  );
+  assert.ok(selected.toolsBase);
+});
 test("refuses floating input or wrong repository before any subprocess", () => {
   for (const key of [
     "tools",
@@ -69,21 +88,23 @@ const cmd=path.basename(process.argv[1]),a=process.argv.slice(2),root=process.en
 fs.appendFileSync(path.join(root,'calls'),JSON.stringify({cmd,a})+'\\n');
 if(cmd==='git'){console.log(a.includes('--show-toplevel')?root:'${assembly}');process.exit(0);}
 if(cmd==='oras'){fs.writeFileSync(path.join(a[a.indexOf('--output')+1],'elohim.happ'),'exact-pinned-happ');process.exit(0);}
+if(cmd==='bash'){if(mode==='source-build')process.exit(25);process.exit(0);}
 const op=a[2];
 if(op==='run')process.exit(99);
 if(op==='image'){
  const built=a[4].includes(':package-');
- console.log(JSON.stringify([{Config:{Labels:{'org.opencontainers.image.revision':mode==='label'&&!built?'wrong':'${input.sourceCommit}','org.elohim.assembly.revision':'${assembly}'}},RepoDigests:['${finalImage}']}])); process.exit(0);
+ console.log(JSON.stringify([{Config:{Labels:{'org.opencontainers.image.revision':mode==='label'&&!built?'wrong':'${typeof config === "object" ? config.sourceCommit : input.sourceCommit}','org.elohim.assembly.revision':'${assembly}'}},RepoDigests:['${finalImage}']}])); process.exit(0);
 }
 if(op==='build'){
- fs.copyFileSync(path.join(a.at(-1),'inputs.json'),path.join(root,'build-inputs.json'));
+ if(fs.existsSync(path.join(a.at(-1),'inputs.json'))) fs.copyFileSync(path.join(a.at(-1),'inputs.json'),path.join(root,'build-inputs.json'));
+ else fs.copyFileSync(path.join(a.at(-1),'Dockerfile.base-check'),path.join(root,'base-check'));
  if(mode==='build')process.exit(23);
 }
 if(op==='push'&&mode==='push')process.exit(24);
 `;
   writeFileSync(join(root, "bin/fake"), fake);
   chmodSync(join(root, "bin/fake"), 0o755);
-  for (const name of ["git", "nerdctl", "oras"])
+  for (const name of ["git", "nerdctl", "oras", "bash"])
     symlinkSync("fake", join(root, "bin", name));
   const result = spawnSync(
     process.execPath,
@@ -206,4 +227,74 @@ test("BuildKit checkout verifier executes successfully only for the declared sou
     writeFileSync(join(root, "inputs.json"), JSON.stringify({ sourceCommit }));
     assert.notEqual(spawnSync(process.execPath, ["-e", code]).status, 0);
   }
+});
+
+test("explicit compatible-base recovery rebuilds the exact source and records actual tools provenance", (t) => {
+  const r = attempt(t, "", rebuildInput);
+  assert.equal(r.result.status, 0, r.result.stderr);
+  const build = r.calls.find((c) => c.cmd === "bash");
+  assert(
+    r.calls.findIndex((c) => c.cmd === "nerdctl" && c.a[2] === "build") <
+      r.calls.indexOf(build),
+  );
+  assert(
+    readFileSync(join(r.root, "base-check"), "utf8").includes("x86-64(-v2)?"),
+  );
+  assert.deepEqual(build.a.slice(1), [
+    "--source",
+    rebuildInput.toolsBase,
+    `harbor.ethosengine.com/ethosengine/elohim-compute-worker:tools-rebuild-${assembly}`,
+    rebuildInput.sourceCommit,
+  ]);
+  const report = JSON.parse(
+    readFileSync(join(r.root, "compute-worker-image/image.json")),
+  );
+  assert.equal(report.base, rebuildInput.toolsBase);
+  assert.equal(report.tools, finalImage);
+  assert.equal(report.sourceCommit, rebuildInput.sourceCommit);
+  assert.equal(report.assemblyCommit, assembly);
+  assert.equal(report.toolsBase, undefined);
+  assert(
+    r.calls.findIndex((c) => c.cmd === "bash") <
+      r.calls.findIndex((c) => c.cmd === "nerdctl" && c.a[2] === "push"),
+  );
+});
+for (const mode of ["build", "source-build", "push", "label"])
+  test(`rebuild ${mode} failure leaves no successful artifact`, (t) => {
+    const r = attempt(t, mode, rebuildInput);
+    assert.notEqual(r.result.status, 0);
+    assert.equal(r.success, false);
+    assert(!r.calls.some((c) => c.cmd === "oras"));
+  });
+test("tools source choice is exclusive and immutable", () => {
+  assert.throws(() => validateInputs({ ...rebuildInput, tools: input.tools }));
+  assert.throws(() =>
+    validateInputs({
+      ...rebuildInput,
+      toolsBase:
+        "harbor.ethosengine.com/devspaces/udi-plus-mem-rust-nix:v2-latest",
+    }),
+  );
+  assert.throws(() =>
+    validateInputs({ ...rebuildInput, base: rebuildInput.toolsBase }),
+  );
+});
+test("ordinary publication selects the same reviewed CPU-compatible base", () => {
+  const jenkins = readFileSync(
+    new URL("../../../elohim/holochain/Jenkinsfile", import.meta.url),
+    "utf8",
+  );
+  const publish = jenkins
+    .split("def publishComputeWorkerIfRequested() {")[1]
+    .split("pipeline {")[0];
+  assert(
+    publish.includes(
+      "readJSON file: 'genesis/scripts/ci/edge-1672-inputs.json'",
+    ),
+  );
+  assert(
+    publish.includes(
+      'withEnv(["COMPUTE_WORKER_BASE_IMAGE=${workerInputs.toolsBase}"])',
+    ),
+  );
 });
