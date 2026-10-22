@@ -99,6 +99,7 @@ for (const mode of [
   "late-expiry",
   "read-failure",
   "bootstrap-timeout",
+  "transport-failure",
 ])
   test(`capture ${mode} has no stale success on refusal`, (t) => {
     const root = mkdtempSync(join(tmpdir(), "capture-window-"));
@@ -136,6 +137,12 @@ for (const mode of [
     chmodSync(statusFile, 0o600);
     let reads = 0;
     const execute = (cmd, args, options) => {
+      if (cmd === "kubectl" && args.at(-1) === "name") {
+        assert.equal(options.timeout, 20000);
+        if (mode === "transport-failure")
+          throw new Error("transport unavailable");
+        return "pod/adam-0\n";
+      }
       if (cmd === "bash") {
         assert.equal(options.env.COMPUTE_WORKER_PROVIDER, provider);
         assert.equal(options.env.COMPUTE_WORKER_IMAGE, pod.image);
@@ -271,17 +278,18 @@ test("failure diagnostics are bounded read-only worker observations and redact c
   );
 });
 
-test("diagnostic read failure is recorded without exposing stderr or greening activation", (t) => {
+test("diagnostic read failure retains redacted stderr without greening activation", (t) => {
   const root = mkdtempSync(join(tmpdir(), "activation-diagnostics-"));
   t.after(() => rmSync(root, { recursive: true, force: true }));
   captureDiagnostics({
     root,
     workload: "adam",
     namespace: "alpha",
+    env: { ADMIN_KEY: "secret-bootstrap-value" },
     execute() {
       throw Object.assign(new Error("secret error"), {
         status: 1,
-        stderr: "secret stderr",
+        stderr: "Forbidden request secret-bootstrap-value",
       });
     },
   });
@@ -289,5 +297,8 @@ test("diagnostic read failure is recorded without exposing stderr or greening ac
     join(root, "rollout-evidence/alpha--compute-worker--adam/current.log"),
     "utf8",
   );
-  assert.equal(content, "diagnostic read unavailable (exit 1)\n");
+  assert.equal(
+    content,
+    "diagnostic read unavailable (exit 1)\nForbidden request [REDACTED]",
+  );
 });

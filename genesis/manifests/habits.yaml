@@ -2001,10 +2001,10 @@ habits:
       - "a2o @concern:measure-runs-on-a-peer (genesis/a2o/features/compute/measure-on-a-peer.feature; default profile: cd genesis/a2o && npx cucumber-js --tags '@concern:measure-runs-on-a-peer')"
       - "python3 -m unittest genesis.agentic.berth_test (the --class measure refusal case: a measure-class claim on the dev berth is refused exit 3, naming just measure as the alternative — landing in parallel under lane D1)"
     evidence: >
-      DELTA 2026-10-22 (status stays RED; evidence delivery): Edge #1678 again refused activation, then Jenkins could not archive root-only diagnostic directories. Public whitelisted evidence now uses 0755 directories and 0644 files, with actual distinct-UID read regression checks; sanitized bounded failure logs also reach the console. No provider startup success, native G2 action or off-host BDD is inferred from fixing this evidence transport.
-    evidence-fingerprint: sha256:65e5950b5761e390
-    evidence-bytes: 9515
-    evidence-entries: 12
+      DELTA 2026-10-22 (status stays RED; read transport unproven): Edge #1679 archived public diagnostics, but every exact-pod/log/exec read returned exit 1. This does not establish a worker bootstrap defect. CI now proves exact-pod read transport before spending the startup budget and retains sanitized bounded stderr; 14 local checks pass, including immediate transport refusal and distinct-UID artifact reads. Native grant/worker/BDD proof remains absent.
+    evidence-fingerprint: sha256:a16f904638d2a241
+    evidence-bytes: 9971
+    evidence-entries: 13
     guard: >
       Regression risks: (1) a RUN_CLASSES vocabulary that drifts from `pipeline-registry.mjs:45`
       (`build|deploy|verify|measure|profile`) — the berth `--class` flag and this habit's checks

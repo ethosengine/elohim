@@ -90,6 +90,33 @@ export function captureActivation({
         env.COMPUTE_WORKER_STARTUP_SECS ||
         String(worker.startupBudgetSeconds || 900),
     };
+    // This runs after rollout: prove read transport before spending a bootstrap budget.
+    const observedPod = execute(
+      "kubectl",
+      [
+        "--request-timeout=15s",
+        "get",
+        "pod",
+        `${workload}-0`,
+        "-n",
+        namespace,
+        "-o",
+        "name",
+      ],
+      {
+        env,
+        cwd: root,
+        encoding: "utf8",
+        stdio: ["ignore", "pipe", "pipe"],
+        timeout: 20000,
+        maxBuffer: 65536,
+      },
+    );
+    assert.equal(
+      observedPod.trim(),
+      `pod/${workload}-0`,
+      "provider pod read transport unproven",
+    );
     execute(
       "bash",
       [
@@ -301,7 +328,7 @@ for (const path of paths) {
         maxBuffer: 262144,
       });
     } catch (error) {
-      output = `diagnostic read unavailable (exit ${Number.isInteger(error.status) ? error.status : "unknown"})\n${error.stdout || ""}`;
+      output = `diagnostic read unavailable (exit ${Number.isInteger(error.status) ? error.status : "unknown"})\n${error.stdout || ""}${error.stderr || ""}`;
     }
     writeFileSync(join(directory, file), redact(output), { mode: 0o644 });
     chmodSync(join(directory, file), 0o644);
