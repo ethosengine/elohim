@@ -71,25 +71,8 @@ function main() {
       info.Config.Labels["org.opencontainers.image.revision"],
       inputs.sourceCommit,
     );
-    // No bootstrapping: override inherited ENTRYPOINT, read embedded immutable checkout only.
-    const embedded = read("nerdctl", [
-      "-n",
-      "k8s.io",
-      "run",
-      "--rm",
-      "--network",
-      "none",
-      "--entrypoint",
-      "git",
-      inputs.tools,
-      "-c",
-      "safe.directory=*",
-      "-C",
-      "/opt/compute/repo",
-      "rev-parse",
-      "HEAD",
-    ]);
-    assert.equal(embedded, inputs.sourceCommit);
+    // Embedded checkout identity is checked inside BuildKit by Dockerfile.mesh.
+    // nerdctl run cannot mount the host containerd snapshots from this CI pod.
     run("oras", ["pull", inputs.happArtifact, "--output", ctx]);
     const happSha256 = createHash("sha256")
       .update(readFileSync(join(ctx, "elohim.happ")))

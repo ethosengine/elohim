@@ -41,7 +41,7 @@ import {
 } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { spawnSync } from "node:child_process";
+import { spawnSync, execFileSync } from "node:child_process";
 import { fileURLToPath } from "node:url";
 import { createHash } from "node:crypto";
 const assembly = "b".repeat(40);
@@ -70,7 +70,7 @@ fs.appendFileSync(path.join(root,'calls'),JSON.stringify({cmd,a})+'\\n');
 if(cmd==='git'){console.log(a.includes('--show-toplevel')?root:'${assembly}');process.exit(0);}
 if(cmd==='oras'){fs.writeFileSync(path.join(a[a.indexOf('--output')+1],'elohim.happ'),'exact-pinned-happ');process.exit(0);}
 const op=a[2];
-if(op==='run'){console.log(mode==='head'?'wrong':'${input.sourceCommit}');process.exit(0);}
+if(op==='run')process.exit(99);
 if(op==='image'){
  const built=a[4].includes(':package-');
  console.log(JSON.stringify([{Config:{Labels:{'org.opencontainers.image.revision':mode==='label'&&!built?'wrong':'${input.sourceCommit}','org.elohim.assembly.revision':'${assembly}'}},RepoDigests:['${finalImage}']}])); process.exit(0);
@@ -114,7 +114,7 @@ if(op==='push'&&mode==='push')process.exit(24);
     success: existsSync(join(root, "compute-worker-image/image.json")),
   };
 }
-test("integration packages only immutable inputs, overrides entrypoint and records derived provenance/hash", (t) => {
+test("integration packages only immutable inputs, avoids client-side container mounts and records derived provenance/hash", (t) => {
   const r = attempt(t);
   assert.equal(r.result.status, 0, r.result.stderr);
   assert(r.success);
@@ -132,11 +132,7 @@ test("integration packages only immutable inputs, overrides entrypoint and recor
     JSON.parse(readFileSync(join(r.root, "build-inputs.json"))),
     Object.fromEntries(Object.entries(report).filter(([k]) => k !== "image")),
   );
-  const run = r.calls.find((c) => c.cmd === "nerdctl" && c.a[2] === "run");
-  assert(run.a.includes("--entrypoint"));
-  assert.equal(run.a[run.a.indexOf("--entrypoint") + 1], "git");
-  assert.equal(run.a[run.a.indexOf("--network") + 1], "none");
-  assert(run.a.includes(input.tools));
+  assert(!r.calls.some((c) => c.cmd === "nerdctl" && c.a[2] === "run"));
   const builds = r.calls.filter(
     (c) => c.cmd === "nerdctl" && c.a[2] === "build",
   );
@@ -150,12 +146,12 @@ test("integration packages only immutable inputs, overrides entrypoint and recor
   assert(r.calls.every((c) => ["git", "nerdctl", "oras"].includes(c.cmd)));
   assert(!JSON.stringify(r.calls).includes("build-compute-worker.sh"));
 });
-for (const mode of ["label", "head", "build", "push"])
+for (const mode of ["label", "build", "push"])
   test(`integration ${mode} failure removes stale success and refuses`, (t) => {
     const r = attempt(t, mode);
     assert.notEqual(r.result.status, 0);
     assert.equal(r.success, false);
-    if (["label", "head"].includes(mode))
+    if (mode === "label")
       assert(!r.calls.some((c) => c.cmd === "nerdctl" && c.a[2] === "build"));
   });
 for (const [name, config] of [
@@ -170,3 +166,44 @@ for (const [name, config] of [
     assert.equal(r.success, false);
     assert(r.calls.every((c) => c.cmd === "git"));
   });
+
+test("BuildKit checkout verifier executes successfully only for the declared source", (t) => {
+  const root = mkdtempSync(join(tmpdir(), "package-head-"));
+  t.after(() => rmSync(root, { recursive: true, force: true }));
+  const repo = join(root, "repo");
+  mkdirSync(repo);
+  execFileSync("git", ["init", "-q", repo]);
+  execFileSync("git", [
+    "-C",
+    repo,
+    "-c",
+    "user.name=Fixture",
+    "-c",
+    "user.email=fixture@example.test",
+    "-c",
+    "core.hooksPath=/dev/null",
+    "commit",
+    "--allow-empty",
+    "-qm",
+    "fixture",
+  ]);
+  const commit = execFileSync("git", ["-C", repo, "rev-parse", "HEAD"], {
+    encoding: "utf8",
+  }).trim();
+  const dockerfile = readFileSync(
+    new URL("../../agentic/compute/Dockerfile.mesh", import.meta.url),
+    "utf8",
+  );
+  const instruction = dockerfile.match(/^RUN node -e '(.+)'$/m)?.[1];
+  assert(instruction);
+  const code = instruction.replaceAll("/opt/compute/", root + "/");
+  writeFileSync(
+    join(root, "inputs.json"),
+    JSON.stringify({ sourceCommit: commit }),
+  );
+  assert.equal(spawnSync(process.execPath, ["-e", code]).status, 0);
+  for (const sourceCommit of ["0".repeat(40), "HEAD"]) {
+    writeFileSync(join(root, "inputs.json"), JSON.stringify({ sourceCommit }));
+    assert.notEqual(spawnSync(process.execPath, ["-e", code]).status, 0);
+  }
+});

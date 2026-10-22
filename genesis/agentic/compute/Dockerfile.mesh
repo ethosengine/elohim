@@ -16,6 +16,9 @@ COPY --from=doorway /usr/local/bin/doorway /opt/compute/mesh-bin/
 COPY --from=relay /usr/local/bin/iroh-relay /opt/compute/mesh-bin/
 COPY --from=beacon /usr/local/bin/relay-addr-beacon /opt/compute/mesh-bin/
 COPY elohim.happ inputs.json /opt/compute/
+# Verify the embedded checkout inside BuildKit, which owns the image snapshot.
+# The CI client cannot mount the host containerd snapshot paths with nerdctl run.
+RUN node -e 'const fs=require("node:fs"),cp=require("node:child_process"),assert=require("node:assert/strict"); const input=JSON.parse(fs.readFileSync("/opt/compute/inputs.json")); assert.match(input.sourceCommit,/^[a-f0-9]{40}$/); assert.equal(cp.execFileSync("git",["-c","safe.directory=*","-C","/opt/compute/repo","rev-parse","HEAD"],{encoding:"utf8"}).trim(),input.sourceCommit);'
 RUN /usr/local/bin/mongod --version
 # Loading the CLI exercises runtime linkage without starting services. Storage
 # and doorway expose --help but do not declare clap's optional --version flag.
