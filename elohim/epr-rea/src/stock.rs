@@ -447,13 +447,15 @@ pub fn stock_over_window_within(
         }
     }
 
+    // The basis names a QUANTITY in the unit, not a number of events: a stock whose events carry
+    // fractions (a red mass drained by 0.25) would otherwise read "0.25 consume events".
     let rate = |count: f64, what: &str| Quantity {
         value: count / window.periods,
         kind: MeasureKind::Rate { per: window.per },
         confidence: Confidence::witnessed(
             Interval::exact(count / window.periods),
             format!(
-                "{count} {what} events on {unit} witnessed in the flow log over {}",
+                "{count} {unit} {what}d by events witnessed in the flow log over {}",
                 window.label()
             ),
         ),
