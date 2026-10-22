@@ -1,7 +1,7 @@
 // CI-only read wrapper: bind a bootstrap receipt to the current reviewed grant window.
 import assert from "node:assert/strict";
 import { execFileSync } from "node:child_process";
-import { readFileSync, writeFileSync, rmSync } from "node:fs";
+import { readFileSync, writeFileSync, rmSync, mkdirSync } from "node:fs";
 import { resolve, join } from "node:path";
 import { pathToFileURL } from "node:url";
 import { validateGrantDeclaration } from "../../agentic/compute/grant-bootstrap.mjs";
@@ -145,9 +145,151 @@ export function captureActivation({
     );
     return result;
   } catch (error) {
+    let reason = "declaration-window-or-incarnation-unproven";
+    try {
+      const original = readFileSync(statusFile, "utf8");
+      if (
+        original.includes("startup budget") &&
+        original.includes("worker bootstrap or grant receipt unavailable")
+      )
+        reason = "bootstrap-or-grant-receipt-timeout";
+      else if (
+        original.includes("startup budget") &&
+        original.includes(
+          "worker missing, not Ready, terminating, or image differs",
+        )
+      )
+        reason = "worker-state-or-image-timeout";
+      else if (
+        original.includes(
+          "public receipt, running worker, or enforced capacity differs",
+        )
+      )
+        reason = "receipt-worker-or-capacity-mismatch";
+    } catch {
+      /* No original capture status exists for earlier validation refusals. */
+    }
+    error.activationReason = reason;
     rmSync(artifact, { force: true });
     rmSync(statusFile, { force: true });
     throw error;
+  }
+}
+// Failure observations never replace activation or admit a task. Only CI calls this.
+export function captureDiagnostics({
+  root,
+  workload,
+  namespace,
+  env = process.env,
+  execute = execFileSync,
+  reason = "activation-unproven",
+}) {
+  assert(
+    /^[a-z0-9][a-z0-9-]*$/.test(workload) &&
+      /^[a-z0-9][a-z0-9-]*$/.test(namespace),
+  );
+  const directory = join(
+    root,
+    "rollout-evidence",
+    `${namespace}--compute-worker--${workload}`,
+  );
+  mkdirSync(directory, { recursive: true, mode: 0o700 });
+  const knownReasons = new Set([
+    "activation-unproven",
+    "declaration-window-or-incarnation-unproven",
+    "bootstrap-or-grant-receipt-timeout",
+    "worker-state-or-image-timeout",
+    "receipt-worker-or-capacity-mismatch",
+  ]);
+  writeFileSync(
+    join(directory, "status.txt"),
+    `REFUSED: ${knownReasons.has(reason) ? reason : "activation-unproven"}\n`,
+    { mode: 0o600 },
+  );
+  const redact = (input) => {
+    let text = String(input || "").slice(-65536);
+    for (const [name, value] of Object.entries(env)) {
+      if (
+        /(TOKEN|PASSWORD|SECRET|KEY)$/.test(name) &&
+        typeof value === "string" &&
+        value.length >= 8
+      )
+        text = text.split(value).join("[REDACTED]");
+    }
+    return text.replace(
+      /eyJ[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+/g,
+      "[REDACTED JWT]",
+    );
+  };
+  const pod = `${workload}-0`;
+  const state =
+    '{.metadata.uid}{"\\n"}{.status.phase}{"\\n"}{.status.containerStatuses[?(@.name=="compute-worker")].ready}{"\\n"}{.status.containerStatuses[?(@.name=="compute-worker")].restartCount}{"\\n"}{.status.containerStatuses[?(@.name=="compute-worker")].state}{"\\n"}{.status.containerStatuses[?(@.name=="compute-worker")].lastState}';
+  const reads = [
+    [
+      "state.txt",
+      ["get", "pod", pod, "-n", namespace, "-o", `jsonpath=${state}`],
+    ],
+    [
+      "current.log",
+      ["logs", pod, "-n", namespace, "-c", "compute-worker", "--tail=100"],
+    ],
+    [
+      "previous.log",
+      [
+        "logs",
+        pod,
+        "-n",
+        namespace,
+        "-c",
+        "compute-worker",
+        "--previous",
+        "--tail=100",
+      ],
+    ],
+  ];
+  // Detached services write files, so container stdout alone can hide the failed station.
+  const meshTail = `const fs = require('node:fs');
+const paths = ['logs/start.log','logs/mongod.log','logs/doorway.log','logs/doorway-b.log','logs/doorway-c.log','logs/matthew.log','logs/jessica.log','logs/james.log','conductors/.sandbox_run_log','conductors/.sandbox_run_log.matthew','conductors/.sandbox_run_log.jessica','conductors/.sandbox_run_log.james'];
+for (const path of paths) {
+ console.log('--- ' + path);
+ let fd;
+ try {
+  fd = fs.openSync('/var/lib/compute/mesh/' + path, fs.constants.O_RDONLY | fs.constants.O_NOFOLLOW);
+  const stat = fs.fstatSync(fd); if (!stat.isFile()) continue;
+  const length = Math.min(stat.size, 4096), buffer = Buffer.alloc(length);
+  fs.readSync(fd, buffer, 0, length, stat.size - length); console.log(buffer.toString());
+ } catch { console.log('unavailable'); } finally { if (fd !== undefined) fs.closeSync(fd); }
+}`;
+  reads.push([
+    "mesh-startup.log",
+    [
+      "exec",
+      pod,
+      "-n",
+      namespace,
+      "-c",
+      "compute-worker",
+      "--",
+      "/usr/local/bin/node",
+      "-e",
+      meshTail,
+    ],
+  ]);
+  for (const [file, args] of reads) {
+    let output;
+    try {
+      output = execute("kubectl", ["--request-timeout=15s", ...args], {
+        env,
+        cwd: root,
+        encoding: "utf8",
+        stdio: ["ignore", "pipe", "pipe"],
+        timeout: 20000,
+        maxBuffer: 262144,
+      });
+    } catch (error) {
+      output = `diagnostic read unavailable (exit ${Number.isInteger(error.status) ? error.status : "unknown"})\n${error.stdout || ""}`;
+    }
+    writeFileSync(join(directory, file), redact(output), { mode: 0o600 });
   }
 }
 if (
@@ -166,7 +308,18 @@ if (
     console.log(
       "compute worker receipt: READY; current declaration window verified, native status checked separately",
     );
-  } catch {
+  } catch (error) {
+    try {
+      const [workload, namespace] = process.argv.slice(2);
+      captureDiagnostics({
+        root: resolve(process.env.WORKSPACE || "."),
+        workload,
+        namespace,
+        reason: error.activationReason,
+      });
+    } catch {
+      /* Diagnostic failure never replaces the original refusal. */
+    }
     console.error(
       "REFUSED compute worker activation: declaration window or incarnation unproven",
     );

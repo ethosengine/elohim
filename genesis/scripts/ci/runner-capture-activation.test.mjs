@@ -12,6 +12,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import {
   captureActivation,
+  captureDiagnostics,
   verifyDeclaration,
 } from "./runner-capture-activation.mjs";
 const now = Date.parse("2026-10-22T04:00:00Z");
@@ -94,6 +95,7 @@ for (const mode of [
   "changed",
   "late-expiry",
   "read-failure",
+  "bootstrap-timeout",
 ])
   test(`capture ${mode} has no stale success on refusal`, (t) => {
     const root = mkdtempSync(join(tmpdir(), "capture-window-"));
@@ -131,6 +133,13 @@ for (const mode of [
       if (cmd === "bash") {
         assert.equal(options.env.COMPUTE_WORKER_PROVIDER, provider);
         assert.equal(options.env.COMPUTE_WORKER_IMAGE, pod.image);
+        if (mode === "bootstrap-timeout") {
+          writeFileSync(
+            statusFile,
+            "REFUSED compute worker receipt: startup budget 900s exhausted: worker bootstrap or grant receipt unavailable",
+          );
+          throw new Error("private child error");
+        }
         writeFileSync(artifact, JSON.stringify(activation));
         writeFileSync(statusFile, "READY original capture");
         return "";
@@ -170,8 +179,83 @@ for (const mode of [
         false,
       );
     } else {
-      assert.throws(go);
+      assert.throws(
+        go,
+        (error) =>
+          mode !== "bootstrap-timeout" ||
+          error.activationReason === "bootstrap-or-grant-receipt-timeout",
+      );
       assert.equal(existsSync(artifact), false);
       assert.equal(existsSync(statusFile), false);
     }
   });
+
+test("failure diagnostics are bounded read-only worker observations and redact credentials", (t) => {
+  const root = mkdtempSync(join(tmpdir(), "activation-diagnostics-"));
+  t.after(() => rmSync(root, { recursive: true, force: true }));
+  const calls = [];
+  captureDiagnostics({
+    root,
+    workload: "adam",
+    namespace: "alpha",
+    env: { ADMIN_KEY: "private-bootstrap-value" },
+    execute(command, args, opts) {
+      calls.push({ command, args, opts });
+      return "bootstrap failed private-bootstrap-value eyJabc.payload.signature";
+    },
+  });
+  assert.equal(calls.length, 4);
+  for (const call of calls) {
+    assert.equal(call.command, "kubectl");
+    assert.equal(call.args[0], "--request-timeout=15s");
+    assert.equal(call.opts.timeout, 20000);
+    assert.equal(call.opts.maxBuffer, 262144);
+    assert(["get", "logs", "exec"].includes(call.args[1]));
+    if (call.args[1] === "exec") {
+      assert.match(call.args.at(-1), /O_RDONLY \| fs.constants.O_NOFOLLOW/);
+      assert.match(call.args.at(-1), /Math.min\(stat.size, 4096\)/);
+      assert(!call.args.at(-1).includes("process.env"));
+    }
+    assert(!call.args.join(" ").includes(".spec"));
+  }
+  for (const name of [
+    "state.txt",
+    "current.log",
+    "previous.log",
+    "mesh-startup.log",
+  ]) {
+    const content = readFileSync(
+      join(root, "rollout-evidence/alpha--compute-worker--adam", name),
+      "utf8",
+    );
+    assert(!content.includes("private-bootstrap-value"));
+    assert(!content.includes("eyJabc"));
+    assert(content.includes("bootstrap failed"));
+  }
+  assert(
+    !existsSync(
+      join(root, "compute-worker-evidence/alpha--adam/activation.json"),
+    ),
+  );
+});
+
+test("diagnostic read failure is recorded without exposing stderr or greening activation", (t) => {
+  const root = mkdtempSync(join(tmpdir(), "activation-diagnostics-"));
+  t.after(() => rmSync(root, { recursive: true, force: true }));
+  captureDiagnostics({
+    root,
+    workload: "adam",
+    namespace: "alpha",
+    execute() {
+      throw Object.assign(new Error("secret error"), {
+        status: 1,
+        stderr: "secret stderr",
+      });
+    },
+  });
+  const content = readFileSync(
+    join(root, "rollout-evidence/alpha--compute-worker--adam/current.log"),
+    "utf8",
+  );
+  assert.equal(content, "diagnostic read unavailable (exit 1)\n");
+});
