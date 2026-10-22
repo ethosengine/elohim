@@ -1002,6 +1002,20 @@ impl Evidence {
     }
 }
 
+/// Story concern -> the feature files declaring it: the STORY home of the concern ontology
+/// ([`super::concern`]), read through this walker's own feature reader so there is one.
+pub(super) fn story_concerns(root: &Path) -> BTreeMap<String, BTreeSet<String>> {
+    let mut out: BTreeMap<String, BTreeSet<String>> = BTreeMap::new();
+    for feature in read_features(root) {
+        for concern in &feature.concerns {
+            out.entry(concern.clone())
+                .or_default()
+                .insert(feature.rel.clone());
+        }
+    }
+    out
+}
+
 /// Every `*.feature` under the a2o tree with its `@concern:` and `@requires:` tags.
 ///
 /// Tags are read only from tag lines (a line whose first non-blank character is `@`), so prose
@@ -1024,8 +1038,8 @@ fn read_features(root: &Path) -> Vec<FeatureTags> {
                 continue;
             }
             for token in line.split_whitespace() {
-                if let Some(c) = token.strip_prefix("@concern:") {
-                    if !c.is_empty() {
+                if token.starts_with(super::concern::TAG_PREFIX) {
+                    if let Some(c) = super::concern::reference_in(token) {
                         concerns.insert(c.to_string());
                     }
                 } else if let Some(r) = token.strip_prefix("@requires:") {

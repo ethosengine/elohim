@@ -774,10 +774,10 @@ habits:
       - "a2o @concern:ledgers-fold-once (genesis/a2o/features/devflow/ledgers-fold-once.feature — four kinds of witness land as four folds on one store and the scoreboard derives from the report; @wip @act:host)"
       - "epr flow report --bound ledger-planes-ceiling@1 (hard 1 over ledger-planes@1: .claude/data/*.jsonl and the berth ledger parsed by a script other than their appender; today 7)"
     evidence: >
-      DELTA 2026-10-16 (RED preserved; check currently unobservable): at origin/dev@42941449e, `epr flow report --bound ledger-planes-ceiling@1` reported `skipped ledger-planes-ceiling@1 · . — no fold for ledger-planes@1` and `0 passed · 0 failed · 1 skipped`, exit 0; the bound cannot be evaluated until a fold for ledger-planes@1 exists, so the check is currently unobservable and red holds.
-    evidence-fingerprint: sha256:f4ce4ff771b8c4a0
-    evidence-bytes: 1001
-    evidence-entries: 2
+      DELTA 2026-10-22 (RED preserved; check now OBSERVABLE, branch feat/sense-organ, unlanded): ledger-planes@1 carries a `probe:` and `epr flow sense --measure ledger-planes@1` folds it; on the worktree root `epr flow report --bound ledger-planes-ceiling@1` reads `failed — 5 ledgers is past the hard watermark 1` (not `skipped`). Under the declared procedure the value is 5, not the 7 the check's prose counted on 2026-10-08: architecture-, ci-, runtime-findings, deprecations and seam-calibration are each parsed by a script other than their appender. Red holds at 5 ≥ 1.
+    evidence-fingerprint: sha256:cb13f5eaed5a01c2
+    evidence-bytes: 1576
+    evidence-entries: 3
     refs:
       - "canon: genesis/docs/content/elohim-protocol/observability/epic.md §7 (the fold is the dev system's one store), §13 ('.epr-meta is not the telemetry store')"
       - "the seven planes today: $CLAUDE_CONFIG_DIR/berth/ledger.jsonl; ram-guard and io-guard events.jsonl; .claude/data/{runtime-findings,ci-findings,quiesce-timeline,sovereignty-guard,governance-findings}.jsonl — each with its own cursor and closure rule; only dev-berth-held-by-measure@1 and sovereignty-landings reach the shared fold"
@@ -1622,6 +1622,55 @@ habits:
     retire-when: >
       when a view-scoped walk through one tier list is the only fetch path brit, rakia, lvi and app
       delivery use, and the household proof of the design's graduation trigger runs in the eprfs gate
+
+  - id: sensing-rides-the-measure-plane
+    declared: elohim/eprfs/.epr-meta/sensing-rides-the-measure-plane.habit.md
+    invariant: >
+      What the development system declares worth measuring is OBSERVED: every declared measure that a
+      bound reads is folded by a declared probe through `epr flow sense`, never by a private ledger
+      or a bespoke judge. Every level is judged by one limit model (`elohim_epr_rea::Bound`, read by
+      the native report). A breach names its dispatch through `epr flow report --breaches`. A
+      detector proposes candidates, a ruling on the candidate's own file classifies each one
+      (duplication | intentional | canonical | unresolved | false-positive), and an excepted
+      candidate is counted and named rather than silently skipped. A concern is a declared entity:
+      a reference to one is valid when it resolves in the home its relation names, never because its
+      spelling matches a grammar.
+    status: red
+    active: false
+    checks:
+      - "cargo test -p elohim-epr-cli --test flow_sense (manifest cargo target): a count probe folds on change only; a candidates probe opens each new subject with 1 and heals each vanished one with 0, so `distinct-subjects-since-reset` reads the open set; a deleted subject drains through the declared `<id>-reset@1`; an excepting ruling closes and names its subject while duplication/unresolved keep it open; a crashed, over-budget or malformed probe writes nothing and exits 1; `report --breaches` carries the bound's concern, dispatch and outstanding subjects"
+      - "epr flow report --bound limit-models-open@1 (hard 1, at-or-above, derive distinct-subjects-since-reset over limit-models@1): open candidates that judge a level outside epr-rea's Bound"
+      - "epr flow report --bound concern-joins-open@1 (hard 1, at-or-above, derive distinct-subjects-since-reset over concern-joins-unresolved@1): files holding a concern reference that does not resolve in its relation's home (evidence-of → story, prices → habit, governed-by → canon, pain-of → habit or canon); spelling is never the test"
+      - "epr flow report --headline `sense:` line: bounds observed of declared, breached, and numb (skipped for want of a fold) — numbness is the red mass this habit drains"
+    evidence: >
+      DELTA 2026-10-22 (BORN red, sense-organ S1, branch feat/sense-organ): the organ is built and
+      unlanded. Measured on the host store before this habit existed: 57 bounds, 46 skipped for want of a
+      fold. First probes: ledger-planes@1 (count), limit-models@1 and concern-tag-parsers@1
+      (candidates). The live readings and the first rulings are recorded in the next delta.
+    evidence-fingerprint: sha256:5d620be2d05b1a6d
+    evidence-bytes: 1790
+    evidence-entries: 2
+    guard: >
+      Risk 1 — closing candidates by ruling them away. A `false-positive` or `intentional` ruling must
+      name the contract difference (inputs, direction, errors, authority, persistence, trust boundary,
+      latency); a ruling whose why is "not worth it" is an unresolved one wearing an exception.
+      Risk 2 — centralizing on similarity. A candidate is a question; consolidation needs the notes'
+      experiment (behavioral oracle anchored outside the code being replaced, plus a restraint case
+      that must stay allowed). A large line-count drop that adds indirection is not progress.
+      Risk 3 — the organ becoming a bypass of itself. Probes are polyglot implementations of a prose
+      procedure; the FOLD and the JUDGE stay native (note::observe, report). A probe that writes its
+      own state file, or a consumer that re-judges a lens instead of reading `--breaches`, is the
+      defect this habit names.
+      Risk 4 — a precision number becoming a ranking score. `sense-classes@1` is shown beside the
+      reasons; it never orders candidates (notes §5).
+    refs:
+      - "spec: genesis/docs/superpowers/specs/2026-10-22-sense-organ-design.md"
+      - "operator notes: autonomous-loop-refactoring-notes.tmp.txt §4–§10 (detection proposes, contract inspection decides, intentional variations are negative examples, no second backlog)"
+      - "siblings: ledgers-fold-once (signature 3: private ledgers, its ledger-planes@1 now probed), governance-plane-single-evaluator (declared twins), dev-system-equilibrium (memory/drift lenses priced here)"
+      - "the census this habit's first parts came from: habit-progress spec §8 (genesis/docs/superpowers/specs/2026-10-22-habit-progress-scalar-design.md, branch feat/habit-progress-scalar)"
+    retire-when: >
+      when no declared bound reads `skipped — no fold` for want of a probe, no development-system code
+      judges a level outside elohim_epr_rea::Bound, and every remaining candidate carries a ruling.
 
   - id: happ-lineage-migration
     declared: elohim/holochain/.epr-meta/happ-lineage-migration.habit.md

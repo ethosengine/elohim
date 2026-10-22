@@ -1,0 +1,12 @@
+{
+  "name": "drain-one-sense-candidate",
+  "description": "Take ONE open limit-models@1 candidate (epr flow report --breaches names them) through contract inspection: migrate it onto elohim_epr_rea::Bound or the native report when it is duplication, or record its ruling when it is not. Serves habit sensing-rides-the-measure-plane. Replace the subject below with the one chosen; the scope with that file and its tests.",
+  "measure": {
+    "type": "cmd",
+    "run": "epr flow sense --measure limit-models@1 --json | python3 -I genesis/agentic/fixtures/sense-restraint/open_subject.py genesis/orchestrator/gate-cycle.mjs"
+  },
+  "target": { "predicate": "==", "value": 0, "stability": { "consecutive": 2, "across_triggers": true } },
+  "baseline": { "predicate": "<=", "value": 1 },
+  "budget": { "iterations": 6, "wall_clock_min": 240 },
+  "scope": { "paths": ["genesis/orchestrator/gate-cycle.mjs", "genesis/orchestrator/gate-cycle.test.mjs"] }
+}

@@ -136,6 +136,21 @@ rules:
       when there is exactly one enforcer of the destructive-git table for four consecutive
       months with no second hand-authored copy found by this rule or by a drift audit — the
       nudge is describing a habit, not producing one
+  - id: durable-primitives-are-native-py
+    class: inject
+    when:
+      write: "*.py"
+      contains-any: [".jsonl", "datetime.now(", "time.time(", ">= hard", "> hard", ">= soft",
+                     "\"hard\"", "'hard'", "ceiling"]
+    dedupe-of: ".claude/scripts/.epr-meta#durable-primitives-are-native-py (the rule's full reasoning) + elohim/eprfs/epr-cli/src/flow/{sense,report,concern}.rs"
+    why: >
+      Python here is a disposable local artifact of the design (operator ruling 2026-10-22); a hook
+      that keeps a `.jsonl` ledger, judges a watermark or dates a measurement by `now()` is growing
+      a primitive in the disposable layer. Fold through `epr flow sense` / `_observation.emit`, judge
+      through `epr flow report`, date by the git HEAD. A guard that must decide in-process within a
+      hook's latency budget (cargo-disk-guard) is a legitimate actuator: say so with
+      `epr flow sense rule --measure limit-models@1 --class intentional`. (Advisory, never blocks.)
+    retire-when: "with its sibling in .claude/scripts/.epr-meta"
 ---
 
 `.claude/hooks/` — the thin hook-transport layer: PreToolUse gates (epr-meta compose-gate,

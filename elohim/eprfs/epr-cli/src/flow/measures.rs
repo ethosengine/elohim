@@ -451,6 +451,13 @@ pub struct Bound {
     /// Carried through uninterpreted: the walker joins a habit to its cost by this key, and the
     /// report itself never reads it.
     pub concern: Option<String>,
+    /// `dispatch-agent:` — who a breach of this bound should be handed to. Carried through
+    /// uninterpreted, like `concern`: the report never dispatches, it names the dispatch so every
+    /// consumer (`report --breaches`, the SessionStart hook, `gate-cycle.mjs`) reads one answer
+    /// instead of re-parsing the registry.
+    pub dispatch_agent: Option<String>,
+    /// `dispatch-prompt:` — the brief that goes with `dispatch_agent`.
+    pub dispatch_prompt: Option<String>,
     pub source: BoundSource,
 }
 
@@ -486,6 +493,104 @@ impl Bound {
             self.measure == *measure
         }
     }
+}
+
+/// What a probe reports, and therefore what `epr flow sense` folds.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum Emits {
+    /// One magnitude about the repository: a single fold on subject `.`.
+    Count,
+    /// A list of subjects, each folded as an outstanding candidate (value 1) and healed with a
+    /// zero when it disappears — the lifecycle `distinct-subjects-since-reset` already reads.
+    Candidates,
+}
+
+impl Emits {
+    pub fn as_str(self) -> &'static str {
+        match self {
+            Emits::Count => "count",
+            Emits::Candidates => "candidates",
+        }
+    }
+}
+
+/// The default wall-clock budget for one probe run, in seconds. A probe is a detector, not a
+/// build: one that needs longer declares `timeout-seconds:` and says so in its own row.
+pub const PROBE_TIMEOUT_DEFAULT_SECONDS: f64 = 120.0;
+
+/// A measure row's `probe:` block — the runnable sense behind its prose procedure.
+#[derive(Debug, Clone, PartialEq)]
+pub struct Probe {
+    /// How the probe runs: a shell command, or a native probe the binary carries.
+    pub kind: ProbeKind,
+    pub emits: Emits,
+    /// A cadence hint for callers (`session`, `push`, `daily`). `epr flow sense --due <d>` selects
+    /// by it; nothing schedules on it.
+    pub due: Option<String>,
+    /// The declared budget, after which the probe is killed and the run reports `refused`.
+    pub timeout_seconds: f64,
+}
+
+/// A probe's implementation.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum ProbeKind {
+    /// `run:` — a command, run by `sh -c` from the repository root. The disposable form: a sketch
+    /// of a detector while its procedure and precision are still being learned.
+    Shell(String),
+    /// `native:` — a probe compiled into `epr` (see `flow::sense::native_probe`), run in-process.
+    /// The durable form, for the primitives the measure plane itself stands on.
+    Native(String),
+}
+
+impl ProbeKind {
+    pub fn describe(&self) -> String {
+        match self {
+            ProbeKind::Shell(run) => run.clone(),
+            ProbeKind::Native(name) => format!("native:{name}"),
+        }
+    }
+}
+
+impl Probe {
+    fn from_block(block: &Value) -> Result<Self, String> {
+        let kind = match (string_at(block, "native"), string_at(block, "run")) {
+            (Some(name), None) => ProbeKind::Native(name),
+            (None, Some(run)) => ProbeKind::Shell(run),
+            (Some(_), Some(_)) => return Err("it names both `native:` and `run:`".into()),
+            (None, None) => return Err("it names neither `native:` nor `run:`".into()),
+        };
+        let emits = match string_at(block, "emits").as_deref() {
+            None | Some("count") => Emits::Count,
+            Some("candidates") => Emits::Candidates,
+            Some(other) => {
+                return Err(format!(
+                    "`emits: {other}` is neither `count` nor `candidates`"
+                ))
+            }
+        };
+        let timeout_seconds =
+            number_at(block, "timeout-seconds").unwrap_or(PROBE_TIMEOUT_DEFAULT_SECONDS);
+        if !(timeout_seconds.is_finite() && timeout_seconds > 0.0) {
+            return Err(format!(
+                "`timeout-seconds: {timeout_seconds}` is not a positive budget"
+            ));
+        }
+        Ok(Self {
+            kind,
+            emits,
+            due: string_at(block, "due"),
+            timeout_seconds,
+        })
+    }
+}
+
+/// A probe together with the measure row that declares it.
+#[derive(Debug, Clone)]
+pub struct DeclaredProbe {
+    pub measure: MeasureRef,
+    pub family: Option<String>,
+    pub unit: Option<String>,
+    pub probe: Probe,
 }
 
 /// One parsed registry file plus the content address of the exact bytes parsed.
@@ -555,6 +660,40 @@ impl Registry {
                 None
             }
         })
+    }
+
+    /// Every measure row that declares a runnable `probe:`, in file order.
+    ///
+    /// A probe is ONE implementation of the row's prose `procedure:`, never a replacement for it:
+    /// the procedure stays the contract a second implementation would be held to. A row whose
+    /// `probe:` block is malformed is dropped with a notice rather than refusing every other
+    /// probe — the same tolerance `bound_from` gives a row this crate does not own. A SUPERSEDED
+    /// row is never sensed: it is retired on purpose, and folding it would keep a withdrawn question
+    /// open under a name its successor replaced.
+    pub fn probes(&self) -> Vec<DeclaredProbe> {
+        rows(&self.doc, "measures")
+            .filter(|row| {
+                !string_at(row, "status").is_some_and(|s| s.eq_ignore_ascii_case("superseded"))
+            })
+            .filter_map(|row| {
+                let id = string_at(row, "id")?;
+                let version = number_at(row, "version").unwrap_or(1.0) as u64;
+                let block = get(row, "probe")?;
+                let measure = MeasureRef { id, version };
+                match Probe::from_block(block) {
+                    Ok(probe) => Some(DeclaredProbe {
+                        measure,
+                        family: string_at(row, "family"),
+                        unit: string_at(row, "unit"),
+                        probe,
+                    }),
+                    Err(reason) => {
+                        eprintln!("sense: skipping the probe on `{measure}` — {reason}");
+                        None
+                    }
+                }
+            })
+            .collect()
     }
 
     /// Bounds declared by this registry's `lenses:` rows.
@@ -755,6 +894,10 @@ fn bound_from(row: &Value, source: BoundSource) -> Option<Bound> {
         superseded_reason: string_at(row, "superseded_reason")
             .or_else(|| string_at(row, "superseded-reason")),
         concern: string_at(row, "concern"),
+        dispatch_agent: string_at(row, "dispatch-agent")
+            .or_else(|| block.and_then(|m| string_at(m, "dispatch-agent"))),
+        dispatch_prompt: string_at(row, "dispatch-prompt")
+            .or_else(|| block.and_then(|m| string_at(m, "dispatch-prompt"))),
         source,
     })
 }
@@ -896,6 +1039,59 @@ mod tests {
             .as_deref(),
             Some("bytes")
         );
+    }
+
+    #[test]
+    fn a_measure_row_with_a_probe_block_is_a_declared_probe() {
+        let reg = registry(
+            "measures:\n  - id: ledger-planes\n    version: 1\n    family: dev-ledgers\n    \
+             unit: ledgers\n    probe:\n      run: python3 -I probe.py\n      due: session\n  \
+             - id: limit-models\n    version: 2\n    probe:\n      run: ./p\n      \
+             emits: candidates\n      timeout-seconds: 5\n  \
+             - id: broken\n    version: 1\n    probe:\n      emits: candidates\n  \
+             - id: both\n    version: 1\n    probe:\n      run: ./x\n      native: y\n  \
+             - id: joins\n    version: 1\n    probe:\n      native: concern-joins\n      \
+             emits: candidates\n  \
+             - id: unprobed\n    version: 1\n  \
+             - id: retired\n    version: 1\n    status: superseded\n    probe:\n      run: ./r\n",
+        );
+        let probes = reg.probes();
+        assert_eq!(
+            probes.len(),
+            3,
+            "the malformed, the doubly-declared, the unprobed and the superseded rows are not probes"
+        );
+        assert_eq!(
+            probes[0].probe.kind,
+            ProbeKind::Shell("python3 -I probe.py".into())
+        );
+        assert_eq!(
+            probes[2].probe.kind,
+            ProbeKind::Native("concern-joins".into())
+        );
+        assert_eq!(probes[0].measure.to_string(), "ledger-planes@1");
+        assert_eq!(probes[0].probe.emits, Emits::Count);
+        assert_eq!(probes[0].probe.due.as_deref(), Some("session"));
+        assert_eq!(
+            probes[0].probe.timeout_seconds,
+            PROBE_TIMEOUT_DEFAULT_SECONDS
+        );
+        assert_eq!(probes[0].unit.as_deref(), Some("ledgers"));
+        assert_eq!(probes[1].measure.to_string(), "limit-models@2");
+        assert_eq!(probes[1].probe.emits, Emits::Candidates);
+        assert_eq!(probes[1].probe.timeout_seconds, 5.0);
+    }
+
+    #[test]
+    fn a_lens_row_carries_its_dispatch_through_uninterpreted() {
+        let reg = registry(
+            "lenses:\n  - id: gate-cycle-full-ceiling\n    version: 1\n    \
+             consumes: [gate-cycle-seconds@1]\n    hard: 1200\n    \
+             dispatch-agent: rust-architect\n    dispatch-prompt: Report only.\n",
+        );
+        let bounds = reg.lens_bounds();
+        assert_eq!(bounds[0].dispatch_agent.as_deref(), Some("rust-architect"));
+        assert_eq!(bounds[0].dispatch_prompt.as_deref(), Some("Report only."));
     }
 
     #[test]

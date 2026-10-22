@@ -77,7 +77,14 @@ const OBSERVATION_TAG: &str = "run:observation";
 /// Slot 5, `cost`, joined on 2026-09-24 (native-delivery sprint, Lane G1): what the delivery path
 /// is costing and what pain the operator had to name before a measure felt it. It is appended,
 /// never inserted, so the five earlier lines keep their positions for every reader that counts.
-const HEADLINE_ORDER: [&str; 6] = ["recall", "index", "cleanup", "scope", "budget", "cost"];
+///
+/// Slot 6, `sense`, joined on 2026-10-22 (sense-organ S1), appended the same way: how much of the
+/// declared measure plane is OBSERVED at all. Every other slot reads one bound; this one reads the
+/// plane's numbness — a bound skipped for want of a fold is a sensor nobody wired, and a session
+/// that cannot see how many there are cannot tell "fine" from "unmeasured".
+const HEADLINE_ORDER: [&str; 7] = [
+    "recall", "index", "cleanup", "scope", "budget", "cost", "sense",
+];
 
 /// The line prefix each slot prints under.
 fn slot_prefix(slot: &str) -> &'static str {
@@ -94,6 +101,7 @@ fn slot_prefix(slot: &str) -> &'static str {
         "cleanup" => "cleanup",
         "scope" => "scope",
         "cost" => "cost",
+        "sense" => "sense",
         _ => "memory-budget",
     }
 }
@@ -702,11 +710,72 @@ pub(super) struct Fold {
     pub(super) value: f64,
     unit: Option<String>,
     pub(super) env: BTreeMap<String, String>,
-    occurred_at: String,
+    pub(super) occurred_at: String,
     /// Sidecar append position — the tie-break when two folds share a HEAD-derived timestamp,
     /// which is the common case rather than the exceptional one (notes are dated by the tree they
     /// were written against, so a whole session's folds share one date).
-    seq: usize,
+    pub(super) seq: usize,
+}
+
+impl Fold {
+    /// The one ordering every reader of the fold plane uses: HEAD-derived date, then append
+    /// position. Named so "latest" cannot mean two things in two functions.
+    pub(super) fn order_key(&self) -> (&str, usize) {
+        (self.occurred_at.as_str(), self.seq)
+    }
+
+    pub(super) fn cid(&self) -> &str {
+        &self.cid
+    }
+}
+
+/// The latest fold of `reset` — the instant the current accumulation window opened — if any.
+pub(super) fn latest_reset<'a>(folds: &'a [Fold], reset: &MeasureRef) -> Option<&'a Fold> {
+    folds
+        .iter()
+        .filter(|fold| fold.measure == *reset)
+        .max_by(|a, b| a.order_key().cmp(&b.order_key()))
+}
+
+/// The latest fold per `(measure, normalized subject)` among `folds`, by [`Fold::order_key`].
+///
+/// The arithmetic `distinct-subjects-since-reset` counts with, extracted so `epr flow sense` (which
+/// must know which candidates are still OPEN before it decides what to heal) and `report
+/// --breaches` (which names the outstanding subjects) read the same answer the bound does.
+pub(super) fn latest_per_subject<'a>(
+    folds: impl IntoIterator<Item = &'a Fold>,
+) -> BTreeMap<(String, String), &'a Fold> {
+    let mut latest: BTreeMap<(String, String), &'a Fold> = BTreeMap::new();
+    for fold in folds {
+        let key = (
+            fold.measure.to_string(),
+            normalize_subject(&fold.subject).to_string(),
+        );
+        match latest.get(&key) {
+            Some(held) if held.order_key() >= fold.order_key() => {}
+            _ => {
+                latest.insert(key, fold);
+            }
+        }
+    }
+    latest
+}
+
+/// The subjects still OUTSTANDING for `measures` since the latest `reset`: those whose latest
+/// fold is non-zero. A zero is the producer's heal and retires the subject.
+pub(super) fn outstanding<'a>(
+    folds: &'a [Fold],
+    reset: &MeasureRef,
+    admit: impl Fn(&Fold) -> bool,
+) -> Vec<&'a Fold> {
+    let opened = latest_reset(folds, reset).map(Fold::order_key);
+    let window = folds.iter().filter(|fold| {
+        fold.measure != *reset && admit(fold) && opened.is_none_or(|key| fold.order_key() > key)
+    });
+    latest_per_subject(window)
+        .into_values()
+        .filter(|fold| fold.value != 0.0)
+        .collect()
 }
 
 /// Evaluate every declared bound of every declared recipe against the folds in the sidecar.
@@ -762,14 +831,10 @@ pub fn report(root: &Path, options: &ReportOptions) -> FlowResult<ReportPayload>
     })
 }
 
-fn evaluate_recipe(
-    root: &Path,
-    recipe: &Recipe,
-    folds: &[Fold],
-    filter: Option<&str>,
-    primary: bool,
-    now: DateTime<Utc>,
-) -> FlowResult<RecipeReport> {
+/// Open one recipe's two registries and project every bound they declare, lenses first.
+///
+/// Refuses when NEITHER registry exists: a recipe with nothing to read is a broken declaration.
+fn recipe_bounds(recipe: &Recipe) -> FlowResult<(Option<Registry>, Option<Registry>, Vec<Bound>)> {
     let measures = Registry::open_optional(&recipe.measures)?;
     let policies = Registry::open_optional(&recipe.policies)?;
     if measures.is_none() && policies.is_none() {
@@ -780,7 +845,6 @@ fn evaluate_recipe(
             recipe.policies.display()
         )));
     }
-
     let mut bounds: Vec<Bound> = Vec::new();
     if let Some(reg) = &measures {
         bounds.extend(reg.lens_bounds());
@@ -788,6 +852,90 @@ fn evaluate_recipe(
     if let Some(reg) = &policies {
         bounds.extend(reg.ceiling_bounds());
     }
+    Ok((measures, policies, bounds))
+}
+
+/// One FAILED bound of the primary recipe, carrying the dispatch its row declares.
+///
+/// The report never dispatches. It NAMES the dispatch, once, so the SessionStart hook, a gate
+/// runner and a shift all read one answer instead of each re-parsing the registry and re-judging
+/// the watermark — the bypass `gate-cycle.mjs` carries today.
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct Breach {
+    pub bound: String,
+    pub measure: String,
+    pub summary: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub observed: Option<f64>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub unit: Option<String>,
+    /// The habit the bound prices, when it declares one.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub concern: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub dispatch_agent: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub dispatch_prompt: Option<String>,
+    /// What is breaching. For a `distinct-subjects-since-reset` bound, every subject still
+    /// outstanding (the candidates a reviewer must judge); otherwise the outcome's own subject.
+    pub subjects: Vec<String>,
+    pub recipe: RecipeRef,
+}
+
+/// The primary recipe's failed bounds, each joined to its declaring row's concern and dispatch.
+pub fn breaches(root: &Path, options: &ReportOptions) -> FlowResult<Vec<Breach>> {
+    let payload = report(root, options)?;
+    let Some(primary) = payload.primary() else {
+        return Ok(Vec::new());
+    };
+    let Some(recipe) = options.recipes.first() else {
+        return Ok(Vec::new());
+    };
+    let (_, _, bounds) = recipe_bounds(recipe)?;
+    let folds = read_folds(root)?;
+    let mut out = Vec::new();
+    for outcome in primary
+        .outcomes
+        .iter()
+        .filter(|o| o.outcome == OutcomeStatus::Failed)
+    {
+        let Some(bound) = bounds.iter().find(|b| b.id == outcome.bound) else {
+            continue;
+        };
+        let subjects = if bound.derive == Some(Derive::DistinctSubjectsSinceReset) {
+            outstanding(&folds, &bound.reset, |fold| admissible(bound, fold))
+                .into_iter()
+                .map(|fold| normalize_subject(&fold.subject).to_string())
+                .collect()
+        } else {
+            vec![outcome.subject.clone()]
+        };
+        out.push(Breach {
+            bound: outcome.bound.clone(),
+            measure: outcome.measure.clone(),
+            summary: outcome.summary.clone(),
+            observed: outcome.observed,
+            unit: outcome.unit.clone(),
+            concern: bound.concern.clone(),
+            dispatch_agent: bound.dispatch_agent.clone(),
+            dispatch_prompt: bound.dispatch_prompt.clone(),
+            subjects,
+            recipe: outcome.recipe.clone(),
+        });
+    }
+    Ok(out)
+}
+
+fn evaluate_recipe(
+    root: &Path,
+    recipe: &Recipe,
+    folds: &[Fold],
+    filter: Option<&str>,
+    primary: bool,
+    now: DateTime<Utc>,
+) -> FlowResult<RecipeReport> {
+    let (measures, policies, mut bounds) = recipe_bounds(recipe)?;
     if let Some(filter) = filter {
         bounds.retain(|bound| bound.matches(filter));
         if bounds.is_empty() {
@@ -1399,16 +1547,9 @@ fn evaluate_derived(
 ) -> BoundOutcome {
     // Ordering is (occurred_at, seq): notes share a HEAD-derived date, so append position is the
     // real discriminator within a session and the date orders across them.
-    let reset = folds
-        .iter()
-        .filter(|fold| fold.measure == bound.reset)
-        .max_by(|a, b| {
-            a.occurred_at
-                .cmp(&b.occurred_at)
-                .then_with(|| a.seq.cmp(&b.seq))
-        });
+    let reset = latest_reset(folds, &bound.reset);
     let after = |fold: &Fold| match reset {
-        Some(reset) => (&fold.occurred_at, fold.seq) > (&reset.occurred_at, reset.seq),
+        Some(reset) => fold.order_key() > reset.order_key(),
         None => true,
     };
 
@@ -1465,21 +1606,13 @@ fn evaluate_derived(
         // into a false alarm that never clears. Reading the latest value per subject is what keeps
         // the fold plane's cardinality equal to the accumulator's.
         Derive::DistinctSubjectsSinceReset => {
-            // (measure, subject) -> the latest fold for that pair, by the SAME (occurred_at, seq)
-            // ordering the reset uses. Explicit rather than last-write-wins on iteration order, so
-            // "latest" means one thing everywhere in this function.
-            let mut latest: BTreeMap<(String, &str), &Fold> = BTreeMap::new();
-            for fold in &contributing {
-                let key = (fold.measure.to_string(), normalize_subject(&fold.subject));
-                match latest.get(&key) {
-                    Some(held)
-                        if (&held.occurred_at, held.seq) >= (&fold.occurred_at, fold.seq) => {}
-                    _ => {
-                        latest.insert(key, fold);
-                    }
-                }
-            }
-            latest.values().filter(|fold| fold.value != 0.0).count() as f64
+            // (measure, subject) -> the latest fold for that pair, by the SAME ordering the reset
+            // uses ([`Fold::order_key`]). Shared with `epr flow sense` and `--breaches` through
+            // [`latest_per_subject`], so "outstanding" means one thing in all three.
+            latest_per_subject(contributing.iter().copied())
+                .values()
+                .filter(|fold| fold.value != 0.0)
+                .count() as f64
         }
         // Unreachable by construction: `evaluate` routes every tree-reading derive to
         // `evaluate_surface_walk` before this function is entered. Answering 0.0 rather than
@@ -2032,6 +2165,9 @@ impl ReportPayload {
                 return line;
             }
         }
+        if slot == "sense" {
+            return self.sense_line();
+        }
         let Some(outcome) = self.slot_outcome(slot) else {
             // A RETIRED slot is not an unmeasured one. Checking supersession before falling through
             // to "no bound declared" is the difference between "this was retired on 2026-09-11 and
@@ -2126,6 +2262,55 @@ impl ReportPayload {
             } else {
                 format!("cost: {joined} ✅")
             },
+        )
+    }
+
+    /// The `sense:` line — how much of the primary recipe's declared plane is observed.
+    ///
+    /// Three numbers, never one: observed of declared, breached, and NUMB (skipped because no fold
+    /// exists). A numb bound is named, a few at a time, because the useful act is to wire its probe
+    /// (`epr flow sense`), and a count alone does not say which sensor to wire first. Superseded
+    /// bounds are not counted — they are retired on purpose, not unmeasured.
+    pub fn sense_line(&self) -> String {
+        let outcomes = self.outcomes();
+        if outcomes.is_empty() {
+            return "sense: skipped (no bound declared)".to_string();
+        }
+        let declared = outcomes.len();
+        let failed = count(outcomes, OutcomeStatus::Failed);
+        let numb: Vec<&str> = outcomes
+            .iter()
+            .filter(|o| o.outcome == OutcomeStatus::Skipped)
+            .map(|o| o.measure.split('@').next().unwrap_or_default())
+            .collect();
+        let observed = declared - numb.len();
+        let mut line = format!("{observed} of {declared} bounds observed");
+        if failed > 0 {
+            line.push_str(&format!(" · {failed} breached"));
+        }
+        if numb.is_empty() {
+            return if failed == 0 {
+                format!("sense: {line} ✅")
+            } else {
+                format!("sense: ⚠ {line}  →  epr flow report --breaches")
+            };
+        }
+        let mut named: Vec<&str> = Vec::new();
+        for name in &numb {
+            if !named.contains(name) {
+                named.push(name);
+            }
+        }
+        let shown: Vec<&str> = named.iter().take(3).copied().collect();
+        let more = if named.len() > shown.len() {
+            format!(", +{}", named.len() - shown.len())
+        } else {
+            String::new()
+        };
+        format!(
+            "sense: ⚠ {line} · numb {} ({}{more})  →  epr flow sense --due session",
+            numb.len(),
+            shown.join(", ")
         )
     }
 
@@ -2277,10 +2462,11 @@ mod tests {
     fn the_headline_order_is_the_gospel_declared_order() {
         assert_eq!(
             HEADLINE_ORDER,
-            ["recall", "index", "cleanup", "scope", "budget", "cost"],
-            "cost is APPENDED: the five earlier slots keep their positions"
+            ["recall", "index", "cleanup", "scope", "budget", "cost", "sense"],
+            "cost and sense are APPENDED: the five earlier slots keep their positions"
         );
         assert_eq!(slot_prefix("cost"), "cost");
+        assert_eq!(slot_prefix("sense"), "sense");
         assert_eq!(slot_prefix("recall"), "recall");
         assert_eq!(slot_prefix("index"), "index");
         // Retired from the order, kept in the vocabulary.

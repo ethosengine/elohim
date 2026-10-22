@@ -20,6 +20,8 @@ retire-when: >
   when the scripts that mint dev findings obtain their writer from epr flow by construction and
   no .claude/data/*.jsonl appender remains.
 ---
+DELTA 2026-10-22 (RED preserved; check now OBSERVABLE, branch feat/sense-organ, unlanded): ledger-planes@1 carries a `probe:` and `epr flow sense --measure ledger-planes@1` folds it; on the worktree root `epr flow report --bound ledger-planes-ceiling@1` reads `failed — 5 ledgers is past the hard watermark 1` (not `skipped`). Under the declared procedure the value is 5, not the 7 the check's prose counted on 2026-10-08: architecture-, ci-, runtime-findings, deprecations and seam-calibration are each parsed by a script other than their appender. Red holds at 5 ≥ 1.
+
 DELTA 2026-10-16 (RED preserved; check currently unobservable): at origin/dev@42941449e, `epr flow report --bound ledger-planes-ceiling@1` reported `skipped ledger-planes-ceiling@1 · . — no fold for ledger-planes@1` and `0 passed · 0 failed · 1 skipped`, exit 0; the bound cannot be evaluated until a fold for ledger-planes@1 exists, so the check is currently unobservable and red holds.
 
 DELTA 2026-10-08 (BORN red): the runtime inventory of 2026-10-08 counts seven accumulated JSONL ledgers with seven cursors and closure rules, of which two reach the shared fold. Tests the first code pass adds: `python3 -m unittest genesis.agentic.berth_test -k fold` (every Ledger.record(kind) emits dev-berth-events@1 through _observation.emit; a missing emitter costs the fold, never the lease) and a ledger-fold test over the harvesters and guards. FIRST MOVE: berth emits on every kind (consolidation order step 6), then the harvesters fold findings instead of keeping their own files. NO status change.

@@ -10,6 +10,7 @@ pub mod acceptance;
 pub mod cites;
 pub mod claim;
 pub mod cluster_state;
+pub mod concern;
 pub mod concerns;
 pub mod context;
 pub mod context_sections;
@@ -36,6 +37,7 @@ pub mod report;
 pub mod retract;
 pub mod scope;
 pub mod seal;
+pub mod sense;
 pub mod stasis;
 pub mod stocks;
 pub mod walk;
@@ -111,9 +113,9 @@ fn flag_hint(word: &str, own: &[&str]) -> String {
 }
 
 /// Every flow subcommand, as a person types it.
-const SUBCOMMANDS: [&str; 17] = [
+const SUBCOMMANDS: [&str; 18] = [
     "project", "walk", "status", "seal", "reseal", "hold", "claim", "context", "ledger", "fulfill",
-    "note", "report", "stocks", "concerns", "memory", "cites", "retract",
+    "note", "report", "stocks", "concerns", "memory", "cites", "retract", "sense",
 ];
 
 /// Entry point invoked by `main` for `epr flow …`.
@@ -248,6 +250,7 @@ pub fn run(args: &[String]) -> FlowResult<ExitCode> {
         "memory" => memory::run(&args[1..]),
         "cites" => run_cites(&args[1..]),
         "retract" => run_retract(&args[1..]),
+        "sense" => run_sense(&args[1..]),
         other => Err(FlowError::InvalidArguments(format!(
             "unknown flow subcommand `{other}`{}\n{}",
             crate::hint::did_you_mean(other, "epr flow", &SUBCOMMANDS),
@@ -870,6 +873,38 @@ fn run_report(args: &[String]) -> FlowResult<ExitCode> {
     options.bound = take_opt(&rest, "--bound")?;
     options.recipes = resolve_recipes(&opts.root, &rest)?;
 
+    // `--breaches`: the primary recipe's FAILED bounds joined to their row's concern and
+    // dispatch — the one reader a hook, a gate runner or a shift asks "what is breaching, and who
+    // should look", instead of each re-parsing the registry and re-judging the watermark.
+    if rest.iter().any(|a| a == "--breaches") {
+        let breaches = report::breaches(&opts.root, &options)?;
+        if opts.json {
+            println!("{}", serde_json::to_string_pretty(&breaches)?);
+        } else if breaches.is_empty() {
+            println!("breaches: none");
+        } else {
+            for breach in &breaches {
+                println!("breach  {}  — {}", breach.bound, breach.summary);
+                if let Some(concern) = &breach.concern {
+                    println!("  prices    {concern}");
+                }
+                for subject in &breach.subjects {
+                    println!("  subject   {subject}");
+                }
+                if let Some(agent) = &breach.dispatch_agent {
+                    println!(
+                        "  DISPATCH  {agent}: {}",
+                        breach
+                            .dispatch_prompt
+                            .as_deref()
+                            .unwrap_or("(no prompt declared)")
+                    );
+                }
+            }
+        }
+        return Ok(ExitCode::SUCCESS);
+    }
+
     let payload = report::report(&opts.root, &options)?;
     // The scope slot's number is a measurement like any other: fold it onto its declared bound here,
     // at the CLI edge, so the SessionStart headline run is also the producer. The pure `report()`
@@ -885,6 +920,97 @@ fn run_report(args: &[String]) -> FlowResult<ExitCode> {
         payload.render();
     }
     Ok(ExitCode::SUCCESS)
+}
+
+/// `epr flow sense [--measure <id@v>]... [--family <f>] [--due <d>] [--dry-run] [--measures PATH]`
+/// and `epr flow sense rule --measure <id@v> --subject <path> --class <c> --why <text>`.
+///
+/// Exit 1 when any selected probe was REFUSED: a detector that could not run is an instrument
+/// failure, and a zero exit would let a caller read the silence as "nothing found".
+fn run_sense(args: &[String]) -> FlowResult<ExitCode> {
+    let (opts, rest) = parse_global(args)?;
+    if wants_help(&rest) {
+        println!("{}", sense_usage());
+        return Ok(ExitCode::SUCCESS);
+    }
+    let measures = match take_opt(&rest, "--measures")? {
+        Some(path) => resolve_under(&opts.root, &path),
+        None => measures::default_measures(&opts.root),
+    };
+    let actor = note::NoteActor {
+        as_ref: take_opt(&rest, "--as")?,
+        session: resolve_session(take_opt(&rest, "--session")?),
+    };
+
+    if rest.first().map(String::as_str) == Some("rule") {
+        let need = |key: &str| -> FlowResult<String> {
+            take_opt(&rest, key)?.ok_or_else(|| {
+                FlowError::InvalidArguments(format!("sense rule needs {key}\n{}", sense_usage()))
+            })
+        };
+        let measure = need("--measure")?;
+        let subject = need("--subject")?;
+        let raw_class = need("--class")?;
+        let class = sense::Classification::parse(&raw_class).ok_or_else(|| {
+            FlowError::InvalidArguments(format!(
+                "unknown class `{raw_class}` — duplication|intentional|canonical|unresolved|\
+                 false-positive"
+            ))
+        })?;
+        let why = need("--why")?;
+        let outcome = sense::rule(
+            &opts.root, &measures, &measure, &subject, class, &why, &actor,
+        )?;
+        if opts.json {
+            println!("{}", serde_json::to_string_pretty(&outcome)?);
+        } else {
+            outcome.render();
+        }
+        return Ok(ExitCode::SUCCESS);
+    }
+
+    let selection = sense::Selection {
+        measures: take_opts_all(&rest, "--measure")?,
+        family: take_opt(&rest, "--family")?,
+        due: take_opt(&rest, "--due")?,
+    };
+    let dry_run = rest.iter().any(|a| a == "--dry-run");
+    let outcomes = sense::sense(&opts.root, &measures, &selection, dry_run, &actor)?;
+    if opts.json {
+        println!("{}", serde_json::to_string_pretty(&outcomes)?);
+    } else if outcomes.is_empty() {
+        println!("sense: no declared probe matches the selection");
+    } else {
+        for outcome in &outcomes {
+            outcome.render();
+        }
+    }
+    let refused = outcomes
+        .iter()
+        .any(|o| o.status == sense::SenseStatus::Refused);
+    Ok(if refused {
+        ExitCode::from(1)
+    } else {
+        ExitCode::SUCCESS
+    })
+}
+
+/// `epr flow sense --help`.
+pub fn sense_usage() -> String {
+    "usage: epr flow sense [--measure <id@version>]... [--family <family>] [--due <cadence>] \
+     [--dry-run] [--measures PATH] [--as agent:<role>@<model>] [--session <id>] [--json] \
+     [--root DIR]\n  \
+     Runs the `probe:` block declared on each selected measure row and folds what it reports \
+     through the native observation writer. A `count` probe folds one value on subject `.`; a \
+     `candidates` probe folds 1 for each newly reported subject and 0 for each that disappeared, \
+     so `distinct-subjects-since-reset` reads the open set. Exit 1 when any probe was refused.\n\n\
+     usage: epr flow sense rule --measure <id@version> --subject <path> \
+     --class duplication|intentional|canonical|unresolved|false-positive --why <text> \
+     [--as …] [--session <id>] [--json] [--root DIR]\n  \
+     Records a contract inspection's answer as a `ruling` note on the candidate's own file. \
+     intentional, canonical and false-positive EXCEPT the subject (closed, counted, named); \
+     duplication and unresolved keep it open.\n"
+        .to_string()
 }
 
 /// `epr flow report placement [--ledger] [--focus [<subject>]] [--json] [--cluster-state PATH]`.
@@ -1430,7 +1556,11 @@ fn usage() -> String {
      status:/path: — dry run unless --write, and the verdict is the same derive_verdict the \
      concern view shows; `migrate [--apply]` is the corpus sweep. `epr flow cites --help` prints \
      the per-verb contract)\n  \
-     | report [--headline] [--bound <id>] [--recipe DIR]... [--measures PATH]... \
+     | sense [--measure <id@version>]... [--family <f>] [--due <d>] [--dry-run] [--json] \
+     [--root DIR] | sense rule --measure <id@version> --subject <path> --class <c> --why <text> \
+     (runs the declared `probe:` on each measure row and folds what it reports; `epr flow sense \
+     --help` prints the contract)\n  \
+     | report [--headline] [--breaches] [--bound <id>] [--recipe DIR]... [--measures PATH]... \
      [--policies PATH]... [--json] [--root DIR] \
      (evaluates every declared lens/ceiling bound against the latest matching fold: \
      passed | failed | skipped, where a bound with NO fold is skipped naming its missing measure, \

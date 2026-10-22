@@ -1,6 +1,29 @@
 ---
 epr-meta-version: 1
 covers: subtree
+rules:
+  - id: durable-primitives-are-native-py
+    class: inject
+    when:
+      write: "*.py"
+      contains-any: [".jsonl", "datetime.now(", "time.time(", ">= hard", "> hard", ">= soft",
+                     "\"hard\"", "'hard'", "ceiling"]
+    dedupe-of: "elohim/eprfs/epr-cli/src/flow/{sense,report,concern}.rs + elohim/epr-rea/src/model.rs (the native fold writer, judge, concern resolver and limit model)"
+    why: >
+      Python in this tree is a disposable local artifact of the design (operator ruling
+      2026-10-22: the lowest-level primitives have first-class Rust support for performance and
+      durability). A script that keeps a ledger (`.jsonl` with its own cursor and closure rule),
+      judges a level against a watermark, or dates a measurement by the wall clock is growing a
+      primitive in the disposable layer. The durable homes: a finding is a fold written by
+      `epr flow sense` (a `probe:` on the measure row — `native:` for a primitive, `run:` only
+      for a detector still being learned); a level is judged by `elohim_epr_rea::Bound` or the
+      native report (`epr flow report --bound`, `--breaches`); a concern reference resolves through
+      `flow::concern`; notes are dated by the git HEAD, not `now()`. Census: the 2026-10-22
+      substrate-bypass survey (16 private ledgers, a habit-side regex copy of the concern tag,
+      seven wall-clock reads) — spec genesis/docs/superpowers/specs/2026-10-22-sense-organ-design.md.
+      If this script is a deliberate sketch, leave it so and say what retires it. (Advisory
+      `inject` nudge — never blocks, names no validator.)
+    retire-when: "when no .claude/data/*.jsonl appender remains and limit-models-open@1 reads 0 — the dev system's primitives are then native by construction"
 ---
 `.claude/scripts/` — the agentic memory + governance toolkit (the `_lib` cascade, the memory-kit
 audit/stasis tools, the lint harness). This manifest CLAIMS full responsibility for the subtree

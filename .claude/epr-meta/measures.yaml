@@ -60,6 +60,17 @@
 #   • `subject:` / `env:` — narrow which folds are evidence. `.` names the repository itself.
 #   • `headline:` — which SessionStart slot the bound renders into, when the measure id does not
 #     already imply it.
+#   • `dispatch-agent:` / `dispatch-prompt:` — who a breach is handed to, and the brief. Read by
+#     `epr flow report --breaches`, never acted on by the report itself.
+#
+# Measure key `epr flow sense` reads (elohim/eprfs/epr-cli/src/flow/sense.rs):
+#   • `probe:` — `{run, emits: count|candidates, due, timeout-seconds}`. ONE runnable
+#     implementation of the row's prose `procedure:` (which stays the contract). `count` folds one
+#     value on subject `.`; `candidates` folds 1 per newly reported file and 0 per vanished one, so
+#     a `distinct-subjects-since-reset` lens reads the open set. A candidate is classified by a
+#     `ruling` note on its own file — `epr flow sense rule --measure M --subject P --class
+#     duplication|intentional|canonical|unresolved|false-positive --why <contract difference>`;
+#     intentional/canonical/false-positive except it (counted, named), the others keep it open.
 
 measures-version: 1
 measures:
@@ -1242,6 +1253,11 @@ measures:
     procedure: >
       Count the files among .claude/data/*.jsonl and $CLAUDE_CONFIG_DIR/berth/ledger.jsonl whose
       basename a script under .claude/scripts other than its own appender parses; subject `.`.
+    probe:
+      run: "python3 -I .claude/scripts/probes/ledger_planes.py"
+      emits: count
+      due: session
+      timeout-seconds: 30
     provenance: Observability epic §13; habit ledgers-fold-once
     status: active
     env-sensitivity: []
@@ -1294,6 +1310,148 @@ measures:
     default-authority: observation
     established_by: slug-leftovers-sprint-20261008
     why: "the 2026-10-08 lamad-spa reading was two CIDs for one name with no way to tell stale from different"
+
+  - id: limit-models
+    version: 1
+    family: substrate-bypass
+    unit: files
+    procedure: >
+      Every tracked development-system source file (.claude/scripts, .claude/hooks, elohim/eprfs,
+      genesis/{orchestrator,agentic}, genesis/a2o/{scripts,steps}; test code excluded) outside
+      elohim/epr-rea that judges a level against a limit with its own comparison — a
+      soft/hard/ceiling/watermark comparison, a comparison against a bound's `.limit` or
+      `band_edge()`, or a locally declared `Bound`/`Compare` type — instead of asking
+      `elohim_epr_rea::Bound` (`breached_by`/`approached_by`) or the native report. One candidate
+      per file; the lines are its symbols.
+    probe:
+      run: "python3 -I .claude/scripts/probes/limit_models.py"
+      emits: candidates
+      due: session
+      timeout-seconds: 60
+    provenance: "substrate-bypass census 2026-10-22 signature 1 (two limit models: flow/measures.rs vs epr-rea Bound); habit-progress spec §8"
+    status: active
+    env-sensitivity: [epoch, transition]
+    default-authority: observation
+    established_by: sense-organ-2026-10-22
+    why: "a level judged outside the one limit model is a verdict nobody else can re-derive"
+  - id: limit-models-reset
+    version: 1
+    family: substrate-bypass
+    unit: resets
+    procedure: >
+      Appended by `epr flow sense` when an open `limit-models@1` candidate's file no longer exists
+      (it cannot take a healing zero), or by a person deliberately draining the window; value 1,
+      subject `.`, `--env measure=limit-models@1`.
+    provenance: sense-organ-2026-10-22
+    status: active
+    env-sensitivity: [measure]
+    default-authority: observation
+    established_by: sense-organ-2026-10-22
+  - id: concern-tag-parsers
+    version: 1
+    family: duplication
+    unit: files
+    procedure: >
+      Every tracked development-system source file (same roots and exclusions as limit-models@1)
+      that implements the `@concern:` tag grammar itself — a regex capture right after the tag, or
+      a strip_prefix/startswith/split on it — rather than calling the owning parser. One candidate
+      per file; the lines are its symbols.
+    provenance: "substrate-bypass census 2026-10-22 signature 4 (three identical Python copies plus a Rust parser with a different character class)"
+    status: superseded
+    superseded_by: concern-joins-unresolved@1
+    superseded_reason: "grammar variance is not the defect: a concern is a declared entity and a reference is valid when it resolves in its relation's home (operator ruling 2026-10-22). Its rulings stand as history."
+    env-sensitivity: [epoch, transition]
+    default-authority: observation
+    established_by: sense-organ-2026-10-22
+    why: "one identifier joins a claim to its proof; four grammars for it disagree on what an identifier is"
+  - id: concern-tag-parsers-reset
+    version: 1
+    family: duplication
+    unit: resets
+    procedure: >
+      Appended by `epr flow sense` when an open `concern-tag-parsers@1` candidate's file no longer
+      exists, or by a person deliberately draining the window; value 1, subject `.`,
+      `--env measure=concern-tag-parsers@1`.
+    provenance: sense-organ-2026-10-22
+    status: superseded
+    superseded_by: concern-joins-unresolved-reset@1
+    env-sensitivity: [measure]
+    default-authority: observation
+    established_by: sense-organ-2026-10-22
+  - id: concern-joins-unresolved
+    version: 1
+    family: concern-ontology
+    unit: files
+    procedure: >
+      A CONCERN is a declared entity with three homes — a habit atom (`id` plus every `@concern:`
+      its `checks:` adopt), the canon (`.claude/epr-meta/{concerns,policies}.yaml` ids and invariant
+      classes), and a story (an a2o `.feature` tag line). A reference's RELATION is fixed by where it
+      is written: a habit check's `@concern:X` is evidence-of (resolves when a story declares X); a
+      lens `concern:` prices (resolves when a habit declares X); a policy `concern:` is governed-by
+      (resolves when the canon declares X); an open findings-ledger row's `concern` is pain-of
+      (resolves in a habit or the canon). Candidates: every file holding a reference that does not
+      resolve in its relation's home; the references are its symbols (`relation:X`). Spelling is
+      never the test — the declaring home is.
+    probe:
+      native: concern-joins
+      emits: candidates
+      due: session
+      timeout-seconds: 60
+    provenance: "sense-organ spec §3 (concern as a declared entity with relations; operator ruling 2026-10-22); supersedes concern-tag-parsers@1"
+    status: active
+    env-sensitivity: [epoch, transition]
+    default-authority: observation
+    established_by: sense-organ-2026-10-22
+    why: "a claim joined to nothing proves nothing; the join, not the spelling, is what can break"
+  - id: concern-joins-unresolved-reset
+    version: 1
+    family: concern-ontology
+    unit: resets
+    procedure: >
+      Appended by `epr flow sense` when an open `concern-joins-unresolved@1` candidate's file no
+      longer exists, or by a person deliberately draining the window; value 1, subject `.`,
+      `--env measure=concern-joins-unresolved@1`.
+    provenance: sense-organ-2026-10-22
+    status: active
+    env-sensitivity: [measure]
+    default-authority: observation
+    established_by: sense-organ-2026-10-22
+  - id: concern-evidence-unadopted
+    version: 1
+    family: concern-ontology
+    unit: concerns
+    procedure: >
+      Story concerns — `@concern:` tags on a2o `.feature` tag lines — that no habit adopts (neither
+      a habit id nor an address in any habit's `checks:`); subject `.`. Not a broken join: a story
+      may precede its habit. It is evidence serving nothing declared, the reading that adopting a
+      story into a habit (or holding the story) drains. Placeholders (`<name>`) are not concerns.
+    probe:
+      native: concern-evidence-unadopted
+      emits: count
+      due: session
+      timeout-seconds: 60
+    provenance: "sense-organ spec §3; CLAUDE.md four artifacts (a plan, spec or story that serves no habit belongs in held/)"
+    status: active
+    env-sensitivity: []
+    default-authority: observation
+    established_by: sense-organ-2026-10-22
+    why: "a story nobody's habit adopts is proof with no promise to keep"
+  - id: sense-classes
+    version: 1
+    family: algedonic-sensing
+    unit: candidates
+    procedure: >
+      Written by `epr flow sense` for every `candidates` probe it runs: per class
+      (duplication | intentional | canonical | unresolved | false-positive | unruled), the number
+      of candidates the probe reported this run whose latest `sense <measure> <class>:` ruling is
+      that class; subject `.`, `--env measure=<pin> --env class=<class>`, folded on change. The
+      learning slot reads a detector's precision from these: false-positive against the rest,
+      unruled as review still owed. Never a ranking score.
+    provenance: "autonomous-loop refactoring notes §8 (measure false positives, known misses, review cost)"
+    status: active
+    env-sensitivity: [measure, class]
+    default-authority: observation
+    established_by: sense-organ-2026-10-22
 
 lenses:
   - id: resource-limit-raise-recurrence
@@ -1483,6 +1641,7 @@ lenses:
       - memory-index-drift@1           # memory-index-drift.json — no fold producer yet
     context: session-headline
     hard: 120
+    concern: dev-system-equilibrium
     status: active
     established_by: memory-kit-replacement-station-1-2026-09-10
     why: >
@@ -1541,6 +1700,7 @@ lenses:
     consumes: [placement-drift-due@1]
     context: session-headline
     hard: 1
+    concern: dev-system-equilibrium
     status: active
     established_by: memory-kit-replacement-station-1-2026-09-10
     why: >
@@ -1568,6 +1728,7 @@ lenses:
     consumes: [map-currency-drift@1]
     context: session-headline
     hard: 1
+    concern: dev-system-equilibrium
     status: active
     established_by: memory-kit-replacement-station-1-2026-09-10
     why: >
@@ -1754,6 +1915,7 @@ lenses:
       - genesis/data/stories
     suffix: .md
     grace-seconds: 120              # the value mine-grace-seconds@1 declares
+    concern: dev-system-equilibrium
     status: active
     established_by: memory-kit-replacement-station-1-2026-09-10
 
@@ -1772,6 +1934,7 @@ lenses:
     consumes: [index-fold-lag@1]
     context: session-headline
     hard: 25
+    concern: dev-system-equilibrium
     status: active
     established_by: governed-discovery-station-4-2026-09-24
 
@@ -2180,3 +2343,56 @@ lenses:
     status: active
     established_by: slug-leftovers-sprint-20261008
     why: "two doorways answering one name differently is the incident; zero is the only honest ceiling"
+  - id: limit-models-open
+    version: 1
+    binding: binding-local
+    class: measure
+    derive: distinct-subjects-since-reset
+    reset: limit-models-reset@1
+    consumes: [limit-models@1]
+    compare: at-or-above
+    context: workspace
+    hard: 1
+    concern: sensing-rides-the-measure-plane
+    dispatch-agent: pattern-hunter
+    dispatch-prompt: "Report only. Run `epr flow report --breaches` and take ONE open limit-models@1 subject. Inspect its contract against elohim_epr_rea::Bound (inputs, sense/direction, inclusive vs strict, units, evidence judging, trust boundary, latency) and record exactly one `epr flow sense rule --measure limit-models@1 --subject <path> --class <c> --why <the difference>`. Never centralize code on similarity alone."
+    retire-when: when no development-system code judges a level outside elohim_epr_rea::Bound and every intentional variation carries a ruling
+    status: active
+    established_by: sense-organ-2026-10-22
+    why: "an open candidate is review owed; zero is the only honest ceiling"
+  - id: concern-joins-open
+    version: 1
+    binding: binding-local
+    class: measure
+    derive: distinct-subjects-since-reset
+    reset: concern-joins-unresolved-reset@1
+    consumes: [concern-joins-unresolved@1]
+    compare: at-or-above
+    context: workspace
+    hard: 1
+    concern: sensing-rides-the-measure-plane
+    dispatch-agent: pattern-hunter
+    dispatch-prompt: "Report only. Run `epr flow report --breaches` and take ONE file named under concern-joins-open@1. For each `relation:X` symbol, find the home that relation resolves in (story feature tag lines, habit atoms, the concerns/policies canon) and report whether X was renamed, retired or never declared. Propose the declaration or the corrected reference; never a regex."
+    retire-when: when every concern reference resolves in its relation's home by construction (references minted from the declared set rather than typed)
+    status: active
+    established_by: sense-organ-2026-10-22
+    why: "a broken join is review owed; zero is the only honest ceiling"
+  - id: concern-tag-parsers-open
+    version: 1
+    binding: binding-local
+    class: measure
+    derive: distinct-subjects-since-reset
+    reset: concern-tag-parsers-reset@1
+    consumes: [concern-tag-parsers@1]
+    compare: at-or-above
+    context: workspace
+    hard: 1
+    concern: sensing-rides-the-measure-plane
+    dispatch-agent: pattern-hunter
+    dispatch-prompt: "Report only. Run `epr flow report --breaches` and take ONE open concern-tag-parsers@1 subject. Compare its accepted grammar with the canonical owner's (`epr flow sense --measure concern-tag-parsers@1` names it as excepted canonical) on uppercase, underscore and trailing punctuation, and record exactly one `epr flow sense rule --measure concern-tag-parsers@1 --subject <path> --class <c> --why <the difference>`."
+    retire-when: when the @concern grammar is declared once and every host calls its owner
+    status: superseded
+    superseded_by: concern-joins-open@1
+    superseded_reason: "a concern is a declared entity; the open set is unresolved joins, not grammar variants"
+    established_by: sense-organ-2026-10-22
+    why: "an open candidate is review owed; zero is the only honest ceiling"
