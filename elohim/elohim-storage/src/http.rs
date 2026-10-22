@@ -7301,24 +7301,24 @@ impl HttpServer {
 
         // /sync/v1/{h_app_id}/docs/{doc_id}
         if parts.len() == 3 && parts[1] == "docs" {
-            let doc_id = parts[2];
+            let doc_id = decode_path_id(parts[2]);
             return self
-                .handle_sync_doc(method, h_app_id, doc_id, req, sync_manager)
+                .handle_sync_doc(method, h_app_id, &doc_id, req, sync_manager)
                 .await;
         }
 
         // /sync/v1/{h_app_id}/docs/{doc_id}/{action}
         if parts.len() == 4 && parts[1] == "docs" {
-            let doc_id = parts[2];
+            let doc_id = decode_path_id(parts[2]);
             let action = parts[3];
 
             return match action {
                 "heads" => {
-                    self.handle_sync_heads(method, h_app_id, doc_id, sync_manager)
+                    self.handle_sync_heads(method, h_app_id, &doc_id, sync_manager)
                         .await
                 }
                 "changes" => {
-                    self.handle_sync_changes(method, h_app_id, doc_id, req, sync_manager)
+                    self.handle_sync_changes(method, h_app_id, &doc_id, req, sync_manager)
                         .await
                 }
                 _ => Ok(Response::builder()
