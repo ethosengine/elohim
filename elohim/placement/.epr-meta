@@ -28,3 +28,16 @@ interfaces spec §1.3 names; `boundary::no_clock` (R-P2), `boundary::no_io_or_as
 `boundary::no_floats_in_ranking` (R-P3) and `boundary::every_ranking_runs_the_contract` (R-P7) scan
 the crate's own sources; R-P4, R-P5 and R-P6 are `compile_fail` doctests. A violation fails
 `just gate elohim-placement`.
+
+## Rust style divergence: explicit contract inputs and refusals
+
+RS-GOV-04 records two existing interface constraints in `core/src/lib.rs` and
+`core/src/params.rs::select_in_force`. R7 returns all three `Unanswered` parts by value;
+boxing them for `result_large_err` would change the declared signatures. `select_in_force`
+takes the contract's seven election inputs plus the method registry needed for its structural
+band check; wrapping them solely for `too_many_arguments` would obscure that correspondence.
+Tradeoffs: larger error values and a longer parameter list. Scope: the named attributes;
+neither exception authorizes parallel decision logic or a new unchecked input. Evidence:
+the existing signature comments and interfaces contract; regression command:
+`just gate elohim-placement`. Responsible: placement-core maintainers. Revisit with the next
+interface revision or evidence that these representations materially cost callers.

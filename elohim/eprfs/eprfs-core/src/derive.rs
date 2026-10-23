@@ -308,7 +308,10 @@ impl DerivationUnanswered {
 /// The look-ups return ruling 7's `Unanswered` by value as the interfaces spec signs them: a
 /// derivation look-up is cold (once per task), so its error size is allowed.
 #[async_trait]
-#[allow(clippy::result_large_err)]
+#[allow(
+    clippy::result_large_err,
+    reason = "The interfaces contract returns Unanswered by value on this once-per-task lookup"
+)]
 pub trait DerivationIndex: Send + Sync {
     /// Carries what reach is judged on (C1). A serving index admits `who` to `at.root`, recomputes
     /// the projected root over its own nodes (a membership check), then answers the records keyed
@@ -336,7 +339,10 @@ pub trait DerivationIndex: Send + Sync {
 }
 
 /// The reader's judgement, never stored in the record.
-#[allow(clippy::result_large_err)]
+#[allow(
+    clippy::result_large_err,
+    reason = "TrustPolicy preserves the interfaces contract's structured Unanswered refusal by value"
+)]
 pub trait TrustPolicy: Send + Sync {
     /// `records` are authenticated. `roster` is the reader's own view of failure domains.
     fn accept<'r>(
@@ -380,7 +386,10 @@ pub struct Derived {
 
 /// The spec's shape, unboxed: an outcome is returned once per task, so its size is allowed.
 #[derive(Debug, Clone, PartialEq, Eq)]
-#[allow(clippy::large_enum_variant)]
+#[allow(
+    clippy::large_enum_variant,
+    reason = "The interfaces contract returns one unboxed outcome per task"
+)]
 pub enum DeriveOutcome {
     Derived(Derived),
     NotDerived(Unanswered<DerivationUnanswered>),

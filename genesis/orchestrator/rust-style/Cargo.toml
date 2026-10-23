@@ -1,0 +1,27 @@
+[package]
+name = "elohim-rust-style"
+version = "0.1.0"
+edition = "2021"
+publish = false
+license = "Apache-2.0"
+description = "Repository Rust style diagnostics and monotonic debt gate"
+
+[workspace]
+
+[dependencies]
+eprfs-meta = { path = "../../../elohim/eprfs/eprfs-meta" }
+proc-macro2 = { version = "1", features = ["span-locations"] }
+quote = "1"
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+syn = { version = "2", features = ["full", "visit"] }
+tempfile = "3"
+toml = "0.8"
+
+[[bin]]
+name = "epr-rust-style"
+path = "src/main.rs"
+
+[profile.dev]
+opt-level = 1
+debug = 0

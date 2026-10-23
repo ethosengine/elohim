@@ -107,6 +107,18 @@ while read -r LOCAL_REF LOCAL_SHA REMOTE_REF REMOTE_SHA; do
   GATE_COMMIT="$LOCAL_SHA"
   export GATE_COMMIT
 
+  # Check EACH pushed object against its actual destination before filters or PVC
+  # deferral. Never substitute the dirty checkout or last ref for the pushed tree.
+  if [[ "$REMOTE_REF" =~ ^refs/heads/(dev|main)$ && "$REMOTE_SHA" != "$ZERO_SHA" ]]; then
+    STYLE_BASE="$REMOTE_SHA"
+  else
+    STYLE_BASE="origin/dev"
+  fi
+  if ! bash "$(git rev-parse --show-toplevel)/genesis/orchestrator/rust-style.sh" --base "$STYLE_BASE" --head "$LOCAL_SHA"; then
+    echo "Rust style reach gate refused this ref; fix findings or restore measurable inputs."
+    exit 1
+  fi
+
   # Determine what changed
   if [ "$REMOTE_SHA" = "$ZERO_SHA" ]; then
     # New branch - check recent commits against remote

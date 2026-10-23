@@ -13,7 +13,10 @@
 //! `testing` feature, the tier contract harness and its counting doubles ([`testing`]).
 
 // eprfs-core's `TreeError` is 128 bytes (an inline CID plus a path); see eprfs-core's lib.rs.
-#![allow(clippy::result_large_err)]
+#![allow(
+    clippy::result_large_err,
+    reason = "Serving preserves eprfs-core TreeError's inline CID and path without a second error representation"
+)]
 
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::Arc;

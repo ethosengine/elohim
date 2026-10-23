@@ -24,3 +24,9 @@ test('the flake reads the declared toolchain file and never floats', () => {
   assert.match(flake, /fromRustupToolchainFile\s+\.\/rust-toolchain\.toml/);
   assert.doesNotMatch(flake, /stable\.latest|nightly\.latest|beta\.latest/);
 });
+
+test('the repository Rust style CI container uses the local gate pin', () => {
+  const gate = JSON.parse(read('genesis/agentic/pool-policy.json')).cargo_env_overrides['*'].RUSTUP_TOOLCHAIN;
+  const image = read('genesis/orchestrator/Jenkinsfile').match(/name: rust-style\s+image: rust:([^\s]+)-bookworm/)?.[1];
+  assert.equal(image, gate);
+});

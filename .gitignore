@@ -73,6 +73,7 @@ target/
 # matches directories, so we need a separate non-directory pattern.
 target
 target-pool/
+.rust-style-target/
 *.happ
 *.dna
 bindings/

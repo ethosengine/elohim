@@ -11,7 +11,10 @@
 // Every `TreeError` variant that names an object carries its 96-byte inline CID; the
 // `Unanswered` variant adds the object's path beside its boxed three parts and lands at 128
 // bytes, one word over clippy's default. Boxing the CID would make every refusal allocate.
-#![allow(clippy::result_large_err)]
+#![allow(
+    clippy::result_large_err,
+    reason = "TreeError retains its inline CID and path; boxing the CID would allocate on every refusal"
+)]
 
 pub mod address;
 pub mod attestation;

@@ -2362,6 +2362,17 @@ spec:
   nodeSelector:
     node-type: edge
   containers:
+  - name: rust-style
+    image: rust:1.96.1-bookworm
+    command: [cat]
+    tty: true
+    resources:
+      requests:
+        memory: "256Mi"
+        cpu: "100m"
+      limits:
+        memory: "2Gi"
+        cpu: "1"
   - name: builder
     image: harbor.ethosengine.com/ethosengine/ci-builder:latest
     # Always: :latest is a moving tag — a cached node can silently serve a stale
@@ -2493,7 +2504,8 @@ spec:
                                 // preserving enough history for orchestrator changeset diffs
                                 // against last-successful baselines. timeout:30 (per attempt)
                                 // replaces the git-plugin 10-min default that was exhausting.
-                                // honorRefspec: only fetch the target branch, not +refs/heads/*
+                                // Fetch only the candidate and its integration branch for
+                                // the style ratchet, not +refs/heads/*.
                                 // (#787 spent 27min on all-heads fetch even with depth:200).
                                 [$class: 'CloneOption', shallow: true, noTags: true, depth: 200, timeout: 30, honorRefspec: true],
                                 [$class: 'CleanBeforeCheckout']
@@ -2501,7 +2513,10 @@ spec:
                             userRemoteConfigs: [[
                                 url: 'https://github.com/ethosengine/elohim.git',
                                 credentialsId: 'ee-bot-pat',
-                                refspec: "+refs/heads/${env.BRANCH_NAME}:refs/remotes/origin/${env.BRANCH_NAME}"
+                                refspec: [
+                                    "+refs/heads/${env.BRANCH_NAME}:refs/remotes/origin/${env.BRANCH_NAME}",
+                                    "+refs/heads/${env.CHANGE_TARGET ?: 'dev'}:refs/remotes/origin/${env.CHANGE_TARGET ?: 'dev'}"
+                                ].unique().join(' ')
                             ]]
                         ])
 
@@ -2634,6 +2649,15 @@ spec:
                         // Milestone 2: Abort older builds that reach this point after checkout
                         milestone(ordinal: 2, label: 'Checkout Complete')
                     }
+                }
+            }
+        }
+
+        stage('Rust Style Gate') {
+            steps {
+                container('rust-style') {
+                    sh 'git config --global --add safe.directory "*"'
+                    sh 'bash genesis/orchestrator/rust-style-ci.sh'
                 }
             }
         }

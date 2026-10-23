@@ -201,6 +201,16 @@ function runProject(project, printOnly, namesOnly) {
     });
   }
 
+  // Explicit crate gates carry the same style floor as changed-project selection.
+  if (project.run.cargo && project.name !== 'rust-style') {
+    const styleArgs = [resolve(ROOT, 'genesis/orchestrator/rust-style.sh'), '--scope', project.dir];
+    if (process.env.GATE_COMMIT) styleArgs.push('--head', process.env.GATE_COMMIT);
+    const style = spawnSync('bash', styleArgs, {
+      cwd: ROOT, stdio: 'inherit', env: gateChildEnv(project, process.env),
+    });
+    if (style.status !== 0) return style.status || 2;
+  }
+
   process.stdout.write(`\n[gate] ${project.name} (${project.dir})\n`);
   const childEnv = gateChildEnv(project, process.env);
   // Evidence by input closure (gate-evidence.mjs): has THIS closure — the step's declared

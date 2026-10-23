@@ -1,6 +1,6 @@
 ---
 name: blind-reader
-description: Context-isolated second reader for authored documents. Receives one document path plus a review profile, reads nothing else, and returns a rich interpretability and coherence review from an unfamiliar reader's perspective. Profiles specialize the cold read for a2o stories, manifesto epics, and READMEs. Read-only; repeat with a fresh reader after revision.
+description: Context-isolated second reader for authored documents. Receives one document path plus a review profile, reads nothing else, and returns a rich interpretability and coherence review from an unfamiliar reader's perspective. Profiles specialize the cold read for a2o stories, prose experience stories, manifesto epics, and READMEs. Read-only; repeat with a fresh reader after revision.
 metadata:
   runtime: codex
   sourceRuntime: elohim-agent
@@ -43,6 +43,10 @@ Apply the named profile in addition to the core cold read. If the profile is unk
 ### `a2o-story`
 
 Review a Gherkin feature as an executable human-value story. Reconstruct the beneficiary, before-state, triggering action, changed outcome, and why that outcome matters. Map every scenario to the feature promise. Trace Background/Given -> When -> Then as a causal narrative. Flag missing transitions, invisible prior state, scenarios that prove only prerequisites while claiming a finish line, assertions that do not entail the title, comments carrying essential meaning, vague outcomes, contradictory personas/state, and implementation-shaped steps whose human value is opaque. Judge interpretability of the proof, not whether step definitions exist or implementation is correct.
+
+### `experience-story`
+
+Review a prose experience story as one person's lived moment that an ordinary reader should recognize as their own. Reconstruct who the story is about, the role they are in, what they want or fear at the start, what they do, what the people and devices around them do, what changes, and why it mattered to them. Read the frontmatter only for what it tells a stranger (title, description); judge the body as the story. Flag a body that needs the frontmatter, a glossary or another document to be understood; protocol or implementation vocabulary where a moment should be; characters named but never placed; feelings asserted rather than shown; friction smoothed over or a hard part skipped; turns the narrative does not earn; an ending stronger than what happened; and promotional or boosterish voice. The test reader is a parent at the kitchen table: if they need a glossary, the story has failed. Do not judge whether the behavior described is implemented or tested.
 
 ### `manifesto-epic`
 

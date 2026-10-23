@@ -1,0 +1,18 @@
+---
+epr-meta-version: 1
+id: rust-style-gate
+covers: subtree
+purpose: >
+  The native Rust style checker shared by agent advice and reach gates. Syntax detection,
+  Git-derived debt baselines and strict scope resolution live here; runtime adapters do
+  not implement another lint evaluator.
+rules:
+  - id: rust-style-strict
+    policy: rust-style-strict@1
+---
+# Rust style gate
+
+This tool is its own first permanently strict scope. RS-GOV-04 requires a reason on every
+lint suppression, including tests, inactive cfg branches and literal macro-generated attributes.
+The native eprfs-meta resolver owns scope inheritance. Git owns the debt baseline; there is no
+editable debt allowance to widen. Plain `allow` and `expect` without reasons cannot be excepted.

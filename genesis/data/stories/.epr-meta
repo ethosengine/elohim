@@ -1,0 +1,51 @@
+---
+epr-meta-version: 1
+id: experience-stories-governance
+covers: subtree
+purpose: >
+  The canonical experience-story catalog — plain-language narratives, one per (subject, role, feature)
+  triple, that a reader who has never read a spec should recognize themselves in. Every story write
+  carries a context-blind reader review, so the story stands without the session that wrote it.
+rules:
+  - id: experience-story-blind-reader-review
+    class: inject
+    when: { write: "*--*--*.md" }
+    route-to: { dest: blind-reader }
+    parameters:
+      review-profile: experience-story
+      variance:
+        floor: one considered fresh read; fix its correctness findings; close by the author's judgment
+        requires: steward-of-record
+        offered-when: the session's declared purpose is authoring the stories in scope
+    why: >
+      After the authoring pass, dispatch a fresh-context blind-reader with ONLY the completed story
+      path and the `experience-story` review profile. Do not provide the conversation, plan, persona
+      records, feature files, epics, or an explanation of what the author meant. Revise from its
+      findings, then repeat with a new blind reader until the story is READY or the operator explicitly
+      defers named findings.
+      Each finding carries a class (correctness | interpretability | preference); the loop closes when a
+      fresh reader returns no correctness or interpretability finding, and preference findings never
+      reopen it. Record the loop's cost where the work already reports — the commit message or the
+      owning habit delta — as rounds, per-class counts per round, and findings resolved. Every round
+      still uses a new reader.
+      The loop is owed when the writer's attention is elsewhere — a technical run that touches a story
+      in passing. A session whose declared purpose is the story itself discharges it at the `variance`
+      floor above, and only under a session-covenant clause the steward of record granted for that
+      session and those paths (`epr covenant`); an agent never grants itself the floor.
+---
+# genesis/data/stories — the canonical experience-story catalog
+
+Schema, voice and lifecycle live in `CONVENTIONS.md`; the storyteller agent owns the directory.
+
+## The review gate
+
+`experience-story-blind-reader-review` matches the triple filename
+(`<subject>--<role>--<feature>.md`), so `CONVENTIONS.md`, `INDEX.md` and the one retired
+pre-triple story are not story writes. It is the same rule the a2o stories carry
+(`genesis/a2o/.epr-meta`), with a profile for prose instead of Gherkin: a fresh reader receives
+only the story path and reports whether a stranger can recover who the story is about, what they
+went through, and why it mattered, without the persona records, features or epics the story was
+composed from.
+
+The full loop is the default. The `variance` floor applies only under a covenant clause the steward
+of record grants for a session whose declared purpose is writing these stories.

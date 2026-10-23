@@ -31,7 +31,10 @@
 // R7 (interfaces spec §2.0) returns every refusal by value with its three parts, so the spec's
 // signatures (`admit`, `InForce::from_head`, `within_band`, `RatificationCheck::verify`) carry an
 // `Unanswered<R>` in their `Err`. Boxing it would change those signatures for a size lint.
-#![allow(clippy::result_large_err)]
+#![allow(
+    clippy::result_large_err,
+    reason = "Interfaces ruling R7 returns all three Unanswered refusal parts by value; boxing would change those public signatures"
+)]
 
 pub mod adopt;
 pub mod ceiling;

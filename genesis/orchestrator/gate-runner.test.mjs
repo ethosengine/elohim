@@ -11,6 +11,13 @@ import { resolveRakiaBin } from './gate-oracle.mjs';
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '../..');
 
+test('Rust style selects new crates and inherited lint configuration', () => {
+  for (const changed of ['new-crate/src/lib.rs', '.cargo/config.toml', 'some/crate/clippy.toml']) {
+    const selected = projectsForChanges(ROOT, [changed], { oracle: 'path' }).map(p => p.name);
+    assert.ok(selected.includes('rust-style'), `${changed} must select the style floor`);
+  }
+});
+
 describe('manifest-driven local gate registry', () => {
   const registry = loadGateRegistry(ROOT);
 

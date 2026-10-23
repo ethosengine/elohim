@@ -1,0 +1,47 @@
+{
+  "apiVersion": "elohim-agent/v1alpha1",
+  "kind": "HookPackage",
+  "metadata": {
+    "id": "rust-style",
+    "name": "rust-style",
+    "version": "1.0.0",
+    "description": "Expose native Rust style findings before edits; reach gates cover every writer.",
+    "sourceRuntime": "claude",
+    "runtimeTargets": [
+      "claude"
+    ],
+    "event": "PreToolUse",
+    "matcher": ".*",
+    "interpreter": "python3",
+    "language": "python",
+    "assetRefs": [],
+    "governance": {
+      "eprRef": "epr:elohim-agent/hooks/rust-style",
+      "policy": "capability-governance@1",
+      "gates": [
+        "epr-meta-resolver",
+        "elohim-agent:packages:verify"
+      ],
+      "ledger": ".claude/data/governance-findings.jsonl"
+    },
+    "master": "package"
+  },
+  "source": {
+    "language": "python",
+    "interpreter": "python3",
+    "path": ".claude/hooks/rust-style.py",
+    "body": "#!/usr/bin/env python3\n\"\"\"Expose native Rust style findings before edits; reach gates cover every writer.\"\"\"\nimport json\nfrom pathlib import Path\nimport subprocess\nimport sys\n\nRETIRE_WHEN = \"all supported runtimes expose the native style gate as a trusted built-in edit check\"\n\n\ndef inspect(root, event):\n    tool = event.get(\"tool_name\", \"\")\n    data = event.get(\"tool_input\", {})\n    if isinstance(data, str):\n        # Codex freeform apply_patch and exec events carry a string, not a dict.\n        data = {\"command\": data}\n    if not isinstance(data, dict):\n        return None\n    path = data.get(\"file_path\") or data.get(\"path\")\n    if not isinstance(path, str) or not path.endswith(\".rs\"):\n        # Shell and opaque orchestration calls cannot be reconstructed safely.\n        # Their committed output is checked independently by pre-push and CI.\n        command = data.get(\"command\", data.get(\"cmd\", data.get(\"code\", \"\")))\n        if isinstance(command, str) and (\"cargo \" in command or \".rs\" in command):\n            return {\"context\": \"Rust style RS-GOV-04 is active: no new unexplained suppressions; touched crates with debt must reduce it. Run just gate rust-style before reach. This tool's prospective source is unavailable; it has not been certified clean.\"}\n        return None\n    target = Path(path)\n    if not target.is_absolute():\n        target = root / target\n    try:\n        relative = target.resolve().relative_to(root.resolve()).as_posix()\n    except ValueError:\n        return None\n    if tool in (\"Write\", \"write_file\"):\n        content = data.get(\"content\")\n    elif tool in (\"Edit\", \"edit_file\"):\n        before = target.read_text()\n        old, new = data.get(\"old_string\"), data.get(\"new_string\")\n        if not isinstance(old, str) or not old or not isinstance(new, str):\n            return {\"context\": \"Rust style: prospective edit is unmeasured; run just gate rust-style.\"}\n        count = before.count(old)\n        if count == 0 or (count > 1 and not data.get(\"replace_all\")):\n            return {\"context\": \"Rust style: edit context is ambiguous; native tool and reach gate will validate it.\"}\n        content = before.replace(old, new, -1 if data.get(\"replace_all\") else 1)\n    else:\n        return {\"context\": \"Rust style RS-GOV-04 applies to this crate. Run just gate rust-style; this tool's prospective source has not been measured.\"}\n    if not isinstance(content, str):\n        return {\"context\": \"Rust style: prospective content is unmeasured.\"}\n    result = subprocess.run(\n        [\"bash\", str(root / \"genesis/orchestrator/rust-style.sh\"), \"--hook\", \"--path\", relative, \"--stdin\"],\n        input=content, text=True, capture_output=True, timeout=4,\n    )\n    if result.returncode not in (0, 1):\n        return {\"context\": \"Rust style UNMEASURED: \" + result.stderr.strip()[:700]}\n    payload = json.loads(result.stdout)\n    failures = payload.get(\"failures\")\n    if not isinstance(failures, list):\n        return {\"context\": \"Rust style UNMEASURED: checker returned no verdict.\"}\n    if failures:\n        return {\"deny\": \"\\n\".join(failures[:8]) + \"\\nSee genesis/docs/rust-style-guide.md#rs-gov-04.\"}\n    return {\"context\": \"Rust style: proposed attributes pass RS-GOV-04 (all cfg branches; cached checker binary passed freshness checks). Crate debt/paydown and compiler checks remain required at reach; just gate rust-style.\"}\n\n\ndef main():\n    root = Path(__file__).resolve().parents[2]\n    try:\n        event = json.loads(sys.stdin.buffer.read(1572864))\n        result = inspect(root, event)\n    except (OSError, ValueError, subprocess.SubprocessError) as error:\n        result = {\"context\": f\"Rust style UNMEASURED ({type(error).__name__}); run just gate rust-style before reach.\"}\n    if result:\n        output = {\"hookEventName\": \"PreToolUse\"}\n        if \"deny\" in result:\n            output.update(permissionDecision=\"deny\", permissionDecisionReason=result[\"deny\"])\n        else:\n            output[\"additionalContext\"] = result[\"context\"]\n        print(json.dumps({\"hookSpecificOutput\": output}))\n    return 0\n\n\nif __name__ == \"__main__\":\n    sys.exit(main())\n"
+  },
+  "registration": {
+    "event": "PreToolUse",
+    "matcher": ".*",
+    "command": "python3 \"$CLAUDE_PROJECT_DIR/.claude/hooks/rust-style.py\"",
+    "timeout": 5,
+    "type": "command"
+  },
+  "projections": {
+    "claude": {
+      "path": ".claude/hooks/rust-style.py"
+    }
+  }
+}

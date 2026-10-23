@@ -450,7 +450,10 @@ fn election_key(
 /// newer declaration never shadows an older verified one. The second value is the refusal of the
 /// newest declaration ranking above the one elected, so an explanation can say what was set aside.
 // The spec's seven inputs plus `methods`, which the structural band check needs (fix round 1).
-#[allow(clippy::too_many_arguments)]
+#[allow(
+    clippy::too_many_arguments,
+    reason = "The contract requires seven election inputs plus methods for the structural band check"
+)]
 pub fn select_in_force(
     scope: &Cid,
     kind: KindId,

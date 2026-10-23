@@ -71,3 +71,15 @@ types and ports. The serving side (`TierEndpoint`) and the tier contract harness
 `eprfs-serve`, so a host can depend on them without depending on eprfs's adapters (R-E3).
 Byte compatibility with `@elohim/eprfs` is pinned by `elohim/eprfs/fixtures/tree-vectors.json`,
 which `tests/vectors.rs` recomputes.
+
+## Rust style divergence: structured refusals by value
+
+RS-GOV-04 records the existing size-lint decisions in `src/lib.rs` and `src/derive.rs`.
+`TreeError` retains its inline CID and path; the derivation interfaces return the complete
+`Unanswered` refusal and `DeriveOutcome` by value, once per task. Boxing these solely to satisfy
+`result_large_err` or `large_enum_variant` would change the interfaces contract and add allocations
+to refusals. The tradeoff is larger stack values. Scope: those attributes only; this does not
+authorize unrelated large types. Evidence: the signatures and rationale immediately above the
+attributes, and the interfaces contract's R7. Regression command: `just gate eprfs` checks the
+consuming types and tests; the Rust style gate checks that these reasons stay attached. Responsible:
+eprfs-core maintainers. Revisit when the interfaces change or measurements justify indirection.

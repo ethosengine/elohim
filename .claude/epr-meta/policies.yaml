@@ -1039,3 +1039,22 @@ policies:
       BEFORE trusting it for classification — a pin mismatch denies every git/rm candidate
       outright (fail-closed: a tampered table cannot be trusted to say what ISN'T destructive
       either), distinct from a merely malformed row, which stays `skipped —` and spoken.
+
+  - id: rust-style-strict
+    version: 1
+    contentHash: sha256:6de3a7df5d7b876c25de1339feb5fa67601df342f5910a20217d9c02ba26c235
+    title: Rust style strict scope
+    binding: binding-local
+    class: deny
+    scope: { write: "*.rs" }
+    validator: epr:validator-rust-style-strict
+    status: active
+    established_by: deliberated-operator-rust-style-2026-10-22
+    why: >
+      The operator requested permanent crate/module strictness after refactors. RS-GOV-04
+      requires nonempty reasons for suppressions in this scope, including legacy source.
+      Fix the attribute; do not remove the scope binding. The same native syntax checker
+      runs in authoring guidance and the manifest-driven reach gate.
+    retire-when: >
+      when the compiler enforces reasoned suppressions across all source configurations
+      and the permanent-scope gate has held through a full release cycle

@@ -17,6 +17,7 @@ name = "epr"
 path = "src/main.rs"
 
 [dependencies]
+elohim-rust-style = { path = "../../../genesis/orchestrator/rust-style" }
 eprfs-core = { path = "../eprfs-core" }
 eprfs-agent = { path = "../eprfs-agent" }
 eprfs-host = { path = "../eprfs-host" }

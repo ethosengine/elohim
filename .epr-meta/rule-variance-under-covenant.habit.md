@@ -59,10 +59,17 @@ evidence: >
   carries `variance:`, `party: human:matthew`, `agent: general-purpose`. Probe files deleted;
   the covenant refs stay local (pushing them is the named frontier). Risk 1 stands: rung 1 is a
   recorded promise, not a proof.
+  DELTA 2026-10-20b (GREEN kept). LIVE re-check, session 4718bf00, with a `storyteller` (the agent
+  whose principal concern is plain storytelling): stamp carried; in-scope `.feature` write → floor
+  line + witness row (`agent: storyteller`); control write → full loop; its record refused. Second
+  variable rule born: `genesis/data/stories/.epr-meta` `experience-story-blind-reader-review`
+  (`*--*--*.md`, new blind-reader profile `experience-story`, package 1.3.0); `epr covenant offer`
+  lists it, the hook fires on a story and stays silent on INDEX/CONVENTIONS. Hook tests 193 ok.
 refs:
   - "genesis/docs/superpowers/specs/2026-10-19-session-covenant-epr-design.md — the authority half (offer, record, check, show)"
   - "elohim/brit/docs/specs/2026-10-19-session-covenant-design.md (branch feat/session-covenant) — the mechanism half: a Layer 2 blessing over the rule's manifest CID"
   - "genesis/a2o/.epr-meta — the first rule to declare `parameters.variance` (a2o-story-blind-reader-review)"
+  - "genesis/data/stories/.epr-meta — the same rule over the prose experience-story catalog (experience-story-blind-reader-review)"
   - ".claude/hooks/blind-reader-review.py, .claude/hooks/covenant-subagent-stamp.py, .claude/hooks/participant-standing.py, .claude/hooks/epr-meta-resolver.py"
 retire-when: >
   when the hooks read a variance as a notarized governance commitment the network validates (rung 3,

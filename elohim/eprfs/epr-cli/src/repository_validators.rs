@@ -61,6 +61,15 @@ fn declared_elsewhere(repo_root: &Path) -> HashSet<String> {
 impl ValidatorProvider for ElohimRepositoryValidators {
     fn evaluate(&self, request: &ValidatorRequest<'_>) -> ValidatorOutcome {
         let detail = match request.reference {
+            "epr:validator-rust-style-strict" => {
+                let Some(content) = request.write.content.as_deref() else {
+                    return ValidatorOutcome::Unavailable;
+                };
+                match elohim_rust_style::scan::scan(&request.write.path, content) {
+                    Ok(findings) => (!findings.is_empty()).then(|| format!("RS-GOV-04 strict: {} unexplained suppression(s); add a meaningful reason", findings.len())),
+                    Err(error) => Some(format!("Rust style UNMEASURED: {error}")),
+                }
+            }
             "epr:validator-p2p-design-gate" => p2p_design_gate(request),
             "epr:validator-brand-vocabulary-boundary" => brand_vocabulary_boundary(request),
             "epr:validator-sovereignty-ontology-guard" => return sovereignty_guard(request),
@@ -866,6 +875,39 @@ mod tests {
             fuel: None,
         };
         brand_vocabulary_boundary(&request)
+    }
+
+    #[test]
+    fn rust_style_strict_uses_native_syntax_and_refuses_missing_evidence() {
+        let dir = TempDir::new().unwrap();
+        let rule = dummy_rule();
+        let mut write = GovernanceWrite::new("src/lib.rs");
+        for (content, expected) in [
+            (None, "unavailable"),
+            (Some("#[allow(dead_code)] fn f() {}"), "flag"),
+            (
+                Some("#[allow(dead_code, reason = \"external ABI entry point\")] fn f() {}"),
+                "pass",
+            ),
+            (Some("fn malformed("), "flag"),
+        ] {
+            write.content = content.map(str::to_string);
+            let request = ValidatorRequest {
+                repo_root: dir.path(),
+                reference: "epr:validator-rust-style-strict",
+                rule: &rule,
+                write: &write,
+                cid: None,
+                fuel: None,
+            };
+            let actual = match ElohimRepositoryValidators.evaluate(&request) {
+                ValidatorOutcome::Pass => "pass",
+                ValidatorOutcome::Unavailable => "unavailable",
+                ValidatorOutcome::Flag { .. } => "flag",
+                _ => "unexpected",
+            };
+            assert_eq!(actual, expected);
+        }
     }
 
     #[test]

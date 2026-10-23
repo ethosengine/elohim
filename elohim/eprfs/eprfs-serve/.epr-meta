@@ -1,0 +1,16 @@
+---
+epr-meta-version: 1
+id: eprfs-serving-style-context
+covers: subtree
+purpose: >
+  The serving adapter and contract harness preserve the portable eprfs-core interfaces;
+  their source lint exceptions are explained at this boundary.
+---
+# Serving contract style context
+
+RS-GOV-04: `src/lib.rs` permits `clippy::result_large_err` because the adapter propagates
+eprfs-core's `TreeError`, including its inline CID and path. Boxing only in this adapter
+would introduce a second error representation for the same refusal. The tradeoff is a larger
+return value. Evidence and the underlying decision: `../eprfs-core/.epr-meta`, “structured
+refusals by value”; regression command: `just gate eprfs`. Responsible: eprfs-serve maintainers.
+Revisit when TreeError's representation changes or measured serving costs justify indirection.

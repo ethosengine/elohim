@@ -38,7 +38,10 @@ impl CountingStorage {
         self
     }
 
-    #[allow(dead_code)]
+    #[allow(
+        dead_code,
+        reason = "Shared counting fixture is compiled by test modules that do not all inspect recorded writes"
+    )]
     pub fn written(&self) -> Vec<BlobCid> {
         let mut cids: Vec<BlobCid> = self.written.lock().unwrap().keys().cloned().collect();
         cids.sort();

@@ -1,0 +1,10 @@
+{
+  "version": 1,
+  "rules": [
+    "RS-GOV-04"
+  ],
+  "external_roots": [
+    "vendor",
+    ".cargo-pool"
+  ]
+}

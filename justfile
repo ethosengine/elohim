@@ -782,3 +782,7 @@ measure *args:
     #!/usr/bin/env bash
     set -euo pipefail
     exec bash "{{ justfile_directory() }}/genesis/agentic/compute/measure.sh" {{ args }}
+
+# One repository-wide syntax/ratchet gate; Cargo resolves the checker freshness.
+_gate-rust-style:
+    bash genesis/orchestrator/rust-style.sh --verify

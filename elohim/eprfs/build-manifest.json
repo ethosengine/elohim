@@ -13,6 +13,7 @@
       "inputs": {
         "sources": [
           "elohim/eprfs/**",
+          "genesis/orchestrator/rust-style/**",
           "elohim/sdk/domains/elohim-agent/adapter/**",
           "elohim/epr/**",
           "elohim/epr-rea/**",
