@@ -78,7 +78,8 @@ mooring whose runtime-asserted pid (ram-guard moors/touches with the Claude proc
 process's nearest ancestor; claim rows record `session_source: flag|env|ancestry`. A mooring expires
 `ttl` seconds after its last touch (pool-policy `berth.mooring_ttl_s`, default 3 h); a lease expires
 `ttl_s` after its last claim or renew. An expired lease can be taken over, and the takeover is on the
-record with `expired_after_s`. Exit codes: 0 ok · 2 usage · 3 refused (held by a live mooring, a class
+record with `expired_after_s`. Exit codes: 0 ok · 1 a renew, release or unmoor done here whose record
+did not reach this device's channel store (named; the other devices still hold the earlier terms) · 2 usage · 3 refused (held by a live mooring, a class
 this berth does not run, a ttl past the class's cap, a class transition, an owner check) · 4 no session
 resolvable (or ambiguous), or the store itself cannot be opened (a guest sandbox: EACCES/ENOENT on
 the lock or dir) — the only code a wrapper may proceed past, unleased.
@@ -111,6 +112,11 @@ CROSSING_KINDS = ("moor", "unmoor", "claim", "renew", "release", "override", "no
 # The measure emitter lives beside the hooks; bin/berth → genesis/agentic → genesis → repo root.
 REPO_ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(os.path.realpath(__file__)))))
 HOOKS_DIR = os.path.join(REPO_ROOT, ".claude", "hooks")
+# The checkout this berth lives in, fixed at load (tests may repoint REPO_ROOT; this never moves).
+HOME_CHECKOUT = REPO_ROOT
+# Set by berth_test for its own process and every berth it spawns: under the test runner the real
+# emitter never folds into this berth's own checkout (a suite run once grew it by 13,000 test records).
+UNDER_TEST_ENV = "BERTH_UNDER_TEST"
 
 
 class BerthUsage(ValueError):
@@ -290,6 +296,7 @@ class Berth:
         self.fold_failures = []  # (resource, kind, why): steward records that did not reach the channel store
         self.sleep = time.sleep  # injectable: tests advance a fake clock instead
         self._obs = obs  # the `_observation` emitter; injected by tests, else imported lazily
+        self._obs_injected = obs is not None
         self._lock_depth = {}
         self._pending_folds = []  # (kind, row) queued by record(); flushed once no berth lock is held
         self.pid_alive = pid_alive  # injectable: tests model liveness and incarnation
@@ -371,7 +378,12 @@ class Berth:
         return n
 
     def dseq_stores(self):
-        """The checkouts whose flow stores hold this device's own records."""
+        """The checkouts whose flow stores hold this device's own records: this checkout and, on a
+        device, its channel store — asked of `epr peer leases` when not yet known (a lost berth dir),
+        since that is where its steward records went."""
+        if (not self.channel_root and not self._channel_read and (self.steward_names or self.steward_prefixes)
+                and self.epr_bin()):
+            self.peer_leases()
         return [root for root in (REPO_ROOT, self.channel_root) if root]
 
     def _highest_dseq(self):
@@ -416,7 +428,7 @@ class Berth:
             return False
         try:
             obs = self.observation()
-            if obs is None:
+            if obs is None or self._fold_refused_under_test(root):
                 landed = False
             else:
                 env = {}
@@ -432,6 +444,15 @@ class Berth:
             self._fold_failed(kind, ev, "`epr flow note` did not write it")
         return landed
 
+    def _fold_refused_under_test(self, root):
+        """Under the test runner ($BERTH_UNDER_TEST=1), the real emitter never writes into the checkout
+        this berth lives in: a test record is not this workspace's record. An injected emitter, or a
+        scratch checkout, is unaffected."""
+        if os.environ.get(UNDER_TEST_ENV) != "1" or self._obs_injected or not root:
+            return False
+        here = {os.path.realpath(HOME_CHECKOUT), os.path.realpath(REPO_ROOT)}
+        return os.path.realpath(root) in here
+
     def _fold_failed(self, kind, ev, why):
         if kind in CROSSING_KINDS:
             where = self.channel_root or "its location unknown"
@@ -442,6 +463,12 @@ class Berth:
         """The crossing records about `resource` that did not reach the channel store, cleared."""
         mine = [why for res, _, why in self.fold_failures if res == resource]
         self.fold_failures = [f for f in self.fold_failures if f[0] != resource]
+        return mine
+
+    def take_release_fold_failures(self):
+        """(resource, why) for every release record that did not reach the channel store, cleared."""
+        mine = [(res, why) for res, kind, why in self.fold_failures if kind == "release"]
+        self.fold_failures = [f for f in self.fold_failures if f[1] != "release"]
         return mine
 
     def _fold_root(self, ev):
@@ -497,7 +524,7 @@ class Berth:
 
     def _emit_pain(self, value, reason, **env):
         obs = self.observation()
-        if obs is None:
+        if obs is None or self._fold_refused_under_test(REPO_ROOT):
             return False
         try:
             if not obs.available():
@@ -1416,7 +1443,10 @@ def _main(argv):
     if cmd == "unmoor":
         b.unmoor(session)
         print(f"unmoored {session}")
-        return 0
+        failed = b.take_release_fold_failures()
+        for res, why in failed:
+            print(f"{res}: released here, but {why} — the other devices still see it held", file=sys.stderr)
+        return 1 if failed else 0
     if cmd == "claim":
         res, note, ttl_s, klass, override, offline_ok = claim_args
         # Claiming is a liveness act: a stale mooring would make the fresh lease look abandoned.

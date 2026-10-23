@@ -18,6 +18,11 @@ from pathlib import Path
 
 REPO = Path(__file__).resolve().parents[2]
 
+# The test runner's marker: a berth that sees it (this process, and every berth subprocess a test
+# spawns, which inherits it) never folds a record into the checkout it lives in through the real
+# emitter. A suite that wants a fold injects an emitter or points the store at a scratch checkout.
+os.environ["BERTH_UNDER_TEST"] = "1"
+
 _NS = runpy.run_path(str(Path(__file__).parent / "bin/berth"))
 Berth = _NS["Berth"]
 BerthUsage = _NS["BerthUsage"]
@@ -32,7 +37,7 @@ class CapacityTransitionTest(unittest.TestCase):
     def setUp(self):
         self.directory = tempfile.TemporaryDirectory()
         self.addCleanup(self.directory.cleanup)
-        self.berth = Berth(self.directory.name, now=lambda: 100, policy_path=MISSING_POLICY)
+        self.berth = Berth(self.directory.name, obs=FakeObservation(), now=lambda: 100, policy_path=MISSING_POLICY)
         for session in ("first", "second", "third"):
             self.berth.moor(session)
         self.berth.capacities["cargo"] = 1
@@ -94,6 +99,45 @@ class FakeObservation:
                "root": root}
         (self.events if measure == "dev-berth-events@1" else self.emits).append(row)
         return True
+
+
+class TestRunnerNeverFoldsIntoThisCheckoutTest(unittest.TestCase):
+    """Under the test runner a berth with the real emitter (none injected) refuses to fold into the
+    checkout it lives in, so a suite run never grows this checkout's flow store; a scratch store
+    still folds."""
+
+    def setUp(self):
+        self.directory = tempfile.TemporaryDirectory()
+        self.addCleanup(self.directory.cleanup)
+        self.real = FakeObservation()
+        saved = sys.modules.get("_observation")
+        sys.modules["_observation"] = self.real  # what `import _observation` finds: the "real" one
+        self.addCleanup(lambda: sys.modules.__setitem__("_observation", saved) if saved is not None
+                        else sys.modules.pop("_observation", None))
+        self.clock = [100.0]
+        self.berth = Berth(self.directory.name, now=lambda: self.clock[0], policy_path=MISSING_POLICY)
+
+    def test_records_and_pain_never_fold_into_this_checkout(self):
+        self.assertEqual(os.environ.get("BERTH_UNDER_TEST"), "1")
+        self.berth.moor("dev")
+        self.berth.claim("cargo", "dev")
+        self.berth.say("dev", "on the record")
+        self.berth.release("cargo", "dev")
+        self.berth._emit_pain(5, "a pain")
+        self.assertEqual(self.real.events, [])
+        self.assertEqual(self.real.emits, [])
+
+    def test_a_scratch_checkout_still_folds(self):
+        scratch = os.path.join(self.directory.name, "scratch-checkout")
+        self.berth._fold_root = lambda ev: (scratch, None)
+        self.berth.say("dev", "folds to the scratch checkout")
+        self.assertEqual([e["root"] for e in self.real.events], [scratch])
+
+    def test_outside_the_runner_this_checkout_folds_as_before(self):
+        os.environ.pop("BERTH_UNDER_TEST")
+        self.addCleanup(os.environ.__setitem__, "BERTH_UNDER_TEST", "1")
+        self.berth.say("dev", "a real record")
+        self.assertEqual([e["root"] for e in self.real.events], [_NS["REPO_ROOT"]])
 
 
 class FoldEveryKindTest(unittest.TestCase):
@@ -205,7 +249,7 @@ class LeaseClassTest(unittest.TestCase):
         return [r for r in self.berth.ledger(1000) if kind is None or r["kind"] == kind]
 
     def test_policy_file_declares_the_mesh_classes_and_mooring_ttl(self):
-        b = Berth(self.directory.name, now=lambda: 0)
+        b = Berth(self.directory.name, obs=FakeObservation(), now=lambda: 0)
         self.assertEqual(b.classes["mesh"]["verify"], {"default_ttl_s": 1800, "max_ttl_s": 3600})
         self.assertIs(b.classes["mesh"]["measure"]["allowed"], False)
         self.assertEqual(b.mooring_ttl_s, 10800)
@@ -379,7 +423,7 @@ class LedgerSafetyTest(unittest.TestCase):
     def setUp(self):
         self.directory = tempfile.TemporaryDirectory()
         self.addCleanup(self.directory.cleanup)
-        self.berth = Berth(self.directory.name, now=lambda: 5, policy_path=MISSING_POLICY)
+        self.berth = Berth(self.directory.name, obs=FakeObservation(), now=lambda: 5, policy_path=MISSING_POLICY)
 
     def test_ledger_tolerates_a_nul_prefixed_and_a_torn_line(self):
         self.berth.record("note", session="a", text="before")
@@ -397,7 +441,7 @@ class LedgerSafetyTest(unittest.TestCase):
             pid = os.fork()
             if pid == 0:
                 try:
-                    b = Berth(self.directory.name, now=lambda: 5, policy_path=MISSING_POLICY)
+                    b = Berth(self.directory.name, obs=FakeObservation(), now=lambda: 5, policy_path=MISSING_POLICY)
                     for i in range(per):
                         b.record("note", session=f"w{w}", text=f"{w}:{i}:" + "x" * 512)
                         b.claim("cargo", f"w{w}") if i % 50 == 0 else None
@@ -427,7 +471,7 @@ class AncestryResolutionTest(unittest.TestCase):
         self.directory = tempfile.TemporaryDirectory()
         self.addCleanup(self.directory.cleanup)
         self.clock = [1000.0]
-        self.berth = Berth(self.directory.name, now=lambda: self.clock[0], policy_path=MISSING_POLICY)
+        self.berth = Berth(self.directory.name, obs=FakeObservation(), now=lambda: self.clock[0], policy_path=MISSING_POLICY)
         # fake pids: liveness by kill(0) would fail, so is_live consults last_seen only
         self.berth.is_live = lambda m: bool(m) and (self.clock[0] - m.get("last_seen", 0)) < m.get("ttl_s", 10800)
 
@@ -572,7 +616,7 @@ class IncarnationTest(unittest.TestCase):
         self.directory = tempfile.TemporaryDirectory()
         self.addCleanup(self.directory.cleanup)
         self.starts = {4242: 111}
-        self.berth = Berth(self.directory.name, now=lambda: 1000.0, policy_path=MISSING_POLICY)
+        self.berth = Berth(self.directory.name, obs=FakeObservation(), now=lambda: 1000.0, policy_path=MISSING_POLICY)
         self.berth.pid_alive = lambda pid: int(pid) in self.starts
         self.berth.pid_start = lambda pid: self.starts.get(int(pid))
 
@@ -642,7 +686,7 @@ class ConcurrencyTest(unittest.TestCase):
         return pid
 
     def test_concurrent_heartbeats_never_read_as_a_dead_holder(self):
-        holder = Berth(self.dir, policy_path=MISSING_POLICY)
+        holder = Berth(self.dir, obs=FakeObservation(), policy_path=MISSING_POLICY)
         holder.moor("holder", pid=os.getpid())
         self.assertTrue(holder.claim("cargo", "holder", ttl_s=600)[0])
         from importlib.machinery import SourceFileLoader
@@ -655,14 +699,14 @@ class ConcurrencyTest(unittest.TestCase):
         self.addCleanup(os.environ.pop, "BERTH_DIR", None)
 
         def beat():
-            b = Berth(self.dir, policy_path=MISSING_POLICY)
+            b = Berth(self.dir, obs=FakeObservation(), policy_path=MISSING_POLICY)
             for i in range(400):
                 b.touch("holder", pid=os.getppid())
                 if i % 4 == 0:
                     ram_guard.berth_touch("holder")
 
         kids = [self._fork(beat) for _ in range(2)]
-        rival = Berth(self.dir, policy_path=MISSING_POLICY)
+        rival = Berth(self.dir, obs=FakeObservation(), policy_path=MISSING_POLICY)
         rival.moor("rival")
         outcomes = [rival.claim("cargo", "rival")[0] for _ in range(300)]
         for kid in kids:
@@ -672,7 +716,7 @@ class ConcurrencyTest(unittest.TestCase):
 
     def test_two_overrun_checks_emit_once(self):
         emits = os.path.join(self.dir, "emits.txt")
-        seed = Berth(self.dir, policy_path=MISSING_POLICY)
+        seed = Berth(self.dir, obs=FakeObservation(), policy_path=MISSING_POLICY)
         now = time.time()
         seed._write_leases({"mesh": {"resource": "mesh", "holder": "h", "since": now - 100,
                                      "claimed_at": now - 100, "ttl_s": 10, "class": "verify"}})
@@ -872,6 +916,58 @@ class StewardClaimTest(unittest.TestCase):
         self.assertIn("did not reach this device's channel store", r.stderr)
         self.assertNotIn("REFUSED", r.stderr)
 
+    def test_a_lost_counter_on_a_device_resumes_from_its_channel_store(self):
+        # The berth dir is lost (no counter, no ledger); this device's own records sit in the channel
+        # store `epr peer leases` names, not in the checkout this berth runs from.
+        channel = Path(self.directory.name) / "channel"
+        (channel / ".eprfs" / "status").mkdir(parents=True)
+        (channel / ".eprfs" / "status" / "flows.jsonl").write_text(
+            json.dumps({"record": {"classifiedAs": ["run:observation", ".", "env:dseq=57"]}}) + "\n"
+            + json.dumps({"record": {"classifiedAs": ["run:observation", ".", "env:dseq=99",
+                                                      f"via:{DEVICE_A}"]}}) + "\n")
+        checkout = Path(self.directory.name) / "checkout"
+        (checkout / ".eprfs" / "status").mkdir(parents=True)
+        (checkout / ".eprfs" / "status" / "flows.jsonl").write_text(
+            json.dumps({"record": {"classifiedAs": ["run:observation", ".", "env:dseq=3"]}}) + "\n")
+        g = Berth.dseq_stores.__globals__
+        saved = g["REPO_ROOT"]
+        g["REPO_ROOT"] = str(checkout)
+        self.addCleanup(g.__setitem__, "REPO_ROOT", saved)
+        out = view()
+        out["store"] = str(channel)
+        self.views(out)
+        b = Berth(os.path.join(self.directory.name, "lost"), now=lambda: self.clock[0], obs=self.obs,
+                  policy_path=str(self.policy))
+        b.epr = str(self.epr)
+        self.assertEqual(b.say("codex-1", "after the berth dir was lost")["dseq"], 58)
+        self.assertEqual(len(self.calls()), 1, "asked once where the channel store is")
+
+    def test_unmoor_names_a_steward_release_that_did_not_cross(self):
+        self.views(view(), view(dev_integration=effective()))
+        self.assertTrue(self.claim()[0])
+        landed = self.obs.emit
+        self.obs.emit = lambda *a, **k: False if k.get("reason") == "release" else landed(*a, **k)
+        main = _NS["main"]
+        g = main.__globals__
+        saved = g["Berth"]
+        berth = self.berth
+        g["Berth"] = lambda *a, **k: berth
+        err, out = io.StringIO(), io.StringIO()
+        try:
+            with contextlib.redirect_stderr(err), contextlib.redirect_stdout(out):
+                rc = main(["berth", "unmoor", "--session", "codex-1"])
+        finally:
+            g["Berth"] = saved
+        self.assertEqual(rc, 1, err.getvalue())
+        self.assertIn("dev-integration: released here, but the release record did not reach this device's "
+                      "channel store", err.getvalue())
+        self.assertIn("the other devices still see it held", err.getvalue())
+        self.assertIsNone(self.berth.mooring("codex-1"))
+
+    def test_the_exit_codes_document_exit_1(self):
+        doc = _NS["__doc__"]
+        self.assertRegex(doc, r"1 (a|the) (renew|release)")
+
     def test_a_pre_check_held_by_releases_this_sessions_unsettled_lease(self):
         with self.berth._locked():
             leases = self.berth.leases()
@@ -885,7 +981,7 @@ class StewardClaimTest(unittest.TestCase):
         self.assertEqual(self.rows("release")[-1]["resource"], "dev-integration")
 
     def test_the_repository_policy_declares_the_steward_resources(self):
-        b = Berth(os.path.join(self.directory.name, "real"), now=lambda: 0,
+        b = Berth(os.path.join(self.directory.name, "real"), obs=FakeObservation(), now=lambda: 0,
                   policy_path=str(REPO / "genesis/agentic/pool-policy.json"))
         self.assertIsNone(b.policy_error)
         for name in ("dev-integration", "jenkins-dispatch", "alpha-fleet", "lane:t6"):
