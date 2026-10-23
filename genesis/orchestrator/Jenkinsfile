@@ -199,6 +199,12 @@ def archivePipelineBaselines(String checkpoint) {
         } catch (Exception e) {
             echo "[baseline:${checkpoint}] WARNING: env.PIPELINE_BASELINES unparseable (${e.message}); starting fresh"
         }
+    } else {
+        // The run stopped before Determine Build Plan loaded the prior baselines
+        // ([skip ci], or a red Rust Style Gate). Carry them forward: archiving {}
+        // cold-starts the next run on HEAD~1 and drops every undispatched commit
+        // (orchestrator/dev #2133 → #2134).
+        baselines = loadPipelineBaselines()
     }
 
     // Rule 2: gate __global__ advance on build state at post-checkpoint.
