@@ -62,7 +62,11 @@ pub enum BlobSignal {
 const MAX_SIGNAL_CHUNK_SIZE: usize = 256 * 1024;
 
 /// Pending blob requests
-#[allow(dead_code)]
+#[allow(
+    dead_code,
+    reason = "`hash` and `requester` are recorded when a request opens but nothing reads them \
+              yet: the map key already carries the hash, and requester attribution has no reader"
+)]
 struct PendingRequest {
     hash: String,
     requester: String,
@@ -3105,6 +3109,8 @@ mod peer_status_tests {
     use diesel::prelude::*;
     use diesel::sqlite::SqliteConnection;
 
+    static INFRA_DECODE_MISS_TEST_LOCK: std::sync::Mutex<()> = std::sync::Mutex::new(());
+
     fn setup_test_conn() -> SqliteConnection {
         let mut conn =
             SqliteConnection::establish(":memory:").expect("Failed to create in-memory database");
@@ -3247,6 +3253,10 @@ mod peer_status_tests {
         // rmp_serde::to_vec_named.
         let wire = rmp_serde::to_vec_named(&dna_signal).expect("encode DNA signal");
 
+        // Both counter assertions hold this lock across the observation and
+        // decode so a parallel malformed decode cannot change the delta.
+        let _guard = INFRA_DECODE_MISS_TEST_LOCK.lock().unwrap();
+        let before = infrastructure_decode_miss_count();
         let decoded =
             decode_infrastructure_signal(&wire).expect("conductor msgpack wire format must decode");
         match decoded {
@@ -3265,7 +3275,7 @@ mod peer_status_tests {
         }
         assert_eq!(
             infrastructure_decode_miss_count(),
-            0,
+            before,
             "a successful decode must not count as a miss"
         );
     }
@@ -3302,6 +3312,7 @@ mod peer_status_tests {
             unexpected_only_field: true,
         })
         .expect("encode");
+        let _guard = INFRA_DECODE_MISS_TEST_LOCK.lock().unwrap();
         let before = infrastructure_decode_miss_count();
         match decode_infrastructure_signal(&wire) {
             Err(SignalDecodeMiss::InfraShapeMismatch { type_tag, .. }) => {
@@ -3553,11 +3564,17 @@ enum ElohimContentWireSignal {
     ContentCommitted {
         action_hash: HoloHashB64,
         #[serde(default)]
-        #[allow(dead_code)]
+        #[allow(
+            dead_code,
+            reason = "wire mirror of the DNA signal: decoded so a shape change is caught, not read"
+        )]
         entry_hash: Option<HoloHashB64>,
         content: crate::rea_projection::ContentEntry,
         #[serde(default)]
-        #[allow(dead_code)]
+        #[allow(
+            dead_code,
+            reason = "wire mirror of the DNA signal: decoded so a shape change is caught, not read"
+        )]
         author: Option<HoloHashB64>,
     },
 }
