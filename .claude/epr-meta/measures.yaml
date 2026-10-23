@@ -1269,10 +1269,12 @@ measures:
     family: berth
     unit: events
     procedure: >
-      Emitted by `berth` Ledger.record() for EVERY kind (moor, unmoor, claim, renew, release,
-      refuse, override, overrun, shed) through _observation.emit, value 1, `--env kind=<kind>
-      --env class=<class> --env resource=<resource>`; sits beside dev-berth-held-by-measure@1.
-      Not yet emitted for most kinds (consolidation order step 6).
+      Emitted by `berth` Berth.record() for EVERY kind (moor, unmoor, claim, renew, release,
+      refuse, override, overrun, note, shed) through _observation.emit: value 1, subject `.`
+      (epr flow note refuses a bare resource name as a subject), reason = the kind, and one
+      `--env k=v` per non-null field of the ledger row (kind, at, session, resource, class, ttl_s,
+      claimed_at, note/text, ...; lists and dicts as compact JSON). Sits beside
+      dev-berth-held-by-measure@1.
     provenance: Observability epic §7; habit ledgers-fold-once; feeds idle-is-free's idle window
     status: active
     env-sensitivity: [kind, class, resource]

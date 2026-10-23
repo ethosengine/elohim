@@ -81,14 +81,78 @@ class FakeObservation:
 
     def __init__(self, available=True):
         self._available = available
-        self.emits = []
+        self.emits = []  # pain emits only; the per-record dev-berth-events@1 folds land in `events`
+        self.events = []
 
     def available(self):
         return self._available
 
     def emit(self, measure, subject, value, *, reason, env=None, root=None):
-        self.emits.append({"measure": measure, "subject": subject, "value": value, "reason": reason, "env": env})
+        row = {"measure": measure, "subject": subject, "value": value, "reason": reason, "env": env}
+        (self.events if measure == "dev-berth-events@1" else self.emits).append(row)
         return True
+
+
+class FoldEveryKindTest(unittest.TestCase):
+    """Every ledger record is also one dev-berth-events@1 fold (habit ledgers-fold-once). The subject is
+    always `.`: `epr flow note` refuses a bare resource name (`cargo`) as an unknown atom, so the resource
+    rides in env."""
+
+    def setUp(self):
+        self.directory = tempfile.TemporaryDirectory()
+        self.addCleanup(self.directory.cleanup)
+        self.clock = [1000.0]
+        self.obs = FakeObservation()
+        self.berth = Berth(self.directory.name, now=lambda: self.clock[0], obs=self.obs, policy_path=MISSING_POLICY)
+
+    def folds(self):
+        return self.obs.events
+
+    def test_fold_every_kind_emits_once(self):
+        b = self.berth
+        steps = [
+            ("moor", ".", lambda: b.moor("s1", model="m")),
+            ("claim", ".", lambda: b.claim("cargo", "s1", note="why")),
+            ("renew", ".", lambda: b.claim("cargo", "s1", note="again")),
+            ("release", ".", lambda: b.release("cargo", "s1")),
+            ("override", ".", lambda: b.record("override", resource="mesh", session="s1", ttl_s=60)),
+            ("note", ".", lambda: b.say("s1", "hello")),
+            ("shed", ".", lambda: b.record("shed", resource="cargo", guard="ram-guard", level=2)),
+            ("unmoor", ".", lambda: b.unmoor("s1")),
+        ]
+        for kind, subject, act in steps:
+            before = len(self.folds())
+            act()
+            new = self.folds()[before:]
+            kinds = [e["reason"] for e in new]
+            self.assertIn(kind, kinds, kind)
+            self.assertEqual(kinds.count(kind), 1, kind)
+            fold = [e for e in new if e["reason"] == kind][0]
+            self.assertEqual((fold["subject"], fold["value"]), (subject, 1), kind)
+            row = [r for r in b.ledger(1000) if r["kind"] == kind][-1]
+            for key, val in row.items():
+                if val is None:
+                    continue
+                self.assertEqual(fold["env"][key], val if isinstance(val, str) else json.dumps(val, sort_keys=True, separators=(",", ":")) if isinstance(val, (list, dict)) else str(val), f"{kind}.{key}")
+        claim = [e for e in self.folds() if e["reason"] == "claim"][0]
+        self.assertEqual((claim["env"]["resource"], claim["env"]["session"], claim["env"]["note"]), ("cargo", "s1", "why"))
+
+    def test_fold_emitter_missing_costs_fold_not_lease(self):
+        self.obs._available = False
+        for session in ("s1", "s2"):
+            self.berth.moor(session)
+        self.assertTrue(self.berth.claim("cargo", "s1")[0])
+        self.assertEqual(self.berth.who("cargo")["holder"], "s1")
+        failing = FakeObservation()
+        failing.emit = lambda *a, **k: False
+        b = Berth(self.directory.name, now=lambda: self.clock[0], obs=failing, policy_path=MISSING_POLICY)
+        self.assertTrue(b.release("cargo", "s1"))
+        self.assertTrue(b.claim("cargo", "s2")[0])
+        self.assertEqual([r["kind"] for r in b.ledger(1000)][-2:], ["release", "claim"])
+        boom = FakeObservation()
+        boom.emit = lambda *a, **k: (_ for _ in ()).throw(RuntimeError("x"))
+        b2 = Berth(self.directory.name, now=lambda: self.clock[0], obs=boom, policy_path=MISSING_POLICY)
+        self.assertTrue(b2.release("cargo", "s2"))
 
 
 class LeaseClassTest(unittest.TestCase):
@@ -526,6 +590,8 @@ class _FileObservation:
         return True
 
     def emit(self, measure, subject, value, *, reason, env=None, root=None):
+        if measure == "dev-berth-events@1":  # the per-record fold is not the once-per-lease pain emit
+            return True
         time.sleep(0.2)
         with open(self.path, "a") as f:
             f.write(f"{measure} {value}\n")

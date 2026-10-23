@@ -85,6 +85,7 @@ DEFAULT_TTL_S = 3 * 3600
 DEFAULT_RESOURCES = {"mesh": 1, "cargo": 1, "disk-heavy": 1}
 DEFAULT_CLASS = "verify"
 OVERRUN_MEASURE = "dev-berth-held-by-measure@1"
+EVENTS_MEASURE = "dev-berth-events@1"
 # The measure emitter lives beside the hooks; bin/berth → genesis/agentic → genesis → repo root.
 REPO_ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(os.path.realpath(__file__)))))
 HOOKS_DIR = os.path.join(REPO_ROOT, ".claude", "hooks")
@@ -242,7 +243,30 @@ class Berth:
                 os.write(fd, line)
             finally:
                 os.close(fd)
+        self._fold(kind, ev)
         return ev
+
+    def _fold(self, kind, ev):
+        """The same record as one `dev-berth-events@1` fold on this host's flow store (habit
+        ledgers-fold-once). Subject is always `.`: `epr flow note` resolves a subject as an atom address,
+        gap id or readable path and refuses a bare resource name like `cargo`, so the resource rides in
+        env (as in dev-berth-held-by-measure@1). reason = the kind; env = every field of the record as a
+        string (absent fields omitted; lists/dicts as compact JSON). Fail-open and outside the ledger
+        lock: a missing emitter costs the fold, never the lease."""
+        try:
+            obs = self.observation()
+            if obs is None:
+                return False
+            env = {}
+            for k, v in ev.items():
+                if v is None:
+                    continue
+                env[k] = v if isinstance(v, str) else (
+                    json.dumps(v, sort_keys=True, separators=(",", ":")) if isinstance(v, (list, dict)) else str(v))
+            return bool(obs.emit(EVENTS_MEASURE, ".", 1, reason=kind,
+                                 env=env, root=REPO_ROOT))
+        except Exception:
+            return False
 
     def ledger(self, n=30):
         """The last n readable events. Per-line tolerant: a torn or NUL-padded line (a crash mid-append,
