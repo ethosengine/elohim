@@ -3,8 +3,9 @@
 //! (spec §3.4).
 //!
 //! A lease is replayed from berth's `dev-berth-events@1` records (T1), each device's in the order
-//! that device wrote them — its own in store order; another device's by their record time, since a
-//! fold appends a head's events in its tree's (CID) order: a `claim` opens it, a
+//! that device wrote them — its own in store order; another device's by the record counter berth
+//! stamps on each (`dseq`; older records by record time, first), since a fold appends a head's
+//! events in its tree's (CID) order: a `claim` opens it, a
 //! `renew` extends it, a `release` (its own, or a forced one naming it) and an `unmoor` close it,
 //! and a claim that took over from another session closes that session's lease. A lease with a
 //! ttl stops binding `ttl_s` after it was claimed or last renewed. Leases folded from a device the
@@ -101,6 +102,10 @@ pub struct LeaseEvent {
     pub session: String,
     /// When the record was written, its device's clock, unix milliseconds.
     pub at: u64,
+    /// Its device's record counter (`env:dseq`): strictly increasing per device, never reused,
+    /// so it orders a device's records even across a step of its clock. `None` for records
+    /// written before berth counted them.
+    pub dseq: Option<u64>,
     /// The lease's claim time as its device stamped it, unix milliseconds.
     pub claimed_at: Option<u64>,
     pub ttl_s: Option<u64>,
@@ -161,6 +166,7 @@ impl LeaseEvent {
             resource,
             session: (*env.get("session")?).to_string(),
             at: unix_ms(env.get("at")?)?,
+            dseq: env.get("dseq").and_then(|n| n.parse().ok()),
             claimed_at: env.get("claimed_at").and_then(|at| unix_ms(at)),
             ttl_s: env.get("ttl_s").and_then(|ttl| ttl.parse().ok()),
             written,
@@ -427,8 +433,17 @@ pub fn steward_lease_view(
     let mut folded: BTreeMap<Resource, Vec<Lease>> = BTreeMap::new();
     for (device, mut events) in by_device {
         // A fold appends a head's events in its channel tree's order (by CID), not the order its
-        // device wrote them: replay them in the device's own order, by its record time.
-        events.sort_by_key(|event| (event.at, event.kind.order(), event.written));
+        // device wrote them: replay them in the device's own order — its record counter, which a
+        // clock step cannot reorder; records from before the counter by record time, first.
+        events.sort_by_key(|event| {
+            (
+                event.dseq.is_some(),
+                event.dseq,
+                event.at,
+                event.kind.order(),
+                event.written,
+            )
+        });
         for (resource, lease) in live(replay(device, events)) {
             folded.entry(resource).or_default().push(lease);
         }

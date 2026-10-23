@@ -319,19 +319,57 @@ fn a_folded_overlapping_lease_is_held_by_its_holder() {
     );
 }
 
+/// A record as berth stamps it with its device's record counter, `dseq`.
+fn counted(event: FlowEvent, dseq: u64) -> FlowEvent {
+    let mut event = event;
+    event.classified_as.push(format!("env:dseq={dseq}"));
+    event
+}
+
 #[test]
 fn another_devices_records_are_replayed_in_its_order_not_the_order_they_were_folded() {
     let h = household();
+    let admission = h.admission();
     // A fold appends a head's events in its channel tree's order, which is by CID: A's release can
-    // land here before the claim it closes. Replayed in A's own order (its record times), the lease
-    // is closed.
+    // land here before the claim it closes. Replayed in A's own order, the lease is closed.
     let s = store(vec![
         from(&h.a.did, record("release", "claude-1", T0 + 5.0, &[])),
         from(&h.a.did, claim("claude-1", T0)),
     ]);
     let heads = table(&h.b.did, &[], &s, &[(&h.a.did, 3, ms(T0) + 6_000)]);
     assert_eq!(
-        verdict(&h.b.did, &s, &heads, &h.admission(), ms(T0) + 7_000),
+        verdict(&h.b.did, &s, &heads, &admission, ms(T0) + 7_000),
+        None
+    );
+
+    // A's order is its record counter, not its clock: A releases, its clock steps back 50 s, and
+    // A re-claims. By record time the re-claim would sort before the release and the resource
+    // would read free here while A holds it; by counter it is held.
+    let s = store(vec![
+        from(
+            &h.a.did,
+            counted(record("release", "claude-1", T0 + 100.0, &[]), 2),
+        ),
+        from(&h.a.did, counted(claim("claude-1", T0 + 50.0), 3)),
+        from(&h.a.did, counted(claim("claude-1", T0), 1)),
+    ]);
+    let heads = table(&h.b.did, &[], &s, &[(&h.a.did, 3, ms(T0) + 101_000)]);
+    assert_eq!(
+        verdict(&h.b.did, &s, &heads, &admission, ms(T0) + 102_000),
+        Some(held(&h.a.did, "claude-1", T0 + 50.0, false))
+    );
+
+    // Records folded before berth counted them sort by record time, ahead of every counted one.
+    let s = store(vec![
+        from(
+            &h.a.did,
+            counted(record("release", "claude-1", T0 - 100.0, &[]), 1),
+        ),
+        from(&h.a.did, claim("claude-1", T0)),
+    ]);
+    let heads = table(&h.b.did, &[], &s, &[(&h.a.did, 3, ms(T0) + 1_000)]);
+    assert_eq!(
+        verdict(&h.b.did, &s, &heads, &admission, ms(T0) + 2_000),
         None
     );
 }
