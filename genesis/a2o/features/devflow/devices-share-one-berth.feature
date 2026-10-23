@@ -3,8 +3,8 @@ Feature: Devices share one berth — a shared resource is held once across all o
   As a developer who works in two development workspaces that are both my devices
   I want a claim on a resource the two workspaces share to count only after my other device has seen it
   So that three things hold:
-    - a landing on dev or a build dispatch from one workspace never runs while one from the other is
-      in flight, nor while a session in the other is watching a build or deploy it has claimed; a
+    - between admitted devices, a landing on dev or a build dispatch from one workspace never runs
+      while one from the other is in flight, nor while a session in the other is watching a build or deploy it has claimed; a
       collision deploys one side's unfinished work over the other's test, or leaves a merge to
       untangle by hand. A build or deploy that no session watches is protected only while its push lasts.
     - a silent workspace is never read as an idle one.
@@ -23,7 +23,8 @@ Feature: Devices share one berth — a shared resource is held once across all o
     A device listed there is ADMITTED: its peers will talk to it. A CONTEST row, valid only when
     signed by one of matthew's admitted devices, names one device's entry as no longer valid, and that
     REVOKES the device. Revocation withdraws the device's standing in coordination; it does not take
-    away its access to the repository, which is withdrawn separately. Each device reads admission
+    away its access to the repository, which is withdrawn separately, and a revoked device can still
+    collide with the others until that access is withdrawn too. Each device reads admission
     from the roster file in its own checkout, so a Contest written on a device takes effect there at
     once, and any other device keeps counting the revoked one until the row reaches its checkout.
     Roster rows travel to the other devices by git, with the repository; the coordination records
@@ -46,6 +47,8 @@ Feature: Devices share one berth — a shared resource is held once across all o
     build on the shared build server), "alpha-fleet" (deploying to the shared test fleet), and LANE
     claims named "lane:" followed by a lane name, which declare who is working on a piece of work.
     Lane claims use the same mechanism as the other three; this story does not test them separately.
+    Not tested here either: a lease running out at its time limit, and the pre-push hook's
+    BERTH_OFFLINE_OK setting; both are described below but no scenario exercises them.
 
   How the two devices stay in step
 
@@ -68,9 +71,12 @@ Feature: Devices share one berth — a shared resource is held once across all o
 
   - A claim on a steward-scoped resource first writes a PENDING lease, which the device's next head
     carries to the other device. The claim then waits up to 10 seconds for every other admitted
-    device to acknowledge that head. It becomes EFFECTIVE, and the command exits 0, when every other
-    device has acknowledged it and no folded lease held by another holder overlaps it, unless the
-    tie-break below gives this claim precedence. Otherwise the berth REFUSES: it exits with code 3,
+    device to acknowledge that head. It becomes EFFECTIVE, and the command exits 0, when both of
+    these hold:
+      (a) every other admitted device has acknowledged it, and
+      (b) no live lease of another holder overlaps it (a pending lease counts as live), or the
+          tie-break below gives this claim precedence.
+    Otherwise the berth REFUSES: it exits with code 3,
     releases the pending lease, and prints one reason line in one of two forms:
       held by <device>/<session> since <time>
       unconfirmed: <device> last seen <age> ago
@@ -203,11 +209,10 @@ Feature: Devices share one berth — a shared resource is held once across all o
     Given device A is the workspace on the first machine and device B the workspace on "shem"
     And matthew's roster, admitting both devices, reached each workspace through its checkout
     And each workspace's peer daemon reaches the other over their own link
-    And session "claude-1" on device A holds "dev-integration"
-    When session "codex-1" on device B claims "dev-integration"
-    Then the claim exits with code 3
+    When session "claude-1" on device A claims "dev-integration" and the claim exits 0
+    And within seconds, with no push to the repository in between, session "codex-1" on device B claims "dev-integration"
+    Then device B's claim exits with code 3
     And the reason line reads "held by" device A and session "claude-1" since the time A claimed it
     And each workspace's berth status lists the other's moorings and leases, read from its own fold
-    And device B's refusal came within seconds of A's claim, with no push to the repository in between
     And no coordination record in this exchange was carried by a git push or by a shared server that can read or keep it
-    But an encrypted relay that only forwarded the link's traffic is allowed
+    And any relay on the path between the two peer daemons saw only encrypted traffic
