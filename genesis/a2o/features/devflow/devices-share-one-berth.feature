@@ -2,11 +2,14 @@
 Feature: Devices share one berth — a shared resource is held once across all of a person's workspaces
   As a developer who works in two development workspaces that are both my devices
   I want a claim on a resource the two workspaces share to count only after my other device has seen it
-  So that no agent session in one workspace lands work on dev, starts a build or deploys to the test
-    fleet while a session in the other workspace is doing the same, since a collision deploys one
-    side's unfinished work over the other's test or leaves a merge to untangle by hand, and so that a
-    silent workspace is never mistaken for an idle one, unless a session deliberately overrides a
-    silent device, which leaves a named record that binds that device until the lease ends
+  So that three things hold:
+    - a landing on dev or a build dispatch from one workspace never runs while one from the other is
+      in flight, nor while a session in the other is watching a build or deploy it has claimed; a
+      collision deploys one side's unfinished work over the other's test, or leaves a merge to
+      untangle by hand. A build or deploy that no session watches is protected only while its push lasts.
+    - a silent workspace is never read as an idle one.
+    - the one declared exception is a session that deliberately overrides a silent device; it leaves
+      a named record that binds that device until the overriding lease ends.
 
   The words this story uses, so it can be read cold.
 
@@ -17,11 +20,15 @@ Feature: Devices share one berth — a shared resource is held once across all o
   - A DEVICE is a machine or workspace container that holds its own signing key; the key is made on
     the device and never copied off it. Here the two workspaces are matthew's devices "A" and "B".
   - The ROSTER is matthew's list of the devices that stand for him, kept as a file in the repository.
-    A device listed there is ADMITTED: its peers will talk to it. A CONTEST row on the roster names
-    one device's entry as no longer valid, and that REVOKES the device. Each device reads admission
+    A device listed there is ADMITTED: its peers will talk to it. A CONTEST row, valid only when
+    signed by one of matthew's admitted devices, names one device's entry as no longer valid, and that
+    REVOKES the device. Revocation withdraws the device's standing in coordination; it does not take
+    away its access to the repository, which is withdrawn separately. Each device reads admission
     from the roster file in its own checkout, so a Contest written on a device takes effect there at
-    once. Roster rows travel to the other devices by git, with the repository; the coordination
-    records below never do.
+    once, and any other device keeps counting the revoked one until the row reaches its checkout.
+    Roster rows travel to the other devices by git, with the repository; the coordination records
+    below never do. Keeping coordination off git and off servers that can read it keeps those records
+    private to matthew's devices and lets them arrive in seconds instead of at the next push.
 
   The berth and its resources
 
@@ -29,7 +36,7 @@ Feature: Devices share one berth — a shared resource is held once across all o
     MOORS (registers itself) with the berth, then CLAIMS a resource. A granted claim is a LEASE: a
     record of who holds the resource, from which device and session, and since when. Each lease
     names its HOLDER as the device and session that claimed it. A lease binds until its holder
-    releases it or its time limit runs out.
+    releases it or its time limit (set on the claim, or defaulted by the kind of work) runs out.
   - "berth status" shows the moorings and leases of every admitted device, grouped by device, read
     from this device's own records and what it has folded from the others (see below).
   - A CONTAINER-SCOPED resource belongs to one workspace alone: its mesh, its build slots ("cargo")
@@ -67,17 +74,22 @@ Feature: Devices share one berth — a shared resource is held once across all o
     releases the pending lease, and prints one reason line in one of two forms:
       held by <device>/<session> since <time>
       unconfirmed: <device> last seen <age> ago
-    An absent device is never read as a free resource. When only one device is admitted, there is no
-    one to wait for, and a claim is effective at once.
+    A claim that already sees a folded lease of another holder that OVERLAPS it (same resource, both
+    leases still live) refuses at once, without waiting. An absent device is never read as a free
+    resource. When only one device is admitted, there is no one to wait for, and a claim is effective
+    at once.
   - Two claims are CONCURRENT when each was made before its device had folded the other's. The
     TIE-BREAK settles them the same way on both devices: the earlier claim time wins; on equal times,
     the device whose signing key sorts lower wins. Each claim carries the claim time its own device
     stamped on it, and both devices compare those same recorded values, never their own clocks.
   - A session may take a lease refused as "unconfirmed" anyway with "--offline-ok"; it never overrides
-    a "held by" refusal. An agent session may do so on its own judgment. The safeguard is the
-    OVERRIDE record it writes: the record reaches the other device when it is back, and from then on
-    that device's berth refuses its own sessions on that resource, naming the overriding device and
-    session, until the overriding lease is released or runs out.
+    a "held by" refusal. The claim still waits its 10 seconds first. An agent session may do so on its
+    own judgment. The safeguard is the OVERRIDE record it writes: the named record that the silent
+    device's absence was deliberately overridden, shown in "berth status" with the overriding device
+    and session. The record reaches the other device when it is back, and from then on that device's
+    berth refuses its own sessions on that resource, naming the overriding device and session, until
+    the overriding lease is released or runs out. The berth cannot stop a revoked device that chooses
+    to override; revocation only means its peers no longer acknowledge or count it.
 
   Pushes, builds and deploys
 
@@ -88,16 +100,20 @@ Feature: Devices share one berth — a shared resource is held once across all o
     and "jenkins-dispatch" when a pushed commit carries any build tag. A refusal stops the push before
     any check runs, and the hook releases whatever it had claimed. The hook holds its claims only for
     the push itself; a session that watches a build or a deploy through to the end takes its own
-    explicit claim on that resource for as long as it watches.
+    explicit claim on that resource for as long as it watches, and a build or deploy that no session
+    watches is protected only while its push lasts. The hook never overrides on its own; a pushing
+    session that sets BERTH_OFFLINE_OK=1 makes each of its claims an explicit "--offline-ok", with the
+    same unconfirmed-only scope and the same override record.
 
   Tags
 
   - The tag "act:host" means the scenario runs on a workspace host, not on a household mesh or the
     fleet. All scenarios but the last run both devices inside one container, each with its own berth,
-    own key and own peer daemon. The last runs them in two real workspaces, which needs the second
-    machine ("shem"); without it that scenario is held, not failed.
+    own key and own peer daemon. The last, tagged "requires:shem", runs them in two real workspaces,
+    which needs the second machine ("shem"); without it that scenario is held, not failed.
   - The tag "wip" marks scenarios whose steps are not implemented yet. The tag
-    "concern:devices-share-one-berth" ties these scenarios to the habit they are the proof for.
+    "concern:devices-share-one-berth" ties these scenarios to the habit they are the proof for. A
+    HABIT is something this repository commits to doing reliably, each bound to a check that proves it.
 
   Background:
     Given two devices of "matthew", "A" and "B", each with its own berth, its own key and its own peer daemon
@@ -145,9 +161,10 @@ Feature: Devices share one berth — a shared resource is held once across all o
     Given no session on either device holds "dev-integration"
     And device A's peer daemon stops, and the last head device B folded from A is 3 minutes old
     When session "codex-1" on device B, on its own judgment, claims "dev-integration" with "--offline-ok"
-    Then the claim exits 0 and device B's berth records an override naming device B and session "codex-1"
+    Then the claim waits 10 seconds for device A's acknowledgement, then takes the lease anyway and exits 0
+    And device B's berth records an override naming device B and session "codex-1"
     When device A's peer daemon starts again and folds device B's next head
-    Then device A's berth status shows device B's override on "dev-integration"
+    Then device A's berth status shows B's lease on "dev-integration" marked as an override of A's silence, naming device B and session "codex-1"
     And a claim by "claude-1" on "dev-integration" on device A exits 3 with the reason line "held by" device B and session "codex-1"
     And once "codex-1" releases "dev-integration" and device A folds that release, a claim by "claude-1" on device A exits 0
 
@@ -178,7 +195,7 @@ Feature: Devices share one berth — a shared resource is held once across all o
     And device A drops device B's connections and refuses new ones exactly as it refuses a stranger's
     And "epr peer status" on device A counts the refused connections from device B
     And a push to dev from session "codex-1" on device B is refused with the reason line "unconfirmed:" naming device A, because A no longer acknowledges B
-    And device A's next push to dev is not blocked, and it carries the Contest row to matthew's other devices
+    And device A's next push to dev is not blocked, and it carries the Contest row to the repository
     And device A's peer daemon was never restarted, so the sessions moored on A and the leases they hold were not interrupted
 
   @requires:shem
@@ -191,5 +208,6 @@ Feature: Devices share one berth — a shared resource is held once across all o
     Then the claim exits with code 3
     And the reason line reads "held by" device A and session "claude-1" since the time A claimed it
     And each workspace's berth status lists the other's moorings and leases, read from its own fold
-    And no coordination record in this exchange was carried by a git push, by a shared server that can read or keep it, or by the person
+    And device B's refusal came within seconds of A's claim, with no push to the repository in between
+    And no coordination record in this exchange was carried by a git push or by a shared server that can read or keep it
     But an encrypted relay that only forwarded the link's traffic is allowed
