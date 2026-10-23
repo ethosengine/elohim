@@ -18,6 +18,7 @@ import {
   payloadHeaders,
   payloadRefusal,
   readRunnerEnv,
+  readGrantStatus,
   RunnerRefusal,
 } from '../lib/compute-runner.js';
 
@@ -520,11 +521,22 @@ function grantRecord(policy: Record<string, unknown>, author = PROVIDER) {
   return {
     signed_action: {
       hashed: {
+        hash: Buffer.from(GRANT_ACTION.slice(1), 'base64url'),
         content: {
-          author: Buffer.from(author.slice(1), 'base64url'),
-          entry_hash: GRANT_ENTRY_RAW,
+          header: {
+            author: Buffer.from(author.slice(1), 'base64url'),
+            timestamp: 1790812800000000,
+            action_seq: 4,
+            prev_action: raw(HoloHashType.Action),
+          },
+          data: {
+            type: 'Create',
+            entry_type: { App: { zome_index: 0, entry_index: 8, visibility: 'Public' } },
+            entry_hash: GRANT_ENTRY_RAW,
+          },
         },
       },
+      signature: new Uint8Array(64),
     },
     entry: {
       Present: {
@@ -599,4 +611,86 @@ it('grantStatus reads withdrawn, lapsed, inactive and unverified honestly', () =
     'lapsed'
   );
   assert.equal(grantStatus({ ...base, author: RUNNER, links: [ACTIVE] }).state, 'unverified');
+});
+
+it('native grant read refuses unsupported/malformed records before authority-link reads', async () => {
+  const good = grantRecord(POLICY);
+  const mutations: Array<(record: ReturnType<typeof grantRecord>) => void> = [
+    record => {
+      Object.assign(record.signed_action.hashed, {
+        content: { author: RUNNER_RAW, entry_hash: GRANT_ENTRY_RAW },
+      });
+    },
+    record => {
+      record.signed_action.hashed.content.data.type = 'Update';
+    },
+    record => {
+      record.signed_action.hashed.content.header.author = Buffer.from(GRANT_ENTRY_RAW);
+    },
+    record => {
+      record.signed_action.hashed.content.data.entry_hash = RUNNER_RAW;
+    },
+    record => {
+      record.signed_action.hashed.hash = Buffer.from(raw(HoloHashType.Action));
+    },
+    record => {
+      record.entry.Present.entry_type = 'Agent';
+    },
+    record => {
+      record.entry.Present.entry = encode({
+        action: 'offers',
+        payload_json: JSON.stringify(POLICY),
+      });
+    },
+    record => {
+      record.entry.Present.entry = encode({ action: 'delegates-compute', payload_json: '[]' });
+    },
+    record => {
+      record.entry.Present.entry = new Uint8Array([0xc1]);
+    },
+  ];
+  for (const mutate of mutations) {
+    const record = structuredClone(good);
+    mutate(record);
+    const calls: string[] = [];
+    const status = await readGrantStatus(
+      {
+        call: async <T>(_role: string, _zome: string, fn: string): Promise<T> => {
+          calls.push(fn);
+          return record as T;
+        },
+      },
+      GRANT_ACTION,
+      NOW
+    );
+    assert.equal(status.state, 'unknown');
+    assert.deepEqual(calls, ['get_commitment_record']);
+  }
+});
+
+it('native signed author mismatch stays unverified and coordinator entry-identity refusal propagates', async () => {
+  const status = await readGrantStatus(
+    {
+      call: async <T>(_role: string, _zome: string, fn: string): Promise<T> =>
+        (fn === 'get_commitment_record' ? grantRecord(POLICY, RUNNER) : [ACTIVE]) as T,
+    },
+    GRANT_ACTION,
+    NOW
+  );
+  assert.equal(status.state, 'unverified');
+  const calls: string[] = [];
+  await assert.rejects(
+    readGrantStatus(
+      {
+        call: async <T>(_role: string, _zome: string, fn: string): Promise<T> => {
+          calls.push(fn);
+          throw new Error('Commitment identity mismatch');
+        },
+      },
+      GRANT_ACTION,
+      NOW
+    ),
+    /Commitment identity mismatch/
+  );
+  assert.deepEqual(calls, ['get_commitment_record']);
 });

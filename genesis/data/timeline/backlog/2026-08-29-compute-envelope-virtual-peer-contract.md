@@ -449,13 +449,33 @@ all three pre-existing libp2p keys and infrastructure credentials retain their
 observed hashes. Each previously absent iroh key is now 32 bytes, and each vault
 contains five credentials. Subsequent ordinary resumes reached readiness in
 **28 seconds**. Evidence: the campaign's `live-evidence/edge-1699/` startup and
-worker logs. This establishes live recovery and resume; the next CI observation
-will also validate and capture the retained recovery inventory and linked seals.
+worker logs. Edge **1701** also validated and captured the retained recovery
+inventory and linked seals; the canonical after-state hash matches its seal,
+`d26eab3e29db67e59fa3c5d3ed902e1453751619d52f1989c061bad5702369e8`.
+That proof retains the original app snapshot and records fifteen credentials
+across the three peers. This establishes live recovery and ordinary resume.
 
 The remaining station is **ready private household → native provider grant**:
 the worker reaches `provider bootstrap ready` and then refuses grant bootstrap
-with a generic error. Preserve the fixed declaration and reconcile any unknown
+with a generic error. Edge 1701's independent observation passed the existing
+declaration checks and read the expected Adam key from health (HTTP 200).
+Its authenticated projection read also returned HTTP 200, but the observation
+could not interpret the response. The diagnostic was found to reject valid
+`proposed`, `cancelled` and `sunset` states; correcting that observer does not
+establish which state the live grant has. Preserve the fixed declaration and reconcile any unknown
 issuance outcome. Probe the actual provider identity and existing grant projection
 without issuing, distinguish those observations from signed native authority,
 then verify the grant and actual BDD completion. **G2 and the Jenkins native BDD
 receipt remain unproven; the native execution profile stays disabled.**
+
+A further station lies between **signed native commitment → runner authority
+status**. The pinned Holochain fork returns an Action with `header.author` and
+`data.entry_hash`; the runner and its old fixture expected those fields directly
+on the Action. A valid native record would therefore be reported as unknown.
+The correction reads the pinned Create shape, binds the returned action hash,
+requires an App entry containing `delegates-compute`, and retains the coordinator's
+native signature and entry-identity verification. Probe the actual wire shape,
+malformed/unsupported records and provider mismatch through the runner and
+authority-probe tests. Current state: **25 focused tests GREEN; live authority
+observation pending**. This fixes a later observation defect; it does not establish
+the cause of Edge 1699's provider bootstrap failure.

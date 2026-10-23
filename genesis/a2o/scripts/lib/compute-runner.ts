@@ -32,6 +32,7 @@ import { join } from 'node:path';
 import {
   decodeHashFromBase64,
   encodeHashToBase64,
+  getHashType,
   hashFrom32AndType,
   HoloHashType,
 } from '@holochain/client';
@@ -629,7 +630,15 @@ export function grantStatus(input: {
 }
 
 interface NativeRecord {
-  signed_action: { hashed: { content: { author?: Uint8Array; entry_hash?: Uint8Array } } };
+  signed_action: {
+    hashed: {
+      hash?: Uint8Array;
+      content: {
+        header?: { author?: Uint8Array };
+        data?: { type?: string; entry_hash?: Uint8Array };
+      };
+    };
+  };
   entry: { Present?: { entry_type: string; entry: Uint8Array } };
 }
 
@@ -645,13 +654,45 @@ export async function readGrantStatus(
     'get_commitment_record',
     decodeHashFromBase64(grantActionHash)
   );
-  const action = record?.signed_action?.hashed?.content;
-  const bytes = record?.entry?.Present?.entry;
-  if (!record || !action?.author || !action.entry_hash || !bytes)
-    return { grantActionHash, state: 'unknown' };
-  const entry = decode(bytes) as { action?: string; payload_json?: string };
-  const policy = JSON.parse(entry.payload_json ?? '{}') as Record<string, unknown>;
-  const cid = encodeHashToBase64(action.entry_hash);
+  // Fork 96bcd2bee215 Action is {header, data}; the coordinator returns the
+  // native Record unchanged and verifies its action/entry hashes before return.
+  const hashed = record?.signed_action?.hashed;
+  const action = hashed?.content;
+  const present = record?.entry?.Present;
+  const bytes = present?.entry;
+  const unknown: GrantStatus = { grantActionHash, state: 'unknown' };
+  if (
+    action?.data?.type !== 'Create' ||
+    present?.entry_type !== 'App' ||
+    !(bytes instanceof Uint8Array) ||
+    bytes.length === 0 ||
+    bytes.length > 256 * 1024
+  )
+    return unknown;
+  let cid: string;
+  let author: string;
+  let policy: Record<string, unknown>;
+  try {
+    const validHash = (value: unknown, type: HoloHashType): value is Uint8Array =>
+      value instanceof Uint8Array && value.length === 39 && getHashType(value) === type;
+    if (
+      !validHash(hashed?.hash, HoloHashType.Action) ||
+      encodeHashToBase64(hashed.hash) !== grantActionHash ||
+      !validHash(action.header?.author, HoloHashType.Agent) ||
+      !validHash(action.data.entry_hash, HoloHashType.Entry)
+    )
+      return unknown;
+    const entry = decode(bytes) as { action?: string; payload_json?: string } | null;
+    if (entry?.action !== 'delegates-compute' || typeof entry.payload_json !== 'string')
+      return unknown;
+    const parsed: unknown = JSON.parse(entry.payload_json);
+    if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) return unknown;
+    policy = parsed as Record<string, unknown>;
+    cid = encodeHashToBase64(action.data.entry_hash);
+    author = encodeHashToBase64(action.header.author);
+  } catch {
+    return unknown;
+  }
   const links = await session.call<StateLink[]>(
     GOVERNANCE_ROLE,
     GOVERNANCE_ZOME,
@@ -661,8 +702,8 @@ export async function readGrantStatus(
   return grantStatus({
     grantActionHash,
     cid,
-    author: encodeHashToBase64(action.author),
-    policy: { ...policy, action: entry.action },
+    author,
+    policy,
     links,
     now,
   });

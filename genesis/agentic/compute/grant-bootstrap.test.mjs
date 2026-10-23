@@ -148,3 +148,213 @@ test("remote adapter, missing token and wrong performer refuse without grant cal
     assert.equal(f.calls.length, 0);
   }
 });
+
+test("normal attempt emits bounded native categories without extra POST or secret output", async () => {
+  for (const [status, body, category] of [
+    [
+      500,
+      "Error: Invalid input: compute grant: native consent record unavailable",
+      "consent-unavailable",
+    ],
+    [
+      500,
+      "Error: Conductor error: secret-token-dynamic-detail",
+      "conductor-error",
+    ],
+    [
+      403,
+      '{"reason":"local-compute-capability-required","secret":"secret-token-dynamic-detail"}',
+      "local-capability-refused",
+    ],
+    [503, '{"status":"catching-up","retryAfter":7}', "catching-up"],
+    [503, '{"error":"local conductor unavailable"}', "conductor-unavailable"],
+    [500, "secret-token-dynamic-detail".repeat(4000), "body-limit"],
+    [200, "not JSON secret-token-dynamic-detail", "response-json-invalid"],
+    [
+      200,
+      JSON.stringify({ ...native(), provider: recipient }),
+      "native-response-invalid",
+    ],
+  ]) {
+    const f = setup();
+    const diagnostics = [];
+    const original = f.fetcher;
+    f.fetcher = async (url, init) => {
+      if (init?.method === "POST") {
+        f.calls.push({ url: String(url), options: init });
+        return new Response(body, { status });
+      }
+      return original(url, init);
+    };
+    await assert.rejects(
+      bootstrapGrant({ ...f, observe: (d) => diagnostics.push(d) }),
+    );
+    assert.equal(f.calls.filter((c) => c.options.method === "POST").length, 1);
+    assert.equal(f.calls[1].options.body, JSON.stringify(declaration().grant));
+    assert.equal(f.calls[1].options.redirect, "error");
+    assert.equal(f.receipts.length, 0);
+    assert.equal(diagnostics.length, 1);
+    assert.equal(diagnostics[0].category, category);
+    assert.equal(diagnostics[0].httpStatus, status);
+    assert.equal(diagnostics[0].outcome, "unknown");
+    assert.deepEqual(Object.keys(diagnostics[0]).sort(), [
+      "category",
+      "httpStatus",
+      "outcome",
+      "phase",
+    ]);
+    const output = JSON.stringify(diagnostics);
+    for (const secret of [
+      "secret-token-dynamic-detail",
+      provider,
+      recipient,
+      f.env.ELOHIM_COMPUTE_LOCAL_TOKEN,
+      f.env.COMPUTE_RUNNER_GRANT_JSON,
+    ])
+      assert.ok(!output.includes(secret));
+  }
+});
+
+test("timeout, connection, body and receipt failures after POST have unknown outcome", async (t) => {
+  const deadlines = [];
+  const controllers = [];
+  t.mock.method(AbortSignal, "timeout", (ms) => {
+    deadlines.push(ms);
+    const controller = new AbortController();
+    controllers.push(controller);
+    return controller.signal;
+  });
+  for (const kind of [
+    "timeout",
+    "connection",
+    "body",
+    "stalled-body",
+    "receipt",
+  ]) {
+    const f = setup();
+    const original = f.fetcher;
+    const diagnostics = [];
+    f.fetcher = async (url, init) => {
+      if (init?.method !== "POST") return original(url, init);
+      f.calls.push({ url: String(url), options: init });
+      if (kind === "timeout")
+        throw Object.assign(new Error("SECRET"), { name: "TimeoutError" });
+      if (kind === "connection") throw new Error("SECRET");
+      if (kind === "body")
+        return new Response(
+          new ReadableStream({
+            start(c) {
+              c.error(new Error("SECRET"));
+            },
+          }),
+        );
+      if (kind === "stalled-body") {
+        setImmediate(() => controllers.at(-1).abort());
+        return new Response(
+          new ReadableStream({
+            pull() {
+              return new Promise(() => {});
+            },
+          }),
+        );
+      }
+      return Response.json(native());
+    };
+    if (kind === "receipt")
+      f.saveReceipt = async () => {
+        throw new Error("SECRET");
+      };
+    await assert.rejects(
+      bootstrapGrant({ ...f, observe: (d) => diagnostics.push(d) }),
+    );
+    assert.equal(f.calls.filter((c) => c.options.method === "POST").length, 1);
+    assert.equal(diagnostics[0].outcome, "unknown");
+    assert.equal(
+      diagnostics[0].category,
+      {
+        timeout: "request-timeout",
+        connection: "connection-failed",
+        body: "body-read-failed",
+        "stalled-body": "request-timeout",
+        receipt: "receipt-write-failed",
+      }[kind],
+    );
+    assert.ok(!JSON.stringify(diagnostics).includes("SECRET"));
+  }
+  assert.ok(deadlines.length === 10 && deadlines.every((ms) => ms === 30000));
+});
+
+test("pre-POST refusal stays not-submitted; an observer cannot swallow a receipt error", async () => {
+  const f = setup({ healthProvider: recipient });
+  const diagnostics = [];
+  await assert.rejects(
+    bootstrapGrant({ ...f, observe: (d) => diagnostics.push(d) }),
+  );
+  assert.equal(diagnostics[0].phase, "health-identity");
+  assert.equal(diagnostics[0].outcome, "not-submitted");
+  assert.equal(f.calls.filter((c) => c.options.method === "POST").length, 0);
+  const receiptFailure = setup();
+  let observed = 0;
+  await assert.rejects(
+    bootstrapGrant({
+      ...receiptFailure,
+      saveReceipt: async () => {
+        throw new Error("receipt not saved");
+      },
+      observe: () => {
+        observed++;
+        throw new Error("observer failure");
+      },
+    }),
+    /receipt not saved/,
+  );
+  assert.equal(observed, 1);
+  assert.equal(
+    receiptFailure.calls.filter((c) => c.options.method === "POST").length,
+    1,
+  );
+});
+
+test("successful observed attempt preserves the exact receipt and fixed grant without failure observation", async () => {
+  const original = setup();
+  const expected = await bootstrapGrant(original);
+  const observed = setup();
+  const diagnostics = [];
+  const receipt = await bootstrapGrant({
+    ...observed,
+    observe: (d) => diagnostics.push(d),
+  });
+  assert.deepEqual(receipt, expected);
+  assert.deepEqual(observed.receipts, original.receipts);
+  assert.deepEqual(diagnostics, []);
+  const posts = observed.calls.filter((c) => c.options.method === "POST");
+  assert.equal(posts.length, 1);
+  assert.equal(posts[0].options.body, original.calls[1].options.body);
+  assert.deepEqual(JSON.parse(posts[0].options.body), declaration().grant);
+  assert.equal(receipt.provider, provider);
+  assert.equal(receipt.recipient, recipient);
+});
+
+test("health refusal cancels its unread body without waiting on cancellation", async () => {
+  const f = setup();
+  let cancelled = false;
+  const diagnostics = [];
+  f.fetcher = async () =>
+    new Response(
+      new ReadableStream({
+        cancel() {
+          cancelled = true;
+          return new Promise(() => {});
+        },
+      }),
+      { status: 503 },
+    );
+  await assert.rejects(
+    bootstrapGrant({ ...f, observe: (d) => diagnostics.push(d) }),
+    /health refused/,
+  );
+  assert.equal(cancelled, true);
+  assert.equal(diagnostics[0].category, "health-http-refused");
+  assert.equal(diagnostics[0].outcome, "not-submitted");
+  assert.deepEqual(f.receipts, []);
+});
