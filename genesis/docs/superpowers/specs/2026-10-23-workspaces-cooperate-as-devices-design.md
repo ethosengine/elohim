@@ -91,7 +91,7 @@ resource pinned. Each device reads admission from the roster file in its own che
 signed on device A and written there takes effect on A at once, with no pull. It reaches the other
 devices with A's next push, and the revoked device's lease has already left A's view, so that push is
 not blocked. The admitted devices drop the revoked device's gossip and tier connections. It therefore
-sees them as silent, and its own steward-scoped claims come back `unconfirmed`. The row travels by git, as Binding rows already do.
+sees them as silent, and its own steward-scoped claims come back `unconfirmed`. Revocation withdraws a device's standing in coordination; it does not revoke the device's repository credentials, which are withdrawn separately. Berth cannot stop a revoked device that chooses to override. The row travels by git, as Binding rows already do.
 
 The device generates its iroh secret key and keeps it at `$XDG_CONFIG_HOME/epr/peer/iroh.key`
 (mode 0600, on the persistent `/nix/xdg/config`). The key is never committed, never copied and never
@@ -206,7 +206,7 @@ them required.
 - A commit carrying `[build:edge]` also needs `alpha-fleet`. A `[build:*]` tag also needs
   `jenkins-dispatch`. The hook holds every claim only for the duration of the push. A session that
   watches a build or deploy through to the end takes its own explicit `berth claim` on that resource
-  for as long as it watches.
+  for as long as it watches. A build or deploy that no session watches is protected only while its push lasts; making CI itself a participant is `ci-as-steward-channel-participant`. The hook never overrides on its own. It honours `BERTH_OFFLINE_OK=1`, set by the session that pushes, as an explicit `--offline-ok` on each of its claims, with the same `unconfirmed`-only scope and the same override record.
 - `berth claim lane:<id> --note '<intent>'` declares who holds a lane before the work starts, so no one
   has to infer it from process lists afterwards.
 - `berth status` adds a section for the other devices: their live moorings, their steward-scoped
