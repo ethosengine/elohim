@@ -35,7 +35,7 @@
     "picomatch": "^4.0.4"
   },
   "scripts": {
-    "prepare": "husky",
+    "prepare": "husky && node .husky/hooks-path.mjs",
     "epr": "RUSTFLAGS= CARGO_TARGET_DIR=/tmp/eprfs-onboarding-target cargo run --manifest-path elohim/eprfs/Cargo.toml -q -p elohim-epr-cli --",
     "app:dev": "pnpm --filter elohim-app start",
     "app:build": "pnpm --filter elohim-app build",
