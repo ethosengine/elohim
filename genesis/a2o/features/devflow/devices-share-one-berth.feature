@@ -201,7 +201,6 @@ Feature: Devices share one berth — a shared resource is held once across all o
       | "12:00:00.700" | "12:00:00.200" | "device B" |
       | "12:00:00.200" | "12:00:00.200" | "device A" |
 
-  @wip
   Scenario: A retired device stops counting without restarting the device that stays
     Given device B is an old workspace whose work matthew has moved to device A, and it is still running
     And session "codex-1" on device B still holds "alpha-fleet", left over from a deploy it was watching

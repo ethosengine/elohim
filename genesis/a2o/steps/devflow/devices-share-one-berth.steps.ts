@@ -22,326 +22,49 @@
  * a smoke by luck).
  */
 import assert from 'node:assert/strict';
-import { type ChildProcess, spawn, spawnSync } from 'node:child_process';
-import { createSocket } from 'node:dgram';
-import {
-  chmodSync,
-  closeSync,
-  copyFileSync,
-  existsSync,
-  mkdirSync,
-  mkdtempSync,
-  openSync,
-  readFileSync,
-  rmSync,
-  statSync,
-  symlinkSync,
-  writeFileSync,
-} from 'node:fs';
-import { tmpdir } from 'node:os';
-import { join, resolve } from 'node:path';
+import { readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { join } from 'node:path';
 
 import { After, Before, Given, Then, When } from '@cucumber/cucumber';
 
-const TAG = '@concern:devices-share-one-berth';
-const repository = resolve('../..');
-const HANDLE = 'matthew';
-// The eprfs gate's own debug target; only read (its mtime and the binary), never written here.
-// eslint-disable-next-line sonarjs/publicly-writable-directories
-const EPR = process.env.EPR_BIN ?? '/tmp/eprfs-gate-target/debug/epr';
-const POLICY = join(repository, 'genesis/agentic/pool-policy.json');
-const ROSTER = `.eprfs/status/participants/${HANDLE}.jsonl`;
-const DEV = 'dev-integration';
-const STEWARD = new Set([DEV, 'alpha-fleet', 'jenkins-dispatch']);
+import {
+  berth,
+  checkEpr,
+  claimedAt,
+  DEV,
+  type Device,
+  env,
+  epr,
+  type Fixture,
+  foldedCurrentHead,
+  git,
+  HANDLE,
+  holds,
+  household,
+  type Label,
+  leases,
+  ledger,
+  must,
+  other,
+  otherDeviceBlock,
+  peerStatus,
+  refusalLine,
+  ROSTER,
+  run,
+  startDaemon,
+  STEWARD,
+  stopDaemon,
+  TAG,
+  verdict,
+  waitFor,
+} from './devices-share-one-berth.fixture.js';
 
-type Label = 'A' | 'B';
-interface Outcome {
-  status: number | null;
-  stdout: string;
-  stderr: string;
-  ms: number;
-}
-interface Device {
-  label: Label;
-  dir: string;
-  config: string;
-  berthDir: string;
-  repo: string;
-  log: string;
-  did: string;
-  node: string;
-  port: number;
-  daemon?: ChildProcess;
-  daemonStarts: number;
-}
-interface Fixture {
-  base: string;
-  origin: string;
-  baseSha: string;
-  devices: Record<Label, Device>;
-  last?: Outcome;
-  push?: Outcome;
-  clockBase?: number;
-  pending: Partial<Record<Label, { started: number; outcome: Promise<Outcome> }>>;
-  outcomes: Partial<Record<Label, Outcome>>;
-  linkBackAt?: number;
-}
 const fixtures = new WeakMap<object, Fixture>();
 
 function state(world: object): Fixture {
   const f = fixtures.get(world);
   assert.ok(f, 'the Background did not run');
   return f;
-}
-const other = (label: Label): Label => (label === 'A' ? 'B' : 'A');
-const sleep = (ms: number) => new Promise(done => setTimeout(done, ms));
-
-/** The environment one device's processes see: its own config home, berth store and checkout. */
-function env(d: Device, extra: Record<string, string> = {}): NodeJS.ProcessEnv {
-  const keep = ['PATH', 'LANG', 'GIT_CONFIG_COUNT', 'GIT_CONFIG_KEY_0', 'GIT_CONFIG_VALUE_0'];
-  const out: NodeJS.ProcessEnv = {};
-  for (const key of keep) if (process.env[key] !== undefined) out[key] = process.env[key];
-  return {
-    ...out,
-    HOME: join(d.dir, 'home'),
-    XDG_CONFIG_HOME: d.config,
-    BERTH_DIR: d.berthDir,
-    CLAUDE_CONFIG_DIR: join(d.dir, 'claude-config'),
-    CLAUDE_PROJECT_DIR: repository,
-    EPR_BIN: EPR,
-    ...extra,
-  };
-}
-
-function runSync(argv: string[], options: { cwd?: string; env?: NodeJS.ProcessEnv } = {}): Outcome {
-  const started = Date.now();
-  const r = spawnSync(argv[0], argv.slice(1), {
-    cwd: options.cwd,
-    env: options.env ?? process.env,
-    encoding: 'utf8',
-    timeout: 60_000,
-    maxBuffer: 8 * 1024 * 1024,
-  });
-  return {
-    status: r.status,
-    stdout: r.stdout ?? '',
-    stderr: r.stderr ?? '',
-    ms: Date.now() - started,
-  };
-}
-
-function run(
-  argv: string[],
-  options: { cwd?: string; env?: NodeJS.ProcessEnv } = {}
-): Promise<Outcome> {
-  const started = Date.now();
-  return new Promise(done => {
-    const child = spawn(argv[0], argv.slice(1), { cwd: options.cwd, env: options.env });
-    let stdout = '';
-    let stderr = '';
-    child.stdout.on('data', chunk => (stdout += chunk));
-    child.stderr.on('data', chunk => (stderr += chunk));
-    child.on('close', status => done({ status, stdout, stderr, ms: Date.now() - started }));
-  });
-}
-
-function must(o: Outcome, what: string): Outcome {
-  assert.equal(o.status, 0, `${what} exited ${o.status}\n${o.stdout}\n${o.stderr}`);
-  return o;
-}
-
-function epr(d: Device, args: string[]): Outcome {
-  return runSync([EPR, ...args], { cwd: d.repo, env: env(d) });
-}
-
-function eprJson(d: Device, args: string[]): Record<string, unknown> {
-  return JSON.parse(must(epr(d, args), `epr ${args.join(' ')} on ${d.label}`).stdout);
-}
-
-function berthArgv(d: Device): string[] {
-  return ['python3', join(d.repo, 'genesis/agentic/bin/berth')];
-}
-
-function berth(d: Device, args: string[], extra: Record<string, string> = {}): Promise<Outcome> {
-  return run([...berthArgv(d), ...args], { cwd: d.repo, env: env(d, extra) });
-}
-
-function git(cwd: string, args: string[], extra: NodeJS.ProcessEnv = {}): Outcome {
-  return runSync(
-    ['git', '-c', 'user.name=Fixture', '-c', 'user.email=fixture@example.invalid', ...args],
-    { cwd, env: { ...process.env, HOME: cwd, ...extra } }
-  );
-}
-
-/** `epr peer leases --json` on device `d`: its standing, its channel store and its lease view. */
-function leases(d: Device): Record<string, unknown> {
-  return eprJson(d, ['peer', 'leases', '--json', '--root', d.repo, '--policy', POLICY]);
-}
-
-function verdict(d: Device, resource: string): Record<string, unknown> | undefined {
-  const v = leases(d)[resource];
-  return v && typeof v === 'object' ? (v as Record<string, unknown>) : undefined;
-}
-
-function peerStatus(d: Device): {
-  ownSeq: number | null;
-  devices: { device: string; seq: number | null; ageS: number | null }[];
-} {
-  return eprJson(d, ['peer', 'status', '--json', '--root', d.repo]) as never;
-}
-
-async function waitFor(what: string, timeoutMs: number, check: () => boolean): Promise<void> {
-  const deadline = Date.now() + timeoutMs;
-  for (;;) {
-    let ok = false;
-    try {
-      ok = check();
-    } catch {
-      ok = false;
-    }
-    if (ok) return;
-    if (Date.now() > deadline) assert.fail(`timed out after ${timeoutMs} ms waiting for: ${what}`);
-    await sleep(200);
-  }
-}
-
-function freePort(): Promise<number> {
-  return new Promise((done, fail) => {
-    const socket = createSocket('udp4');
-    socket.on('error', fail);
-    socket.bind(0, '127.0.0.1', () => {
-      const { port } = socket.address();
-      socket.close(() => done(port));
-    });
-  });
-}
-
-function startDaemon(f: Fixture, d: Device): void {
-  const peer = f.devices[other(d.label)];
-  const log = openSync(d.log, 'a');
-  d.daemon = spawn(
-    EPR,
-    [
-      'peer',
-      'serve',
-      '--root',
-      d.repo,
-      '--listen',
-      `127.0.0.1:${d.port}`,
-      '--peer',
-      `${peer.node}@127.0.0.1:${peer.port}`,
-      '--policy',
-      POLICY,
-    ],
-    { cwd: d.repo, env: env(d), stdio: ['ignore', log, log] }
-  );
-  closeSync(log);
-  d.daemonStarts += 1;
-}
-
-async function stopDaemon(d: Device): Promise<void> {
-  const daemon = d.daemon;
-  if (daemon?.exitCode !== null || daemon.signalCode !== null) return;
-  const exited = new Promise(done => daemon.once('exit', done));
-  daemon.kill('SIGTERM');
-  const killed = await Promise.race([exited.then(() => true), sleep(5000).then(() => false)]);
-  if (!killed) {
-    daemon.kill('SIGKILL');
-    await exited;
-  }
-}
-
-/** Device `d` has folded `from`'s head as it stands now (a head at least as new as `from`'s own). */
-async function foldedCurrentHead(d: Device, from: Device, timeoutMs = 20_000): Promise<void> {
-  let own: number | null = null;
-  await waitFor(`${d.label} folds ${from.label}'s current head`, timeoutMs, () => {
-    own ??= peerStatus(from).ownSeq;
-    const seen = peerStatus(d).devices.find(x => x.device === from.did);
-    return own !== null && seen !== undefined && seen.seq !== null && seen.seq >= own;
-  });
-}
-
-function ledger(d: Device): Record<string, unknown>[] {
-  const path = join(d.berthDir, 'ledger.jsonl');
-  if (!existsSync(path)) return [];
-  return readFileSync(path, 'utf8')
-    .split('\n')
-    .filter(line => line.trim())
-    .map(line => JSON.parse(line));
-}
-
-/** When `session` on `d` claimed `resource`, as its berth stamped it (RFC 3339, whole seconds). */
-function claimedAt(d: Device, session: string, resource: string): string {
-  const row = ledger(d)
-    .filter(r => r.kind === 'claim' && r.session === session && r.resource === resource)
-    .pop();
-  assert.ok(row, `no claim of ${resource} by ${session} on ${d.label}`);
-  return rfc3339(Number(row.claimed_at));
-}
-
-function rfc3339(seconds: number): string {
-  return new Date(Math.floor(seconds) * 1000).toISOString().replace(/\.\d{3}Z$/, 'Z');
-}
-
-/** `berth status` on `d`: the block it prints for device `did` among the other devices. */
-function otherDeviceBlock(status: string, did: string): string[] {
-  const section = status.split('other devices')[1] ?? '';
-  const lines = section.split('\n');
-  const start = lines.findIndex(l => l.startsWith(`    device ${did}`));
-  assert.ok(start >= 0, `berth status lists no device ${did}:\n${status}`);
-  const block = [lines[start]];
-  for (const l of lines.slice(start + 1)) {
-    if (!l.startsWith('      ')) break;
-    block.push(l);
-  }
-  return block;
-}
-
-function refusalLine(o: Outcome, resource: string): string {
-  const line = `${o.stdout}\n${o.stderr}`
-    .split('\n')
-    .find(l => l.startsWith(`${resource}: REFUSED — `));
-  assert.ok(line, `no refusal line for ${resource}:\n${o.stdout}\n${o.stderr}`);
-  return line;
-}
-
-function holds(d: Device, resource: string, session: string): boolean {
-  const who = JSON.parse(
-    must(runSync([...berthArgv(d), 'who', resource], { env: env(d) }), 'berth who').stdout
-  );
-  let mine: { holder?: string }[] = [];
-  if (Array.isArray(who)) mine = who;
-  else if (who) mine = [who];
-  return mine.some((lease: { holder?: string }) => lease.holder === session);
-}
-
-// ---------------------------------------------------------------- the fixture
-
-let eprChecked: string | null = null;
-
-/** The `epr` must exist and be newer than every tracked eprfs source: fail loudly otherwise. */
-function checkEpr(): void {
-  if (eprChecked === EPR) return;
-  const build =
-    'CARGO_TARGET_DIR=/tmp/eprfs-gate-target RUSTFLAGS= cargo build --manifest-path ' +
-    'elohim/eprfs/Cargo.toml -p elohim-epr-cli --bin epr (or set EPR_BIN)';
-  assert.ok(existsSync(EPR), `no epr at ${EPR} — build it: ${build}`);
-  const files = must(
-    runSync(['git', 'ls-files', 'elohim/eprfs'], { cwd: repository }),
-    'git ls-files'
-  ).stdout.split('\n');
-  let newest = 0;
-  let newestFile = '';
-  for (const file of files) {
-    if (!/(\.rs|Cargo\.toml|Cargo\.lock)$/.test(file)) continue;
-    const mtime = statSync(join(repository, file)).mtimeMs;
-    if (mtime > newest) [newest, newestFile] = [mtime, file];
-  }
-  assert.ok(
-    statSync(EPR).mtimeMs >= newest,
-    `${EPR} is older than ${newestFile} — a stale epr measures old code; rebuild: ${build}`
-  );
-  eprChecked = EPR;
 }
 
 Before({ tags: TAG }, function () {
@@ -358,129 +81,12 @@ After({ tags: TAG }, async function () {
     rmSync(f.base, { recursive: true, force: true });
 });
 
-function makeDevice(
-  base: string,
-  name: string,
-  origin: string
-): Omit<Device, 'label' | 'did' | 'node' | 'port'> {
-  const dir = join(base, name);
-  const repo = join(dir, 'repo');
-  for (const sub of ['config', 'berth', 'home', 'claude-config'])
-    mkdirSync(join(dir, sub), { recursive: true });
-  must(git(dir, ['clone', '-q', '-b', 'dev', origin, repo]), 'clone');
-  // berth folds into the flow store of the checkout it lives in: the one this device's daemon serves.
-  mkdirSync(join(repo, '.claude'), { recursive: true });
-  symlinkSync(join(repository, '.claude/hooks'), join(repo, '.claude/hooks'));
-  symlinkSync(join(repository, '.claude/epr-meta'), join(repo, '.claude/epr-meta'));
-  // The real pre-push hook, as this checkout's own hook (no git config is changed).
-  copyFileSync(join(repository, '.husky/pre-push.bash'), join(repo, '.git/hooks/pre-push'));
-  chmodSync(join(repo, '.git/hooks/pre-push'), 0o755);
-  return {
-    dir,
-    config: join(dir, 'config'),
-    berthDir: join(dir, 'berth'),
-    repo,
-    log: join(dir, 'serve.log'),
-    daemonStarts: 0,
-  };
-}
-
 Given(
   'two devices of {string}, {string} and {string}, each with its own berth, its own key and its own peer daemon',
   { timeout: 120_000 },
   async function (person: string, first: string, second: string) {
     assert.deepEqual([person, first, second], [HANDLE, 'A', 'B']);
-    const base = mkdtempSync(join(tmpdir(), 'devices-share-one-berth-'));
-    // The repository both devices integrate on: a bare origin whose dev holds berth.
-    const seed = join(base, 'seed');
-    const origin = join(base, 'origin.git');
-    mkdirSync(join(seed, '.epr-meta'), { recursive: true });
-    mkdirSync(join(seed, 'genesis/agentic/bin'), { recursive: true });
-    writeFileSync(
-      join(seed, '.epr-meta/repository.yaml'),
-      'version: 1\nagent: repo:ethosengine/elohim\n'
-    );
-    writeFileSync(join(seed, 'README.md'), '# devices-share-one-berth fixture\n');
-    writeFileSync(join(seed, '.gitignore'), '.claude/\n.eprfs/status/flows.jsonl\n');
-    copyFileSync(
-      join(repository, 'genesis/agentic/bin/berth'),
-      join(seed, 'genesis/agentic/bin/berth')
-    );
-    must(git(base, ['init', '-q', '--bare', origin]), 'init origin');
-    must(git(seed, ['init', '-q', '-b', 'dev']), 'init seed');
-    must(git(seed, ['add', '-A']), 'add');
-    must(git(seed, ['commit', '-q', '-m', 'fixture']), 'commit');
-    must(git(seed, ['push', '-q', origin, 'dev']), 'seed origin');
-    const baseSha = must(git(seed, ['rev-parse', 'HEAD']), 'rev-parse').stdout.trim();
-
-    // Two devices, X first on the roster; each mints its own keys on first use.
-    const x = { ...makeDevice(base, 'x', origin), label: 'A' as Label, did: '', node: '', port: 0 };
-    const y = { ...makeDevice(base, 'y', origin), label: 'B' as Label, did: '', node: '', port: 0 };
-    const carry = (from: Device, to: Device) => {
-      mkdirSync(join(to.repo, '.eprfs/status/participants'), { recursive: true });
-      copyFileSync(join(from.repo, ROSTER), join(to.repo, ROSTER));
-    };
-    must(
-      epr(x, [
-        'actor',
-        'witness',
-        '--subject',
-        `human:${HANDLE}`,
-        '--as',
-        'agent:fixture@claude-opus-5-5',
-        '--session',
-        'fixture-x',
-        '--basis',
-        'the devices-share-one-berth fixture',
-        '--root',
-        x.repo,
-      ]),
-      'witness'
-    );
-    carry(x, y);
-    const request = join(base, 'request.json');
-    const authorization = join(base, 'authorization.json');
-    writeFileSync(
-      request,
-      must(epr(y, ['actor', 'device', 'enroll', '--handle', HANDLE, '--root', y.repo]), 'enroll')
-        .stdout
-    );
-    writeFileSync(
-      authorization,
-      must(epr(x, ['actor', 'device', 'authorize', request, '--root', x.repo]), 'authorize').stdout
-    );
-    must(epr(y, ['actor', 'device', 'bind', authorization, '--root', y.repo]), 'bind');
-    carry(y, x);
-    for (const d of [x, y]) d.node = must(epr(d, ['peer', 'id']), 'peer id').stdout.trim();
-    must(
-      epr(x, ['actor', 'device', 'endpoint', '--node-id', x.node, '--root', x.repo]),
-      'endpoint x'
-    );
-    carry(x, y);
-    must(
-      epr(y, ['actor', 'device', 'endpoint', '--node-id', y.node, '--root', y.repo]),
-      'endpoint y'
-    );
-    carry(y, x);
-    for (const d of [x, y]) {
-      d.did = String(eprJson(d, ['peer', 'status', '--json', '--root', d.repo]).device);
-      d.port = await freePort();
-    }
-    // "A" is the device whose signing key sorts lower; the story's tie-break examples rely on it.
-    const [a, b] = x.did < y.did ? [x, y] : [y, x];
-    a.label = 'A';
-    b.label = 'B';
-    const f: Fixture = {
-      base,
-      origin,
-      baseSha,
-      devices: { A: a, B: b },
-      pending: {},
-      outcomes: {},
-    };
-    fixtures.set(this, f);
-    startDaemon(f, a);
-    startDaemon(f, b);
+    fixtures.set(this, await household());
   }
 );
 
@@ -1074,15 +680,22 @@ Then('the berth status on device A and on device B names the same holder', async
   assert.match(theirs, /\n {4}dev-integration free/, theirs);
 });
 
-// ---------------------------------------------------------------- a retired device (@wip)
+// ---------------------------------------------------------------- a retired device
 //
-// Held @wip: three of its steps need what the implementation does not have yet, and they say so
-// as `pending` rather than pass on a stand-in — a verb that signs a Contest of ANOTHER device's
-// binding on this device (`epr actor contest` contests this device's own standing record), a
-// daemon that closes the open connections of a device a reload no longer admits (the gossip gate
-// refuses only new ones), and `epr peer status` counting refused connections (the gate's counter
-// is in memory only). The push that carries the Contest row also needs the fixture checkout to
-// carry the gates the hook runs after its claims.
+// The Contest is `epr actor device contest` on A; A's daemon reloads its roster on its own tick,
+// closes what B held open and refuses B as it refuses a stranger (the like-a-stranger comparison
+// over real endpoints is eprfs-peer's `a_contested_device_is_disconnected_refused_like_a_stranger_
+// and_counted`); here it is read where an operator reads it, `epr peer status` on A.
+
+/** `epr peer status --json` on `d`: the refused connections it reports for `device`. */
+function refusedFrom(d: Device, device: string): number {
+  const status = JSON.parse(
+    must(epr(d, ['peer', 'status', '--json', '--root', d.repo]), 'peer status').stdout
+  ) as { refusedConnections?: { device: string | null; count: number }[] };
+  return (status.refusedConnections ?? [])
+    .filter(r => r.device === device)
+    .reduce((sum, r) => sum + r.count, 0);
+}
 
 Given(
   'device B is an old workspace whose work matthew has moved to device A, and it is still running',
@@ -1132,9 +745,25 @@ Given(
 When(
   "matthew, on device A, contests device B's entry, signing the Contest row on A and writing it into A's own roster file",
   function () {
-    // No verb signs a Contest of another device's binding: `epr actor contest` contests this
-    // device's own standing record.
-    return 'pending';
+    const { A, B } = state(this).devices;
+    const out = must(
+      epr(A, [
+        'actor',
+        'device',
+        'contest',
+        '--device',
+        B.did,
+        '--basis',
+        "an old workspace; matthew's work moved to device A",
+        '--root',
+        A.repo,
+      ]),
+      'device contest on A'
+    );
+    const outcome = JSON.parse(out.stdout) as { device: string; by: string };
+    assert.deepEqual([outcome.device, outcome.by], [B.did, A.did]);
+    const rows = readFileSync(join(A.repo, ROSTER), 'utf8');
+    assert.match(rows, /"kind":"contest"/);
   }
 );
 
@@ -1145,6 +774,10 @@ Then(
     const status = must(await berth(A, ['status']), 'berth status on A').stdout;
     assert.ok(!status.includes(B.did), status);
     assert.equal(verdict(A, resource), undefined);
+    // No pull: origin's dev is where the fixture left it. No restart: A's daemon started once.
+    const dev = must(git(state(this).origin, ['rev-parse', 'dev']), 'rev-parse dev').stdout.trim();
+    assert.equal(dev, state(this).baseSha);
+    assert.equal(A.daemonStarts, 1);
   }
 );
 
@@ -1161,10 +794,15 @@ Then(
 
 Then(
   "device A drops device B's connections and refuses new ones exactly as it refuses a stranger's",
-  function () {
-    // The gossip gate refuses a newly unadmitted device's NEW connections only; an open one stays
-    // until it closes.
-    return 'pending';
+  { timeout: 120_000 },
+  async function () {
+    const { A, B } = state(this).devices;
+    // B keeps trying (its gossip redials A, and it fetches A's newer heads from A's tier): each
+    // connection A closes or refuses is counted against B's node id.
+    await waitFor("A to refuse B's connections", 90_000, () => refusedFrom(A, B.did) >= 1);
+    const listed = peerStatus(A).devices.map(x => x.device);
+    assert.ok(!listed.includes(B.did), `A still lists B: ${listed.join(', ')}`);
+    assert.ok(A.daemon?.exitCode === null && A.daemonStarts === 1, "A's daemon kept running");
   }
 );
 
@@ -1172,8 +810,10 @@ Then(
   '{string} on device A counts the refused connections from device B',
   function (command: string) {
     assert.equal(command, 'epr peer status');
-    // `epr peer status` does not report refused connections; the gate's count is in memory only.
-    return 'pending';
+    const { A, B } = state(this).devices;
+    assert.ok(refusedFrom(A, B.did) >= 1);
+    const text = must(epr(A, ['peer', 'status', '--root', A.repo]), 'peer status').stdout;
+    assert.match(text, /refused connections {2}\S+: \d+/, text);
   }
 );
 
@@ -1197,9 +837,22 @@ Then(
 
 Then(
   "device A's next push to dev is not blocked, and it carries the Contest row to the repository",
-  function () {
-    // The fixture checkout carries none of the gates the hook runs after its claims.
-    return 'pending';
+  { timeout: 60_000 },
+  async function () {
+    const f = state(this);
+    const { A } = f.devices;
+    must(git(A.repo, ['add', ROSTER]), 'add roster');
+    must(git(A.repo, ['commit', '-q', '-m', 'roster: retire device B']), 'commit');
+    const o = await run(['git', 'push', 'origin', 'HEAD:dev'], {
+      cwd: A.repo,
+      env: env(A, { BERTH_SESSION: 'claude-1' }),
+    });
+    assert.equal(o.status, 0, `${o.stdout}\n${o.stderr}`);
+    assert.match(`${o.stdout}\n${o.stderr}`, new RegExp(`${DEV}: claimed by claude-1`));
+    const carried = must(git(f.origin, ['show', `dev:${ROSTER}`]), 'show roster on dev').stdout;
+    assert.match(carried, /"kind":"contest"/);
+    // The push held dev-integration only while it ran.
+    assert.equal(holds(A, DEV, 'claude-1'), false);
   }
 );
 
