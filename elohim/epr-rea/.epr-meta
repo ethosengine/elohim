@@ -82,3 +82,11 @@ Three properties of this crate are load-bearing for the law and easy to erode:
 Known gaps live in the guidestar §5 (ranked), not here — notably that a **floor bound mints no
 algedonic evidence**, because the wire evidence is ceiling-signed and emitting through it would
 produce a signal whose own `crossed()` reads false.
+
+**Device-binding contests (2026-10-23, controller ruling for workspaces-cooperate T7).** A Contest of a
+device's standing row (its binding, or the chain root's genesis) counts only when its signer still
+stands: `Roster::contested` decides those rows over the signer → device graph (`retired_devices`),
+order-independently. Mutual or cyclic contests retire every device in the cycle (fail closed), so a
+retired device can still retaliate against the device that retired it, and both then stand retired;
+the remedy is re-binding the device the person keeps — a human act. Contests of human-standing
+records (witnesses, claims, founding records) keep the membership rule unchanged.

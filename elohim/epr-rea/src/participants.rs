@@ -741,10 +741,63 @@ impl Roster {
         }
 
         let mut memo = HashMap::new();
-        contests
+        let mut contested: BTreeSet<String> = contests
             .iter()
             .filter(|(_, by_rows)| by_rows.iter().any(|c| effective(c, &contests, &mut memo)))
             .map(|(target, _)| target.clone())
+            .collect();
+
+        // A contest of a DEVICE's standing row (its binding, or the root's genesis) counts only
+        // when its signer still stands (spec §3.1: "valid only when signed by one of the person's
+        // admitted devices"), which the general rule above cannot say: membership ignores
+        // contests. Those rows are decided here instead, over the graph signer → contested device.
+        let devices = self.device_rows(verifier, &members);
+        let retired = retired_devices(&self.rows, &devices, &members, verifier);
+        contested.retain(|cid| !devices.contains_key(cid));
+        contested.extend(
+            devices
+                .iter()
+                .filter(|(_, device)| retired.contains(*device))
+                .map(|(cid, _)| cid.clone()),
+        );
+        contested
+    }
+
+    /// Each verifying device-standing row of this lineage, by CID, and the device it stands:
+    /// the chain root's genesis rows, and every member's bindings under this root.
+    fn device_rows(
+        &self,
+        verifier: &dyn SignatureVerifier,
+        members: &BTreeSet<String>,
+    ) -> HashMap<String, String> {
+        let Some(root) = self.chain_root(verifier) else {
+            return HashMap::new();
+        };
+        self.rows
+            .iter()
+            .filter_map(|(cid, row)| match row {
+                ParticipantRow::Genesis {
+                    chain_root,
+                    signer,
+                    signature,
+                    ..
+                } if chain_root == &root
+                    && row_signature_verifies(verifier, row, signer, signature) =>
+                {
+                    Some((cid.to_string(), root.clone()))
+                }
+                ParticipantRow::Binding {
+                    chain_root,
+                    controller,
+                    ..
+                } if chain_root == &root
+                    && members.contains(controller)
+                    && verify_binding(row, verifier).is_ok() =>
+                {
+                    Some((cid.to_string(), controller.clone()))
+                }
+                _ => None,
+            })
             .collect()
     }
 
@@ -853,6 +906,88 @@ impl Roster {
         }
         Some(found)
     }
+}
+
+/// The devices retired by device-binding contests: `devices` maps each device-standing row's CID
+/// to its device, and an edge `signer → device` is an admissible contest (a member's, verifying)
+/// of one of those rows. A device is retired when a contest of it is signed by a device that is
+/// not itself retired, or by a device in the same contest cycle as it: mutual or cyclic contests
+/// retire every device in the cycle (fail closed; the person re-binds the device they keep), and
+/// a self-contest retires its signer. Decided over the graph's strongly connected components, so
+/// the order of the rows never changes the answer. A retired device can still retaliate against
+/// the device that retired it, and the pair then both stand retired; the remedy is a re-binding,
+/// a human act.
+fn retired_devices(
+    rows: &[(Cid, ParticipantRow)],
+    devices: &HashMap<String, String>,
+    members: &BTreeSet<String>,
+    verifier: &dyn SignatureVerifier,
+) -> BTreeSet<String> {
+    let mut edges: BTreeSet<(String, String)> = BTreeSet::new();
+    for (_, row) in rows {
+        if let ParticipantRow::Contest {
+            target_cid,
+            by,
+            signature,
+            ..
+        } = row
+        {
+            if let Some(device) = devices.get(target_cid) {
+                if members.contains(by) && row_signature_verifies(verifier, row, by, signature) {
+                    edges.insert((by.clone(), device.clone()));
+                }
+            }
+        }
+    }
+    let mut out: BTreeMap<String, BTreeSet<String>> = BTreeMap::new();
+    for (from, to) in &edges {
+        out.entry(from.clone()).or_default().insert(to.clone());
+    }
+    let reaches = |from: &str, to: &str| -> bool {
+        let mut seen = BTreeSet::new();
+        let mut stack = vec![from.to_string()];
+        while let Some(node) = stack.pop() {
+            if node == to {
+                return true;
+            }
+            if seen.insert(node.clone()) {
+                stack.extend(out.get(&node).into_iter().flatten().cloned());
+            }
+        }
+        false
+    };
+    // Per edge, whether its two ends share a cycle (the target reaches back to the signer).
+    let cyclic: BTreeSet<(String, String)> = edges
+        .iter()
+        .filter(|(from, to)| reaches(to, from))
+        .cloned()
+        .collect();
+    fn retired(
+        device: &str,
+        edges: &BTreeSet<(String, String)>,
+        cyclic: &BTreeSet<(String, String)>,
+        memo: &mut BTreeMap<String, bool>,
+    ) -> bool {
+        if let Some(known) = memo.get(device) {
+            return *known;
+        }
+        let incoming: Vec<&(String, String)> =
+            edges.iter().filter(|(_, to)| to == device).collect();
+        // A contest from inside its cycle retires at once; any other comes from an earlier
+        // component of the (acyclic) condensation, so the recursion terminates.
+        let answer = incoming.iter().any(|edge| cyclic.contains(*edge))
+            || incoming
+                .iter()
+                .any(|(from, _)| !retired(from, edges, cyclic, memo));
+        memo.insert(device.to_string(), answer);
+        answer
+    }
+    let mut memo = BTreeMap::new();
+    devices
+        .values()
+        .filter(|device| retired(device, &edges, &cyclic, &mut memo))
+        .cloned()
+        .collect()
 }
 
 /// How a device stands by the roster alone — see [`Roster::device_standing_row`].
@@ -1989,5 +2124,156 @@ mod tests {
         let w = ActorRecord::Witness(witness("s1"));
         let line = Roster::line_for(&genesis(&w, &a)).unwrap();
         assert!(!line.contains('@'), "no email, no role@model: {line}");
+    }
+
+    // ── device-binding contests: only a standing device's contest retires a device ────────
+
+    /// A three-device lineage (A the root, B and C bound by A), each with an endpoint, and the
+    /// CIDs of A's genesis and of B's and C's bindings.
+    fn three_device_rows(a: &Device, b: &Device, c: &Device) -> (Vec<ParticipantRow>, [String; 3]) {
+        let w = ActorRecord::Witness(witness("s1"));
+        let mut roster = Roster::new("matthew").unwrap();
+        let gen = roster.append(genesis(&w, a)).unwrap().to_string();
+        let bind_b = roster
+            .append(binding(a, a, b, (true, true)))
+            .unwrap()
+            .to_string();
+        let bind_c = roster
+            .append(binding(a, a, c, (true, true)))
+            .unwrap()
+            .to_string();
+        roster.append(endpoint(a, a, NODE_A, 1)).unwrap();
+        roster.append(endpoint(a, b, NODE_B, 1)).unwrap();
+        roster.append(endpoint(a, c, NODE_B2, 1)).unwrap();
+        (rows_of(&roster), [gen, bind_b, bind_c])
+    }
+
+    fn roster_of(rows: &[ParticipantRow]) -> Roster {
+        let mut roster = Roster::new("matthew").unwrap();
+        for row in rows {
+            roster.append(row.clone()).unwrap();
+        }
+        roster
+    }
+
+    fn admitted_devices(
+        rows: &[ParticipantRow],
+        root: &Device,
+        v: &dyn SignatureVerifier,
+    ) -> BTreeSet<String> {
+        admitted_endpoints(rows, &root.did, v)
+            .into_values()
+            .collect()
+    }
+
+    #[test]
+    fn i3_a_retired_devices_contest_retires_no_one() {
+        let (a, b, c) = (
+            device("DeviceA", 1),
+            device("DeviceB", 2),
+            device("DeviceC", 3),
+        );
+        let v = verifier(&[&a, &b, &c]);
+        let (mut rows, [_, bind_b, bind_c]) = three_device_rows(&a, &b, &c);
+        // A retires B; B, retired, then contests C: C stays admitted.
+        rows.push(contest(&bind_b, &a));
+        rows.push(contest(&bind_c, &b));
+        assert_eq!(
+            admitted_devices(&rows, &a, &v),
+            BTreeSet::from([a.did.clone(), c.did.clone()])
+        );
+        let roster = roster_of(&rows);
+        assert!(roster.device_standing_row(&c.did, &v).is_some());
+        assert!(roster.device_standing_row(&b.did, &v).is_none());
+    }
+
+    #[test]
+    fn i3_mutual_contests_retire_both_devices() {
+        let (a, b, c) = (
+            device("DeviceA", 1),
+            device("DeviceB", 2),
+            device("DeviceC", 3),
+        );
+        let v = verifier(&[&a, &b, &c]);
+        let (mut rows, [gen, bind_b, _]) = three_device_rows(&a, &b, &c);
+        // A retires B and B retires A: a cycle; both stand contested, C is untouched.
+        rows.push(contest(&bind_b, &a));
+        rows.push(contest(&gen, &b));
+        assert_eq!(
+            admitted_devices(&rows, &a, &v),
+            BTreeSet::from([c.did.clone()])
+        );
+        // A self-contest retires the device that signed it.
+        let (mut rows, [_, _, bind_c]) = three_device_rows(&a, &b, &c);
+        rows.push(contest(&bind_c, &c));
+        assert_eq!(
+            admitted_devices(&rows, &a, &v),
+            BTreeSet::from([a.did.clone(), b.did.clone()])
+        );
+    }
+
+    #[test]
+    fn i3_a_contest_signed_outside_the_lineage_is_ignored() {
+        let (a, b, c) = (
+            device("DeviceA", 1),
+            device("DeviceB", 2),
+            device("DeviceC", 3),
+        );
+        let x = device("DeviceX", 9);
+        let v = verifier(&[&a, &b, &c, &x]);
+        let (mut rows, [_, bind_b, _]) = three_device_rows(&a, &b, &c);
+        rows.push(contest(&bind_b, &x));
+        assert_eq!(
+            admitted_devices(&rows, &a, &v),
+            BTreeSet::from([a.did.clone(), b.did.clone(), c.did.clone()])
+        );
+    }
+
+    #[test]
+    fn i3_the_order_of_contest_rows_never_decides() {
+        let (a, b, c) = (
+            device("DeviceA", 1),
+            device("DeviceB", 2),
+            device("DeviceC", 3),
+        );
+        let v = verifier(&[&a, &b, &c]);
+        let (base, [gen, bind_b, bind_c]) = three_device_rows(&a, &b, &c);
+        let contests = [
+            contest(&bind_b, &a),
+            contest(&bind_c, &b),
+            contest(&gen, &c),
+        ];
+        // Every order of the three contests, each placed before or after the endpoint rows.
+        let orders = [
+            [0, 1, 2],
+            [0, 2, 1],
+            [1, 0, 2],
+            [1, 2, 0],
+            [2, 0, 1],
+            [2, 1, 0],
+        ];
+        let mut results = BTreeSet::new();
+        for order in orders {
+            for before_endpoints in [false, true] {
+                let mut rows: Vec<ParticipantRow> = base[..3].to_vec();
+                let picked: Vec<ParticipantRow> =
+                    order.iter().map(|&i| contests[i].clone()).collect();
+                if before_endpoints {
+                    rows.extend(picked.clone());
+                    rows.extend(base[3..].iter().cloned());
+                } else {
+                    rows.extend(base[3..].iter().cloned());
+                    rows.extend(picked);
+                }
+                results.insert(admitted_devices(&rows, &a, &v));
+            }
+        }
+        assert_eq!(
+            results.len(),
+            1,
+            "one result whatever the order: {results:?}"
+        );
+        // A→B→C→A is a cycle: all three stand contested.
+        assert!(results.into_iter().next().unwrap().is_empty());
     }
 }
