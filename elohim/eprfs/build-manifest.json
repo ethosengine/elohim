@@ -9,7 +9,7 @@
   "description": "EPRFS — EPR-governed filesystem projection substrate (eprfs-core/host/local/meta/storage library crates + the eprfs-agent adapter). Publishes the library crates to the internal Nexus 'elohim' registry on dev and main.",
   "steps": {
     "rust-build-test": {
-      "description": "fmt + clippy + tests for the eprfs workspace (the library crates, eprfs-serve and the eprfs-agent adapter)",
+      "description": "fmt + clippy + tests for the eprfs workspace (the library crates, eprfs-serve, eprfs-peer and the eprfs-agent adapter)",
       "inputs": {
         "sources": [
           "elohim/eprfs/**",
@@ -27,7 +27,8 @@
           "scripts/ci/publish_eprfs.py",
           "scripts/ci/test_publish_eprfs.py",
           "crates/consent-grant/**",
-          "crates/seam-contracts/**"
+          "crates/seam-contracts/**",
+          "vendor/iroh-quinn-proto-0.13.0/**"
         ],
         "buildProcess": ["elohim/eprfs/Jenkinsfile"]
       },

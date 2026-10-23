@@ -1,0 +1,25 @@
+[package]
+name = "eprfs-peer"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+authors.workspace = true
+repository.workspace = true
+description = "A device's iroh peer: its persisted peer key, its endpoint, and admission of authenticated node ids to the devices its own roster names"
+# Consumed by path from epr-cli; no pipeline publishes it, so it does not claim to be released.
+publish = false
+
+[dependencies]
+elohim-epr-rea = { path = "../../epr-rea" }
+# Pinned with elohim-storage (iroh 0.92 / iroh-gossip 0.92 share one iroh-base). The workspace
+# [patch] carries the same vendored iroh-quinn-proto storage carries.
+iroh = "=0.92"
+# iroh 0.92's SecretKey::generate takes a rand_core 0.6 CSPRNG; rand 0.8's OsRng is that.
+rand = "0.8"
+thiserror.workspace = true
+url = "2"
+
+[dev-dependencies]
+elohim-epr = { path = "../../epr" }
+tempfile = "3"
+tokio = { workspace = true, features = ["time"] }

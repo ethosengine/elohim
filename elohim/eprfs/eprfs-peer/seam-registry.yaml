@@ -1,0 +1,150 @@
+# A device's iroh peer: its key, its endpoint, and admission of authenticated node ids.
+seamRegistryVersion: 1
+crate: eprfs-peer
+crateRoot: elohim/eprfs/eprfs-peer
+seamLocus: "The door between a device and the other devices of its own person: an inbound iroh peer is admitted only when the node id iroh authenticated in the handshake is named by a valid PeerEndpoint row of the same lineage in this device's own roster. The device's peer key is minted here and never leaves it."
+decisionPoints:
+  - name: admits
+    kind: verdict-fn
+    sourceLocation:
+      file: src/admission.rs
+      modulePath: eprfs_peer::Admission::admits
+    summary: "Map an authenticated iroh node id to the device did:key whose valid PeerEndpoint row (highest device-signed seq, same chain_root, device standing on the roster, no conflict, equivocation or contest) names it, as elohim_epr_rea::admitted_endpoints reads the device's own roster; every other node id is refused. reload re-reads the rows, so a Contest written locally takes effect without a pull."
+    concernIds:
+      - id: C0
+        status: answered
+        justification: "Admission is a pure read of the roster in this device's own checkout — a repo-plane file that travels by git. Nothing is asked over the network, published or gossiped."
+      - id: C1
+        status: answered
+        justification: "A node id cannot admit itself: only a row signed by a device standing in the lineage names it, and two devices claiming one node id are both refused."
+      - id: C2
+        status: answered
+        justification: "Which endpoint row stands is decided by the device-signed seq inside epr-rea, never by line order, so replaying an old row cannot undo a rotation."
+      - id: C3
+        status: n-a
+        justification: "A local, synchronous lookup; no peer is waited on."
+      - id: C4
+        status: answered
+        justification: "Not admitted is one answer: unknown, superseded, contested and conflicting node ids all read None."
+      - id: C5
+        status: answered
+        justification: "Every row is re-verified (CID recomputed on read, signature checked by the caller's verifier) before it confers admission."
+      - id: C6a
+        status: answered
+        justification: "One pass over the roster rows per reload; admits is a map lookup."
+      - id: C6b
+        status: answered
+        justification: "Read-only; reload replaces the map wholesale."
+      - id: C7
+        status: n-a
+        justification: "Nothing is advertised."
+      - id: C8
+        status: partial
+        justification: "The verdict is returned per call; refusals are not yet counted here (the tier and gossip consumers count them, T4/T5)."
+      - id: C9
+        status: answered
+        justification: "Admission is per lineage (chain_root); a device's endpoint rotates by seq under its own signature, and a contested binding revokes it."
+      - id: C10
+        status: answered
+        justification: "A new crate; node ids compare in the roster's canonical 64-lowercase-hex form, computed from the key bytes rather than iroh's Display."
+      - id: C11
+        status: n-a
+        justification: "No fan-out."
+      - id: C12
+        status: answered
+        justification: "Default deny, no admit-on-error path: an absent or empty roster admits nobody, an unreadable or tampered one is an error."
+      - id: C13
+        status: n-a
+        justification: "The same at every stage."
+      - id: C14
+        status: partial
+        justification: "The verdict is the consumer's to witness; this crate records none."
+    contractTests:
+      - path: elohim/eprfs/eprfs-peer/tests/admission.rs
+        testName: admission_maps_node_id_to_device
+        kind: integration
+      - path: elohim/eprfs/eprfs-peer/tests/admission.rs
+        testName: an_unverifiable_endpoint_row_admits_nobody
+        kind: integration
+      - path: elohim/eprfs/eprfs-peer/tests/admission.rs
+        testName: reload_takes_a_rotation_and_a_revocation_at_once
+        kind: integration
+      - path: elohim/eprfs/eprfs-peer/tests/admission.rs
+        testName: roster_rows_come_from_the_devices_own_roster_file
+        kind: integration
+      - path: elohim/eprfs/eprfs-peer/tests/endpoint.rs
+        testName: an_inbound_peer_is_named_by_its_authenticated_node_id
+        kind: integration
+    notes: "Spec 2026-10-23-workspaces-cooperate-as-devices-design §3.1. The tier gate (StewardDevicesGate, T4) and gossip neighbour filter (T5) consume it."
+  - name: load_or_generate
+    kind: state-transition
+    sourceLocation:
+      file: src/key.rs
+      modulePath: eprfs_peer::PeerKey::load_or_generate
+    summary: "Load this device's iroh secret key, or mint one: written to an O_EXCL sibling created at mode 0600 and published by hard link (first writer wins). A key file open to group or others, or not 32 bytes, is refused and left as found — never repaired or regenerated, since a new key silently changes the device's node id."
+    concernIds:
+      - id: C0
+        status: answered
+        justification: "A device-local secret on the persistent config volume; never committed, copied, sent, printed or logged."
+      - id: C1
+        status: n-a
+        justification: "No election."
+      - id: C2
+        status: n-a
+        justification: "No head order."
+      - id: C3
+        status: n-a
+        justification: "Local filesystem only."
+      - id: C4
+        status: answered
+        justification: "Absent mints; exposed and corrupt are distinct refusals; any other I/O failure is reported with its path."
+      - id: C5
+        status: n-a
+        justification: "No evidence is weighed."
+      - id: C6a
+        status: answered
+        justification: "One 32-byte read or write."
+      - id: C6b
+        status: answered
+        justification: "Concurrent first starts converge on the first published key; later starts only read."
+      - id: C7
+        status: n-a
+        justification: "Nothing is advertised."
+      - id: C8
+        status: answered
+        justification: "Each refusal names the file and why (mode or length); the secret is never in an error."
+      - id: C9
+        status: answered
+        justification: "The node id is stable across restarts; a new key is a new PeerEndpoint row (rotation by seq), never an in-place regeneration."
+      - id: C10
+        status: answered
+        justification: "Same file format as elohim-storage's iroh.key (32 raw ed25519 bytes)."
+      - id: C11
+        status: n-a
+        justification: "No fan-out."
+      - id: C12
+        status: answered
+        justification: "A key another account could read is refused rather than used."
+      - id: C13
+        status: n-a
+        justification: "The same at every stage."
+      - id: C14
+        status: n-a
+        justification: "No act to witness."
+    contractTests:
+      - path: elohim/eprfs/eprfs-peer/tests/key.rs
+        testName: key_generated_once_with_mode_0600
+        kind: integration
+      - path: elohim/eprfs/eprfs-peer/tests/key.rs
+        testName: key_reused_across_restarts
+        kind: integration
+      - path: elohim/eprfs/eprfs-peer/tests/key.rs
+        testName: key_never_in_debug_output
+        kind: integration
+      - path: elohim/eprfs/eprfs-peer/tests/key.rs
+        testName: a_key_file_readable_by_group_or_others_is_refused
+        kind: integration
+      - path: elohim/eprfs/eprfs-peer/tests/key.rs
+        testName: a_key_file_of_the_wrong_length_is_refused_not_regenerated
+        kind: integration
+    notes: "Spec §3.1: the key lives at $XDG_CONFIG_HOME/epr/peer/iroh.key; the caller resolves that directory."

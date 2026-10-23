@@ -8,6 +8,7 @@ members = [
     "eprfs-host",
     "eprfs-local",
     "eprfs-meta",
+    "eprfs-peer",
     "eprfs-serve",
     "eprfs-storage",
     "../sdk/domains/elohim-agent/adapter",
@@ -34,5 +35,12 @@ tokio = { version = "1", features = ["macros", "rt-multi-thread"] }
 # dependencies pushed it past the SessionStart hooks' 6 s budget as recall receipts grew
 # (7.6 s measured 2026-09-26). Optimizing dependencies only keeps the budget, and our own crates'
 # debug build, as they are.
+[patch.crates-io]
+# Mirrors elohim/elohim-storage/Cargo.toml: iroh 0.92 resolves iroh-quinn-proto 0.13.0, whose GSO
+# tail-loss-probe path can violate `untracked_bytes <= segment_size`, poison the connection mutex
+# and abort the process. The vendored crate carries only Quinn upstream fix 434c3586; see its
+# VENDOR-NOTE.md for the evidence and the retirement condition. eprfs-peer pulls iroh 0.92.
+iroh-quinn-proto = { path = "../../vendor/iroh-quinn-proto-0.13.0" }
+
 [profile.dev.package."*"]
 opt-level = 2

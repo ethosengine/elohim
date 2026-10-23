@@ -444,7 +444,10 @@ seams:
     # decisions that explicitly elect no head and publish nothing. Routed 2026-10-09 (registries
     # born unrouted at bca121bdc, 2026-09-28). `eprfs-serve` is the same family's serving side
     # (reach-judged answers to another tier, no election, no head order); routed 2026-10-23 after
-    # its registry was born unrouted at 5e7612aa7.
-    registry_crates: [elohim-seam-contracts, elohim-epr-rea, elohim-epr-cli, eprfs-core, eprfs-local, eprfs-storage, eprfs-serve]
+    # its registry was born unrouted at 5e7612aa7. `eprfs-peer` is the same family's device-peer
+    # side (a device's iroh key, endpoint and roster-read admission of its own person's devices:
+    # a pure read of the repo-plane roster, no election, no head order); routed in the commit
+    # that births its registry.
+    registry_crates: [elohim-seam-contracts, elohim-epr-rea, elohim-epr-cli, eprfs-core, eprfs-local, eprfs-storage, eprfs-serve, eprfs-peer]
     habits: []
     n_a_concerns: []
