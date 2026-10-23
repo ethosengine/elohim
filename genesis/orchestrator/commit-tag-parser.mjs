@@ -20,6 +20,8 @@ export const BUILD_TAG_ALIASES = {
   sophia: 'elohim-sophia',
   steward: 'elohim-steward',
   conductor: 'elohim-conductor',
+  eprfs: 'elohim-eprfs',
+  epr: 'elohim-epr',
 };
 
 /**
