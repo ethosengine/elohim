@@ -2,14 +2,19 @@
 Feature: Devices share one berth — a shared resource is held once across all of a person's workspaces
   As a developer who works in two development workspaces that are both my devices
   I want a claim on a resource the two workspaces share to count only after my other device has seen it
-  So that three things hold:
-    - between admitted devices, a landing on dev or a build dispatch from one workspace never runs
-      while one from the other is in flight, nor while a session in the other is watching a build or deploy it has claimed; a
-      collision deploys one side's unfinished work over the other's test, or leaves a merge to
-      untangle by hand. A build or deploy that no session watches is protected only while its push lasts.
+  So that these things hold:
+    - between admitted devices, a landing on dev from one workspace never runs while a landing from
+      the other is in flight; and a push that would start a build, or a deploy to the test fleet,
+      also waits while the other side has claimed a build or deploy it is watching. A landing with
+      no build tag may go ahead while a deploy is being watched, because it starts no build and
+      reaches no fleet. A build or deploy that no session watches is protected only while its push
+      lasts.
+    - why it matters: a collision would deploy one side's unfinished work over the other's test, or leave a merge
+      to untangle by hand.
     - a silent workspace is never read as an idle one.
     - the one declared exception is a session that deliberately overrides a silent device; it leaves
-      a named record that binds that device until the overriding lease ends.
+      a named record that binds that device from the moment the record reaches it until the
+      overriding lease ends.
 
   The words this story uses, so it can be read cold.
 
@@ -47,8 +52,9 @@ Feature: Devices share one berth — a shared resource is held once across all o
     build on the shared build server), "alpha-fleet" (deploying to the shared test fleet), and LANE
     claims named "lane:" followed by a lane name, which declare who is working on a piece of work.
     Lane claims use the same mechanism as the other three; this story does not test them separately.
-    Not tested here either: a lease running out at its time limit, and the pre-push hook's
-    BERTH_OFFLINE_OK setting; both are described below but no scenario exercises them.
+    Not tested here either: a lease running out at its time limit, the pre-push hook's
+    BERTH_OFFLINE_OK setting, and the hook never overriding on its own; all are described below but
+    no scenario exercises them.
 
   How the two devices stay in step
 
@@ -95,7 +101,10 @@ Feature: Devices share one berth — a shared resource is held once across all o
     and session. The record reaches the other device when it is back, and from then on that device's
     berth refuses its own sessions on that resource, naming the overriding device and session, until
     the overriding lease is released or runs out. The berth cannot stop a revoked device that chooses
-    to override; revocation only means its peers no longer acknowledge or count it.
+    to override; revocation only means its peers no longer acknowledge or count it. And if both
+    devices override during the same break in the link, both hold the resource until the link
+    heals; then the tie-break settles them, and the losing device's berth reports the refusal on
+    that fold and releases its lease.
 
   Pushes, builds and deploys
 
@@ -134,6 +143,7 @@ Feature: Devices share one berth — a shared resource is held once across all o
     Then the claim exits with code 3
     And the reason line reads "held by" device A and session "claude-1" since the time A claimed it
     And device B's berth status lists that lease under device A, read from B's own fold
+    And a claim by "codex-1" with "--offline-ok" is refused the same way, "held by" naming device A, because an override never overrides a held lease
     When session "claude-1" releases "dev-integration"
     And device B folds the head from device A that carries the release
     And session "codex-1" on device B claims "dev-integration" again
@@ -158,7 +168,7 @@ Feature: Devices share one berth — a shared resource is held once across all o
     And device A's peer daemon stops, and the last head device B folded from A is 3 minutes old
     When session "codex-1" on device B claims "dev-integration"
     Then the claim waits 10 seconds for device A's acknowledgement and exits with code 3
-    And the reason line reads "unconfirmed:" naming device A, last seen 3 minutes ago
+    And the reason line reads "unconfirmed:" naming device A, last seen about 3 minutes ago
     And no line of the output says the resource is free
     And device B holds no lease on "dev-integration"
     But a claim by "codex-1" on the container-scoped resource "cargo" is effective at once
