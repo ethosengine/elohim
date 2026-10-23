@@ -51,7 +51,7 @@ pub use channel::{
     channel_tier_id, project_channel, ChannelStore, ChannelTree, CHANNEL_EVENTS, RETAINED_ROOTS,
 };
 pub use daemon::{PeerConfig, PeerDaemon, FOLD_DEADLINE, TICK};
-pub use endpoint::{bind, bind_on, relay_from_env, relay_from_value, RELAY_ENV};
+pub use endpoint::{bind, bind_on, peer_from_arg, relay_from_env, relay_from_value, RELAY_ENV};
 pub use error::PeerError;
 pub use fold::{
     fetch_channel, fold_events, fold_root, folded_from, ChannelEvent, Fetched, FoldOutcome,
@@ -61,6 +61,9 @@ pub use gate::{SharedAdmission, StewardDevicesGate};
 pub use gossip::GatedGossip;
 pub use head::{ChannelHead, HeadSigner, MAX_HEAD_BYTES};
 pub use head_table::{DeviceHead, DroppedHeads, HeadTable, HEAD_TABLE_VERSION};
+/// The iroh address types a dialer names peers with, so a consumer needs no iroh dependency of
+/// its own.
+pub use iroh::{NodeAddr, NodeId};
 pub use key::PeerKey;
 pub use tier::{
     tier_call, tier_request, TierAnswer, TierCountersSnapshot, TierLimits, TierProtocol,

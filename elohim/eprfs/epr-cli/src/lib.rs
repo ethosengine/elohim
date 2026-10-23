@@ -21,6 +21,8 @@ pub mod git;
 pub mod govern;
 pub mod hint;
 pub mod integrate;
+#[cfg(feature = "peer")]
+pub mod peer;
 pub mod process;
 pub mod ready;
 pub mod report;

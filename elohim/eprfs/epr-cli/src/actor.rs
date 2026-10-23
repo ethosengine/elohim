@@ -1835,6 +1835,68 @@ pub fn device_bind(
     })
 }
 
+/// The lineage a device's peer joins: the handle whose roster this device stands on, that
+/// roster's chain root, and the roster file admission is read from.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct StewardLineage {
+    pub handle: String,
+    pub chain_root: String,
+    pub roster: PathBuf,
+}
+
+/// The lineage `did` (this device) stands on in the checkout at `root`, for `epr peer`. Without
+/// `handle` it is the one roster this device stands on.
+///
+/// Refused when the handle has no roster here, when this device does not stand on it, or when
+/// its chain root is not the root this device pinned (R-P15) — the same refusals `device
+/// endpoint` makes before it names an endpoint.
+pub fn steward_lineage(
+    root: &Path,
+    handle: Option<&str>,
+    did: &str,
+    key_file: &Path,
+) -> ActorResult<StewardLineage> {
+    let verifier = verifier();
+    let handle = match handle {
+        Some(handle) => {
+            Roster::new(handle)?;
+            handle.to_string()
+        }
+        None => endpoint_handle(root, did)?,
+    };
+    if !roster_file(root, &handle).is_file() {
+        return Err(ActorError::InvalidArguments(format!(
+            "{handle} has no roster in this checkout ({})",
+            roster_rel(&handle)
+        )));
+    }
+    let roster = read_roster(root, &handle)?;
+    if roster.device_standing_row(did, &verifier).is_none() {
+        return Err(ActorError::InvalidArguments(format!(
+            "this device ({}) does not stand on {handle}'s roster — witness it or bind it first",
+            short_did(did)
+        )));
+    }
+    let chain_root = roster
+        .chain_root(&verifier)
+        .ok_or_else(|| ActorError::InvalidArguments("the roster has no chain root".into()))?;
+    if let Some(pin) = device_key::read_root_pin(key_file, &handle)? {
+        if pin != chain_root {
+            return Err(ActorError::InvalidArguments(format!(
+                "{handle}'s roster here has chain root {} but this device pinned {} — the \
+                 lineage is contested; this device does not join it",
+                short_did(&chain_root),
+                short_did(&pin)
+            )));
+        }
+    }
+    Ok(StewardLineage {
+        roster: roster_file(root, &handle),
+        handle,
+        chain_root,
+    })
+}
+
 /// The machine-facing result of `device endpoint`.
 #[derive(Debug, Serialize)]
 #[serde(rename_all = "camelCase")]
@@ -2051,7 +2113,7 @@ fn json_or_path(input: &str) -> ActorResult<String> {
 }
 
 /// `did:key:z6Mk…abcd` — enough to recognise a device in a line of output.
-fn short_did(did: &str) -> String {
+pub(crate) fn short_did(did: &str) -> String {
     if did.len() > 24 {
         format!("{}…{}", &did[..16], &did[did.len() - 4..])
     } else {

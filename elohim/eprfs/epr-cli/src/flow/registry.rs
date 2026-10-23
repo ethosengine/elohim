@@ -11,7 +11,6 @@ use super::{FlowError, FlowResult};
 
 #[derive(Debug, Deserialize)]
 pub struct Registry {
-    #[allow(dead_code)]
     pub version: u32,
     pub recipes: Vec<Recipe>,
 }
@@ -22,7 +21,6 @@ pub struct Recipe {
     pub id: String,
     pub version: u32,
     #[serde(default)]
-    #[allow(dead_code)]
     pub description: String,
     pub stages: Vec<RecipeStage>,
     #[serde(default)]

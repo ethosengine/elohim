@@ -83,3 +83,31 @@ fn relay_value_parses_or_refuses_never_falls_back() {
         "a bad relay is a hard error"
     );
 }
+
+#[test]
+fn a_peer_argument_is_a_node_id_at_a_socket_address() {
+    let dir = tempfile::tempdir().expect("tempdir");
+    let key = eprfs_peer::PeerKey::load_or_generate(dir.path()).expect("key");
+    let addr =
+        eprfs_peer::peer_from_arg(&format!("{}@127.0.0.1:4919", key.node_id())).expect("parses");
+    assert_eq!(addr.node_id, key.node_id());
+    assert_eq!(
+        addr.direct_addresses().copied().collect::<Vec<_>>(),
+        vec!["127.0.0.1:4919"
+            .parse::<std::net::SocketAddr>()
+            .expect("addr")]
+    );
+    for bad in [
+        "127.0.0.1:4919",
+        "nonsense@127.0.0.1:4919",
+        &format!("{}@nowhere", key.node_id()),
+    ] {
+        assert!(
+            matches!(
+                eprfs_peer::peer_from_arg(bad),
+                Err(eprfs_peer::PeerError::InvalidPeer { .. })
+            ),
+            "{bad}"
+        );
+    }
+}

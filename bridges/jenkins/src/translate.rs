@@ -231,8 +231,10 @@ pub fn observed_stages(run: &WfapiRun) -> Vec<ObservedStage> {
 }
 
 /// What this module can hand the sidecar. Exactly two shapes, on purpose.
-// Unboxed like `FlowRecord` itself: an observation is moved straight into the sidecar record.
-#[allow(clippy::large_enum_variant)]
+#[allow(
+    clippy::large_enum_variant,
+    reason = "unboxed like FlowRecord itself: an observation is moved straight into the sidecar record"
+)]
 #[derive(Debug, Clone, PartialEq)]
 pub enum Observation {
     Process(Process),

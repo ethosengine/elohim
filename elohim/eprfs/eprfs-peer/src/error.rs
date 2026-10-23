@@ -52,6 +52,10 @@ pub enum PeerError {
         source: url::ParseError,
     },
 
+    /// A `--peer` address that is not `<node_id>@<ip:port>`.
+    #[error("invalid peer address {value:?}: {reason}")]
+    InvalidPeer { value: String, reason: String },
+
     /// iroh could not bind the endpoint.
     #[error("cannot bind the iroh endpoint: {0}")]
     Bind(#[source] Box<iroh::endpoint::BindError>),

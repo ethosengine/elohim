@@ -33,6 +33,18 @@ fn main() -> ExitCode {
             }
         };
     }
+    // `peer` is this device on its person's steward channel: `id`, the long-running `serve`, and
+    // `status`. It renders its own lines, not a Report.
+    #[cfg(feature = "peer")]
+    if raw.first().map(String::as_str) == Some("peer") {
+        return match elohim_epr_cli::peer::run(&raw[1..]) {
+            Ok(code) => code,
+            Err(error) => {
+                eprintln!("epr peer: {error}");
+                ExitCode::from(2)
+            }
+        };
+    }
     if raw.first().map(String::as_str) == Some("integrate") {
         return match elohim_epr_cli::integrate::run(&raw[1..]) {
             Ok(code) => code,
@@ -214,7 +226,7 @@ fn run() -> Result<(Report, bool)> {
 }
 
 /// Every top-level command, as a person types it.
-const COMMANDS: [&str; 12] = [
+const COMMANDS: [&str; 13] = [
     "setup",
     "doctor",
     "explain",
@@ -227,6 +239,7 @@ const COMMANDS: [&str; 12] = [
     "device",
     "identity",
     "covenant",
+    "peer",
 ];
 
 fn global_args(args: Vec<String>) -> Result<(Option<PathBuf>, Vec<String>)> {
@@ -321,5 +334,5 @@ fn print_human(report: &Report) {
 }
 
 fn usage() -> &'static str {
-    "usage: epr [--repo PATH] [--json] <setup|doctor|explain PATH|check [PATH...]|govern --path REL ...|ready [--target REF] [--deep]|integrate --acceptance CID [--root DIR]|flow ...|actor <claim --as agent:<role>@<model> --session ID|current --session ID>|canon-lift [--check|--write]|device <ask|redeem|approve> ...|identity <begin|standing> ...|covenant <offer|show|check|record> --session ID ...>"
+    "usage: epr [--repo PATH] [--json] <setup|doctor|explain PATH|check [PATH...]|govern --path REL ...|ready [--target REF] [--deep]|integrate --acceptance CID [--root DIR]|flow ...|actor <claim --as agent:<role>@<model> --session ID|current --session ID>|canon-lift [--check|--write]|device <ask|redeem|approve> ...|identity <begin|standing> ...|covenant <offer|show|check|record> --session ID ...|peer <id|serve|status> ...>"
 }

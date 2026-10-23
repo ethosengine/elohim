@@ -16,6 +16,12 @@ path = "src/lib.rs"
 name = "epr"
 path = "src/main.rs"
 
+[features]
+# `epr peer` and `epr flow fold` (the steward channel). On for the `epr` binary; the bridges that
+# reuse this crate's library take it without them, so they carry no iroh stack.
+default = ["peer"]
+peer = ["dep:eprfs-peer", "dep:tokio"]
+
 [dependencies]
 elohim-rust-style = { path = "../../../genesis/orchestrator/rust-style" }
 eprfs-core = { path = "../eprfs-core" }
@@ -23,6 +29,11 @@ eprfs-agent = { path = "../eprfs-agent" }
 eprfs-host = { path = "../eprfs-host" }
 eprfs-meta = { path = "../eprfs-meta" }
 elohim-epr-rea = { path = "../../epr-rea" }
+# `epr peer` and `epr flow fold`: this device on its person's steward channel. The crate holds the
+# iroh peer; this binary supplies the device key as a signer and verifier, never the key itself.
+eprfs-peer = { path = "../eprfs-peer", optional = true }
+# The peer daemon's runtime (`epr peer serve`, `epr flow fold`).
+tokio = { workspace = true, features = ["rt-multi-thread", "time"], optional = true }
 # The canonical CID codec. `canon_lift` mints every atom through `elohim_epr::cid::compute_cid`
 # — the same function the P0.4 liftability gate proved — never a second implementation.
 elohim-epr = { path = "../../epr" }

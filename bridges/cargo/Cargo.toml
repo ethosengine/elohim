@@ -24,7 +24,8 @@ elohim-epr-rea = { path = "../../elohim/epr-rea" }
 # The one CID codec: raw CIDs wrapping a published checksum (node 2) and dag-cbor CIDs.
 elohim-epr = { path = "../../elohim/epr" }
 # Reused, never re-minted: offer parsing, its body-CID address and the repository agent.
-elohim-epr-cli = { path = "../../elohim/eprfs/epr-cli" }
+# Without `peer`: the library only, never the steward channel's iroh stack.
+elohim-epr-cli = { path = "../../elohim/eprfs/epr-cli", default-features = false }
 cid = "0.11"
 chrono = "0.4"
 serde = { version = "1", features = ["derive"] }

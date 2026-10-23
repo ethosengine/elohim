@@ -25,7 +25,8 @@ elohim-epr-rea = { path = "../../elohim/epr-rea" }
 elohim-epr = { path = "../../elohim/epr" }
 # Reused, never re-minted: the recipe registry, the distinct-Steward offer standing (Slice 0's
 # affiliations and verdict path), the body CID and the repository agent.
-elohim-epr-cli = { path = "../../elohim/eprfs/epr-cli" }
+# Without `peer`: the library only, never the steward channel's iroh stack.
+elohim-epr-cli = { path = "../../elohim/eprfs/epr-cli", default-features = false }
 cid = "0.11"
 chrono = "0.4"
 serde = { version = "1", features = ["derive"] }

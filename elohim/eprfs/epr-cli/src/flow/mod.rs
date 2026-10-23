@@ -91,6 +91,11 @@ pub enum FlowError {
     /// the reason on its screen and answers without that route.
     #[error("unavailable: {0}")]
     Unavailable(String),
+
+    /// Another device's channel root could not be folded: it is not admitted, not reachable, or
+    /// its tree does not hold events at their own CIDs. Nothing partial is trusted.
+    #[error("fold: {0}")]
+    Fold(String),
 }
 
 pub type FlowResult<T> = std::result::Result<T, FlowError>;
@@ -251,6 +256,7 @@ pub fn run(args: &[String]) -> FlowResult<ExitCode> {
         "cites" => run_cites(&args[1..]),
         "retract" => run_retract(&args[1..]),
         "sense" => run_sense(&args[1..]),
+        "fold" => run_fold(&args[1..]),
         other => Err(FlowError::InvalidArguments(format!(
             "unknown flow subcommand `{other}`{}\n{}",
             crate::hint::did_you_mean(other, "epr flow", &SUBCOMMANDS),
@@ -922,6 +928,93 @@ fn run_report(args: &[String]) -> FlowResult<ExitCode> {
     Ok(ExitCode::SUCCESS)
 }
 
+/// `epr flow fold` in a build without the steward channel (the bridges' library build).
+#[cfg(not(feature = "peer"))]
+fn run_fold(_args: &[String]) -> FlowResult<ExitCode> {
+    Err(FlowError::Fold(
+        "this epr was built without the `peer` feature".into(),
+    ))
+}
+
+/// `epr flow fold --from <device> --root <cid>` — the import path for another device's flow
+/// events (spec §3.3). `--root` names the channel root, so the checkout is `--repo`.
+#[cfg(feature = "peer")]
+fn run_fold(args: &[String]) -> FlowResult<ExitCode> {
+    let mut options = crate::peer::Options {
+        root: PathBuf::from("."),
+        ..crate::peer::Options::default()
+    };
+    let (mut from, mut channel_root) = (None, None);
+    let mut i = 0;
+    while i < args.len() {
+        let flag = args[i].as_str();
+        if flag == "--json" {
+            options.json = true;
+            i += 1;
+            continue;
+        }
+        let value = args
+            .get(i + 1)
+            .cloned()
+            .ok_or_else(|| FlowError::InvalidArguments(format!("{flag} needs a value")))?;
+        match flag {
+            "--from" => from = Some(value),
+            "--root" => channel_root = Some(value),
+            "--repo" => options.root = PathBuf::from(value),
+            "--handle" => options.handle = Some(value),
+            "--peer" => options.peers.push(value),
+            "--policy" => options.policy = Some(PathBuf::from(value)),
+            other => {
+                return Err(FlowError::InvalidArguments(format!(
+                    "unknown fold argument `{other}`{}",
+                    flag_hint(
+                        other,
+                        &[
+                            "--from", "--root", "--repo", "--handle", "--peer", "--policy",
+                            "--json"
+                        ]
+                    )
+                )))
+            }
+        }
+        i += 2;
+    }
+    let (Some(from), Some(channel_root)) = (from, channel_root) else {
+        return Err(FlowError::InvalidArguments(
+            "fold needs --from <device-did> and --root <channel-root-cid>".into(),
+        ));
+    };
+    options.root = std::fs::canonicalize(&options.root).unwrap_or(options.root);
+    let (outcome, complete) = crate::peer::fold(&options, &from, &channel_root)
+        .map_err(|e| FlowError::Fold(e.to_string()))?;
+    if options.json {
+        println!(
+            "{}",
+            serde_json::json!({
+                "from": from,
+                "root": channel_root,
+                "appended": outcome.appended,
+                "already": outcome.already,
+                "refused": outcome.refused,
+                "complete": complete,
+            })
+        );
+    } else {
+        println!(
+            "fold  {from} {channel_root}: {} appended, {} already folded, {} refused{}",
+            outcome.appended,
+            outcome.already,
+            outcome.refused,
+            if complete {
+                ""
+            } else {
+                " — more remain; fold again"
+            }
+        );
+    }
+    Ok(ExitCode::SUCCESS)
+}
+
 /// `epr flow sense [--measure <id@v>]... [--family <f>] [--due <d>] [--dry-run] [--measures PATH]`
 /// and `epr flow sense rule --measure <id@v> --subject <path> --class <c> --why <text>`.
 ///
@@ -1556,6 +1649,12 @@ fn usage() -> String {
      status:/path: — dry run unless --write, and the verdict is the same derive_verdict the \
      concern view shows; `migrate [--apply]` is the corpus sweep. `epr flow cites --help` prints \
      the per-verb contract)\n  \
+     | fold --from <device-did> --root <channel-root-cid> [--repo DIR] [--handle H] \
+     [--peer NODE_ID@IP:PORT]... [--policy PATH] [--json] \
+     (fold one channel root from one admitted device into this device's flow store: each \
+     crossing event is read from that device's tier, checked against its CID and this device's \
+     own allow-list, and appended once with via:<device>; `epr peer serve` does this for every \
+     newer head. --root here is the channel root; the checkout is --repo, default .)\n  \
      | sense [--measure <id@version>]... [--family <f>] [--due <d>] [--dry-run] [--json] \
      [--root DIR] | sense rule --measure <id@version> --subject <path> --class <c> --why <text> \
      (runs the declared `probe:` on each measure row and folds what it reports; `epr flow sense \

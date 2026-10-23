@@ -1,8 +1,8 @@
 //! Binding the device's iroh endpoint.
 
-use std::net::SocketAddrV4;
+use std::net::{SocketAddr, SocketAddrV4};
 
-use iroh::{Endpoint, RelayMap, RelayMode, RelayUrl};
+use iroh::{Endpoint, NodeAddr, NodeId, RelayMap, RelayMode, RelayUrl};
 use url::Url;
 
 use crate::error::PeerError;
@@ -88,4 +88,23 @@ pub fn relay_from_value(value: Option<&str>) -> Result<Option<Url>, PeerError> {
             value: value.to_string(),
             source,
         })
+}
+
+/// A device's direct address given as `<node_id>@<ip:port>` (`epr peer serve --peer`). The
+/// roster names node ids only; a dialer that has no relay names the address itself.
+///
+/// # Errors
+///
+/// [`PeerError::InvalidPeer`] when `arg` is not a node id, an `@` and a socket address.
+pub fn peer_from_arg(arg: &str) -> Result<NodeAddr, PeerError> {
+    let invalid = |reason: String| PeerError::InvalidPeer {
+        value: arg.to_string(),
+        reason,
+    };
+    let (node, addr) = arg
+        .split_once('@')
+        .ok_or_else(|| invalid("expected <node_id>@<ip:port>".into()))?;
+    let node: NodeId = node.parse().map_err(|e| invalid(format!("node id: {e}")))?;
+    let addr: SocketAddr = addr.parse().map_err(|e| invalid(format!("address: {e}")))?;
+    Ok(NodeAddr::new(node).with_direct_addresses([addr]))
 }

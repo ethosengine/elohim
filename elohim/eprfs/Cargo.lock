@@ -947,6 +947,7 @@ dependencies = [
  "eprfs-core",
  "eprfs-host",
  "eprfs-meta",
+ "eprfs-peer",
  "glob",
  "libc",
  "rand_core 0.6.4",
@@ -958,6 +959,7 @@ dependencies = [
  "sha2 0.10.9",
  "tempfile",
  "thiserror 2.0.18",
+ "tokio",
  "unicode-normalization",
 ]
 
