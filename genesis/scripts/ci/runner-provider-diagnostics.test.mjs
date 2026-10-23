@@ -144,3 +144,93 @@ test("changed imported code cannot forward an arbitrary POST", async () => {
   assert.equal(calls, 0);
   assert.equal(result.phase, "pre-issuance-check-refused");
 });
+
+test("native proposed and withdrawn lifecycle rows remain projection-only observations", async () => {
+  for (const state of ["proposed", "cancelled", "sunset"]) {
+    const env = environment();
+    const result = await inspectProviderBootstrap({
+      env,
+      load: async () => bootstrap,
+      fetcher: async (url, options) => {
+        assert.equal(options.method, "GET");
+        return url.pathname === "/health"
+          ? Response.json({
+              dhtParticipation: { agentKeys: { lamad: provider } },
+            })
+          : Response.json({
+              provider,
+              grants: [
+                {
+                  provider,
+                  recipient,
+                  scope: "measure-stage",
+                  grantCid: "uhCEk" + "c".repeat(48),
+                  state,
+                  private: env.ELOHIM_COMPUTE_LOCAL_TOKEN,
+                },
+              ],
+            });
+      },
+    });
+    assert.deepEqual(result.projectedGrants, [
+      { grantCid: "uhCEk" + "c".repeat(48), state },
+    ]);
+    assert.equal(result.nativeStatusChecked, false);
+    assert.equal(result.grantReadUnavailable, undefined);
+    assert(!JSON.stringify(result).includes(env.ELOHIM_COMPUTE_LOCAL_TOKEN));
+  }
+});
+test("projection refusal is classified without disclosing arbitrary response data", async () => {
+  for (const [body, reason] of [
+    [{ provider, grants: [{ state: "PRIVATE-UNKNOWN" }] }, "projection-row"],
+    [{ secret: "PRIVATE-UNKNOWN" }, "projection-envelope"],
+  ]) {
+    const result = await inspectProviderBootstrap({
+      env: environment(),
+      load: async () => bootstrap,
+      fetcher: async (url) =>
+        url.pathname === "/health"
+          ? Response.json({
+              dhtParticipation: { agentKeys: { lamad: provider } },
+            })
+          : Response.json(body),
+    });
+    assert.equal(result.grantReadRefusal, reason);
+    assert.equal(result.grantReadUnavailable, true);
+    assert.equal(result.projectedGrants, undefined);
+    assert(!JSON.stringify(result).includes("PRIVATE-UNKNOWN"));
+  }
+});
+
+test("bounded projection body and transport failures keep fixed classifications", async () => {
+  for (const [respond, reason] of [
+    [() => new Response("PRIVATE-MALFORMED"), "invalid-json"],
+    [() => new Response("x".repeat(65537)), "response-bound"],
+    [
+      () => {
+        throw new TypeError("PRIVATE-TRANSPORT");
+      },
+      "read-unavailable",
+    ],
+    [
+      () => {
+        throw new DOMException("PRIVATE-TIMEOUT", "TimeoutError");
+      },
+      "timeout",
+    ],
+  ]) {
+    const result = await inspectProviderBootstrap({
+      env: environment(),
+      load: async () => bootstrap,
+      fetcher: async (url) =>
+        url.pathname === "/health"
+          ? Response.json({
+              dhtParticipation: { agentKeys: { lamad: provider } },
+            })
+          : respond(),
+    });
+    assert.equal(result.grantReadRefusal, reason);
+    assert.equal(result.grantReadUnavailable, true);
+    assert(!JSON.stringify(result).includes("PRIVATE-"));
+  }
+});

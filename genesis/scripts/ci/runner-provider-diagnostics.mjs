@@ -111,7 +111,7 @@ export async function inspectProviderBootstrap({
     }
     const body = await boundedJson(response);
     if (body.provider !== declaration.provider || !Array.isArray(body.grants))
-      throw new Error("projection shape");
+      throw new Error("projection envelope");
     result.projectedGrantCount = body.grants.length;
     result.projectedGrants = body.grants.slice(0, 8).map((row) => {
       if (
@@ -119,14 +119,32 @@ export async function inspectProviderBootstrap({
         row.recipient !== declaration.recipient ||
         row.scope !== "measure-stage" ||
         !/^uhCEk[A-Za-z0-9_-]{48}$/.test(row.grantCid || "") ||
-        !["active", "offered", "withdrawn", "expired", "revoked"].includes(
-          row.state,
-        )
+        ![
+          "proposed",
+          "active",
+          "offered",
+          "withdrawn",
+          "expired",
+          "revoked",
+          "cancelled",
+          "sunset",
+        ].includes(row.state)
       )
-        throw new Error("projection shape");
+        throw new Error("projection row");
       return { grantCid: row.grantCid, state: row.state };
     });
-  } catch {
+  } catch (error) {
+    result.grantReadRefusal = [
+      "response bound",
+      "projection envelope",
+      "projection row",
+    ].includes(error?.message)
+      ? error.message.replaceAll(" ", "-")
+      : error?.name === "TimeoutError" || error?.name === "AbortError"
+        ? "timeout"
+        : error?.name === "SyntaxError"
+          ? "invalid-json"
+          : "read-unavailable";
     delete result.projectedGrants;
     delete result.projectedGrantCount;
     result.grantReadUnavailable = true;
