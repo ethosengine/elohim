@@ -392,6 +392,44 @@ for (const path of paths) {
   const length = Math.min(stat.size, 4096), buffer = Buffer.alloc(length);
   fs.readSync(fd, buffer, 0, length, stat.size - length); console.log(buffer.toString());
  } catch { console.log('unavailable'); } finally { if (fd !== undefined) fs.closeSync(fd); }
+}
+// Hash-only identity observations: never print key, credential, config or DB bytes.
+const crypto = require('node:crypto'), base = '/var/lib/compute/mesh/';
+function physical(path) {
+ let parent = base.slice(0, -1);
+ for (const part of path.split('/')) { parent += '/' + part; if (fs.lstatSync(parent).isSymbolicLink()) throw new Error('symlink'); }
+ return parent;
+}
+function observe(path, hash = false) {
+ let fd;
+ try {
+  const target = physical(path), st = fs.lstatSync(target);
+  const row = { path, kind: st.isDirectory() ? 'directory' : st.isFile() ? 'file' : 'other', size: st.size, mtime: st.mtime.toISOString() };
+  if (hash) {
+   if (!st.isFile() || st.size > 65536) throw new Error('not bounded regular file');
+   fd = fs.openSync(target, fs.constants.O_RDONLY | fs.constants.O_NOFOLLOW);
+   const current = fs.fstatSync(fd);
+   if (!current.isFile() || current.size > 65536 || current.ino !== st.ino) throw new Error('changed');
+   const buffer = Buffer.alloc(current.size);
+   if (fs.readSync(fd, buffer, 0, buffer.length, 0) !== buffer.length) throw new Error('short read');
+   row.sha256 = crypto.createHash('sha256').update(buffer).digest('hex');
+  }
+  console.log('identity-observation ' + JSON.stringify(row));
+ } catch (error) { console.log('identity-observation ' + JSON.stringify({ path, ...(error.code === 'ENOENT' ? { missing: true } : { unavailable: true }) })); }
+ finally { if (fd !== undefined) fs.closeSync(fd); }
+}
+for (const path of ['logs/start.log','initialization-continuation/start.log','initialization-continuation/apps-before.jsonl','initialization-continuation/apps-after.jsonl','initialization-continuation/complete']) observe(path, true);
+observe('initialization-continuation/consumed');
+for (const peer of ['matthew','jessica','james']) {
+ observe(peer + '/content.db');
+ for (const file of ['identity.key','iroh.key','closed-chain-fence/closed-cells.json']) observe(peer + '/' + file, true);
+ const directory = peer + '/closed-chain-fence/credentials';
+ try {
+  const names = fs.readdirSync(physical(directory));
+  if (names.length > 16 || names.some(name => !/^[0-9a-f]{78}-[0-9a-f]{78}[.]json$/.test(name))) throw new Error('unexpected credential inventory');
+  console.log('identity-observation ' + JSON.stringify({ path: directory, credentialCount: names.length }));
+  for (const name of names.sort()) observe(directory + '/' + name, true);
+ } catch (error) { console.log('identity-observation ' + JSON.stringify({ path: directory, ...(error.code === 'ENOENT' ? { missing: true } : { unavailable: true }) })); }
 }`;
   reads.push([
     "mesh-startup.log",

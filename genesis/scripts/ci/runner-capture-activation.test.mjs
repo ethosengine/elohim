@@ -5,6 +5,7 @@ import {
   mkdtempSync,
   chmodSync,
   statSync,
+  symlinkSync,
   mkdirSync,
   writeFileSync,
   readFileSync,
@@ -469,4 +470,80 @@ test("diagnostics passes its original observed pod identity to persisted reader"
     /identity changed/,
   );
   assert.match(readFileSync(join(directory, "status.txt"), "utf8"), /^REFUSED/);
+});
+
+test("persisted identity inventory emits bounded hashes without key or credential bytes", async (t) => {
+  const root = mkdtempSync(join(tmpdir(), "identity-observation-"));
+  t.after(() => rmSync(root, { recursive: true, force: true }));
+  let script;
+  await captureDiagnostics({
+    root,
+    workload: "adam",
+    namespace: "alpha",
+    env: {},
+    execute(_command, args) {
+      if (args.includes("exec")) script = args.at(-1);
+      return "";
+    },
+  });
+  const mesh = join(root, "mesh");
+  const credentials = join(mesh, "matthew/closed-chain-fence/credentials");
+  mkdirSync(credentials, { recursive: true });
+  mkdirSync(join(mesh, "initialization-continuation/consumed"), {
+    recursive: true,
+  });
+  mkdirSync(join(mesh, "jessica"));
+  writeFileSync(join(mesh, "matthew/identity.key"), "private-transport-key");
+  writeFileSync(join(mesh, "matthew/content.db"), "private-database-bytes");
+  writeFileSync(
+    join(mesh, "matthew/runtime-config.toml"),
+    "private-config-token",
+  );
+  writeFileSync(
+    join(mesh, "initialization-continuation/apps-before.jsonl"),
+    "public-identity-baseline",
+  );
+  writeFileSync(
+    join(credentials, "a".repeat(78) + "-" + "b".repeat(78) + ".json"),
+    "private-signing-credential",
+  );
+  symlinkSync(
+    join(mesh, "matthew/identity.key"),
+    join(mesh, "matthew/iroh.key"),
+  );
+  writeFileSync(join(mesh, "jessica/identity.key"), Buffer.alloc(65537, 120));
+  const output = execFileSync(
+    process.execPath,
+    ["-e", script.replaceAll("/var/lib/compute/mesh/", mesh + "/")],
+    { encoding: "utf8" },
+  );
+  for (const secret of [
+    "private-transport-key",
+    "private-database-bytes",
+    "private-config-token",
+    "private-signing-credential",
+    "public-identity-baseline",
+  ])
+    assert(!output.includes(secret));
+  const rows = output
+    .split("\n")
+    .filter((line) => line.startsWith("identity-observation "))
+    .map((line) => JSON.parse(line.slice(21)));
+  const row = (path) => rows.find((item) => item.path === path);
+  assert.match(row("matthew/identity.key").sha256, /^[a-f0-9]{64}$/);
+  assert.equal(row("matthew/iroh.key").unavailable, true);
+  assert.equal(row("matthew/iroh.key").missing, undefined);
+  assert.equal(row("jessica/iroh.key").missing, true);
+  assert.equal(row("jessica/iroh.key").unavailable, undefined);
+  assert.equal(row("jessica/identity.key").unavailable, true);
+  assert.equal(row("matthew/content.db").sha256, undefined);
+  assert.equal(
+    row("matthew/closed-chain-fence/credentials").credentialCount,
+    1,
+  );
+  assert.equal(row("initialization-continuation/consumed").kind, "directory");
+  assert.match(
+    row("initialization-continuation/apps-before.jsonl").sha256,
+    /^[a-f0-9]{64}$/,
+  );
 });

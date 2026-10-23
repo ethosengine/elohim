@@ -365,7 +365,8 @@ Two further stations were exposed before that live attempt:
   refusal fixtures. Source `b8d1f8295` passes those checks and a read-only call
   against three local conductors, five provisioned cells each. The private
   `continuation-local-app-identities.jsonl` receipt records that local evidence.
-  Current state: **GREEN locally; live Adam continuation unmeasured**. Source
+  Current state: **GREEN locally; Edge 1694 passed the initial live identity
+  inspection, but the full continuation remains RED at storage readiness**. Source
   `6b06b6c6` is barred from activation despite its successful mocked checks.
 - Chain `measure-runs-on-a-peer`, between a source correction and publication
   of its execution flavor: make the cost of rebuilding unchanged native inputs
@@ -375,8 +376,9 @@ Two further stations were exposed before that live attempt:
   the corrected source behind a superseded assembly. Probe two assemblies
   whose complete native build inputs match, recording cache hits/misses,
   compilation time and resulting artifact provenance; changed inputs must
-  invalidate reuse. Current state: **RED for observed reuse**, with final
-  Edge 1692 duration still unmeasured. Edge 1685's saved log measures the fork
+  invalidate reuse. Current state: **RED for observed reuse**. Saved logs measure
+  the fork build RUN at **2774.3 seconds** in Edge 1692 and **2783.7 seconds** in
+  Edge 1693. Edge 1685's saved log measures the fork
   build RUN alone at **2773.3 seconds** (the conductor release build reports
   35m31s, the CLI build 10m39s); this is one cold build, not a general benchmark
   or total pipeline duration. The saved pod declaration gives the OCI BuildKit
@@ -393,3 +395,27 @@ Two further stations were exposed before that live attempt:
 These are refinement inputs for the existing stories, not additional executable
 coverage. Keep compile/reuse, artifact fetch/cache, on-target compatibility and
 authorized execution as separately measured costs in the same performance work.
+
+### Cold startup and interrupted continuation station (2026-10-23)
+
+Chain `measure-runs-on-a-peer`, between retained identities and a ready private
+household: allow cold storage initialization to finish within a declared budget,
+and retain enough evidence to reconcile an interrupted attempt. Edge **1694**
+resumed the existing conductors and passed the initial identity inspection. All
+three storage peers migrated their databases and attached app interfaces at
+23:55:18–19 UTC on October 22; their first infrastructure signing credentials
+were persisted at 23:55:50–55. The mesh refused storage readiness at 23:56:24,
+after its 30 × 2-second health loop. Subsequent launches refused the consumed,
+unresolved continuation as designed. G2 and native BDD remain unproven.
+
+The storage boot path awaits multiple roles and signing operations sequentially
+before opening HTTP. Its request timeouts and retry backoffs can exceed that
+health-loop budget; the retained logs also show conductor write contention.
+The existing 900-second worker wait is an operational bound, not measured proof
+that this cold boot completes. Probe cold startup through actual HTTP readiness,
+record per-stage elapsed time and the deadline outcome, then verify unchanged
+conductor identities against the original retained snapshot. Before another
+attempt, inspect which storage identities were persisted; absence after an
+interruption must not be treated as permission to replace an existing identity.
+Current state: **RED**. Neither a longer timeout nor a process-start message is
+completion evidence; never erase the consumed attempt to obtain a retry.
