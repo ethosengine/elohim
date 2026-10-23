@@ -750,7 +750,7 @@ async fn a_contested_device_is_disconnected_refused_like_a_stranger_and_counted(
         );
     }
     let ask = |endpoint: iroh::Endpoint| {
-        let (addr, question, tree) = (addr_a.clone(), question.clone(), tree.clone());
+        let (addr, question) = (addr_a.clone(), question.clone());
         async move {
             eprfs_peer::tier_call(&endpoint, addr, question, &tree)
                 .await
