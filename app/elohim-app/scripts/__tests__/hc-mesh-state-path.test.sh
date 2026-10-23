@@ -66,6 +66,8 @@ mesh_ports_up=0
 ss() { [ "$admin_ports_up" = 1 ] && printf 'LISTEN\n' || return 1; }
 mesh_ports_busy() { [ "$mesh_ports_up" = 1 ]; }
 assert_no_live_peer_processes() { return 0; }
+# This file tests captured fixture state, independent of a real mesh on the host.
+storage_pid_for_port() { return 1; }
 
 write_complete_conductor() {
   mkdir -p "$LOCAL_DEV_DIR/unit/ks" "$LOCAL_DEV_DIR/unit/databases"
@@ -297,6 +299,7 @@ for explicit in 0 1; do
     maybe_migrate_legacy_mesh_dir() { return 0; }
     maybe_migrate_legacy_conductors() { return 0; }
     preflight() { return 0; }
+    household_start_mode() { echo fresh; }
     setsid() {
       shift # nohup
       local -a child=("$@")

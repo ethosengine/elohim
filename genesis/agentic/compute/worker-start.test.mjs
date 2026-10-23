@@ -61,6 +61,7 @@ test "$MONGOD_BIN" = /usr/local/bin/mongod
 test "$MONGO_PORT" = 37017
 mkdir -p "$MESH_DIR"
 printf '%s' "${"$"}{MESH_CONTINUE_INITIALIZATION_LOG_SHA256:-}" > "$MESH_DIR/continuation-digest"
+printf '%s' "${"$"}{MESH_CONTINUE_INITIALIZATION_STATE_SHA256:-}" > "$MESH_DIR/continuation-state-digest"
 printf '%s %s %s %s %s %s %s %s\\n' "$1" "$MESH_STORAGE_BASE_PORT" "$MESH_CONDUCTOR_BASE_PORT" "$MESH_P2P_BASE_PORT" "$MESH_METRICS_BASE_PORT" "$MESH_RESET" "$MESH_PORTAL" "${"$"}{PROVIDER_TEST_TOKEN:-scrubbed}" >> "$MESH_DIR/events"
 if [ "$1" = start ]; then
   for peer in matthew jessica james; do
@@ -159,11 +160,16 @@ test(
   (t) => {
     const f = fixture(t);
     f.env.COMPUTE_CONTINUE_INITIALIZATION_LOG_SHA256 = "d".repeat(64);
+    f.env.COMPUTE_CONTINUE_INITIALIZATION_STATE_SHA256 = "e".repeat(64);
     let run = f.run();
     assert.equal(run.status, 0, run.stderr);
     assert.equal(
       readFileSync(join(f.state, "mesh/continuation-digest"), "utf8"),
       "d".repeat(64),
+    );
+    assert.equal(
+      readFileSync(join(f.state, "mesh/continuation-state-digest"), "utf8"),
+      "e".repeat(64),
     );
     const key = join(f.state, "mesh/matthew/identity.key");
     assert.equal(statSync(key).mode & 0o777, 0o600);

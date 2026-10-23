@@ -259,6 +259,16 @@ async function renderEnabled(source, config, overrides) {
       "resumeInitializationLogSha256 requires privateMesh and an exact reviewed log digest",
     );
   }
+  if (
+    config.resumeInitializationStateSha256 !== undefined &&
+    (config.privateMesh !== true ||
+      !/^[a-f0-9]{64}$/.test(config.resumeInitializationStateSha256) ||
+      !/^[a-f0-9]{64}$/.test(config.resumeInitializationLogSha256 || ""))
+  ) {
+    throw new Error(
+      "resumeInitializationStateSha256 requires privateMesh, original log consent and an exact reviewed state digest",
+    );
+  }
   if (config.runnerGrant?.enabled === true) {
     validateGrantDeclaration(config.runnerGrant);
     if (config.runnerGrant.provider !== config.performer) {
@@ -313,6 +323,14 @@ async function renderEnabled(source, config, overrides) {
             {
               name: "COMPUTE_CONTINUE_INITIALIZATION_LOG_SHA256",
               value: config.resumeInitializationLogSha256,
+            },
+          ]
+        : []),
+      ...(config.resumeInitializationStateSha256
+        ? [
+            {
+              name: "COMPUTE_CONTINUE_INITIALIZATION_STATE_SHA256",
+              value: config.resumeInitializationStateSha256,
             },
           ]
         : []),

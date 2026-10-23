@@ -976,6 +976,221 @@ print_household_state_gaps() {
 
 # Private, one-shot continuation of a reviewed interrupted first initialization.
 # The retained log hash is operator consent, not evidence that an app is usable.
+# One reviewed continuation of the consumed first attempt. Inventory contains
+# hashes, never credential bytes; backups remain inside the private journal.
+initialization_existing_state() { # inventory | reserve | prelaunch | verify | seal | proof
+  python3 - "$MESH_DIR" "$1" "${MESH_CONTINUE_INITIALIZATION_STATE_SHA256:-}" "${PEERS[@]}" <<'PYEXISTING'
+import base64, hashlib, json, os, pathlib, re, shutil, stat, sys
+root = pathlib.Path(sys.argv[1]); mode = sys.argv[2]; expected = sys.argv[3]; peers = sys.argv[4:]
+journal = root / "initialization-continuation"; attempt = journal / "resume-existing"
+def check_path(p, directory=False):
+    assert p.is_relative_to(root), "path escapes mesh"
+    for part in [p, *p.parents]:
+        if part == root.parent: break
+        assert not part.is_symlink(), "symlink in recovery state"
+    assert stat.S_ISDIR(p.stat().st_mode) if directory else stat.S_ISREG(p.stat().st_mode), "wrong state type"
+    return p
+
+def read(p):
+    p = check_path(p)
+    assert 0 < p.stat().st_size <= 65536, "recovery file exceeds 64KiB or is empty"
+    with p.open("rb") as stream: data = stream.read(65537)
+    assert 0 < len(data) <= 65536, "recovery file changed beyond read bound"
+    return data
+
+def sha(data): return hashlib.sha256(data).hexdigest()
+def unique(pairs):
+    result = {}
+    for k, v in pairs:
+        assert k not in result, "duplicate JSON key"
+        result[k] = v
+    return result
+
+def credential(p):
+    value = json.loads(read(p), object_pairs_hook=unique)
+    assert set(value) == {"signingAgentKey", "keypair", "capSecret", "mintedAt"}, "credential schema differs"
+    for k, n in [("signingAgentKey",39),("keypair",32),("capSecret",64)]:
+        assert isinstance(value[k], str) and re.fullmatch(r"[0-9a-f]{%d}" % (n*2), value[k]), "invalid credential hex"
+    assert type(value["mintedAt"]) is int and -(2**63) <= value["mintedAt"] < 2**63, "invalid credential timestamp"
+
+def hash39(value):
+    assert isinstance(value, str) and value.startswith("u"), "invalid cell hash"
+    raw = base64.urlsafe_b64decode(value[1:] + "=" * ((-len(value[1:])) % 4))
+    assert len(raw) == 39, "invalid cell hash length"
+    return raw.hex()
+
+try:
+    assert peers == ["matthew", "jessica", "james"], "unexpected recovery roster"
+    check_path(root, True); check_path(journal, True); check_path(journal / "consumed", True)
+    assert not list((journal / "consumed").iterdir()), "unexpected original consumed state"
+    known = {"start.log","invocation","consumed","apps-before.jsonl","resume-existing"}
+    if mode in {"verify", "seal", "proof"}: known.update({"apps-after.jsonl","complete","complete.tmp"})
+    assert {p.name for p in journal.iterdir()} <= known, "unknown original journal state"
+    read(journal / "invocation")
+    baseline = [json.loads(line, object_pairs_hook=unique) for line in read(journal / "apps-before.jsonl").splitlines()]
+    assert [b["peer"] for b in baseline] == peers, "baseline roster differs"
+    allowed = {}; initial = {}
+    for b in baseline:
+        names = set()
+        for role, cells in b["cells"].items():
+            assert cells, "empty baseline role"
+            for cell in cells:
+                assert cell["agent_pub_key"] == b["agent"], "baseline agent differs"
+                names.add(hash39(cell["dna_hash"]) + "-" + hash39(cell["agent_pub_key"]) + ".json")
+        infra = b["cells"]["infrastructure"]
+        assert len(infra) == 1, "ambiguous infrastructure cell"
+        initial[b["peer"]] = hash39(infra[0]["dna_hash"]) + "-" + hash39(b["agent"]) + ".json"
+        allowed[b["peer"]] = names
+    if mode in {"verify", "seal", "proof", "prelaunch"}:
+        check_path(attempt, True)
+        if mode != "prelaunch": check_path(attempt / "consumed", True)
+        encoded = read(attempt / "inventory.json")
+        saved = json.loads(encoded, object_pairs_hook=unique)
+        assert set(saved) == {"version","peers","files"} and saved["version"] == 1 and saved["peers"] == peers, "saved inventory schema differs"
+        assert encoded == (json.dumps(saved,sort_keys=True,separators=(",",":"))+"\n").encode(), "noncanonical inventory"
+        assert not expected or sha(encoded) == expected, "saved inventory not reviewed"
+        paths = {"initialization-continuation/start.log", "initialization-continuation/apps-before.jsonl", "logs/start.log"}
+        for peer in peers:
+            paths.update({f"{peer}/content.db",f"{peer}/identity.key",f"{peer}/iroh.key",f"{peer}/closed-chain-fence/closed-cells.json",f"{peer}/closed-chain-fence/credentials/{initial[peer]}"})
+        assert set(saved["files"]) == paths, "saved inventory paths differ"
+        originals = {}
+        for relative, entry in saved["files"].items():
+            if relative.endswith(("/iroh.key","/closed-cells.json")):
+                assert entry is None, "expected reviewed absence"
+            elif relative.endswith("/content.db"):
+                assert set(entry) == {"size"} and type(entry["size"]) is int and entry["size"] > 0, "invalid database size"
+            else:
+                assert set(entry) == {"sha256"} and re.fullmatch("[0-9a-f]{64}",entry["sha256"]), "invalid saved digest"
+                assert sha(read(attempt / "backup" / relative)) == entry["sha256"], "private backup changed"
+                originals[relative] = entry["sha256"]
+                if mode != "proof" and relative != "logs/start.log":
+                    assert sha(read(root / relative)) == entry["sha256"], "original identity/evidence changed"
+        if mode == "proof":
+            seal = json.loads(read(attempt / "complete"), object_pairs_hook=unique)
+            after_bytes = read(attempt / "after-state.json")
+            after = json.loads(after_bytes, object_pairs_hook=unique)
+            assert after_bytes == (json.dumps(after,sort_keys=True,separators=(",",":"))+"\n").encode(), "noncanonical after-state"
+            assert seal == {"version":1,"inventorySha256":sha(encoded),"afterSha256":sha(after_bytes)}, "additional seal differs"
+            assert set(after) == {"version","inventorySha256","originalFiles","iroh","credentials","appsBeforeSha256","appsAfterSha256"}, "after-state schema differs"
+            assert after["version"] == 1 and after["inventorySha256"] == sha(encoded) and after["originalFiles"] == originals, "after-state binding differs"
+            assert after["appsBeforeSha256"] == sha(read(journal / "apps-before.jsonl")) == originals["initialization-continuation/apps-before.jsonl"], "original apps changed"
+            assert after["appsAfterSha256"] == sha(read(journal / "apps-after.jsonl")) == after["appsBeforeSha256"], "sealed apps differ"
+            assert sha(read(journal / "start.log")) == originals["initialization-continuation/start.log"], "original log changed"
+            assert read(attempt / "apps-before.jsonl") == read(journal / "apps-before.jsonl"), "prelaunch apps changed"
+            assert set(after["iroh"]) == set(peers), "sealed iroh roster differs"
+            for peer, item in after["iroh"].items():
+                assert set(item) == {"size","sha256"} and item["size"] == 32 and re.fullmatch("[0-9a-f]{64}",item["sha256"]), "invalid sealed iroh"
+            for peer in peers:
+                prefix = f"{peer}/closed-chain-fence/credentials/"
+                names = {key[len(prefix):] for key in after["credentials"] if key.startswith(prefix)}
+                assert initial[peer] in names and names <= allowed[peer], "sealed credential names differ"
+            assert all(any(k.startswith(f"{peer}/closed-chain-fence/credentials/") for peer in peers) and re.fullmatch("[0-9a-f]{64}",v) for k,v in after["credentials"].items()), "invalid sealed credential"
+            for peer in peers:
+                key = f"{peer}/closed-chain-fence/credentials/{initial[peer]}"
+                assert after["credentials"][key] == originals[key], "sealed original credential differs"
+        elif mode != "prelaunch":
+            after = {"version":1,"inventorySha256":sha(encoded),"originalFiles":originals,"iroh":{},"credentials":{},"appsBeforeSha256":sha(read(journal / "apps-before.jsonl")),"appsAfterSha256":sha(read(journal / "apps-after.jsonl")) if mode == "seal" else None}
+            for peer in peers:
+                key = read(root / peer / "iroh.key")
+                assert len(key) == 32, "iroh identity must be exactly 32 bytes"
+                after["iroh"][peer] = {"size":len(key),"sha256":sha(key)}
+                vault = check_path(root / peer / "closed-chain-fence" / "credentials", True)
+                entries = list(vault.iterdir())
+                assert initial[peer] in {p.name for p in entries}, "original credential missing"
+                assert {p.name for p in entries} <= allowed[peer], "unknown new credential"
+                for p in entries:
+                    credential(p); after["credentials"][str(p.relative_to(root))] = sha(read(p))
+                ledger = root / peer / "closed-chain-fence" / "closed-cells.json"
+                assert not os.path.lexists(ledger), "unexpected closed-cell ledger"
+            if mode == "seal":
+                assert after["appsBeforeSha256"] == after["appsAfterSha256"], "installed apps changed"
+                assert read(attempt / "apps-before.jsonl") == read(journal / "apps-before.jsonl"), "prelaunch apps changed"
+                after_bytes = (json.dumps(after,sort_keys=True,separators=(",",":"))+"\n").encode()
+                (attempt / "after-state.json").write_bytes(after_bytes)
+                (attempt / "after-state.json").chmod(0o600)
+                seal = {"version":1,"inventorySha256":sha(encoded),"afterSha256":sha(after_bytes)}
+                (attempt / "complete.tmp").write_text(json.dumps(seal,sort_keys=True,separators=(",",":"))+"\n")
+                (attempt / "complete.tmp").chmod(0o600)
+                (attempt / "complete.tmp").replace(attempt / "complete")
+    else:
+        assert not os.path.lexists(journal / "complete") and not os.path.lexists(journal / "apps-after.jsonl"), "original attempt already advanced"
+        files = {}
+        for rel in ["initialization-continuation/start.log", "initialization-continuation/apps-before.jsonl", "logs/start.log"]:
+            p = root / rel
+            if rel == "logs/start.log" and (attempt / "backup/logs/start.log").exists(): p = attempt / "backup/logs/start.log"
+            files[rel] = {"sha256": sha(read(p))}
+        for peer in peers:
+            base = root / peer; check_path(base, True)
+            files[f"{peer}/content.db"] = {"size": check_path(base / "content.db").stat().st_size}
+            assert files[f"{peer}/content.db"]["size"] > 0, "empty database"
+            files[f"{peer}/identity.key"] = {"sha256": sha(read(base / "identity.key"))}
+            for rel in [f"{peer}/iroh.key", f"{peer}/closed-chain-fence/closed-cells.json"]:
+                assert not os.path.lexists(root / rel), "reviewed absent state exists"
+                files[rel] = None
+            vault = check_path(base / "closed-chain-fence/credentials", True)
+            entries = list(vault.iterdir())
+            assert len(entries) == 1 and entries[0].name == initial[peer], "credential inventory differs"
+            credential(entries[0])
+            files[str(entries[0].relative_to(root))] = {"sha256": sha(read(entries[0]))}
+        encoded = (json.dumps({"version":1,"peers":peers,"files":files},sort_keys=True,separators=(",",":"))+"\n").encode()
+        if mode == "reserve":
+            assert re.fullmatch("[0-9a-f]{64}",expected) and sha(encoded) == expected, "state not reviewed"
+            check_path(attempt, True)
+            for relative, entry in files.items():
+                if entry is not None and "sha256" in entry:
+                    dest = attempt / "backup" / relative
+                    dest.parent.mkdir(parents=True, exist_ok=True, mode=0o700)
+                    dest.write_bytes(read(root / relative)); dest.chmod(0o600)
+                    assert sha(read(dest)) == entry["sha256"], "state changed during reservation"
+            for peer in peers:
+                p = root / "logs" / (peer + ".log")
+                if p.exists():
+                    dest = attempt / "backup/logs" / (peer + ".log")
+                    dest.write_bytes(read(p)); dest.chmod(0o600)
+            (attempt / "inventory.json").write_bytes(encoded)
+            (attempt / "inventory.json").chmod(0o600)
+        else: sys.stdout.buffer.write(encoded)
+except (AssertionError, ValueError, KeyError, TypeError, OSError) as error:
+    print("REFUSED initialization existing-state verification: " + str(error), file=sys.stderr)
+    sys.exit(1)
+PYEXISTING
+}
+
+initialization_existing_check() {
+  local dir="$MESH_DIR/initialization-continuation" attempt="$MESH_DIR/initialization-continuation/resume-existing" digest
+  [[ "${MESH_CONTINUE_INITIALIZATION_STATE_SHA256:-}" =~ ^[a-f0-9]{64}$ ]] || return 1
+  [[ "${MESH_CONTINUE_INITIALIZATION_LOG_SHA256:-}" =~ ^[a-f0-9]{64}$ ]] || return 1
+  [ "$(sha256sum "$dir/start.log" | cut -d' ' -f1)" = "$MESH_CONTINUE_INITIALIZATION_LOG_SHA256" ] || return 1
+  if [ -e "$attempt" ] || [ -L "$attempt" ]; then
+    [ -d "$attempt" ] && [ ! -L "$attempt" ] && [ ! -e "$attempt/consumed" ] && [ ! -L "$attempt/consumed" ] || return 1
+    [ -n "${MESH_EXISTING_INITIALIZATION_INVOCATION:-}" ] &&
+      [ "$(cat "$attempt/invocation")" = "$MESH_EXISTING_INITIALIZATION_INVOCATION" ] || return 1
+    initialization_existing_state prelaunch || return 1
+  fi
+  digest="$(initialization_existing_state inventory)" || return 1
+  [ "$(printf '%s\n' "$digest" | sha256sum | cut -d' ' -f1)" = "$MESH_CONTINUE_INITIALIZATION_STATE_SHA256" ] || return 1
+  [ "$(conductor_state_kind)" = complete ] && [ "$(archive_state_kind_at "$MESH_DIR")" = complete ] || return 1
+  [ -z "$(live_pids_in_registry "$PID_DIR")" ] && ! mesh_ports_busy && assert_no_live_peer_processes initialization-existing
+}
+
+reserve_initialization_existing() {
+  initialization_existing_check || return 1
+  local attempt="$MESH_DIR/initialization-continuation/resume-existing"
+  (umask 077; mkdir "$attempt") || return 1
+  initialization_existing_state reserve || return 1
+  MESH_EXISTING_INITIALIZATION_INVOCATION="$(cat /proc/sys/kernel/random/uuid)"
+  export MESH_EXISTING_INITIALIZATION_INVOCATION
+  printf '%s\n' "$MESH_EXISTING_INITIALIZATION_INVOCATION" > "$attempt/invocation"
+}
+
+verify_existing_initialization_apps() {
+    initialization_app_identities > "$MESH_DIR/initialization-continuation/resume-existing/apps-before.jsonl" || return 1
+    cmp -s "$MESH_DIR/initialization-continuation/apps-before.jsonl" \
+      "$MESH_DIR/initialization-continuation/resume-existing/apps-before.jsonl" || {
+      echo 'REFUSED initialization continuation: original installed identities changed before storage launch' >&2; return 1;
+    }
+}
+
 initialization_continuation_ready() {
   local dir="$MESH_DIR/initialization-continuation" digest path
   [ -e "$dir" ] || [ -L "$dir" ] || return 0
@@ -988,7 +1203,11 @@ initialization_continuation_ready() {
   [ "$(sha256sum "$dir/start.log" | cut -d' ' -f1)" = "$digest" ] || return 1
   [ -z "${MESH_CONTINUE_INITIALIZATION_LOG_SHA256:-}" ] ||
     [ "$MESH_CONTINUE_INITIALIZATION_LOG_SHA256" = "$digest" ] || return 1
-  cmp -s "$dir/apps-before.jsonl" "$dir/apps-after.jsonl"
+  cmp -s "$dir/apps-before.jsonl" "$dir/apps-after.jsonl" || return 1
+  if [ -e "$dir/resume-existing" ] || [ -L "$dir/resume-existing" ]; then
+    [ -s "$dir/resume-existing/complete" ] && [ ! -L "$dir/resume-existing/complete" ] || return 1
+    initialization_existing_state proof || return 1
+  fi
 }
 
 initialization_continuation_check() {
@@ -996,12 +1215,17 @@ initialization_continuation_check() {
   local expected="${MESH_CONTINUE_INITIALIZATION_LOG_SHA256:-}"
   [ ! -L "$dir" ] || return 1
   [ ! -e "$dir" ] || [ -d "$dir" ] || return 1
+  [ -z "${MESH_CONTINUE_INITIALIZATION_STATE_SHA256:-}" ] || [ -d "$dir" ] || return 1
   if [ -d "$dir" ]; then
     if [ -s "$dir/complete" ]; then
       initialization_continuation_ready || {
         echo 'REFUSED initialization continuation: completed proof is inconsistent' >&2; return 1;
       }
       return 2
+    fi
+    if [ -n "${MESH_CONTINUE_INITIALIZATION_STATE_SHA256:-}" ]; then
+      initialization_existing_check || return 1
+      return 3
     fi
     if [ -n "${MESH_INITIALIZATION_INVOCATION:-}" ] &&
        [ ! -e "$dir/consumed" ] &&
@@ -1094,6 +1318,9 @@ finish_initialization_continuation() {
     "$MESH_DIR/initialization-continuation/apps-after.jsonl" || {
     echo 'REFUSED initialization continuation: installed identities changed' >&2; return 1;
   }
+  if [ -d "$MESH_DIR/initialization-continuation/resume-existing" ]; then
+    initialization_existing_state seal || return 1
+  fi
   printf '%s\n' "$MESH_CONTINUE_INITIALIZATION_LOG_SHA256" > "$MESH_DIR/initialization-continuation/complete.tmp" || return 1
   mv "$MESH_DIR/initialization-continuation/complete.tmp" "$MESH_DIR/initialization-continuation/complete"
 }
@@ -1102,6 +1329,7 @@ household_start_mode() { # running | fresh | resume | reset; refuses incoherent 
   local continuation_rc=0
   initialization_continuation_check || continuation_rc=$?
   if [ "$continuation_rc" = 0 ]; then echo continue-initialization; return 0; fi
+  if [ "$continuation_rc" = 3 ]; then echo continue-existing-initialization; return 0; fi
   [ "$continuation_rc" = 2 ] || return 1
   if [ "$MESH_RESET" = "1" ]; then
     echo reset
@@ -4110,6 +4338,34 @@ print(next((i["id"] for i in items if str(i.get("dhtAnchorHash") or "").startswi
   fi
 }
 
+# A wall-clock budget, not an iteration count multiplied by per-peer curl waits.
+# Cold signing spans several sequential requests before storage binds HTTP.
+# This only observes readiness; the caller still owns identity verification.
+storage_ready_within() { # <seconds>
+  local budget="$1" deadline remaining request_budget ok i name
+  [[ "$budget" =~ ^[1-9][0-9]*$ ]] || return 1
+  deadline=$((SECONDS + budget))
+  while [ "$SECONDS" -lt "$deadline" ]; do
+    ok=1 i=0
+    for name in "${PEERS[@]}"; do
+      remaining=$((deadline - SECONDS))
+      [ "$remaining" -gt 0 ] || return 1
+      request_budget=2
+      [ "$remaining" -ge "$request_budget" ] || request_budget="$remaining"
+      curl --fail --silent --max-time "$request_budget" \
+        "http://localhost:$(http_port "$i")/health" >/dev/null || ok=0
+      i=$((i+1))
+    done
+    # A slow last response must not turn an expired budget into readiness.
+    remaining=$((deadline - SECONDS))
+    [ "$remaining" -gt 0 ] || return 1
+    [ "$ok" = 1 ] && return 0
+    [ "$remaining" -le 2 ] || remaining=2
+    sleep "$remaining"
+  done
+  return 1
+}
+
 start_storage_peer() { # <peer-name> <peer-index>
   local name="$1" i="$2"
   local doorway_env=() ark_env=()
@@ -4661,9 +4917,12 @@ start_detached() {
   preflight || return 1
   mkdir -p "$MESH_DIR" "$LOGDIR"
   local logfile="$LOGDIR/start.log"
-  if [ "$(household_start_mode)" = continue-initialization ]; then
-    reserve_initialization_continuation || return 1
-  fi
+  local start_mode
+  start_mode="$(household_start_mode)" || return 1
+  case "$start_mode" in
+    continue-initialization) reserve_initialization_continuation || return 1 ;;
+    continue-existing-initialization) reserve_initialization_existing || return 1 ;;
+  esac
   : > "$logfile"
   local -a launch=(bash "$0" __start_all_inner)
   # MESH_DIR is exported for scenario consumers. Preserve the default-selection
@@ -4781,6 +5040,14 @@ start_all() {
     mkdir "$MESH_DIR/initialization-continuation/consumed" || return 1
     unset MESH_INITIALIZATION_INVOCATION
   fi
+  if [ "$start_mode" = continue-existing-initialization ]; then
+    if [ -z "${MESH_EXISTING_INITIALIZATION_INVOCATION:-}" ]; then
+      reserve_initialization_existing || return 1
+    fi
+    initialization_existing_check || return 1
+    mkdir "$MESH_DIR/initialization-continuation/resume-existing/consumed" || return 1
+    unset MESH_EXISTING_INITIALIZATION_INVOCATION
+  fi
   if [ "$start_mode" = reset ]; then
     reset_household_state || return 1
   fi
@@ -4824,7 +5091,7 @@ start_all() {
         rm -f "$MESH_DIR/prologue-hosted-humans.json"
       fi
     fi
-  elif [ "$start_mode" = resume ] || [ "$start_mode" = continue-initialization ]; then
+  elif [ "$start_mode" = resume ] || [[ "$start_mode" = continue-*initialization ]]; then
     MESH_RESUME=1
     archive_mode="$(archive_mode_at "$MESH_DIR")"
   else
@@ -5313,6 +5580,10 @@ EOF
     }
   fi
 
+  if [ "$start_mode" = continue-existing-initialization ]; then
+    verify_existing_initialization_apps || return 1
+  fi
+
   # 3. Storage peers: one per conductor, agent key read from its conductor.
   local i=0
   for name in "${PEERS[@]}"; do
@@ -5320,19 +5591,21 @@ EOF
     i=$((i+1))
   done
 
-  for _ in $(seq 1 30); do
-    local ok=0 j=0
-    for _n in "${PEERS[@]}"; do
-      curl -s -m 2 "http://localhost:$(http_port $j)/health" >/dev/null && ok=$((ok+1)); j=$((j+1))
-    done
-    [ "$ok" -ge ${#PEERS[@]} ] && break; sleep 2
-  done
-
-  if [ "$start_mode" = continue-initialization ]; then
-    [ "$ok" -ge ${#PEERS[@]} ] || {
-      echo 'REFUSED initialization continuation: storage readiness incomplete' >&2; return 1;
+  if [[ "$start_mode" = continue-*initialization ]]; then
+    # Match the outer worker readiness allowance. Its earlier-started deadline
+    # remains authoritative; healthy sockets still cannot bypass the proof seal.
+    storage_ready_within 900 || {
+      echo 'REFUSED initialization continuation: storage readiness incomplete within 900s' >&2; return 1;
     }
     finish_initialization_continuation || return 1
+  else
+    for _ in $(seq 1 30); do
+      local ok=0 j=0
+      for _n in "${PEERS[@]}"; do
+        curl -s -m 2 "http://localhost:$(http_port $j)/health" >/dev/null && ok=$((ok+1)); j=$((j+1))
+      done
+      [ "$ok" -ge ${#PEERS[@]} ] && break; sleep 2
+    done
   fi
   refresh_mesh_pidfiles
   reconcile_doorway_pool_performer

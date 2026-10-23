@@ -419,3 +419,17 @@ attempt, inspect which storage identities were persisted; absence after an
 interruption must not be treated as permission to replace an existing identity.
 Current state: **RED**. Neither a longer timeout nor a process-start message is
 completion evidence; never erase the consumed attempt to obtain a retry.
+
+Edge **1696** supplied the missing state observation. Each peer retained a
+nonempty database, its libp2p `identity.key`, and one infrastructure signing
+credential; all three `iroh.key` files were confirmed absent, separately from
+unreadable or refused paths. The original log, failed-attempt log and original
+app-identity snapshot matched their recorded hashes; `consumed` existed and
+`apps-after`/`complete` did not. This establishes unfinished storage initialization,
+not a complete household ready for ordinary resume. The proposed additional
+attempt binds that exact inventory, retains the original snapshot and all prior
+evidence, and requires unchanged pre-existing keys and credentials at completion.
+The runtime can refresh rejected signing credentials on an open cell, so private
+backup plus hash comparison detects that outcome; it does not prove replacement
+is impossible. The longer readiness path and additional recovery remain
+**unproven on Adam** until a new immutable image completes and seals both checks.
