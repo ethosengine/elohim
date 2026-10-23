@@ -699,6 +699,27 @@
       }
     },
     {
+      "citesContentCid": "bafyreidn4ot56xl3q5wclxqthh7ll6thmao7gqxvsefcail5tqblujwcgu",
+      "citesContentSha256": "sha256:6de3a7df5d7b876c25de1339feb5fa67601df342f5910a20217d9c02ba26c235",
+      "registry": "policies.yaml",
+      "precedent": {
+        "id": "rust-style-strict@1",
+        "title": "Rust style strict scope",
+        "summary": "Rust style strict scope",
+        "full_reasoning": "The operator requested permanent crate/module strictness after refactors. RS-GOV-04 requires nonempty reasons for suppressions in this scope, including legacy source. Fix the attribute; do not remove the scope binding. The same native syntax checker runs in authoring guidance and the manifest-driven reach gate.",
+        "binding": "binding-local",
+        "scope_json": "{\"scope\":{\"write\":\"*.rs\"}}",
+        "citations": null,
+        "status": "active",
+        "established_by": "deliberated-operator-rust-style-2026-10-22",
+        "established_at": null,
+        "superseded_by": null,
+        "created_at": null,
+        "updated_at": null,
+        "metadata_json": "{\"enforcementClass\":\"deny\",\"registry\":\"policies.yaml\",\"resolutionMode\":\"pinned\",\"validator\":\"epr:validator-rust-style-strict\",\"version\":1}"
+      }
+    },
+    {
       "citesContentCid": "bafyreif2hughz2hfxxndvjbecyb2rvaha36nyx4qa4xdr44ngdxva4dqfu",
       "citesContentSha256": "sha256:ba3d0c7ce8e5bdda3aa4241603a8d40706fcdc5f90072e38f38d30ef5070702d",
       "registry": "policies.yaml",

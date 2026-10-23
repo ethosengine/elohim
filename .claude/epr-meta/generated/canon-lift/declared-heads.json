@@ -607,6 +607,28 @@
       ]
     },
     {
+      "id": "rust-style-strict",
+      "resolutionMode": "pinned",
+      "resolutionModeSource": "registry-default",
+      "head": {
+        "registry": "policies.yaml",
+        "version": 1,
+        "cid": "bafyreidn4ot56xl3q5wclxqthh7ll6thmao7gqxvsefcail5tqblujwcgu",
+        "sha256Pin": "sha256:6de3a7df5d7b876c25de1339feb5fa67601df342f5910a20217d9c02ba26c235"
+      },
+      "tipBasis": "sole-active",
+      "competing": false,
+      "versions": [
+        {
+          "registry": "policies.yaml",
+          "version": 1,
+          "status": "active",
+          "cid": "bafyreidn4ot56xl3q5wclxqthh7ll6thmao7gqxvsefcail5tqblujwcgu",
+          "supersededBy": null
+        }
+      ]
+    },
+    {
       "id": "source-file-loc-ceiling",
       "resolutionMode": "pinned",
       "resolutionModeSource": "registry-default",

@@ -638,6 +638,21 @@
       "supersededBy": null
     },
     {
+      "id": "rust-style-strict",
+      "version": 1,
+      "registry": "policies.yaml",
+      "status": "active",
+      "resolutionMode": "pinned",
+      "resolutionModeSource": "registry-default",
+      "sha256Pin": "sha256:6de3a7df5d7b876c25de1339feb5fa67601df342f5910a20217d9c02ba26c235",
+      "sha256Computed": "sha256:6de3a7df5d7b876c25de1339feb5fa67601df342f5910a20217d9c02ba26c235",
+      "pinState": "verified",
+      "cid": "bafyreidn4ot56xl3q5wclxqthh7ll6thmao7gqxvsefcail5tqblujwcgu",
+      "bodyBytes": 569,
+      "supersedes": [],
+      "supersededBy": null
+    },
+    {
       "id": "source-file-loc-ceiling",
       "version": 1,
       "registry": "policies.yaml",
