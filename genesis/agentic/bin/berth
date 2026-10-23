@@ -88,6 +88,7 @@ import errno
 import fcntl
 import json
 import os
+import re
 import shutil
 import subprocess
 import sys
@@ -105,6 +106,8 @@ POLL_S = 0.25  # how often a steward claim re-reads the lease view
 PEER_TIMEOUT_S = 10
 OVERRUN_MEASURE = "dev-berth-held-by-measure@1"
 EVENTS_MEASURE = "dev-berth-events@1"
+# The berth record kinds that cross to the steward's other devices (pool-policy berth.channel.crosses).
+CROSSING_KINDS = ("moor", "unmoor", "claim", "renew", "release", "override", "note", "shed")
 # The measure emitter lives beside the hooks; bin/berth → genesis/agentic → genesis → repo root.
 REPO_ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(os.path.realpath(__file__)))))
 HOOKS_DIR = os.path.join(REPO_ROOT, ".claude", "hooks")
@@ -281,7 +284,10 @@ class Berth:
         # The device's channel store (`epr peer leases` names it): steward records are written there,
         # so they cross. None until the view was read, or when this workspace is not a device.
         self.channel_root = None
+        self.channel_standing = None
+        self.channel_error = None
         self._channel_read = False
+        self.fold_failures = []  # (resource, kind, why): steward records that did not reach the channel store
         self.sleep = time.sleep  # injectable: tests advance a fake clock instead
         self._obs = obs  # the `_observation` emitter; injected by tests, else imported lazily
         self._lock_depth = {}
@@ -324,10 +330,12 @@ class Berth:
             self._flush_folds()  # outermost exit: the lock is released, the `epr` subprocess may run
 
     def record(self, kind, **fields):
-        ev = {"at": round(self.now(), 3), "kind": kind}
-        ev.update(fields)
-        line = (json.dumps(ev, sort_keys=True) + "\n").encode()
         with self._locked():
+            # `dseq` is this device's record counter: it orders the device's records for the other
+            # devices, which a step of this device's clock (`at`) cannot.
+            ev = {"at": round(self.now(), 3), "kind": kind, "dseq": self._next_dseq()}
+            ev.update(fields)
+            line = (json.dumps(ev, sort_keys=True) + "\n").encode()
             fd = os.open(self.ledger_path, os.O_WRONLY | os.O_APPEND | os.O_CREAT, 0o644)
             try:
                 os.write(fd, line)
@@ -342,6 +350,49 @@ class Berth:
             self._flush_folds()
         return ev
 
+    def _next_dseq(self):
+        """The next record number of this device (the berth lock is held). Persisted in the berth dir —
+        one per container, so every worktree's berth shares it — before it is used, so it is never
+        reused. A lost counter resumes above every number this device has written: its ledger, and its
+        own records in its flow stores (never another device's, folded via it)."""
+        path = os.path.join(self.dir, "dseq")
+        try:
+            with open(path) as f:
+                last = int(f.read().strip())
+        except (OSError, ValueError):
+            last = self._highest_dseq()
+        n = last + 1
+        tmp = f"{path}.{os.getpid()}.tmp"
+        with open(tmp, "w") as f:
+            f.write(f"{n}\n")
+            f.flush()
+            os.fsync(f.fileno())
+        os.replace(tmp, path)
+        return n
+
+    def dseq_stores(self):
+        """The checkouts whose flow stores hold this device's own records."""
+        return [root for root in (REPO_ROOT, self.channel_root) if root]
+
+    def _highest_dseq(self):
+        highest = 0
+        for ev in self.ledger(0):
+            if isinstance(ev.get("dseq"), int):
+                highest = max(highest, ev["dseq"])
+        pattern = re.compile(r'"env:dseq=(\d+)"')
+        for root in self.dseq_stores():
+            try:
+                with open(os.path.join(root, ".eprfs", "status", "flows.jsonl"), encoding="utf-8",
+                          errors="replace") as f:
+                    for line in f:
+                        if "env:dseq=" not in line or '"via:' in line:
+                            continue
+                        for found in pattern.findall(line):
+                            highest = max(highest, int(found))
+            except OSError:
+                continue
+        return highest
+
     def _flush_folds(self):
         while self._pending_folds:
             kind, ev = self._pending_folds.pop(0)
@@ -354,31 +405,60 @@ class Berth:
         env (as in dev-berth-held-by-measure@1). reason = the kind; env = every field of the record as a
         string (absent fields omitted; lists/dicts as compact JSON; a row's own `reason` rides as env:reason,
         distinct from the emit's --reason = the kind). Called only from _flush_folds, i.e. with no berth
-        lock held. Fail-open: a missing emitter costs the fold, never the lease."""
+        lock held. Fail-open for this checkout's own records: a missing emitter costs the fold, never the
+        lease. A steward-scoped record of a device that does not reach its channel store is not silent:
+        it is kept in `fold_failures` for the claim, renew or release that wrote it to report."""
+        resource = ev.get("resource")
+        steward = isinstance(resource, str) and self.steward_scoped(resource)
+        root, unreachable = self._fold_root(ev)
+        if unreachable:
+            self._fold_failed(kind, ev, unreachable)
+            return False
         try:
             obs = self.observation()
             if obs is None:
-                return False
-            env = {}
-            for k, v in ev.items():
-                if v is None:
-                    continue
-                env[k] = v if isinstance(v, str) else (
-                    json.dumps(v, sort_keys=True, separators=(",", ":")) if isinstance(v, (list, dict)) else str(v))
-            return bool(obs.emit(EVENTS_MEASURE, ".", 1, reason=kind,
-                                 env=env, root=self._fold_root(ev)))
+                landed = False
+            else:
+                env = {}
+                for k, v in ev.items():
+                    if v is None:
+                        continue
+                    env[k] = v if isinstance(v, str) else (
+                        json.dumps(v, sort_keys=True, separators=(",", ":")) if isinstance(v, (list, dict)) else str(v))
+                landed = bool(obs.emit(EVENTS_MEASURE, ".", 1, reason=kind, env=env, root=root))
         except Exception:
-            return False
+            landed = False
+        if not landed and steward and self.channel_root and root == self.channel_root:
+            self._fold_failed(kind, ev, "`epr flow note` did not write it")
+        return landed
+
+    def _fold_failed(self, kind, ev, why):
+        if kind in CROSSING_KINDS:
+            where = self.channel_root or "its location unknown"
+            self.fold_failures.append((ev.get("resource"), kind,
+                                       f"the {kind} record did not reach this device's channel store ({where}): {why}"))
+
+    def take_fold_failures(self, resource):
+        """The crossing records about `resource` that did not reach the channel store, cleared."""
+        mine = [why for res, _, why in self.fold_failures if res == resource]
+        self.fold_failures = [f for f in self.fold_failures if f[0] != resource]
+        return mine
 
     def _fold_root(self, ev):
-        """Where a record folds: a steward-scoped resource's records go to the device's channel store
-        (the one `epr peer serve` projects), so they cross; everything else to this checkout."""
+        """(root, unreachable): where a record folds. A steward-scoped resource's records go to the
+        device's channel store (the one `epr peer serve` projects), so they cross; everything else, and
+        every record of a workspace that is not one of its steward's devices, to this checkout. A
+        device whose channel store cannot be read gets no root, never this checkout's in its place."""
         resource = ev.get("resource")
         if not (isinstance(resource, str) and self.steward_scoped(resource)):
-            return REPO_ROOT
+            return REPO_ROOT, None
         if not self._channel_read:
             self.peer_leases()
-        return self.channel_root or REPO_ROOT
+        if self.channel_root:
+            return self.channel_root, None
+        if self.channel_standing == "not_a_device":
+            return REPO_ROOT, None
+        return None, self.channel_error or "this device's channel store is unknown"
 
     def ledger(self, n=30):
         """The last n readable events. Per-line tolerant: a torn or NUL-padded line (a crash mid-append,
@@ -660,6 +740,8 @@ class Berth:
         writes a `kind: override` row and emits dev-berth-held-by-measure@1 = ttl immediately.
         A steward-scoped resource is then settled across this person's devices (`_settle_steward`);
         `offline_ok` takes an `unconfirmed` one anyway, on the record.
+        A steward record that cannot reach the device's channel store refuses a claim, and leaves a
+        renew held but returns ok=None: kept here, not confirmed to the other devices.
         Raises BerthUsage for a mis-stated claim (unknown class, override without --ttl)."""
         klass = klass or DEFAULT_CLASS
         if self.policy_error:
@@ -713,6 +795,15 @@ class Berth:
         with self._locked():
             ok, lease, reason = self._claim_locked(resource, session, note, ttl_s if explicit_ttl else None,
                                                    ttl_s, klass, seat, overriding, session_source, seen=seen)
+        failed = self.take_fold_failures(resource) if ok else []
+        if failed:
+            if renewing or reason.startswith("renewed"):
+                # The lease stays: it was held before. Its renew did not cross, so say so.
+                return None, lease, (f"renewed here, but {failed[0]} — the other devices still hold its "
+                                     f"earlier terms")
+            self.release(resource, session, reason=f"steward: {failed[0]}")
+            self.take_fold_failures(resource)
+            return False, None, failed[0]
         if ok and steward:
             return self._settle_steward(resource, session, lease, offline_ok, renewal=bool(renewing))
         if ok and overriding:
@@ -936,6 +1027,14 @@ class Berth:
         steward lease view. An error whenever the view could not be computed: an unreadable view is
         never a free resource. Remembers the channel store, where steward records are written."""
         self._channel_read = True
+        view, err = self._read_peer_leases(timeout)
+        self.channel_error = err
+        self.channel_standing = view.get("standing") if view else None
+        store = view.get("store") if view and view.get("standing") == "device" else None
+        self.channel_root = store if isinstance(store, str) and store else None
+        return view, err
+
+    def _read_peer_leases(self, timeout):
         epr = self.epr_bin()
         if not epr:
             return None, self._no_epr()
@@ -953,8 +1052,6 @@ class Berth:
             return None, f"the steward lease view is not JSON: {e}"
         if not isinstance(view, dict):
             return None, "the steward lease view is not an object"
-        store = view.get("store") if view.get("standing") == "device" else None
-        self.channel_root = store if isinstance(store, str) and store else None
         return view, None
 
     def _view_now(self, view):
@@ -995,6 +1092,9 @@ class Berth:
             reason = steward_reason(verdict, self._view_now(view))
             self.record("refuse", resource=resource, session=session, reason="held",
                         holder=f"{verdict['device']}/{verdict['session']}", **{"class": klass})
+            if mine:
+                # This session's own unsettled lease lost: it must not linger here or on the channel.
+                self.release(resource, session, reason=f"steward: {reason}")
             return True, None, False, reason
         seen = view.get("seen") if isinstance(view.get("seen"), dict) else {}
         return True, seen, "pending" if mine else False, None
@@ -1044,6 +1144,10 @@ class Berth:
                             claimed_at=lease.get("claimed_at"), overrode=verdict.get("device"),
                             last_seen=verdict.get("last_seen"), reason=f"--offline-ok over {reason}",
                             **{"class": lease.get("class")})
+                failed = self.take_fold_failures(resource)
+                if failed:
+                    self.release(resource, session, reason=f"steward: {failed[0]}")
+                    return False, None, failed[0]
                 self._mark_effective(resource, session)
                 return True, lease, f"claimed over a silent device; {reason} — override on the record"
         else:
@@ -1325,6 +1429,9 @@ def _main(argv):
         except BerthUsage as e:
             print(f"berth: {e}", file=sys.stderr)
             return 2
+        if ok is None:
+            print(f"{res}: {reason}", file=sys.stderr)
+            return 1
         if ok:
             head, _, tail = reason.partition("; ")
             print(f"{res}: {head} by {session} (session from {source})" + (f"\n  {tail}" if tail else ""))
@@ -1342,6 +1449,11 @@ def _main(argv):
         force = "--force" in argv
         done = b.release(argv[0], session, force=force, reason="forced" if force else None)
         print(f"{argv[0]}: {'released' if done else 'was not held'} by {session}" + (" (forced)" if force and done else ""))
+        failed = b.take_fold_failures(argv[0])
+        if failed:
+            print(f"{argv[0]}: released here, but {failed[0]} — the other devices still see it held",
+                  file=sys.stderr)
+            return 1
         return 0
     if cmd == "say":
         to = _opt(argv, "--to")

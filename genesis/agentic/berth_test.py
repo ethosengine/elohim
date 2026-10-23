@@ -814,6 +814,76 @@ class StewardClaimTest(unittest.TestCase):
             ok, lease, reason = self.berth.claim(resource, session, **kw)
         return ok, lease, reason, err.getvalue()
 
+    def test_every_record_carries_a_device_counter_that_survives_restarts_and_a_lost_counter(self):
+        b = Berth(os.path.join(self.directory.name, "counted"), now=lambda: self.clock[0], obs=self.obs,
+                  policy_path=MISSING_POLICY)
+        b.dseq_stores = lambda: []  # this checkout's real store is not the fixture's
+        b.moor("s1")
+        b.claim("cargo", "s1")
+        # The clock steps back: the counter does not.
+        self.clock[0] -= 3600
+        b.release("cargo", "s1")
+        self.assertEqual([r["dseq"] for r in b.ledger(1000)], [1, 2, 3])
+        self.assertEqual([e["env"]["dseq"] for e in self.obs.events[-3:]], ["1", "2", "3"])
+        # A new berth process continues it.
+        b2 = Berth(b.dir, now=lambda: self.clock[0], obs=self.obs, policy_path=MISSING_POLICY)
+        b2.dseq_stores = lambda: []
+        self.assertEqual(b2.say("s1", "hello")["dseq"], 4)
+        # A lost counter resumes above every number this device has written: its ledger, and its own
+        # records in its stores (never another device's, folded via it).
+        os.remove(os.path.join(b.dir, "dseq"))
+        store = Path(self.directory.name) / "channel" / ".eprfs" / "status"
+        store.mkdir(parents=True)
+        (store / "flows.jsonl").write_text(
+            json.dumps({"record": {"classifiedAs": ["run:observation", ".", "env:dseq=41"]}}) + "\n"
+            + json.dumps({"record": {"classifiedAs": ["run:observation", ".", "env:dseq=99",
+                                                      f"via:{DEVICE_A}"]}}) + "\n")
+        b3 = Berth(b.dir, now=lambda: self.clock[0], obs=self.obs, policy_path=MISSING_POLICY)
+        b3.dseq_stores = lambda: [str(store.parent.parent)]
+        self.assertEqual(b3.say("s1", "again")["dseq"], 42)
+        self.assertEqual(b3.say("s1", "and again")["dseq"], 43)
+
+    def test_a_claim_whose_record_cannot_reach_the_channel_store_refuses(self):
+        self.views(view(), view(dev_integration=effective()))
+        landed = self.obs.emit
+        self.obs.emit = lambda *a, **k: False if k.get("reason") == "claim" else landed(*a, **k)
+        ok, lease, reason, _ = self.claim()
+        self.assertFalse(ok)
+        self.assertIsNone(lease)
+        self.assertIn(f"did not reach this device's channel store ({CHANNEL_STORE})", reason)
+        self.assertIsNone(self.berth.who("dev-integration"))
+        self.assertEqual(len(self.calls()), 1, "refused before the settle")
+
+    def test_a_renew_that_cannot_reach_the_channel_store_keeps_the_lease_and_says_so(self):
+        self.views(view(), view(dev_integration=effective()))
+        self.assertTrue(self.claim()[0])
+        # Another berth process renews; it cannot read where the channel store is.
+        self.berth = self.make()
+        self.views("EXIT 1 epr peer: the steward lease view is unavailable")
+        ok, lease, reason, _ = self.claim()
+        self.assertIsNone(ok, "kept, but not confirmed")
+        self.assertIn("did not reach this device's channel store", reason)
+        self.assertIn("the steward lease view is unavailable", reason)
+        self.assertEqual(self.berth.who("dev-integration")["holder"], "codex-1")
+        self.assertEqual(self.rows("release"), [])
+        # Through the CLI: the lease is kept and the exit is non-zero, naming the error.
+        r = self.run_cli("claim", "dev-integration", "--session", "codex-1")
+        self.assertEqual(r.returncode, 1, r.stderr)
+        self.assertIn("did not reach this device's channel store", r.stderr)
+        self.assertNotIn("REFUSED", r.stderr)
+
+    def test_a_pre_check_held_by_releases_this_sessions_unsettled_lease(self):
+        with self.berth._locked():
+            leases = self.berth.leases()
+            leases["dev-integration"] = self.berth._new_lease("dev-integration", "codex-1", None, None, "verify", None)
+            self.berth._write_leases(leases)
+        self.views(view(dev_integration=held_by_a()))
+        ok, lease, reason, _ = self.claim()
+        self.assertFalse(ok)
+        self.assertEqual(reason, f"held by {DEVICE_A}/claude-1 since 2026-10-23T15:28:09Z")
+        self.assertIsNone(self.berth.who("dev-integration"))
+        self.assertEqual(self.rows("release")[-1]["resource"], "dev-integration")
+
     def test_the_repository_policy_declares_the_steward_resources(self):
         b = Berth(os.path.join(self.directory.name, "real"), now=lambda: 0,
                   policy_path=str(REPO / "genesis/agentic/pool-policy.json"))
@@ -1014,6 +1084,7 @@ class StewardClaimTest(unittest.TestCase):
 
         def leases(timeout=10):
             self.berth._channel_read = True
+            self.berth.channel_root, self.berth.channel_standing = CHANNEL_STORE, "device"
             timeouts.append(timeout)
             self.clock[0] += min(3, timeout)  # each read is slow, and gives up at its timeout
             return (view(dev_integration=pending()) if len(timeouts) > 1 else view()), None
@@ -1039,6 +1110,15 @@ class StewardClaimTest(unittest.TestCase):
             self.assertFalse(ok)
             self.assertIn(str(bad), reason)
             self.assertFalse(b.owner_check("dev-integration", "codex-1", "deploy")[0])
+
+    def run_cli(self, *args):
+        project = Path(self.directory.name) / "project"
+        (project / "genesis" / "agentic").mkdir(parents=True, exist_ok=True)
+        (project / "genesis" / "agentic" / "pool-policy.json").write_text(json.dumps(STEWARD_POLICY))
+        env = {k: v for k, v in os.environ.items() if k not in ("BERTH_SESSION", "CLAUDE_SESSION_ID")}
+        env.update({"BERTH_DIR": self.berth.dir, "EPR_BIN": str(self.epr), "CLAUDE_PROJECT_DIR": str(project)})
+        return subprocess.run([sys.executable, str(REPO / "genesis/agentic/bin/berth"), *args], env=env,
+                              capture_output=True, text=True, timeout=60)
 
     def test_cli_refusal_is_exit_3_with_one_reason_line(self):
         project = Path(self.directory.name) / "project"
