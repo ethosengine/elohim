@@ -7,10 +7,9 @@
 //! the process environment other tests share. Every root is a committed tempdir repo, so claims and
 //! witnesses have a real HEAD to be dated against — never the real sidecar.
 
+use std::collections::BTreeMap;
 use std::path::{Path, PathBuf};
 use std::process::{Command, Output};
-
-use std::collections::BTreeMap;
 
 use elohim_epr_cli::actor::{
     self, claim_with_device, contest, device_authorize, device_bind, device_endpoint,
@@ -479,6 +478,7 @@ fn device_endpoint_appends_one_signed_row() {
         chain_root,
         device: signer,
         node_id,
+        seq,
         nonce,
         signature,
     } = rows.last().unwrap()
@@ -489,6 +489,8 @@ fn device_endpoint_appends_one_signed_row() {
     assert_eq!(chain_root, &a.did_key());
     assert_eq!(signer, &a.did_key());
     assert_eq!(node_id, NODE_A);
+    assert_eq!(*seq, 1, "a device's first endpoint row is seq 1");
+    assert_eq!(outcome["seq"], 1);
     assert!(!nonce.is_empty() && !signature.is_empty());
     assert_eq!(
         outcome["rowCid"],
@@ -526,12 +528,14 @@ fn device_endpoint_appends_one_signed_row() {
     // Again with the same node id: already admitted for this device, nothing appended.
     let again = device_endpoint(root, None, NODE_A, &a).expect("idempotent");
     assert!(!again.appended);
+    assert_eq!(again.seq, None);
     assert_eq!(again.row_cid, outcome["rowCid"]);
     assert_eq!(roster_rows(root, "matthew").len(), before + 1);
 
     // A rebuilt workspace's new key: one more row, and it supersedes the old one.
     let rotated = device_endpoint(root, Some("matthew"), NODE_B, &a).expect("rotates");
     assert!(rotated.appended);
+    assert_eq!(rotated.seq, Some(2), "one above the device's highest seq");
     let rows = roster_rows(root, "matthew");
     assert_eq!(rows.len(), before + 2);
     assert_eq!(

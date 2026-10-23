@@ -106,7 +106,8 @@ pub use model::{
 };
 pub use participants::{
     admitted_endpoints, endpoint_admission, standing_human, standing_human_pinned, verify_binding,
-    EndpointAdmission, ParticipantRow, Roster, RosterStanding, RosterVia,
+    verify_peer_endpoint, AdmittedEndpoint, EndpointAdmission, ParticipantRow, Roster,
+    RosterStanding, RosterVia,
 };
 #[cfg(feature = "sidecar")]
 pub use participants::{RosterTransaction, SidecarRoster};

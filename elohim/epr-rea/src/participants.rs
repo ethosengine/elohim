@@ -90,8 +90,9 @@ pub enum ParticipantRow {
     },
     /// A device's peer endpoint: `device`, a member of `chain_root`'s lineage, answers on the
     /// iroh NodeId `node_id`. Signed by `device` alone — a device names its own endpoint, nobody
-    /// names it for the device. The newest verifying row for a device supersedes older ones,
-    /// which is how a key rotates; [`admitted_endpoints`] is the read.
+    /// names it for the device. The verifying row with the device's highest `seq` supersedes
+    /// its others, which is how a key rotates; line order never decides, so replaying an old
+    /// row cannot undo a rotation. [`admitted_endpoints`] is the read.
     PeerEndpoint {
         handle: String,
         chain_root: String,
@@ -99,6 +100,9 @@ pub enum ParticipantRow {
         device: String,
         /// The iroh NodeId in its canonical printed form (64 lowercase hex characters).
         node_id: String,
+        /// The device's own sequence over its endpoint rows, under its signature: the highest
+        /// verifying `seq` is the device's endpoint.
+        seq: u64,
         /// Minted by the device per row, so two rows naming the same node id stay distinct.
         nonce: String,
         /// `device`'s signature over [`ParticipantRow::signing_message`], lowercase hex.
@@ -140,6 +144,7 @@ enum RowBody<'a> {
         chain_root: &'a str,
         device: &'a str,
         node_id: &'a str,
+        seq: u64,
         nonce: &'a str,
     },
 }
@@ -218,6 +223,7 @@ impl ParticipantRow {
                 chain_root,
                 device,
                 node_id,
+                seq,
                 nonce,
                 ..
             } => RowBody::PeerEndpoint {
@@ -225,6 +231,7 @@ impl ParticipantRow {
                 chain_root,
                 device,
                 node_id,
+                seq: *seq,
                 nonce,
             },
         };
@@ -351,32 +358,68 @@ pub fn verify_binding(row: &ParticipantRow, verifier: &dyn SignatureVerifier) ->
     Ok(())
 }
 
+/// Verify a peer endpoint row: its shape, and `device`'s own signature over its body (which
+/// covers `seq`). Whether the device stands on the roster is [`endpoint_admission`]'s question.
+pub fn verify_peer_endpoint(row: &ParticipantRow, verifier: &dyn SignatureVerifier) -> Result<()> {
+    let ParticipantRow::PeerEndpoint {
+        device, signature, ..
+    } = row
+    else {
+        return Err(FabricError::Decode("not a peer endpoint row".into()));
+    };
+    row.validate_shape()?;
+    if !row_signature_verifies(verifier, row, device, signature) {
+        return Err(FabricError::Decode(format!(
+            "peer endpoint does not verify as `{device}`'s signature"
+        )));
+    }
+    Ok(())
+}
+
+/// One admitted endpoint: the device it belongs to and the row it stands on.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct AdmittedEndpoint {
+    /// The device, `did:key:…`.
+    pub device: String,
+    /// CID of the verified `PeerEndpoint` row that admits it.
+    pub row_cid: String,
+}
+
 /// What a roster admits as peer endpoints for one lineage — see [`endpoint_admission`].
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
 pub struct EndpointAdmission {
-    /// Admitted iroh node id → the device (`did:key:…`) it belongs to.
-    pub admitted: BTreeMap<String, String>,
+    /// Admitted iroh node id → the device it belongs to and the row that admits it.
+    pub admitted: BTreeMap<String, AdmittedEndpoint>,
     /// Node ids that two or more standing devices claim, with every claimant. None of them is
     /// admitted on that id: one node id answers for one device or for nobody.
     pub conflicts: BTreeMap<String, BTreeSet<String>>,
+    /// Standing devices whose highest-`seq` verifying rows name different node ids, with those
+    /// ids. Such a device admits nothing — no older row stands in for it.
+    pub equivocations: BTreeMap<String, BTreeSet<String>>,
 }
 
 /// The peer endpoints `rows` admit for the lineage rooted at `chain_root`: iroh node id →
-/// device did:key. Shorthand for [`endpoint_admission`]'s `admitted`.
+/// device did:key. The node-id → device projection of [`endpoint_admission`]'s `admitted`.
 pub fn admitted_endpoints(
     rows: &[ParticipantRow],
     chain_root: &str,
     verifier: &dyn SignatureVerifier,
 ) -> BTreeMap<String, String> {
-    endpoint_admission(rows, chain_root, verifier).admitted
+    endpoint_admission(rows, chain_root, verifier)
+        .admitted
+        .into_iter()
+        .map(|(node_id, endpoint)| (node_id, endpoint.device))
+        .collect()
 }
 
-/// Which iroh node ids the roster `rows` (append order) admit for the lineage rooted at
-/// `chain_root`, and which it refuses as conflicting. Pure over the rows: each device reads
-/// admission from the roster in its own checkout, never over the network.
+/// Which iroh node ids the roster `rows` admit for the lineage rooted at `chain_root`, and
+/// which it refuses. Pure over the rows: each device reads admission from the roster in its own
+/// checkout, never over the network.
 ///
-/// A device's endpoint is its NEWEST [`ParticipantRow::PeerEndpoint`] whose signature verifies
-/// as that device's, and it is admitted only when all of these hold:
+/// A device's endpoint is decided by its verifying [`ParticipantRow::PeerEndpoint`] rows
+/// ([`verify_peer_endpoint`]) with the HIGHEST `seq` — never by line order, so re-appending or
+/// reordering an older validly signed row cannot roll a rotation back. It is admitted only when
+/// all of these hold:
 ///
 /// - the row names `chain_root`, and the lineage has a verifying genesis with that root —
 ///   rows naming any other root (a rival genesis, an endpoint filed under another lineage) are
@@ -385,13 +428,12 @@ pub fn admitted_endpoints(
 ///   and neither its genesis row nor the founding record is effectively contested, or it is
 ///   the controller of a both-halves binding authorized from inside the lineage and that
 ///   binding is not effectively contested;
-/// - the endpoint row itself is not effectively contested. A contested newest row does NOT
-///   revive an older one: a superseded key stays superseded;
+/// - every row at the device's highest `seq` names the same node id — otherwise the device is
+///   listed in [`EndpointAdmission::equivocations`] and admits nothing;
+/// - none of those rows is effectively contested. A contested highest row does NOT revive a
+///   lower one: a superseded key stays superseded;
 /// - no other standing device's endpoint claims the same node id. Both claimants are refused
 ///   and reported in [`EndpointAdmission::conflicts`].
-///
-/// A row that fails its shape check counts for nothing, and a newer row that does not verify
-/// never displaces an older valid one.
 pub fn endpoint_admission(
     rows: &[ParticipantRow],
     chain_root: &str,
@@ -403,48 +445,95 @@ pub fn endpoint_admission(
     };
     let contested = roster.contested(verifier);
 
-    // Newest verifying endpoint row per device: (row CID, node id).
-    let mut newest: BTreeMap<&str, (String, &str)> = BTreeMap::new();
+    // Per device: its highest verifying seq, and every row at it.
+    let mut highest: BTreeMap<&str, HighestEndpointRows<'_>> = BTreeMap::new();
     for (cid, row) in roster.rows() {
-        if let ParticipantRow::PeerEndpoint {
+        let ParticipantRow::PeerEndpoint {
             device,
             node_id,
-            signature,
+            seq,
             ..
         } = row
-        {
-            if row_signature_verifies(verifier, row, device, signature) {
-                newest.insert(device, (cid.to_string(), node_id));
-            }
+        else {
+            continue;
+        };
+        if verify_peer_endpoint(row, verifier).is_err() {
+            continue;
+        }
+        let entry = highest.entry(device).or_insert(HighestEndpointRows {
+            seq: *seq,
+            rows: Vec::new(),
+        });
+        if *seq > entry.seq {
+            *entry = HighestEndpointRows {
+                seq: *seq,
+                rows: Vec::new(),
+            };
+        }
+        if *seq == entry.seq {
+            entry.rows.push((cid.to_string(), node_id));
         }
     }
 
-    let mut claims: BTreeMap<String, BTreeSet<String>> = BTreeMap::new();
-    for (device, (row_cid, node_id)) in newest {
-        if contested.contains(&row_cid) || roster.device_standing_row(device, verifier).is_none() {
+    let mut claims: BTreeMap<String, Vec<AdmittedEndpoint>> = BTreeMap::new();
+    for (
+        device,
+        HighestEndpointRows {
+            rows: at_highest, ..
+        },
+    ) in highest
+    {
+        if roster.device_standing_row(device, verifier).is_none() {
             continue;
         }
+        let named: BTreeSet<String> = at_highest
+            .iter()
+            .map(|(_, node_id)| (*node_id).to_string())
+            .collect();
+        if named.len() > 1 {
+            admission.equivocations.insert(device.to_string(), named);
+            continue;
+        }
+        if at_highest
+            .iter()
+            .any(|(row_cid, _)| contested.contains(row_cid))
+        {
+            continue;
+        }
+        // Every row at the highest seq names the one node id; the first in line order stands.
+        let Some((row_cid, node_id)) = at_highest.into_iter().next() else {
+            continue;
+        };
         claims
             .entry(node_id.to_string())
             .or_default()
-            .insert(device.to_string());
+            .push(AdmittedEndpoint {
+                device: device.to_string(),
+                row_cid,
+            });
     }
-    for (node_id, devices) in claims {
-        let mut claimants = devices.into_iter();
-        match (claimants.next(), claimants.next()) {
-            (Some(device), None) => {
-                admission.admitted.insert(node_id, device);
+    for (node_id, mut claimants) in claims {
+        if claimants.len() == 1 {
+            if let Some(endpoint) = claimants.pop() {
+                admission.admitted.insert(node_id, endpoint);
             }
-            (Some(first), Some(second)) => {
-                let mut all: BTreeSet<String> = claimants.collect();
-                all.insert(first);
-                all.insert(second);
-                admission.conflicts.insert(node_id, all);
-            }
-            (None, _) => {}
+        } else {
+            admission.conflicts.insert(
+                node_id,
+                claimants
+                    .into_iter()
+                    .map(|endpoint| endpoint.device)
+                    .collect(),
+            );
         }
     }
     admission
+}
+
+/// One device's verifying endpoint rows at its highest `seq`: `(row CID, node id)` each.
+struct HighestEndpointRows<'a> {
+    seq: u64,
+    rows: Vec<(String, &'a str)>,
 }
 
 /// The roster of the lineage rooted at `chain_root`, built from `rows`: the handle of that
@@ -1507,13 +1596,14 @@ mod tests {
     const NODE_B: &str = "b1b2b3b4b5b6b7b8b9c0c1c2c3c4c5c6c7c8c9d0d1d2d3d4d5d6d7d8d9e0e1e2";
     const NODE_B2: &str = "0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b";
 
-    fn endpoint(root: &Device, dev: &Device, node_id: &str, nonce: &str) -> ParticipantRow {
+    fn endpoint(root: &Device, dev: &Device, node_id: &str, seq: u64) -> ParticipantRow {
         let mut row = ParticipantRow::PeerEndpoint {
             handle: "matthew".into(),
             chain_root: root.did.clone(),
             device: dev.did.clone(),
             node_id: node_id.into(),
-            nonce: nonce.into(),
+            seq,
+            nonce: format!("nonce-{seq}"),
             signature: String::new(),
         };
         let message = row.signing_message().unwrap();
@@ -1544,12 +1634,13 @@ mod tests {
             chain_root: "did:key:zDeviceA".into(),
             device: "did:key:zDeviceB".into(),
             node_id: NODE_B.into(),
+            seq: 7,
             nonce: "nonce-1".into(),
             signature: String::new(),
         };
         let message = String::from_utf8(row.signing_message().unwrap()).unwrap();
         assert_eq!(
-            message, "elohim:participant-roster-row:v1:bafyreieyg23w7zkd66yqdz4xn65xfxj3r2mta6zqkqcdq7obmmrmuyag4y",
+            message, "elohim:participant-roster-row:v1:bafyreietixh7hduwgh5pg7eubyqvr4kn7hopqwipswdz7necdf3fes6scm",
             "the bytes a device signs for its endpoint are fixed: changing them orphans every \
              PeerEndpoint row already written"
         );
@@ -1567,6 +1658,16 @@ mod tests {
         assert_eq!(json["kind"], "peerEndpoint");
         assert_eq!(json["chainRoot"], "did:key:zDeviceA");
         assert_eq!(json["nodeId"], NODE_B);
+        assert_eq!(json["seq"], 7);
+        // seq is under the signature: a row re-sequenced by anyone but the device stops verifying.
+        let mut resequenced = row.clone();
+        if let ParticipantRow::PeerEndpoint { seq, .. } = &mut resequenced {
+            *seq = 8;
+        }
+        assert_ne!(
+            resequenced.signing_message().unwrap(),
+            row.signing_message().unwrap()
+        );
     }
 
     #[test]
@@ -1581,16 +1682,19 @@ mod tests {
             // iroh also PARSES base32, but prints hex: only the printed form is canonical.
             "ksxwu3zbnr4sk2dbmr4xg3lfnrsws2dfnzsxa3dfnr2xg5dfnzsxa3dfnr2q",
         ] {
-            let row = endpoint(&a, &a, bad, "nonce-1");
+            let row = endpoint(&a, &a, bad, 1);
             let err = row.validate_shape().expect_err("not a canonical node id");
             assert!(err.to_string().contains("node id"), "{bad}: {err}");
         }
-        let no_nonce = endpoint(&a, &a, NODE_A, " ");
+        let mut no_nonce = endpoint(&a, &a, NODE_A, 1);
+        if let ParticipantRow::PeerEndpoint { nonce, .. } = &mut no_nonce {
+            *nonce = " ".into();
+        }
         assert!(
             no_nonce.validate_shape().is_err(),
             "an endpoint needs a nonce"
         );
-        let mut unsigned = endpoint(&a, &a, NODE_A, "nonce-1");
+        let mut unsigned = endpoint(&a, &a, NODE_A, 1);
         if let ParticipantRow::PeerEndpoint { signature, .. } = &mut unsigned {
             signature.clear();
         }
@@ -1598,7 +1702,7 @@ mod tests {
             unsigned.validate_shape().is_err(),
             "an unsigned endpoint is refused"
         );
-        endpoint(&a, &a, NODE_A, "nonce-1")
+        endpoint(&a, &a, NODE_A, 1)
             .validate_shape()
             .expect("a canonical endpoint passes");
     }
@@ -1610,7 +1714,7 @@ mod tests {
         let w = ActorRecord::Witness(witness("s1"));
         let mut roster = Roster::new("matthew").unwrap();
         roster.append(genesis(&w, &a)).unwrap();
-        roster.append(endpoint(&a, &a, NODE_A, "n1")).unwrap();
+        roster.append(endpoint(&a, &a, NODE_A, 1)).unwrap();
 
         let admitted = admitted_endpoints(&rows_of(&roster), &a.did, &v);
         assert_eq!(
@@ -1625,8 +1729,8 @@ mod tests {
         let b = device("DeviceB", 2);
         let v = verifier(&[&a, &b]);
         let (mut roster, _) = two_device_roster(&a, &b);
-        roster.append(endpoint(&a, &a, NODE_A, "n1")).unwrap();
-        roster.append(endpoint(&a, &b, NODE_B, "n2")).unwrap();
+        roster.append(endpoint(&a, &a, NODE_A, 1)).unwrap();
+        roster.append(endpoint(&a, &b, NODE_B, 1)).unwrap();
 
         let admitted = admitted_endpoints(&rows_of(&roster), &a.did, &v);
         assert_eq!(
@@ -1648,13 +1752,13 @@ mod tests {
         let mut roster = Roster::new("matthew").unwrap();
         roster.append(genesis(&w, &a)).unwrap();
         // C was never bound: its own well-signed endpoint admits nothing.
-        roster.append(endpoint(&a, &c, NODE_B, "n1")).unwrap();
+        roster.append(endpoint(&a, &c, NODE_B, 1)).unwrap();
         // Half a binding is no binding: B signed alone.
         let half = binding(&a, &a, &b, (false, true));
         assert!(roster.append(half.clone()).is_err());
-        roster.append(endpoint(&a, &b, NODE_B2, "n2")).unwrap();
+        roster.append(endpoint(&a, &b, NODE_B2, 1)).unwrap();
         // A row naming A as its device but signed by C is forged, not A's.
-        let mut forged = endpoint(&a, &a, NODE_A, "n3");
+        let mut forged = endpoint(&a, &a, NODE_A, 1);
         let message = forged.signing_message().unwrap();
         if let ParticipantRow::PeerEndpoint { signature, .. } = &mut forged {
             *signature = sign(&c, &message);
@@ -1675,8 +1779,8 @@ mod tests {
         let b = device("DeviceB", 2);
         let v = verifier(&[&a, &b]);
         let (mut roster, binding_cid) = two_device_roster(&a, &b);
-        roster.append(endpoint(&a, &a, NODE_A, "n1")).unwrap();
-        roster.append(endpoint(&a, &b, NODE_B, "n2")).unwrap();
+        roster.append(endpoint(&a, &a, NODE_A, 1)).unwrap();
+        roster.append(endpoint(&a, &b, NODE_B, 1)).unwrap();
         assert_eq!(admitted_endpoints(&rows_of(&roster), &a.did, &v).len(), 2);
 
         // A contests B's binding, AFTER B's endpoint was written: B loses its endpoint.
@@ -1703,8 +1807,8 @@ mod tests {
         let b = device("DeviceB", 2);
         let v = verifier(&[&a, &b]);
         let (mut roster, _) = two_device_roster(&a, &b);
-        roster.append(endpoint(&a, &b, NODE_B, "n1")).unwrap();
-        let newer = roster.append(endpoint(&a, &b, NODE_B2, "n2")).unwrap();
+        roster.append(endpoint(&a, &b, NODE_B, 1)).unwrap();
+        let newer = roster.append(endpoint(&a, &b, NODE_B2, 2)).unwrap();
         roster.append(contest(&newer.to_string(), &a)).unwrap();
         assert!(
             admitted_endpoints(&rows_of(&roster), &a.did, &v).is_empty(),
@@ -1719,8 +1823,8 @@ mod tests {
         let c = device("DeviceC", 3);
         let v = verifier(&[&a, &b, &c]);
         let (mut roster, _) = two_device_roster(&a, &b);
-        roster.append(endpoint(&a, &b, NODE_B, "n1")).unwrap();
-        roster.append(endpoint(&a, &b, NODE_B2, "n2")).unwrap();
+        roster.append(endpoint(&a, &b, NODE_B, 1)).unwrap();
+        roster.append(endpoint(&a, &b, NODE_B2, 2)).unwrap();
         let admitted = admitted_endpoints(&rows_of(&roster), &a.did, &v);
         assert_eq!(
             admitted,
@@ -1729,7 +1833,7 @@ mod tests {
         );
 
         // A newer row that does not verify as B's never displaces B's valid one.
-        let mut forged = endpoint(&a, &b, NODE_A, "n3");
+        let mut forged = endpoint(&a, &b, NODE_A, 3);
         let message = forged.signing_message().unwrap();
         if let ParticipantRow::PeerEndpoint { signature, .. } = &mut forged {
             *signature = sign(&c, &message);
@@ -1739,13 +1843,98 @@ mod tests {
     }
 
     #[test]
+    fn a_replayed_older_endpoint_row_does_not_roll_back() {
+        let a = device("DeviceA", 1);
+        let b = device("DeviceB", 2);
+        let v = verifier(&[&a, &b]);
+        let (mut roster, _) = two_device_roster(&a, &b);
+        let old = endpoint(&a, &b, NODE_B, 1);
+        let new = endpoint(&a, &b, NODE_B2, 2);
+        roster.append(old.clone()).unwrap();
+        let rotated = roster.append(new.clone()).unwrap();
+        // Someone re-appends B's old, validly signed row after the rotation.
+        roster.append(old.clone()).unwrap();
+
+        let expected = BTreeMap::from([(NODE_B2.to_string(), b.did.clone())]);
+        let rows = rows_of(&roster);
+        assert_eq!(
+            admitted_endpoints(&rows, &a.did, &v),
+            expected,
+            "line order never decides: the retired node id stays retired"
+        );
+        // A history rewritten so the old row simply comes last: still the highest seq wins.
+        let mut reordered: Vec<ParticipantRow> = rows.iter().take(2).cloned().collect();
+        reordered.push(new);
+        reordered.push(old);
+        assert_eq!(admitted_endpoints(&reordered, &a.did, &v), expected);
+        // The admitted entry names the row it stands on.
+        let admission = endpoint_admission(&rows, &a.did, &v);
+        assert_eq!(
+            admission.admitted.get(NODE_B2).map(|e| e.row_cid.clone()),
+            Some(rotated.to_string())
+        );
+    }
+
+    #[test]
+    fn same_seq_different_node_ids_refuses_device() {
+        let a = device("DeviceA", 1);
+        let b = device("DeviceB", 2);
+        let v = verifier(&[&a, &b]);
+        let (mut roster, _) = two_device_roster(&a, &b);
+        roster.append(endpoint(&a, &a, NODE_A, 1)).unwrap();
+        roster.append(endpoint(&a, &b, NODE_B, 1)).unwrap();
+        roster.append(endpoint(&a, &b, NODE_B, 3)).unwrap();
+        roster.append(endpoint(&a, &b, NODE_B2, 3)).unwrap();
+
+        let admission = endpoint_admission(&rows_of(&roster), &a.did, &v);
+        assert_eq!(
+            admission
+                .admitted
+                .iter()
+                .map(|(node, e)| (node.clone(), e.device.clone()))
+                .collect::<BTreeMap<_, _>>(),
+            BTreeMap::from([(NODE_A.to_string(), a.did.clone())]),
+            "a device that names two node ids at one seq admits neither, nor an older one"
+        );
+        assert_eq!(
+            admission.equivocations,
+            BTreeMap::from([(
+                b.did.clone(),
+                BTreeSet::from([NODE_B.to_string(), NODE_B2.to_string()])
+            )])
+        );
+
+        // The same node id twice at one seq (a re-run) is not an equivocation.
+        roster.append(endpoint(&a, &b, NODE_B2, 4)).unwrap();
+        let mut again = endpoint(&a, &b, NODE_B2, 4);
+        if let ParticipantRow::PeerEndpoint {
+            nonce, signature, ..
+        } = &mut again
+        {
+            *nonce = "another-nonce".into();
+            signature.clear();
+        }
+        let message = again.signing_message().unwrap();
+        if let ParticipantRow::PeerEndpoint { signature, .. } = &mut again {
+            *signature = sign(&b, &message);
+        }
+        roster.append(again).unwrap();
+        let admission = endpoint_admission(&rows_of(&roster), &a.did, &v);
+        assert!(admission.equivocations.is_empty());
+        assert_eq!(
+            admission.admitted.get(NODE_B2).map(|e| e.device.clone()),
+            Some(b.did.clone())
+        );
+    }
+
+    #[test]
     fn a_node_id_claimed_by_two_devices_admits_neither() {
         let a = device("DeviceA", 1);
         let b = device("DeviceB", 2);
         let v = verifier(&[&a, &b]);
         let (mut roster, _) = two_device_roster(&a, &b);
-        roster.append(endpoint(&a, &a, NODE_A, "n1")).unwrap();
-        roster.append(endpoint(&a, &b, NODE_A, "n2")).unwrap();
+        roster.append(endpoint(&a, &a, NODE_A, 1)).unwrap();
+        roster.append(endpoint(&a, &b, NODE_A, 1)).unwrap();
 
         let admission = endpoint_admission(&rows_of(&roster), &a.did, &v);
         assert!(admission.admitted.is_empty(), "both claimants are refused");
@@ -1759,7 +1948,7 @@ mod tests {
         assert!(admitted_endpoints(&rows_of(&roster), &a.did, &v).is_empty());
 
         // B rotates away from the shared id: both are admitted again.
-        roster.append(endpoint(&a, &b, NODE_B, "n3")).unwrap();
+        roster.append(endpoint(&a, &b, NODE_B, 2)).unwrap();
         assert_eq!(admitted_endpoints(&rows_of(&roster), &a.did, &v).len(), 2);
     }
 
@@ -1773,12 +1962,12 @@ mod tests {
         // Eve's rival genesis is FIRST in line order, then A's lineage.
         let mut roster = Roster::new("matthew").unwrap();
         roster.append(genesis(&w, &eve)).unwrap();
-        roster.append(endpoint(&eve, &eve, NODE_B2, "n0")).unwrap();
+        roster.append(endpoint(&eve, &eve, NODE_B2, 1)).unwrap();
         roster.append(genesis(&w, &a)).unwrap();
         roster.append(binding(&a, &a, &b, (true, true))).unwrap();
-        roster.append(endpoint(&a, &b, NODE_B, "n1")).unwrap();
+        roster.append(endpoint(&a, &b, NODE_B, 1)).unwrap();
         // An endpoint naming Eve's root, signed by B, counts for nothing in A's lineage.
-        roster.append(endpoint(&eve, &b, NODE_A, "n2")).unwrap();
+        roster.append(endpoint(&eve, &b, NODE_A, 2)).unwrap();
 
         let rows = rows_of(&roster);
         assert_eq!(

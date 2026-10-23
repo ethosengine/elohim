@@ -41,9 +41,9 @@ use std::process::ExitCode;
 use cid::Cid;
 use elohim_epr_rea::{
     endpoint_admission, parse_acting_participant, parse_participant_ref, record_signing_message,
-    standing_human_pinned, verify_binding, ActorClaim, ActorRecord, ActorStore, ActorWitness,
-    FabricError, ParticipantRef, ParticipantRow, RecordSignature, Roster, RosterStanding,
-    RosterVia, SidecarActorStore, SidecarRoster, SignatureVerifier,
+    standing_human_pinned, verify_binding, verify_peer_endpoint, ActorClaim, ActorRecord,
+    ActorStore, ActorWitness, FabricError, ParticipantRef, ParticipantRow, RecordSignature, Roster,
+    RosterStanding, RosterVia, SidecarActorStore, SidecarRoster, SignatureVerifier,
 };
 use eprfs_meta::hex_lower;
 use rand_core::{OsRng, RngCore};
@@ -1845,6 +1845,9 @@ pub struct EndpointOutcome {
     pub device: String,
     /// The iroh node id the roster now admits for this device.
     pub node_id: String,
+    /// The `seq` of the appended row — one above this device's highest; `null` when nothing was
+    /// appended.
+    pub seq: Option<u64>,
     /// CID of the `PeerEndpoint` row that names `node_id` for this device.
     pub row_cid: String,
     /// `false` when the roster already admitted `node_id` for this device and nothing was
@@ -1910,27 +1913,24 @@ pub fn device_endpoint(
     let rows: Vec<ParticipantRow> = roster.rows().iter().map(|(_, row)| row.clone()).collect();
     let admission = endpoint_admission(&rows, &chain_root, &verifier);
     match admission.admitted.get(node_id) {
-        Some(owner) if *owner == did => {
-            let row_cid = newest_endpoint_row(&roster, &did, node_id).ok_or_else(|| {
-                ActorError::InvalidArguments(format!(
-                    "{node_id} is admitted for this device but no endpoint row names it"
-                ))
-            })?;
+        Some(admitted) if admitted.device == did => {
+            // The verified row admission stands on — never an unverified row that names the id.
             return Ok(EndpointOutcome {
                 handle: handle.clone(),
                 chain_root,
                 device: did,
                 node_id: node_id.to_string(),
-                row_cid,
+                seq: None,
+                row_cid: admitted.row_cid.clone(),
                 appended: false,
                 roster_path: roster_rel(&handle),
             });
         }
-        Some(owner) => {
+        Some(admitted) => {
             return Err(ActorError::InvalidArguments(format!(
                 "node id {node_id} is already admitted for {} — one node id answers for one \
                  device, and a second claim would refuse both",
-                short_did(owner)
+                short_did(&admitted.device)
             )))
         }
         None => {}
@@ -1945,6 +1945,7 @@ pub fn device_endpoint(
         }
     }
 
+    let seq = next_endpoint_seq(&rows, &did, &verifier)?;
     let mut nonce = [0u8; 16];
     OsRng.fill_bytes(&mut nonce);
     let row = signed_row(
@@ -1953,6 +1954,7 @@ pub fn device_endpoint(
             chain_root: chain_root.clone(),
             device: did.clone(),
             node_id: node_id.to_string(),
+            seq,
             nonce: hex_lower(&nonce),
             signature: String::new(),
         },
@@ -1964,6 +1966,7 @@ pub fn device_endpoint(
         chain_root,
         device: did,
         node_id: node_id.to_string(),
+        seq: Some(seq),
         row_cid: row_cid.to_string(),
         appended: true,
         roster_path: roster_rel(&handle),
@@ -1990,16 +1993,33 @@ fn endpoint_handle(root: &Path, did: &str) -> ActorResult<String> {
     }
 }
 
-/// The CID of the newest `PeerEndpoint` row by `did` naming `node_id`.
-fn newest_endpoint_row(roster: &Roster, did: &str, node_id: &str) -> Option<String> {
-    roster.rows().iter().rev().find_map(|(cid, row)| match row {
-        ParticipantRow::PeerEndpoint {
-            device,
-            node_id: named,
-            ..
-        } if device == did && named == node_id => Some(cid.to_string()),
-        _ => None,
-    })
+/// The `seq` this device's next endpoint row carries: one above the highest `seq` among the
+/// device's own verifying endpoint rows, so it supersedes every one of them. Rows that do not
+/// verify as the device's are not the device's and never raise it.
+fn next_endpoint_seq(
+    rows: &[ParticipantRow],
+    did: &str,
+    verifier: &dyn SignatureVerifier,
+) -> ActorResult<u64> {
+    let highest = rows
+        .iter()
+        .filter_map(|row| match row {
+            ParticipantRow::PeerEndpoint { device, seq, .. }
+                if device == did && verify_peer_endpoint(row, verifier).is_ok() =>
+            {
+                Some(*seq)
+            }
+            _ => None,
+        })
+        .max();
+    match highest {
+        None => Ok(1),
+        Some(seq) => seq.checked_add(1).ok_or_else(|| {
+            ActorError::InvalidArguments(
+                "this device's endpoint sequence is exhausted — no higher seq exists".into(),
+            )
+        }),
+    }
 }
 
 fn binding_row(
