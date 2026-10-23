@@ -70,7 +70,8 @@ _META_KEYS = {"epr-habit-version", "cites"}
 # Canonical field order in the projection. Anything else follows in declared order.
 _FIELD_ORDER = ("id", "invariant", "status", "active", "checks", "evidence")
 
-_SKIP = ("/node_modules/", "/.claude/worktrees/", "/fixtures/", "/__tests__/")
+_SKIP = ("/node_modules/", "/.worktrees/", "/.claude/worktrees/", "/local-dev/", "/fixtures/",
+         "/__tests__/")
 
 
 def governed_dir(habit_path: Path) -> Path:
