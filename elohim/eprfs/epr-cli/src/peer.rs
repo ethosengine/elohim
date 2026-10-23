@@ -23,6 +23,7 @@ use std::process::ExitCode;
 use std::sync::Arc;
 use std::time::{SystemTime, UNIX_EPOCH};
 
+use elohim_epr_rea::ParticipantRow;
 use eprfs_peer::{
     lease_events, other_devices, peer_from_arg, relay_from_env, roster_rows_from_file,
     steward_lease_view, Admission, CrossingAllowList, HeadTable, LeaseVerdict, NodeAddr,
@@ -379,6 +380,18 @@ struct StatusOutcome {
     devices: Vec<DeviceStatus>,
     dropped: eprfs_peer::DroppedHeads,
     channel: eprfs_peer::ChannelCounters,
+    /// Connections this device's daemon refused, per node id, with the device the roster names
+    /// for it (a contested device's old endpoint row still names it); `None` for a stranger.
+    refused_connections: Vec<RefusedConnections>,
+}
+
+/// One node id's refused connections, as `status` reports them.
+#[derive(Debug, Serialize)]
+#[serde(rename_all = "camelCase")]
+struct RefusedConnections {
+    node_id: String,
+    device: Option<String>,
+    count: u64,
 }
 
 fn status(options: &Options) -> PeerResult<ExitCode> {
@@ -408,6 +421,22 @@ fn status(options: &Options) -> PeerResult<ExitCode> {
             acked: head.and_then(|h| h.folded.get(&did).copied()),
         });
     }
+    let rows = roster_rows_from_file(&device.lineage.roster)?;
+    let refused_connections = table
+        .channel
+        .refused_connections
+        .iter()
+        .map(|(node, count)| RefusedConnections {
+            node_id: node.clone(),
+            device: rows.iter().find_map(|row| match row {
+                ParticipantRow::PeerEndpoint {
+                    device, node_id, ..
+                } if node_id == node => Some(device.clone()),
+                _ => None,
+            }),
+            count: *count,
+        })
+        .collect();
     let outcome = StatusOutcome {
         handle: device.lineage.handle.clone(),
         chain_root: device.lineage.chain_root.clone(),
@@ -417,6 +446,7 @@ fn status(options: &Options) -> PeerResult<ExitCode> {
         devices,
         dropped: table.dropped,
         channel: table.channel,
+        refused_connections,
     };
     if options.json {
         println!("{}", serde_json::to_string_pretty(&outcome)?);
@@ -458,6 +488,20 @@ fn render(outcome: &StatusOutcome) {
         "dropped heads  unadmitted {}  forged {}  rollback {}  replayed {}  malformed {}",
         d.unadmitted, d.forged, d.rollback, d.replayed, d.malformed
     );
+    if !outcome.refused_connections.is_empty() {
+        let refused: Vec<String> = outcome
+            .refused_connections
+            .iter()
+            .map(|r| {
+                let who = r
+                    .device
+                    .as_deref()
+                    .map_or_else(|| format!("stranger {}", short(&r.node_id)), short);
+                format!("{who}: {}", r.count)
+            })
+            .collect();
+        println!("refused connections  {}", refused.join("  "));
+    }
     let c = &outcome.channel;
     if let Some(error) = &c.last_projection_error {
         println!(

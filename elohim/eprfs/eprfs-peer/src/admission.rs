@@ -91,7 +91,7 @@ impl Admission {
 
 /// A node id in the roster's canonical form: its 32 bytes as lowercase hex. Computed from the
 /// bytes rather than iroh's `Display`, so the comparison cannot drift with a printing change.
-fn node_id_hex(node: &NodeId) -> String {
+pub(crate) fn node_id_hex(node: &NodeId) -> String {
     node.as_bytes()
         .iter()
         .fold(String::with_capacity(64), |mut hex, byte| {

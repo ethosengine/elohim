@@ -655,3 +655,125 @@ async fn a_contest_during_a_stalled_fold_appends_nothing_and_records_no_head() {
     router_c.shutdown().await.expect("shutdown C");
     daemon_a.shutdown().await;
 }
+
+/// A node id as the head table keys refused connections: its 32 bytes in lowercase hex.
+fn hex(node: iroh::NodeId) -> String {
+    node.as_bytes().iter().map(|b| format!("{b:02x}")).collect()
+}
+
+/// The QUIC application code a connection was closed with, once it closes.
+async fn closed_with(connection: &iroh::endpoint::Connection) -> Option<u64> {
+    match tokio::time::timeout(WITHIN, connection.closed()).await {
+        Ok(iroh::endpoint::ConnectionError::ApplicationClosed(close)) => {
+            Some(close.error_code.into_inner())
+        }
+        _ => None,
+    }
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn a_contested_device_is_disconnected_refused_like_a_stranger_and_counted() {
+    let a = device("DeviceA", 1);
+    let c = device("DeviceC", 3);
+    let dirs: Vec<tempfile::TempDir> = (0..3).map(|_| tempfile::tempdir().unwrap()).collect();
+    let (key_a, key_c, key_d) = (
+        load_key(dirs[0].path()),
+        load_key(dirs[1].path()),
+        load_key(dirs[2].path()),
+    );
+    let bound = binding(&a, &c);
+    let rows = vec![
+        genesis(&a),
+        bound.clone(),
+        endpoint_row(&a, &a, &key_a),
+        endpoint_row(&a, &c, &key_c),
+    ];
+    let side_a = Side::new(&rows);
+    let port_a = free_port();
+    let daemon_a = PeerDaemon::start(config(
+        &a,
+        &a.did,
+        key_a,
+        &side_a,
+        &[&a, &c],
+        vec![],
+        local(port_a),
+    ))
+    .await
+    .expect("A starts");
+    let addr_a = iroh::NodeAddr::new(daemon_a.node_id())
+        .with_direct_addresses([std::net::SocketAddr::V4(local(port_a))]);
+    let alpns = vec![eprfs_peer::TIER_ALPN.to_vec(), iroh_gossip::ALPN.to_vec()];
+    let endpoint_c = eprfs_peer::bind(&key_c, None, alpns.clone())
+        .await
+        .expect("C binds");
+    let endpoint_d = eprfs_peer::bind(&key_d, None, alpns)
+        .await
+        .expect("D binds");
+    let tree = eprfs_core::TreeLimits::default();
+    let question = eprfs_peer::TierRequest::Read {
+        root: eprfs_core::BlobCid::compute(b"no such root"),
+        path: eprfs_core::TreePath::from_slash_bytes(b"channel").expect("path"),
+    };
+
+    // C, admitted, holds an open tier connection that A has answered on.
+    let open = endpoint_c
+        .connect(addr_a.clone(), eprfs_peer::TIER_ALPN)
+        .await
+        .expect("C connects");
+    eprfs_peer::tier_request(&open, &question, &tree)
+        .await
+        .expect("A answers an admitted device");
+
+    // A contests C in its own checkout: with no restart, A closes C's open connection.
+    SidecarRoster::open(side_a.checkout.dir.path(), HANDLE)
+        .expect("roster")
+        .append(contest(&a, &bound))
+        .expect("contest");
+    assert_eq!(
+        closed_with(&open).await,
+        Some(u64::from(eprfs_peer::NOT_ADMITTED)),
+        "the contested device's open connection is closed as not admitted"
+    );
+
+    // New connections from C are refused exactly as a stranger's (D's): the gossip ALPN closes
+    // them with the same code, and the tier gives the same uniform refusal.
+    for (who, endpoint) in [("C", &endpoint_c), ("stranger D", &endpoint_d)] {
+        let gossip = endpoint
+            .connect(addr_a.clone(), iroh_gossip::ALPN)
+            .await
+            .expect("the handshake completes");
+        assert_eq!(
+            closed_with(&gossip).await,
+            Some(u64::from(eprfs_peer::NOT_ADMITTED)),
+            "{who}'s gossip connection is refused"
+        );
+    }
+    let ask = |endpoint: iroh::Endpoint| {
+        let (addr, question, tree) = (addr_a.clone(), question.clone(), tree.clone());
+        async move {
+            eprfs_peer::tier_call(&endpoint, addr, question, &tree)
+                .await
+                .expect("an answer")
+        }
+    };
+    let from_c = ask(endpoint_c.clone()).await;
+    let from_d = ask(endpoint_d.clone()).await;
+    assert!(
+        matches!(from_c, eprfs_peer::TierAnswer::Unanswered { .. }),
+        "{from_c:?}"
+    );
+    assert_eq!(from_c, from_d, "C gets a stranger's refusal");
+
+    // A counts the refused connections per node id, in the head table `epr peer status` reads.
+    eventually("A records C's and D's refused connections", || {
+        let refused = side_a.table().channel.refused_connections;
+        refused.get(&hex(key_c.node_id())).copied().unwrap_or(0) >= 3
+            && refused.get(&hex(key_d.node_id())).copied().unwrap_or(0) >= 2
+    })
+    .await;
+
+    daemon_a.shutdown().await;
+    endpoint_c.close().await;
+    endpoint_d.close().await;
+}

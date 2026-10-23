@@ -216,6 +216,7 @@ impl TierCounters {
 #[derive(Clone)]
 pub struct TierProtocol {
     inner: Arc<Inner>,
+    book: crate::connections::ConnectionBook,
 }
 
 struct Inner {
@@ -250,6 +251,7 @@ impl TierProtocol {
         let gate = StewardDevicesGate::new(admission);
         let endpoint = TierEndpoint::new(self_id, store, gate.clone(), None, limits.tree)?;
         Ok(TierProtocol {
+            book: crate::connections::ConnectionBook::default(),
             inner: Arc::new(Inner {
                 gate,
                 endpoint,
@@ -257,6 +259,14 @@ impl TierProtocol {
                 counters: TierCounters::default(),
             }),
         })
+    }
+
+    /// Record accepted connections in `book`, so a reload that drops a device can close what it
+    /// holds open, and count there each connection accepted from a node id not admitted (it is
+    /// still answered, with the uniform refusal).
+    pub fn with_book(mut self, book: crate::connections::ConnectionBook) -> TierProtocol {
+        self.book = book;
+        self
     }
 
     pub fn counters(&self) -> TierCountersSnapshot {
@@ -273,6 +283,11 @@ impl ProtocolHandler for TierProtocol {
     async fn accept(&self, connection: Connection) -> Result<(), AcceptError> {
         // The handshake proved the peer holds this node id's key; nothing it sends names it.
         let remote = connection.remote_node_id()?;
+        if self.inner.gate.requester(&remote).agent().is_some() {
+            self.book.admitted(remote, &connection);
+        } else {
+            self.book.refused(remote);
+        }
         let per_connection = self.inner.limits.max_streams_per_connection.max(1);
         let mut streams = JoinSet::new();
         loop {

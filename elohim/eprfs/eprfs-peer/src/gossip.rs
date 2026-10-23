@@ -14,10 +14,8 @@ use iroh::endpoint::{Connection, VarInt};
 use iroh::protocol::{AcceptError, ProtocolHandler};
 use iroh_gossip::net::Gossip;
 
+use crate::connections::{ConnectionBook, NOT_ADMITTED};
 use crate::gate::SharedAdmission;
-
-/// The QUIC error code an unadmitted gossip connection is closed with.
-const NOT_ADMITTED: u32 = 1;
 
 /// iroh-gossip, answering admitted devices only. Mount it under [`iroh_gossip::ALPN`].
 #[derive(Debug, Clone)]
@@ -25,6 +23,7 @@ pub struct GatedGossip {
     gossip: Gossip,
     admission: SharedAdmission,
     refused: Arc<AtomicU64>,
+    book: ConnectionBook,
 }
 
 impl GatedGossip {
@@ -33,7 +32,15 @@ impl GatedGossip {
             gossip,
             admission,
             refused: Arc::new(AtomicU64::new(0)),
+            book: ConnectionBook::default(),
         }
+    }
+
+    /// Record accepted connections in `book` and count refusals there, so a reload that drops a
+    /// device can close what it holds open.
+    pub fn with_book(mut self, book: ConnectionBook) -> GatedGossip {
+        self.book = book;
+        self
     }
 
     /// Connections closed because their node id was not admitted.
@@ -52,9 +59,11 @@ impl ProtocolHandler for GatedGossip {
             .is_ok_and(|admission| admission.admits(&remote).is_some());
         if !admitted {
             self.refused.fetch_add(1, Ordering::Relaxed);
+            self.book.refused(remote);
             connection.close(VarInt::from_u32(NOT_ADMITTED), b"");
             return Ok(());
         }
+        self.book.admitted(remote, &connection);
         self.gossip.accept(connection).await
     }
 

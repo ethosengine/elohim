@@ -35,6 +35,7 @@ mod admission;
 mod allow;
 mod announce;
 mod channel;
+mod connections;
 mod daemon;
 mod endpoint;
 mod error;
@@ -56,6 +57,7 @@ pub use announce::{
 pub use channel::{
     channel_tier_id, project_channel, ChannelStore, ChannelTree, CHANNEL_EVENTS, RETAINED_ROOTS,
 };
+pub use connections::{ConnectionBook, NOT_ADMITTED};
 pub use daemon::{PeerConfig, PeerDaemon, FOLD_DEADLINE, TICK};
 pub use endpoint::{bind, bind_on, peer_from_arg, relay_from_env, relay_from_value, RELAY_ENV};
 pub use error::PeerError;

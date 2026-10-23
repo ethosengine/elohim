@@ -40,6 +40,7 @@ use crate::admission::{roster_rows_from_file, Admission};
 use crate::allow::CrossingAllowList;
 use crate::announce::{topic_for, Channel, HeadVerdict};
 use crate::channel::{channel_tier_id, project_channel, ChannelStore};
+use crate::connections::ConnectionBook;
 use crate::endpoint::bind_on;
 use crate::error::PeerError;
 use crate::fold::{fold_root, FoldLimits, FoldReport, FoldTarget};
@@ -118,6 +119,7 @@ impl PeerDaemon {
         table.save(&config.state_dir)?;
         let store = Arc::new(ChannelStore::default());
         let limits = TierLimits::default();
+        let book = ConnectionBook::default();
         let tier = TierProtocol::new(
             channel_tier_id(),
             store.clone(),
@@ -126,7 +128,8 @@ impl PeerDaemon {
         )
         .map_err(|e| PeerError::ChannelTree {
             reason: e.to_string(),
-        })?;
+        })?
+        .with_book(book.clone());
 
         let endpoint = bind_on(
             &config.key,
@@ -140,7 +143,7 @@ impl PeerDaemon {
             .accept(TIER_ALPN, tier)
             .accept(
                 iroh_gossip::ALPN,
-                GatedGossip::new(gossip.clone(), admission.clone()),
+                GatedGossip::new(gossip.clone(), admission.clone()).with_book(book.clone()),
             )
             .spawn();
 
@@ -160,6 +163,7 @@ impl PeerDaemon {
         let run = Run {
             channel: Channel::new(config.device.clone(), table),
             admission,
+            book,
             flow,
             store,
             endpoint,
@@ -294,6 +298,8 @@ struct Run {
     config: PeerConfig,
     channel: Channel,
     admission: SharedAdmission,
+    /// The connections the tier and gossip accepted, and those they refused.
+    book: ConnectionBook,
     flow: SidecarFlowStore,
     store: Arc<ChannelStore>,
     endpoint: Endpoint,
@@ -386,6 +392,12 @@ impl Run {
 
     async fn tick(&mut self) -> Result<(), PeerError> {
         self.reload_roster().await;
+        // Refused connections reach the head table `epr peer status` reads, announce or not.
+        let refused = self.book.refused_counts();
+        if self.channel.table().channel.refused_connections != refused {
+            self.channel.counters_mut().refused_connections = refused;
+            self.save()?;
+        }
         self.reproject()?;
         let now = Instant::now();
         if !self.channel.due(now) {
@@ -436,6 +448,13 @@ impl Run {
         };
         if let Ok(mut admission) = self.admission.write() {
             admission.reload(&rows, &*self.config.verifier);
+            // A device the reload dropped keeps nothing it had open here.
+            let closed = self.book.close_unadmitted(&admission);
+            if closed > 0 {
+                self.log(&format!(
+                    "closed {closed} connection(s) of devices no longer admitted"
+                ));
+            }
         }
         self.drop_unadmitted_folds();
         let me = self.endpoint.node_id();
