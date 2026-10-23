@@ -119,6 +119,8 @@ class FoldEveryKindTest(unittest.TestCase):
             ("note", ".", lambda: b.say("s1", "hello")),
             ("shed", ".", lambda: b.record("shed", resource="cargo", guard="ram-guard", level=2)),
             ("unmoor", ".", lambda: b.unmoor("s1")),
+            ("refuse", ".", lambda: b.record("refuse", resource="mesh", session="s1", reason="held")),
+            ("overrun", ".", lambda: b.record("overrun", resource="mesh", holder="s1", ttl_s=60, held_s=90)),
         ]
         for kind, subject, act in steps:
             before = len(self.folds())
@@ -136,6 +138,29 @@ class FoldEveryKindTest(unittest.TestCase):
                 self.assertEqual(fold["env"][key], val if isinstance(val, str) else json.dumps(val, sort_keys=True, separators=(",", ":")) if isinstance(val, (list, dict)) else str(val), f"{kind}.{key}")
         claim = [e for e in self.folds() if e["reason"] == "claim"][0]
         self.assertEqual((claim["env"]["resource"], claim["env"]["session"], claim["env"]["note"]), ("cargo", "s1", "why"))
+
+    def test_fold_emitter_runs_with_the_berth_lock_released(self):
+        """claim/release call record() inside the re-entrant lock; the epr subprocess must not."""
+        seen = []
+        b = self.berth
+
+        def emit(measure, subject, value, *, reason, env=None, root=None):
+            fd = os.open(b.lock_path, os.O_RDWR)
+            try:
+                import fcntl
+                fcntl.flock(fd, fcntl.LOCK_EX | fcntl.LOCK_NB)  # raises if the lock is held
+                fcntl.flock(fd, fcntl.LOCK_UN)
+                seen.append((reason, b._lock_depth.get("berth")))
+            finally:
+                os.close(fd)
+            return True
+
+        b._obs = type("O", (), {"available": lambda self: True, "emit": staticmethod(emit)})()
+        b.moor("s1")
+        b.claim("cargo", "s1")
+        b.release("cargo", "s1")
+        self.assertEqual([r for r, _ in seen], ["moor", "claim", "release"])
+        self.assertTrue(all(depth == 0 for _, depth in seen))
 
     def test_fold_emitter_missing_costs_fold_not_lease(self):
         self.obs._available = False

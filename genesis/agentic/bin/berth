@@ -198,6 +198,7 @@ class Berth:
         self.capacities, self.mooring_ttl_s, self.classes = load_policy(policy_path)
         self._obs = obs  # the `_observation` emitter; injected by tests, else imported lazily
         self._lock_depth = {}
+        self._pending_folds = []  # (kind, row) queued by record(); flushed once no berth lock is held
         self.pid_alive = pid_alive  # injectable: tests model liveness and incarnation
         self.pid_start = pid_start_time
 
@@ -232,6 +233,8 @@ class Berth:
                 fcntl.flock(fd, fcntl.LOCK_UN)
         finally:
             os.close(fd)
+        if name == "berth":
+            self._flush_folds()  # outermost exit: the lock is released, the `epr` subprocess may run
 
     def record(self, kind, **fields):
         ev = {"at": round(self.now(), 3), "kind": kind}
@@ -243,16 +246,28 @@ class Berth:
                 os.write(fd, line)
             finally:
                 os.close(fd)
-        self._fold(kind, ev)
+        # Queue, never emit under the lock: record() runs inside claim/release/moor's critical section
+        # (the lock is re-entrant), and a slow `epr` (5 s timeout) would stall every concurrent claimant.
+        # The queue flushes when the outermost `berth` lock exits — here, if record() is the outermost.
+        # External writers (io-guard's shed rows) must go through Berth.record so they fold too.
+        self._pending_folds.append((kind, ev))
+        if not self._lock_depth.get("berth"):
+            self._flush_folds()
         return ev
+
+    def _flush_folds(self):
+        while self._pending_folds:
+            kind, ev = self._pending_folds.pop(0)
+            self._fold(kind, ev)
 
     def _fold(self, kind, ev):
         """The same record as one `dev-berth-events@1` fold on this host's flow store (habit
         ledgers-fold-once). Subject is always `.`: `epr flow note` resolves a subject as an atom address,
         gap id or readable path and refuses a bare resource name like `cargo`, so the resource rides in
         env (as in dev-berth-held-by-measure@1). reason = the kind; env = every field of the record as a
-        string (absent fields omitted; lists/dicts as compact JSON). Fail-open and outside the ledger
-        lock: a missing emitter costs the fold, never the lease."""
+        string (absent fields omitted; lists/dicts as compact JSON; a row's own `reason` rides as env:reason,
+        distinct from the emit's --reason = the kind). Called only from _flush_folds, i.e. with no berth
+        lock held. Fail-open: a missing emitter costs the fold, never the lease."""
         try:
             obs = self.observation()
             if obs is None:
