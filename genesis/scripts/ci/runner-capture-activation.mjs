@@ -1,6 +1,8 @@
 // CI-only read wrapper: bind a bootstrap receipt to the current reviewed grant window.
 import assert from "node:assert/strict";
 import { withClusterTransport } from "./runner-cluster-transport.mjs";
+import { inspectProviderBootstrap } from "./runner-provider-diagnostics.mjs";
+import { readRecoveryProof } from "./runner-recovery-diagnostics.mjs";
 import { execFileSync } from "node:child_process";
 import {
   readFileSync,
@@ -237,15 +239,21 @@ export async function readPersistedLogs({
   const call = (argv) => {
     const remaining = deadline - now();
     assert(remaining > 0, "persisted-log observation deadline");
+    // The fixed exec now includes two sequential five-second read-only HTTP calls.
+    // Pod observations stay short; neither arm extends the shared deadline.
+    const isExec = argv[0] === "exec";
     return execute(
       "kubectl",
       [
-        `--request-timeout=${Math.max(1, Math.floor(Math.min(3000, remaining)))}ms`,
+        `--request-timeout=${Math.max(1, Math.floor(Math.min(isExec ? 12000 : 3000, remaining)))}ms`,
         ...argv,
       ],
       {
         ...options,
-        timeout: Math.max(1, Math.floor(Math.min(4000, remaining))),
+        timeout: Math.max(
+          1,
+          Math.floor(Math.min(isExec ? 13000 : 4000, remaining)),
+        ),
         killSignal: "SIGKILL",
       },
     );
@@ -366,6 +374,10 @@ export async function captureDiagnostics({
       ["logs", pod, "-n", namespace, "-c", "compute-worker", "--tail=100"],
     ],
     [
+      "provider-errors.json",
+      ["logs", pod, "-n", namespace, "-c", "elohim-node", "--tail=200"],
+    ],
+    [
       "previous.log",
       [
         "logs",
@@ -430,7 +442,9 @@ for (const peer of ['matthew','jessica','james']) {
   console.log('identity-observation ' + JSON.stringify({ path: directory, credentialCount: names.length }));
   for (const name of names.sort()) observe(directory + '/' + name, true);
  } catch (error) { console.log('identity-observation ' + JSON.stringify({ path: directory, ...(error.code === 'ENOENT' ? { missing: true } : { unavailable: true }) })); }
-}`;
+}
+console.log('recovery-proof ' + JSON.stringify((${readRecoveryProof.toString()})()));
+(${inspectProviderBootstrap.toString()})().then(result => console.log('provider-observation ' + JSON.stringify(result)), () => console.log('provider-observation unavailable'));`;
   reads.push([
     "mesh-startup.log",
     [
@@ -478,6 +492,42 @@ for (const peer of ['matthew','jessica','james']) {
       !String(output).startsWith("diagnostic read unavailable")
     )
       originalUid = String(output).split("\n")[0];
+    if (file === "provider-errors.json") {
+      // Server logs can contain arbitrary request data: publish categories only.
+      const errors = String(output)
+        .split("\n")
+        .filter((line) => /Request error/i.test(line));
+      const classifiers = [
+        [
+          /capability|cap.?grant|cap.?secret|unauthoriz/i,
+          "native-authorization",
+        ],
+        [/timed? ?out|timeout|deadline/i, "native-timeout"],
+        [
+          /deserial|serializ|decode|missing field|invalid type/i,
+          "native-wire-shape",
+        ],
+        [/sqlite|database|locked/i, "database"],
+        [/not found|missing/i, "native-record-missing"],
+        [/connect|socket|transport/i, "native-transport"],
+      ];
+      output =
+        JSON.stringify({
+          kind: "provider-log-observation",
+          requestErrorCount: errors.length,
+          readUnavailable: String(output).startsWith(
+            "diagnostic read unavailable",
+          ),
+          categories: errors
+            .slice(-16)
+            .map(
+              (line) =>
+                classifiers.find(([pattern]) => pattern.test(line))?.[1] ||
+                "request-error-unclassified",
+            ),
+          grantRequestCorrelationProven: false,
+        }) + "\n";
+    }
     writeFileSync(join(directory, file), redact(output), { mode: 0o644 });
     chmodSync(join(directory, file), 0o644);
   }

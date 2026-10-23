@@ -168,6 +168,12 @@ by its peers. Spare RAM cannot satisfy missing instructions. A compatible ELF
 cannot authorize a task. A successful task cannot establish interoperability
 with a different flavor unless that interaction was measured.
 
+Matthew's shorthand is **blood-type compatibility for donor and recipient**:
+compatibility is directional, so an artifact's requirements must fit the receiving
+machine's observed capabilities. This describes the matching rule; artifact
+provenance, current execution authority and communication between participating
+peers still require their own evidence.
+
 ### Evidence and its boundary
 
 - Edge **1683** exposed `Fatal glibc error: CPU does not support x86-64-v3`
@@ -351,8 +357,9 @@ reached its first directory creation. The byte-bound continuation checks the ret
 log, rejects prior-storage witnesses, and compares installed agent/cell identities before
 and after readiness. Its unresolved attempt refuses replay. Probe:
 `hc-mesh-initialization-continuation.test.sh` plus actual provider before/after identity
-and readiness evidence. Current live state **RED**: focused fixtures verify the repair,
-but live continuation, G2 and the native three-scenario completion remain unproven.
+and readiness evidence. The first attempt remained **RED** at storage readiness;
+Edge **1699** subsequently completed the reviewed continuation, as recorded below.
+G2 and the native three-scenario completion remain unproven.
 
 Two further stations were exposed before that live attempt:
 
@@ -365,8 +372,8 @@ Two further stations were exposed before that live attempt:
   refusal fixtures. Source `b8d1f8295` passes those checks and a read-only call
   against three local conductors, five provisioned cells each. The private
   `continuation-local-app-identities.jsonl` receipt records that local evidence.
-  Current state: **GREEN locally; Edge 1694 passed the initial live identity
-  inspection, but the full continuation remains RED at storage readiness**. Source
+  Current state: **GREEN locally and in Edge 1699's before/after comparison**;
+  Edge 1694 had passed the initial inspection before refusing storage readiness. Source
   `6b06b6c6` is barred from activation despite its successful mocked checks.
 - Chain `measure-runs-on-a-peer`, between a source correction and publication
   of its execution flavor: make the cost of rebuilding unchanged native inputs
@@ -417,8 +424,8 @@ record per-stage elapsed time and the deadline outcome, then verify unchanged
 conductor identities against the original retained snapshot. Before another
 attempt, inspect which storage identities were persisted; absence after an
 interruption must not be treated as permission to replace an existing identity.
-Current state: **RED**. Neither a longer timeout nor a process-start message is
-completion evidence; never erase the consumed attempt to obtain a retry.
+State after Edge 1694: **RED**. Neither a longer timeout nor a process-start
+message is completion evidence; never erase the consumed attempt to obtain a retry.
 
 Edge **1696** supplied the missing state observation. Each peer retained a
 nonempty database, its libp2p `identity.key`, and one infrastructure signing
@@ -431,5 +438,24 @@ attempt binds that exact inventory, retains the original snapshot and all prior
 evidence, and requires unchanged pre-existing keys and credentials at completion.
 The runtime can refresh rejected signing credentials on an open cell, so private
 backup plus hash comparison detects that outcome; it does not prove replacement
-is impossible. The longer readiness path and additional recovery remain
-**unproven on Adam** until a new immutable image completes and seals both checks.
+is impossible.
+
+Edge **1699** observed the additional continuation complete at **03:28:48 UTC**
+on October 23 using source `9dcd88757309a732f9ebc283c1ea5fdeb5b01dc0` and image
+`39db545bcd2672d670ca3cb2e8fe137750d82e74d66acd4023e9cfc610393320`.
+The retained app snapshots have identical SHA-256
+`19153b700d3c9b9bdf9a7c58aa2d229cb55fd0303717d5e1ad8305fe0324f7ce`;
+all three pre-existing libp2p keys and infrastructure credentials retain their
+observed hashes. Each previously absent iroh key is now 32 bytes, and each vault
+contains five credentials. Subsequent ordinary resumes reached readiness in
+**28 seconds**. Evidence: the campaign's `live-evidence/edge-1699/` startup and
+worker logs. This establishes live recovery and resume; the next CI observation
+will also validate and capture the retained recovery inventory and linked seals.
+
+The remaining station is **ready private household → native provider grant**:
+the worker reaches `provider bootstrap ready` and then refuses grant bootstrap
+with a generic error. Preserve the fixed declaration and reconcile any unknown
+issuance outcome. Probe the actual provider identity and existing grant projection
+without issuing, distinguish those observations from signed native authority,
+then verify the grant and actual BDD completion. **G2 and the Jenkins native BDD
+receipt remain unproven; the native execution profile stays disabled.**

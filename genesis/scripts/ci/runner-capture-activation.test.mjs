@@ -234,10 +234,12 @@ test("failure diagnostics are bounded read-only worker observations and redact c
     env: { ADMIN_KEY: "private-bootstrap-value" },
     execute(command, args, opts) {
       calls.push({ command, args, opts });
+      if (args.includes("elohim-node"))
+        return "Request error: missing field private-provider-detail\nRequest error: timeout private-value";
       return "bootstrap failed private-bootstrap-value eyJabc.payload.signature";
     },
   });
-  assert.equal(calls.length, 4);
+  assert.equal(calls.length, 5);
   for (const call of calls) {
     assert.equal(call.command, "kubectl");
     assert.equal(call.args[0], "--request-timeout=15s");
@@ -247,7 +249,8 @@ test("failure diagnostics are bounded read-only worker observations and redact c
     if (call.args[1] === "exec") {
       assert.match(call.args.at(-1), /O_RDONLY \| fs.constants.O_NOFOLLOW/);
       assert.match(call.args.at(-1), /Math.min\(stat.size, 4096\)/);
-      assert(!call.args.at(-1).includes("process.env"));
+      assert.match(call.args.at(-1), /issuance intentionally not attempted/);
+      assert(!call.args.at(-1).includes("JSON.stringify(env)"));
     }
     assert(!call.args.join(" ").includes(".spec"));
   }
@@ -275,6 +278,15 @@ test("failure diagnostics are bounded read-only worker observations and redact c
       );
     }
   }
+  const providerErrors = JSON.parse(
+    readFileSync(join(oldDirectory, "provider-errors.json"), "utf8"),
+  );
+  assert.deepEqual(providerErrors.categories, [
+    "native-wire-shape",
+    "native-timeout",
+  ]);
+  assert.equal(providerErrors.grantRequestCorrelationProven, false);
+  assert(!JSON.stringify(providerErrors).includes("private-"));
   assert(
     !existsSync(
       join(root, "compute-worker-evidence/alpha--adam/activation.json"),
@@ -408,6 +420,53 @@ test("persisted log retry respects deadline and request limits", async () => {
   };
   await assert.rejects(readPersistedLogs(f.options), /deadline/);
   assert.deepEqual(f.calls, [2500, 1500, 500]);
+});
+test("provider reads fit exec budget while identity reads and total deadline stay bounded", async () => {
+  for (const budgetMs of [20000, 2500]) {
+    const f = logObserver({ budgetMs });
+    await readPersistedLogs(f.options);
+    assert.equal(f.calls.length, 3);
+    const limits =
+      budgetMs === 20000 ? [4000, 13000, 4000] : [2500, 2500, 2500];
+    assert.deepEqual(
+      f.calls.map((call) => call.options.timeout),
+      limits,
+    );
+    assert.equal(
+      f.calls[1].args[0],
+      `--request-timeout=${Math.min(12000, budgetMs)}ms`,
+    );
+    assert.equal(
+      f.calls[0].args[0],
+      `--request-timeout=${Math.min(3000, budgetMs)}ms`,
+    );
+    assert(f.calls.every((call) => call.options.killSignal === "SIGKILL"));
+  }
+});
+test("provider transport timeout retains already emitted public proof and refuses activation", async (t) => {
+  const root = mkdtempSync(join(tmpdir(), "provider-timeout-"));
+  t.after(() => rmSync(root, { recursive: true, force: true }));
+  await captureDiagnostics({
+    root,
+    workload: "adam",
+    namespace: "alpha",
+    env: {},
+    execute(_command, args) {
+      if (args.includes("exec"))
+        throw Object.assign(new Error("timed out"), {
+          stdout: 'recovery-proof {"status":"verified"}\n',
+          stderr: "transport timeout",
+        });
+      return "";
+    },
+  });
+  const directory = join(root, "rollout-evidence/alpha--compute-worker--adam");
+  assert.match(
+    readFileSync(join(directory, "mesh-startup.log"), "utf8"),
+    /recovery-proof.*verified/,
+  );
+  assert.match(readFileSync(join(directory, "status.txt"), "utf8"), /^REFUSED/);
+  assert(!existsSync(join(directory, "activation.json")));
 });
 for (const failure of ["Forbidden", "Unauthorized", "configuration missing"]) {
   test(`persisted log ${failure} refuses immediately`, async () => {
