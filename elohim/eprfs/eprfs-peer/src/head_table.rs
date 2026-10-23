@@ -8,6 +8,7 @@
 //! {
 //!   "version": 1,
 //!   "own": { "device", "root", "seq", "at", "folded": {"<did>": seq}, "signature" },
+//!   "own_log": [ { "seq", "root", "at", "events" } ],
 //!   "devices": {
 //!     "<did>": { "seq", "root", "at", "folded": {"<did>": seq}, "folded_at", "events_folded" }
 //!   },
@@ -18,6 +19,11 @@
 //! ```
 //!
 //! `own` is this device's last announced head (so `seq` keeps increasing across restarts).
+//! `own_log` is its last [`OWN_LOG_LEN`] announces, oldest first, each with `events`: how many
+//! flow events of this device's store the announced root was projected from. The steward lease
+//! view (T6) reads it to find the first own head that carried a claim: a claim written as the
+//! store's `n`th event is in every head whose `events` is at least `n`. A file written before the
+//! log existed loads with an empty one.
 //! `devices` holds, per other device, the last head folded: its `seq`, `root`, `at` (that
 //! device's clock, display only) and `folded` (its acknowledgement vector), with `folded_at`
 //! (this device's clock, unix milliseconds) and the running count of events appended from it.
@@ -38,11 +44,17 @@ use crate::head::ChannelHead;
 /// The table's format version.
 pub const HEAD_TABLE_VERSION: u32 = 1;
 
+/// How many of this device's own announces [`HeadTable::own_log`] keeps.
+pub const OWN_LOG_LEN: usize = 64;
+
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct HeadTable {
     pub version: u32,
     /// This device's last announced head.
     pub own: Option<ChannelHead>,
+    /// This device's last [`OWN_LOG_LEN`] announces, oldest first.
+    #[serde(default)]
+    pub own_log: Vec<OwnAnnounce>,
     /// The last head folded from each other device, by did:key.
     pub devices: BTreeMap<String, DeviceHead>,
     pub dropped: DroppedHeads,
@@ -74,11 +86,24 @@ impl Default for HeadTable {
         HeadTable {
             version: HEAD_TABLE_VERSION,
             own: None,
+            own_log: Vec::new(),
             devices: BTreeMap::new(),
             dropped: DroppedHeads::default(),
             channel: ChannelCounters::default(),
         }
     }
+}
+
+/// One of this device's own announces, as the steward lease view needs it.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct OwnAnnounce {
+    pub seq: u64,
+    pub root: BlobCid,
+    /// This device's clock when it announced, unix milliseconds.
+    pub at: u64,
+    /// How many flow events of this device's store `root` was projected from. The store is
+    /// append-only, so the head covers exactly its first `events` events.
+    pub events: u64,
 }
 
 /// The last head folded from one device.

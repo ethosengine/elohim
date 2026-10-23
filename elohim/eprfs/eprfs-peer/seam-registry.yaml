@@ -508,3 +508,84 @@ decisionPoints:
         testName: a_cid_outside_the_channel_tree_is_unanswered_over_the_tier
         kind: integration
     notes: "Spec §3.3. epr flow fold --from <device> --root <cid> runs it once; the daemon runs it for every newer head."
+  - name: steward_lease_view
+    kind: verdict-fn
+    sourceLocation:
+      file: src/lease_view.rs
+      modulePath: eprfs_peer::steward_lease_view
+    summary: "Whether a lease on a steward-scoped resource (StewardScope: dev-integration, jenkins-dispatch, alpha-fleet, lane:<id>) holds across one person's devices. Leases are replayed from dev-berth-events@1 records, this device's own and those folded via an admitted device (a contested device's are ignored entirely); per resource the live leases compete and the earlier claimed_at, then the lower device did:key, wins on both devices alike. Another device's winner is HeldBy at once. This device's winner is Effective once every other admitted device's last folded head acknowledges the first own head that carried the claim (found in HeadTable.own_log by store position, not by time), Pending until confirm_wait_s from the claim's write, then Unconfirmed naming the silent device; an offline-ok override record makes it Effective at once and binds the others as an ordinary lease. With no other admitted device a claim is Effective at once."
+    concernIds:
+      - id: C0
+        status: answered
+        justification: "Pure over this device's own flow store, head table and roster: nothing is asked over the network; epr peer leases prints it for berth."
+      - id: C1
+        status: answered
+        justification: "A deterministic tie-break over values each claim's own device recorded (claimed_at, then device did:key, then session) settles a concurrent pair the same way on both devices."
+      - id: C2
+        status: answered
+        justification: "An acknowledgement counts only for an own head projected from a store already holding the claim (own_log.events >= the claim's store position); a head announced after the claim's stamp but projected before it reached the store confirms nothing."
+      - id: C3
+        status: answered
+        justification: "A device that does not acknowledge within confirm_wait_s reads Unconfirmed, naming it and when it was last folded; an absent device is never a free resource."
+      - id: C4
+        status: answered
+        justification: "Effective, Pending, Unconfirmed and HeldBy are distinct verdicts; HeldBy wins over Unconfirmed."
+      - id: C5
+        status: answered
+        justification: "Only folded leases of admitted devices count; a Contest removes the device's leases and its acknowledgement duty together."
+      - id: C6a
+        status: answered
+        justification: "Linear in the berth records of the flow store; the own log is bounded at 64 announces."
+      - id: C6b
+        status: n-a
+        justification: "Reads only; the head table is replaced atomically by the daemon."
+      - id: C7
+        status: n-a
+        justification: "Nothing is advertised."
+      - id: C8
+        status: answered
+        justification: "Every verdict names its device, session and times; berth prints one reason line from it."
+      - id: C9
+        status: answered
+        justification: "A head table written before own_log existed loads with an empty log: claims then read Pending, never Effective, until the next announce."
+      - id: C10
+        status: answered
+        justification: "New; reads the T1 berth record fields and the T5 head table."
+      - id: C11
+        status: n-a
+        justification: "No fan-out."
+      - id: C12
+        status: answered
+        justification: "A view that cannot be computed is a non-zero exit of epr peer leases, which berth refuses on; it is never read as free."
+      - id: C13
+        status: n-a
+        justification: "The same at every stage."
+      - id: C14
+        status: partial
+        justification: "Overrides and refusals are berth records on the flow store; the view itself is not witnessed."
+    contractTests:
+      - path: elohim/eprfs/eprfs-peer/tests/lease_view.rs
+        testName: a_claim_every_other_device_acknowledged_is_effective
+        kind: integration
+      - path: elohim/eprfs/eprfs-peer/tests/lease_view.rs
+        testName: an_unacknowledged_claim_is_pending_then_unconfirmed_naming_the_device
+        kind: integration
+      - path: elohim/eprfs/eprfs-peer/tests/lease_view.rs
+        testName: an_ack_of_a_head_projected_before_the_claim_reached_the_store_does_not_confirm_it
+        kind: integration
+      - path: elohim/eprfs/eprfs-peer/tests/lease_view.rs
+        testName: a_folded_overlapping_lease_is_held_by_its_holder
+        kind: integration
+      - path: elohim/eprfs/eprfs-peer/tests/lease_view.rs
+        testName: a_concurrent_pair_is_settled_the_same_way_on_both_devices
+        kind: integration
+      - path: elohim/eprfs/eprfs-peer/tests/lease_view.rs
+        testName: a_contested_devices_leases_are_ignored_and_it_is_not_waited_for
+        kind: integration
+      - path: elohim/eprfs/eprfs-peer/tests/lease_view.rs
+        testName: with_no_other_admitted_device_a_claim_is_effective_at_once
+        kind: integration
+      - path: elohim/eprfs/epr-cli/tests/peer.rs
+        testName: peer_leases_prints_the_steward_view_while_serve_holds_its_lock
+        kind: integration
+    notes: "Spec §3.4; review focus items 1 and 2. berth (genesis/agentic/bin/berth) polls epr peer leases --json for steward-scoped claims and owner checks; container-scoped resources never call it."

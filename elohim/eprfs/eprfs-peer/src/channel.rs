@@ -46,6 +46,8 @@ pub struct ChannelTree {
     root: BlobCid,
     nodes: Vec<(BlobCid, Bytes)>,
     leaves: Vec<(BlobCid, Bytes)>,
+    /// How many flow events of the store the tree was projected from, crossing or not.
+    read: u64,
 }
 
 impl ChannelTree {
@@ -56,6 +58,12 @@ impl ChannelTree {
     /// How many events crossed.
     pub fn events(&self) -> usize {
         self.leaves.len()
+    }
+
+    /// How many flow events of the store it was projected from, crossing or not: the store is
+    /// append-only, so the tree covers exactly its first `read` events.
+    pub fn read(&self) -> u64 {
+        self.read
     }
 
     fn blobs(&self) -> impl Iterator<Item = &(BlobCid, Bytes)> {
@@ -80,7 +88,9 @@ where
     let mut leaves = Vec::new();
     let mut entries = Vec::new();
     let mut seen = HashSet::new();
-    for (cid, event) in store.events().map_err(PeerError::FlowStore)? {
+    let events = store.events().map_err(PeerError::FlowStore)?;
+    let read = u64::try_from(events.len()).unwrap_or(u64::MAX);
+    for (cid, event) in events {
         if !allow.admits(&event) || !seen.insert(cid) {
             continue;
         }
@@ -118,6 +128,7 @@ where
         root: child,
         nodes,
         leaves,
+        read,
     })
 }
 

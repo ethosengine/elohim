@@ -1,7 +1,7 @@
 //! Which authenticated iroh node ids this device admits, read from the roster in its own
 //! checkout.
 
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, BTreeSet};
 use std::fmt::Write as _;
 use std::io;
 use std::path::Path;
@@ -58,6 +58,11 @@ impl Admission {
     /// request, even on a connection admitted earlier.
     pub fn admits_device(&self, device: &str) -> bool {
         self.admitted.values().any(|admitted| admitted == device)
+    }
+
+    /// Every device (a `did:key`) admitted now, this device included.
+    pub fn devices(&self) -> BTreeSet<&str> {
+        self.admitted.values().map(String::as_str).collect()
     }
 
     /// The node id `device` (a `did:key`) is admitted on now, to dial it; `None` when the device

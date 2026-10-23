@@ -18,7 +18,7 @@ use iroh_gossip::proto::TopicId;
 use crate::admission::Admission;
 use crate::error::PeerError;
 use crate::head::{ChannelHead, HeadSigner};
-use crate::head_table::{ChannelCounters, DeviceHead, HeadTable};
+use crate::head_table::{ChannelCounters, DeviceHead, HeadTable, OwnAnnounce, OWN_LOG_LEN};
 
 /// How long a change waits for others before it is announced.
 pub const ANNOUNCE_DEBOUNCE: Duration = Duration::from_secs(1);
@@ -62,6 +62,8 @@ pub struct Channel {
     table: HeadTable,
     /// This device's current channel root, once projected.
     root: Option<BlobCid>,
+    /// How many flow events the current root was projected from.
+    covers: u64,
     /// When a change first waited to be announced.
     pending_since: Option<Instant>,
     last_announced: Option<Instant>,
@@ -78,6 +80,7 @@ impl Channel {
             device,
             table,
             root: None,
+            covers: 0,
             pending_since: None,
             last_announced: None,
             acked_floor: 0,
@@ -192,6 +195,13 @@ impl Channel {
         }
     }
 
+    /// The current root was projected from the store's first `events` flow events. Recorded with
+    /// every announce in [`HeadTable::own_log`], so the lease view can tell which head first
+    /// carried a claim. Called after every projection, whether or not the root moved.
+    pub fn covers(&mut self, events: u64) {
+        self.covers = events;
+    }
+
     /// A neighbour joined the topic: it hears the current head within the debounce.
     pub fn neighbor_up(&mut self, now: Instant) {
         self.schedule(now);
@@ -243,6 +253,14 @@ impl Channel {
             .map(|(device, head)| (device.clone(), head.seq))
             .collect();
         let head = ChannelHead::sign(self.device.clone(), root, seq, at, folded, signer)?;
+        self.table.own_log.push(OwnAnnounce {
+            seq,
+            root: head.root.clone(),
+            at,
+            events: self.covers,
+        });
+        let excess = self.table.own_log.len().saturating_sub(OWN_LOG_LEN);
+        self.table.own_log.drain(..excess);
         self.table.own = Some(head.clone());
         self.pending_since = None;
         self.last_announced = Some(now);

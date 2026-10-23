@@ -19,6 +19,10 @@
 //!   the heads it hears; [`fold_root`] folds another device's events into this device's flow store
 //!   `via` that device; [`HeadTable`] persists what was folded; [`PeerDaemon`] runs it all behind
 //!   `epr peer serve`.
+//! - The steward lease view (§3.4): [`steward_lease_view`] reads, for each steward-scoped
+//!   resource ([`StewardScope`]), whether this device's lease is effective, pending or
+//!   unconfirmed, or another device's lease holds it, from the berth records ([`LeaseEvent`]) and
+//!   the head table's acknowledgements. `epr peer leases --json` prints it for berth.
 //!
 //! **Admission at connect time is the possession proof.** iroh authenticates the remote node id
 //! cryptographically on every connection: the TLS handshake carries the peer's raw ed25519
@@ -40,6 +44,8 @@ mod gossip;
 mod head;
 mod head_table;
 mod key;
+mod lease_view;
+mod steward_scope;
 mod tier;
 
 pub use admission::{roster_rows_from_file, Admission};
@@ -60,11 +66,19 @@ pub use fold::{
 pub use gate::{SharedAdmission, StewardDevicesGate};
 pub use gossip::GatedGossip;
 pub use head::{ChannelHead, HeadSigner, MAX_HEAD_BYTES};
-pub use head_table::{ChannelCounters, DeviceHead, DroppedHeads, HeadTable, HEAD_TABLE_VERSION};
+pub use head_table::{
+    ChannelCounters, DeviceHead, DroppedHeads, HeadTable, OwnAnnounce, HEAD_TABLE_VERSION,
+    OWN_LOG_LEN,
+};
 /// The iroh address types a dialer names peers with, so a consumer needs no iroh dependency of
 /// its own.
 pub use iroh::{NodeAddr, NodeId};
 pub use key::PeerKey;
+pub use lease_view::{
+    lease_events, steward_lease_view, LeaseEvent, LeaseKind, LeaseVerdict, Resource,
+    BERTH_EVENTS_MEASURE,
+};
+pub use steward_scope::{StewardScope, DEFAULT_CONFIRM_WAIT_S};
 pub use tier::{
     tier_call, tier_request, TierAnswer, TierCountersSnapshot, TierLimits, TierProtocol,
     TierRequest, FRAME_DEADLINE, MAX_ANSWER_FRAME_BYTES, MAX_CONCURRENT_STREAMS,

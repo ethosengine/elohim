@@ -19,8 +19,8 @@ use crate::error::PeerError;
 /// The slot a folded event carries naming the device it was folded from: `via:<did:key>`.
 pub const VIA_SLOT: &str = "via:";
 
-const MEASURE_SLOT: &str = "measure:";
-const KIND_SLOT: &str = "reason:";
+pub(crate) const MEASURE_SLOT: &str = "measure:";
+pub(crate) const KIND_SLOT: &str = "reason:";
 
 /// `classifiedAs` is tag first, subject second; the prefixed slots follow (epr-rea
 /// `FlowEvent::classified_as`). A subject is never read as a slot.
@@ -134,7 +134,7 @@ pub fn via_device(event: &FlowEvent) -> Option<&str> {
     slots(event).find_map(|slot| slot.strip_prefix(VIA_SLOT))
 }
 
-fn slots(event: &FlowEvent) -> impl Iterator<Item = &str> {
+pub(crate) fn slots(event: &FlowEvent) -> impl Iterator<Item = &str> {
     event
         .classified_as
         .iter()
@@ -143,7 +143,7 @@ fn slots(event: &FlowEvent) -> impl Iterator<Item = &str> {
 }
 
 /// The value of the one slot with `prefix`; `None` when there is none or more than one.
-fn single_slot<'e>(event: &'e FlowEvent, prefix: &str) -> Option<&'e str> {
+pub(crate) fn single_slot<'e>(event: &'e FlowEvent, prefix: &str) -> Option<&'e str> {
     let mut values = slots(event).filter_map(|slot| slot.strip_prefix(prefix));
     match (values.next(), values.next()) {
         (Some(value), None) => Some(value),

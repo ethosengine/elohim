@@ -481,6 +481,7 @@ impl Run {
                 self.failed_stamp = None;
                 self.store.install(&tree);
                 self.channel.changed(tree.root().clone(), Instant::now());
+                self.channel.covers(tree.read());
                 if self
                     .channel
                     .counters_mut()

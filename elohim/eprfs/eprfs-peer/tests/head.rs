@@ -9,7 +9,7 @@ use std::time::{Duration, Instant};
 use eprfs_core::BlobCid;
 use eprfs_peer::{
     topic_for, Channel, ChannelHead, HeadTable, HeadVerdict, PeerError, ANNOUNCE_DEBOUNCE,
-    REANNOUNCE_EVERY,
+    OWN_LOG_LEN, REANNOUNCE_EVERY,
 };
 use support::{device, household, Household};
 
@@ -333,4 +333,63 @@ fn an_acknowledgement_at_the_top_of_the_seq_range_saturates_and_never_wraps() {
         .expect("announce")
         .expect("a head");
     assert_eq!(again.seq, u64::MAX, "never wraps to zero");
+}
+
+#[test]
+fn every_announce_is_logged_with_how_many_events_its_root_covers() {
+    let h = household();
+    let mut channel = Channel::new(h.a.did.clone(), HeadTable::default());
+    let signer = h.a.signer();
+    let mut now = Instant::now();
+
+    // The root is projected from the store's first 3 events; the head announcing it says so.
+    channel.changed(root("a1"), now);
+    channel.covers(3);
+    now += ANNOUNCE_DEBOUNCE;
+    let first = channel
+        .announce(now, 1_000, &signer)
+        .expect("announce")
+        .expect("a head");
+    let log = &channel.table().own_log;
+    assert_eq!(log.len(), 1);
+    assert_eq!(
+        (log[0].seq, &log[0].root, log[0].at, log[0].events),
+        (first.seq, &first.root, 1_000, 3)
+    );
+
+    // Bounded: only the last OWN_LOG_LEN announces are kept, oldest dropped first.
+    for i in 0..(OWN_LOG_LEN as u64 + 10) {
+        channel.changed(root(&format!("a{}", i + 2)), now);
+        channel.covers(4 + i);
+        now += ANNOUNCE_DEBOUNCE;
+        channel
+            .announce(now, 2_000 + i, &signer)
+            .expect("announce")
+            .expect("a head");
+    }
+    let log = &channel.table().own_log;
+    assert_eq!(log.len(), OWN_LOG_LEN);
+    let own_seq = channel.table().own.as_ref().expect("own").seq;
+    assert_eq!(log.last().map(|e| e.seq), Some(own_seq));
+    assert_eq!(
+        log.first().map(|e| e.seq),
+        Some(own_seq - OWN_LOG_LEN as u64 + 1)
+    );
+    assert!(log.windows(2).all(|w| w[0].seq < w[1].seq));
+
+    // A version-1 table written before the log existed still loads, with an empty log.
+    let dir = tempfile::tempdir().expect("tempdir");
+    std::fs::write(
+        dir.path().join(HeadTable::FILE_NAME),
+        r#"{"version":1,"own":null,"devices":{},"dropped":{"unadmitted":0,"forged":0,"rollback":0,"replayed":0,"malformed":0}}"#,
+    )
+    .expect("write");
+    let loaded = HeadTable::load(dir.path()).expect("loads");
+    assert!(loaded.own_log.is_empty());
+    // And the log persists across a save and load.
+    channel.table().save(dir.path()).expect("save");
+    assert_eq!(
+        HeadTable::load(dir.path()).expect("loads").own_log,
+        channel.table().own_log
+    );
 }
