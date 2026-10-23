@@ -363,3 +363,31 @@ fn peer_answers_help_and_refuses_an_unknown_verb() {
         .unwrap();
     assert_eq!(out.status.code(), Some(2));
 }
+
+#[test]
+fn flow_fold_refuses_while_this_devices_peer_serves() {
+    let (keys, a, b) = household();
+    // `epr peer serve` holds this lock for its lifetime; a fold dialling on the same node id
+    // would confuse the other device's path to it.
+    let _serving = elohim_epr_cli::peer::ServeLock::acquire(&a.peer_dir()).expect("lock");
+    let out = a.epr(&[
+        "flow",
+        "fold",
+        "--from",
+        &b.key.did_key(),
+        "--root",
+        "bafyreigh2akiscaildcqabsyg3dfr6chu3fgpregiymsck7e7aqa4s52zy",
+        "--repo",
+        a.root(),
+        "--peer",
+        &format!("{}@127.0.0.1:9", b.node_id()),
+        "--policy",
+        policy(keys.path()).to_str().unwrap(),
+    ]);
+    let stderr = String::from_utf8_lossy(&out.stderr).to_string();
+    assert_eq!(out.status.code(), Some(2), "{stderr}");
+    assert!(stderr.contains("epr peer serve is running"), "{stderr}");
+    assert!(stderr.contains("folds every newer head"), "{stderr}");
+    // A second serve is refused the same way.
+    assert!(elohim_epr_cli::peer::ServeLock::acquire(&a.peer_dir()).is_err());
+}

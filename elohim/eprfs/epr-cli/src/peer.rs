@@ -48,6 +48,15 @@ pub enum PeerCliError {
 
     #[error("json: {0}")]
     Json(#[from] serde_json::Error),
+
+    /// This device's `epr peer serve` holds its serve lock.
+    #[error(
+        "epr peer serve is running for this device (it holds `{}`) and folds every newer head on \
+         its own; stop it, or let it fold — a second endpoint on the same node id would confuse \
+         the other devices' path to this one",
+        .0.display()
+    )]
+    Serving(PathBuf),
 }
 
 pub type PeerResult<T> = Result<T, PeerCliError>;
@@ -152,6 +161,42 @@ pub fn peer_dir() -> PeerResult<PathBuf> {
     Ok(config_home.join("epr").join("peer"))
 }
 
+/// The lock `epr peer serve` holds on `<peer dir>/serve.lock` for its whole life, so no second
+/// endpoint ever answers on this device's node id beside it: `epr flow fold` and a second
+/// `serve` refuse while it is held. Released when dropped (and by the kernel when the process
+/// ends, however it ends).
+#[derive(Debug)]
+pub struct ServeLock {
+    _file: std::fs::File,
+}
+
+impl ServeLock {
+    /// The lock file's name inside the peer directory.
+    pub const FILE_NAME: &'static str = "serve.lock";
+
+    /// Take the lock without waiting.
+    ///
+    /// # Errors
+    ///
+    /// [`PeerCliError::Serving`] when another process holds it; [`PeerCliError::Io`] when the
+    /// file cannot be opened or locked.
+    pub fn acquire(peer_dir: &Path) -> PeerResult<ServeLock> {
+        std::fs::create_dir_all(peer_dir)?;
+        let path = peer_dir.join(Self::FILE_NAME);
+        let file = std::fs::OpenOptions::new()
+            .create(true)
+            .append(true)
+            .open(&path)?;
+        match rustix::fs::flock(&file, rustix::fs::FlockOperation::NonBlockingLockExclusive) {
+            Ok(()) => Ok(ServeLock { _file: file }),
+            Err(errno) if errno == rustix::io::Errno::WOULDBLOCK => {
+                Err(PeerCliError::Serving(path))
+            }
+            Err(errno) => Err(PeerCliError::Io(errno.into())),
+        }
+    }
+}
+
 /// This device as a member of its lineage: its device key, its lineage and its peer directory.
 pub struct Device {
     pub key: DeviceKey,
@@ -242,6 +287,7 @@ fn runtime() -> PeerResult<tokio::runtime::Runtime> {
 
 fn serve(options: Options) -> PeerResult<ExitCode> {
     let device = Device::open(&options.root, options.handle.as_deref())?;
+    let _serving = ServeLock::acquire(&device.peer_dir)?;
     let allow = allow_list(&options)?;
     if allow.is_empty() {
         eprintln!(
@@ -287,9 +333,10 @@ fn serve(options: Options) -> PeerResult<ExitCode> {
             sockets.join(", "),
             device.lineage.handle
         );
-        daemon.wait().await;
+        // The loop ends on its own only for a reason worth a non-zero exit; it is named.
+        let ended = daemon.wait().await;
         daemon.shutdown().await;
-        Ok::<_, PeerCliError>(())
+        ended.map_err(PeerCliError::Peer)
     })?;
     Ok(ExitCode::SUCCESS)
 }
@@ -319,6 +366,7 @@ struct StatusOutcome {
     own_seq: Option<u64>,
     devices: Vec<DeviceStatus>,
     dropped: eprfs_peer::DroppedHeads,
+    channel: eprfs_peer::ChannelCounters,
 }
 
 fn status(options: &Options) -> PeerResult<ExitCode> {
@@ -356,6 +404,7 @@ fn status(options: &Options) -> PeerResult<ExitCode> {
         own_seq: table.own.as_ref().map(|own| own.seq),
         devices,
         dropped: table.dropped,
+        channel: table.channel,
     };
     if options.json {
         println!("{}", serde_json::to_string_pretty(&outcome)?);
@@ -397,6 +446,19 @@ fn render(outcome: &StatusOutcome) {
         "dropped heads  unadmitted {}  forged {}  rollback {}  replayed {}  malformed {}",
         d.unadmitted, d.forged, d.rollback, d.replayed, d.malformed
     );
+    let c = &outcome.channel;
+    if let Some(error) = &c.last_projection_error {
+        println!(
+            "channel NOT PROJECTING ({} failures): {error} — nothing new of this device crosses",
+            c.projection_failures
+        );
+    }
+    if c.fold_failures + c.oversized_events + c.over_budget_folds > 0 {
+        println!(
+            "folds  failed {}  oversized events {}  over budget {}",
+            c.fold_failures, c.oversized_events, c.over_budget_folds
+        );
+    }
 }
 
 /// A did:key or CID shortened for a status line (both are ASCII).
@@ -414,12 +476,10 @@ fn unix_ms() -> u64 {
 
 /// `epr flow fold --from <device> --root <cid>`: fold one channel root from one admitted device
 /// into this device's flow store, once. The daemon folds every newer head the same way.
-pub fn fold(
-    options: &Options,
-    from: &str,
-    root: &str,
-) -> PeerResult<(eprfs_peer::FoldOutcome, bool)> {
+pub fn fold(options: &Options, from: &str, root: &str) -> PeerResult<eprfs_peer::FoldReport> {
     let device = Device::open(&options.root, options.handle.as_deref())?;
+    // Held for the fold, so no `serve` starts on this node id meanwhile either.
+    let _not_serving = ServeLock::acquire(&device.peer_dir)?;
     let admission = device.admission()?;
     let node = admission.node_for(from).ok_or_else(|| {
         PeerCliError::InvalidArguments(format!(
@@ -469,6 +529,7 @@ pub fn fold(
             &store,
             &allow,
             &eprfs_core::TreeLimits::default(),
+            &eprfs_peer::FoldLimits::default(),
         )
         .await;
         endpoint.close().await;

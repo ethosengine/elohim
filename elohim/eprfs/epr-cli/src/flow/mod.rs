@@ -985,8 +985,9 @@ fn run_fold(args: &[String]) -> FlowResult<ExitCode> {
         ));
     };
     options.root = std::fs::canonicalize(&options.root).unwrap_or(options.root);
-    let (outcome, complete) = crate::peer::fold(&options, &from, &channel_root)
+    let report = crate::peer::fold(&options, &from, &channel_root)
         .map_err(|e| FlowError::Fold(e.to_string()))?;
+    let (outcome, complete) = (report.outcome, report.complete);
     if options.json {
         println!(
             "{}",
