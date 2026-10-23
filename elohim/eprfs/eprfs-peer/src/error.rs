@@ -130,6 +130,11 @@ pub enum PeerError {
     #[error("the peer's tier did not answer for {what}")]
     FoldUnanswered { what: String },
 
+    /// The device a fold reads from is no longer admitted (a Contest was folded while the fold
+    /// ran): nothing of it is appended.
+    #[error("{device} is no longer admitted; nothing of its fold is appended")]
+    FoldRevoked { device: String },
+
     /// The daemon's loop ended other than by being stopped: its gossip stream ended, a head could
     /// not be persisted before it was announced, or the loop task failed.
     #[error("the device peer stopped: {reason}")]

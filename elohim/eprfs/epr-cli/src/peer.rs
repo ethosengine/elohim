@@ -51,9 +51,9 @@ pub enum PeerCliError {
 
     /// This device's `epr peer serve` holds its serve lock.
     #[error(
-        "epr peer serve is running for this device (it holds `{}`) and folds every newer head on \
-         its own; stop it, or let it fold — a second endpoint on the same node id would confuse \
-         the other devices' path to this one",
+        "epr peer serve (or another epr flow fold) is running for this device (it holds `{}`); \
+         a serving daemon folds every newer head on its own — stop it, or let it fold. A second \
+         endpoint on the same node id would confuse the other devices' path to this one",
         .0.display()
     )]
     Serving(PathBuf),
@@ -521,6 +521,8 @@ pub fn fold(options: &Options, from: &str, root: &str) -> PeerResult<eprfs_peer:
             device: from,
             since: since.as_ref(),
             root: &root,
+            // Admission was read from this checkout's roster at the start of this one-shot fold.
+            admission: None,
         };
         let folded = eprfs_peer::fold_root(
             &endpoint,

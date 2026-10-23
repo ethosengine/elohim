@@ -482,3 +482,160 @@ async fn a_projection_failure_is_recorded_where_status_reads_it() {
 
     daemon.shutdown().await;
 }
+
+/// A real channel tier whose answers wait until the test opens a gate: a fold stalled mid-fetch.
+#[derive(Debug, Clone)]
+struct GatedTier {
+    inner: eprfs_peer::TierProtocol,
+    open: Arc<tokio::sync::Semaphore>,
+    accepted: Arc<std::sync::atomic::AtomicUsize>,
+}
+
+impl iroh::protocol::ProtocolHandler for GatedTier {
+    async fn accept(
+        &self,
+        connection: iroh::endpoint::Connection,
+    ) -> Result<(), iroh::protocol::AcceptError> {
+        self.accepted
+            .fetch_add(1, std::sync::atomic::Ordering::SeqCst);
+        // The gate is opened once, for good: the permit is never returned.
+        if let Ok(permit) = self.open.acquire().await {
+            permit.forget();
+            self.open.add_permits(1);
+        }
+        self.inner.accept(connection).await
+    }
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn a_contest_during_a_stalled_fold_appends_nothing_and_records_no_head() {
+    let a = device("DeviceA", 1);
+    let c = device("DeviceC", 3);
+    let dirs: Vec<tempfile::TempDir> = (0..2).map(|_| tempfile::tempdir().unwrap()).collect();
+    let (key_a, key_c) = (load_key(dirs[0].path()), load_key(dirs[1].path()));
+    let bound_c = binding(&a, &c);
+    let rows = vec![
+        genesis(&a),
+        bound_c.clone(),
+        endpoint_row(&a, &a, &key_a),
+        endpoint_row(&a, &c, &key_c),
+    ];
+    let id_a = key_a.node_id();
+    let side_a = Side::new(&rows);
+
+    // C: a real device with a claim in its channel tree, whose tier answers only once the gate
+    // opens.
+    let c_checkout = Checkout::new();
+    c_checkout.append(berth_event("claim", "alpha-fleet", "sc", "1.0"));
+    let allow = CrossingAllowList::from_policy(&policy()).expect("policy");
+    let tree = eprfs_peer::project_channel(&c_checkout.store(), &allow).expect("projects");
+    let store = Arc::new(eprfs_peer::ChannelStore::default());
+    store.install(&tree);
+    let c_admission = Arc::new(std::sync::RwLock::new(eprfs_peer::Admission::from_roster(
+        &rows,
+        &a.did,
+        &*verifier(&[&a, &c]),
+    )));
+    let gated = GatedTier {
+        inner: eprfs_peer::TierProtocol::new(
+            eprfs_peer::channel_tier_id(),
+            store,
+            c_admission,
+            eprfs_peer::TierLimits::default(),
+        )
+        .expect("tier"),
+        open: Arc::new(tokio::sync::Semaphore::new(0)),
+        accepted: Arc::default(),
+    };
+    let endpoint_c = eprfs_peer::bind(
+        &key_c,
+        None,
+        vec![eprfs_peer::TIER_ALPN.to_vec(), iroh_gossip::ALPN.to_vec()],
+    )
+    .await
+    .expect("bind C");
+    let addr_c = support::loopback(&endpoint_c);
+    let gossip_c = iroh_gossip::net::Gossip::builder().spawn(endpoint_c.clone());
+    let router_c = iroh::protocol::Router::builder(endpoint_c.clone())
+        .accept(eprfs_peer::TIER_ALPN, gated.clone())
+        .accept(iroh_gossip::ALPN, gossip_c.clone())
+        .spawn();
+
+    let port_a = free_port();
+    let daemon_a = PeerDaemon::start(config(
+        &a,
+        &a.did,
+        key_a,
+        &side_a,
+        &[&a, &c],
+        vec![addr_c],
+        local(port_a),
+    ))
+    .await
+    .expect("A starts");
+    endpoint_c
+        .add_node_addr(
+            iroh::NodeAddr::new(id_a)
+                .with_direct_addresses([std::net::SocketAddr::V4(local(port_a))]),
+        )
+        .expect("A's address");
+    let (sender_c, _receiver_c) = gossip_c
+        .subscribe(eprfs_peer::topic_for(&a.did), vec![id_a])
+        .await
+        .expect("C joins")
+        .split();
+    let signer_c = c.signer();
+    let c_did = c.did.clone();
+    let root_c = tree.root().clone();
+    let c_heads = tokio::spawn(async move {
+        for seq in 1..200u64 {
+            let head = eprfs_peer::ChannelHead::sign(
+                c_did.clone(),
+                root_c.clone(),
+                seq,
+                seq,
+                Default::default(),
+                &signer_c,
+            )
+            .expect("signs");
+            let _ = sender_c
+                .broadcast(head.to_wire().expect("wire").into())
+                .await;
+            tokio::time::sleep(Duration::from_millis(300)).await;
+        }
+    });
+    let accepted = gated.accepted.clone();
+    eventually("A's fold of C is in flight", || {
+        accepted.load(std::sync::atomic::Ordering::SeqCst) > 0
+    })
+    .await;
+
+    // The Contest lands in A's own checkout while the fold waits; then C's tier answers.
+    SidecarRoster::open(side_a.checkout.dir.path(), HANDLE)
+        .expect("roster")
+        .append(contest(&a, &bound_c))
+        .expect("contest");
+    eventually("A drops C's heads as unadmitted", || {
+        side_a.table().dropped.unadmitted > 0
+    })
+    .await;
+    gated.open.add_permits(1);
+    tokio::time::sleep(Duration::from_secs(3)).await;
+
+    assert!(
+        !side_a
+            .checkout
+            .events()
+            .iter()
+            .any(|(_, e)| via_device(e) == Some(c.did.as_str())),
+        "nothing of C is appended after its Contest"
+    );
+    assert!(
+        !side_a.table().devices.contains_key(&c.did),
+        "the head table records no head of a contested device"
+    );
+
+    c_heads.abort();
+    router_c.shutdown().await.expect("shutdown C");
+    daemon_a.shutdown().await;
+}

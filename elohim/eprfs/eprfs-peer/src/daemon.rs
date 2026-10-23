@@ -166,6 +166,7 @@ impl PeerDaemon {
             joined: bootstrap,
             roster_stamp: stamp(&config.roster),
             flow_stamp: None,
+            failed_stamp: None,
             tree: limits.tree,
             folds_tx,
             in_flight: HashMap::new(),
@@ -289,10 +290,13 @@ struct Run {
     joined: Vec<NodeId>,
     roster_stamp: Stamp,
     flow_stamp: Stamp,
+    /// The state of the log the last failed projection read, so a failure is counted once.
+    failed_stamp: Option<Stamp>,
     tree: TreeLimits,
     folds_tx: mpsc::UnboundedSender<FoldDone>,
-    /// Per device, the seq of the head whose fold is in flight.
-    in_flight: HashMap<String, u64>,
+    /// Per device, the seq of the head whose fold is in flight, and its task (aborted when a
+    /// reload drops the device).
+    in_flight: HashMap<String, (u64, tokio::task::AbortHandle)>,
     /// Per device, the newest head that arrived while its fold was in flight.
     waiting: HashMap<String, ChannelHead>,
 }
@@ -419,6 +423,7 @@ impl Run {
         if let Ok(mut admission) = self.admission.write() {
             admission.reload(&rows, &*self.config.verifier);
         }
+        self.drop_unadmitted_folds();
         let me = self.endpoint.node_id();
         let fresh: Vec<NodeId> = others(&self.admission, me)
             .into_iter()
@@ -433,6 +438,34 @@ impl Run {
         }
     }
 
+    /// Whether `device` is admitted now. Fail closed: a poisoned admission admits nobody.
+    fn admitted(&self, device: &str) -> bool {
+        self.admission
+            .read()
+            .is_ok_and(|admission| admission.admits_device(device))
+    }
+
+    /// Abort the in-flight fold, and forget the waiting head, of every device admission no
+    /// longer admits: a Contest stops what that device was still sending.
+    fn drop_unadmitted_folds(&mut self) {
+        let dropped: Vec<String> = self
+            .in_flight
+            .keys()
+            .chain(self.waiting.keys())
+            .filter(|device| !self.admitted(device))
+            .cloned()
+            .collect();
+        for device in dropped {
+            if let Some((seq, task)) = self.in_flight.remove(&device) {
+                task.abort();
+                self.log(&format!(
+                    "fold of {device} seq {seq} stopped: the device is no longer admitted"
+                ));
+            }
+            self.waiting.remove(&device);
+        }
+    }
+
     /// Re-project the channel tree when the flow store changed. A failure is recorded where
     /// `epr peer status` reads it; the last good root stays served and announced.
     fn reproject(&mut self) -> Result<(), PeerError> {
@@ -440,9 +473,12 @@ impl Run {
         if now.is_some() && now == self.flow_stamp {
             return Ok(());
         }
-        self.flow_stamp = now;
         match project_channel(&self.flow, &self.config.allow) {
             Ok(tree) => {
+                // Only a projection that succeeded settles this state of the log; a failed one
+                // is retried on the next tick.
+                self.flow_stamp = now;
+                self.failed_stamp = None;
                 self.store.install(&tree);
                 self.channel.changed(tree.root().clone(), Instant::now());
                 if self
@@ -456,11 +492,15 @@ impl Run {
                 }
             }
             Err(e) => {
-                self.log(&format!("channel not projected: {e}"));
-                let counters = self.channel.counters_mut();
-                counters.projection_failures += 1;
-                counters.last_projection_error = Some(e.to_string());
-                self.save()?;
+                // Counted and saved once per state of the log, though retried every tick.
+                if self.failed_stamp != Some(now) {
+                    self.failed_stamp = Some(now);
+                    self.log(&format!("channel not projected: {e}"));
+                    let counters = self.channel.counters_mut();
+                    counters.projection_failures += 1;
+                    counters.last_projection_error = Some(e.to_string());
+                    self.save()?;
+                }
             }
         }
         Ok(())
@@ -493,7 +533,7 @@ impl Run {
     /// Fold `head` on a task of its own, or keep it as the device's next fold when one is in
     /// flight (only the newest waits).
     fn fold(&mut self, head: ChannelHead) {
-        if let Some(&in_flight) = self.in_flight.get(&head.device) {
+        if let Some(&(in_flight, _)) = self.in_flight.get(&head.device) {
             let newer = head.seq > in_flight
                 && self
                     .waiting
@@ -523,19 +563,23 @@ impl Run {
             .channel
             .last_folded(&head.device)
             .map(|(_, root)| root.clone());
-        self.in_flight.insert(head.device.clone(), head.seq);
+        let seq = head.seq;
+        let device = head.device.clone();
+        let admission = self.admission.clone();
         let endpoint = self.endpoint.clone();
         let flow_root = self.config.flow_root.clone();
         let allow = self.config.allow.clone();
         let tree = self.tree;
         let done = self.folds_tx.clone();
-        tokio::spawn(async move {
+        let task = tokio::spawn(async move {
             let folding = async {
                 let store = SidecarFlowStore::open(&flow_root).map_err(PeerError::FlowStore)?;
                 let target = FoldTarget {
                     device: &head.device,
                     since: since.as_ref(),
                     root: &head.root,
+                    // Re-checked under the append lock: a Contest folded meanwhile appends nothing.
+                    admission: Some(&admission),
                 };
                 fold_root(
                     &endpoint,
@@ -558,11 +602,21 @@ impl Run {
             // The loop has stopped when nobody receives; nothing is left to record.
             let _ = done.send(FoldDone { head, result });
         });
+        self.in_flight.insert(device, (seq, task.abort_handle()));
     }
 
     /// Record a finished fold, then start the device's waiting head, if any.
     fn fold_done(&mut self, FoldDone { head, result }: FoldDone) -> Result<(), PeerError> {
         self.in_flight.remove(&head.device);
+        if !self.admitted(&head.device) {
+            // Contested while the fold ran: no head is recorded and no acknowledgement advances.
+            self.waiting.remove(&head.device);
+            self.log(&format!(
+                "fold of {} seq {} discarded: the device is no longer admitted",
+                head.device, head.seq
+            ));
+            return Ok(());
+        }
         match result {
             Ok(report) => {
                 let counters = self.channel.counters_mut();

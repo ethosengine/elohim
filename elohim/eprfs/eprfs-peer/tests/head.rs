@@ -306,3 +306,31 @@ fn a_wiped_peer_dir_recovers_its_seq_from_the_others_acks() {
         .expect("a head");
     assert_eq!(next.seq, 42);
 }
+
+#[test]
+fn an_acknowledgement_at_the_top_of_the_seq_range_saturates_and_never_wraps() {
+    let h = household();
+    let admission = h.admission();
+    let signer = h.a.signer();
+    let mut channel = Channel::new(h.a.did.clone(), HeadTable::default());
+    let mut acked = BTreeMap::new();
+    acked.insert(h.a.did.clone(), u64::MAX);
+    let from_b =
+        ChannelHead::sign(h.b.did.clone(), root("b1"), 1, 1, acked, &h.b.signer()).expect("signs");
+    assert_eq!(
+        channel.judge(&from_b, &admission, &*h.verify),
+        HeadVerdict::Fold
+    );
+    let t0 = Instant::now();
+    channel.changed(root("a1"), t0);
+    let first = channel
+        .announce(t0 + ANNOUNCE_DEBOUNCE, 2, &signer)
+        .expect("announce")
+        .expect("a head");
+    assert_eq!(first.seq, u64::MAX, "saturates at the top, no overflow");
+    let again = channel
+        .announce(t0 + REANNOUNCE_EVERY * 2, 3, &signer)
+        .expect("announce")
+        .expect("a head");
+    assert_eq!(again.seq, u64::MAX, "never wraps to zero");
+}

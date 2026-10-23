@@ -21,6 +21,7 @@ use iroh::{Endpoint, NodeAddr};
 use crate::allow::{via_device, CrossingAllowList, VIA_SLOT};
 use crate::channel::CHANNEL_EVENTS;
 use crate::error::PeerError;
+use crate::gate::SharedAdmission;
 use crate::tier::{tier_request, tier_request_capped, TierAnswer, TierRequest, TIER_ALPN};
 
 /// The most events one fold reads. A larger change is folded across successive heads: the fold
@@ -269,6 +270,19 @@ pub fn fold_events(
     events: &[ChannelEvent],
     allow: &CrossingAllowList,
 ) -> Result<FoldOutcome, PeerError> {
+    fold_events_admitted(store, device, events, allow, None)
+}
+
+/// [`fold_events`], refusing with [`PeerError::FoldRevoked`] — and appending nothing — when
+/// `admission` no longer admits `device`. The check is made under the flow store's exclusive
+/// lock, immediately before the first append; a poisoned admission admits nobody.
+fn fold_events_admitted(
+    store: &SidecarFlowStore,
+    device: &str,
+    events: &[ChannelEvent],
+    allow: &CrossingAllowList,
+    admission: Option<&SharedAdmission>,
+) -> Result<FoldOutcome, PeerError> {
     let mut tx = store.transaction().map_err(PeerError::FlowStore)?;
     let mut held: HashSet<Cid> = tx
         .records()
@@ -276,6 +290,16 @@ pub fn fold_events(
         .into_iter()
         .map(|(cid, _)| cid)
         .collect();
+    let admitted = admission.is_none_or(|admission| {
+        admission
+            .read()
+            .is_ok_and(|admission| admission.admits_device(device))
+    });
+    if !admitted {
+        return Err(PeerError::FoldRevoked {
+            device: device.to_string(),
+        });
+    }
     let mut outcome = FoldOutcome::default();
     for ChannelEvent { cid, event } in events {
         if atom_cid(event).map_err(PeerError::FlowStore)? != *cid {
@@ -317,12 +341,15 @@ where
 }
 
 /// Which tree a fold reads: `root`, announced by `device`, diffed from `since` (the root last
-/// folded from that device, if any).
+/// folded from that device, if any). With `admission`, the device must still be admitted when the
+/// fold appends: the daemon passes the admission it reloads, so a Contest folded while the fold
+/// ran leaves nothing of it appended.
 #[derive(Debug, Clone, Copy)]
 pub struct FoldTarget<'a> {
     pub device: &'a str,
     pub since: Option<&'a BlobCid>,
     pub root: &'a BlobCid,
+    pub admission: Option<&'a SharedAdmission>,
 }
 
 /// What [`fold_root`] did.
@@ -369,7 +396,13 @@ pub async fn fold_root(
     .await;
     connection.close(VarInt::from_u32(0), b"");
     let fetched = fetched?;
-    let outcome = fold_events(store, target.device, &fetched.events, allow)?;
+    let outcome = fold_events_admitted(
+        store,
+        target.device,
+        &fetched.events,
+        allow,
+        target.admission,
+    )?;
     Ok(FoldReport {
         outcome,
         complete: fetched.complete,

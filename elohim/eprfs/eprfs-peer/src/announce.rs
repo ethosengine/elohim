@@ -234,7 +234,8 @@ impl Channel {
         let Some(root) = self.root.clone() else {
             return Ok(None);
         };
-        let seq = self.own_seq().max(self.acked_floor) + 1;
+        // Saturating: an admitted device acknowledging u64::MAX cannot overflow this device's seq.
+        let seq = self.own_seq().max(self.acked_floor).saturating_add(1);
         let folded: BTreeMap<String, u64> = self
             .table
             .devices

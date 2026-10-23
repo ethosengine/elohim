@@ -386,7 +386,10 @@ fn flow_fold_refuses_while_this_devices_peer_serves() {
     ]);
     let stderr = String::from_utf8_lossy(&out.stderr).to_string();
     assert_eq!(out.status.code(), Some(2), "{stderr}");
-    assert!(stderr.contains("epr peer serve is running"), "{stderr}");
+    assert!(
+        stderr.contains("epr peer serve (or another epr flow fold) is running"),
+        "{stderr}"
+    );
     assert!(stderr.contains("folds every newer head"), "{stderr}");
     // A second serve is refused the same way.
     assert!(elohim_epr_cli::peer::ServeLock::acquire(&a.peer_dir()).is_err());

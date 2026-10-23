@@ -336,3 +336,66 @@ async fn an_oversized_event_or_an_exhausted_budget_leaves_the_fold_incomplete() 
     a.close().await;
     b.router.shutdown().await.expect("shutdown");
 }
+
+#[tokio::test(flavor = "multi_thread")]
+async fn a_fold_appends_nothing_once_its_device_is_no_longer_admitted() {
+    let h = household();
+    let b = serve_b(&h).await;
+    b.checkout
+        .append(berth_event("claim", "cargo", "sb", "1.0"));
+    let tree = b.project(&allow());
+    let a = bind(&h.key_a, None, vec![]).await.expect("bind A");
+    let a_checkout = Checkout::new();
+
+    // Admission as A holds it after folding a Contest of B's binding.
+    let mut rows = h.rows.clone();
+    rows.push(support::contest(&h.a, &h.rows[1]));
+    let revoked: eprfs_peer::SharedAdmission = std::sync::Arc::new(std::sync::RwLock::new(
+        eprfs_peer::Admission::from_roster(&rows, &h.a.did, &*h.verify),
+    ));
+    let target = eprfs_peer::FoldTarget {
+        device: &h.b.did,
+        since: None,
+        root: tree.root(),
+        admission: Some(&revoked),
+    };
+    let folded = eprfs_peer::fold_root(
+        &a,
+        b.addr.clone(),
+        target,
+        &a_checkout.store(),
+        &allow(),
+        &TreeLimits::default(),
+        &FoldLimits::default(),
+    )
+    .await;
+    assert!(
+        matches!(folded, Err(eprfs_peer::PeerError::FoldRevoked { .. })),
+        "{folded:?}"
+    );
+    assert!(a_checkout.events().is_empty(), "nothing is appended");
+
+    // The same fold under an admission that still admits B appends B's claim.
+    let admitted = h.shared_admission();
+    let target = eprfs_peer::FoldTarget {
+        device: &h.b.did,
+        since: None,
+        root: tree.root(),
+        admission: Some(&admitted),
+    };
+    let report = eprfs_peer::fold_root(
+        &a,
+        b.addr.clone(),
+        target,
+        &a_checkout.store(),
+        &allow(),
+        &TreeLimits::default(),
+        &FoldLimits::default(),
+    )
+    .await
+    .expect("folds");
+    assert_eq!(report.outcome.appended, 1);
+
+    a.close().await;
+    b.router.shutdown().await.expect("shutdown");
+}
