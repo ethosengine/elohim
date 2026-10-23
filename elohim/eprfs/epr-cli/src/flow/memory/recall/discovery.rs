@@ -50,7 +50,10 @@ pub(super) use elohim_epr_index::terms::{identifier_words, stem};
 /// that mention the most of them first. Ranking is over DECLARED metadata only — it is candidate
 /// discovery, never authority, which is why every row still arrives with a `read` command rather
 /// than an excerpt.
-#[allow(clippy::too_many_arguments)]
+#[allow(
+    clippy::too_many_arguments,
+    reason = "one traversal serves both discovery doors; each argument is a separate declared filter"
+)]
 pub fn discover_scored(
     root: &Path,
     contract: &Contract,

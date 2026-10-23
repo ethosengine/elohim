@@ -30,7 +30,9 @@ use eprfs_peer::{
 };
 use serde::Serialize;
 
-use crate::actor::{steward_lineage, ActorError, StewardLineage};
+use crate::actor::{
+    channel_standing, steward_lineage, ActorError, ChannelStanding, StewardLineage,
+};
 use crate::device_key::{self, DeviceKey};
 
 /// Where the crossing allow-list is read from, under the checkout.
@@ -472,34 +474,98 @@ fn render(outcome: &StatusOutcome) {
 }
 
 /// `epr peer leases`: the steward lease view for this device, now.
+///
+/// It reads the channel store `epr peer serve` recorded in the head table (the checkout at
+/// `--root` only when no daemon has served on this device yet), never creating one: a recorded
+/// store that is gone is an error. The output says how this workspace stands first: `device`
+/// (with the view), `not_a_device` (no device key, not on a roster here, or no endpoint row: its
+/// steward-scoped resources are container-scoped) or `revoked` (its binding is contested). It
+/// exits non-zero only when the view could not be computed.
 fn leases(options: &Options) -> PeerResult<ExitCode> {
-    let device = Device::open(&options.root, options.handle.as_deref())?;
-    let admission = device.admission()?;
-    let table = HeadTable::load(&device.peer_dir)?;
+    let table = HeadTable::load(&peer_dir()?)?;
+    let root = table
+        .store
+        .as_ref()
+        .map_or_else(|| options.root.clone(), |place| place.root.clone());
     let policy = options
         .policy
         .clone()
         .unwrap_or_else(|| options.root.join(POLICY_REL));
     let scope = StewardScope::from_policy_file(&policy)?;
-    let store = elohim_epr_rea::SidecarFlowStore::open(&options.root)
-        .map_err(|e| PeerCliError::Peer(PeerError::FlowStore(e)))?;
-    let (own, folded) = lease_events(&store)?;
-    let did = device.key.did_key();
+    // A recorded channel store that is gone is never read as an empty (free) one.
+    if let Some(place) = table.store.as_ref().filter(|place| !place.log.is_file()) {
+        return Err(PeerCliError::InvalidArguments(format!(
+            "the channel store `{}` that epr peer serve recorded is gone; restart epr peer serve \
+             on this device's checkout",
+            place.log.display()
+        )));
+    }
     let now = unix_ms();
+    let mut out = serde_json::Map::new();
+    out.insert("now".into(), now.into());
+    out.insert("confirm_wait_s".into(), scope.confirm_wait_s().into());
+    let standing = match standing(&root, options.handle.as_deref())? {
+        Standing::Device(device) => device,
+        Standing::NotADevice(why) => {
+            return answer(options, out, "not_a_device", None, &why);
+        }
+        Standing::Revoked(did) => {
+            return answer(
+                options,
+                out,
+                "revoked",
+                Some(did),
+                "this device's binding is contested",
+            );
+        }
+    };
+    let (device, admission) = *standing;
+    let did = device.key.did_key();
+    if !admission.admits_device(&did) {
+        return answer(
+            options,
+            out,
+            "not_a_device",
+            Some(did),
+            "no PeerEndpoint row names this device's peer (run: epr actor device endpoint)",
+        );
+    }
+    let log = root.join(".eprfs/status/flows.jsonl");
+    if !log.is_file() {
+        return Err(PeerCliError::InvalidArguments(format!(
+            "this checkout has no flow store at `{}`; nothing of this device's channel is here",
+            log.display()
+        )));
+    }
+    let store = elohim_epr_rea::SidecarFlowStore::open(&root)
+        .map_err(|e| PeerCliError::Peer(PeerError::FlowStore(e)))?;
     let mut view = steward_lease_view(
         &did,
-        &own,
-        &folded,
+        &lease_events(&store)?,
         &table,
         &admission,
         now,
         scope.confirm_wait_s(),
-    );
+    )?;
     view.retain(|resource, _| scope.covers(resource));
+    let seen: serde_json::Map<String, serde_json::Value> = table
+        .devices
+        .iter()
+        .filter(|(other, _)| admission.admits_device(other))
+        .map(|(other, head)| (other.clone(), head.seq.into()))
+        .collect();
+    out.insert("standing".into(), "device".into());
+    out.insert("device".into(), did.into());
+    out.insert(
+        "store".into(),
+        std::fs::canonicalize(&root)
+            .unwrap_or(root)
+            .display()
+            .to_string()
+            .into(),
+    );
+    out.insert("seen".into(), seen.into());
     if options.json {
-        let mut out = serde_json::Map::new();
-        out.insert("now".into(), now.into());
-        out.insert("confirm_wait_s".into(), scope.confirm_wait_s().into());
         for (resource, verdict) in view {
             out.insert(resource, serde_json::to_value(verdict)?);
         }
@@ -523,18 +589,10 @@ fn leases(options: &Options) -> PeerResult<ExitCode> {
                     .collect::<Vec<_>>()
                     .join(", ")
             ),
+            // berth formats the refusal line and its age; this line only names the device.
             LeaseVerdict::Unconfirmed {
-                session,
-                device,
-                last_seen,
-            } => format!(
-                "unconfirmed for {session} here: {} {}",
-                short(device),
-                last_seen.map_or_else(
-                    || "never seen".to_string(),
-                    |at| format!("last seen {}s ago", now.saturating_sub(at) / 1000)
-                )
-            ),
+                session, device, ..
+            } => format!("unconfirmed for {session} here: {}", short(device)),
             LeaseVerdict::HeldBy {
                 device,
                 session,
@@ -551,6 +609,54 @@ fn leases(options: &Options) -> PeerResult<ExitCode> {
             ),
         };
         println!("{resource:<18} {line}");
+    }
+    Ok(ExitCode::SUCCESS)
+}
+
+/// How this workspace stands for the lease view.
+enum Standing {
+    /// A device of its steward, with the admission its roster gives.
+    Device(Box<(Device, Admission)>),
+    NotADevice(String),
+    Revoked(String),
+}
+
+fn standing(root: &Path, handle: Option<&str>) -> PeerResult<Standing> {
+    let key_file = device_key::resolve_path()?;
+    if !key_file.is_file() {
+        return Ok(Standing::NotADevice(format!(
+            "this workspace has no device key ({})",
+            key_file.display()
+        )));
+    }
+    let did = DeviceKey::load(&key_file)?.did_key();
+    match channel_standing(root, handle, &did)? {
+        ChannelStanding::NotADevice(why) => Ok(Standing::NotADevice(why)),
+        ChannelStanding::Revoked { .. } => Ok(Standing::Revoked(did)),
+        ChannelStanding::Stands { handle } => {
+            let device = Device::open(root, Some(&handle))?;
+            let admission = device.admission()?;
+            Ok(Standing::Device(Box::new((device, admission))))
+        }
+    }
+}
+
+/// The answer for a workspace that has no view: how it stands and why.
+fn answer(
+    options: &Options,
+    mut out: serde_json::Map<String, serde_json::Value>,
+    standing: &str,
+    device: Option<String>,
+    why: &str,
+) -> PeerResult<ExitCode> {
+    out.insert("standing".into(), standing.into());
+    out.insert("device".into(), device.into());
+    out.insert("store".into(), serde_json::Value::Null);
+    out.insert("why".into(), why.into());
+    if options.json {
+        println!("{}", serde_json::to_string_pretty(&out)?);
+    } else {
+        println!("{standing}: {why}");
     }
     Ok(ExitCode::SUCCESS)
 }

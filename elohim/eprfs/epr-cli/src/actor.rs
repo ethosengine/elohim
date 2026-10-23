@@ -1897,6 +1897,64 @@ pub fn steward_lineage(
     })
 }
 
+/// How this device stands for its steward's channel in the checkout at `root` (spec §3.1, §3.4).
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum ChannelStanding {
+    /// A member of no roster here (with `handle`, not of that one): not one of a steward's
+    /// devices, so it has nothing to coordinate with.
+    NotADevice(String),
+    /// A member of `handle`'s roster whose own binding (or, for the chain root, genesis) is
+    /// effectively contested: revoked.
+    Revoked { handle: String },
+    /// Stands on `handle`'s roster.
+    Stands { handle: String },
+}
+
+/// [`ChannelStanding`] of the device `did` in the checkout at `root`, on `handle`'s roster or the
+/// one roster it is a member of.
+///
+/// # Errors
+///
+/// [`ActorError`] when a roster cannot be read or the device is a member of more than one and no
+/// handle names which.
+pub fn channel_standing(
+    root: &Path,
+    handle: Option<&str>,
+    did: &str,
+) -> ActorResult<ChannelStanding> {
+    let candidates = match handle {
+        Some(handle) => vec![handle.to_string()],
+        None => roster_handles(root),
+    };
+    let member: Vec<String> = candidates
+        .into_iter()
+        .filter(|handle| device_enrolled(root, handle, did))
+        .collect();
+    match member.as_slice() {
+        [] => Ok(ChannelStanding::NotADevice(format!(
+            "this device ({}) is on no participant roster in {}",
+            short_did(did),
+            root.display()
+        ))),
+        [handle] => {
+            let roster = read_roster(root, handle)?;
+            Ok(if roster.device_standing_row(did, &verifier()).is_some() {
+                ChannelStanding::Stands {
+                    handle: handle.clone(),
+                }
+            } else {
+                ChannelStanding::Revoked {
+                    handle: handle.clone(),
+                }
+            })
+        }
+        _ => Err(ActorError::InvalidArguments(
+            "this device is on more than one participant roster — name one with --handle <handle>"
+                .into(),
+        )),
+    }
+}
+
 /// The machine-facing result of `device endpoint`.
 #[derive(Debug, Serialize)]
 #[serde(rename_all = "camelCase")]

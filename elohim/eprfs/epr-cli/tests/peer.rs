@@ -15,11 +15,12 @@ use elohim_epr_cli::actor::{
 };
 use elohim_epr_cli::device_key::{self, DeviceKey};
 use elohim_epr_rea::{
-    atom_cid, AgentRef, FlowEvent, FlowRecord, FlowStore, Magnitude, ReaVerb, SidecarFlowStore,
+    atom_cid, AgentRef, FlowEvent, FlowRecord, FlowStore, Magnitude, ParticipantRow, ReaVerb,
+    SidecarFlowStore, SidecarRoster,
 };
 use eprfs_peer::{
     project_channel, via_device, CrossingAllowList, DeviceHead, HeadTable, PeerConfig, PeerDaemon,
-    PeerKey,
+    PeerKey, StorePlace,
 };
 use tempfile::TempDir;
 
@@ -421,10 +422,8 @@ fn berth_record(
     event
 }
 
-#[test]
-fn peer_leases_prints_the_steward_view_while_serve_holds_its_lock() {
-    let (keys, a, b) = household();
-    let policy = keys.path().join("steward-policy.json");
+fn steward_policy(dir: &Path) -> PathBuf {
+    let policy = dir.join("steward-policy.json");
     std::fs::write(
         &policy,
         r#"{"berth": {"resources": {"cargo": 2,
@@ -434,37 +433,63 @@ fn peer_leases_prints_the_steward_view_while_serve_holds_its_lock() {
               "crosses": {"dev-berth-events@1": ["claim", "release"]}}}}"#,
     )
     .unwrap();
-    // B has folded A's claim on dev-integration; its own cargo claim is container-scoped.
-    let mut store = SidecarFlowStore::open(b.checkout.path()).unwrap();
-    let a_did = a.key.did_key();
-    for event in [
-        berth_record(
-            "claim",
-            "dev-integration",
-            "claude-1",
-            "1792769289.000",
-            Some(&a_did),
-        ),
-        berth_record("claim", "cargo", "codex-1", "1792769290.000", None),
-    ] {
-        store.append(FlowRecord::Event(event)).unwrap();
-    }
-    // The view reads the store and the head table only: it answers while serve runs.
-    let _serving = elohim_epr_cli::peer::ServeLock::acquire(&b.peer_dir()).expect("lock");
-    let out = b.epr(&[
+    policy
+}
+
+fn leases_json(device: &Device, root: &str, policy: &Path) -> serde_json::Value {
+    let out = device.epr(&[
         "peer",
         "leases",
         "--json",
         "--root",
-        b.root(),
+        root,
         "--policy",
         policy.to_str().unwrap(),
     ]);
     let stderr = String::from_utf8_lossy(&out.stderr).to_string();
     assert!(out.status.success(), "{stderr}");
-    let view: serde_json::Value = serde_json::from_slice(&out.stdout).unwrap();
+    serde_json::from_slice(&out.stdout).unwrap()
+}
+
+fn append(root: &Path, events: impl IntoIterator<Item = FlowEvent>) {
+    let mut store = SidecarFlowStore::open(root).unwrap();
+    for event in events {
+        store.append(FlowRecord::Event(event)).unwrap();
+    }
+}
+
+#[test]
+fn peer_leases_prints_the_steward_view_while_serve_holds_its_lock() {
+    let (keys, a, b) = household();
+    let policy = steward_policy(keys.path());
+    // B has folded A's claim on dev-integration; its own cargo claim is container-scoped.
+    let a_did = a.key.did_key();
+    append(
+        b.checkout.path(),
+        [
+            berth_record(
+                "claim",
+                "dev-integration",
+                "claude-1",
+                "1792769289.000",
+                Some(&a_did),
+            ),
+            berth_record("claim", "cargo", "codex-1", "1792769290.000", None),
+        ],
+    );
+    // The view reads the store and the head table only: it answers while serve runs.
+    let _serving = elohim_epr_cli::peer::ServeLock::acquire(&b.peer_dir()).expect("lock");
+    let view = leases_json(&b, b.root(), &policy);
     assert!(view["now"].as_u64().is_some(), "{view}");
     assert_eq!(view["confirm_wait_s"], 10);
+    assert_eq!(view["standing"], "device");
+    assert_eq!(view["device"], b.key.did_key());
+    // No daemon has served here yet, so the channel store is the checkout's own.
+    assert_eq!(
+        view["store"],
+        b.checkout.path().canonicalize().unwrap().to_str().unwrap()
+    );
+    assert_eq!(view["seen"], serde_json::json!({}));
     assert_eq!(
         view["dev-integration"],
         serde_json::json!({
@@ -476,10 +501,93 @@ fn peer_leases_prints_the_steward_view_while_serve_holds_its_lock() {
         })
     );
     assert!(view.get("cargo").is_none(), "container-scoped: {view}");
+}
 
-    // A device with no key cannot compute a view: a non-zero exit, never an empty (free) view.
+#[test]
+fn peer_leases_reads_the_channel_store_the_daemon_serves_not_the_callers() {
+    let (keys, a, b) = household();
+    let policy = steward_policy(keys.path());
+    let a_did = a.key.did_key();
+    // B's daemon serves B's checkout, where A's claim was folded.
+    append(
+        b.checkout.path(),
+        [berth_record(
+            "claim",
+            "dev-integration",
+            "claude-1",
+            "1792769289.000",
+            Some(&a_did),
+        )],
+    );
+    let served = b.checkout.path().canonicalize().unwrap();
+    let mut table = HeadTable {
+        store: Some(StorePlace {
+            root: served.clone(),
+            log: served.join(".eprfs/status/flows.jsonl"),
+        }),
+        ..HeadTable::default()
+    };
+    table.save(&b.peer_dir()).unwrap();
+    // A worktree of B's with a flow store of its own, holding none of the fold.
+    let worktree = checkout();
+    append(
+        worktree.path(),
+        [berth_record(
+            "claim",
+            "cargo",
+            "codex-1",
+            "1792769290.000",
+            None,
+        )],
+    );
+    let view = leases_json(&b, worktree.path().to_str().unwrap(), &policy);
+    assert_eq!(view["store"], served.to_str().unwrap());
+    assert_eq!(view["dev-integration"]["verdict"], "held_by", "{view}");
+    assert_eq!(view["dev-integration"]["device"], a_did);
+
+    // A recorded channel store that is gone is a refusal, never an empty (free) view, and the
+    // view creates nothing in its place.
+    let gone = TempDir::new().unwrap();
+    table.store = Some(StorePlace {
+        root: gone.path().to_path_buf(),
+        log: gone.path().join(".eprfs/status/flows.jsonl"),
+    });
+    table.save(&b.peer_dir()).unwrap();
+    let out = b.epr(&[
+        "peer",
+        "leases",
+        "--json",
+        "--root",
+        b.root(),
+        "--policy",
+        policy.to_str().unwrap(),
+    ]);
+    assert!(!out.status.success());
+    assert!(out.stdout.is_empty());
+    assert!(
+        String::from_utf8_lossy(&out.stderr).contains("channel store"),
+        "{}",
+        String::from_utf8_lossy(&out.stderr)
+    );
+    assert!(!gone.path().join(".eprfs").exists());
+}
+
+#[test]
+fn peer_leases_names_a_workspace_that_is_not_one_of_its_stewards_devices() {
+    let (keys, a, b) = household();
+    let policy = steward_policy(keys.path());
+    let _ = a;
+    // No device key.
     let out = Command::new(env!("CARGO_BIN_EXE_epr"))
-        .args(["peer", "leases", "--json", "--root", b.root()])
+        .args([
+            "peer",
+            "leases",
+            "--json",
+            "--root",
+            b.root(),
+            "--policy",
+            policy.to_str().unwrap(),
+        ])
         .env(
             device_key::DEVICE_KEY_ENV,
             keys.path().join("absent/ed25519.seed"),
@@ -487,6 +595,97 @@ fn peer_leases_prints_the_steward_view_while_serve_holds_its_lock() {
         .env("XDG_CONFIG_HOME", b.config.path())
         .output()
         .unwrap();
-    assert!(!out.status.success());
-    assert!(out.stdout.is_empty());
+    assert!(
+        out.status.success(),
+        "{}",
+        String::from_utf8_lossy(&out.stderr)
+    );
+    let view: serde_json::Value = serde_json::from_slice(&out.stdout).unwrap();
+    assert_eq!(view["standing"], "not_a_device", "{view}");
+    assert!(view["device"].is_null());
+    assert!(
+        view["why"].as_str().unwrap().contains("no device key"),
+        "{view}"
+    );
+    // A key on no roster in this checkout.
+    let stranger = Device::new(&keys, "stranger");
+    let view = leases_json(&stranger, b.root(), &policy);
+    assert_eq!(view["standing"], "not_a_device", "{view}");
+    assert!(view["why"].as_str().unwrap().contains("roster"), "{view}");
+}
+
+#[test]
+fn peer_leases_reports_a_device_whose_binding_is_contested_as_revoked() {
+    let (keys, a, b) = household();
+    let policy = steward_policy(keys.path());
+    // A contests B's binding, and the row reaches B's checkout.
+    let roster = SidecarRoster::open(b.checkout.path(), HANDLE).unwrap();
+    let binding_cid = roster
+        .read()
+        .unwrap()
+        .rows()
+        .iter()
+        .find_map(|(cid, row)| {
+            matches!(row, ParticipantRow::Binding { .. }).then(|| cid.to_string())
+        })
+        .expect("B's binding");
+    let mut row = ParticipantRow::Contest {
+        handle: HANDLE.into(),
+        target_cid: binding_cid,
+        by: a.key.did_key(),
+        basis: "that workspace is retired".into(),
+        signature: String::new(),
+    };
+    let signature: String = a
+        .key
+        .sign(&row.signing_message().unwrap())
+        .iter()
+        .map(|byte| format!("{byte:02x}"))
+        .collect();
+    if let ParticipantRow::Contest { signature: s, .. } = &mut row {
+        *s = signature;
+    }
+    roster.append(row).unwrap();
+    let view = leases_json(&b, b.root(), &policy);
+    assert_eq!(view["standing"], "revoked", "{view}");
+    assert_eq!(view["device"], b.key.did_key());
+    assert_eq!(view["why"], "this device's binding is contested");
+}
+
+#[test]
+fn peer_leases_is_effective_at_once_for_a_steward_with_one_device() {
+    let keys = TempDir::new().unwrap();
+    let a = Device::new(&keys, "solo");
+    let root = a.checkout.path();
+    witness(
+        root,
+        "human:matthew",
+        "agent:orchestrator@claude-opus-5-5",
+        "s1",
+        "operator of this stewarded device; present in this session",
+        false,
+        &a.key,
+    )
+    .unwrap();
+    device_endpoint(root, None, &a.node_id(), &a.key).unwrap();
+    let now_s = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .unwrap()
+        .as_secs_f64();
+    append(
+        root,
+        [berth_record(
+            "claim",
+            "lane:solo",
+            "claude-1",
+            &format!("{now_s:.3}"),
+            None,
+        )],
+    );
+    let view = leases_json(&a, a.root(), &steward_policy(keys.path()));
+    assert_eq!(
+        view["lane:solo"],
+        serde_json::json!({"verdict": "effective", "session": "claude-1"}),
+        "{view}"
+    );
 }
