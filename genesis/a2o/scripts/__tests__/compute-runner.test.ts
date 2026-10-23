@@ -615,7 +615,7 @@ it('grantStatus reads withdrawn, lapsed, inactive and unverified honestly', () =
 
 it('native grant read refuses unsupported/malformed records before authority-link reads', async () => {
   const good = grantRecord(POLICY);
-  const mutations: Array<(record: ReturnType<typeof grantRecord>) => void> = [
+  const mutations: ((record: ReturnType<typeof grantRecord>) => void)[] = [
     record => {
       Object.assign(record.signed_action.hashed, {
         content: { author: RUNNER_RAW, entry_hash: GRANT_ENTRY_RAW },
