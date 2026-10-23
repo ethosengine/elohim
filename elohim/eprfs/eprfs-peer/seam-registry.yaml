@@ -2,7 +2,7 @@
 seamRegistryVersion: 1
 crate: eprfs-peer
 crateRoot: elohim/eprfs/eprfs-peer
-seamLocus: "The door between a device and the other devices of its own person: an inbound iroh peer is admitted only when the node id iroh authenticated in the handshake is named by a valid PeerEndpoint row of the same lineage in this device's own roster, and the device's eprfs tier is served on that door's ALPN to admitted devices only. The device's peer key is minted here and never leaves it."
+seamLocus: "The door between a device and the other devices of its own person: an inbound iroh peer is admitted only when the node id iroh authenticated in the handshake is named by a valid PeerEndpoint row of the same lineage in this device's own roster, and the device's channel tree is served on that door's tier ALPN, and its signed heads gossiped on its steward topic, to admitted devices only. Only allow-listed events cross, and another device's are folded into this device's flow store via that device. The device's peer key is minted here and never leaves it."
 decisionPoints:
   - name: admits
     kind: verdict-fn
@@ -304,3 +304,207 @@ decisionPoints:
         testName: the_client_refuses_an_answer_frame_past_its_cap
         kind: integration
     notes: "Spec §3.2. T5 asks a peer's tier for a channel diff through tier_call / tier_request."
+  - name: admits_crossing
+    kind: verdict-fn
+    sourceLocation:
+      file: src/allow.rs
+      modulePath: eprfs_peer::CrossingAllowList::admits
+    summary: "Whether a flow event may enter this device's channel tree, or be folded from another's: exactly one measure slot on the crossing allow-list (pool-policy.json berth.channel.crosses, {measure: [kinds]}) and exactly one reason:<kind> listed for it, and no via:<device> slot (an event folded from another device never re-crosses). Default deny: an absent list lets nothing cross; a malformed one is refused, never widened."
+    concernIds:
+      - id: C0
+        status: answered
+        justification: "Default deny: only the berth records the spec names (moor, unmoor, claim, renew, release, override, note, shed) cross; recall, session, memory and every other measure stay local, whatever the flow store holds."
+      - id: C1
+        status: n-a
+        justification: "No election."
+      - id: C2
+        status: n-a
+        justification: "No head order; the channel head orders by seq."
+      - id: C3
+        status: n-a
+        justification: "A pure predicate."
+      - id: C4
+        status: answered
+        justification: "Not crossing is one answer: another measure, an unlisted kind, a doubled slot and a folded event all read false."
+      - id: C5
+        status: answered
+        justification: "Applied twice: on projection by the authoring device and again on fold by the receiving device, against its own list."
+      - id: C6a
+        status: answered
+        justification: "Linear in an event's slots."
+      - id: C6b
+        status: n-a
+        justification: "Holds nothing."
+      - id: C7
+        status: n-a
+        justification: "Nothing is advertised."
+      - id: C8
+        status: partial
+        justification: "Refused events are counted per fold (FoldOutcome::refused); events left out of a projection are not counted."
+      - id: C9
+        status: answered
+        justification: "The list is read from the checkout's pool-policy.json at daemon start; a policy change takes effect on restart."
+      - id: C10
+        status: answered
+        justification: "New; reads the slot vocabulary berth's dev-berth-events@1 records already carry (T1)."
+      - id: C11
+        status: n-a
+        justification: "No fan-out."
+      - id: C12
+        status: answered
+        justification: "Fail closed: a malformed list is an error, an absent one admits nothing."
+      - id: C13
+        status: n-a
+        justification: "The same at every stage."
+      - id: C14
+        status: n-a
+        justification: "A predicate; the fold counts its refusals."
+    contractTests:
+      - path: elohim/eprfs/eprfs-peer/tests/channel.rs
+        testName: channel_tree_holds_only_allowed_kinds
+        kind: integration
+      - path: elohim/eprfs/eprfs-peer/tests/channel.rs
+        testName: a_malformed_crossing_list_is_refused_not_widened
+        kind: integration
+      - path: elohim/eprfs/eprfs-peer/tests/fold.rs
+        testName: a_fold_refuses_kinds_off_its_own_allow_list
+        kind: integration
+    notes: "Spec §3.3; review focus item 5. The served store holds only projected channel trees (ChannelStore), so an admitted device reads nothing that did not cross."
+  - name: judge
+    kind: verdict-fn
+    sourceLocation:
+      file: src/announce.rs
+      modulePath: eprfs_peer::Channel::judge
+    summary: "What a device does with a channel head heard on its steward topic: its own head is ignored; a head from a device admission does not admit now is dropped as unadmitted; a head whose signature (over device, root, seq, at and the folded acknowledgement vector) does not verify against the did:key it names is dropped as forged; a head whose seq is lower than, or equal to, the last folded from that device is dropped as rollback or replay. Every drop is counted in the persisted head table; only a Fold verdict is folded, and only a folded head whose root moved schedules the re-announce that acknowledges it."
+    concernIds:
+      - id: C0
+        status: answered
+        justification: "Only admitted devices are gossip neighbours (GatedGossip closes every other connection) and only an admitted device's signed head is folded."
+      - id: C1
+        status: n-a
+        justification: "No election."
+      - id: C2
+        status: answered
+        justification: "Per-device seq, strictly increasing and persisted across restarts; a lower or equal seq is refused and counted. No decision compares two devices' clocks."
+      - id: C3
+        status: answered
+        justification: "A fold is bounded by a deadline and retried on the next head; a silent device is simply not folded."
+      - id: C4
+        status: answered
+        justification: "Unadmitted, forged, rollback, replay and malformed are distinct counted verdicts."
+      - id: C5
+        status: answered
+        justification: "The signature is checked before the order, so a forged head with a high seq counts as forged and never moves the last folded seq."
+      - id: C6a
+        status: answered
+        justification: "A head is capped at 4 KiB on decode; judging is a map lookup and one signature check."
+      - id: C6b
+        status: answered
+        justification: "The head table is replaced atomically on every change."
+      - id: C7
+        status: n-a
+        justification: "Nothing is advertised beyond the head itself."
+      - id: C8
+        status: answered
+        justification: "Counted by reason in HeadTable.dropped, read by epr peer status."
+      - id: C9
+        status: answered
+        justification: "Admission is re-read when the roster file changes, so a Contest written locally drops the device's heads at once, with no restart."
+      - id: C10
+        status: answered
+        justification: "New; heads are canonical DAG-CBOR under a domain tag, signed by the device key epr-cli holds."
+      - id: C11
+        status: answered
+        justification: "Acknowledging only heads whose root moved stops two devices acknowledging each other's acknowledgements forever."
+      - id: C12
+        status: answered
+        justification: "A poisoned admission admits nobody; an unreadable roster admits nobody until it reads."
+      - id: C13
+        status: n-a
+        justification: "The same at every stage."
+      - id: C14
+        status: partial
+        justification: "Drops are counted and logged, not witnessed."
+    contractTests:
+      - path: elohim/eprfs/eprfs-peer/tests/head.rs
+        testName: head_signature_verifies_against_device_did
+        kind: integration
+      - path: elohim/eprfs/eprfs-peer/tests/head.rs
+        testName: forged_head_dropped_and_counted
+        kind: integration
+      - path: elohim/eprfs/eprfs-peer/tests/head.rs
+        testName: lower_seq_head_refused_as_rollback
+        kind: integration
+      - path: elohim/eprfs/eprfs-peer/tests/head.rs
+        testName: folding_a_newer_head_reannounces_with_updated_ack
+        kind: integration
+      - path: elohim/eprfs/eprfs-peer/tests/daemon.rs
+        testName: two_daemons_fold_each_others_heads_and_drop_a_contested_device
+        kind: integration
+    notes: "Spec §3.2–§3.3; review focus items 3 and 4. T6 reads the head table's acknowledgement vectors."
+  - name: fold_events
+    kind: state-transition
+    sourceLocation:
+      file: src/fold.rs
+      modulePath: eprfs_peer::fold_events
+    summary: "Append another device's crossing events to this device's flow store under one SidecarFlowStore transaction, each with a via:<device> slot and otherwise verbatim (provider, actor claim and every berth field kept). Idempotent by event CID: an event already folded via that device is not appended again. Events are fetched by fetch_channel: a diff from the root last folded, or a listing when the diff cannot be answered; every leaf must be named by its event CID, carry that CID's digest, and hold that event's canonical bytes."
+    concernIds:
+      - id: C0
+        status: answered
+        justification: "Reads only the admitted device's tier, which serves only its channel tree."
+      - id: C1
+        status: n-a
+        justification: "No election."
+      - id: C2
+        status: n-a
+        justification: "Order is the head's; the fold appends in the tree's order and dedups by CID."
+      - id: C3
+        status: answered
+        justification: "Bounded by MAX_FOLD_EVENTS per fold and a daemon deadline; an incomplete fold leaves the head unrecorded so the next one resumes."
+      - id: C4
+        status: answered
+        justification: "Appended, already folded and refused are counted apart; integrity and unanswered failures are distinct errors."
+      - id: C5
+        status: answered
+        justification: "Each leaf is checked against its CID by the tier client and against its name and canonical encoding here, and re-checked against this device's own allow-list."
+      - id: C6a
+        status: answered
+        justification: "At most MAX_FOLD_EVENTS leaves per fold, each under the tier's frame caps."
+      - id: C6b
+        status: answered
+        justification: "Appends are individually synced under the flow store's exclusive lock."
+      - id: C7
+        status: n-a
+        justification: "Nothing is advertised."
+      - id: C8
+        status: partial
+        justification: "Counted per fold and logged; not persisted beyond HeadTable.devices[*].events_folded."
+      - id: C9
+        status: n-a
+        justification: "No version skew within one lineage."
+      - id: C10
+        status: answered
+        justification: "New: the first import path for flow events, through epr-rea's SidecarFlowStore::transaction."
+      - id: C11
+        status: n-a
+        justification: "No fan-out."
+      - id: C12
+        status: answered
+        justification: "An event that is not at its own CID fails the whole fold, never partially trusted."
+      - id: C13
+        status: n-a
+        justification: "The same at every stage."
+      - id: C14
+        status: partial
+        justification: "Folded events carry their provenance (via); the fold itself is not witnessed."
+    contractTests:
+      - path: elohim/eprfs/eprfs-peer/tests/fold.rs
+        testName: fold_is_idempotent_by_event_cid
+        kind: integration
+      - path: elohim/eprfs/eprfs-peer/tests/fold.rs
+        testName: fold_records_via_device_provenance
+        kind: integration
+      - path: elohim/eprfs/eprfs-peer/tests/fold.rs
+        testName: a_cid_outside_the_channel_tree_is_unanswered_over_the_tier
+        kind: integration
+    notes: "Spec §3.3. epr flow fold --from <device> --root <cid> runs it once; the daemon runs it for every newer head."

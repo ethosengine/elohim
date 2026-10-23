@@ -1,0 +1,327 @@
+//! The fold: another device's crossing events, read from its tier and appended to this device's
+//! own flow store with provenance `via:<device>` (spec §3.3).
+//!
+//! Fetching asks the device's tier for the diff between the root last folded from it and the new
+//! one, and lists the new root's `channel/events` when the diff cannot be answered (the device no
+//! longer holds the old root, or this is the first fold). Every leaf is checked three ways before
+//! it is folded: the tier client checks its bytes hash to its CID and that it is at the path
+//! asked; here its name must be that CID, and its bytes must be a FlowEvent whose canonical
+//! encoding they are. Appending is idempotent by event CID: a replay or a duplicate announce
+//! appends nothing.
+
+use std::collections::HashSet;
+
+use cid::Cid;
+use elohim_epr_rea::model::canonical_bytes;
+use elohim_epr_rea::{atom_cid, FlowEvent, FlowRecord, FlowStore, SidecarFlowStore};
+use eprfs_core::{BlobCid, TreeEntryKind, TreeLimits, TreePath, View};
+use iroh::endpoint::{Connection, VarInt};
+use iroh::{Endpoint, NodeAddr};
+
+use crate::allow::{via_device, CrossingAllowList, VIA_SLOT};
+use crate::channel::CHANNEL_EVENTS;
+use crate::error::PeerError;
+use crate::tier::{tier_request, TierAnswer, TierRequest, TIER_ALPN};
+
+/// The most events one fold reads. A larger change is folded across successive heads: the fold
+/// reports itself incomplete and the head is not recorded, so the next one resumes from the same
+/// base and skips what was already folded.
+pub const MAX_FOLD_EVENTS: usize = 1024;
+
+/// One crossing event as another device's channel tree holds it.
+#[derive(Debug, Clone, PartialEq)]
+pub struct ChannelEvent {
+    /// The event's own atom CID: its name in the tree (its leaf is the same digest, raw codec).
+    pub cid: Cid,
+    pub event: FlowEvent,
+}
+
+/// What [`fetch_channel`] read.
+#[derive(Debug, Clone, Default)]
+pub struct Fetched {
+    pub events: Vec<ChannelEvent>,
+    /// False when more than [`MAX_FOLD_EVENTS`] new events were offered and only that many read.
+    pub complete: bool,
+}
+
+/// What [`fold_events`] did.
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
+pub struct FoldOutcome {
+    /// Events appended to this device's flow store.
+    pub appended: u64,
+    /// Events already folded (the same event CID via the same device).
+    pub already: u64,
+    /// Events this device's own allow-list does not admit; never appended.
+    pub refused: u64,
+}
+
+/// Read the events of the channel tree at `root` on an open tier connection that `known` does not
+/// already hold (the original CIDs [`folded_from`] returns for that device). `since` is the root
+/// last folded from that device, the diff's base.
+///
+/// # Errors
+///
+/// The [`tier_request`] errors; [`PeerError::FoldUnanswered`] when the tier does not answer for
+/// `root`; [`PeerError::FoldIntegrity`] when the tree does not hold events at their own CIDs.
+pub async fn fetch_channel(
+    connection: &Connection,
+    since: Option<&BlobCid>,
+    root: &BlobCid,
+    known: &HashSet<Cid>,
+    tree: &TreeLimits,
+) -> Result<Fetched, PeerError> {
+    let events_dir = TreePath::from_slash_bytes(CHANNEL_EVENTS.as_bytes())
+        .map_err(|e| integrity(e.to_string()))?;
+    let offered = match since {
+        Some(old) if old == root => Vec::new(),
+        Some(old) => match diff(connection, old, root, &events_dir, tree).await? {
+            Some(added) => added,
+            None => list(connection, root, &events_dir, tree).await?,
+        },
+        None => list(connection, root, &events_dir, tree).await?,
+    };
+    let mut fresh = Vec::new();
+    for (name, leaf) in offered {
+        let cid = Cid::try_from(name.as_str())
+            .map_err(|e| integrity(format!("entry `{name}` is not a CID: {e}")))?;
+        // The leaf holds the event's bytes under the raw codec: one digest, two codecs.
+        if leaf.as_cid().hash() != cid.hash() {
+            return Err(integrity(format!("entry {cid} holds leaf {leaf}")));
+        }
+        if !known.contains(&cid) {
+            fresh.push((cid, leaf));
+        }
+    }
+    let complete = fresh.len() <= MAX_FOLD_EVENTS;
+    fresh.truncate(MAX_FOLD_EVENTS);
+    let mut events = Vec::with_capacity(fresh.len());
+    for (cid, leaf) in fresh {
+        let path = events_dir.join(cid.to_string().as_bytes());
+        let request = TierRequest::Read {
+            root: root.clone(),
+            path,
+        };
+        let read = match tier_request(connection, &request, tree).await? {
+            TierAnswer::Read(read) => read,
+            other => return Err(unanswered(format!("event {cid}"), &other)),
+        };
+        if read.cid != leaf {
+            return Err(integrity(format!("event {cid} was served as {}", read.cid)));
+        }
+        events.push(ChannelEvent {
+            cid,
+            event: decode_event(&cid, &read.bytes)?,
+        });
+    }
+    Ok(Fetched { events, complete })
+}
+
+/// The `(name, leaf)` pairs the diff from `old` to `new` adds under `channel/events`, or `None`
+/// when the diff is not answered or reports anything but added files there (a whole directory
+/// added, a kind changed), which a listing answers instead.
+async fn diff(
+    connection: &Connection,
+    old: &BlobCid,
+    new: &BlobCid,
+    events_dir: &TreePath,
+    tree: &TreeLimits,
+) -> Result<Option<Vec<(String, BlobCid)>>, PeerError> {
+    let request = TierRequest::Diff {
+        old: old.clone(),
+        new: new.clone(),
+        view: View::from_tree_paths([events_dir.clone()]),
+    };
+    let TierAnswer::Diff(changes) = tier_request(connection, &request, tree).await? else {
+        return Ok(None);
+    };
+    let mut added = Vec::new();
+    for change in changes {
+        let parts = change.path.components();
+        let under_events = parts.len() == events_dir.components().len() + 1
+            && parts.starts_with(events_dir.components());
+        match (&change.old, &change.new) {
+            // An event that left the tree (a narrower allow-list) is not unfolded.
+            (Some(TreeEntryKind::File { .. }), None) if under_events => {}
+            (None, Some(TreeEntryKind::File { blob, .. })) if under_events => {
+                let Some(name) = parts.last().and_then(|n| String::from_utf8(n.clone()).ok())
+                else {
+                    return Ok(None);
+                };
+                added.push((name, blob.as_blob_cid().clone()));
+            }
+            _ => return Ok(None),
+        }
+    }
+    Ok(Some(added))
+}
+
+/// Every `(name, leaf)` under `channel/events` at `root`.
+async fn list(
+    connection: &Connection,
+    root: &BlobCid,
+    events_dir: &TreePath,
+    tree: &TreeLimits,
+) -> Result<Vec<(String, BlobCid)>, PeerError> {
+    let request = TierRequest::List {
+        root: root.clone(),
+        path: events_dir.clone(),
+    };
+    let listing = match tier_request(connection, &request, tree).await? {
+        TierAnswer::List(listing) => listing,
+        other => return Err(unanswered(format!("root {root}"), &other)),
+    };
+    listing
+        .entries
+        .into_iter()
+        .map(|entry| {
+            let name = String::from_utf8(entry.name)
+                .map_err(|_| integrity("an entry name is not UTF-8".into()))?;
+            match entry.kind {
+                TreeEntryKind::File { blob, .. } => Ok((name, blob.as_blob_cid().clone())),
+                _ => Err(integrity(format!("entry `{name}` is not an event file"))),
+            }
+        })
+        .collect()
+}
+
+/// The FlowEvent `bytes` hold, refused unless they are its canonical encoding and its atom CID is
+/// `cid`.
+fn decode_event(cid: &Cid, bytes: &[u8]) -> Result<FlowEvent, PeerError> {
+    let event: FlowEvent = serde_ipld_dagcbor::from_slice(bytes)
+        .map_err(|e| integrity(format!("event {cid} is not a FlowEvent: {e}")))?;
+    let canonical = canonical_bytes(&event).map_err(PeerError::FlowStore)?;
+    if canonical != bytes || atom_cid(&event).map_err(PeerError::FlowStore)? != *cid {
+        return Err(integrity(format!(
+            "event {cid} is not in its canonical encoding at its own CID"
+        )));
+    }
+    Ok(event)
+}
+
+/// Append `events`, read from `device`'s channel, to this device's flow store, each with a
+/// `via:<device>` slot, under one transaction ([`SidecarFlowStore::transaction`]). An event this
+/// device's own `allow` does not admit is refused; an event already folded via `device` is not
+/// appended again.
+///
+/// # Errors
+///
+/// [`PeerError::FlowStore`] when the store cannot be read or appended to;
+/// [`PeerError::FoldIntegrity`] when an event is not at its stated CID.
+pub fn fold_events(
+    store: &SidecarFlowStore,
+    device: &str,
+    events: &[ChannelEvent],
+    allow: &CrossingAllowList,
+) -> Result<FoldOutcome, PeerError> {
+    let mut tx = store.transaction().map_err(PeerError::FlowStore)?;
+    let mut held: HashSet<Cid> = tx
+        .records()
+        .map_err(PeerError::FlowStore)?
+        .into_iter()
+        .map(|(cid, _)| cid)
+        .collect();
+    let mut outcome = FoldOutcome::default();
+    for ChannelEvent { cid, event } in events {
+        if atom_cid(event).map_err(PeerError::FlowStore)? != *cid {
+            return Err(integrity(format!("event {cid} is not at its own CID")));
+        }
+        if !allow.admits(event) {
+            outcome.refused += 1;
+            continue;
+        }
+        let folded = with_via(event, device);
+        let folded_cid = atom_cid(&folded).map_err(PeerError::FlowStore)?;
+        if !held.insert(folded_cid) {
+            outcome.already += 1;
+            continue;
+        }
+        tx.append(FlowRecord::Event(folded))
+            .map_err(PeerError::FlowStore)?;
+        outcome.appended += 1;
+    }
+    Ok(outcome)
+}
+
+/// The original CIDs of every event this device has folded via `device`.
+///
+/// # Errors
+///
+/// [`PeerError::FlowStore`] when the store cannot be read.
+pub fn folded_from<S>(store: &S, device: &str) -> Result<HashSet<Cid>, PeerError>
+where
+    S: FlowStore + ?Sized,
+{
+    let mut known = HashSet::new();
+    for (_, event) in store.events().map_err(PeerError::FlowStore)? {
+        if via_device(&event) == Some(device) {
+            known.insert(atom_cid(&without_via(event)).map_err(PeerError::FlowStore)?);
+        }
+    }
+    Ok(known)
+}
+
+/// Which tree a fold reads: `root`, announced by `device`, diffed from `since` (the root last
+/// folded from that device, if any).
+#[derive(Debug, Clone, Copy)]
+pub struct FoldTarget<'a> {
+    pub device: &'a str,
+    pub since: Option<&'a BlobCid>,
+    pub root: &'a BlobCid,
+}
+
+/// Fold `target` from the device whose tier answers at `peer`: dial it, fetch what this device has
+/// not folded, and append it.
+///
+/// Returns what was appended and whether the fold was complete (see [`MAX_FOLD_EVENTS`]).
+///
+/// # Errors
+///
+/// [`PeerError::TierConnect`] when the device cannot be reached, and the [`fetch_channel`] and
+/// [`fold_events`] errors.
+pub async fn fold_root(
+    endpoint: &Endpoint,
+    peer: NodeAddr,
+    target: FoldTarget<'_>,
+    store: &SidecarFlowStore,
+    allow: &CrossingAllowList,
+    tree: &TreeLimits,
+) -> Result<(FoldOutcome, bool), PeerError> {
+    let known = folded_from(store, target.device)?;
+    let connection = endpoint
+        .connect(peer, TIER_ALPN)
+        .await
+        .map_err(|e| PeerError::TierConnect(Box::new(e)))?;
+    let fetched = fetch_channel(&connection, target.since, target.root, &known, tree).await;
+    connection.close(VarInt::from_u32(0), b"");
+    let fetched = fetched?;
+    let outcome = fold_events(store, target.device, &fetched.events, allow)?;
+    Ok((outcome, fetched.complete))
+}
+
+fn with_via(event: &FlowEvent, device: &str) -> FlowEvent {
+    let mut folded = event.clone();
+    folded.classified_as.push(format!("{VIA_SLOT}{device}"));
+    folded
+}
+
+fn without_via(mut event: FlowEvent) -> FlowEvent {
+    event
+        .classified_as
+        .retain(|slot| !slot.starts_with(VIA_SLOT));
+    event
+}
+
+fn integrity(reason: String) -> PeerError {
+    PeerError::FoldIntegrity { reason }
+}
+
+fn unanswered(what: String, answer: &TierAnswer) -> PeerError {
+    let why = match answer {
+        TierAnswer::Failed { reason } => format!(" ({reason})"),
+        TierAnswer::Unanswered { .. } => " (unanswered)".to_string(),
+        _ => " (an answer of another kind)".to_string(),
+    };
+    PeerError::FoldUnanswered {
+        what: format!("{what}{why}"),
+    }
+}

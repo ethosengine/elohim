@@ -74,4 +74,55 @@ pub enum PeerError {
     /// answer.
     #[error("the peer's tier served an object that fails its address or path: {cid}")]
     TierLeafIntegrity { cid: eprfs_core::BlobCid },
+
+    /// The crossing allow-list (`berth.channel.crosses` in pool-policy.json) could not be read or
+    /// is not `{measure: [kind, …]}`. Refused, never widened: a list that does not parse lets
+    /// nothing cross.
+    #[error("the crossing allow-list at `{}` is invalid: {reason}", path.display())]
+    Policy { path: PathBuf, reason: String },
+
+    /// The device's flow store could not be read or appended to.
+    #[error("the flow store failed: {0}")]
+    FlowStore(#[source] elohim_epr_rea::FabricError),
+
+    /// A channel tree could not be encoded (an event or a directory past the tree limits).
+    #[error("cannot build the channel tree: {reason}")]
+    ChannelTree { reason: String },
+
+    /// A channel head does not verify against the did:key it names, or names another device than
+    /// the one it is checked as.
+    #[error("the channel head does not verify as {device}")]
+    HeadSignature { device: String },
+
+    /// A channel head that does not encode or decode within its cap.
+    #[error("bad channel head: {reason}")]
+    HeadFrame { reason: String },
+
+    /// The persisted head table could not be read or written.
+    #[error("head table I/O at `{}`: {source}", path.display())]
+    HeadTableIo {
+        path: PathBuf,
+        #[source]
+        source: io::Error,
+    },
+
+    /// The persisted head table does not parse. It is never silently reset: its own seq keeps
+    /// this device's heads strictly increasing.
+    #[error("the head table `{}` does not parse: {reason}", path.display())]
+    HeadTableInvalid { path: PathBuf, reason: String },
+
+    /// A peer's channel tree served something that is not a crossing event at its own CID: a leaf
+    /// whose name is not the CID of its bytes, bytes that are not a canonical FlowEvent, or an
+    /// entry that is not a file under `channel/events`.
+    #[error("the peer's channel tree does not hold events at their own CIDs: {reason}")]
+    FoldIntegrity { reason: String },
+
+    /// The peer's tier did not answer for a root or path the fold needs (it does not hold the
+    /// root, or the device is no longer admitted there). Retried on the next head.
+    #[error("the peer's tier did not answer for {what}")]
+    FoldUnanswered { what: String },
+
+    /// The daemon could not start its gossip on the steward topic.
+    #[error("cannot join the steward channel topic: {reason}")]
+    Gossip { reason: String },
 }

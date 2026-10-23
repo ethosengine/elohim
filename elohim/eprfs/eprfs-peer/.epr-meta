@@ -4,9 +4,9 @@ id: eprfs-peer-style
 covers: subtree
 purpose: >
   A device's iroh peer: its persisted peer key, its endpoint, admission of authenticated
-  node ids to the devices its own roster names, and the tier ALPN serving its eprfs store to
-  those devices only. Strict under the Rust style guide from its
-  first commit.
+  node ids to the devices its own roster names, the tier ALPN serving its channel tree to
+  those devices only, and the steward channel that signs, gossips and folds their heads.
+  Strict under the Rust style guide from its first commit.
 rules:
   - id: rust-style-strict
     policy: rust-style-strict@1
@@ -30,3 +30,11 @@ devices. Frame bodies are read as they arrive, never pre-allocated from a claime
 
 The secret key never leaves `PeerKey` except into the endpoint builder: no `Display`, `Clone`
 or serialization, and `Debug` prints the node id only.
+
+The steward channel (spec §3.3) adds `iroh-gossip =0.92` (pinned with iroh). What crosses is
+pool-policy.json's `berth.channel.crosses`, default deny, applied on projection and again on
+fold. The tier serves a `ChannelStore` holding projected channel trees and nothing else, with a
+constant `TierId` that names no device. Heads are signed by the device key epr-cli holds,
+reached through a signer closure, so this crate still holds no device key. The head table
+(`<peer dir>/heads.json`) is the one place what was folded is persisted; the steward lease view reads
+it.

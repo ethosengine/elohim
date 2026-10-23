@@ -12,6 +12,14 @@
 //!   [`StewardDevicesGate`], which answers only admitted devices; everyone else gets
 //!   eprfs-serve's uniform refusal. [`tier_call`] and [`tier_request`] ask a peer's tier.
 //!
+//! - The steward channel (§3.3): [`project_channel`] places this device's crossing events (the
+//!   [`CrossingAllowList`] from `pool-policy.json`) in a channel tree served from a
+//!   [`ChannelStore`]; [`ChannelHead`] is the signed head a device gossips on [`topic_for`] its
+//!   lineage, carrying its acknowledgement vector; [`Channel`] keeps the announce rhythm and judges
+//!   the heads it hears; [`fold_root`] folds another device's events into this device's flow store
+//!   `via` that device; [`HeadTable`] persists what was folded; [`PeerDaemon`] runs it all behind
+//!   `epr peer serve`.
+//!
 //! **Admission at connect time is the possession proof.** iroh authenticates the remote node id
 //! cryptographically on every connection: the TLS handshake carries the peer's raw ed25519
 //! public key and proves it holds the matching secret, and `Connection::remote_node_id` reads
@@ -20,16 +28,39 @@
 //! provided the caller passes only `remote_node_id`, never an id a peer merely claims.
 
 mod admission;
+mod allow;
+mod announce;
+mod channel;
+mod daemon;
 mod endpoint;
 mod error;
+mod fold;
 mod gate;
+mod gossip;
+mod head;
+mod head_table;
 mod key;
 mod tier;
 
 pub use admission::{roster_rows_from_file, Admission};
-pub use endpoint::{bind, relay_from_env, relay_from_value, RELAY_ENV};
+pub use allow::{via_device, CrossingAllowList, VIA_SLOT};
+pub use announce::{
+    topic_for, Channel, HeadVerdict, ANNOUNCE_DEBOUNCE, REANNOUNCE_EVERY, TOPIC_PREFIX,
+};
+pub use channel::{
+    channel_tier_id, project_channel, ChannelStore, ChannelTree, CHANNEL_EVENTS, RETAINED_ROOTS,
+};
+pub use daemon::{PeerConfig, PeerDaemon, FOLD_DEADLINE, TICK};
+pub use endpoint::{bind, bind_on, relay_from_env, relay_from_value, RELAY_ENV};
 pub use error::PeerError;
+pub use fold::{
+    fetch_channel, fold_events, fold_root, folded_from, ChannelEvent, Fetched, FoldOutcome,
+    FoldTarget, MAX_FOLD_EVENTS,
+};
 pub use gate::{SharedAdmission, StewardDevicesGate};
+pub use gossip::GatedGossip;
+pub use head::{ChannelHead, HeadSigner, MAX_HEAD_BYTES};
+pub use head_table::{DeviceHead, DroppedHeads, HeadTable, HEAD_TABLE_VERSION};
 pub use key::PeerKey;
 pub use tier::{
     tier_call, tier_request, TierAnswer, TierCountersSnapshot, TierLimits, TierProtocol,

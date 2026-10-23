@@ -60,6 +60,23 @@ impl Admission {
         self.admitted.values().any(|admitted| admitted == device)
     }
 
+    /// The node id `device` (a `did:key`) is admitted on now, to dial it; `None` when the device
+    /// has no admitted endpoint.
+    pub fn node_for(&self, device: &str) -> Option<NodeId> {
+        self.admitted
+            .iter()
+            .find(|(_, admitted)| admitted.as_str() == device)
+            .and_then(|(node, _)| node.parse().ok())
+    }
+
+    /// Every node id admitted now.
+    pub fn nodes(&self) -> Vec<NodeId> {
+        self.admitted
+            .keys()
+            .filter_map(|node| node.parse().ok())
+            .collect()
+    }
+
     /// Re-read admission for the same lineage from the current `rows`. Rotations and
     /// revocations in `rows` take effect here; nothing earlier is kept.
     pub fn reload(&mut self, rows: &[ParticipantRow], verifier: &dyn SignatureVerifier) {

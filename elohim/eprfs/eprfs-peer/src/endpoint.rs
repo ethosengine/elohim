@@ -1,5 +1,7 @@
 //! Binding the device's iroh endpoint.
 
+use std::net::SocketAddrV4;
+
 use iroh::{Endpoint, RelayMap, RelayMode, RelayUrl};
 use url::Url;
 
@@ -30,14 +32,33 @@ pub async fn bind(
     relay: Option<Url>,
     alpns: Vec<Vec<u8>>,
 ) -> Result<Endpoint, PeerError> {
+    bind_on(key, relay, alpns, None).await
+}
+
+/// [`bind`], listening on `listen` when given (a fixed IPv4 address the other devices are told
+/// to dial directly, as an in-container smoke does) and on an ephemeral port otherwise.
+///
+/// # Errors
+///
+/// [`PeerError::Bind`] when iroh cannot bind its sockets (the address is taken, say).
+pub async fn bind_on(
+    key: &PeerKey,
+    relay: Option<Url>,
+    alpns: Vec<Vec<u8>>,
+    listen: Option<SocketAddrV4>,
+) -> Result<Endpoint, PeerError> {
     let relay_mode = match relay {
         Some(url) => RelayMode::Custom(RelayMap::from_iter([RelayUrl::from(url)])),
         None => RelayMode::Disabled,
     };
-    Endpoint::builder()
+    let mut builder = Endpoint::builder()
         .secret_key(key.secret().clone())
         .relay_mode(relay_mode)
-        .alpns(alpns)
+        .alpns(alpns);
+    if let Some(listen) = listen {
+        builder = builder.bind_addr_v4(listen);
+    }
+    builder
         .bind()
         .await
         .map_err(|e| PeerError::Bind(Box::new(e)))

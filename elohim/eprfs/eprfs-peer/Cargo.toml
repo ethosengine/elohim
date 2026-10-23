@@ -5,11 +5,18 @@ edition.workspace = true
 license.workspace = true
 authors.workspace = true
 repository.workspace = true
-description = "A device's iroh peer: its persisted peer key, its endpoint, admission of authenticated node ids to the devices its own roster names, and the tier ALPN serving its eprfs store to those devices only"
+description = "A device's iroh peer: its persisted peer key, its endpoint, admission of authenticated node ids to the devices its own roster names, the tier ALPN serving its channel tree to those devices only, and the steward channel that signs, gossips and folds their heads"
 # Consumed by path from epr-cli; no pipeline publishes it, so it does not claim to be released.
 publish = false
 
 [dependencies]
+# The channel store is an EprfsStorage adapter.
+async-trait.workspace = true
+# The gossip topic is blake3 of its name, as elohim-storage derives its iroh topics.
+blake3 = "1"
+bytes.workspace = true
+# The CID type FlowStore names its records by.
+cid = "0.11"
 elohim-epr-rea = { path = "../../epr-rea" }
 elohim-seam-contracts = { path = "../../../crates/seam-contracts", features = ["serde"] }
 eprfs-core = { path = "../eprfs-core" }
@@ -17,9 +24,14 @@ eprfs-serve = { path = "../eprfs-serve" }
 # Pinned with elohim-storage (iroh 0.92 / iroh-gossip 0.92 share one iroh-base). The workspace
 # [patch] carries the same vendored iroh-quinn-proto storage carries.
 iroh = "=0.92"
+iroh-gossip = "=0.92"
+# The gossip receiver is a Stream; futures-lite is the StreamExt iroh-gossip itself uses.
+futures-lite = "2"
 # iroh 0.92's SecretKey::generate takes a rand_core 0.6 CSPRNG; rand 0.8's OsRng is that.
 rand = "0.8"
 serde.workspace = true
+# pool-policy.json's crossing allow-list and the persisted head table.
+serde_json.workspace = true
 # The canonical DAG-CBOR codec eprfs-core already encodes trees with; the tier frames use it too.
 serde_ipld_dagcbor = "0.6"
 thiserror.workspace = true
@@ -29,7 +41,6 @@ tokio = { workspace = true, features = ["rt", "sync", "time"] }
 url = "2"
 
 [dev-dependencies]
-bytes.workspace = true
 elohim-epr = { path = "../../epr" }
 eprfs-serve = { path = "../eprfs-serve", features = ["testing"] }
 tempfile = "3"
