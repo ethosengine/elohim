@@ -91,9 +91,120 @@ fi
 
 # ── Change Detection ──────────────────────────────────────────────
 
+# The pushed refs, read once: the berth claims below must see them before any check runs.
+PUSH_LINES=()
+while read -r PUSH_LINE; do
+  PUSH_LINES+=("$PUSH_LINE")
+done
+
+# ── Berth: integration claims ─────────────────────────────────────
+#
+# A push to dev or main lands on the branch every device of this person integrates on, so it holds
+# the steward-scoped `dev-integration` through berth for the life of the push (class verify, ttl
+# 1800 s — a steward lease with no ttl would bind until released). A pushed commit carrying
+# `[build:edge]` (or a tag list naming edge, or `[build:all]`) also needs `alpha-fleet`, since it
+# deploys to the test fleet; any `[build:*]` tag also needs `jenkins-dispatch`. Spec
+# 2026-10-23-workspaces-cooperate-as-devices-design.md §3.5.
+#
+#   berth exit 0  held for this push, released on every exit below (pass, failed gate, refusal,
+#                 Ctrl-C); a claim that only RENEWED a lease this session already held (a session
+#                 watching a deploy) is left to that session, never released here
+#   berth exit 3  the push is refused before any check runs; berth's reason line is printed as is
+#   berth exit 4  no session resolvable: the push proceeds UNLEASED and says so
+#
+# The hook never overrides a silent device on its own: BERTH_OFFLINE_OK=1, set by the pushing
+# session, makes each claim an explicit `--offline-ok` (it overrides `unconfirmed` only, never
+# `held by`, and leaves an override record). Fail-open only for a checkout with no berth (a branch
+# predating it). HUSKY=0 still bypasses the whole hook.
+HOOK_ON_EXIT=""
+hook_on_exit() {
+  local handler
+  for handler in $HOOK_ON_EXIT; do
+    "$handler"
+  done
+}
+trap hook_on_exit EXIT
+trap 'exit 130' INT
+trap 'exit 143' TERM
+trap 'exit 129' HUP
+
+BERTH_BIN="$HOOK_WORK_TREE/genesis/agentic/bin/berth"
+BERTH_HELD=""
+BERTH_CLAIMING=""
+berth_release_claims() {
+  local res
+  # A claim still in flight when the push ends (Ctrl-C mid-settle) may have written its lease.
+  for res in $BERTH_HELD $BERTH_CLAIMING; do
+    "$BERTH_BIN" release "$res" >/dev/null 2>&1 ||
+      echo "[pre-push] berth: $res was not released — run: berth release $res" >&2
+  done
+  BERTH_HELD=""
+}
+HOOK_ON_EXIT="$HOOK_ON_EXIT berth_release_claims"
+
+BERTH_TARGETS=""
+BERTH_MESSAGES=""
+for PUSH_LINE in "${PUSH_LINES[@]}"; do
+  read -r _ B_LOCAL B_REMOTE_REF B_REMOTE <<<"$PUSH_LINE"
+  [ "$B_LOCAL" = "$ZERO_SHA" ] && continue
+  case "$B_REMOTE_REF" in
+    refs/heads/dev | refs/heads/main) ;;
+    *) continue ;;
+  esac
+  BERTH_TARGETS="$BERTH_TARGETS ${B_REMOTE_REF#refs/heads/}"
+  if [ "$B_REMOTE" != "$ZERO_SHA" ] && git cat-file -e "$B_REMOTE^{commit}" 2>/dev/null; then
+    BERTH_MESSAGES="$BERTH_MESSAGES$(git log --format=%B "$B_REMOTE..$B_LOCAL" 2>/dev/null)"$'\n'
+  else
+    BERTH_MESSAGES="$BERTH_MESSAGES$(git log --format=%B "$B_LOCAL" --not --remotes 2>/dev/null)"$'\n'
+  fi
+done
+
+if [ -n "$BERTH_TARGETS" ] && [ -f "$BERTH_BIN" ]; then
+  # The orchestrator's own tag grammar (genesis/orchestrator/commit-tag-parser.mjs): [build:a,b-c].
+  BERTH_NEEDS="dev-integration"
+  if printf '%s' "$BERTH_MESSAGES" | grep -qiE '\[build:([a-z,-]*,)?(edge|all)(,[a-z,-]*)?\]'; then
+    BERTH_NEEDS="$BERTH_NEEDS alpha-fleet"
+  fi
+  if printf '%s' "$BERTH_MESSAGES" | grep -qiE '\[build:[a-z,-]+\]'; then
+    BERTH_NEEDS="$BERTH_NEEDS jenkins-dispatch"
+  fi
+  BERTH_FLAGS=(--class verify --ttl 1800 --note "pre-push to${BERTH_TARGETS}")
+  [ "${BERTH_OFFLINE_OK-}" = "1" ] && BERTH_FLAGS+=(--offline-ok)
+  for BERTH_RES in $BERTH_NEEDS; do
+    BERTH_CLAIMING="$BERTH_RES"
+    BERTH_OUT=$("$BERTH_BIN" claim "$BERTH_RES" "${BERTH_FLAGS[@]}" 2>&1)
+    BERTH_RC=$?
+    BERTH_CLAIMING=""
+    [ -n "$BERTH_OUT" ] && printf '%s\n' "$BERTH_OUT" >&2
+    case "$BERTH_RC" in
+      0)
+        # A renew is a lease this session already held (it watches that build or deploy): its own.
+        printf '%s' "$BERTH_OUT" | grep -q "^$BERTH_RES: renewed" || BERTH_HELD="$BERTH_HELD $BERTH_RES"
+        ;;
+      1)
+        # A renew here whose record did not cross: the lease is still held, on its earlier terms.
+        echo "[pre-push] berth: $BERTH_RES is held, but the other devices see its earlier terms (above)."
+        ;;
+      3)
+        echo "[pre-push] REFUSED: this push needs $BERTH_RES (reason above). Nothing was pushed."
+        exit 1
+        ;;
+      4)
+        echo "[pre-push] berth: no session resolvable — this push proceeds UNLEASED on $BERTH_RES."
+        ;;
+      *)
+        echo "[pre-push] REFUSED: berth claim $BERTH_RES exited $BERTH_RC (above). Bypass all gates: HUSKY=0 git push"
+        exit 1
+        ;;
+    esac
+  done
+fi
+# ── Berth: claims taken ───────────────────────────────────────────
+
 CHANGED=""
 PUSH_TARGETS=""
-while read -r LOCAL_REF LOCAL_SHA REMOTE_REF REMOTE_SHA; do
+for PUSH_LINE in "${PUSH_LINES[@]}"; do
+  read -r LOCAL_REF LOCAL_SHA REMOTE_REF REMOTE_SHA <<<"$PUSH_LINE"
   # Skip delete pushes
   if [ "$LOCAL_SHA" = "$ZERO_SHA" ]; then
     continue
@@ -697,7 +808,8 @@ if [ -n "$RA_PIDS" ]; then
   for pid in $RA_PIDS; do
     kill -STOP "$pid" 2>/dev/null || true
   done
-  trap resume_rust_analyzer EXIT INT TERM HUP
+  # Resumed on any exit — normal, error or signal — beside the berth release (one EXIT trap).
+  HOOK_ON_EXIT="resume_rust_analyzer $HOOK_ON_EXIT"
 fi
 
 # ── Run Gates ─────────────────────────────────────────────────────

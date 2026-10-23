@@ -34,7 +34,9 @@ Commands:
                                                                    holds it; --force = override row
   berth say     --session S [--to SESSION] TEXT                    a deliberation note, on the record
   berth who     RESOURCE                                           json of the holder (or null)
-  berth status                                                     moorings · leases · capacity
+  berth status                                                     moorings · leases · capacity, and the
+                                                                   other devices' moorings and steward
+                                                                   leases, read from this device's fold
   berth ledger  [-n 30]                                            the append-only record
   berth overrun-check [RESOURCE]                                   emit dev-berth-held-by-measure@1 once
                                                                    for a lease held past its ttl (hooks)
@@ -109,6 +111,8 @@ OVERRUN_MEASURE = "dev-berth-held-by-measure@1"
 EVENTS_MEASURE = "dev-berth-events@1"
 # The berth record kinds that cross to the steward's other devices (pool-policy berth.channel.crosses).
 CROSSING_KINDS = ("moor", "unmoor", "claim", "renew", "release", "override", "note", "shed")
+# A session's mooring crosses with its steward leases, so the other devices can list who is moored here.
+MOORING_KINDS = ("moor", "unmoor")
 # The measure emitter lives beside the hooks; bin/berth → genesis/agentic → genesis → repo root.
 REPO_ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(os.path.realpath(__file__)))))
 HOOKS_DIR = os.path.join(REPO_ROOT, ".claude", "hooks")
@@ -380,11 +384,39 @@ class Berth:
     def dseq_stores(self):
         """The checkouts whose flow stores hold this device's own records: this checkout and, on a
         device, its channel store — asked of `epr peer leases` when not yet known (a lost berth dir),
-        since that is where its steward records went."""
+        since that is where its steward records and moorings went."""
         if (not self.channel_root and not self._channel_read and (self.steward_names or self.steward_prefixes)
                 and self.epr_bin()):
             self.peer_leases()
-        return [root for root in (REPO_ROOT, self.channel_root) if root]
+        roots = [REPO_ROOT, self.channel_root or self.cached_channel_root()]
+        return list(dict.fromkeys(root for root in roots if root))
+
+    def _channel_cache_path(self):
+        return os.path.join(self.dir, "channel-store")
+
+    def cached_channel_root(self):
+        """The channel store the last view of this device named (the berth dir is one per container,
+        so every worktree's berth shares it), or None."""
+        try:
+            with open(self._channel_cache_path()) as f:
+                return f.read().strip() or None
+        except OSError:
+            return None
+
+    def _remember_channel(self, root):
+        """Keep where this device's channel store is, so a later berth process folds its moorings
+        there without asking `epr` first; forget it once the workspace is not a device."""
+        path = self._channel_cache_path()
+        try:
+            if root is None:
+                os.remove(path)
+            elif self.cached_channel_root() != root:
+                tmp = f"{path}.{os.getpid()}.tmp"
+                with open(tmp, "w") as f:
+                    f.write(root + "\n")
+                os.replace(tmp, path)
+        except OSError:
+            pass
 
     def _highest_dseq(self):
         highest = 0
@@ -477,6 +509,10 @@ class Berth:
         every record of a workspace that is not one of its steward's devices, to this checkout. A
         device whose channel store cannot be read gets no root, never this checkout's in its place."""
         resource = ev.get("resource")
+        if ev.get("kind") in MOORING_KINDS and resource is None:
+            # A mooring crosses when this workspace is a device whose channel store is known (this
+            # process read it, or an earlier one did); it never asks `epr` for it, and never fails.
+            return self.channel_root or self.cached_channel_root() or REPO_ROOT, None
         if not (isinstance(resource, str) and self.steward_scoped(resource)):
             return REPO_ROOT, None
         if not self._channel_read:
@@ -1059,6 +1095,10 @@ class Berth:
         self.channel_standing = view.get("standing") if view else None
         store = view.get("store") if view and view.get("standing") == "device" else None
         self.channel_root = store if isinstance(store, str) and store else None
+        if self.channel_root:
+            self._remember_channel(self.channel_root)
+        elif self.channel_standing in ("not_a_device", "revoked"):
+            self._remember_channel(None)
         return view, err
 
     def _read_peer_leases(self, timeout):
@@ -1241,6 +1281,7 @@ def render_status(b):
                                  f"(takeover on next claim)")
             else:
                 lines.append(f"    {res:<11} free")
+    lines += _other_devices_lines(b)
     ram = _guard_state("ram-guard")
     io = _guard_state("io-guard")
     if ram:
@@ -1249,6 +1290,56 @@ def render_status(b):
         lines.append(f"  io-guard:  {io.get('level', '?')} write={io.get('write_mb_s', '?')}MB/s ({io.get('window_s', '?')}s)"
                      f" psi_full10={io.get('psi_full_avg10', '?')}% mode={io.get('mode', '?')} paused={len(io.get('paused', []))}")
     return "\n".join(lines)
+
+
+def _other_devices_lines(b):
+    """The other devices of this person, as this device has folded them (`epr peer leases --json`:
+    `others` and the `held_by` verdicts, replayed in each device's own record order): each one's last
+    head, its open moorings and its steward-scoped leases, lane claims among them. Only a berth whose
+    policy declares steward-scoped resources asks; a view it cannot read says so, never "none"."""
+    if not (b.steward_names or b.steward_prefixes):
+        return []
+    if b.policy_error:
+        return [f"  other devices: unknown — pool-policy {b.policy_error}"]
+    if not b.epr_bin():
+        return [f"  other devices: unknown — {b._no_epr()}"]
+    view, err = b.peer_leases()
+    if err:
+        return [f"  other devices: unknown — {err}"]
+    standing = view.get("standing")
+    if standing == "not_a_device":
+        return [f"  other devices: none — this workspace is not one of its steward's devices ({view.get('why')}; "
+                f"run: just status device)"]
+    if standing != "device":
+        return [f"  other devices: none — {standing}: {view.get('why')}"]
+    now_ms = b._view_now(view)
+    others = view.get("others") if isinstance(view.get("others"), dict) else {}
+    held = {}
+    for res, verdict in view.items():
+        if isinstance(verdict, dict) and verdict.get("verdict") == "held_by":
+            held.setdefault(verdict.get("device"), []).append((res, verdict))
+    lines = ["  other devices (read from this device's fold of their records):"]
+    if not others and not held:
+        lines.append("    none — no other device is admitted on this roster")
+    for did in sorted(set(others) | set(held)):
+        info = others.get(did) or {}
+        seen = info.get("last_seen")
+        if seen is None:
+            head = "SILENT: no head folded yet"
+        else:
+            age = now_ms - seen
+            head = f"head seq {info.get('seq')} folded {_peer_age(age)} ago"
+            if age > b.freshness_s * 1000:
+                head += f" — SILENT past {b.freshness_s}s"
+        lines.append(f"    device {did}  {head}")
+        for session, since in sorted((info.get("moorings") or {}).items()):
+            lines.append(f"      moored {session} since {_rfc3339(since)}")
+        for res, verdict in sorted(held.get(did, []), key=lambda item: item[0]):
+            line = f"      {res}  {steward_reason(verdict, now_ms)}"
+            if verdict.get("override"):
+                line += " — an override of this device's silence (offline-ok)"
+            lines.append(line)
+    return lines
 
 
 def _fmt_ledger(ev):

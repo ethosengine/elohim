@@ -24,9 +24,9 @@ use std::sync::Arc;
 use std::time::{SystemTime, UNIX_EPOCH};
 
 use eprfs_peer::{
-    lease_events, peer_from_arg, relay_from_env, roster_rows_from_file, steward_lease_view,
-    Admission, CrossingAllowList, HeadTable, LeaseVerdict, NodeAddr, PeerConfig, PeerDaemon,
-    PeerError, PeerKey, StewardScope,
+    lease_events, other_devices, peer_from_arg, relay_from_env, roster_rows_from_file,
+    steward_lease_view, Admission, CrossingAllowList, HeadTable, LeaseVerdict, NodeAddr,
+    PeerConfig, PeerDaemon, PeerError, PeerKey, StewardScope,
 };
 use serde::Serialize;
 
@@ -539,14 +539,18 @@ fn leases(options: &Options) -> PeerResult<ExitCode> {
     }
     let store = elohim_epr_rea::SidecarFlowStore::open(&root)
         .map_err(|e| PeerCliError::Peer(PeerError::FlowStore(e)))?;
+    let events = lease_events(&store)?;
     let mut view = steward_lease_view(
         &did,
-        &lease_events(&store)?,
+        &events,
         &table,
         &admission,
         now,
         scope.confirm_wait_s(),
     )?;
+    // The other devices as this one has folded them (berth status lists their moorings beside
+    // the leases above), replayed in each device's own order, as the leases are.
+    let others = other_devices(&did, &events, &table, &admission)?;
     view.retain(|resource, _| scope.covers(resource));
     let seen: serde_json::Map<String, serde_json::Value> = table
         .devices
@@ -565,6 +569,7 @@ fn leases(options: &Options) -> PeerResult<ExitCode> {
             .into(),
     );
     out.insert("seen".into(), seen.into());
+    out.insert("others".into(), serde_json::to_value(others)?);
     if options.json {
         for (resource, verdict) in view {
             out.insert(resource, serde_json::to_value(verdict)?);

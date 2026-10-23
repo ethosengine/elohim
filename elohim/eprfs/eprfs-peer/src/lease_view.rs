@@ -67,9 +67,12 @@ const ENV_SLOT: &str = "env:";
 /// A berth resource name: `dev-integration`, `lane:<id>`, ….
 pub type Resource = String;
 
-/// The berth record kinds that open, extend, mark or close a lease.
+/// The berth record kinds that open, extend, mark or close a lease, and the mooring that a
+/// session's leases live under.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum LeaseKind {
+    /// A session moored (or refreshed its mooring); it names no resource.
+    Moor,
     Claim,
     Renew,
     Release,
@@ -79,14 +82,16 @@ pub enum LeaseKind {
 
 impl LeaseKind {
     /// Within one millisecond of one device's records, the order they can only have been
-    /// written in: a lease is claimed before it is renewed, overridden or released.
+    /// written in: a session moors before it claims, and a lease is claimed before it is renewed,
+    /// overridden or released.
     fn order(self) -> u8 {
         match self {
-            LeaseKind::Claim => 0,
-            LeaseKind::Renew => 1,
-            LeaseKind::Override => 2,
-            LeaseKind::Release => 3,
-            LeaseKind::Unmoor => 4,
+            LeaseKind::Moor => 0,
+            LeaseKind::Claim => 1,
+            LeaseKind::Renew => 2,
+            LeaseKind::Override => 3,
+            LeaseKind::Release => 4,
+            LeaseKind::Unmoor => 5,
         }
     }
 }
@@ -97,7 +102,7 @@ pub struct LeaseEvent {
     pub kind: LeaseKind,
     /// The device it was folded from (`via:<did>`); `None` for this device's own.
     pub via: Option<String>,
-    /// `None` only for an `unmoor`, which closes every lease of its session.
+    /// `None` only for a `moor`, and for an `unmoor`, which closes every lease of its session.
     pub resource: Option<Resource>,
     pub session: String,
     /// When the record was written, its device's clock, unix milliseconds.
@@ -130,6 +135,7 @@ impl LeaseEvent {
             return None;
         }
         let kind = match single_slot(event, KIND_SLOT)? {
+            "moor" => LeaseKind::Moor,
             "claim" => LeaseKind::Claim,
             "renew" => LeaseKind::Renew,
             "release" => LeaseKind::Release,
@@ -147,7 +153,7 @@ impl LeaseEvent {
             }
         }
         let resource = env.get("resource").map(|r| (*r).to_string());
-        if resource.is_none() && kind != LeaseKind::Unmoor {
+        if resource.is_none() && !matches!(kind, LeaseKind::Moor | LeaseKind::Unmoor) {
             return None;
         }
         let names = |key: &str| {
@@ -358,6 +364,7 @@ fn replay<'e>(
                     open.remove(&(resource.clone(), holder.clone()));
                 }
             }
+            LeaseKind::Moor => {}
             LeaseKind::Override => {
                 if let Some(lease) = open.get_mut(&key) {
                     if event.overrode.is_some()
@@ -432,18 +439,7 @@ pub fn steward_lease_view(
     }
     let mut folded: BTreeMap<Resource, Vec<Lease>> = BTreeMap::new();
     for (device, mut events) in by_device {
-        // A fold appends a head's events in its channel tree's order (by CID), not the order its
-        // device wrote them: replay them in the device's own order — its record counter, which a
-        // clock step cannot reorder; records from before the counter by record time, first.
-        events.sort_by_key(|event| {
-            (
-                event.dseq.is_some(),
-                event.dseq,
-                event.at,
-                event.kind.order(),
-                event.written,
-            )
-        });
+        events.sort_by_key(|event| device_order(event));
         for (resource, lease) in live(replay(device, events)) {
             folded.entry(resource).or_default().push(lease);
         }
@@ -490,6 +486,88 @@ pub fn steward_lease_view(
         view.insert(resource, verdict);
     }
     Ok(view)
+}
+
+/// The order another device wrote its records in. A fold appends a head's events in its channel
+/// tree's order (by CID), not the order its device wrote them: replay them by the device's record
+/// counter, which a clock step cannot reorder; records from before the counter by record time,
+/// first.
+fn device_order(event: &LeaseEvent) -> (bool, Option<u64>, u64, u8, u64) {
+    (
+        event.dseq.is_some(),
+        event.dseq,
+        event.at,
+        event.kind.order(),
+        event.written,
+    )
+}
+
+/// Another admitted device as this device knows it from its own fold: the last head folded from
+/// it and the sessions moored there.
+#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize)]
+pub struct OtherDevice {
+    /// The seq of the last head folded from it; `None` when none was.
+    pub seq: Option<u64>,
+    /// When that head was folded, this device's clock, unix milliseconds.
+    pub last_seen: Option<u64>,
+    /// Its sessions moored and not unmoored, each with when it moored (its clock, unix ms).
+    pub moorings: BTreeMap<String, u64>,
+}
+
+/// Every other device `admitted` admits now, read from this device's fold (`store`, `heads`): its
+/// last head and its open moorings, replayed in the order that device wrote them, as the lease view
+/// replays its leases. A contested device is not listed. Pure, like [`steward_lease_view`].
+///
+/// # Errors
+///
+/// [`PeerError::NotAdmitted`] when `admitted` does not admit `me`.
+pub fn other_devices(
+    me: &str,
+    store: &LeaseStore,
+    heads: &HeadTable,
+    admitted: &Admission,
+) -> Result<BTreeMap<String, OtherDevice>, PeerError> {
+    if !admitted.admits_device(me) {
+        return Err(PeerError::NotAdmitted {
+            device: me.to_string(),
+        });
+    }
+    let mut others: BTreeMap<String, OtherDevice> = admitted
+        .devices()
+        .into_iter()
+        .filter(|device| *device != me)
+        .map(|device| {
+            let head = heads.devices.get(device);
+            let known = OtherDevice {
+                seq: head.map(|head| head.seq),
+                last_seen: head.map(|head| head.folded_at),
+                moorings: BTreeMap::new(),
+            };
+            (device.to_string(), known)
+        })
+        .collect();
+    let mut by_device: BTreeMap<&str, Vec<&LeaseEvent>> = BTreeMap::new();
+    for event in &store.folded {
+        if let Some(device) = event.via.as_deref().filter(|d| others.contains_key(*d)) {
+            by_device.entry(device).or_default().push(event);
+        }
+    }
+    for (device, mut events) in by_device {
+        events.sort_by_key(|event| device_order(event));
+        let moorings = &mut others.entry(device.to_string()).or_default().moorings;
+        for event in events {
+            match event.kind {
+                LeaseKind::Moor => {
+                    moorings.entry(event.session.clone()).or_insert(event.at);
+                }
+                LeaseKind::Unmoor => {
+                    moorings.remove(&event.session);
+                }
+                _ => {}
+            }
+        }
+    }
+    Ok(others)
 }
 
 /// Whether `other`'s lease (folded from another device) precedes `mine`, whose claim was first

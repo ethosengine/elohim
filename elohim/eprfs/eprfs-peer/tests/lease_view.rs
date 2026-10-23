@@ -12,8 +12,8 @@ use std::collections::BTreeMap;
 use elohim_epr_rea::{atom_cid, FlowEvent};
 use eprfs_core::BlobCid;
 use eprfs_peer::{
-    steward_lease_view, Admission, DeviceHead, HeadTable, LeaseStore, LeaseVerdict, OwnAnnounce,
-    PeerError, StewardScope, VIA_SLOT,
+    other_devices, steward_lease_view, Admission, DeviceHead, HeadTable, LeaseStore, LeaseVerdict,
+    OwnAnnounce, PeerError, StewardScope, VIA_SLOT,
 };
 use support::{binding, contest, endpoint_row, event_with, genesis, household, Household, MEASURE};
 
@@ -624,4 +624,62 @@ fn the_steward_scope_reads_names_and_lane_prefix_from_the_policy() {
     let none = StewardScope::from_policy(&serde_json::json!({})).expect("reads");
     assert!(!none.covers("dev-integration"));
     assert_eq!(none.confirm_wait_s(), 10);
+}
+
+/// A berth mooring record (`moor` or `unmoor`) by `session`, written at `at` as the device's
+/// `dseq`th record. A mooring names no resource.
+fn mooring(kind: &str, session: &str, at: f64, dseq: u64) -> FlowEvent {
+    let mut env = vec![
+        format!("env:at={at:.3}"),
+        format!("env:dseq={dseq}"),
+        format!("env:kind={kind}"),
+        format!("env:session={session}"),
+    ];
+    env.sort();
+    event_with(MEASURE, kind, env)
+}
+
+#[test]
+fn other_devices_moorings_are_replayed_in_each_devices_order_from_the_fold() {
+    let h = household();
+    let counted = |event: FlowEvent, dseq: u64| {
+        let mut event = event;
+        event.classified_as.push(format!("env:dseq={dseq}"));
+        event
+    };
+    // B moored codex-1 and codex-2, claimed, then unmoored codex-2; A folded B's head in its
+    // tree's order, the unmoor first. A's own mooring is A's, not another device's.
+    let s = store(vec![
+        own(mooring("moor", "claude-1", T0 - 5.0, 1)),
+        from(&h.b.did, mooring("unmoor", "codex-2", T0 + 3.0, 4)),
+        from(&h.b.did, counted(claim("codex-1", T0 + 2.0), 3)),
+        from(&h.b.did, mooring("moor", "codex-2", T0 + 1.0, 2)),
+        from(&h.b.did, mooring("moor", "codex-1", T0, 1)),
+    ]);
+    let heads = table(&h.a.did, &[], &s, &[(&h.b.did, 0, ms(T0) + 4_000)]);
+    let others = other_devices(&h.a.did, &s, &heads, &h.admission()).expect("A is admitted");
+    let b = others.get(&h.b.did).expect("B is listed under its own did");
+    assert_eq!(b.moorings.keys().collect::<Vec<_>>(), vec!["codex-1"]);
+    assert_eq!(b.moorings["codex-1"], ms(T0));
+    assert_eq!((b.seq, b.last_seen), (Some(9), Some(ms(T0) + 4_000)));
+    assert_eq!(others.len(), 1, "this device is not among the others");
+
+    // A device admitted but never folded is listed, silent: no head, no moorings.
+    let never = other_devices(
+        &h.a.did,
+        &store(vec![]),
+        &HeadTable::default(),
+        &h.admission(),
+    )
+    .expect("A is admitted");
+    assert_eq!(never[&h.b.did].last_seen, None);
+    assert!(never[&h.b.did].moorings.is_empty());
+
+    // A contested device is not one of A's devices any more: it is not listed at all.
+    let mut rows = h.rows.clone();
+    rows.push(contest(&h.a, &binding(&h.a, &h.b)));
+    let admission = Admission::from_roster(&rows, &h.a.did, &*h.verify);
+    assert!(other_devices(&h.a.did, &s, &heads, &admission)
+        .expect("A is admitted")
+        .is_empty());
 }

@@ -477,9 +477,27 @@ fn peer_leases_prints_the_steward_view_while_serve_holds_its_lock() {
             berth_record("claim", "cargo", "codex-1", "1792769290.000", None),
         ],
     );
+    // A moored claude-1 (a mooring names no resource), folded into B's store too.
+    let mut moored = berth_record("moor", "", "claude-1", "1792769288.000", Some(&a_did));
+    moored
+        .classified_as
+        .retain(|slot| !slot.starts_with("env:resource=") && !slot.starts_with("env:claimed_at="));
+    append(b.checkout.path(), [moored]);
     // The view reads the store and the head table only: it answers while serve runs.
     let _serving = elohim_epr_cli::peer::ServeLock::acquire(&b.peer_dir()).expect("lock");
     let view = leases_json(&b, b.root(), &policy);
+    // The other devices, read from B's fold: A, with claude-1 moored and no head folded yet.
+    assert_eq!(
+        view["others"],
+        serde_json::json!({
+            a_did.clone(): {
+                "seq": null,
+                "last_seen": null,
+                "moorings": {"claude-1": 1_792_769_288_000u64}
+            }
+        }),
+        "{view}"
+    );
     assert!(view["now"].as_u64().is_some(), "{view}");
     assert_eq!(view["confirm_wait_s"], 10);
     assert_eq!(view["standing"], "device");

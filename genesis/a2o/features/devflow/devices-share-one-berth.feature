@@ -1,4 +1,4 @@
-@e2e @devflow @concern:devices-share-one-berth @act:host @wip
+@e2e @devflow @concern:devices-share-one-berth @act:host
 Feature: Devices share one berth — a shared resource is held once across all of a person's workspaces
   As a developer who works in two development workspaces that are both my devices
   I want a claim on a resource the two workspaces share to count only after my other device has seen it
@@ -201,6 +201,7 @@ Feature: Devices share one berth — a shared resource is held once across all o
       | "12:00:00.700" | "12:00:00.200" | "device B" |
       | "12:00:00.200" | "12:00:00.200" | "device A" |
 
+  @wip
   Scenario: A retired device stops counting without restarting the device that stays
     Given device B is an old workspace whose work matthew has moved to device A, and it is still running
     And session "codex-1" on device B still holds "alpha-fleet", left over from a deploy it was watching
@@ -214,7 +215,7 @@ Feature: Devices share one berth — a shared resource is held once across all o
     And device A's next push to dev is not blocked, and it carries the Contest row to the repository
     And device A's peer daemon was never restarted, so the sessions moored on A and the leases they hold were not interrupted
 
-  @requires:shem
+  @wip @requires:shem
   Scenario: Across two real workspaces, a held integration claim is refused naming who holds it
     Given device A is the workspace on the first machine and device B the workspace on "shem"
     And matthew's roster, admitting both devices, reached each workspace through its checkout

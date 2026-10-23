@@ -980,6 +980,66 @@ class StewardClaimTest(unittest.TestCase):
         self.assertIsNone(self.berth.who("dev-integration"))
         self.assertEqual(self.rows("release")[-1]["resource"], "dev-integration")
 
+    def test_status_lists_other_devices_read_from_this_devices_fold(self):
+        device_c = "did:key:z6MkDeviceC"
+        out = view(dev_integration=held_by_a(override=True),
+                   lane_t7={"verdict": "held_by", "device": DEVICE_A, "session": "claude-2",
+                            "since": SINCE_MS + 60_000, "override": False},
+                   alpha_fleet=effective())
+        out["lane:t7"] = out.pop("lane-t7")
+        out["others"] = {
+            DEVICE_A: {"seq": 9, "last_seen": NOW_MS - 12_000,
+                       "moorings": {"claude-1": SINCE_MS - 60_000, "claude-2": SINCE_MS}},
+            device_c: {"seq": None, "last_seen": None, "moorings": {}},
+        }
+        self.views(out)
+        status = render_status(self.berth)
+        section = status.split("other devices", 1)[1]
+        self.assertIn(f"device {DEVICE_A}  head seq 9 folded 12s ago", section)
+        self.assertIn("moored claude-1", section)
+        self.assertIn("moored claude-2", section)
+        self.assertIn(f"dev-integration  held by {DEVICE_A}/claude-1 since 2026-10-23T15:28:09Z"
+                      f" — an override of this device's silence (offline-ok)", section)
+        self.assertIn(f"lane:t7  held by {DEVICE_A}/claude-2 since 2026-10-23T15:29:09Z", section)
+        self.assertIn(f"device {device_c}  SILENT: no head folded yet", section)
+        # This device's own steward lease is not another device's.
+        self.assertNotIn("alpha-fleet", section)
+        self.assertEqual(len(self.calls()), 1)
+
+    def test_status_says_why_there_is_no_other_devices_section(self):
+        self.views(not_a_device())
+        self.assertIn("other devices: none — this workspace is not one of its steward's devices",
+                      render_status(self.berth))
+        self.views("EXIT 1 epr peer: the roster does not read")
+        self.assertIn("other devices: unknown — the steward lease view could not be computed: "
+                      "epr peer: the roster does not read", render_status(self.make()))
+        b = Berth(os.path.join(self.directory.name, "container-only"), now=lambda: self.clock[0], obs=self.obs,
+                  policy_path=MISSING_POLICY)
+        b.epr = str(self.epr)
+        self.views(view())
+        self.assertNotIn("other devices", render_status(b))
+        self.assertEqual(self.calls(), [], "a berth with no steward resources never asks")
+
+    def test_a_mooring_folds_to_the_channel_store_once_this_device_knows_it(self):
+        channel = os.path.join(self.directory.name, "served-checkout")
+        out = view()
+        out["store"] = channel
+        self.views(out)
+        self.berth.peer_leases()
+        # A later berth process (another worktree's session) moors: its mooring crosses.
+        later = self.make()
+        later.moor("codex-2")
+        later.unmoor("codex-2")
+        roots = [e["root"] for e in self.obs.events if e["reason"] in ("moor", "unmoor")
+                 and e["env"].get("session") == "codex-2"]
+        self.assertEqual(roots, [channel, channel])
+        # A workspace that is not a device: moorings stay in this checkout.
+        self.views(not_a_device())
+        later.peer_leases()
+        self.make().moor("codex-3")
+        self.assertEqual([e["root"] for e in self.obs.events if e["env"].get("session") == "codex-3"],
+                         [_NS["REPO_ROOT"]])
+
     def test_the_repository_policy_declares_the_steward_resources(self):
         b = Berth(os.path.join(self.directory.name, "real"), obs=FakeObservation(), now=lambda: 0,
                   policy_path=str(REPO / "genesis/agentic/pool-policy.json"))

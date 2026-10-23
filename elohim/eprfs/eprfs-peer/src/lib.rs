@@ -75,8 +75,8 @@ pub use head_table::{
 pub use iroh::{NodeAddr, NodeId};
 pub use key::PeerKey;
 pub use lease_view::{
-    lease_events, steward_lease_view, LeaseEvent, LeaseKind, LeaseStore, LeaseVerdict, Resource,
-    BERTH_EVENTS_MEASURE,
+    lease_events, other_devices, steward_lease_view, LeaseEvent, LeaseKind, LeaseStore,
+    LeaseVerdict, OtherDevice, Resource, BERTH_EVENTS_MEASURE,
 };
 pub use steward_scope::{StewardScope, DEFAULT_CONFIRM_WAIT_S};
 pub use tier::{
