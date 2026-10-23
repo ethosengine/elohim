@@ -78,12 +78,12 @@ devices can connect, an update is one gossip announce plus one tier read, and no
 A new `ParticipantRow` variant:
 
 ```text
-PeerEndpoint { handle, chain_root, device, node_id, nonce, signature }
+PeerEndpoint { handle, chain_root, device, node_id, seq, nonce, signature }
 ```
 
 `device` signs it with its did:key. The row is valid when `device` is the handle's Genesis
 `chain_root` or the `controller` of a valid Binding row, and no valid Contest names that binding. The
-newest valid PeerEndpoint row for a device supersedes older ones, which is how a key rotates. A Contest
+valid PeerEndpoint row with the highest device-signed `seq` supersedes the device's older ones (line order in the file never decides, so replaying an old row cannot undo a rotation; two rows at one `seq` naming different node ids refuse the device), which is how a key rotates. A Contest
 on the device's binding revokes the device: its node id stops being admitted and its heads are ignored
 from the next fold onward. Every lease and lane claim already folded from that device also drops
 out of the steward lease view once the Contest is folded, so a revoked device cannot keep a shared
