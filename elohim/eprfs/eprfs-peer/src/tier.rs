@@ -405,12 +405,13 @@ pub async fn tier_call(
     endpoint: &Endpoint,
     peer: NodeAddr,
     req: TierRequest,
+    tree: &TreeLimits,
 ) -> Result<TierAnswer, PeerError> {
     let connection = endpoint
         .connect(peer, TIER_ALPN)
         .await
         .map_err(|e| PeerError::TierConnect(Box::new(e)))?;
-    let answer = tier_request(&connection, &req).await;
+    let answer = tier_request(&connection, &req, tree).await;
     connection.close(VarInt::from_u32(0), b"");
     answer
 }
@@ -419,8 +420,10 @@ pub async fn tier_call(
 ///
 /// Read and List answers are checked here for self-consistency and for the path asked: a leaf
 /// must be at the requested path and its bytes must hash to its CID; a listing must be at the
-/// requested path and its entries must encode to its CID. Anything else is an error, never an
-/// answer. Membership under the requested root is not checked here: that would need the spine.
+/// requested path and its entries must encode to its CID under `tree`, the caller's own tree
+/// limits (a listing the caller would refuse to encode is refused here too). Anything else is an
+/// error, never an answer. Membership under the requested root is not checked here: that would
+/// need the spine.
 ///
 /// # Errors
 ///
@@ -431,18 +434,23 @@ pub async fn tier_call(
 pub async fn tier_request(
     connection: &Connection,
     req: &TierRequest,
+    tree: &TreeLimits,
 ) -> Result<TierAnswer, PeerError> {
     let frame = encode_frame(req, MAX_REQUEST_FRAME_BYTES)?;
     let (mut send, mut recv) = connection.open_bi().await.map_err(stream_error)?;
     send.write_all(&frame).await.map_err(stream_error)?;
     send.finish().map_err(stream_error)?;
     let answer: TierAnswer = read_frame(&mut recv, MAX_ANSWER_FRAME_BYTES).await?;
-    check_answer(req, &answer)?;
+    check_answer(req, &answer, tree)?;
     Ok(answer)
 }
 
 /// The client's checks on a served leaf or listing (see [`tier_request`]).
-fn check_answer(req: &TierRequest, answer: &TierAnswer) -> Result<(), PeerError> {
+fn check_answer(
+    req: &TierRequest,
+    answer: &TierAnswer,
+    tree: &TreeLimits,
+) -> Result<(), PeerError> {
     let (cid, consistent) = match (req, answer) {
         (TierRequest::Read { path, .. }, TierAnswer::Read(leaf)) => (
             &leaf.cid,
@@ -450,7 +458,7 @@ fn check_answer(req: &TierRequest, answer: &TierAnswer) -> Result<(), PeerError>
         ),
         (TierRequest::List { path, .. }, TierAnswer::List(listing)) => (
             &listing.cid,
-            listing.path == *path && listing_cid(listing).as_ref() == Some(&listing.cid),
+            listing.path == *path && listing_cid(listing, tree).as_ref() == Some(&listing.cid),
         ),
         (TierRequest::Diff { .. }, TierAnswer::Diff(_))
         | (_, TierAnswer::Unanswered { .. } | TierAnswer::Failed { .. }) => return Ok(()),
@@ -463,12 +471,11 @@ fn check_answer(req: &TierRequest, answer: &TierAnswer) -> Result<(), PeerError>
     }
 }
 
-/// The CID a listing's entries encode to, or `None` when they are not a valid tree node.
-fn listing_cid(listing: &DirListing) -> Option<BlobCid> {
+/// The CID a listing's entries encode to under `tree`, or `None` when they are not a valid tree
+/// node within those limits.
+fn listing_cid(listing: &DirListing, tree: &TreeLimits) -> Option<BlobCid> {
     let node = TreeNode::new(listing.entries.clone()).ok()?;
-    encode_tree(&node, &TreeLimits::default())
-        .ok()
-        .map(|(cid, _)| cid)
+    encode_tree(&node, tree).ok().map(|(cid, _)| cid)
 }
 
 fn stream_error(e: impl std::error::Error + Send + Sync + 'static) -> PeerError {

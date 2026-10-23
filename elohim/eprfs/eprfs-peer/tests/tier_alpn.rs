@@ -301,10 +301,13 @@ async fn client(key: &PeerKey) -> Endpoint {
 }
 
 async fn call(client: &Endpoint, addr: &NodeAddr, req: TierRequest) -> TierAnswer {
-    tokio::time::timeout(WITHIN, tier_call(client, addr.clone(), req))
-        .await
-        .expect("answers in time")
-        .expect("answers")
+    tokio::time::timeout(
+        WITHIN,
+        tier_call(client, addr.clone(), req, &TreeLimits::default()),
+    )
+    .await
+    .expect("answers in time")
+    .expect("answers")
 }
 
 fn tier_id(device: &Device) -> TierId {
@@ -463,7 +466,9 @@ async fn contested_device_refused_after_admission_reload() {
         path: tp("channel/events/e1"),
     };
 
-    let before = tier_request(&connection, &read).await.expect("answers");
+    let before = tier_request(&connection, &read, &TreeLimits::default())
+        .await
+        .expect("answers");
     assert!(
         matches!(&before, TierAnswer::Read(leaf) if leaf.cid == s.first),
         "admitted before the contest, got {before:?}"
@@ -476,7 +481,9 @@ async fn contested_device_refused_after_admission_reload() {
         .expect("admission lock")
         .reload(&rows, &h.verify);
 
-    let after = tier_request(&connection, &read).await.expect("answers");
+    let after = tier_request(&connection, &read, &TreeLimits::default())
+        .await
+        .expect("answers");
     assert!(
         matches!(
             &after,
@@ -529,6 +536,7 @@ async fn an_oversize_request_frame_is_refused_before_it_is_read() {
             root: s.new.clone(),
             path: tp("channel/events/e1"),
         },
+        &TreeLimits::default(),
     )
     .await
     .expect("the connection still answers");
@@ -584,8 +592,10 @@ async fn a_header_only_stream_is_dropped_at_the_deadline_and_its_permit_returned
     let served = tier_id(&h.a);
     let s = store(&served);
     let bound = Arc::new(Semaphore::new(1));
+    // Long enough that a loaded CI host still sends the shed probe before the deadline fires.
+    let deadline = Duration::from_millis(1500);
     let limits = TierLimits {
-        frame_deadline: Duration::from_millis(300),
+        frame_deadline: deadline,
         admitted_in_flight: Arc::clone(&bound),
         ..TierLimits::default()
     };
@@ -596,7 +606,7 @@ async fn a_header_only_stream_is_dropped_at_the_deadline_and_its_permit_returned
     let started = Instant::now();
     let (_send, mut stalled) = header_only(&connection, 100).await;
     permits_free(&bound, 0).await;
-    let shed = tier_request(&connection, &read_e1(&s)).await;
+    let shed = tier_request(&connection, &read_e1(&s), &TreeLimits::default()).await;
     assert!(
         matches!(shed, Err(PeerError::TierStream(_))),
         "with the one permit held, a further stream is shed, not queued: {shed:?}"
@@ -607,13 +617,13 @@ async fn a_header_only_stream_is_dropped_at_the_deadline_and_its_permit_returned
         .expect("the stalled stream ends in time");
     assert!(ended.is_err(), "the stalled stream is reset: {ended:?}");
     assert!(
-        started.elapsed() >= Duration::from_millis(250),
+        started.elapsed() >= deadline * 5 / 6,
         "not before the deadline: {:?}",
         started.elapsed()
     );
     permits_free(&bound, 1).await;
 
-    let after = tier_request(&connection, &read_e1(&s))
+    let after = tier_request(&connection, &read_e1(&s), &TreeLimits::default())
         .await
         .expect("answers");
     assert!(matches!(after, TierAnswer::Read(_)), "{after:?}");
@@ -655,7 +665,9 @@ async fn strangers_share_their_own_bound_and_never_shed_an_admitted_device() {
 
     let b = client(&h.key_b).await;
     let conn_b = connect(&b, &server.addr).await;
-    let admitted = tier_request(&conn_b, &read_e1(&s)).await.expect("answers");
+    let admitted = tier_request(&conn_b, &read_e1(&s), &TreeLimits::default())
+        .await
+        .expect("answers");
     assert!(
         matches!(admitted, TierAnswer::Read(_)),
         "the person's own device is answered while strangers hold their bound: {admitted:?}"
@@ -665,7 +677,7 @@ async fn strangers_share_their_own_bound_and_never_shed_an_admitted_device() {
     let (_d2, key_2) = peer_key();
     let stranger_2 = client(&key_2).await;
     let conn_2 = connect(&stranger_2, &server.addr).await;
-    let shed = tier_request(&conn_2, &read_e1(&s)).await;
+    let shed = tier_request(&conn_2, &read_e1(&s), &TreeLimits::default()).await;
     assert!(
         matches!(shed, Err(PeerError::TierStream(_))),
         "the unadmitted bound holds across connections: {shed:?}"
@@ -675,7 +687,9 @@ async fn strangers_share_their_own_bound_and_never_shed_an_admitted_device() {
     // A stranger that goes away returns its permit; the next stranger gets the uniform refusal.
     conn_1.close(0u32.into(), b"");
     permits_free(&strangers, 1).await;
-    let refused = tier_request(&conn_2, &read_e1(&s)).await.expect("answers");
+    let refused = tier_request(&conn_2, &read_e1(&s), &TreeLimits::default())
+        .await
+        .expect("answers");
     assert!(
         matches!(&refused, TierAnswer::Unanswered { why, .. }
             if matches!(&why.why, ItemAbsence::Refused { refusal, .. }
@@ -696,6 +710,9 @@ async fn an_answer_the_peer_never_reads_is_reset_at_the_deadline() {
     let h = household();
     let served = tier_id(&h.a);
     let s = store(&served);
+    // 12 MiB must exceed quinn's default send window (the stream and connection windows are both
+    // far smaller), so the server's write blocks on flow control and only the deadline can end it.
+    // A smaller answer would be buffered whole and finished without the peer reading a byte.
     let big = s.tier.insert(&vec![7u8; 12 * 1024 * 1024]);
     let root = channel_root(&s.tier, &[("big", &big)]);
     let bound = Arc::new(Semaphore::new(1));
@@ -747,10 +764,13 @@ async fn a_connection_answers_at_most_its_stream_bound_at_once() {
 
     let started = Instant::now();
     let _stalled = header_only(&connection, 100).await;
-    let queued = tokio::time::timeout(WITHIN, tier_request(&connection, &read_e1(&s)))
-        .await
-        .expect("answers in time")
-        .expect("answers");
+    let queued = tokio::time::timeout(
+        WITHIN,
+        tier_request(&connection, &read_e1(&s), &TreeLimits::default()),
+    )
+    .await
+    .expect("answers in time")
+    .expect("answers");
     assert!(matches!(queued, TierAnswer::Read(_)), "{queued:?}");
     assert!(
         started.elapsed() >= Duration::from_millis(400),
@@ -830,9 +850,12 @@ async fn ask_rogue(frame: Vec<u8>, req: TierRequest) -> Result<TierAnswer, PeerE
     let (_dc, client_key) = peer_key();
     let rogue = mount(&server_key, Rogue { frame }).await;
     let client = client(&client_key).await;
-    let answer = tokio::time::timeout(WITHIN, tier_call(&client, rogue.addr.clone(), req))
-        .await
-        .expect("answers in time");
+    let answer = tokio::time::timeout(
+        WITHIN,
+        tier_call(&client, rogue.addr.clone(), req, &TreeLimits::default()),
+    )
+    .await
+    .expect("answers in time");
     client.close().await;
     rogue.router.shutdown().await.expect("shutdown");
     answer
@@ -909,4 +932,36 @@ async fn the_client_refuses_an_answer_frame_past_its_cap() {
         matches!(answer, Err(PeerError::TierFrame { .. })),
         "{answer:?}"
     );
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn a_listing_is_rederived_under_the_callers_own_tree_limits() {
+    let h = household();
+    let served = tier_id(&h.a);
+    let s = store(&served);
+    let server = serve(&h.key_a, &s, admission(&h), served).await;
+    let b = client(&h.key_b).await;
+    let list = TierRequest::List {
+        root: s.new.clone(),
+        path: tp("channel/events"),
+    };
+
+    let within = call(&b, &server.addr, list.clone()).await;
+    assert!(matches!(within, TierAnswer::List(_)), "{within:?}");
+
+    // A caller whose limits would refuse to encode the served node refuses the listing too.
+    let narrow = TreeLimits {
+        max_entries_per_node: 1,
+        ..TreeLimits::default()
+    };
+    let refused = tokio::time::timeout(WITHIN, tier_call(&b, server.addr.clone(), list, &narrow))
+        .await
+        .expect("answers in time");
+    assert!(
+        matches!(refused, Err(PeerError::TierLeafIntegrity { .. })),
+        "{refused:?}"
+    );
+
+    b.close().await;
+    server.router.shutdown().await.expect("shutdown");
 }
