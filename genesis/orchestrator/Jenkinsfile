@@ -2496,7 +2496,10 @@ spec:
                     script {
                         sh 'git config --global --add safe.directory "*"'
 
-                        checkout([
+                        // A manual checkout returns the Git plugin's variables instead of
+                        // exporting them. The style ratchet's integration baseline is kept
+                        // under its own name so the changeset baseline chain is unchanged.
+                        def scmVars = checkout([
                             $class: 'GitSCM',
                             branches: [[name: "*/${env.BRANCH_NAME}"]],
                             extensions: [
@@ -2519,6 +2522,7 @@ spec:
                                 ].unique().join(' ')
                             ]]
                         ])
+                        env.STYLE_PREVIOUS_SUCCESSFUL_COMMIT = scmVars.GIT_PREVIOUS_SUCCESSFUL_COMMIT ?: ''
 
                         env.GIT_COMMIT_SHORT = getGitCommitHash()
                         env.GIT_COMMIT_FULL = getGitCommitHashFull()
@@ -2657,7 +2661,9 @@ spec:
             steps {
                 container('rust-style') {
                     sh 'git config --global --add safe.directory "*"'
-                    sh 'bash genesis/orchestrator/rust-style-ci.sh'
+                    withEnv(["GIT_PREVIOUS_SUCCESSFUL_COMMIT=${env.STYLE_PREVIOUS_SUCCESSFUL_COMMIT ?: ''}"]) {
+                        sh 'bash genesis/orchestrator/rust-style-ci.sh'
+                    }
                 }
             }
         }
