@@ -10,16 +10,20 @@ use bytes::Bytes;
 use elohim_epr::proof::{self, AgentKeypair};
 use elohim_epr_rea::{ActorRecord, ActorWitness, ParticipantRow};
 use eprfs_core::{
-    encode_tree, BlobCid, ItemAbsence, ReachReason, TierId, TreeEntry, TreeEntryKind, TreeLimits,
-    TreeNode, TreePath, View,
+    encode_tree, BlobCid, DirListing, ItemAbsence, LeafKind, ReachReason, ReadLeaf, TierId,
+    TreeEntry, TreeEntryKind, TreeLimits, TreeNode, TreePath, View,
 };
 use eprfs_peer::{
-    bind, tier_call, tier_request, Admission, PeerKey, SharedAdmission, TierAnswer, TierProtocol,
-    TierRequest, MAX_REQUEST_FRAME_BYTES, TIER_ALPN,
+    bind, tier_call, tier_request, Admission, PeerError, PeerKey, SharedAdmission, TierAnswer,
+    TierLimits, TierProtocol, TierRequest, MAX_ANSWER_FRAME_BYTES, MAX_REQUEST_FRAME_BYTES,
+    TIER_ALPN,
 };
 use eprfs_serve::testing::CountingTier;
-use iroh::protocol::Router;
+use iroh::endpoint::{Connection, RecvStream, SendStream};
+use iroh::protocol::{AcceptError, ProtocolHandler, Router};
 use iroh::{Endpoint, NodeAddr};
+use tokio::sync::Semaphore;
+use tokio::time::Instant;
 
 const HANDLE: &str = "matthew";
 const WITHIN: Duration = Duration::from_secs(20);
@@ -246,11 +250,25 @@ struct Serving {
 }
 
 async fn serve(key: &PeerKey, store: &Store, admission: SharedAdmission, id: TierId) -> Serving {
+    serve_with(key, store, admission, id, TierLimits::default()).await
+}
+
+async fn serve_with(
+    key: &PeerKey,
+    store: &Store,
+    admission: SharedAdmission,
+    id: TierId,
+    limits: TierLimits,
+) -> Serving {
+    let protocol = TierProtocol::new(id, store.tier.clone(), admission, limits).expect("protocol");
+    mount(key, protocol.clone()).await.with(protocol)
+}
+
+/// A router on `key` answering `TIER_ALPN` with `handler`, and the loopback address to dial.
+async fn mount<P: ProtocolHandler>(key: &PeerKey, handler: P) -> Mounted {
     let endpoint = bind(key, None, vec![TIER_ALPN.to_vec()])
         .await
         .expect("bind server");
-    let protocol = TierProtocol::new(id, store.tier.clone(), admission, TreeLimits::default())
-        .expect("protocol");
     let port = endpoint
         .bound_sockets()
         .into_iter()
@@ -259,13 +277,22 @@ async fn serve(key: &PeerKey, store: &Store, admission: SharedAdmission, id: Tie
         .port();
     let addr = NodeAddr::new(endpoint.node_id())
         .with_direct_addresses([SocketAddr::from((Ipv4Addr::LOCALHOST, port))]);
-    let router = Router::builder(endpoint)
-        .accept(TIER_ALPN, protocol.clone())
-        .spawn();
-    Serving {
-        router,
-        addr,
-        protocol,
+    let router = Router::builder(endpoint).accept(TIER_ALPN, handler).spawn();
+    Mounted { router, addr }
+}
+
+struct Mounted {
+    router: Router,
+    addr: NodeAddr,
+}
+
+impl Mounted {
+    fn with(self, protocol: TierProtocol) -> Serving {
+        Serving {
+            router: self.router,
+            addr: self.addr,
+            protocol,
+        }
     }
 }
 
@@ -510,4 +537,319 @@ async fn an_oversize_request_frame_is_refused_before_it_is_read() {
     drop(connection);
     b.close().await;
     server.router.shutdown().await.expect("shutdown");
+}
+
+fn admission(h: &Household) -> SharedAdmission {
+    Arc::new(RwLock::new(Admission::from_roster(
+        &h.rows, &h.a.did, &h.verify,
+    )))
+}
+
+async fn connect(client: &Endpoint, addr: &NodeAddr) -> Connection {
+    tokio::time::timeout(WITHIN, client.connect(addr.clone(), TIER_ALPN))
+        .await
+        .expect("connects in time")
+        .expect("connects")
+}
+
+/// Open a stream and send only a request header claiming `len` body bytes, never the body. The
+/// caller keeps the send half open, so the server is left waiting for a body that never comes.
+async fn header_only(connection: &Connection, len: u32) -> (SendStream, RecvStream) {
+    let (mut send, recv) = connection.open_bi().await.expect("stream");
+    send.write_all(&len.to_be_bytes()).await.expect("header");
+    (send, recv)
+}
+
+/// Wait until `permits` of the in-flight bound are free.
+async fn permits_free(bound: &Semaphore, permits: usize) {
+    tokio::time::timeout(WITHIN, async {
+        while bound.available_permits() != permits {
+            tokio::time::sleep(Duration::from_millis(10)).await;
+        }
+    })
+    .await
+    .expect("the in-flight permits settle in time");
+}
+
+fn read_e1(s: &Store) -> TierRequest {
+    TierRequest::Read {
+        root: s.new.clone(),
+        path: tp("channel/events/e1"),
+    }
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn a_header_only_stream_is_dropped_at_the_deadline_and_its_permit_returned() {
+    let h = household();
+    let served = tier_id(&h.a);
+    let s = store(&served);
+    let bound = Arc::new(Semaphore::new(1));
+    let limits = TierLimits {
+        frame_deadline: Duration::from_millis(300),
+        in_flight: Arc::clone(&bound),
+        ..TierLimits::default()
+    };
+    let server = serve_with(&h.key_a, &s, admission(&h), served, limits).await;
+    let b = client(&h.key_b).await;
+    let connection = connect(&b, &server.addr).await;
+
+    let started = Instant::now();
+    let (_send, mut stalled) = header_only(&connection, 100).await;
+    permits_free(&bound, 0).await;
+    let shed = tier_request(&connection, &read_e1(&s)).await;
+    assert!(
+        matches!(shed, Err(PeerError::TierStream(_))),
+        "with the one permit held, a further stream is shed, not queued: {shed:?}"
+    );
+
+    let ended = tokio::time::timeout(WITHIN, stalled.read_to_end(1024))
+        .await
+        .expect("the stalled stream ends in time");
+    assert!(ended.is_err(), "the stalled stream is reset: {ended:?}");
+    assert!(
+        started.elapsed() >= Duration::from_millis(250),
+        "not before the deadline: {:?}",
+        started.elapsed()
+    );
+    permits_free(&bound, 1).await;
+
+    let after = tier_request(&connection, &read_e1(&s))
+        .await
+        .expect("answers");
+    assert!(matches!(after, TierAnswer::Read(_)), "{after:?}");
+    let counters = server.protocol.counters();
+    assert_eq!(
+        (
+            counters.timed_out_frames,
+            counters.shed_streams,
+            counters.requests
+        ),
+        (1, 1, 1),
+        "{counters:?}"
+    );
+
+    drop(connection);
+    b.close().await;
+    server.router.shutdown().await.expect("shutdown");
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn the_in_flight_bound_holds_across_connections() {
+    let h = household();
+    let served = tier_id(&h.a);
+    let s = store(&served);
+    let bound = Arc::new(Semaphore::new(2));
+    let limits = TierLimits {
+        frame_deadline: Duration::from_secs(60),
+        in_flight: Arc::clone(&bound),
+        ..TierLimits::default()
+    };
+    let server = serve_with(&h.key_a, &s, admission(&h), served, limits).await;
+
+    // Two strangers, each on its own connection, each stalling one stream.
+    let (_d1, key_1) = peer_key();
+    let (_d2, key_2) = peer_key();
+    let stranger_1 = client(&key_1).await;
+    let stranger_2 = client(&key_2).await;
+    let conn_1 = connect(&stranger_1, &server.addr).await;
+    let conn_2 = connect(&stranger_2, &server.addr).await;
+    let _stalled_1 = header_only(&conn_1, 100).await;
+    let _stalled_2 = header_only(&conn_2, 100).await;
+    permits_free(&bound, 0).await;
+
+    let b = client(&h.key_b).await;
+    let conn_b = connect(&b, &server.addr).await;
+    let shed = tier_request(&conn_b, &read_e1(&s)).await;
+    assert!(
+        matches!(shed, Err(PeerError::TierStream(_))),
+        "a third connection's stream is shed while two others hold the bound: {shed:?}"
+    );
+    assert_eq!(server.protocol.counters().shed_streams, 1);
+
+    // A peer that goes away releases its permit with its stream.
+    conn_1.close(0u32.into(), b"");
+    permits_free(&bound, 1).await;
+    let after = tier_request(&conn_b, &read_e1(&s)).await.expect("answers");
+    assert!(matches!(after, TierAnswer::Read(_)), "{after:?}");
+
+    drop((conn_2, conn_b));
+    for endpoint in [stranger_1, stranger_2, b] {
+        endpoint.close().await;
+    }
+    server.router.shutdown().await.expect("shutdown");
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn a_connection_answers_at_most_its_stream_bound_at_once() {
+    let h = household();
+    let served = tier_id(&h.a);
+    let s = store(&served);
+    let limits = TierLimits {
+        frame_deadline: Duration::from_millis(500),
+        max_streams_per_connection: 1,
+        ..TierLimits::default()
+    };
+    let server = serve_with(&h.key_a, &s, admission(&h), served, limits).await;
+    let b = client(&h.key_b).await;
+    let connection = connect(&b, &server.addr).await;
+
+    let started = Instant::now();
+    let _stalled = header_only(&connection, 100).await;
+    let queued = tokio::time::timeout(WITHIN, tier_request(&connection, &read_e1(&s)))
+        .await
+        .expect("answers in time")
+        .expect("answers");
+    assert!(matches!(queued, TierAnswer::Read(_)), "{queued:?}");
+    assert!(
+        started.elapsed() >= Duration::from_millis(400),
+        "the second stream waits for the first to end: {:?}",
+        started.elapsed()
+    );
+    let counters = server.protocol.counters();
+    assert_eq!(
+        (counters.timed_out_frames, counters.shed_streams),
+        (1, 0),
+        "queued per connection, not shed: {counters:?}"
+    );
+
+    drop(connection);
+    b.close().await;
+    server.router.shutdown().await.expect("shutdown");
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn an_answer_past_the_frame_cap_is_sent_as_failed() {
+    let h = household();
+    let served = tier_id(&h.a);
+    let s = store(&served);
+    let limits = TierLimits {
+        max_answer_frame_bytes: 16,
+        ..TierLimits::default()
+    };
+    let server = serve_with(&h.key_a, &s, admission(&h), served, limits).await;
+    let b = client(&h.key_b).await;
+
+    let answer = call(&b, &server.addr, read_e1(&s)).await;
+    assert!(
+        matches!(&answer, TierAnswer::Failed { reason } if reason.contains("cap")),
+        "never truncated: {answer:?}"
+    );
+    assert_eq!(server.protocol.counters().oversized_answers, 1);
+
+    b.close().await;
+    server.router.shutdown().await.expect("shutdown");
+}
+
+/// A tier that answers every stream with the same raw bytes, whatever was asked.
+#[derive(Debug, Clone)]
+struct Rogue {
+    frame: Vec<u8>,
+}
+
+impl ProtocolHandler for Rogue {
+    async fn accept(&self, connection: Connection) -> Result<(), AcceptError> {
+        while let Ok((mut send, mut recv)) = connection.accept_bi().await {
+            let _ = recv.read_to_end(1024 * 1024).await;
+            let _ = send.write_all(&self.frame).await;
+            let _ = send.finish();
+        }
+        Ok(())
+    }
+}
+
+fn rogue_frame(answer: &TierAnswer) -> Vec<u8> {
+    let body = serde_ipld_dagcbor::to_vec(answer).expect("encode");
+    let mut frame = u32::try_from(body.len())
+        .expect("small")
+        .to_be_bytes()
+        .to_vec();
+    frame.extend_from_slice(&body);
+    frame
+}
+
+/// Ask a rogue tier answering with `frame` one question.
+async fn ask_rogue(frame: Vec<u8>, req: TierRequest) -> Result<TierAnswer, PeerError> {
+    let (_ds, server_key) = peer_key();
+    let (_dc, client_key) = peer_key();
+    let rogue = mount(&server_key, Rogue { frame }).await;
+    let client = client(&client_key).await;
+    let answer = tokio::time::timeout(WITHIN, tier_call(&client, rogue.addr.clone(), req))
+        .await
+        .expect("answers in time");
+    client.close().await;
+    rogue.router.shutdown().await.expect("shutdown");
+    answer
+}
+
+fn read(path: &str) -> TierRequest {
+    TierRequest::Read {
+        root: BlobCid::compute(b"some root"),
+        path: tp(path),
+    }
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn the_client_rejects_a_leaf_whose_bytes_fail_its_address() {
+    let leaf = ReadLeaf::new(
+        tp("channel/events/e1"),
+        BlobCid::compute_raw(b"event one"),
+        LeafKind::File { executable: false },
+        Bytes::from_static(b"not event one"),
+    );
+    let answer = ask_rogue(
+        rogue_frame(&TierAnswer::Read(leaf)),
+        read("channel/events/e1"),
+    )
+    .await;
+    assert!(
+        matches!(answer, Err(PeerError::TierLeafIntegrity { .. })),
+        "{answer:?}"
+    );
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn the_client_rejects_a_leaf_for_another_path() {
+    let leaf = ReadLeaf::new(
+        tp("channel/events/e2"),
+        BlobCid::compute_raw(b"event two"),
+        LeafKind::File { executable: false },
+        Bytes::from_static(b"event two"),
+    );
+    let answer = ask_rogue(
+        rogue_frame(&TierAnswer::Read(leaf)),
+        read("channel/events/e1"),
+    )
+    .await;
+    assert!(
+        matches!(answer, Err(PeerError::TierLeafIntegrity { .. })),
+        "a self-consistent leaf at the wrong path is refused: {answer:?}"
+    );
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn the_client_rejects_a_listing_that_is_not_its_cid() {
+    let listing = DirListing::new(
+        tp("channel/events"),
+        BlobCid::compute(b"another directory"),
+        vec![file("e1", &BlobCid::compute_raw(b"event one"))],
+    );
+    let req = TierRequest::List {
+        root: BlobCid::compute(b"some root"),
+        path: tp("channel/events"),
+    };
+    let answer = ask_rogue(rogue_frame(&TierAnswer::List(listing)), req).await;
+    assert!(
+        matches!(answer, Err(PeerError::TierLeafIntegrity { .. })),
+        "{answer:?}"
+    );
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn the_client_refuses_an_answer_frame_past_its_cap() {
+    let header_only = (MAX_ANSWER_FRAME_BYTES + 1).to_be_bytes().to_vec();
+    let answer = ask_rogue(header_only, read("channel/events/e1")).await;
+    assert!(
+        matches!(answer, Err(PeerError::TierFrame { .. })),
+        "{answer:?}"
+    );
 }

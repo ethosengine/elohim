@@ -3,15 +3,22 @@
 //!
 //! One request per bidirectional stream. Each frame is a big-endian `u32` length and then that
 //! many bytes of canonical DAG-CBOR (the codec eprfs-core encodes trees with): a [`TierRequest`]
-//! one way, a [`TierAnswer`] back. A length past the cap is refused before anything is
-//! allocated for it.
+//! one way, a [`TierAnswer`] back. A length past the cap is refused, and a body is read as it
+//! arrives, so memory follows the bytes a peer actually sent, never the length it claimed.
+//!
+//! Serving work is bounded three ways ([`TierLimits`]): every frame must arrive (or leave) within
+//! a deadline, one connection has at most a few streams answered at once, and every connection of
+//! one [`TierProtocol`] shares one bound on streams in flight. A stream past that shared bound is
+//! reset at once, before any byte of it is read, whoever sent it; admission is judged later, on
+//! the decoded request, so a stranger's refusal stays uniform.
 
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::Arc;
+use std::time::Duration;
 
 use eprfs_core::{
-    BatchOptions, BlobCid, DirListing, EprfsStorage, ItemAbsence, ReadLeaf, TierId, TreeChange,
-    TreeError, TreeLimits, TreePath, TreeResult, View,
+    encode_tree, BatchOptions, BlobCid, DirListing, EprfsStorage, ItemAbsence, ReadLeaf, TierId,
+    TreeChange, TreeError, TreeLimits, TreeNode, TreePath, TreeResult, View,
 };
 use eprfs_serve::TierEndpoint;
 use iroh::endpoint::{Connection, RecvStream, SendStream, VarInt};
@@ -19,6 +26,7 @@ use iroh::protocol::{AcceptError, ProtocolHandler};
 use iroh::{Endpoint, NodeAddr, NodeId};
 use seam_contracts::Unanswered;
 use serde::{Deserialize, Serialize};
+use tokio::sync::Semaphore;
 use tokio::task::JoinSet;
 
 use crate::error::PeerError;
@@ -27,20 +35,65 @@ use crate::gate::{SharedAdmission, StewardDevicesGate};
 /// The ALPN a device's tier answers on.
 pub const TIER_ALPN: &[u8] = b"/elohim/eprfs-tier/1.0.0";
 
-/// The largest request frame accepted, in bytes. A request names roots, paths and a view; a view
+/// The default largest request frame, in bytes. A request names roots, paths and a view; a view
 /// of 256 paths at `TreeLimits::max_path_bytes` (4096) fits.
 pub const MAX_REQUEST_FRAME_BYTES: u32 = 1024 * 1024;
 
-/// The largest answer frame, in bytes: four `TreeLimits::max_node_bytes` (4 MiB). An answer
-/// past it (a leaf or a diff that large) is sent as [`TierAnswer::Failed`], never truncated.
+/// The largest answer frame, in bytes: four `TreeLimits::max_node_bytes` (4 MiB). The client
+/// refuses an answer past it; a server never sends one larger, whatever its [`TierLimits`] say.
+/// An answer past the server's cap (a leaf or a diff that large) is sent as
+/// [`TierAnswer::Failed`], never truncated.
 pub const MAX_ANSWER_FRAME_BYTES: u32 = 16 * 1024 * 1024;
 
-/// How many streams of one connection are answered at once. Further streams wait in QUIC's own
-/// flow control until one finishes (RS-CON-02: bounded concurrent work).
+/// The default number of streams of one connection answered at once. Further streams wait in
+/// QUIC's own flow control until one finishes (RS-CON-02: bounded concurrent work).
 pub const MAX_CONCURRENT_STREAMS: usize = 8;
 
-/// The QUIC error code a refused frame resets its stream with.
+/// The default number of streams in flight across every connection of one [`TierProtocol`].
+pub const MAX_IN_FLIGHT_STREAMS: usize = 64;
+
+/// The default time one frame may take to arrive or to leave.
+pub const FRAME_DEADLINE: Duration = Duration::from_secs(10);
+
+/// The QUIC error code a refused or timed-out frame resets its stream with.
 const REFUSED_FRAME: u32 = 1;
+
+/// The QUIC error code a stream shed at the in-flight bound is reset with.
+const BUSY: u32 = 2;
+
+/// How a [`TierProtocol`] bounds its work. `Clone` shares `in_flight`: every protocol cloned from
+/// one set of limits draws on the same bound.
+#[derive(Debug, Clone)]
+pub struct TierLimits {
+    /// The tree limits the endpoint reads under.
+    pub tree: TreeLimits,
+    /// A request frame past this is refused and its stream reset.
+    pub max_request_frame_bytes: u32,
+    /// An answer past this is sent as [`TierAnswer::Failed`]. Never above
+    /// [`MAX_ANSWER_FRAME_BYTES`], the client's own cap.
+    pub max_answer_frame_bytes: u32,
+    /// Each request frame must arrive, and each answer frame leave, within this; a stream that
+    /// stalls past it is reset and its permits returned.
+    pub frame_deadline: Duration,
+    /// Streams of one connection answered at once; at least one.
+    pub max_streams_per_connection: usize,
+    /// Streams in flight across every connection, from accept to answer. A stream that finds no
+    /// permit is reset at once (shed), before any byte of it is read.
+    pub in_flight: Arc<Semaphore>,
+}
+
+impl Default for TierLimits {
+    fn default() -> TierLimits {
+        TierLimits {
+            tree: TreeLimits::default(),
+            max_request_frame_bytes: MAX_REQUEST_FRAME_BYTES,
+            max_answer_frame_bytes: MAX_ANSWER_FRAME_BYTES,
+            frame_deadline: FRAME_DEADLINE,
+            max_streams_per_connection: MAX_CONCURRENT_STREAMS,
+            in_flight: Arc::new(Semaphore::new(MAX_IN_FLIGHT_STREAMS)),
+        }
+    }
+}
 
 /// One question to a device's tier: [`TierEndpoint`]'s read, list and diff.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -103,6 +156,8 @@ struct TierCounters {
     requests: AtomicU64,
     unadmitted: AtomicU64,
     refused_frames: AtomicU64,
+    timed_out_frames: AtomicU64,
+    shed_streams: AtomicU64,
     oversized_answers: AtomicU64,
 }
 
@@ -113,9 +168,14 @@ pub struct TierCountersSnapshot {
     pub requests: u64,
     /// Of those, requests from a node id admission did not map to a device.
     pub unadmitted: u64,
-    /// Streams reset for a request frame past the cap or one that did not decode.
+    /// Streams reset for a request frame past the cap, one that did not decode, or a stream that
+    /// failed or closed before its frame was whole.
     pub refused_frames: u64,
-    /// Answers sent as [`TierAnswer::Failed`] for exceeding [`MAX_ANSWER_FRAME_BYTES`].
+    /// Streams reset because a frame did not arrive or leave within the deadline.
+    pub timed_out_frames: u64,
+    /// Streams reset unread because the in-flight bound was full.
+    pub shed_streams: u64,
+    /// Answers sent as [`TierAnswer::Failed`] for exceeding the answer frame cap.
     pub oversized_answers: u64,
 }
 
@@ -130,6 +190,8 @@ impl TierCounters {
             requests: read(&self.requests),
             unadmitted: read(&self.unadmitted),
             refused_frames: read(&self.refused_frames),
+            timed_out_frames: read(&self.timed_out_frames),
+            shed_streams: read(&self.shed_streams),
             oversized_answers: read(&self.oversized_answers),
         }
     }
@@ -147,6 +209,7 @@ pub struct TierProtocol {
 struct Inner {
     gate: StewardDevicesGate,
     endpoint: TierEndpoint<StewardDevicesGate>,
+    limits: TierLimits,
     counters: TierCounters,
 }
 
@@ -160,7 +223,8 @@ impl std::fmt::Debug for TierProtocol {
 
 impl TierProtocol {
     /// Serve `store` as `self_id`, answering only the devices `admission` admits. The gate and the
-    /// node-id lookup share the one `admission`, so they cannot disagree.
+    /// node-id lookup share the one `admission`, so they cannot disagree. Work is bounded by
+    /// `limits` ([`TierLimits::default`] for the defaults).
     ///
     /// # Errors
     ///
@@ -169,14 +233,15 @@ impl TierProtocol {
         self_id: TierId,
         store: Arc<dyn EprfsStorage>,
         admission: SharedAdmission,
-        limits: TreeLimits,
+        limits: TierLimits,
     ) -> eprfs_core::Result<TierProtocol> {
         let gate = StewardDevicesGate::new(admission);
-        let endpoint = TierEndpoint::new(self_id, store, gate.clone(), None, limits)?;
+        let endpoint = TierEndpoint::new(self_id, store, gate.clone(), None, limits.tree)?;
         Ok(TierProtocol {
             inner: Arc::new(Inner {
                 gate,
                 endpoint,
+                limits,
                 counters: TierCounters::default(),
             }),
         })
@@ -196,17 +261,32 @@ impl ProtocolHandler for TierProtocol {
     async fn accept(&self, connection: Connection) -> Result<(), AcceptError> {
         // The handshake proved the peer holds this node id's key; nothing it sends names it.
         let remote = connection.remote_node_id()?;
+        let per_connection = self.inner.limits.max_streams_per_connection.max(1);
         let mut streams = JoinSet::new();
         loop {
             while streams.try_join_next().is_some() {}
-            while streams.len() >= MAX_CONCURRENT_STREAMS {
-                streams.join_next().await;
+            while streams.len() >= per_connection {
+                if streams.join_next().await.is_none() {
+                    break;
+                }
             }
-            let Ok((send, recv)) = connection.accept_bi().await else {
+            let Ok((mut send, mut recv)) = connection.accept_bi().await else {
                 break;
             };
+            // The shared bound is taken before any byte is read and held until the stream's task
+            // ends, on every path (a dropped or aborted task drops its permit).
+            let Ok(permit) = Arc::clone(&self.inner.limits.in_flight).try_acquire_owned() else {
+                TierCounters::bump(&self.inner.counters.shed_streams);
+                // Best effort: the stream is being refused either way.
+                let _ = recv.stop(VarInt::from_u32(BUSY));
+                let _ = send.reset(VarInt::from_u32(BUSY));
+                continue;
+            };
             let inner = Arc::clone(&self.inner);
-            streams.spawn(async move { inner.answer_stream(remote, send, recv).await });
+            streams.spawn(async move {
+                inner.answer_stream(remote, send, recv).await;
+                drop(permit);
+            });
         }
         while streams.join_next().await.is_some() {}
         Ok(())
@@ -216,10 +296,18 @@ impl ProtocolHandler for TierProtocol {
 impl Inner {
     /// Answer one stream. Stream failures end it quietly: the peer sees its stream fail.
     async fn answer_stream(&self, remote: NodeId, mut send: SendStream, mut recv: RecvStream) {
-        let request = match read_frame::<TierRequest>(&mut recv, MAX_REQUEST_FRAME_BYTES).await {
-            Ok(request) => request,
-            Err(_) => {
-                TierCounters::bump(&self.counters.refused_frames);
+        let deadline = self.limits.frame_deadline;
+        let cap = self.limits.max_request_frame_bytes;
+        let read = tokio::time::timeout(deadline, read_frame::<TierRequest>(&mut recv, cap)).await;
+        let request = match read {
+            Ok(Ok(request)) => request,
+            Ok(Err(_)) | Err(_) => {
+                let counter = if read.is_err() {
+                    &self.counters.timed_out_frames
+                } else {
+                    &self.counters.refused_frames
+                };
+                TierCounters::bump(counter);
                 // Best effort: the stream is being abandoned either way.
                 let _ = recv.stop(VarInt::from_u32(REFUSED_FRAME));
                 let _ = send.reset(VarInt::from_u32(REFUSED_FRAME));
@@ -233,22 +321,34 @@ impl Inner {
             TierCounters::bump(&self.counters.unadmitted);
         }
         let answer = self.answer(&who, request).await;
-        let frame = match encode_frame(&answer, MAX_ANSWER_FRAME_BYTES) {
+        let cap = self
+            .limits
+            .max_answer_frame_bytes
+            .min(MAX_ANSWER_FRAME_BYTES);
+        let frame = match encode_frame(&answer, cap) {
             Ok(frame) => frame,
             Err(e) => {
                 TierCounters::bump(&self.counters.oversized_answers);
                 let failed = TierAnswer::Failed {
                     reason: e.to_string(),
                 };
+                // A failure names only the cap and the size; it fits the client's own cap.
                 match encode_frame(&failed, MAX_ANSWER_FRAME_BYTES) {
                     Ok(frame) => frame,
                     Err(_) => return,
                 }
             }
         };
-        if send.write_all(&frame).await.is_ok() {
+        match tokio::time::timeout(deadline, send.write_all(&frame)).await {
             // Best effort: a peer that went away has nothing left to read.
-            let _ = send.finish();
+            Ok(Ok(())) => {
+                let _ = send.finish();
+            }
+            Ok(Err(_)) => {}
+            Err(_) => {
+                TierCounters::bump(&self.counters.timed_out_frames);
+                let _ = send.reset(VarInt::from_u32(REFUSED_FRAME));
+            }
         }
     }
 
@@ -298,14 +398,17 @@ pub async fn tier_call(
 
 /// Ask one question on an open tier connection, on a stream of its own.
 ///
-/// A [`TierAnswer::Read`] is checked here: a leaf whose bytes fail its CID is an error, never an
-/// answer.
+/// Read and List answers are checked here for self-consistency and for the path asked: a leaf
+/// must be at the requested path and its bytes must hash to its CID; a listing must be at the
+/// requested path and its entries must encode to its CID. Anything else is an error, never an
+/// answer. Membership under the requested root is not checked here: that would need the spine.
 ///
 /// # Errors
 ///
 /// - [`PeerError::TierStream`] when the stream fails or the peer resets it.
 /// - [`PeerError::TierFrame`] when either frame is past its cap or the answer does not decode.
-/// - [`PeerError::TierLeafIntegrity`] when a served leaf fails its address.
+/// - [`PeerError::TierLeafIntegrity`] when a served leaf or listing fails its address or answers
+///   another path.
 pub async fn tier_request(
     connection: &Connection,
     req: &TierRequest,
@@ -315,14 +418,38 @@ pub async fn tier_request(
     send.write_all(&frame).await.map_err(stream_error)?;
     send.finish().map_err(stream_error)?;
     let answer: TierAnswer = read_frame(&mut recv, MAX_ANSWER_FRAME_BYTES).await?;
-    if let TierAnswer::Read(leaf) = &answer {
-        if !leaf.cid.verifies(&leaf.bytes) {
-            return Err(PeerError::TierLeafIntegrity {
-                cid: leaf.cid.clone(),
-            });
-        }
-    }
+    check_answer(req, &answer)?;
     Ok(answer)
+}
+
+/// The client's checks on a served leaf or listing (see [`tier_request`]).
+fn check_answer(req: &TierRequest, answer: &TierAnswer) -> Result<(), PeerError> {
+    let (cid, consistent) = match (req, answer) {
+        (TierRequest::Read { path, .. }, TierAnswer::Read(leaf)) => (
+            &leaf.cid,
+            leaf.path == *path && leaf.cid.verifies(&leaf.bytes),
+        ),
+        (TierRequest::List { path, .. }, TierAnswer::List(listing)) => (
+            &listing.cid,
+            listing.path == *path && listing_cid(listing).as_ref() == Some(&listing.cid),
+        ),
+        (TierRequest::Diff { .. }, TierAnswer::Diff(_))
+        | (_, TierAnswer::Unanswered { .. } | TierAnswer::Failed { .. }) => return Ok(()),
+        _ => return Err(frame_error("the answer is not of the kind asked")),
+    };
+    if consistent {
+        Ok(())
+    } else {
+        Err(PeerError::TierLeafIntegrity { cid: cid.clone() })
+    }
+}
+
+/// The CID a listing's entries encode to, or `None` when they are not a valid tree node.
+fn listing_cid(listing: &DirListing) -> Option<BlobCid> {
+    let node = TreeNode::new(listing.entries.clone()).ok()?;
+    encode_tree(&node, &TreeLimits::default())
+        .ok()
+        .map(|(cid, _)| cid)
 }
 
 fn stream_error(e: impl std::error::Error + Send + Sync + 'static) -> PeerError {
@@ -353,7 +480,12 @@ fn encode_frame<T: Serialize>(value: &T, cap: u32) -> Result<Vec<u8>, PeerError>
     Ok(frame)
 }
 
-/// Read one frame: its length first, checked against `cap` before the body is allocated.
+/// The most a frame body read reserves ahead of the bytes that arrived.
+const READ_CHUNK: usize = 64 * 1024;
+
+/// Read one frame, server request or client answer alike: its length first, refused past `cap`,
+/// then its body chunk by chunk as it arrives, so memory follows the bytes received, never the
+/// length claimed. The caller bounds the time it may take.
 async fn read_frame<T: for<'de> Deserialize<'de>>(
     recv: &mut RecvStream,
     cap: u32,
@@ -367,7 +499,15 @@ async fn read_frame<T: for<'de> Deserialize<'de>>(
         )));
     }
     let len = usize::try_from(len).map_err(|e| frame_error(e.to_string()))?;
-    let mut body = vec![0u8; len];
-    recv.read_exact(&mut body).await.map_err(stream_error)?;
+    let mut body = Vec::with_capacity(len.min(READ_CHUNK));
+    while body.len() < len {
+        let want = (len - body.len()).min(READ_CHUNK);
+        let chunk = recv
+            .read_chunk(want, true)
+            .await
+            .map_err(stream_error)?
+            .ok_or_else(|| frame_error("the stream ended inside a frame"))?;
+        body.extend_from_slice(&chunk.bytes);
+    }
     serde_ipld_dagcbor::from_slice(&body).map_err(|e| frame_error(e.to_string()))
 }

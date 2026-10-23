@@ -16,11 +16,16 @@ rules:
 Born strict (RS-GOV-03): every lint suppression in this subtree carries a literal reason, and
 the native style gate holds it at zero findings. The crate depends on `elohim-epr-rea` for the
 roster, on iroh `=0.92` (with the workspace's vendored `iroh-quinn-proto` patch, as
-elohim-storage carries) for the endpoint, and on `eprfs-core`/`eprfs-serve` for the tier it serves
-on `/elohim/eprfs-tier/1.0.0` (`TierEndpoint` behind `StewardDevicesGate`; frames are the same
-`serde_ipld_dagcbor` codec eprfs-core encodes trees with). It takes no dependency on `epr-cli`: the did:key
-verifier arrives as a `&dyn SignatureVerifier` parameter. elohim-storage takes no dependency on
-this crate (R-E3).
+elohim-storage carries) for the endpoint, and on `eprfs-core`/`eprfs-serve` for the tier it
+serves on `/elohim/eprfs-tier/1.0.0` (`TierEndpoint` behind `StewardDevicesGate`; frames use the
+`serde_ipld_dagcbor` codec eprfs-core encodes trees with). It takes no dependency on `epr-cli`:
+the did:key verifier arrives as a `&dyn SignatureVerifier` parameter. elohim-storage takes no
+dependency on this crate (R-E3).
+
+The tier is network-facing before admission, so its work is bounded before any request is
+read: a frame deadline, a per-connection stream bound and one in-flight bound shared by every
+connection (`TierLimits`). Frame bodies are read as they arrive, never pre-allocated from a
+claimed length.
 
 The secret key never leaves `PeerKey` except into the endpoint builder: no `Display`, `Clone`
 or serialization, and `Debug` prints the node id only.

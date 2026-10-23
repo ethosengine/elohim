@@ -219,7 +219,7 @@ decisionPoints:
     sourceLocation:
       file: src/tier.rs
       modulePath: eprfs_peer::TierAnswer
-    summary: "The tier ALPN's wire: one TierRequest (read, list or diff) per bidirectional stream and one TierAnswer back, each a big-endian u32 length plus canonical DAG-CBOR. A request frame past MAX_REQUEST_FRAME_BYTES (1 MiB) is refused before allocation and its stream reset; an answer past MAX_ANSWER_FRAME_BYTES (16 MiB) is sent as Failed, never truncated; at most MAX_CONCURRENT_STREAMS (8) streams per connection are answered at once. The client verifies a served leaf against its CID before returning it."
+    summary: "The tier ALPN's wire: one TierRequest (read, list or diff) per bidirectional stream and one TierAnswer back, each a big-endian u32 length plus canonical DAG-CBOR. One read_frame serves both directions: a length past the cap (requests 1 MiB by default, answers 16 MiB) is refused, and a body is read chunk by chunk as it arrives, never pre-allocated from the claimed length. TierLimits bounds the serving side before any request is read: each frame must arrive or leave within frame_deadline (10 s), at most max_streams_per_connection (8) streams of one connection are answered at once (further streams wait in QUIC flow control), and every connection shares one in_flight semaphore (64) taken at accept before any byte is read; a stream finding no permit is reset unread (shed). An answer past the server's cap is sent as Failed, never truncated. The client checks a Read leaf (path equals the requested path, bytes hash to its CID) and a List listing (path equals the requested path, entries encode to its CID)."
     concernIds:
       - id: C0
         status: answered
@@ -232,25 +232,25 @@ decisionPoints:
         justification: "No head order; T5 orders heads by seq."
       - id: C3
         status: answered
-        justification: "One request per stream; concurrency per connection is bounded and further streams wait in QUIC flow control."
+        justification: "Every frame has a deadline, so a header-only or trickling stream is reset and its permits returned; a peer closing its connection ends its streams' tasks."
       - id: C4
         status: answered
         justification: "TreeError::Unanswered crosses whole as Unanswered with ruling 7's three parts; any other tree error is Failed with its message."
       - id: C5
-        status: answered
-        justification: "The endpoint verifies leaves it serves, and tier_request re-verifies a leaf against its CID; a mismatch is TierLeafIntegrity, never an answer."
+        status: partial
+        justification: "The endpoint verifies the leaves it serves. tier_request checks self-consistency and path only: a Read leaf's path must equal the requested path and its bytes hash to its CID; a List listing's path must equal the requested path and its entries encode to its CID; a mismatch is TierLeafIntegrity, an answer of another kind is TierFrame. It does not check that the object lies under the requested root (that needs the spine); Diff answers are not checked."
       - id: C6a
         status: answered
-        justification: "Frame lengths are capped before allocation in both directions."
+        justification: "Frame lengths are capped in both directions and bodies are read as they arrive, so memory follows bytes received; per-connection and process-wide stream bounds cap concurrent work across all connections."
       - id: C6b
-        status: n-a
-        justification: "Stateless per stream."
+        status: answered
+        justification: "The in-flight permit is an owned guard dropped with the stream's task on every path (answer, refusal, timeout, peer close, abort)."
       - id: C7
         status: n-a
         justification: "Nothing is advertised."
       - id: C8
         status: answered
-        justification: "Counted: requests, unadmitted, refused frames, oversized answers (TierProtocol::counters), beside the endpoint's own ServeCounters."
+        justification: "Counted: requests, unadmitted, refused frames, timed-out frames, shed streams, oversized answers (TierProtocol::counters), beside the endpoint's own ServeCounters."
       - id: C9
         status: answered
         justification: "The ALPN carries its version (/elohim/eprfs-tier/1.0.0); a wire change is a new ALPN."
@@ -275,5 +275,29 @@ decisionPoints:
         kind: integration
       - path: elohim/eprfs/eprfs-peer/tests/tier_alpn.rs
         testName: admitted_device_reads_and_diffs_a_root
+        kind: integration
+      - path: elohim/eprfs/eprfs-peer/tests/tier_alpn.rs
+        testName: a_header_only_stream_is_dropped_at_the_deadline_and_its_permit_returned
+        kind: integration
+      - path: elohim/eprfs/eprfs-peer/tests/tier_alpn.rs
+        testName: the_in_flight_bound_holds_across_connections
+        kind: integration
+      - path: elohim/eprfs/eprfs-peer/tests/tier_alpn.rs
+        testName: a_connection_answers_at_most_its_stream_bound_at_once
+        kind: integration
+      - path: elohim/eprfs/eprfs-peer/tests/tier_alpn.rs
+        testName: an_answer_past_the_frame_cap_is_sent_as_failed
+        kind: integration
+      - path: elohim/eprfs/eprfs-peer/tests/tier_alpn.rs
+        testName: the_client_rejects_a_leaf_whose_bytes_fail_its_address
+        kind: integration
+      - path: elohim/eprfs/eprfs-peer/tests/tier_alpn.rs
+        testName: the_client_rejects_a_leaf_for_another_path
+        kind: integration
+      - path: elohim/eprfs/eprfs-peer/tests/tier_alpn.rs
+        testName: the_client_rejects_a_listing_that_is_not_its_cid
+        kind: integration
+      - path: elohim/eprfs/eprfs-peer/tests/tier_alpn.rs
+        testName: the_client_refuses_an_answer_frame_past_its_cap
         kind: integration
     notes: "Spec §3.2. T5 asks a peer's tier for a channel diff through tier_call / tier_request."

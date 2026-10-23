@@ -69,7 +69,9 @@ pub enum PeerError {
     #[error("bad tier frame: {reason}")]
     TierFrame { reason: String },
 
-    /// A peer's tier served a leaf whose bytes fail its address. Never accepted as an answer.
-    #[error("the peer's tier served bytes that fail their address {cid}")]
+    /// A peer's tier served a leaf or listing that fails its address (bytes or entries that do
+    /// not encode to its CID) or that is at another path than the one asked. Never accepted as an
+    /// answer.
+    #[error("the peer's tier served an object that fails its address or path: {cid}")]
     TierLeafIntegrity { cid: eprfs_core::BlobCid },
 }

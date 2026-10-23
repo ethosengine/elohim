@@ -5,7 +5,7 @@ edition.workspace = true
 license.workspace = true
 authors.workspace = true
 repository.workspace = true
-description = "A device's iroh peer: its persisted peer key, its endpoint, and admission of authenticated node ids to the devices its own roster names"
+description = "A device's iroh peer: its persisted peer key, its endpoint, admission of authenticated node ids to the devices its own roster names, and the tier ALPN serving its eprfs store to those devices only"
 # Consumed by path from epr-cli; no pipeline publishes it, so it does not claim to be released.
 publish = false
 
@@ -23,8 +23,9 @@ serde.workspace = true
 # The canonical DAG-CBOR codec eprfs-core already encodes trees with; the tier frames use it too.
 serde_ipld_dagcbor = "0.6"
 thiserror.workspace = true
-# Bounded per-connection concurrency for the tier ALPN (a JoinSet of stream tasks).
-tokio = { workspace = true, features = ["rt"] }
+# Bounded tier work: a JoinSet of stream tasks per connection, a process-wide semaphore of
+# in-flight streams, and a deadline on every frame.
+tokio = { workspace = true, features = ["rt", "sync", "time"] }
 url = "2"
 
 [dev-dependencies]
@@ -32,4 +33,4 @@ bytes.workspace = true
 elohim-epr = { path = "../../epr" }
 eprfs-serve = { path = "../eprfs-serve", features = ["testing"] }
 tempfile = "3"
-tokio = { workspace = true, features = ["time"] }
+tokio = { workspace = true, features = ["sync", "time"] }
