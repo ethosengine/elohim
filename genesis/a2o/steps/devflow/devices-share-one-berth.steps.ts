@@ -683,9 +683,12 @@ Then('the berth status on device A and on device B names the same holder', async
 // ---------------------------------------------------------------- a retired device
 //
 // The Contest is `epr actor device contest` on A; A's daemon reloads its roster on its own tick,
-// closes what B held open and refuses B as it refuses a stranger (the like-a-stranger comparison
-// over real endpoints is eprfs-peer's `a_contested_device_is_disconnected_refused_like_a_stranger_
-// and_counted`); here it is read where an operator reads it, `epr peer status` on A.
+// closes what B held open and refuses B as it refuses a stranger. These steps assert what an
+// operator reads (`epr peer status` on A counts B's refused connections); the PROOF of the
+// clause "drops device B's connections and refuses new ones exactly as it refuses a stranger's"
+// — an open connection closed with the not-admitted code, new ones closed with the stranger's
+// code, the same tier answer as a stranger's — is eprfs-peer's real-endpoint test
+// `a_contested_device_is_disconnected_refused_like_a_stranger_and_counted` (tests/daemon.rs).
 
 /** `epr peer status --json` on `d`: the refused connections it reports for `device`. */
 function refusedFrom(d: Device, device: string): number {

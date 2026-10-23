@@ -305,7 +305,23 @@ export function holds(d: Device, resource: string, session: string): boolean {
 
 let eprChecked: string | null = null;
 
-/** The `epr` must exist and be newer than every tracked eprfs source: fail loudly otherwise. */
+/**
+ * Every tree `epr` builds from: the eprfs workspace and each of its Cargo path dependencies
+ * (`grep path = elohim/eprfs/*\/Cargo.toml`), the roster and contest admission among them.
+ */
+const EPR_SOURCES = [
+  'elohim/eprfs',
+  'elohim/epr',
+  'elohim/epr-rea',
+  'elohim/epr-index',
+  'vendor/iroh-quinn-proto-0.13.0',
+  'crates/seam-contracts',
+  'crates/consent-grant',
+  'bridges/did/did-bridge',
+  'genesis/orchestrator/rust-style',
+];
+
+/** The `epr` must exist and be newer than every tracked source it builds from: fail loudly otherwise. */
 export function checkEpr(): void {
   if (eprChecked === EPR) return;
   const build =
@@ -313,7 +329,7 @@ export function checkEpr(): void {
     'elohim/eprfs/Cargo.toml -p elohim-epr-cli --bin epr (or set EPR_BIN)';
   assert.ok(existsSync(EPR), `no epr at ${EPR} — build it: ${build}`);
   const files = must(
-    runSync(['git', 'ls-files', 'elohim/eprfs'], { cwd: repository }),
+    runSync(['git', 'ls-files', ...EPR_SOURCES], { cwd: repository }),
     'git ls-files'
   ).stdout.split('\n');
   let newest = 0;

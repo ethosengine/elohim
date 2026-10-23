@@ -133,6 +133,15 @@ class TestRunnerNeverFoldsIntoThisCheckoutTest(unittest.TestCase):
         self.berth.say("dev", "folds to the scratch checkout")
         self.assertEqual([e["root"] for e in self.real.events], [scratch])
 
+    def test_a_repointed_repo_root_folds_into_its_scratch_checkout(self):
+        scratch = os.path.join(self.directory.name, "scratch-root")
+        g = Berth._fold_root.__globals__
+        saved = g["REPO_ROOT"]
+        g["REPO_ROOT"] = scratch
+        self.addCleanup(g.__setitem__, "REPO_ROOT", saved)
+        self.berth.say("dev", "into the scratch checkout")
+        self.assertEqual([e["root"] for e in self.real.events], [scratch])
+
     def test_outside_the_runner_this_checkout_folds_as_before(self):
         os.environ.pop("BERTH_UNDER_TEST")
         self.addCleanup(os.environ.__setitem__, "BERTH_UNDER_TEST", "1")
@@ -1005,6 +1014,17 @@ class StewardClaimTest(unittest.TestCase):
         # This device's own steward lease is not another device's.
         self.assertNotIn("alpha-fleet", section)
         self.assertEqual(len(self.calls()), 1)
+
+    def test_a_folded_mooring_past_the_mooring_ttl_is_stale_not_live(self):
+        out = view()
+        out["others"] = {DEVICE_A: {"seq": 9, "last_seen": NOW_MS - 1_000, "moorings": {
+            "claude-1": NOW_MS - 60_000,
+            "claude-old": NOW_MS - (self.berth.mooring_ttl_s + 60) * 1000}}}
+        self.views(out)
+        section = render_status(self.berth).split("other devices", 1)[1]
+        self.assertIn("      moored claude-1 since ", section)
+        self.assertNotIn("      moored claude-old", section)
+        self.assertIn("      STALE claude-old — last moored ", section)
 
     def test_status_says_why_there_is_no_other_devices_section(self):
         self.views(not_a_device())

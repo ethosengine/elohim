@@ -655,12 +655,14 @@ fn other_devices_moorings_are_replayed_in_each_devices_order_from_the_fold() {
         from(&h.b.did, counted(claim("codex-1", T0 + 2.0), 3)),
         from(&h.b.did, mooring("moor", "codex-2", T0 + 1.0, 2)),
         from(&h.b.did, mooring("moor", "codex-1", T0, 1)),
+        // codex-1 moored again later: its latest moor is what a status reads its age from.
+        from(&h.b.did, mooring("moor", "codex-1", T0 + 5.0, 5)),
     ]);
     let heads = table(&h.a.did, &[], &s, &[(&h.b.did, 0, ms(T0) + 4_000)]);
     let others = other_devices(&h.a.did, &s, &heads, &h.admission()).expect("A is admitted");
     let b = others.get(&h.b.did).expect("B is listed under its own did");
     assert_eq!(b.moorings.keys().collect::<Vec<_>>(), vec!["codex-1"]);
-    assert_eq!(b.moorings["codex-1"], ms(T0));
+    assert_eq!(b.moorings["codex-1"], ms(T0 + 5.0));
     assert_eq!((b.seq, b.last_seen), (Some(9), Some(ms(T0) + 4_000)));
     assert_eq!(others.len(), 1, "this device is not among the others");
 

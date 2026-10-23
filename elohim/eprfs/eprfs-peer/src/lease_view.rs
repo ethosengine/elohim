@@ -510,7 +510,7 @@ pub struct OtherDevice {
     pub seq: Option<u64>,
     /// When that head was folded, this device's clock, unix milliseconds.
     pub last_seen: Option<u64>,
-    /// Its sessions moored and not unmoored, each with when it moored (its clock, unix ms).
+    /// Its sessions moored and not unmoored, each with its latest moor (its clock, unix ms).
     pub moorings: BTreeMap<String, u64>,
 }
 
@@ -558,7 +558,8 @@ pub fn other_devices(
         for event in events {
             match event.kind {
                 LeaseKind::Moor => {
-                    moorings.entry(event.session.clone()).or_insert(event.at);
+                    // The latest moor: a re-moor refreshes it, so its age says whether it is live.
+                    moorings.insert(event.session.clone(), event.at);
                 }
                 LeaseKind::Unmoor => {
                     moorings.remove(&event.session);

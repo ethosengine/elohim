@@ -482,8 +482,9 @@ class Berth:
         scratch checkout, is unaffected."""
         if os.environ.get(UNDER_TEST_ENV) != "1" or self._obs_injected or not root:
             return False
-        here = {os.path.realpath(HOME_CHECKOUT), os.path.realpath(REPO_ROOT)}
-        return os.path.realpath(root) in here
+        # The checkout this file lives in, fixed at load: a test that repoints REPO_ROOT at a
+        # scratch checkout folds there.
+        return os.path.realpath(root) == os.path.realpath(HOME_CHECKOUT)
 
     def _fold_failed(self, kind, ev, why):
         if kind in CROSSING_KINDS:
@@ -1333,7 +1334,14 @@ def _other_devices_lines(b):
                 head += f" — SILENT past {b.freshness_s}s"
         lines.append(f"    device {did}  {head}")
         for session, since in sorted((info.get("moorings") or {}).items()):
-            lines.append(f"      moored {session} since {_rfc3339(since)}")
+            # A folded mooring is the device's latest moor record; past the mooring ttl with no
+            # newer one (its session died unmoored, or never moored again), it is not live.
+            age = now_ms - since
+            if age > b.mooring_ttl_s * 1000:
+                lines.append(f"      STALE {session} — last moored {_peer_age(age)} ago, past the "
+                             f"{b.mooring_ttl_s}s mooring ttl")
+            else:
+                lines.append(f"      moored {session} since {_rfc3339(since)}")
         for res, verdict in sorted(held.get(did, []), key=lambda item: item[0]):
             line = f"      {res}  {steward_reason(verdict, now_ms)}"
             if verdict.get("override"):
