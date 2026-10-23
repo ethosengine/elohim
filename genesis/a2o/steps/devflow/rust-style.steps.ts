@@ -1,12 +1,16 @@
 // The Rust integration fixtures own setup and behavioral assertions. Cucumber
 // exposes the same checks as developer stories without duplicating the evaluator.
-import { Given, When, Then } from '@cucumber/cucumber';
 import assert from 'node:assert/strict';
 import { spawnSync } from 'node:child_process';
 import { resolve } from 'node:path';
 
+import { Given, When, Then } from '@cucumber/cucumber';
+
 const ROOT = resolve(__dirname, '../../../..');
-type StyleWorld = { rustStyleFixture?: string; rustStyleResult?: ReturnType<typeof spawnSync> };
+interface StyleWorld {
+  rustStyleFixture?: string;
+  rustStyleResult?: ReturnType<typeof spawnSync>;
+}
 
 Given(
   'a Rust change with a committed unexplained suppression and an uncommitted repair',
@@ -32,6 +36,7 @@ When(
   function (this: StyleWorld) {
     assert.ok(this.rustStyleFixture);
     this.rustStyleResult = spawnSync(
+      // eslint-disable-next-line sonarjs/no-os-command-from-path -- runs the repository's own checker script under the host bash, as CI does
       'bash',
       [resolve(ROOT, 'genesis/orchestrator/rust-style.sh'), '--acceptance', this.rustStyleFixture],
       {

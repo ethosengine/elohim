@@ -655,9 +655,10 @@ pub fn init_ssr_render_client() -> Arc<reqwest::Client> {
             // The whole point: never hand a connection back to a pool that
             // another runtime could later check out. See above.
             .pool_max_idle_per_host(0)
-            // Pool-free means a fresh name lookup per render fetch; time it so
-            // a slow one is named (target `doorway::ssr::dns`).
-            .dns_resolver(Arc::new(crate::ssr::TimedDnsResolver))
+            // Pool-free connections, shared lookups: concurrent render fetches
+            // share one timed lookup per host and reuse its answer briefly
+            // (target `doorway::ssr::dns`).
+            .dns_resolver(Arc::new(crate::ssr::TimedDnsResolver::default()))
             .build()
             .unwrap_or_default(),
     )
@@ -4489,7 +4490,10 @@ mod epr_dispatch_breaker_tests {
     }
 
     #[test]
-    #[allow(clippy::assertions_on_constants)] // the const relation IS the pinned invariant
+    #[allow(
+        clippy::assertions_on_constants,
+        reason = "the const relation IS the pinned invariant"
+    )]
     fn dispatch_timeout_is_tightened_well_under_the_old_30s_wall() {
         // The regression this fix closes: a per-request .timeout() override
         // silently widened past the 10s browser-facing budget, back up to a

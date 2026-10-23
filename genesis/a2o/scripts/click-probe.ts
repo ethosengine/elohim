@@ -43,8 +43,46 @@ const USAGE =
   'Usage: probe <url> [--as <FixtureHuman>] [--out <slug>] [--max <n>] [--viewport WxH] [--budget <seconds>]';
 
 /** Labels never clicked: they mutate shared state or end the session. */
-const SKIP_LABEL =
-  /\b(sign ?out|log ?out|delete|remove|revoke|leave|publish|send|submit|confirm|archive|destroy|reset|follow|unfollow|block|pay|transfer|approve|reject|accept|decline|vote|join|enroll|invite|request|save|create|add|like|react|share|post|upload|install|grant)\b/i;
+const SKIP_WORDS = [
+  'sign ?out',
+  'log ?out',
+  'delete',
+  'remove',
+  'revoke',
+  'leave',
+  'publish',
+  'send',
+  'submit',
+  'confirm',
+  'archive',
+  'destroy',
+  'reset',
+  'follow',
+  'unfollow',
+  'block',
+  'pay',
+  'transfer',
+  'approve',
+  'reject',
+  'accept',
+  'decline',
+  'vote',
+  'join',
+  'enroll',
+  'invite',
+  'request',
+  'save',
+  'create',
+  'add',
+  'like',
+  'react',
+  'share',
+  'post',
+  'upload',
+  'install',
+  'grant',
+];
+const SKIP_LABEL = new RegExp(String.raw`\b(${SKIP_WORDS.join('|')})\b`, 'i');
 
 interface Candidate {
   i: number;
@@ -110,11 +148,11 @@ const COLLECT = `(() => {
 })()`;
 
 /** Describe each collected element (signature lets a reload find it again). */
-const ENUMERATE = `(() => {
+const ENUMERATE = String.raw`(() => {
   const SEL = ${JSON.stringify(CLICK_SEL)};
   const up = el => el.parentElement || (el.getRootNode() && el.getRootNode().host) || null;
   return ${COLLECT}.map((el, i) => {
-    const text = (el.innerText || el.textContent || '').trim().replace(/\\s+/g, ' ');
+    const text = (el.innerText || el.textContent || '').trim().replace(/\s+/g, ' ');
     let region = null;
     for (let n = el; n; n = up(n)) {
       const t = n.tagName.toLowerCase(), role = n.getAttribute('role');
@@ -246,7 +284,7 @@ export async function runProbe(argv: string[]) {
     const landedAt = page.url();
     const onLoad = drain();
     await page.screenshot({ path: join(outDir, 'page.png'), fullPage: true });
-    const candidates = (await page.evaluate(ENUMERATE)) as Candidate[];
+    const candidates = await page.evaluate<Candidate[]>(ENUMERATE);
 
     const externalLinks: { href: string; status: number | string }[] = [];
     const origin = new URL(landedAt).origin;
@@ -295,16 +333,19 @@ export async function runProbe(argv: string[]) {
         });
         continue;
       }
-      if (page.url() !== landedAt) await load(page, landedAt);
-      else await page.evaluate(() => window.scrollTo(0, 0));
+      if (page.url() === landedAt) {
+        await page.evaluate(() => window.scrollTo(0, 0));
+      } else {
+        await load(page, landedAt);
+      }
       drain();
-      const now = (await page.evaluate(ENUMERATE)) as Candidate[];
+      const now = await page.evaluate<Candidate[]>(ENUMERATE);
       const idx = now.findIndex(n => n.sig === c.sig);
       if (idx < 0) {
         await load(page, landedAt);
         drain();
       }
-      const fresh = idx < 0 ? ((await page.evaluate(ENUMERATE)) as Candidate[]) : now;
+      const fresh = idx < 0 ? await page.evaluate<Candidate[]>(ENUMERATE) : now;
       const at = fresh.findIndex(n => n.sig === c.sig);
       if (at < 0) {
         results.push({
@@ -351,14 +392,15 @@ export async function runProbe(argv: string[]) {
       if (opened) {
         outcome = 'popup';
         await opened.close().catch(() => {});
-      } else if (after.split('#')[0] !== landedAt.split('#')[0]) outcome = 'navigated';
-      else {
+      } else if (after.split('#')[0] === landedAt.split('#')[0]) {
         // NO-EFFECT only when neither the text state nor the pixels moved —
         // an opacity flip changes pixels but not innerText.
         const afterShot = await page.screenshot({ type: 'jpeg', quality: 40 }).catch(() => null);
         const pixelsMoved = !beforeShot || !afterShot || !beforeShot.equals(afterShot);
         const textMoved = (await page.evaluate(VISIBLE_STATE)) !== before;
         outcome = textMoved ? 'in-page' : pixelsMoved ? 'PIXELS-ONLY' : 'NO-EFFECT';
+      } else {
+        outcome = 'navigated';
       }
       results.push({ ...base, outcome, to: opened ? opened.url() : after, shot, ...drain() });
     }
@@ -368,7 +410,7 @@ export async function runProbe(argv: string[]) {
     for (const c of nav)
       byHref.set(c.href!, [
         ...(byHref.get(c.href!) ?? []),
-        `${c.region}:${c.text || c.label || c.testid}`,
+        `${c.region}:${[c.text, c.label, c.testid].find(Boolean)}`,
       ]);
     const duplicateNav = [...byHref]
       .filter(([, v]) => v.length > 1)

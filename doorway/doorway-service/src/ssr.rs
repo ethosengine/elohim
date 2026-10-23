@@ -377,68 +377,324 @@ fn ssr_dns_lookup_is_slow(elapsed_ms: u128) -> bool {
     elapsed_ms >= SSR_DNS_SLOW_LOOKUP_MS
 }
 
-/// The SSR render client's DNS resolver: the system resolver, timed.
+/// How long a resolved address set is served without asking again. Matches
+/// CoreDNS's default record TTL for cluster services (`ttl 30`).
+pub const SSR_DNS_FRESH_TTL: Duration = Duration::from_secs(30);
+
+/// How long past freshness a last-good address set may still be served when
+/// the refresh does not answer in time (serve-stale, RFC 8767 §5, which caps
+/// stale data at one to three days). The render upstream is a cluster Service
+/// whose address lives as long as the Service does.
+pub const SSR_DNS_STALE_CAP: Duration = Duration::from_secs(24 * 60 * 60);
+
+/// How long a resolve with a stale answer in hand waits for the refresh before
+/// serving the stale answer. A healthy lookup answers well inside it; a hung
+/// one costs the fetch this much instead of the whole soft budget.
+pub const SSR_DNS_STALE_GRACE: Duration = Duration::from_millis(150);
+
+/// The SSR render client's DNS resolver: the system resolver, timed, shared
+/// across concurrent fetches, and remembered.
 ///
 /// The render client is pool-free on purpose (`init_ssr_render_client`), so
-/// every render fetch opens a fresh connection and performs a fresh name
-/// lookup — a `/` render performs about 29. A fetch that stalls at the soft
-/// budget while storage's own request histogram shows no slow request spent
-/// that time before the request reached storage: in the lookup, in the
-/// connect, or waiting on the render thread. This resolver makes the lookup
-/// share of that readable: a slow or failed lookup is a `warn!` on target
-/// `doorway::ssr::dns` carrying the host and the elapsed time. A stalled
-/// render with no such line beside it rules the lookup out.
+/// every render fetch opens a fresh connection. Before 2026-10-23 every fetch
+/// also performed its own name lookup: a `/` render issued about 29
+/// `getaddrinfo` calls for the same host in the same few milliseconds, and on
+/// alpha a few of them, late in that burst, did not answer within the 1200 ms
+/// soft budget. The drop guards below measured it: 35 of 35 fetches cut on
+/// doorway-alpha (2026-10-23, image `04ef84c`) were cut in `sending`, never
+/// woken-and-unpolled, each beside a "name lookup abandoned" line
+/// (`genesis/data/timeline/backlog/self-heal-alpha-ssr-post-bundle-swap-cold-fetch-stall.md`).
 ///
-/// Resolution itself is unchanged in kind — `tokio::net::lookup_host` runs the
-/// same `getaddrinfo` reqwest's default resolver runs, on the blocking pool.
+/// So resolution goes through an [`SsrAddressBook`]:
 ///
-/// A lookup that never completes is named too. The render's traced fetcher
-/// cuts a fetch at the soft budget by DROPPING its future
-/// (`tokio::time::timeout` in `elohim_render::traced_fetcher`), and the lookup
-/// future goes with it — so a lookup slow enough to stall a fetch never
-/// reaches the completion arms below. [`LookupWatch`] logs on that drop.
-/// Without it the instrument is silent in exactly the case it exists for.
-#[derive(Debug, Default, Clone, Copy)]
-pub struct TimedDnsResolver;
+/// - **single-flight** — concurrent resolves of one host share one lookup;
+/// - **fresh hits** — an answer younger than [`SSR_DNS_FRESH_TTL`] is served
+///   without a lookup;
+/// - **serve-stale** — an older last-good answer (up to [`SSR_DNS_STALE_CAP`])
+///   starts or joins a refresh and is served if the refresh has not answered
+///   within [`SSR_DNS_STALE_GRACE`];
+/// - **detached lookups** — each lookup runs on its own thread and writes its
+///   answer into the book, so a fetch cut at the soft budget no longer throws
+///   the lookup away: the next render finds the answer.
+///
+/// Connections stay unpooled: an address list is plain data, owned by no
+/// runtime, so sharing it does not reintroduce the cross-runtime hazard the
+/// pool-free client exists to avoid.
+///
+/// The instrument is unchanged: a slow or failed lookup is a `warn!` on target
+/// `doorway::ssr::dns` carrying the host and the elapsed time (now once per
+/// lookup, not once per fetch), and a fetch that waits on a lookup with no
+/// answer in hand and is cut logs "name lookup abandoned before it answered"
+/// from [`LookupWatch`].
+#[derive(Debug, Default, Clone)]
+pub struct TimedDnsResolver {
+    book: SsrAddressBook,
+}
 
 impl reqwest::dns::Resolve for TimedDnsResolver {
     fn resolve(&self, name: reqwest::dns::Name) -> reqwest::dns::Resolving {
+        let book = self.book.clone();
         Box::pin(async move {
             let host = name.as_str().to_string();
-            let started = Instant::now();
-            // Logs from `Drop` if the lookup never answers: the render's soft
-            // budget drops the whole fetch future at the cut, and a lookup still
-            // pending then would otherwise leave no line at all.
-            let mut watch = LookupWatch::new(&host, started);
-            let looked_up = tokio::net::lookup_host((host.as_str(), 0)).await;
-            watch.answered();
-            let elapsed_ms = started.elapsed().as_millis();
-            match looked_up {
-                Ok(addrs) => {
-                    let addrs: Vec<std::net::SocketAddr> = addrs.collect();
-                    if ssr_dns_lookup_is_slow(elapsed_ms) {
+            match book.resolve(&host).await {
+                Ok(addrs) => Ok(Box::new(addrs.into_iter()) as reqwest::dns::Addrs),
+                Err(e) => Err(Box::new(e) as Box<dyn std::error::Error + Send + Sync>),
+            }
+        })
+    }
+}
+
+/// A blocking name lookup: host to socket addresses (port 0).
+pub type SsrLookupFn =
+    Arc<dyn Fn(&str) -> std::io::Result<Vec<std::net::SocketAddr>> + Send + Sync>;
+
+/// The system resolver (`getaddrinfo`), the same one reqwest's default
+/// resolver and `tokio::net::lookup_host` run.
+fn system_lookup(host: &str) -> std::io::Result<Vec<std::net::SocketAddr>> {
+    use std::net::ToSocketAddrs;
+    Ok((host, 0).to_socket_addrs()?.collect())
+}
+
+/// A lookup's answer as every waiter on it sees it.
+type LookupAnswer = std::result::Result<Vec<std::net::SocketAddr>, (std::io::ErrorKind, String)>;
+
+/// One in-flight lookup: waiters hold a receiver; the lookup thread sends.
+type InFlight = tokio::sync::watch::Receiver<Option<LookupAnswer>>;
+
+#[derive(Default)]
+struct HostEntry {
+    /// The last good answer and when it arrived.
+    last_good: Option<(Vec<std::net::SocketAddr>, Instant)>,
+    in_flight: Option<InFlight>,
+}
+
+/// The SSR render client's address book: single-flight lookups, a short fresh
+/// window, and serve-stale under a hung refresh. See [`TimedDnsResolver`].
+#[derive(Clone)]
+pub struct SsrAddressBook {
+    hosts: Arc<std::sync::Mutex<HashMap<String, HostEntry>>>,
+    lookup: SsrLookupFn,
+    fresh_ttl: Duration,
+    stale_cap: Duration,
+    stale_grace: Duration,
+}
+
+impl Default for SsrAddressBook {
+    fn default() -> Self {
+        Self::new(
+            Arc::new(system_lookup),
+            SSR_DNS_FRESH_TTL,
+            SSR_DNS_STALE_CAP,
+            SSR_DNS_STALE_GRACE,
+        )
+    }
+}
+
+impl std::fmt::Debug for SsrAddressBook {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("SsrAddressBook")
+            .field("fresh_ttl", &self.fresh_ttl)
+            .field("stale_cap", &self.stale_cap)
+            .field("stale_grace", &self.stale_grace)
+            .finish_non_exhaustive()
+    }
+}
+
+/// What a resolve found in the book.
+enum BookRead {
+    Fresh(Vec<std::net::SocketAddr>),
+    Stale(Vec<std::net::SocketAddr>, InFlight),
+    Empty(InFlight),
+}
+
+impl SsrAddressBook {
+    pub fn new(
+        lookup: SsrLookupFn,
+        fresh_ttl: Duration,
+        stale_cap: Duration,
+        stale_grace: Duration,
+    ) -> Self {
+        Self {
+            hosts: Arc::default(),
+            lookup,
+            fresh_ttl,
+            stale_cap,
+            stale_grace,
+        }
+    }
+
+    /// Resolve `host`: a fresh answer at once, else join or start the one
+    /// lookup for it (serving a stale answer if that lookup is slow).
+    pub async fn resolve(&self, host: &str) -> std::io::Result<Vec<std::net::SocketAddr>> {
+        let started = Instant::now();
+        match self.read(host) {
+            BookRead::Fresh(addrs) => Ok(addrs),
+            BookRead::Stale(stale, rx) => {
+                match tokio::time::timeout(self.stale_grace, wait_answer(rx)).await {
+                    Ok(Ok(addrs)) => Ok(addrs),
+                    Ok(Err(e)) => {
+                        tracing::debug!(
+                            target: "doorway::ssr::dns",
+                            host = %host,
+                            error = %e,
+                            "SSR render fetch: refresh failed; serving the last good address"
+                        );
+                        Ok(stale)
+                    }
+                    Err(_) => {
+                        tracing::debug!(
+                            target: "doorway::ssr::dns",
+                            host = %host,
+                            grace_ms = self.stale_grace.as_millis() as u64,
+                            "SSR render fetch: refresh slower than the grace; serving the last good address"
+                        );
+                        Ok(stale)
+                    }
+                }
+            }
+            BookRead::Empty(rx) => {
+                // Logs from `Drop` if no answer arrives before the render's soft
+                // budget drops the fetch. The lookup itself carries on and
+                // writes the book.
+                let mut watch = LookupWatch::new(host, started);
+                let answer = wait_answer(rx).await;
+                watch.answered();
+                answer
+            }
+        }
+    }
+
+    /// Read the book under its lock, starting a lookup when one is needed and
+    /// none is running.
+    fn read(&self, host: &str) -> BookRead {
+        let mut hosts = self
+            .hosts
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner);
+        let entry = hosts.entry(host.to_string()).or_default();
+        let now = Instant::now();
+        let usable = match &entry.last_good {
+            Some((addrs, at)) => {
+                let age = now.saturating_duration_since(*at);
+                if age < self.fresh_ttl {
+                    return BookRead::Fresh(addrs.clone());
+                }
+                (age < self.fresh_ttl + self.stale_cap).then(|| addrs.clone())
+            }
+            None => None,
+        };
+        // A lookup whose thread died without answering is not in flight.
+        let joinable = entry
+            .in_flight
+            .as_ref()
+            .filter(|rx| rx.has_changed().is_ok())
+            .cloned();
+        let rx = match joinable {
+            Some(rx) => rx,
+            None => {
+                let rx = self.start_lookup(host);
+                entry.in_flight = Some(rx.clone());
+                rx
+            }
+        };
+        match usable {
+            Some(addrs) => BookRead::Stale(addrs, rx),
+            None => BookRead::Empty(rx),
+        }
+    }
+
+    #[cfg(test)]
+    fn read_last_good(&self, host: &str) -> Option<Vec<std::net::SocketAddr>> {
+        let hosts = self
+            .hosts
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner);
+        hosts
+            .get(host)
+            .and_then(|e| e.last_good.as_ref().map(|(a, _)| a.clone()))
+    }
+
+    /// Run one lookup on its own thread. It outlives every waiter: a waiter cut
+    /// by the soft budget drops only its receiver, and the answer still lands
+    /// in the book.
+    fn start_lookup(&self, host: &str) -> InFlight {
+        let (tx, rx) = tokio::sync::watch::channel(None);
+        let host = host.to_string();
+        let hosts = Arc::clone(&self.hosts);
+        let lookup = Arc::clone(&self.lookup);
+        let spawned = std::thread::Builder::new()
+            .name("ssr-dns".into())
+            .spawn(move || {
+                let started = Instant::now();
+                let looked_up = lookup(&host);
+                let elapsed_ms = started.elapsed().as_millis();
+                let answer: LookupAnswer = match looked_up {
+                    Ok(addrs) => {
+                        if ssr_dns_lookup_is_slow(elapsed_ms) {
+                            tracing::warn!(
+                                target: "doorway::ssr::dns",
+                                host = %host,
+                                elapsed_ms = elapsed_ms as u64,
+                                addresses = addrs.len(),
+                                "SSR render fetch: slow name lookup"
+                            );
+                        }
+                        Ok(addrs)
+                    }
+                    Err(e) => {
                         tracing::warn!(
                             target: "doorway::ssr::dns",
                             host = %host,
                             elapsed_ms = elapsed_ms as u64,
-                            addresses = addrs.len(),
-                            "SSR render fetch: slow name lookup"
+                            error = %e,
+                            "SSR render fetch: name lookup failed"
                         );
+                        Err((e.kind(), e.to_string()))
                     }
-                    Ok(Box::new(addrs.into_iter()) as reqwest::dns::Addrs)
+                };
+                {
+                    let mut hosts = hosts
+                        .lock()
+                        .unwrap_or_else(std::sync::PoisonError::into_inner);
+                    let entry = hosts.entry(host).or_default();
+                    // A failure or an empty answer keeps the last good one.
+                    if let Ok(addrs) = &answer {
+                        if !addrs.is_empty() {
+                            entry.last_good = Some((addrs.clone(), Instant::now()));
+                        }
+                    }
+                    entry.in_flight = None;
                 }
-                Err(e) => {
-                    tracing::warn!(
-                        target: "doorway::ssr::dns",
-                        host = %host,
-                        elapsed_ms = elapsed_ms as u64,
-                        error = %e,
-                        "SSR render fetch: name lookup failed"
-                    );
-                    Err(Box::new(e) as Box<dyn std::error::Error + Send + Sync>)
-                }
-            }
-        })
+                // No receiver left is fine: the book already holds the answer.
+                let _ = tx.send(Some(answer));
+            });
+        if let Err(e) = spawned {
+            tracing::warn!(
+                target: "doorway::ssr::dns",
+                error = %e,
+                "SSR render fetch: could not start a name lookup thread"
+            );
+        }
+        rx
+    }
+}
+
+/// Wait for a lookup's answer. A lookup that ended without answering (its
+/// thread could not start or panicked) reads as an error.
+async fn wait_answer(mut rx: InFlight) -> std::io::Result<Vec<std::net::SocketAddr>> {
+    let answer = rx
+        .wait_for(Option::is_some)
+        .await
+        .map_err(|_| {
+            std::io::Error::other("SSR render fetch: name lookup ended without an answer")
+        })?
+        .clone();
+    match answer {
+        Some(Ok(addrs)) => Ok(addrs),
+        Some(Err((kind, msg))) => Err(std::io::Error::new(kind, msg)),
+        None => Err(std::io::Error::other(
+            "SSR render fetch: name lookup ended without an answer",
+        )),
     }
 }
 
@@ -485,13 +741,19 @@ impl Drop for LookupWatch {
 // alpha's `/` renders stall at the 1200 ms soft budget on about one cold render
 // in three while storage's histogram shows no request slower than 1 s
 // (`genesis/data/timeline/backlog/self-heal-alpha-ssr-post-bundle-swap-cold-fetch-stall.md`).
-// The leading candidate is the render thread not polling its own fetches: the
-// render runs on a `current_thread` runtime that also runs the V8 isolate, so a
-// fetch woken by its socket waits until the isolate yields. A gap between polls
-// alone cannot separate that from honest waiting on the network (a future with
-// no wakeup is not polled either), so the watch also wraps the waker: it records
-// when the fetch was woken and how long each wake waited for its poll. A wake
-// that was never polled before the cut is the direct reading of starvation.
+// The candidate this watch was built to test is the render thread not polling
+// its own fetches: the render runs on a `current_thread` runtime that also runs
+// the V8 isolate, so a fetch woken by its socket waits until the isolate yields.
+// A gap between polls alone cannot separate that from honest waiting on the
+// network (a future with no wakeup is not polled either), so the watch also
+// wraps the waker: it records when the fetch was woken and how long each wake
+// waited for its poll. A wake that was never polled before the cut is the direct
+// reading of starvation.
+//
+// Its first reading (doorway-alpha, 2026-10-23) ruled starvation out: every cut
+// fetch was in `sending`, with no wake pending and `max_wake_to_poll_ms` 0, beside
+// a "name lookup abandoned" line. The time went to the name lookup, which
+// `SsrAddressBook` now shares and remembers.
 
 /// How far a render fetch got.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -963,7 +1225,7 @@ mod tests {
         use std::str::FromStr;
 
         let name = reqwest::dns::Name::from_str("localhost").expect("valid name");
-        let addrs: Vec<std::net::SocketAddr> = TimedDnsResolver
+        let addrs: Vec<std::net::SocketAddr> = TimedDnsResolver::default()
             .resolve(name)
             .await
             .expect("localhost resolves")
@@ -1111,6 +1373,177 @@ mod tests {
         assert!(!answered.armed);
         let abandoned = LookupWatch::new("h", Instant::now());
         assert!(abandoned.armed, "dropped without an answer => it logs");
+    }
+
+    // ── SsrAddressBook ──────────────────────────────────────────────────────
+
+    use std::sync::atomic::AtomicUsize;
+
+    fn addr(last: u8) -> std::net::SocketAddr {
+        std::net::SocketAddr::from(([10, 0, 0, last], 0))
+    }
+
+    /// A lookup that counts its calls, answers from `answers` (cycling the
+    /// last), and blocks while `gate` is held.
+    fn scripted_lookup(
+        calls: Arc<AtomicUsize>,
+        gate: Arc<std::sync::Mutex<()>>,
+        answers: Vec<std::io::Result<Vec<std::net::SocketAddr>>>,
+    ) -> SsrLookupFn {
+        let answers = Arc::new(std::sync::Mutex::new(answers));
+        Arc::new(move |_host: &str| {
+            let n = calls.fetch_add(1, Ordering::SeqCst);
+            drop(gate.lock().expect("gate"));
+            let answers = answers.lock().expect("answers");
+            match &answers[n.min(answers.len() - 1)] {
+                Ok(a) => Ok(a.clone()),
+                Err(e) => Err(std::io::Error::new(e.kind(), e.to_string())),
+            }
+        })
+    }
+
+    fn book(lookup: SsrLookupFn, fresh: Duration, cap: Duration) -> SsrAddressBook {
+        SsrAddressBook::new(lookup, fresh, cap, Duration::from_millis(50))
+    }
+
+    #[tokio::test]
+    async fn a_burst_of_resolves_for_one_host_shares_one_lookup() {
+        let calls = Arc::new(AtomicUsize::new(0));
+        let gate = Arc::new(std::sync::Mutex::new(()));
+        let held = gate.lock().expect("gate");
+        let book = book(
+            scripted_lookup(calls.clone(), gate.clone(), vec![Ok(vec![addr(1)])]),
+            SSR_DNS_FRESH_TTL,
+            SSR_DNS_STALE_CAP,
+        );
+        // The shape of one `/` render: 29 fetches resolve the same host at once.
+        let waiters: Vec<_> = (0..29)
+            .map(|_| {
+                let book = book.clone();
+                tokio::spawn(async move { book.resolve("storage.svc").await })
+            })
+            .collect();
+        tokio::time::sleep(Duration::from_millis(20)).await;
+        drop(held);
+        for w in waiters {
+            assert_eq!(w.await.expect("join").expect("resolves"), vec![addr(1)]);
+        }
+        assert_eq!(calls.load(Ordering::SeqCst), 1, "one lookup, not 29");
+    }
+
+    #[tokio::test]
+    async fn a_fresh_answer_is_served_without_a_lookup() {
+        let calls = Arc::new(AtomicUsize::new(0));
+        let gate = Arc::new(std::sync::Mutex::new(()));
+        let book = book(
+            scripted_lookup(calls.clone(), gate, vec![Ok(vec![addr(1)])]),
+            Duration::from_secs(60),
+            SSR_DNS_STALE_CAP,
+        );
+        book.resolve("h").await.expect("first");
+        book.resolve("h").await.expect("second");
+        assert_eq!(calls.load(Ordering::SeqCst), 1);
+    }
+
+    #[tokio::test]
+    async fn a_cut_waiter_does_not_throw_the_lookup_away() {
+        let calls = Arc::new(AtomicUsize::new(0));
+        let gate = Arc::new(std::sync::Mutex::new(()));
+        let held = gate.lock().expect("gate");
+        let book = book(
+            scripted_lookup(calls.clone(), gate.clone(), vec![Ok(vec![addr(7)])]),
+            Duration::from_secs(60),
+            SSR_DNS_STALE_CAP,
+        );
+        // The soft budget cuts the fetch while its lookup hangs.
+        let cut = tokio::time::timeout(Duration::from_millis(30), book.resolve("h")).await;
+        assert!(cut.is_err(), "the hung lookup outlasts the budget");
+        // The lookup answers after the cut; its answer still lands in the book.
+        drop(held);
+        for _ in 0..100 {
+            if book.read_last_good("h").is_some() {
+                break;
+            }
+            tokio::time::sleep(Duration::from_millis(5)).await;
+        }
+        assert_eq!(book.resolve("h").await.expect("cached"), vec![addr(7)]);
+        assert_eq!(
+            calls.load(Ordering::SeqCst),
+            1,
+            "the next render needs no lookup"
+        );
+    }
+
+    #[tokio::test]
+    async fn a_hung_refresh_serves_the_last_good_answer_within_the_grace() {
+        let calls = Arc::new(AtomicUsize::new(0));
+        let gate = Arc::new(std::sync::Mutex::new(()));
+        let book = book(
+            scripted_lookup(
+                calls.clone(),
+                gate.clone(),
+                vec![Ok(vec![addr(1)]), Ok(vec![addr(2)])],
+            ),
+            Duration::ZERO, // every answer is immediately stale
+            SSR_DNS_STALE_CAP,
+        );
+        assert_eq!(book.resolve("h").await.expect("first"), vec![addr(1)]);
+        let held = gate.lock().expect("gate");
+        let started = Instant::now();
+        let served = book.resolve("h").await.expect("stale");
+        assert_eq!(served, vec![addr(1)], "the last good answer, not a stall");
+        assert!(started.elapsed() < Duration::from_millis(1_000));
+        drop(held);
+        for _ in 0..100 {
+            if book.read_last_good("h") == Some(vec![addr(2)]) {
+                break;
+            }
+            tokio::time::sleep(Duration::from_millis(5)).await;
+        }
+        assert_eq!(
+            book.read_last_good("h"),
+            Some(vec![addr(2)]),
+            "refresh landed"
+        );
+        assert_eq!(calls.load(Ordering::SeqCst), 2);
+    }
+
+    #[tokio::test]
+    async fn a_failed_lookup_is_not_remembered_and_keeps_the_last_good() {
+        let calls = Arc::new(AtomicUsize::new(0));
+        let gate = Arc::new(std::sync::Mutex::new(()));
+        let book = book(
+            scripted_lookup(
+                calls.clone(),
+                gate,
+                vec![Err(std::io::Error::other("nxdomain")), Ok(vec![addr(3)])],
+            ),
+            Duration::from_secs(60),
+            SSR_DNS_STALE_CAP,
+        );
+        assert!(book.resolve("h").await.is_err());
+        assert!(book.read_last_good("h").is_none());
+        assert_eq!(book.resolve("h").await.expect("retried"), vec![addr(3)]);
+        assert_eq!(calls.load(Ordering::SeqCst), 2);
+    }
+
+    #[tokio::test]
+    async fn an_answer_past_the_stale_cap_is_not_served() {
+        let calls = Arc::new(AtomicUsize::new(0));
+        let gate = Arc::new(std::sync::Mutex::new(()));
+        let book = book(
+            scripted_lookup(
+                calls.clone(),
+                gate.clone(),
+                vec![Ok(vec![addr(1)]), Ok(vec![addr(2)])],
+            ),
+            Duration::ZERO,
+            Duration::ZERO,
+        );
+        book.resolve("h").await.expect("first");
+        // No usable answer in hand: the resolve waits for the lookup.
+        assert_eq!(book.resolve("h").await.expect("second"), vec![addr(2)]);
+        assert_eq!(calls.load(Ordering::SeqCst), 2);
     }
 
     // ── boot materialize budget (structural no-overwhelm) ───────────────────
