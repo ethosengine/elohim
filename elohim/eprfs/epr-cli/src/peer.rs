@@ -8,6 +8,10 @@
 //!   command, never started at workspace boot.
 //! - `status` prints one line per admitted device: its last folded head, its age, and how many
 //!   events were folded from it, read from the head table the daemon persists.
+//! - `leases` prints the steward lease view (§3.4): for each steward-scoped resource a live lease
+//!   names, whether this device's lease is effective, pending or unconfirmed, or another device
+//!   holds it. It reads the flow store and the head table only, never the network, so it answers
+//!   while `serve` runs; berth polls it to settle a steward-scoped claim.
 //!
 //! The iroh key lives at `$XDG_CONFIG_HOME/epr/peer/iroh.key` (mode 0600). Neither it nor the
 //! device key is ever printed, logged or copied: the device key is reached only as a signer.
@@ -20,8 +24,9 @@ use std::sync::Arc;
 use std::time::{SystemTime, UNIX_EPOCH};
 
 use eprfs_peer::{
-    peer_from_arg, relay_from_env, roster_rows_from_file, Admission, CrossingAllowList, HeadTable,
-    NodeAddr, PeerConfig, PeerDaemon, PeerError, PeerKey,
+    lease_events, peer_from_arg, relay_from_env, roster_rows_from_file, steward_lease_view,
+    Admission, CrossingAllowList, HeadTable, LeaseVerdict, NodeAddr, PeerConfig, PeerDaemon,
+    PeerError, PeerKey, StewardScope,
 };
 use serde::Serialize;
 
@@ -70,7 +75,11 @@ pub fn usage() -> String {
      admitted devices only; runs until stopped. EPR_PEER_RELAY_URL homes it to a relay; \
      --peer names a device's direct address when there is none)\n  \
      | status [--root DIR] [--handle H] [--json] \
-     (one line per admitted device: its last folded head, its age and the events folded)>"
+     (one line per admitted device: its last folded head, its age and the events folded)\n  \
+     | leases [--root DIR] [--handle H] [--policy PATH] [--json] \
+     (the steward lease view: per steward-scoped resource, effective | pending | unconfirmed | \
+     held_by, read from the flow store and the head table; exits non-zero only when it cannot \
+     be computed)>"
         .to_string()
 }
 
@@ -84,9 +93,10 @@ pub fn run(args: &[String]) -> PeerResult<ExitCode> {
         Some("id") => id(&Options::parse(&args[1..])?),
         Some("serve") => serve(Options::parse(&args[1..])?),
         Some("status") => status(&Options::parse(&args[1..])?),
+        Some("leases") => leases(&Options::parse(&args[1..])?),
         Some(other) => Err(PeerCliError::InvalidArguments(format!(
             "unknown peer verb `{other}`{}\n{}",
-            crate::hint::did_you_mean(other, "epr peer", &["id", "serve", "status"]),
+            crate::hint::did_you_mean(other, "epr peer", &["id", "serve", "status", "leases"]),
             usage()
         ))),
         None => Err(PeerCliError::InvalidArguments(usage())),
@@ -459,6 +469,90 @@ fn render(outcome: &StatusOutcome) {
             c.fold_failures, c.oversized_events, c.over_budget_folds
         );
     }
+}
+
+/// `epr peer leases`: the steward lease view for this device, now.
+fn leases(options: &Options) -> PeerResult<ExitCode> {
+    let device = Device::open(&options.root, options.handle.as_deref())?;
+    let admission = device.admission()?;
+    let table = HeadTable::load(&device.peer_dir)?;
+    let policy = options
+        .policy
+        .clone()
+        .unwrap_or_else(|| options.root.join(POLICY_REL));
+    let scope = StewardScope::from_policy_file(&policy)?;
+    let store = elohim_epr_rea::SidecarFlowStore::open(&options.root)
+        .map_err(|e| PeerCliError::Peer(PeerError::FlowStore(e)))?;
+    let (own, folded) = lease_events(&store)?;
+    let did = device.key.did_key();
+    let now = unix_ms();
+    let mut view = steward_lease_view(
+        &did,
+        &own,
+        &folded,
+        &table,
+        &admission,
+        now,
+        scope.confirm_wait_s(),
+    );
+    view.retain(|resource, _| scope.covers(resource));
+    if options.json {
+        let mut out = serde_json::Map::new();
+        out.insert("now".into(), now.into());
+        out.insert("confirm_wait_s".into(), scope.confirm_wait_s().into());
+        for (resource, verdict) in view {
+            out.insert(resource, serde_json::to_value(verdict)?);
+        }
+        println!("{}", serde_json::to_string_pretty(&out)?);
+        return Ok(ExitCode::SUCCESS);
+    }
+    if view.is_empty() {
+        println!("no live lease on a steward-scoped resource");
+    }
+    for (resource, verdict) in &view {
+        let line = match verdict {
+            LeaseVerdict::Effective { session } => format!("effective, held by {session} here"),
+            LeaseVerdict::Pending {
+                session,
+                waiting_on,
+            } => format!(
+                "pending for {session} here, waiting on {}",
+                waiting_on
+                    .iter()
+                    .map(|device| short(device))
+                    .collect::<Vec<_>>()
+                    .join(", ")
+            ),
+            LeaseVerdict::Unconfirmed {
+                session,
+                device,
+                last_seen,
+            } => format!(
+                "unconfirmed for {session} here: {} {}",
+                short(device),
+                last_seen.map_or_else(
+                    || "never seen".to_string(),
+                    |at| format!("last seen {}s ago", now.saturating_sub(at) / 1000)
+                )
+            ),
+            LeaseVerdict::HeldBy {
+                device,
+                session,
+                overriding,
+                ..
+            } => format!(
+                "held by {}/{session}{}",
+                short(device),
+                if *overriding {
+                    " (an override of this device's silence)"
+                } else {
+                    ""
+                }
+            ),
+        };
+        println!("{resource:<18} {line}");
+    }
+    Ok(ExitCode::SUCCESS)
 }
 
 /// A did:key or CID shortened for a status line (both are ASCII).

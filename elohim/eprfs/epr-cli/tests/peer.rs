@@ -394,3 +394,99 @@ fn flow_fold_refuses_while_this_devices_peer_serves() {
     // A second serve is refused the same way.
     assert!(elohim_epr_cli::peer::ServeLock::acquire(&a.peer_dir()).is_err());
 }
+
+/// A berth record as T1 folds it, `via` another device when folded from it.
+fn berth_record(
+    kind: &str,
+    resource: &str,
+    session: &str,
+    at: &str,
+    via: Option<&str>,
+) -> FlowEvent {
+    let mut event = claim(session);
+    event.classified_as = vec![
+        "run:observation".into(),
+        ".".into(),
+        format!("reason:{kind}"),
+        "measure:dev-berth-events@1".into(),
+        format!("env:at={at}"),
+        format!("env:claimed_at={at}"),
+        format!("env:kind={kind}"),
+        format!("env:resource={resource}"),
+        format!("env:session={session}"),
+    ];
+    if let Some(device) = via {
+        event.classified_as.push(format!("via:{device}"));
+    }
+    event
+}
+
+#[test]
+fn peer_leases_prints_the_steward_view_while_serve_holds_its_lock() {
+    let (keys, a, b) = household();
+    let policy = keys.path().join("steward-policy.json");
+    std::fs::write(
+        &policy,
+        r#"{"berth": {"resources": {"cargo": 2,
+              "dev-integration": {"capacity": 1, "scope": "steward"},
+              "lane:": {"capacity": 1, "scope": "steward"}},
+            "channel": {"confirm_wait_s": 10,
+              "crosses": {"dev-berth-events@1": ["claim", "release"]}}}}"#,
+    )
+    .unwrap();
+    // B has folded A's claim on dev-integration; its own cargo claim is container-scoped.
+    let mut store = SidecarFlowStore::open(b.checkout.path()).unwrap();
+    let a_did = a.key.did_key();
+    for event in [
+        berth_record(
+            "claim",
+            "dev-integration",
+            "claude-1",
+            "1792769289.000",
+            Some(&a_did),
+        ),
+        berth_record("claim", "cargo", "codex-1", "1792769290.000", None),
+    ] {
+        store.append(FlowRecord::Event(event)).unwrap();
+    }
+    // The view reads the store and the head table only: it answers while serve runs.
+    let _serving = elohim_epr_cli::peer::ServeLock::acquire(&b.peer_dir()).expect("lock");
+    let out = b.epr(&[
+        "peer",
+        "leases",
+        "--json",
+        "--root",
+        b.root(),
+        "--policy",
+        policy.to_str().unwrap(),
+    ]);
+    let stderr = String::from_utf8_lossy(&out.stderr).to_string();
+    assert!(out.status.success(), "{stderr}");
+    let view: serde_json::Value = serde_json::from_slice(&out.stdout).unwrap();
+    assert!(view["now"].as_u64().is_some(), "{view}");
+    assert_eq!(view["confirm_wait_s"], 10);
+    assert_eq!(
+        view["dev-integration"],
+        serde_json::json!({
+            "verdict": "held_by",
+            "device": a_did,
+            "session": "claude-1",
+            "since": 1_792_769_289_000u64,
+            "override": false
+        })
+    );
+    assert!(view.get("cargo").is_none(), "container-scoped: {view}");
+
+    // A device with no key cannot compute a view: a non-zero exit, never an empty (free) view.
+    let out = Command::new(env!("CARGO_BIN_EXE_epr"))
+        .args(["peer", "leases", "--json", "--root", b.root()])
+        .env(
+            device_key::DEVICE_KEY_ENV,
+            keys.path().join("absent/ed25519.seed"),
+        )
+        .env("XDG_CONFIG_HOME", b.config.path())
+        .output()
+        .unwrap();
+    assert!(!out.status.success());
+    assert!(out.stdout.is_empty());
+}

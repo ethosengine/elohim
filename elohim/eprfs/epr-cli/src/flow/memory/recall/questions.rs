@@ -83,7 +83,10 @@ struct RawReachedWhen {
 /// that named this file) and the question array.
 #[derive(Debug, Deserialize)]
 struct RawBank {
-    #[allow(dead_code)]
+    #[allow(
+        dead_code,
+        reason = "a bank must declare its format version to parse, but no reader branches on it yet"
+    )]
     version: u32,
     recipe: String,
     questions: Vec<RawQuestion>,
