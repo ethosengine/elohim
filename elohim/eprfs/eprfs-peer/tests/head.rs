@@ -336,34 +336,52 @@ fn an_acknowledgement_at_the_top_of_the_seq_range_saturates_and_never_wraps() {
 }
 
 #[test]
-fn every_announce_is_logged_with_how_many_events_its_root_covers() {
+fn each_new_root_is_logged_with_the_events_it_covers_and_reannounces_are_not() {
     let h = household();
     let mut channel = Channel::new(h.a.did.clone(), HeadTable::default());
     let signer = h.a.signer();
     let mut now = Instant::now();
+    let last = |n: u64| Some(format!("event-{n}"));
 
-    // The root is projected from the store's first 3 events; the head announcing it says so.
+    // The root is projected from the store's first 3 events; the head announcing it says so,
+    // naming the last event it counted.
     channel.changed(root("a1"), now);
-    channel.covers(3);
+    channel.covers(3, last(3));
     now += ANNOUNCE_DEBOUNCE;
     let first = channel
         .announce(now, 1_000, &signer)
         .expect("announce")
         .expect("a head");
-    let log = &channel.table().own_log;
+    let log = channel.table().own_log.clone();
     assert_eq!(log.len(), 1);
     assert_eq!(
-        (log[0].seq, &log[0].root, log[0].at, log[0].events),
-        (first.seq, &first.root, 1_000, 3)
+        (
+            log[0].seq,
+            &log[0].root,
+            log[0].at,
+            log[0].events,
+            &log[0].last
+        ),
+        (first.seq, &first.root, 1_000, 3, &last(3))
     );
 
-    // Bounded: only the last OWN_LOG_LEN announces are kept, oldest dropped first.
+    // The periodic re-announce of an unchanged root mints a new seq but no new entry: the entry
+    // that first carried each event is kept.
+    now += REANNOUNCE_EVERY;
+    let again = channel
+        .announce(now, 2_000, &signer)
+        .expect("announce")
+        .expect("a head");
+    assert!(again.seq > first.seq);
+    assert_eq!(channel.table().own_log, log);
+
+    // Bounded: only the last OWN_LOG_LEN roots are kept, oldest dropped first.
     for i in 0..(OWN_LOG_LEN as u64 + 10) {
         channel.changed(root(&format!("a{}", i + 2)), now);
-        channel.covers(4 + i);
+        channel.covers(4 + i, last(4 + i));
         now += ANNOUNCE_DEBOUNCE;
         channel
-            .announce(now, 2_000 + i, &signer)
+            .announce(now, 3_000 + i, &signer)
             .expect("announce")
             .expect("a head");
     }
@@ -371,10 +389,6 @@ fn every_announce_is_logged_with_how_many_events_its_root_covers() {
     assert_eq!(log.len(), OWN_LOG_LEN);
     let own_seq = channel.table().own.as_ref().expect("own").seq;
     assert_eq!(log.last().map(|e| e.seq), Some(own_seq));
-    assert_eq!(
-        log.first().map(|e| e.seq),
-        Some(own_seq - OWN_LOG_LEN as u64 + 1)
-    );
     assert!(log.windows(2).all(|w| w[0].seq < w[1].seq));
 
     // A version-1 table written before the log existed still loads, with an empty log.
@@ -386,6 +400,7 @@ fn every_announce_is_logged_with_how_many_events_its_root_covers() {
     .expect("write");
     let loaded = HeadTable::load(dir.path()).expect("loads");
     assert!(loaded.own_log.is_empty());
+    assert!(loaded.store.is_none());
     // And the log persists across a save and load.
     channel.table().save(dir.path()).expect("save");
     assert_eq!(

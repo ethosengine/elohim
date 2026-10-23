@@ -46,7 +46,7 @@ use crate::fold::{fold_root, FoldLimits, FoldReport, FoldTarget};
 use crate::gate::SharedAdmission;
 use crate::gossip::GatedGossip;
 use crate::head::{ChannelHead, HeadSigner};
-use crate::head_table::HeadTable;
+use crate::head_table::{HeadTable, StorePlace};
 use crate::key::PeerKey;
 use crate::tier::{TierLimits, TierProtocol, TIER_ALPN};
 
@@ -110,8 +110,12 @@ impl PeerDaemon {
             &config.chain_root,
             &*config.verifier,
         )));
-        let table = HeadTable::load(&config.state_dir)?;
+        let mut table = HeadTable::load(&config.state_dir)?;
         let flow = SidecarFlowStore::open(&config.flow_root).map_err(PeerError::FlowStore)?;
+        // The one flow store this device's channel is projected from: recorded before anything
+        // is announced, so the lease view and berth read and write this store, not their own.
+        table.store = Some(store_place(&config.flow_root, flow.log_path()));
+        table.save(&config.state_dir)?;
         let store = Arc::new(ChannelStore::default());
         let limits = TierLimits::default();
         let tier = TierProtocol::new(
@@ -254,6 +258,16 @@ type Stamp = Option<(u64, SystemTime)>;
 fn stamp(path: &std::path::Path) -> Stamp {
     let meta = std::fs::metadata(path).ok()?;
     Some((meta.len(), meta.modified().ok()?))
+}
+
+/// Where the channel store is, by canonical path (as given when a path cannot be resolved).
+fn store_place(root: &std::path::Path, log: &std::path::Path) -> StorePlace {
+    let canonical =
+        |path: &std::path::Path| path.canonicalize().unwrap_or_else(|_| path.to_path_buf());
+    StorePlace {
+        root: canonical(root),
+        log: canonical(log),
+    }
 }
 
 fn unix_ms() -> u64 {
@@ -481,7 +495,8 @@ impl Run {
                 self.failed_stamp = None;
                 self.store.install(&tree);
                 self.channel.changed(tree.root().clone(), Instant::now());
-                self.channel.covers(tree.read());
+                self.channel
+                    .covers(tree.read(), tree.last().map(ToString::to_string));
                 if self
                     .channel
                     .counters_mut()

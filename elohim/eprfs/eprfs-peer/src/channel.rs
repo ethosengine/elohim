@@ -17,6 +17,7 @@ use std::sync::RwLock;
 
 use async_trait::async_trait;
 use bytes::Bytes;
+use cid::Cid;
 use elohim_epr_rea::model::canonical_bytes;
 use elohim_epr_rea::FlowStore;
 use eprfs_core::{
@@ -48,6 +49,8 @@ pub struct ChannelTree {
     leaves: Vec<(BlobCid, Bytes)>,
     /// How many flow events of the store the tree was projected from, crossing or not.
     read: u64,
+    /// The CID of the last of them.
+    last: Option<Cid>,
 }
 
 impl ChannelTree {
@@ -64,6 +67,12 @@ impl ChannelTree {
     /// append-only, so the tree covers exactly its first `read` events.
     pub fn read(&self) -> u64 {
         self.read
+    }
+
+    /// The CID of the last flow event it was projected from, `None` for an empty store: with
+    /// [`Self::read`], the store's identity at that position.
+    pub fn last(&self) -> Option<&Cid> {
+        self.last.as_ref()
     }
 
     fn blobs(&self) -> impl Iterator<Item = &(BlobCid, Bytes)> {
@@ -90,6 +99,7 @@ where
     let mut seen = HashSet::new();
     let events = store.events().map_err(PeerError::FlowStore)?;
     let read = u64::try_from(events.len()).unwrap_or(u64::MAX);
+    let last = events.last().map(|(cid, _)| *cid);
     for (cid, event) in events {
         if !allow.admits(&event) || !seen.insert(cid) {
             continue;
@@ -129,6 +139,7 @@ where
         nodes,
         leaves,
         read,
+        last,
     })
 }
 

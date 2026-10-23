@@ -119,6 +119,11 @@ pub enum PeerError {
     #[error("the head table `{}` does not parse: {reason}", path.display())]
     HeadTableInvalid { path: PathBuf, reason: String },
 
+    /// The lease view was asked for on a device its own roster does not admit (no PeerEndpoint
+    /// row, or its binding contested): it has no standing on the steward channel to judge from.
+    #[error("this device ({device}) is not admitted on its own roster's steward channel")]
+    NotAdmitted { device: String },
+
     /// A peer's channel tree served something that is not a crossing event at its own CID: a leaf
     /// whose name is not the CID of its bytes, bytes that are not a canonical FlowEvent, or an
     /// entry that is not a file under `channel/events`.

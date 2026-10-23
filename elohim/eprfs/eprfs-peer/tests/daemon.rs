@@ -403,6 +403,22 @@ async fn a_started_daemon_serves_only_its_channel_tree() {
     .expect("B starts");
     eventually("B announces", || side_b.table().own.is_some()).await;
     let root_b = side_b.table().own.expect("own head").root;
+    // The head table names the one flow store this device's channel is projected from, and each
+    // own head the event it counted up to (here B's second, the local `refuse`), so a reader of
+    // the lease view reads that store and can tell when it is no longer the store counted.
+    let table_b = side_b.table();
+    let place = table_b.store.expect("the channel store is recorded");
+    let checkout = side_b
+        .checkout
+        .dir
+        .path()
+        .canonicalize()
+        .expect("canonical");
+    assert_eq!(place.root, checkout);
+    assert_eq!(place.log, checkout.join(".eprfs/status/flows.jsonl"));
+    let logged = table_b.own_log.last().expect("an own announce");
+    assert_eq!(logged.events, 2);
+    assert_eq!(logged.last, Some(refused.to_string()));
 
     let client = eprfs_peer::bind(&key_a, None, vec![])
         .await

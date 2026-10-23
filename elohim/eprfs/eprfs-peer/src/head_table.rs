@@ -8,7 +8,8 @@
 //! {
 //!   "version": 1,
 //!   "own": { "device", "root", "seq", "at", "folded": {"<did>": seq}, "signature" },
-//!   "own_log": [ { "seq", "root", "at", "events" } ],
+//!   "own_log": [ { "seq", "root", "at", "events", "last" } ],
+//!   "store": { "root", "log" },
 //!   "devices": {
 //!     "<did>": { "seq", "root", "at", "folded": {"<did>": seq}, "folded_at", "events_folded" }
 //!   },
@@ -19,11 +20,16 @@
 //! ```
 //!
 //! `own` is this device's last announced head (so `seq` keeps increasing across restarts).
-//! `own_log` is its last [`OWN_LOG_LEN`] announces, oldest first, each with `events`: how many
-//! flow events of this device's store the announced root was projected from. The steward lease
-//! view (T6) reads it to find the first own head that carried a claim: a claim written as the
-//! store's `n`th event is in every head whose `events` is at least `n`. A file written before the
-//! log existed loads with an empty one.
+//! `own_log` holds the own heads that announced a new root — the last [`OWN_LOG_LEN`], oldest
+//! first; a periodic re-announce of an unchanged root adds none — each with `events`, how many
+//! flow events of the channel store the root was projected from, and `last`, the CID of the last
+//! of them. The steward lease view (T6) reads it to find the first own head that carried a
+//! claim: a claim written as the store's `n`th event is in every head whose `events` is at least
+//! `n`, but only while the store holds `last` at position `events` — an entry counted over a
+//! store since reset or replaced confirms nothing. `store` names that channel store: the one
+//! flow store `epr peer serve` projects, recorded when it starts, which every reader of the
+//! steward channel reads (and berth writes its steward records to). A file written before these
+//! fields existed loads with an empty log and no store.
 //! `devices` holds, per other device, the last head folded: its `seq`, `root`, `at` (that
 //! device's clock, display only) and `folded` (its acknowledgement vector), with `folded_at`
 //! (this device's clock, unix milliseconds) and the running count of events appended from it.
@@ -33,7 +39,7 @@
 use std::collections::BTreeMap;
 use std::fs::{self, File, OpenOptions};
 use std::io::{self, Write};
-use std::path::Path;
+use std::path::{Path, PathBuf};
 
 use eprfs_core::BlobCid;
 use serde::{Deserialize, Serialize};
@@ -45,16 +51,19 @@ use crate::head::ChannelHead;
 pub const HEAD_TABLE_VERSION: u32 = 1;
 
 /// How many of this device's own announces [`HeadTable::own_log`] keeps.
-pub const OWN_LOG_LEN: usize = 64;
+pub const OWN_LOG_LEN: usize = 1024;
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct HeadTable {
     pub version: u32,
     /// This device's last announced head.
     pub own: Option<ChannelHead>,
-    /// This device's last [`OWN_LOG_LEN`] announces, oldest first.
+    /// The own heads that announced a new root, the last [`OWN_LOG_LEN`], oldest first.
     #[serde(default)]
     pub own_log: Vec<OwnAnnounce>,
+    /// The flow store this device's channel is projected from, once `epr peer serve` has run.
+    #[serde(default)]
+    pub store: Option<StorePlace>,
     /// The last head folded from each other device, by did:key.
     pub devices: BTreeMap<String, DeviceHead>,
     pub dropped: DroppedHeads,
@@ -87,6 +96,7 @@ impl Default for HeadTable {
             version: HEAD_TABLE_VERSION,
             own: None,
             own_log: Vec::new(),
+            store: None,
             devices: BTreeMap::new(),
             dropped: DroppedHeads::default(),
             channel: ChannelCounters::default(),
@@ -101,9 +111,21 @@ pub struct OwnAnnounce {
     pub root: BlobCid,
     /// This device's clock when it announced, unix milliseconds.
     pub at: u64,
-    /// How many flow events of this device's store `root` was projected from. The store is
+    /// How many flow events of the channel store `root` was projected from. The store is
     /// append-only, so the head covers exactly its first `events` events.
     pub events: u64,
+    /// The CID of the last of them (`None` when `events` is 0): the store's identity at that
+    /// position. An entry whose `last` is not the store's `events`th event counted another store.
+    #[serde(default)]
+    pub last: Option<String>,
+}
+
+/// Where this device's channel store is: the checkout `epr peer serve` projects, and its flow
+/// log, both canonical paths.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct StorePlace {
+    pub root: PathBuf,
+    pub log: PathBuf,
 }
 
 /// The last head folded from one device.

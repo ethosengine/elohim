@@ -513,17 +513,17 @@ decisionPoints:
     sourceLocation:
       file: src/lease_view.rs
       modulePath: eprfs_peer::steward_lease_view
-    summary: "Whether a lease on a steward-scoped resource (StewardScope: dev-integration, jenkins-dispatch, alpha-fleet, lane:<id>) holds across one person's devices. Leases are replayed from dev-berth-events@1 records, this device's own and those folded via an admitted device (a contested device's are ignored entirely); per resource the live leases compete and the earlier claimed_at, then the lower device did:key, wins on both devices alike. Another device's winner is HeldBy at once. This device's winner is Effective once every other admitted device's last folded head acknowledges the first own head that carried the claim (found in HeadTable.own_log by store position, not by time), Pending until confirm_wait_s from the claim's write, then Unconfirmed naming the silent device; an offline-ok override record makes it Effective at once and binds the others as an ordinary lease. With no other admitted device a claim is Effective at once."
+    summary: "Whether a lease on a steward-scoped resource (StewardScope: dev-integration, jenkins-dispatch, alpha-fleet, lane:<id>) holds across one person's devices, read from the device's one channel store (the flow store epr peer serve projects, recorded in heads.json). Leases are replayed from dev-berth-events@1 records, this device's own and those folded via an admitted device (a contested device's are ignored entirely; a device the roster does not admit gets no view). Another device's lease precedes this device's when this device's claim was written after it reached the store, or when neither claim saw the other and it wins the tie-break (earlier claimed_at, then lower device did:key); a lease whose claim carries a seen vector reaching the head that carried ours never precedes ours, whatever the clocks. A preceding lease is HeldBy. This device's lease otherwise is Effective once every other admitted device's last folded head acknowledges the first own head that carried the claim (HeadTable.own_log by store position, each entry proven against the store by the CID of the last event it counted), Pending until confirm_wait_s from the claim's write, then Unconfirmed naming the silent device; an offline-ok override record makes it Effective at once and binds the others as an ordinary lease. With no other admitted device a claim is Effective at once."
     concernIds:
       - id: C0
         status: answered
         justification: "Pure over this device's own flow store, head table and roster: nothing is asked over the network; epr peer leases prints it for berth."
       - id: C1
         status: answered
-        justification: "A deterministic tie-break over values each claim's own device recorded (claimed_at, then device did:key, then session) settles a concurrent pair the same way on both devices."
+        justification: "Only concurrent claims are settled by the tie-break over values each claim's own device recorded (claimed_at, then device did:key, then session); a claim written after its writer saw the other lease yields, known exactly by the writer from its store order and by the other device from the claim's seen vector. Where the two sides know differently both yield, never both hold."
       - id: C2
         status: answered
-        justification: "An acknowledgement counts only for an own head projected from a store already holding the claim (own_log.events >= the claim's store position); a head announced after the claim's stamp but projected before it reached the store confirms nothing."
+        justification: "An acknowledgement counts only for an own head projected from a store already holding the claim (own_log.events >= the claim's store position) and counted over this same store (own_log.last is the store's event at that position); a head announced after the claim's stamp but projected before it reached the store, or counted over a reset store, confirms nothing."
       - id: C3
         status: answered
         justification: "A device that does not acknowledge within confirm_wait_s reads Unconfirmed, naming it and when it was last folded; an absent device is never a free resource."
@@ -535,7 +535,7 @@ decisionPoints:
         justification: "Only folded leases of admitted devices count; a Contest removes the device's leases and its acknowledgement duty together."
       - id: C6a
         status: answered
-        justification: "Linear in the berth records of the flow store; the own log is bounded at 64 announces."
+        justification: "Linear in the berth records of the channel store; the own log keeps the last 1024 new roots (a periodic re-announce adds none)."
       - id: C6b
         status: n-a
         justification: "Reads only; the head table is replaced atomically by the daemon."
@@ -585,7 +585,25 @@ decisionPoints:
       - path: elohim/eprfs/eprfs-peer/tests/lease_view.rs
         testName: with_no_other_admitted_device_a_claim_is_effective_at_once
         kind: integration
+      - path: elohim/eprfs/eprfs-peer/tests/lease_view.rs
+        testName: an_own_log_that_counted_another_store_never_confirms_a_claim
+        kind: integration
+      - path: elohim/eprfs/eprfs-peer/tests/lease_view.rs
+        testName: a_lease_the_claimant_had_already_seen_is_not_overturned_by_its_earlier_clock
+        kind: integration
+      - path: elohim/eprfs/eprfs-peer/tests/lease_view.rs
+        testName: two_overrides_taken_while_the_link_was_down_are_settled_by_the_tie_break
+        kind: integration
+      - path: elohim/eprfs/eprfs-peer/tests/lease_view.rs
+        testName: another_devices_records_are_replayed_in_its_order_not_the_order_they_were_folded
+        kind: integration
       - path: elohim/eprfs/epr-cli/tests/peer.rs
         testName: peer_leases_prints_the_steward_view_while_serve_holds_its_lock
+        kind: integration
+      - path: elohim/eprfs/epr-cli/tests/peer.rs
+        testName: peer_leases_reads_the_channel_store_the_daemon_serves_not_the_callers
+        kind: integration
+      - path: elohim/eprfs/epr-cli/tests/peer.rs
+        testName: peer_leases_reports_a_device_whose_binding_is_contested_as_revoked
         kind: integration
     notes: "Spec §3.4; review focus items 1 and 2. berth (genesis/agentic/bin/berth) polls epr peer leases --json for steward-scoped claims and owner checks; container-scoped resources never call it."

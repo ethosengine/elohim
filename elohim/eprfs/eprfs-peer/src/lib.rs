@@ -67,15 +67,15 @@ pub use gate::{SharedAdmission, StewardDevicesGate};
 pub use gossip::GatedGossip;
 pub use head::{ChannelHead, HeadSigner, MAX_HEAD_BYTES};
 pub use head_table::{
-    ChannelCounters, DeviceHead, DroppedHeads, HeadTable, OwnAnnounce, HEAD_TABLE_VERSION,
-    OWN_LOG_LEN,
+    ChannelCounters, DeviceHead, DroppedHeads, HeadTable, OwnAnnounce, StorePlace,
+    HEAD_TABLE_VERSION, OWN_LOG_LEN,
 };
 /// The iroh address types a dialer names peers with, so a consumer needs no iroh dependency of
 /// its own.
 pub use iroh::{NodeAddr, NodeId};
 pub use key::PeerKey;
 pub use lease_view::{
-    lease_events, steward_lease_view, LeaseEvent, LeaseKind, LeaseVerdict, Resource,
+    lease_events, steward_lease_view, LeaseEvent, LeaseKind, LeaseStore, LeaseVerdict, Resource,
     BERTH_EVENTS_MEASURE,
 };
 pub use steward_scope::{StewardScope, DEFAULT_CONFIRM_WAIT_S};
