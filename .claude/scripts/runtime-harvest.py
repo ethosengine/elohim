@@ -187,6 +187,10 @@ def _provide_loop_stuck_finding(node, samples):
                 # settledByDeclaration = the seam itself. Measured 2026-10-09: fp 2b4761b2eaf6
                 # re-filed with 16/16 rows unanswered on adam's full conductor dataset. fp is
                 # node+class+provenance, so enriching the line never changes the fingerprint.
+                # WHY: 2026-10-23 the dead arm selected 4 of 12 rows; the other 8 were
+                # received rows the receiver guard never selects, named by no counter.
+                # deadHeldNotAuthor names them (a node predating it prints None).
+                f"deadHeldNotAuthor={pl.get('reanchorDeadHeldNotAuthor')} "
                 f"heldUnanswered={pl.get('reanchorHeldUnanswered')} "
                 f"heldUnbacked={pl.get('reanchorHeldUnbacked')} "
                 f"settledByDeclaration={pl.get('deadSettledByDeclaration')}{stale}",

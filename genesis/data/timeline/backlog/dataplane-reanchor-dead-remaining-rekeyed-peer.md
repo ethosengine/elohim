@@ -6,7 +6,7 @@ contentFormat: "markdown"
 title: "Re-keyed dead anchors need a heal under the current key — dead_remaining survives a pod restart (mechanism corrected 2026-09-11: the rows are SETTLED-not-skipped, and nothing clears the dead verdict on a settled row)"
 slug: "dataplane-reanchor-dead-remaining-rekeyed-peer"
 written: "2026-09-06"
-updated: "2026-10-19"
+updated: "2026-10-23"
 author: "story-harvest; mechanism corrected 2026-09-11 (runtime-triage, endpoint-confirmed)"
 status: "backlog"
 priority: "high"
@@ -30,6 +30,10 @@ cites:
   - https://elohim.host/admin/self-healing
   - https://elohim.host/db/p2p/conductor-diagnostics
   - https://doorway-alpha.elohim.host/p2p/status
+  - https://elohim.host/db/content?limit=500
+  - elohim/elohim-storage/src/p2p/anchor_verify.rs
+  - elohim/sdk/schemas/v1/views/p2p-status-view.schema.json
+  - elohim/elohim-storage/tests/schema_contract.rs
 ---
 
 > **2026-09-11 — runtime-triage mechanism correction (endpoint-confirmed).** The
@@ -873,3 +877,133 @@ residue draining.
 (`reanchorDeadRemaining − deadSettledByDeclaration`) is 0, or it moves sweep to sweep, with
 `deadRemainingStuck false` and `reanchorSweepsAbandoned 0`. Not verified as of 03:38Z: the
 condition is live (`stuckSweeps 4`, `deadRemainingStuck true`).
+
+## 2026-10-23 — re-filed at poll 214: the residue row "in no held counter" is eight received rows the dead arm never selects
+
+`2b4761b2eaf6` re-filed as a NEW ledger line (`seen 1, first_poll 214`, 2026-10-23T11:07Z). Same
+concern, same file; nothing forked.
+
+### What is exhausted
+
+Ledger line (node `alpha-b`, provenance `p2p-status:provide-loop`):
+`provideLoop.deadRemainingStuck reanchorDeadRemaining=12 reanchorPending=37 stuckSweeps=39 heldUnanswered=4 heldUnbacked=0 settledByDeclaration=0`.
+
+`https://elohim.host/p2p/status .provideLoop`, re-fetched 11:10Z:
+
+```json
+{"reanchorPending":37,"reanchorCompleted":42,"reanchorFailed":0,"reanchorCaughtUp":false,
+ "reanchorDeadRemaining":12,"stuckSweeps":39,"deadRemainingStuck":true,
+ "reanchorSkippedReach":0,"reanchorSkippedContentType":0,"reanchorAdopted":0,"reanchorHeld":1,
+ "reanchorHeldBackoff":3,"reanchorHeldUnbacked":0,"reanchorHeldUnanswered":4,
+ "deadSettledByDeclaration":0,"reanchorAwaitingChannel":0,"reanchorSweepsAbandoned":1}
+```
+
+`/health` at the same instant: pools 7/7, workers 4/4, `p2p.caughtUp false`, `divergentAnchor 113`.
+doorway-alpha (matthew): `reanchorDeadRemaining 0`, `deadRemainingStuck false`, caught up.
+
+Loki, `{namespace="elohim-alpha", pod="elohim-adam-alpha-0"}` (read by a ci-investigator
+sub-analyst): the last three `reanchor_backfill: sweep complete` lines (10:46:30Z, 10:56:42Z,
+11:01:13Z) are identical:
+
+```
+reanchored 0, already_anchored 0, adopted 0, held 1, held_backoff 3, held_unbacked 0,
+held_unanswered 4, dead_settled_by_declaration 0, awaiting_channel 0, held_not_author 25,
+failed 0, remaining 25, dead_candidates 4, dead_remaining 12
+```
+
+Every start-of-sweep line reads `candidates: 0, dead_candidates: 4`. The 11:07:34Z sweep was
+abandoned on the 120 s witness budget at 11:09:34Z. There were 52 budget-abandon lines after
+04:00Z, and that abandon is the `reanchorSweepsAbandoned 1` above. The snapshot it left in place
+is the 11:01Z one, which is identical to the two before it. Two `ghost-witness ... marked dead`
+lines appear in the window, one row each (05:08Z, 08:32Z).
+
+### Reading
+
+`dead_remaining 12`, `dead_candidates 4`. The dead recount (`count_dead_anchor_content`) counts
+every dead row. Since the receiver guard landed (143c828fb, 2026-10-17), the dead selection
+(`list_dead_anchor_content_ids`) takes only rows listed in `content_local_authorship`. The other
+**8 are dead rows this peer received from a peer**. They are never candidates and never
+re-authored here, because minting their root is their author's act, and no counter named them.
+They sat in the stuck residue anyway, so most of `stuckSweeps 39` measured a population that no
+sweep of adam's could move. This is the 2026-10-19 entry's "third residue row is in no held
+counter", now counted.
+
+The other 4 are adam's own rows, and every one is `reanchorHeldUnanswered`. Each sweep, one of them
+gets a fresh pre-flight (`held 1`) and three replay the backoff. They are the four dead rows the
+public list shows (`GET https://elohim.host/db/content?limit=500`: 201 rows, 123 live,
+74 unverified, 4 dead): `fct-bible-leviticus-19-9-10`, `fct-bible-deuteronomy-11-18-21`,
+`fct-module-15-retrospective-manifesto-line`,
+`fct-module-15-retrospective-follow-up-the-covenant-holds`. The 25 never-authored rows were all
+received as well (`held_not_author 25 = remaining 25`).
+
+The same seam had a second defect. When neither selection found an own row, `run_once` published
+an all-zero result, so a peer holding only received rows read `reanchorPending 0,
+reanchorCaughtUp true`. The same rows beside a single own candidate read as pending and not
+caught up.
+
+### Root-cause inventory
+
+- `elohim/elohim-storage/src/db/content_diesel.rs`: `list_dead_anchor_content_ids` filters on
+  `content_local_authorship` and `count_dead_anchor_content` does not. No count named the
+  difference.
+- `elohim/elohim-storage/src/services/reanchor_backfill.rs`, `run_once`: the recount fed the whole
+  dead population to `dead_remaining`, and the empty-candidates branch published
+  `ReanchorSweepResult::default()`.
+- `elohim/elohim-storage/src/services/provide_loop_status.rs`, `publish_reanchor_sweep`: the stuck
+  detector read `dead_remaining − settled`, which included rows held for their author.
+- `elohim/elohim-storage/src/services/head_adoption.rs`, `DeclarationBacking::Unanswered` and the
+  DB-read arms of `try_adopt_canonical_head_explained`: the four own rows. Not changed.
+- `elohim/elohim-storage/src/p2p/projection_reconcile.rs`, `witness_ghost_anchors`: stamps received
+  ghosts dead (a true verdict), then holds them for their author.
+
+### Fix path (landed on dev with this entry)
+
+- `content_diesel::count_dead_anchor_not_locally_authored`, the dead-arm twin of
+  `count_unanchored_not_locally_authored`. Test:
+  `a_received_dead_row_is_counted_dead_never_selected_and_named`.
+- `ReanchorReport.dead_held_not_author` is recounted after the loop beside `remaining` and
+  `dead_remaining`, logged on `sweep complete`, and carried by `sweep_result()`.
+- `ReanchorSweepResult::stuck_residue()` is the unhealed dead residue minus the rows held for their
+  author, and `stuckSweeps` / `deadRemainingStuck` read it. `reanchorDeadRemaining`,
+  `reanchorPending` and `reanchorCaughtUp` are unchanged: received dead rows stay dead, stay
+  pending and keep `caughtUp` false, as the received NULL rows already did.
+- Wire, additive: `ProvideLoopStatus.reanchorDeadHeldNotAuthor` (view schema, schema contract
+  case, generated TS).
+- The empty-candidates branch publishes the received populations it holds (`remaining =
+  held_not_author`, `dead_remaining = dead_held_not_author`) instead of zeros.
+- Poller: the finding line carries `deadHeldNotAuthor=`. The fingerprint does not key on the line.
+- Tests: `dead_rows_held_for_their_author_keep_caught_up_false_but_never_read_stuck` (status) and
+  `received_dead_rows_are_named_and_kept_out_of_the_stuck_residue` (sweep accounting on adam's
+  numbers).
+
+### Missing nodes (named, not built)
+
+- **Exit for a received dead row.** `dead` is persisted with no expiry. For an own row only a
+  re-author clears it, and a received row is never re-authored here. `p2p::anchor_verify`
+  re-asks only `dht_anchor_state IS NULL` rows, and the heal leg revives a row
+  (`stamp_own_conductor_canonical_head`) only when the row is a gap against a peer. So a received
+  row whose author's action later reaches adam's conductor, while it agrees with its peers, has no
+  proven path back to `live`. Probe after the roll: watch `reanchorDeadHeldNotAuthor` on
+  elohim.host. If it stays flat at 8 for days while adam's conductor answers, the exit is missing.
+  The candidate cure is `anchor_verify` re-asking received dead rows on its existing ladder;
+  `confirm_anchor_live` already requires the exact hash and an own-conductor canonical answer.
+- **A hold that writes the row.** Each of the four own rows has an `updatedAt` equal to a
+  sweep-complete timestamp (10:46:30, 10:51:12, 10:56:42, 11:01:13), so the held pre-flight
+  touches the row every time it runs. Not traced here.
+
+### Current decision — fix applied on dev for the sensing half; the residue of four is BLOCKED (2026-10-23)
+
+Once the edge roll carries this, adam reads `reanchorDeadHeldNotAuthor 8` and a stuck residue of
+4, every one `reanchorHeldUnanswered`. The verdict will stay true on those 4. That is the
+2026-10-19 decision unchanged: backing or head reads go unanswered against a degraded fleet
+(52 witness-budget abandons in seven hours today), and the cure is fleet network health, not
+storage code. No kubectl from this lane. Ledger `2b4761b2eaf6` (`first_poll 214`) is `blocked`,
+`backlog: dataplane-reanchor-dead-remaining-rekeyed-peer`.
+
+### Verification
+
+Not verified on the fleet: the fields reach adam with the next edge roll. Local evidence: the
+three new tests, the schema contract case and the `elohim-storage` gate. Fleet read owed after the
+roll: `elohim.host/p2p/status .provideLoop` shows `reanchorDeadHeldNotAuthor` (8 today), and
+`reanchorHeldUnanswered` equals the stuck residue (`reanchorDeadRemaining −
+deadSettledByDeclaration − reanchorDeadHeldNotAuthor`). The condition was live at 11:10Z.

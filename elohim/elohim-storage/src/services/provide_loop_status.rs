@@ -64,6 +64,21 @@
 //! `reanchorAwaitingChannel` and leave the `caughtUp` residue exactly as
 //! settled-by-declaration rows do; `reanchorPending` still counts them.
 //!
+//! ## Held for their author is not wedged (2026-10-23)
+//!
+//! Since the receiver guard (2026-10-17) the dead-anchor heal arm selects only
+//! rows THIS peer authored: re-authoring a dead row mints a root under this
+//! peer's key, which is the author's act. A dead row that arrived from a peer
+//! is never a candidate and waits for its author's root to be adopted — but
+//! the dead recount still counted it, so it sat in the stuck residue with no
+//! per-arm counter naming it (adam, 2026-10-23: `reanchorDeadRemaining` 12 of
+//! which the sweep selected 4, `stuckSweeps` 39). Those rows are published as
+//! `reanchorDeadHeldNotAuthor`. They stay dead, stay in
+//! `reanchorDeadRemaining` / `reanchorPending`, and keep `caughtUp` false
+//! exactly as the never-authored arm's received rows keep `remaining`; only the
+//! stuck detector leaves them out, because no sweep of this peer's could move
+//! them and the verdict exists to say this peer's loop is wedged.
+//!
 //! Category C (operational): a per-process status snapshot, reconstructed in
 //! memory, never persisted, never notarized. Mirrors
 //! `p2p::projection_reconcile::ProjectionReconcileState`. The cross-sweep
@@ -124,6 +139,11 @@ pub struct ReanchorSweepResult {
     /// awaiting the channel's adoption, not re-anchor work. Subtracted from
     /// `remaining` for `caughtUp` only.
     pub awaiting_channel: usize,
+    /// DEAD-anchor rows (of `dead_remaining`) this peer did not author: the
+    /// receiver guard never selects them, and they wait for their author's root
+    /// to be adopted. Recounted after the loop. Subtracted for the stuck
+    /// detector only — `caughtUp` still counts them.
+    pub dead_held_not_author: usize,
     /// Rows that errored re-authoring this sweep (retryable).
     pub failed: usize,
     /// NULL-anchor (never-authored) rows remaining after the sweep.
@@ -162,6 +182,22 @@ impl ReanchorSweepResult {
     /// `remaining` (they are a subset of it).
     pub fn awaiting_channel(&self) -> usize {
         self.awaiting_channel.min(self.remaining)
+    }
+
+    /// Dead rows held for their author, clamped to the unhealed residue they
+    /// are a subset of (they are never candidates, so never settled).
+    pub fn dead_held_not_author(&self) -> usize {
+        self.dead_held_not_author.min(self.dead_residue())
+    }
+
+    /// What the stuck detector reads: the unhealed dead residue minus the rows
+    /// held for their author — the dead rows this peer's own sweep selects and
+    /// has not healed. A residue made only of received rows is not wedged
+    /// here; it is waiting on another peer, and `reanchorDeadHeldNotAuthor`
+    /// says so.
+    pub fn stuck_residue(&self) -> usize {
+        self.dead_residue()
+            .saturating_sub(self.dead_held_not_author())
     }
 
     /// What `caughtUp` reads: never-authored rows NOT awaiting a release
@@ -287,7 +323,8 @@ pub struct ProvideLoopStatus {
     #[ts(type = "number")]
     pub reanchor_dead_remaining: usize,
     /// Consecutive sweeps the unhealed dead residue (`reanchorDeadRemaining`
-    /// minus `deadSettledByDeclaration`) has sat at the same non-zero value. 0
+    /// minus `deadSettledByDeclaration` and `reanchorDeadHeldNotAuthor`) has
+    /// sat at the same non-zero value. 0
     /// while the residue is empty or moving. Watch it climb 1 → 2 → 3 to see a
     /// heal stall in progress.
     pub stuck_sweeps: u32,
@@ -346,6 +383,15 @@ pub struct ProvideLoopStatus {
     /// `reanchorPending`; `caughtUp` reads only the rows beside them.
     #[ts(type = "number")]
     pub reanchor_awaiting_channel: usize,
+    /// Dead-anchor rows (of `reanchorDeadRemaining`) this peer did not author,
+    /// recounted after the LAST sweep. The receiver guard never selects them —
+    /// minting their root is their author's act — so they wait for the
+    /// author's root to be adopted. They stay dead and stay in
+    /// `reanchorDeadRemaining` / `reanchorPending` (`caughtUp` stays false);
+    /// `stuckSweeps` and `deadRemainingStuck` read only the residue beside
+    /// them, because no sweep of this peer's can move them.
+    #[ts(type = "number")]
+    pub reanchor_dead_held_not_author: usize,
     /// Consecutive re-anchor sweeps that ENDED WITHOUT PUBLISHING a result
     /// since the last published one — the sweep's wall-clock budget elapsed
     /// and its future was dropped, or it returned an error before its recount.
@@ -377,6 +423,7 @@ impl Default for ProvideLoopStatus {
             reanchor_held_unanswered: 0,
             dead_settled_by_declaration: 0,
             reanchor_awaiting_channel: 0,
+            reanchor_dead_held_not_author: 0,
             reanchor_sweeps_abandoned: 0,
         }
     }
@@ -439,7 +486,7 @@ impl ProvideLoopState {
     /// verdict via [`is_dead_remaining_stuck`], both pure.
     pub async fn publish_reanchor_sweep(&self, result: ReanchorSweepResult) {
         let pending = result.pending();
-        let residue = result.dead_residue();
+        let residue = result.stuck_residue();
         let mut inner = self.inner.write().await;
 
         let run = next_unchanged_sweeps(
@@ -466,6 +513,7 @@ impl ProvideLoopState {
         s.reanchor_held_unanswered = result.held_unanswered;
         s.dead_settled_by_declaration = result.settled_by_declaration();
         s.reanchor_awaiting_channel = result.awaiting_channel();
+        s.reanchor_dead_held_not_author = result.dead_held_not_author();
         s.reanchor_sweeps_abandoned = 0;
     }
 
@@ -847,6 +895,61 @@ mod tests {
         assert!(!snap.dead_remaining_stuck);
         assert_eq!(snap.reanchor_pending, 15);
         assert_eq!(snap.reanchor_awaiting_channel, 13);
+    }
+
+    #[tokio::test]
+    async fn dead_rows_held_for_their_author_keep_caught_up_false_but_never_read_stuck() {
+        // adam, 2026-10-23: 12 dead rows, 4 selected (this peer's own, held on
+        // unanswered probes), 8 received and never selected. The 8 are named,
+        // stay pending and keep caughtUp false; the stuck verdict reads only
+        // the 4 this peer's sweep selects.
+        let state = ProvideLoopState::new();
+        let adam = ReanchorSweepResult {
+            remaining: 25,
+            dead_remaining: 12,
+            held: 1,
+            held_backoff: 3,
+            held_unanswered: 4,
+            dead_held_not_author: 8,
+            ..Default::default()
+        };
+        assert_eq!(adam.stuck_residue(), 4);
+        for _ in 0..DEAD_REMAINING_STUCK_SWEEPS {
+            state.publish_reanchor_sweep(adam).await;
+        }
+        let snap = state.status().await;
+        assert!(snap.dead_remaining_stuck, "the 4 own rows are still wedged");
+        assert_eq!(snap.reanchor_dead_held_not_author, 8);
+        assert_eq!(snap.reanchor_dead_remaining, 12, "never laundered");
+        assert_eq!(snap.reanchor_pending, 37);
+        assert!(!snap.reanchor_caught_up);
+
+        // Only received dead rows left: pending, not caught up, not stuck.
+        let state = ProvideLoopState::new();
+        let received_only = ReanchorSweepResult {
+            dead_remaining: 8,
+            dead_held_not_author: 8,
+            ..Default::default()
+        };
+        for _ in 0..(DEAD_REMAINING_STUCK_SWEEPS + 2) {
+            state.publish_reanchor_sweep(received_only).await;
+        }
+        let snap = state.status().await;
+        assert!(!snap.dead_remaining_stuck);
+        assert_eq!(snap.stuck_sweeps, 0);
+        assert!(!snap.reanchor_caught_up, "a dead row is not caught up");
+        assert_eq!(snap.reanchor_pending, 8);
+        assert_eq!(snap.reanchor_dead_held_not_author, 8);
+
+        // An overshooting count (a row revived between loop and recount) can
+        // never push the stuck residue below zero.
+        let overshoot = ReanchorSweepResult {
+            dead_remaining: 2,
+            dead_held_not_author: 5,
+            ..Default::default()
+        };
+        assert_eq!(overshoot.dead_held_not_author(), 2);
+        assert_eq!(overshoot.stuck_residue(), 0);
     }
 
     #[tokio::test]

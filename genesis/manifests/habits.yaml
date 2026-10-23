@@ -112,9 +112,9 @@ habits:
       - "a2o @concern:household-follows-head (genesis/a2o/features/devflow/epr-follows-its-head.feature — Act I host, the binary class of this invariant: a device that missed a landing heals at its next session, a session keeps its pinned CID, a failed health check or a dirty build never becomes the head, and moving back is a revert. Spec genesis/docs/superpowers/specs/2026-10-23-household-follows-latest-design.md, slices 1–2 = epr plus brit following its attested gitlink pin on one workspace)"
     evidence: >
       DELTA 2026-10-24c (RED preserved; the epr head had never landed on shem (`bin-store status`: `head: null`), now it can): `bin-store` judged cleanliness over the whole tree on every ingest, because `source_paths` ran `cargo metadata --offline` unfiltered, which needs every platform's crates (`android_system_properties`) that no host build downloads. Cargo exited 101, the whole-tree fallback took over, and the hooks' own `.claude/data` ledgers made each pre-push candidate a `dirty-build` (e8b8ec499: "bin-store refused epr candidate health or provenance"). The resolve is now filtered to the rustc host, which keeps the 20 in-repo path packages and nothing outside the repo; `source-state` on e8b8ec499 reads `clean: true`. Proof: `bin_store_test.py` 61 passed (new: the host-platform filter). The head itself lands at the next eprfs-gated push. NO status change.
-    evidence-fingerprint: sha256:c42bfea444474034
-    evidence-bytes: 261294
-    evidence-entries: 169
+    evidence-fingerprint: sha256:c710960b7d543f36
+    evidence-bytes: 262487
+    evidence-entries: 170
     guard: >
       Regression risk = the fleet-safety invariants in sync/projector.rs
       (empty-never-projects, reconcile-offers/events-assert, broadcast-tier reach

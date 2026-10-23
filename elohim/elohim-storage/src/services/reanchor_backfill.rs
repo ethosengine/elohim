@@ -156,6 +156,11 @@ pub struct ReanchorReport {
     /// `remaining` until the author's root is adopted. Includes any row the
     /// write-time guard refused in a race with the selection.
     pub held_not_author: usize,
+    /// DEAD-anchor rows (of `dead_remaining`) this peer did not author,
+    /// recounted after the loop. The dead arm's twin of `held_not_author`:
+    /// never candidates (the selection excludes them), still dead, waiting for
+    /// their author's root. Published as `reanchorDeadHeldNotAuthor`.
+    pub dead_held_not_author: usize,
     /// NULL-arm candidates held (fresh or replayed) because their slug is bound
     /// to a release channel (`HoldBasis::AwaitingChannel`) — not re-anchor work;
     /// they author when the channel adopts. Published as
@@ -242,6 +247,7 @@ impl ReanchorReport {
             held_unanswered: self.held_unanswered,
             dead_settled_by_declaration: self.dead_settled_by_declaration,
             awaiting_channel: self.awaiting_channel,
+            dead_held_not_author: self.dead_held_not_author,
             failed: self.failed,
             remaining: self.remaining,
             dead_remaining: self.dead_remaining,
@@ -424,11 +430,26 @@ pub async fn run_once(
         // content — nothing to heal" while a whole dead population sat
         // untouched; the emptiness test now covers both classes.)
         //
-        // An all-zero result also RESETS the stuck detector: a drained dead
-        // population is done, not wedged.
-        state
-            .publish_reanchor_sweep(ReanchorSweepResult::default())
-            .await;
+        // A result with no residue of this peer's own also RESETS the stuck
+        // detector: a drained dead population is done, not wedged.
+        //
+        // Nothing to heal is not the same as nothing pending. Every row still
+        // unanchored or dead here is a RECEIVED row — the selections above
+        // take this peer's own rows first and found none — and the non-empty
+        // path keeps those in `remaining` / `dead_remaining`. Publishing zeros
+        // here instead read a peer holding only received rows as caught up,
+        // while the same rows beside one own candidate read not caught up.
+        let dead_held_not_author = {
+            let mut conn = pool
+                .get()
+                .map_err(|e| StorageError::Internal(format!("reanchor: db conn: {e}")))?;
+            crate::db::content_diesel::count_dead_anchor_not_locally_authored(&mut conn, &app_ctx)?
+                as usize
+        };
+        report.remaining = held_not_author;
+        report.dead_remaining = dead_held_not_author;
+        report.dead_held_not_author = dead_held_not_author;
+        state.publish_reanchor_sweep(report.sweep_result()).await;
         return Ok(report);
     }
 
@@ -729,13 +750,23 @@ pub async fn run_once(
 
     // Recount remaining NULL-anchor rows so pending/caughtUp are honest even
     // when a sweep was capped at max_per_sweep or some re-authors failed.
-    (report.remaining, report.dead_remaining) = {
+    //
+    // The dead recount counts every dead row, but the dead arm selects only
+    // this peer's own: the received ones are recounted apart so the arm that
+    // holds them is named on the wire instead of hiding in the stuck residue.
+    (
+        report.remaining,
+        report.dead_remaining,
+        report.dead_held_not_author,
+    ) = {
         let mut conn = pool
             .get()
             .map_err(|e| StorageError::Internal(format!("reanchor: recount conn: {e}")))?;
         (
             crate::db::content_diesel::count_unanchored_content(&mut conn, &app_ctx)? as usize,
             crate::db::content_diesel::count_dead_anchor_content(&mut conn, &app_ctx)? as usize,
+            crate::db::content_diesel::count_dead_anchor_not_locally_authored(&mut conn, &app_ctx)?
+                as usize,
         )
     };
 
@@ -765,6 +796,7 @@ pub async fn run_once(
         dead_settled_by_declaration = report.dead_settled_by_declaration,
         awaiting_channel = report.awaiting_channel,
         held_not_author = report.held_not_author,
+        dead_held_not_author = report.dead_held_not_author,
         failed = report.failed,
         remaining = report.remaining,
         skipped_reach = report.skipped_reach,
@@ -1048,6 +1080,43 @@ mod tests {
         // node still reads NOT caught up.
         assert_eq!(snap.reanchor_pending, 2);
         assert!(!snap.reanchor_caught_up);
+    }
+
+    /// adam, 2026-10-23: the dead recount named 12, the dead arm selected 4.
+    /// The 8 received rows reach the wire under their own name and stay out of
+    /// the stuck residue; the 4 own rows held on unanswered probes stay in it.
+    #[tokio::test]
+    async fn received_dead_rows_are_named_and_kept_out_of_the_stuck_residue() {
+        use crate::services::provide_loop_status::{ProvideLoopState, DEAD_REMAINING_STUCK_SWEEPS};
+
+        let mut report = ReanchorReport {
+            dead_candidates: 4,
+            held_not_author: 25,
+            remaining: 25,
+            dead_remaining: 12,
+            dead_held_not_author: 8,
+            ..Default::default()
+        };
+        report.record(RowOutcome::Held);
+        report.record_hold_basis(HoldBasis::Unanswered, true);
+        for _ in 0..3 {
+            report.record(RowOutcome::HeldBackoff);
+            report.record_hold_basis(HoldBasis::Unanswered, true);
+        }
+        let published = report.sweep_result();
+        assert_eq!(published.dead_held_not_author, 8);
+        assert_eq!(published.stuck_residue(), 4);
+        assert_eq!(published.held_unanswered, 4, "the arm covers the residue");
+
+        let state = ProvideLoopState::new();
+        for _ in 0..DEAD_REMAINING_STUCK_SWEEPS {
+            state.publish_reanchor_sweep(published).await;
+        }
+        let snap = state.status().await;
+        assert!(snap.dead_remaining_stuck);
+        assert_eq!(snap.reanchor_dead_held_not_author, 8);
+        assert_eq!(snap.reanchor_held_unanswered, 4);
+        assert_eq!(snap.reanchor_pending, 37);
     }
 
     /// F3's accounting at the sweep: only a DEAD-arm hold that rests on an

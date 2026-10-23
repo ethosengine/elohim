@@ -3862,6 +3862,36 @@ pub fn count_unanchored_not_locally_authored(
         })
 }
 
+/// DEAD-anchor rows this peer did not author — the dead-arm twin of
+/// [`count_unanchored_not_locally_authored`]. [`list_dead_anchor_content_ids`]
+/// never selects them (the receiver guard), yet [`count_dead_anchor_content`]
+/// counts them, so without this count they sat in the re-anchor sweep's dead
+/// residue with no arm naming them (adam, 2026-10-23: 12 dead, 4 selected).
+/// They stay dead and stay counted in `dead_remaining`; this only names them.
+pub fn count_dead_anchor_not_locally_authored(
+    conn: &mut SqliteConnection,
+    ctx: &AppContext,
+) -> Result<i64, StorageError> {
+    content::table
+        .filter(content::h_app_id.eq(&ctx.h_app_id))
+        .filter(content::dht_anchor_hash.is_not_null())
+        .filter(content::dht_anchor_state.eq("dead"))
+        .filter(
+            content::id.ne_all(
+                content_local_authorship::table
+                    .filter(content_local_authorship::h_app_id.eq(&ctx.h_app_id))
+                    .select(content_local_authorship::content_id),
+            ),
+        )
+        .count()
+        .get_result(conn)
+        .map_err(|e| {
+            StorageError::Internal(format!(
+                "count_dead_anchor_not_locally_authored failed: {e}"
+            ))
+        })
+}
+
 /// Drain-loop write: mark a content row as p2p_published at the current time.
 /// Operates on the operational projection column only — does not touch
 /// dht_anchor_hash or any notarized state. Idempotent — re-publishing an
@@ -8695,6 +8725,42 @@ mod tests {
                 .unwrap()
                 .len(),
             0
+        );
+    }
+
+    #[test]
+    fn a_received_dead_row_is_counted_dead_never_selected_and_named() {
+        let mut conn = setup_test_db();
+        let ctx = AppContext::new("lamad");
+        insert_anchored_row(&mut conn, &ctx, "own-dead", Some("uhCkkOWN"));
+        insert_anchored_row(&mut conn, &ctx, "received-dead", Some("uhCkkTHEIRS"));
+        // `received-dead` arrived from a peer: no local authorship row.
+        diesel::delete(
+            content_local_authorship::table
+                .filter(content_local_authorship::h_app_id.eq(&ctx.h_app_id))
+                .filter(content_local_authorship::content_id.eq("received-dead")),
+        )
+        .execute(&mut conn)
+        .unwrap();
+        mark_anchor_state(
+            &mut conn,
+            &ctx,
+            &["own-dead".to_string(), "received-dead".to_string()],
+            AnchorState::Dead,
+        )
+        .unwrap();
+
+        let selected: Vec<String> = list_dead_anchor_content_ids(&mut conn, &ctx, 100)
+            .unwrap()
+            .into_iter()
+            .map(|(id, _, _)| id)
+            .collect();
+        assert_eq!(selected, vec!["own-dead".to_string()]);
+        assert_eq!(count_dead_anchor_content(&mut conn, &ctx).unwrap(), 2);
+        assert_eq!(
+            count_dead_anchor_not_locally_authored(&mut conn, &ctx).unwrap(),
+            1,
+            "the received row is counted dead and named, never selected"
         );
     }
 

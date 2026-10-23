@@ -49,7 +49,8 @@ reanchorCaughtUp: boolean,
 reanchorDeadRemaining: number, 
 /**
  * Consecutive sweeps the unhealed dead residue (`reanchorDeadRemaining`
- * minus `deadSettledByDeclaration`) has sat at the same non-zero value. 0
+ * minus `deadSettledByDeclaration` and `reanchorDeadHeldNotAuthor`) has
+ * sat at the same non-zero value. 0
  * while the residue is empty or moving. Watch it climb 1 → 2 → 3 to see a
  * heal stall in progress.
  */
@@ -120,6 +121,16 @@ deadSettledByDeclaration: number,
  * `reanchorPending`; `caughtUp` reads only the rows beside them.
  */
 reanchorAwaitingChannel: number, 
+/**
+ * Dead-anchor rows (of `reanchorDeadRemaining`) this peer did not author,
+ * recounted after the LAST sweep. The receiver guard never selects them —
+ * minting their root is their author's act — so they wait for the
+ * author's root to be adopted. They stay dead and stay in
+ * `reanchorDeadRemaining` / `reanchorPending` (`caughtUp` stays false);
+ * `stuckSweeps` and `deadRemainingStuck` read only the residue beside
+ * them, because no sweep of this peer's can move them.
+ */
+reanchorDeadHeldNotAuthor: number, 
 /**
  * Consecutive re-anchor sweeps that ENDED WITHOUT PUBLISHING a result
  * since the last published one — the sweep's wall-clock budget elapsed

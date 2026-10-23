@@ -745,7 +745,11 @@ fn resolve_role_cell(
 /// (`authoring_app_id == reading_app_id && !closed`) — the shape every role
 /// starts in and the shape a byte-identical-with-empty-snapshot response
 /// depends on.
-#[allow(clippy::too_many_arguments)]
+#[allow(
+    clippy::too_many_arguments,
+    reason = "a pure join of independently looked-up inputs (snapshot, the three authoring \
+              lookups, sweep); bundling them would only rename the same seven reads"
+)]
 fn lineage_view_for(
     role: &str,
     dna_hash: &str,
