@@ -302,12 +302,47 @@ fn run_device(args: &[String]) -> ActorResult<ExitCode> {
             );
             Ok(ExitCode::SUCCESS)
         }
+        "contest" => {
+            // `--device` takes a value here (elsewhere in `actor` it is a bare flag).
+            let mut args = args[1..].to_vec();
+            let target = match args.iter().position(|a| a == "--device") {
+                Some(i) if i + 1 < args.len() => {
+                    let target = args.remove(i + 1);
+                    args.remove(i);
+                    target
+                }
+                _ => {
+                    return Err(ActorError::InvalidArguments(
+                        "device contest needs --device <did:key> — the device whose entry is \
+                         retired"
+                            .into(),
+                    ))
+                }
+            };
+            let (opts, rest) = parse_global(&args)?;
+            let basis = required(
+                &rest,
+                "--basis",
+                "device contest needs --basis \"<one line you stand behind>\"",
+            )?;
+            let handle = take_opt(&rest, "--handle")?;
+            let key = DeviceKey::open()?;
+            let outcome = device_contest(&opts.root, handle.as_deref(), &target, &basis, &key)?;
+            println!("{}", serde_json::to_string_pretty(&outcome)?);
+            eprintln!(
+                "contest  {}: {} no longer stands for it (row appended to this checkout's roster; \
+                 it travels to the other devices by git)",
+                outcome.handle,
+                short_did(&outcome.device)
+            );
+            Ok(ExitCode::SUCCESS)
+        }
         other => Err(ActorError::InvalidArguments(format!(
-            "unknown device verb `{other}`{} — enroll | authorize | bind | endpoint\n{}",
+            "unknown device verb `{other}`{} — enroll | authorize | bind | endpoint | contest\n{}",
             crate::hint::did_you_mean(
                 other,
                 "epr actor device",
-                &["enroll", "authorize", "bind", "endpoint"]
+                &["enroll", "authorize", "bind", "endpoint", "contest"]
             ),
             usage()
         ))),
@@ -2113,6 +2148,113 @@ fn endpoint_handle(root: &Path, did: &str) -> ActorResult<String> {
     }
 }
 
+/// The machine-facing result of `device contest`.
+#[derive(Debug, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct DeviceContestOutcome {
+    pub handle: String,
+    /// The contested device, `did:key:…`.
+    pub device: String,
+    /// The row the contested device stood on (its binding, or its genesis for the chain root).
+    pub target_cid: String,
+    /// This device, `did:key:…` — the contest row's signer.
+    pub by: String,
+    pub basis: String,
+    /// CID of the appended `Contest` row.
+    pub row_cid: String,
+    pub roster_path: String,
+}
+
+/// `epr actor device contest --device <did:key> --basis "<line>"` — retire another device of
+/// this lineage: a `Contest` row naming the roster row that device stands on (its binding, or the
+/// genesis for the chain root), signed by THIS device. Admission reads the roster in each
+/// checkout, so the contested device stops being admitted here at once (spec §3.1) and on the
+/// other devices when the row reaches them by git. Its access to the repository is a separate
+/// matter.
+///
+/// Refused, appending nothing: this device does not stand on the roster; the target is this
+/// device; the target is not a device of the lineage, or is already contested; an empty basis.
+pub fn device_contest(
+    root: &Path,
+    handle: Option<&str>,
+    target: &str,
+    basis: &str,
+    device: &DeviceKey,
+) -> ActorResult<DeviceContestOutcome> {
+    let did = device.did_key();
+    let basis = basis.trim();
+    if basis.is_empty() {
+        return Err(ActorError::InvalidArguments(
+            "a device contest needs a basis — one line the contester stands behind".into(),
+        ));
+    }
+    if target == did {
+        return Err(ActorError::InvalidArguments(format!(
+            "{} is this device — a device does not contest itself; contest it from another \
+             device of the lineage",
+            short_did(&did)
+        )));
+    }
+    let verifier = verifier();
+    let handle = match handle {
+        Some(handle) => {
+            Roster::new(handle)?;
+            handle.to_string()
+        }
+        None => endpoint_handle(root, &did)?,
+    };
+    if !roster_file(root, &handle).is_file() {
+        return Err(ActorError::InvalidArguments(format!(
+            "{handle} has no roster in this checkout ({})",
+            roster_rel(&handle)
+        )));
+    }
+    let mut roster_tx = SidecarRoster::open(root, &handle)?.transaction()?;
+    let roster = roster_tx.read()?;
+    if roster.device_standing_row(&did, &verifier).is_none() {
+        return Err(ActorError::InvalidArguments(format!(
+            "this device ({}) does not stand on {handle}'s roster — only a standing device's \
+             contest counts",
+            short_did(&did)
+        )));
+    }
+    let Some(standing) = roster.device_standing_row(target, &verifier) else {
+        return Err(ActorError::InvalidArguments(
+            if roster.members(&verifier).contains(target) {
+                format!(
+                    "{} is already contested on {handle}'s roster — nothing to add",
+                    short_did(target)
+                )
+            } else {
+                format!(
+                    "{} is not a device of {handle}'s lineage — nothing to contest",
+                    short_did(target)
+                )
+            },
+        ));
+    };
+    let row = signed_row(
+        ParticipantRow::Contest {
+            handle: handle.clone(),
+            target_cid: standing.row_cid.clone(),
+            by: did.clone(),
+            basis: basis.to_string(),
+            signature: String::new(),
+        },
+        device,
+    )?;
+    let row_cid = roster_tx.append(row)?;
+    Ok(DeviceContestOutcome {
+        handle: handle.clone(),
+        device: target.to_string(),
+        target_cid: standing.row_cid,
+        by: did,
+        basis: basis.to_string(),
+        row_cid: row_cid.to_string(),
+        roster_path: roster_rel(&handle),
+    })
+}
+
 /// The `seq` this device's next endpoint row carries: one above the highest `seq` among the
 /// device's own verifying endpoint rows, so it supersedes every one of them. Rows that do not
 /// verify as the device's are not the device's and never raise it.
@@ -2276,7 +2418,8 @@ pub fn usage() -> String {
      | device enroll --handle <handle> [--root DIR]\n  \
      | device authorize <request-json-or-path> [--root DIR]\n  \
      | device bind <authorization-json-or-path> [--root DIR]\n  \
-     | device endpoint --node-id <iroh-node-id> [--handle <handle>] [--root DIR]\n\
+     | device endpoint --node-id <iroh-node-id> [--handle <handle>] [--root DIR]\n  \
+     | device contest --device <did:key> --basis \"<line>\" [--handle <handle>] [--root DIR]\n\
      >\n\
      `actor device` puts this machine's key on this repository's roster for a participant. \
      To join a node to a person's identity on the network instead, see `epr device`."

@@ -12,8 +12,8 @@ use std::path::{Path, PathBuf};
 use std::process::{Command, Output};
 
 use elohim_epr_cli::actor::{
-    self, claim_with_device, contest, device_authorize, device_bind, device_endpoint,
-    device_enroll, witness, ActorError, RosterState,
+    self, claim_with_device, contest, device_authorize, device_bind, device_contest,
+    device_endpoint, device_enroll, witness, ActorError, RosterState,
 };
 use elohim_epr_cli::device_key::{self, DeviceKey};
 use elohim_epr_rea::{
@@ -592,6 +592,98 @@ fn device_endpoint_refuses_unrostered_devices_taken_ids_and_bad_ids() {
             (NODE_A.to_string(), a.did_key()),
             (NODE_B.to_string(), b.did_key()),
         ])
+    );
+}
+
+#[test]
+fn device_contest_revokes_another_devices_binding_and_admission_drops_it() {
+    let dir = fixture();
+    let keys = TempDir::new().unwrap();
+    let root = dir.path();
+    let (key_a, a) = device(&keys, "a");
+    let (_, b) = device(&keys, "b");
+    let (_, stranger) = device(&keys, "stranger");
+    witness(root, SUBJECT, WITNESS, SESSION, BASIS, false, &a).unwrap();
+    bind_second_device(root, &a, &b);
+    device_endpoint(root, None, NODE_A, &a).unwrap();
+    device_endpoint(root, None, NODE_B, &b).unwrap();
+    let rows = roster_rows(root, "matthew");
+    assert_eq!(
+        admitted_endpoints(&rows, &a.did_key(), &device_key::verify).len(),
+        2
+    );
+    let binding_cid = SidecarRoster::open(root, "matthew")
+        .unwrap()
+        .read()
+        .unwrap()
+        .rows()
+        .iter()
+        .find(|(_, row)| matches!(row, ParticipantRow::Binding { controller, .. } if *controller == b.did_key()))
+        .map(|(cid, _)| cid.to_string())
+        .expect("b's binding");
+
+    // A, through the built binary, contests B's entry: one Contest row of A's naming B's binding.
+    let b_did = b.did_key();
+    let out = epr(
+        root,
+        &key_a,
+        &[
+            "actor",
+            "device",
+            "contest",
+            "--device",
+            &b_did,
+            "--basis",
+            "an old workspace, retired",
+        ],
+    );
+    let stderr = String::from_utf8_lossy(&out.stderr).to_string();
+    assert!(out.status.success(), "contest runs: {stderr}");
+    let outcome: serde_json::Value = serde_json::from_slice(&out.stdout).unwrap();
+    assert_eq!(outcome["handle"], "matthew");
+    assert_eq!(outcome["device"], b_did);
+    assert_eq!(outcome["by"], a.did_key());
+    assert_eq!(outcome["targetCid"], binding_cid);
+    let rows = roster_rows(root, "matthew");
+    let ParticipantRow::Contest {
+        target_cid,
+        by,
+        basis,
+        signature,
+        ..
+    } = rows.last().unwrap()
+    else {
+        panic!("a contest row expected: {rows:?}")
+    };
+    assert_eq!((target_cid, by), (&binding_cid, &a.did_key()));
+    assert_eq!(basis, "an old workspace, retired");
+    assert!(!signature.is_empty());
+    // Admission (what every daemon reads) no longer admits B; A stands as before.
+    assert_eq!(
+        admitted_endpoints(&rows, &a.did_key(), &device_key::verify),
+        BTreeMap::from([(NODE_A.to_string(), a.did_key())])
+    );
+
+    // Refusals, each appending nothing.
+    let before = roster_rows(root, "matthew").len();
+    let err = device_contest(root, None, &b_did, "again", &a).expect_err("already contested");
+    assert!(err.to_string().contains("already contested"), "{err}");
+    let err = device_contest(root, None, &a.did_key(), "myself", &a).expect_err("self");
+    assert!(err.to_string().contains("itself"), "{err}");
+    let err = device_contest(root, None, &stranger.did_key(), "who", &a).expect_err("unknown");
+    assert!(err.to_string().contains("not a device of"), "{err}");
+    let err = device_contest(root, Some("matthew"), &a.did_key(), "x", &stranger)
+        .expect_err("a stranger has no standing to contest");
+    assert!(err.to_string().contains("does not stand"), "{err}");
+    let err = device_contest(root, Some("matthew"), &a.did_key(), "x", &b)
+        .expect_err("a contested device no longer stands");
+    assert!(err.to_string().contains("does not stand"), "{err}");
+    let err = device_contest(root, None, &b_did, " ", &a).expect_err("a basis is required");
+    assert!(err.to_string().contains("basis"), "{err}");
+    assert_eq!(
+        roster_rows(root, "matthew").len(),
+        before,
+        "nothing appended"
     );
 }
 
