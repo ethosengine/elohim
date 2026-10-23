@@ -442,7 +442,9 @@ seams:
     # `eprfs-core`, `eprfs-local`, `eprfs-storage` (elohim/eprfs) — the eprfs content-addressing
     # family this plane_note names: byte-integrity, verified-closure and private local custody
     # decisions that explicitly elect no head and publish nothing. Routed 2026-10-09 (registries
-    # born unrouted at bca121bdc, 2026-09-28).
-    registry_crates: [elohim-seam-contracts, elohim-epr-rea, elohim-epr-cli, eprfs-core, eprfs-local, eprfs-storage]
+    # born unrouted at bca121bdc, 2026-09-28). `eprfs-serve` is the same family's serving side
+    # (reach-judged answers to another tier, no election, no head order); routed 2026-10-23 after
+    # its registry was born unrouted at 5e7612aa7.
+    registry_crates: [elohim-seam-contracts, elohim-epr-rea, elohim-epr-cli, eprfs-core, eprfs-local, eprfs-storage, eprfs-serve]
     habits: []
     n_a_concerns: []
