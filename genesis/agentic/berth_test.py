@@ -681,6 +681,232 @@ class ConcurrencyTest(unittest.TestCase):
             self.assertEqual(len(f.read().splitlines()), 1)
 
 
+STEWARD_POLICY = {"berth": {
+    "resources": {"mesh": 1, "cargo": 2, "disk-heavy": 1,
+                  "dev-integration": {"capacity": 1, "scope": "steward"},
+                  "jenkins-dispatch": {"capacity": 1, "scope": "steward"},
+                  "alpha-fleet": {"capacity": 1, "scope": "steward"},
+                  "lane:": {"capacity": 1, "scope": "steward"}},
+    "channel": {"freshness_s": 90, "confirm_wait_s": 10,
+                "crosses": {"dev-berth-events@1": ["claim", "release", "override"]}}}}
+DEVICE_A = "did:key:z6MkDeviceA"
+DEVICE_B = "did:key:z6MkDeviceB"
+# 2026-10-23T15:28:09Z, unix milliseconds.
+SINCE_MS = 1792769289000
+NOW_MS = SINCE_MS + 600_000
+
+STUB_EPR = r"""#!/usr/bin/env python3
+# A stand-in `epr`: answers `peer leases --json` with the next view in views.jsonl (the last one
+# repeats) and logs every leases call; anything else (the fold emitter) succeeds silently.
+import json, os, sys
+here = os.path.dirname(os.path.abspath(__file__))
+if sys.argv[1:3] != ["peer", "leases"]:
+    sys.exit(0)
+with open(os.path.join(here, "calls.log"), "a") as f:
+    f.write(json.dumps(sys.argv[1:]) + "\n")
+with open(os.path.join(here, "calls.log")) as f:
+    n = sum(1 for _ in f)
+with open(os.path.join(here, "views.jsonl")) as f:
+    views = [line for line in f.read().splitlines() if line.strip()]
+line = views[min(n, len(views)) - 1]
+if line.startswith("EXIT "):
+    code, _, message = line[5:].partition(" ")
+    sys.stderr.write(message + "\n")
+    sys.exit(int(code))
+print(line)
+"""
+
+
+def view(**resources):
+    out = {"now": NOW_MS, "confirm_wait_s": 10}
+    out.update({k.replace("_", "-"): v for k, v in resources.items()})
+    return out
+
+
+def held_by_a(override=False):
+    return {"verdict": "held_by", "device": DEVICE_A, "session": "claude-1", "since": SINCE_MS,
+            "override": override}
+
+
+def unconfirmed_a(session="codex-1", last_seen=NOW_MS - 180_000):
+    return {"verdict": "unconfirmed", "session": session, "device": DEVICE_A, "last_seen": last_seen}
+
+
+class StewardClaimTest(unittest.TestCase):
+    """Steward-scoped resources (dev-integration, jenkins-dispatch, alpha-fleet, lane:<id>) are shared
+    by every device of one person: a claim writes its lease, then reads `epr peer leases --json` until
+    the verdict leaves pending. `held by` and `unconfirmed:` refuse (exit 3) and release the lease;
+    --offline-ok overrides only `unconfirmed`, on the record. Container-scoped resources never ask."""
+
+    def setUp(self):
+        self.directory = tempfile.TemporaryDirectory()
+        self.addCleanup(self.directory.cleanup)
+        root = Path(self.directory.name)
+        self.policy = root / "pool-policy.json"
+        self.policy.write_text(json.dumps(STEWARD_POLICY))
+        self.bin = root / "bin"
+        self.bin.mkdir()
+        self.epr = self.bin / "epr"
+        self.epr.write_text(STUB_EPR)
+        self.epr.chmod(0o755)
+        self.clock = [SINCE_MS / 1000 + 590]
+        self.slept = []
+        self.obs = FakeObservation()
+        self.berth = Berth(str(root / "berth"), now=lambda: self.clock[0], obs=self.obs,
+                           policy_path=str(self.policy))
+        self.berth.epr = str(self.epr)
+        self.berth.sleep = self.sleep
+        for session in ("codex-1", "other"):
+            self.berth.moor(session)
+
+    def sleep(self, seconds):
+        self.slept.append(seconds)
+        self.clock[0] += seconds
+
+    def views(self, *views):
+        (self.bin / "views.jsonl").write_text(
+            "".join((v if isinstance(v, str) else json.dumps(v)) + "\n" for v in views))
+
+    def calls(self):
+        try:
+            return [json.loads(line) for line in (self.bin / "calls.log").read_text().splitlines()]
+        except FileNotFoundError:
+            return []
+
+    def rows(self, kind=None):
+        return [r for r in self.berth.ledger(1000) if kind is None or r["kind"] == kind]
+
+    def test_the_repository_policy_declares_the_steward_resources(self):
+        b = Berth(os.path.join(self.directory.name, "real"), now=lambda: 0,
+                  policy_path=str(REPO / "genesis/agentic/pool-policy.json"))
+        for name in ("dev-integration", "jenkins-dispatch", "alpha-fleet", "lane:t6"):
+            self.assertTrue(b.steward_scoped(name), name)
+        for name in ("mesh", "cargo", "disk-heavy", "lane:"):
+            self.assertFalse(b.steward_scoped(name), name)
+        self.assertEqual(b.confirm_wait_s, 10)
+        self.assertEqual(b.freshness_s, 90)
+        self.assertEqual(b.capacities["cargo"], 2)
+        self.assertEqual(b.capacities["dev-integration"], 1)
+
+    def test_steward_claim_unconfirmed_names_device(self):
+        self.views(view(dev_integration={"verdict": "pending", "session": "codex-1",
+                                         "waiting_on": [DEVICE_A]}),
+                   view(dev_integration=unconfirmed_a()))
+        ok, lease, reason = self.berth.claim("dev-integration", "codex-1")
+        self.assertFalse(ok)
+        self.assertIsNone(lease)
+        self.assertEqual(reason, f"unconfirmed: {DEVICE_A} last seen 3m ago")
+        self.assertNotIn("free", reason)
+        # It waited, polling at most every 250 ms, and asked about its own claim only.
+        self.assertEqual(len(self.calls()), 2)
+        self.assertTrue(self.slept and all(s <= 0.25 for s in self.slept))
+        self.assertIn("--json", self.calls()[0])
+        # The pending lease does not linger as held.
+        self.assertIsNone(self.berth.who("dev-integration"))
+        self.assertEqual(self.rows("release")[-1]["resource"], "dev-integration")
+        # A device never folded reads "never seen".
+        self.views(view(dev_integration=unconfirmed_a(last_seen=None)))
+        self.assertEqual(self.berth.claim("dev-integration", "codex-1")[2], f"unconfirmed: {DEVICE_A} never seen")
+
+    def test_unconfirmed_age_reads_seconds_minutes_then_hours(self):
+        fmt = _NS["steward_reason"]
+        ages = [(119_999, "119s"), (120_000, "2m"), (7_199_999, "119m"), (7_200_000, "2h"), (9_000_000, "2h")]
+        for age_ms, text in ages:
+            self.assertEqual(fmt(unconfirmed_a(last_seen=NOW_MS - age_ms), NOW_MS),
+                             f"unconfirmed: {DEVICE_A} last seen {text} ago")
+
+    def test_steward_claim_held_names_holder(self):
+        self.views(view(dev_integration=held_by_a()))
+        for offline_ok in (False, True):
+            ok, lease, reason = self.berth.claim("dev-integration", "codex-1", offline_ok=offline_ok)
+            self.assertFalse(ok)
+            self.assertIsNone(lease)
+            # An override never overrides a held lease.
+            self.assertEqual(reason, f"held by {DEVICE_A}/claude-1 since 2026-10-23T15:28:09Z")
+            self.assertIsNone(self.berth.who("dev-integration"))
+        # Refused at once: a folded overlapping lease is not waited on.
+        self.assertEqual(self.slept, [])
+        self.assertEqual(self.rows("override"), [])
+
+    def test_offline_ok_writes_override(self):
+        self.views(view(dev_integration=unconfirmed_a()))
+        ok, lease, reason = self.berth.claim("dev-integration", "codex-1", offline_ok=True)
+        self.assertTrue(ok, reason)
+        self.assertEqual(self.berth.who("dev-integration")["holder"], "codex-1")
+        row = self.rows("override")[-1]
+        self.assertEqual((row["resource"], row["session"], row["holder"]), ("dev-integration", "codex-1", "codex-1"))
+        self.assertEqual(row["overrode"], DEVICE_A)
+        self.assertEqual(row["claimed_at"], lease["claimed_at"])
+        self.assertIn(f"unconfirmed: {DEVICE_A} last seen 3m ago", row["reason"])
+        # The override row crosses like any berth record.
+        self.assertEqual(self.obs.events[-1]["reason"], "override")
+        self.assertEqual(self.obs.events[-1]["env"]["overrode"], DEVICE_A)
+
+    def test_single_device_steward_claim_effective(self):
+        self.views(json.dumps({"now": NOW_MS, "confirm_wait_s": 10,
+                               "lane:t6": {"verdict": "effective", "session": "codex-1"}}))
+        ok, lease, reason = self.berth.claim("lane:t6", "codex-1", note="the lease view")
+        self.assertTrue(ok, reason)
+        self.assertEqual(len(self.calls()), 1)
+        self.assertEqual(self.slept, [], "no other admitted device: effective at once, no wait")
+        self.assertEqual(self.berth.who("lane:t6")["holder"], "codex-1")
+
+    def test_container_scope_never_calls_peer(self):
+        self.views("EXIT 1 a container claim must never ask")
+        self.assertTrue(self.berth.claim("cargo", "codex-1")[0])
+        self.assertTrue(self.berth.owner_check("cargo", "other", "stop")[0] is False)
+        self.berth.epr = "/nonexistent/epr"
+        self.assertTrue(self.berth.claim("mesh", "codex-1")[0])
+        self.assertEqual(self.calls(), [])
+
+    def test_missing_epr_refuses_a_steward_claim_naming_the_cure(self):
+        self.berth.epr = "/nonexistent/epr"
+        ok, lease, reason = self.berth.claim("dev-integration", "codex-1")
+        self.assertFalse(ok)
+        self.assertIsNone(lease)
+        self.assertIn("EPR_BIN", reason)
+        self.assertIsNone(self.berth.who("dev-integration"))
+        self.assertEqual(self.rows("claim"), [], "no lease is written that could not be confirmed")
+
+    def test_an_unreadable_view_is_never_free(self):
+        self.views("EXIT 2 epr peer: this device has no device key")
+        ok, lease, reason = self.berth.claim("dev-integration", "codex-1")
+        self.assertFalse(ok)
+        self.assertIn("this device has no device key", reason)
+        self.assertIsNone(self.berth.who("dev-integration"))
+        # A claim whose own lease is missing from the view (its record never reached the flow store)
+        # is not effective either.
+        self.views(view())
+        ok, _, reason = self.berth.claim("dev-integration", "codex-1")
+        self.assertFalse(ok)
+        self.assertIn("flow store", reason)
+
+    def test_owner_check_reads_the_same_view(self):
+        self.views(view(alpha_fleet=held_by_a()))
+        ok, _, reason = self.berth.owner_check("alpha-fleet", "codex-1", "deploy")
+        self.assertFalse(ok)
+        self.assertEqual(reason, f"held by {DEVICE_A}/claude-1 since 2026-10-23T15:28:09Z")
+        # --force overrides a local holder, never another device's lease.
+        self.assertFalse(self.berth.owner_check("alpha-fleet", "codex-1", "deploy", force=True)[0])
+        self.views(view())
+        self.assertTrue(self.berth.owner_check("alpha-fleet", "codex-1", "deploy")[0])
+
+    def test_cli_refusal_is_exit_3_with_one_reason_line(self):
+        project = Path(self.directory.name) / "project"
+        (project / "genesis" / "agentic").mkdir(parents=True)
+        (project / "genesis" / "agentic" / "pool-policy.json").write_text(json.dumps(STEWARD_POLICY))
+        self.views(view(dev_integration=held_by_a()))
+        env = {k: v for k, v in os.environ.items() if k not in ("BERTH_SESSION", "CLAUDE_SESSION_ID")}
+        env.update({"BERTH_DIR": os.path.join(self.directory.name, "cli-berth"), "EPR_BIN": str(self.epr),
+                    "CLAUDE_PROJECT_DIR": str(project)})
+        for extra in ([], ["--offline-ok"]):
+            r = subprocess.run([sys.executable, str(REPO / "genesis/agentic/bin/berth"), "claim", "dev-integration",
+                                "--session", "codex-1", *extra], env=env, capture_output=True, text=True, timeout=60)
+            self.assertEqual(r.returncode, 3, r.stderr)
+            self.assertEqual(r.stderr.splitlines(),
+                             [f"dev-integration: REFUSED — held by {DEVICE_A}/claude-1 since 2026-10-23T15:28:09Z"])
+
+
 class StoreUnavailableTest(unittest.TestCase):
     """The berth store is the host session's organ, never a guest's: an invocation that cannot open
     it exits 4 (the wrapper's proceed-unleased code) with one named line, never a traceback."""

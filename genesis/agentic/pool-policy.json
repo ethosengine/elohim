@@ -100,15 +100,21 @@
     }
   },
   "berth": {
-    "_comment": "Carrying capacity of THIS workspace as one tevah berth (genesis/agentic/bin/berth). Sessions moor (who: session, model, lab, runtime, principal; what: task, write_set), claim/release leases on the named resources, and leave deliberation notes on the record. Records are Ephemeral (C) locally and shaped for their protocol homes: mooring → delegates-compute Mishpat::Commitment, lease → REA `use` commitment, note → witnessed interaction, shed → tevah §5.3 breach event. capacity 1 = one holder at a time; a second claimant is REFUSED (exit 3) with the holder named, never queued.",
+    "_comment": "Carrying capacity of THIS workspace as one tevah berth (genesis/agentic/bin/berth). Sessions moor (who: session, model, lab, runtime, principal; what: task, write_set), claim/release leases on the named resources, and leave deliberation notes on the record. Records are Ephemeral (C) locally and shaped for their protocol homes: mooring → delegates-compute Mishpat::Commitment, lease → REA `use` commitment, note → witnessed interaction, shed → tevah §5.3 breach event. capacity 1 = one holder at a time; a second claimant is REFUSED (exit 3) with the holder named, never queued. A resource entry is a capacity (container-scoped: this workspace's own, never consulting peers) or {capacity, scope: container|steward}. Steward-scoped resources are shared by every device of one person (spec 2026-10-23-workspaces-cooperate-as-devices-design.md §3.4): a claim on one asks `epr peer leases --json` and is effective only once every other admitted device has acknowledged it; `held by …` and `unconfirmed: …` exit 3, and --offline-ok overrides only `unconfirmed`, writing a `kind: override` row. A key ending in `:` names a prefix: `lane:` covers every `lane:<id>`.",
     "resources": {
       "mesh": 1,
       "cargo": 2,
-      "disk-heavy": 1
+      "disk-heavy": 1,
+      "dev-integration": { "capacity": 1, "scope": "steward" },
+      "jenkins-dispatch": { "capacity": 1, "scope": "steward" },
+      "alpha-fleet": { "capacity": 1, "scope": "steward" },
+      "lane:": { "capacity": 1, "scope": "steward" }
     },
     "mooring_ttl_s": 10800,
     "channel": {
-      "_comment": "The steward channel between one person's devices (spec 2026-10-23-workspaces-cooperate-as-devices-design.md §3.3). `crosses` is the crossing allow-list `epr peer serve` projects each device's channel tree from: {measure: [kinds]}, default deny. Only the berth records the spec names cross (moor, unmoor, claim, renew, release, override, note = a `berth say`, shed); refuse and overrun stay local. Recall sessions and receipts, private memory, session transcripts and every other measure never cross. The env:<k>=<v> slots a berth record carries are its own fields, never process environment.",
+      "_comment": "The steward channel between one person's devices (spec 2026-10-23-workspaces-cooperate-as-devices-design.md §3.3). `crosses` is the crossing allow-list `epr peer serve` projects each device's channel tree from: {measure: [kinds]}, default deny. Only the berth records the spec names cross (moor, unmoor, claim, renew, release, override, note = a `berth say`, shed); refuse and overrun stay local. Recall sessions and receipts, private memory, session transcripts and every other measure never cross. The env:<k>=<v> slots a berth record carries are its own fields, never process environment. `confirm_wait_s` is how long a steward-scoped claim waits for every other admitted device to acknowledge it before it reads `unconfirmed`; `freshness_s` only sets when `berth status` reports a device as silent.",
+      "freshness_s": 90,
+      "confirm_wait_s": 10,
       "crosses": {
         "dev-berth-events@1": ["moor", "unmoor", "claim", "renew", "release", "override", "note", "shed"]
       }

@@ -28,7 +28,7 @@ Commands:
   berth unmoor  --session S                                        leave; releases every lease held
   berth touch   --session S [--pid N]                              liveness heartbeat (hooks call it)
   berth claim   RESOURCE --session S [--class verify|measure|mesh] [--ttl SECONDS] [--note TEXT]
-                                                                   take one unit; exit 3 if held or refused
+                [--offline-ok]                                     take one unit; exit 3 if held or refused
   berth release RESOURCE --session S [--force]                     --force gives back whoever holds it
   berth owner-check RESOURCE [--action A] [--force]                exit 3 while another live session
                                                                    holds it; --force = override row
@@ -43,6 +43,19 @@ Resources (capacity 1 unless pool-policy.json `berth.resources` says otherwise):
   mesh        the household mesh (start/stop/prologue/test mesh)
   cargo       one heavy cargo build/test/check per container (pool-policy io.max_concurrent_heavy)
   disk-heavy  any sustained-write job that is not cargo (prologue seed, pnpm install, blob sync)
+
+Steward-scoped resources (pool-policy.json `berth.resources.<name>.scope: steward`) are shared by every
+device of one person, not this workspace alone: dev-integration, jenkins-dispatch, alpha-fleet and every
+`lane:<id>`. A claim on one writes its lease (a crossing record), then reads `epr peer leases --json`
+every 250 ms until the verdict leaves pending, at most `berth.channel.confirm_wait_s` (10 s): it is
+effective once every other admitted device has acknowledged it, at once when no other device is
+admitted. Otherwise it releases the lease and exits 3 with one reason line:
+  held by <device-did>/<session> since <YYYY-MM-DDTHH:MM:SSZ>
+  unconfirmed: <device-did> last seen <n>s|<n>m|<n>h ago   (or: never seen)
+--offline-ok takes an `unconfirmed` lease anyway and writes a `kind: override` row naming the silent
+device; it never overrides `held by`. `owner-check` reads the same view. A missing `epr` or a view it
+cannot compute refuses: an absent device is never read as a free resource. Container-scoped resources
+never ask a peer.
 
 Lease classes (pool-policy.json `berth.classes.<resource>`; a resource with no table takes any class
 and gets no default ttl). The mesh lease is the dev berth's router:
@@ -75,6 +88,8 @@ import errno
 import fcntl
 import json
 import os
+import shutil
+import subprocess
 import sys
 import time
 
@@ -84,6 +99,10 @@ POLICY_FILE = os.path.join(PROJECT_DIR, "genesis", "agentic", "pool-policy.json"
 DEFAULT_TTL_S = 3 * 3600
 DEFAULT_RESOURCES = {"mesh": 1, "cargo": 1, "disk-heavy": 1}
 DEFAULT_CLASS = "verify"
+DEFAULT_CONFIRM_WAIT_S = 10
+DEFAULT_FRESHNESS_S = 90
+POLL_S = 0.25  # how often a steward claim re-reads the lease view
+PEER_TIMEOUT_S = 10
 OVERRUN_MEASURE = "dev-berth-held-by-measure@1"
 EVENTS_MEASURE = "dev-berth-events@1"
 # The measure emitter lives beside the hooks; bin/berth → genesis/agentic → genesis → repo root.
@@ -149,7 +168,9 @@ def load_policy(path=POLICY_FILE):
             caps["cargo"] = int(io_pol["max_concurrent_heavy"])
         berth = pol.get("berth") or {}
         for k, v in (berth.get("resources") or {}).items():
-            caps[k] = int(v)
+            if k.startswith("_"):
+                continue
+            caps[k] = int(v.get("capacity", 1)) if isinstance(v, dict) else int(v)
         if berth.get("mooring_ttl_s"):
             mooring_ttl_s = int(berth["mooring_ttl_s"])
         classes = {k: v for k, v in (berth.get("classes") or {}).items() if isinstance(v, dict)}
@@ -160,6 +181,49 @@ def load_policy(path=POLICY_FILE):
 
 def load_capacities(path=POLICY_FILE):
     return load_policy(path)[0]
+
+
+def load_steward(path=POLICY_FILE):
+    """(names, prefixes, confirm_wait_s, freshness_s): the steward-scoped resources pool-policy.json
+    declares (`berth.resources.<name>.scope: steward`; a key ending in `:` is a prefix) and the
+    channel's waits. None declared on any miss: every resource is then container-scoped."""
+    names, prefixes = set(), set()
+    wait, fresh = DEFAULT_CONFIRM_WAIT_S, DEFAULT_FRESHNESS_S
+    try:
+        with open(path) as f:
+            berth = json.load(f).get("berth") or {}
+        for k, v in (berth.get("resources") or {}).items():
+            if isinstance(v, dict) and v.get("scope") == "steward":
+                (prefixes if k.endswith(":") else names).add(k)
+        channel = berth.get("channel") or {}
+        wait = int(channel.get("confirm_wait_s", wait))
+        fresh = int(channel.get("freshness_s", fresh))
+    except Exception:
+        pass
+    return names, prefixes, wait, fresh
+
+
+def _rfc3339(ms):
+    """Unix milliseconds as RFC 3339 UTC, whole seconds (floored), `Z`."""
+    return time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime(int(ms) // 1000))
+
+
+def _peer_age(ms):
+    """An age for a refusal line: `<n>s` under 120 s, `<n>m` under 120 min, else `<n>h` (floored)."""
+    secs = max(0, int(ms) // 1000)
+    return f"{secs}s" if secs < 120 else (f"{secs // 60}m" if secs < 7200 else f"{secs // 3600}h")
+
+
+def steward_reason(verdict, now_ms):
+    """The one reason line a refused steward claim prints, from its `epr peer leases` verdict:
+    `held by <device>/<session> since <time>` or `unconfirmed: <device> last seen <age> ago`. The a2o
+    steps for devices-share-one-berth match these words; this is their only formatter."""
+    if verdict.get("verdict") == "held_by":
+        return f"held by {verdict['device']}/{verdict['session']} since {_rfc3339(verdict['since'])}"
+    seen = verdict.get("last_seen")
+    if seen is None:
+        return f"unconfirmed: {verdict['device']} never seen"
+    return f"unconfirmed: {verdict['device']} last seen {_peer_age(now_ms - seen)} ago"
 
 
 def proc_ancestry(pid=None, hops=32):
@@ -195,7 +259,12 @@ class Berth:
         self.lock_path = os.path.join(self.dir, "berth.lock")
         self.emitted_dir = os.path.join(self.dir, "emitted")
         self.now = now or time.time
+        self.policy_path = policy_path
         self.capacities, self.mooring_ttl_s, self.classes = load_policy(policy_path)
+        (self.steward_names, self.steward_prefixes,
+         self.confirm_wait_s, self.freshness_s) = load_steward(policy_path)
+        self.epr = None  # injectable: the `epr` a steward claim asks; else resolved like the fold emitter
+        self.sleep = time.sleep  # injectable: tests advance a fake clock instead
         self._obs = obs  # the `_observation` emitter; injected by tests, else imported lazily
         self._lock_depth = {}
         self._pending_folds = []  # (kind, row) queued by record(); flushed once no berth lock is held
@@ -554,13 +623,15 @@ class Berth:
         return lease
 
     def claim(self, resource, session, note=None, ttl_s=None, klass=None, seat=None, override=False,
-              session_source=None):
+              session_source=None, offline_ok=False):
         """Returns (ok, lease, reason). A live holder that is not us ⇒ refused (exit 3): the honest
         answer is 'held by X since T', never a silent queue. Capacity > 1 is modelled as slots.
 
         The class table routes: a class the policy marks `allowed: false` is refused with its named
         alternative unless `override` (MEASURE_ON_DEV_BERTH=1) declares the hold — then it claims,
         writes a `kind: override` row and emits dev-berth-held-by-measure@1 = ttl immediately.
+        A steward-scoped resource is then settled across this person's devices (`_settle_steward`);
+        `offline_ok` takes an `unconfirmed` one anyway, on the record.
         Raises BerthUsage for a mis-stated claim (unknown class, override without --ttl)."""
         klass = klass or DEFAULT_CLASS
         explicit_ttl = ttl_s is not None
@@ -598,9 +669,20 @@ class Berth:
                 return False, None, (f"a {klass} lease on {resource} holds at most {int(cap)}s and --ttl {ttl_s} is "
                                      f"longer — declare it measure (`just measure <scope>`, or "
                                      f"MEASURE_ON_DEV_BERTH=1 --class measure --ttl {ttl_s})")
+        steward = self.steward_scoped(resource)
+        if steward and not self.epr_bin():
+            # Checked before any lease is written: a lease that cannot be confirmed is never taken.
+            where = self.epr or "$EPR_BIN, the gate target or PATH"
+            reason = (f"no `epr` binary to read the steward lease view (looked at {where}) — build it "
+                      f"(`cargo build --manifest-path elohim/eprfs/Cargo.toml -p elohim-epr-cli`) or set EPR_BIN; "
+                      f"a steward-scoped claim is never taken unconfirmed")
+            self.record("refuse", resource=resource, session=session, reason="no-epr", **{"class": klass})
+            return False, None, reason
         with self._locked():
             ok, lease, reason = self._claim_locked(resource, session, note, ttl_s if explicit_ttl else None,
                                                    ttl_s, klass, seat, overriding, session_source)
+        if ok and steward:
+            return self._settle_steward(resource, session, lease, offline_ok)
         if ok and overriding:
             self.record("override", resource=resource, session=session, holder=session, ttl_s=ttl_s,
                         claimed_at=lease.get("claimed_at"), reason=note, seat=seat,
@@ -713,7 +795,18 @@ class Berth:
     def owner_check(self, resource, session, action, force=False, note=None):
         """May `session` do `action` (a destructive act on the resource, e.g. stop the household)?
         Refused while another LIVE session holds the resource; `force` proceeds and writes an
-        `override` row naming whom it overrode. Returns (ok, holders, reason)."""
+        `override` row naming whom it overrode. A steward-scoped resource also reads the steward lease
+        view: another device's lease refuses, `force` or not, and so does a view that cannot be read.
+        Returns (ok, holders, reason)."""
+        if self.steward_scoped(resource):
+            view, err = self.peer_leases()
+            if err:
+                return False, [], err
+            verdict = view.get(resource) or {}
+            if verdict.get("verdict") == "held_by":
+                self.record("refuse", resource=resource, session=session, reason="owner", action=action,
+                            holder=f"{verdict['device']}/{verdict['session']}")
+                return False, [verdict], steward_reason(verdict, self._view_now(view))
         with self._locked():
             live = self.live_leases(self.leases(), resource)
             others = [l for l in live if l.get("holder") != session]
@@ -763,6 +856,89 @@ class Berth:
         if len(live) == 1 and live[0] is leases.get(resource):
             return live[0]
         return live or None
+
+    # ------------------------------------------------------------ steward-scoped resources
+    def steward_scoped(self, resource):
+        """Shared by every device of this person (pool-policy `scope: steward`), not this workspace's
+        own: named, or under a declared prefix (`lane:` covers `lane:<id>`, never bare `lane:`)."""
+        return resource in self.steward_names or any(
+            resource.startswith(p) and len(resource) > len(p) for p in self.steward_prefixes)
+
+    def epr_bin(self):
+        """The `epr` a steward claim asks, found the way the fold emitter finds it ($EPR_BIN, the gate
+        target, PATH), or None when there is no executable one."""
+        path = self.epr
+        if path is None:
+            obs = self.observation()
+            resolve = getattr(obs, "resolve_bin", None) if obs else None
+            path = resolve() if resolve else (os.environ.get("EPR_BIN") or shutil.which("epr"))
+        return path if path and os.path.isfile(path) and os.access(path, os.X_OK) else None
+
+    def peer_leases(self):
+        """(view, error): `epr peer leases --json` for this checkout and policy. An error whenever the
+        view could not be computed — an unreadable view is never a free resource."""
+        epr = self.epr_bin()
+        if not epr:
+            return None, "no `epr` binary to read the steward lease view — set EPR_BIN or build elohim-epr-cli"
+        try:
+            r = subprocess.run([epr, "peer", "leases", "--json", "--root", REPO_ROOT, "--policy", self.policy_path],
+                               capture_output=True, text=True, timeout=PEER_TIMEOUT_S)
+        except (OSError, subprocess.TimeoutExpired) as e:
+            return None, f"the steward lease view did not answer: {e}"
+        if r.returncode != 0:
+            why = (r.stderr.strip().splitlines() or [f"exit {r.returncode}"])[-1]
+            return None, f"the steward lease view could not be computed: {why}"
+        try:
+            view = json.loads(r.stdout)
+        except json.JSONDecodeError as e:
+            return None, f"the steward lease view is not JSON: {e}"
+        if not isinstance(view, dict):
+            return None, "the steward lease view is not an object"
+        return view, None
+
+    def _view_now(self, view):
+        now = view.get("now")
+        return now if isinstance(now, (int, float)) else round(self.now() * 1000)
+
+    def _settle_steward(self, resource, session, lease, offline_ok):
+        """The lease is written (it crosses on this device's next head); read the view until it leaves
+        pending, at most confirm_wait_s (plus a poll's grace, the view's own wait being authoritative).
+        Effective → claimed. held by → refused at once. unconfirmed → refused, or with offline_ok taken
+        anyway with an override row naming the silent device. Every refusal releases the lease, so a
+        claim that did not hold never blocks anyone."""
+        deadline = self.now() + self.confirm_wait_s + 1
+        while True:
+            view, err = self.peer_leases()
+            verdict = (view or {}).get(resource)
+            kind = verdict.get("verdict") if isinstance(verdict, dict) else None
+            if kind == "pending" and verdict.get("session") == session and self.now() < deadline:
+                self.sleep(POLL_S)
+                continue
+            break
+        if err:
+            reason = err
+        elif kind is None:
+            reason = (f"this device's lease on {resource} is not in its flow store (the dev-berth-events@1 fold "
+                      f"did not land — is `epr flow note` working?), so no other device can see it")
+        elif kind == "held_by":
+            reason = steward_reason(verdict, self._view_now(view))
+        elif verdict.get("session") != session:
+            reason = f"held by {verdict.get('session')} on this device"
+        elif kind == "effective":
+            return True, lease, "claimed"
+        elif kind == "unconfirmed":
+            reason = steward_reason(verdict, self._view_now(view))
+            if offline_ok:
+                self.record("override", resource=resource, session=session, holder=session,
+                            claimed_at=lease.get("claimed_at"), overrode=verdict.get("device"),
+                            last_seen=verdict.get("last_seen"), reason=f"--offline-ok over {reason}",
+                            **{"class": lease.get("class")})
+                return True, lease, f"claimed over a silent device; {reason} — override on the record"
+        else:
+            waiting = (verdict.get("waiting_on") or ["another device"])[0]
+            reason = f"unconfirmed: {waiting} did not acknowledge within {self.confirm_wait_s}s"
+        self.release(resource, session, reason=f"steward: {reason}")
+        return False, None, reason
 
     # ------------------------------------------------------------ notes
     def say(self, session, text, to=None):
@@ -952,10 +1128,13 @@ def _main(argv):
     if cmd == "claim":
         # Parsed and class-checked BEFORE the session is resolved: a class this berth does not run
         # is refused (exit 3) whether or not the caller can name itself.
-        usage = "usage: berth claim RESOURCE --session S [--class verify|measure|mesh] [--ttl SECONDS] [--note TEXT]"
+        usage = ("usage: berth claim RESOURCE --session S [--class verify|measure|mesh] [--ttl SECONDS] [--note TEXT] "
+                 "[--offline-ok]")
         ttl = _opt(argv, "--ttl")
         note = _opt(argv, "--note")
         klass = _opt(argv, "--class") or DEFAULT_CLASS
+        offline_ok = "--offline-ok" in argv
+        argv = [a for a in argv if a != "--offline-ok"]
         if not argv:
             print(usage, file=sys.stderr)
             return 2
@@ -975,7 +1154,7 @@ def _main(argv):
             ok, lease, reason = b.claim(res, session, note=note, ttl_s=ttl_s, klass=klass, session_source=source)
             print(f"{res}: REFUSED — {reason}", file=sys.stderr)
             return 3
-        claim_args = (res, note, ttl_s, klass, override)
+        claim_args = (res, note, ttl_s, klass, override, offline_ok)
 
     if cmd == "owner-check":
         if not argv:
@@ -990,6 +1169,9 @@ def _main(argv):
             if force and reason.startswith("forced"):
                 print(f"{argv[0]}: {action} — {reason} (override on the record)", file=sys.stderr)
             return 0
+        if b.steward_scoped(argv[0]):
+            print(f"{argv[0]}: REFUSED — {reason}", file=sys.stderr)
+            return 3
         print(f"{argv[0]}: REFUSED — {reason}. Ask them (`berth say --to <holder> …`), or override on the "
               f"record (MESH_STOP_FORCE=1 for `just mesh stop`)", file=sys.stderr)
         return 3
@@ -1019,14 +1201,14 @@ def _main(argv):
         print(f"unmoored {session}")
         return 0
     if cmd == "claim":
-        res, note, ttl_s, klass, override = claim_args
+        res, note, ttl_s, klass, override, offline_ok = claim_args
         # Claiming is a liveness act: a stale mooring would make the fresh lease look abandoned.
         if not b.touch(session):
             b.moor(session)
         try:
             ok, lease, reason = b.claim(res, session, note=note, ttl_s=ttl_s, klass=klass,
                                         seat=os.environ.get("BERTH_SEAT") or None,
-                                        override=override, session_source=source)
+                                        override=override, session_source=source, offline_ok=offline_ok)
         except BerthUsage as e:
             print(f"berth: {e}", file=sys.stderr)
             return 2
