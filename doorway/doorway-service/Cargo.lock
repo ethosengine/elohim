@@ -1520,6 +1520,7 @@ dependencies = [
  "dotenvy",
  "ed25519-dalek",
  "elohim-cache-core",
+ "elohim-chrome-asset",
  "elohim-compute",
  "elohim-peer-fabric",
  "elohim-render",
@@ -1546,6 +1547,7 @@ dependencies = [
  "ipld-core",
  "jsonschema",
  "jsonwebtoken",
+ "lamad-types",
  "lazy_static",
  "lru 0.16.3",
  "mongodb",
@@ -3241,6 +3243,15 @@ dependencies = [
  "winapi",
  "yaml_serde",
  "zeroize",
+]
+
+[[package]]
+name = "lamad-types"
+version = "0.1.0"
+dependencies = [
+ "holo_hash",
+ "serde",
+ "serde_json",
 ]
 
 [[package]]

@@ -20,14 +20,14 @@ Feature: Blob replication — EPR blobHash metadata propagation to federation pe
   peer so elohim.host can resolve the landing app directly.
 
   Background:
-    Given peer "alpha-A" at "alpha-A"
-    And peer "elohim.host" at "elohim.host"
+    Given federated peer "alpha-A" at "alpha-A"
+    And federated peer "elohim.host" at "elohim.host"
 
   Scenario: alpha-A has a non-null blobHash for the landing EPR (baseline)
     # Green baseline. alpha-A is the deploy-time author peer. The Jenkinsfile
     # stageSpaBlob stage wrote the non-null blobHash into the content record at
     # deploy time. This scenario passes today and confirms the source is correct.
-    Then EPR "elohim-host-landing" blobHash is non-null on peer "alpha-A"
+    Then EPR "elohim-host-landing" blobHash is non-null on federated peer "alpha-A"
 
   Scenario: elohim.host has a non-null blobHash for the landing EPR (RED — the gap)
     # RED-FIRST. elohim.host is the alpha-b federation peer. The EPR content record
@@ -37,7 +37,7 @@ Feature: Blob replication — EPR blobHash metadata propagation to federation pe
     #   AssertionError: EPR "elohim-host-landing" on elohim.host:
     #     blobHash is null — blob not yet attached
     # When it passes, EPR metadata has replicated and elohim.host can serve the landing app.
-    Then EPR "elohim-host-landing" blobHash is non-null on peer "elohim.host"
+    Then EPR "elohim-host-landing" blobHash is non-null on federated peer "elohim.host"
 
   # ── Harvested 2026-07-23 (shift/reach-vocab-slice2): replica targets track declared reach ──
   # Constraint discovered: distribution's ReachClass parsed declared-reach strings

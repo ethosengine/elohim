@@ -3,6 +3,8 @@ import { SimpleChange, ChangeDetectorRef, SecurityContext } from '@angular/core'
 import { IframeRendererComponent, Html5AppContent } from './iframe-renderer.component';
 import { ContentNode } from '../../models/content-node.model';
 import { DomSanitizer } from '@angular/platform-browser';
+import { signal } from '@angular/core';
+import { AppsOriginService } from '../../services/apps-origin.service';
 
 describe('IframeRendererComponent', () => {
   let component: IframeRendererComponent;
@@ -35,9 +37,22 @@ describe('IframeRendererComponent', () => {
     metadata,
   });
 
+  /** The discovery read, already answered: null = unpaired name (same-origin /apps/). */
+  let knownAppsOrigin: ReturnType<typeof signal<string | null | undefined>>;
+  let resolveDiscovery: (origin: string | null) => void;
+  let appsOriginStub: Pick<AppsOriginService, 'appsOrigin' | 'resolve' | 'appUrl'>;
+
   beforeEach(async () => {
+    knownAppsOrigin = signal<string | null | undefined>(null);
+    const pending = new Promise<string | null>(r => (resolveDiscovery = r));
+    appsOriginStub = {
+      appsOrigin: knownAppsOrigin.asReadonly(),
+      resolve: () => pending,
+      appUrl: AppsOriginService.prototype.appUrl,
+    };
     await TestBed.configureTestingModule({
       imports: [IframeRendererComponent],
+      providers: [{ provide: AppsOriginService, useValue: appsOriginStub }],
     }).compileComponents();
 
     fixture = TestBed.createComponent(IframeRendererComponent);
@@ -247,6 +262,60 @@ describe('IframeRendererComponent', () => {
       );
       expect(framed).toBe('/apps/letter-to-dtpr/index.html');
       expect(component.fallbackUrl).toBe('https://claude.ai/artifact/example');
+      expect(component.frameOrigin).toBe('same-origin');
+    });
+
+    const framedUrl = () =>
+      TestBed.inject(DomSanitizer).sanitize(SecurityContext.RESOURCE_URL, component.safeUrl);
+
+    it("frames the apps origin's raw URL when the name is apps-paired", () => {
+      knownAppsOrigin.set('http://apps.elohim.localhost:8888');
+      component.node = createHtml5AppNode({
+        slug: 'letter-to-dtpr',
+        entryPoint: 'index.html',
+      });
+      component.ngOnChanges({
+        node: new SimpleChange(null, component.node, true),
+      });
+
+      expect(framedUrl()).toBe('http://apps.elohim.localhost:8888/apps/letter-to-dtpr/index.html');
+      expect(component.frameOrigin).toBe('http://apps.elohim.localhost:8888');
+    });
+
+    it('waits for the first discovery read rather than framing twice', async () => {
+      knownAppsOrigin.set(undefined);
+      component.node = createHtml5AppNode({
+        slug: 'letter-to-dtpr',
+        entryPoint: 'index.html',
+      });
+      component.ngOnChanges({
+        node: new SimpleChange(null, component.node, true),
+      });
+      expect(component.safeUrl).toBeNull();
+
+      resolveDiscovery('http://apps.elohim.localhost:8888');
+      await Promise.resolve();
+      await Promise.resolve();
+      expect(framedUrl()).toBe('http://apps.elohim.localhost:8888/apps/letter-to-dtpr/index.html');
+    });
+
+    it('drops a late discovery answer for a node that has moved on', async () => {
+      knownAppsOrigin.set(undefined);
+      component.node = createHtml5AppNode({
+        slug: 'first',
+        entryPoint: 'index.html',
+      });
+      component.ngOnChanges({
+        node: new SimpleChange(null, component.node, true),
+      });
+      const next = createContentNode('https://example.com/embed');
+      component.node = next;
+      component.ngOnChanges({ node: new SimpleChange(null, next, false) });
+
+      resolveDiscovery('http://apps.elohim.localhost:8888');
+      await Promise.resolve();
+      await Promise.resolve();
+      expect(framedUrl()).toBe('https://example.com/embed');
     });
 
     it('should use static sandbox policy (Angular security restriction)', fakeAsync(() => {

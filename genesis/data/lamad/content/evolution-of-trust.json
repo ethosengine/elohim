@@ -8,7 +8,8 @@
   "content": {
     "slug": "evolution-of-trust",
     "entryPoint": "index.html",
-    "fallbackUrl": "https://ncase.me/trust/"
+    "fallbackUrl": "https://ncase.me/trust/",
+    "capabilities": []
   },
   "contentFormat": "html5-app",
   "sourcePath": "docs/content/fct/evolution-of-trust",
@@ -39,14 +40,7 @@
     "localZipPath": "docs/content/fct/evolution-of-trust.zip",
     "localIndexPath": "docs/content/fct/evolution-of-trust/index.html",
     "blobHash": "ee5301c995967ff1e0a7b07a7f5e2de4f5f547bb3718547d33248453b77cb30f",
-    "requiredCapabilities": [
-      "javascript"
-    ],
     "securityPolicy": {
-      "sandbox": [
-        "allow-scripts",
-        "allow-same-origin"
-      ],
       "csp": "default-src 'self'; script-src 'unsafe-inline'"
     },
     "thumbnailUrl": "https://ncase.me/trust/social/thumbnail.png",

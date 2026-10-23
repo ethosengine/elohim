@@ -28,7 +28,7 @@ Feature: Chapter 5 — adam co-stewards via a rea-agreement
   the agreement has not yet been notarized and projected on alpha.
 
   Background:
-    Given peer "alpha-A" at "alpha-A"
+    Given federated peer "alpha-A" at "alpha-A"
 
   # ---------------------------------------------------------------------------
   # STATIONS (added 2026-07-26, story-harvest of the overnight cure sprint).

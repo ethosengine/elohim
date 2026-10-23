@@ -187,6 +187,13 @@ elohim-compute = { path = "../../elohim/elohim-compute" }
 # SSR rendering engine (V8/deno_core — loads Angular SSR bundles)
 elohim-render = { path = "../../elohim/elohim-render" }
 
+# The content shell and its typed context island (ChromeContext v1,
+# render_content_shell) — the one renderer every medium shares.
+elohim-chrome-asset = { path = "../../elohim/elohim-chrome-asset" }
+
+# The ONE html5-app contentBody parser and witness rule (lenient ingest, `json`).
+lamad-types = { path = "../../elohim/sdk/domains/lamad/types", features = ["json"] }
+
 # Wisdom-as-system-auth gate: fires on every state-changing write path.
 # default-features = false excludes ts-rs and the testing shims.
 gate-client = { path = "../../elohim/elohim-agent/gate-client", default-features = false }

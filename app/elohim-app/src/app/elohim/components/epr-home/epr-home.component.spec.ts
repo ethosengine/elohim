@@ -1,10 +1,16 @@
 import { HttpClient } from '@angular/common/http';
 import { Component, EventEmitter, Input, Output, signal } from '@angular/core';
 import { ComponentFixture, TestBed } from '@angular/core/testing';
-import { ActivatedRoute, ParamMap, convertToParamMap, provideRouter } from '@angular/router';
+import {
+  ActivatedRoute,
+  ParamMap,
+  Router,
+  convertToParamMap,
+  provideRouter,
+} from '@angular/router';
 
 import { BehaviorSubject, Observable, Subject, of, throwError } from 'rxjs';
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { ObservationEmitterService } from '@elohim/rea-runtime';
 import { GovernanceApiService } from '@elohim/service';
@@ -23,18 +29,25 @@ import { StorageApiService } from '../../services/storage-api.service';
 import { StorageClientService } from '../../services/storage-client.service';
 
 import {
+  CHROME_SECTION_IDS,
+  DELIVERY_VALUE_MAX,
   anchorWords,
   attentionLine,
   completionWords,
   daysRemainingWords,
+  appPermissions,
+  deliveryValue,
   discussionTitle,
   focalShape,
   healthWords,
   heldChip,
   holdingWords,
+  hopWords,
   labelWords,
   legFromFragment,
+  parseDeliveryPath,
   reachSubtitle,
+  requestFromFragment,
   shortAnchor,
   toAtom,
   verifyLine,
@@ -131,6 +144,85 @@ describe('epr-home.model', () => {
     expect(legFromFragment('step/2')).toBeNull();
     expect(legFromFragment(null)).toBeNull();
     expect(legFromFragment('toString')).toBeNull();
+  });
+
+  it("maps the content chrome's card sections onto this page, and only those it carries", () => {
+    expect(requestFromFragment('source')).toEqual({ leg: null, anchor: 'source' });
+    expect(requestFromFragment('delivery')).toEqual({ leg: null, anchor: 'delivery' });
+    expect(requestFromFragment('holders')).toEqual({ leg: 'holds', anchor: 'holds' });
+    expect(requestFromFragment('steward')).toEqual({ leg: 'governed', anchor: 'governed' });
+    expect(requestFromFragment('claims')).toEqual({ leg: 'from', anchor: 'claims' });
+    expect(requestFromFragment('yours')).toEqual({ leg: null, anchor: 'yours' });
+    expect(requestFromFragment('permissions')).toEqual({ leg: null, anchor: 'permissions' });
+    expect(requestFromFragment('network')).toEqual({ leg: 'holds' });
+    expect(requestFromFragment('holds')).toEqual({ leg: 'holds' });
+    expect(requestFromFragment(null)).toBeNull();
+    expect(requestFromFragment('toString')).toBeNull();
+    expect(CHROME_SECTION_IDS).toContain('permissions');
+  });
+
+  it("keeps the link's delivery claim honest: absent parts stay absent, values are capped", () => {
+    const path = (q: Record<string, string>) => parseDeliveryPath(convertToParamMap(q));
+    expect(path({})).toEqual([]);
+    expect(path({ via: '', peer: '   ' })).toEqual([]);
+    expect(path({ via: 'doorway-alpha', peer: 'peer-jessica' })).toEqual([
+      { role: 'doorway', id: 'doorway-alpha' },
+      { role: 'holder', peer: 'peer-jessica' },
+    ]);
+    expect(path({ via: 'doorway-alpha' })).toEqual([{ role: 'doorway', id: 'doorway-alpha' }]);
+    expect(path({ peer: 'peer-jessica' })).toEqual([{ role: 'holder', peer: 'peer-jessica' }]);
+    const long = 'x'.repeat(DELIVERY_VALUE_MAX + 50);
+    expect(deliveryValue(long)).toBe(`${'x'.repeat(DELIVERY_VALUE_MAX)}…`);
+    expect(deliveryValue('x'.repeat(DELIVERY_VALUE_MAX))).toBe('x'.repeat(DELIVERY_VALUE_MAX));
+    // Bidi overrides and controls cannot reorder or hide the surrounding text.
+    expect(deliveryValue('alpha\u202Eahpla\u0000')).toBe('alphaahpla');
+    expect(deliveryValue('\u202E')).toBeNull();
+  });
+
+  it("shows the chrome facing's app lens as vocabulary rows", () => {
+    const facing = (app?: Record<string, unknown>) =>
+      ({ ...chromeFacing(), app }) as unknown as Parameters<typeof appPermissions>[0];
+    // Not read yet: no section. Read failed: claim nothing for an html5-app only.
+    expect(appPermissions(undefined, 'html5-app')).toBeNull();
+    expect(appPermissions(null, 'html5-app')).toBe('unreadable');
+    expect(appPermissions(null, 'markdown')).toBeNull();
+    // No app lens: not an app bundle.
+    expect(appPermissions(facing(), 'markdown')).toBeNull();
+    const perm = appPermissions(
+      facing({
+        entry: 'index.html',
+        capabilities: ['forms', 'camera'],
+        presents: false,
+        sources: ['https://fonts.example'],
+      }),
+      'html5-app'
+    ) as { capabilities: { value: string; label: string; device: boolean }[]; sources: string[] };
+    expect(perm.capabilities.map(r => [r.value, r.label, r.device])).toEqual([
+      ['forms', 'Submit forms', false],
+      ['camera', 'Camera', true],
+    ]);
+    expect(perm.sources).toEqual(['https://fonts.example']);
+    expect(
+      appPermissions(
+        facing({ entry: 'index.html', capabilities: [], presents: true }),
+        'spa-bundle'
+      )
+    ).toEqual({ capabilities: [], sources: [] });
+  });
+
+  it('says each delivery hop in words, the value kept apart as the link wrote it', () => {
+    expect(hopWords({ role: 'self' })).toEqual({ lead: 'from your own peer', value: null });
+    expect(hopWords({ role: 'doorway', id: 'doorway-alpha' })).toEqual({
+      lead: 'through doorway',
+      value: 'doorway-alpha',
+    });
+    expect(hopWords({ role: 'holder', peer: 'peer-jessica' })).toEqual({
+      lead: 'from peer',
+      value: 'peer-jessica',
+    });
+    expect(hopWords({ role: 'holder', peer: 'p', transport: 'iroh' }).lead).toBe(
+      'from peer (over iroh)'
+    );
   });
 
   it("says the storage peer's health in words first", () => {
@@ -242,6 +334,22 @@ class EprFocalStub {
   @Output() failed = new EventEmitter<string>();
 }
 
+/** Storage's content-chrome facing (GET /api/v1/epr/{id}/chrome), as the wire carries it. */
+function chromeFacing(app: Record<string, unknown> | null = null): Record<string, unknown> {
+  return {
+    recordId: 'evolution-of-trust',
+    title: 'The Evolution of Trust',
+    format: 'html5-app',
+    mode: 'trustful',
+    reach: 'commons',
+    witness: 'amber',
+    computedAt: '2026-10-15T00:00:00Z',
+    claims: { attestations: [] },
+    steward: { stewards: [] },
+    ...(app ? { app } : {}),
+  };
+}
+
 const rawSimulation = {
   id: 'evolution-of-trust',
   title: 'The Evolution of Trust',
@@ -328,17 +436,33 @@ describe('EprHomeComponent', () => {
 
   async function configure(
     paramMap: Observable<ParamMap>,
-    opts: { fragment?: Observable<string | null>; snapshot?: Observable<unknown> } = {}
+    opts: {
+      fragment?: Observable<string | null>;
+      snapshot?: Observable<unknown>;
+      query?: Record<string, string>;
+      chrome?: Observable<unknown>;
+    } = {}
   ): Promise<void> {
     await TestBed.configureTestingModule({
       imports: [EprHomeComponent],
       providers: [
         provideRouter([]),
-        { provide: HttpClient, useValue: { get: vi.fn().mockReturnValue(of({ related: [] })) } },
+        {
+          provide: HttpClient,
+          useValue: {
+            get: vi.fn((url: string) =>
+              url.endsWith('/chrome') ? (opts.chrome ?? chromeResponse) : of({ related: [] })
+            ),
+          },
+        },
         { provide: StorageClientService, useValue: storage },
         {
           provide: ActivatedRoute,
-          useValue: { paramMap, fragment: opts.fragment ?? of(null) },
+          useValue: {
+            paramMap,
+            fragment: opts.fragment ?? of(null),
+            queryParamMap: of(convertToParamMap(opts.query ?? {})),
+          },
         },
         {
           provide: ResilienceService,
@@ -387,12 +511,21 @@ describe('EprHomeComponent', () => {
 
   async function mount(
     resourceId: string,
-    opts: { fragment?: Observable<string | null>; snapshot?: Observable<unknown> } = {}
+    opts: {
+      fragment?: Observable<string | null>;
+      snapshot?: Observable<unknown>;
+      query?: Record<string, string>;
+      chrome?: Observable<unknown>;
+    } = {}
   ): Promise<void> {
     await configure(of(convertToParamMap({ resourceId })), opts);
   }
 
+  /** The facing every mount reads unless a test names its own: an app declaring nothing extra. */
+  let chromeResponse: Observable<unknown>;
+
   beforeEach(() => {
+    chromeResponse = of(chromeFacing({ entry: 'index.html', capabilities: [], presents: false }));
     storage = {
       getStorageBaseUrl: vi.fn().mockReturnValue('https://doorway.test'),
       getContent: vi.fn().mockReturnValue(of(rawSimulation)),
@@ -1041,5 +1174,195 @@ describe('EprHomeComponent', () => {
     await mount('evolution-of-trust');
     expect(q(fixture, 'epr-home-focal-claimed')).toBeNull();
     expect(fixture.nativeElement.querySelector('.focal-stub')).not.toBeNull();
+  });
+
+  describe('how this reached you (?via=&peer= from the content chrome)', () => {
+    const hops = () =>
+      Array.from(
+        fixture.nativeElement.querySelectorAll(
+          '[data-testid="epr-home-delivery-hop"]'
+        ) as NodeListOf<HTMLElement>
+      );
+
+    it('names both the doorway and the peer, as the link describes them', async () => {
+      await mount('evolution-of-trust', { query: { via: 'doorway-alpha', peer: 'peer-jessica' } });
+      const block = q(fixture, 'epr-home-delivery')!;
+      expect(block).not.toBeNull();
+      expect(block.id).toBe('delivery');
+      expect(block.textContent).toContain('as your link describes it');
+      expect(hops().map(h => h.textContent?.trim().replace(/\s+/g, ' '))).toEqual([
+        'through doorway doorway-alpha',
+        'from peer peer-jessica',
+      ]);
+      expect(block.textContent).toMatch(
+        /through doorway\s*doorway-alpha\s*·\s*from peer\s*peer-jessica/
+      );
+    });
+
+    it('shows no block when the link names neither', async () => {
+      await mount('evolution-of-trust');
+      expect(q(fixture, 'epr-home-delivery')).toBeNull();
+      expect(fixture.nativeElement.querySelector('#delivery')).toBeNull();
+    });
+
+    it('never guesses a missing part', async () => {
+      await mount('evolution-of-trust', { query: { peer: 'peer-jessica' } });
+      expect(hops().length).toBe(1);
+      expect(hops()[0].textContent).toContain('from peer');
+      expect(hops()[0].textContent).toContain('peer-jessica');
+      expect(q(fixture, 'epr-home-delivery')?.textContent).not.toContain('doorway');
+      expect(q(fixture, 'epr-home-delivery')?.textContent).not.toContain('·');
+    });
+
+    it('renders crafted values as escaped, capped text', async () => {
+      const html = '<img src=x onerror="alert(1)"><b>bold</b>';
+      const long = 'p'.repeat(400);
+      await mount('evolution-of-trust', { query: { via: html, peer: long } });
+      const [via, peer] = hops();
+      expect(via.querySelector('img')).toBeNull();
+      expect(via.querySelector('b')).toBeNull();
+      expect(via.querySelector('code')?.textContent).toBe(html);
+      expect(peer.querySelector('code')?.textContent).toBe(`${'p'.repeat(DELIVERY_VALUE_MAX)}…`);
+      expect(q(fixture, 'epr-home-delivery')!.querySelector('img')).toBeNull();
+    });
+
+    it('is not shown on the out-of-reach gate (nothing was delivered)', async () => {
+      storage.getContent.mockReturnValue(of(null));
+      await mount('concept-bidirectional-trust', { query: { via: 'doorway-alpha' } });
+      expect(q(fixture, 'epr-home-delivery')).toBeNull();
+    });
+  });
+
+  describe("the content chrome's card sections", () => {
+    let scrolled: string[];
+    let navigate: ReturnType<typeof vi.spyOn>;
+    const original = HTMLElement.prototype.scrollIntoView;
+
+    beforeEach(() => {
+      scrolled = [];
+      HTMLElement.prototype.scrollIntoView = function (this: HTMLElement) {
+        scrolled.push(this.id);
+      };
+      navigate = vi.spyOn(Router.prototype, 'navigate').mockResolvedValue(true);
+      auth.isAuthenticated.set(true);
+      auth.humanId.set('human-matthew');
+    });
+
+    afterEach(() => {
+      HTMLElement.prototype.scrollIntoView = original;
+      navigate.mockRestore();
+    });
+
+    for (const section of [
+      'source',
+      'delivery',
+      'holders',
+      'steward',
+      'claims',
+      'yours',
+      'permissions',
+    ]) {
+      it(`#${section} lands on a section this page carries, and keeps the link as written`, async () => {
+        await mount('evolution-of-trust', {
+          fragment: of(section),
+          query: { via: 'doorway-alpha', peer: 'peer-jessica' },
+        });
+        await settle();
+        const anchor = requestFromFragment(section)!.anchor!;
+        expect(fixture.nativeElement.querySelector(`#${anchor}`)).not.toBeNull();
+        expect(scrolled).toContain(anchor);
+        expect(navigate).not.toHaveBeenCalled();
+      });
+    }
+
+    it('#claims opens the attestations fold', async () => {
+      await mount('evolution-of-trust', { fragment: of('claims') });
+      expect(q(fixture, 'epr-home-fold-from')).not.toBeNull();
+    });
+
+    it('#holders opens the network detail', async () => {
+      await mount('evolution-of-trust', { fragment: of('holders') });
+      expect(q(fixture, 'epr-home-fold-holds')).not.toBeNull();
+      expect(resilienceDetail.getResilience).toHaveBeenCalledWith('evolution-of-trust');
+    });
+
+    it('#permissions scrolls nowhere on a record that is not an html5-app', async () => {
+      storage.getContent.mockReturnValue(of({ ...rawSimulation, contentFormat: 'markdown' }));
+      await mount('evolution-of-trust', {
+        fragment: of('permissions'),
+        chrome: of(chromeFacing()),
+      });
+      expect(q(fixture, 'epr-home-leg-permissions')).toBeNull();
+      await settle();
+      expect(scrolled).toEqual([]);
+    });
+  });
+
+  describe("what it may do (the content-chrome facing's app lens)", () => {
+    const caps = () =>
+      Array.from(
+        fixture.nativeElement.querySelectorAll(
+          '[data-testid="epr-home-capability"]'
+        ) as NodeListOf<HTMLElement>
+      );
+    const app = (extra: Record<string, unknown>) =>
+      of(chromeFacing({ entry: 'index.html', capabilities: [], presents: false, ...extra }));
+
+    it("reads the record's app declarations from storage's chrome facing", async () => {
+      await mount('evolution-of-trust');
+      const http = TestBed.inject(HttpClient) as unknown as { get: ReturnType<typeof vi.fn> };
+      expect(http.get).toHaveBeenCalledWith(
+        'https://doorway.test/api/v1/epr/evolution-of-trust/chrome'
+      );
+    });
+
+    it('labels each declared capability and marks device ones as your own choice', async () => {
+      await mount('evolution-of-trust', { chrome: app({ capabilities: ['forms', 'microphone'] }) });
+      const section = q(fixture, 'epr-home-leg-permissions')!;
+      expect(section.id).toBe('permissions');
+      expect(section.textContent).toContain('What it may do');
+      expect(caps().map(c => c.dataset['capability'])).toEqual(['forms', 'microphone']);
+      expect(caps()[0].textContent).toContain('Submit forms');
+      expect(caps()[0].textContent).not.toContain('asks you first');
+      expect(caps()[1].textContent).toContain('Microphone');
+      expect(caps()[1].textContent).toContain('asks you first');
+      expect(q(fixture, 'epr-home-permissions-none')).toBeNull();
+    });
+
+    it('names the origins it says it reaches, as declarations', async () => {
+      await mount('evolution-of-trust', {
+        chrome: app({ sources: ['https://fonts.example', 'https://cdn.example'] }),
+      });
+      const sources = Array.from(
+        fixture.nativeElement.querySelectorAll(
+          '[data-testid="epr-home-permission-source"]'
+        ) as NodeListOf<HTMLElement>
+      ).map(el => el.textContent?.trim());
+      expect(sources).toEqual(['https://fonts.example', 'https://cdn.example']);
+      expect(q(fixture, 'epr-home-permissions-sources')?.textContent).toContain('not a grant');
+      expect(q(fixture, 'epr-home-permissions-none')).toBeNull();
+    });
+
+    it('says "Declares nothing extra" when the lens declares nothing', async () => {
+      await mount('evolution-of-trust');
+      expect(q(fixture, 'epr-home-permissions-none')?.textContent).toContain(
+        'Declares nothing extra'
+      );
+      expect(caps()).toEqual([]);
+    });
+
+    it('claims nothing when the facing cannot be read', async () => {
+      await mount('evolution-of-trust', { chrome: throwError(() => new Error('503')) });
+      expect(q(fixture, 'epr-home-permissions-unreadable')).not.toBeNull();
+      expect(q(fixture, 'epr-home-permissions-none')).toBeNull();
+    });
+
+    it('is absent when the facing carries no app lens', async () => {
+      storage.getContent.mockReturnValue(
+        of({ ...rawSimulation, contentFormat: 'markdown', contentBody: '# hi' })
+      );
+      await mount('evolution-of-trust', { chrome: of(chromeFacing()) });
+      expect(q(fixture, 'epr-home-leg-permissions')).toBeNull();
+    });
   });
 });

@@ -61,6 +61,11 @@ self.addEventListener('activate', event => {
           .filter(name => name.startsWith('apps-') && name !== CACHE_NAME)
           .map(name => caches.delete(name))
       );
+      // Navigation preload makes the browser itself send a navigation's request while
+      // this worker starts, with the request's real Fetch Metadata. A worker that
+      // re-fetches a navigation can only send `Sec-Fetch-Dest: empty`, and the doorway
+      // answers the content shell only to `document` + `navigate`.
+      if (self.registration.navigationPreload) await self.registration.navigationPreload.enable();
       await self.clients.claim();
     })()
   );
@@ -86,12 +91,22 @@ self.addEventListener('fetch', (event: FetchEvent) => {
   // the raw entry is already cached under its CID path by the iframe's own
   // load. An iframe's request has destination 'iframe' and keeps the cached
   // path below. Offline, fall back to the cached bytes.
+  //
+  // The network answer must come from the navigation preload: a request this
+  // worker re-sends with fetch() reaches the doorway as `Sec-Fetch-Dest: empty`,
+  // which the doorway rightly serves raw (it is also what an iframe's
+  // re-fetched request looks like), so the person would never see the shell.
+  // A browser without navigation preload, while it reports itself online, is
+  // left to navigate on its own for the same reason.
   if (event.request.destination === 'document') {
+    // eslint-disable-next-line no-restricted-syntax -- a service worker only ever runs in a browser, never under SSR
+    if (!self.registration.navigationPreload && navigator.onLine) return;
     event.respondWith(
       (async () => {
         console.log(`[apps-sw] document-navigation: network-first ${url.pathname}`);
         try {
-          const answered = await fetch(event.request);
+          const preloaded = (await event.preloadResponse) as Response | undefined;
+          const answered = preloaded ?? (await fetch(event.request));
           // A doorway that is up but cannot serve (5xx) is as good as away for
           // the person; a 4xx is the doorway's own answer and stands.
           if (answered.status < 500) return answered;
@@ -105,6 +120,25 @@ self.addEventListener('fetch', (event: FetchEvent) => {
     return;
   }
 
+  // A frame's navigation (the content's entry document) also answers from the network
+  // first, through its preload: the doorway's response carries the content policy that
+  // lets the browser report what the content does beyond its record, and bytes served
+  // from this cache would carry none. Offline, or with the doorway unable to serve,
+  // the verified cached bytes still open the content; only the observation is lost.
+  if (event.request.mode === 'navigate') {
+    event.respondWith(
+      (async () => {
+        try {
+          const preloaded = (await event.preloadResponse) as Response | undefined;
+          if (preloaded && preloaded.status < 500) return preloaded;
+        } catch {
+          // offline: fall through to the verified cache
+        }
+        return handleAppFetch(event);
+      })()
+    );
+    return;
+  }
   event.respondWith(handleAppFetch(event));
 });
 

@@ -62,6 +62,12 @@ pub struct PublicNameMember {
 pub struct PublicNameDocument {
     pub name: String,
     pub members: Vec<PublicNameMember>,
+    /// The name declares a separate content origin, `apps.<name>` (the
+    /// content-chrome trust edge). Declared once, with the name's membership,
+    /// so every member doorway derives the same pairing — never a per-doorway
+    /// switch. Absent = `false`: the name keeps content same-origin.
+    #[serde(default)]
+    pub apps: bool,
 }
 
 /// Every membership document this doorway can currently read.
@@ -497,6 +503,7 @@ mod tests {
         PublicNameDocument {
             name: name.to_string(),
             members,
+            apps: false,
         }
     }
 

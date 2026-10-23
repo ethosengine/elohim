@@ -5322,38 +5322,54 @@ decisionPoints:
     sourceLocation:
       file: src/routes/apps.rs
       modulePath: routes::apps::serve_app_file
-      line: 219
+      line: 223
     summary: >
-      Decides, for an addressed /apps/<slug>/<file> request that reach has already admitted,
-      whether the doorway answers the raw bundle bytes or a no-store content shell: the shell
-      only when the browser's own Fetch Metadata says a person is opening a page
-      (is_document_navigation, line 370: Sec-Fetch-Dest document and Sec-Fetch-Mode navigate),
-      the doorway's own content projection resolves an html5-app descriptor
-      (cache::app_file_cache::resolve_app_descriptor, line 475), and the file is the node's
-      declared entry (is_html5_entry, line 386). Every other request — frame, subresource,
-      no Fetch Metadata, spa-bundle, non-entry, no descriptor — takes serve_raw_app_file
-      unchanged. The shell frames the same address, so the bytes a person runs are still the
-      bytes the blobHash names; the shell never enters the file cache, and both
-      representations carry Vary on the two Fetch Metadata headers. The holders figure is a
-      bounded 1.5 s read of the resilience view with an unknown state on failure.
+      Decides, for an addressed /apps/<slug>/<file> request that reach has already admitted
+      (and whose slug and file survived the percent-decoded traversal check,
+      safe_app_segments — for the admin cache bypass too), whether the doorway answers the
+      raw bundle bytes or a no-store content shell: on a name with no apps origin, the shell
+      only when Fetch Metadata says a person is opening a page (is_document_navigation:
+      Sec-Fetch-Dest document and Sec-Fetch-Mode navigate), the projection resolves an
+      html5-app descriptor (cache::app_file_cache::resolve_app_descriptor), and the file is
+      the record's declared entry (is_html5_entry). The shell is the shared
+      elohim_chrome_asset::render_content_shell over a typed ChromeContext v1
+      (medium web2-doorway): viewer hosted-session only after the doorway VERIFIES the
+      bearer or the `doorway_token` session cookie (server::http::verify_session_token —
+      the validator its authenticated routes use), else visitor; the record readings from
+      ONE seam (chrome_readings) — storage's content-chrome facing (GET
+      /api/v1/epr/{id}/chrome) read through the registry's declared-primary route within a
+      300 ms chip budget and held in the doorway's edge cache for the route's cache_ttl,
+      taken as stated (title, mode, reach, witness, contentAddress, app entry/capabilities/
+      themeHint as the object theme, holders only when the facing already took them). A
+      facing 401/403 is the reach refusal (never a descriptor fallback); a 404/410 (one peer
+      lagging), a timeout, network failure, 5xx/429 or a body over 256 KiB (read
+      incrementally) lets the doorway's projection descriptor fill in — trust lags delivery,
+      so a known record stays trustful; the trustless shell only when neither knows it. The
+      edge cache is bounded (1024 entries, expired first, then oldest). Isolation
+      origin-pair on a paired name else opaque-sandbox; delivery path = the doorway's own
+      hop plus the holder hop named by the key the storage peer's manifest reported about
+      itself (both reportedBy doorway; no `checked`, no receipt). The shell carries no
+      framing restriction (a third party may frame the chromed shell). A projected head
+      change moves the descriptor's address with the served bytes. On a paired name the
+      per-side rule is apps_host_wants_shell (registered separately).
       Spec: genesis/docs/superpowers/specs/2026-10-14-content-apps-wear-chrome-design.md.
     concernIds:
       - { id: C0, status: answered, justification: "A delivery-representation choice at the doorway's web2 seam; the content's identity, bytes and authority are untouched (the shell frames the addressed bytes)." }
-      - { id: C1, status: n-a, justification: "No head is elected or changed; the descriptor is read from the projection the slug index already derives from." }
+      - { id: C1, status: n-a, justification: "No head is elected; set_slug_head only carries the reconciler's declared head into the descriptor so the shown address equals the served one." }
       - { id: C2, status: n-a, justification: "No ordering or authority clock; the predicate reads request headers and a projected record." }
-      - { id: C3, status: answered, justification: "A cold or absent projection yields no descriptor and the raw path, never an error; the holders read times out to an unknown badge." }
-      - { id: C4, status: answered, justification: "Reach refusal precedes any shell output (a_reach_refusal_comes_before_any_shell_output); the shell carries no address claim (no ETag, X-Content-Address, X-Cache)." }
-      - { id: C5, status: n-a, justification: "No acceptance evidence is produced; the shell is presentation, not a record." }
-      - { id: C6a, status: answered, justification: "One holders fetch under a 1500 ms timeout; the shell is no-store with Vary so no cache serves one representation for the other." }
+      - { id: C3, status: answered, justification: "A cold or absent projection yields no descriptor and the raw path (or, on the always-render path, the honest trustless shell), never an error." }
+      - { id: C4, status: answered, justification: "Reach refusal precedes any shell output on both shell paths; the shell carries no address claim (no ETag, X-Content-Address, X-Cache); traversal is refused before any forward, bypass included." }
+      - { id: C5, status: n-a, justification: "No acceptance evidence is produced; delivery.checked is omitted until a verifier reports it." }
+      - { id: C6a, status: answered, justification: "No extra I/O on the shell path: holders moved to the element's lazy read; the shell is no-store with Vary." }
       - { id: C6b, status: n-a, justification: "Idempotent read; nothing is written." }
-      - { id: C7, status: answered, justification: "Serving selection changes only the representation of the entry file for a page navigation; _capability and X-Deliverability still describe bundle readiness, never shell success." }
+      - { id: C7, status: answered, justification: "Serving selection changes only the representation of an entry page; _capability and X-Deliverability still describe bundle readiness, never shell success." }
       - { id: C8, status: partial, justification: "The shell path logs through the existing apps arm; no distinct counter for shell-vs-raw answers yet." }
-      - { id: C9, status: n-a, justification: "No identity or key transition." }
-      - { id: C10, status: answered, justification: "New response headers X-Elohim-Chrome and Vary are additive; raw bytes and existing headers are unchanged (a_frame_load_gets_the_same_bytes_as_no_headers_plus_vary)." }
-      - { id: C11, status: answered, justification: "The branch sits after admission and reach; the admin cache bypass does not bypass chrome selection." }
-      - { id: C12, status: answered, justification: "Grants nothing: the reach check stays the gate, and a request without Fetch Metadata is served as before (the rule qualifies what people see, not who may see it)." }
+      - { id: C9, status: n-a, justification: "No identity or key transition; the viewer is read from a verified bearer, never from header presence." }
+      - { id: C10, status: answered, justification: "The island is the schema-v1 ChromeContext (chrome-context.schema.json) from elohim-chrome-asset; the facing is read by a private serde mirror of storage's ContentChromeFacingView whose lenses are optional (absent = not selected); the manifest's `peer` is additive (old manifests parse unchanged)." }
+      - { id: C11, status: answered, justification: "The branch sits after admission and the addressed-serve reach fold; the admin cache bypass does not bypass chrome selection or the traversal check." }
+      - { id: C12, status: answered, justification: "Grants nothing: capabilities are the record's declaration (unknown ones dropped), the chrome computes the frame; reach stays the gate." }
       - { id: C13, status: n-a, justification: "No authority scaffold or tier." }
-      - { id: C14, status: partial, justification: "A failing holders read is explicit in the badge's unknown state but not yet surfaced as a metric." }
+      - { id: C14, status: partial, justification: "CSP violations on the raw bytes the shell frames are relayed (handle_csp_report); shell-vs-raw outcomes are not yet metered." }
     contractTests:
       - path: doorway/doorway-service/src/routes/apps.rs
         testName: a_page_navigation_to_an_html5_entry_gets_the_shell
@@ -5374,7 +5390,37 @@ decisionPoints:
         testName: the_admin_cache_bypass_does_not_bypass_chrome_selection
         kind: unit
       - path: doorway/doorway-service/src/routes/apps.rs
-        testName: a_failing_holders_fetch_still_yields_a_shell_with_the_unknown_badge
+        testName: traversal_is_refused_encoded_and_under_the_admin_bypass
+        kind: unit
+      - path: doorway/doorway-service/src/routes/apps.rs
+        testName: the_witness_is_green_only_when_the_record_is_anchored
+        kind: unit
+      - path: doorway/doorway-service/src/routes/apps.rs
+        testName: capabilities_reach_and_theme_come_from_the_projected_record
+        kind: unit
+      - path: doorway/doorway-service/src/routes/apps.rs
+        testName: the_viewer_is_a_hosted_session_only_with_a_validated_session
+        kind: unit
+      - path: doorway/doorway-service/src/routes/apps.rs
+        testName: delivery_reports_the_doorway_hop_and_the_holder_by_its_own_key
+        kind: unit
+      - path: doorway/doorway-service/src/routes/apps.rs
+        testName: the_shell_takes_its_readings_from_the_content_chrome_facing
+        kind: unit
+      - path: doorway/doorway-service/src/routes/apps.rs
+        testName: the_facing_is_read_through_the_registry_route_and_its_cache
+        kind: unit
+      - path: doorway/doorway-service/src/routes/apps.rs
+        testName: a_facing_refusal_is_the_answer_never_the_descriptor
+        kind: unit
+      - path: doorway/doorway-service/src/routes/apps.rs
+        testName: a_lagging_peer_without_the_record_does_not_demote_a_known_record
+        kind: unit
+      - path: doorway/doorway-service/src/routes/apps.rs
+        testName: an_oversized_facing_is_abandoned_and_the_descriptor_fills_in
+        kind: unit
+      - path: doorway/doorway-service/src/routes/apps.rs
+        testName: the_facing_cache_is_bounded_and_evicts_expired_entries_first
         kind: unit
       - path: doorway/doorway-service/src/routes/apps.rs
         testName: a_hostile_title_is_escaped_everywhere_it_lands
@@ -5387,4 +5433,206 @@ decisionPoints:
         kind: unit
       - path: doorway/doorway-service/src/cache/app_file_cache.rs
         testName: refresh_app_drops_the_descriptor_with_the_slug_head
+        kind: unit
+      - path: doorway/doorway-service/src/cache/app_file_cache.rs
+        testName: a_redeploy_moves_the_descriptor_address_with_the_served_head
+        kind: unit
+      - path: doorway/doorway-service/src/cache/app_file_cache.rs
+        testName: descriptor_reads_witness_reach_and_declared_capabilities
+        kind: unit
+
+  - name: apps_pairing
+    kind: pure-decision-predicate
+    sourceLocation:
+      file: src/routes/apps.rs
+      modulePath: routes::apps::apps_pairing
+      line: 1582
+    summary: >
+      Derives, from the Host header alone, whether a request is on a public name or on that
+      name's separate content origin `apps.<name>` — the content-chrome trust edge. A name
+      pairs only when it DECLARES an apps origin: the `apps` flag on its membership document
+      (services::name_routing::standing::PublicNameDocument::apps, so every member of one
+      name agrees), or, for a name with no document, DOORWAY_APPS_NAMES (routes::apps::
+      name_pairs / apps_edge). The pairing is a property of the public name, never of a
+      doorway instance: computed once per request at the top of the pipeline
+      (routes::apps::RequestEdge), with no per-instance state, so it survives doorways
+      federating under DNS anycast. URLs built from it keep the request's port and a scheme
+      that only ever upgrades (request_scheme: the doorway's own TLS listener is https, an
+      X-Forwarded-Proto https upgrades, nothing downgrades). On the content origin the
+      doorway answers a closed surface (apps_host_route: /apps/*, /blob/*, /apps-sw.js
+      dispatched as the paired name, /api/v1/peers/delivery, GET /_elohim/boot, POST
+      /_elohim/csp-report/<address>) and 404s the rest; on the name, every /apps/ request but a page
+      opening of an html5-app entry is 308-moved to the content origin, query kept.
+      Spec: genesis/docs/superpowers/specs/2026-10-14-content-apps-wear-chrome-design.md.
+    concernIds:
+      - { id: C0, status: answered, justification: "Web2 origin derivation at the doorway seam; creates no entity, no identity and no content authority. The apps flag is a field on the existing membership projection (Category C), not a new record." }
+      - { id: C1, status: n-a, justification: "No head is elected or moved; the pairing names an origin, not a version." }
+      - { id: C2, status: n-a, justification: "No ordering or authority clock; a pure function of the Host header and the name's declaration." }
+      - { id: C3, status: answered, justification: "A name that declares nothing (every existing household lane name) has no pairing and is served exactly as before." }
+      - { id: C4, status: answered, justification: "Closed surface on the content origin: anything outside it is an explicit 404, never a fall-through to the EPR router." }
+      - { id: C5, status: n-a, justification: "Produces no acceptance evidence." }
+      - { id: C6a, status: n-a, justification: "No I/O; derivation is synchronous over headers and a membership snapshot, once per request." }
+      - { id: C6b, status: n-a, justification: "Pure function; nothing is written." }
+      - { id: C7, status: answered, justification: "The declaration lives with the name's membership, so a federated name cannot advertise two content origins; the env list is only a fallback for names with no document." }
+      - { id: C8, status: partial, justification: "Redirects and 404s pass through the existing request accounting; no distinct pairing counter." }
+      - { id: C9, status: n-a, justification: "No key or identity transition." }
+      - { id: C10, status: answered, justification: "Additive: `apps` is #[serde(default)] on the membership document (old documents read false); no name pairs unless declared." }
+      - { id: C11, status: answered, justification: "Evaluated after CORS preflight and before admission/standing; the worker request is re-addressed to the name so name standing and relay still apply to it." }
+      - { id: C12, status: answered, justification: "Grants nothing: reach is still decided by storage on every byte serve; the pairing only chooses which origin answers." }
+      - { id: C13, status: n-a, justification: "No authority scaffold or tier." }
+      - { id: C14, status: partial, justification: "A declared name whose apps.<name> does not resolve shows as a frame that never loads; not yet surfaced as a metric." }
+    contractTests:
+      - path: doorway/doorway-service/src/routes/apps.rs
+        testName: the_pairing_is_derived_from_the_host_alone
+        kind: unit
+      - path: doorway/doorway-service/src/routes/apps.rs
+        testName: built_urls_never_downgrade_the_scheme
+        kind: unit
+      - path: doorway/doorway-service/src/routes/apps.rs
+        testName: only_names_that_declare_apps_pair
+        kind: unit
+      - path: doorway/doorway-service/src/routes/apps.rs
+        testName: the_apps_host_answers_only_its_closed_surface
+        kind: unit
+      - path: doorway/doorway-service/src/routes/apps.rs
+        testName: on_the_name_host_anything_but_a_page_opening_moves_to_the_apps_origin
+        kind: unit
+      - path: doorway/doorway-service/src/routes/apps.rs
+        testName: on_the_name_host_the_shell_frames_the_boot_page_and_sends_no_framing_restriction
+        kind: unit
+      - path: doorway/doorway-service/src/server/http.rs
+        testName: the_content_chrome_edge_paths_are_service_paths
+        kind: unit
+      - path: doorway/doorway-service/src/routes/auth_discovery.rs
+        testName: the_apps_flag_is_present_only_for_a_paired_name
+        kind: unit
+      - path: doorway/doorway-service/tests/schema_contract.rs
+        testName: auth_discovery_with_apps_flag_matches_schema
+        kind: integration
+
+  - name: apps_host_wants_shell
+    kind: pure-decision-predicate
+    sourceLocation:
+      file: src/routes/apps.rs
+      modulePath: routes::apps::apps_host_wants_shell
+      line: 1783
+    summary: >
+      On the content origin `apps.<name>`, decides by Fetch Metadata whether a request for
+      ANY html file gets the raw bytes or a 302 to the name's always-render shell
+      (/_elohim/content/<slug>/<file>, query kept; routes::apps::handle_content_shell): a
+      page opening (Sec-Fetch-Dest document), a frame from another site (iframe/frame/
+      embed/object with Sec-Fetch-Site cross-site or absent), or no Fetch Metadata at all is
+      redirected — projected entry, non-entry page, content-address path and unprojected
+      record alike — so no top-level HTML is ever shown bare there. The shell path never
+      re-applies Fetch Metadata and never redirects, so the chain cannot loop; with no record
+      it renders an honest trustless "no protocol record" shell (opaque sandbox, no
+      capabilities). A same-site frame (a wrapper on the name) and the worker's own reads get
+      the bytes; raw HTML carries the shared content policy
+      (elohim_chrome_asset::content_policy — Report-Only for trustful, enforced for
+      trustless, the record's declared sources, reporting to the doorway relay),
+      `Reporting-Endpoints`, `no-store`, and Vary on Sec-Fetch-Dest/Mode/Site. NO
+      frame-ancestors on raw content or the boot page: enforced, it checks every ancestor
+      and refused the bytes when a third party framed the chromed shell; Fetch Metadata is
+      the enforcement. The boot page (boot_response) obeys the same rule (a cross-site frame,
+      a page opening or no Fetch Metadata → the shell for `to`), registers the apps worker
+      and replaces itself with a `to` that stays under /apps/ after URL normalisation
+      (encoded dot segments refused), its query kept. A facing refusal refuses raw HTML.
+      Same-site framing marks a doorway-origin wrapper, not a verified `presents` claim
+      (recorded debt). Spec: genesis/docs/superpowers/specs/2026-10-14-content-apps-wear-chrome-design.md.
+    concernIds:
+      - { id: C0, status: answered, justification: "Delivery-representation routing at the doorway's web2 seam; the bytes and the record are the network's." }
+      - { id: C1, status: n-a, justification: "No head election." }
+      - { id: C2, status: n-a, justification: "No ordering; reads request headers only." }
+      - { id: C3, status: answered, justification: "No descriptor means the trustless shell on the always-render path, never an error and never a redirect loop." }
+      - { id: C4, status: answered, justification: "Redirects carry no-store and Vary; a refused reach answers 403 on the raw path and on both shell paths; malformed shell or boot paths are 400, never redirected." }
+      - { id: C5, status: n-a, justification: "No acceptance evidence." }
+      - { id: C6a, status: n-a, justification: "No added I/O beyond the existing descriptor read." }
+      - { id: C6b, status: n-a, justification: "Idempotent reads." }
+      - { id: C7, status: answered, justification: "Fetch Metadata is the browser's own statement; the rule is the same on every doorway answering the name." }
+      - { id: C8, status: partial, justification: "No distinct counter for shell-redirect versus raw answers yet." }
+      - { id: C9, status: n-a, justification: "No identity transition." }
+      - { id: C10, status: answered, justification: "Only active when the name declares an apps origin; undeclared names keep today's responses." }
+      - { id: C11, status: answered, justification: "Runs after admission and the addressed-serve reach fold in the /apps and /_elohim/content arms." }
+      - { id: C12, status: partial, justification: "Grants nothing; Fetch Metadata decides who may have raw bytes. Same-site framing is not yet a verified `presents` claim, and a frameable shell's grant controls need a top-level check (recorded debt)." }
+      - { id: C13, status: n-a, justification: "No authority scaffold." }
+      - { id: C14, status: answered, justification: "CSP violations on raw HTML are reported to the doorway relay and forwarded to storage against the content address." }
+    contractTests:
+      - path: doorway/doorway-service/src/routes/apps.rs
+        testName: on_the_apps_host_html_people_would_see_bare_goes_to_the_shell
+        kind: unit
+      - path: doorway/doorway-service/src/routes/apps.rs
+        testName: the_redirect_chain_ends_at_a_shell_that_always_renders
+        kind: unit
+      - path: doorway/doorway-service/src/routes/apps.rs
+        testName: on_the_apps_host_a_same_site_frame_gets_raw_bytes_under_the_shared_policy
+        kind: unit
+      - path: doorway/doorway-service/src/routes/apps.rs
+        testName: the_boot_page_opens_only_a_path_under_apps
+        kind: unit
+      - path: doorway/doorway-service/src/routes/apps.rs
+        testName: fetch_metadata_not_frame_ancestors_decides_who_gets_the_boot_page
+        kind: unit
+
+  - name: handle_csp_report
+    kind: verdict-fn
+    sourceLocation:
+      file: src/routes/csp_report.rs
+      modulePath: routes::csp_report::handle_csp_report
+      line: 121
+    summary: >
+      The doorway's CSP violation relay (POST /_elohim/csp-report/<contentAddress>, named by
+      apps-origin raw HTML's shared content policy report-uri/report-to and
+      Reporting-Endpoints; the address the bytes were served as rides in the path the
+      doorway emits). It stamps provenance and judges nothing: 404 for a path naming no
+      single safe address, 415 for a body that is not application/reports+json,
+      application/csp-report or application/json, 413 past 64 KiB, 400 for a body that is
+      not a report — all BEFORE the limiter, so they consume nothing — then 429 past the
+      per-client, per-address window (client IP via X-Forwarded-For and the trusted hop
+      count; bounded table). Otherwise it forwards the body VERBATIM, content type passed
+      through, to ONE storage peer's POST /api/v1/epr/{contentAddress}/signals with
+      X-Elohim-Relayed-By (this doorway), X-Elohim-Observed-Origin (Origin, else Referer's
+      origin) and X-Elohim-Document-Match (whether the report's document's /apps/<id>/ names
+      the same bytes as the path address — equal, or connected through the doorway's CACHED
+      head/descriptor/facing with CIDv1 and legacy sha256-<hex> compared by digest; no fetch
+      on a miss, which records false), client X-Elohim-* never forwarded; a mismatch is
+      forwarded with the fact, never refused. Answers 204 whatever storage decides.
+      Signed reporting tokens are recorded hardening debt.
+    concernIds:
+      - { id: C0, status: answered, justification: "A thin web2 relay: the signal's source of truth is storage's feedback record against the content address; the doorway holds no ledger." }
+      - { id: C1, status: n-a, justification: "No head election." }
+      - { id: C2, status: n-a, justification: "No ordering clock." }
+      - { id: C3, status: partial, justification: "A storage failure is logged and the browser still gets 204; the report is not retried or queued (browsers resend future violations)." }
+      - { id: C4, status: answered, justification: "Each refusal class is a distinct status; nothing unparsed or unaddressed is forwarded." }
+      - { id: C5, status: n-a, justification: "Not acceptance evidence; a browser report is an observation for storage to weigh." }
+      - { id: C6a, status: answered, justification: "One forward with a 2 s timeout; body capped at 64 KiB." }
+      - { id: C6b, status: partial, justification: "No idempotency key; a duplicate browser report is forwarded twice." }
+      - { id: C7, status: n-a, justification: "No advertised serving selection." }
+      - { id: C8, status: partial, justification: "Drops and relay failures are logged; no dedicated counter." }
+      - { id: C9, status: n-a, justification: "No identity transition." }
+      - { id: C10, status: answered, justification: "Accepts both browser report wire formats (and plain JSON) and forwards them unchanged with their content type; the address rides in the path the doorway itself emitted." }
+      - { id: C11, status: answered, justification: "Doorway-wide fixed-window rate limit at the edge before any parse or forward." }
+      - { id: C12, status: answered, justification: "Grants nothing; the relay cannot widen or narrow any content's standing — reviewers act through gates." }
+      - { id: C13, status: n-a, justification: "No authority scaffold." }
+      - { id: C14, status: answered, justification: "This IS the residual witness path for content misbehaviour reaching the content's holders." }
+    contractTests:
+      - path: doorway/doorway-service/src/routes/csp_report.rs
+        testName: the_report_endpoint_carries_the_content_address
+        kind: unit
+      - path: doorway/doorway-service/src/routes/csp_report.rs
+        testName: reports_name_their_documents_and_origins_are_observed
+        kind: unit
+      - path: doorway/doorway-service/src/routes/csp_report.rs
+        testName: the_relay_limits_each_client_per_address_in_bounded_memory
+        kind: unit
+      - path: doorway/doorway-service/src/routes/csp_report.rs
+        testName: the_relay_stamps_provenance_and_forwards_verbatim_to_one_peer
+        kind: unit
+      - path: doorway/doorway-service/src/routes/csp_report.rs
+        testName: malformed_reports_are_refused_before_the_limiter
+        kind: unit
+      - path: doorway/doorway-service/src/routes/csp_report.rs
+        testName: a_slug_document_matches_its_cid_path_through_the_cache
+        kind: unit
+      - path: doorway/doorway-service/src/routes/csp_report.rs
+        testName: a_cid_document_matches_a_sha256_path
         kind: unit

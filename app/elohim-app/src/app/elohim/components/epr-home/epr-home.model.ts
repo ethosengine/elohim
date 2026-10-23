@@ -5,7 +5,11 @@
  * backend-owned and shown verbatim.
  */
 
+import { FRAME_CAPABILITIES_TABLE } from '@app/generated/schema-enums';
+
+import type { ContentChromeFacingView } from '@app/generated/content-chrome-facing';
 import type { ResilienceSnapshotView } from '@app/generated/resilience-snapshot-view';
+import type { FrameCapabilityEntry } from '@app/generated/schema-enums';
 import type {
   ChallengeView,
   ContentEngagementStatsView,
@@ -114,6 +118,49 @@ export function toAtom(raw: Record<string, unknown>): EprHomeAtom {
   };
 }
 
+// ── What it may do (the content-chrome facing's app lens) ───────────────────
+
+/**
+ * An app bundle's declarations as storage's content-chrome facing reads them
+ * (GET /api/v1/epr/{id}/chrome → `app`, parsed in Rust by lamad-types
+ * Html5AppBody — one parser for one declaration). Each capability is shown as
+ * its vocabulary row (label · sandbox · allow · device); `sources` are the
+ * origins the record says it reaches beyond its own, as declared.
+ *
+ * `null` = no section (not an app bundle, or not read yet); `'unreadable'` =
+ * the facing could not be read for an html5-app, so nothing is claimed.
+ */
+export type AppPermissions =
+  | null
+  | 'unreadable'
+  | {
+      readonly capabilities: readonly FrameCapabilityEntry[];
+      readonly sources: readonly string[];
+    };
+
+const CAPABILITY_ROWS: ReadonlyMap<string, FrameCapabilityEntry> = new Map(
+  FRAME_CAPABILITIES_TABLE.map(row => [row.value, row])
+);
+
+/**
+ * Display rows for the facing's app lens. `chrome` is `undefined` while the
+ * read is in flight and `null` when it failed. A capability without a
+ * vocabulary row is not shown (never displayed as if granted).
+ */
+export function appPermissions(
+  chrome: ContentChromeFacingView | null | undefined,
+  contentFormat: string
+): AppPermissions {
+  if (chrome === undefined) return null;
+  if (chrome === null) return contentFormat === 'html5-app' ? 'unreadable' : null;
+  const app = chrome.app;
+  if (!app) return null;
+  const capabilities = app.capabilities
+    .map(value => CAPABILITY_ROWS.get(value))
+    .filter((row): row is FrameCapabilityEntry => row !== undefined);
+  return { capabilities, sources: app.sources ?? [] };
+}
+
 /** Short anchor for display: first 12 + last 8 characters. */
 export function shortAnchor(hash: string): string {
   return hash.length <= 24 ? hash : `${hash.slice(0, 12)}…${hash.slice(-8)}`;
@@ -218,6 +265,119 @@ export function legFromFragment(fragment: string | null | undefined): LegAnchor 
   if (!fragment) return null;
   if (LEGACY_TAB_FRAGMENTS.has(fragment)) return LEGACY_TAB_FRAGMENTS.get(fragment) ?? null;
   return LEG_ANCHORS.has(fragment) ? (fragment as LegAnchor) : null;
+}
+
+/** True for a retired viewer tab fragment, which the frame renames in place to its leg. */
+export function isLegacyTabFragment(fragment: string | null | undefined): boolean {
+  return !!fragment && LEGACY_TAB_FRAGMENTS.has(fragment);
+}
+
+/**
+ * A request to open one leg's fold and/or bring one section into view — a new
+ * object each time, so arriving at the same place twice re-opens it. `leg` is
+ * null when the section has no fold; `anchor` is the element id to scroll to
+ * when it is not the leg itself.
+ */
+export interface FoldRequest {
+  leg: LegAnchor | null;
+  anchor?: string;
+}
+
+// ── The content chrome's page-info cards (chrome spec §3) ───────────────────
+
+/**
+ * Every page-info card ends in `/epr/<id>#<section>`. Each section this page
+ * carries maps to the element it scrolls to (a stable id) and the leg whose
+ * fold holds it. A section the page doesn't render for this record (no
+ * #permissions on a non-html5-app record) scrolls nowhere rather than
+ * somewhere wrong.
+ */
+const CHROME_SECTIONS: ReadonlyMap<string, FoldRequest> = new Map<string, FoldRequest>([
+  ['permissions', { leg: null, anchor: 'permissions' }],
+  ['source', { leg: null, anchor: 'source' }],
+  ['delivery', { leg: null, anchor: 'delivery' }],
+  ['holders', { leg: 'holds', anchor: 'holds' }],
+  ['steward', { leg: 'governed', anchor: 'governed' }],
+  ['claims', { leg: 'from', anchor: 'claims' }],
+  ['yours', { leg: null, anchor: 'yours' }],
+]);
+
+/** The section ids the chrome's cards can land on, in card order. */
+export const CHROME_SECTION_IDS: readonly string[] = [...CHROME_SECTIONS.keys()];
+
+/** A route fragment as the fold it opens and the section it brings into view. */
+export function requestFromFragment(fragment: string | null | undefined): FoldRequest | null {
+  if (!fragment) return null;
+  const chrome = CHROME_SECTIONS.get(fragment);
+  if (chrome) return { ...chrome };
+  const leg = legFromFragment(fragment);
+  return leg ? { leg } : null;
+}
+
+// ── How this reached you (the chrome's ?via=&peer=) ─────────────────────────
+
+/** The longest delivery value shown; a link anyone can craft gets no more room. */
+export const DELIVERY_VALUE_MAX = 128;
+
+// C0/C1 controls and the bidi embedding/override/isolate marks: a crafted
+// value must not be able to reorder or hide the text around it.
+// eslint-disable-next-line no-control-regex
+const UNSHOWABLE = /[\u0000-\u001f\u007f-\u009f\u200e\u200f\u202a-\u202e\u2066-\u2069]/g;
+
+/** One query value as shown: unshowable marks dropped, trimmed, capped with an ellipsis. */
+export function deliveryValue(raw: string | null | undefined): string | null {
+  const text = (raw ?? '').replace(UNSHOWABLE, '').trim();
+  if (!text) return null;
+  const chars = Array.from(text);
+  return chars.length > DELIVERY_VALUE_MAX
+    ? `${chars.slice(0, DELIVERY_VALUE_MAX).join('')}…`
+    : text;
+}
+
+/**
+ * One hop of the delivery path, as the visitor's own link describes it:
+ * `self` (their own peer served it), a `holder` peer that served the bytes
+ * (over a named transport when the link says so), or the `doorway` it came
+ * through. These are claims carried in a URL anyone can write — shown as
+ * text, labelled as the link's, never treated as authority.
+ */
+export type DeliveryHop =
+  | { role: 'self' }
+  | { role: 'holder'; peer: string; transport?: 'iroh' | 'libp2p' }
+  | { role: 'doorway'; id: string };
+
+/** The read side of a query string (an Angular ParamMap satisfies it). */
+export interface QueryParams {
+  get(name: string): string | null;
+}
+
+/**
+ * The ONE place the delivery query is read. Today the content chrome links
+ * with `?via=<doorway>&peer=<peer>`; a later `path` param changes only this
+ * parser. A part the link doesn't name is absent — never guessed.
+ */
+export function parseDeliveryPath(params: QueryParams): DeliveryHop[] {
+  const hops: DeliveryHop[] = [];
+  const via = deliveryValue(params.get('via'));
+  const peer = deliveryValue(params.get('peer'));
+  if (via) hops.push({ role: 'doorway', id: via });
+  if (peer) hops.push({ role: 'holder', peer });
+  return hops;
+}
+
+/** A hop in words: the lead phrase, and the link's value for it (shown as code). */
+export function hopWords(hop: DeliveryHop): { lead: string; value: string | null } {
+  switch (hop.role) {
+    case 'self':
+      return { lead: 'from your own peer', value: null };
+    case 'doorway':
+      return { lead: 'through doorway', value: hop.id };
+    case 'holder':
+      return {
+        lead: hop.transport ? `from peer (over ${hop.transport})` : 'from peer',
+        value: hop.peer,
+      };
+  }
 }
 
 // ── Network detail (Who holds it → fold) ────────────────────────────────────

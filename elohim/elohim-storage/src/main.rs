@@ -1584,6 +1584,8 @@ async fn async_main(
 
         // Stash the registry in shared state for HTTP handlers.
         hc_registry_for_http = Some(registry.clone());
+        // The content chrome's witness reading asks this conductor.
+        elohim_storage::services::content_witness::register_conductor(registry.clone());
 
         // A missing or unreadable policy file must not take the conductor
         // signal subscribers down with it: everything below (heartbeat,
@@ -5874,6 +5876,11 @@ async fn async_main(
         // without it until then.
         // `command_tx` is `None` on a pure-iroh node; byte requests then go
         // over the iroh fetch leg (`NodeBytePresence::request`).
+        // The content chrome's witness reading asks ONE of these peers whether
+        // it holds a record this node authored and has no receipt for yet.
+        if let Some(peers) = reconcile_peers.clone() {
+            elohim_storage::services::content_witness::register_peers(peers);
+        }
         if let (Some(peers), Some(pool)) = (reconcile_peers.clone(), db_pool.clone()) {
             let bytes: Arc<dyn elohim_storage::services::courier_obey::BytePresence> =
                 Arc::new(elohim_storage::p2p::trigger_courier::NodeBytePresence {

@@ -23,7 +23,7 @@ Feature: Membership projection stamps the member's agent key — household resil
   agent key that join needs.
 
   Background:
-    Given peer "alpha-A" at "alpha-A"
+    Given federated peer "alpha-A" at "alpha-A"
 
   Scenario: No household-placed human on alpha-A is missing its agent_pub_key
     # If this ever regresses, it is exactly the all-zeros-resilience-card bug:
@@ -37,7 +37,7 @@ Feature: Membership projection stamps the member's agent key — household resil
     # all (seed-humans deliberately writes agent_pub_key NULL for it), so it
     # sits out of scope entirely rather than counting as an offender — mirrors
     # the sibling fossil-check scenario's "observable" scoping below.
-    Then no HOUSEHOLD-member human on peer "alpha-A" is missing its agentPubKey
+    Then no HOUSEHOLD-member human on federated peer "alpha-A" is missing its agentPubKey
 
   # Landed with the boot-time membership-truth key-supersede pass
   # (elohim-storage/src/services/membership_identity_reconcile.rs, commit
@@ -71,4 +71,4 @@ Feature: Membership projection stamps the member's agent key — household resil
     # exists to catch — that is precisely the forced-bijection case
     # single_fossil_with_one_current_member_supersedes covers, and it must
     # never survive a boot past the reconcile pass.
-    Then every observable HOUSEHOLD-member human on peer "alpha-A" has a non-fossil agentPubKey
+    Then every observable HOUSEHOLD-member human on federated peer "alpha-A" has a non-fossil agentPubKey

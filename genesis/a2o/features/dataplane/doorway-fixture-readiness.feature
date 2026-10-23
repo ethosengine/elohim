@@ -16,27 +16,27 @@ Feature: The household holds the site before a visitor relies on its spare doorw
   anything. Failure here means the drill's starting conditions are not met.
 
   Background:
-    Given peer "alpha-A" at "alpha-A"
-    And peer "elohim.host" at "elohim.host"
+    Given federated peer "alpha-A" at "alpha-A"
+    And federated peer "elohim.host" at "elohim.host"
 
   Scenario: Either doorway serves assets from the same declared landing bundle
-    When I query "/" on peer "alpha-A" expecting raw text
+    When I query "/" on federated peer "alpha-A" expecting raw text
     Then the raw response status is 200
     And the raw response body contains "app-root"
-    When I query "/" on peer "elohim.host" expecting raw text
+    When I query "/" on federated peer "elohim.host" expecting raw text
     Then the raw response status is 200
     And the raw response body contains "app-root"
-    When a visitor asks peer "alpha-A" for the page at "/"
-    Then every script and stylesheet the page from peer "alpha-A" names is one that peer serves
-    And the page from peer "alpha-A" names the same browser entry point as the declared browser head of EPR "elohim-host-landing"
-    And the build stamp peer "alpha-A" serves is the one the declared browser head of EPR "elohim-host-landing" carries
-    When a visitor asks peer "elohim.host" for the page at "/"
-    Then every script and stylesheet the page from peer "elohim.host" names is one that peer serves
-    And the page from peer "elohim.host" names the same browser entry point as the declared browser head of EPR "elohim-host-landing"
-    And the build stamp peer "elohim.host" serves is the one the declared browser head of EPR "elohim-host-landing" carries
+    When a visitor asks federated peer "alpha-A" for the page at "/"
+    Then every script and stylesheet the page from federated peer "alpha-A" names is one that peer serves
+    And the page from federated peer "alpha-A" names the same browser entry point as the declared browser head of EPR "elohim-host-landing"
+    And the build stamp federated peer "alpha-A" serves is the one the declared browser head of EPR "elohim-host-landing" carries
+    When a visitor asks federated peer "elohim.host" for the page at "/"
+    Then every script and stylesheet the page from federated peer "elohim.host" names is one that peer serves
+    And the page from federated peer "elohim.host" names the same browser entry point as the declared browser head of EPR "elohim-host-landing"
+    And the build stamp federated peer "elohim.host" serves is the one the declared browser head of EPR "elohim-host-landing" carries
     And every serving doorway among "alpha-A" and "elohim.host" resolves the same declared head for content "elohim-host-landing"
 
   Scenario: A second holder can supply the manifesto before the primary is stopped
-    When I query "/db/content/manifesto" on peer "alpha-A" expecting raw text
+    When I query "/db/content/manifesto" on federated peer "alpha-A" expecting raw text
     Then the raw response status is 200
     And content "manifesto" has a blob that a holder behind doorway "alpha-A" other than its primary answers for

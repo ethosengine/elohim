@@ -24,9 +24,10 @@ import { EprRelationship } from '../../models/epr-head.model';
 import { EprRelationshipsPanelComponent } from '../epr-relationships-panel/epr-relationships-panel.component';
 
 import {
+  AppPermissions,
   EprHomeAtom,
   FoldLeg,
-  LegAnchor,
+  FoldRequest,
   StewardRow,
   attentionLine,
   daysRemainingWords,
@@ -59,11 +60,6 @@ export function humanizeSlug(slug: string): string {
     .split('-')
     .filter(Boolean);
   return words.map((w, i) => (i === 0 ? w.charAt(0).toUpperCase() + w.slice(1) : w)).join(' ');
-}
-
-/** A request to open one leg's fold (a new object each time, so a repeat re-opens). */
-export interface FoldRequest {
-  leg: LegAnchor;
 }
 
 /** The "is it still whole" check, as the frame tracks it. */
@@ -108,6 +104,8 @@ export class EprHomeLegsComponent {
   private readonly injector = inject(Injector);
 
   readonly atom = input.required<EprHomeAtom>();
+  /** The record's app declarations (content-chrome facing); null = no section. */
+  readonly permissions = input<AppPermissions>(null);
   /** `undefined` = not yet asked; `null` = asked, nothing found (spec F5). */
   readonly snapshot = input<ResilienceSnapshotView | null | undefined>(undefined);
   readonly stewards = input<StewardRow[]>([]);
@@ -137,7 +135,7 @@ export class EprHomeLegsComponent {
     source: () => ({ id: this.atom().id, req: this.openFold() }),
     computation: ({ id, req }, previous) => {
       const next = new Set(previous?.source.id === id ? previous.value : []);
-      if (req && req.leg !== 'here') next.add(req.leg);
+      if (req?.leg && req.leg !== 'here') next.add(req.leg);
       return next;
     },
   });
@@ -209,10 +207,13 @@ export class EprHomeLegsComponent {
     // that leg into view; the router does no anchor scrolling here.
     effect(() => {
       const req = this.openFold();
-      if (!req) return;
+      // A request naming a section anchor is scrolled by the frame, which
+      // holds every section (some live outside the legs).
+      if (!req?.leg || req.anchor) return;
+      const leg = req.leg;
       afterNextRender(
         () => {
-          const el = this.host.nativeElement.querySelector<HTMLElement>(`#${req.leg}`);
+          const el = this.host.nativeElement.querySelector<HTMLElement>(`#${leg}`);
           if (el && typeof el.scrollIntoView === 'function') {
             el.scrollIntoView({ block: 'start' });
           }

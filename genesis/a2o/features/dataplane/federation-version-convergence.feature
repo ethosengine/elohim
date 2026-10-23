@@ -83,8 +83,8 @@ Feature: Federation version convergence — two doorways that disagree serve the
   a green here as a capability receipt, never as a closed harm.
 
   Background:
-    Given peer "alpha-A" at "alpha-A"
-    And peer "elohim.host" at "elohim.host"
+    Given federated peer "alpha-A" at "alpha-A"
+    And federated peer "elohim.host" at "elohim.host"
 
   # BOUND 2026-09-05 (steps/dataplane/federation-deploy.steps.ts).
   #
@@ -131,7 +131,7 @@ Feature: Federation version convergence — two doorways that disagree serve the
     # authors its OWN, LATER revision of that same page, which its conductor declares as its head
     # at the STAGING tier. So the peer that must move is holding the NEWER head, and the head it
     # must move TO is older.
-    Given peer "alpha-A" and peer "elohim.host" both declare a head for a page this run authored
+    Given federated peer "alpha-A" and federated peer "elohim.host" both declare a head for a page this run authored
     And their declared heads DISAGREE
     And an EARNED canonical declaration exists on the page's root author for the head it authored
     And carried elections are enabled on the fleet via the operator flag ELOHIM_OBEY_CARRIED_ELECTION
@@ -150,8 +150,8 @@ Feature: Federation version convergence — two doorways that disagree serve the
     # first thing asserted about that page is that this run never wrote to it.
     # ON A PAGE THIS RUN NEVER TOUCHED — the next line is the pivot, and what entitles the two after it.
     And EPR "elohim-host-landing" was never staged by this run
-    And the served head for EPR "elohim-host-landing" matches the declared head on peer "alpha-A"
-    And the served head for EPR "elohim-host-landing" matches the declared head on peer "elohim.host"
+    And the served head for EPR "elohim-host-landing" matches the declared head on federated peer "alpha-A"
+    And the served head for EPR "elohim-host-landing" matches the declared head on federated peer "elohim.host"
     # MECHANISM — how that outcome is trustworthy, not a trust-the-peer copy. The peer that moved
     # gave up a head it had authored LATER and took one authored EARLIER, so no rule that prefers
     # the freshest write — and no simple copy of whoever spoke last — can account for the move.
@@ -185,10 +185,10 @@ Feature: Federation version convergence — two doorways that disagree serve the
   # its own conductor verifies the carried declaration exactly as the scenario above requires.
   @regression @requires:owned-substrate
   Scenario: a new earned head declared with the same text still reaches a peer that already holds the page
-    Given peer "alpha-A" and peer "elohim.host" both hold a page this run authored, at the same head
-    And the page's root author on peer "alpha-A" declares a NEW earned canonical head whose text is unchanged
-    When peer "alpha-A" announces the change to its federation
-    Then peer "elohim.host" is told that the page's declared head changed
-    And peer "elohim.host" verifies the carried declaration in wasm and moves its served head to it before any reconcile sweep runs
+    Given federated peer "alpha-A" and federated peer "elohim.host" both hold a page this run authored, at the same head
+    And the page's root author on federated peer "alpha-A" declares a NEW earned canonical head whose text is unchanged
+    When federated peer "alpha-A" announces the change to its federation
+    Then federated peer "elohim.host" is told that the page's declared head changed
+    And federated peer "elohim.host" verifies the carried declaration in wasm and moves its served head to it before any reconcile sweep runs
     # The same trust principle as the scenario above: the move is peer-verified, never credential-mediated.
     And no doorway credential, seed or deploy is involved anywhere in the chain

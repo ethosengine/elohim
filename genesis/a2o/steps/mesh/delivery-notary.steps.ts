@@ -906,7 +906,7 @@ When(
 );
 
 Then(
-  'the canonical head of {string} is the newly promoted version on peer {string}',
+  'the canonical head of {string} is the newly promoted version on federated peer {string}',
   async function (this: E2EWorld, contentId: string, peerName: string) {
     const state = notaryPromotionState.get(this);
     assert.ok(
@@ -970,36 +970,41 @@ When(
 // sync-doc-by-created-id probe below is new.
 // ---------------------------------------------------------------------------
 
-Then(
+for (const expression of [
   /^\/sync doc matching the created content id is present on peer "([^"]+)" within (\d+) s$/,
-  { timeout: 60_000 },
-  async function (this: E2EWorld, peerName: string, secondsStr: string) {
-    const seconds = Number.parseInt(secondsStr, 10);
-    const contentId = this.contentIds.get('lastContentId');
-    assert.ok(
-      contentId,
-      'no content id captured — a "... creates content titled ..." step must run first'
-    );
-    // content_doc_id() (elohim-storage src/sync/projector.rs) namespaces
-    // every projected content document as "node:{content.id}".
-    const docId = `node:${contentId}`;
-    const url = this.getDoorway(peerName).url;
-    let lastHeads: string[] = [];
-    const present = await pollForGauge<true>(
-      async () => {
-        const { body } = await probeSyncDocHeads(url, 'elohim', docId);
-        lastHeads = Array.isArray(body.heads) ? body.heads : [];
-        return lastHeads.length > 0 ? true : undefined;
-      },
-      { intervalMs: 1_000, timeoutMs: seconds * 1000 }
-    );
-    assert.ok(
-      present,
-      `/sync doc "${docId}" not present (no committed heads) on ${peerName} within ${seconds}s ` +
-        `(last seen heads: [${lastHeads.join(', ')}])`
-    );
-  }
-);
+  /^\/sync doc matching the created content id is present on federated peer "([^"]+)" within (\d+) s$/,
+]) {
+  Then(
+    expression,
+    { timeout: 60_000 },
+    async function (this: E2EWorld, peerName: string, secondsStr: string) {
+      const seconds = Number.parseInt(secondsStr, 10);
+      const contentId = this.contentIds.get('lastContentId');
+      assert.ok(
+        contentId,
+        'no content id captured — a "... creates content titled ..." step must run first'
+      );
+      // content_doc_id() (elohim-storage src/sync/projector.rs) namespaces
+      // every projected content document as "node:{content.id}".
+      const docId = `node:${contentId}`;
+      const url = this.getDoorway(peerName).url;
+      let lastHeads: string[] = [];
+      const present = await pollForGauge<true>(
+        async () => {
+          const { body } = await probeSyncDocHeads(url, 'elohim', docId);
+          lastHeads = Array.isArray(body.heads) ? body.heads : [];
+          return lastHeads.length > 0 ? true : undefined;
+        },
+        { intervalMs: 1_000, timeoutMs: seconds * 1000 }
+      );
+      assert.ok(
+        present,
+        `/sync doc "${docId}" not present (no committed heads) on ${peerName} within ${seconds}s ` +
+          `(last seen heads: [${lastHeads.join(', ')}])`
+      );
+    }
+  );
+}
 
 // ---------------------------------------------------------------------------
 // Sibling @wip scenarios in these same four feature files — none of these
@@ -1033,7 +1038,7 @@ When(
 // doorbell carrier (gossip topic + conductor-resolve trigger) is not yet
 // implemented — dht-unity plan T4."
 Given(
-  'EPR {string} has a declared canonical head on peer {string}',
+  'EPR {string} has a declared canonical head on federated peer {string}',
   function (this: E2EWorld, _eprId: string, _peerName: string) {
     return 'pending';
   }

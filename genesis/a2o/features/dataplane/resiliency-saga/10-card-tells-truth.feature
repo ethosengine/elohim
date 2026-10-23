@@ -37,13 +37,13 @@ Feature: Chapter 10 — the resilience card tells the truth
   if it agrees with itself everywhere it's rendered.
 
   Background:
-    Given peer "alpha-A" at "alpha-A"
-    And peer "elohim.host" at "elohim.host"
+    Given federated peer "alpha-A" at "alpha-A"
+    And federated peer "elohim.host" at "elohim.host"
 
   Scenario: Both doorways report the same non-zero stewarding count for elohim-host-landing
     Then peers "alpha-A" and "elohim.host" report the same non-zero stewardingCollectives for "elohim-host-landing"
 
   @wip @browser-only
   Scenario: The rendered resilience card shows the truth on elohim.host
-    When I render the resilience card for "elohim-host-landing" on peer "elohim.host"
+    When I render the resilience card for "elohim-host-landing" on federated peer "elohim.host"
     Then the rendered card capture has no HTTP errors and a screenshot

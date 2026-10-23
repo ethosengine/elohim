@@ -70,15 +70,15 @@ Feature: Notary authority — the federation converges on ONE earned canonical h
   exactly what must come true, and pass unchanged the moment it does.
 
   Background:
-    Given peer "alpha-A" at "alpha-A"
-    And peer "elohim.host" at "elohim.host"
+    Given federated peer "alpha-A" at "alpha-A"
+    And federated peer "elohim.host" at "elohim.host"
 
   @requires:multi-node
   Scenario: A federation peer serves the landing EPR at the notarized tier (baseline — green)
     # Green baseline. The landing EPR is served with a notarized head on the author/promoter
     # peer — the padlock is lit where the canonical head has been elected. This confirms the
     # notary path produces green at all; the gap is convergence (next scenario), not reachability.
-    Then EPR "elohim-host-landing" trust is "notarized" on peer "alpha-A"
+    Then EPR "elohim-host-landing" trust is "notarized" on federated peer "alpha-A"
 
   @requires:multi-node
   Scenario: Every federation peer resolves the SAME canonical head (RED — the convergence gap)
@@ -120,7 +120,7 @@ Feature: Notary authority — the federation converges on ONE earned canonical h
     # When it passes, the notary refuses a move by a peer lacking earned authority for the EPR
     # with 401/403 (reach-cohort edit-membership + author/community signature): earned authorship
     # declares, Elohim witnesses the grant, and no unearned peer can move the canonical head.
-    Then the HEAD authority surface refuses a non-author move of "elohim-host-landing" on peer "alpha-A"
+    Then the HEAD authority surface refuses a non-author move of "elohim-host-landing" on federated peer "alpha-A"
 
   # ── EPR upgrade lifecycle (archetype) ────────────────────────────────────────
   # The whole life of a versioned artifact, not just a single-shot convergence. An archetype
@@ -140,12 +140,12 @@ Feature: Notary authority — the federation converges on ONE earned canonical h
     Given EPR "elohim-host-landing" resolves the same canonical head across peers "alpha-A" and "elohim.host"
     When the steward promotes a new version of "elohim-host-landing" to canonical
     Then EPR "elohim-host-landing" resolves the same canonical head across peers "alpha-A" and "elohim.host"
-    And the canonical head of "elohim-host-landing" is the newly promoted version on peer "elohim.host"
+    And the canonical head of "elohim-host-landing" is the newly promoted version on federated peer "elohim.host"
     # Durability: the head must survive the substrate churn that caused the live regression —
     # a re-seed and a projector re-run must not resurrect the superseded head.
     When the substrate re-seeds and re-projects "elohim-host-landing"
-    Then the canonical head of "elohim-host-landing" is the newly promoted version on peer "elohim.host"
-    And the canonical head of "elohim-host-landing" is the newly promoted version on peer "alpha-A"
+    Then the canonical head of "elohim-host-landing" is the newly promoted version on federated peer "elohim.host"
+    And the canonical head of "elohim-host-landing" is the newly promoted version on federated peer "alpha-A"
 
   # ── The upgrade doorbell (operator direction, 2026-07-11) ────────────────────
   # Today a declared canonical head reaches other peers only by the COINCIDENCE of
@@ -165,7 +165,7 @@ Feature: Notary authority — the federation converges on ONE earned canonical h
   # implemented — dht-unity plan T4. Kept parseable and RED-defining.
   @wip @requires:multi-node
   Scenario: A declared canonical head rings the upgrade doorbell — every peer re-verifies and adopts within one sync window (RED — no doorbell)
-    Given EPR "elohim-host-landing" has a declared canonical head on peer "alpha-A"
+    Given EPR "elohim-host-landing" has a declared canonical head on federated peer "alpha-A"
     When the canonical head declaration is announced to the federation
     Then EPR "elohim-host-landing" resolves the same canonical head across peers "alpha-A" and "elohim.host" within one sync window
 
@@ -182,7 +182,7 @@ Feature: Notary authority — the federation converges on ONE earned canonical h
   # (resolve_name_binding) is owed. Design: genesis/docs/superpowers/specs/2026-10-08-name-binding-design.md
   @wip @regression @requires:multi-node
   Scenario: Two doorways answering one name with two addresses name two electors or two clocks, never one binding
-    Given peer "alpha-A" and peer "elohim.host" each answer the name "lamad-spa"
+    Given federated peer "alpha-A" and federated peer "elohim.host" each answer the name "lamad-spa"
     When the two answers name different CIDs
     Then each answer names the elector and the election clock of the binding behind it
     And the two answers differ in elector or in election clock

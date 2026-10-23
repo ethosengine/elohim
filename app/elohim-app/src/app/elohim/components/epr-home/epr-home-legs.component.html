@@ -285,6 +285,46 @@
     }
   </section>
 
+  <!-- What it may do (the app bundle's declarations, read from the content-chrome facing) -->
+  @if (permissions(); as perm) {
+    <section class="leg" id="permissions" data-testid="epr-home-leg-permissions">
+      <h3 class="leg__title">What it may do</h3>
+      @if (perm === 'unreadable') {
+        <p class="leg__line leg__line--quiet" data-testid="epr-home-permissions-unreadable">
+          Couldn't read what it declares.
+        </p>
+      } @else if (perm.capabilities.length === 0 && perm.sources.length === 0) {
+        <p class="leg__line" data-testid="epr-home-permissions-none">Declares nothing extra.</p>
+      } @else {
+        @for (cap of perm.capabilities; track cap.value) {
+          <div
+            class="leg__row"
+            data-testid="epr-home-capability"
+            [attr.data-capability]="cap.value"
+          >
+            <span>{{ cap.label }}</span>
+            @if (cap.device) {
+              <span class="pill">asks you first</span>
+            }
+          </div>
+        }
+        @if (perm.sources.length > 0) {
+          <div class="leg__line" data-testid="epr-home-permissions-sources">
+            Says it reaches beyond itself to
+            @for (source of perm.sources; track source) {
+              <span class="leg__mono" data-testid="epr-home-permission-source">{{ source }}</span>
+            }
+            <span class="leg__line--quiet">— what it declares, not a grant.</span>
+          </div>
+        }
+      }
+      <p class="leg__line leg__line--quiet">
+        As its record asks. Its own scripts run; the rest stays within what this doorway admits and
+        what you allow.
+      </p>
+    </section>
+  }
+
   <!-- Where it came from (process) -->
   <section class="leg" id="from" data-testid="epr-home-leg-from">
     <div class="leg__head">
@@ -351,7 +391,7 @@
         }
       </div>
     }
-    <div class="leg__row leg__row--stack">
+    <div class="leg__row leg__row--stack" id="source" data-testid="epr-home-source">
       <span class="leg__ui leg__ui--muted">Notarized</span>
       <span>added {{ addedOn() }} · updated {{ updatedOn() }}</span>
       @if (anchorShort(); as anchor) {
@@ -374,7 +414,7 @@
     </div>
     @if (isOpen('from')) {
       <div class="fold" id="epr-home-fold-from" data-testid="epr-home-fold-from">
-        <div data-testid="epr-home-attestations">
+        <div id="claims" data-testid="epr-home-attestations">
           @if (attestations() === undefined) {
             <p class="leg__line leg__line--quiet">Checking…</p>
           } @else if (attestations() === null) {

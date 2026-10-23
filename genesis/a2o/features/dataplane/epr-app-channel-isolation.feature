@@ -42,8 +42,8 @@ Feature: Public visitors keep the published app while Matthew stages its success
   are a household reconciliation allowance for this fixture, not a WAN availability promise.
 
   Background:
-    Given peer "alpha-A" at "alpha-A"
-    And peer "elohim.host" at "elohim.host"
+    Given federated peer "alpha-A" at "alpha-A"
+    And federated peer "elohim.host" at "elohim.host"
     And the household's storage peers are "matthew" behind doorway "alpha-A", "jessica" behind doorway "elohim.host", and "james" behind no doorway
 
   @requires:owned-substrate

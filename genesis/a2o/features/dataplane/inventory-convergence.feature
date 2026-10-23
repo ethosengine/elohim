@@ -36,8 +36,8 @@ Feature: Inventory-gossip apply plane converges under WAN-adversarial gossip
   no-op (that is locked by peer_blob_inventory.rs's tests).
 
   Background:
-    Given peer "alpha-A" at "alpha-A"
-    And peer "elohim.host" at "elohim.host"
+    Given federated peer "alpha-A" at "alpha-A"
+    And federated peer "elohim.host" at "elohim.host"
 
   Scenario: the seed-facing doorway peer catches its projection up under sustained gossip
     # Under the storm the seed peer (adam) cannot drain inventory, so the projection it
@@ -47,13 +47,13 @@ Feature: Inventory-gossip apply plane converges under WAN-adversarial gossip
     # while a 300 s projection-reconcile sweep is in flight. Each peer is polled every
     # 15 s for up to 600 s (two sweep cadences); a peer still behind after that fails
     # with the last /health evidence.
-    Then peer "alpha-A" /health p2p.caughtUp becomes true within 600 seconds
-    And peer "elohim.host" /health p2p.caughtUp becomes true within 600 seconds
+    Then federated peer "alpha-A" /health p2p.caughtUp becomes true within 600 seconds
+    And federated peer "elohim.host" /health p2p.caughtUp becomes true within 600 seconds
 
   # HELD (2026-08-21): 2 undefined step(s) — story-first placeholder; remove @wip when steps land.
   @wip
   Scenario: the admission plane keeps headroom instead of wedging under the CPU storm
     # The non-idempotent re-apply + re-score pegs the runtime; HTTP admission backs up and
     # semaphore headroom collapses toward zero. A converged plane leaves permits available.
-    Then peer "alpha-A" /health semaphorePermits >= 1
-    And peer "elohim.host" /health semaphorePermits >= 1
+    Then federated peer "alpha-A" /health semaphorePermits >= 1
+    And federated peer "elohim.host" /health semaphorePermits >= 1

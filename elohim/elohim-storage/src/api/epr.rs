@@ -204,6 +204,14 @@ pub async fn handle(
             get_epr_raw(req, cid, pool, ctx).await
         }
 
+        // GET /api/v1/epr/:id/chrome — the content-chrome facing (Category C:
+        // recomputed per request, never stored). `:id` is a record id or a
+        // content address.
+        (&Method::GET, p) if is_chrome_facing_path(p) => {
+            let id = p.trim_end_matches("/chrome");
+            get_chrome_facing(&req, id, pool, ctx).await
+        }
+
         // GET /api/v1/epr/:scope/lens-market — plural-Mishpat lens market (S7).
         // NOTE: the `:scope` segment here is the EPR SLUG-ID (e.g. `epr:lamad-spa`,
         // plan A3), NOT a dag-cbor CID like the other epr sub-resources. The market
@@ -1049,6 +1057,180 @@ async fn get_nav_context(
 // GET /api/v1/epr/:cid/raw — EPR-content facing inspector (Category C read-only)
 // ---------------------------------------------------------------------------
 
+/// Pure route-classifier for the content-chrome facing (route-shadow guard):
+/// exactly `{id}/chrome`, two segments.
+pub(crate) fn is_chrome_facing_path(path: &str) -> bool {
+    path.ends_with("/chrome") && path.split('/').count() == 2 && !path.starts_with('/')
+}
+
+/// Pure route-classifier for the content-address signal intake:
+/// exactly `{id}/signals`, two segments.
+pub(crate) fn is_content_signals_path(path: &str) -> bool {
+    path.ends_with("/signals") && path.split('/').count() == 2 && !path.starts_with('/')
+}
+
+/// GET /api/v1/epr/:id/chrome — every reading the protocol chrome shows for one
+/// record, folded by `elohim_facings::folds::content_chrome` from the record and
+/// the projections it composes (`services::content_chrome_facing`).
+///
+/// **Ephemeral (Category C):** recomputed on every request from the Notarized
+/// record and its projections, and never stored. The record is judged by the
+/// same reach verifier as `GET /db/content/{id}`; an unknown or unservable record
+/// is 404.
+async fn get_chrome_facing(
+    req: &Request<Incoming>,
+    id: &str,
+    pool: &DbPool,
+    ctx: &AppContext,
+) -> Result<Response<Full<Bytes>>, StorageError> {
+    use crate::services::content_chrome_facing as facing;
+    let now = crate::db::models::current_timestamp();
+    let Some((view, record)) = facing::build_facing(
+        pool,
+        ctx,
+        id,
+        facing::peer_status_staleness_secs(),
+        &now,
+        crate::services::content_witness::node_probe(),
+    )
+    .await?
+    else {
+        return Ok(response::not_found(&format!("no record for {id}")));
+    };
+    let agent_cid = super::account::extract_agent_cid_explicit(req);
+    let mut conn = get_conn(pool)?;
+    if let Some(refused) = super::content_reach_gate::reach_refusal(
+        &mut conn,
+        ctx,
+        &record.id,
+        &record.reach,
+        agent_cid.as_deref(),
+        None,
+    ) {
+        return Ok(refused);
+    }
+    Ok(response::ok(&view))
+}
+
+/// POST /api/v1/epr/:id/signals — record what content was seen doing that its
+/// record did not declare (`services::content_signals`). `:id` is a record id or
+/// a content address; the subject is always the content address. 202 with the
+/// counts; 404 when no record answers to `:id`; 429 when every report in the
+/// body was past the per-address limit; 503 when this peer holds no agent key to
+/// record under. Records locally only — the observation plane propagates.
+pub async fn post_content_signals(
+    req: Request<Incoming>,
+    id: &str,
+    pool: &DbPool,
+    ctx: &AppContext,
+    manager: &crate::observation::manager::ObservationManagerBackend,
+    observer: Option<String>,
+) -> Result<Response<Full<Bytes>>, StorageError> {
+    use crate::services::{content_chrome_facing as facing, content_signals as signals};
+    use http_body_util::{BodyExt, Limited};
+
+    let content_type = req
+        .headers()
+        .get(hyper::header::CONTENT_TYPE)
+        .and_then(|v| v.to_str().ok())
+        .map(str::to_string);
+    // What the path says about the report (relay headers, or the direct
+    // request's own origin and client address) — recorded, never a refusal.
+    let client = req
+        .extensions()
+        .get::<crate::http::CallerAddr>()
+        .map(|addr| addr.0.ip());
+    let envelope = signals::envelope_from_headers(req.headers(), client);
+    let body = match Limited::new(req.into_body(), signals::MAX_SIGNAL_BODY_BYTES + 1)
+        .collect()
+        .await
+    {
+        Ok(b) => b.to_bytes(),
+        Err(_) => {
+            return Ok(response::bad_request(&format!(
+                "signal body unreadable or over {} bytes",
+                signals::MAX_SIGNAL_BODY_BYTES
+            )))
+        }
+    };
+    let parsed = match signals::parse_signal_body(content_type.as_deref(), &body) {
+        Ok(p) => p,
+        Err(e) => return Ok(response::error_response(e)),
+    };
+
+    let mut conn = get_conn(pool)?;
+    let record = facing::resolve_record(&mut conn, ctx, id)?;
+    let address = match &record {
+        Some(r) => r
+            .blob_hash
+            .as_deref()
+            .or(r.blob_cid.as_deref())
+            .and_then(facing::display_address),
+        None => None,
+    };
+    let Some(address) = address else {
+        return Ok(response::not_found(&format!(
+            "no content address for {id}: a signal names content this peer holds a record for"
+        )));
+    };
+    // Every name a report's document path may give this content.
+    let mut names = vec![address.clone()];
+    if let Some(r) = &record {
+        names.push(r.id.clone());
+        for addr in [r.blob_hash.as_deref(), r.blob_cid.as_deref()]
+            .into_iter()
+            .flatten()
+        {
+            names.extend(facing::canonical_address(addr));
+            names.push(addr.to_string());
+        }
+        if let Some(slug) = r
+            .content_body
+            .as_deref()
+            .map(lamad_types::Html5AppBody::from_json_str)
+            .and_then(|b| b.slug)
+        {
+            names.push(slug);
+        }
+    }
+    names.sort();
+    names.dedup();
+    let subject = signals::SignalSubject {
+        content_address: address.clone(),
+        record_id: record.as_ref().map(|r| r.id.clone()),
+        names,
+    };
+    let Some(observer) = observer.filter(|o| !o.is_empty()) else {
+        return Ok(response::service_unavailable(
+            "this peer holds no agent key to record the signal under",
+        ));
+    };
+    let now = chrono::Utc::now();
+    let outcome = signals::record_signals(
+        manager,
+        &mut conn,
+        &observer,
+        &subject,
+        &envelope,
+        &parsed,
+        now.timestamp(),
+        &now.format("%Y-%m-%dT%H:%M:%SZ").to_string(),
+        signals::rate_limiter(),
+    )
+    .await?;
+    let body = serde_json::json!({
+        "contentAddress": address,
+        "recorded": outcome.recorded,
+        "rateLimited": outcome.rate_limited,
+    });
+    let status = if outcome.recorded == 0 && outcome.rate_limited > 0 {
+        StatusCode::TOO_MANY_REQUESTS
+    } else {
+        StatusCode::ACCEPTED
+    };
+    Ok(response::json_response(status, &body))
+}
+
 /// Pure route-classifier for the lens-market sub-resource (route-shadow guard).
 ///
 /// True iff `path` is exactly `{scope}/lens-market` (two segments). The `{scope}`
@@ -1175,5 +1357,30 @@ mod dedup_tests {
             !is_lens_market_path("lens-market"),
             "single segment without a scope is not the market route"
         );
+    }
+
+    // ---------------------------------------------------------------------------
+    // Content chrome — facing + signal intake route-shadow guards.
+    // ---------------------------------------------------------------------------
+
+    #[test]
+    fn chrome_and_signals_classifiers_match_only_their_routes() {
+        assert!(is_chrome_facing_path("evolution-of-trust/chrome"));
+        assert!(is_chrome_facing_path("bafkreiabc/chrome"));
+        assert!(
+            !is_chrome_facing_path("chrome"),
+            "bare `chrome` is a CID lookup"
+        );
+        assert!(!is_chrome_facing_path("a/b/chrome"));
+        assert!(!is_chrome_facing_path("bafyreiabc/raw"));
+        assert!(
+            !is_lens_market_path("x/chrome"),
+            "lens-market never shadows chrome"
+        );
+
+        assert!(is_content_signals_path("evolution-of-trust/signals"));
+        assert!(!is_content_signals_path("signals"));
+        assert!(!is_content_signals_path("a/b/signals"));
+        assert!(!is_chrome_facing_path("x/signals"));
     }
 }

@@ -124,8 +124,8 @@ Feature: A doorway is still the same doorway after it restarts
   # hostname and the other does not; both are fixture labels, neither is an
   # address a visitor types, and nothing here hard-codes one.
   Background:
-    Given peer "alpha-A" at "alpha-A"
-    And peer "elohim.host" at "elohim.host"
+    Given federated peer "alpha-A" at "alpha-A"
+    And federated peer "elohim.host" at "elohim.host"
 
   Scenario: A doorway comes back from its own restart as the same doorway
     # The whole cure in one pass: the doorway says it LOADED rather than minted,

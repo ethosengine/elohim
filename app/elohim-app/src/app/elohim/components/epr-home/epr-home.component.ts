@@ -15,7 +15,7 @@ import {
   untracked,
 } from '@angular/core';
 import { takeUntilDestroyed, toObservable, toSignal } from '@angular/core/rxjs-interop';
-import { ActivatedRoute, Router, RouterModule } from '@angular/router';
+import { ActivatedRoute, Router, RouterModule, convertToParamMap } from '@angular/router';
 
 import {
   Subject,
@@ -57,7 +57,6 @@ import {
   ConcernSubmit,
   CopiesSummary,
   EprHomeLegsComponent,
-  FoldRequest,
   VerifyState,
   humanizeSlug,
 } from './epr-home-legs.component';
@@ -71,20 +70,28 @@ import {
   reactionSignal,
 } from './epr-home-signals';
 import {
+  DeliveryHop,
   EprHomeAtom,
+  appPermissions,
   FoldLeg,
+  FoldRequest,
   LegAnchor,
   StewardRow,
   anchorWords,
   discussionTitle,
   heldChip,
   holdingWords,
+  hopWords,
+  isLegacyTabFragment,
   legFromFragment,
+  parseDeliveryPath,
   reachSubtitle,
+  requestFromFragment,
   toAtom,
 } from './epr-home.model';
 
 import type { AttestationView } from '@app/generated/attestation-view';
+import type { ContentChromeFacingView } from '@app/generated/content-chrome-facing';
 import type { ResilienceSnapshotView } from '@app/generated/resilience-snapshot-view';
 import type {
   ChallengeView,
@@ -206,14 +213,32 @@ export class EprHomeComponent {
   private readonly legClicks = new Subject<LegAnchor>();
   private readonly fragment$ = this.route.fragment ?? of(null);
 
-  /** A new object per request, so arriving at the same leg twice re-opens it. */
+  /**
+   * A new object per request, so arriving at the same leg twice re-opens it.
+   * A fragment may be a leg, a retired viewer tab, or one of the content
+   * chrome's card sections (#source, #holders, #claims, …).
+   */
   readonly openFold = toSignal<FoldRequest | null>(
     merge(
-      combineLatest([this.route.paramMap, this.fragment$]).pipe(map(([, f]) => legFromFragment(f))),
-      this.legClicks
-    ).pipe(map(leg => (leg ? { leg } : null))),
+      combineLatest([this.route.paramMap, this.fragment$]).pipe(
+        map(([, f]) => requestFromFragment(f))
+      ),
+      this.legClicks.pipe(map((leg): FoldRequest => ({ leg })))
+    ),
     { initialValue: null }
   );
+
+  /**
+   * How this reached you — the delivery path as the visitor's own link
+   * describes it (parsed in one place: parseDeliveryPath). Anyone can write
+   * such a link, so the hops are inspectable claims about the delivery, shown
+   * as text and labelled as the link's, never authority. No hops → nothing.
+   */
+  readonly deliveryHops = toSignal(
+    (this.route.queryParamMap ?? of(convertToParamMap({}))).pipe(map(parseDeliveryPath)),
+    { initialValue: [] as DeliveryHop[] }
+  );
+  readonly delivery = computed(() => this.deliveryHops().map(hop => hopWords(hop)));
 
   /** The atom whose network detail has been asked for (lazy: holds fold or #holds). */
   private readonly resilienceWantedFor = signal<string | null>(null);
@@ -393,6 +418,35 @@ export class EprHomeComponent {
       )
     ),
     { initialValue: undefined }
+  );
+
+  /**
+   * Storage's content-chrome facing for this record (GET /api/v1/epr/{id}/chrome,
+   * reached through the doorway like other /api/v1 reads). The record's app
+   * declarations are read from its `app` lens — parsed in Rust — never from the
+   * record's opaque body. `undefined` while in flight; `null` when the read failed.
+   */
+  readonly chrome = toSignal<ContentChromeFacingView | null | undefined>(
+    this.atomId$.pipe(
+      switchMap(id =>
+        id
+          ? this.http
+              .get<ContentChromeFacingView>(
+                `${this.storage.getStorageBaseUrl()}/api/v1/epr/${encodeURIComponent(id)}/chrome`
+              )
+              .pipe(
+                catchError(() => of(null)),
+                startWith(undefined)
+              )
+          : of(undefined)
+      )
+    ),
+    { initialValue: undefined }
+  );
+
+  /** What the record's app declares it may do; null (no section) unless it is an app bundle. */
+  readonly permissions = computed(() =>
+    appPermissions(this.chrome(), this.atom()?.contentFormat ?? '')
   );
 
   readonly contributors = toSignal(
@@ -598,7 +652,7 @@ export class EprHomeComponent {
     // fragment across it. Rename it in place to the leg it opens.
     this.fragment$.pipe(takeUntilDestroyed(this.destroyRef)).subscribe(fragment => {
       const leg = legFromFragment(fragment);
-      if (fragment && leg && leg !== fragment) {
+      if (isLegacyTabFragment(fragment) && leg) {
         void this.router.navigate([], {
           relativeTo: this.route,
           fragment: leg,
@@ -647,6 +701,24 @@ export class EprHomeComponent {
       } else if (s.status === 'not-found') {
         this.seoService.setTitle('Out of reach');
       }
+    });
+
+    // A content-chrome card lands on a section of this page (#source,
+    // #delivery, #claims, …). Bring it into view once it has rendered; a
+    // section this page doesn't carry (or one not shown — #yours signed out,
+    // #delivery with no claim) scrolls nowhere rather than somewhere wrong.
+    effect(() => {
+      const anchor = this.openFold()?.anchor;
+      if (!anchor || this.status() !== 'loaded') return;
+      afterNextRender(
+        () => {
+          const el = this.elRef.nativeElement.querySelector<HTMLElement>(`#${anchor}`);
+          if (el && typeof el.scrollIntoView === 'function') {
+            el.scrollIntoView({ block: 'start' });
+          }
+        },
+        { injector: this.injector }
+      );
     });
 
     // Network detail is read only when someone asks for it: the holds fold

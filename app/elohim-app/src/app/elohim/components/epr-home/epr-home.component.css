@@ -149,6 +149,24 @@
   color: var(--el-text-muted);
 }
 
+/* How this reached you: the visitor's link's own claim — one quiet line */
+
+.epr-home__delivery {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 4px 6px;
+  margin: 0;
+  font-family: var(--el-font-ui);
+  font-size: 12px;
+  color: var(--el-text-muted);
+  overflow-wrap: anywhere;
+}
+
+.epr-home__delivery .epr-home__mono {
+  color: var(--el-text-muted);
+}
+
 .epr-home__mono {
   font-family: var(--el-font-mono);
   font-size: 12px;

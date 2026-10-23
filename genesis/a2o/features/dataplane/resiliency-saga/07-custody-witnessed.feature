@@ -83,8 +83,8 @@ Feature: Chapter 7 — custody is witnessed
   finish line.
 
   Background:
-    Given peer "alpha-A" at "alpha-A"
+    Given federated peer "alpha-A" at "alpha-A"
 
   Scenario: At least one shard is witnessed as actively stocked
     When I read "/api/v1/weave"
-    Then labeled metric "elohim_custody_class_count" with label "class" "stocked" on peer "alpha-A" >= 1
+    Then labeled metric "elohim_custody_class_count" with label "class" "stocked" on federated peer "alpha-A" >= 1

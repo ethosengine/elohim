@@ -100,8 +100,8 @@ Feature: Nobody can hand themselves standing over another person, household, or 
   Background:
     # Naming only. These two steps bind the doorway HTTP surface; they do NOT supply the per-peer
     # conductor zome-call access every scenario needs — see @harness-gap:conductor-zome-call.
-    Given peer "author" at "E2E_DOORWAY_ALPHA"
-    And peer "second" at "E2E_DOORWAY_B"
+    Given federated peer "author" at "E2E_DOORWAY_ALPHA"
+    And federated peer "second" at "E2E_DOORWAY_B"
 
   # ── 1. (infrastructure DNA) A peer cannot report another peer's status ───────
 
@@ -109,11 +109,11 @@ Feature: Nobody can hand themselves standing over another person, household, or 
   Scenario: A peer cannot make itself the source of another peer's status
     # Claim: an AgentToPeerStatus link, whose base IS the ownership claim (the D6 case), passes for
     # any base today.
-    Given peer "second" reports its own status and has never asked peer "author" to report it
-    When peer "author" reports peer "second"'s condition as though peer "second" had said it
-    Then peer "second", who did not make the claim, refuses it
-    And the claim never appears in peer "second"'s recorded status
-    And peer "second"'s recorded status, read back from peer "second", is exactly what it was before peer "author" acted
+    Given federated peer "second" reports its own status and has never asked federated peer "author" to report it
+    When federated peer "author" reports federated peer "second"'s condition as though federated peer "second" had said it
+    Then federated peer "second", who did not make the claim, refuses it
+    And the claim never appears in federated peer "second"'s recorded status
+    And federated peer "second"'s recorded status, read back from federated peer "second", is exactly what it was before federated peer "author" acted
 
   # ── 2. (imagodei DNA) Nobody can steward a person who never agreed to it ─────
 
@@ -123,11 +123,11 @@ Feature: Nobody can hand themselves standing over another person, household, or 
     # Decision D3's two legal forms — subject-authored, or steward-authored with a distinct
     # verified witness — are stated in the Given and exercised honestly in scenario 06.
     Given someone may steward a person only if that person agreed to it, or if a third party who is neither the steward nor the person witnessed the arrangement
-    And a person on peer "second" has not agreed to peer "author" stewarding them, and nobody has witnessed any such arrangement
-    When peer "author", using only the tools the network ships to everyone today, records itself as that person's steward on its own say-so
-    Then peer "second", who did not make the claim, refuses it
+    And a person on federated peer "second" has not agreed to federated peer "author" stewarding them, and nobody has witnessed any such arrangement
+    When federated peer "author", using only the tools the network ships to everyone today, records itself as that person's steward on its own say-so
+    Then federated peer "second", who did not make the claim, refuses it
     And the claim never appears in that person's stewardship record
-    And that person's stewardship record, read back from peer "second", is exactly what it was before peer "author" acted
+    And that person's stewardship record, read back from federated peer "second", is exactly what it was before federated peer "author" acted
 
   # ── 3. (imagodei + qahal) A steward roster does not grow from an invented sponsor ──
 
@@ -137,23 +137,23 @@ Feature: Nobody can hand themselves standing over another person, household, or 
     # Membership{role: Steward} is checked only for "some sponsor is named", never that the named
     # sponsor actually vouched; the literal word "founder" passes on a collective the claimant
     # never founded.
-    Given a group on peer "second" keeps a roster of stewards, and a person joins that roster only when an existing steward vouches for them
-    And no existing steward has vouched for peer "author"
-    When peer "author" adds itself to that roster, naming a voucher who never vouched for it
-    Then peer "second", who did not make the claim, refuses it
+    Given a group on federated peer "second" keeps a roster of stewards, and a person joins that roster only when an existing steward vouches for them
+    And no existing steward has vouched for federated peer "author"
+    When federated peer "author" adds itself to that roster, naming a voucher who never vouched for it
+    Then federated peer "second", who did not make the claim, refuses it
     And the claim never appears in the group's roster of stewards
-    And the group's roster of stewards, read back from peer "second", is exactly what it was before peer "author" acted
+    And the group's roster of stewards, read back from federated peer "second", is exactly what it was before federated peer "author" acted
 
   # ── 4. (infrastructure DNA) A peer cannot claim to serve on someone else's behalf ──
 
   @wip @dna:infrastructure @concern:authority-in-integrity-04-content-server
   Scenario: A peer cannot sign itself up to serve another peer's content
     # Claim: a ContentServer entry carries no author-binding field at all today.
-    Given peer "author" runs storage of its own, and peer "second" has never asked it to serve any content
-    When peer "author" lists itself as serving content on peer "second"'s behalf
-    Then peer "second", who did not make the claim, refuses it
-    And the claim never appears in peer "second"'s list of who may serve its content
-    And peer "second"'s list of who may serve its content, read back from peer "second", is exactly what it was before peer "author" acted
+    Given federated peer "author" runs storage of its own, and federated peer "second" has never asked it to serve any content
+    When federated peer "author" lists itself as serving content on federated peer "second"'s behalf
+    Then federated peer "second", who did not make the claim, refuses it
+    And the claim never appears in federated peer "second"'s list of who may serve its content
+    And federated peer "second"'s list of who may serve its content, read back from federated peer "second", is exactly what it was before federated peer "author" acted
 
   # ── 5. (node-registry DNA) A peer cannot sign a health report as someone else ──
 
@@ -162,11 +162,11 @@ Feature: Nobody can hand themselves standing over another person, household, or 
     # Claim: no peer checks a HealthAttestation's claimed identity against who actually signed it;
     # the field named "Prevents spoofing" prevents nothing, since the action was already signed by
     # its real author and no validating peer compares the two.
-    Given peer "author" has never been registered as peer "second", and holds none of peer "second"'s standing
-    When peer "author" signs a health report as though peer "second" had written it
-    Then peer "second", who did not make the claim, refuses it
-    And the claim never appears in peer "second"'s recorded health
-    And peer "second"'s recorded health, read back from peer "second", is exactly what it was before peer "author" acted
+    Given federated peer "author" has never been registered as federated peer "second", and holds none of federated peer "second"'s standing
+    When federated peer "author" signs a health report as though federated peer "second" had written it
+    Then federated peer "second", who did not make the claim, refuses it
+    And the claim never appears in federated peer "second"'s recorded health
+    And federated peer "second"'s recorded health, read back from federated peer "second", is exactly what it was before federated peer "author" acted
 
   # ── 6. NEGATIVE CONTROL — honest claims still land, and a second peer sees them ──
 
@@ -175,17 +175,17 @@ Feature: Nobody can hand themselves standing over another person, household, or 
     # One honest counterpart per numbered scenario above. The two stewardship lines are D3's two
     # legal forms, both exercised so neither goes untested. Why this is ONE scenario is in the
     # Feature text; each Then names its claim, so a failure report says which honest claim broke.
-    Given peer "second" reports its own status honestly
-    And a person on peer "second" has agreed to peer "author" stewarding them
-    And a different person on peer "second" is stewarded by peer "author"
-    And someone who is neither that person nor peer "author" witnessed that arrangement being made
-    And an existing steward of a group on peer "second" vouches for peer "author", who then joins that group's roster of stewards
-    And peer "second" asks peer "author" to serve some of its content, and peer "author" lists itself as serving it
-    And peer "author" reports on peer "second"'s health, signed under peer "author"'s own name
-    When each of these honestly made claims reaches peer "second"
+    Given federated peer "second" reports its own status honestly
+    And a person on federated peer "second" has agreed to federated peer "author" stewarding them
+    And a different person on federated peer "second" is stewarded by federated peer "author"
+    And someone who is neither that person nor federated peer "author" witnessed that arrangement being made
+    And an existing steward of a group on federated peer "second" vouches for federated peer "author", who then joins that group's roster of stewards
+    And federated peer "second" asks federated peer "author" to serve some of its content, and federated peer "author" lists itself as serving it
+    And federated peer "author" reports on federated peer "second"'s health, signed under federated peer "author"'s own name
+    When each of these honestly made claims reaches federated peer "second"
     Then the honest status report is accepted
     And both honest stewardship arrangements are accepted
     And the honest addition to the roster of stewards is accepted
     And the honest offer to serve content is accepted
     And the honest health report is accepted
-    And peer "second", who authored none of them, can see each one
+    And federated peer "second", who authored none of them, can see each one

@@ -14,8 +14,8 @@ Feature: Chapter 1 — the device awakens
   later chapter in the saga silently assumes.
 
   Background:
-    Given peer "alpha-A" at "alpha-A"
+    Given federated peer "alpha-A" at "alpha-A"
 
   Scenario: The conductor is connected and the peer reports healthy
-    Then peer "alpha-A" /health conductor.connected is true
-    And peer "alpha-A" is healthy
+    Then federated peer "alpha-A" /health conductor.connected is true
+    And federated peer "alpha-A" is healthy

@@ -53,6 +53,7 @@ pub mod api;
 
 // Core modules (always available)
 pub mod app_deliverability; // Pure deliverability verdict over a bundle's extracted entries
+pub mod apps_chrome; // Peer-native chrome decision for /apps (Fetch Metadata × loopback origin pair) — web-seam debt with /apps serving
 pub mod blob_reach; // Reach enforcement for the blob BYTE route (GET /blob/{hash})
 pub mod blob_store;
 pub mod chain_write_gate; // One source chain, one writer at a time (per-cell write serialization)

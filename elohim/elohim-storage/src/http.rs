@@ -582,6 +582,13 @@ pub struct HttpServer {
             std::collections::HashMap<String, crate::app_deliverability::DeliverabilityVerdict>,
         >,
     >,
+    /// Whether an app bundle's bytes matched their content address, per
+    /// canonical `sha256-{hex}` key — recorded when the bundle is extracted
+    /// (`handle_app_request`'s slow path hashes the ZIP it is about to unpack).
+    /// The peer-native shell reports `delivery.checked {by:"peer"}` only for a
+    /// key recorded `true` here; absent (never extracted this process) or
+    /// `false` means no check is claimed. Process-lifetime.
+    content_checks: Arc<tokio::sync::RwLock<std::collections::HashMap<String, bool>>>,
     /// T7 (head-plane trust-gradient program): process-lifetime
     /// verification-memo store, wired once at startup via
     /// [`Self::with_memo_store`] and cloned into the per-request
@@ -1520,6 +1527,7 @@ impl HttpServer {
             deliverability_memo: Arc::new(tokio::sync::RwLock::new(
                 std::collections::HashMap::new(),
             )),
+            content_checks: Arc::new(tokio::sync::RwLock::new(std::collections::HashMap::new())),
             memo_store: None,
             search_index: None,
             reach_gates_prepared: Arc::new(std::sync::atomic::AtomicUsize::new(0)),
@@ -3122,13 +3130,18 @@ impl HttpServer {
                 self.handle_app_capability(p, agent_cid.as_deref()).await
             }
 
-            // HTML5 App serving: /apps/{slug}/{file_path}
-            (Method::GET, p) if p.starts_with("/apps/") => {
+            // HTML5 App serving: /apps/{slug}/{file_path}, plus the peer-native
+            // chrome's dedicated shell path /_elohim/shell/apps/{slug}/{file}.
+            // A request without Fetch Metadata takes the unchanged raw serve.
+            (Method::GET, p)
+                if p.starts_with("/apps/")
+                    || p.starts_with(&format!("{}/apps/", crate::apps_chrome::SHELL_PREFIX)) =>
+            {
                 if self.db_pool.is_some() {
                     let query = req.uri().query().unwrap_or("");
                     let agent_cid = crate::api::account::extract_agent_cid_explicit(&req)
                         .or_else(|| Self::extract_agent_id(&req));
-                    self.handle_app_request(&path, query, agent_cid.as_deref())
+                    self.handle_apps_get(req.headers(), &path, query, agent_cid.as_deref())
                         .await
                 } else {
                     Ok(Response::builder()
@@ -3801,10 +3814,30 @@ impl HttpServer {
     /// routes that doorway should proxy to clients, plus the blob proxy config.
     /// Infrastructure endpoints (/health, /shard/*, /sync/*, /import/*) are
     /// intentionally omitted — doorway proxies only API routes.
+    ///
+    /// The manifest also carries this storage peer's own identity (`peer`), so
+    /// the doorway that reads it at boot (its StewardPeer source) can name the
+    /// holder hop of a delivery by the key this peer actually holds —
+    /// `{role:"holder", peer:<agentKey>, reportedBy:"holder"}` — instead of a
+    /// configured string. Additive: a doorway that does not read `peer` parses
+    /// `DoorwayRoutes` exactly as before.
     async fn handle_manifest(&self) -> Result<Response<Full<Bytes>>, StorageError> {
         let routes = build_manifest();
-        let body = serde_json::to_string(&routes)
-            .map_err(|e| StorageError::Internal(format!("Failed to serialize manifest: {}", e)))?;
+        let agent_key = self
+            .hc_registry
+            .as_ref()
+            .and_then(|r| r.lamad_client())
+            .map(|hc| hc.agent_key_uhcak());
+        let transport_id = self
+            .node_transport
+            .as_ref()
+            .and_then(|t| t.status_peer_id());
+        let body = serde_json::to_string(&manifest_with_peer_identity(
+            &routes,
+            agent_key.as_deref(),
+            transport_id.as_deref(),
+        ))
+        .map_err(|e| StorageError::Internal(format!("Failed to serialize manifest: {}", e)))?;
         Ok(Response::builder()
             .status(StatusCode::OK)
             .header(header::CONTENT_TYPE, "application/json")
@@ -11411,6 +11444,262 @@ impl HttpServer {
         Ok(builder.body(Full::new(Bytes::new())).unwrap())
     }
 
+    /// GET `/apps/…` and `/_elohim/shell/apps/…` — the peer-native chrome front.
+    ///
+    /// A request without Fetch Metadata, or for a record that is not an
+    /// `html5-app`, takes [`Self::handle_app_request`] unchanged. Otherwise
+    /// `apps_chrome::decide` picks the shell, a raw serve with content-origin
+    /// headers, or a redirect (see `src/apps_chrome.rs` for the loopback origin
+    /// pair and why it is one-directional).
+    async fn handle_apps_get(
+        &self,
+        headers: &hyper::HeaderMap,
+        path: &str,
+        query: &str,
+        agent_cid: Option<&str>,
+    ) -> Result<Response<Full<Bytes>>, StorageError> {
+        use crate::apps_chrome::{self as chrome, AppsDecision};
+
+        let shell_rest = path
+            .strip_prefix(chrome::SHELL_PREFIX)
+            .filter(|rest| rest.starts_with("/apps/"));
+        let via_shell = shell_rest.is_some();
+        let apps_path = shell_rest.unwrap_or(path);
+        let kind = chrome::fetch_kind(headers);
+        if !via_shell && kind == chrome::FetchKind::Unmarked {
+            return self.handle_app_request(path, query, agent_cid).await;
+        }
+
+        let (identifier, _) = parse_app_path(apps_path);
+        let record = match self.resolve_app_record(identifier).await? {
+            Some(record) if record.content_format == "html5-app" => record,
+            _ if via_shell => {
+                return Ok(Response::builder()
+                    .status(StatusCode::NOT_FOUND)
+                    .header(header::CONTENT_TYPE, "application/json")
+                    .body(Full::new(Bytes::from(
+                        r#"{"error": "No html5-app record for this shell"}"#,
+                    )))
+                    .unwrap())
+            }
+            _ => return self.handle_app_request(path, query, agent_cid).await,
+        };
+
+        let role = chrome::host_role(headers.get(header::HOST).and_then(|v| v.to_str().ok()));
+        let path_and_query = if query.is_empty() {
+            apps_path.to_string()
+        } else {
+            format!("{apps_path}?{query}")
+        };
+        match chrome::decide(kind, &role, via_shell, &path_and_query, &record.id) {
+            AppsDecision::Raw => self.handle_app_request(apps_path, query, agent_cid).await,
+            AppsDecision::RawContent {
+                frame_ancestors,
+                report_endpoint,
+            } => {
+                let mut resp = self.handle_app_request(apps_path, query, agent_cid).await?;
+                if resp.status().is_success() {
+                    // Every record /apps serves is a protocol record: trustful.
+                    let sources = record
+                        .content_body
+                        .as_deref()
+                        .map(lamad_types::Html5AppBody::from_json_str)
+                        .unwrap_or_default()
+                        .sources;
+                    chrome::apply_content_headers(
+                        resp.headers_mut(),
+                        &frame_ancestors,
+                        report_endpoint.as_deref(),
+                        &record.id,
+                        elohim_chrome_asset::TrustMode::Trustful,
+                        &sources,
+                    );
+                }
+                Ok(resp)
+            }
+            AppsDecision::Redirect { location } => Ok(Response::builder()
+                .status(StatusCode::FOUND)
+                .header(header::LOCATION, location)
+                .header(header::CACHE_CONTROL, "no-store")
+                .header(header::VARY, chrome::FETCH_METADATA_VARY)
+                .body(Full::new(Bytes::new()))
+                .unwrap()),
+            AppsDecision::Shell {
+                isolation,
+                frame_src,
+            } => {
+                self.render_app_shell(&record, &role, isolation, frame_src, agent_cid)
+                    .await
+            }
+        }
+    }
+
+    /// The html5-app record an `/apps/{identifier}` path names: a content
+    /// address resolves through its record, a slug through the slug index (then
+    /// the DB). Served at the same floor as `/apps` itself.
+    async fn resolve_app_record(
+        &self,
+        identifier: &str,
+    ) -> Result<Option<db::models::Content>, StorageError> {
+        if identifier.is_empty() {
+            return Ok(None);
+        }
+        let content_id = if is_content_address(identifier) {
+            identifier.to_string()
+        } else {
+            let indexed = {
+                let index = self.slug_index.read().await;
+                index.get(identifier).cloned()
+            };
+            match indexed {
+                Some(entry) => entry.content_id,
+                None => match self.lookup_slug_entry(identifier).await? {
+                    Some(entry) => entry.content_id,
+                    None => return Ok(None),
+                },
+            }
+        };
+        let mut conn = self.get_conn()?;
+        crate::services::content_chrome_facing::resolve_record(
+            &mut conn,
+            &db::AppContext::default_lamad(),
+            &content_id,
+        )
+    }
+
+    /// Render the content shell for `record` on this peer: the island is filled
+    /// from the content-chrome facing; this peer adds only the frame source, the
+    /// isolation it chose, its own `self` delivery hop, and `checked` when it
+    /// verified the bundle against its address at extraction.
+    async fn render_app_shell(
+        &self,
+        record: &db::models::Content,
+        role: &crate::apps_chrome::HostRole,
+        isolation: crate::apps_chrome::ShellIsolation,
+        frame_src: String,
+        agent_cid: Option<&str>,
+    ) -> Result<Response<Full<Bytes>>, StorageError> {
+        use crate::services::content_chrome_facing as facing;
+        use elohim_chrome_asset::{
+            CheckedBy, ChromeContext, ChromeMedium, ContentFrame, DeliveryCheck, Isolation,
+            IsolationBoundary, ViewerKind,
+        };
+
+        let ctx = db::AppContext::default_lamad();
+        {
+            // The shell describes the record, so it is judged as the record is.
+            let mut conn = self.get_conn()?;
+            if let Some(refused) = crate::api::content_reach_gate::reach_refusal(
+                &mut conn,
+                &ctx,
+                &record.id,
+                &record.reach,
+                agent_cid,
+                self.memo_store.clone(),
+            ) {
+                return Ok(refused);
+            }
+        }
+        let Some(pool) = self.db_pool.as_ref() else {
+            return Ok(response::service_unavailable("Database not available"));
+        };
+        let now = db::models::current_timestamp();
+        let Some((view, _)) = facing::build_facing(
+            pool,
+            &ctx,
+            &record.id,
+            facing::peer_status_staleness_secs(),
+            &now,
+            crate::services::content_witness::node_probe(),
+        )
+        .await?
+        else {
+            return Ok(response::not_found("App not found"));
+        };
+
+        let checked = match (
+            view.content_address.clone(),
+            record
+                .blob_hash
+                .as_deref()
+                .and_then(facing::canonical_address),
+        ) {
+            (Some(address), Some(key))
+                if self.content_checks.read().await.get(&key).copied() == Some(true) =>
+            {
+                Some(DeliveryCheck {
+                    by: CheckedBy::Peer,
+                    against: address,
+                })
+            }
+            _ => None,
+        };
+        let isolation = match isolation {
+            crate::apps_chrome::ShellIsolation::OriginPair { content_origin } => Isolation {
+                boundary: IsolationBoundary::OriginPair,
+                content_origin: Some(content_origin),
+            },
+            crate::apps_chrome::ShellIsolation::OpaqueSandbox => Isolation {
+                boundary: IsolationBoundary::OpaqueSandbox,
+                content_origin: None,
+            },
+        };
+        let Some(island) = facing::island_from_facing(
+            &view,
+            ContentFrame {
+                src: frame_src,
+                title: view.title.clone(),
+            },
+            isolation,
+            vec![facing::self_hop()],
+            checked,
+        ) else {
+            return Ok(response::not_found(
+                "App ZIP not available (no content address)",
+            ));
+        };
+
+        // On the chrome loopback name the request comes from this machine, whose
+        // conductor holds the person's key; anywhere else nobody is validated.
+        let viewer = if matches!(role, crate::apps_chrome::HostRole::Chrome { .. })
+            && self
+                .hc_registry
+                .as_ref()
+                .and_then(|r| r.lamad_client())
+                .is_some()
+        {
+            ViewerKind::DeviceAgent
+        } else {
+            ViewerKind::Visitor
+        };
+        let mut chrome_ctx = ChromeContext::v1(record.id.clone(), viewer, ChromeMedium::PeerNative);
+        chrome_ctx.title = Some(view.title.clone());
+        // The record's declared theme hint, carried whole (scheme and colour).
+        chrome_ctx.theme = view
+            .app
+            .as_ref()
+            .and_then(|a| a.theme_hint.as_ref())
+            .map(|h| elohim_chrome_asset::ThemeHint {
+                color_scheme: h.color_scheme.clone(),
+                theme_color: h.theme_color.clone(),
+                tokens: None,
+            })
+            .filter(|h| !h.is_empty())
+            .map(elohim_chrome_asset::ChromeTheme::from);
+        chrome_ctx.content = Some(island);
+        let html = elohim_chrome_asset::render_content_shell(&chrome_ctx);
+
+        Ok(Response::builder()
+            .status(StatusCode::OK)
+            .header(header::CONTENT_TYPE, "text/html; charset=utf-8")
+            .header(header::CACHE_CONTROL, "no-store")
+            .header(header::VARY, crate::apps_chrome::FETCH_METADATA_VARY)
+            .header("Content-Security-Policy", "frame-ancestors 'self'")
+            .header("X-Content-Slug", record.id.as_str())
+            .body(Full::new(Bytes::from(html)))
+            .unwrap())
+    }
+
     /// Handle HTML5 app file requests
     ///
     /// Route: GET /apps/{identifier}/{file_path}
@@ -11791,6 +12080,23 @@ impl HttpServer {
         };
 
         debug!(identifier = %identifier, zip_size = zip_data.len(), "Fetched ZIP blob");
+
+        // Check the bundle against its content address before unpacking it, and
+        // remember the outcome for the peer-native shell's `delivery.checked`.
+        // Recorded, not enforced: a mismatch is logged and the serve proceeds
+        // exactly as before (the shell then simply claims no check).
+        if let Ok(expected) = crate::blob_store::BlobStore::parse_content_address(&blob_hash) {
+            use sha2::{Digest, Sha256};
+            let expected = expected.to_ascii_lowercase();
+            let matched = format!("{:x}", Sha256::digest(&zip_data)) == expected;
+            if !matched {
+                warn!(identifier = %identifier, blob_hash = %blob_hash, "app bundle bytes do not match their content address");
+            }
+            self.content_checks
+                .write()
+                .await
+                .insert(format!("sha256-{expected}"), matched);
+        }
 
         // Extract ALL files from ZIP
         let cursor = std::io::Cursor::new(&zip_data);
@@ -18306,6 +18612,26 @@ fn correlate_issues(entries: &[crate::db::models::ObservationEntry]) -> Vec<Obse
 /// in doorway. Security-adjacent: this exposes the CRDT doc-sync plane through
 /// doorway. The sync API does not itself enforce reach (it shares the known
 /// http-reach-enforcement-gap); GET reads mirror /db content-read posture.
+/// The `GET /manifest` body: the route manifest plus, when this peer holds a
+/// conductor agent key, `peer: {agentKey, transportId?}` — the identities the
+/// peer actually holds (its conductor cell key, and the transport id its running
+/// node reports), never configuration strings. Absent when no key is held.
+pub fn manifest_with_peer_identity(
+    routes: &doorway_client::DoorwayRoutes,
+    agent_key: Option<&str>,
+    transport_id: Option<&str>,
+) -> serde_json::Value {
+    let mut value = serde_json::to_value(routes).unwrap_or_else(|_| serde_json::json!({}));
+    if let (Some(key), Some(obj)) = (agent_key.filter(|k| !k.is_empty()), value.as_object_mut()) {
+        let mut peer = serde_json::json!({ "agentKey": key });
+        if let Some(t) = transport_id.filter(|t| !t.is_empty()) {
+            peer["transportId"] = serde_json::Value::String(t.to_string());
+        }
+        obj.insert("peer".to_string(), peer);
+    }
+    value
+}
+
 pub fn build_manifest() -> doorway_client::DoorwayRoutes {
     DoorwayRoutesBuilder::new()
         // =====================================================================
@@ -20546,6 +20872,35 @@ pub fn build_manifest() -> doorway_client::DoorwayRoutes {
                 .build(),
         )
         // =====================================================================
+        // /api/v1/epr/:id/chrome — the content-chrome facing. Ephemeral
+        // (Category C): recomputed per request from the Notarized record and the
+        // projections it composes (holders, couplings, attestations,
+        // stewardship); never stored, no entry type. `:id` is a record id or a
+        // content address. Declared so every doorway's registry reaches it and
+        // the chrome's lazy re-read resolves through `readingsBase`.
+        // =====================================================================
+        .route(
+            Route::get("/api/v1/epr/{id}/chrome")
+                .handler("get_epr_chrome_facing")
+                .cache_ttl(30)
+                .public_if_reach("commons")
+                .build(),
+        )
+        // =====================================================================
+        // /api/v1/epr/:id/signals — content-address signal intake. Records a
+        // browser CSP / Reporting API report (or a chrome/inspector intent) as an
+        // `undeclared-behaviour` observation by this peer about the content
+        // address; rate-limited per address; never fans out. The ONE route a
+        // doorway relays browser reports to. Unauthenticated by nature (browsers
+        // post reports without credentials) — it records evidence, never a
+        // verdict, and accepts only subjects this peer holds a record for.
+        // =====================================================================
+        .route(
+            Route::post("/api/v1/epr/{id}/signals")
+                .handler("post_epr_content_signals")
+                .build(),
+        )
+        // =====================================================================
         // /api/v1/epr/:scope/lens-market — plural-Mishpat lens market (lens-market S7).
         // `:scope` is the EPR SLUG-ID (e.g. epr:lamad-spa), NOT a dag-cbor CID.
         // Read-projection of the A-class `lenses` table keyed on `governs_epr`.
@@ -21349,6 +21704,18 @@ mod tests {
             paths.contains(&"/api/v1/epr/{scope}/lens-market"),
             "missing /api/v1/epr/{{scope}}/lens-market (lens-market S7 — doorway reachability)"
         );
+        // Content chrome (chrome-trust-edge). Same route-shadow guard
+        // discipline as lens-market: the arms dispatch through api/epr.rs
+        // (`is_chrome_facing_path`) and api/mod.rs (`is_content_signals_path`);
+        // unregistered here, a doorway's manifest matcher would miss them.
+        assert!(
+            paths.contains(&"/api/v1/epr/{id}/chrome"),
+            "missing /api/v1/epr/{{id}}/chrome (content-chrome facing — doorway reachability)"
+        );
+        assert!(
+            paths.contains(&"/api/v1/epr/{id}/signals"),
+            "missing /api/v1/epr/{{id}}/signals (content-address signal intake — the doorway relay target)"
+        );
         // Wave 3 M1 — vf-graphql bridge endpoint
         assert!(
             paths.contains(&"/api/v1/vf-graphql"),
@@ -21601,6 +21968,226 @@ mod tests {
             .unwrap();
         }
         (server.with_db_pool(pool), hash)
+    }
+
+    // ── Peer-native chrome on /apps (chrome-trust-edge) ────────────────────
+
+    fn fetch_headers(host: &str, dest: Option<&str>) -> hyper::HeaderMap {
+        let mut h = hyper::HeaderMap::new();
+        h.insert(header::HOST, host.parse().unwrap());
+        if let Some(dest) = dest {
+            h.insert("sec-fetch-dest", dest.parse().unwrap());
+            h.insert("sec-fetch-mode", "navigate".parse().unwrap());
+        }
+        h
+    }
+
+    fn island_of(html: &str) -> serde_json::Value {
+        let start = html
+            .find("id=\"elohim-omni-context\">")
+            .expect("context island")
+            + "id=\"elohim-omni-context\">".len();
+        let end = start + html[start..].find("</script>").unwrap();
+        serde_json::from_str(&html[start..end]).expect("island is JSON")
+    }
+
+    #[tokio::test]
+    async fn apps_navigation_on_the_chrome_origin_renders_the_peer_native_shell() {
+        let (server, _) = spa_bundle_server_with_row("evo", "evo", "commons").await;
+        let nav = fetch_headers("localhost:8090", Some("document"));
+        let resp = server
+            .handle_apps_get(&nav, "/apps/evo/index.html", "level=2", None)
+            .await
+            .unwrap();
+        assert_eq!(resp.status(), StatusCode::OK);
+        assert_eq!(resp.headers()[header::CACHE_CONTROL], "no-store");
+        assert_eq!(
+            resp.headers()[header::VARY],
+            crate::apps_chrome::FETCH_METADATA_VARY
+        );
+        let html = String::from_utf8(body_bytes(resp).await.to_vec()).unwrap();
+        assert!(
+            !html.contains("<iframe"),
+            "the chrome builds the frame after it mounts"
+        );
+        let ctx = island_of(&html);
+        assert_eq!(ctx["version"], 1);
+        assert_eq!(ctx["medium"], "peer-native");
+        assert_eq!(
+            ctx["viewer"]["kind"], "visitor",
+            "no conductor key held in this test"
+        );
+        let content = &ctx["content"];
+        assert_eq!(content["recordId"], "evo");
+        assert_eq!(content["mode"], "trustful");
+        // Anchored, but no conductor answers in this test: the witness is
+        // unread, and an unread witness reads amber, never green.
+        assert_eq!(content["witness"], "amber");
+        assert_eq!(content["isolation"]["boundary"], "origin-pair");
+        assert_eq!(
+            content["isolation"]["contentOrigin"],
+            "http://127.0.0.1:8090"
+        );
+        assert_eq!(
+            content["frame"]["src"],
+            "http://127.0.0.1:8090/apps/evo/index.html?level=2"
+        );
+        assert_eq!(
+            content["delivery"]["path"],
+            serde_json::json!([{"role": "self", "reportedBy": "self"}])
+        );
+        assert!(
+            content["delivery"].get("checked").is_none(),
+            "no check is claimed before this peer has hashed the bundle"
+        );
+        assert!(
+            content["holders"]["headline"].is_string(),
+            "holders worded by the fold"
+        );
+
+        // The frame's own load, on the content origin: raw bytes with the
+        // content-origin headers. Extracting it hashes the bundle.
+        let frame = fetch_headers("127.0.0.1:8090", Some("iframe"));
+        let raw = server
+            .handle_apps_get(&frame, "/apps/evo/index.html", "level=2", None)
+            .await
+            .unwrap();
+        assert_eq!(raw.status(), StatusCode::OK);
+        let csp = raw.headers()["content-security-policy"]
+            .to_str()
+            .unwrap()
+            .to_string();
+        assert!(
+            csp.starts_with("frame-ancestors http://localhost:8090;"),
+            "{csp}"
+        );
+        assert!(csp.contains("report-uri /api/v1/epr/evo/signals"), "{csp}");
+        assert_eq!(
+            raw.headers()["reporting-endpoints"],
+            "elohim-signals=\"http://127.0.0.1:8090/api/v1/epr/evo/signals\""
+        );
+        assert_eq!(raw.headers()[header::CACHE_CONTROL], "no-store");
+        assert_eq!(
+            raw.headers()["content-security-policy-report-only"],
+            "default-src 'self' blob: data: 'unsafe-inline' 'unsafe-eval'; \
+             report-uri /api/v1/epr/evo/signals",
+            "trustful raw content is observed against its declared sources"
+        );
+        assert_eq!(
+            body_bytes(raw).await.as_ref(),
+            b"<!doctype html><title>shell</title>"
+        );
+
+        // Now the peer has verified the bytes against their address: the next
+        // shell reports it.
+        let again = server
+            .handle_apps_get(&nav, "/apps/evo/index.html", "", None)
+            .await
+            .unwrap();
+        let html = String::from_utf8(body_bytes(again).await.to_vec()).unwrap();
+        let checked = &island_of(&html)["content"]["delivery"]["checked"];
+        assert_eq!(checked["by"], "peer");
+        assert!(checked["against"].as_str().unwrap().starts_with("bafkrei"));
+    }
+
+    #[tokio::test]
+    async fn apps_requests_without_fetch_metadata_keep_the_raw_serve_byte_identical() {
+        let (server, _) = spa_bundle_server_with_row("evo", "evo", "commons").await;
+        for file in ["index.html", "main-7J5AOAQZ.js"] {
+            let path = format!("/apps/evo/{file}");
+            let old = server.handle_app_request(&path, "", None).await.unwrap();
+            let new = server
+                .handle_apps_get(&fetch_headers("localhost:8090", None), &path, "", None)
+                .await
+                .unwrap();
+            assert_eq!(old.status(), new.status(), "{file}");
+            assert_eq!(old.headers(), new.headers(), "{file}");
+            assert_eq!(body_bytes(old).await, body_bytes(new).await, "{file}");
+        }
+    }
+
+    #[tokio::test]
+    async fn apps_navigation_on_the_content_origin_redirects_to_a_shell_that_always_renders() {
+        let (server, _) = spa_bundle_server_with_row("evo", "evo", "commons").await;
+        let resp = server
+            .handle_apps_get(
+                &fetch_headers("127.0.0.1:8090", Some("document")),
+                "/apps/evo/index.html",
+                "",
+                None,
+            )
+            .await
+            .unwrap();
+        assert_eq!(resp.status(), StatusCode::FOUND);
+        let location = resp.headers()[header::LOCATION]
+            .to_str()
+            .unwrap()
+            .to_string();
+        assert_eq!(
+            location,
+            "http://localhost:8090/_elohim/shell/apps/evo/index.html"
+        );
+        // Following it with NO Fetch Metadata still renders the shell (no loop).
+        let shell = server
+            .handle_apps_get(
+                &fetch_headers("localhost:8090", None),
+                "/_elohim/shell/apps/evo/index.html",
+                "",
+                None,
+            )
+            .await
+            .unwrap();
+        assert_eq!(shell.status(), StatusCode::OK);
+        let html = String::from_utf8(body_bytes(shell).await.to_vec()).unwrap();
+        assert_eq!(island_of(&html)["content"]["recordId"], "evo");
+    }
+
+    #[tokio::test]
+    async fn apps_navigation_on_an_unpaired_host_frames_in_an_opaque_sandbox() {
+        let (server, _) = spa_bundle_server_with_row("evo", "evo", "commons").await;
+        let resp = server
+            .handle_apps_get(
+                &fetch_headers("node.local:8090", Some("document")),
+                "/apps/evo/index.html",
+                "",
+                None,
+            )
+            .await
+            .unwrap();
+        let html = String::from_utf8(body_bytes(resp).await.to_vec()).unwrap();
+        let content = &island_of(&html)["content"];
+        assert_eq!(content["isolation"]["boundary"], "opaque-sandbox");
+        assert!(content["isolation"].get("contentOrigin").is_none());
+        assert_eq!(content["frame"]["src"], "/apps/evo/index.html");
+        let frame = server
+            .handle_apps_get(
+                &fetch_headers("node.local:8090", Some("iframe")),
+                "/apps/evo/index.html",
+                "",
+                None,
+            )
+            .await
+            .unwrap();
+        assert!(frame.headers()["content-security-policy"]
+            .to_str()
+            .unwrap()
+            .starts_with("frame-ancestors 'self';"));
+    }
+
+    #[tokio::test]
+    async fn apps_shell_respects_reach() {
+        let (server, _) =
+            spa_bundle_server_with_row("household-app", "household", "community").await;
+        let resp = server
+            .handle_apps_get(
+                &fetch_headers("localhost:8090", Some("document")),
+                "/apps/household-app/index.html",
+                "",
+                None,
+            )
+            .await
+            .unwrap();
+        assert_eq!(resp.status(), StatusCode::FORBIDDEN);
     }
 
     // The slug path slipped the reach gate: `/apps/{slug}` resolved through
@@ -22357,6 +22944,22 @@ mod auth_me_tests {
 
     /// Verify that build_manifest() includes the /auth/me route.
     /// This guards against accidental removal from the manifest.
+    #[test]
+    fn manifest_carries_the_peers_held_identity_additively() {
+        let routes = build_manifest();
+        let with = manifest_with_peer_identity(&routes, Some("uhCAkself"), Some("12D3KooWself"));
+        assert_eq!(with["peer"]["agentKey"], "uhCAkself");
+        assert_eq!(with["peer"]["transportId"], "12D3KooWself");
+        // Additive: the routes still parse as DoorwayRoutes for an old doorway.
+        let parsed: doorway_client::DoorwayRoutes = serde_json::from_value(with).unwrap();
+        assert_eq!(parsed, routes);
+        let without = manifest_with_peer_identity(&routes, None, Some("12D3KooWself"));
+        assert!(
+            without.get("peer").is_none(),
+            "no held key → no peer, never a config string"
+        );
+    }
+
     #[test]
     fn build_manifest_includes_auth_me_route() {
         let manifest = build_manifest();

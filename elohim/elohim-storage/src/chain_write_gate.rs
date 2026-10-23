@@ -384,6 +384,9 @@ const CRATE_READ_FNS: &[&str] = &[
     "get_rea_commitment",
     "get_rea_economic_event",
     "get_record_for_action",
+    // One action's receipt rows + one local `get_details`; commits nothing
+    // (content_store/src/record_witness.rs).
+    "get_record_witness_facts",
     "list_feedback_signal_refs_by_signer",
     "resolve_canonical_election",
     "resolve_canonical_elections",

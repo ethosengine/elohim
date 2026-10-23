@@ -784,7 +784,7 @@ async fn async_main(worker_threads: usize) -> anyhow::Result<()> {
     let fetches = futures_util::future::join_all(peer_urls.iter().map(|storage_url| async move {
         (
             storage_url.clone(),
-            crate::services::route_registry::fetch_steward_manifest(storage_url).await,
+            crate::services::route_registry::fetch_steward_manifest_with_peer(storage_url).await,
         )
     }))
     .await;
@@ -792,10 +792,18 @@ async fn async_main(worker_threads: usize) -> anyhow::Result<()> {
     let mut registration_results: Vec<(String, Result<usize, String>)> = Vec::new();
     for (storage_url, manifest) in fetches {
         let outcome = match manifest {
-            Ok(manifest) => Ok(state
-                .route_registry
-                .install_steward_routes(&storage_url, &manifest)
-                .await),
+            Ok((manifest, identity)) => {
+                // The peer names itself by the key it holds; the doorway's
+                // delivery hop reports exactly that, never a configured label.
+                state
+                    .route_registry
+                    .record_peer_identity(&storage_url, identity)
+                    .await;
+                Ok(state
+                    .route_registry
+                    .install_steward_routes(&storage_url, &manifest)
+                    .await)
+            }
             Err(e) => Err(e),
         };
         registration_results.push((storage_url, outcome));

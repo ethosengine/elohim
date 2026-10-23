@@ -126,9 +126,12 @@ function requireListing(world: E2EWorld, label: string): Listing {
   return listing;
 }
 
-Given('peer {string} is reachable for reach probes', function (this: E2EWorld, peerName: string) {
-  peerMap(this).set(peerName, resolvePeerUrl(peerName));
-});
+Given(
+  'federated peer {string} is reachable for reach probes',
+  function (this: E2EWorld, peerName: string) {
+    peerMap(this).set(peerName, resolvePeerUrl(peerName));
+  }
+);
 
 /**
  * NON-VACUITY CONTROL. Every assertion below is of the form "the credentialled
@@ -142,7 +145,7 @@ Given('peer {string} is reachable for reach probes', function (this: E2EWorld, p
  * than skipping.
  */
 Given(
-  'peer {string} holds a restricted-reach fixture an anonymous caller is refused, named {string}',
+  'federated peer {string} holds a restricted-reach fixture an anonymous caller is refused, named {string}',
   async function (this: E2EWorld, peerName: string, contentId: string) {
     const base = peerMap(this).get(peerName) ?? resolvePeerUrl(peerName);
     peerMap(this).set(peerName, base);
@@ -159,7 +162,7 @@ Given(
 );
 
 When(
-  'I list content on peer {string} anonymously',
+  'I list content on federated peer {string} anonymously',
   async function (this: E2EWorld, peerName: string) {
     await captureListing(this, peerName, 'anonymous');
   }
@@ -170,7 +173,7 @@ When(
  * literal wire request an attacker would send.
  */
 When(
-  'I list content on peer {string} presenting header {string}',
+  'I list content on federated peer {string} presenting header {string}',
   async function (this: E2EWorld, peerName: string, headerSpec: string) {
     const idx = headerSpec.indexOf(':');
     assert.ok(idx > 0, `Header must be "Name: value", got "${headerSpec}"`);
@@ -326,7 +329,7 @@ Then(
  * hash — the hash is an implementation detail of where the bytes live.
  */
 When(
-  'I fetch the blob of {string} on peer {string} anonymously',
+  'I fetch the blob of {string} on federated peer {string} anonymously',
   async function (this: E2EWorld, contentId: string, peerName: string) {
     const base = peerMap(this).get(peerName) ?? resolvePeerUrl(peerName);
     peerMap(this).set(peerName, base);
@@ -387,7 +390,7 @@ function byteProbe(world: E2EWorld): Map<string, number> {
  * error the defect would also have produced.
  */
 When(
-  'I PUT a well-formed head for {string} on peer {string} anonymously',
+  'I PUT a well-formed head for {string} on federated peer {string} anonymously',
   async function (this: E2EWorld, headId: string, peerName: string) {
     const base = peerMap(this).get(peerName) ?? resolvePeerUrl(peerName);
     peerMap(this).set(peerName, base);
@@ -431,7 +434,7 @@ Then(
  * `content`, the bundle's address), exactly as the byte-route step does.
  */
 When(
-  'I fetch the app {string} on peer {string} by its slug and by its content address anonymously',
+  'I fetch the app {string} on federated peer {string} by its slug and by its content address anonymously',
   async function (this: E2EWorld, appId: string, peerName: string) {
     const base = peerMap(this).get(peerName) ?? resolvePeerUrl(peerName);
     peerMap(this).set(peerName, base);

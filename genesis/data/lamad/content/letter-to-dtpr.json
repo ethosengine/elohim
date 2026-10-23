@@ -8,7 +8,8 @@
   "content": {
     "slug": "letter-to-dtpr",
     "entryPoint": "index.html",
-    "fallbackUrl": "https://claude.ai/artifact/NgJu5DhD3gWg1QZ6L87UNx"
+    "fallbackUrl": "https://claude.ai/artifact/NgJu5DhD3gWg1QZ6L87UNx",
+    "capabilities": []
   },
   "entryPoint": "index.html",
   "fallbackUrl": "https://claude.ai/artifact/NgJu5DhD3gWg1QZ6L87UNx",
@@ -38,14 +39,7 @@
     "embedStrategy": "iframe",
     "localSourcePath": "docs/content/elohim-protocol/letters/dtpr",
     "localZipPath": "docs/content/elohim-protocol/letters/dtpr.zip",
-    "requiredCapabilities": [
-      "javascript"
-    ],
     "securityPolicy": {
-      "sandbox": [
-        "allow-scripts",
-        "allow-same-origin"
-      ],
       "csp": "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; font-src 'self'"
     },
     "keywords": [

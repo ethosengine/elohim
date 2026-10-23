@@ -22,7 +22,10 @@ pub type CapabilityExtensions = std::collections::BTreeMap<String, CapabilityExt
 
 #[derive(Debug, Clone, Serialize, TS)]
 #[serde(rename_all = "camelCase")]
-#[ts(export, export_to = "../../../elohim/sdk/storage-client-ts/src/generated/")]
+#[ts(
+    export,
+    export_to = "../../../elohim/sdk/storage-client-ts/src/generated/"
+)]
 pub struct AppView {
     pub id: String,
     pub name: String,
@@ -34,7 +37,10 @@ pub struct AppView {
 /// Health metrics for a custodian node
 #[derive(Debug, Clone, Serialize, Deserialize, TS)]
 #[serde(rename_all = "camelCase")]
-#[ts(export, export_to = "../../../elohim/sdk/storage-client-ts/src/generated/")]
+#[ts(
+    export,
+    export_to = "../../../elohim/sdk/storage-client-ts/src/generated/"
+)]
 pub struct CustodianHealthView {
     pub uptime_percent: f64,
     pub availability: bool,
@@ -48,7 +54,10 @@ pub struct CustodianHealthView {
 /// Storage metrics for a custodian node
 #[derive(Debug, Clone, Serialize, Deserialize, TS)]
 #[serde(rename_all = "camelCase")]
-#[ts(export, export_to = "../../../elohim/sdk/storage-client-ts/src/generated/")]
+#[ts(
+    export,
+    export_to = "../../../elohim/sdk/storage-client-ts/src/generated/"
+)]
 pub struct CustodianStorageMetricsView {
     pub total_capacity_bytes: i64,
     pub used_bytes: i64,
@@ -64,7 +73,10 @@ pub struct CustodianStorageMetricsView {
 /// Bandwidth metrics for a custodian node
 #[derive(Debug, Clone, Serialize, Deserialize, TS)]
 #[serde(rename_all = "camelCase")]
-#[ts(export, export_to = "../../../elohim/sdk/storage-client-ts/src/generated/")]
+#[ts(
+    export,
+    export_to = "../../../elohim/sdk/storage-client-ts/src/generated/"
+)]
 pub struct CustodianBandwidthView {
     pub declared_mbps: f64,
     pub current_usage_mbps: f64,
@@ -80,7 +92,10 @@ pub struct CustodianBandwidthView {
 /// Computation metrics for a custodian node
 #[derive(Debug, Clone, Serialize, Deserialize, TS)]
 #[serde(rename_all = "camelCase")]
-#[ts(export, export_to = "../../../elohim/sdk/storage-client-ts/src/generated/")]
+#[ts(
+    export,
+    export_to = "../../../elohim/sdk/storage-client-ts/src/generated/"
+)]
 pub struct CustodianComputationView {
     pub cpu_cores: u32,
     pub cpu_usage_percent: f64,
@@ -93,7 +108,10 @@ pub struct CustodianComputationView {
 /// Reputation metrics for a custodian node
 #[derive(Debug, Clone, Serialize, Deserialize, TS)]
 #[serde(rename_all = "camelCase")]
-#[ts(export, export_to = "../../../elohim/sdk/storage-client-ts/src/generated/")]
+#[ts(
+    export,
+    export_to = "../../../elohim/sdk/storage-client-ts/src/generated/"
+)]
 pub struct CustodianReputationView {
     pub reliability_rating: f64,
     pub speed_rating: f64,
@@ -105,7 +123,10 @@ pub struct CustodianReputationView {
 /// Economic metrics for a custodian node
 #[derive(Debug, Clone, Serialize, Deserialize, TS)]
 #[serde(rename_all = "camelCase")]
-#[ts(export, export_to = "../../../elohim/sdk/storage-client-ts/src/generated/")]
+#[ts(
+    export,
+    export_to = "../../../elohim/sdk/storage-client-ts/src/generated/"
+)]
 pub struct CustodianEconomicView {
     pub steward_tier: u32,
     pub price_per_gb: f64,
@@ -121,7 +142,10 @@ pub struct CustodianEconomicView {
 /// used by the shefa dashboard and operator tooling.
 #[derive(Debug, Clone, Serialize, TS)]
 #[serde(rename_all = "camelCase")]
-#[ts(export, export_to = "../../../elohim/sdk/storage-client-ts/src/generated/")]
+#[ts(
+    export,
+    export_to = "../../../elohim/sdk/storage-client-ts/src/generated/"
+)]
 pub struct CustodianMetricsView {
     pub custodian_id: String,
     pub tier: u32,
@@ -140,7 +164,10 @@ pub struct CustodianMetricsView {
 /// Alert for custodian operators.
 #[derive(Debug, Clone, Serialize, TS)]
 #[serde(rename_all = "camelCase")]
-#[ts(export, export_to = "../../../elohim/sdk/storage-client-ts/src/generated/")]
+#[ts(
+    export,
+    export_to = "../../../elohim/sdk/storage-client-ts/src/generated/"
+)]
 pub struct CustodianAlertView {
     pub custodian_id: String,
     /// "warning" | "critical"
@@ -153,7 +180,10 @@ pub struct CustodianAlertView {
 /// Recommendation for custodian operators.
 #[derive(Debug, Clone, Serialize, TS)]
 #[serde(rename_all = "camelCase")]
-#[ts(export, export_to = "../../../elohim/sdk/storage-client-ts/src/generated/")]
+#[ts(
+    export,
+    export_to = "../../../elohim/sdk/storage-client-ts/src/generated/"
+)]
 pub struct CustodianRecommendationView {
     pub custodian_id: String,
     pub category: String,
@@ -167,7 +197,10 @@ pub struct CustodianRecommendationView {
 /// (serialised back to String for the `UpsertCustodianMetrics` insertable).
 #[derive(Debug, Clone, Deserialize, TS)]
 #[serde(rename_all = "camelCase")]
-#[ts(export, export_to = "../../../elohim/sdk/storage-client-ts/src/generated/")]
+#[ts(
+    export,
+    export_to = "../../../elohim/sdk/storage-client-ts/src/generated/"
+)]
 pub struct ReportCustodianMetricsInputView {
     pub custodian_id: String,
     pub tier: u32,
@@ -184,7 +217,10 @@ pub struct ReportCustodianMetricsInputView {
 /// A node protecting the operator's data.
 #[derive(Debug, Clone, Serialize, TS)]
 #[serde(rename_all = "camelCase")]
-#[ts(export, export_to = "../../../elohim/sdk/storage-client-ts/src/generated/")]
+#[ts(
+    export,
+    export_to = "../../../elohim/sdk/storage-client-ts/src/generated/"
+)]
 pub struct CustodianNodeView {
     pub id: String,
     pub name: String,
@@ -215,7 +251,10 @@ pub struct CustodianNodeView {
 /// Geographic distribution of custodians in a region.
 #[derive(Debug, Clone, Serialize, TS)]
 #[serde(rename_all = "camelCase")]
-#[ts(export, export_to = "../../../elohim/sdk/storage-client-ts/src/generated/")]
+#[ts(
+    export,
+    export_to = "../../../elohim/sdk/storage-client-ts/src/generated/"
+)]
 pub struct RegionalPresenceView {
     pub region: String,
     pub custodian_count: u32,
@@ -227,7 +266,10 @@ pub struct RegionalPresenceView {
 /// Trust relationship in the trust graph.
 #[derive(Debug, Clone, Serialize, TS)]
 #[serde(rename_all = "camelCase")]
-#[ts(export, export_to = "../../../elohim/sdk/storage-client-ts/src/generated/")]
+#[ts(
+    export,
+    export_to = "../../../elohim/sdk/storage-client-ts/src/generated/"
+)]
 pub struct TrustRelationshipView {
     pub from: String,
     pub to: String,
@@ -245,7 +287,10 @@ pub struct TrustRelationshipView {
 /// No dedicated DB table — assembled by the data protection service.
 #[derive(Debug, Clone, Serialize, TS)]
 #[serde(rename_all = "camelCase")]
-#[ts(export, export_to = "../../../elohim/sdk/storage-client-ts/src/generated/")]
+#[ts(
+    export,
+    export_to = "../../../elohim/sdk/storage-client-ts/src/generated/"
+)]
 pub struct FamilyCommunityProtectionStatusView {
     // Redundancy model
     /// "full_replica" | "threshold_split" | "erasure_coded"
@@ -273,7 +318,10 @@ pub struct FamilyCommunityProtectionStatusView {
 /// Time-series data point for metric history charts.
 #[derive(Debug, Clone, Serialize, TS)]
 #[serde(rename_all = "camelCase")]
-#[ts(export, export_to = "../../../elohim/sdk/storage-client-ts/src/generated/")]
+#[ts(
+    export,
+    export_to = "../../../elohim/sdk/storage-client-ts/src/generated/"
+)]
 pub struct MetricHistoryView {
     pub timestamp: String,
     pub value: f64,
@@ -282,7 +330,10 @@ pub struct MetricHistoryView {
 /// Node availability tracking.
 #[derive(Debug, Clone, Serialize, TS)]
 #[serde(rename_all = "camelCase")]
-#[ts(export, export_to = "../../../elohim/sdk/storage-client-ts/src/generated/")]
+#[ts(
+    export,
+    export_to = "../../../elohim/sdk/storage-client-ts/src/generated/"
+)]
 pub struct UpTimeMetricsView {
     pub up_percent: f64,
     pub downtime_hours_24: f64,
@@ -297,7 +348,10 @@ pub struct UpTimeMetricsView {
 /// Real-time node performance and capacity.
 #[derive(Debug, Clone, Serialize, TS)]
 #[serde(rename_all = "camelCase")]
-#[ts(export, export_to = "../../../elohim/sdk/storage-client-ts/src/generated/")]
+#[ts(
+    export,
+    export_to = "../../../elohim/sdk/storage-client-ts/src/generated/"
+)]
 pub struct ComputeMetricsView {
     // CPU
     pub cpu_total_cores: u32,
@@ -345,7 +399,10 @@ pub struct ComputeMetricsView {
 /// A node in the user's cluster.
 #[derive(Debug, Clone, Serialize, TS)]
 #[serde(rename_all = "camelCase")]
-#[ts(export, export_to = "../../../elohim/sdk/storage-client-ts/src/generated/")]
+#[ts(
+    export,
+    export_to = "../../../elohim/sdk/storage-client-ts/src/generated/"
+)]
 pub struct OwnedNodeView {
     pub node_id: String,
     pub display_name: String,
@@ -373,7 +430,10 @@ pub struct OwnedNodeView {
 /// A role a node is playing in the cluster.
 #[derive(Debug, Clone, Serialize, TS)]
 #[serde(rename_all = "camelCase")]
-#[ts(export, export_to = "../../../elohim/sdk/storage-client-ts/src/generated/")]
+#[ts(
+    export,
+    export_to = "../../../elohim/sdk/storage-client-ts/src/generated/"
+)]
 pub struct NodeRoleView {
     /// "storage" | "compute" | "gateway" | "custodian" | "archive"
     pub role: String,
@@ -384,7 +444,10 @@ pub struct NodeRoleView {
 /// Node topology overview for an operator.
 #[derive(Debug, Clone, Serialize, TS)]
 #[serde(rename_all = "camelCase")]
-#[ts(export, export_to = "../../../elohim/sdk/storage-client-ts/src/generated/")]
+#[ts(
+    export,
+    export_to = "../../../elohim/sdk/storage-client-ts/src/generated/"
+)]
 pub struct NodeTopologyStateView {
     pub nodes: Vec<OwnedNodeView>,
     pub total_nodes: u32,
@@ -403,7 +466,10 @@ pub struct NodeTopologyStateView {
 /// Alert when a node goes offline.
 #[derive(Debug, Clone, Serialize, TS)]
 #[serde(rename_all = "camelCase")]
-#[ts(export, export_to = "../../../elohim/sdk/storage-client-ts/src/generated/")]
+#[ts(
+    export,
+    export_to = "../../../elohim/sdk/storage-client-ts/src/generated/"
+)]
 pub struct OfflineNodeAlertView {
     pub id: String,
     /// "info" | "warning" | "critical"
@@ -429,7 +495,10 @@ pub struct OfflineNodeAlertView {
 /// A single custodian relationship (helping or being helped).
 #[derive(Debug, Clone, Serialize, TS)]
 #[serde(rename_all = "camelCase")]
-#[ts(export, export_to = "../../../elohim/sdk/storage-client-ts/src/generated/")]
+#[ts(
+    export,
+    export_to = "../../../elohim/sdk/storage-client-ts/src/generated/"
+)]
 pub struct CustodianRelationshipView {
     pub agent_id: String,
     pub display_name: String,
@@ -451,7 +520,10 @@ pub struct CustodianRelationshipView {
 /// Bidirectional custodian view (who I help vs who helps me).
 #[derive(Debug, Clone, Serialize, TS)]
 #[serde(rename_all = "camelCase")]
-#[ts(export, export_to = "../../../elohim/sdk/storage-client-ts/src/generated/")]
+#[ts(
+    export,
+    export_to = "../../../elohim/sdk/storage-client-ts/src/generated/"
+)]
 pub struct BidirectionalCustodianView {
     pub helping: Vec<CustodianRelationshipView>,
     pub helping_count: u32,
@@ -470,7 +542,10 @@ pub struct BidirectionalCustodianView {
 /// Storage breakdown by content type.
 #[derive(Debug, Clone, Serialize, TS)]
 #[serde(rename_all = "camelCase")]
-#[ts(export, export_to = "../../../elohim/sdk/storage-client-ts/src/generated/")]
+#[ts(
+    export,
+    export_to = "../../../elohim/sdk/storage-client-ts/src/generated/"
+)]
 pub struct ContentTypeStorageView {
     /// "video" | "audio" | "image" | "document" | "application" | "learning" | "other"
     pub content_type: String,
@@ -487,7 +562,10 @@ pub struct ContentTypeStorageView {
 /// Storage breakdown by reach level (0–7).
 #[derive(Debug, Clone, Serialize, TS)]
 #[serde(rename_all = "camelCase")]
-#[ts(export, export_to = "../../../elohim/sdk/storage-client-ts/src/generated/")]
+#[ts(
+    export,
+    export_to = "../../../elohim/sdk/storage-client-ts/src/generated/"
+)]
 pub struct ReachLevelStorageView {
     pub reach_level: u32,
     pub reach_label: String,
@@ -502,7 +580,10 @@ pub struct ReachLevelStorageView {
 /// Storage breakdown for a single node.
 #[derive(Debug, Clone, Serialize, TS)]
 #[serde(rename_all = "camelCase")]
-#[ts(export, export_to = "../../../elohim/sdk/storage-client-ts/src/generated/")]
+#[ts(
+    export,
+    export_to = "../../../elohim/sdk/storage-client-ts/src/generated/"
+)]
 pub struct NodeStorageBreakdownView {
     pub node_id: String,
     pub node_name: String,
@@ -520,7 +601,10 @@ pub struct NodeStorageBreakdownView {
 /// What types of content are stored where.
 #[derive(Debug, Clone, Serialize, TS)]
 #[serde(rename_all = "camelCase")]
-#[ts(export, export_to = "../../../elohim/sdk/storage-client-ts/src/generated/")]
+#[ts(
+    export,
+    export_to = "../../../elohim/sdk/storage-client-ts/src/generated/"
+)]
 pub struct StorageContentDistributionView {
     pub by_content_type: Vec<ContentTypeStorageView>,
     pub by_reach_level: Vec<ReachLevelStorageView>,
@@ -533,7 +617,10 @@ pub struct StorageContentDistributionView {
 /// A specific compute deficiency.
 #[derive(Debug, Clone, Serialize, TS)]
 #[serde(rename_all = "camelCase")]
-#[ts(export, export_to = "../../../elohim/sdk/storage-client-ts/src/generated/")]
+#[ts(
+    export,
+    export_to = "../../../elohim/sdk/storage-client-ts/src/generated/"
+)]
 pub struct ComputeGapView {
     /// "cpu" | "memory" | "storage" | "bandwidth" | "redundancy"
     pub resource: String,
@@ -549,7 +636,10 @@ pub struct ComputeGapView {
 /// Suggested node to address compute gaps.
 #[derive(Debug, Clone, Serialize, TS)]
 #[serde(rename_all = "camelCase")]
-#[ts(export, export_to = "../../../elohim/sdk/storage-client-ts/src/generated/")]
+#[ts(
+    export,
+    export_to = "../../../elohim/sdk/storage-client-ts/src/generated/"
+)]
 pub struct NodeRecommendationView {
     /// "holoport" | "holoport-plus" | "holoport-nano" | "self-hosted" | "cloud"
     pub node_type: String,
@@ -568,7 +658,10 @@ pub struct NodeRecommendationView {
 /// Compute needs assessment — gaps and recommendations for the help-flow.
 #[derive(Debug, Clone, Serialize, TS)]
 #[serde(rename_all = "camelCase")]
-#[ts(export, export_to = "../../../elohim/sdk/storage-client-ts/src/generated/")]
+#[ts(
+    export,
+    export_to = "../../../elohim/sdk/storage-client-ts/src/generated/"
+)]
 pub struct ComputeNeedsAssessmentView {
     pub current_capacity_cpu_cores: u32,
     pub current_capacity_memory_gb: f64,
@@ -586,7 +679,10 @@ pub struct ComputeNeedsAssessmentView {
 /// Trust context summary for client observability.
 #[derive(Debug, Clone, Serialize, TS)]
 #[serde(rename_all = "camelCase")]
-#[ts(export, export_to = "../../../elohim/sdk/storage-client-ts/src/generated/")]
+#[ts(
+    export,
+    export_to = "../../../elohim/sdk/storage-client-ts/src/generated/"
+)]
 pub struct TrustContextView {
     pub composite_trust: f64,
     pub mastery_depth: f64,
@@ -601,7 +697,10 @@ pub struct TrustContextView {
 /// Gate evaluation result for client.
 #[derive(Debug, Clone, Serialize, TS)]
 #[serde(rename_all = "camelCase")]
-#[ts(export, export_to = "../../../elohim/sdk/storage-client-ts/src/generated/")]
+#[ts(
+    export,
+    export_to = "../../../elohim/sdk/storage-client-ts/src/generated/"
+)]
 pub struct GateEvaluationView {
     pub tier: String,
     pub trust_context: TrustContextView,
@@ -616,7 +715,10 @@ pub struct GateEvaluationView {
 
 #[derive(Debug, Clone, Serialize, TS)]
 #[serde(rename_all = "camelCase")]
-#[ts(export, export_to = "../../../elohim/sdk/storage-client-ts/src/generated/")]
+#[ts(
+    export,
+    export_to = "../../../elohim/sdk/storage-client-ts/src/generated/"
+)]
 pub struct ScheduleView {
     pub id: String,
     pub entity_type: String,
@@ -631,7 +733,10 @@ pub struct ScheduleView {
 
 #[derive(Debug, Clone, Deserialize, TS)]
 #[serde(rename_all = "camelCase")]
-#[ts(export, export_to = "../../../elohim/sdk/storage-client-ts/src/generated/")]
+#[ts(
+    export,
+    export_to = "../../../elohim/sdk/storage-client-ts/src/generated/"
+)]
 pub struct CreateScheduleInputView {
     pub entity_type: String,
     pub entity_id: String,
@@ -642,7 +747,10 @@ pub struct CreateScheduleInputView {
 
 #[derive(Debug, Clone, Deserialize, TS)]
 #[serde(rename_all = "camelCase")]
-#[ts(export, export_to = "../../../elohim/sdk/storage-client-ts/src/generated/")]
+#[ts(
+    export,
+    export_to = "../../../elohim/sdk/storage-client-ts/src/generated/"
+)]
 pub struct UpdateScheduleInputView {
     pub scheduled_at: Option<String>,
     pub expires_at: Option<String>,
@@ -651,7 +759,10 @@ pub struct UpdateScheduleInputView {
 
 #[derive(Debug, Clone, Serialize, TS)]
 #[serde(rename_all = "camelCase")]
-#[ts(export, export_to = "../../../elohim/sdk/storage-client-ts/src/generated/")]
+#[ts(
+    export,
+    export_to = "../../../elohim/sdk/storage-client-ts/src/generated/"
+)]
 pub struct SpatialContextView {
     pub id: String,
     pub entity_type: String,
@@ -678,7 +789,10 @@ pub struct SpatialContextView {
 
 #[derive(Debug, Clone, Deserialize, TS)]
 #[serde(rename_all = "camelCase")]
-#[ts(export, export_to = "../../../elohim/sdk/storage-client-ts/src/generated/")]
+#[ts(
+    export,
+    export_to = "../../../elohim/sdk/storage-client-ts/src/generated/"
+)]
 pub struct CreateSpatialContextInputView {
     pub entity_type: String,
     pub entity_id: String,
@@ -698,7 +812,10 @@ pub struct CreateSpatialContextInputView {
 
 #[derive(Debug, Clone, Deserialize, TS)]
 #[serde(rename_all = "camelCase")]
-#[ts(export, export_to = "../../../elohim/sdk/storage-client-ts/src/generated/")]
+#[ts(
+    export,
+    export_to = "../../../elohim/sdk/storage-client-ts/src/generated/"
+)]
 pub struct UpdateSpatialContextInputView {
     pub latitude: Option<f64>,
     pub longitude: Option<f64>,
@@ -714,7 +831,10 @@ pub struct UpdateSpatialContextInputView {
 
 #[derive(Debug, Clone, Serialize, TS)]
 #[serde(rename_all = "camelCase")]
-#[ts(export, export_to = "../../../elohim/sdk/storage-client-ts/src/generated/")]
+#[ts(
+    export,
+    export_to = "../../../elohim/sdk/storage-client-ts/src/generated/"
+)]
 pub struct PlaceView {
     pub id: String,
     pub dht_anchor_hash: String,
@@ -739,7 +859,10 @@ pub struct PlaceView {
 
 #[derive(Debug, Clone, Deserialize, TS)]
 #[serde(rename_all = "camelCase")]
-#[ts(export, export_to = "../../../elohim/sdk/storage-client-ts/src/generated/")]
+#[ts(
+    export,
+    export_to = "../../../elohim/sdk/storage-client-ts/src/generated/"
+)]
 pub struct CreatePlaceInputView {
     pub name: String,
     pub place_type: String,
@@ -760,7 +883,10 @@ pub struct CreatePlaceInputView {
 /// View for a geospatial hazard event
 #[derive(Debug, Clone, Serialize, TS)]
 #[serde(rename_all = "camelCase")]
-#[ts(export, export_to = "../../../elohim/sdk/storage-client-ts/src/generated/")]
+#[ts(
+    export,
+    export_to = "../../../elohim/sdk/storage-client-ts/src/generated/"
+)]
 pub struct HazardView {
     pub id: String,
     pub h_app_id: String,
@@ -787,7 +913,10 @@ pub struct HazardView {
 /// Input for creating a hazard
 #[derive(Debug, Clone, Deserialize, TS)]
 #[serde(rename_all = "camelCase")]
-#[ts(export, export_to = "../../../elohim/sdk/storage-client-ts/src/generated/")]
+#[ts(
+    export,
+    export_to = "../../../elohim/sdk/storage-client-ts/src/generated/"
+)]
 pub struct CreateHazardInputView {
     pub place_id: String,
     pub hazard_type: String,
@@ -814,7 +943,10 @@ pub struct CreateHazardInputView {
 /// View for a generated risk alert
 #[derive(Debug, Clone, Serialize, TS)]
 #[serde(rename_all = "camelCase")]
-#[ts(export, export_to = "../../../elohim/sdk/storage-client-ts/src/generated/")]
+#[ts(
+    export,
+    export_to = "../../../elohim/sdk/storage-client-ts/src/generated/"
+)]
 pub struct RiskAlertView {
     pub id: String,
     pub h_app_id: String,
@@ -841,7 +973,10 @@ pub struct RiskAlertView {
 /// Input for updating a risk alert (PATCH semantics)
 #[derive(Debug, Clone, Deserialize, TS)]
 #[serde(rename_all = "camelCase")]
-#[ts(export, export_to = "../../../elohim/sdk/storage-client-ts/src/generated/")]
+#[ts(
+    export,
+    export_to = "../../../elohim/sdk/storage-client-ts/src/generated/"
+)]
 pub struct UpdateRiskAlertInputView {
     #[serde(default)]
     pub status: Option<String>,
@@ -854,7 +989,10 @@ pub struct UpdateRiskAlertInputView {
 /// Carrying capacity summary for the dashboard tile
 #[derive(Debug, Clone, Serialize, TS)]
 #[serde(rename_all = "camelCase")]
-#[ts(export, export_to = "../../../elohim/sdk/storage-client-ts/src/generated/")]
+#[ts(
+    export,
+    export_to = "../../../elohim/sdk/storage-client-ts/src/generated/"
+)]
 pub struct CapacitySummaryView {
     pub resource_count: u32,
     pub worst_utilization: f64,
@@ -865,7 +1003,10 @@ pub struct CapacitySummaryView {
 /// Hazard summary for the dashboard tile
 #[derive(Debug, Clone, Serialize, TS)]
 #[serde(rename_all = "camelCase")]
-#[ts(export, export_to = "../../../elohim/sdk/storage-client-ts/src/generated/")]
+#[ts(
+    export,
+    export_to = "../../../elohim/sdk/storage-client-ts/src/generated/"
+)]
 pub struct HazardEntrySummaryView {
     pub active_count: u32,
     pub worst_severity: String,
@@ -876,7 +1017,10 @@ pub struct HazardEntrySummaryView {
 /// Vulnerability summary for the dashboard tile
 #[derive(Debug, Clone, Serialize, TS)]
 #[serde(rename_all = "camelCase")]
-#[ts(export, export_to = "../../../elohim/sdk/storage-client-ts/src/generated/")]
+#[ts(
+    export,
+    export_to = "../../../elohim/sdk/storage-client-ts/src/generated/"
+)]
 pub struct VulnerabilitySummaryView {
     pub overall_score: f64,
     pub risk_tier: String,
@@ -886,7 +1030,10 @@ pub struct VulnerabilitySummaryView {
 /// Weather summary for the dashboard tile
 #[derive(Debug, Clone, Serialize, TS)]
 #[serde(rename_all = "camelCase")]
-#[ts(export, export_to = "../../../elohim/sdk/storage-client-ts/src/generated/")]
+#[ts(
+    export,
+    export_to = "../../../elohim/sdk/storage-client-ts/src/generated/"
+)]
 pub struct WeatherEntrySummaryView {
     pub risk_level: String,
     pub temperature_c: f64,
@@ -897,7 +1044,10 @@ pub struct WeatherEntrySummaryView {
 /// Alert summary for the dashboard tile
 #[derive(Debug, Clone, Serialize, TS)]
 #[serde(rename_all = "camelCase")]
-#[ts(export, export_to = "../../../elohim/sdk/storage-client-ts/src/generated/")]
+#[ts(
+    export,
+    export_to = "../../../elohim/sdk/storage-client-ts/src/generated/"
+)]
 pub struct AlertEntrySummaryView {
     pub active_count: u32,
     pub worst_severity: String,
@@ -908,7 +1058,10 @@ pub struct AlertEntrySummaryView {
 /// Route summary for the dashboard tile
 #[derive(Debug, Clone, Serialize, TS)]
 #[serde(rename_all = "camelCase")]
-#[ts(export, export_to = "../../../elohim/sdk/storage-client-ts/src/generated/")]
+#[ts(
+    export,
+    export_to = "../../../elohim/sdk/storage-client-ts/src/generated/"
+)]
 pub struct RouteEntrySummaryView {
     pub active_route_count: u32,
     pub total_distance_km: f64,
@@ -917,7 +1070,10 @@ pub struct RouteEntrySummaryView {
 /// Single place entry in the planet-scale dashboard
 #[derive(Debug, Clone, Serialize, TS)]
 #[serde(rename_all = "camelCase")]
-#[ts(export, export_to = "../../../elohim/sdk/storage-client-ts/src/generated/")]
+#[ts(
+    export,
+    export_to = "../../../elohim/sdk/storage-client-ts/src/generated/"
+)]
 pub struct PlaceDashboardEntry {
     // Core (always present)
     pub id: String,
@@ -948,7 +1104,10 @@ pub struct PlaceDashboardEntry {
 /// Risk tier distribution counts across all places
 #[derive(Debug, Clone, Serialize, TS)]
 #[serde(rename_all = "camelCase")]
-#[ts(export, export_to = "../../../elohim/sdk/storage-client-ts/src/generated/")]
+#[ts(
+    export,
+    export_to = "../../../elohim/sdk/storage-client-ts/src/generated/"
+)]
 pub struct RiskTierDistribution {
     pub low: u32,
     pub moderate: u32,
@@ -960,7 +1119,10 @@ pub struct RiskTierDistribution {
 /// Summary statistics for the full dashboard
 #[derive(Debug, Clone, Serialize, TS)]
 #[serde(rename_all = "camelCase")]
-#[ts(export, export_to = "../../../elohim/sdk/storage-client-ts/src/generated/")]
+#[ts(
+    export,
+    export_to = "../../../elohim/sdk/storage-client-ts/src/generated/"
+)]
 pub struct DashboardSummaryView {
     pub total_places: u32,
     pub places_by_risk_tier: RiskTierDistribution,
@@ -973,7 +1135,10 @@ pub struct DashboardSummaryView {
 /// Full spatial dashboard response
 #[derive(Debug, Clone, Serialize, TS)]
 #[serde(rename_all = "camelCase")]
-#[ts(export, export_to = "../../../elohim/sdk/storage-client-ts/src/generated/")]
+#[ts(
+    export,
+    export_to = "../../../elohim/sdk/storage-client-ts/src/generated/"
+)]
 pub struct SpatialDashboardView {
     pub places: Vec<PlaceDashboardEntry>,
     pub summary: DashboardSummaryView,
@@ -982,7 +1147,10 @@ pub struct SpatialDashboardView {
 
 #[derive(Debug, Clone, Serialize, TS)]
 #[serde(rename_all = "camelCase")]
-#[ts(export, export_to = "../../../elohim/sdk/storage-client-ts/src/generated/")]
+#[ts(
+    export,
+    export_to = "../../../elohim/sdk/storage-client-ts/src/generated/"
+)]
 pub struct ResilienceView {
     pub content_id: String,
     pub encoding: EncodingInfoView,
@@ -994,7 +1162,10 @@ pub struct ResilienceView {
 
 #[derive(Debug, Clone, Serialize, TS)]
 #[serde(rename_all = "camelCase")]
-#[ts(export, export_to = "../../../elohim/sdk/storage-client-ts/src/generated/")]
+#[ts(
+    export,
+    export_to = "../../../elohim/sdk/storage-client-ts/src/generated/"
+)]
 pub struct EncodingInfoView {
     pub strategy: String,
     pub data_shards: i32,
@@ -1005,7 +1176,10 @@ pub struct EncodingInfoView {
 
 #[derive(Debug, Clone, Serialize, TS)]
 #[serde(rename_all = "camelCase")]
-#[ts(export, export_to = "../../../elohim/sdk/storage-client-ts/src/generated/")]
+#[ts(
+    export,
+    export_to = "../../../elohim/sdk/storage-client-ts/src/generated/"
+)]
 pub struct DistributionView {
     pub total_shards: i32,
     pub shards_with_locations: i32,
@@ -1015,7 +1189,10 @@ pub struct DistributionView {
 
 #[derive(Debug, Clone, Serialize, TS)]
 #[serde(rename_all = "camelCase")]
-#[ts(export, export_to = "../../../elohim/sdk/storage-client-ts/src/generated/")]
+#[ts(
+    export,
+    export_to = "../../../elohim/sdk/storage-client-ts/src/generated/"
+)]
 pub struct ShardInfoView {
     pub hash: String,
     pub shard_type: String,
@@ -1025,7 +1202,10 @@ pub struct ShardInfoView {
 
 #[derive(Debug, Clone, Serialize, TS)]
 #[serde(rename_all = "camelCase")]
-#[ts(export, export_to = "../../../elohim/sdk/storage-client-ts/src/generated/")]
+#[ts(
+    export,
+    export_to = "../../../elohim/sdk/storage-client-ts/src/generated/"
+)]
 pub struct ResilienceStewardshipView {
     pub steward_count: i32,
     pub allocations: Vec<StewardshipAllocationView>,
@@ -1033,7 +1213,10 @@ pub struct ResilienceStewardshipView {
 
 #[derive(Debug, Clone, Serialize, TS)]
 #[serde(rename_all = "camelCase")]
-#[ts(export, export_to = "../../../elohim/sdk/storage-client-ts/src/generated/")]
+#[ts(
+    export,
+    export_to = "../../../elohim/sdk/storage-client-ts/src/generated/"
+)]
 pub struct CommitmentHealthView {
     pub active_peers: i32,
     pub total_committed_bytes: i64,
@@ -1042,7 +1225,10 @@ pub struct CommitmentHealthView {
 
 #[derive(Debug, Clone, Serialize, TS)]
 #[serde(rename_all = "camelCase")]
-#[ts(export, export_to = "../../../elohim/sdk/storage-client-ts/src/generated/")]
+#[ts(
+    export,
+    export_to = "../../../elohim/sdk/storage-client-ts/src/generated/"
+)]
 pub struct HealthScoreView {
     pub score: f32,
     pub can_survive_failures: i32,
@@ -1051,7 +1237,10 @@ pub struct HealthScoreView {
 
 #[derive(Debug, Clone, Serialize, TS)]
 #[serde(rename_all = "camelCase")]
-#[ts(export, export_to = "../../../elohim/sdk/storage-client-ts/src/generated/")]
+#[ts(
+    export,
+    export_to = "../../../elohim/sdk/storage-client-ts/src/generated/"
+)]
 pub struct VerificationResultView {
     pub content_id: String,
     pub verified: bool,
@@ -1070,7 +1259,10 @@ pub struct VerificationResultView {
 /// Wire view for a notarized gate decision attestation.
 #[derive(Debug, Clone, Serialize, TS)]
 #[serde(rename_all = "camelCase")]
-#[ts(export, export_to = "../../../elohim/sdk/storage-client-ts/src/generated/")]
+#[ts(
+    export,
+    export_to = "../../../elohim/sdk/storage-client-ts/src/generated/"
+)]
 pub struct GateDecisionAttestationView {
     /// CID of this attestation (self-addressing, globally unique).
     pub decision_id: String,
@@ -1105,7 +1297,10 @@ pub struct GateDecisionAttestationView {
 /// Wire view for a notarized gate decision challenge.
 #[derive(Debug, Clone, Serialize, TS)]
 #[serde(rename_all = "camelCase")]
-#[ts(export, export_to = "../../../elohim/sdk/storage-client-ts/src/generated/")]
+#[ts(
+    export,
+    export_to = "../../../elohim/sdk/storage-client-ts/src/generated/"
+)]
 pub struct GateDecisionChallengeView {
     /// CID of this challenge (self-addressing, globally unique).
     pub challenge_id: String,
@@ -1135,7 +1330,10 @@ pub struct GateDecisionChallengeView {
 /// its own reputation; no protocol steward can assign it.
 #[derive(Debug, Clone, Serialize, TS)]
 #[serde(rename_all = "camelCase")]
-#[ts(export, export_to = "../../../elohim/sdk/storage-client-ts/src/generated/")]
+#[ts(
+    export,
+    export_to = "../../../elohim/sdk/storage-client-ts/src/generated/"
+)]
 pub struct ElohimReputationProfileView {
     /// AgentPubKey (base64) of the queried elohim agent.
     pub elohim_id: String,
@@ -1172,7 +1370,10 @@ pub struct ElohimReputationProfileView {
 /// Renderer kind a bundle targets. Mirrors `enums/renderer-kind.schema.json`.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, TS)]
 #[serde(rename_all = "kebab-case")]
-#[ts(export, export_to = "../../../elohim/sdk/storage-client-ts/src/generated/")]
+#[ts(
+    export,
+    export_to = "../../../elohim/sdk/storage-client-ts/src/generated/"
+)]
 pub enum RendererKind {
     AngularSsr,
     ReactRsc,
@@ -1185,7 +1386,10 @@ pub enum RendererKind {
 /// One bundle a doorway carries (mirrors `bundles[]` items in the profile schema).
 #[derive(Debug, Clone, Serialize, Deserialize, TS)]
 #[serde(rename_all = "camelCase")]
-#[ts(export, export_to = "../../../elohim/sdk/storage-client-ts/src/generated/")]
+#[ts(
+    export,
+    export_to = "../../../elohim/sdk/storage-client-ts/src/generated/"
+)]
 pub struct BundleEntry {
     pub name: String,
     pub version: String,
@@ -1198,7 +1402,10 @@ pub struct BundleEntry {
 /// layered into PeerStatusView post-construction. NOT a DHT entry.
 #[derive(Debug, Clone, Serialize, Deserialize, TS)]
 #[serde(rename_all = "camelCase")]
-#[ts(export, export_to = "../../../elohim/sdk/storage-client-ts/src/generated/")]
+#[ts(
+    export,
+    export_to = "../../../elohim/sdk/storage-client-ts/src/generated/"
+)]
 pub struct RenderCapabilityProfile {
     pub bundles: Vec<BundleEntry>,
     pub renderers: Vec<RendererKind>,
@@ -1211,7 +1418,10 @@ pub struct RenderCapabilityProfile {
 /// Tier-2 extension capability claim (one entry in the extensions map).
 #[derive(Debug, Clone, Serialize, Deserialize, TS)]
 #[serde(rename_all = "camelCase")]
-#[ts(export, export_to = "../../../elohim/sdk/storage-client-ts/src/generated/")]
+#[ts(
+    export,
+    export_to = "../../../elohim/sdk/storage-client-ts/src/generated/"
+)]
 pub struct CapabilityExtensionEntry {
     pub schema_ref: String,
     pub profile: JsonVal,
@@ -1225,7 +1435,10 @@ pub struct CapabilityExtensionEntry {
 /// elohim-agent-service. All string arrays default to empty.
 #[derive(Debug, Clone, Serialize, Deserialize, TS)]
 #[serde(rename_all = "camelCase")]
-#[ts(export, export_to = "../../../elohim/sdk/storage-client-ts/src/generated/")]
+#[ts(
+    export,
+    export_to = "../../../elohim/sdk/storage-client-ts/src/generated/"
+)]
 pub struct ElohimCapabilityProfile {
     /// Fully-qualified model name. E.g. `claude-opus-4-7`, `llama-3.1-70b-q4`.
     pub model_name: String,
@@ -1260,7 +1473,10 @@ pub struct ElohimCapabilityProfile {
 /// Wire format: `elohim/sdk/schemas/v1/views/peer-status-view.schema.json`
 #[derive(Debug, Clone, Serialize, TS)]
 #[serde(rename_all = "camelCase")]
-#[ts(export, export_to = "../../../elohim/sdk/storage-client-ts/src/generated/")]
+#[ts(
+    export,
+    export_to = "../../../elohim/sdk/storage-client-ts/src/generated/"
+)]
 pub struct PeerStatusView {
     /// Agent pubkey of the peer (base64url encoded).
     pub peer_id: String,
@@ -1295,7 +1511,10 @@ pub struct PeerStatusView {
 /// Wire format: embedded in `NodeShapeView`.
 #[derive(Debug, Clone, Serialize, Deserialize, TS, PartialEq)]
 #[serde(rename_all = "camelCase")]
-#[ts(export, export_to = "../../../elohim/sdk/storage-client-ts/src/generated/")]
+#[ts(
+    export,
+    export_to = "../../../elohim/sdk/storage-client-ts/src/generated/"
+)]
 pub struct CommittedResources {
     pub cpu_cores: i32,
     pub memory_gb: i32,
@@ -1314,7 +1533,10 @@ pub struct CommittedResources {
 /// Wire format: `elohim/sdk/schemas/v1/views/node-shape-view.schema.json`
 #[derive(Debug, Clone, Serialize, Deserialize, TS, PartialEq)]
 #[serde(rename_all = "camelCase")]
-#[ts(export, export_to = "../../../elohim/sdk/storage-client-ts/src/generated/")]
+#[ts(
+    export,
+    export_to = "../../../elohim/sdk/storage-client-ts/src/generated/"
+)]
 pub struct NodeShapeView {
     pub node_id: String,
     pub hostname: String,
@@ -1339,7 +1561,10 @@ pub struct NodeShapeView {
 /// Wire format: embedded in `HouseholdDevicesView`.
 #[derive(Debug, Clone, Serialize, TS)]
 #[serde(rename_all = "camelCase")]
-#[ts(export, export_to = "../../../elohim/sdk/storage-client-ts/src/generated/")]
+#[ts(
+    export,
+    export_to = "../../../elohim/sdk/storage-client-ts/src/generated/"
+)]
 pub struct DeviceEntryView {
     pub shape: NodeShapeView,
     /// Live peer status; present when online, null when offline/unknown.
@@ -1351,7 +1576,10 @@ pub struct DeviceEntryView {
 /// Wire format: `elohim/sdk/schemas/v1/views/household-devices-view.schema.json`
 #[derive(Debug, Clone, Serialize, TS)]
 #[serde(rename_all = "camelCase")]
-#[ts(export, export_to = "../../../elohim/sdk/storage-client-ts/src/generated/")]
+#[ts(
+    export,
+    export_to = "../../../elohim/sdk/storage-client-ts/src/generated/"
+)]
 pub struct HouseholdDevicesView {
     pub household_id: String,
     pub devices: Vec<DeviceEntryView>,
@@ -1365,7 +1593,10 @@ pub struct HouseholdDevicesView {
 /// Wire format: `elohim/sdk/schemas/v1/views/network-posture-view.schema.json`
 #[derive(Debug, Clone, Serialize, TS)]
 #[serde(rename_all = "camelCase")]
-#[ts(export, export_to = "../../../elohim/sdk/storage-client-ts/src/generated/")]
+#[ts(
+    export,
+    export_to = "../../../elohim/sdk/storage-client-ts/src/generated/"
+)]
 pub struct NetworkPostureView {
     pub total_peers: i32,
     pub active_peers: i32,
@@ -1386,7 +1617,10 @@ pub struct NetworkPostureView {
 /// Wire format: `elohim/sdk/schemas/v1/views/household-resilience-view.schema.json`
 #[derive(Debug, Clone, Serialize, Default, TS)]
 #[serde(rename_all = "camelCase")]
-#[ts(export, export_to = "../../../elohim/sdk/storage-client-ts/src/generated/")]
+#[ts(
+    export,
+    export_to = "../../../elohim/sdk/storage-client-ts/src/generated/"
+)]
 pub struct HouseholdResilienceView {
     pub content_id: String,
     pub households_stewarding: i32,
@@ -1398,7 +1632,10 @@ pub struct HouseholdResilienceView {
 
 #[derive(Debug, Clone, Serialize, Default, TS)]
 #[serde(rename_all = "camelCase")]
-#[ts(export, export_to = "../../../elohim/sdk/storage-client-ts/src/generated/")]
+#[ts(
+    export,
+    export_to = "../../../elohim/sdk/storage-client-ts/src/generated/"
+)]
 pub struct HouseholdResilienceDetails {
     #[serde(default)]
     pub steward_households: Vec<String>,
@@ -1414,7 +1651,10 @@ pub struct HouseholdResilienceDetails {
 /// Wire format: `elohim/sdk/schemas/v1/views/placement-gap-view.schema.json`
 #[derive(Debug, Clone, Serialize, TS)]
 #[serde(rename_all = "camelCase")]
-#[ts(export, export_to = "../../../elohim/sdk/storage-client-ts/src/generated/")]
+#[ts(
+    export,
+    export_to = "../../../elohim/sdk/storage-client-ts/src/generated/"
+)]
 pub struct PlacementGapView {
     pub id: String,
     pub content_id: String,
@@ -1432,7 +1672,10 @@ pub struct PlacementGapView {
 /// Wire format: embedded in `resilience-snapshot-view.schema.json`
 #[derive(Debug, Clone, Serialize, TS)]
 #[serde(rename_all = "camelCase")]
-#[ts(export, export_to = "../../../elohim/sdk/storage-client-ts/src/generated/")]
+#[ts(
+    export,
+    export_to = "../../../elohim/sdk/storage-client-ts/src/generated/"
+)]
 pub struct RegionalDistributionView {
     pub local: i32,
     pub regional: i32,
@@ -1448,7 +1691,10 @@ pub struct RegionalDistributionView {
 /// Wire format: `elohim/sdk/schemas/v1/views/resilience-snapshot-view.schema.json`
 #[derive(Debug, Clone, Serialize, TS)]
 #[serde(rename_all = "camelCase")]
-#[ts(export, export_to = "../../../elohim/sdk/storage-client-ts/src/generated/")]
+#[ts(
+    export,
+    export_to = "../../../elohim/sdk/storage-client-ts/src/generated/"
+)]
 pub struct ResilienceSnapshotView {
     pub content_id: String,
     /// `"unmeasured"` when the content has never entered the distribution
@@ -1516,7 +1762,10 @@ pub struct ResilienceSnapshotView {
 /// Wire format: embedded in `resilience-snapshot-view.schema.json` details
 #[derive(Debug, Clone, Serialize, TS)]
 #[serde(rename_all = "camelCase")]
-#[ts(export, export_to = "../../../elohim/sdk/storage-client-ts/src/generated/")]
+#[ts(
+    export,
+    export_to = "../../../elohim/sdk/storage-client-ts/src/generated/"
+)]
 pub struct StewardingCollectiveEntry {
     pub id: String,
     pub kind: String,
@@ -1544,7 +1793,10 @@ pub struct StewardingCollectiveEntry {
 /// Wire format: embedded in `resilience-snapshot-view.schema.json` details
 #[derive(Debug, Clone, Serialize, TS)]
 #[serde(rename_all = "camelCase")]
-#[ts(export, export_to = "../../../elohim/sdk/storage-client-ts/src/generated/")]
+#[ts(
+    export,
+    export_to = "../../../elohim/sdk/storage-client-ts/src/generated/"
+)]
 pub struct ResilienceSnapshotDetailsView {
     pub stewarding_collectives: Vec<StewardingCollectiveEntry>,
     pub online_peers: OnlinePeersView,
@@ -1557,7 +1809,10 @@ pub struct ResilienceSnapshotDetailsView {
 /// Wire format: embedded in `resilience-snapshot-view.schema.json` details
 #[derive(Debug, Clone, Serialize, TS)]
 #[serde(rename_all = "camelCase")]
-#[ts(export, export_to = "../../../elohim/sdk/storage-client-ts/src/generated/")]
+#[ts(
+    export,
+    export_to = "../../../elohim/sdk/storage-client-ts/src/generated/"
+)]
 pub struct OnlinePeersView {
     /// Peers with an active online|degraded PeerStatus across the stewarding
     /// collectives.
@@ -1576,7 +1831,10 @@ pub struct OnlinePeersView {
 /// Wire format: `feltStatus` in `resilience-snapshot-view.schema.json`
 #[derive(Debug, Clone, Serialize, TS)]
 #[serde(rename_all = "camelCase")]
-#[ts(export, export_to = "../../../elohim/sdk/storage-client-ts/src/generated/")]
+#[ts(
+    export,
+    export_to = "../../../elohim/sdk/storage-client-ts/src/generated/"
+)]
 pub struct FeltStatusView {
     /// Canonical content-neutral felt sentence — the single source of truth for
     /// the translation. The consuming component adds warm framing; it never
@@ -1603,7 +1861,10 @@ pub struct FeltStatusView {
 /// Wire format: embedded in `resilience-snapshot-view.schema.json` feltStatus.floor
 #[derive(Debug, Clone, Serialize, TS)]
 #[serde(rename_all = "camelCase")]
-#[ts(export, export_to = "../../../elohim/sdk/storage-client-ts/src/generated/")]
+#[ts(
+    export,
+    export_to = "../../../elohim/sdk/storage-client-ts/src/generated/"
+)]
 pub struct FeltFloorView {
     /// Resilience tier: `"standard"` (default) until the content declares its
     /// own value-tier (vault/keepsake/ephemeral/…).
@@ -1618,7 +1879,10 @@ pub struct FeltFloorView {
 
 /// Replica health bucket for a CID's distribution summary.
 #[derive(Debug, Clone, Serialize, Deserialize, TS, PartialEq, Eq)]
-#[ts(export, export_to = "../../../elohim/sdk/storage-client-ts/src/generated/")]
+#[ts(
+    export,
+    export_to = "../../../elohim/sdk/storage-client-ts/src/generated/"
+)]
 #[serde(rename_all = "snake_case")]
 pub enum ReplicaHealth {
     Healthy,
@@ -1638,7 +1902,10 @@ pub enum ReplicaHealth {
 /// `"self_scope"`, because `self` is a Rust reserved word and cannot be a
 /// variant name.
 #[derive(Debug, Clone, Serialize, Deserialize, TS, PartialEq, Eq)]
-#[ts(export, export_to = "../../../elohim/sdk/storage-client-ts/src/generated/")]
+#[ts(
+    export,
+    export_to = "../../../elohim/sdk/storage-client-ts/src/generated/"
+)]
 #[serde(rename_all = "snake_case")]
 pub enum ReachClass {
     Private,
@@ -1654,7 +1921,10 @@ pub enum ReachClass {
 
 /// Where the bytes for the current fetch were sourced from.
 #[derive(Debug, Clone, Serialize, Deserialize, TS, PartialEq, Eq)]
-#[ts(export, export_to = "../../../elohim/sdk/storage-client-ts/src/generated/")]
+#[ts(
+    export,
+    export_to = "../../../elohim/sdk/storage-client-ts/src/generated/"
+)]
 #[serde(rename_all = "snake_case")]
 pub enum FetchSource {
     ProjectedViaDoorway,
@@ -1664,7 +1934,10 @@ pub enum FetchSource {
 
 /// Viewer's role for a CID.
 #[derive(Debug, Clone, Serialize, Deserialize, TS, PartialEq, Eq)]
-#[ts(export, export_to = "../../../elohim/sdk/storage-client-ts/src/generated/")]
+#[ts(
+    export,
+    export_to = "../../../elohim/sdk/storage-client-ts/src/generated/"
+)]
 #[serde(rename_all = "snake_case")]
 pub enum MyRole {
     SoleReplica,
@@ -1678,7 +1951,10 @@ pub enum MyRole {
 /// branch on `kind` without untagged-enum heuristics. The `None` unit variant
 /// serializes as `{"kind":"none","value":null}`.
 #[derive(Debug, Clone, Serialize, Deserialize, TS, PartialEq, Eq)]
-#[ts(export, export_to = "../../../elohim/sdk/storage-client-ts/src/generated/")]
+#[ts(
+    export,
+    export_to = "../../../elohim/sdk/storage-client-ts/src/generated/"
+)]
 #[serde(tag = "kind", content = "value", rename_all = "snake_case")]
 pub enum DiversityHint {
     /// Replicas span these region-metro tiers.
@@ -1693,7 +1969,10 @@ pub enum DiversityHint {
 
 /// Federation-level projection coverage classification for a CID.
 #[derive(Debug, Clone, Serialize, Deserialize, TS, PartialEq, Eq)]
-#[ts(export, export_to = "../../../elohim/sdk/storage-client-ts/src/generated/")]
+#[ts(
+    export,
+    export_to = "../../../elohim/sdk/storage-client-ts/src/generated/"
+)]
 #[serde(rename_all = "snake_case")]
 pub enum ProjectionTier {
     Local,
@@ -1705,7 +1984,10 @@ pub enum ProjectionTier {
 /// (no `Free`) matching the distribution-details schema; named CommitmentTier
 /// (NOT `Tier`) to avoid clobbering the 4-variant `peer_capacity::Tier` export.
 #[derive(Debug, Clone, Serialize, Deserialize, TS, PartialEq, Eq)]
-#[ts(export, export_to = "../../../elohim/sdk/storage-client-ts/src/generated/")]
+#[ts(
+    export,
+    export_to = "../../../elohim/sdk/storage-client-ts/src/generated/"
+)]
 #[serde(rename_all = "snake_case")]
 pub enum CommitmentTier {
     Dwelling,
@@ -1715,7 +1997,10 @@ pub enum CommitmentTier {
 
 /// One active replicates-* commitment whose recipient + scope cover this CID.
 #[derive(Debug, Clone, Serialize, Deserialize, TS)]
-#[ts(export, export_to = "../../../elohim/sdk/storage-client-ts/src/generated/")]
+#[ts(
+    export,
+    export_to = "../../../elohim/sdk/storage-client-ts/src/generated/"
+)]
 #[serde(rename_all = "camelCase")]
 pub struct ReplicationCommitmentRef {
     pub commitment_cid: String,
@@ -1728,7 +2013,10 @@ pub struct ReplicationCommitmentRef {
 
 /// Fault-domain diversity rollup for a CID's replica set.
 #[derive(Debug, Clone, Serialize, Deserialize, TS, Default)]
-#[ts(export, export_to = "../../../elohim/sdk/storage-client-ts/src/generated/")]
+#[ts(
+    export,
+    export_to = "../../../elohim/sdk/storage-client-ts/src/generated/"
+)]
 #[serde(rename_all = "camelCase")]
 pub struct FaultDomainDiversity {
     pub distinct_household_count: u32,
@@ -1740,7 +2028,10 @@ pub struct FaultDomainDiversity {
 
 /// RS-encoding shard descriptor for a replica peer.
 #[derive(Debug, Clone, Serialize, Deserialize, TS, PartialEq, Eq)]
-#[ts(export, export_to = "../../../elohim/sdk/storage-client-ts/src/generated/")]
+#[ts(
+    export,
+    export_to = "../../../elohim/sdk/storage-client-ts/src/generated/"
+)]
 #[serde(rename_all = "camelCase")]
 pub struct ShardsByEncoding {
     pub encoding: String,
@@ -1749,7 +2040,10 @@ pub struct ShardsByEncoding {
 
 /// Commitment-backed replication counts for a CID's authoring household.
 #[derive(Debug, Clone, Serialize, Deserialize, TS, Default)]
-#[ts(export, export_to = "../../../elohim/sdk/storage-client-ts/src/generated/")]
+#[ts(
+    export,
+    export_to = "../../../elohim/sdk/storage-client-ts/src/generated/"
+)]
 #[serde(rename_all = "camelCase")]
 pub struct CommitmentBackedReplication {
     pub dwelling_commitments: u32,
@@ -1761,7 +2055,10 @@ pub struct CommitmentBackedReplication {
 /// Inline per-CID distribution payload hydrated onto EPR/content responses.
 /// Operational (Category C) projection; not persisted.
 #[derive(Debug, Clone, Serialize, Deserialize, TS, PartialEq, Eq)]
-#[ts(export, export_to = "../../../elohim/sdk/storage-client-ts/src/generated/")]
+#[ts(
+    export,
+    export_to = "../../../elohim/sdk/storage-client-ts/src/generated/"
+)]
 #[serde(rename_all = "camelCase")]
 pub struct DistributionSummary {
     pub replica_count: u32,
@@ -1783,7 +2080,10 @@ pub struct DistributionSummary {
 /// from imagodei DHT). Mirrors the protocol enum at
 /// `elohim/sdk/schemas/v1/enums/device-archetype.schema.json`.
 #[derive(Debug, Clone, Serialize, Deserialize, TS, PartialEq, Eq, Hash)]
-#[ts(export, export_to = "../../../elohim/sdk/storage-client-ts/src/generated/")]
+#[ts(
+    export,
+    export_to = "../../../elohim/sdk/storage-client-ts/src/generated/"
+)]
 #[serde(rename_all = "snake_case")]
 pub enum DeviceArchetype {
     Node,
@@ -1794,7 +2094,10 @@ pub enum DeviceArchetype {
 
 /// Per-replica row in a CID's distribution-details view.
 #[derive(Debug, Clone, Serialize, Deserialize, TS, PartialEq, Eq)]
-#[ts(export, export_to = "../../../elohim/sdk/storage-client-ts/src/generated/")]
+#[ts(
+    export,
+    export_to = "../../../elohim/sdk/storage-client-ts/src/generated/"
+)]
 #[serde(rename_all = "camelCase")]
 pub struct ReplicaPeer {
     pub peer_id: String,
@@ -1814,7 +2117,10 @@ pub struct ReplicaPeer {
 
 /// Per-doorway projector row in a CID's distribution-details view.
 #[derive(Debug, Clone, Serialize, Deserialize, TS, PartialEq, Eq)]
-#[ts(export, export_to = "../../../elohim/sdk/storage-client-ts/src/generated/")]
+#[ts(
+    export,
+    export_to = "../../../elohim/sdk/storage-client-ts/src/generated/"
+)]
 #[serde(rename_all = "camelCase")]
 pub struct ProjectorIdentity {
     pub doorway_hostname: String,
@@ -1830,7 +2136,10 @@ pub struct ProjectorIdentity {
 /// `PeerHouseholdEdge` which lands in T07. T07 (or a follow-up) extends both
 /// the schema and this struct with the optional field.
 #[derive(Debug, Clone, Serialize, Deserialize, TS)]
-#[ts(export, export_to = "../../../elohim/sdk/storage-client-ts/src/generated/")]
+#[ts(
+    export,
+    export_to = "../../../elohim/sdk/storage-client-ts/src/generated/"
+)]
 #[serde(rename_all = "camelCase")]
 pub struct DistributionDetails {
     pub summary: DistributionSummary,
@@ -1854,7 +2163,10 @@ pub struct DistributionDetails {
 /// Wire format: `elohim/sdk/schemas/v1/views/placement-gap-row.schema.json`
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, TS)]
 #[serde(rename_all = "camelCase")]
-#[ts(export, export_to = "../../../elohim/sdk/storage-client-ts/src/generated/")]
+#[ts(
+    export,
+    export_to = "../../../elohim/sdk/storage-client-ts/src/generated/"
+)]
 pub struct PlacementGapRow {
     pub kind: PlacementGapKind,
     pub content_id: String,
@@ -1870,7 +2182,10 @@ pub struct PlacementGapRow {
 /// - `reach_class`: content's declared reach class requires wider distribution than achieved
 #[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq, TS)]
 #[serde(rename_all = "snake_case")]
-#[ts(export, export_to = "../../../elohim/sdk/storage-client-ts/src/generated/")]
+#[ts(
+    export,
+    export_to = "../../../elohim/sdk/storage-client-ts/src/generated/"
+)]
 pub enum PlacementGapKind {
     HubDiversity,
     ReplicaCount,
@@ -1880,7 +2195,10 @@ pub enum PlacementGapKind {
 /// Concrete target-vs-observed delta for a `PlacementGapRow`.
 #[derive(Debug, Clone, Default, Serialize, Deserialize, PartialEq, Eq, TS)]
 #[serde(rename_all = "camelCase")]
-#[ts(export, export_to = "../../../elohim/sdk/storage-client-ts/src/generated/")]
+#[ts(
+    export,
+    export_to = "../../../elohim/sdk/storage-client-ts/src/generated/"
+)]
 pub struct PlacementGapShortfall {
     pub target: i32,
     pub observed: i32,
@@ -1908,7 +2226,10 @@ pub struct PlacementGapShortfall {
 /// future work adds richer classification from binding tables).
 #[derive(Debug, Clone, Default, Serialize, Deserialize, PartialEq, Eq, TS)]
 #[serde(rename_all = "camelCase")]
-#[ts(export, export_to = "../../../elohim/sdk/storage-client-ts/src/generated/")]
+#[ts(
+    export,
+    export_to = "../../../elohim/sdk/storage-client-ts/src/generated/"
+)]
 pub struct ResilienceHubView {
     pub content_id: String,
     pub hubs: Vec<HubSummary>,
@@ -1919,7 +2240,10 @@ pub struct ResilienceHubView {
 /// without changing the API shape.
 #[derive(Debug, Clone, Default, Serialize, Deserialize, PartialEq, Eq, TS)]
 #[serde(rename_all = "camelCase")]
-#[ts(export, export_to = "../../../elohim/sdk/storage-client-ts/src/generated/")]
+#[ts(
+    export,
+    export_to = "../../../elohim/sdk/storage-client-ts/src/generated/"
+)]
 pub struct HubSummary {
     /// Stable identifier for this hub. When hub-membership facts are not yet
     /// notarized, `hub_id` is the `peer_id` of the single-device participant
@@ -1949,7 +2273,10 @@ pub struct HubSummary {
 ///   operator-configured ad-hoc role
 #[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq, TS)]
 #[serde(rename_all = "snake_case")]
-#[ts(export, export_to = "../../../elohim/sdk/storage-client-ts/src/generated/")]
+#[ts(
+    export,
+    export_to = "../../../elohim/sdk/storage-client-ts/src/generated/"
+)]
 pub enum HubKind {
     /// Single household / dwelling-scoped hub.
     Dwelling,
@@ -1987,7 +2314,10 @@ impl Default for HubKind {
 /// fields when projecting `ComputeTriptychGql` — to keep the GraphQL wire
 /// shape consistent. The HTTP wire stays integer; the asymmetry is by design.
 #[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize, TS)]
-#[ts(export, export_to = "../../../elohim/sdk/storage-client-ts/src/generated/")]
+#[ts(
+    export,
+    export_to = "../../../elohim/sdk/storage-client-ts/src/generated/"
+)]
 #[serde(rename_all = "camelCase")]
 pub struct ComputeTriptych {
     /// Bytes available on device blob filesystem (capacity - used). `None` when
@@ -2021,7 +2351,10 @@ pub struct ComputeTriptych {
 /// wire (`bigint | null` in TypeScript). A GraphQL surface would stringify
 /// for JS `Number` precision safety (see `DeviceSummaryGql` pattern).
 #[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize, TS)]
-#[ts(export, export_to = "../../../elohim/sdk/storage-client-ts/src/generated/")]
+#[ts(
+    export,
+    export_to = "../../../elohim/sdk/storage-client-ts/src/generated/"
+)]
 #[serde(rename_all = "camelCase")]
 pub struct HubComputeAggregateView {
     /// Stable identifier for this hub. When hub-membership facts are not yet
@@ -2048,7 +2381,10 @@ pub struct HubComputeAggregateView {
 
 /// Per-device summary in `MyClusterView`.
 #[derive(Debug, Clone, Serialize, Deserialize, TS, PartialEq, Eq)]
-#[ts(export, export_to = "../../../elohim/sdk/storage-client-ts/src/generated/")]
+#[ts(
+    export,
+    export_to = "../../../elohim/sdk/storage-client-ts/src/generated/"
+)]
 #[serde(rename_all = "camelCase")]
 pub struct DeviceSummary {
     pub peer_id: String,
@@ -2077,7 +2413,10 @@ pub struct DeviceSummary {
 
 /// Aggregated totals across the agent's devices.
 #[derive(Debug, Clone, Serialize, Deserialize, TS, PartialEq, Eq)]
-#[ts(export, export_to = "../../../elohim/sdk/storage-client-ts/src/generated/")]
+#[ts(
+    export,
+    export_to = "../../../elohim/sdk/storage-client-ts/src/generated/"
+)]
 #[serde(rename_all = "camelCase")]
 pub struct DeviceTotals {
     pub storage_used_bytes: u64,
@@ -2088,7 +2427,10 @@ pub struct DeviceTotals {
 
 /// Federated cluster view of an agent's devices.
 #[derive(Debug, Clone, Serialize, Deserialize, TS, PartialEq, Eq)]
-#[ts(export, export_to = "../../../elohim/sdk/storage-client-ts/src/generated/")]
+#[ts(
+    export,
+    export_to = "../../../elohim/sdk/storage-client-ts/src/generated/"
+)]
 #[serde(rename_all = "camelCase")]
 pub struct MyClusterView {
     pub agent_cid: String,
@@ -2099,7 +2441,10 @@ pub struct MyClusterView {
 
 /// Per-household reciprocation edge in a peer topology view.
 #[derive(Debug, Clone, Serialize, Deserialize, TS, PartialEq, Eq)]
-#[ts(export, export_to = "../../../elohim/sdk/storage-client-ts/src/generated/")]
+#[ts(
+    export,
+    export_to = "../../../elohim/sdk/storage-client-ts/src/generated/"
+)]
 #[serde(rename_all = "camelCase")]
 pub struct PeerHouseholdEdge {
     pub household_id: String,
@@ -2120,7 +2465,10 @@ pub struct PeerHouseholdEdge {
 
 /// Sole-replica risk row in a peer topology view.
 #[derive(Debug, Clone, Serialize, Deserialize, TS, PartialEq, Eq)]
-#[ts(export, export_to = "../../../elohim/sdk/storage-client-ts/src/generated/")]
+#[ts(
+    export,
+    export_to = "../../../elohim/sdk/storage-client-ts/src/generated/"
+)]
 #[serde(rename_all = "camelCase")]
 pub struct ResilienceCliff {
     pub household_id: String,
@@ -2129,7 +2477,10 @@ pub struct ResilienceCliff {
 
 /// Per-agent peer topology — reciprocation edges + resilience cliffs.
 #[derive(Debug, Clone, Serialize, Deserialize, TS, PartialEq, Eq)]
-#[ts(export, export_to = "../../../elohim/sdk/storage-client-ts/src/generated/")]
+#[ts(
+    export,
+    export_to = "../../../elohim/sdk/storage-client-ts/src/generated/"
+)]
 #[serde(rename_all = "camelCase")]
 pub struct PeerTopologyView {
     pub agent_cid: String,
@@ -2141,7 +2492,10 @@ pub struct PeerTopologyView {
 
 /// Direction of byte flow across a doorway federation edge.
 #[derive(Debug, Clone, Serialize, Deserialize, TS, PartialEq, Eq)]
-#[ts(export, export_to = "../../../elohim/sdk/storage-client-ts/src/generated/")]
+#[ts(
+    export,
+    export_to = "../../../elohim/sdk/storage-client-ts/src/generated/"
+)]
 #[serde(rename_all = "snake_case")]
 pub enum FederationDirection {
     Bidirectional,
@@ -2151,7 +2505,10 @@ pub enum FederationDirection {
 
 /// Per-doorway federation row in a doorway dashboard.
 #[derive(Debug, Clone, Serialize, Deserialize, TS, PartialEq, Eq)]
-#[ts(export, export_to = "../../../elohim/sdk/storage-client-ts/src/generated/")]
+#[ts(
+    export,
+    export_to = "../../../elohim/sdk/storage-client-ts/src/generated/"
+)]
 #[serde(rename_all = "camelCase")]
 pub struct DashboardFederationPeer {
     pub doorway_hostname: String,
@@ -2164,7 +2521,10 @@ pub struct DashboardFederationPeer {
 ///
 /// `cache_hit_rate_24h` is `f64` so PartialEq only.
 #[derive(Debug, Clone, Serialize, Deserialize, TS, PartialEq)]
-#[ts(export, export_to = "../../../elohim/sdk/storage-client-ts/src/generated/")]
+#[ts(
+    export,
+    export_to = "../../../elohim/sdk/storage-client-ts/src/generated/"
+)]
 #[serde(rename_all = "camelCase")]
 pub struct ProjectionCoverage {
     pub projected_cid_count: u32,
@@ -2175,7 +2535,10 @@ pub struct ProjectionCoverage {
 
 /// DNS/TLS/reachability surface for a doorway hostname.
 #[derive(Debug, Clone, Serialize, Deserialize, TS, PartialEq, Eq)]
-#[ts(export, export_to = "../../../elohim/sdk/storage-client-ts/src/generated/")]
+#[ts(
+    export,
+    export_to = "../../../elohim/sdk/storage-client-ts/src/generated/"
+)]
 #[serde(rename_all = "camelCase")]
 pub struct PublicSurfaceState {
     pub dns_resolves: bool,
@@ -2190,7 +2553,10 @@ pub struct PublicSurfaceState {
 /// Doorway operator dashboard view — composed at request time from cluster +
 /// reciprocity views over view-federation/1.0.0.
 #[derive(Debug, Clone, Serialize, Deserialize, TS, PartialEq)]
-#[ts(export, export_to = "../../../elohim/sdk/storage-client-ts/src/generated/")]
+#[ts(
+    export,
+    export_to = "../../../elohim/sdk/storage-client-ts/src/generated/"
+)]
 #[serde(rename_all = "camelCase")]
 pub struct DoorwayDashboardView {
     pub doorway_hostname: String,
@@ -2202,7 +2568,10 @@ pub struct DoorwayDashboardView {
 
 #[derive(Debug, Clone, Serialize, TS)]
 #[serde(rename_all = "camelCase")]
-#[ts(export, export_to = "../../../elohim/sdk/storage-client-ts/src/generated/")]
+#[ts(
+    export,
+    export_to = "../../../elohim/sdk/storage-client-ts/src/generated/"
+)]
 pub struct Libp2pTransportProfileView {
     pub peer_id: String,
     pub addrs: Vec<String>,
@@ -2211,7 +2580,10 @@ pub struct Libp2pTransportProfileView {
 
 #[derive(Debug, Clone, Serialize, TS)]
 #[serde(rename_all = "camelCase")]
-#[ts(export, export_to = "../../../elohim/sdk/storage-client-ts/src/generated/")]
+#[ts(
+    export,
+    export_to = "../../../elohim/sdk/storage-client-ts/src/generated/"
+)]
 pub struct IrohTransportProfileView {
     pub node_id: String,
     pub relays: Vec<String>,
@@ -2220,7 +2592,10 @@ pub struct IrohTransportProfileView {
 
 #[derive(Debug, Clone, Serialize, TS)]
 #[serde(rename_all = "camelCase")]
-#[ts(export, export_to = "../../../elohim/sdk/storage-client-ts/src/generated/")]
+#[ts(
+    export,
+    export_to = "../../../elohim/sdk/storage-client-ts/src/generated/"
+)]
 pub struct PeerTransportManifestView {
     pub agent_cid: String,
     pub libp2p: Option<Libp2pTransportProfileView>,
@@ -2241,7 +2616,10 @@ pub struct PeerTransportManifestView {
 /// view is a projection of both for the single PUT response.
 #[derive(Debug, Clone, Serialize, TS)]
 #[serde(rename_all = "camelCase")]
-#[ts(export, export_to = "../../../elohim/sdk/storage-client-ts/src/generated/")]
+#[ts(
+    export,
+    export_to = "../../../elohim/sdk/storage-client-ts/src/generated/"
+)]
 pub struct PutBlobResponseView {
     pub blob_hash: String,
     pub total_size: u64,
@@ -2272,7 +2650,10 @@ pub struct PutBlobResponseView {
 /// shapes do not require a Rust redeploy.
 #[derive(Debug, Clone, Serialize, TS)]
 #[serde(rename_all = "camelCase")]
-#[ts(export, export_to = "../../../elohim/sdk/storage-client-ts/src/generated/")]
+#[ts(
+    export,
+    export_to = "../../../elohim/sdk/storage-client-ts/src/generated/"
+)]
 pub struct ObservationView {
     pub observer_cid: String,
     pub log_cid: String,
@@ -2303,7 +2684,10 @@ pub struct ObservationView {
 /// (unix seconds) is stamped by the server when absent.
 #[derive(Debug, Clone, Serialize, Deserialize, TS)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
-#[ts(export, export_to = "../../../elohim/sdk/storage-client-ts/src/generated/")]
+#[ts(
+    export,
+    export_to = "../../../elohim/sdk/storage-client-ts/src/generated/"
+)]
 pub struct ObservationIntentView {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     #[ts(optional)]
@@ -2332,7 +2716,10 @@ pub struct ObservationIntentView {
 /// log position and sequence.
 #[derive(Debug, Clone, Serialize, Deserialize, TS)]
 #[serde(rename_all = "camelCase")]
-#[ts(export, export_to = "../../../elohim/sdk/storage-client-ts/src/generated/")]
+#[ts(
+    export,
+    export_to = "../../../elohim/sdk/storage-client-ts/src/generated/"
+)]
 pub struct ObservationAcceptedView {
     pub observer_cid: String,
     pub observer_cid_namespace: String,
@@ -2351,7 +2738,10 @@ pub struct ObservationAcceptedView {
 /// Wire format: `weave-view.schema.json` (added in Slice 4).
 #[derive(Debug, Clone, Serialize, TS)]
 #[serde(rename_all = "camelCase")]
-#[ts(export, export_to = "../../../elohim/sdk/storage-client-ts/src/generated/")]
+#[ts(
+    export,
+    export_to = "../../../elohim/sdk/storage-client-ts/src/generated/"
+)]
 pub struct WeaveView {
     pub placement_gap_count: u32,
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -2385,7 +2775,10 @@ pub struct WeaveView {
 /// Wire format: `mishpat-commitment-view.schema.json`.
 #[derive(Debug, Clone, Serialize, TS)]
 #[serde(rename_all = "camelCase")]
-#[ts(export, export_to = "../../../elohim/sdk/storage-client-ts/src/generated/")]
+#[ts(
+    export,
+    export_to = "../../../elohim/sdk/storage-client-ts/src/generated/"
+)]
 pub struct MishpatCommitmentView {
     pub cid: String,
     pub action: String,
@@ -2413,7 +2806,10 @@ pub struct MishpatCommitmentView {
 /// the observations table).
 #[derive(Debug, Clone, Serialize, TS)]
 #[serde(rename_all = "camelCase")]
-#[ts(export, export_to = "../../../elohim/sdk/storage-client-ts/src/generated/")]
+#[ts(
+    export,
+    export_to = "../../../elohim/sdk/storage-client-ts/src/generated/"
+)]
 pub struct ObservationDiversitySummaryView {
     pub subject_cid: String,
     pub observation_kind: String,
@@ -2426,4 +2822,215 @@ pub struct ObservationDiversitySummaryView {
     pub total_count: i64,
     pub first_observed_at: i64,
     pub last_observed_at: i64,
+}
+
+// =============================================================================
+// Content-chrome facing — every reading the protocol chrome shows for one record
+// =============================================================================
+
+/// The content-chrome facing: what the chrome (the chip and its page-info
+/// cards) shows about one EPR content record, folded in
+/// `elohim_facings::folds::content_chrome` from the record and the projections
+/// it composes (holders, couplings, attestations, stewardship).
+///
+/// Source of truth: none of its own. Ephemeral (Category C): recomputed per
+/// request from the Notarized record (`content`, DHT-projected) and the
+/// projections the folds read; never stored, no entry type, no DNA change.
+/// Served by `GET /api/v1/epr/{id}/chrome`; the storage peer's own `/apps`
+/// shell fills its context island from the same fold.
+///
+/// The not-selected contract: a lens this facing did not compute is ABSENT on
+/// the wire (never `null`, never a zero). `holders` is absent when no holder
+/// reading could be taken; `legs` when no EPR atom couples the record; `app`
+/// for a record that is not an `html5-app`. `claims` and `steward` are always
+/// selected — an empty list is a measured "none recorded".
+#[derive(Debug, Clone, Serialize, TS)]
+#[serde(rename_all = "camelCase")]
+#[ts(
+    export,
+    export_to = "../../../elohim/sdk/storage-client-ts/src/generated/"
+)]
+pub struct ContentChromeFacingView {
+    /// The record's id (the EPR address the chrome links back to).
+    pub record_id: String,
+    pub title: String,
+    /// The record's `contentFormat`, verbatim.
+    pub format: String,
+    /// `"trustful"` for a protocol record (every record this facing reads).
+    pub mode: String,
+    /// The record's reach, verbatim.
+    pub reach: String,
+    /// `"green"` once a conductor other than the record's author holds the
+    /// record as valid (and the record carries its DHT anchor); `"amber"`
+    /// until then, and whenever this peer cannot read that in time. The anchor
+    /// alone is not a witness. Derived on every read, never written.
+    pub witness: String,
+    /// RFC 3339 time this peer folded the facing.
+    pub computed_at: String,
+    /// The bundle's content address (CIDv1, the `X-Content-Address` spelling),
+    /// when the record names one.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[ts(optional)]
+    pub content_address: Option<String>,
+    /// What an app-bundle record (`html5-app`, or a wrapper's `spa-bundle`)
+    /// declares about how it is framed and whether it presents other content.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[ts(optional)]
+    pub app: Option<ContentChromeAppLens>,
+    /// The holders reading (the resiliency fold's felt status).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[ts(optional)]
+    pub holders: Option<ContentChromeHoldersLens>,
+    /// The Claims reading: attestations whose subject is this record.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[ts(optional)]
+    pub claims: Option<ContentChromeClaimsLens>,
+    /// The record's EPR coupling legs (knowledge · value · governance).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[ts(optional)]
+    pub legs: Option<EprCouplingView>,
+    /// Who stewards the record (active stewardship allocations).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[ts(optional)]
+    pub steward: Option<ContentChromeStewardLens>,
+}
+
+/// An app bundle's body declarations — `html5-app`, and the `spa-bundle` a
+/// wrapper uses (lamad-types `Html5AppBody`, lenient parse: an unknown
+/// capability is dropped, never granted).
+#[derive(Debug, Clone, Serialize, TS)]
+#[serde(rename_all = "camelCase")]
+#[ts(
+    export,
+    export_to = "../../../elohim/sdk/storage-client-ts/src/generated/"
+)]
+pub struct ContentChromeAppLens {
+    /// The entry file a visit enters at (declared, default `index.html`).
+    pub entry: String,
+    /// Frame capability ids the record requests, in declared order.
+    pub capabilities: Vec<String>,
+    /// `true` when the bundle is a wrapper that presents other content.
+    pub presents: bool,
+    /// Origins (`scheme://host[:port]`) the app declares it may reach beyond its
+    /// own — what its content is observed against (Report-Only), not a grant.
+    /// Absent when the record declares none.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[ts(optional)]
+    pub sources: Option<Vec<String>>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[ts(optional)]
+    pub theme_hint: Option<ContentChromeThemeHint>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[ts(optional)]
+    pub fallback_url: Option<String>,
+}
+
+/// `themeHint` as the record declares it.
+#[derive(Debug, Clone, Serialize, TS)]
+#[serde(rename_all = "camelCase")]
+#[ts(
+    export,
+    export_to = "../../../elohim/sdk/storage-client-ts/src/generated/"
+)]
+pub struct ContentChromeThemeHint {
+    /// `"light"` | `"dark"`.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[ts(optional)]
+    pub color_scheme: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[ts(optional)]
+    pub theme_color: Option<String>,
+}
+
+/// The holders reading, worded by the resiliency fold (`build_felt_status`).
+#[derive(Debug, Clone, Serialize, TS)]
+#[serde(rename_all = "camelCase")]
+#[ts(
+    export,
+    export_to = "../../../elohim/sdk/storage-client-ts/src/generated/"
+)]
+pub struct ContentChromeHoldersLens {
+    /// Households holding the record now.
+    pub holders: u32,
+    /// Households the record's resilience floor wants.
+    pub target: u32,
+    /// The fold's own sentence, verbatim (`FeltStatusView.headline`).
+    pub headline: String,
+    /// `"protected"` | `"watching"` | `"needs-help"` | `"not-yet-seen"`.
+    pub reassurance: String,
+    /// RFC 3339 time this peer took the reading.
+    pub as_of: String,
+    pub held_by: Vec<StewardingCollectiveEntry>,
+    /// Distinct collectives with an ACTIVE provide commitment covering this
+    /// record's reach — holding it by notarized promise, not just by bytes
+    /// (`ResilienceSnapshotView.commitmentBackedCollectives`, the same snapshot).
+    pub commitment_backed_collectives: u32,
+}
+
+/// The Claims reading: the record's attestations, newest first.
+#[derive(Debug, Clone, Serialize, TS)]
+#[serde(rename_all = "camelCase")]
+#[ts(
+    export,
+    export_to = "../../../elohim/sdk/storage-client-ts/src/generated/"
+)]
+pub struct ContentChromeClaimsLens {
+    pub attestations: Vec<ContentChromeClaim>,
+}
+
+/// One attestation about the record, as the projection carries it.
+#[derive(Debug, Clone, Serialize, TS)]
+#[serde(rename_all = "camelCase")]
+#[ts(
+    export,
+    export_to = "../../../elohim/sdk/storage-client-ts/src/generated/"
+)]
+pub struct ContentChromeClaim {
+    /// The attestation's CID.
+    pub id: String,
+    /// `attestation:<subtype>`.
+    pub kind: String,
+    /// Who made the claim (issuer agent CID).
+    pub issuer_cid: String,
+    /// `"witness"` | `"self-attest"` | `"audit-signature"` | `"computational"`.
+    pub proof_class: String,
+    pub title: String,
+    pub created_at: String,
+    /// `true` when the attestation was revoked; it stays listed so the person
+    /// can see that it was withdrawn.
+    pub revoked: bool,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[ts(optional)]
+    pub expires_at: Option<String>,
+}
+
+/// Who stewards the record.
+#[derive(Debug, Clone, Serialize, TS)]
+#[serde(rename_all = "camelCase")]
+#[ts(
+    export,
+    export_to = "../../../elohim/sdk/storage-client-ts/src/generated/"
+)]
+pub struct ContentChromeStewardLens {
+    /// Active allocations, largest share first.
+    pub stewards: Vec<ContentChromeSteward>,
+}
+
+/// One active stewardship allocation on the record.
+#[derive(Debug, Clone, Serialize, TS)]
+#[serde(rename_all = "camelCase")]
+#[ts(
+    export,
+    export_to = "../../../elohim/sdk/storage-client-ts/src/generated/"
+)]
+pub struct ContentChromeSteward {
+    /// The steward's contributor-presence id.
+    pub presence_id: String,
+    pub contribution_type: String,
+    pub allocation_ratio: f32,
+    /// The allocation's governance state (`disputed` when contested).
+    pub governance_state: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[ts(optional)]
+    pub display_name: Option<String>,
 }

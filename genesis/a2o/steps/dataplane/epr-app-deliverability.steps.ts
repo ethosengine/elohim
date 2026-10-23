@@ -27,6 +27,17 @@ import { join } from 'node:path';
 import { Given, When, Then, After, Before } from '@cucumber/cucumber';
 
 import {
+  shellVisitSessions,
+  buildAppsWorker,
+  visitShellInBrowser,
+  entryUrl,
+  chromeEntryUrl,
+  requireShellVisit,
+  card,
+  type AppsWorker,
+  type ShellVisit,
+} from '../../scripts/lib/chrome-shell.js';
+import {
   connectConductor,
   declareEarnedCanonicalHead,
   meshConductorPorts,
@@ -61,9 +72,7 @@ import {
   stageBundleThroughStorage,
   stageInvalidFixture,
   visitInBrowser,
-  visitShellInBrowser,
   type BrowserVisit,
-  type ShellVisit,
   type FixtureBundle,
 } from './epr-app-deliverability.helpers.js';
 
@@ -182,7 +191,7 @@ Before({ timeout: 180_000 }, async function (this: E2EWorld, scenario) {
   );
 });
 
-function app(world: E2EWorld): PublishedApp {
+export function app(world: E2EWorld): PublishedApp {
   const record = publishedApps.get(world);
   assert.ok(
     record,
@@ -384,15 +393,23 @@ Given(
   }
 );
 
-function buildNextFixture(this: E2EWorld, root = false): void {
-  const existing = publishedApps.get(this);
+/**
+ * Worlds whose bundle is a CONTENT app, served at `/apps/<slug>/` (and on a separate content
+ * origin) rather than at a projection mount. Its honest base is relative: a base naming the
+ * mount path sends every asset to a route only the mounting doorway answers.
+ */
+export const contentAppWorlds = new WeakSet<E2EWorld>();
+
+export function buildNextFixture(this: E2EWorld, root = false, fresh = false): void {
+  const existing = fresh ? undefined : publishedApps.get(this);
   const slug =
     existing?.slug ??
     `epr-app-deliverability-${Date.now().toString(36)}-${randomBytes(4).toString('hex')}`;
   const mountPath = existing?.mountPath ?? (root ? '/' : `/lamad/concept/${slug}`);
   const bundle = buildFixtureBundle({
     coherent: true,
-    baseHref: `${mountPath.replace(/\/$/, '')}/`,
+    // eslint-disable-next-line sonarjs/no-empty-collection -- The chrome story's Before hook adds its worlds.
+    baseHref: contentAppWorlds.has(this) ? './' : `${mountPath.replace(/\/$/, '')}/`,
   });
   this.onCleanup(async () => {
     removeFixtureBundle(bundle);
@@ -440,9 +457,10 @@ When('Matthew builds coherent successor artifact B', function (this: E2EWorld) {
  * declaration guard would refuse the write anyway (measured 2026-09-05 —
  * declare_earned_canonical_head is restricted to a page's root author).
  */
-async function authorOwnedEprRecord(
+export async function authorOwnedEprRecord(
   world: E2EWorld,
-  contentFormat: 'html5-app' | 'spa-bundle' = 'html5-app'
+  contentFormat: 'html5-app' | 'spa-bundle' = 'html5-app',
+  capabilities: string[] = []
 ): Promise<void> {
   const record = app(world);
   record.declaredFormat = contentFormat;
@@ -467,7 +485,9 @@ async function authorOwnedEprRecord(
         description: 'a small site this test run published, so it may declare its own head',
         contentType: 'collective',
         contentFormat,
-        content: { slug: record.slug, entryPoint: 'index.html' },
+        // Storage's create input names the body `contentBody` (a JSON string); a `content`
+        // field is the seed-file shape and is dropped here, taking the declared capabilities with it.
+        contentBody: JSON.stringify({ slug: record.slug, entryPoint: 'index.html', capabilities }),
         reach: 'commons',
       },
     ]),
@@ -1581,7 +1601,7 @@ Then(
 // ---------------------------------------------------------------------------
 
 When(
-  'a visitor opens the page at {string} on peer {string} in a browser',
+  'a visitor opens the page at {string} on federated peer {string} in a browser',
   // The browser visit's own 120s plus one bounded catching-up ride before it.
   { timeout: CATCHUP_RIDE_STEP_TIMEOUT_MS + 120_000 },
   async function (this: E2EWorld, urlPath: string, peerName: string) {
@@ -1597,7 +1617,7 @@ When(
 );
 
 When(
-  'a visitor opens the app this run published on peer {string} in a browser',
+  'a visitor opens the app this run published on federated peer {string} in a browser',
   { timeout: 120_000 },
   async function (this: E2EWorld, peerName: string) {
     visitMap(this).set(peerName, await visitInBrowser(appUrl(this, peerName)));
@@ -1605,7 +1625,7 @@ When(
 );
 
 Then(
-  'the browser on peer {string} reported no uncaught error',
+  'the browser on federated peer {string} reported no uncaught error',
   function (this: E2EWorld, peerName: string) {
     const visit = requireVisit(this, peerName);
     assert.deepStrictEqual(
@@ -1618,7 +1638,7 @@ Then(
 );
 
 Then(
-  'every asset the browser asked peer {string} for arrived',
+  'every asset the browser asked federated peer {string} for arrived',
   function (this: E2EWorld, peerName: string) {
     const visit = requireVisit(this, peerName);
     // Off-peer references (a CDN font, an analytics beacon) are somebody else's
@@ -1637,7 +1657,7 @@ Then(
 );
 
 Then(
-  'the app root on the page from peer {string} has content',
+  'the app root on the page from federated peer {string} has content',
   function (this: E2EWorld, peerName: string) {
     const visit = requireVisit(this, peerName);
     assert.ok(
@@ -1666,7 +1686,7 @@ Then(
  * mean the same thing.
  */
 Then(
-  'the build stamp peer {string} serves is the one the declared browser head of EPR {string} carries',
+  'the build stamp federated peer {string} serves is the one the declared browser head of EPR {string} carries',
   { timeout: 90_000 },
   async function (this: E2EWorld, peerName: string, eprId: string) {
     const peerUrl = resolvePeerUrl(peerName);
@@ -1720,7 +1740,7 @@ Then(
 
 /** ACT I form — the published bundle's own stamp is known to this run directly. */
 Then(
-  'the build stamp peer {string} serves for this app is the one the published bundle carries',
+  'the build stamp federated peer {string} serves for this app is the one the published bundle carries',
   { timeout: 90_000 },
   async function (this: E2EWorld, peerName: string) {
     const record = app(this);
@@ -1899,7 +1919,7 @@ Then(
 );
 
 Then(
-  'the browser on peer {string} completed client bootstrap',
+  'the browser on federated peer {string} completed client bootstrap',
   function (this: E2EWorld, peer: string) {
     assert.equal(
       requireVisit(this, peer).bootstrapReady,
@@ -2113,25 +2133,13 @@ After({ tags: '@deliverability-browser', timeout: 450_000 }, async function (thi
 // gets the bytes
 // ---------------------------------------------------------------------------
 
-/** The entry address of the run-owned app on one doorway: `/apps/<slug>/index.html`. */
-function entryUrl(world: E2EWorld, peerName: string): string {
-  return `${resolvePeerUrl(peerName)}/apps/${encodeURIComponent(app(world).slug)}/index.html`;
-}
-
-function requireShellVisit(world: E2EWorld, peerName: string): ShellVisit {
-  const visit = requireVisit(world, peerName);
-  assert.ok(
-    'mainHeaders' in visit,
-    `${peerName}: the recorded browser visit was not a shell visit — "a visitor opens this app's entry address … as a page in a browser" must run first`
-  );
-  return visit as ShellVisit;
-}
-
 interface EntryAnswer {
   status: number;
   headers: Record<string, string | undefined>;
   body: Buffer;
 }
+
+const appsWorkers = new WeakMap<E2EWorld, Map<string, AppsWorker>>();
 
 const entryAnswers = new WeakMap<E2EWorld, Map<string, EntryAnswer>>();
 
@@ -2172,18 +2180,53 @@ Then(
   }
 );
 
+Given(
+  "the visitor's browser holds the apps worker this source builds, installed from doorway {string}",
+  { timeout: 60_000 },
+  async function (this: E2EWorld, peerName: string) {
+    const workers = appsWorkers.get(this) ?? new Map<string, AppsWorker>();
+    workers.set(peerName, await buildAppsWorker());
+    appsWorkers.set(this, workers);
+  }
+);
+
 When(
-  "a visitor opens this app's entry address on peer {string} as a page in a browser",
+  "a visitor opens this app's entry address on federated peer {string} as a page in a browser",
   { timeout: 120_000 },
   async function (this: E2EWorld, peerName: string) {
-    visitMap(this).set(peerName, await visitShellInBrowser(entryUrl(this, peerName)));
+    const workers = appsWorkers.get(this);
+    const worker = workers?.get(peerName);
+    workers?.delete(peerName);
+    visitMap(this).set(
+      peerName,
+      await visitShellInBrowser(
+        // eslint-disable-next-line sonarjs/no-empty-collection -- The chrome story's Before hook adds its worlds.
+        contentAppWorlds.has(this)
+          ? chromeEntryUrl(app(this).slug, peerName)
+          : entryUrl(app(this).slug, peerName),
+        30_000,
+        worker,
+        shellVisitSessions.get(this)
+      )
+    );
+  }
+);
+
+Then(
+  'the apps worker stood between the visitor and doorway {string} when the page opened',
+  function (this: E2EWorld, peerName: string) {
+    assert.equal(
+      requireShellVisit(requireVisit(this, peerName), peerName).mainFromServiceWorker,
+      true,
+      `${peerName}: the apps worker did not stand between the visitor and doorway; this visit proves nothing about returning visitors`
+    );
   }
 );
 
 Then(
   'doorway {string} answered the visitor with a content shell that no cache may keep',
   function (this: E2EWorld, peerName: string) {
-    const visit = requireShellVisit(this, peerName);
+    const visit = requireShellVisit(requireVisit(this, peerName), peerName);
     assert.equal(visit.mainStatus, 200, `${peerName}: ${visit.url} answered ${visit.mainStatus}`);
     assert.equal(
       visit.mainHeaders['x-elohim-chrome'],
@@ -2197,71 +2240,108 @@ Then(
   }
 );
 
+function compareHoldersReading(
+  visit: ShellVisit,
+  text: string
+): { expected: string; matches: boolean } {
+  const felt = (
+    JSON.parse(text) as {
+      feltStatus?: {
+        headline?: string;
+        floor?: { hasHouseholds: number; wantsHouseholds: number };
+      };
+    }
+  ).feltStatus;
+  const floor = felt?.floor;
+  if (!floor) return { expected: 'no resilience floor', matches: false };
+  const expected =
+    felt.headline ??
+    (floor.hasHouseholds >= 1
+      ? `Held by ${floor.hasHouseholds} of ${floor.wantsHouseholds} households`
+      : 'Not yet held by any household');
+  const holders = visit.content?.holders;
+  return {
+    expected,
+    matches:
+      !!visit.holdersText?.includes(expected) &&
+      (!holders ||
+        (holders.holders === floor.hasHouseholds && holders.target === floor.wantsHouseholds)),
+  };
+}
+
 Then(
-  "the shell's resiliency badge from doorway {string} states the holder count from that doorway's own resilience reading for this app",
+  "the chrome's Holders card from doorway {string} states the holder count from that doorway's own resilience reading for this app",
+  { timeout: 40_000 },
   async function (this: E2EWorld, peerName: string) {
-    const visit = requireShellVisit(this, peerName);
+    const visit = requireShellVisit(requireVisit(this, peerName), peerName);
     const url = `${resolvePeerUrl(peerName)}/api/v1/resilience/${encodeURIComponent(app(this).slug)}/household`;
-    let floor: { hasHouseholds: number; wantsHouseholds: number } | undefined;
-    let reading: string;
-    try {
-      const response = await getRaw(url, { timeoutMs: 5000 });
-      reading = `HTTP ${response.status}: ${response.text}`;
-      if (response.status === 200) {
-        floor = (
-          JSON.parse(response.text) as {
-            feltStatus?: { floor?: { hasHouseholds: number; wantsHouseholds: number } };
-          }
-        ).feltStatus?.floor;
+    const deadline = Date.now() + 30_000;
+    let reading = 'not read';
+    let expected = 'no resilience floor';
+    let matches = false;
+    let first = true;
+    do {
+      try {
+        // A retained session can refresh the visible card; closed visits keep their capture.
+        if (visit.page && (!first || visit.holdersText === undefined))
+          visit.holdersText = await card(visit.page, 'holders');
+        const response = await getRaw(url, { timeoutMs: 5000 });
+        reading = `HTTP ${response.status}: ${response.text}`;
+        if (response.status === 200) {
+          ({ expected, matches } = compareHoldersReading(visit, response.text));
+        }
+      } catch (error) {
+        reading = `failed: ${String(error)}`;
       }
-    } catch (error) {
-      reading = `failed: ${String(error)}`;
-    }
-    const context = `${peerName}: resilience reading GET ${url} ${reading}; badge text "${visit.badgeText}"`;
-    assert.equal(visit.badgeHolders, floor ? String(floor.hasHouseholds) : null, context);
-    assert.equal(visit.badgeTarget, floor ? String(floor.wantsHouseholds) : null, context);
-    let expectedText = 'Held by households · see where it lives';
-    if (floor) {
-      expectedText =
-        floor.hasHouseholds === 0
-          ? 'Not yet held by any household'
-          : `Held by ${floor.hasHouseholds} of ${floor.wantsHouseholds} households`;
-    }
-    assert.equal(visit.badgeText, expectedText, context);
+      if (matches || Date.now() >= deadline) break;
+      first = false;
+      await new Promise(resolve => setTimeout(resolve, 500));
+    } while (Date.now() < deadline);
+    assert.ok(
+      matches,
+      `${peerName}: Holders card text ${JSON.stringify(visit.holdersText)}; expected ${JSON.stringify(expected)}; island holders ${JSON.stringify(visit.content?.holders)}; resilience reading GET ${url} ${reading}`
+    );
   }
 );
 
 Then(
-  "the shell's resiliency badge from doorway {string} links to this app's EPR page",
+  "the chrome's Holders card from doorway {string} ends at this app's EPR page",
   function (this: E2EWorld, peerName: string) {
-    const visit = requireShellVisit(this, peerName);
-    assert.equal(
-      visit.badgeHref,
-      `/epr/${app(this).slug}`,
-      `${peerName}: the badge leads to "${visit.badgeHref}", not this app's EPR page`
-    );
+    const visit = requireShellVisit(requireVisit(this, peerName), peerName);
+    assert.equal(visit.content?.recordId, app(this).slug);
+    assert.ok(visit.holdersHref, 'Holders card has no EPR link');
+    const link = new URL(visit.holdersHref, visit.url);
+    assert.equal(link.pathname, `/epr/${app(this).slug}`);
+    assert.equal(link.hash, '#holders');
   }
 );
 
 Then(
   "the shell from doorway {string} shows the app in a frame whose address is this app's entry address",
   function (this: E2EWorld, peerName: string) {
-    const visit = requireShellVisit(this, peerName);
-    assert.ok(visit.frameSrcResolved, `${peerName}: the shell has no content-app-frame`);
-    const resolved = new URL(visit.frameSrcResolved);
-    assert.equal(
-      resolved.pathname,
-      `/apps/${encodeURIComponent(app(this).slug)}/index.html`,
-      `${peerName}: the frame points at "${visit.frameSrc}", not this app's entry address`
+    const visit = requireShellVisit(requireVisit(this, peerName), peerName);
+    assert.ok(
+      visit.frameSrcResolved,
+      `${peerName}: the shell has no content-app-frame; visit errors: ${JSON.stringify(visit.pageErrors)}`
     );
-    assert.equal(resolved.origin, new URL(visit.url).origin);
+    const resolved = new URL(visit.frameSrcResolved);
+    const target =
+      resolved.pathname === '/_elohim/boot' ? resolved.searchParams.get('to') : resolved.pathname;
+    assert.equal(target, `/apps/${encodeURIComponent(app(this).slug)}/index.html`);
+    assert.equal(resolved.origin, visit.content?.isolation.contentOrigin);
+    // Only an apps-paired name moves content to apps.<name>; an unpaired name frames its own origin.
+    const pageHost = new URL(visit.url).hostname;
+    assert.equal(
+      resolved.hostname,
+      visit.content?.isolation.boundary === 'origin-pair' ? `apps.${pageHost}` : pageHost
+    );
   }
 );
 
 Then(
   "the app inside the shell's frame from doorway {string} completed client bootstrap in the frame's own document",
   function (this: E2EWorld, peerName: string) {
-    const visit = requireShellVisit(this, peerName);
+    const visit = requireShellVisit(requireVisit(this, peerName), peerName);
     assert.equal(
       visit.frameBootstrapReady,
       true,
@@ -2273,7 +2353,7 @@ Then(
 Then(
   "the app root in the frame's own document from doorway {string} has content",
   function (this: E2EWorld, peerName: string) {
-    const visit = requireShellVisit(this, peerName);
+    const visit = requireShellVisit(requireVisit(this, peerName), peerName);
     assert.ok(
       visit.frameRootPresent,
       `${peerName}: the frame's document (${visit.frameUrl ?? 'none'}) has no app root element`
@@ -2290,7 +2370,7 @@ async function requestEntryAs(
   peerName: string,
   dest: 'iframe' | 'document'
 ): Promise<void> {
-  const response = await getRawWithHeaders(entryUrl(world, peerName), {
+  const response = await getRawWithHeaders(entryUrl(app(world).slug, peerName), {
     timeoutMs: 15_000,
     headers: {
       'sec-fetch-dest': dest,

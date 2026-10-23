@@ -5,7 +5,7 @@
 //! `elohim-chrome-asset` crate (deps: `sha2`, `serde`, `serde_json` — no V8)
 //! — so serving the static element does NOT require compiling V8.
 //! `elohim-render` hard-depends on `deno_core` (the SSR-splice renderers in
-//! `omnibar.rs` / `theme.rs`), so the served-asset accessors were lifted out to
+//! `theme.rs`), so the served-asset accessors were lifted out to
 //! keep the doorway's and the storage sidecar's `/chrome/` route off the V8
 //! path. See `elohim-chrome-asset` for the implementation and rationale.
 //!
@@ -15,7 +15,10 @@
 
 pub use elohim_chrome_asset::{
     element_js_bytes, element_js_hash, element_script_path, escape_json_for_script, inject_element,
-    ChromeContext, NavLink, ReceiptLink, CONTEXT_SCRIPT_ID, ELEMENT_JS, STABLE_ELEMENT_PATH,
+    render_content_shell, CheckedBy, ChromeContext, ChromeMedium, ContentDelivery, ContentFrame,
+    ContentIsland, DeliveryCheck, DeliveryHop, DeliveryTransport, HolderReading, HopReporter,
+    Isolation, IsolationBoundary, NavLink, ReceiptLink, TrustMode, Viewer, ViewerKind,
+    WitnessState, CHROME_CONTEXT_VERSION, CONTEXT_SCRIPT_ID, ELEMENT_JS, STABLE_ELEMENT_PATH,
 };
 
 #[cfg(test)]

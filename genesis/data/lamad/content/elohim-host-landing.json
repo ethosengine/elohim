@@ -8,7 +8,11 @@
   "content": {
     "slug": "elohim-host-landing",
     "entryPoint": "index.html",
-    "fallbackUrl": "https://alpha.elohim.host/"
+    "fallbackUrl": "https://alpha.elohim.host/",
+    "capabilities": [
+      "forms"
+    ],
+    "presents": true
   },
   "contentFormat": "html5-app",
   "sourcePath": "app/elohim-app/dist/elohim-app/browser",
@@ -41,9 +45,7 @@
     "blobPopulatedBy": "Jenkinsfile:stageSpaBlob (root pipeline). The elohim-app browser bundle is zipped + uploaded as a blob; the hash is written into db/content/elohim-host-landing.blobHash and db/content/lamad-spa.blobHash. Intentionally absent from this source JSON so seed-sqlite does not clobber the deploy-time value on re-seed.",
     "serverBlobPopulatedBy": "Jenkinsfile:stageSpaBlobs (root pipeline, kind: server). The elohim-app SSR *server* bundle is zipped + uploaded as a blob; the hash is written into db/content/elohim-host-landing.serverBlobHash via PATCH. Collapsed onto this one EPR node (SSR row collapse) — there is no separate elohim-host-landing-ssr row. Intentionally absent from this source JSON so seed-sqlite does not clobber the deploy-time value on re-seed; absent serverBlobHash ⇒ SSR not materialized (CSR fallback, never a crash).",
     "embedStrategy": "iframe",
-    "requiredCapabilities": ["javascript"],
     "securityPolicy": {
-      "sandbox": ["allow-scripts", "allow-same-origin", "allow-forms"],
       "csp": "default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; font-src 'self' data:"
     },
     "originalContentType": "landing-surface",

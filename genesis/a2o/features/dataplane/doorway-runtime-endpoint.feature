@@ -13,8 +13,8 @@ Feature: A packaged app reads content through the doorway that served it
   Sibling selection during an outage and WAN ingress continuity remain separate stories.
 
   Background:
-    Given peer "alpha-A" at "alpha-A"
-    And peer "elohim.host" at "elohim.host"
+    Given federated peer "alpha-A" at "alpha-A"
+    And federated peer "elohim.host" at "elohim.host"
     And every serving doorway among "alpha-A" and "elohim.host" resolves the same declared head for content "elohim-host-landing"
 
   Scenario Outline: The same package lets a visitor read the manifesto at either entrance

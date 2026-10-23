@@ -240,7 +240,7 @@ async function grantDelegatesCompute(
 // ---------------------------------------------------------------------------
 
 Given(
-  '{string} holds an active {string} commitment over peer {string}',
+  '{string} holds an active {string} commitment over federated peer {string}',
   async function (
     this: E2EWorld,
     personaRaw: string,
@@ -261,7 +261,7 @@ Given(
 );
 
 Given(
-  '{string} held a {string} commitment over peer {string}',
+  '{string} held a {string} commitment over federated peer {string}',
   async function (
     this: E2EWorld,
     personaRaw: string,
@@ -278,7 +278,7 @@ Given(
 );
 
 Given(
-  '{string} holds no {string} commitment over peer {string}',
+  '{string} holds no {string} commitment over federated peer {string}',
   async function (
     this: E2EWorld,
     personaRaw: string,
@@ -313,7 +313,7 @@ Given('that commitment has been revoked', async function (this: E2EWorld): Promi
 // ---------------------------------------------------------------------------
 
 When(
-  '{string} requests a reconcile on peer {string} through the doorway',
+  '{string} requests a reconcile on federated peer {string} through the doorway',
   async function (
     this: E2EWorld,
     personaRaw: string,
@@ -357,38 +357,44 @@ Then('the request is accepted', function (this: E2EWorld): void {
   );
 });
 
-Then('peer {string} performs the reconcile', function (this: E2EWorld, _peerName: string): void {
-  const s = state(this);
-  assert.ok(s.lastReconcile, 'no reconcile response recorded — run the reconcile When step first');
-  assert.equal(
-    s.lastReconcile.status,
-    200,
-    `expected a 200 attestation, got ${s.lastReconcile.status}: ${s.lastReconcile.text.slice(0, 300)}`
-  );
-  const body = s.lastReconcile.body;
-  assert.ok(body, `200 response body was not valid JSON: ${s.lastReconcile.text.slice(0, 300)}`);
-  assert.equal(
-    body['verb'],
-    'reconcile',
-    `expected verb:"reconcile" in the attestation body, got ${JSON.stringify(body)}`
-  );
-  // The design doesn't pin an exact outcome-field name yet (task spec: "an
-  // outcome/accepted field") — check the plausible candidates rather than
-  // over-fitting a guess.
-  const acceptedIndicators = [
-    body['accepted'] === true,
-    body['outcome'] === 'accepted',
-    body['performed'] === true,
-    body['reconciled'] === true,
-  ];
-  assert.ok(
-    acceptedIndicators.some(Boolean),
-    `no outcome/accepted-shaped field found in attestation body: ${JSON.stringify(body)}`
-  );
-});
+Then(
+  'federated peer {string} performs the reconcile',
+  function (this: E2EWorld, _peerName: string): void {
+    const s = state(this);
+    assert.ok(
+      s.lastReconcile,
+      'no reconcile response recorded — run the reconcile When step first'
+    );
+    assert.equal(
+      s.lastReconcile.status,
+      200,
+      `expected a 200 attestation, got ${s.lastReconcile.status}: ${s.lastReconcile.text.slice(0, 300)}`
+    );
+    const body = s.lastReconcile.body;
+    assert.ok(body, `200 response body was not valid JSON: ${s.lastReconcile.text.slice(0, 300)}`);
+    assert.equal(
+      body['verb'],
+      'reconcile',
+      `expected verb:"reconcile" in the attestation body, got ${JSON.stringify(body)}`
+    );
+    // The design doesn't pin an exact outcome-field name yet (task spec: "an
+    // outcome/accepted field") — check the plausible candidates rather than
+    // over-fitting a guess.
+    const acceptedIndicators = [
+      body['accepted'] === true,
+      body['outcome'] === 'accepted',
+      body['performed'] === true,
+      body['reconciled'] === true,
+    ];
+    assert.ok(
+      acceptedIndicators.some(Boolean),
+      `no outcome/accepted-shaped field found in attestation body: ${JSON.stringify(body)}`
+    );
+  }
+);
 
 Then(
-  'peer {string} attests the commitment cid it acted under',
+  'federated peer {string} attests the commitment cid it acted under',
   function (this: E2EWorld, _peerName: string): void {
     const s = state(this);
     const body = s.lastReconcile?.body;
@@ -426,22 +432,28 @@ Then('the request is refused', function (this: E2EWorld): void {
   );
 });
 
-Then('peer {string} performs no reconcile', function (this: E2EWorld, _peerName: string): void {
-  const s = state(this);
-  assert.ok(s.lastReconcile, 'no reconcile response recorded — run the reconcile When step first');
-  assert.notEqual(
-    s.lastReconcile.status,
-    200,
-    `expected no acceptance, but the peer answered 200: ${s.lastReconcile.text.slice(0, 300)}`
-  );
-});
+Then(
+  'federated peer {string} performs no reconcile',
+  function (this: E2EWorld, _peerName: string): void {
+    const s = state(this);
+    assert.ok(
+      s.lastReconcile,
+      'no reconcile response recorded — run the reconcile When step first'
+    );
+    assert.notEqual(
+      s.lastReconcile.status,
+      200,
+      `expected no acceptance, but the peer answered 200: ${s.lastReconcile.text.slice(0, 300)}`
+    );
+  }
+);
 
 // ---------------------------------------------------------------------------
 // Scenario 4 — a peer serves its own runtime telemetry directly
 // ---------------------------------------------------------------------------
 
 When(
-  'peer {string} is asked for its runtime status directly',
+  'federated peer {string} is asked for its runtime status directly',
   async function (this: E2EWorld, peerName: string): Promise<string | undefined> {
     const storageBaseUrl = resolveStorageUrl(peerName);
     if (!storageBaseUrl) return 'pending';
@@ -456,7 +468,7 @@ When(
 );
 
 Then(
-  'peer {string} reports its own sync, reconcile and peer counts',
+  'federated peer {string} reports its own sync, reconcile and peer counts',
   function (this: E2EWorld, _peerName: string): void {
     const s = state(this);
     assert.ok(

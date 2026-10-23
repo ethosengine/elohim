@@ -135,8 +135,8 @@ Feature: A deploy that meets a doorway not ready for it is answered in seconds, 
   # "peer" because files that also talk to the storage peer behind a doorway share it; here
   # only the doorway is used.
   Background:
-    Given peer "alpha-A" at "alpha-A"
-    And peer "elohim.host" at "elohim.host"
+    Given federated peer "alpha-A" at "alpha-A"
+    And federated peer "elohim.host" at "elohim.host"
 
   # STATION 1 — the question a deploy asks first, answered in seconds while a doorway sheds.
   #

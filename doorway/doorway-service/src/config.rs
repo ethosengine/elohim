@@ -306,6 +306,17 @@ pub struct Args {
     #[arg(long, env = "DOORWAY_PUBLIC_NAMES", value_delimiter = ',')]
     pub public_names: Vec<String>,
 
+    /// Public names that pair with a separate content origin, `apps.<name>`
+    /// (the content-chrome trust edge, spec
+    /// `2026-10-14-content-apps-wear-chrome-design.md` "Decided (2026-10-15)"),
+    /// comma-separated — the FALLBACK for a name that has no membership
+    /// document. A name WITH a document pairs exactly when the document says
+    /// `"apps": true` (`PublicNameDocument::apps`), whatever this list says:
+    /// the members of one name must agree, so the declaration lives with the
+    /// name. Empty (default): no name without a document pairs.
+    #[arg(long, env = "DOORWAY_APPS_NAMES", value_delimiter = ',')]
+    pub apps_names: Vec<String>,
+
     /// Additional public gateway addresses for this same doorway identity.
     /// Lower list positions receive higher priority in the signed registration.
     #[arg(long, env = "DOORWAY_URLS", value_delimiter = ',')]

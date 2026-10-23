@@ -121,10 +121,25 @@ pub struct AuthDiscovery {
     /// Where to SEND a human to sign in. Origin-relative by construction.
     pub portal: &'static str,
     pub endpoints: AuthEndpoints,
+    /// `true` only when the request's public name declares a separate
+    /// content origin; omitted otherwise (never `false`). Clients derive that
+    /// origin by the pairing rule — same scheme, `apps.` + the page's own host
+    /// and port — so this document still names no foreign origin.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub apps: Option<bool>,
 }
 
 /// The doorway-hosted sign-in portal, served by doorway-app under `/threshold/*`.
 const PORTAL_PATH: &str = "/threshold/login";
+
+/// The `apps` flag this request's discovery document carries: `Some(true)`
+/// when the request's public name declares a content origin — decided from
+/// `Host` by the apps routing's own pairing — else `None` (omitted).
+pub fn discovery_apps_flag<B>(state: &AppState, req: &hyper::Request<B>) -> Option<bool> {
+    crate::routes::apps::request_edge(state, req)
+        .filter(|e| e.pairing.side == crate::routes::apps::PairingSide::Name)
+        .map(|_| true)
+}
 
 /// `GET /.well-known/elohim-auth`
 ///
@@ -133,12 +148,14 @@ const PORTAL_PATH: &str = "/threshold/login";
 pub fn handle_auth_discovery(
     state: Arc<AppState>,
     if_none_match: Option<&str>,
+    apps: Option<bool>,
 ) -> Response<Full<Bytes>> {
     let body = AuthDiscovery {
         version: 1,
         doorway_id: state.args.doorway_id.clone(),
         portal: PORTAL_PATH,
         endpoints: AuthEndpoints::current(),
+        apps,
     };
 
     match serde_json::to_string_pretty(&body) {
@@ -184,12 +201,44 @@ pub fn handle_auth_discovery(
 mod tests {
     use super::*;
 
+    #[tokio::test]
+    async fn the_apps_flag_is_present_only_for_a_paired_name() {
+        use clap::Parser;
+        use http_body_util::BodyExt;
+        let mut args = crate::config::Args::parse_from(["doorway", "--listen", "127.0.0.1:0"]);
+        args.apps_names = vec!["elohim.localhost".into()];
+        let state = Arc::new(AppState::new(args));
+        let discover = |host: &'static str| {
+            let req = hyper::Request::builder()
+                .uri("/.well-known/elohim-auth")
+                .header("host", host)
+                .body(())
+                .unwrap();
+            let apps = discovery_apps_flag(&state, &req);
+            handle_auth_discovery(Arc::clone(&state), None, apps)
+        };
+        let body = |resp: Response<Full<Bytes>>| async move {
+            let bytes = resp.into_body().collect().await.unwrap().to_bytes();
+            serde_json::from_slice::<serde_json::Value>(&bytes).unwrap()
+        };
+        // Paired: `apps: true`, and still no foreign origin anywhere.
+        let paired = body(discover("elohim.localhost:8888")).await;
+        assert_eq!(paired["apps"], true);
+        assert_eq!(foreign_locations(&paired), Vec::<String>::new());
+        // Unpaired: omitted — never false, never null.
+        for host in ["elohim.local:8888", "localhost:8888"] {
+            let unpaired = body(discover(host)).await;
+            assert!(unpaired.get("apps").is_none(), "{host}");
+        }
+    }
+
     fn doc() -> serde_json::Value {
         let d = AuthDiscovery {
             version: 1,
             doorway_id: Some("alpha-elohim-host".to_string()),
             portal: PORTAL_PATH,
             endpoints: AuthEndpoints::current(),
+            apps: None,
         };
         serde_json::to_value(&d).expect("discovery serializes")
     }
@@ -253,6 +302,7 @@ mod tests {
                 doorway_id: Some("alpha-elohim-host".to_string()),
                 portal: hostile,
                 endpoints: AuthEndpoints::current(),
+                apps: None,
             };
             let doc = serde_json::to_value(&escaping).expect("serializes");
             let caught = foreign_locations(&doc);
@@ -330,6 +380,7 @@ mod tests {
             doorway_id: None,
             portal: PORTAL_PATH,
             endpoints: AuthEndpoints::current(),
+            apps: None,
         };
         let v = serde_json::to_value(&d).unwrap();
         assert!(v.get("doorwayId").is_none());

@@ -17,13 +17,13 @@
 Feature: Doorway catching-up page — staged, honest shed progress for people
 
   Background:
-    Given peer "alpha-A" at "alpha-A"
+    Given federated peer "alpha-A" at "alpha-A"
 
   Scenario: status.json always carries the recovery-progress fields
     # The catching-up page's poll target is doorway-local (never proxied,
     # never shed), so its fields must be present on a HEALTHY doorway too —
     # that is what lets the page observe recovery the moment it happens.
-    When I query "/status.json" on peer "alpha-A"
+    When I query "/status.json" on federated peer "alpha-A"
     Then the surface response status is 200
     And the surface response has field "upstreams"
     And the surface response has field "admission"
@@ -34,9 +34,9 @@ Feature: Doorway catching-up page — staged, honest shed progress for people
     # incident they return the upstream's real response or its real failure —
     # never the doorway's own shed. Healthy substrate → trivially green;
     # incident → this is the probe-stays-answerable guarantee.
-    When I query "/p2p/status" on peer "alpha-A"
+    When I query "/p2p/status" on federated peer "alpha-A"
     Then the surface response is not the doorway shed body
-    When I query "/db/p2p/conductor-diagnostics" on peer "alpha-A"
+    When I query "/db/p2p/conductor-diagnostics" on federated peer "alpha-A"
     Then the surface response is not the doorway shed body
 
   # Harvested from the 2026-07-20/21 adam slow-link incident (finding:
@@ -48,7 +48,7 @@ Feature: Doorway catching-up page — staged, honest shed progress for people
   # fields so the diagnostic that named the second defect can never silently regress.
   @regression
   Scenario: each upstream in status.json carries circuit state and error streak
-    When I query "/status.json" on peer "alpha-A"
+    When I query "/status.json" on federated peer "alpha-A"
     Then the surface response status is 200
     And each entry under "upstreams" has field "circuit"
     And each entry under "upstreams" has field "errorStreak"
@@ -66,8 +66,8 @@ Feature: Doorway catching-up page — staged, honest shed progress for people
   # we pin THAT invariant rather than force a flaky live degradation.
   @wip @regression
   Scenario: a cache-warm doorway renders the shell without a synchronous upstream fetch
-    Given the doorway hot cache on peer "alpha-A" is warm
-    When I request "/" on peer "alpha-A"
+    Given the doorway hot cache on federated peer "alpha-A" is warm
+    When I request "/" on federated peer "alpha-A"
     Then the surface response status is 200
     And the response header "x-ssr-rendered" is "1"
     And the response header "x-ssr-fetches" is "0"

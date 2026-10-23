@@ -84,6 +84,7 @@ export const DEFAULT_SUT_COMPONENTS: readonly SutComponent[] = [
   { name: 'appPackaging', path: 'elohim/sdk' },
   { name: 'appStaging', path: 'scripts/ci' },
   { name: 'appContracts', path: 'app/scripts' },
+  { name: 'appsWorker', path: 'app/elohim-app/src/apps-sw.ts' },
   { name: 'dependencies', path: 'pnpm-lock.yaml' },
   { name: 'workspace', path: 'pnpm-workspace.yaml' },
   { name: 'meshLauncher', path: 'app/elohim-app/scripts/hc-mesh.sh' },

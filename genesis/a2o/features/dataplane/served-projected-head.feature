@@ -23,16 +23,16 @@ Feature: Served-vs-declared projected head propagation
   carries the attestation without turning green builds red.
 
   Background:
-    Given peer "alpha-A" at "alpha-A"
-    And peer "elohim.host" at "elohim.host"
+    Given federated peer "alpha-A" at "alpha-A"
+    And federated peer "elohim.host" at "elohim.host"
 
   Scenario: Every doorway serves the declared landing head
     # elohim-host-landing is the root landing EPR (browser + server bundles). Its
     # content row carries a serverBlobHash once a head has been authored for it:
     # on alpha once per deploy by the pipeline, on the household lane by the
     # test-environment staging (the Act I Prologue), which stamps it on every peer.
-    Then the served head for EPR "elohim-host-landing" matches the declared head on peer "alpha-A"
-    And the served head for EPR "elohim-host-landing" matches the declared head on peer "elohim.host"
+    Then the served head for EPR "elohim-host-landing" matches the declared head on federated peer "alpha-A"
+    And the served head for EPR "elohim-host-landing" matches the declared head on federated peer "elohim.host"
 
   # lamad-spa is the lamad pillar EPR. On alpha the pipeline authors BOTH its
   # browser and server bundles, so its row carries a serverBlobHash there and
@@ -43,5 +43,5 @@ Feature: Served-vs-declared projected head propagation
   # pending is the honest reading of a precondition the lane has not staged —
   # lift it by staging the server bundle, never by weakening the comparison.
   Scenario: Every doorway serves the declared lamad-spa head
-    Then the served head for EPR "lamad-spa" matches the declared head on peer "alpha-A"
-    And the served head for EPR "lamad-spa" matches the declared head on peer "elohim.host"
+    Then the served head for EPR "lamad-spa" matches the declared head on federated peer "alpha-A"
+    And the served head for EPR "lamad-spa" matches the declared head on federated peer "elohim.host"

@@ -51,17 +51,17 @@ Feature: Reach is enforced at the HTTP egress, not inferred from a header
     # "alpha-A" is the A-side doorway of the alpha fleet's A/B pair, resolved to
     # a URL by the shared dataplane peer resolver (E2E_DOORWAY_ALPHA). Every
     # scenario probes it as an ordinary web client would.
-    Given peer "alpha-A" is reachable for reach probes
+    Given federated peer "alpha-A" is reachable for reach probes
     # Control: without this, "returned no more than anonymous" is trivially true
     # on a corpus holding nothing restricted, and all three scenarios would go
     # green while proving nothing. "bdd-smoke-tests" is a private-reach fixture.
-    And peer "alpha-A" holds a restricted-reach fixture an anonymous caller is refused, named "bdd-smoke-tests"
+    And federated peer "alpha-A" holds a restricted-reach fixture an anonymous caller is refused, named "bdd-smoke-tests"
 
   # The measured defect, stated as its own regression test. Before the
   # 2026-08-20 cure this scenario fails with ~910 leaked rows.
   Scenario: An unverifiable bearer token grants nothing beyond anonymous
-    When I list content on peer "alpha-A" anonymously
-    And I list content on peer "alpha-A" presenting header "Authorization: Bearer not-a-real-token"
+    When I list content on federated peer "alpha-A" anonymously
+    And I list content on federated peer "alpha-A" presenting header "Authorization: Bearer not-a-real-token"
     Then both listings answered 200
     # The ABSOLUTE, and it must come first: the two assertions below are
     # relative, so a defect that elevates BOTH postures equally passes them
@@ -78,8 +78,8 @@ Feature: Reach is enforced at the HTTP egress, not inferred from a header
   # the strip: a doorway change that stopped stripping would otherwise be silent
   # until someone probed for it, which is how the bearer bypass survived.
   Scenario: A self-asserted identity header is stripped and grants nothing beyond anonymous
-    When I list content on peer "alpha-A" anonymously
-    And I list content on peer "alpha-A" presenting header "X-Agent-Cid: matthew"
+    When I list content on federated peer "alpha-A" anonymously
+    And I list content on federated peer "alpha-A" presenting header "X-Agent-Cid: matthew"
     Then both listings answered 200
     And the anonymous listing contains only rows at or above "public" reach
     And the presented credential returned no rows beyond the anonymous listing
@@ -89,8 +89,8 @@ Feature: Reach is enforced at the HTTP egress, not inferred from a header
   # invariant, separate wire name — a strip that covered only the current name
   # would leave this one open.
   Scenario: A self-asserted legacy agent header is stripped and grants nothing beyond anonymous
-    When I list content on peer "alpha-A" anonymously
-    And I list content on peer "alpha-A" presenting header "X-Agent-Id: matthew"
+    When I list content on federated peer "alpha-A" anonymously
+    And I list content on federated peer "alpha-A" presenting header "X-Agent-Id: matthew"
     Then both listings answered 200
     And the anonymous listing contains only rows at or above "public" reach
     And the presented credential returned no rows beyond the anonymous listing
@@ -126,8 +126,8 @@ Feature: Reach is enforced at the HTTP egress, not inferred from a header
   # rather than passing emptily.
   @wip @regression
   Scenario: A restricted row's bytes are refused on the blob route, not only its listing row
-    Given peer "alpha-A" holds a restricted-reach fixture an anonymous caller is refused, named "community-garden-club"
-    When I fetch the blob of "community-garden-club" on peer "alpha-A" anonymously
+    Given federated peer "alpha-A" holds a restricted-reach fixture an anonymous caller is refused, named "community-garden-club"
+    When I fetch the blob of "community-garden-club" on federated peer "alpha-A" anonymously
     Then the blob fetch of "community-garden-club" was refused with a non-success status
 
   # The write side of the same door. `PUT /epr-head/{id}` took a JSON head from
@@ -148,7 +148,7 @@ Feature: Reach is enforced at the HTTP egress, not inferred from a header
   # the edge validation from reddening on the known defect.
   @wip @regression
   Scenario: An anonymous PUT of a declared head is refused
-    When I PUT a well-formed head for "reach-probe-remote-head-put" on peer "alpha-A" anonymously
+    When I PUT a well-formed head for "reach-probe-remote-head-put" on federated peer "alpha-A" anonymously
     Then the head PUT for "reach-probe-remote-head-put" was refused with a non-success status
 
   # The third way out. An app bundle — a web application the peer serves at
@@ -169,6 +169,6 @@ Feature: Reach is enforced at the HTTP egress, not inferred from a header
   # fails loudly until it does.
   @wip @regression
   Scenario: A restricted app bundle is refused by slug and by content address alike
-    Given peer "alpha-A" holds a restricted-reach fixture an anonymous caller is refused, named "reach-probe-restricted-app"
-    When I fetch the app "reach-probe-restricted-app" on peer "alpha-A" by its slug and by its content address anonymously
+    Given federated peer "alpha-A" holds a restricted-reach fixture an anonymous caller is refused, named "reach-probe-restricted-app"
+    When I fetch the app "reach-probe-restricted-app" on federated peer "alpha-A" by its slug and by its content address anonymously
     Then both app fetches of "reach-probe-restricted-app" were refused with a non-success status

@@ -104,6 +104,15 @@ To add a new distributed file, add it to `INTERFACE_FILES` in `codegen-ts.mjs`.
 2. Run `pnpm run schema:codegen:ts`
 3. Import: `import { MyEnum, ALL_MY_ENUMS, CORE_MY_ENUMS } from './generated/schema-enums.js'`
 
+### Vocabulary enums with per-value annotations (`_table`, no `_dna`)
+
+A presentation-edge vocabulary that is NOT DNA-notarized (e.g. `frame-capability`, `page-info-section`) carries a `_table` marker instead of `_dna`, plus a `oneOf` of `{ "const": <value>, "x-label": ..., "x-<annotation>": ... }` beside its plain `enum` (the generators fail loud if the two disagree). `_table.annotations` maps each `x-` key to its TS field and Rust method name. One schema then projects to:
+
+- `schema-enums.ts`: `ALL_<CONSTANT>`, the bare alias, the type alias, `<Title>Entry`, and `<CONSTANT>_TABLE` (one row per value);
+- `elohim/sdk/domains/lamad/types/src/generated_vocab.rs` (`schema:codegen:rs`): a serde enum with `ALL`, `as_str`, `parse`, one `const fn` per annotation, and `<CONSTANT>_TABLE_JSON` for scripts that cannot import TS.
+
+Never add `_dna` to such an enum: that writes it into the integrity zome's `generated_enums.rs` and moves the DNA hash. The shared row reader is `scripts/lib/table-enum.mjs`.
+
 ## Adding a New Input/View Schema
 
 1. Create `v1/inputs/create-thing-input.schema.json` or `v1/views/thing-view.schema.json`

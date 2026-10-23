@@ -34,8 +34,8 @@ Feature: TURN relay capacity bounds doorway-operator serviceable scale
   # (less relay demand), or any router swap at either premises.
 
   Background:
-    Given peer "alpha-A" at "alpha-A"
-    And peer "elohim.host" at "elohim.host"
+    Given federated peer "alpha-A" at "alpha-A"
+    And federated peer "elohim.host" at "elohim.host"
 
   @wip
   Scenario: Relay pool absorbs the fleet's concurrent allocation demand on both legs

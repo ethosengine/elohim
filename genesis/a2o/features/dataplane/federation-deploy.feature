@@ -87,23 +87,23 @@ Feature: Federation deploy uniformity — landing EPR resolves on all federation
     pointer. Both doorways' `/health` report `p2p.caughtUp: false`, `p2p.converged: false`, with `divergentAnchor` counts
     of 2131 (alpha-A) and 1011 (elohim.host) — the reconcile sweep has not settled the fleet.
 
-  # `peer "<name>" at "<alias>"` registers a peer under a local name, resolving the second
+  # `federated peer "<name>" at "<alias>"` registers a peer under a local name, resolving the second
   # parameter (an environment-alias key, not a duplicate label) to that peer's live base URL —
   # "alpha-A" resolves to the doorway-alpha environment, "elohim.host" to the public elohim.host
   # endpoint. Every step below addresses peers by the name registered here.
   Background:
-    Given peer "alpha-A" at "alpha-A"
-    And peer "elohim.host" at "elohim.host"
+    Given federated peer "alpha-A" at "alpha-A"
+    And federated peer "elohim.host" at "elohim.host"
 
   Scenario: alpha-A fully resolves the landing EPR on both conditions (baseline — green)
     # Green baseline. alpha-A is the deploy-time author peer. The Jenkinsfile stageSpaBlob
     # stage wrote the non-null blobHash into the EPR content record and the SPA blob was
     # uploaded locally, so the EprRouter resolves the landing app correctly. Both assertions
     # pass today and confirm the author-peer surface is healthy.
-    Given EPR "elohim-host-landing" was uploaded to peer "alpha-A" at deploy time
-    When I query "/" on peer "alpha-A"
-    Then resolving "/" on peer "alpha-A" does NOT return App-not-found
-    And EPR "elohim-host-landing" blobHash is non-null on peer "alpha-A"
+    Given EPR "elohim-host-landing" was uploaded to federated peer "alpha-A" at deploy time
+    When I query "/" on federated peer "alpha-A"
+    Then resolving "/" on federated peer "alpha-A" does NOT return App-not-found
+    And EPR "elohim-host-landing" blobHash is non-null on federated peer "alpha-A"
 
   Scenario: elohim.host fully resolves the landing EPR on both conditions (uniform deploy — federation peer)
     # Authored RED-FIRST 2026-06-29. elohim.host is the alpha-b federation peer. At that time the
@@ -129,9 +129,9 @@ Feature: Federation deploy uniformity — landing EPR resolves on all federation
     # scenario proves elohim.host resolves the page WITHOUT ever having received a direct
     # deploy-time upload of its own. Whatever made blobHash non-null here arrived by propagation
     # from alpha-A, not by a second per-host stageSpaBlob run.
-    When I query "/" on peer "elohim.host"
-    Then resolving "/" on peer "elohim.host" does NOT return App-not-found
-    And EPR "elohim-host-landing" blobHash is non-null on peer "elohim.host"
+    When I query "/" on federated peer "elohim.host"
+    Then resolving "/" on federated peer "elohim.host" does NOT return App-not-found
+    And EPR "elohim-host-landing" blobHash is non-null on federated peer "elohim.host"
 
   @wip
   Scenario: the deploy authority can stage bytes on a NON-author doorway (precondition for uniform resolution)
@@ -160,9 +160,9 @@ Feature: Federation deploy uniformity — landing EPR resolves on all federation
     # an operator identity. @wip until a deployed build carries the gate — the same way the blob
     # byte-route gate scenario landed ahead of its own deploy.
     Given the fleet deploy authority is the CI pipeline's shared seed credential, distinct from any single doorway's own admin identity
-    When the fleet deploy authority stages a blob on peer "elohim.host"
-    Then staging the blob on peer "elohim.host" is accepted
+    When the fleet deploy authority stages a blob on federated peer "elohim.host"
+    Then staging the blob on federated peer "elohim.host" is accepted
     # ANTI-REGRESSION: this must NOT be satisfiable by reopening the hole the gate closed.
     # A credential-free remote caller stays refused; a green here with this line failing means
     # the fix was a bypass, not an authority.
-    And staging a blob on peer "elohim.host" with NO credential is refused
+    And staging a blob on federated peer "elohim.host" with NO credential is refused

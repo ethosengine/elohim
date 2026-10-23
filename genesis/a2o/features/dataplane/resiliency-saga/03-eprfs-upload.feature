@@ -37,9 +37,9 @@ Feature: Chapter 3 — matthew's deploy-time upload of elohim-host-landing mater
   convergence chapters that follow build on this baseline.
 
   Background:
-    Given peer "alpha-A" at "alpha-A"
+    Given federated peer "alpha-A" at "alpha-A"
 
   Scenario: elohim-host-landing resolves with a matching served head and an attached blob
-    Given EPR "elohim-host-landing" was uploaded to peer "alpha-A" at deploy time
-    Then the served head for EPR "elohim-host-landing" matches the declared head on peer "alpha-A"
-    And EPR "elohim-host-landing" blobHash is non-null on peer "alpha-A"
+    Given EPR "elohim-host-landing" was uploaded to federated peer "alpha-A" at deploy time
+    Then the served head for EPR "elohim-host-landing" matches the declared head on federated peer "alpha-A"
+    And EPR "elohim-host-landing" blobHash is non-null on federated peer "alpha-A"

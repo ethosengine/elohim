@@ -9,8 +9,6 @@
 //! SSR shell, `/deliver` CSR, the Tauri static SPA).
 //!
 //! - [`theme`] — the theme inputs (the `--omni-*` token shape + base palette).
-//! - [`omnibar`] — the Rust markup/style renderer (the design source-of-truth
-//!   the element JS faithfully ports).
 //! - [`element`] — re-export shim over the light `elohim-chrome-asset` crate
 //!   (the content-addressed served element bytes/hash/path + the `inject_element`
 //!   SSR-HTML helper). Lives in a separate crate so serving the static element
@@ -24,13 +22,14 @@
 
 pub mod element;
 pub mod enhance;
-pub mod omnibar;
 pub mod theme;
 
 pub use element::{
     element_js_bytes, element_js_hash, element_script_path, escape_json_for_script, inject_element,
-    ChromeContext, NavLink, ReceiptLink, CONTEXT_SCRIPT_ID, ELEMENT_JS, STABLE_ELEMENT_PATH,
+    render_content_shell, CheckedBy, ChromeContext, ChromeMedium, ContentDelivery, ContentFrame,
+    ContentIsland, DeliveryCheck, DeliveryHop, DeliveryTransport, HolderReading, HopReporter,
+    Isolation, IsolationBoundary, NavLink, ReceiptLink, TrustMode, Viewer, ViewerKind,
+    WitnessState, CHROME_CONTEXT_VERSION, CONTEXT_SCRIPT_ID, ELEMENT_JS, STABLE_ELEMENT_PATH,
 };
 pub use enhance::{enhance_js_bytes, enhance_js_hash, enhance_script_path, ENHANCE_JS};
-pub use omnibar::{html_escape, render_omnibar_markup, render_omnibar_style, ChromeInput};
 pub use theme::{base_palette, BasePalette, ColorScheme, Theme, ThemeTokens};

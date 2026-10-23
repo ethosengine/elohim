@@ -130,7 +130,7 @@ Feature: Chapter 11 — the pull queue can finish
   re-admission is still @wip (see its station comment).
 
   Background:
-    Given peer "alpha-A" at "alpha-A"
+    Given federated peer "alpha-A" at "alpha-A"
 
   # Stage split (2026-08-16, operator directive): this scenario previously
   # asserted alpha-A's WHOLE-NODE `/p2p/status pull.caughtUp` — every pin on
@@ -146,11 +146,11 @@ Feature: Chapter 11 — the pull queue can finish
   # per-item polling step chapter 5 already uses for the same content id.
   Scenario: the household's pin for elohim-host-landing reaches caught-up within a bounded window
     Then within 60 seconds doorway "alpha-A" reports the pull for "elohim-host-landing" is caught up
-    And metric "elohim_acquisition_pins_retired" on peer "alpha-A" >= 0
+    And metric "elohim_acquisition_pins_retired" on federated peer "alpha-A" >= 0
 
   Scenario: both retirement reasons are published as distinct series
-    Then labeled metric "elohim_acquisition_pin_retirements_total" with label "reason" "exhausted" on peer "alpha-A" >= 0
-    And labeled metric "elohim_acquisition_pin_retirements_total" with label "reason" "readmitted" on peer "alpha-A" >= 0
+    Then labeled metric "elohim_acquisition_pin_retirements_total" with label "reason" "exhausted" on federated peer "alpha-A" >= 0
+    And labeled metric "elohim_acquisition_pin_retirements_total" with label "reason" "readmitted" on federated peer "alpha-A" >= 0
 
   # Station (minted 2026-07-31, blind-reader revision): the missing node this
   # live lane cannot supply — the full cause-and-effect chain from an

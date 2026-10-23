@@ -1281,6 +1281,11 @@
   color: white;
 }
 
+/* Beside "Open in {pillar}", the EPR page link sits next to it rather than splitting the row. */
+.open-in-pillar-link + .epr-page-link {
+  margin-left: 0.5rem;
+}
+
 /* Network Tab */
 .network-tab {
   display: flex;

@@ -348,6 +348,17 @@ MESH_MEMBERSHIP_NAME="${MESH_MEMBERSHIP_NAME:-elohim.local}"
 # whose channel is `candidate`. Both names live on both doorways — a doorway's
 # identity is not a hostname. Empty = the single-lane household.
 MESH_MEMBERSHIP_CANDIDATE_NAME="${MESH_MEMBERSHIP_CANDIDATE_NAME:-alpha.elohim.local}"
+# Content-chrome trust edge: a public name that DECLARES it pairs with a
+# separate content origin, apps.<name> — the `apps` flag on its membership
+# document, or, for a name with no document, DOORWAY_APPS_NAMES. In the
+# household only `elohim.localhost` declares it: browsers resolve *.localhost to
+# loopback with no resolver rule, and elohim.localhost / apps.elohim.localhost
+# are same-site (plain localhost / apps.localhost are not). It has no membership
+# document, so no standing rule applies to it. The lane names (elohim.local,
+# alpha.elohim.local) do not pair, so their lanes keep today's behaviour.
+# MESH_APPS_ORIGINS=0 keeps content same-origin everywhere.
+MESH_APPS_ORIGINS="${MESH_APPS_ORIGINS:-1}"
+MESH_APPS_PUBLIC_NAME="${MESH_APPS_PUBLIC_NAME:-elohim.localhost}"
 MESH_MEMBERSHIP_PROBE_SECS="${MESH_MEMBERSHIP_PROBE_SECS:-3}"
 
 LEGACY_CONDUCTOR_DIR="$REPO_ROOT/elohim/holochain/local-dev"
@@ -2475,6 +2486,13 @@ EOF
 membership_names() {
   echo "$MESH_MEMBERSHIP_NAME"
   [ -n "$MESH_MEMBERSHIP_CANDIDATE_NAME" ] && echo "$MESH_MEMBERSHIP_CANDIDATE_NAME"
+  return 0
+}
+
+# The household's names that declare a content origin (DOORWAY_APPS_NAMES — the
+# fallback for names with no membership document), when on.
+apps_public_names() {
+  [ "$MESH_APPS_ORIGINS" = "1" ] && [ -n "$MESH_APPS_PUBLIC_NAME" ] && echo "$MESH_APPS_PUBLIC_NAME"
   return 0
 }
 
@@ -4828,6 +4846,7 @@ EOF
     DOORWAY_HEALTH_PORT="$DOORWAY_A_HEALTH_PORT" \
     DOORWAY_MEMBERSHIP_DIR="$([ "$MESH_MEMBERSHIP" = "1" ] && echo "$MESH_DIR/membership")" \
     DOORWAY_PUBLIC_NAMES="$([ "$MESH_MEMBERSHIP" = "1" ] && membership_names | paste -sd, -)" \
+    DOORWAY_APPS_NAMES="$(apps_public_names | paste -sd, -)" \
     DOORWAY_NODE_KEY_FILE="$MESH_DIR/doorway-a-node.key" \
     MONGODB_URI="mongodb://127.0.0.1:$MONGO_PORT" MONGODB_DB="doorway-a" \
     ELOHIM_NETWORK_STAKES="$ELOHIM_NETWORK_STAKES" \
@@ -4886,6 +4905,7 @@ EOF
     DOORWAY_HEALTH_PORT="$DOORWAY_B_HEALTH_PORT" \
     DOORWAY_MEMBERSHIP_DIR="$([ "$MESH_MEMBERSHIP" = "1" ] && echo "$MESH_DIR/membership")" \
     DOORWAY_PUBLIC_NAMES="$([ "$MESH_MEMBERSHIP" = "1" ] && membership_names | paste -sd, -)" \
+    DOORWAY_APPS_NAMES="$(apps_public_names | paste -sd, -)" \
     DOORWAY_NODE_KEY_FILE="$MESH_DIR/doorway-b-node.key" \
     MONGODB_URI="mongodb://127.0.0.1:$MONGO_PORT" MONGODB_DB="doorway-b" \
     ELOHIM_NETWORK_STAKES="$ELOHIM_NETWORK_STAKES" \
@@ -4957,6 +4977,7 @@ EOF
     DOORWAY_ID="${DOORWAY_C_ID:-gamma-elohim-host}" \
     DOORWAY_HEALTH_PORT="$DOORWAY_C_HEALTH_PORT" \
     DOORWAY_MEMBERSHIP_DIR="$([ "$MESH_MEMBERSHIP" = "1" ] && echo "$MESH_DIR/membership")" \
+    DOORWAY_APPS_NAMES="$(apps_public_names | paste -sd, -)" \
     DOORWAY_NODE_KEY_FILE="$MESH_DIR/doorway-c-node.key" \
     MONGODB_URI="mongodb://127.0.0.1:$MONGO_PORT" MONGODB_DB="doorway-c" \
     ELOHIM_NETWORK_STAKES="$ELOHIM_NETWORK_STAKES" \

@@ -82,8 +82,8 @@ Feature: Operator verbs are commitment-gated protocol acts, not cluster surgery
     # the sibling dataplane suites (one doorway pair, byte-identical Background);
     # the scenarios below address alpha-A only (the seeded identity realm — see
     # the realm note in the preamble).
-    Given peer "alpha-A" at "alpha-A"
-    And peer "elohim.host" at "elohim.host"
+    Given federated peer "alpha-A" at "alpha-A"
+    And federated peer "elohim.host" at "elohim.host"
 
   Scenario: a commitment holder can drive a reconcile and the peer attests to it
     # The positive half — a cure may not simply refuse everything. The holder's authority
@@ -92,19 +92,19 @@ Feature: Operator verbs are commitment-gated protocol acts, not cluster surgery
     # external callers reach a peer). The attestation is OBSERVABLE: the 200 response
     # body names the commitment cid the peer acted under plus the id of the recorded
     # economic event (the durable audit row the grant's rate ceiling counts).
-    Given "matthew" holds an active "delegates-compute" commitment over peer "alpha-A"
-    When "matthew" requests a reconcile on peer "alpha-A" through the doorway
+    Given "matthew" holds an active "delegates-compute" commitment over federated peer "alpha-A"
+    When "matthew" requests a reconcile on federated peer "alpha-A" through the doorway
     Then the request is accepted
-    And peer "alpha-A" performs the reconcile
-    And peer "alpha-A" attests the commitment cid it acted under
+    And federated peer "alpha-A" performs the reconcile
+    And federated peer "alpha-A" attests the commitment cid it acted under
 
   Scenario: a caller without a commitment is refused
     # Fail-closed. Today both admin verbs answer on the operator-seat class without ever
     # consulting authorize_operation, so this is the scenario that is honestly red.
-    Given "james" holds no "delegates-compute" commitment over peer "alpha-A"
-    When "james" requests a reconcile on peer "alpha-A" through the doorway
+    Given "james" holds no "delegates-compute" commitment over federated peer "alpha-A"
+    When "james" requests a reconcile on federated peer "alpha-A" through the doorway
     Then the request is refused
-    And peer "alpha-A" performs no reconcile
+    And federated peer "alpha-A" performs no reconcile
 
   Scenario: a revoked commitment stops working immediately
     # Revocability is the whole point of preferring a commitment over a key: a key must be
@@ -112,9 +112,9 @@ Feature: Operator verbs are commitment-gated protocol acts, not cluster surgery
     # gone. This scenario deliberately starts from the post-revocation state — the
     # grant-then-revoke transition is the fixture; the assertion is that the SAME holder
     # who succeeded in the first scenario is refused the moment the grant is revoked.
-    Given "matthew" held a "delegates-compute" commitment over peer "alpha-A"
+    Given "matthew" held a "delegates-compute" commitment over federated peer "alpha-A"
     And that commitment has been revoked
-    When "matthew" requests a reconcile on peer "alpha-A" through the doorway
+    When "matthew" requests a reconcile on federated peer "alpha-A" through the doorway
     Then the request is refused
 
   # HELD (2026-08-21): the negative leg is a regex over the storage base URL string — it can
@@ -127,8 +127,8 @@ Feature: Operator verbs are commitment-gated protocol acts, not cluster surgery
     # the probe hits the peer's OWN public hostname and the peer's own HTTP surface
     # answers with its sync/reconcile/peer state; the negative step pins that no
     # Grafana/Loki/Prometheus hop is part of that answer path.
-    When peer "alpha-A" is asked for its runtime status directly
-    Then peer "alpha-A" reports its own sync, reconcile and peer counts
+    When federated peer "alpha-A" is asked for its runtime status directly
+    Then federated peer "alpha-A" reports its own sync, reconcile and peer counts
     And the answer does not traverse the operator's observability cluster
 
   @wip

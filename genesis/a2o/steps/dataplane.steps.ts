@@ -329,15 +329,14 @@ function getPeerUrl(world: E2EWorld, peerName: string): string {
  *   Given peer "node-A" at "alpha-A"
  *   Given peer "node-B" at "E2E_DOORWAY_ALPHA"
  */
-Given(
-  'peer {string} at {string}',
-  function (this: E2EWorld, peerName: string, hostEnvOrAlias: string) {
+for (const expression of ['peer {string} at {string}', 'federated peer {string} at {string}']) {
+  Given(expression, function (this: E2EWorld, peerName: string, hostEnvOrAlias: string) {
     const url = resolvePeerUrl(hostEnvOrAlias);
     getPeerMap(this).set(peerName, url);
     // Also register as a doorway so shared doorway-based steps work on the same peer
     this.addDoorway(peerName, url);
-  }
-);
+  });
+}
 
 /**
  * Opt-in variant of the step above (story 5.2 — the doorway's rustls
@@ -354,7 +353,7 @@ Given(
  *   Given peer "doorway-a-tls" at "E2E_DOORWAY_A_TLS", or this scenario is pending
  */
 Given(
-  'peer {string} at {string}, or this scenario is pending',
+  'federated peer {string} at {string}, or this scenario is pending',
   function (this: E2EWorld, peerName: string, envVar: string) {
     const url = process.env[envVar];
     if (!url) {
@@ -433,7 +432,7 @@ Then(
  * assertion with an invisible trigger).
  */
 Given(
-  'EPR {string} was uploaded to peer {string} at deploy time',
+  'EPR {string} was uploaded to federated peer {string} at deploy time',
   function (this: E2EWorld, _eprId: string, _peerName: string) {
     // Documentary only — the upload happened in the deploy pipeline.
   }
@@ -453,7 +452,7 @@ Given(
  *   When I query "/sync/v1/elohim/docs" on peer "alpha-A"
  */
 When(
-  'I query {string} on peer {string}',
+  'I query {string} on federated peer {string}',
   async function (this: E2EWorld, path: string, peerName: string) {
     const baseUrl = getPeerUrl(this, peerName);
     // Delegate to the single shared HTTP path in surfaces.ts (no inline undici import).
@@ -481,7 +480,7 @@ When(
  * parsed as an alternation separator in a Cucumber expression string.
  */
 Then(
-  /^peer "([^"]+)" \/health p2p\.caughtUp is true$/,
+  /^federated peer "([^"]+)" \/health p2p\.caughtUp is true$/,
   async function (this: E2EWorld, peerName: string) {
     const url = getPeerUrl(this, peerName);
     const { body } = await probeHealth(url);
@@ -517,7 +516,7 @@ const CAUGHTUP_WAIT_POLL_INTERVAL_MS = 15_000;
 const CAUGHTUP_WAIT_MAX_SECONDS = 600;
 
 Then(
-  /^peer "([^"]+)" \/health p2p\.caughtUp becomes true within (\d+) seconds$/,
+  /^federated peer "([^"]+)" \/health p2p\.caughtUp becomes true within (\d+) seconds$/,
   // Default cucumber step timeout (30s) is far shorter than the wait; +30s
   // margin over the longest wait this step permits (one probe may be in flight
   // at the deadline).
@@ -575,7 +574,7 @@ Then(
  * Assert that the p2p.peerCount is at least the given number.
  */
 Then(
-  /^peer "([^"]+)" \/health peerCount >= (\d+)$/,
+  /^federated peer "([^"]+)" \/health peerCount >= (\d+)$/,
   async function (this: E2EWorld, peerName: string, minCountStr: string) {
     const minCount = Number.parseInt(minCountStr, 10);
     const url = getPeerUrl(this, peerName);
@@ -596,7 +595,7 @@ Then(
  * Assert that the conductor.connected flag is true on /health.
  */
 Then(
-  /^peer "([^"]+)" \/health conductor\.connected is true$/,
+  /^federated peer "([^"]+)" \/health conductor\.connected is true$/,
   async function (this: E2EWorld, peerName: string) {
     const url = getPeerUrl(this, peerName);
     const { body } = await probeHealth(url);
@@ -628,7 +627,7 @@ Then(
 /**
  * Assert /health returns a healthy status (healthy: true, status: 'online').
  */
-Then('peer {string} is healthy', async function (this: E2EWorld, peerName: string) {
+Then('federated peer {string} is healthy', async function (this: E2EWorld, peerName: string) {
   const url = getPeerUrl(this, peerName);
   const { body } = await probeHealth(url);
   assert.ok(
@@ -645,7 +644,7 @@ Then('peer {string} is healthy', async function (this: E2EWorld, peerName: strin
  * NOTE: Uses regex because '/' in Cucumber expressions is parsed as alternation.
  */
 Then(
-  /^peer "([^"]+)" \/health divergentAnchor <= (\d+)$/,
+  /^federated peer "([^"]+)" \/health divergentAnchor <= (\d+)$/,
   async function (this: E2EWorld, peerName: string, maxAnchorStr: string) {
     const maxAnchor = Number.parseInt(maxAnchorStr, 10);
     const url = getPeerUrl(this, peerName);
@@ -709,9 +708,11 @@ Then(
  * CONVERGENCE rather than about the producer racing us on a doc it has not
  * finished writing.
  */
-When(
+for (const expression of [
   /^a content sync doc is selected from peer "([^"]+)"$/,
-  async function (this: E2EWorld, peerName: string) {
+  /^a content sync doc is selected from federated peer "([^"]+)"$/,
+]) {
+  When(expression, async function (this: E2EWorld, peerName: string) {
     const url = getPeerUrl(this, peerName);
     const { body } = await probeSyncDocs(url, 'elohim');
     const documents = Array.isArray(body?.documents) ? body.documents : [];
@@ -727,8 +728,8 @@ When(
       docId: withHeads.docId,
       heads: [...withHeads.heads],
     });
-  }
-);
+  });
+}
 
 /** Read back the document chosen by "a content sync doc is selected from peer". */
 function requireSelectedSyncDoc(world: E2EWorld): SelectedSyncDoc {
@@ -765,7 +766,7 @@ function sameHeadSet(a: string[], b: string[]): boolean {
  * and this step cannot tell the difference.
  */
 Then(
-  /^the selected sync doc is present on peer "([^"]+)"$/,
+  /^the selected sync doc is present on federated peer "([^"]+)"$/,
   async function (this: E2EWorld, peerName: string) {
     const { docId } = requireSelectedSyncDoc(this);
     const url = getPeerUrl(this, peerName);
@@ -789,9 +790,11 @@ Then(
  * Convergence is eventual, so this polls: a document still in flight across
  * the libp2p gossip engine legitimately reads a stale head for a few seconds.
  */
-Then(
+for (const expression of [
   /^the selected sync doc has converged onto peer "([^"]+)"$/,
-  async function (this: E2EWorld, peerName: string) {
+  /^the selected sync doc has converged onto federated peer "([^"]+)"$/,
+]) {
+  Then(expression, async function (this: E2EWorld, peerName: string) {
     const selected = requireSelectedSyncDoc(this);
     const url = getPeerUrl(this, peerName);
 
@@ -812,8 +815,8 @@ Then(
         `[${selected.heads.join(', ')}] vs ${peerName} heads ` +
         `[${lastSeen.join(', ')}]${lastSeen.length === 0 ? ' (document absent here)' : ''}`
     );
-  }
-);
+  });
+}
 
 /**
  * Assert that a sync document has the given minimum number of heads.
@@ -838,7 +841,7 @@ Then(
  * NOTE: Uses regex because '/' in Cucumber expressions is parsed as alternation.
  */
 Then(
-  /^\/sync\/v1\/elohim\/docs list on peer "([^"]+)" has at least (\d+) documents?$/,
+  /^\/sync\/v1\/elohim\/docs list on federated peer "([^"]+)" has at least (\d+) documents?$/,
   async function (this: E2EWorld, peerName: string, minCountStr: string) {
     const minCount = Number.parseInt(minCountStr, 10);
     const url = getPeerUrl(this, peerName);
@@ -895,7 +898,7 @@ Then(
  * A non-null blobHash confirms that a blob has been attached to the EPR node.
  */
 Then(
-  'EPR {string} blobHash is non-null on peer {string}',
+  'EPR {string} blobHash is non-null on federated peer {string}',
   // probeContent rides the bounded catching-up shed; cucumber's 30s default
   // would kill the ride mid-flight, so the ceiling derives from the ride cap.
   { timeout: CATCHUP_RIDE_STEP_TIMEOUT_MS },
@@ -932,7 +935,7 @@ Then(
  * we cannot even ask the question.
  */
 Then(
-  'the served head for EPR {string} matches the declared head on peer {string}',
+  'the served head for EPR {string} matches the declared head on federated peer {string}',
   // One ridden probeContent + two bounded health fetches — ceiling derives
   // from the ride cap plus the extra fetches' own 15s timeouts.
   { timeout: CATCHUP_RIDE_STEP_TIMEOUT_MS + 30_000 },
@@ -1184,7 +1187,7 @@ export function recordServedPage(world: E2EWorld, peerName: string, page: Served
  * a documented body, and that is churn, not the stale-shell defect under test.
  */
 When(
-  'a visitor asks peer {string} for the page at {string}',
+  'a visitor asks federated peer {string} for the page at {string}',
   { timeout: CATCHUP_RIDE_STEP_TIMEOUT_MS },
   async function (this: E2EWorld, peerName: string, urlPath: string) {
     const peerUrl = getPeerUrl(this, peerName);
@@ -1228,7 +1231,7 @@ function requireServedPage(world: E2EWorld, peerName: string): ServedPage {
  * somebody else's contract, and this step holds a peer only to its own.
  */
 Then(
-  'every script and stylesheet the page from peer {string} names is one that peer serves',
+  'every script and stylesheet the page from federated peer {string} names is one that peer serves',
   // One bounded fetch per named asset (a page names a handful), all sharing
   // one catching-up ride budget.
   { timeout: CATCHUP_RIDE_STEP_TIMEOUT_MS + 60_000 },
@@ -1280,7 +1283,7 @@ Then(
  *     stands on its own either way.
  */
 Then(
-  'the page from peer {string} names the same browser entry point as the declared browser head of EPR {string}',
+  'the page from federated peer {string} names the same browser entry point as the declared browser head of EPR {string}',
   // One ridden read of the content row plus two bounded fetches.
   { timeout: CATCHUP_RIDE_STEP_TIMEOUT_MS + 30_000 },
   async function (this: E2EWorld, peerName: string, eprId: string) {
@@ -1345,7 +1348,7 @@ Then(
  * the notary-overlay propagation lands (Plan C1/C3/C4).
  */
 Then(
-  'EPR {string} trust is {string} on peer {string}',
+  'EPR {string} trust is {string} on federated peer {string}',
   async function (this: E2EWorld, eprId: string, expectedTrust: string, peerName: string) {
     const url = getPeerUrl(this, peerName);
     // Use getRaw (never throws) so a non-200 (e.g. 503 "catching-up" on a peer
@@ -1437,7 +1440,7 @@ Then(
  * non-author before any mutation. So no write is ever attempted while the surface is a 404.
  */
 Then(
-  'the HEAD authority surface refuses a non-author move of {string} on peer {string}',
+  'the HEAD authority surface refuses a non-author move of {string} on federated peer {string}',
   async function (this: E2EWorld, contentId: string, peerName: string) {
     const url = getPeerUrl(this, peerName);
     // (1) Read-only existence check against a real, notarized EPR.
@@ -1497,7 +1500,7 @@ Then(
  * same household must resolve too — that's the actual bug this scenario guards.
  */
 Then(
-  'no HOUSEHOLD-member human on peer {string} is missing its agentPubKey',
+  'no HOUSEHOLD-member human on federated peer {string} is missing its agentPubKey',
   // STATE assertion over durable rows — rides the bounded catching-up shed
   // (the edge #1360 class: breaker-open shed while the rows were correct).
   { timeout: CATCHUP_RIDE_STEP_TIMEOUT_MS },
@@ -1571,7 +1574,7 @@ Then(
  * failure to probe.
  */
 Then(
-  'every observable HOUSEHOLD-member human on peer {string} has a non-fossil agentPubKey',
+  'every observable HOUSEHOLD-member human on federated peer {string} has a non-fossil agentPubKey',
   // The humans read is a STATE assertion and rides the shed; the follow-up
   // conductor-diagnostics probe keeps its honest-pass-on-non-200 semantics.
   { timeout: CATCHUP_RIDE_STEP_TIMEOUT_MS + 30_000 },
@@ -1672,7 +1675,7 @@ Then(
  * "App not found" at the root projection).
  */
 Then(
-  'resolving {string} on peer {string} does NOT return App-not-found',
+  'resolving {string} on federated peer {string} does NOT return App-not-found',
   async function (this: E2EWorld, path: string, peerName: string) {
     const url = getPeerUrl(this, peerName);
     // Delegate to the single shared HTTP path in surfaces.ts (no inline undici import).
@@ -1768,111 +1771,116 @@ Then(
  *   Then metric "doorway_watchdog_reconnects_total" on peer "alpha-A" >= 0
  *   Then metric "p2p_connected_peers" on peer "alpha-A" >= 1
  */
-Then(
+for (const expression of [
   'metric {string} on peer {string} {word} {float}',
-  // Default cucumber step timeout (30s) is shorter than the storage-owned
-  // branch's own bounded gauge poll (up to GAUGE_SWEEP_POLL_TIMEOUT_MS =
-  // 6 minutes) — without an explicit override cucumber would kill the step
-  // long before the poll's own deadline governor fires (same 30s-vs-longer-
-  // poll trap as the commitment/pull polling steps in
-  // steps/dataplane/resiliency-saga.steps.ts). +15s margin over the poll's
-  // own timeout, matching that file's convention.
-  { timeout: GAUGE_SWEEP_POLL_TIMEOUT_MS + 15_000 },
-  async function (
-    this: E2EWorld,
-    metricName: string,
-    peerName: string,
-    cmp: string,
-    expected: number
-  ) {
-    const doorwayUrl = getPeerUrl(this, peerName);
+  'metric {string} on federated peer {string} {word} {float}',
+]) {
+  Then(
+    expression,
+    // Default cucumber step timeout (30s) is shorter than the storage-owned
+    // branch's own bounded gauge poll (up to GAUGE_SWEEP_POLL_TIMEOUT_MS =
+    // 6 minutes) — without an explicit override cucumber would kill the step
+    // long before the poll's own deadline governor fires (same 30s-vs-longer-
+    // poll trap as the commitment/pull polling steps in
+    // steps/dataplane/resiliency-saga.steps.ts). +15s margin over the poll's
+    // own timeout, matching that file's convention.
+    { timeout: GAUGE_SWEEP_POLL_TIMEOUT_MS + 15_000 },
+    async function (
+      this: E2EWorld,
+      metricName: string,
+      peerName: string,
+      cmp: string,
+      expected: number
+    ) {
+      const doorwayUrl = getPeerUrl(this, peerName);
 
-    // Determine which metrics endpoint to probe:
-    // - doorway metrics: same host, port 8080 (if E2E_DOORWAY_METRICS_ALPHA is set,
-    //   use that; otherwise derive from the doorway URL)
-    // - storage metrics: E2E_STORAGE_ALPHA direct URL
-    const metricsEnvKey = `E2E_METRICS_${peerName.toUpperCase().replace(/[^A-Z0-9]/g, '_')}`;
-    const storageUrl = resolveStorageUrl(peerName);
+      // Determine which metrics endpoint to probe:
+      // - doorway metrics: same host, port 8080 (if E2E_DOORWAY_METRICS_ALPHA is set,
+      //   use that; otherwise derive from the doorway URL)
+      // - storage metrics: E2E_STORAGE_ALPHA direct URL
+      const metricsEnvKey = `E2E_METRICS_${peerName.toUpperCase().replace(/[^A-Z0-9]/g, '_')}`;
+      const storageUrl = resolveStorageUrl(peerName);
 
-    let metricsBaseUrl: string;
-    // elohim_-prefixed metrics (identity-fill, custody-class, custodian
-    // capacity — resiliency-saga chapters 2/8) are registered in
-    // elohim-storage's own metrics.rs and NEVER proxied by doorway's
-    // port-8080 /metrics; they were missing from this list (only
-    // p2p_/reconcile_/dedup_ were routed to storage), so a chapter-2/8
-    // assertion silently probed the WRONG endpoint (doorway:8080) and read
-    // "metric not present in scrape" — a routing bug, not the sweep-timing
-    // race the pending message implied.
-    const isStorageOwned =
-      metricName.startsWith('p2p_') ||
-      metricName.startsWith('reconcile_') ||
-      metricName.startsWith('dedup_') ||
-      metricName.startsWith('elohim_');
-    if (process.env[metricsEnvKey]) {
-      metricsBaseUrl = process.env[metricsEnvKey]!;
-    } else if (isStorageOwned) {
-      // Storage metric — needs direct storage URL
-      if (!storageUrl) {
+      let metricsBaseUrl: string;
+      // elohim_-prefixed metrics (identity-fill, custody-class, custodian
+      // capacity — resiliency-saga chapters 2/8) are registered in
+      // elohim-storage's own metrics.rs and NEVER proxied by doorway's
+      // port-8080 /metrics; they were missing from this list (only
+      // p2p_/reconcile_/dedup_ were routed to storage), so a chapter-2/8
+      // assertion silently probed the WRONG endpoint (doorway:8080) and read
+      // "metric not present in scrape" — a routing bug, not the sweep-timing
+      // race the pending message implied.
+      const isStorageOwned =
+        metricName.startsWith('p2p_') ||
+        metricName.startsWith('reconcile_') ||
+        metricName.startsWith('dedup_') ||
+        metricName.startsWith('elohim_');
+      if (process.env[metricsEnvKey]) {
+        metricsBaseUrl = process.env[metricsEnvKey]!;
+      } else if (isStorageOwned) {
+        // Storage metric — needs direct storage URL
+        if (!storageUrl) {
+          // eslint-disable-next-line no-console
+          console.log(
+            `  PENDING: metric "${metricName}" on ${peerName} — ` +
+              `storage metrics URL not set (set E2E_STORAGE_${peerName.toUpperCase()})`
+          );
+          return 'pending';
+        }
+        metricsBaseUrl = storageUrl;
+      } else {
+        // Doorway metric: try port 8080 on the same host
+        try {
+          const parsed = new URL(doorwayUrl);
+          parsed.port = '8080';
+          metricsBaseUrl = parsed.origin;
+        } catch {
+          metricsBaseUrl = doorwayUrl;
+        }
+      }
+
+      let actual: number | undefined;
+      if (isStorageOwned) {
+        // Storage-owned gauges (elohim_/p2p_/reconcile_/dedup_) can be
+        // populated by a periodic sweep with a multi-minute cadence rather
+        // than on every scrape — poll rather than declaring pending on the
+        // first miss. Doorway metrics (below) have no such sweep-cadence gap
+        // and keep the original single-probe behavior.
+        actual = await pollForGauge(async () => {
+          const metrics = await probeMetrics(metricsBaseUrl);
+          return metrics.get(metricName);
+        });
+      } else {
+        let metrics: ParsedMetrics;
+        try {
+          metrics = await probeMetrics(metricsBaseUrl);
+        } catch (err) {
+          // eslint-disable-next-line no-console
+          console.log(
+            `  PENDING: metric "${metricName}" on ${peerName} — /metrics not reachable: ${String(err)}`
+          );
+          return 'pending';
+        }
+        actual = metrics.get(metricName);
+      }
+
+      if (actual === undefined) {
+        // Metric absent (or /metrics unreachable) through the full poll budget —
+        // a typo'd name would silently false-pass a >= 0 assertion, and a gauge
+        // that's genuinely never been swept is an honest observability gap, not
+        // a confirmed zero measurement. Treat both as pending, never a failure.
         // eslint-disable-next-line no-console
         console.log(
           `  PENDING: metric "${metricName}" on ${peerName} — ` +
-            `storage metrics URL not set (set E2E_STORAGE_${peerName.toUpperCase()})`
+            `not present after polling up to ${GAUGE_SWEEP_POLL_TIMEOUT_MS / 1000}s ` +
+            `(typo? /metrics unreachable? sweep genuinely hasn't run yet?)`
         );
         return 'pending';
       }
-      metricsBaseUrl = storageUrl;
-    } else {
-      // Doorway metric: try port 8080 on the same host
-      try {
-        const parsed = new URL(doorwayUrl);
-        parsed.port = '8080';
-        metricsBaseUrl = parsed.origin;
-      } catch {
-        metricsBaseUrl = doorwayUrl;
-      }
+      assertMetric(metricName, peerName, cmp, expected, actual);
     }
-
-    let actual: number | undefined;
-    if (isStorageOwned) {
-      // Storage-owned gauges (elohim_/p2p_/reconcile_/dedup_) can be
-      // populated by a periodic sweep with a multi-minute cadence rather
-      // than on every scrape — poll rather than declaring pending on the
-      // first miss. Doorway metrics (below) have no such sweep-cadence gap
-      // and keep the original single-probe behavior.
-      actual = await pollForGauge(async () => {
-        const metrics = await probeMetrics(metricsBaseUrl);
-        return metrics.get(metricName);
-      });
-    } else {
-      let metrics: ParsedMetrics;
-      try {
-        metrics = await probeMetrics(metricsBaseUrl);
-      } catch (err) {
-        // eslint-disable-next-line no-console
-        console.log(
-          `  PENDING: metric "${metricName}" on ${peerName} — /metrics not reachable: ${String(err)}`
-        );
-        return 'pending';
-      }
-      actual = metrics.get(metricName);
-    }
-
-    if (actual === undefined) {
-      // Metric absent (or /metrics unreachable) through the full poll budget —
-      // a typo'd name would silently false-pass a >= 0 assertion, and a gauge
-      // that's genuinely never been swept is an honest observability gap, not
-      // a confirmed zero measurement. Treat both as pending, never a failure.
-      // eslint-disable-next-line no-console
-      console.log(
-        `  PENDING: metric "${metricName}" on ${peerName} — ` +
-          `not present after polling up to ${GAUGE_SWEEP_POLL_TIMEOUT_MS / 1000}s ` +
-          `(typo? /metrics unreachable? sweep genuinely hasn't run yet?)`
-      );
-      return 'pending';
-    }
-    assertMetric(metricName, peerName, cmp, expected, actual);
-  }
-);
+  );
+}
 
 /** Apply a comparison operator and throw a descriptive assertion if it fails */
 function assertMetric(
@@ -1917,7 +1925,7 @@ function assertMetric(
  * the response is not an "App not found" error.
  */
 Then(
-  'EPR {string} nav-context is reachable on peer {string}',
+  'EPR {string} nav-context is reachable on federated peer {string}',
   async function (this: E2EWorld, eprId: string, peerName: string) {
     const url = getPeerUrl(this, peerName);
     const { body } = await probeEprNavContext(url, eprId);

@@ -132,6 +132,24 @@
               </a>
             }
           </div>
+          @if (delivery().length > 0) {
+            <p class="epr-home__delivery" id="delivery" data-testid="epr-home-delivery">
+              <span class="epr-home__ui--muted">
+                How this reached you, as your link describes it:
+              </span>
+              @for (hop of delivery(); track $index; let first = $first) {
+                @if (!first) {
+                  <span aria-hidden="true">·</span>
+                }
+                <span data-testid="epr-home-delivery-hop">
+                  {{ hop.lead }}
+                  @if (hop.value !== null) {
+                    <code class="epr-home__mono">{{ hop.value }}</code>
+                  }
+                </span>
+              }
+            </p>
+          }
         </header>
 
         @if (a.shape === 'immersive') {
@@ -173,7 +191,7 @@
         <div class="epr-home__body" [class.epr-home__body--reading]="a.shape === 'reading'">
           <div class="epr-home__main">
             @if (signedIn()) {
-              <section class="epr-home__mark" data-testid="epr-home-your-mark">
+              <section class="epr-home__mark" id="yours" data-testid="epr-home-your-mark">
                 <div class="epr-home__mark-head">
                   <h3>Your mark on it</h3>
                   <span class="epr-home__ui epr-home__ui--muted">
@@ -292,6 +310,7 @@
           <app-epr-home-legs
             class="epr-home__rail"
             [atom]="a"
+            [permissions]="permissions()"
             [snapshot]="snapshot()"
             [peersHolding]="peersHolding()"
             [copies]="copies()"

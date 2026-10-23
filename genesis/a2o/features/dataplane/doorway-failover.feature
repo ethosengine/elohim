@@ -131,8 +131,8 @@ Feature: Doorway failover — two doorways, one name, one truth
   purpose and the standing to promise it comes back.
 
   Background:
-    Given peer "alpha-A" at "alpha-A"
-    And peer "elohim.host" at "elohim.host"
+    Given federated peer "alpha-A" at "alpha-A"
+    And federated peer "elohim.host" at "elohim.host"
 
   Scenario: Every doorway is honestly classifiable — shed is not death
     # A doorway mid-catch-up is DEGRADED, not down: it must answer its /health
@@ -152,7 +152,7 @@ Feature: Doorway failover — two doorways, one name, one truth
     # Steady-state prerequisite only. The actual induced-shed, sibling-selection
     # and recovery contract lives in doorway-apex-transition.feature. A pass here
     # cannot fulfil that feature or prove DNS/ingress failover.
-    When I query "/" on peer "elohim.host" expecting raw text
+    When I query "/" on federated peer "elohim.host" expecting raw text
     Then the raw response status is 200
     And the raw response body contains "app-root"
 

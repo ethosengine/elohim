@@ -178,8 +178,17 @@ pub fn resolve_operator_capability(
 }
 
 fn extract_token(req: &Request<Incoming>) -> Option<String> {
-    let auth_header = req
-        .headers()
+    session_token_from_headers(req.headers())
+}
+
+/// The session credential a request presents, chosen the way this doorway's
+/// authenticated routes choose it: the `Authorization` bearer FIRST (an
+/// invalid bearer is then refused, never rescued by a cookie), else the first
+/// `doorway_token` cookie. Extraction only — verification is the caller's.
+/// Shared with the content shell's viewer (`routes::apps`) so the two cannot
+/// drift.
+pub(crate) fn session_token_from_headers(headers: &hyper::HeaderMap) -> Option<String> {
+    let auth_header = headers
         .get(header::AUTHORIZATION)
         .and_then(|v| v.to_str().ok());
 
@@ -187,7 +196,7 @@ fn extract_token(req: &Request<Incoming>) -> Option<String> {
         return Some(token.to_string());
     }
 
-    req.headers()
+    headers
         .get("cookie")
         .and_then(|v| v.to_str().ok())
         .and_then(|cookies| {

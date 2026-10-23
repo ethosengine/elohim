@@ -25,9 +25,9 @@ Feature: Chapter 4 — the doorway serves
   human-facing proof that matthew's doorway is up and serving.
 
   Background:
-    Given peer "elohim.host" at "elohim.host"
+    Given federated peer "elohim.host" at "elohim.host"
 
   Scenario: The root path serves the landing SPA shell
-    When I query "/" on peer "elohim.host" expecting raw text
+    When I query "/" on federated peer "elohim.host" expecting raw text
     Then the raw response status is 200
     And the raw response body contains "app-root"

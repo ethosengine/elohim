@@ -83,7 +83,7 @@ impl std::fmt::Display for BlobError {
 /// - Raw SHA256 hex (64 char hex string) - returns as-is
 ///
 /// Returns SHA256 hex string for cache lookups.
-fn parse_content_address(addr: &str) -> Result<String, BlobError> {
+pub(crate) fn parse_content_address(addr: &str) -> Result<String, BlobError> {
     // Try CID first (starts with common CID prefixes)
     if addr.starts_with("baf") || addr.starts_with("Qm") || addr.starts_with("z") {
         match Cid::from_str(addr) {

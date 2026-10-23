@@ -24,8 +24,8 @@
 
   <!-- Content -->
   <div *ngIf="node && !isLoading" class="content">
-    <!-- Header -->
-    <div class="content-header">
+    <!-- Header: the content's record, shown around its frame (lamad's viewer is a wrapper) -->
+    <div class="content-header" data-testid="viewer-record">
       <div class="header-nav">
         <button
           type="button"
@@ -63,6 +63,18 @@
             Open in {{ pillarMount.pillarName }} ↗
           </a>
         }
+
+        <!--
+          The content's EPR page: its full record, claims and holders. Plain href
+          (cross-bundle full load) to the universal /epr/{id} address.
+        -->
+        <a
+          class="open-in-pillar-link epr-page-link"
+          [attr.href]="getEprPageHref()"
+          data-testid="viewer-epr-page-link"
+        >
+          Its record and claims ↗
+        </a>
       </div>
 
       <div class="header-main">

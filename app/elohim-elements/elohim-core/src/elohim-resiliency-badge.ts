@@ -1,38 +1,28 @@
-import { css, html, LitElement, type PropertyValues } from 'lit';
-import { property, state } from 'lit/decorators.js';
+import { css, html, LitElement } from 'lit';
+import { property } from 'lit/decorators.js';
 
-export type ResiliencyBadgeState = 'held' | 'thin' | 'unknown';
-
-/** The slice of the resilience snapshot view (`feltStatus.floor`) this badge reads. */
-interface ResilienceFloorSlice {
-  feltStatus?: { floor?: { hasHouseholds?: number; wantsHouseholds?: number } | null } | null;
-}
+export type ResiliencyBadgeState = 'held' | 'thin' | 'unknown' | 'known';
 
 /**
- * <elohim-resiliency-badge> — how many households hold a piece of content, as a
- * single link to where it lives (the EPR page). The whole badge is the anchor.
+ * <elohim-resiliency-badge> — a link-badge that shows the holders headline it is
+ * GIVEN, as a single link to where the content lives (the EPR page). The whole badge
+ * is the anchor.
  *
- * Wording is ported from the EPR page's held chip: "Held by {holders} of {target}
- * households"; zero holders reads "Not yet held by any household"; when the figures
- * are unknown, "Held by households · see where it lives".
+ * It owns no wording logic and does no lookup. The sentence is the resilience fold's
+ * own `FeltStatusView.headline` (the chrome's holders reading carries it as
+ * `holders.headline`), passed in through `headline`. The only sentence this element
+ * adds is the unknown-state one, shown when no headline was supplied:
+ * "Held by households · see where it lives".
  *
- * Figures come from the `holders` / `target` properties, or — when `content-id` is
- * set and neither is supplied — from a same-origin fetch of
- * `{base-url}/api/v1/resilience/{content-id}/household`, reading
- * `feltStatus.floor.hasHouseholds` / `wantsHouseholds`. A failed or unmeasured
- * fetch silently keeps the unknown state.
- *
- * `data-state` reflects `held | thin | unknown` (thin when holders < target) so
- * themes can colour it; the figures are always text, never colour alone.
+ * `data-state` reflects the explicit `state` property (`held | thin | unknown`) so
+ * themes can colour it; with none it is `known` when a headline is shown and
+ * `unknown` otherwise. The sentence is always text, never colour alone.
  *
  * @element elohim-resiliency-badge
  *
- * @prop {string} contentId - (attr `content-id`) content to look up when figures are not supplied
+ * @prop {string} headline - the sentence to show, verbatim (the fold's headline)
  * @prop {string} href - EPR address the badge links to, e.g. `/epr/<id>`
- * @prop {number | undefined} holders - households holding the content
- * @prop {number | undefined} target - households wanted to hold it
- * @prop {ResiliencyBadgeState | undefined} state - explicit state override
- * @prop {string} baseUrl - (attr `base-url`) prefix for the lookup; default same-origin
+ * @prop {ResiliencyBadgeState | undefined} state - explicit display state
  *
  * @cssprop --elohim-resiliency-badge-fg - Foreground color (default: inherit)
  * @cssprop --elohim-resiliency-badge-bg - Background (default: transparent)
@@ -56,17 +46,9 @@ interface ResilienceFloorSlice {
  * @capabilityStates empty:n/a, loading:n/a, error:designed, stale:n/a, contested:n/a, offline:designed, unauthorized:n/a
  */
 export class ElohimResiliencyBadge extends LitElement {
-  @property({ attribute: 'content-id' }) contentId = '';
+  @property() headline = '';
   @property() href = '';
-  @property({ type: Number }) holders?: number;
-  @property({ type: Number }) target?: number;
   @property() state?: ResiliencyBadgeState;
-  @property({ attribute: 'base-url' }) baseUrl = '';
-
-  @state() private fetchedHolders?: number;
-  @state() private fetchedTarget?: number;
-
-  private fetchSeq = 0;
 
   static override readonly styles = css`
     :host {
@@ -127,55 +109,13 @@ export class ElohimResiliencyBadge extends LitElement {
     }
   `;
 
-  protected override updated(changed: PropertyValues): void {
-    if (changed.has('contentId') || changed.has('baseUrl')) void this.lookup();
-  }
-
-  private get figures(): { holders?: number; target?: number } {
-    const supplied = this.holders !== undefined && this.target !== undefined;
-    return supplied
-      ? { holders: this.holders, target: this.target }
-      : { holders: this.fetchedHolders, target: this.fetchedTarget };
-  }
-
   private get derivedState(): ResiliencyBadgeState {
     if (this.state) return this.state;
-    const { holders, target } = this.figures;
-    if (holders === undefined || target === undefined) return 'unknown';
-    return holders < target ? 'thin' : 'held';
+    return this.headline ? 'known' : 'unknown';
   }
 
   private get label(): string {
-    const { holders, target } = this.figures;
-    if (holders === undefined || target === undefined) {
-      return 'Held by households · see where it lives';
-    }
-    return holders === 0
-      ? 'Not yet held by any household'
-      : `Held by ${holders} of ${target} households`;
-  }
-
-  private async lookup(): Promise<void> {
-    const seq = ++this.fetchSeq;
-    this.fetchedHolders = undefined;
-    this.fetchedTarget = undefined;
-    if (!this.contentId || (this.holders !== undefined && this.target !== undefined)) return;
-    try {
-      const url = `${this.baseUrl.replace(/\/$/, '')}/api/v1/resilience/${encodeURIComponent(
-        this.contentId
-      )}/household`;
-      const res = await fetch(url);
-      if (!res.ok) return;
-      const body = (await res.json()) as ResilienceFloorSlice;
-      const floor = body.feltStatus?.floor;
-      if (seq !== this.fetchSeq || !floor) return;
-      if (typeof floor.hasHouseholds === 'number' && typeof floor.wantsHouseholds === 'number') {
-        this.fetchedHolders = floor.hasHouseholds;
-        this.fetchedTarget = floor.wantsHouseholds;
-      }
-    } catch {
-      // Silent: the unknown state is the honest fallback.
-    }
+    return this.headline || 'Held by households · see where it lives';
   }
 
   override render() {

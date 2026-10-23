@@ -45,7 +45,10 @@
     ],
     "extensions": [
       "zip"
-    ]
+    ],
+    "bodySchema": {
+      "$ref": "./schemas/html5-app-body.schema.json"
+    }
   },
   "spa-bundle": {
     "description": "Single-page application served as a doorway's root web surface. ZIP archive extracted and cached by doorway with SPA routing (unmatched paths serve index.html).",
@@ -56,7 +59,10 @@
     ],
     "extensions": [
       "zip"
-    ]
+    ],
+    "bodySchema": {
+      "$ref": "./schemas/html5-app-body.schema.json"
+    }
   },
   "epr-composite": {
     "description": "EPR composite layout — a content node whose body references other EPRs. Used for paths, curated collections, and landing pages.",

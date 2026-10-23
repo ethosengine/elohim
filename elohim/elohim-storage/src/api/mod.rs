@@ -169,6 +169,23 @@ pub async fn handle_api_request(
             hc_registry.as_ref(),
         )
         .await
+    } else if sub_path.starts_with("epr/")
+        && method == Method::POST
+        && epr::is_content_signals_path(sub_path.trim_start_matches("epr/"))
+    {
+        // POST /api/v1/epr/{id}/signals — content-address signal intake. Routed
+        // here (not inside epr::handle) because it records through the
+        // observation manager under this peer's own agent key. Recorded rows are
+        // read through GET /api/v1/observations/by-subject.
+        let id = sub_path
+            .trim_start_matches("epr/")
+            .trim_end_matches("/signals")
+            .to_string();
+        let observer = hc_registry
+            .as_ref()
+            .and_then(|r| r.lamad_client())
+            .map(|hc| hc.agent_key_uhcak());
+        epr::post_content_signals(req, &id, &pool, &app_ctx, &observation_manager, observer).await
     } else if sub_path.starts_with("epr") {
         let resource_path = sub_path.strip_prefix("epr").unwrap_or("");
         epr::handle(

@@ -55,10 +55,10 @@ Feature: Chapter 6 — blobs sync to one head
   content-level flow on a settled substrate, never substrate bootstrap itself.
 
   Background:
-    Given peer "alpha-A" at "alpha-A"
+    Given federated peer "alpha-A" at "alpha-A"
 
   Scenario: a locally declared head becomes alpha-A's own served head
-    Then the served head for EPR "elohim-host-landing" matches the declared head on peer "alpha-A"
+    Then the served head for EPR "elohim-host-landing" matches the declared head on federated peer "alpha-A"
 
   # REMOVED (2026-08-16, stage-1/stage-2 split — see the header note above).
   #
@@ -162,11 +162,11 @@ Feature: Chapter 6 — blobs sync to one head
   # adopt-before-author sweep are stage-1 preconditions (deploy/quiesce cycle);
   # this scenario proves the state those mechanisms must leave behind.
   Scenario: elohim.host's declared head converges with alpha-A's
-    Given peer "elohim.host" at "elohim.host"
-    Then peer "elohim.host" resolves the declared head for content "elohim-host-landing" equal to peer "alpha-A"
+    Given federated peer "elohim.host" at "elohim.host"
+    Then federated peer "elohim.host" resolves the declared head for content "elohim-host-landing" equal to federated peer "alpha-A"
 
   Scenario: Both conductors anchor elohim-host-landing at the same root
-    Given peer "elohim.host" at "elohim.host"
+    Given federated peer "elohim.host" at "elohim.host"
     Then peers "alpha-A" and "elohim.host" hold the same DHT anchor for content "elohim-host-landing"
 
   # ---------------------------------------------------------------------------
@@ -219,15 +219,15 @@ Feature: Chapter 6 — blobs sync to one head
   # inducing each failure class, which would pollute the quiesced stage-2
   # substrate — deliberately deferred to fault-injection scenarios.
   Scenario: the chain-contention failure counter is registered and queryable
-    Then labeled metric "elohim_content_witness_reauthor_failed_total" with label "class" "chain_head_moved" on peer "alpha-A" >= 0
+    Then labeled metric "elohim_content_witness_reauthor_failed_total" with label "class" "chain_head_moved" on federated peer "alpha-A" >= 0
 
   Scenario: the stale-anchor collision counter is registered and queryable
-    Then labeled metric "elohim_content_witness_reauthor_failed_total" with label "class" "already_exists" on peer "alpha-A" >= 0
+    Then labeled metric "elohim_content_witness_reauthor_failed_total" with label "class" "already_exists" on federated peer "alpha-A" >= 0
 
   Scenario: the sweep-abandoned counter is registered and queryable
-    Then metric "elohim_content_witness_sweep_abandoned_total" on peer "alpha-A" >= 0
+    Then metric "elohim_content_witness_sweep_abandoned_total" on federated peer "alpha-A" >= 0
 
   Scenario: alpha-A and elohim.host serve the same converged head for elohim-host-landing
-    Given peer "elohim.host" at "elohim.host"
-    Then the served head for EPR "elohim-host-landing" matches the declared head on peer "alpha-A"
-    And the served head for EPR "elohim-host-landing" matches the declared head on peer "elohim.host"
+    Given federated peer "elohim.host" at "elohim.host"
+    Then the served head for EPR "elohim-host-landing" matches the declared head on federated peer "alpha-A"
+    And the served head for EPR "elohim-host-landing" matches the declared head on federated peer "elohim.host"

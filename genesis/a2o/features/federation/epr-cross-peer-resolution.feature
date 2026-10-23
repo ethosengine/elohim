@@ -41,34 +41,34 @@ Feature: EPR Cross-Peer Content Resolution
     # "staging" needs it for a learner, the protocol resolves Pete's
     # EPR Head via DHT, fetches the body via the shard plane, and
     # caches it locally — all on the first request, no operator setup.
-    Given peer "alpha" has content "fct-module-01-church-dilemma" stewarded by Pete
-    And peer "staging" does not have "fct-module-01-church-dilemma" locally
-    When peer "staging" requests content "fct-module-01-church-dilemma"
-    Then the content is resolved via EPR protocol from peer "alpha"
+    Given federated peer "alpha" has content "fct-module-01-church-dilemma" stewarded by Pete
+    And federated peer "staging" does not have "fct-module-01-church-dilemma" locally
+    When federated peer "staging" requests content "fct-module-01-church-dilemma"
+    Then the content is resolved via EPR protocol from federated peer "alpha"
     And the content body is fetched via shard protocol
-    And the content is persisted to local SQLite on peer "staging"
+    And the content is persisted to local SQLite on federated peer "staging"
     And subsequent requests return the content without P2P resolution
 
   Scenario: EPR Heads publish to DHT on ingestion
     # Authoring is publishing. The moment Matthew creates content on his
     # household peer, the EPR Head is anchored on the DHT — making it
     # discoverable by any other peer that has standing to fetch it.
-    Given peer "alpha" ingests content "test-concept"
+    Given federated peer "alpha" ingests content "test-concept"
     Then the DHT contains an EPR Head for "test-concept"
-    And peer "staging" can discover "test-concept" via Kademlia lookup
+    And federated peer "staging" can discover "test-concept" via Kademlia lookup
 
   Scenario: Content GET returns 404 when no peer has the content
     # No silent fallthroughs. If nobody has it, the reader gets a clear
     # 404 — not an empty page, not an infinite spinner. Honest absence.
     Given no peer has content "nonexistent-concept"
-    When peer "alpha" requests content "nonexistent-concept"
+    When federated peer "alpha" requests content "nonexistent-concept"
     Then the response is 404 Not Found
 
   Scenario: Single content create publishes EPR Head
     # The smallest unit of authoring — one POST — carries the full
     # publish flow: notarize, anchor, gossip the head. No batching,
     # no manual sync step.
-    Given peer "alpha" creates content "new-concept" via POST /db/content
+    Given federated peer "alpha" creates content "new-concept" via POST /db/content
     Then the DHT contains an EPR Head for "new-concept"
 
   # The precondition is an actual cross-peer resolve — storage's P2P fallback in
@@ -83,7 +83,7 @@ Feature: EPR Cross-Peer Content Resolution
     # When content arrives via cross-peer resolution rather than local
     # storage, the local record carries that provenance. Operators can
     # see federation flows without it leaking into the user-facing UI.
-    Given peer "staging" resolves "cross-steward-concept" via P2P
+    Given federated peer "staging" resolves "cross-steward-concept" via P2P
     Then the local content record has metadata "resolved_via" = "p2p"
 
   # --- Reach-gated access (the ones the audit confirmed have substrate but step defs may be wip) ---
@@ -114,7 +114,7 @@ Feature: EPR Cross-Peer Content Resolution
   # @wip retained: federation step-def layer (federation-epr.steps.ts) not yet built; reach-gate substrate is live.
   # Backlog destination: doorway-full-facilitator sprint
   # Citation: 2026-05-16-epr-wip-disposition.md row 5
-  # Gate condition: lifts when federation-epr.steps.ts ships with `peer "X" has content "Y" with reach "<level>"`, `human "Z" is a consented member of collective "W"`, and `human "Z" requests content "Y" from peer "X"` step verbs. The community-reach gate itself is enforced at elohim/elohim-storage/src/epr_service.rs:86–189 — substrate is ready; only the BDD glue is missing.
+  # Gate condition: lifts when federation-epr.steps.ts ships with `federated peer "X" has content "Y" with reach "<level>"`, `human "Z" is a consented member of collective "W"`, and `human "Z" requests content "Y" from federated peer "X"` step verbs. The community-reach gate itself is enforced at elohim/elohim-storage/src/epr_service.rs:86–189 — substrate is ready; only the BDD glue is missing.
   @wip
   Scenario: Community-reach guide accessible only to consented collective members
     # Matthew's collective ("local-church") authored a governance guide
@@ -123,12 +123,12 @@ Feature: EPR Cross-Peer Content Resolution
     # Frank is outside the collective; for him, the same URL surfaces a
     # respectful "this content belongs to local-church, here's how to
     # ask for membership" page rather than a hard 403 page.
-    Given peer "alpha" has content "community-governance-guide" with reach "community"
+    Given federated peer "alpha" has content "community-governance-guide" with reach "community"
     And human "Matthew" is a consented member of collective "local-church"
     And human "Frank" has no collective memberships
-    When human "Matthew" requests content "community-governance-guide" from peer "alpha"
+    When human "Matthew" requests content "community-governance-guide" from federated peer "alpha"
     Then the content is served successfully
-    When human "Frank" requests content "community-governance-guide" from peer "alpha"
+    When human "Frank" requests content "community-governance-guide" from federated peer "alpha"
     Then the response is 403 with reason "No consented collective membership"
 
   # @wip retained: federation step-def layer + standing-relationship fixture builder not yet built; trusted-reach substrate is live.
@@ -140,13 +140,13 @@ Feature: EPR Cross-Peer Content Resolution
     # Some content is stewarded for a circle of trust — not for everyone
     # in a collective, but for those the steward has explicitly extended
     # trust to. The reach gate enforces that relationship structurally.
-    Given peer "alpha" has content "advanced-theology" with reach "trusted"
+    Given federated peer "alpha" has content "advanced-theology" with reach "trusted"
     And human "Pete" is a steward of "advanced-theology"
     And human "Matthew" has a "trusted" relationship with human "Pete"
     And human "Frank" has no relationships with any steward of "advanced-theology"
-    When human "Matthew" requests content "advanced-theology" from peer "alpha"
+    When human "Matthew" requests content "advanced-theology" from federated peer "alpha"
     Then the content is served successfully
-    When human "Frank" requests content "advanced-theology" from peer "alpha"
+    When human "Frank" requests content "advanced-theology" from federated peer "alpha"
     Then the response is 403 with reason "No trusted relationship with content steward"
 
   # @wip retained: federation step-def layer + prerequisite-attestation fixture not yet built; attestation gate is live in substrate.
@@ -160,7 +160,7 @@ Feature: EPR Cross-Peer Content Resolution
     # checking it is a graph traversal, not a database query at the
     # publisher. Terrance sees a respectful "build prerequisites first"
     # affordance pointing to the prerequisite path.
-    Given peer "alpha" has content "calculus-201" with reach "public"
+    Given federated peer "alpha" has content "calculus-201" with reach "public"
     And content "calculus-201" requires prerequisite mastery of "calculus-101"
     And human "Matthew" has mastery of "calculus-101"
     And human "Terrance" does not have mastery of "calculus-101"
@@ -172,15 +172,15 @@ Feature: EPR Cross-Peer Content Resolution
   # @wip retained: cross-peer recognition-event tracking step-defs + steward-share fixture builder not yet built.
   # Backlog destination: doorway-full-facilitator sprint
   # Citation: 2026-05-16-epr-wip-disposition.md row 8
-  # Gate condition: lifts when federation-epr.steps.ts ships with `peer "X" has content "Y" stewarded by "A" at N% and "B" at M%`, `peer "X" resolves "Y" via P2P from peer "Z"`, and `recognition events are created for steward "A" and steward "B"` step verbs. Recognition emission on P2P delivery is the substrate behaviour the test will assert; verify against epr_service path.
+  # Gate condition: lifts when federation-epr.steps.ts ships with `federated peer "X" has content "Y" stewarded by "A" at N% and "B" at M%`, `federated peer "X" resolves "Y" via P2P from federated peer "Z"`, and `recognition events are created for steward "A" and steward "B"` step verbs. Recognition emission on P2P delivery is the substrate behaviour the test will assert; verify against epr_service path.
   @wip
   Scenario: Recognition distributes proportionally to stewards on P2P delivery
     # Stewardship is real work and the protocol counts it. When peer
     # "staging" fetches Pete and Terrance's co-stewarded content, both
     # stewards receive recognition events proportional to their declared
     # share. This is shefa — value flowing where work was done.
-    Given peer "alpha" has content "economics-primer" stewarded by "Pete" at 60% and "Terrance" at 40%
-    When peer "staging" resolves "economics-primer" via P2P from peer "alpha"
+    Given federated peer "alpha" has content "economics-primer" stewarded by "Pete" at 60% and "Terrance" at 40%
+    When federated peer "staging" resolves "economics-primer" via P2P from federated peer "alpha"
     Then recognition events are created for steward "Pete" and steward "Terrance"
     And steward "Pete" receives approximately 60% of the recognition
     And steward "Terrance" receives approximately 40% of the recognition
@@ -196,9 +196,9 @@ Feature: EPR Cross-Peer Content Resolution
     # access "intimate" content, the device-side policy refuses, and the
     # refusal is local + visible — no awkward attempt-and-deny round-trip
     # to the server.
-    Given peer "alpha" has content "intimate-journal" with reach "intimate"
+    Given federated peer "alpha" has content "intimate-journal" with reach "intimate"
     And human "Terrance" has a device policy with reach_level_max of 3
-    When human "Terrance" requests content "intimate-journal" from peer "alpha"
+    When human "Terrance" requests content "intimate-journal" from federated peer "alpha"
     Then the response is 403 with reason matching "Reach level .* exceeds maximum"
 
   # --- Wave 3 additions: cross-peer human moments the substrate enables ---
@@ -222,16 +222,16 @@ Feature: EPR Cross-Peer Content Resolution
   # @wip retained: cross-peer disconnect simulator + multi-steward failover step-defs not yet built.
   # Backlog destination: doorway-full-facilitator sprint
   # Citation: 2026-05-16-epr-wip-disposition.md row 11
-  # Gate condition: lifts when federation-epr.steps.ts ships with `peer "X" has content "Y" with multiple stewards`, `peer "X" disconnects mid-fetch before delivering the body`, and `the resolver attempts a different peer that holds the CID` step verbs, plus the disconnect simulator helper. The multi-steward failover behaviour belongs to doorway/storage; verify against the existing P2P fetch retry logic before authoring.
+  # Gate condition: lifts when federation-epr.steps.ts ships with `federated peer "X" has content "Y" with multiple stewards`, `federated peer "X" disconnects mid-fetch before delivering the body`, and `the resolver attempts a different peer that holds the CID` step verbs, plus the disconnect simulator helper. The multi-steward failover behaviour belongs to doorway/storage; verify against the existing P2P fetch retry logic before authoring.
   @wip
   Scenario: Cross-peer fetch surfaces transient peer-offline as a soft state
     # Mid-fetch, the source peer goes offline. The renderer should not
     # blank the page or show a stack trace; it shows a "fetching from
     # other stewards" affordance and tries another peer that holds the
     # CID. The reader sees latency, not failure.
-    Given peer "alpha" has content "module-X" with multiple stewards "Pete", "Jessica"
+    Given federated peer "alpha" has content "module-X" with multiple stewards "Pete", "Jessica"
     And Terrance's peer "household-terrance" begins resolving "module-X"
-    When peer "alpha" disconnects mid-fetch before delivering the body
+    When federated peer "alpha" disconnects mid-fetch before delivering the body
     Then the renderer surfaces a "fetching from another steward" indicator
     And the resolver attempts a different peer that holds the CID
     And the body eventually delivers without Terrance seeing an error page

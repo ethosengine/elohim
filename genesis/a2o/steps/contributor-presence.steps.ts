@@ -46,7 +46,7 @@ import { E2EWorld } from '../src/framework/world.js';
 // ---------------------------------------------------------------------------
 
 Then(
-  'every fixture resident on peer {string} exists as a contributor presence in state {string}',
+  'every fixture resident on federated peer {string} exists as a contributor presence in state {string}',
   function (this: E2EWorld, _peerName: string, _state: string) {
     // Pending Stage 1: GET /db/presences on the peer; every fixture resident
     // (the 11 conductor-less residents) resolves to a presence row in the
@@ -56,7 +56,7 @@ Then(
 );
 
 Then(
-  'no fixture resident on peer {string} remains a bare human row without a backing presence',
+  'no fixture resident on federated peer {string} remains a bare human row without a backing presence',
   function (this: E2EWorld, _peerName: string) {
     // Pending Stage 1: cross-check GET /db/humans against GET /db/presences —
     // a fixture resident may keep a humans row only if it is marked
@@ -67,7 +67,7 @@ Then(
 );
 
 Then(
-  'each fixture-resident presence on peer {string} carries a steward-authored witnessed ascription for its household residency',
+  'each fixture-resident presence on federated peer {string} carries a steward-authored witnessed ascription for its household residency',
   function (this: E2EWorld, _peerName: string) {
     // Pending Stage 1: for each fixture-resident presence, assert an
     // attestation:witnessed-ascription exists whose subject is the presence
@@ -79,7 +79,7 @@ Then(
 );
 
 Then(
-  'the household holder relation on peer {string} counts every fixture resident as a witnessed holder',
+  'the household holder relation on federated peer {string} counts every fixture resident as a witnessed holder',
   function (this: E2EWorld, _peerName: string) {
     // Pending Stage 2: the household-resilience holder relation splits
     // verified (agent_pub_key) vs witnessed (presence-backed) holders; every
@@ -89,7 +89,7 @@ Then(
 );
 
 Then(
-  'the household holder relation on peer {string} counts zero fixture residents as verified holders',
+  'the household holder relation on federated peer {string} counts zero fixture residents as verified holders',
   function (this: E2EWorld, _peerName: string) {
     // Pending Stage 2: a fixture resident has no agent key — counting one as
     // verified would be a false-green on the resilience card.
@@ -98,7 +98,7 @@ Then(
 );
 
 Then(
-  'no household-placed human on peer {string} lacks both an agent key and a witnessed presence',
+  'no household-placed human on federated peer {string} lacks both an agent key and a witnessed presence',
   function (this: E2EWorld, _peerName: string) {
     // Pending Stage 2: the evolved invariant —
     // household_id => (agent_pub_key OR witnessed-presence), zero orphans.
@@ -157,7 +157,7 @@ Given(
 );
 
 Given(
-  '{string} has completed her claim on peer {string}',
+  '{string} has completed her claim on federated peer {string}',
   function (this: E2EWorld, _personaName: string, _peerName: string) {
     // Pending Stage 4: presence in state 'claimed', identity bound, key live —
     // the posture the card-flip scenario observes.
@@ -202,7 +202,7 @@ When('an appeal of the settlement is convened and witnessed', function (this: E2
 // -- Then -------------------------------------------------------------------
 
 Then(
-  'her contributor presence on peer {string} is in state {string}',
+  'her contributor presence on federated peer {string} is in state {string}',
   function (this: E2EWorld, _peerName: string, _state: string) {
     // Pending Stage 3: GET the presence and assert presenceState — the
     // 4-state machine unclaimed -> stewarded -> claiming -> claimed.
@@ -267,7 +267,7 @@ Then('no backfill event asserts a valuation semantic', function (this: E2EWorld)
 });
 
 Then(
-  'the household holder relation on peer {string} counts {string} as a verified holder',
+  'the household holder relation on federated peer {string} counts {string} as a verified holder',
   function (this: E2EWorld, _peerName: string, _personaName: string) {
     // Pending Stage 4: with her own key bound, the holder relation counts her
     // verified — the observable the whole arc exists for.
@@ -276,7 +276,7 @@ Then(
 );
 
 Then(
-  'the household holder relation on peer {string} no longer counts {string} as a witnessed holder',
+  'the household holder relation on federated peer {string} no longer counts {string} as a witnessed holder',
   function (this: E2EWorld, _peerName: string, _personaName: string) {
     // Pending Stage 4: the flip is a MOVE, not an add — she must leave the
     // witnessed count when she enters the verified count.

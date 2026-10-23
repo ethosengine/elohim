@@ -20,14 +20,14 @@ Feature: EPR projection fallback — root resolution on federation peer
   "App not found". Either outcome unblocks the user landing experience on elohim.host.
 
   Background:
-    Given peer "alpha-A" at "alpha-A"
-    And peer "elohim.host" at "elohim.host"
+    Given federated peer "alpha-A" at "alpha-A"
+    And federated peer "elohim.host" at "elohim.host"
 
   Scenario: alpha-A root resolves without App-not-found (baseline)
     # Green baseline. alpha-A is the deploy-time author peer and has a non-null blobHash,
     # so the EprRouter resolves the landing app correctly. This scenario passes today
     # and confirms the surface works on a peer with a healthy EPR record.
-    Then resolving "/" on peer "alpha-A" does NOT return App-not-found
+    Then resolving "/" on federated peer "alpha-A" does NOT return App-not-found
 
   Scenario: elohim.host root resolves without App-not-found (RED — the gap)
     # RED-FIRST. elohim.host returns HTTP 404 {"error":"App not found: elohim-host-landing"}
@@ -36,4 +36,4 @@ Feature: EPR projection fallback — root resolution on federation peer
     #     — route may not be registered
     # (the 404 check fires before the body-text check; both would fail independently)
     # When it passes, elohim.host serves the SPA or a syncing status instead of App-not-found.
-    Then resolving "/" on peer "elohim.host" does NOT return App-not-found
+    Then resolving "/" on federated peer "elohim.host" does NOT return App-not-found

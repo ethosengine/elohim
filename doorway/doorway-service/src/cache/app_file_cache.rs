@@ -72,10 +72,19 @@ pub struct AppDescriptor {
     pub content_id: String,
     /// `html5-app`, `spa-bundle`, ...
     pub content_format: String,
-    /// The bundle's declared entry file, when the node declares one.
-    pub entry_point: Option<String>,
     /// The node's human title.
     pub title: Option<String>,
+    /// The record's `contentBody`, read through the ONE lenient html5-app
+    /// parser (`lamad_types::Html5AppBody::from_json_value`): entry point,
+    /// declared capabilities (unknown ones dropped, never granted), theme hint.
+    pub body: lamad_types::Html5AppBody,
+    /// The record's projected `dhtAnchorHash`, as projected. The witness is
+    /// derived from it on every read (`lamad_types::witness_from_anchor`),
+    /// never stored as a verdict.
+    pub dht_anchor_hash: Option<String>,
+    /// The record's declared reach as projected (display only; the reach gate
+    /// asks storage, never this field).
+    pub reach: Option<String>,
 }
 
 impl AppDescriptor {
@@ -89,23 +98,28 @@ impl AppDescriptor {
                 .filter(|s| !s.is_empty())
                 .map(str::to_string)
         };
+        // contentBody arrives as a JSON string or a BSON document; the parser
+        // reads both once it is a serde_json value.
+        let body = data
+            .get("contentBody")
+            .cloned()
+            .map(|b| lamad_types::Html5AppBody::from_json_value(b.into_relaxed_extjson()))
+            .unwrap_or_default();
         Some(Self {
             blob_hash: blob_hash.to_string(),
             content_id: non_empty("id").unwrap_or_default(),
             content_format: non_empty("contentFormat").unwrap_or_default(),
-            entry_point: content_body_field(data, "entryPoint"),
             title: non_empty("title"),
+            body,
+            dht_anchor_hash: non_empty("dhtAnchorHash"),
+            reach: non_empty("reach"),
         })
     }
 
     /// The entry file the chrome branch compares the served path against:
     /// the declared entry point, else `index.html`.
     pub fn entry_file(&self) -> &str {
-        self.entry_point
-            .as_deref()
-            .map(|e| e.trim_start_matches("./"))
-            .filter(|e| !e.is_empty())
-            .unwrap_or("index.html")
+        self.body.entry_file()
     }
 }
 
@@ -492,12 +506,31 @@ impl AppFileCacheService {
         // Only the descriptor is filled here — the head index belongs to the
         // reconciler, and the projection's blobHash may be the stale one.
         let data = self.scan_projected_app(identifier).await?;
-        let descriptor = AppDescriptor::from_data(&data)?;
+        let mut descriptor = AppDescriptor::from_data(&data)?;
+        // A head the reconciler declared outranks the projection's (possibly
+        // stale) blobHash: the shell must name the bytes actually served.
+        if let Some(head) = self.slug_index.read().await.get(identifier) {
+            descriptor.blob_hash = head.clone();
+        }
         self.descriptor_index
             .write()
             .await
             .insert(identifier.to_string(), descriptor.clone());
         Some(descriptor)
+    }
+
+    /// The content addresses this doorway already holds for `slug` — its
+    /// declared head and its cached descriptor's address — from memory only,
+    /// never a Mongo scan (an unknown slug is an immediate `[]`).
+    pub async fn cached_addresses(&self, slug: &str) -> Vec<String> {
+        let mut out = Vec::new();
+        if let Some(head) = self.slug_index.read().await.get(slug) {
+            out.push(head.clone());
+        }
+        if let Some(d) = self.descriptor_index.read().await.get(slug) {
+            out.push(d.blob_hash.clone());
+        }
+        out
     }
 
     /// Reverse the slug index: which app slug currently declares `blob_hash` as
@@ -534,6 +567,15 @@ impl AppFileCacheService {
         }
         let mut index = self.slug_index.write().await;
         index.insert(slug.to_string(), blob_hash.to_string());
+        drop(index);
+        // The descriptor names the address the chrome shows and keys grants
+        // by; it must move with the head the bytes are served from, or a
+        // redeploy shows the old address over the new bytes.
+        if let Some(d) = self.descriptor_index.write().await.get_mut(slug) {
+            if d.blob_hash != blob_hash {
+                d.blob_hash = blob_hash.to_string();
+            }
+        }
         debug!(slug = %slug, blob_hash = %blob_hash, "Slug head declared in the index");
     }
 
@@ -895,8 +937,13 @@ mod tests {
             blob_hash: "sha256-old-head".into(),
             content_id: "quiz-1".into(),
             content_format: "html5-app".into(),
-            entry_point: Some("old.html".into()),
             title: Some("Old".into()),
+            body: lamad_types::Html5AppBody {
+                entry_point: "old.html".into(),
+                ..Default::default()
+            },
+            dht_anchor_hash: None,
+            reach: None,
         };
         svc.descriptor_index
             .write()
@@ -907,6 +954,33 @@ mod tests {
         // The store is unreachable here, so a fresh read yields None; the
         // point is that the stale descriptor is not returned.
         assert_eq!(svc.resolve_app_descriptor("quiz-1").await, None);
+    }
+
+    #[tokio::test]
+    async fn a_redeploy_moves_the_descriptor_address_with_the_served_head() {
+        let svc = super::AppFileCacheService::new(
+            &crate::db::mongo::MongoClient::unconnected_for_test(),
+            "t".to_string(),
+        );
+        let d = super::AppDescriptor::from_data(&bson::doc! {
+            "id": "quiz-1", "contentFormat": "html5-app", "blobHash": "sha256-release-a",
+            "contentBody": r#"{"slug":"quiz-1","capabilities":["forms"]}"#,
+        })
+        .unwrap();
+        svc.descriptor_index
+            .write()
+            .await
+            .insert("quiz-1".into(), d);
+        // The reconciler declares the redeployed head the bytes now come from.
+        svc.set_slug_head("quiz-1", "sha256-release-b").await;
+        assert_eq!(
+            svc.resolve_blob_hash("quiz-1").await.as_deref(),
+            Some("sha256-release-b")
+        );
+        let after = svc.resolve_app_descriptor("quiz-1").await.unwrap();
+        assert_eq!(after.blob_hash, "sha256-release-b");
+        // Everything else the record says is unchanged.
+        assert_eq!(after.body.capabilities.len(), 1);
     }
 
     #[test]
@@ -945,10 +1019,53 @@ mod tests {
 
         let bare = bson::doc! { "blobHash": "sha256-x", "contentFormat": "spa-bundle" };
         let d = super::AppDescriptor::from_data(&bare).unwrap();
-        assert_eq!(d.entry_point, None);
+        assert_eq!(d.body, lamad_types::Html5AppBody::default());
         assert_eq!(d.entry_file(), "index.html");
 
         assert!(super::AppDescriptor::from_data(&bson::doc! { "id": "no-blob" }).is_none());
+    }
+
+    #[test]
+    fn descriptor_reads_witness_reach_and_declared_capabilities() {
+        // contentBody as a JSON string, record anchored on the DHT
+        let data = bson::doc! {
+            "id": "quiz-1", "contentFormat": "html5-app", "blobHash": "sha256-x",
+            "reach": "commons", "dhtAnchorHash": "uhCkkAnchor",
+            "contentBody": r#"{"slug":"quiz-1","capabilities":["forms","popups","forms",""," fullscreen ",7]}"#,
+        };
+        let d = super::AppDescriptor::from_data(&data).unwrap();
+        let caps = |d: &super::AppDescriptor| -> Vec<&str> {
+            d.body.capabilities.iter().map(|c| c.as_str()).collect()
+        };
+        assert_eq!(
+            lamad_types::witness_from_anchor(d.dht_anchor_hash.as_deref()).as_str(),
+            "green"
+        );
+        assert_eq!(d.reach.as_deref(), Some("commons"));
+        assert_eq!(caps(&d), vec!["forms", "popups", "fullscreen"]);
+
+        // contentBody as a BSON document; an empty anchor is not a witness
+        let data = bson::doc! {
+            "blobHash": "sha256-x", "dhtAnchorHash": "",
+            "contentBody": { "slug": "quiz-1", "capabilities": ["downloads", "clipboard-write"] },
+        };
+        let d = super::AppDescriptor::from_data(&data).unwrap();
+        assert_eq!(
+            lamad_types::witness_from_anchor(d.dht_anchor_hash.as_deref()).as_str(),
+            "amber"
+        );
+        assert_eq!(d.reach, None);
+        assert_eq!(caps(&d), vec!["downloads", "clipboard-write"]);
+
+        // a null anchor (the wire shape of an un-anchored row) is not a witness;
+        // an undeclared capability is dropped, never granted
+        let data = bson::doc! {
+            "blobHash": "sha256-x", "dhtAnchorHash": bson::Bson::Null,
+            "contentBody": r#"{"capabilities":["take-over-the-chrome"]}"#,
+        };
+        let d = super::AppDescriptor::from_data(&data).unwrap();
+        assert_eq!(d.dht_anchor_hash, None);
+        assert!(d.body.capabilities.is_empty());
     }
 
     use super::*;

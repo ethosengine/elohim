@@ -486,7 +486,7 @@ function writeReceipt(receipt: OrganicReceipt): string {
  *   Given peer "alpha-A" and peer "elohim.host" both declare a head for EPR "elohim-host-landing"
  */
 Given(
-  'peer {string} and peer {string} both declare a head for a page this run authored',
+  'federated peer {string} and federated peer {string} both declare a head for a page this run authored',
   { timeout: 180_000 },
   async function (this: E2EWorld, winnerAlias: string, laggardAlias: string) {
     resetStagingWrites();
@@ -1136,7 +1136,7 @@ async function adoptionTriggers(peer: PeerRef): Promise<number> {
 }
 
 Given(
-  'peer {string} and peer {string} both hold a page this run authored, at the same head',
+  'federated peer {string} and federated peer {string} both hold a page this run authored, at the same head',
   { timeout: 180_000 },
   async function (this: E2EWorld, winnerAlias: string, laggardAlias: string) {
     resetStagingWrites();
@@ -1188,7 +1188,7 @@ Given(
 );
 
 Given(
-  "the page's root author on peer {string} declares a NEW earned canonical head whose text is unchanged",
+  "the page's root author on federated peer {string} declares a NEW earned canonical head whose text is unchanged",
   { timeout: 120_000 },
   async function (this: E2EWorld, alias: string) {
     const s = headOnly(this);
@@ -1217,7 +1217,7 @@ Given(
 );
 
 When(
-  'peer {string} announces the change to its federation',
+  'federated peer {string} announces the change to its federation',
   { timeout: 60_000 },
   async function (this: E2EWorld, alias: string) {
     const s = headOnly(this);
@@ -1236,7 +1236,7 @@ When(
 );
 
 Then(
-  "peer {string} is told that the page's declared head changed",
+  "federated peer {string} is told that the page's declared head changed",
   { timeout: TOLD_WAIT_MS + 30_000 },
   async function (this: E2EWorld, alias: string) {
     const s = headOnly(this);
@@ -1261,7 +1261,7 @@ Then(
 );
 
 Then(
-  'peer {string} verifies the carried declaration in wasm and moves its served head to it before any reconcile sweep runs',
+  'federated peer {string} verifies the carried declaration in wasm and moves its served head to it before any reconcile sweep runs',
   { timeout: PROJECTION_WAIT_MS + 60_000 },
   async function (this: E2EWorld, alias: string) {
     const s = headOnly(this);

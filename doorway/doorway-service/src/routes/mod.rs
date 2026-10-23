@@ -16,6 +16,7 @@ pub mod challenge;
 pub mod chrome;
 pub mod coherence;
 pub mod collectives;
+pub mod csp_report;
 pub mod dashboard_ws;
 // `db` module retired 2026-05-25 as part of Pattern Z anti-pattern cleanup —
 // see genesis/docs/superpowers/specs/2026-05-23-doorway-access-tier-patterns.md

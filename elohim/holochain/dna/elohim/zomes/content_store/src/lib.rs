@@ -59,6 +59,10 @@ pub use attention_tending::{
 // Z.D substrate-correct deploy: republish-epr EconomicEvent action validator.
 pub mod republish_epr;
 
+// Content-chrome witness: the local facts (author, receipts, held-valid) storage
+// derives amber/green from. Coordinator-only and read-only.
+pub mod record_witness;
+
 pub use bootstrap_steward::{
     am_i_bootstrap_steward, bootstrap_steward, maybe_bootstrap_steward, BootstrapStewardError,
     DnaProperties as BootstrapStewardDnaProperties,

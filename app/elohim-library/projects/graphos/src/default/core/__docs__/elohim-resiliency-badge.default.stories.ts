@@ -1,8 +1,9 @@
 /**
  * Library A default story — elohim-resiliency-badge
  *
- * Blank-slate proof: no brand tokens bound. Figures are supplied via args;
- * no live network. The fetch path is exercised by the unit spec with a stubbed fetch.
+ * Blank-slate proof: no brand tokens bound. The headline is supplied via args (it is the
+ * resilience fold's own sentence in the product); no live network, and the element
+ * itself does no lookup and owns no wording beyond the unknown-state sentence.
  */
 
 import type { Meta, StoryObj } from '@storybook/web-components';
@@ -16,56 +17,52 @@ const meta: Meta = {
     docs: {
       description: {
         component: `
-\`<elohim-resiliency-badge>\` — a link-badge showing how many households hold a piece of content.
+\`<elohim-resiliency-badge>\` — a link-badge that shows the holders headline it is given.
 
-**Attributes:** \`content-id\`, \`href\`, \`holders\`, \`target\`, \`state\` (held | thin | unknown), \`base-url\`.
+**Attributes:** \`headline\`, \`href\`, \`state\` (held | thin | unknown | known).
 **Part:** \`badge\`. **Reflects:** \`data-state\`.
 **Custom properties:** \`--elohim-resiliency-badge-{fg,bg,border,radius,padding,held-fg,thin-fg,hover-bg}\`.
         `.trim(),
       },
     },
   },
-  args: { href: '/epr/example', holders: 3, target: 3 },
+  args: { href: '/epr/example', headline: 'Held by 3 of 3 households' },
   render: args =>
     html`<elohim-resiliency-badge
       href=${args['href']}
-      .holders=${args['holders']}
-      .target=${args['target']}
+      headline=${args['headline'] ?? ''}
+      state=${args['state'] ?? ''}
     ></elohim-resiliency-badge>`,
 };
 
 export default meta;
 type Story = StoryObj;
 
-export const Known: Story = { name: 'Known (held)' };
+export const Known: Story = { name: 'Known (held)', args: { state: 'held' } };
 
-export const Thin: Story = { name: 'Thin', args: { holders: 1, target: 3 } };
+export const Thin: Story = {
+  name: 'Thin',
+  args: { headline: 'Held by 1 of 3 households', state: 'thin' },
+};
 
-export const NotYetHeld: Story = { name: 'NotYetHeld', args: { holders: 0, target: 3 } };
+export const NotYetHeld: Story = {
+  name: 'NotYetHeld',
+  args: { headline: 'Not yet held by any household', state: 'thin' },
+};
 
 export const Unknown: Story = {
   name: 'Unknown',
-  args: { holders: undefined, target: undefined },
-};
-
-export const WithFetchMocked: Story = {
-  name: 'WithFetchMocked (figures as the fetch would derive them)',
-  args: { holders: 2, target: 3 },
-  parameters: {
-    docs: {
-      description: {
-        story:
-          'With `content-id` set and no figures, the element fetches `/api/v1/resilience/{id}/household` and reads `feltStatus.floor`. Shown here with the derived figures supplied; no network is used.',
-      },
-    },
-  },
+  args: { headline: '' },
 };
 
 export const Unstyled: Story = {
   name: 'Unstyled (blank-slate proof)',
   render: () => html`
     <div style="all: initial;">
-      <elohim-resiliency-badge href="/epr/example" .holders=${1} .target=${3}></elohim-resiliency-badge>
+      <elohim-resiliency-badge
+        href="/epr/example"
+        headline="Held by 1 of 3 households"
+      ></elohim-resiliency-badge>
     </div>
   `,
 };
@@ -76,8 +73,7 @@ export const CustomTheme: Story = {
     <div style="background:#111; padding:1rem; font-family: Georgia, serif;">
       <elohim-resiliency-badge
         href="/epr/example"
-        .holders=${1}
-        .target=${3}
+        headline="Held by 1 of 3 households"
         style="
           --elohim-resiliency-badge-fg: #ffd400;
           --elohim-resiliency-badge-border: 2px dashed #ff00aa;
@@ -93,7 +89,10 @@ export const Rtl: Story = {
   name: 'RTL canary',
   render: () => html`
     <div dir="rtl">
-      <elohim-resiliency-badge href="/epr/example" .holders=${2} .target=${3}></elohim-resiliency-badge>
+      <elohim-resiliency-badge
+        href="/epr/example"
+        headline="Held by 2 of 3 households"
+      ></elohim-resiliency-badge>
     </div>
   `,
 };

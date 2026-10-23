@@ -671,10 +671,37 @@ fn auth_discovery_matches_schema() {
         doorway_id: Some("alpha-elohim-host".to_string()),
         portal: "/threshold/login",
         endpoints: AuthEndpoints::current(),
+        apps: None,
     };
 
     let json = serde_json::to_value(&doc).unwrap();
     validate_against_schema("views/auth-discovery.schema.json", &json);
+}
+
+/// A public name that declares a content origin advertises `apps: true` —
+/// never an origin — and the document still validates.
+#[test]
+fn auth_discovery_with_apps_flag_matches_schema() {
+    let doc = AuthDiscovery {
+        version: 1,
+        doorway_id: Some("alpha-elohim-host".to_string()),
+        portal: "/threshold/login",
+        endpoints: AuthEndpoints::current(),
+        apps: Some(true),
+    };
+    let json = serde_json::to_value(&doc).unwrap();
+    assert_eq!(json["apps"], true);
+    validate_against_schema("views/auth-discovery.schema.json", &json);
+
+    // `false` is not expressible: the flag is present-and-true or absent.
+    let mut forged = json.clone();
+    forged["apps"] = serde_json::Value::Bool(false);
+    let schema = load_schema("views/auth-discovery.schema.json");
+    let compiled = jsonschema::validator_for(&schema).expect("schema compiles");
+    assert!(!compiled.is_valid(&forged), "apps:false must not validate");
+    // …and neither is an origin in its place.
+    forged["apps"] = serde_json::Value::String("https://apps.evil.example".into());
+    assert!(!compiled.is_valid(&forged), "an origin must not validate");
 }
 
 /// A doorway with no configured id omits the field rather than sending null,
@@ -686,6 +713,7 @@ fn auth_discovery_without_doorway_id_matches_schema() {
         doorway_id: None,
         portal: "/threshold/login",
         endpoints: AuthEndpoints::current(),
+        apps: None,
     };
 
     let json = serde_json::to_value(&doc).unwrap();
@@ -708,6 +736,7 @@ fn auth_discovery_schema_refuses_a_foreign_origin() {
             doorway_id: Some("alpha-elohim-host".to_string()),
             portal: hostile,
             endpoints: AuthEndpoints::current(),
+            apps: None,
         };
         let json = serde_json::to_value(&doc).unwrap();
         let schema = load_schema("views/auth-discovery.schema.json");

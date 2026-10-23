@@ -1,10 +1,18 @@
 import { CommonModule } from '@angular/common';
-import { Component, Input, OnChanges, SimpleChanges, inject } from '@angular/core';
+import {
+  ChangeDetectorRef,
+  Component,
+  Input,
+  OnChanges,
+  SimpleChanges,
+  inject,
+} from '@angular/core';
 import { DomSanitizer, SafeResourceUrl } from '@angular/platform-browser';
 
 // @coverage: 80.7% (2026-02-24)
 
 import { ContentNode } from '../../models/content-node.model';
+import { AppsOriginService } from '../../services/apps-origin.service';
 
 /**
  * HTML5 app content structure for doorway-served apps.
@@ -27,9 +35,12 @@ export interface Html5AppContent {
  * 2. HTML5 App mode: content is Html5AppContent, served via doorway's /apps/ endpoint
  *
  * For HTML5 apps, the component builds the doorway URL:
- *   `${doorwayUrl}/apps/${slug}/${entryPoint}`
+ *   `${appsOrigin}/apps/${slug}/${entryPoint}`
  *
- * The doorway handles zip extraction, caching, and serving with proper headers.
+ * On an apps-paired public name the raw bytes live on `apps.<name>`, so this
+ * wrapper frames that origin's URL and the doorway serves the bare content to
+ * the same-site frame (no second chrome). Unpaired names keep same-origin
+ * `/apps/...`. The doorway handles zip extraction, caching, and headers.
  */
 @Component({
   selector: 'app-iframe-renderer',
@@ -54,9 +65,17 @@ export interface Html5AppContent {
         </div>
       }
       @if (safeUrl) {
+        <!--
+          TODO(capabilities): sandbox/allow are static here, not the record's declared
+          capabilities. The one source to share is frameAttributes in
+          elohim/elohim-chrome-asset/src/omni-element.js (mode x isolation x declared
+          capabilities x the person's grants); do not grow a second capability table here.
+        -->
         <iframe
           [src]="safeUrl"
           sandbox="allow-scripts allow-same-origin allow-forms allow-popups"
+          data-testid="app-frame"
+          [attr.data-frame-origin]="frameOrigin"
           class="iframe-content"
           [class.hidden]="loading"
           allowfullscreen
@@ -75,9 +94,15 @@ export class IframeRendererComponent implements OnChanges {
   loading = true;
   errorMessage: string | null = null;
   fallbackUrl: string | null = null;
+  /** The origin the html5-app frame loads from ('same-origin' when unpaired); null otherwise. */
+  frameOrigin: string | null = null;
   // Note: sandbox is static in template due to Angular security restrictions (NG0910)
 
   private readonly sanitizer = inject(DomSanitizer);
+  private readonly appsOrigin = inject(AppsOriginService);
+  private readonly cdr = inject(ChangeDetectorRef);
+  /** Bumped per configure, so a slow discovery read never frames a node that has moved on. */
+  private configureSeq = 0;
 
   ngOnChanges(changes: SimpleChanges): void {
     if (changes['node'] && this.node) {
@@ -97,6 +122,9 @@ export class IframeRendererComponent implements OnChanges {
   }
 
   private configureIframe(): void {
+    const seq = ++this.configureSeq;
+    this.safeUrl = null;
+    this.frameOrigin = null;
     const { contentFormat, metadata } = this.node;
     let content = this.node.content;
 
@@ -111,11 +139,18 @@ export class IframeRendererComponent implements OnChanges {
 
     // HTML5 App mode: content is Html5AppContent object
     if (contentFormat === 'html5-app' && this.isHtml5AppContent(content)) {
-      const url = this.buildHtml5AppUrl(content);
-      this.fallbackUrl = content.fallbackUrl ?? null;
-      // Security: URL is constructed from trusted doorway endpoint + content metadata
-      // eslint-disable-next-line sonarjs/no-angular-bypass-sanitization
-      this.safeUrl = this.sanitizer.bypassSecurityTrustResourceUrl(url);
+      const app = content;
+      this.fallbackUrl = app.fallbackUrl ?? null;
+      const known = this.appsOrigin.appsOrigin();
+      if (known !== undefined) {
+        this.frameHtml5App(app, known);
+      } else {
+        // First frame this session: ask the doorway once, then frame. Framing
+        // same-origin first and moving would load the app twice.
+        void this.appsOrigin.resolve().then(origin => {
+          if (seq === this.configureSeq) this.frameHtml5App(app, origin);
+        });
+      }
       return;
     }
 
@@ -150,30 +185,25 @@ export class IframeRendererComponent implements OnChanges {
   }
 
   /**
-   * Build the doorway URL for an HTML5 app.
-   * Format: ${doorwayUrl}/apps/${slug}/${entryPoint}
+   * Frame an HTML5 app: `${appsOrigin}/apps/${slug}/${entryPoint}`.
    *
-   * The frame always shows the bundle the doorway serves and verifies by its hash.
-   * `fallbackUrl` only feeds the "open elsewhere" link: the doorway base is the empty
-   * string (same origin), so treating "no base" as "use the fallback" framed an outside
-   * copy instead of the protocol's own.
-   */
-  private buildHtml5AppUrl(content: Html5AppContent): string {
-    const doorwayUrl = this.resolveDoorwayUrl();
-    const { slug, entryPoint } = content;
-    return `${doorwayUrl}/apps/${slug}/${entryPoint}`;
-  }
-
-  /**
-   * Resolve the doorway base URL.
+   * The frame shows the bundle the doorway serves and verifies by its hash.
+   * `fallbackUrl` only feeds the "open elsewhere" link — an empty base means
+   * same origin, never "use the fallback", which would frame an outside copy
+   * instead of the protocol's own.
    *
-   * Returns empty string (relative URL) for all environments. Doorway serves
-   * everything from the same origin — either directly or via ingress proxy.
-   * This ensures the service worker can intercept /apps/ requests for ZIP
-   * delivery on cold cache.
+   * Cold-cache delivery of `/apps/` is a service worker's job on whichever origin
+   * the frame loads from: same-origin, the shell's worker; on an apps-paired name,
+   * the worker registered on the apps origin (src/apps-sw.ts), not the name's.
    */
-  private resolveDoorwayUrl(): string {
-    return '';
+  private frameHtml5App(content: Html5AppContent, appsOrigin: string | null): void {
+    const url = this.appsOrigin.appUrl(content.slug, content.entryPoint, appsOrigin);
+    this.frameOrigin = appsOrigin ?? 'same-origin';
+    // Security: URL is the page's own origin or the apps origin its doorway pairs
+    // it with (AppsOriginService only accepts apps.<this host>), plus content metadata.
+    // eslint-disable-next-line sonarjs/no-angular-bypass-sanitization
+    this.safeUrl = this.sanitizer.bypassSecurityTrustResourceUrl(url);
+    this.cdr.markForCheck();
   }
 
   /**

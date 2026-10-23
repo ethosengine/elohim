@@ -16,8 +16,8 @@ Feature: A reader continues through a sibling when a household doorway stops ans
   content are the evidence; a test-side fetch or a cached title cannot pass the story.
 
   Background:
-    Given peer "alpha-A" at "alpha-A"
-    And peer "elohim.host" at "elohim.host"
+    Given federated peer "alpha-A" at "alpha-A"
+    And federated peer "elohim.host" at "elohim.host"
     And every serving doorway among "alpha-A" and "elohim.host" resolves the same declared head for content "elohim-host-landing"
 
   Scenario: Following a public reading link survives an entrance outage and recovery

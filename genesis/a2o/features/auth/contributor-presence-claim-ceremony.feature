@@ -36,7 +36,7 @@ Feature: Gertrude claims her presence — a convened, witnessed, negotiated sett
   conditions, not the answer.
 
   Background:
-    Given peer "alpha-A" at "alpha-A"
+    Given federated peer "alpha-A" at "alpha-A"
     And "Gertrude" exists as a commons-stewarded contributor presence with a steward-authored witnessed ascription
 
   @requires:shem @act:iii
@@ -45,7 +45,7 @@ Feature: Gertrude claims her presence — a convened, witnessed, negotiated sett
     # Intent — it opens the negotiation; nothing transfers here.
     Given a conductor is provisioned for "Gertrude" on the shem canvas
     When "Gertrude" files a claim intent on her contributor presence
-    Then her contributor presence on peer "alpha-A" is in state "claiming"
+    Then her contributor presence on federated peer "alpha-A" is in state "claiming"
     And a claim intent event is recorded for her presence
 
   @act:i
@@ -65,7 +65,7 @@ Feature: Gertrude claims her presence — a convened, witnessed, negotiated sett
     # chain-root cid (never a raw key) so the claim survives every rotation.
     Given the claim convening for "Gertrude" has concluded with a witnessed settlement
     When the deterministic floor executes the settlement
-    Then her contributor presence on peer "alpha-A" is in state "claimed"
+    Then her contributor presence on federated peer "alpha-A" is in state "claimed"
     And her identity binding is stamped through the membership stamp
     And her presence claimed_root is anchored at her identity chain-root
 
@@ -83,9 +83,9 @@ Feature: Gertrude claims her presence — a convened, witnessed, negotiated sett
     # The observable the whole arc exists for: with her own key bound, the
     # household-resilience holder relation counts her verified — and stops
     # counting her witnessed.
-    Given "Gertrude" has completed her claim on peer "alpha-A"
-    Then the household holder relation on peer "alpha-A" counts "Gertrude" as a verified holder
-    And the household holder relation on peer "alpha-A" no longer counts "Gertrude" as a witnessed holder
+    Given "Gertrude" has completed her claim on federated peer "alpha-A"
+    Then the household holder relation on federated peer "alpha-A" counts "Gertrude" as a verified holder
+    And the household holder relation on federated peer "alpha-A" no longer counts "Gertrude" as a witnessed holder
 
   @act:i
   Scenario: A settlement is appealable through correcting events

@@ -233,35 +233,40 @@ async function assertLabeledMetric(args: LabeledMetricAssertion): Promise<'pendi
  * Example:
  *   Then labeled metric "elohim_identity_fill_total" with label "action" "created" on peer "alpha-A" >= 1
  */
-Then(
+for (const expression of [
   'labeled metric {string} with label {string} {string} on peer {string} {word} {float}',
-  // Default cucumber step timeout (30s) is shorter than the bounded gauge
-  // poll below (up to GAUGE_SWEEP_POLL_TIMEOUT_MS = 6 minutes) — without an
-  // explicit override cucumber would kill the step long before the poll's
-  // own deadline governor fires (same trap the 60s commitment/pull polling
-  // steps below document; +15s margin, matching their convention).
-  { timeout: GAUGE_SWEEP_POLL_TIMEOUT_MS + 15_000 },
-  async function (
-    this: E2EWorld,
-    metricName: string,
-    labelKey: string,
-    labelValue: string,
-    peerName: string,
-    cmp: string,
-    expected: number
-  ) {
-    return assertLabeledMetric({
-      world: this,
-      metricName,
-      labelKey,
-      labelValue,
-      peerName,
-      cmp,
-      expected,
-      strict: false,
-    });
-  }
-);
+  'labeled metric {string} with label {string} {string} on federated peer {string} {word} {float}',
+]) {
+  Then(
+    expression,
+    // Default cucumber step timeout (30s) is shorter than the bounded gauge
+    // poll below (up to GAUGE_SWEEP_POLL_TIMEOUT_MS = 6 minutes) — without an
+    // explicit override cucumber would kill the step long before the poll's
+    // own deadline governor fires (same trap the 60s commitment/pull polling
+    // steps below document; +15s margin, matching their convention).
+    { timeout: GAUGE_SWEEP_POLL_TIMEOUT_MS + 15_000 },
+    async function (
+      this: E2EWorld,
+      metricName: string,
+      labelKey: string,
+      labelValue: string,
+      peerName: string,
+      cmp: string,
+      expected: number
+    ) {
+      return assertLabeledMetric({
+        world: this,
+        metricName,
+        labelKey,
+        labelValue,
+        peerName,
+        cmp,
+        expected,
+        strict: false,
+      });
+    }
+  );
+}
 
 /**
  * Strict sibling of the labelled-metric step above: once /metrics has
@@ -647,7 +652,7 @@ export const rawCapture = new WeakMap<E2EWorld, RawCapture>();
  *   When I query "/" on peer "elohim.host" expecting raw text
  */
 When(
-  'I query {string} on peer {string} expecting raw text',
+  'I query {string} on federated peer {string} expecting raw text',
   // Sized for BOTH bounded waits back to back: the readiness poll (90s) and
   // then the shed ride (CATCHUP_RIDE_STEP_TIMEOUT_MS). Cucumber's 30s default
   // (steps/common.steps.ts setDefaultTimeout) would kill the step mid-wait.
@@ -851,7 +856,7 @@ Then(
  *   Then peer "elohim.host" resolves the declared head for content "elohim-host-landing" equal to peer "alpha-A"
  */
 Then(
-  'peer {string} resolves the declared head for content {string} equal to peer {string}',
+  'federated peer {string} resolves the declared head for content {string} equal to federated peer {string}',
   // probeDeclaredHead rides the bounded shed (surfaces.ts), so this step can
   // wait far past cucumber's 31s default. Both peers are read concurrently
   // below, so ONE ride's ceiling covers the step.
@@ -915,7 +920,7 @@ const lookErrors = new WeakMap<E2EWorld, string>();
  *   When I render the resilience card for "elohim-host-landing" on peer "elohim.host"
  */
 When(
-  'I render the resilience card for {string} on peer {string}',
+  'I render the resilience card for {string} on federated peer {string}',
   async function (this: E2EWorld, contentId: string, peerName: string) {
     const doorway = this.getDoorway(peerName);
     const url = `${doorway.url}/epr/${encodeURIComponent(contentId)}`;

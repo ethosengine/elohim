@@ -35,17 +35,17 @@ Feature: The landing surface carries real backing claims
   disclosure rather than a decoration.
 
   Background:
-    Given peer "alpha" at "E2E_DOORWAY_ALPHA"
+    Given federated peer "alpha" at "E2E_DOORWAY_ALPHA"
 
   # --- The atoms exist at all ---
 
   Scenario: The landing EPR resolves a nav-context projection
     # Precondition for everything below: the seeder's atom family landed, and
     # the slug-fallback lookup (epr_nav_context_view::project) finds it.
-    Then EPR "elohim-host-landing" nav-context is reachable on peer "alpha"
+    Then EPR "elohim-host-landing" nav-context is reachable on federated peer "alpha"
 
   Scenario: The nav-context projection answers with a related-atom skeleton
-    When I query "/api/v1/epr/elohim-host-landing/nav-context" on peer "alpha"
+    When I query "/api/v1/epr/elohim-host-landing/nav-context" on federated peer "alpha"
     Then the surface response status is 200
     And the surface response has field "cid"
     And the surface response has field "related"
@@ -56,7 +56,7 @@ Feature: The landing surface carries real backing claims
     # whose entries all carry a cid is the regression anchor for the empty
     # `claims: []` era: with no claims and one dangling governance leg, this
     # array carried a single unresolvable stranger.
-    When I query "/api/v1/epr/elohim-host-landing/nav-context" on peer "alpha"
+    When I query "/api/v1/epr/elohim-host-landing/nav-context" on federated peer "alpha"
     Then the surface response status is 200
     And each entry under "related" has field "cid"
 
@@ -69,14 +69,14 @@ Feature: The landing surface carries real backing claims
   # atom this peer does not hold carries a cid and no label; the assertion says
   # which of the two it found.
   Scenario: The governance leg resolves to the landing surface's own governance state
-    When I query "/api/v1/epr/elohim-host-landing/nav-context" on peer "alpha"
+    When I query "/api/v1/epr/elohim-host-landing/nav-context" on federated peer "alpha"
     Then the entry labelled "elohim-host-landing-governance" appears under "related"
 
   Scenario: The claims name the stewardship and custody assertions
     # Not "there are claims" — WHICH claims. The landing atom asserts exactly
     # two: who stewards this content and on what provenance, and that a
     # custody-blob pledge is held for its SSR artifact.
-    When I query "/api/v1/epr/elohim-host-landing/nav-context" on peer "alpha"
+    When I query "/api/v1/epr/elohim-host-landing/nav-context" on federated peer "alpha"
     Then the entry labelled "elohim-host-landing-stewardship-claim" appears under "related"
     And the entry labelled "elohim-host-landing-custody-claim" appears under "related"
 

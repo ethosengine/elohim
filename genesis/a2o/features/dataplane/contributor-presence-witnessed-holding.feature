@@ -24,28 +24,28 @@ Feature: Fixture residents hold their households as witnessed presences, not bar
   backing witnessed presence.
 
   Background:
-    Given peer "alpha-A" at "alpha-A"
+    Given federated peer "alpha-A" at "alpha-A"
 
   Scenario: Every fixture resident exists as a commons-stewarded contributor presence
     # Stage 1 forcing function: the 11 fixture residents are seeded through the
     # existing presences pipeline (presences.json -> seed-presences.ts), state
     # "stewarded" — held by the elohim-commons in trust, claimable later.
-    Then every fixture resident on peer "alpha-A" exists as a contributor presence in state "stewarded"
-    And no fixture resident on peer "alpha-A" remains a bare human row without a backing presence
+    Then every fixture resident on federated peer "alpha-A" exists as a contributor presence in state "stewarded"
+    And no fixture resident on federated peer "alpha-A" remains a bare human row without a backing presence
 
   Scenario: Steward-authored witnessed ascriptions cover fixture-resident household residency
     # A real agent authors the ascription ABOUT the presence, signed with their
     # own key — mediated agency, never a synthetic self-attestation. The
     # ascription is the attestation:witnessed-ascription kind (Content-entry
     # convention; zero new DHT entry types).
-    Then each fixture-resident presence on peer "alpha-A" carries a steward-authored witnessed ascription for its household residency
+    Then each fixture-resident presence on federated peer "alpha-A" carries a steward-authored witnessed ascription for its household residency
 
   Scenario: The holder relation counts fixture residents as witnessed, never verified
     # Verified = agent_pub_key present (a live key the resilience join can reach).
     # Witnessed = presence-backed, ascribed by a steward. A fixture resident has
     # no key, so counting one as verified would be a false-green on the card.
-    Then the household holder relation on peer "alpha-A" counts every fixture resident as a witnessed holder
-    And the household holder relation on peer "alpha-A" counts zero fixture residents as verified holders
+    Then the household holder relation on federated peer "alpha-A" counts every fixture resident as a witnessed holder
+    And the household holder relation on federated peer "alpha-A" counts zero fixture residents as verified holders
 
   Scenario: No household-placed row is orphaned under the evolved invariant
     # The evolved invariant: household_id => (agent_pub_key OR witnessed-presence).
@@ -53,4 +53,4 @@ Feature: Fixture residents hold their households as witnessed presences, not bar
     # again exactly one bug — the membership-projection agent-key drop — and
     # never the fixture default. Zero matching rows on a peer with no households
     # is an honest pass; the invariant is an implication.
-    Then no household-placed human on peer "alpha-A" lacks both an agent key and a witnessed presence
+    Then no household-placed human on federated peer "alpha-A" lacks both an agent key and a witnessed presence

@@ -262,7 +262,7 @@ async function createContentOnPeer(
 }
 
 Given(
-  'peer {string} ingests content {string}',
+  'federated peer {string} ingests content {string}',
   { timeout: 60_000 },
   async function (this: E2EWorld, peerName: string, alias: string) {
     await createContentOnPeer(this, peerName, alias);
@@ -273,7 +273,7 @@ Given(
   // The '/' characters must be escaped: an unescaped '/' in a cucumber expression is
   // alternation syntax, and 'POST /db/content' reads as an EMPTY alternative — which
   // throws at support-code load and aborts the whole run (a2o CLAUDE.md watch-out).
-  String.raw`peer {string} creates content {string} via POST \/db\/content`,
+  String.raw`federated peer {string} creates content {string} via POST \/db\/content`,
   { timeout: 60_000 },
   async function (this: E2EWorld, peerName: string, alias: string) {
     await createContentOnPeer(this, peerName, alias);
@@ -380,7 +380,7 @@ Then(
  * Example: And peer "staging" can discover "test-concept" via Kademlia lookup
  */
 Then(
-  'peer {string} can discover {string} via Kademlia lookup',
+  'federated peer {string} can discover {string} via Kademlia lookup',
   { timeout: 180_000 },
   async function (this: E2EWorld, peerName: string, alias: string) {
     const originPeer = this.contentIds.get(ORIGIN_PEER_KEY) ?? ALPHA_PEER;
@@ -457,7 +457,7 @@ Given(
  * Example: When peer "staging" requests content "fct-module-01-church-dilemma"
  */
 When(
-  'peer {string} requests content {string}',
+  'federated peer {string} requests content {string}',
   { timeout: 180_000 },
   async function (this: E2EWorld, peerName: string, alias: string) {
     const url = peerUrl(peerName);
@@ -567,7 +567,7 @@ function resolvedVia(view: ContentRowView): string | undefined {
  * Example: Given peer "alpha" has content "fct-module-01-church-dilemma" stewarded by Pete
  */
 Given(
-  'peer {string} has content {string} stewarded by {word}',
+  'federated peer {string} has content {string} stewarded by {word}',
   { timeout: 60_000 },
   async function (this: E2EWorld, peerName: string, alias: string, steward: string) {
     const id = await createContentOnPeer(this, peerName, alias);
@@ -582,7 +582,7 @@ Given(
  * Example: And peer "staging" does not have "fct-module-01-church-dilemma" locally
  */
 Given(
-  'peer {string} does not have {string} locally',
+  'federated peer {string} does not have {string} locally',
   { timeout: 60_000 },
   async function (this: E2EWorld, peerName: string, alias: string) {
     const origin = originPeerOf(this);
@@ -612,7 +612,7 @@ Given(
  * Example: Then the content is resolved via EPR protocol from peer "alpha"
  */
 Then(
-  'the content is resolved via EPR protocol from peer {string}',
+  'the content is resolved via EPR protocol from federated peer {string}',
   { timeout: 60_000 },
   async function (this: E2EWorld, originName: string) {
     const reader = 'staging';
@@ -680,7 +680,7 @@ Then(
  * Example: And the content is persisted to local SQLite on peer "staging"
  */
 Then(
-  'the content is persisted to local SQLite on peer {string}',
+  'the content is persisted to local SQLite on federated peer {string}',
   { timeout: 60_000 },
   async function (this: E2EWorld, peerName: string) {
     const origin = originPeerOf(this);
@@ -753,7 +753,7 @@ Then(
  * Example: Given peer "staging" resolves "cross-steward-concept" via P2P
  */
 Given(
-  'peer {string} resolves {string} via P2P',
+  'federated peer {string} resolves {string} via P2P',
   { timeout: 240_000 },
   async function (this: E2EWorld, peerName: string, alias: string) {
     // "alpha" is the only counterpart this harness declares; the feature names

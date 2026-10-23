@@ -1762,6 +1762,25 @@ describe('ContentViewerComponent', () => {
       expect(fixture.nativeElement.querySelector(PILLAR_AFFORDANCE)).toBeFalsy();
     }));
   });
+
+  // Lamad's viewer is a wrapper: the record sits around the frame and links to
+  // the content's own EPR page (a2o: "the learning app's viewer shows the
+  // app's record and a link to its EPR page around the frame").
+  describe('record around the frame', () => {
+    it('shows the record and a plain-href link to the universal EPR page', fakeAsync(() => {
+      fixture.detectChanges();
+      tick();
+      fixture.detectChanges();
+
+      const record = fixture.nativeElement.querySelector('[data-testid="viewer-record"]');
+      expect(record?.textContent).toContain(mockContentNode.title);
+      const link = record?.querySelector(
+        '[data-testid="viewer-epr-page-link"]',
+      ) as HTMLAnchorElement | null;
+      expect(link?.tagName.toLowerCase()).toBe('a');
+      expect(link?.getAttribute('href')).toBe(`/epr/${encodeURIComponent(mockContentNode.id)}`);
+    }));
+  });
   // =========================================================================
   // Content load — OnPush subscribe-mutation regression (@regression)
   //

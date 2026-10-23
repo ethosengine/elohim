@@ -5,5 +5,5 @@
  * Uses IframeRendererComponent to display apps in a sandboxed iframe.
  */
 
-export { Html5AppFormatPlugin } from './html5-app-format.plugin';
-export type { Html5AppContent } from '../../../renderers/iframe-renderer/iframe-renderer.component';
+export { Html5AppFormatPlugin } from "./html5-app-format.plugin";
+export type { Html5AppContent } from "../../../renderers/iframe-renderer/iframe-renderer.component";

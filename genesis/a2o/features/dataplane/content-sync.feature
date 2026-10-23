@@ -27,15 +27,15 @@ Feature: Content-sync plane convergence
     # "elohim.host" → E2E_DOORWAY_B / E2E_DOORWAY_BETA. On the deployed fleet those are two
     # doorways in front of two storage peers; on a household mesh they are the two local
     # doorways. Either way the pair must share ONE P2P network, or convergence is untestable.
-    Given peer "alpha-A" at "alpha-A"
-    And peer "elohim.host" at "elohim.host"
+    Given federated peer "alpha-A" at "alpha-A"
+    And federated peer "elohim.host" at "elohim.host"
 
   @act:i
   Scenario: The sync plane has produced at least one document on alpha-A
     # Confirms the content-projection producer is running and the sync table is non-empty.
     # A total >= 1 means at least one content node has been authored and projected into
     # an Automerge document — the minimum evidence that the sync plane is live.
-    Then /sync/v1/elohim/docs list on peer "alpha-A" has at least 1 document
+    Then /sync/v1/elohim/docs list on federated peer "alpha-A" has at least 1 document
 
   @act:i
   Scenario: A content node named by alpha-A has committed changes there
@@ -43,8 +43,8 @@ Feature: Content-sync plane convergence
     # this exercises the PER-DOCUMENT heads surface, so a failure here indicts the
     # producer on alpha-A and clears the gossip layer of suspicion. Non-empty heads mean
     # that Automerge document has at least one committed change, not merely a row.
-    When a content sync doc is selected from peer "alpha-A"
-    Then the selected sync doc is present on peer "alpha-A"
+    When a content sync doc is selected from federated peer "alpha-A"
+    Then the selected sync doc is present on federated peer "alpha-A"
 
   @act:i
   Scenario: The same content doc has converged onto elohim.host
@@ -52,8 +52,8 @@ Feature: Content-sync plane convergence
     # at the SAME point in its change history — equal head sets, not merely two non-empty
     # ones. Two peers each sitting on a different head is a DIVERGED document, which is
     # the failure this scenario is here to catch; presence alone would pass it.
-    When a content sync doc is selected from peer "alpha-A"
-    Then the selected sync doc has converged onto peer "elohim.host"
+    When a content sync doc is selected from federated peer "alpha-A"
+    Then the selected sync doc has converged onto federated peer "elohim.host"
 
   @act:i @requires:owned-substrate
   Scenario: Author a content node and confirm it converges on a second peer within 30 s
@@ -71,8 +71,8 @@ Feature: Content-sync plane convergence
     Given human "Matthew" is logged in on doorway "alpha" with device
     When Matthew creates content titled "Dataplane sync probe" with tags "e2e,sync"
     Then the content should be created successfully
-    And /sync doc matching the created content id is present on peer "alpha-A" within 5 s
-    And /sync doc matching the created content id is present on peer "elohim.host" within 30 s
+    And /sync doc matching the created content id is present on federated peer "alpha-A" within 5 s
+    And /sync doc matching the created content id is present on federated peer "elohim.host" within 30 s
 
   @wip @requires:shem @act:iii
   Scenario: Cross-tenant content doc converges via shem relay within 60 s

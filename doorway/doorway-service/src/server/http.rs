@@ -398,6 +398,11 @@ pub struct AppState {
     /// `crate::services::name_routing::standing`.
     pub public_names: Arc<crate::services::name_routing::standing::PublicNameRegistry>,
 
+    /// The delivery facts this doorway reports about ITSELF (id, `did:web`),
+    /// constant for the process: derived from `args` once (forced at boot by
+    /// [`AppState::doorway_self`] in `run`), never rebuilt per request.
+    pub doorway_self: std::sync::OnceLock<crate::routes::apps::DoorwaySelf>,
+
     /// Materialized `/sitemap.xml` cache (spec §7.5): `(generation, xml)`.
     /// Served when the cached generation still matches `epr_router.generation()`;
     /// otherwise re-materialized from the routing table + commons ids and
@@ -707,6 +712,12 @@ mod signal_relay_identity_tests {
 }
 
 impl AppState {
+    /// This doorway's self-reported delivery facts, derived from `args` once.
+    pub fn doorway_self(&self) -> &crate::routes::apps::DoorwaySelf {
+        self.doorway_self
+            .get_or_init(|| crate::routes::apps::DoorwaySelf::from_args(&self.args))
+    }
+
     /// Build a **federation-aware** `JwtValidator` — the live wiring seam for
     /// Task 2.1's cross-doorway trust core.
     ///
@@ -852,6 +863,7 @@ impl AppState {
             public_names: Arc::new(
                 crate::services::name_routing::standing::PublicNameRegistry::new(),
             ),
+            doorway_self: std::sync::OnceLock::new(),
             sitemap_cache: Arc::new(tokio::sync::RwLock::new(None)),
             transport_manifests: Arc::new(crate::routes::TransportManifestStore::new()),
             portal_health_override: Arc::new(tokio::sync::RwLock::new(
@@ -981,6 +993,7 @@ impl AppState {
             public_names: Arc::new(
                 crate::services::name_routing::standing::PublicNameRegistry::new(),
             ),
+            doorway_self: std::sync::OnceLock::new(),
             sitemap_cache: Arc::new(tokio::sync::RwLock::new(None)),
             transport_manifests: Arc::new(crate::routes::TransportManifestStore::new()),
             portal_health_override: Arc::new(tokio::sync::RwLock::new(
@@ -1125,6 +1138,7 @@ impl AppState {
             public_names: Arc::new(
                 crate::services::name_routing::standing::PublicNameRegistry::new(),
             ),
+            doorway_self: std::sync::OnceLock::new(),
             sitemap_cache: Arc::new(tokio::sync::RwLock::new(None)),
             transport_manifests: Arc::new(crate::routes::TransportManifestStore::new()),
             portal_health_override: Arc::new(tokio::sync::RwLock::new(
@@ -1289,6 +1303,7 @@ impl AppState {
             public_names: Arc::new(
                 crate::services::name_routing::standing::PublicNameRegistry::new(),
             ),
+            doorway_self: std::sync::OnceLock::new(),
             sitemap_cache: Arc::new(tokio::sync::RwLock::new(None)),
             transport_manifests: Arc::new(crate::routes::TransportManifestStore::new()),
             portal_health_override: Arc::new(tokio::sync::RwLock::new(
@@ -1482,7 +1497,8 @@ pub fn determine_auth_posture<B>(req: &Request<B>) -> AuthPosture {
 /// the M5 auth-portal-convergence sprint; today the session layer doesn't
 /// produce that cookie shape but the shim is wire-ready.
 fn build_ssr_user_credential<B>(req: &Request<B>) -> Option<crate::ssr::UserCredential> {
-    if let Some(auth) = req.headers().get(hyper::header::AUTHORIZATION) {
+    let headers = req.headers();
+    if let Some(auth) = headers.get(hyper::header::AUTHORIZATION) {
         if let Ok(value) = auth.to_str() {
             return Some(crate::ssr::UserCredential {
                 header_name: "Authorization".into(),
@@ -1490,7 +1506,7 @@ fn build_ssr_user_credential<B>(req: &Request<B>) -> Option<crate::ssr::UserCred
             });
         }
     }
-    if let Some(cookie) = req.headers().get(hyper::header::COOKIE) {
+    if let Some(cookie) = headers.get(hyper::header::COOKIE) {
         if let Ok(value) = cookie.to_str() {
             if value.contains("doorway_session=") || value.contains("steward_attestation=") {
                 return Some(crate::ssr::UserCredential {
@@ -1587,12 +1603,27 @@ pub(crate) fn resolve_verified_claims_from_request<B>(
     state: &AppState,
     req: &Request<B>,
 ) -> Option<crate::auth::Claims> {
-    let auth_header = req
-        .headers()
+    resolve_verified_claims_from_headers(state, req.headers())
+}
+
+/// [`resolve_verified_claims_from_request`] over a bare header map, for a
+/// handler handed `req.headers()` (the `/apps` content shell's viewer). Same
+/// verification, so a header's mere presence is never a session.
+pub(crate) fn resolve_verified_claims_from_headers(
+    state: &AppState,
+    headers: &hyper::HeaderMap,
+) -> Option<crate::auth::Claims> {
+    let auth_header = headers
         .get(hyper::header::AUTHORIZATION)
         .and_then(|v| v.to_str().ok());
     let token = extract_token_from_header(auth_header)?;
+    verify_session_token(state, token)
+}
 
+/// Verify one session token with this doorway's JWT validator — the single
+/// check every credential path ends in. `None` for an unconfigured validator,
+/// a bad signature, or an expired token.
+pub(crate) fn verify_session_token(state: &AppState, token: &str) -> Option<crate::auth::Claims> {
     let validator = JwtValidator::from_config(
         state.args.configured_jwt_secret(),
         state.args.jwt_expiry_seconds,
@@ -2288,6 +2319,9 @@ fn spawn_health_listener(
 }
 
 pub async fn run(state: Arc<AppState>) -> Result<(), DoorwayError> {
+    // The doorway's self-reported delivery facts, fixed at boot.
+    let _ = state.doorway_self();
+
     // Public-name membership (campaign story 2.2): read ONCE before the first
     // request can arrive, so a doorway never answers a public name from an
     // empty reading, then refreshed in the background.
@@ -2490,7 +2524,7 @@ pub async fn run(state: Arc<AppState>) -> Result<(), DoorwayError> {
         match listener.accept().await {
             Ok((stream, addr)) => {
                 let state = Arc::clone(&state);
-                tokio::spawn(serve_connection(stream, addr, state));
+                tokio::spawn(serve_connection(stream, addr, state, false));
             }
             Err(e) => {
                 error!("Error accepting connection: {:?}", e);
@@ -2506,14 +2540,21 @@ pub async fn run(state: Arc<AppState>) -> Result<(), DoorwayError> {
 /// call the exact same code: the TLS listener terminates rustls and then
 /// rejoins this one pipeline, so the two fronts can never diverge in routing
 /// behavior — it is one router with two doors, not two routers.
-async fn serve_connection<IO>(stream: IO, addr: SocketAddr, state: Arc<AppState>)
+///
+/// `over_tls` marks every request on a TLS connection with
+/// [`routes::apps::ArrivedOverTls`], so a URL the doorway builds for the
+/// browser (the content-origin pairing) keeps the scheme the request came in on.
+async fn serve_connection<IO>(stream: IO, addr: SocketAddr, state: Arc<AppState>, over_tls: bool)
 where
     IO: tokio::io::AsyncRead + tokio::io::AsyncWrite + Unpin + Send + 'static,
 {
     let io = TokioIo::new(stream);
 
-    let service = service_fn(move |req: Request<Incoming>| {
+    let service = service_fn(move |mut req: Request<Incoming>| {
         let state = Arc::clone(&state);
+        if over_tls {
+            req.extensions_mut().insert(routes::apps::ArrivedOverTls);
+        }
         async move {
             // Extract CORS context at the outermost level so every
             // response — including early returns — gets CORS headers.
@@ -2628,7 +2669,7 @@ fn spawn_tls_listener(
                     tokio::spawn(async move {
                         match acceptor.accept(stream).await {
                             Ok(tls_stream) => {
-                                serve_connection(tls_stream, peer_addr, state).await;
+                                serve_connection(tls_stream, peer_addr, state, true).await;
                             }
                             Err(e) => {
                                 debug!("TLS handshake failed from {}: {:?}", peer_addr, e);
@@ -2849,6 +2890,10 @@ fn is_service_path(path: &str) -> bool {
         // SPA bundle — the /auth/portal incident shape. FLIPPED 2026-06-27.
         "/sync/",
         "/apps/",
+        // /_elohim/* — the content-chrome trust edge's doorway-owned paths
+        // (the always-render content shell, the CSP report relay, the apps
+        // origin's boot page). Explicit arms; never the EPR router's.
+        "/_elohim/",
         "/epr-head/",
         "/epr/",
         "/blob/",
@@ -3132,6 +3177,13 @@ mod shakeout_tests {
         // The sibling federation routes stay covered too.
         assert!(is_service_path("/api/v1/federation/doorways"));
         assert!(is_service_path("/api/v1/federation/coherence"));
+    }
+
+    #[test]
+    fn the_content_chrome_edge_paths_are_service_paths() {
+        assert!(is_service_path("/_elohim/content/quiz-1/index.html"));
+        assert!(is_service_path("/_elohim/csp-report"));
+        assert!(is_service_path("/_elohim/boot"));
     }
 
     #[test]
@@ -7444,7 +7496,7 @@ mod name_relay_request_tests {
 
 /// This doorway's federation id — the one `x-elohim-served-by` names under a
 /// public name. Same fallback the relay tier uses.
-fn self_doorway_id(args: &Args) -> String {
+pub(crate) fn self_doorway_id(args: &Args) -> String {
     args.doorway_id
         .clone()
         .unwrap_or_else(|| args.node_id.to_string())
@@ -7727,6 +7779,47 @@ async fn handle_request_under_names(
     addr: SocketAddr,
     req: Request<Incoming>,
 ) -> Result<Response<BoxBody>, hyper::Error> {
+    // ── The content origin (`apps.<name>`) answers a closed surface ──────────
+    // Derived from the Host header alone (`routes::apps::apps_pairing`), so any
+    // doorway answering the name computes the same thing. The worker script is
+    // the paired NAME's bytes, so its request is dispatched as if it had come
+    // in on the name (standing, relay and the EPR router all see the name).
+    // The pairing is computed ONCE here and carried to the arms below as a
+    // request extension (`routes::apps::RequestEdge`).
+    let mut req = req;
+    let over_tls = req
+        .extensions()
+        .get::<routes::apps::ArrivedOverTls>()
+        .is_some();
+    let mut edge = routes::apps::apps_edge(&state, req.headers(), over_tls);
+    if let Some(apps_edge) = edge.clone() {
+        if apps_edge.pairing.side == routes::apps::PairingSide::Apps {
+            use routes::apps::AppsHostRoute;
+            match routes::apps::apps_host_route(req.method(), req.uri().path()) {
+                AppsHostRoute::Boot => {
+                    return Ok(to_boxed(routes::apps::boot_response(
+                        req.uri().query(),
+                        req.headers(),
+                        &apps_edge,
+                    )));
+                }
+                AppsHostRoute::Worker => {
+                    if let Ok(name) =
+                        hyper::header::HeaderValue::from_str(&apps_edge.pairing.name_authority())
+                    {
+                        req.headers_mut().insert(hyper::header::HOST, name);
+                    }
+                    edge = Some(apps_edge.as_name_side());
+                }
+                AppsHostRoute::Pass => {}
+                AppsHostRoute::NotFound => {
+                    return Ok(to_boxed(routes::apps::apps_host_not_found()));
+                }
+            }
+        }
+    }
+    req.extensions_mut().insert(routes::apps::RequestEdge(edge));
+
     let public_name_served_by = {
         let membership = state.public_names.snapshot();
         if membership.is_empty() {
@@ -8300,9 +8393,13 @@ async fn handle_request(
                 .get(hyper::header::IF_NONE_MATCH)
                 .and_then(|v| v.to_str().ok())
                 .map(str::to_owned);
+            // `apps: true` when the name declares a content origin (same
+            // pairing the apps routing uses); clients derive the origin.
+            let apps = routes::auth_discovery::discovery_apps_flag(&state, &req);
             to_boxed(routes::auth_discovery::handle_auth_discovery(
                 Arc::clone(&state),
                 inm.as_deref(),
+                apps,
             ))
         }
 
@@ -8988,8 +9085,49 @@ async fn handle_request(
         // HEAD /apps/{app_id}/_capability — lightweight probe, no body
         (Method::HEAD, p) if p.starts_with("/apps/") && p.ends_with("/_capability") => {
             debug!(path = %p, "Handling app capability probe");
+            // On a name with an apps origin, every /apps/ request but a page
+            // opening lives on `apps.<name>` (the worker probes there).
+            if let Some(edge) = routes::apps::request_edge(&state, &req) {
+                if edge.pairing.side == routes::apps::PairingSide::Name {
+                    return Ok(to_boxed(routes::apps::moved_to_apps_origin(
+                        &edge,
+                        p,
+                        req.uri().query(),
+                    )));
+                }
+            }
             return Ok(to_boxed(
                 routes::handle_app_capability(Arc::clone(&state), p).await,
+            ));
+        }
+
+        // The content-chrome edge's always-render shell (GET
+        // /_elohim/content/<slug>/<file>): where the apps origin sends a
+        // person it will not show bare bytes to. Unlike /apps/ it never
+        // re-applies Fetch Metadata, so no redirect can loop.
+        (Method::GET, p) if p.starts_with(routes::apps::CONTENT_SHELL_PREFIX) => {
+            let admitted_reach =
+                if let Some(address) = addressed_segment(p, routes::apps::CONTENT_SHELL_PREFIX) {
+                    match fold_for_addressed_serve(&state, &req, p, address).await {
+                        Ok(reach) => reach,
+                        Err(blocked) => return Ok(to_boxed(*blocked)),
+                    }
+                } else {
+                    None
+                };
+            let serve_ctx = routes::apps::serve_context(&state, &req);
+            let mut response =
+                routes::apps::handle_content_shell(Arc::clone(&state), p, &serve_ctx).await;
+            stamp_addressed_admission(&mut response, admitted_reach.as_deref());
+            return Ok(to_boxed(response));
+        }
+
+        // CSP violation reports from apps-origin HTML (POST
+        // /_elohim/csp-report/<contentAddress>): format-checked, rate-limited,
+        // and relayed to ONE storage peer's content signals route (no fan-out).
+        (Method::POST, p) if p.starts_with(routes::csp_report::CSP_REPORT_PATH) => {
+            return Ok(to_boxed(
+                routes::csp_report::handle_csp_report(Arc::clone(&state), req, addr).await,
             ));
         }
 
@@ -9010,7 +9148,9 @@ async fn handle_request(
                 None
             };
             debug!(path = %p, "Handling app request (projection cache)");
-            let mut response = routes::handle_app_request(Arc::clone(&state), p, req.headers()).await;
+            let serve_ctx = routes::apps::serve_context(&state, &req);
+            let mut response =
+                routes::handle_app_request(Arc::clone(&state), p, req.headers(), &serve_ctx).await;
             stamp_addressed_admission(&mut response, admitted_reach.as_deref());
             return Ok(to_boxed(response));
         }
@@ -12548,6 +12688,7 @@ mod root_projection_shadow_regression_tests {
                     },
                 )
                 .collect(),
+            apps: false,
         }
     }
 

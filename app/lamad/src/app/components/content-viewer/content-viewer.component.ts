@@ -68,7 +68,12 @@ import type {
   FeedbackContext,
   MechanismSelection,
 } from 'elohim-core';
-import { GovernanceApiService, claimsFromDeclaration, epr } from '@elohim/service';
+import {
+  GovernanceApiService,
+  claimsFromDeclaration,
+  epr,
+  eprToUniversalHref,
+} from '@elohim/service';
 import { EventService, ObservationEmitterService, scrollDepthPct } from '@elohim/rea-runtime';
 
 import { LAMAD_ROUTE_CLAIMS } from '../../generated/route-claims';
@@ -1267,6 +1272,15 @@ export class ContentViewerComponent
     // links are href, never routerLink).
     const base = '/lamad'; // route-literal-ok: cross-bundle pillar base for the granted claim mount (Open-in-pillar lens)
     return { href: base + claim.commands(epr(this.node.id)).join('/'), pillarName: 'Lamad' };
+  }
+
+  /**
+   * The content's EPR page — the universal `/epr/{id}` address, minted, never
+   * a literal. Lamad's viewer is a wrapper: it shows the record around the
+   * frame, and this link reaches the full record (claims, holders, legs).
+   */
+  getEprPageHref(): string | null {
+    return this.node ? eprToUniversalHref({ id: this.node.id, tier: 'head' }) : null;
   }
 
   /**

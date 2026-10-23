@@ -179,6 +179,23 @@ pub struct RouteRegistry {
     /// "alpha-A" until its next boot. Install re-sorts steward routes by this
     /// rank, so declared order wins regardless of arrival order.
     peer_priority: RwLock<HashMap<String, usize>>,
+
+    /// The identity each steward storage peer reports about ITSELF in its
+    /// `GET /manifest` body (`peer: {agentKey, transportId?}`), keyed by the
+    /// storage URL (trailing slash trimmed). Absent for a peer that holds no
+    /// key. Category C: re-read with every manifest install, never persisted.
+    peer_identities: RwLock<HashMap<String, StewardPeerIdentity>>,
+}
+
+/// What a storage peer's manifest says about the peer itself.
+#[derive(Debug, Clone, PartialEq, Eq, serde::Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct StewardPeerIdentity {
+    /// The peer's conductor agent key (`uhCAk…`).
+    pub agent_key: String,
+    /// The transport id its running node reports, when it reports one.
+    #[serde(default)]
+    pub transport_id: Option<String>,
 }
 
 /// Entry for DNA-discovered routes
@@ -206,7 +223,36 @@ impl RouteRegistry {
             compiled_routes: RwLock::new(Vec::new()),
             last_compiled: RwLock::new(None),
             peer_priority: RwLock::new(HashMap::new()),
+            peer_identities: RwLock::new(HashMap::new()),
         }
+    }
+
+    /// Record (or clear, with `None`) the identity a steward peer's manifest
+    /// reported about itself.
+    pub async fn record_peer_identity(
+        &self,
+        storage_url: &str,
+        identity: Option<StewardPeerIdentity>,
+    ) {
+        let key = storage_url.trim_end_matches('/').to_string();
+        let mut ids = self.peer_identities.write().await;
+        match identity {
+            Some(id) => {
+                ids.insert(key, id);
+            }
+            None => {
+                ids.remove(&key);
+            }
+        }
+    }
+
+    /// The identity the steward peer at `storage_url` reported about itself.
+    pub async fn peer_identity(&self, storage_url: &str) -> Option<StewardPeerIdentity> {
+        self.peer_identities
+            .read()
+            .await
+            .get(storage_url.trim_end_matches('/'))
+            .cloned()
     }
 
     /// Declare steward-peer priority: index in `urls` is the rank (0 = primary).
@@ -715,7 +761,8 @@ impl RouteRegistry {
     /// number of compiled routes added, or an error string if the fetch or parse
     /// fails.
     pub async fn register_steward_peer(&self, storage_url: &str) -> Result<usize, String> {
-        let manifest = fetch_steward_manifest(storage_url).await?;
+        let (manifest, identity) = fetch_steward_manifest_with_peer(storage_url).await?;
+        self.record_peer_identity(storage_url, identity).await;
         Ok(self.install_steward_routes(storage_url, &manifest).await)
     }
 
@@ -968,6 +1015,36 @@ pub fn spawn_cleanup_task(
 /// first, so install order IS peer priority. Fetching and installing in one
 /// concurrent step would hand priority to whichever peer answered fastest.
 pub async fn fetch_steward_manifest(storage_url: &str) -> Result<DoorwayRoutes, String> {
+    fetch_steward_manifest_with_peer(storage_url)
+        .await
+        .map(|(routes, _)| routes)
+}
+
+/// [`fetch_steward_manifest`] plus the identity the peer reports about itself
+/// in the same body (`peer: {agentKey, transportId?}`; absent when it holds no
+/// key). Additive on the wire: the route manifest parses exactly as before.
+pub async fn fetch_steward_manifest_with_peer(
+    storage_url: &str,
+) -> Result<(DoorwayRoutes, Option<StewardPeerIdentity>), String> {
+    let body = fetch_manifest_body(storage_url).await?;
+    parse_manifest_with_peer(body)
+}
+
+/// Split a manifest body into its routes and the peer's self-reported identity.
+pub fn parse_manifest_with_peer(
+    mut body: serde_json::Value,
+) -> Result<(DoorwayRoutes, Option<StewardPeerIdentity>), String> {
+    let identity = body
+        .as_object_mut()
+        .and_then(|o| o.remove("peer"))
+        .and_then(|p| serde_json::from_value::<StewardPeerIdentity>(p).ok())
+        .filter(|p| !p.agent_key.trim().is_empty());
+    let routes: DoorwayRoutes =
+        serde_json::from_value(body).map_err(|e| format!("Failed to parse manifest JSON: {e}"))?;
+    Ok((routes, identity))
+}
+
+async fn fetch_manifest_body(storage_url: &str) -> Result<serde_json::Value, String> {
     let url = format!("{}/manifest", storage_url.trim_end_matches('/'));
 
     let client = reqwest::Client::builder()

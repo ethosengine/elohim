@@ -25,13 +25,13 @@ Feature: Chapter 8 — capacity is reported
   live and readable — the numbers the resilience card ultimately draws on.
 
   Background:
-    Given peer "alpha-A" at "alpha-A"
+    Given federated peer "alpha-A" at "alpha-A"
 
   Scenario: The cluster reports non-zero free custodian capacity
-    Then metric "elohim_custodian_free_bytes" on peer "alpha-A" > 0
+    Then metric "elohim_custodian_free_bytes" on federated peer "alpha-A" > 0
 
   # HELD (2026-08-21): >=0 on an unsigned gauge is unfalsifiable; the chapter header
   # admits it is a placeholder until identity-fill lands.
   @wip
   Scenario: The cluster reports a non-negative stewarded-bytes aggregate
-    Then metric "elohim_custodian_stewarded_bytes" on peer "alpha-A" >= 0
+    Then metric "elohim_custodian_stewarded_bytes" on federated peer "alpha-A" >= 0

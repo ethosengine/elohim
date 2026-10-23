@@ -34,7 +34,11 @@ use crate::server::AppState;
 /// explicit `doorway_id`, else the domain of `doorway_url`, else a local-dev
 /// fallback.
 fn derive_doorway_host(state: &AppState) -> String {
-    if let Some(ref doorway_id) = state.args.doorway_id {
+    derive_doorway_host_from_args(&state.args)
+}
+
+fn derive_doorway_host_from_args(args: &crate::config::Args) -> String {
+    if let Some(ref doorway_id) = args.doorway_id {
         // doorway_id is like "alpha-elohim-host" or "doorway-a.elohim.host".
         // Dots ⇒ already a domain; otherwise convert dashes to dots.
         if doorway_id.contains('.') {
@@ -42,12 +46,26 @@ fn derive_doorway_host(state: &AppState) -> String {
         } else {
             doorway_id.replace('-', ".")
         }
-    } else if let Some(ref doorway_url) = state.args.doorway_url {
-        extract_domain(doorway_url)
-            .unwrap_or_else(|| format!("localhost:doorway:{}", state.args.node_id))
+    } else if let Some(ref doorway_url) = args.doorway_url {
+        extract_domain(doorway_url).unwrap_or_else(|| format!("localhost:doorway:{}", args.node_id))
     } else {
-        format!("localhost:doorway:{}", state.args.node_id)
+        format!("localhost:doorway:{}", args.node_id)
     }
+}
+
+/// The `did:web` this doorway's `/.well-known/did.json` names, when it names a
+/// real host (declared `DOORWAY_ID` or `DOORWAY_URL`). `None` for the
+/// local-dev fallback host, which is not a resolvable `did:web`.
+pub(crate) fn doorway_did(args: &crate::config::Args) -> Option<String> {
+    if args.doorway_id.is_none() && args.doorway_url.is_none() {
+        return None;
+    }
+    let host = derive_doorway_host_from_args(args);
+    if host.starts_with("localhost:doorway:") {
+        return None;
+    }
+    let did = format!("did:web:{host}");
+    Did::parse(&did).ok().map(|_| did)
 }
 
 /// Extract domain from a URL (e.g., "https://alpha.elohim.host" -> "alpha.elohim.host")

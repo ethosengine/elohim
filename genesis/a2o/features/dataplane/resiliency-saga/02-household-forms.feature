@@ -44,7 +44,7 @@ Feature: Chapter 2 — the household forms
   downstream actually reads.
 
   Background:
-    Given peer "alpha-A" at "alpha-A"
+    Given federated peer "alpha-A" at "alpha-A"
 
   Scenario: The household's member rows are durably filled from membership truth
     Then the humans row "human-matthew-manager" on doorway "alpha-A" has "agentPubKey" set
@@ -54,4 +54,4 @@ Feature: Chapter 2 — the household forms
     And the humans row "human-james-son" on doorway "alpha-A" has "householdId" equal to "household-dowell"
 
   Scenario: Station — the identity-fill sweep is alive and accounting this boot
-    Then labeled metric "elohim_identity_fill_total" with label "action" "skipped_present" on peer "alpha-A" >= 0
+    Then labeled metric "elohim_identity_fill_total" with label "action" "skipped_present" on federated peer "alpha-A" >= 0

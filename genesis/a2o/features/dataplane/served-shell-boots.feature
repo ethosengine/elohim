@@ -16,8 +16,8 @@ Feature: The shell a doorway serves can boot
   # Two doorways answer for the same site, so both are asked: a person reaches
   # whichever one their DNS hands them, and neither may serve a dead page.
   Background:
-    Given peer "alpha-A" at "alpha-A"
-    And peer "elohim.host" at "elohim.host"
+    Given federated peer "alpha-A" at "alpha-A"
+    And federated peer "elohim.host" at "elohim.host"
 
   # 2026-09-04: both doorways answered 200 at "/" with a page from a PREVIOUS
   # bundle era — it named main-EAKNZDUP.js while the declared browser head
@@ -26,12 +26,12 @@ Feature: The shell a doorway serves can boot
   # every visitor got a blank page.
   @regression @requires:doorway
   Scenario: The site root names the declared entry script and reachable assets
-    When a visitor asks peer "alpha-A" for the page at "/"
-    And a visitor asks peer "elohim.host" for the page at "/"
-    Then every script and stylesheet the page from peer "alpha-A" names is one that peer serves
-    And the page from peer "alpha-A" names the same browser entry point as the declared browser head of EPR "elohim-host-landing"
-    And every script and stylesheet the page from peer "elohim.host" names is one that peer serves
-    And the page from peer "elohim.host" names the same browser entry point as the declared browser head of EPR "elohim-host-landing"
+    When a visitor asks federated peer "alpha-A" for the page at "/"
+    And a visitor asks federated peer "elohim.host" for the page at "/"
+    Then every script and stylesheet the page from federated peer "alpha-A" names is one that peer serves
+    And the page from federated peer "alpha-A" names the same browser entry point as the declared browser head of EPR "elohim-host-landing"
+    And every script and stylesheet the page from federated peer "elohim.host" names is one that peer serves
+    And the page from federated peer "elohim.host" names the same browser entry point as the declared browser head of EPR "elohim-host-landing"
 
   # THE DYNAMIC CLAUSE (2026-09-08, spec 2026-09-08-epr-app-deliverability-through-doorway
   # D4). The two assertions above are read off the page's TEXT: they prove the
@@ -64,12 +64,12 @@ Feature: The shell a doorway serves can boot
   # stale-shell shape one notch down — assets 200, stamp absent.
   @regression @requires:doorway
   Scenario Outline: Client bootstrap completes and renders through each doorway
-    When a visitor opens the page at "/" on peer "<peer>" in a browser
-    Then the browser on peer "<peer>" reported no uncaught error
-    And the browser on peer "<peer>" completed client bootstrap
-    And every asset the browser asked peer "<peer>" for arrived
-    And the app root on the page from peer "<peer>" has content
-    And the build stamp peer "<peer>" serves is the one the declared browser head of EPR "elohim-host-landing" carries
+    When a visitor opens the page at "/" on federated peer "<peer>" in a browser
+    Then the browser on federated peer "<peer>" reported no uncaught error
+    And the browser on federated peer "<peer>" completed client bootstrap
+    And every asset the browser asked federated peer "<peer>" for arrived
+    And the app root on the page from federated peer "<peer>" has content
+    And the build stamp federated peer "<peer>" serves is the one the declared browser head of EPR "elohim-host-landing" carries
 
     Examples:
       | peer        |
@@ -93,7 +93,7 @@ Feature: The shell a doorway serves can boot
   # unchanged once wired, and doesn't need re-proving station by station.
   @regression @requires:doorway-tls
   Scenario: The site root names the declared entry script over the doorway's own TLS listener
-    Given peer "doorway-a-tls" at "E2E_DOORWAY_A_TLS", or this scenario is pending
-    When a visitor asks peer "doorway-a-tls" for the page at "/"
-    Then every script and stylesheet the page from peer "doorway-a-tls" names is one that peer serves
-    And the page from peer "doorway-a-tls" names the same browser entry point as the declared browser head of EPR "elohim-host-landing"
+    Given federated peer "doorway-a-tls" at "E2E_DOORWAY_A_TLS", or this scenario is pending
+    When a visitor asks federated peer "doorway-a-tls" for the page at "/"
+    Then every script and stylesheet the page from federated peer "doorway-a-tls" names is one that peer serves
+    And the page from federated peer "doorway-a-tls" names the same browser entry point as the declared browser head of EPR "elohim-host-landing"

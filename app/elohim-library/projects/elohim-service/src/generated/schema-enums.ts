@@ -249,6 +249,54 @@ export const ALL_ENGAGEMENT_TYPES = [
 export const ENGAGEMENT_TYPES = ALL_ENGAGEMENT_TYPES;
 export type EngagementType = (typeof ALL_ENGAGEMENT_TYPES)[number];
 
+export const ALL_FRAME_CAPABILITIES = [
+  'forms',
+  'popups',
+  'downloads',
+  'fullscreen',
+  'clipboard-write',
+  'camera',
+  'microphone',
+  'geolocation',
+] as const;
+export const FRAME_CAPABILITIES = ALL_FRAME_CAPABILITIES;
+export type FrameCapability = (typeof ALL_FRAME_CAPABILITIES)[number];
+export interface FrameCapabilityEntry {
+  readonly value: FrameCapability;
+  readonly label: string;
+  readonly sandbox: string | null;
+  readonly allow: string | null;
+  readonly device: boolean;
+}
+export const FRAME_CAPABILITIES_TABLE: readonly FrameCapabilityEntry[] = [
+  { value: 'forms', label: 'Submit forms', sandbox: 'allow-forms', allow: null, device: false },
+  { value: 'popups', label: 'Open windows', sandbox: 'allow-popups', allow: null, device: false },
+  {
+    value: 'downloads',
+    label: 'Download files',
+    sandbox: 'allow-downloads',
+    allow: null,
+    device: false,
+  },
+  {
+    value: 'fullscreen',
+    label: 'Go fullscreen',
+    sandbox: null,
+    allow: 'fullscreen',
+    device: false,
+  },
+  {
+    value: 'clipboard-write',
+    label: 'Copy to your clipboard',
+    sandbox: null,
+    allow: 'clipboard-write',
+    device: false,
+  },
+  { value: 'camera', label: 'Camera', sandbox: null, allow: 'camera', device: true },
+  { value: 'microphone', label: 'Microphone', sandbox: null, allow: 'microphone', device: true },
+  { value: 'geolocation', label: 'Location', sandbox: null, allow: 'geolocation', device: true },
+];
+
 export const CORE_INFERENCE_SOURCES = ['explicit', 'path', 'tag', 'semantic'] as const;
 export const ALL_INFERENCE_SOURCES = ['explicit', 'path', 'tag', 'semantic', 'system'] as const;
 export const INFERENCE_SOURCES = ALL_INFERENCE_SOURCES;
@@ -303,6 +351,31 @@ export const CORE_OBSERVATION_POLARITIES = ['positive', 'negative'] as const;
 export const ALL_OBSERVATION_POLARITIES = ['positive', 'negative'] as const;
 export const OBSERVATION_POLARITIES = ALL_OBSERVATION_POLARITIES;
 export type ObservationPolarity = (typeof ALL_OBSERVATION_POLARITIES)[number];
+
+export const ALL_PAGE_INFO_SECTIONS = [
+  'source',
+  'delivery',
+  'holders',
+  'steward',
+  'claims',
+  'permissions',
+  'yours',
+] as const;
+export const PAGE_INFO_SECTIONS = ALL_PAGE_INFO_SECTIONS;
+export type PageInfoSection = (typeof ALL_PAGE_INFO_SECTIONS)[number];
+export interface PageInfoSectionEntry {
+  readonly value: PageInfoSection;
+  readonly label: string;
+}
+export const PAGE_INFO_SECTIONS_TABLE: readonly PageInfoSectionEntry[] = [
+  { value: 'source', label: 'Source' },
+  { value: 'delivery', label: 'Delivery' },
+  { value: 'holders', label: 'Holders' },
+  { value: 'steward', label: 'Steward' },
+  { value: 'claims', label: 'Claims' },
+  { value: 'permissions', label: 'Permissions' },
+  { value: 'yours', label: 'Yours' },
+];
 
 export const CORE_PATH_VISIBILITIES = ['private', 'unlisted', 'community', 'public'] as const;
 export const ALL_PATH_VISIBILITIES = [

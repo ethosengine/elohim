@@ -14,6 +14,7 @@ import { join, resolve, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { tmpdir } from 'node:os';
 import { execFileSync } from 'node:child_process';
+import { tableRows } from './lib/table-enum.mjs';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const REPO_ROOT = resolve(__dirname, '../../../../');
@@ -37,6 +38,16 @@ const OUTPUT_ATTESTATION_KINDS = resolve(
 const OUTPUT_EPR_ORDINALS = resolve(
   REPO_ROOT,
   'elohim/epr/src/generated/ordinals.rs',
+);
+
+// Non-DNA vocabulary enums carrying a `_table` marker (frame-capability,
+// page-info-section) project into lamad-types, the domain crate the html5-app body
+// parser lives in and the doorway / chrome / storage producers already share. NEVER
+// into the DNA's generated_enums.rs: these are presentation-edge vocabulary, and an
+// integrity-zome edit would move the DNA hash.
+const OUTPUT_LAMAD_VOCAB = resolve(
+  REPO_ROOT,
+  'elohim/sdk/domains/lamad/types/src/generated_vocab.rs',
 );
 
 const VERIFY = process.argv.includes('--verify');
@@ -161,6 +172,140 @@ async function generateEprOrdinals() {
   return header + '\n' + blocks.join('\n');
 }
 
+/** kebab-case / snake value → PascalCase Rust variant name. */
+function rustVariant(value) {
+  return value
+    .split(/[-_\s]+/)
+    .filter(Boolean)
+    .map((w) => w.charAt(0).toUpperCase() + w.slice(1))
+    .join('');
+}
+
+function rustStr(v) {
+  return JSON.stringify(String(v));
+}
+
+/** The first sentence of a schema description, for a one-line doc comment. */
+function firstSentence(text) {
+  if (!text) return '';
+  const m = text.match(/^(.*?[.!?])(\s|$)/s);
+  return (m ? m[1] : text).replace(/\s+/g, ' ').trim();
+}
+
+/**
+ * Rust enum + accessor methods for one `_table` vocabulary enum. Annotation values
+ * are typed by what the rows carry: all-boolean → bool, strings with any null →
+ * Option<&'static str>, all strings → &'static str.
+ */
+function formatRustTable(schema) {
+  const type = schema._table.rustType;
+  const constant = schema._table.constant;
+  if (!type) throw new Error(`${schema.title}: _table.rustType is required for Rust codegen`);
+  const rows = tableRows(schema);
+  const mapping = schema._table.annotations || {};
+  const lines = [];
+  const doc = firstSentence(schema.description);
+  lines.push(`/// ${schema.title} — ${doc}`);
+  lines.push('///');
+  lines.push(`/// Generated from \`${schema.$id}\`; wire values are the schema's kebab-case strings.`);
+  lines.push('#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord, Serialize, Deserialize)]');
+  lines.push(`pub enum ${type} {`);
+  for (const r of rows) {
+    lines.push(`    #[serde(rename = ${rustStr(r.value)})]`);
+    lines.push(`    ${rustVariant(r.value)},`);
+  }
+  lines.push('}');
+  lines.push('');
+  lines.push(`impl ${type} {`);
+  lines.push('    /// Every value, in schema order.');
+  lines.push(`    pub const ALL: &'static [${type}] = &[`);
+  for (const r of rows) lines.push(`        ${type}::${rustVariant(r.value)},`);
+  lines.push('    ];');
+  lines.push('');
+  lines.push('    /// The wire value.');
+  lines.push('    pub const fn as_str(self) -> &\'static str {');
+  lines.push('        match self {');
+  for (const r of rows) lines.push(`            ${type}::${rustVariant(r.value)} => ${rustStr(r.value)},`);
+  lines.push('        }');
+  lines.push('    }');
+  lines.push('');
+  lines.push('    /// Parse a wire value; `None` for anything outside the vocabulary.');
+  lines.push('    pub fn parse(value: &str) -> Option<Self> {');
+  lines.push('        match value {');
+  for (const r of rows) lines.push(`            ${rustStr(r.value)} => Some(${type}::${rustVariant(r.value)}),`);
+  lines.push('            _ => None,');
+  lines.push('        }');
+  lines.push('    }');
+  for (const [key, names] of Object.entries(mapping)) {
+    const kinds = new Set(rows.map((r) => (r[key] === null ? 'null' : typeof r[key])));
+    let ret;
+    let lit;
+    if (kinds.has('boolean')) {
+      if (kinds.size !== 1) throw new Error(`${schema.title}: ${key} mixes booleans with other values`);
+      ret = 'bool';
+      lit = (v) => String(v);
+    } else if (kinds.has('null')) {
+      ret = "Option<&'static str>";
+      lit = (v) => (v === null ? 'None' : `Some(${rustStr(v)})`);
+    } else {
+      ret = "&'static str";
+      lit = (v) => rustStr(v);
+    }
+    lines.push('');
+    lines.push(`    /// The value's \`${key}\` annotation.`);
+    lines.push(`    pub const fn ${names.rs}(self) -> ${ret} {`);
+    lines.push('        match self {');
+    for (const r of rows) lines.push(`            ${type}::${rustVariant(r.value)} => ${lit(r[key])},`);
+    lines.push('        }');
+    lines.push('    }');
+  }
+  lines.push('}');
+  lines.push('');
+  lines.push(`impl std::fmt::Display for ${type} {`);
+  lines.push('    fn fmt(&self, f: &mut std::fmt::Formatter<\'_>) -> std::fmt::Result {');
+  lines.push('        f.write_str(self.as_str())');
+  lines.push('    }');
+  lines.push('}');
+  if (Object.keys(mapping).length > 0) {
+    const json = JSON.stringify(
+      rows.map((r) => {
+        const o = { value: r.value };
+        for (const [key, names] of Object.entries(mapping)) o[names.ts] = r[key];
+        return o;
+      }),
+    );
+    lines.push('');
+    lines.push(`/// The ${schema.title} table as compact JSON, one object per value in schema order,`);
+    lines.push('/// keyed exactly like the TS `' + constant + '_TABLE` rows — for a script that cannot');
+    lines.push('/// import TS (e.g. the chrome element, which splices it in at serve time).');
+    lines.push(`pub const ${constant}_TABLE_JSON: &str = r#"${json}"#;`);
+  }
+  return lines.join('\n');
+}
+
+/**
+ * lamad-types/src/generated_vocab.rs from every `_table` enum without `_dna`.
+ * Returns null when there are none.
+ */
+async function generateLamadVocab() {
+  const files = (await readdir(ENUM_DIR)).filter((f) => f.endsWith('.schema.json')).sort();
+  const blocks = [];
+  for (const file of files) {
+    const schema = JSON.parse(await readFile(join(ENUM_DIR, file), 'utf8'));
+    if (schema._dna || !schema._table) continue;
+    blocks.push(formatRustTable(schema));
+  }
+  if (blocks.length === 0) return null;
+  const header = `//! AUTO-GENERATED from protocol vocabulary schemas carrying a \`_table\` marker.
+//! DO NOT EDIT — regenerate with: pnpm run schema:codegen:rs
+//!
+//! Source: elohim/sdk/schemas/v1/enums/*.schema.json (\`_table\`, no \`_dna\`)
+
+use serde::{Deserialize, Serialize};
+`;
+  return header + '\n' + blocks.join('\n\n') + '\n';
+}
+
 /**
  * Resolves a manifest block that may be an inline object or a JSON $ref pointer.
  * When the block has a "$ref" key, reads and parses the referenced JSON relative
@@ -258,6 +403,7 @@ async function main() {
   const generated = await generate();
   const generatedKinds = await generateAttestationKinds();
   const generatedEprOrdinals = await generateEprOrdinals();
+  const generatedLamadVocab = await generateLamadVocab();
 
   const enumTargets = [
     { label: 'DNA', path: OUTPUT_DNA },
@@ -337,6 +483,29 @@ async function main() {
       }
     }
 
+    // Verify lamad-types vocabulary file (FrameCapability, PageInfoSection, ...)
+    if (generatedLamadVocab !== null) {
+      const tmpVocab = join(tmpDir, 'generated_vocab.rs');
+      await writeFile(tmpVocab, generatedLamadVocab);
+      try {
+        execFileSync('rustfmt', ['--edition', '2021', tmpVocab], { stdio: 'pipe' });
+      } catch {
+        // rustfmt not available — compare raw
+      }
+      const expectedVocab = await readFile(tmpVocab, 'utf8');
+      let existingVocab;
+      try {
+        existingVocab = await readFile(OUTPUT_LAMAD_VOCAB, 'utf8');
+      } catch {
+        console.error(`FAIL: Generated file does not exist (lamad-vocab): ${OUTPUT_LAMAD_VOCAB}`);
+        stale = true;
+      }
+      if (existingVocab !== undefined && existingVocab !== expectedVocab) {
+        console.error('FAIL: Rust lamad-vocab codegen is stale. Run: pnpm run schema:codegen:rs');
+        stale = true;
+      }
+    }
+
     await rm(tmpDir, { recursive: true });
     if (stale) process.exit(1);
     console.log('Rust codegen is up to date.');
@@ -374,6 +543,17 @@ async function main() {
       // rustfmt not available
     }
     console.log(`Generated (epr-ordinal): ${OUTPUT_EPR_ORDINALS}`);
+  }
+
+  // Write lamad-types vocabulary file (non-DNA `_table` enums)
+  if (generatedLamadVocab !== null) {
+    await writeFile(OUTPUT_LAMAD_VOCAB, generatedLamadVocab);
+    try {
+      execFileSync('rustfmt', ['--edition', '2021', OUTPUT_LAMAD_VOCAB], { stdio: 'pipe' });
+    } catch {
+      // rustfmt not available
+    }
+    console.log(`Generated (lamad-vocab): ${OUTPUT_LAMAD_VOCAB}`);
   }
 }
 

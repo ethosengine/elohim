@@ -5698,7 +5698,7 @@
       "declarations": [
         {
           "kind": "class",
-          "description": "<elohim-resiliency-badge> — how many households hold a piece of content, as a\nsingle link to where it lives (the EPR page). The whole badge is the anchor.\n\nWording is ported from the EPR page's held chip: \"Held by {holders} of {target}\nhouseholds\"; zero holders reads \"Not yet held by any household\"; when the figures\nare unknown, \"Held by households · see where it lives\".\n\nFigures come from the `holders` / `target` properties, or — when `content-id` is\nset and neither is supplied — from a same-origin fetch of\n`{base-url}/api/v1/resilience/{content-id}/household`, reading\n`feltStatus.floor.hasHouseholds` / `wantsHouseholds`. A failed or unmeasured\nfetch silently keeps the unknown state.\n\n`data-state` reflects `held | thin | unknown` (thin when holders < target) so\nthemes can colour it; the figures are always text, never colour alone.",
+          "description": "<elohim-resiliency-badge> — a link-badge that shows the holders headline it is\nGIVEN, as a single link to where the content lives (the EPR page). The whole badge\nis the anchor.\n\nIt owns no wording logic and does no lookup. The sentence is the resilience fold's\nown `FeltStatusView.headline` (the chrome's holders reading carries it as\n`holders.headline`), passed in through `headline`. The only sentence this element\nadds is the unknown-state one, shown when no headline was supplied:\n\"Held by households · see where it lives\".\n\n`data-state` reflects the explicit `state` property (`held | thin | unknown`) so\nthemes can colour it; with none it is `known` when a headline is shown and\n`unknown` otherwise. The sentence is always text, never colour alone.",
           "name": "ElohimResiliencyBadge",
           "cssProperties": [
             {
@@ -5743,13 +5743,13 @@
           "members": [
             {
               "kind": "field",
-              "name": "contentId",
+              "name": "headline",
               "type": {
                 "text": "string"
               },
               "default": "''",
-              "description": "(attr `content-id`) content to look up when figures are not supplied",
-              "attribute": "content-id"
+              "description": "the sentence to show, verbatim (the fold's headline)",
+              "attribute": "headline"
             },
             {
               "kind": "field",
@@ -5763,74 +5763,12 @@
             },
             {
               "kind": "field",
-              "name": "holders",
-              "type": {
-                "text": "number | undefined"
-              },
-              "description": "households holding the content",
-              "attribute": "holders"
-            },
-            {
-              "kind": "field",
-              "name": "target",
-              "type": {
-                "text": "number | undefined"
-              },
-              "description": "households wanted to hold it",
-              "attribute": "target"
-            },
-            {
-              "kind": "field",
               "name": "state",
               "type": {
                 "text": "ResiliencyBadgeState | undefined"
               },
-              "description": "explicit state override",
+              "description": "explicit display state",
               "attribute": "state"
-            },
-            {
-              "kind": "field",
-              "name": "baseUrl",
-              "type": {
-                "text": "string"
-              },
-              "default": "''",
-              "description": "(attr `base-url`) prefix for the lookup; default same-origin",
-              "attribute": "base-url"
-            },
-            {
-              "kind": "field",
-              "name": "fetchedHolders",
-              "type": {
-                "text": "number | undefined"
-              },
-              "privacy": "private"
-            },
-            {
-              "kind": "field",
-              "name": "fetchedTarget",
-              "type": {
-                "text": "number | undefined"
-              },
-              "privacy": "private"
-            },
-            {
-              "kind": "field",
-              "name": "fetchSeq",
-              "type": {
-                "text": "number"
-              },
-              "privacy": "private",
-              "default": "0"
-            },
-            {
-              "kind": "field",
-              "name": "figures",
-              "type": {
-                "text": "{ holders?: number; target?: number }"
-              },
-              "privacy": "private",
-              "readonly": true
             },
             {
               "kind": "field",
@@ -5849,27 +5787,17 @@
               },
               "privacy": "private",
               "readonly": true
-            },
-            {
-              "kind": "method",
-              "name": "lookup",
-              "privacy": "private",
-              "return": {
-                "type": {
-                  "text": "Promise<void>"
-                }
-              }
             }
           ],
           "attributes": [
             {
-              "name": "content-id",
+              "name": "headline",
               "type": {
                 "text": "string"
               },
               "default": "''",
-              "description": "(attr `content-id`) content to look up when figures are not supplied",
-              "fieldName": "contentId"
+              "description": "the sentence to show, verbatim (the fold's headline)",
+              "fieldName": "headline"
             },
             {
               "name": "href",
@@ -5881,37 +5809,12 @@
               "fieldName": "href"
             },
             {
-              "name": "holders",
-              "type": {
-                "text": "number | undefined"
-              },
-              "description": "households holding the content",
-              "fieldName": "holders"
-            },
-            {
-              "name": "target",
-              "type": {
-                "text": "number | undefined"
-              },
-              "description": "households wanted to hold it",
-              "fieldName": "target"
-            },
-            {
               "name": "state",
               "type": {
                 "text": "ResiliencyBadgeState | undefined"
               },
-              "description": "explicit state override",
+              "description": "explicit display state",
               "fieldName": "state"
-            },
-            {
-              "name": "base-url",
-              "type": {
-                "text": "string"
-              },
-              "default": "''",
-              "description": "(attr `base-url`) prefix for the lookup; default same-origin",
-              "fieldName": "baseUrl"
             }
           ],
           "superclass": {
@@ -8253,79 +8156,6 @@
     },
     {
       "kind": "javascript-module",
-      "path": "src/loader/loader.ts",
-      "declarations": [
-        {
-          "kind": "class",
-          "description": "",
-          "name": "Loader",
-          "members": [
-            {
-              "kind": "field",
-              "name": "verifyCid",
-              "type": {
-                "text": "boolean"
-              },
-              "privacy": "private",
-              "readonly": true
-            },
-            {
-              "kind": "method",
-              "name": "resolve",
-              "return": {
-                "type": {
-                  "text": "Promise<LoaderResolution>"
-                }
-              },
-              "parameters": [
-                {
-                  "name": "cid",
-                  "type": {
-                    "text": "string"
-                  }
-                }
-              ]
-            },
-            {
-              "kind": "method",
-              "name": "verifyCidMatches",
-              "privacy": "private",
-              "return": {
-                "type": {
-                  "text": "Promise<void>"
-                }
-              },
-              "parameters": [
-                {
-                  "name": "cid",
-                  "type": {
-                    "text": "string"
-                  }
-                },
-                {
-                  "name": "bytes",
-                  "type": {
-                    "text": "Uint8Array"
-                  }
-                }
-              ]
-            }
-          ]
-        }
-      ],
-      "exports": [
-        {
-          "kind": "js",
-          "name": "Loader",
-          "declaration": {
-            "name": "Loader",
-            "module": "src/loader/loader.ts"
-          }
-        }
-      ]
-    },
-    {
-      "kind": "javascript-module",
       "path": "src/localize/locale-store.ts",
       "declarations": [
         {
@@ -8674,6 +8504,79 @@
     },
     {
       "kind": "javascript-module",
+      "path": "src/loader/loader.ts",
+      "declarations": [
+        {
+          "kind": "class",
+          "description": "",
+          "name": "Loader",
+          "members": [
+            {
+              "kind": "field",
+              "name": "verifyCid",
+              "type": {
+                "text": "boolean"
+              },
+              "privacy": "private",
+              "readonly": true
+            },
+            {
+              "kind": "method",
+              "name": "resolve",
+              "return": {
+                "type": {
+                  "text": "Promise<LoaderResolution>"
+                }
+              },
+              "parameters": [
+                {
+                  "name": "cid",
+                  "type": {
+                    "text": "string"
+                  }
+                }
+              ]
+            },
+            {
+              "kind": "method",
+              "name": "verifyCidMatches",
+              "privacy": "private",
+              "return": {
+                "type": {
+                  "text": "Promise<void>"
+                }
+              },
+              "parameters": [
+                {
+                  "name": "cid",
+                  "type": {
+                    "text": "string"
+                  }
+                },
+                {
+                  "name": "bytes",
+                  "type": {
+                    "text": "Uint8Array"
+                  }
+                }
+              ]
+            }
+          ]
+        }
+      ],
+      "exports": [
+        {
+          "kind": "js",
+          "name": "Loader",
+          "declaration": {
+            "name": "Loader",
+            "module": "src/loader/loader.ts"
+          }
+        }
+      ]
+    },
+    {
+      "kind": "javascript-module",
       "path": "src/navigation/epr-link-interceptor.ts",
       "declarations": [
         {
@@ -8804,131 +8707,6 @@
           "declaration": {
             "name": "installEprResolutionProvider",
             "module": "src/navigation/epr-resolution-provider.ts"
-          }
-        }
-      ]
-    },
-    {
-      "kind": "javascript-module",
-      "path": "src/session/session.ts",
-      "declarations": [
-        {
-          "kind": "class",
-          "description": "",
-          "name": "Session",
-          "members": [
-            {
-              "kind": "field",
-              "name": "_currentUser",
-              "type": {
-                "text": "CurrentUserView | null"
-              },
-              "privacy": "private",
-              "default": "null"
-            },
-            {
-              "kind": "field",
-              "name": "subscribers",
-              "privacy": "private",
-              "readonly": true,
-              "default": "new Set<Subscriber>()"
-            },
-            {
-              "kind": "field",
-              "name": "currentUser",
-              "type": {
-                "text": "CurrentUserView | null"
-              },
-              "readonly": true
-            },
-            {
-              "kind": "field",
-              "name": "isAuthenticated",
-              "type": {
-                "text": "boolean"
-              },
-              "readonly": true
-            },
-            {
-              "kind": "method",
-              "name": "refreshFromCookies",
-              "return": {
-                "type": {
-                  "text": "void"
-                }
-              },
-              "description": "Re-read the elohim_session cookie and notify subscribers if the\nresolved CurrentUserView changes. Call this after any auth-related\nevent (login completed, logout, cookie set externally)."
-            },
-            {
-              "kind": "method",
-              "name": "subscribe",
-              "return": {
-                "type": {
-                  "text": "() => void"
-                }
-              },
-              "parameters": [
-                {
-                  "name": "fn",
-                  "type": {
-                    "text": "Subscriber"
-                  }
-                }
-              ],
-              "description": "Subscribe to session changes. Returns an unsubscribe function."
-            },
-            {
-              "kind": "method",
-              "name": "readCookie",
-              "privacy": "private",
-              "return": {
-                "type": {
-                  "text": "string | null"
-                }
-              },
-              "parameters": [
-                {
-                  "name": "name",
-                  "type": {
-                    "text": "string"
-                  }
-                }
-              ]
-            },
-            {
-              "kind": "method",
-              "name": "shallowEquals",
-              "privacy": "private",
-              "return": {
-                "type": {
-                  "text": "boolean"
-                }
-              },
-              "parameters": [
-                {
-                  "name": "a",
-                  "type": {
-                    "text": "CurrentUserView | null"
-                  }
-                },
-                {
-                  "name": "b",
-                  "type": {
-                    "text": "CurrentUserView | null"
-                  }
-                }
-              ]
-            }
-          ]
-        }
-      ],
-      "exports": [
-        {
-          "kind": "js",
-          "name": "Session",
-          "declaration": {
-            "name": "Session",
-            "module": "src/session/session.ts"
           }
         }
       ]
@@ -9812,6 +9590,131 @@
           "declaration": {
             "name": "getThemeStore",
             "module": "src/theme/theme-store.ts"
+          }
+        }
+      ]
+    },
+    {
+      "kind": "javascript-module",
+      "path": "src/session/session.ts",
+      "declarations": [
+        {
+          "kind": "class",
+          "description": "",
+          "name": "Session",
+          "members": [
+            {
+              "kind": "field",
+              "name": "_currentUser",
+              "type": {
+                "text": "CurrentUserView | null"
+              },
+              "privacy": "private",
+              "default": "null"
+            },
+            {
+              "kind": "field",
+              "name": "subscribers",
+              "privacy": "private",
+              "readonly": true,
+              "default": "new Set<Subscriber>()"
+            },
+            {
+              "kind": "field",
+              "name": "currentUser",
+              "type": {
+                "text": "CurrentUserView | null"
+              },
+              "readonly": true
+            },
+            {
+              "kind": "field",
+              "name": "isAuthenticated",
+              "type": {
+                "text": "boolean"
+              },
+              "readonly": true
+            },
+            {
+              "kind": "method",
+              "name": "refreshFromCookies",
+              "return": {
+                "type": {
+                  "text": "void"
+                }
+              },
+              "description": "Re-read the elohim_session cookie and notify subscribers if the\nresolved CurrentUserView changes. Call this after any auth-related\nevent (login completed, logout, cookie set externally)."
+            },
+            {
+              "kind": "method",
+              "name": "subscribe",
+              "return": {
+                "type": {
+                  "text": "() => void"
+                }
+              },
+              "parameters": [
+                {
+                  "name": "fn",
+                  "type": {
+                    "text": "Subscriber"
+                  }
+                }
+              ],
+              "description": "Subscribe to session changes. Returns an unsubscribe function."
+            },
+            {
+              "kind": "method",
+              "name": "readCookie",
+              "privacy": "private",
+              "return": {
+                "type": {
+                  "text": "string | null"
+                }
+              },
+              "parameters": [
+                {
+                  "name": "name",
+                  "type": {
+                    "text": "string"
+                  }
+                }
+              ]
+            },
+            {
+              "kind": "method",
+              "name": "shallowEquals",
+              "privacy": "private",
+              "return": {
+                "type": {
+                  "text": "boolean"
+                }
+              },
+              "parameters": [
+                {
+                  "name": "a",
+                  "type": {
+                    "text": "CurrentUserView | null"
+                  }
+                },
+                {
+                  "name": "b",
+                  "type": {
+                    "text": "CurrentUserView | null"
+                  }
+                }
+              ]
+            }
+          ]
+        }
+      ],
+      "exports": [
+        {
+          "kind": "js",
+          "name": "Session",
+          "declaration": {
+            "name": "Session",
+            "module": "src/session/session.ts"
           }
         }
       ]
