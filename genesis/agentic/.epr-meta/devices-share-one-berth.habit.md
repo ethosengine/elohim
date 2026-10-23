@@ -9,8 +9,8 @@ invariant: >
 status: red
 active: false
 checks:
-  - "a2o @concern:devices-share-one-berth (genesis/a2o/features/devflow/devices-share-one-berth.feature, two devices in one container: held claim refused naming the holder, silent device read as unconfirmed, simultaneous claim settled once, revoked device ignored; @wip @act:host; cd genesis/a2o && pnpm exec cucumber-js --tags '@concern:devices-share-one-berth and not @requires:shem')"
-  - "a2o @concern:devices-share-one-berth and @requires:shem (the same feature's cross-workspace scenario: the held-claim refusal between the ethosengine and shem workspaces over their own link, nothing carried by git, a doorway or the operator)"
+  - "a2o @concern:devices-share-one-berth (genesis/a2o/features/devflow/devices-share-one-berth.feature, two devices in one container: a held claim refused naming the holder; a push stopped while the other device holds dev-integration, alpha-fleet or jenkins-dispatch; a silent device read as unconfirmed; an override that binds the returning device; concurrent claims settled once; a retired device's lease dropped without restart; @act:host; cd genesis/a2o && pnpm exec cucumber-js --tags '@concern:devices-share-one-berth and not @requires:shem and not @wip'. Every scenario is @wip until T7 lands the steps, so this selects zero scenarios today)"
+  - "a2o @concern:devices-share-one-berth and @requires:shem (the same feature's cross-workspace scenario: the held-claim refusal between the ethosengine and shem workspaces over their own link, no coordination record carried by git, a shared server or the operator; also @wip until T7, and held without shem)"
 refs:
   - "spec: genesis/docs/superpowers/specs/2026-10-23-workspaces-cooperate-as-devices-design.md §3.4 (steward-scoped resources, effectiveness, tie-break, refusal wording), §3.5 (pre-push claims dev-integration), §6 (this habit)"
   - "plan: genesis/docs/superpowers/plans/2026-10-23-workspaces-cooperate-as-devices-plan.md (T0 story and habit; T6 lease view; T7 pre-push and status; T8 the cross-workspace receipt that flips this green)"
