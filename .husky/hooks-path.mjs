@@ -8,10 +8,17 @@
 // ran. When that shim dir is missing (an install that ran only in a worktree), it is installed
 // from this checkout's freshly generated one, so the path never names an empty directory.
 //
-// Idempotent. A no-op under HUSKY=0 (the same switch husky honours) and outside a git checkout.
+// So a push from a worktree runs the MAIN checkout's hook script (`.husky/_/h` runs
+// `<main>/.husky/pre-push`), with the worktree as its work tree: the hook's logic is whatever the
+// main checkout has checked out, and the gate inputs are the worktree's. That version skew is
+// expected — the hook on dev governs pushes to dev.
+//
+// Idempotent. A no-op under HUSKY=0 (the same switch husky honours), outside a git checkout, and
+// when the common dir is not a `.git` directory (a separate git dir or a submodule), whose parent
+// is not the checkout.
 import { execFileSync } from 'node:child_process';
 import { cpSync, existsSync } from 'node:fs';
-import { dirname, join, resolve } from 'node:path';
+import { basename, dirname, join, resolve } from 'node:path';
 
 function git(args, cwd) {
   return execFileSync('git', args, { cwd, encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] })
@@ -28,6 +35,7 @@ function main(cwd) {
   } catch {
     return 'not a git checkout — nothing to do';
   }
+  if (basename(common) !== '.git') return `${common} is not a .git common dir — hooksPath left as it is`;
   const target = join(dirname(common), '.husky', '_');
   const local = join(top, '.husky', '_');
   if (!existsSync(target) && existsSync(local) && local !== target) {

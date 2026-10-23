@@ -87,3 +87,16 @@ test('HUSKY=0 and a directory outside any git checkout are no-ops', (t) => {
   const none = runScript(outside, { GIT_CEILING_DIRECTORIES: tmpdir() });
   assert.equal(none.status, 0, none.stderr);
 });
+
+test('a common dir not named .git (separate-git-dir, submodule) is left alone', (t) => {
+  const dir = realpathSync(mkdtempSync(join(tmpdir(), 'hooks-path-sep-')));
+  t.after(() => rmSync(dir, { recursive: true, force: true }));
+  const work = join(dir, 'work');
+  mkdirSync(work);
+  git(dir, 'init', '-q', '--separate-git-dir', join(dir, 'store.git'), work);
+  git(work, 'config', 'core.hooksPath', '.husky/_');
+  const r = runScript(work);
+  assert.equal(r.status, 0, r.stderr);
+  assert.match(r.stdout, /not a \.git common dir/);
+  assert.equal(git(work, 'config', '--get', 'core.hooksPath'), '.husky/_');
+});

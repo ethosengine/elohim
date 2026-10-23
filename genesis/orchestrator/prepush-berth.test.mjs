@@ -39,6 +39,8 @@ if [ "$1" = claim ]; then
     3) echo "$2: REFUSED — held by did:key:z6MkDeviceA/claude-1 since 2026-10-23T15:28:09Z" >&2; exit 3 ;;
     4) echo "berth: no session (pass --session, or set BERTH_SESSION / CLAUDE_SESSION_ID)" >&2; exit 4 ;;
     I) kill -INT "$HOOK_PID"; exit 130 ;;
+    U) echo "$2: renewed here, but the renew record did not reach this device's channel store (/x): y" >&2; exit 1 ;;
+    E) echo "Traceback (most recent call last): KeyError" >&2; exit 1 ;;
   esac
 fi
 [ "$1" = release ] && echo "$2: released by codex-1"
@@ -82,6 +84,8 @@ function fixture(t, message, answers = {}) {
 /** Run the hook's block for one pushed ref, then `after` (the gates that follow it). */
 function runBlock(fx, { ref = "refs/heads/dev", after = "echo GATES-RAN", env = {} } = {}) {
   const preamble = [
+    // The hook sets pipefail before this block; the block runs under it.
+    "set -o pipefail",
     "export HOOK_PID=$$",
     `ZERO_SHA=${ZERO}`,
     `HOOK_WORK_TREE='${fx.dir}'`,
@@ -223,5 +227,38 @@ test("prepush_offline_ok_no_session_and_a_renewed_watch", (t) => {
   assert.deepEqual(watch.calls.filter((c) => c.startsWith("release")), [
     "release dev-integration",
     "release jenkins-dispatch",
+  ]);
+});
+
+test("a_large_landing_still_claims_by_its_build_tags", (t) => {
+  // Over the 64 KiB pipe buffer, with the tag on the first line: a `grep -q` that stops early
+  // must never read as "no tag" (under pipefail its writer's SIGPIPE once did).
+  const body = `${"x".repeat(99)}\n`.repeat(800);
+  const fx = fixture(t, `deploy the fix [build:edge]\n\n${body}`);
+  for (let run = 0; run < 10; run += 1) {
+    const r = runBlock(fx);
+    assert.equal(r.status, 0, r.out);
+    const claims = r.calls.filter((c) => c.startsWith("claim")).map((c) => c.split(" --note")[0]);
+    assert.deepEqual(
+      claims.slice(-3),
+      [CLAIM("dev-integration"), CLAIM("alpha-fleet"), CLAIM("jenkins-dispatch")],
+      `run ${run}`,
+    );
+  }
+});
+
+test("prepush_exit_1_is_a_renew_only_on_berths_own_line", (t) => {
+  // berth's "renewed here, but …": the session's own lease is still held, so the push goes on.
+  const renewed = runBlock(fixture(t, "deploy [build:edge]", { "alpha-fleet": "U" }));
+  assert.equal(renewed.status, 0, renewed.out);
+  assert.ok(renewed.out.includes("GATES-RAN"));
+  // Any other exit 1 (a crash) refuses, and gives back what the push had taken.
+  const crashed = runBlock(fixture(t, "deploy [build:edge]", { "alpha-fleet": "E" }));
+  assert.equal(crashed.status, 1, crashed.out);
+  assert.ok(!crashed.out.includes("GATES-RAN"));
+  assert.match(crashed.out, /REFUSED: berth claim alpha-fleet failed/);
+  assert.deepEqual(crashed.calls.filter((c) => c.startsWith("release")), [
+    "release dev-integration",
+    "release alpha-fleet",
   ]);
 });

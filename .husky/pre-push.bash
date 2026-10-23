@@ -104,18 +104,33 @@ done
 # 1800 s — a steward lease with no ttl would bind until released). A pushed commit carrying
 # `[build:edge]` (or a tag list naming edge, or `[build:all]`) also needs `alpha-fleet`, since it
 # deploys to the test fleet; any `[build:*]` tag also needs `jenkins-dispatch`. Spec
-# 2026-10-23-workspaces-cooperate-as-devices-design.md §3.5.
+# 2026-10-23-workspaces-cooperate-as-devices-design.md §3.5. Every pushed commit's message is read
+# ("a pushed commit"), so this can claim more than the orchestrator dispatches, which reads only the
+# tip's message: a tag quoted in an earlier commit's prose still claims. Over-claiming is the safe
+# side. The messages are matched with here-strings, never a pipe: under pipefail an early-exiting
+# `grep -q` on more than a pipe buffer of messages read as "no tag" (SIGPIPE).
 #
 #   berth exit 0  held for this push, released on every exit below (pass, failed gate, refusal,
 #                 Ctrl-C); a claim that only RENEWED a lease this session already held (a session
 #                 watching a deploy) is left to that session, never released here
 #   berth exit 3  the push is refused before any check runs; berth's reason line is printed as is
 #   berth exit 4  no session resolvable: the push proceeds UNLEASED and says so
+#   berth exit 1  only for berth's own "renewed here, but …" line (a renew of a lease this session
+#                 held, whose record did not reach the channel: still held, earlier terms); any
+#                 other exit 1 is an error and refuses the push
+#
+# A workspace that is one of its steward's devices but has no `epr` binary is refused every push
+# to dev (berth: "no `epr` binary to read the steward lease view …"): an unreadable view is never a
+# free resource. The cure is the one berth names — build `epr` or set EPR_BIN.
 #
 # The hook never overrides a silent device on its own: BERTH_OFFLINE_OK=1, set by the pushing
 # session, makes each claim an explicit `--offline-ok` (it overrides `unconfirmed` only, never
 # `held by`, and leaves an override record). Fail-open only for a checkout with no berth (a branch
 # predating it). HUSKY=0 still bypasses the whole hook.
+#
+# core.hooksPath is absolute (.husky/hooks-path.mjs), so a push from a linked worktree runs the MAIN
+# checkout's copy of this script against the worktree: until the main checkout carries this block,
+# such a push claims nothing. The hook on dev governs pushes to dev.
 HOOK_ON_EXIT=""
 hook_on_exit() {
   local handler
@@ -136,7 +151,7 @@ berth_release_claims() {
   # A claim still in flight when the push ends (Ctrl-C mid-settle) may have written its lease.
   for res in $BERTH_HELD $BERTH_CLAIMING; do
     "$BERTH_BIN" release "$res" >/dev/null 2>&1 ||
-      echo "[pre-push] berth: $res was not released — run: berth release $res" >&2
+      echo "[pre-push] berth: $res released here, but did not reach the channel — run: berth release $res" >&2
   done
   BERTH_HELD=""
 }
@@ -162,10 +177,10 @@ done
 if [ -n "$BERTH_TARGETS" ] && [ -f "$BERTH_BIN" ]; then
   # The orchestrator's own tag grammar (genesis/orchestrator/commit-tag-parser.mjs): [build:a,b-c].
   BERTH_NEEDS="dev-integration"
-  if printf '%s' "$BERTH_MESSAGES" | grep -qiE '\[build:([a-z,-]*,)?(edge|all)(,[a-z,-]*)?\]'; then
+  if grep -qiE '\[build:([a-z,-]*,)?(edge|all)(,[a-z,-]*)?\]' <<<"$BERTH_MESSAGES"; then
     BERTH_NEEDS="$BERTH_NEEDS alpha-fleet"
   fi
-  if printf '%s' "$BERTH_MESSAGES" | grep -qiE '\[build:[a-z,-]+\]'; then
+  if grep -qiE '\[build:[a-z,-]+\]' <<<"$BERTH_MESSAGES"; then
     BERTH_NEEDS="$BERTH_NEEDS jenkins-dispatch"
   fi
   BERTH_FLAGS=(--class verify --ttl 1800 --note "pre-push to${BERTH_TARGETS}")
@@ -179,11 +194,17 @@ if [ -n "$BERTH_TARGETS" ] && [ -f "$BERTH_BIN" ]; then
     case "$BERTH_RC" in
       0)
         # A renew is a lease this session already held (it watches that build or deploy): its own.
-        printf '%s' "$BERTH_OUT" | grep -q "^$BERTH_RES: renewed" || BERTH_HELD="$BERTH_HELD $BERTH_RES"
+        grep -q "^$BERTH_RES: renewed" <<<"$BERTH_OUT" || BERTH_HELD="$BERTH_HELD $BERTH_RES"
         ;;
       1)
-        # A renew here whose record did not cross: the lease is still held, on its earlier terms.
-        echo "[pre-push] berth: $BERTH_RES is held, but the other devices see its earlier terms (above)."
+        if grep -q "^$BERTH_RES: renewed here, but " <<<"$BERTH_OUT"; then
+          # A renew whose record did not cross: the lease is still held, on its earlier terms.
+          echo "[pre-push] berth: $BERTH_RES is held, but the other devices see its earlier terms (above)."
+        else
+          echo "[pre-push] REFUSED: berth claim $BERTH_RES failed (exit 1, above). Bypass all gates: HUSKY=0 git push"
+          BERTH_HELD="$BERTH_HELD $BERTH_RES" # it may have written its lease before failing
+          exit 1
+        fi
         ;;
       3)
         echo "[pre-push] REFUSED: this push needs $BERTH_RES (reason above). Nothing was pushed."
@@ -194,6 +215,7 @@ if [ -n "$BERTH_TARGETS" ] && [ -f "$BERTH_BIN" ]; then
         ;;
       *)
         echo "[pre-push] REFUSED: berth claim $BERTH_RES exited $BERTH_RC (above). Bypass all gates: HUSKY=0 git push"
+        BERTH_HELD="$BERTH_HELD $BERTH_RES" # it may have written its lease before failing
         exit 1
         ;;
     esac
