@@ -87,7 +87,11 @@ newest valid PeerEndpoint row for a device supersedes older ones, which is how a
 on the device's binding revokes the device: its node id stops being admitted and its heads are ignored
 from the next fold onward. Every lease and lane claim already folded from that device also drops
 out of the steward lease view once the Contest is folded, so a revoked device cannot keep a shared
-resource pinned. The row travels by git, as Binding rows already do.
+resource pinned. Each device reads admission from the roster file in its own checkout. A Contest
+signed on device A and written there takes effect on A at once, with no pull. It reaches the other
+devices with A's next push, and the revoked device's lease has already left A's view, so that push is
+not blocked. The admitted devices drop the revoked device's gossip and tier connections. It therefore
+sees them as silent, and its own steward-scoped claims come back `unconfirmed`. The row travels by git, as Binding rows already do.
 
 The device generates its iroh secret key and keeps it at `$XDG_CONFIG_HOME/epr/peer/iroh.key`
 (mode 0600, on the persistent `/nix/xdg/config`). The key is never committed, never copied and never
@@ -183,8 +187,11 @@ concurrent claim arrived late, reports the refusal on that fold and releases.
 
 A refused or unconfirmed claim exits 3 and names its reason, `held by <device>/<session> since …` or
 `unconfirmed: <device> last seen <age> ago`. An absent peer is never read as a free resource.
-`--offline-ok` takes the lease anyway and records a `kind: override` row. An agent session may pass
-it on its own judgment. The safeguard is the record, not a gate: the override row crosses on
+`--offline-ok` takes the lease anyway and records a `kind: override` row. It overrides only an
+`unconfirmed` refusal, never `held by`. The overriding lease is an ordinary lease: it binds until it is
+released or its ttl expires. Two overrides taken while the devices could not reach each other are
+concurrent claims, and the tie-break settles them. An agent session may pass `--offline-ok` on its
+own judgment. The safeguard is the record, not a gate: the override row crosses on
 reconnect, and the other device's berth then refuses its own sessions on that resource, naming the
 overriding device and session.
 
@@ -197,7 +204,9 @@ them required.
 - The pre-push hook claims `dev-integration` (class `verify`, ttl 1800 s) for a push to `dev` or
   `main`, and releases it when the push ends. A refusal stops the push and names the holder.
 - A commit carrying `[build:edge]` also needs `alpha-fleet`. A `[build:*]` tag also needs
-  `jenkins-dispatch`.
+  `jenkins-dispatch`. The hook holds every claim only for the duration of the push. A session that
+  watches a build or deploy through to the end takes its own explicit `berth claim` on that resource
+  for as long as it watches.
 - `berth claim lane:<id> --note '<intent>'` declares who holds a lane before the work starts, so no one
   has to infer it from process lists afterwards.
 - `berth status` adds a section for the other devices: their live moorings, their steward-scoped
