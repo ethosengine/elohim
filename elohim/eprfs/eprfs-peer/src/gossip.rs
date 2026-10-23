@@ -53,17 +53,21 @@ impl ProtocolHandler for GatedGossip {
     async fn accept(&self, connection: Connection) -> Result<(), AcceptError> {
         // The handshake proved the peer holds this node id's key. Fail closed on a poisoned lock.
         let remote = connection.remote_node_id()?;
-        let admitted = self
-            .admission
-            .read()
-            .is_ok_and(|admission| admission.admits(&remote).is_some());
+        // Booked under the same read of admission that admitted it, so a reload (which takes the
+        // write lock, then closes what the book holds) cannot slip between the two.
+        let admitted = match self.admission.read() {
+            Ok(admission) if admission.admits(&remote).is_some() => {
+                self.book.admitted(remote, &connection);
+                true
+            }
+            _ => false,
+        };
         if !admitted {
             self.refused.fetch_add(1, Ordering::Relaxed);
             self.book.refused(remote);
             connection.close(VarInt::from_u32(NOT_ADMITTED), b"");
             return Ok(());
         }
-        self.book.admitted(remote, &connection);
         self.gossip.accept(connection).await
     }
 

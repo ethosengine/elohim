@@ -24,7 +24,7 @@ use std::path::PathBuf;
 use std::sync::{Arc, RwLock};
 use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
 
-use elohim_epr_rea::{SidecarFlowStore, SignatureVerifier};
+use elohim_epr_rea::{ParticipantRow, SidecarFlowStore, SignatureVerifier};
 use eprfs_core::TreeLimits;
 use futures_lite::StreamExt;
 use iroh::protocol::Router;
@@ -38,7 +38,7 @@ use url::Url;
 
 use crate::admission::{roster_rows_from_file, Admission};
 use crate::allow::CrossingAllowList;
-use crate::announce::{topic_for, Channel, HeadVerdict};
+use crate::announce::{topic_for, Channel, HeadVerdict, REANNOUNCE_EVERY};
 use crate::channel::{channel_tier_id, project_channel, ChannelStore};
 use crate::connections::ConnectionBook;
 use crate::endpoint::bind_on;
@@ -120,6 +120,7 @@ impl PeerDaemon {
         let store = Arc::new(ChannelStore::default());
         let limits = TierLimits::default();
         let book = ConnectionBook::default();
+        book.name(roster_named_nodes(&rows, &config.chain_root));
         let tier = TierProtocol::new(
             channel_tier_id(),
             store.clone(),
@@ -164,6 +165,7 @@ impl PeerDaemon {
             channel: Channel::new(config.device.clone(), table),
             admission,
             book,
+            refused_saved: None,
             flow,
             store,
             endpoint,
@@ -300,6 +302,8 @@ struct Run {
     admission: SharedAdmission,
     /// The connections the tier and gossip accepted, and those they refused.
     book: ConnectionBook,
+    /// When refused-connection counts were last written on their own.
+    refused_saved: Option<Instant>,
     flow: SidecarFlowStore,
     store: Arc<ChannelStore>,
     endpoint: Endpoint,
@@ -392,11 +396,23 @@ impl Run {
 
     async fn tick(&mut self) -> Result<(), PeerError> {
         self.reload_roster().await;
-        // Refused connections reach the head table `epr peer status` reads, announce or not.
-        let refused = self.book.refused_counts();
-        if self.channel.table().channel.refused_connections != refused {
-            self.channel.counters_mut().refused_connections = refused;
-            self.save()?;
+        // Refused connections reach the head table `epr peer status` reads: kept in memory every
+        // tick, written with the next announce, or on their own at most once per re-announce
+        // interval — never once per refused connection.
+        let (refused, strangers) = (self.book.refused_counts(), self.book.refused_strangers());
+        let counters = &self.channel.table().channel;
+        if counters.refused_connections != refused || counters.refused_strangers != strangers {
+            let counters = self.channel.counters_mut();
+            counters.refused_connections = refused;
+            counters.refused_strangers = strangers;
+            let now = Instant::now();
+            if self
+                .refused_saved
+                .is_none_or(|at| now.duration_since(at) >= REANNOUNCE_EVERY)
+            {
+                self.refused_saved = Some(now);
+                self.save()?;
+            }
         }
         self.reproject()?;
         let now = Instant::now();
@@ -446,6 +462,8 @@ impl Run {
                 Vec::new()
             }
         };
+        self.book
+            .name(roster_named_nodes(&rows, &self.config.chain_root));
         if let Ok(mut admission) = self.admission.write() {
             admission.reload(&rows, &*self.config.verifier);
             // A device the reload dropped keeps nothing it had open here.
@@ -698,4 +716,19 @@ impl Run {
         }
         self.save()
     }
+}
+
+/// Every node id a `PeerEndpoint` row of `chain_root`'s lineage names (64 lowercase hex), admitted
+/// or not: the node ids whose refused connections are counted one by one. Bounded by the roster.
+fn roster_named_nodes(rows: &[ParticipantRow], chain_root: &str) -> Vec<String> {
+    rows.iter()
+        .filter_map(|row| match row {
+            ParticipantRow::PeerEndpoint {
+                chain_root: root,
+                node_id,
+                ..
+            } if root == chain_root => Some(node_id.clone()),
+            _ => None,
+        })
+        .collect()
 }

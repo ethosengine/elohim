@@ -4,10 +4,12 @@
 //! The tier and the gossip ALPN record each connection they accept here. When a roster reload
 //! leaves a node id unadmitted, [`ConnectionBook::close_unadmitted`] closes every open connection
 //! of that node with [`NOT_ADMITTED`], so a retired device keeps nothing it had open; its new
-//! connections then meet the same refusal a stranger's do. Every refusal is counted per node id,
-//! and the daemon persists the counts in its head table, where `epr peer status` reads them.
+//! connections then meet the same refusal a stranger's do. A refusal is counted per node id only
+//! for node ids the roster names (its devices, admitted or contested); every other node id — free
+//! to mint — folds into one strangers total, so a stranger cannot grow this map. The daemon
+//! persists both in its head table, where `epr peer status` reads them.
 
-use std::collections::{BTreeMap, HashMap};
+use std::collections::{BTreeMap, BTreeSet, HashMap};
 use std::sync::{Arc, Mutex};
 
 use iroh::endpoint::{Connection, VarInt};
@@ -29,6 +31,21 @@ pub struct ConnectionBook {
 struct Book {
     open: HashMap<NodeId, Vec<Connection>>,
     refused: BTreeMap<String, u64>,
+    strangers: u64,
+    /// Node ids (64 lowercase hex) the roster names: the only ones counted one by one.
+    named: BTreeSet<String>,
+}
+
+impl Book {
+    fn count(&mut self, node: &NodeId) {
+        let hex = node_id_hex(node);
+        if self.named.contains(&hex) {
+            let n = self.refused.entry(hex).or_default();
+            *n = n.saturating_add(1);
+        } else {
+            self.strangers = self.strangers.saturating_add(1);
+        }
+    }
 }
 
 impl ConnectionBook {
@@ -41,10 +58,18 @@ impl ConnectionBook {
         }
     }
 
+    /// The node ids the roster names (64 lowercase hex), replacing the last set: refusals of
+    /// these are counted one by one, every other node id's as a stranger's.
+    pub fn name(&self, nodes: impl IntoIterator<Item = String>) {
+        if let Ok(mut book) = self.inner.lock() {
+            book.named = nodes.into_iter().collect();
+        }
+    }
+
     /// Count one connection refused from `node`.
     pub fn refused(&self, node: NodeId) {
         if let Ok(mut book) = self.inner.lock() {
-            *book.refused.entry(node_id_hex(&node)).or_default() += 1;
+            book.count(&node);
         }
     }
 
@@ -65,7 +90,7 @@ impl ConnectionBook {
             for connection in book.open.remove(&node).unwrap_or_default() {
                 if connection.close_reason().is_none() {
                     connection.close(VarInt::from_u32(NOT_ADMITTED), b"not admitted");
-                    *book.refused.entry(node_id_hex(&node)).or_default() += 1;
+                    book.count(&node);
                     closed += 1;
                 }
             }
@@ -73,11 +98,19 @@ impl ConnectionBook {
         closed
     }
 
-    /// Refused connections so far, per node id (64 lowercase hex).
+    /// Refused connections so far, per roster-named node id (64 lowercase hex).
     pub fn refused_counts(&self) -> BTreeMap<String, u64> {
         self.inner
             .lock()
             .map(|book| book.refused.clone())
+            .unwrap_or_default()
+    }
+
+    /// Refused connections so far from node ids the roster does not name.
+    pub fn refused_strangers(&self) -> u64 {
+        self.inner
+            .lock()
+            .map(|book| book.strangers)
             .unwrap_or_default()
     }
 }

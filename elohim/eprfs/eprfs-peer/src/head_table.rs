@@ -88,10 +88,13 @@ pub struct ChannelCounters {
     pub oversized_events: u64,
     /// Folds stopped at their byte budget.
     pub over_budget_folds: u64,
-    /// Connections refused per node id (64 lowercase hex): a stranger's, a contested device's
+    /// Connections refused per node id (64 lowercase hex) the roster names: a contested device's
     /// new ones, and the open ones a reload closed.
     #[serde(default)]
     pub refused_connections: BTreeMap<String, u64>,
+    /// Connections refused from node ids the roster does not name, in one total.
+    #[serde(default)]
+    pub refused_strangers: u64,
 }
 
 impl Default for HeadTable {

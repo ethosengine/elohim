@@ -292,13 +292,9 @@ async fn flow_fold_folds_a_devices_channel_root_once_and_status_reads_it() {
             events_folded: 1,
         },
     );
-    // Connections A refused: three of B's (say after a Contest), two of a stranger's.
-    let stranger_node = "ab".repeat(32);
+    // Connections A refused: three of B's (say after a Contest), and strangers' in one total.
     table.channel.refused_connections.insert(b.node_id(), 3);
-    table
-        .channel
-        .refused_connections
-        .insert(stranger_node.clone(), 2);
+    table.channel.refused_strangers = 2;
     table.save(&a.peer_dir()).unwrap();
     let status = a.epr(&["peer", "status", "--root", a.root(), "--json"]);
     assert!(
@@ -312,22 +308,19 @@ async fn flow_fold_folds_a_devices_channel_root_once_and_status_reads_it() {
     assert_eq!(devices[0]["device"], b_did);
     assert_eq!(devices[0]["seq"], 4);
     assert_eq!(devices[0]["eventsFolded"], 1);
-    // Refused connections, by the device the roster names for the node id, else unnamed.
-    let mut expected = vec![
-        serde_json::json!({"nodeId": stranger_node, "device": null, "count": 2}),
-        serde_json::json!({"nodeId": b.node_id(), "device": b_did, "count": 3}),
-    ];
-    expected.sort_by_key(|row| row["nodeId"].as_str().unwrap_or_default().to_string());
+    // Refused connections, by the device the roster names for the node id; strangers in a total.
     assert_eq!(
         json["refusedConnections"],
-        serde_json::Value::Array(expected),
+        serde_json::json!([{"nodeId": b.node_id(), "device": b_did, "count": 3}]),
         "{json}"
     );
+    assert_eq!(json["refusedStrangers"], 2, "{json}");
     let text = a.epr(&["peer", "status", "--root", a.root()]);
     let text = String::from_utf8_lossy(&text.stdout).to_string();
     assert!(text.contains("head seq 4"), "{text}");
     assert!(text.contains("refused connections"), "{text}");
     assert!(text.contains(": 3"), "{text}");
+    assert!(text.contains("strangers: 2"), "{text}");
 
     // Nothing printed carries the peer key.
     let secret = std::fs::read(a.peer_dir().join(PeerKey::FILE_NAME)).unwrap();

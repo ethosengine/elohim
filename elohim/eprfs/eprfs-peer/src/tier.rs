@@ -217,6 +217,8 @@ impl TierCounters {
 pub struct TierProtocol {
     inner: Arc<Inner>,
     book: crate::connections::ConnectionBook,
+    /// The admission the gate reads, held here too so a connection is booked under the same read.
+    admission: SharedAdmission,
 }
 
 struct Inner {
@@ -248,10 +250,11 @@ impl TierProtocol {
         admission: SharedAdmission,
         limits: TierLimits,
     ) -> eprfs_core::Result<TierProtocol> {
-        let gate = StewardDevicesGate::new(admission);
+        let gate = StewardDevicesGate::new(admission.clone());
         let endpoint = TierEndpoint::new(self_id, store, gate.clone(), None, limits.tree)?;
         Ok(TierProtocol {
             book: crate::connections::ConnectionBook::default(),
+            admission,
             inner: Arc::new(Inner {
                 gate,
                 endpoint,
@@ -283,9 +286,16 @@ impl ProtocolHandler for TierProtocol {
     async fn accept(&self, connection: Connection) -> Result<(), AcceptError> {
         // The handshake proved the peer holds this node id's key; nothing it sends names it.
         let remote = connection.remote_node_id()?;
-        if self.inner.gate.requester(&remote).agent().is_some() {
-            self.book.admitted(remote, &connection);
-        } else {
+        // Booked under the same read of admission that admitted it, so a reload (which takes the
+        // write lock, then closes what the book holds) cannot slip between the two. Fail closed.
+        let admitted = match self.admission.read() {
+            Ok(admission) if admission.admits(&remote).is_some() => {
+                self.book.admitted(remote, &connection);
+                true
+            }
+            _ => false,
+        };
+        if !admitted {
             self.book.refused(remote);
         }
         let per_connection = self.inner.limits.max_streams_per_connection.max(1);

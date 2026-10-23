@@ -383,6 +383,8 @@ struct StatusOutcome {
     /// Connections this device's daemon refused, per node id, with the device the roster names
     /// for it (a contested device's old endpoint row still names it); `None` for a stranger.
     refused_connections: Vec<RefusedConnections>,
+    /// Connections refused from node ids the roster does not name, in one total.
+    refused_strangers: u64,
 }
 
 /// One node id's refused connections, as `status` reports them.
@@ -437,7 +439,9 @@ fn status(options: &Options) -> PeerResult<ExitCode> {
             count: *count,
         })
         .collect();
+    let refused_strangers = table.channel.refused_strangers;
     let outcome = StatusOutcome {
+        refused_strangers,
         handle: device.lineage.handle.clone(),
         chain_root: device.lineage.chain_root.clone(),
         device: did,
@@ -488,8 +492,8 @@ fn render(outcome: &StatusOutcome) {
         "dropped heads  unadmitted {}  forged {}  rollback {}  replayed {}  malformed {}",
         d.unadmitted, d.forged, d.rollback, d.replayed, d.malformed
     );
-    if !outcome.refused_connections.is_empty() {
-        let refused: Vec<String> = outcome
+    if !outcome.refused_connections.is_empty() || outcome.refused_strangers > 0 {
+        let mut refused: Vec<String> = outcome
             .refused_connections
             .iter()
             .map(|r| {
@@ -500,6 +504,9 @@ fn render(outcome: &StatusOutcome) {
                 format!("{who}: {}", r.count)
             })
             .collect();
+        if outcome.refused_strangers > 0 {
+            refused.push(format!("strangers: {}", outcome.refused_strangers));
+        }
         println!("refused connections  {}", refused.join("  "));
     }
     let c = &outcome.channel;

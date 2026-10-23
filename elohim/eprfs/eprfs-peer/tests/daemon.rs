@@ -188,8 +188,19 @@ async fn two_daemons_fold_each_others_heads_and_drop_a_contested_device() {
     side_b
         .checkout
         .append(berth_event("claim", "alpha-fleet", "sb", "2.0"));
-    eventually("A drops B's newer head as unadmitted", || {
-        side_a.table().dropped.unadmitted > dropped_before
+    // B's newer head is dropped as unadmitted if it still arrives; or B's connection is closed
+    // and refused, and it never arrives at all.
+    let node_b = hex(id_b);
+    eventually("A drops B's newer head, or refuses B's connection", || {
+        let table = side_a.table();
+        table.dropped.unadmitted > dropped_before
+            || table
+                .channel
+                .refused_connections
+                .get(&node_b)
+                .copied()
+                .unwrap_or(0)
+                > 0
     })
     .await;
     assert_eq!(side_a.table().devices[&b.did].seq, folded_before);
@@ -631,9 +642,21 @@ async fn a_contest_during_a_stalled_fold_appends_nothing_and_records_no_head() {
         .expect("roster")
         .append(contest(&a, &bound_c))
         .expect("contest");
-    eventually("A drops C's heads as unadmitted", || {
-        side_a.table().dropped.unadmitted > 0
-    })
+    let node_c = hex(key_c.node_id());
+    eventually(
+        "A drops C's heads as unadmitted, or refuses C's connection",
+        || {
+            let table = side_a.table();
+            table.dropped.unadmitted > 0
+                || table
+                    .channel
+                    .refused_connections
+                    .get(&node_c)
+                    .copied()
+                    .unwrap_or(0)
+                    > 0
+        },
+    )
     .await;
     gated.open.add_permits(1);
     tokio::time::sleep(Duration::from_secs(3)).await;
@@ -766,12 +789,29 @@ async fn a_contested_device_is_disconnected_refused_like_a_stranger_and_counted(
     assert_eq!(from_c, from_d, "C gets a stranger's refusal");
 
     // A counts the refused connections per node id, in the head table `epr peer status` reads.
-    eventually("A records C's and D's refused connections", || {
-        let refused = side_a.table().channel.refused_connections;
-        refused.get(&hex(key_c.node_id())).copied().unwrap_or(0) >= 3
-            && refused.get(&hex(key_d.node_id())).copied().unwrap_or(0) >= 2
+    // C is a device the roster names (contested): counted one by one. D is a stranger: counted in
+    // the strangers total. Written at most once per re-announce interval, so allow for one.
+    tokio::time::timeout(Duration::from_secs(45), async {
+        loop {
+            let counters = side_a.table().channel;
+            if counters
+                .refused_connections
+                .get(&hex(key_c.node_id()))
+                .copied()
+                .unwrap_or(0)
+                >= 3
+                && counters.refused_strangers >= 2
+                && !counters
+                    .refused_connections
+                    .contains_key(&hex(key_d.node_id()))
+            {
+                break;
+            }
+            tokio::time::sleep(Duration::from_millis(200)).await;
+        }
     })
-    .await;
+    .await
+    .expect("A records C's refused connections and D's as a stranger's within 45 s");
 
     daemon_a.shutdown().await;
     endpoint_c.close().await;
