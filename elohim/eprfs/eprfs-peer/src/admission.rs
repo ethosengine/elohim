@@ -53,6 +53,13 @@ impl Admission {
         self.admitted.get(&node_id_hex(node)).map(String::as_str)
     }
 
+    /// Whether `device` (a `did:key`) currently has an admitted node id. The tier gate asks this
+    /// on every request, so a [`Self::reload`] that drops a device takes effect at its next
+    /// request, even on a connection admitted earlier.
+    pub fn admits_device(&self, device: &str) -> bool {
+        self.admitted.values().any(|admitted| admitted == device)
+    }
+
     /// Re-read admission for the same lineage from the current `rows`. Rotations and
     /// revocations in `rows` take effect here; nothing earlier is kept.
     pub fn reload(&mut self, rows: &[ParticipantRow], verifier: &dyn SignatureVerifier) {

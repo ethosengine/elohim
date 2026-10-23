@@ -10,7 +10,8 @@ publish = ["elohim"]
 
 [dependencies]
 async-trait.workspace = true
-bytes.workspace = true
+# `serde` so a served leaf (`ReadLeaf::bytes`) crosses a wire as one byte string.
+bytes = { workspace = true, features = ["serde"] }
 serde.workspace = true
 serde_json.workspace = true
 serde_bytes = "0.11"

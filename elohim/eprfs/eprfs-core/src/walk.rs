@@ -238,6 +238,21 @@ pub struct View {
     paths: BTreeSet<TreePath>,
 }
 
+/// A view crosses a wire as its sequence of paths, each in [`TreePath`]'s form.
+impl Serialize for View {
+    fn serialize<S: Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
+        serializer.collect_seq(&self.paths)
+    }
+}
+
+/// Re-normalized on arrival ([`View::from_tree_paths`]): a sender cannot hand a reader a view
+/// that is not an antichain.
+impl<'de> Deserialize<'de> for View {
+    fn deserialize<D: Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
+        Vec::<TreePath>::deserialize(deserializer).map(Self::from_tree_paths)
+    }
+}
+
 impl View {
     pub fn whole() -> Self {
         Self::from_tree_paths([TreePath::root()])
@@ -1138,13 +1153,16 @@ pub(crate) fn find<'n>(node: &'n TreeNode, name: &[u8]) -> Option<&'n TreeEntry>
         .map(|index| &node.entries[index])
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "kebab-case", rename_all_fields = "camelCase")]
 pub enum LeafKind {
     File { executable: bool },
     Symlink,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq)]
+/// Serializable so a tier answers it over a transport (the device peer's tier ALPN).
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
 #[non_exhaustive]
 pub struct ReadLeaf {
     pub path: TreePath,
@@ -1202,7 +1220,9 @@ pub async fn read_path<S: EprfsStorage + ?Sized>(
     })
 }
 
-#[derive(Debug, Clone, PartialEq, Eq)]
+/// Serializable so a tier answers it over a transport (the device peer's tier ALPN).
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
 #[non_exhaustive]
 pub struct DirListing {
     pub path: TreePath,
@@ -1261,7 +1281,9 @@ pub async fn list_dir<S: EprfsStorage + ?Sized>(
 
 /// One difference between two roots. `None/Some` is added, `Some/None` is
 /// removed, `Some/Some` is a changed kind, executable bit, leaf or reference.
-#[derive(Debug, Clone, PartialEq, Eq)]
+/// Serializable so a tier answers it over a transport (the device peer's tier ALPN).
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
 #[non_exhaustive]
 pub struct TreeChange {
     pub path: TreePath,
@@ -1553,6 +1575,43 @@ mod tests {
     }
 
     const THREE_PATH_SPINE: [&str; 7] = ["", "a1", "a1/b2", "a4", "a4/b4", "a9", "a9/b0"];
+
+    fn dagcbor_round_trip<T: Serialize + for<'de> Deserialize<'de>>(value: &T) -> T {
+        let bytes = serde_ipld_dagcbor::to_vec(value).unwrap();
+        serde_ipld_dagcbor::from_slice(&bytes).unwrap()
+    }
+
+    #[test]
+    fn served_answers_round_trip_as_dag_cbor() {
+        let leaf_cid = BlobCid::compute_raw(b"\xffbytes");
+        let leaf = ReadLeaf::new(
+            TreePath::from_components(vec![b"a".to_vec(), vec![0xff]]).unwrap(),
+            leaf_cid.clone(),
+            LeafKind::File { executable: true },
+            Bytes::from_static(b"\xffbytes"),
+        );
+        assert_eq!(dagcbor_round_trip(&leaf), leaf, "non-UTF-8 names survive");
+        let listing = DirListing::new(TreePath::root(), leaf_cid.clone(), vec![]);
+        assert_eq!(dagcbor_round_trip(&listing), listing);
+        let change = TreeChange::new(
+            tp("a/b"),
+            None,
+            Some(TreeEntryKind::File {
+                blob: leaf_cid.into(),
+                executable: false,
+            }),
+        );
+        assert_eq!(dagcbor_round_trip(&change), change);
+    }
+
+    #[test]
+    fn a_view_from_the_wire_is_renormalized() {
+        let sent = vec![tp("a/b"), tp("a"), tp("a"), tp("c")];
+        let bytes = serde_ipld_dagcbor::to_vec(&sent).unwrap();
+        let view: View = serde_ipld_dagcbor::from_slice(&bytes).unwrap();
+        assert_eq!(view, View::from_tree_paths([tp("a"), tp("c")]));
+        assert_eq!(dagcbor_round_trip(&view), view);
+    }
 
     fn cids(nodes: &HashMap<TreePath, BlobCid>, paths: &[&str]) -> Vec<BlobCid> {
         paths.iter().map(|p| nodes[&tp(p)].clone()).collect()

@@ -3,7 +3,8 @@
 use std::io;
 use std::path::PathBuf;
 
-/// Why the device peer could not load its key, read its roster or bind its endpoint.
+/// Why the device peer could not load its key, read its roster, bind its endpoint or ask a
+/// peer's tier.
 #[derive(Debug, thiserror::Error)]
 #[non_exhaustive]
 pub enum PeerError {
@@ -54,4 +55,21 @@ pub enum PeerError {
     /// iroh could not bind the endpoint.
     #[error("cannot bind the iroh endpoint: {0}")]
     Bind(#[source] Box<iroh::endpoint::BindError>),
+
+    /// A peer's tier could not be dialled.
+    #[error("cannot reach the peer's tier: {0}")]
+    TierConnect(#[source] Box<iroh::endpoint::ConnectError>),
+
+    /// A tier stream failed or was reset mid-exchange (a peer resets a stream whose request
+    /// frame it refused).
+    #[error("the tier stream failed: {0}")]
+    TierStream(#[source] Box<dyn std::error::Error + Send + Sync>),
+
+    /// A tier frame past its cap, or one that does not decode.
+    #[error("bad tier frame: {reason}")]
+    TierFrame { reason: String },
+
+    /// A peer's tier served a leaf whose bytes fail its address. Never accepted as an answer.
+    #[error("the peer's tier served bytes that fail their address {cid}")]
+    TierLeafIntegrity { cid: eprfs_core::BlobCid },
 }

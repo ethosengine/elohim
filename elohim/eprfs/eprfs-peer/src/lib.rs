@@ -8,6 +8,9 @@
 //! - [`Admission`] maps an authenticated iroh node id to the device `did:key` whose valid
 //!   `PeerEndpoint` row names it, read from the roster in this device's own checkout
 //!   ([`roster_rows_from_file`]). Everyone else is refused.
+//! - [`TierProtocol`] serves this device's eprfs store on [`TIER_ALPN`] behind
+//!   [`StewardDevicesGate`], which answers only admitted devices; everyone else gets
+//!   eprfs-serve's uniform refusal. [`tier_call`] and [`tier_request`] ask a peer's tier.
 //!
 //! **Admission at connect time is the possession proof.** iroh authenticates the remote node id
 //! cryptographically on every connection: the TLS handshake carries the peer's raw ed25519
@@ -19,9 +22,16 @@
 mod admission;
 mod endpoint;
 mod error;
+mod gate;
 mod key;
+mod tier;
 
 pub use admission::{roster_rows_from_file, Admission};
 pub use endpoint::{bind, relay_from_env, relay_from_value, RELAY_ENV};
 pub use error::PeerError;
+pub use gate::{SharedAdmission, StewardDevicesGate};
 pub use key::PeerKey;
+pub use tier::{
+    tier_call, tier_request, TierAnswer, TierCountersSnapshot, TierProtocol, TierRequest,
+    MAX_ANSWER_FRAME_BYTES, MAX_CONCURRENT_STREAMS, MAX_REQUEST_FRAME_BYTES, TIER_ALPN,
+};

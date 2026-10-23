@@ -2,7 +2,7 @@
 seamRegistryVersion: 1
 crate: eprfs-peer
 crateRoot: elohim/eprfs/eprfs-peer
-seamLocus: "The door between a device and the other devices of its own person: an inbound iroh peer is admitted only when the node id iroh authenticated in the handshake is named by a valid PeerEndpoint row of the same lineage in this device's own roster. The device's peer key is minted here and never leaves it."
+seamLocus: "The door between a device and the other devices of its own person: an inbound iroh peer is admitted only when the node id iroh authenticated in the handshake is named by a valid PeerEndpoint row of the same lineage in this device's own roster, and the device's eprfs tier is served on that door's ALPN to admitted devices only. The device's peer key is minted here and never leaves it."
 decisionPoints:
   - name: admits
     kind: verdict-fn
@@ -40,7 +40,7 @@ decisionPoints:
         justification: "Nothing is advertised."
       - id: C8
         status: partial
-        justification: "The verdict is returned per call; refusals are not yet counted here (the tier and gossip consumers count them, T4/T5)."
+        justification: "The verdict is returned per call; the tier counts unadmitted requests (TierProtocol::counters); the gossip consumer counts its own (T5)."
       - id: C9
         status: answered
         justification: "Admission is per lineage (chain_root); a device's endpoint rotates by seq under its own signature, and a contested binding revokes it."
@@ -148,3 +148,132 @@ decisionPoints:
         testName: a_key_file_of_the_wrong_length_is_refused_not_regenerated
         kind: integration
     notes: "Spec §3.1: the key lives at $XDG_CONFIG_HOME/epr/peer/iroh.key; the caller resolves that directory."
+  - name: admit
+    kind: verdict-fn
+    sourceLocation:
+      file: src/gate.rs
+      modulePath: eprfs_peer::StewardDevicesGate::admit
+    summary: "The device tier's ReachGate: a Requester is admitted for any root or object only when it is DeviceHeld and names a device did:key whose node id Admission admits at the moment of the request. StewardDevicesGate::requester builds the Requester from the connection's authenticated remote node id (never from the request); an unadmitted node id becomes Requester::anonymous, which the gate refuses, so eprfs-serve's TierEndpoint answers with its uniform OutsideStanding refusal."
+    concernIds:
+      - id: C0
+        status: answered
+        justification: "A stranger receives the same refusal, carrying no standing label, for a held root and an unknown one; its request never reaches the store."
+      - id: C1
+        status: answered
+        justification: "The requester's identity is the node id iroh authenticated in the handshake, mapped through the device's own roster; nothing the peer sends names it."
+      - id: C2
+        status: n-a
+        justification: "No head order."
+      - id: C3
+        status: answered
+        justification: "Synchronous read of the shared admission; a poisoned lock refuses rather than waits."
+      - id: C4
+        status: answered
+        justification: "Not admitted is one refusal (OutsideStanding, no label) whatever the reason: unknown, contested, rotated away or anonymous."
+      - id: C5
+        status: answered
+        justification: "Admission re-verifies every roster row on reload; the gate only reads its verdict."
+      - id: C6a
+        status: answered
+        justification: "Two map reads per request."
+      - id: C6b
+        status: answered
+        justification: "Read-only; reload replaces admission under the write lock."
+      - id: C7
+        status: n-a
+        justification: "Nothing is advertised."
+      - id: C8
+        status: answered
+        justification: "TierProtocol::counters counts unadmitted requests; the stranger cannot tell them apart."
+      - id: C9
+        status: answered
+        justification: "Admission is read on every request, so a reload that contests or rotates a device takes effect at its next request on an already-open connection."
+      - id: C10
+        status: answered
+        justification: "New; implements eprfs-core's ReachGate unchanged."
+      - id: C11
+        status: n-a
+        justification: "No fan-out."
+      - id: C12
+        status: answered
+        justification: "Default deny; no admit-on-error path, and a poisoned lock admits nobody."
+      - id: C13
+        status: n-a
+        justification: "The same at every stage."
+      - id: C14
+        status: partial
+        justification: "Refusals are counted, not witnessed."
+    contractTests:
+      - path: elohim/eprfs/eprfs-peer/tests/tier_alpn.rs
+        testName: admitted_device_reads_and_diffs_a_root
+        kind: integration
+      - path: elohim/eprfs/eprfs-peer/tests/tier_alpn.rs
+        testName: stranger_gets_uniform_refusal_for_held_and_unknown_roots
+        kind: integration
+      - path: elohim/eprfs/eprfs-peer/tests/tier_alpn.rs
+        testName: contested_device_refused_after_admission_reload
+        kind: integration
+    notes: "Spec §3.2. Mirrors eprfs-serve's an_unadmitted_requester_cannot_distinguish_private_and_unknown_roots over the wire."
+  - name: tier_frames
+    kind: boundary-answer-type
+    sourceLocation:
+      file: src/tier.rs
+      modulePath: eprfs_peer::TierAnswer
+    summary: "The tier ALPN's wire: one TierRequest (read, list or diff) per bidirectional stream and one TierAnswer back, each a big-endian u32 length plus canonical DAG-CBOR. A request frame past MAX_REQUEST_FRAME_BYTES (1 MiB) is refused before allocation and its stream reset; an answer past MAX_ANSWER_FRAME_BYTES (16 MiB) is sent as Failed, never truncated; at most MAX_CONCURRENT_STREAMS (8) streams per connection are answered at once. The client verifies a served leaf against its CID before returning it."
+    concernIds:
+      - id: C0
+        status: answered
+        justification: "Only the device's own store is served (no upstream chain), so nothing is forwarded on a peer's behalf."
+      - id: C1
+        status: n-a
+        justification: "No election."
+      - id: C2
+        status: n-a
+        justification: "No head order; T5 orders heads by seq."
+      - id: C3
+        status: answered
+        justification: "One request per stream; concurrency per connection is bounded and further streams wait in QUIC flow control."
+      - id: C4
+        status: answered
+        justification: "TreeError::Unanswered crosses whole as Unanswered with ruling 7's three parts; any other tree error is Failed with its message."
+      - id: C5
+        status: answered
+        justification: "The endpoint verifies leaves it serves, and tier_request re-verifies a leaf against its CID; a mismatch is TierLeafIntegrity, never an answer."
+      - id: C6a
+        status: answered
+        justification: "Frame lengths are capped before allocation in both directions."
+      - id: C6b
+        status: n-a
+        justification: "Stateless per stream."
+      - id: C7
+        status: n-a
+        justification: "Nothing is advertised."
+      - id: C8
+        status: answered
+        justification: "Counted: requests, unadmitted, refused frames, oversized answers (TierProtocol::counters), beside the endpoint's own ServeCounters."
+      - id: C9
+        status: answered
+        justification: "The ALPN carries its version (/elohim/eprfs-tier/1.0.0); a wire change is a new ALPN."
+      - id: C10
+        status: answered
+        justification: "The answer types are eprfs-core's own (ReadLeaf, DirListing, TreeChange, Unanswered<ItemAbsence>), serialized in their home crate; no second wire struct."
+      - id: C11
+        status: n-a
+        justification: "No fan-out."
+      - id: C12
+        status: answered
+        justification: "A frame that is oversize or does not decode is refused and its stream reset; the connection keeps serving."
+      - id: C13
+        status: n-a
+        justification: "The same at every stage."
+      - id: C14
+        status: n-a
+        justification: "No act to witness."
+    contractTests:
+      - path: elohim/eprfs/eprfs-peer/tests/tier_alpn.rs
+        testName: an_oversize_request_frame_is_refused_before_it_is_read
+        kind: integration
+      - path: elohim/eprfs/eprfs-peer/tests/tier_alpn.rs
+        testName: admitted_device_reads_and_diffs_a_root
+        kind: integration
+    notes: "Spec §3.2. T5 asks a peer's tier for a channel diff through tier_call / tier_request."

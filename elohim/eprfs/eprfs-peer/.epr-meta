@@ -3,8 +3,9 @@ epr-meta-version: 1
 id: eprfs-peer-style
 covers: subtree
 purpose: >
-  A device's iroh peer: its persisted peer key, its endpoint, and admission of authenticated
-  node ids to the devices its own roster names. Strict under the Rust style guide from its
+  A device's iroh peer: its persisted peer key, its endpoint, admission of authenticated
+  node ids to the devices its own roster names, and the tier ALPN serving its eprfs store to
+  those devices only. Strict under the Rust style guide from its
   first commit.
 rules:
   - id: rust-style-strict
@@ -14,8 +15,10 @@ rules:
 
 Born strict (RS-GOV-03): every lint suppression in this subtree carries a literal reason, and
 the native style gate holds it at zero findings. The crate depends on `elohim-epr-rea` for the
-roster and on iroh `=0.92` (with the workspace's vendored `iroh-quinn-proto` patch, as
-elohim-storage carries) for the endpoint. It takes no dependency on `epr-cli`: the did:key
+roster, on iroh `=0.92` (with the workspace's vendored `iroh-quinn-proto` patch, as
+elohim-storage carries) for the endpoint, and on `eprfs-core`/`eprfs-serve` for the tier it serves
+on `/elohim/eprfs-tier/1.0.0` (`TierEndpoint` behind `StewardDevicesGate`; frames are the same
+`serde_ipld_dagcbor` codec eprfs-core encodes trees with). It takes no dependency on `epr-cli`: the did:key
 verifier arrives as a `&dyn SignatureVerifier` parameter. elohim-storage takes no dependency on
 this crate (R-E3).
 
