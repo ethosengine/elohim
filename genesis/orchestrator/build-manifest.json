@@ -136,6 +136,7 @@
           "recipe": "_gate-rust-style",
           "cargo": {
             "workspace": "genesis__orchestrator__rust-style",
+            "profile": "dev",
             "rustflags": "",
             "env": {
               "CARGO_BUILD_JOBS": "1"

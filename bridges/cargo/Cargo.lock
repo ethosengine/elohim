@@ -516,6 +516,7 @@ dependencies = [
  "elohim-epr",
  "elohim-epr-index",
  "elohim-epr-rea",
+ "elohim-rust-style",
  "eprfs-agent",
  "eprfs-core",
  "eprfs-host",
@@ -558,6 +559,20 @@ dependencies = [
  "serde_ipld_dagcbor",
  "serde_json",
  "thiserror 2.0.18",
+]
+
+[[package]]
+name = "elohim-rust-style"
+version = "0.1.0"
+dependencies = [
+ "eprfs-meta",
+ "proc-macro2",
+ "quote",
+ "serde",
+ "serde_json",
+ "syn",
+ "tempfile",
+ "toml",
 ]
 
 [[package]]
