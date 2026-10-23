@@ -519,7 +519,11 @@ pub struct DepEdge {
 impl DepEdge {
     /// Construct a `DepEdge`, enforcing the invariant
     /// `sealed_cid.is_some() ⇔ governor == Governor::CiteSeal`.
-    #[allow(clippy::too_many_arguments)]
+    #[allow(
+        clippy::too_many_arguments,
+        reason = "every field is an independent input the invariant check reads together; a \
+                  builder would let an edge exist before validate() runs"
+    )]
     pub fn new(
         from: String,
         to: String,
