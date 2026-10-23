@@ -85,7 +85,9 @@ PeerEndpoint { handle, chain_root, device, node_id, nonce, signature }
 `chain_root` or the `controller` of a valid Binding row, and no valid Contest names that binding. The
 newest valid PeerEndpoint row for a device supersedes older ones, which is how a key rotates. A Contest
 on the device's binding revokes the device: its node id stops being admitted and its heads are ignored
-from the next fold onward. The row travels by git, as Binding rows already do.
+from the next fold onward. Every lease and lane claim already folded from that device also drops
+out of the steward lease view once the Contest is folded, so a revoked device cannot keep a shared
+resource pinned. The row travels by git, as Binding rows already do.
 
 The device generates its iroh secret key and keeps it at `$XDG_CONFIG_HOME/epr/peer/iroh.key`
 (mode 0600, on the persistent `/nix/xdg/config`). The key is never committed, never copied and never
