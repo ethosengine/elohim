@@ -3,22 +3,24 @@ id: "backlog-self-heal-alpha-ssr-post-bundle-swap-cold-fetch-stall"
 kind: "backlog"
 contentType: "backlog-item"
 contentFormat: "markdown"
-title: "alpha's SSR renders stall at the 1200ms fetch soft budget in bursts: first seen as a ~15min window after a bundle-head swap, then (2026-10-02) sporadically for hours on a days-old head — the stalled fetches are named, storage never saw a slow request, so the time is lost before the request reaches storage; (2026-10-16) the drop guards that name the phase at the cut are built, awaiting deploy"
+title: "alpha's SSR renders stall at the 1200ms fetch soft budget in bursts: first seen as a ~15min window after a bundle-head swap, then (2026-10-02) sporadically for hours on a days-old head — the stalled fetches are named, storage never saw a slow request, so the time is lost before the request reaches storage; (2026-10-16) the drop guards that name the phase at the cut are built; (2026-10-23) deployed, they name the name lookup, and the render client now shares and remembers it, awaiting deploy"
 slug: "self-heal-alpha-ssr-post-bundle-swap-cold-fetch-stall"
 written: "2026-09-12"
-updated: "2026-10-19"
+updated: "2026-10-23"
 author: "runtime-triage"
 status: "wip"
 priority: "medium"
-self_heal_status: blocked
+self_heal_status: in-progress
 severity: medium
 fingerprints: [da8bb3bdd7e1]
 nodes: [alpha, doorway-alpha, elohim-matthew-alpha]
 relatedNodeIds: []
-tags: [self-heal, render-degenerate, ssr, pool-free-client, name-lookup, soft-budget, bundle-head-swap, cold-window, elohim-render, doorway, observability-gap, true-positive, recurrence, matthew, alpha, performance, perf-latency, trustful-self, friction-wait, plane-projection, fused-planes, unit-call, phase-transition, lane-interactive]
+tags: [self-heal, render-degenerate, ssr, pool-free-client, name-lookup, single-flight, serve-stale, soft-budget, bundle-head-swap, cold-window, elohim-render, doorway, observability-gap, true-positive, recurrence, matthew, alpha, performance, perf-latency, trustful-self, friction-wait, plane-projection, fused-planes, unit-call, phase-transition, lane-interactive]
 cites:
   - https://doorway-alpha.elohim.host/admin/render-stats
   - https://doorway-alpha.elohim.host/admin/self-healing
+  - https://doorway-alpha.elohim.host/version
+  - http://loki.observability.svc.cluster.local:3100/loki/api/v1/query_range
   - https://doorway-alpha.elohim.host/db/content/elohim-host-landing/head
   - https://elohim.host/admin/render-stats
   - https://elohim.host/db/content/elohim-host-landing/head
@@ -1041,3 +1043,145 @@ does not tune it.
 **Current decision:** still BLOCKED on fix path step 2, an edge deploy that carries both guards. The
 dev landing reaches alpha through the next edge build. Then do step 3, the Loki read beside
 `degenerate_fetches`.
+
+---
+
+# 2026-10-23: `da8bb3bdd7e1` fired a sixth time, on the first image that carries the guards; they read out, and the name lookup is where the time goes
+
+## What is exhausted
+
+Ledger line (fp `da8bb3bdd7e1`, node **alpha**, filed poll 237, `2026-10-23T15:05:35+00:00`):
+
+```
+render degenerate 11/43 of NEW renders = 0.26 over 5 of the last 8 polls (SSR stalled/timedOut saturation)
+```
+
+Re-fetch at triage, `GET https://doorway-alpha.elohim.host/admin/render-stats` (15:08:01Z, HTTP 200):
+
+```json
+{"total": 25, "rendered": 18, "renderedEmpty": 0, "stalled": 7, "timedOut": 0,
+ "errored": 0, "avgWallMs": 443, "maxWallMs": 1278, "degenerateRate": 0.28}
+```
+
+`/version`: commit `04ef84c`, built 2026-10-21T23:30:13Z. `04ef84c` carries `LookupWatch` and
+`WatchedFetch` (`git show 04ef84c0:doorway/doorway-service/src/ssr.rs`), so owed step 2 of the
+2026-10-16 decision is done. `/health` uptime 37167 s: the process started at about 04:48Z today.
+`/admin/self-healing` (15:08Z): `admission.shedTotal: 0`, upstream `circuit: closed`,
+`errorStreak: 0`, `warmup.completed: true`, `conductor.connectedWorkers: 4/4`,
+`projector.caughtUp: true`. **The condition is live, at the same rate as before.**
+
+## The reading (owed step 3)
+
+Loki, read directly at `http://loki.observability.svc.cluster.local:3100`,
+`{namespace="elohim-alpha"}`, 2026-10-23T04:30Z to 15:09Z, pod `elohim-doorway-alpha-5466cdb4c7-57fbj`:
+
+| stall (UTC) | `wall_ms` | `doorway::ssr::fetch` lines | `doorway::ssr::dns` "abandoned" lines |
+|---|---|---|---|
+| 05:23:21 | 1278 | 6 | 6 |
+| 09:27:45 | 1231 | 3 | 3 |
+| 12:21:31 | 1262 | 6 | 6 |
+| 13:27:19 | 1258 | 4 | 4 |
+| 13:37:31 | 1253 | 4 | 4 |
+| 13:53:05 | 1233 | 5 | 5 |
+| 14:13:05 | 1245 | 1 | 1 |
+
+7 stalls (the counter says 7), 35 fetch lines, 35 dns lines, matched within the same second. On
+all 35 fetch lines: `phase: "sending"`, `polls: 3`, `max_wake_to_poll_ms: 0`,
+`woken_unpolled_ms: None`, `max_poll_gap_ms` 1195-1201. All 35 dns lines read
+`"SSR render fetch: name lookup abandoned before it answered"`, host
+`elohim-matthew-alpha.elohim-alpha.svc.cluster.local`, `elapsed_ms` 1200-1201. No lookup on this
+pod completed slowly (zero "slow name lookup" lines): each lookup either answered quickly or did
+not answer within the budget. One example pair:
+
+```json
+{"timestamp":"2026-10-23T05:23:21.558858Z","fields":{"message":"SSR render fetch abandoned before it answered","path":"/api/v1/resilience/concept-path-forward-policymakers","phase":"sending","elapsed_ms":1200,"polls":3,"max_poll_gap_ms":1196,"max_wake_to_poll_ms":0,"woken_unpolled_ms":"None"},"target":"doorway::ssr::fetch"}
+{"timestamp":"2026-10-23T05:23:21.558930Z","fields":{"message":"SSR render fetch: name lookup abandoned before it answered","host":"elohim-matthew-alpha.elohim-alpha.svc.cluster.local","elapsed_ms":1200},"target":"doorway::ssr::dns"}
+```
+
+Read with the 2026-10-16 table, this is row 2: **the name lookup hung.**
+
+- **The render thread is ruled out.** No fetch was ever woken and left unpolled, and no wake waited
+  for its poll. The 2026-10-13 leading candidate is wrong.
+- **Connect, write and storage are ruled out.** Every cut fetch was still waiting on its lookup.
+- **Why position in the issue order matters (inferred, not measured):** a `/` render fires about
+  29 `getaddrinfo` calls for one name in a few milliseconds. The name has four dots under the pod
+  default `ndots:5`, so each call walks the search list first, and each step is an A and an AAAA
+  query over UDP: on the order of 200 queries in one burst. A query dropped in that burst costs the
+  glibc resolver its retry timeout (5 s by default), far past the 1200 ms budget. The lookups that
+  lose are the ones late in the burst. Which hop drops the query (conntrack, CoreDNS, the node) is
+  not established and does not need to be for the cure below.
+
+## Root-cause inventory (this pass)
+
+1. `doorway/doorway-service/src/server/http.rs`, `init_ssr_render_client`: the render client is
+   pool-free on purpose, and before this pass its resolver ran one lookup per fetch.
+2. `doorway/doorway-service/src/ssr.rs`, `TimedDnsResolver::resolve` (as deployed): each call ran
+   its own `tokio::net::lookup_host`, and the soft-budget cut dropped the lookup with the fetch, so a
+   hung lookup taught the next render nothing.
+
+## Fix path (applied)
+
+All in `doorway/doorway-service/src/ssr.rs`, plus the constructor call in `server/http.rs`:
+`TimedDnsResolver` now resolves through an `SsrAddressBook`.
+
+- **Single-flight.** Concurrent resolves of one host share one lookup. A `/` render issues one
+  lookup instead of 29, which removes the burst.
+- **Fresh window.** An answer younger than `SSR_DNS_FRESH_TTL` (30 s, the CoreDNS default record
+  TTL) is served with no lookup.
+- **Serve-stale.** A last-good answer older than that (capped at `SSR_DNS_STALE_CAP`, 24 h, inside
+  RFC 8767's one-to-three-day cap) starts or joins a refresh and is served if the refresh has not
+  answered within `SSR_DNS_STALE_GRACE` (150 ms). The render upstream is a cluster Service, whose
+  address lives as long as the Service does. alpha renders about 2.4 times an hour (25 in this process's 10.3 hours), so nearly every
+  render after the first one takes this path: a healthy refresh answers inside the grace and is
+  used; a hung one costs the fetch 150 ms instead of the whole budget.
+- **Detached lookups.** Each lookup runs on its own thread and writes its answer into the book.
+  A fetch cut at the soft budget drops only its wait, so the answer still reaches the next render.
+- **Instruments kept.** "slow name lookup" and "name lookup failed" now log once per lookup, not
+  once per fetch. `LookupWatch` still logs "name lookup abandoned before it answered" for a fetch
+  that waited with no answer in hand (only the very first render can do that now, or a render
+  arriving after the stale cap). A served-stale answer logs at `debug`.
+- Connections stay unpooled. An address list is plain data, owned by no runtime, so sharing it does
+  not bring back the cross-runtime hazard the pool-free client exists to avoid.
+
+Unchanged refusals: the soft budget, `_render_degenerate`, `DEFAULT_SSR_RENDER_PERMITS` and the
+pool-free client are untouched. Not done, and optional: a `dnsConfig` (`ndots: 2`, or
+`single-request-reopen`) on the doorway manifests would shorten every lookup on the pod, not just
+the render client's. It is not needed for this cure.
+
+## Current decision (supersedes 2026-10-16 and 2026-10-19)
+
+**FIX BUILT, AWAITING LANDING AND AN EDGE DEPLOY.** Branch `fix/self-heal-ssr-dns-single-flight`
+(worktree `.worktrees/self-heal-ssr-dns-single-flight`), not merged and not pushed: the integrator
+owns both. Ledger line `status: triaged`.
+
+What the poller cites on re-encounter: this record. A re-file before an image carrying this branch
+reaches alpha needs no triage. After it reaches alpha, the expected reading is zero or near-zero
+`degenerate_fetches` lines on doorway-alpha, and the ledger line closes by disappearance once the
+render delta stops collecting stalls. If stalls continue after the deploy, read
+`doorway::ssr::fetch` again: a stall with no dns "abandoned" line beside it means the lookup is
+solved and the next phase is showing.
+
+Not this record: alpha-b (`elohim.host`, fp `afc100835f7c`) read 14 of 17 renders degenerate in
+the same pass, with a different shape. Its cut fetches are also `phase: "sending"`, but 14 of its
+15 stalls have no dns "abandoned" line beside them, many fetches end `errored` within tens of
+milliseconds, and its `/admin/self-healing` warmup reports
+`Failed to connect to http://elohim-adam-alpha...:8090/api/v1/cache/stream`. That points at adam's
+storage (connect), not at the lookup. The single-flight book may remove the slow-lookup share there
+too (30 "slow name lookup" lines at 854-885 ms on that pod), but it is a separate concern.
+
+## Verification
+
+- 2026-10-23 15:08:01Z: `/admin/render-stats`, `/admin/self-healing`, `/health`, `/version`
+  re-fetched on both doorways (HTTP 200, quoted above). **The condition is live; nothing is claimed
+  fixed on the node.**
+- Loki read at about 15:09Z, as quoted above.
+- `just gate doorway/doorway-service` (2026-10-23, worktree `.worktrees/self-heal-ssr-dns-single-flight`,
+  pool slot `family/self`, toolchain 1.96.1): rust-style PASS (doorway-service debt 47 -> 46: the
+  `assertions_on_constants` allow in `server/http.rs` now carries its reason in the attribute),
+  `cargo fmt --check`, `cargo clippy -- -D warnings`, and `cargo test --lib --bins` all green,
+  **1839 passed, 0 failed, 2 ignored**, including six new tests in `ssr::tests`:
+  `a_burst_of_resolves_for_one_host_shares_one_lookup` (29 concurrent resolves, one lookup),
+  `a_fresh_answer_is_served_without_a_lookup`, `a_cut_waiter_does_not_throw_the_lookup_away`,
+  `a_hung_refresh_serves_the_last_good_answer_within_the_grace`,
+  `a_failed_lookup_is_not_remembered_and_keeps_the_last_good`, `an_answer_past_the_stale_cap_is_not_served`.
+- Not yet verified on the node: that needs the deploy. The ledger line is `triaged`, not deleted.
