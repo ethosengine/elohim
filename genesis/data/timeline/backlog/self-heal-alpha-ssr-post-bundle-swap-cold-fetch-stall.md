@@ -1190,3 +1190,16 @@ the deploy:
   `a_hung_refresh_serves_the_last_good_answer_within_the_grace`,
   `a_failed_lookup_is_not_remembered_and_keeps_the_last_good`, `an_answer_past_the_stale_cap_is_not_served`.
 - Not yet verified on the node: that needs the deploy. The ledger line is `triaged`, not deleted.
+
+## After the deploy (2026-10-23, edge #1705)
+
+- Landed on dev as 9ab74d440. elohim-edge/dev #1705 (upstream orchestrator #2135, HEAD 142536509)
+  pushed `elohim-doorway:1.0.0-dev-14253650@sha256:67446d54…` and rolled all seven alpha StatefulSets.
+- `GET https://doorway-alpha.elohim.host/admin/render-stats` on the new process, after twelve `/`
+  renders spaced 5 s apart: `{"total":15,"rendered":15,"stalled":0,"timedOut":0,"maxWallMs":365,
+  "degenerateRate":0.0}`. The 15:08Z reading on the previous image was 7 stalled of 25.
+- `elohim.host` (alpha-b) read `stalled 3/3` on its own new process at the same time. That is
+  fp `afc100835f7c` (adam's storage connect, above), not this record.
+- Fifteen renders is a small base against a rate of about one in four, so this is not yet a closure.
+  Closure stays with the harvester: the ledger line remains `triaged` until `da8bb3bdd7e1` stops
+  collecting stalls.
