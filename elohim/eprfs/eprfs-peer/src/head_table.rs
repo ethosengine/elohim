@@ -11,7 +11,9 @@
 //!   "devices": {
 //!     "<did>": { "seq", "root", "at", "folded": {"<did>": seq}, "folded_at", "events_folded" }
 //!   },
-//!   "dropped": { "unadmitted", "forged", "rollback", "replayed", "malformed" }
+//!   "dropped": { "unadmitted", "forged", "rollback", "replayed", "malformed" },
+//!   "channel": { "projection_failures", "last_projection_error", "fold_failures",
+//!                "oversized_events", "over_budget_folds" }
 //! }
 //! ```
 //!
@@ -44,6 +46,27 @@ pub struct HeadTable {
     /// The last head folded from each other device, by did:key.
     pub devices: BTreeMap<String, DeviceHead>,
     pub dropped: DroppedHeads,
+    /// The daemon's own channel health: projection and fold failures.
+    #[serde(default)]
+    pub channel: ChannelCounters,
+}
+
+/// What went wrong on this device's side of the channel, so `epr peer status` can say it rather
+/// than only the daemon's log.
+#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
+pub struct ChannelCounters {
+    /// Projections of the channel tree that failed. While failing, the last good root is still
+    /// announced and nothing new crosses.
+    pub projection_failures: u64,
+    /// Why the latest projection failed; cleared by the next one that succeeds.
+    pub last_projection_error: Option<String>,
+    /// Folds that failed (unreachable, unanswered, or a tree that does not hold its events at
+    /// their CIDs); each is retried on the device's next head.
+    pub fold_failures: u64,
+    /// Events refused for exceeding the per-event cap.
+    pub oversized_events: u64,
+    /// Folds stopped at their byte budget.
+    pub over_budget_folds: u64,
 }
 
 impl Default for HeadTable {
@@ -53,6 +76,7 @@ impl Default for HeadTable {
             own: None,
             devices: BTreeMap::new(),
             dropped: DroppedHeads::default(),
+            channel: ChannelCounters::default(),
         }
     }
 }

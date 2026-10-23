@@ -73,6 +73,10 @@ pub enum PeerError {
     #[error("bad tier frame: {reason}")]
     TierFrame { reason: String },
 
+    /// A received tier frame whose stated length is past the reader's cap; its body is never read.
+    #[error("a tier frame of {len} bytes exceeds the {cap}-byte cap")]
+    TierFrameTooLarge { len: u32, cap: u32 },
+
     /// A peer's tier served a leaf or listing that fails its address (bytes or entries that do
     /// not encode to its CID) or that is at another path than the one asked. Never accepted as an
     /// answer.
@@ -125,6 +129,11 @@ pub enum PeerError {
     /// root, or the device is no longer admitted there). Retried on the next head.
     #[error("the peer's tier did not answer for {what}")]
     FoldUnanswered { what: String },
+
+    /// The daemon's loop ended other than by being stopped: its gossip stream ended, a head could
+    /// not be persisted before it was announced, or the loop task failed.
+    #[error("the device peer stopped: {reason}")]
+    DaemonEnded { reason: String },
 
     /// The daemon could not start its gossip on the steward topic.
     #[error("cannot join the steward channel topic: {reason}")]

@@ -54,13 +54,13 @@ pub use daemon::{PeerConfig, PeerDaemon, FOLD_DEADLINE, TICK};
 pub use endpoint::{bind, bind_on, peer_from_arg, relay_from_env, relay_from_value, RELAY_ENV};
 pub use error::PeerError;
 pub use fold::{
-    fetch_channel, fold_events, fold_root, folded_from, ChannelEvent, Fetched, FoldOutcome,
-    FoldTarget, MAX_FOLD_EVENTS,
+    fetch_channel, fold_events, fold_root, folded_from, ChannelEvent, Fetched, FoldLimits,
+    FoldOutcome, FoldReport, FoldTarget, MAX_EVENT_BYTES, MAX_FOLD_BYTES, MAX_FOLD_EVENTS,
 };
 pub use gate::{SharedAdmission, StewardDevicesGate};
 pub use gossip::GatedGossip;
 pub use head::{ChannelHead, HeadSigner, MAX_HEAD_BYTES};
-pub use head_table::{DeviceHead, DroppedHeads, HeadTable, HEAD_TABLE_VERSION};
+pub use head_table::{ChannelCounters, DeviceHead, DroppedHeads, HeadTable, HEAD_TABLE_VERSION};
 /// The iroh address types a dialer names peers with, so a consumer needs no iroh dependency of
 /// its own.
 pub use iroh::{NodeAddr, NodeId};

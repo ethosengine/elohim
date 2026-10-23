@@ -929,7 +929,7 @@ async fn the_client_refuses_an_answer_frame_past_its_cap() {
     let header_only = (MAX_ANSWER_FRAME_BYTES + 1).to_be_bytes().to_vec();
     let answer = ask_rogue(header_only, read("channel/events/e1")).await;
     assert!(
-        matches!(answer, Err(PeerError::TierFrame { .. })),
+        matches!(answer, Err(PeerError::TierFrameTooLarge { .. })),
         "{answer:?}"
     );
 }

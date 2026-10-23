@@ -256,3 +256,53 @@ fn the_topic_is_blake3_of_the_named_chain_root() {
     assert_eq!(topic_for(chain_root).as_bytes(), expected.as_bytes());
     assert_ne!(topic_for(chain_root), topic_for("did:key:zOther"));
 }
+
+#[test]
+fn a_wiped_peer_dir_recovers_its_seq_from_the_others_acks() {
+    let h = household();
+    let admission = h.admission();
+    let signer = h.a.signer();
+    // A's head table is gone; B's last head acknowledges A up to seq 40.
+    let mut channel = Channel::new(h.a.did.clone(), HeadTable::default());
+    let mut acked = BTreeMap::new();
+    acked.insert(h.a.did.clone(), 40);
+    let from_b =
+        ChannelHead::sign(h.b.did.clone(), root("b1"), 9, 1, acked, &h.b.signer()).expect("signs");
+    assert_eq!(
+        channel.judge(&from_b, &admission, &*h.verify),
+        HeadVerdict::Fold
+    );
+    let t0 = Instant::now();
+    channel.changed(root("a1"), t0);
+    let head = channel
+        .announce(t0 + ANNOUNCE_DEBOUNCE, 2, &signer)
+        .expect("announce")
+        .expect("a head");
+    assert_eq!(
+        head.seq, 41,
+        "the next head is above every seq the others folded"
+    );
+
+    // A forged head claiming a high acknowledgement moves nothing.
+    let mut forged_ack = BTreeMap::new();
+    forged_ack.insert(h.a.did.clone(), 1_000);
+    let mut forged = ChannelHead::sign(
+        h.b.did.clone(),
+        root("b1"),
+        10,
+        1,
+        BTreeMap::new(),
+        &h.b.signer(),
+    )
+    .expect("signs");
+    forged.folded = forged_ack;
+    assert_eq!(
+        channel.judge(&forged, &admission, &*h.verify),
+        HeadVerdict::Forged
+    );
+    let next = channel
+        .announce(t0 + REANNOUNCE_EVERY * 2, 3, &signer)
+        .expect("announce")
+        .expect("a head");
+    assert_eq!(next.seq, 42);
+}

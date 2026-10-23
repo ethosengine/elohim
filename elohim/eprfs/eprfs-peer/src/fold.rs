@@ -21,12 +21,44 @@ use iroh::{Endpoint, NodeAddr};
 use crate::allow::{via_device, CrossingAllowList, VIA_SLOT};
 use crate::channel::CHANNEL_EVENTS;
 use crate::error::PeerError;
-use crate::tier::{tier_request, TierAnswer, TierRequest, TIER_ALPN};
+use crate::tier::{tier_request, tier_request_capped, TierAnswer, TierRequest, TIER_ALPN};
 
 /// The most events one fold reads. A larger change is folded across successive heads: the fold
 /// reports itself incomplete and the head is not recorded, so the next one resumes from the same
 /// base and skips what was already folded.
 pub const MAX_FOLD_EVENTS: usize = 1024;
+
+/// The largest event one fold accepts, in bytes. A berth record is well under a kilobyte; a
+/// larger leaf is refused before its bytes are read past this, and leaves the fold incomplete.
+pub const MAX_EVENT_BYTES: usize = 64 * 1024;
+
+/// The most event bytes one fold reads before it stops (and reports itself incomplete), so an
+/// admitted device that misbehaves costs this device bounded memory per fold.
+pub const MAX_FOLD_BYTES: usize = 8 * 1024 * 1024;
+
+/// What one read answer may carry beyond the event's own bytes: its path, CIDs and framing.
+const READ_ANSWER_OVERHEAD: usize = 4096;
+
+/// How much one fold reads.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct FoldLimits {
+    /// New events read per fold ([`MAX_FOLD_EVENTS`]).
+    pub max_events: usize,
+    /// The largest event accepted ([`MAX_EVENT_BYTES`]); a larger one leaves the fold incomplete.
+    pub max_event_bytes: usize,
+    /// Event bytes read per fold ([`MAX_FOLD_BYTES`]); the event that crosses it is the last.
+    pub max_fold_bytes: usize,
+}
+
+impl Default for FoldLimits {
+    fn default() -> FoldLimits {
+        FoldLimits {
+            max_events: MAX_FOLD_EVENTS,
+            max_event_bytes: MAX_EVENT_BYTES,
+            max_fold_bytes: MAX_FOLD_BYTES,
+        }
+    }
+}
 
 /// One crossing event as another device's channel tree holds it.
 #[derive(Debug, Clone, PartialEq)]
@@ -40,8 +72,13 @@ pub struct ChannelEvent {
 #[derive(Debug, Clone, Default)]
 pub struct Fetched {
     pub events: Vec<ChannelEvent>,
-    /// False when more than [`MAX_FOLD_EVENTS`] new events were offered and only that many read.
+    /// False when the fold stopped short of every new event: past the event count, at an event
+    /// over the per-event cap, or past the byte budget ([`FoldLimits`]).
     pub complete: bool,
+    /// Events refused for exceeding the per-event cap (at most one: the fold stops there).
+    pub oversized: u64,
+    /// Whether the fold stopped at the byte budget.
+    pub over_budget: bool,
 }
 
 /// What [`fold_events`] did.
@@ -69,6 +106,7 @@ pub async fn fetch_channel(
     root: &BlobCid,
     known: &HashSet<Cid>,
     tree: &TreeLimits,
+    limits: &FoldLimits,
 ) -> Result<Fetched, PeerError> {
     let events_dir = TreePath::from_slash_bytes(CHANNEL_EVENTS.as_bytes())
         .map_err(|e| integrity(e.to_string()))?;
@@ -92,28 +130,46 @@ pub async fn fetch_channel(
             fresh.push((cid, leaf));
         }
     }
-    let complete = fresh.len() <= MAX_FOLD_EVENTS;
-    fresh.truncate(MAX_FOLD_EVENTS);
-    let mut events = Vec::with_capacity(fresh.len());
+    let mut fetched = Fetched {
+        complete: fresh.len() <= limits.max_events,
+        ..Fetched::default()
+    };
+    fresh.truncate(limits.max_events);
+    // The answer frame is capped too, so an oversized leaf is refused before its bytes are read.
+    let answer_cap = u32::try_from(limits.max_event_bytes.saturating_add(READ_ANSWER_OVERHEAD))
+        .unwrap_or(u32::MAX);
+    let mut read_bytes = 0usize;
     for (cid, leaf) in fresh {
+        if read_bytes >= limits.max_fold_bytes {
+            fetched.over_budget = true;
+            fetched.complete = false;
+            break;
+        }
         let path = events_dir.join(cid.to_string().as_bytes());
         let request = TierRequest::Read {
             root: root.clone(),
             path,
         };
-        let read = match tier_request(connection, &request, tree).await? {
-            TierAnswer::Read(read) => read,
-            other => return Err(unanswered(format!("event {cid}"), &other)),
+        let read = match tier_request_capped(connection, &request, tree, answer_cap).await {
+            Ok(TierAnswer::Read(read)) if read.bytes.len() <= limits.max_event_bytes => read,
+            Ok(TierAnswer::Read(_)) | Err(PeerError::TierFrameTooLarge { .. }) => {
+                fetched.oversized += 1;
+                fetched.complete = false;
+                break;
+            }
+            Ok(other) => return Err(unanswered(format!("event {cid}"), &other)),
+            Err(e) => return Err(e),
         };
         if read.cid != leaf {
             return Err(integrity(format!("event {cid} was served as {}", read.cid)));
         }
-        events.push(ChannelEvent {
+        read_bytes = read_bytes.saturating_add(read.bytes.len());
+        fetched.events.push(ChannelEvent {
             cid,
             event: decode_event(&cid, &read.bytes)?,
         });
     }
-    Ok(Fetched { events, complete })
+    Ok(fetched)
 }
 
 /// The `(name, leaf)` pairs the diff from `old` to `new` adds under `channel/events`, or `None`
@@ -269,10 +325,20 @@ pub struct FoldTarget<'a> {
     pub root: &'a BlobCid,
 }
 
+/// What [`fold_root`] did.
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
+pub struct FoldReport {
+    pub outcome: FoldOutcome,
+    /// False when the fold stopped short ([`Fetched::complete`]); the head is then not recorded.
+    pub complete: bool,
+    /// Events refused for exceeding the per-event cap.
+    pub oversized: u64,
+    /// Whether the fold stopped at its byte budget.
+    pub over_budget: bool,
+}
+
 /// Fold `target` from the device whose tier answers at `peer`: dial it, fetch what this device has
-/// not folded, and append it.
-///
-/// Returns what was appended and whether the fold was complete (see [`MAX_FOLD_EVENTS`]).
+/// not folded within `limits`, and append it.
 ///
 /// # Errors
 ///
@@ -285,17 +351,31 @@ pub async fn fold_root(
     store: &SidecarFlowStore,
     allow: &CrossingAllowList,
     tree: &TreeLimits,
-) -> Result<(FoldOutcome, bool), PeerError> {
+    fold_limits: &FoldLimits,
+) -> Result<FoldReport, PeerError> {
     let known = folded_from(store, target.device)?;
     let connection = endpoint
         .connect(peer, TIER_ALPN)
         .await
         .map_err(|e| PeerError::TierConnect(Box::new(e)))?;
-    let fetched = fetch_channel(&connection, target.since, target.root, &known, tree).await;
+    let fetched = fetch_channel(
+        &connection,
+        target.since,
+        target.root,
+        &known,
+        tree,
+        fold_limits,
+    )
+    .await;
     connection.close(VarInt::from_u32(0), b"");
     let fetched = fetched?;
     let outcome = fold_events(store, target.device, &fetched.events, allow)?;
-    Ok((outcome, fetched.complete))
+    Ok(FoldReport {
+        outcome,
+        complete: fetched.complete,
+        oversized: fetched.oversized,
+        over_budget: fetched.over_budget,
+    })
 }
 
 fn with_via(event: &FlowEvent, device: &str) -> FlowEvent {

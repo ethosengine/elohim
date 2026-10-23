@@ -9,8 +9,8 @@ use std::time::Duration;
 use eprfs_core::{TreeLimits, TreePath};
 use eprfs_peer::{
     bind, channel_tier_id, fetch_channel, fold_events, folded_from, project_channel, tier_call,
-    via_device, ChannelStore, ChannelTree, CrossingAllowList, TierAnswer, TierLimits, TierProtocol,
-    TierRequest, CHANNEL_EVENTS, TIER_ALPN,
+    via_device, ChannelStore, ChannelTree, CrossingAllowList, FoldLimits, TierAnswer, TierLimits,
+    TierProtocol, TierRequest, CHANNEL_EVENTS, TIER_ALPN,
 };
 use iroh::endpoint::Connection;
 use iroh::protocol::Router;
@@ -85,9 +85,16 @@ async fn fold_is_idempotent_by_event_cid() {
     let limits = TreeLimits::default();
 
     let known = folded_from(&a_checkout.store(), &h.b.did).expect("known");
-    let fetched = fetch_channel(&connection, None, first.root(), &known, &limits)
-        .await
-        .expect("fetches");
+    let fetched = fetch_channel(
+        &connection,
+        None,
+        first.root(),
+        &known,
+        &limits,
+        &FoldLimits::default(),
+    )
+    .await
+    .expect("fetches");
     assert!(fetched.complete);
     assert_eq!(fetched.events.len(), 2);
     let outcome =
@@ -106,9 +113,16 @@ async fn fold_is_idempotent_by_event_cid() {
     // A refetch of the same root skips every event already folded: nothing is read again.
     let known = folded_from(&a_checkout.store(), &h.b.did).expect("known");
     assert_eq!(known.len(), 2);
-    let refetch = fetch_channel(&connection, None, first.root(), &known, &limits)
-        .await
-        .expect("fetches");
+    let refetch = fetch_channel(
+        &connection,
+        None,
+        first.root(),
+        &known,
+        &limits,
+        &FoldLimits::default(),
+    )
+    .await
+    .expect("fetches");
     assert!(refetch.events.is_empty());
 
     // A newer root is diffed against the last one folded: only the new event crosses.
@@ -121,6 +135,7 @@ async fn fold_is_idempotent_by_event_cid() {
         second.root(),
         &known,
         &limits,
+        &FoldLimits::default(),
     )
     .await
     .expect("fetches");
@@ -152,6 +167,7 @@ async fn fold_records_via_device_provenance() {
         tree.root(),
         &Default::default(),
         &TreeLimits::default(),
+        &FoldLimits::default(),
     )
     .await
     .expect("fetches");
@@ -205,6 +221,7 @@ async fn a_fold_refuses_kinds_off_its_own_allow_list() {
         tree.root(),
         &Default::default(),
         &TreeLimits::default(),
+        &FoldLimits::default(),
     )
     .await
     .expect("fetches");
@@ -259,6 +276,63 @@ async fn a_cid_outside_the_channel_tree_is_unanswered_over_the_tier() {
         "{as_root:?}"
     );
 
+    a.close().await;
+    b.router.shutdown().await.expect("shutdown");
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn an_oversized_event_or_an_exhausted_budget_leaves_the_fold_incomplete() {
+    let h = household();
+    let b = serve_b(&h).await;
+    b.checkout
+        .append(berth_event("claim", "cargo", "sb", "1.0"));
+    b.checkout
+        .append(berth_event("release", "cargo", "sb", "1.5"));
+    // An admitted device's record far past any berth record's size.
+    let mut huge = berth_event("note", "-", "sb", "2.0");
+    huge.classified_as
+        .push(format!("env:text={}", "x".repeat(70 * 1024)));
+    let huge = b.checkout.append(huge);
+    let tree = b.project(&allow());
+    let (a, connection) = connect_a(&h, &b).await;
+    let limits = TreeLimits::default();
+
+    let fetched = fetch_channel(
+        &connection,
+        None,
+        tree.root(),
+        &Default::default(),
+        &limits,
+        &FoldLimits::default(),
+    )
+    .await
+    .expect("fetches");
+    assert!(
+        !fetched.complete,
+        "an oversized event leaves the fold incomplete"
+    );
+    assert_eq!(fetched.oversized, 1);
+    assert!(fetched.events.len() <= 2);
+    assert!(fetched.events.iter().all(|e| e.cid != huge));
+
+    // A budget smaller than one event stops the fold after the first small one.
+    let tight = FoldLimits {
+        max_fold_bytes: 16,
+        ..FoldLimits::default()
+    };
+    let skip_huge: std::collections::HashSet<cid::Cid> = [huge].into_iter().collect();
+    let fetched = fetch_channel(&connection, None, tree.root(), &skip_huge, &limits, &tight)
+        .await
+        .expect("fetches");
+    assert!(!fetched.complete);
+    assert!(fetched.over_budget);
+    assert_eq!(
+        fetched.events.len(),
+        1,
+        "the event that crossed the budget is kept, no more"
+    );
+
+    drop(connection);
     a.close().await;
     b.router.shutdown().await.expect("shutdown");
 }

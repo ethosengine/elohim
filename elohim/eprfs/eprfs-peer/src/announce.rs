@@ -18,7 +18,7 @@ use iroh_gossip::proto::TopicId;
 use crate::admission::Admission;
 use crate::error::PeerError;
 use crate::head::{ChannelHead, HeadSigner};
-use crate::head_table::{DeviceHead, HeadTable};
+use crate::head_table::{ChannelCounters, DeviceHead, HeadTable};
 
 /// How long a change waits for others before it is announced.
 pub const ANNOUNCE_DEBOUNCE: Duration = Duration::from_secs(1);
@@ -65,6 +65,10 @@ pub struct Channel {
     /// When a change first waited to be announced.
     pending_since: Option<Instant>,
     last_announced: Option<Instant>,
+    /// The highest of this device's seqs another admitted device has acknowledged folding. A
+    /// device whose head table was lost resumes above it, so its next head is not refused as a
+    /// rollback; no clock is compared.
+    acked_floor: u64,
 }
 
 impl Channel {
@@ -76,11 +80,17 @@ impl Channel {
             root: None,
             pending_since: None,
             last_announced: None,
+            acked_floor: 0,
         }
     }
 
     pub fn table(&self) -> &HeadTable {
         &self.table
+    }
+
+    /// The channel-health counters, for the daemon to record projection and fold failures in.
+    pub fn counters_mut(&mut self) -> &mut ChannelCounters {
+        &mut self.table.channel
     }
 
     /// The last folded `(seq, root)` from `device`.
@@ -112,6 +122,12 @@ impl Channel {
                 _ => HeadVerdict::Fold,
             }
         };
+        if matches!(
+            verdict,
+            HeadVerdict::Fold | HeadVerdict::Rollback | HeadVerdict::Replayed
+        ) {
+            self.acknowledged(head);
+        }
         let dropped = &mut self.table.dropped;
         match verdict {
             HeadVerdict::Unadmitted => dropped.unadmitted += 1,
@@ -121,6 +137,23 @@ impl Channel {
             HeadVerdict::Fold | HeadVerdict::Own => {}
         }
         verdict
+    }
+
+    /// A verified head from another device acknowledges this device up to `folded[me]`. When that
+    /// is at or past this device's next seq (its head table was lost), the next head goes above it,
+    /// soon.
+    fn acknowledged(&mut self, head: &ChannelHead) {
+        let Some(&acked) = head.folded.get(&self.device) else {
+            return;
+        };
+        if acked > self.own_seq() && acked > self.acked_floor {
+            self.acked_floor = acked;
+            self.schedule(Instant::now());
+        }
+    }
+
+    fn own_seq(&self) -> u64 {
+        self.table.own.as_ref().map_or(0, |own| own.seq)
     }
 
     /// Count a message on the topic that is not a head.
@@ -201,7 +234,7 @@ impl Channel {
         let Some(root) = self.root.clone() else {
             return Ok(None);
         };
-        let seq = self.table.own.as_ref().map_or(0, |own| own.seq) + 1;
+        let seq = self.own_seq().max(self.acked_floor) + 1;
         let folded: BTreeMap<String, u64> = self
             .table
             .devices

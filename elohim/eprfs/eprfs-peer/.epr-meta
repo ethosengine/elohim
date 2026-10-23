@@ -38,3 +38,13 @@ constant `TierId` that names no device. Heads are signed by the device key epr-c
 reached through a signer closure, so this crate still holds no device key. The head table
 (`<peer dir>/heads.json`) is the one place what was folded is persisted; the steward lease view reads
 it.
+
+Gossip is gated where it can be, and known to leak where it cannot. iroh-gossip's plumtree
+forwards every message it receives to its other neighbours before this crate judges it, so a
+forged or unadmitted head can travel one hop further than the device that refuses it; and
+`GatedGossip` gates accepted connections only, so the dials iroh-gossip makes on its own (shuffle
+and forward-join hints from a neighbour) are not gated. Both are acceptable here: every receiver
+verifies every head against the admitted device's did:key before anything is folded, and the
+gossip carries heads only (did, root, seq, ack vector), never an event body, which crosses only
+over the tier ALPN to an admitted node id. The upgrade path, if either matters, is a gate on
+`NeighborUp` that drops a neighbour admission does not map to a device.

@@ -428,7 +428,8 @@ pub async fn tier_call(
 /// # Errors
 ///
 /// - [`PeerError::TierStream`] when the stream fails or the peer resets it.
-/// - [`PeerError::TierFrame`] when either frame is past its cap or the answer does not decode.
+/// - [`PeerError::TierFrame`] when the request is past its cap or the answer does not decode;
+///   [`PeerError::TierFrameTooLarge`] when the answer frame is past the client's cap.
 /// - [`PeerError::TierLeafIntegrity`] when a served leaf or listing fails its address or answers
 ///   another path.
 pub async fn tier_request(
@@ -436,11 +437,23 @@ pub async fn tier_request(
     req: &TierRequest,
     tree: &TreeLimits,
 ) -> Result<TierAnswer, PeerError> {
+    tier_request_capped(connection, req, tree, MAX_ANSWER_FRAME_BYTES).await
+}
+
+/// [`tier_request`] with a smaller answer cap (never above [`MAX_ANSWER_FRAME_BYTES`]): an answer
+/// past `answer_cap` is [`PeerError::TierFrameTooLarge`], refused before its body is read.
+pub(crate) async fn tier_request_capped(
+    connection: &Connection,
+    req: &TierRequest,
+    tree: &TreeLimits,
+    answer_cap: u32,
+) -> Result<TierAnswer, PeerError> {
     let frame = encode_frame(req, MAX_REQUEST_FRAME_BYTES)?;
     let (mut send, mut recv) = connection.open_bi().await.map_err(stream_error)?;
     send.write_all(&frame).await.map_err(stream_error)?;
     send.finish().map_err(stream_error)?;
-    let answer: TierAnswer = read_frame(&mut recv, MAX_ANSWER_FRAME_BYTES).await?;
+    let cap = answer_cap.min(MAX_ANSWER_FRAME_BYTES);
+    let answer: TierAnswer = read_frame(&mut recv, cap).await?;
     check_answer(req, &answer, tree)?;
     Ok(answer)
 }
@@ -520,9 +533,7 @@ async fn read_frame<T: for<'de> Deserialize<'de>>(
     recv.read_exact(&mut header).await.map_err(stream_error)?;
     let len = u32::from_be_bytes(header);
     if len > cap {
-        return Err(frame_error(format!(
-            "a frame of {len} bytes exceeds the {cap}-byte cap"
-        )));
+        return Err(PeerError::TierFrameTooLarge { len, cap });
     }
     let len = usize::try_from(len).map_err(|e| frame_error(e.to_string()))?;
     let mut body = Vec::with_capacity(len.min(READ_CHUNK));

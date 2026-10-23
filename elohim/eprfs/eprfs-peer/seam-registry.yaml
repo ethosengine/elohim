@@ -460,7 +460,7 @@ decisionPoints:
         justification: "Order is the head's; the fold appends in the tree's order and dedups by CID."
       - id: C3
         status: answered
-        justification: "Bounded by MAX_FOLD_EVENTS per fold and a daemon deadline; an incomplete fold leaves the head unrecorded so the next one resumes."
+        justification: "Each fold runs on its own task, one in flight per device (a newer head waits, coalesced), under a deadline, so a slow device never holds back another device's fold or this device's announce; an incomplete fold leaves the head unrecorded so the next one resumes."
       - id: C4
         status: answered
         justification: "Appended, already folded and refused are counted apart; integrity and unanswered failures are distinct errors."
@@ -469,7 +469,7 @@ decisionPoints:
         justification: "Each leaf is checked against its CID by the tier client and against its name and canonical encoding here, and re-checked against this device's own allow-list."
       - id: C6a
         status: answered
-        justification: "At most MAX_FOLD_EVENTS leaves per fold, each under the tier's frame caps."
+        justification: "FoldLimits: at most 1024 events, each at most 64 KiB (its answer frame capped before the body is read), and an 8 MiB byte budget per fold; anything past is an incomplete fold, counted in the head table."
       - id: C6b
         status: answered
         justification: "Appends are individually synced under the flow store's exclusive lock."
