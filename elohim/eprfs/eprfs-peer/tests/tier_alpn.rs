@@ -586,7 +586,7 @@ async fn a_header_only_stream_is_dropped_at_the_deadline_and_its_permit_returned
     let bound = Arc::new(Semaphore::new(1));
     let limits = TierLimits {
         frame_deadline: Duration::from_millis(300),
-        in_flight: Arc::clone(&bound),
+        admitted_in_flight: Arc::clone(&bound),
         ..TierLimits::default()
     };
     let server = serve_with(&h.key_a, &s, admission(&h), served, limits).await;
@@ -634,48 +634,100 @@ async fn a_header_only_stream_is_dropped_at_the_deadline_and_its_permit_returned
 }
 
 #[tokio::test(flavor = "multi_thread")]
-async fn the_in_flight_bound_holds_across_connections() {
+async fn strangers_share_their_own_bound_and_never_shed_an_admitted_device() {
     let h = household();
     let served = tier_id(&h.a);
     let s = store(&served);
-    let bound = Arc::new(Semaphore::new(2));
+    let strangers = Arc::new(Semaphore::new(1));
     let limits = TierLimits {
         frame_deadline: Duration::from_secs(60),
-        in_flight: Arc::clone(&bound),
+        unadmitted_in_flight: Arc::clone(&strangers),
         ..TierLimits::default()
     };
     let server = serve_with(&h.key_a, &s, admission(&h), served, limits).await;
 
-    // Two strangers, each on its own connection, each stalling one stream.
+    // A stranger stalls one stream and holds the whole unadmitted bound.
     let (_d1, key_1) = peer_key();
-    let (_d2, key_2) = peer_key();
     let stranger_1 = client(&key_1).await;
-    let stranger_2 = client(&key_2).await;
     let conn_1 = connect(&stranger_1, &server.addr).await;
-    let conn_2 = connect(&stranger_2, &server.addr).await;
-    let _stalled_1 = header_only(&conn_1, 100).await;
-    let _stalled_2 = header_only(&conn_2, 100).await;
-    permits_free(&bound, 0).await;
+    let _stalled = header_only(&conn_1, 100).await;
+    permits_free(&strangers, 0).await;
 
     let b = client(&h.key_b).await;
     let conn_b = connect(&b, &server.addr).await;
-    let shed = tier_request(&conn_b, &read_e1(&s)).await;
+    let admitted = tier_request(&conn_b, &read_e1(&s)).await.expect("answers");
+    assert!(
+        matches!(admitted, TierAnswer::Read(_)),
+        "the person's own device is answered while strangers hold their bound: {admitted:?}"
+    );
+
+    // A second stranger, on a connection of its own, is shed.
+    let (_d2, key_2) = peer_key();
+    let stranger_2 = client(&key_2).await;
+    let conn_2 = connect(&stranger_2, &server.addr).await;
+    let shed = tier_request(&conn_2, &read_e1(&s)).await;
     assert!(
         matches!(shed, Err(PeerError::TierStream(_))),
-        "a third connection's stream is shed while two others hold the bound: {shed:?}"
+        "the unadmitted bound holds across connections: {shed:?}"
     );
     assert_eq!(server.protocol.counters().shed_streams, 1);
 
-    // A peer that goes away releases its permit with its stream.
+    // A stranger that goes away returns its permit; the next stranger gets the uniform refusal.
     conn_1.close(0u32.into(), b"");
-    permits_free(&bound, 1).await;
-    let after = tier_request(&conn_b, &read_e1(&s)).await.expect("answers");
-    assert!(matches!(after, TierAnswer::Read(_)), "{after:?}");
+    permits_free(&strangers, 1).await;
+    let refused = tier_request(&conn_2, &read_e1(&s)).await.expect("answers");
+    assert!(
+        matches!(&refused, TierAnswer::Unanswered { why, .. }
+            if matches!(&why.why, ItemAbsence::Refused { refusal, .. }
+                if refusal.reason == ReachReason::OutsideStanding
+                    && refusal.needs_standing.is_none())),
+        "{refused:?}"
+    );
 
     drop((conn_2, conn_b));
     for endpoint in [stranger_1, stranger_2, b] {
         endpoint.close().await;
     }
+    server.router.shutdown().await.expect("shutdown");
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn an_answer_the_peer_never_reads_is_reset_at_the_deadline() {
+    let h = household();
+    let served = tier_id(&h.a);
+    let s = store(&served);
+    let big = s.tier.insert(&vec![7u8; 12 * 1024 * 1024]);
+    let root = channel_root(&s.tier, &[("big", &big)]);
+    let bound = Arc::new(Semaphore::new(1));
+    let limits = TierLimits {
+        frame_deadline: Duration::from_millis(300),
+        admitted_in_flight: Arc::clone(&bound),
+        ..TierLimits::default()
+    };
+    let server = serve_with(&h.key_a, &s, admission(&h), served, limits).await;
+    let b = client(&h.key_b).await;
+    let connection = connect(&b, &server.addr).await;
+
+    // A whole request, then never a byte read of the 12 MiB answer.
+    let (mut send, _unread) = connection.open_bi().await.expect("stream");
+    let request = TierRequest::Read {
+        root,
+        path: tp("channel/events/big"),
+    };
+    send.write_all(&frame_of(&request)).await.expect("request");
+    send.finish().expect("finish");
+
+    tokio::time::timeout(WITHIN, async {
+        while server.protocol.counters().timed_out_frames == 0 {
+            tokio::time::sleep(Duration::from_millis(10)).await;
+        }
+    })
+    .await
+    .expect("the stalled answer is reset in time");
+    permits_free(&bound, 1).await;
+
+    drop(connection);
+    b.close().await;
     server.router.shutdown().await.expect("shutdown");
 }
 
@@ -758,7 +810,12 @@ impl ProtocolHandler for Rogue {
 }
 
 fn rogue_frame(answer: &TierAnswer) -> Vec<u8> {
-    let body = serde_ipld_dagcbor::to_vec(answer).expect("encode");
+    frame_of(answer)
+}
+
+/// A length-prefixed DAG-CBOR frame, as the tier writes one.
+fn frame_of<T: serde::Serialize>(value: &T) -> Vec<u8> {
+    let body = serde_ipld_dagcbor::to_vec(value).expect("encode");
     let mut frame = u32::try_from(body.len())
         .expect("small")
         .to_be_bytes()

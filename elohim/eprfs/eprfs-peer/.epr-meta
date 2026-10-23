@@ -23,9 +23,10 @@ the did:key verifier arrives as a `&dyn SignatureVerifier` parameter. elohim-sto
 dependency on this crate (R-E3).
 
 The tier is network-facing before admission, so its work is bounded before any request is
-read: a frame deadline, a per-connection stream bound and one in-flight bound shared by every
-connection (`TierLimits`). Frame bodies are read as they arrive, never pre-allocated from a
-claimed length.
+read: a frame deadline, a per-connection stream bound, and two in-flight pools shared by every
+connection, one for admitted devices and a smaller one for everyone else, chosen from the
+authenticated node id at accept (`TierLimits`), so strangers can never shed the person's own
+devices. Frame bodies are read as they arrive, never pre-allocated from a claimed length.
 
 The secret key never leaves `PeerKey` except into the endpoint builder: no `Display`, `Clone`
 or serialization, and `Debug` prints the node id only.

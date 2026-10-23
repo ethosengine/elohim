@@ -8,9 +8,12 @@
 //!
 //! Serving work is bounded three ways ([`TierLimits`]): every frame must arrive (or leave) within
 //! a deadline, one connection has at most a few streams answered at once, and every connection of
-//! one [`TierProtocol`] shares one bound on streams in flight. A stream past that shared bound is
-//! reset at once, before any byte of it is read, whoever sent it; admission is judged later, on
-//! the decoded request, so a stranger's refusal stays uniform.
+//! one [`TierProtocol`] shares a bound on streams in flight. That bound is two pools: the node id
+//! iroh authenticated is classified when each stream is accepted, and admitted devices draw on
+//! one pool, everyone else on a smaller other, so a stranger flood never sheds the person's own
+//! devices. A stream finding its pool empty is reset at once, before any byte of it is read. The
+//! request itself is still judged on decode, so a device dropped by a reload mid-connection gets
+//! the uniform refusal, and a stranger's refusal is unchanged.
 
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::Arc;
@@ -49,8 +52,13 @@ pub const MAX_ANSWER_FRAME_BYTES: u32 = 16 * 1024 * 1024;
 /// QUIC's own flow control until one finishes (RS-CON-02: bounded concurrent work).
 pub const MAX_CONCURRENT_STREAMS: usize = 8;
 
-/// The default number of streams in flight across every connection of one [`TierProtocol`].
+/// The default number of admitted devices' streams in flight across every connection of one
+/// [`TierProtocol`].
 pub const MAX_IN_FLIGHT_STREAMS: usize = 64;
+
+/// The default number of unadmitted streams in flight across every connection of one
+/// [`TierProtocol`]: enough for a stranger to receive its refusal, too few to crowd anything.
+pub const MAX_UNADMITTED_IN_FLIGHT_STREAMS: usize = 8;
 
 /// The default time one frame may take to arrive or to leave.
 pub const FRAME_DEADLINE: Duration = Duration::from_secs(10);
@@ -61,8 +69,8 @@ const REFUSED_FRAME: u32 = 1;
 /// The QUIC error code a stream shed at the in-flight bound is reset with.
 const BUSY: u32 = 2;
 
-/// How a [`TierProtocol`] bounds its work. `Clone` shares `in_flight`: every protocol cloned from
-/// one set of limits draws on the same bound.
+/// How a [`TierProtocol`] bounds its work. `Clone` shares the two in-flight pools: every protocol
+/// cloned from one set of limits draws on the same bounds.
 #[derive(Debug, Clone)]
 pub struct TierLimits {
     /// The tree limits the endpoint reads under.
@@ -77,9 +85,12 @@ pub struct TierLimits {
     pub frame_deadline: Duration,
     /// Streams of one connection answered at once; at least one.
     pub max_streams_per_connection: usize,
-    /// Streams in flight across every connection, from accept to answer. A stream that finds no
-    /// permit is reset at once (shed), before any byte of it is read.
-    pub in_flight: Arc<Semaphore>,
+    /// Admitted devices' streams in flight across every connection, from accept to answer. A
+    /// stream that finds no permit is reset at once (shed), before any byte of it is read.
+    pub admitted_in_flight: Arc<Semaphore>,
+    /// Every other node id's streams in flight across every connection, shed alike. Strangers
+    /// draw only on this pool, never on the admitted one.
+    pub unadmitted_in_flight: Arc<Semaphore>,
 }
 
 impl Default for TierLimits {
@@ -90,7 +101,8 @@ impl Default for TierLimits {
             max_answer_frame_bytes: MAX_ANSWER_FRAME_BYTES,
             frame_deadline: FRAME_DEADLINE,
             max_streams_per_connection: MAX_CONCURRENT_STREAMS,
-            in_flight: Arc::new(Semaphore::new(MAX_IN_FLIGHT_STREAMS)),
+            admitted_in_flight: Arc::new(Semaphore::new(MAX_IN_FLIGHT_STREAMS)),
+            unadmitted_in_flight: Arc::new(Semaphore::new(MAX_UNADMITTED_IN_FLIGHT_STREAMS)),
         }
     }
 }
@@ -273,9 +285,16 @@ impl ProtocolHandler for TierProtocol {
             let Ok((mut send, mut recv)) = connection.accept_bi().await else {
                 break;
             };
-            // The shared bound is taken before any byte is read and held until the stream's task
-            // ends, on every path (a dropped or aborted task drops its permit).
-            let Ok(permit) = Arc::clone(&self.inner.limits.in_flight).try_acquire_owned() else {
+            // The pool is chosen by the authenticated node id's admission now, read once and fail
+            // closed; the request is still judged on decode. The permit is taken before any byte
+            // is read and held until the stream's task ends, on every path (a dropped or aborted
+            // task drops its permit).
+            let pool = if self.inner.gate.requester(&remote).agent().is_some() {
+                &self.inner.limits.admitted_in_flight
+            } else {
+                &self.inner.limits.unadmitted_in_flight
+            };
+            let Ok(permit) = Arc::clone(pool).try_acquire_owned() else {
                 TierCounters::bump(&self.inner.counters.shed_streams);
                 // Best effort: the stream is being refused either way.
                 let _ = recv.stop(VarInt::from_u32(BUSY));

@@ -34,5 +34,5 @@ pub use key::PeerKey;
 pub use tier::{
     tier_call, tier_request, TierAnswer, TierCountersSnapshot, TierLimits, TierProtocol,
     TierRequest, FRAME_DEADLINE, MAX_ANSWER_FRAME_BYTES, MAX_CONCURRENT_STREAMS,
-    MAX_IN_FLIGHT_STREAMS, MAX_REQUEST_FRAME_BYTES, TIER_ALPN,
+    MAX_IN_FLIGHT_STREAMS, MAX_REQUEST_FRAME_BYTES, MAX_UNADMITTED_IN_FLIGHT_STREAMS, TIER_ALPN,
 };

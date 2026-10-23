@@ -219,7 +219,7 @@ decisionPoints:
     sourceLocation:
       file: src/tier.rs
       modulePath: eprfs_peer::TierAnswer
-    summary: "The tier ALPN's wire: one TierRequest (read, list or diff) per bidirectional stream and one TierAnswer back, each a big-endian u32 length plus canonical DAG-CBOR. One read_frame serves both directions: a length past the cap (requests 1 MiB by default, answers 16 MiB) is refused, and a body is read chunk by chunk as it arrives, never pre-allocated from the claimed length. TierLimits bounds the serving side before any request is read: each frame must arrive or leave within frame_deadline (10 s), at most max_streams_per_connection (8) streams of one connection are answered at once (further streams wait in QUIC flow control), and every connection shares one in_flight semaphore (64) taken at accept before any byte is read; a stream finding no permit is reset unread (shed). An answer past the server's cap is sent as Failed, never truncated. The client checks a Read leaf (path equals the requested path, bytes hash to its CID) and a List listing (path equals the requested path, entries encode to its CID)."
+    summary: "The tier ALPN's wire: one TierRequest (read, list or diff) per bidirectional stream and one TierAnswer back, each a big-endian u32 length plus canonical DAG-CBOR. One read_frame serves both directions: a length past the cap (requests 1 MiB by default, answers 16 MiB) is refused, and a body is read chunk by chunk as it arrives, never pre-allocated from the claimed length. TierLimits bounds the serving side before any request is read: each frame must arrive or leave within frame_deadline (10 s), at most max_streams_per_connection (8) streams of one connection are answered at once (further streams wait in QUIC flow control), and every connection shares two in-flight pools taken at accept before any byte is read: the authenticated node id is classified once per stream (fail closed) and admitted devices draw on admitted_in_flight (64), everyone else on unadmitted_in_flight (8), so a stranger flood never sheds the person's own devices; a stream finding its pool empty is reset unread (shed). The request is still judged on decode, so a device dropped by a reload mid-connection gets the uniform refusal. An answer past the server's cap is sent as Failed, never truncated. The client checks a Read leaf (path equals the requested path, bytes hash to its CID) and a List listing (path equals the requested path, entries encode to its CID)."
     concernIds:
       - id: C0
         status: answered
@@ -241,7 +241,7 @@ decisionPoints:
         justification: "The endpoint verifies the leaves it serves. tier_request checks self-consistency and path only: a Read leaf's path must equal the requested path and its bytes hash to its CID; a List listing's path must equal the requested path and its entries encode to its CID; a mismatch is TierLeafIntegrity, an answer of another kind is TierFrame. It does not check that the object lies under the requested root (that needs the spine); Diff answers are not checked."
       - id: C6a
         status: answered
-        justification: "Frame lengths are capped in both directions and bodies are read as they arrive, so memory follows bytes received; per-connection and process-wide stream bounds cap concurrent work across all connections."
+        justification: "Frame lengths are capped in both directions and bodies are read as they arrive, so memory follows bytes received; a per-connection bound and two process-wide pools (admitted, unadmitted) cap concurrent work across all connections, and strangers can exhaust only their own pool."
       - id: C6b
         status: answered
         justification: "The in-flight permit is an owned guard dropped with the stream's task on every path (answer, refusal, timeout, peer close, abort)."
@@ -280,7 +280,10 @@ decisionPoints:
         testName: a_header_only_stream_is_dropped_at_the_deadline_and_its_permit_returned
         kind: integration
       - path: elohim/eprfs/eprfs-peer/tests/tier_alpn.rs
-        testName: the_in_flight_bound_holds_across_connections
+        testName: strangers_share_their_own_bound_and_never_shed_an_admitted_device
+        kind: integration
+      - path: elohim/eprfs/eprfs-peer/tests/tier_alpn.rs
+        testName: an_answer_the_peer_never_reads_is_reset_at_the_deadline
         kind: integration
       - path: elohim/eprfs/eprfs-peer/tests/tier_alpn.rs
         testName: a_connection_answers_at_most_its_stream_bound_at_once
