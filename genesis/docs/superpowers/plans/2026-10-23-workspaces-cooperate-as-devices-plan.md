@@ -167,10 +167,16 @@ Read §3 before any task. This plan does not restate it.
     - `lower_seq_head_refused_as_rollback`, which covers review focus item 4.
     - `fold_is_idempotent_by_event_cid`.
     - `fold_records_via_device_provenance`.
+    - `folding_a_newer_head_reannounces_with_updated_ack`: after folding B's head with seq `s`, A's
+      next head carries `folded[B] == s`.
   - Implement:
     - `pub fn project_channel(store: &SidecarFlowStore, allow: &CrossingAllowList) -> Result<BlobCid, PeerError>`.
-    - `pub struct ChannelHead { device, root, seq, at, signature }`, with `sign(...)` and
-      `verify(&self, device_did: &str) -> Result<(), PeerError>`.
+    - `pub struct ChannelHead { device, root, seq, at, folded: BTreeMap<String, u64>, signature }`,
+      with `sign(...)` and `verify(&self, device_did: &str) -> Result<(), PeerError>`. `folded` is
+      inside the signed bytes.
+    - `pub struct HeadTable`: per device, the last folded `seq`, `root`, head `at`, its `folded`
+      vector, and the local `folded_at`. It is persisted as JSON under the peer state dir, and T6
+      reads it.
     - `pub fn topic_for(chain_root: &str) -> iroh_gossip::proto::TopicId`, which is blake3 of
       `"elohim/steward-channel/1/" ‖ chain_root`.
     - `pub struct Channel`, holding announce, debounce (1 s), re-announce (30 s) and a per-device
@@ -187,14 +193,19 @@ Read §3 before any task. This plan does not restate it.
 
 - [ ] **T6 — steward-scoped resources and the lease view** (serves devices-share-one-berth)
   - Tests first, in Rust (`eprfs-peer`, or `epr-cli` if the fold lives there):
-    `steward_lease_view` covers four cases:
-    - Every peer is fresh: the lease is effective.
-    - A peer is stale: `Unconfirmed { device, last_seen }`. This is review focus item 1.
+    `steward_lease_view` covers six cases:
+    - Every other device's head acknowledges the claim's seq: the lease is `Effective`.
+    - A device has not acknowledged: `Pending` before `confirm_wait_s` has passed, then
+      `Unconfirmed { device, last_seen }`. This is review focus item 1.
     - A folded overlapping lease: `HeldBy { device, session, since }`.
-    - A simultaneous pair: the tie-break holds and both sides compute the same winner. This is
-      review focus item 2.
-  - Implement `pub fn steward_lease_view(own: &[LeaseEvent], folded: &[LeaseEvent], heads: &HeadTable, now, freshness_s) -> BTreeMap<Resource, LeaseVerdict>`.
-    Expose it as `epr peer leases --json`.
+    - A concurrent pair: the tie-break holds and both sides compute the same winner. This is review
+      focus item 2.
+    - A folded lease from a device whose binding is contested is ignored (spec §3.1, amended).
+    - No other admitted device: `Effective` at once.
+  - Implement `pub fn steward_lease_view(own: &[LeaseEvent], folded: &[LeaseEvent], heads: &HeadTable, admitted: &Admission, now, confirm_wait_s) -> BTreeMap<Resource, LeaseVerdict>`.
+    Expose it as `epr peer leases --json`. A berth claim polls it, in-process or at short intervals,
+    until the verdict leaves `Pending` or `confirm_wait_s` (10 s, `berth.channel.confirm_wait_s`) has
+    passed.
   - In `genesis/agentic/bin/berth`:
     - Resources declared `scope: steward` in `pool-policy.json` call `epr peer leases --json` on
       claim and on `owner-check`.
@@ -206,7 +217,7 @@ Read §3 before any task. This plan does not restate it.
     `test_offline_ok_writes_override`, `test_single_device_steward_claim_effective` and
     `test_container_scope_never_calls_peer`.
   - Declare `dev-integration`, `jenkins-dispatch`, `alpha-fleet` and the `lane:` prefix as
-    `scope: steward` in `genesis/agentic/pool-policy.json`. Set `berth.channel.freshness_s: 90`.
+    `scope: steward` in `genesis/agentic/pool-policy.json`. Set `berth.channel.freshness_s: 90` and `berth.channel.confirm_wait_s: 10`.
   - Verify: `python3 -m unittest genesis.agentic.berth_test` passes, `just gate eprfs` passes, and
     the orchestrator gate passes (`pool-policy.json` is shared with `rust-toolchain-pin.test.mjs`).
 

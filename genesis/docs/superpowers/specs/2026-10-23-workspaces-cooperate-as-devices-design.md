@@ -134,8 +134,14 @@ The allow-list is default-deny and declared in `genesis/agentic/pool-policy.json
 After each change (debounced to 1 s), and every 30 s regardless, the device signs and announces:
 
 ```text
-ChannelHead { device, root, seq, at, signature }   # seq strictly increasing per device
+ChannelHead { device, root, seq, at, folded, signature }   # seq strictly increasing per device
+                                                           # folded: {device → highest seq folded}
 ```
+
+`folded` is the device's acknowledgement vector: for each other admitted device, the highest `seq`
+it has folded from that device. A device that folds a newer head re-announces its own head
+(debounced to 1 s), so an acknowledgement reaches the sender within a couple of seconds while both
+devices are up. No decision in this design compares two devices' clocks.
 
 To fold, a device that receives a newer head from an admitted device asks that device's tier for the
 diff between the last folded root and the new one. It verifies each event leaf against its CID and
@@ -155,21 +161,32 @@ is it.
 - **Steward-scoped** resources are `dev-integration`, `jenkins-dispatch`, `alpha-fleet`, and lane
   claims named `lane:<id>`.
 
-A claim on a steward-scoped resource records the lease as today and becomes **effective** only when
-both conditions hold:
+A claim on a steward-scoped resource has a lifecycle:
 
-1. For every other admitted device, a ChannelHead dated after the claim, and no older than the
-   freshness window (90 s, `berth.channel.freshness_s`), has been folded.
-2. No folded lease held by another holder overlaps it.
+1. **Pending.** The claim writes its lease as today. The lease is a crossing event, so the device's
+   next head (sequence `s`) carries it to the other devices.
+2. **Confirming.** The claim command blocks for up to `berth.channel.confirm_wait_s` (10 s) until
+   every other admitted device has announced a head whose `folded` entry for this device is at
+   least `s`. That is proof that the device has seen the claim.
+3. **Settled.** The claim is **effective**, and the command exits 0, when every other device has
+   acknowledged `s` and no folded lease held by another holder overlaps it, unless the tie-break
+   below gives this claim precedence. Otherwise it exits 3 and releases its pending lease:
+   `held by <device>/<session> since …` when an overlapping lease wins, and
+   `unconfirmed: <device> last seen <age> ago` when a device did not acknowledge in time.
 
-Two claims made before either device saw the other are settled by a deterministic tie-break: the
-earlier `claimed_at` wins, then the lexically lower device did:key. The loser's berth reports the
-refusal on its next fold and releases.
+Two claims made before either device had folded the other's are concurrent. A deterministic
+tie-break settles them: the earlier `claimed_at` wins, then the lexically lower device did:key. Both
+devices compare the same recorded values, each claim's own `claimed_at` as its device stamped it, so
+they reach the same verdict. A device whose lease loses after it was already effective, because a
+concurrent claim arrived late, reports the refusal on that fold and releases.
+`berth.channel.freshness_s` (90 s) only sets when `berth status` reports a device as silent.
 
 A refused or unconfirmed claim exits 3 and names its reason, `held by <device>/<session> since …` or
 `unconfirmed: <device> last seen <age> ago`. An absent peer is never read as a free resource.
-`--offline-ok` takes the lease anyway and records a `kind: override` row. That row crosses on
-reconnect, so the override is honest and visible to the other device.
+`--offline-ok` takes the lease anyway and records a `kind: override` row. An agent session may pass
+it on its own judgment. The safeguard is the record, not a gate: the override row crosses on
+reconnect, and the other device's berth then refuses its own sessions on that resource, naming the
+overriding device and session.
 
 When only one device is admitted, the set of other devices is empty and every steward-scoped claim is
 effective at once. That is local-first: the design works on one device and adds peers without making
