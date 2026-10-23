@@ -2426,10 +2426,10 @@ spec:
         HAPP_NAME = "elohim"
         PATH = "/nix/var/nix/profiles/default/bin:${env.PATH}"
         NPM_TOKEN = credentials('ee-nexus-npm-token')
-        // Pipeline state tracking
-        IMAGES_PUSHED = 'false'
-        HAPP_AVAILABLE = 'false'
-        EDGE_NODE_HEALTHY = 'false'
+        // Pipeline state (IMAGES_PUSHED, HAPP_AVAILABLE, EDGE_NODE_HEALTHY) is NOT declared
+        // here: a variable from this block ignores later `env.X = 'true'` assignments, so
+        // every run read 'false' (edge #1705 pushed and deployed, labelled
+        // "hApp:NO | Push:Skip | Deploy:?"). Stages set them; readers compare to 'true'.
     }
 
     parameters {
@@ -3125,7 +3125,7 @@ BRANCH_NAME=${env.BRANCH_NAME}"""
                                     To fix this, run the pipeline with FORCE_BUILD=true after
                                     ensuring the DNA has been successfully built and archived.
 
-                                    Current hApp availability: ${env.HAPP_AVAILABLE}
+                                    Current hApp availability: ${env.HAPP_AVAILABLE ?: 'false'}
                                     ═══════════════════════════════════════════════════════════
                                     """
                                     // Don't fail the pipeline - just skip deployment
@@ -3146,7 +3146,7 @@ BRANCH_NAME=${env.BRANCH_NAME}"""
                             DEPLOYING EDGE NODE TO DEV (Topology-Aware)
                             ═══════════════════════════════════════════════════════════
                             Image Tag: ${IMAGE_TAG}
-                            Images Pushed: ${env.IMAGES_PUSHED}
+                            Images Pushed: ${env.IMAGES_PUSHED ?: 'false'}
                             Force Deploy: ${params.FORCE_DEPLOY}
                             Deploy Strategy: ${strategy}
                             ═══════════════════════════════════════════════════════════
