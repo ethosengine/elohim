@@ -166,7 +166,11 @@ pub(super) enum ReaderRef {
     /// `@capabilityMaxLens`/stimulus/textuality vocabulary graphos already renders). Declared now
     /// so [`resolve`]'s match is exhaustive against the design this station is one rung of; not
     /// yet produced by [`reader_from_session`] or any other resolver here.
-    #[allow(dead_code)]
+    #[allow(
+        dead_code,
+        reason = "declared so resolve's match stays exhaustive against the human-lens design; \
+                  no resolver constructs it until station 2/3 lands"
+    )]
     Human { agent_cid: String, tier: String },
     /// No claim was found for the session. Honest absence, not a refusal — a session that never
     /// called `epr actor claim` is a normal, common shape.

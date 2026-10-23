@@ -40,10 +40,10 @@ use std::process::ExitCode;
 
 use cid::Cid;
 use elohim_epr_rea::{
-    parse_acting_participant, parse_participant_ref, record_signing_message, standing_human_pinned,
-    verify_binding, ActorClaim, ActorRecord, ActorStore, ActorWitness, FabricError, ParticipantRef,
-    ParticipantRow, RecordSignature, Roster, RosterStanding, RosterVia, SidecarActorStore,
-    SidecarRoster, SignatureVerifier,
+    endpoint_admission, parse_acting_participant, parse_participant_ref, record_signing_message,
+    standing_human_pinned, verify_binding, ActorClaim, ActorRecord, ActorStore, ActorWitness,
+    FabricError, ParticipantRef, ParticipantRow, RecordSignature, Roster, RosterStanding,
+    RosterVia, SidecarActorStore, SidecarRoster, SignatureVerifier,
 };
 use eprfs_meta::hex_lower;
 use rand_core::{OsRng, RngCore};
@@ -234,7 +234,8 @@ pub fn run(args: &[String]) -> ActorResult<ExitCode> {
     }
 }
 
-/// `epr actor device enroll | authorize | bind` — the three-command ceremony (ruling R-P8).
+/// `epr actor device enroll | authorize | bind` — the three-command ceremony (ruling R-P8) — and
+/// `endpoint`, which names this device's iroh node id on the roster (spec §3.1).
 ///
 /// Every verb prints JSON on stdout (the request and the authorization are the messages carried
 /// between the two devices), so `--json` is accepted and implied.
@@ -277,9 +278,37 @@ fn run_device(args: &[String]) -> ActorResult<ExitCode> {
             }
             Ok(ExitCode::SUCCESS)
         }
+        "endpoint" => {
+            let (opts, rest) = parse_global(&args[1..])?;
+            let node_id = required(
+                &rest,
+                "--node-id",
+                "device endpoint needs --node-id <id> — the iroh node id this device answers on",
+            )?;
+            let handle = take_opt(&rest, "--handle")?;
+            let key = DeviceKey::open()?;
+            let outcome = device_endpoint(&opts.root, handle.as_deref(), &node_id, &key)?;
+            println!("{}", serde_json::to_string_pretty(&outcome)?);
+            eprintln!(
+                "endpoint  {}: {} answers on {} ({})",
+                outcome.handle,
+                short_did(&outcome.device),
+                outcome.node_id,
+                if outcome.appended {
+                    "row appended — it travels to the other devices by git"
+                } else {
+                    "already on the roster — nothing appended"
+                }
+            );
+            Ok(ExitCode::SUCCESS)
+        }
         other => Err(ActorError::InvalidArguments(format!(
-            "unknown device verb `{other}`{} — enroll | authorize | bind\n{}",
-            crate::hint::did_you_mean(other, "epr actor device", &["enroll", "authorize", "bind"]),
+            "unknown device verb `{other}`{} — enroll | authorize | bind | endpoint\n{}",
+            crate::hint::did_you_mean(
+                other,
+                "epr actor device",
+                &["enroll", "authorize", "bind", "endpoint"]
+            ),
             usage()
         ))),
     }
@@ -1452,8 +1481,8 @@ fn open_contests(
     open
 }
 
-/// Fill a row's own signature slot (`signature` on a genesis or a contest) with `device`'s
-/// signature over the row's signing message.
+/// Fill a row's own signature slot (`signature` on a genesis, a contest or a peer endpoint)
+/// with `device`'s signature over the row's signing message.
 fn signed_row(mut row: ParticipantRow, device: &DeviceKey) -> ActorResult<ParticipantRow> {
     let signature = hex_lower(&device.sign(&row.signing_message()?));
     match &mut row {
@@ -1461,6 +1490,9 @@ fn signed_row(mut row: ParticipantRow, device: &DeviceKey) -> ActorResult<Partic
             signature: slot, ..
         }
         | ParticipantRow::Contest {
+            signature: slot, ..
+        }
+        | ParticipantRow::PeerEndpoint {
             signature: slot, ..
         } => *slot = signature,
         ParticipantRow::Binding { .. } => {
@@ -1803,6 +1835,173 @@ pub fn device_bind(
     })
 }
 
+/// The machine-facing result of `device endpoint`.
+#[derive(Debug, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct EndpointOutcome {
+    pub handle: String,
+    pub chain_root: String,
+    /// This device, `did:key:…` — the row's signer.
+    pub device: String,
+    /// The iroh node id the roster now admits for this device.
+    pub node_id: String,
+    /// CID of the `PeerEndpoint` row that names `node_id` for this device.
+    pub row_cid: String,
+    /// `false` when the roster already admitted `node_id` for this device and nothing was
+    /// appended.
+    pub appended: bool,
+    pub roster_path: String,
+}
+
+/// `epr actor device endpoint --node-id <id> [--handle <h>]` — append a `PeerEndpoint` row,
+/// signed by this device, naming the iroh node id its peer answers on (spec §3.1). The newest
+/// row supersedes older ones, so a rebuilt workspace with a new iroh key runs this again.
+///
+/// Refused — and nothing appended — when this device does not stand on the handle's roster
+/// (unbound, or its binding or founding record contested), when the roster's root is not the
+/// root this device pinned (R-P15), when `node_id` is not an iroh node id as iroh prints it, or
+/// when another device already holds `node_id` (one id answers for one device; a second claim
+/// would refuse both). Without `--handle`, the handle is the one roster this device stands on.
+/// The read, the decision and the append happen under the roster's exclusive lock.
+pub fn device_endpoint(
+    root: &Path,
+    handle: Option<&str>,
+    node_id: &str,
+    device: &DeviceKey,
+) -> ActorResult<EndpointOutcome> {
+    let did = device.did_key();
+    let verifier = verifier();
+    let handle = match handle {
+        Some(handle) => {
+            Roster::new(handle)?;
+            handle.to_string()
+        }
+        None => endpoint_handle(root, &did)?,
+    };
+    if !roster_file(root, &handle).is_file() {
+        return Err(ActorError::InvalidArguments(format!(
+            "{handle} has no roster in this checkout ({}) — nothing to name an endpoint on",
+            roster_rel(&handle)
+        )));
+    }
+    let mut roster_tx = SidecarRoster::open(root, &handle)?.transaction()?;
+    let roster = roster_tx.read()?;
+    if roster.device_standing_row(&did, &verifier).is_none() {
+        return Err(ActorError::InvalidArguments(format!(
+            "this device ({}) does not stand on {handle}'s roster — witness it or bind it first; \
+             only a standing device's endpoint is admitted",
+            short_did(&did)
+        )));
+    }
+    let chain_root = roster
+        .chain_root(&verifier)
+        .ok_or_else(|| ActorError::InvalidArguments("the roster has no chain root".into()))?;
+    if let Some(pin) = device_key::read_root_pin(device.path(), &handle)? {
+        if pin != chain_root {
+            return Err(ActorError::InvalidArguments(format!(
+                "{handle}'s roster here has chain root {} but this device pinned {} — the \
+                 lineage is contested; no endpoint is named on it",
+                short_did(&chain_root),
+                short_did(&pin)
+            )));
+        }
+    }
+
+    let rows: Vec<ParticipantRow> = roster.rows().iter().map(|(_, row)| row.clone()).collect();
+    let admission = endpoint_admission(&rows, &chain_root, &verifier);
+    match admission.admitted.get(node_id) {
+        Some(owner) if *owner == did => {
+            let row_cid = newest_endpoint_row(&roster, &did, node_id).ok_or_else(|| {
+                ActorError::InvalidArguments(format!(
+                    "{node_id} is admitted for this device but no endpoint row names it"
+                ))
+            })?;
+            return Ok(EndpointOutcome {
+                handle: handle.clone(),
+                chain_root,
+                device: did,
+                node_id: node_id.to_string(),
+                row_cid,
+                appended: false,
+                roster_path: roster_rel(&handle),
+            });
+        }
+        Some(owner) => {
+            return Err(ActorError::InvalidArguments(format!(
+                "node id {node_id} is already admitted for {} — one node id answers for one \
+                 device, and a second claim would refuse both",
+                short_did(owner)
+            )))
+        }
+        None => {}
+    }
+    if let Some(claimants) = admission.conflicts.get(node_id) {
+        if claimants.iter().any(|claimant| *claimant != did) {
+            return Err(ActorError::InvalidArguments(format!(
+                "node id {node_id} is already claimed by {} devices on {handle}'s roster — none \
+                 of them is admitted on it; choose another id",
+                claimants.len()
+            )));
+        }
+    }
+
+    let mut nonce = [0u8; 16];
+    OsRng.fill_bytes(&mut nonce);
+    let row = signed_row(
+        ParticipantRow::PeerEndpoint {
+            handle: handle.clone(),
+            chain_root: chain_root.clone(),
+            device: did.clone(),
+            node_id: node_id.to_string(),
+            nonce: hex_lower(&nonce),
+            signature: String::new(),
+        },
+        device,
+    )?;
+    let row_cid = roster_tx.append(row)?;
+    Ok(EndpointOutcome {
+        handle: handle.clone(),
+        chain_root,
+        device: did,
+        node_id: node_id.to_string(),
+        row_cid: row_cid.to_string(),
+        appended: true,
+        roster_path: roster_rel(&handle),
+    })
+}
+
+/// The one handle whose roster this device is a member of — the handle `device endpoint` names
+/// when no `--handle` is given. None or several is refused, naming the fix.
+fn endpoint_handle(root: &Path, did: &str) -> ActorResult<String> {
+    let mut handles = roster_handles(root)
+        .into_iter()
+        .filter(|handle| device_enrolled(root, handle, did));
+    match (handles.next(), handles.next()) {
+        (Some(handle), None) => Ok(handle),
+        (None, _) => Err(ActorError::InvalidArguments(format!(
+            "this device ({}) is on no participant roster in this checkout — witness it or bind \
+             it first",
+            short_did(did)
+        ))),
+        (Some(_), Some(_)) => Err(ActorError::InvalidArguments(
+            "this device is on more than one participant roster — name one with --handle <handle>"
+                .into(),
+        )),
+    }
+}
+
+/// The CID of the newest `PeerEndpoint` row by `did` naming `node_id`.
+fn newest_endpoint_row(roster: &Roster, did: &str, node_id: &str) -> Option<String> {
+    roster.rows().iter().rev().find_map(|(cid, row)| match row {
+        ParticipantRow::PeerEndpoint {
+            device,
+            node_id: named,
+            ..
+        } if device == did && named == node_id => Some(cid.to_string()),
+        _ => None,
+    })
+}
+
 fn binding_row(
     request: &EnrollRequest,
     chain_root: &str,
@@ -1899,7 +2098,7 @@ fn parse_global(args: &[String]) -> ActorResult<(GlobalOpts, Vec<String>)> {
                 i += 1;
             }
             "--as" | "--session" | "--subject" | "--basis" | "--handle" | "--answers"
-            | "--under" => {
+            | "--under" | "--node-id" => {
                 let value = args.get(i + 1).ok_or_else(|| {
                     ActorError::InvalidArguments(format!("{} needs a value", args[i]))
                 })?;
@@ -1936,7 +2135,8 @@ pub fn usage() -> String {
      [--json] [--root DIR]\n  \
      | device enroll --handle <handle> [--root DIR]\n  \
      | device authorize <request-json-or-path> [--root DIR]\n  \
-     | device bind <authorization-json-or-path> [--root DIR]\n\
+     | device bind <authorization-json-or-path> [--root DIR]\n  \
+     | device endpoint --node-id <iroh-node-id> [--handle <handle>] [--root DIR]\n\
      >\n\
      `actor device` puts this machine's key on this repository's roster for a participant. \
      To join a node to a person's identity on the network instead, see `epr device`."

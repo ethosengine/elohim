@@ -10,14 +10,16 @@
 use std::path::{Path, PathBuf};
 use std::process::{Command, Output};
 
+use std::collections::BTreeMap;
+
 use elohim_epr_cli::actor::{
-    self, claim_with_device, contest, device_authorize, device_bind, device_enroll, witness,
-    ActorError, RosterState,
+    self, claim_with_device, contest, device_authorize, device_bind, device_endpoint,
+    device_enroll, witness, ActorError, RosterState,
 };
 use elohim_epr_cli::device_key::{self, DeviceKey};
 use elohim_epr_rea::{
-    standing_human, ActorRecord, ActorStore, AgentRef, ParticipantRow, SidecarActorStore,
-    SidecarRoster,
+    admitted_endpoints, standing_human, ActorRecord, ActorStore, AgentRef, ParticipantRow,
+    SidecarActorStore, SidecarRoster,
 };
 use tempfile::TempDir;
 
@@ -426,6 +428,167 @@ fn device_enroll_authorize_bind_round_trip_with_two_keys() {
     )
     .unwrap();
     device_bind(root, authorization_path.to_str().unwrap(), &c).expect("bind from a path");
+}
+
+// ── device endpoint ─────────────────────────────────────────────────────────────────────────
+
+const NODE_A: &str = "a1a2a3a4a5a6a7a8a9b0b1b2b3b4b5b6b7b8b9c0c1c2c3c4c5c6c7c8c9d0d1d2";
+const NODE_B: &str = "b1b2b3b4b5b6b7b8b9c0c1c2c3c4c5c6c7c8c9d0d1d2d3d4d5d6d7d8d9e0e1e2";
+
+/// Bind `b` to the lineage `a` founded, through the three-command ceremony.
+fn bind_second_device(root: &Path, a: &DeviceKey, b: &DeviceKey) {
+    let request = device_enroll(root, "matthew", b).unwrap();
+    let authorization =
+        device_authorize(root, &serde_json::to_string(&request).unwrap(), a).unwrap();
+    device_bind(root, &serde_json::to_string(&authorization).unwrap(), b).unwrap();
+}
+
+#[test]
+fn device_endpoint_appends_one_signed_row() {
+    let dir = fixture();
+    let keys = TempDir::new().unwrap();
+    let root = dir.path();
+    let (key_file, a) = device(&keys, "a");
+    witness(root, SUBJECT, WITNESS, SESSION, BASIS, false, &a).unwrap();
+    let before = roster_rows(root, "matthew").len();
+
+    // The verb a device runs, through the built binary with the key named on the child alone.
+    let out = epr(
+        root,
+        &key_file,
+        &["actor", "device", "endpoint", "--node-id", NODE_A],
+    );
+    let stderr = String::from_utf8_lossy(&out.stderr).to_string();
+    assert!(out.status.success(), "endpoint runs: {stderr}");
+    let outcome: serde_json::Value = serde_json::from_slice(&out.stdout).unwrap();
+    assert_eq!(outcome["appended"], true, "{outcome}");
+    assert_eq!(outcome["handle"], "matthew");
+    assert_eq!(outcome["nodeId"], NODE_A);
+    assert_eq!(outcome["device"], a.did_key());
+    assert_eq!(outcome["chainRoot"], a.did_key());
+    assert_eq!(
+        outcome["rosterPath"],
+        ".eprfs/status/participants/matthew.jsonl"
+    );
+
+    // Exactly one row more: the device's own signed PeerEndpoint.
+    let rows = roster_rows(root, "matthew");
+    assert_eq!(rows.len(), before + 1, "{rows:?}");
+    let ParticipantRow::PeerEndpoint {
+        handle,
+        chain_root,
+        device: signer,
+        node_id,
+        nonce,
+        signature,
+    } = rows.last().unwrap()
+    else {
+        panic!("a peer endpoint row expected: {rows:?}")
+    };
+    assert_eq!(handle, "matthew");
+    assert_eq!(chain_root, &a.did_key());
+    assert_eq!(signer, &a.did_key());
+    assert_eq!(node_id, NODE_A);
+    assert!(!nonce.is_empty() && !signature.is_empty());
+    assert_eq!(
+        outcome["rowCid"],
+        SidecarRoster::open(root, "matthew")
+            .unwrap()
+            .read()
+            .unwrap()
+            .rows()
+            .last()
+            .unwrap()
+            .0
+            .to_string()
+    );
+    // The signature verifies: the roster admits this node id for this device.
+    assert_eq!(
+        admitted_endpoints(&rows, &a.did_key(), &device_key::verify),
+        BTreeMap::from([(NODE_A.to_string(), a.did_key())])
+    );
+
+    // No key material is printed or written.
+    let seed = std::fs::read(&key_file).unwrap();
+    let seed_hex: String = seed.iter().map(|b| format!("{b:02x}")).collect();
+    let seed_text = String::from_utf8_lossy(&seed).trim().to_string();
+    let roster_text =
+        std::fs::read_to_string(root.join(".eprfs/status/participants/matthew.jsonl")).unwrap();
+    let stdout = String::from_utf8_lossy(&out.stdout).to_string();
+    for surface in [&stdout, &stderr, &roster_text] {
+        assert!(!surface.contains(&seed_hex), "no seed bytes in output");
+        assert!(
+            seed_text.len() < 32 || !surface.contains(&seed_text),
+            "no seed text in output"
+        );
+    }
+
+    // Again with the same node id: already admitted for this device, nothing appended.
+    let again = device_endpoint(root, None, NODE_A, &a).expect("idempotent");
+    assert!(!again.appended);
+    assert_eq!(again.row_cid, outcome["rowCid"]);
+    assert_eq!(roster_rows(root, "matthew").len(), before + 1);
+
+    // A rebuilt workspace's new key: one more row, and it supersedes the old one.
+    let rotated = device_endpoint(root, Some("matthew"), NODE_B, &a).expect("rotates");
+    assert!(rotated.appended);
+    let rows = roster_rows(root, "matthew");
+    assert_eq!(rows.len(), before + 2);
+    assert_eq!(
+        admitted_endpoints(&rows, &a.did_key(), &device_key::verify),
+        BTreeMap::from([(NODE_B.to_string(), a.did_key())])
+    );
+}
+
+#[test]
+fn device_endpoint_refuses_unrostered_devices_taken_ids_and_bad_ids() {
+    let dir = fixture();
+    let keys = TempDir::new().unwrap();
+    let root = dir.path();
+    let (_, a) = device(&keys, "a");
+    let (_, b) = device(&keys, "b");
+    let (_, stranger) = device(&keys, "stranger");
+    witness(root, SUBJECT, WITNESS, SESSION, BASIS, false, &a).unwrap();
+    bind_second_device(root, &a, &b);
+    let before = roster_rows(root, "matthew").len();
+
+    let err = device_endpoint(root, None, NODE_A, &stranger).expect_err("not on any roster");
+    assert!(matches!(err, ActorError::InvalidArguments(_)), "{err}");
+    assert!(err.to_string().contains("roster"), "{err}");
+    let err = device_endpoint(root, Some("matthew"), NODE_A, &stranger)
+        .expect_err("named handle, still not a member");
+    assert!(err.to_string().contains("does not stand"), "{err}");
+
+    let err = device_endpoint(root, None, "NOT-A-NODE-ID", &a).expect_err("bad node id");
+    assert!(err.to_string().contains("node id"), "{err}");
+    let err = device_endpoint(root, Some("nobody"), NODE_A, &a).expect_err("no such roster");
+    assert!(err.to_string().contains("nobody"), "{err}");
+    assert!(
+        !root
+            .join(".eprfs/status/participants/nobody.jsonl")
+            .exists(),
+        "a refused endpoint creates no roster"
+    );
+    assert_eq!(
+        roster_rows(root, "matthew").len(),
+        before,
+        "nothing appended"
+    );
+
+    // A takes NODE_A; B claiming the same id would refuse both, so it is refused up front.
+    device_endpoint(root, None, NODE_A, &a).unwrap();
+    let err = device_endpoint(root, None, NODE_A, &b).expect_err("taken by another device");
+    assert!(err.to_string().contains("already admitted"), "{err}");
+    device_endpoint(root, None, NODE_B, &b).expect("B's own id");
+    let rows = roster_rows(root, "matthew");
+    assert_eq!(rows.len(), before + 2);
+    assert_eq!(
+        admitted_endpoints(&rows, &a.did_key(), &device_key::verify),
+        BTreeMap::from([
+            (NODE_A.to_string(), a.did_key()),
+            (NODE_B.to_string(), b.did_key()),
+        ])
+    );
 }
 
 #[test]
