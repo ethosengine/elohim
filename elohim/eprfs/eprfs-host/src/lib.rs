@@ -19,23 +19,15 @@ pub struct HostProfile {
 
 impl HostProfile {
     pub fn current_platform() -> Self {
-        #[cfg(target_os = "linux")]
-        {
-            return Self::linux_native();
+        if cfg!(target_os = "linux") {
+            Self::linux_native()
+        } else if cfg!(target_os = "macos") {
+            Self::macos_native()
+        } else if cfg!(target_os = "windows") {
+            Self::windows_native()
+        } else {
+            Self::portable_directory()
         }
-
-        #[cfg(target_os = "macos")]
-        {
-            return Self::macos_native();
-        }
-
-        #[cfg(target_os = "windows")]
-        {
-            return Self::windows_native();
-        }
-
-        #[allow(unreachable_code)]
-        Self::portable_directory()
     }
 
     pub fn linux_native() -> Self {
@@ -135,5 +127,21 @@ mod tests {
         assert_eq!(profile.symlinks, SymlinkMode::Marker);
         assert_eq!(profile.executable_bits, Capability::Unsupported);
         assert_eq!(profile.peer_sync, PeerSync::ManagedProjection);
+    }
+
+    #[test]
+    fn current_platform_is_the_compiled_targets_profile() {
+        let expected = if cfg!(target_os = "linux") {
+            HostProfile::linux_native()
+        } else if cfg!(target_os = "macos") {
+            HostProfile::macos_native()
+        } else if cfg!(target_os = "windows") {
+            HostProfile::windows_native()
+        } else {
+            HostProfile::portable_directory()
+        };
+        assert_eq!(HostProfile::current_platform(), expected);
+        #[cfg(target_os = "linux")]
+        assert_eq!(HostProfile::current_platform().name, "linux-native");
     }
 }
