@@ -3171,4 +3171,4 @@ decisionPoints:
   concernIds: *f2_custody_concerns
   contractTests:
   - {path: elohim/eprfs/device-runtime/tests/launcher.rs, testName: redirected_store_refuses_running_launcher_candidate, kind: integration}
-  - {path: genesis/agentic/native-epr-bootstrap.test.mjs, testName: hookless launcher queues the existing bootstrap and returns EX_TEMPFAIL, kind: integration}
+  - {path: genesis/agentic/native-epr-bootstrap.test.mjs, testName: hooklessLauncherQueuesTheExistingBootstrap, kind: integration}

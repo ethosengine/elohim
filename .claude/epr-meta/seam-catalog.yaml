@@ -451,6 +451,14 @@ seams:
     # side (a device's iroh key, endpoint and roster-read admission of its own person's devices:
     # a pure read of the repo-plane roster, no election, no head order); routed in the commit
     # that births its registry.
-    registry_crates: [elohim-seam-contracts, elohim-epr-rea, elohim-epr-cli, eprfs-core, eprfs-local, eprfs-storage, eprfs-serve, eprfs-peer]
+    # `elohim-device-runtime` (elohim/eprfs/device-runtime) is the same family's device side: its
+    # decision points judge a device's own private custody (which verified build this device
+    # lands, pins and keeps) and the ephemeral session identity read from the local process
+    # table. A landed head here is this device's local pointer, never an elected network head,
+    # and nothing it decides is published. `gate-runner` (genesis/orchestrator) is the
+    # CI/orchestrator this plane_note names: its receipt key decides whether a local gate result
+    # may be reused for an identical source closure, a governance verdict over the tree. Both
+    # routed in the commit that births their registries (device-runtime slice A, 2026-10-24).
+    registry_crates: [elohim-seam-contracts, elohim-epr-rea, elohim-epr-cli, eprfs-core, eprfs-local, eprfs-storage, eprfs-serve, eprfs-peer, elohim-device-runtime, gate-runner]
     habits: []
     n_a_concerns: []
