@@ -89,6 +89,7 @@ the lock or dir) — the only code a wrapper may proceed past, unleased.
 import contextlib
 import errno
 import fcntl
+import glob
 import json
 import os
 import re
@@ -126,8 +127,10 @@ UNDER_TEST_ENV = "BERTH_UNDER_TEST"
 # The line a refusal adds when the claim is unconfirmed while this device's own daemon is down: the
 # other device was never told, so the cure is here, not there.
 DAEMON_DOWN_LINE = "(this device's peer daemon is not running: start it with epr peer serve)"
-# A failed `epr` call whose first line says this: a binary built before `epr peer` existed.
-STALE_EPR_HINT = "rebuild epr (this binary predates the peer verbs)"
+# A failed `epr` call whose first line says "unknown command" or "usage:": a binary built before
+# `epr peer` existed. `{path}` is that binary.
+STALE_EPR_HINT = ("{path} predates the peer verbs: replace it (cargo install --path elohim/eprfs/epr-cli "
+                  "--locked) or export EPR_BIN=<a current epr>")
 
 _PREFLIGHT = None
 
@@ -1104,7 +1107,7 @@ class Berth:
     def _no_epr(self):
         where = self.epr or "EPR_BIN, PATH or the cargo target pool"
         return (f"no `epr` binary to read the steward lease view (looked at {where}) — build it: "
-                f"`just gate eprfs` (or export EPR_BIN=<path>); this workspace is a device (it has a "
+                f"`cargo install --path elohim/eprfs/epr-cli --locked` (or export EPR_BIN=<path>); this workspace is a device (it has a "
                 f"device key), and a steward-scoped claim is never taken unconfirmed")
 
     @staticmethod
@@ -1128,6 +1131,37 @@ class Berth:
             self._remember_channel(None)
         return view, err
 
+    def _run_peer_leases(self, epr, timeout):
+        try:
+            return subprocess.run([epr, "peer", "leases", "--json", "--root", REPO_ROOT, "--policy", self.policy_path],
+                                  capture_output=True, text=True, timeout=max(0.1, timeout)), None
+        except (OSError, subprocess.TimeoutExpired) as e:
+            return None, f"the steward lease view did not answer: {e}"
+
+    @staticmethod
+    def _is_stale_epr(r):
+        first = (r.stderr.strip().splitlines() or [""])[0].strip()
+        return "unknown command" in first or first.startswith("usage:")
+
+    def _may_fall_through(self):
+        """Only a resolved epr may be replaced: an explicit `self.epr` or $EPR_BIN is honoured."""
+        return self.epr is None and not os.environ.get("EPR_BIN")
+
+    @staticmethod
+    def _pool_candidates():
+        """The cargo-pool `epr` builds `just status device` would consider, newest first."""
+        pre = _device_preflight()
+        pool = os.environ.get("CARGO_TARGET_POOL_ROOT") or pre.POOL_ROOT_DEFAULT
+        found = []
+        for pattern in pre._POOL_GLOBS:
+            for candidate in glob.glob(pattern.format(pool=pool)):
+                try:
+                    if os.access(candidate, os.X_OK):
+                        found.append((os.stat(candidate).st_mtime, candidate))
+                except OSError:
+                    continue
+        return [c for _, c in sorted(found, reverse=True)]
+
     def _read_peer_leases(self, timeout):
         epr = self.epr_bin()
         if not epr:
@@ -1138,16 +1172,22 @@ class Berth:
                 return {"now": round(self.now() * 1000), "standing": "not_a_device", "device": None,
                         "store": None, "why": f"this workspace has no device key ({key})"}, None
             return None, self._no_epr()
-        try:
-            r = subprocess.run([epr, "peer", "leases", "--json", "--root", REPO_ROOT, "--policy", self.policy_path],
-                               capture_output=True, text=True, timeout=max(0.1, timeout))
-        except (OSError, subprocess.TimeoutExpired) as e:
-            return None, f"the steward lease view did not answer: {e}"
+        r, err = self._run_peer_leases(epr, timeout)
+        if err:
+            return None, err
+        if r.returncode != 0 and self._is_stale_epr(r) and self._may_fall_through():
+            for candidate in self._pool_candidates():
+                if candidate == epr:
+                    continue
+                alt, alt_err = self._run_peer_leases(candidate, timeout)
+                if not alt_err and alt.returncode == 0:
+                    self.epr, epr, r = candidate, candidate, alt
+                    break
         if r.returncode != 0:
             # The first line names what went wrong; later lines are usage or context.
             why = (r.stderr.strip().splitlines() or [f"exit {r.returncode}"])[0].strip()
-            if "unknown command" in why or why.startswith("usage:"):
-                why = f"{why} — {STALE_EPR_HINT}"
+            if self._is_stale_epr(r):
+                why = f"{why} \u2014 {STALE_EPR_HINT.format(path=epr)}"
             return None, f"the steward lease view could not be computed: {why}"
         try:
             view = json.loads(r.stdout)

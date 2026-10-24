@@ -1236,7 +1236,7 @@ class StewardClaimTest(unittest.TestCase):
         self.assertFalse(ok)
         self.assertIsNone(lease)
         self.assertIn("EPR_BIN", reason)
-        self.assertIn("just gate eprfs", reason, "the cure `just status device` names")
+        self.assertIn("cargo install --path elohim/eprfs/epr-cli --locked", reason)
         self.assertIsNone(self.berth.who("dev-integration"))
         self.assertEqual(self.rows("claim"), [], "no lease is written that could not be confirmed")
         self.assertFalse(self.berth.owner_check("dev-integration", "codex-1", "deploy")[0])
@@ -1310,8 +1310,9 @@ class StewardClaimTest(unittest.TestCase):
         self.berth.epr = str(stale)
         ok, _, reason, _ = self.claim()
         self.assertFalse(ok)
-        self.assertEqual(reason, "the steward lease view could not be computed: epr: invalid arguments: unknown "
-                                 "command `peer` — rebuild epr (this binary predates the peer verbs)")
+        self.assertEqual(reason, f"the steward lease view could not be computed: epr: invalid arguments: unknown "
+                                 f"command `peer` \u2014 {stale} predates the peer verbs: replace it (cargo install "
+                                 f"--path elohim/eprfs/epr-cli --locked) or export EPR_BIN=<a current epr>")
         failing = Path(self.directory.name) / "failing-epr"
         failing.write_text("#!/bin/sh\necho 'epr peer: the roster does not read' >&2\n"
                            "echo '  caused by: line 3' >&2\nexit 2\n")
@@ -1319,6 +1320,67 @@ class StewardClaimTest(unittest.TestCase):
         self.berth.epr = str(failing)
         self.assertEqual(self.claim()[2],
                          "the steward lease view could not be computed: epr peer: the roster does not read")
+
+    STALE_STUB = ("#!/bin/sh\necho 'epr: invalid arguments: unknown command `peer`' >&2\n"
+                  "echo 'usage: epr <setup|doctor|...>' >&2\nexit 2\n")
+
+    def _stale_path_epr(self):
+        stale_dir = Path(self.directory.name) / "path-bin"
+        stale_dir.mkdir()
+        stale = stale_dir / "epr"
+        stale.write_text(self.STALE_STUB)
+        stale.chmod(0o755)
+        return stale
+
+    def _pool_epr(self, script):
+        pool = Path(self.directory.name) / "pool"
+        slot = pool / "family" / "slot" / "elohim__eprfs" / "t" / "release"
+        slot.mkdir(parents=True)
+        (slot / "epr").write_text(script)
+        (slot / "epr").chmod(0o755)
+        return pool, slot
+
+    def _env(self, stale, pool, **extra):
+        env = {"PATH": f"{stale.parent}{os.pathsep}{os.environ.get('PATH', '')}", "CARGO_TARGET_POOL_ROOT": str(pool), **extra}
+        patcher = mock.patch.dict(os.environ, env)
+        patcher.start()
+        self.addCleanup(patcher.stop)
+        if "EPR_BIN" not in extra:
+            os.environ.pop("EPR_BIN", None)
+
+    def test_a_stale_epr_on_path_falls_through_to_a_current_pool_build(self):
+        stale = self._stale_path_epr()
+        pool, slot = self._pool_epr(STUB_EPR)
+        (slot / "views.jsonl").write_text(json.dumps(view()) + "\n" + json.dumps(view(dev_integration=effective())) + "\n")
+        self._env(stale, pool)
+        self.berth.epr = None
+        ok, lease, reason, _ = self.claim()
+        self.assertTrue(ok, reason)
+        self.assertEqual(self.berth.epr, str(slot / "epr"), "the working path is remembered")
+
+    def test_a_stale_epr_on_path_and_no_working_pool_build_names_the_path_and_the_cure(self):
+        stale = self._stale_path_epr()
+        pool, slot = self._pool_epr(self.STALE_STUB)
+        self._env(stale, pool)
+        self.berth.epr = None
+        ok, lease, reason, _ = self.claim()
+        self.assertFalse(ok)
+        self.assertEqual(reason, f"the steward lease view could not be computed: epr: invalid arguments: unknown "
+                                 f"command `peer` \u2014 {stale} predates the peer verbs: replace it (cargo install "
+                                 f"--path elohim/eprfs/epr-cli --locked) or export EPR_BIN=<a current epr>")
+        self.assertIsNone(self.berth.who("dev-integration"))
+
+    def test_an_explicit_epr_bin_that_is_stale_is_not_fallen_through(self):
+        stale = self._stale_path_epr()
+        pool, slot = self._pool_epr(STUB_EPR)
+        (slot / "views.jsonl").write_text(json.dumps(view()) + "\n")
+        self._env(stale, pool, EPR_BIN=str(stale))
+        self.berth.epr = None
+        ok, lease, reason, _ = self.claim()
+        self.assertFalse(ok)
+        self.assertIn(str(stale), reason)
+        self.assertIn("cargo install --path elohim/eprfs/epr-cli --locked", reason)
+        self.assertFalse((slot / "calls.log").exists(), "the pool build was never asked")
 
     def test_an_enrolled_device_whose_view_fails_is_refused(self):
         self.views("EXIT 2 epr peer: the channel store `/x/.eprfs/status/flows.jsonl` that epr peer serve recorded is gone")
