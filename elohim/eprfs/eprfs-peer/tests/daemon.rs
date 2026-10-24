@@ -203,6 +203,34 @@ async fn two_daemons_fold_each_others_heads_and_drop_a_contested_device() {
                 > 0
     })
     .await;
+    // The negative checks must see B's newer heads have been sent: wait until B itself announced
+    // past what A had folded, then let B keep broadcasting (a change a second, each announced
+    // after the 1 s debounce) for 3 s before asserting that nothing more was folded.
+    eventually("B announces a head past what A folded", || {
+        side_b
+            .table()
+            .own
+            .as_ref()
+            .is_some_and(|own| own.seq > folded_before)
+    })
+    .await;
+    for i in 0..6 {
+        side_b.checkout.append(berth_event(
+            "claim",
+            &format!("lane:settle-{i}"),
+            "sb",
+            &format!("{}.0", 3 + i),
+        ));
+        tokio::time::sleep(Duration::from_millis(500)).await;
+    }
+    assert!(
+        side_b
+            .table()
+            .own
+            .as_ref()
+            .is_some_and(|own| own.seq > folded_before + 1),
+        "B kept announcing while A was contested"
+    );
     assert_eq!(side_a.table().devices[&b.did].seq, folded_before);
     assert_eq!(
         eprfs_peer::folded_from(&side_a.checkout.store(), &b.did)
