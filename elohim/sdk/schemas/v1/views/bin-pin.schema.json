@@ -1,0 +1,57 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "epr:schema:view:bin-pin",
+  "title": "BinPin",
+  "description": "Device-local CLI output; reconstructed from private custody and runtime observations. No network authority.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "cid",
+    "session",
+    "pinnedAt",
+    "ownerPid",
+    "ownerStartTime",
+    "provisional"
+  ],
+  "properties": {
+    "cid": {
+      "type": "string",
+      "pattern": "^baf[k-y]rei[a-z2-7]+$"
+    },
+    "session": {
+      "type": "string"
+    },
+    "pinnedAt": {
+      "type": "string"
+    },
+    "ownerPid": {
+      "type": [
+        "integer",
+        "null"
+      ],
+      "minimum": 1
+    },
+    "ownerStartTime": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "pattern": "^[0-9]+$"
+    },
+    "provisional": {
+      "type": "boolean"
+    },
+    "runningCid": {
+      "type": "string",
+      "pattern": "^baf[k-y]rei[a-z2-7]+$"
+    },
+    "source": {
+      "type": "string",
+      "enum": [
+        "candidate",
+        "current"
+      ],
+      "description": "Source of truth: device-runtime executable resolution and daemon admission; local operational vocabulary."
+    }
+  }
+}

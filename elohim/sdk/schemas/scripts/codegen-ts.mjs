@@ -75,6 +75,17 @@ const ENUM_OUTPUT_PATHS = GENERATED_OUTPUT_DIRS.map((d) => join(d, 'schema-enums
 
 // Interface files to distribute alongside schema-enums.ts
 const INTERFACE_FILES = [
+  { src: 'views/bin-resolution.ts', dest: 'bin-resolution.ts', dirs: [resolve(REPO_ROOT, 'elohim/sdk/storage-client-ts/src/generated')] },
+  { src: 'views/bin-pin.ts', dest: 'bin-pin.ts', dirs: [resolve(REPO_ROOT, 'elohim/sdk/storage-client-ts/src/generated')] },
+  { src: 'views/bin-release.ts', dest: 'bin-release.ts', dirs: [resolve(REPO_ROOT, 'elohim/sdk/storage-client-ts/src/generated')] },
+  { src: 'views/bin-bootstrap.ts', dest: 'bin-bootstrap.ts', dirs: [resolve(REPO_ROOT, 'elohim/sdk/storage-client-ts/src/generated')] },
+  { src: 'views/bin-gc.ts', dest: 'bin-gc.ts', dirs: [resolve(REPO_ROOT, 'elohim/sdk/storage-client-ts/src/generated')] },
+  { src: 'views/bin-migrate.ts', dest: 'bin-migrate.ts', dirs: [resolve(REPO_ROOT, 'elohim/sdk/storage-client-ts/src/generated')] },
+  { src: 'views/bin-install-launcher.ts', dest: 'bin-install-launcher.ts', dirs: [resolve(REPO_ROOT, 'elohim/sdk/storage-client-ts/src/generated')] },
+  { src: 'views/bin-shadows.ts', dest: 'bin-shadows.ts', dirs: [resolve(REPO_ROOT, 'elohim/sdk/storage-client-ts/src/generated')] },
+  { src: 'views/bin-follow.ts', dest: 'bin-follow.ts', dirs: [resolve(REPO_ROOT, 'elohim/sdk/storage-client-ts/src/generated')] },
+  { src: 'views/peer-cli-status.ts', dest: 'peer-cli-status.ts', dirs: [resolve(REPO_ROOT, 'elohim/sdk/storage-client-ts/src/generated')] },
+
   {
     src: 'views/source-state.ts',
     dest: 'source-state.ts',

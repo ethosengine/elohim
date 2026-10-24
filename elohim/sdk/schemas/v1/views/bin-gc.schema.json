@@ -1,0 +1,35 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "epr:schema:view:bin-gc",
+  "title": "BinGc",
+  "description": "Device-local CLI output; reconstructed from private custody and runtime observations. No network authority.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "kept",
+    "removed",
+    "removedSessions"
+  ],
+  "properties": {
+    "kept": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "pattern": "^baf[k-y]rei[a-z2-7]+$"
+      }
+    },
+    "removed": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "pattern": "^baf[k-y]rei[a-z2-7]+$"
+      }
+    },
+    "removedSessions": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    }
+  }
+}

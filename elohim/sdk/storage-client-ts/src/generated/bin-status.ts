@@ -15,9 +15,16 @@ export interface BinStatus {
   resolvedCid: string | null;
   resolved: string | null;
   verifiedCurrent: boolean;
-  candidates: Release[];
+  candidates: BinRelease[];
+  /**
+   * Derived head links need explicit repair.
+   */
+  headRepairNeeded: boolean;
 }
-export interface Release {
+/**
+ * Device-local CLI output; reconstructed from private custody and runtime observations. No network authority.
+ */
+export interface BinRelease {
   cid: string;
   rcid: string;
   tool: string;
@@ -39,5 +46,9 @@ export interface Release {
   attestations: {
     [k: string]: unknown;
   };
+  /**
+   * Adoption route, cache for a verified cached ancestor.
+   */
+  source?: string;
   [k: string]: unknown;
 }

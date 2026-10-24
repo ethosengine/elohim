@@ -59,11 +59,28 @@ impl Store {
             )
         })
     }
+    pub(super) fn require_migrated(&self) -> Result<()> {
+        if self.root.join("migration.pending").exists() {
+            return Err(Refusal::new(
+                "migration-incomplete",
+                "unfinished migration; run epr bin migrate before mutating this store",
+            ));
+        }
+        Ok(())
+    }
     /// Re-address legacy SHA-256 releases and references in place. The mapping is persisted
     /// before references change; rerunning after interruption resumes it. Old bytes remain as
     /// inert migration history, so already-running old executables are never unlinked.
     pub fn migrate(&self) -> Result<Value> {
+        self.migrate_checkpoint(|| Ok(()))
+    }
+    pub(super) fn migrate_checkpoint(
+        &self,
+        after_releases: impl FnOnce() -> Result<()>,
+    ) -> Result<Value> {
         let _lock = files::Lock::acquire(&self.root, files::MUTATION_WAIT)?;
+        let marker = self.root.join("migration.pending");
+        files::atomic_json(&marker, &json!({"version":1}))?;
         let journal = self.root.join("migration.json");
         let mut mapping: BTreeMap<String, String> = files::read_json(&journal).unwrap_or_default();
         for dir in files::children(&self.root) {
@@ -200,6 +217,7 @@ impl Store {
             mapping.insert(old.into(), cid);
             files::atomic_json(&journal, &mapping)?;
         }
+        after_releases()?;
         for name in ["current", "previous"] {
             if let Ok(target) = fs::read_link(self.root.join(name)) {
                 if let Some(new) = target.to_str().and_then(|old| mapping.get(old)) {
@@ -240,6 +258,9 @@ impl Store {
                 }
             }
         }
+        self.repair_heads_locked()?;
+        fs::remove_file(&marker)?;
+        files::sync_parent(&marker)?;
         Ok(json!({"migrated":mapping,"legacyRetained":true}))
     }
 }

@@ -1,0 +1,45 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "epr:schema:view:bin-follow",
+  "title": "BinFollow",
+  "description": "Device-local CLI output; reconstructed from private custody and runtime observations. No network authority.",
+  "oneOf": [
+    {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "followed",
+        "why"
+      ],
+      "properties": {
+        "followed": {
+          "const": false,
+          "type": "boolean"
+        },
+        "why": {
+          "type": "string"
+        }
+      }
+    },
+    {
+      "allOf": [
+        {
+          "$ref": "epr:schema:view:bin-release"
+        },
+        {
+          "type": "object",
+          "additionalProperties": true,
+          "required": [
+            "followed"
+          ],
+          "properties": {
+            "followed": {
+              "const": true,
+              "type": "boolean"
+            }
+          }
+        }
+      ]
+    }
+  ]
+}

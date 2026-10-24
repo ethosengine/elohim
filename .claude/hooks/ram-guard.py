@@ -298,27 +298,25 @@ IO_GUARD = os.path.join(PROJECT_DIR, "genesis", "agentic", "bin", "io-guard")
 BERTH = os.path.join(PROJECT_DIR, "genesis", "agentic", "bin", "berth")
 
 
-_SHELLS = {"sh", "bash", "dash", "zsh", "ash"}
+_SESSION_MOD = None
 
 
-def claude_pid():
-    """The Claude process that spawned this hook — the runtime-asserted identity a mooring carries.
-    The hook's parent, skipping a `sh -c` wrapper when the harness did not exec through it."""
-    pid = os.getppid()
-    try:
-        for _ in range(3):
-            with open(f"/proc/{pid}/comm") as f:
-                comm = f.read().strip()
-            if comm not in _SHELLS:
-                return pid
-            with open(f"/proc/{pid}/stat") as f:
-                nxt = int(f.read().rsplit(")", 1)[1].split()[1])
-            if nxt <= 1:
-                break
-            pid = nxt
-    except (OSError, ValueError, IndexError):
-        pass
-    return os.getppid()
+def _session_identity():
+    """Use the stdlib shim directly: the timer path must never spawn epr."""
+    global _SESSION_MOD
+    if _SESSION_MOD is None:
+        _SESSION_MOD = _load(os.path.join(HOOK_DIR, "..", "scripts", "_lib", "session.py"), "ram_guard_session")
+    return _SESSION_MOD.resolve_fallback()
+
+
+def owner_pid():
+    """The registered runtime owner, or the direct parent when it cannot be observed."""
+    return _session_identity().get("ownerPid") or os.getppid()
+
+
+def session_key(data):
+    """The hook event's explicit session wins; otherwise use shared runtime attribution."""
+    return data.get("session_id") or _session_identity().get("session") or "default"
 
 
 _BERTH_MOD = None
@@ -339,7 +337,7 @@ def berth_touch(session):
     this session by process ancestry. Goes through `Berth.touch` — under the berth lock, written
     tmp + os.replace — so a concurrent claimant never reads a half-written mooring as a dead holder."""
     try:
-        _berth().Berth().touch(session or "default", pid=claude_pid())
+        _berth().Berth().touch(session or "default", pid=owner_pid())
     except Exception:
         pass
 
@@ -379,7 +377,7 @@ def io_guard_and_berth_lines(session):
     try:
         subprocess.run([sys.executable, BERTH, "moor", "--session", session, "--runtime", "claude-code",
                         "--principal", os.environ.get("USER_EMAIL") or os.environ.get("USER") or "operator",
-                        "--pid", str(claude_pid())],
+                        "--pid", str(owner_pid())],
                        capture_output=True, text=True, timeout=6)
         r = subprocess.run([sys.executable, BERTH, "status"], capture_output=True, text=True, timeout=6)
         st = (r.stdout or "").strip().splitlines()
@@ -398,7 +396,7 @@ def main(argv):
         data = json.load(sys.stdin) if not sys.stdin.isatty() else {}
     except Exception:
         data = {}
-    session = data.get("session_id") or os.environ.get("CLAUDE_SESSION_ID") or "default"
+    session = session_key(data)
     d = store_dir()
 
     if event == "session":

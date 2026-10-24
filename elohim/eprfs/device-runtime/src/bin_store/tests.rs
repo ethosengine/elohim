@@ -78,6 +78,7 @@ struct State {
     published_ref: Option<String>,
     unchanged: bool,
     health_fail: bool,
+    health_bad: Option<String>,
     health_dirty: bool,
     health_move: Option<String>,
     verdict: Option<Value>,
@@ -85,6 +86,7 @@ struct State {
     calls: Vec<CommandSpec>,
     install_fail: bool,
     metadata: Option<Value>,
+    distances: BTreeMap<String, u64>,
 }
 struct Fake {
     state: Arc<Mutex<State>>,
@@ -122,6 +124,7 @@ impl Runner for Fake {
                         s.descended
                     }
                 }
+                "rev-list" => out = s.distances.get(&a[2]).copied().unwrap_or(0).to_string(),
                 "diff" => success = s.unchanged,
                 "cat-file" | "worktree" => {}
                 _ => success = false,
@@ -157,7 +160,11 @@ impl Runner for Fake {
                 )
                 .unwrap();
             }
-            success = !s.health_fail;
+            success = !s.health_fail
+                && !s
+                    .health_bad
+                    .as_ref()
+                    .is_some_and(|cid| c.program.contains(cid));
         } else if c.args == ["--version"] {
             if c.program.contains("cargo-bin") {
                 success = !s.install_fail;
@@ -238,7 +245,8 @@ impl Fixture {
             0o444,
         )
         .unwrap();
-        self.store
+        let record = self
+            .store
             .ingest(
                 &source,
                 &IngestOptions {
@@ -248,7 +256,9 @@ impl Fixture {
                     ..Default::default()
                 },
             )
-            .unwrap()
+            .unwrap();
+        atomic_json(&source.join("release.json"), &record).unwrap();
+        record
     }
     fn head(&self, r: &Release) {
         atomic_link(&self.store.root.join("current"), Path::new(&r.cid)).unwrap();
@@ -675,6 +685,11 @@ fn test_gc_holds_lock_and_keeps_heads_live_pins_and_grace() {
     }
     f.head(&rows[0]);
     atomic_link(&f.store.root.join("previous"), Path::new(&rows[1].cid)).unwrap();
+    atomic_json(
+        &f.store.root.join("current.json"),
+        &json!({"cid":rows[0].cid,"commit":f.commit(),"previous":rows[1].cid}),
+    )
+    .unwrap();
     proc_entry(&f.path("proc"), 200, 1, "codex", 20);
     for (key, r, pid, start) in [
         ("live", &rows[2], Some(200), Some("20")),
@@ -1264,7 +1279,27 @@ fn migration_is_idempotent_and_preserves_provenance_and_pins() {
         .unwrap()
         .set_modified(std::time::UNIX_EPOCH)
         .unwrap();
+    // Inject termination at the release/session boundary. The retry must fence GC until complete.
+    let crash = f
+        .store
+        .migrate_checkpoint(|| Err(Refusal::new("injected-crash", "after releases")))
+        .unwrap_err();
+    assert_eq!(crash.kind, "injected-crash");
+    assert!(f.store.root.join("migration.pending").exists());
+    assert_eq!(
+        f.store
+            .gc(&f.path("proc"), Some(u64::MAX))
+            .unwrap_err()
+            .kind,
+        "migration-incomplete"
+    );
+    assert_eq!(
+        read_json::<Value>(&f.store.root.join("sessions/s")).unwrap()["cid"],
+        old
+    );
+    assert!(f.store.verified(&raw.to_string()));
     let first = f.store.migrate().unwrap();
+    assert!(!f.store.root.join("migration.pending").exists());
     assert_eq!(
         fs::metadata(native.join(".used"))
             .unwrap()
@@ -1283,6 +1318,18 @@ fn migration_is_idempotent_and_preserves_provenance_and_pins() {
     let p: Pin = read_json(&f.store.root.join("sessions/s")).unwrap();
     assert_eq!(p.cid, cid);
     assert_eq!(p.owner_start_time.as_deref(), Some("123"));
+    // Once migration completes, a live pin alone retains the release beyond grace.
+    for name in ["current", "previous", "current.json"] {
+        fs::remove_file(f.store.root.join(name)).unwrap();
+    }
+    proc_entry(&f.path("proc"), 5, 1, "claude", 123);
+    assert!(
+        f.store.gc(&f.path("proc"), Some(u64::MAX)).unwrap()["removed"]
+            .as_array()
+            .unwrap()
+            .is_empty()
+    );
+    assert!(f.store.verified(&cid));
 }
 #[test]
 fn no_session_gets_no_pin() {
@@ -1344,10 +1391,11 @@ fn status_schema_contract() {
         );
     }
     let release = &status["candidates"][0];
-    for key in schema["definitions"]["Release"]["required"]
-        .as_array()
-        .unwrap()
-    {
+    let release_schema: Value = serde_json::from_str(include_str!(
+        "../../../../sdk/schemas/v1/views/bin-release.schema.json"
+    ))
+    .unwrap();
+    for key in release_schema["required"].as_array().unwrap() {
         assert!(release.get(key.as_str().unwrap()).is_some(), "{key}");
     }
     assert_eq!(release["cid"], r.cid);
@@ -1504,6 +1552,7 @@ fn running_daemon_identity_and_gc_follow_live_process_not_session_or_head() {
     assert_eq!(live[0].running_cid.as_deref(), Some(r.cid.as_str()));
     assert_eq!(live[0].source.as_deref(), Some("current"));
     fs::remove_file(f.store.root.join("current")).unwrap();
+    fs::remove_file(f.store.root.join("current.json")).unwrap();
     // After head removal, only the live process retains these bytes beyond grace.
     let result = f.store.gc(&proc, Some(4_000_000_000)).unwrap();
     assert!(result["kept"].as_array().unwrap().contains(&json!(r.cid)));
@@ -1688,4 +1737,326 @@ fn direct_daemon_rehashes_current_release_before_admission() {
         "daemon-release-unverified"
     );
     assert!(f.store.live_daemons(&proc).unwrap().is_empty());
+}
+
+#[test]
+fn f2_observational_status_never_locks_or_publishes() {
+    fn snapshot(root: &Path) -> BTreeMap<PathBuf, (std::time::SystemTime, Vec<u8>)> {
+        let meta = root.symlink_metadata().unwrap();
+        let bytes = if meta.file_type().is_symlink() {
+            fs::read_link(root)
+                .unwrap()
+                .to_string_lossy()
+                .as_bytes()
+                .to_vec()
+        } else if meta.is_file() {
+            fs::read(root).unwrap()
+        } else {
+            Vec::new()
+        };
+        let mut rows = BTreeMap::from([(root.to_owned(), (meta.modified().unwrap(), bytes))]);
+        if meta.is_dir() {
+            for entry in fs::read_dir(root).unwrap() {
+                rows.extend(snapshot(&entry.unwrap().path()));
+            }
+        }
+        rows
+    }
+    let f = Fixture::new("epr");
+    let r = f.release("a");
+    f.head(&r);
+    fs::set_permissions(f.store.root(), fs::Permissions::from_mode(0o555)).unwrap();
+    let _lock = Lock::acquire(f.store.root(), Duration::from_millis(20)).unwrap();
+    let before = snapshot(f.store.root());
+    let start = std::time::Instant::now();
+    let status = f
+        .store
+        .status(&identity("observer"), None, false, &|_| None)
+        .unwrap();
+    assert!(start.elapsed() < Duration::from_secs(1));
+    assert_eq!(status.source, "current");
+    assert_eq!(snapshot(f.store.root()), before);
+    assert!(!f.store.root.join("sessions").exists());
+    fs::set_permissions(f.store.root(), fs::Permissions::from_mode(0o755)).unwrap();
+}
+
+#[test]
+fn f2_atomic_head_record_repairs_torn_links() {
+    let f = Fixture::new("epr");
+    let old = f.release("old");
+    f.land(&old).unwrap();
+    let next = f.release("next");
+    // Crash cut: authoritative record has committed, derived links have not.
+    atomic_json(
+        &f.store.root.join("current.json"),
+        &json!({"cid":next.cid,"commit":f.commit(),"previous":old.cid}),
+    )
+    .unwrap();
+    assert_eq!(f.store.head("current"), Some(next.cid.clone()));
+    let status = serde_json::to_value(
+        f.store
+            .status(&identity("observer"), None, false, &|_| None)
+            .unwrap(),
+    )
+    .unwrap();
+    assert_eq!(status["headRepairNeeded"], true);
+    f.store
+        .status(&identity("repair"), None, true, &|_| None)
+        .unwrap();
+    assert_eq!(
+        read_link(&f.store.root.join("current")),
+        Some(next.cid.clone())
+    );
+    assert_eq!(read_link(&f.store.root.join("previous")), Some(old.cid));
+    f.land(&next).unwrap();
+}
+
+#[test]
+fn f2_interrupted_migration_fences_gc_pins_and_land() {
+    let f = Fixture::new("epr");
+    let r = f.release("converted");
+    f.head(&r);
+    let pin = json!({"cid":"sha256:legacy","session":"live","owner_pid":5,"owner_starttime":"123"});
+    atomic_json(&f.store.root.join("sessions/live"), &pin).unwrap();
+    atomic_json(
+        &f.store.root.join("migration.pending"),
+        &json!({"version":1}),
+    )
+    .unwrap();
+    let err = f
+        .store
+        .gc(Path::new("/absent"), Some(u64::MAX))
+        .unwrap_err();
+    assert_eq!(err.kind, "migration-incomplete");
+    assert!(err.detail.contains("epr bin migrate"));
+    assert_eq!(
+        read_json::<Value>(&f.store.root.join("sessions/live")).unwrap(),
+        pin
+    );
+    assert!(f.store.verified(&r.cid));
+    assert_eq!(
+        f.store
+            .pin(&identity("new"), None, false, None)
+            .unwrap_err()
+            .kind,
+        "migration-incomplete"
+    );
+    assert_eq!(f.land(&r).unwrap_err().kind, "migration-incomplete");
+}
+
+#[test]
+fn f2_cache_bootstrap_preserves_older_provenance_without_cargo() {
+    let f = Fixture::new("epr");
+    let r = f.release("older");
+    let old = f.commit();
+    f.state.lock().unwrap().head = "b".repeat(40);
+    f.state.lock().unwrap().calls.clear();
+    let landed = f.store.bootstrap(f.tmp.path(), None).unwrap();
+    assert_eq!(landed.cid, r.cid);
+    assert_eq!(landed.extra["source"], "cache");
+    assert_eq!(
+        read_json::<Value>(&f.store.root.join("current.json")).unwrap()["commit"],
+        old
+    );
+    assert!(!f
+        .state
+        .lock()
+        .unwrap()
+        .calls
+        .iter()
+        .any(|c| c.program == "cargo"));
+}
+
+#[test]
+fn f2_closure_requires_and_preserves_its_own_provenance() {
+    let f = Fixture::new("epr");
+    let r = f.release("closure");
+    let old = f.commit();
+    f.state.lock().unwrap().head = "b".repeat(40);
+    let options = IngestOptions {
+        repo: Some(f.tmp.path().into()),
+        source_commit: Some(f.commit()),
+        tree_clean: Some(true),
+        closure: true,
+        ..Default::default()
+    };
+    fs::remove_file(f.path("closure/release.json")).unwrap();
+    assert_eq!(
+        f.store
+            .ingest(&f.path("closure"), &options)
+            .unwrap_err()
+            .kind,
+        "closure-provenance-missing"
+    );
+    atomic_json(&f.path("closure/release.json"), &r).unwrap();
+    let imported = f.store.ingest(&f.path("closure"), &options).unwrap();
+    assert!(imported.source(&f.commit()).is_none());
+    assert!(imported.source(&old).is_some());
+    assert_eq!(f.land(&imported).unwrap_err().kind, "commit-mismatch");
+}
+
+#[test]
+fn f2_deadline_includes_descendant_pipe_drain() {
+    let spec = CommandSpec {
+        program: "/bin/sh".into(),
+        args: vec!["-c".into(), "sleep 3 & exit 0".into()],
+        cwd: None,
+        env: BTreeMap::new(),
+        timeout: Duration::from_millis(100),
+    };
+    let start = std::time::Instant::now();
+    let result = SystemRunner.run(&spec);
+    assert!(start.elapsed() < Duration::from_secs(1));
+    assert_eq!(result.unwrap_err().kind, "command-timeout");
+}
+
+#[test]
+fn f2_machine_output_contracts_validate_real_outputs_and_reject_missing_fields() {
+    let f = Fixture::new("epr");
+    let r = f.release("a");
+    let bootstrap = f.store.bootstrap(f.tmp.path(), None).unwrap();
+    let pin = f
+        .store
+        .pin(&identity("contract"), None, false, None)
+        .unwrap();
+    let outputs = json!([
+        ["bin-resolution", f.store.resolve_current(None).unwrap()],
+        ["source-state", f.store.source_state(f.tmp.path()).unwrap()],
+        [
+            "bin-status",
+            f.store
+                .status(&identity("contract"), None, false, &|_| None)
+                .unwrap()
+        ],
+        ["bin-pin", pin],
+        ["bin-release", r],
+        ["bin-bootstrap", bootstrap],
+        ["bin-gc", f.store.gc(Path::new("/absent"), None).unwrap()],
+        ["bin-migrate", f.store.migrate().unwrap()],
+        ["bin-install-launcher", f.install().unwrap()],
+        ["bin-follow", f.store.follow(f.tmp.path(), None).unwrap()],
+        ["bin-shadows", f.store.shadows("")]
+    ]);
+    let base = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../sdk/schemas/v1/views");
+    for row in outputs.as_array().unwrap() {
+        let name = row[0].as_str().unwrap();
+        let value = &row[1];
+        let schema: Value = read_json(&base.join(format!("{name}.schema.json"))).unwrap();
+        let mut options = jsonschema::options();
+        for referenced in ["bin-release", "bin-shadows"] {
+            let resource: Value =
+                read_json(&base.join(format!("{referenced}.schema.json"))).unwrap();
+            options.with_resource(
+                format!("epr:schema:view:{referenced}"),
+                jsonschema::Resource::from_contents(resource).unwrap(),
+            );
+        }
+        let validator = options.build(&schema).unwrap();
+        validator
+            .validate(value)
+            .unwrap_or_else(|error| panic!("{name}: {error}"));
+        assert!(
+            !validator.is_valid(&json!({})),
+            "{name} accepts missing fields"
+        );
+        if let Some(required) = schema["required"].as_array() {
+            for key in required {
+                let mut bad = value.clone();
+                bad.as_object_mut().unwrap().remove(key.as_str().unwrap());
+                assert!(!validator.is_valid(&bad), "{name} accepts missing {key}");
+            }
+        }
+        if schema["additionalProperties"] == false {
+            let mut bad = value.clone();
+            bad["unexpected"] = json!(true);
+            assert!(
+                !validator.is_valid(&bad),
+                "{name} accepts unexpected fields"
+            );
+        }
+    }
+}
+
+#[test]
+fn f2_ingest_deadline_releases_mutation_lock_after_fork() {
+    let f = Fixture::new("brit");
+    let registry: Registry =
+        serde_json::from_value(json!({"version":1,"tools":{"brit":{"bins":["brit"]}}})).unwrap();
+    let store = Store::new(f.path("timeout-store"), "brit", &registry).unwrap();
+    let bad = f.path("forker");
+    atomic_bytes(&bad, b"#!/bin/sh\nsleep 60 &\nexit 0\n", 0o755).unwrap();
+    let options = IngestOptions {
+        source_commit: Some("fixture".into()),
+        tree_clean: Some(true),
+        ..Default::default()
+    };
+    let start = std::time::Instant::now();
+    let error = store.ingest(&bad, &options).unwrap_err();
+    assert_eq!(error.kind, "command-timeout");
+    assert!(start.elapsed() < Duration::from_secs(18));
+    atomic_bytes(&bad, b"#!/bin/sh\necho brit fixture\n", 0o755).unwrap();
+    assert!(
+        store.ingest(&bad, &options).is_ok(),
+        "timeout must release mutation lock"
+    );
+}
+
+#[test]
+fn f2_landing_link_failure_is_repaired_by_bootstrap() {
+    let f = Fixture::new("epr");
+    let old = f.release("old");
+    f.land(&old).unwrap();
+    let new = f.release("new");
+    // Force the link rename to fail after the JSON commit, the same durable cut as a crash.
+    fs::remove_file(f.store.root.join("current")).unwrap();
+    fs::create_dir(f.store.root.join("current")).unwrap();
+    assert_eq!(f.land(&new).unwrap_err().kind, "io");
+    assert_eq!(f.store.head("current"), Some(new.cid.clone()));
+    assert_eq!(f.store.head("previous"), Some(old.cid));
+    fs::remove_dir(f.store.root.join("current")).unwrap();
+    assert_eq!(f.store.bootstrap(f.tmp.path(), None).unwrap().cid, new.cid);
+    assert_eq!(read_link(&f.store.root.join("current")), Some(new.cid));
+}
+
+#[test]
+fn f2_cache_prefers_nearest_ancestor_and_skips_failed_health() {
+    for fails in [false, true] {
+        let f = Fixture::new("epr");
+        let oldest = f.release("oldest");
+        f.state.lock().unwrap().head = "b".repeat(40);
+        let nearest = f.release("nearest");
+        let head = "c".repeat(40);
+        {
+            let mut state = f.state.lock().unwrap();
+            state.head = head.clone();
+            state
+                .distances
+                .insert(format!("{}..{head}", oldest.provenance.source_commit), 3);
+            state
+                .distances
+                .insert(format!("{}..{head}", nearest.provenance.source_commit), 1);
+        }
+        if fails {
+            f.state.lock().unwrap().health_bad = Some(nearest.cid.clone());
+        }
+        assert_eq!(
+            f.store.bootstrap(f.tmp.path(), None).unwrap().cid,
+            if fails { oldest.cid } else { nearest.cid }
+        );
+    }
+}
+
+#[test]
+fn f2_bootstrap_recovers_a_legacy_first_landing_without_metadata() {
+    let f = Fixture::new("epr");
+    let release = f.release("first");
+    // The old publisher could crash after its first symlink write, before any JSON existed.
+    atomic_link(&f.store.root.join("current"), Path::new(&release.cid)).unwrap();
+    assert!(f.store.head_repair_needed());
+    f.store.bootstrap(f.tmp.path(), None).unwrap();
+    assert!(!f.store.head_repair_needed());
+    let committed: Value = read_json(&f.store.root.join("current.json")).unwrap();
+    assert_eq!(committed["cid"], release.cid);
+    assert_eq!(committed["commit"], f.commit());
+    f.land(&release).unwrap();
 }

@@ -75,3 +75,45 @@ test('bootstrap unreadable declaration grants no trust and prints the cures', t 
   const calls = readFileSync(f.calls, 'utf8').trim().split('\n').map(JSON.parse);
   assert.ok(calls.every(c => !c.args.some(a => a.startsWith('safe.directory='))));
 });
+
+test('hookless launcher queues the existing bootstrap and returns EX_TEMPFAIL', async t => {
+  const launcher = process.env.BIN_LAUNCH_BIN;
+  assert.ok(launcher, 'set BIN_LAUNCH_BIN to the built fixture launcher');
+  const f = fixture(t);
+  writeFileSync(f.trust, `${f.root}\n`);
+  const scripts = join(f.root, 'genesis/agentic');
+  mkdirSync(scripts, { recursive: true });
+  symlinkSync(script, join(scripts, 'native-epr-bootstrap.mjs'));
+  const bin = join(f.base, 'bin');
+  symlinkSync(launcher, join(bin, 'epr'));
+  writeFileSync(join(bin, 'bin-tools.json'), JSON.stringify({version: 1, tools: {epr: {
+    bins: ['epr'], source: {kind: 'repository'}, candidateEnv: {epr: ['EPR_BIN']},
+  }}}));
+  const cargo = join(bin, 'cargo');
+  writeFileSync(cargo, `#!${process.execPath}\nconst fs = require('node:fs'); const path = require('node:path');
+fs.appendFileSync(${JSON.stringify(f.calls)}, 'build\\n');
+const dir = path.join(process.env.CARGO_TARGET_DIR, 'debug'); fs.mkdirSync(dir, {recursive:true});
+fs.writeFileSync(path.join(dir, 'epr'), '#!${process.execPath}\\n' + ${JSON.stringify("const fs = require('node:fs'); fs.appendFileSync(" + JSON.stringify(f.calls) + ", JSON.stringify(process.argv.slice(2)) + '\\n'); console.log(JSON.stringify({clean:true,cid:'fixture'}));")});
+fs.chmodSync(path.join(dir, 'epr'), 0o755);
+`);
+  chmodSync(cargo, 0o755);
+  const env = { ...process.env, PATH: `${bin}:${dirname(process.execPath)}:/usr/bin:/bin`,
+    EPR_REPO_ROOT: f.root, EPR_STORE: join(f.base, 'private-store'), EPR_BIN_TOOLS: join(bin, 'bin-tools.json'),
+    HOME: join(f.base, 'home'), XDG_CONFIG_HOME: join(f.base, 'xdg') };
+  delete env.EPR_BIN;
+  delete env.ELOHIM_DEVICE_KEY_FILE;
+  const result = spawnSync(join(bin, 'epr'), ['--version'], {env, cwd:f.root, encoding:'utf8', timeout:2000});
+  assert.equal(result.status, 75, result.stderr);
+  assert.match(result.stderr, /bootstrapping: retry shortly/);
+  const deadline = Date.now() + 10000;
+  let calls = '';
+  while (Date.now() < deadline) {
+    try { calls = readFileSync(f.calls, 'utf8'); } catch {}
+    if (calls.includes('install-launcher')) break;
+    await new Promise(resolve => setTimeout(resolve, 50));
+  }
+  assert.match(calls, /build/);
+  assert.match(calls, /migrate/);
+  assert.match(calls, /land/);
+  assert.match(calls, /install-launcher/);
+});

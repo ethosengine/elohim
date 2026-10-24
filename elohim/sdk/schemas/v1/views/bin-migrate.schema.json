@@ -1,0 +1,25 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "epr:schema:view:bin-migrate",
+  "title": "BinMigrate",
+  "description": "Device-local CLI output; reconstructed from private custody and runtime observations. No network authority.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "migrated",
+    "legacyRetained"
+  ],
+  "properties": {
+    "migrated": {
+      "type": "object",
+      "additionalProperties": {
+        "type": "string",
+        "pattern": "^baf[k-y]rei[a-z2-7]+$"
+      }
+    },
+    "legacyRetained": {
+      "const": true,
+      "type": "boolean"
+    }
+  }
+}

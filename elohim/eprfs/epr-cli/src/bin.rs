@@ -40,7 +40,7 @@ pub(crate) fn execute(args: &[String]) -> Result<String, Refusal> {
             break;
         }
         match arg.as_str() {
-            "--json"|"--revert"|"--current"|"--pin"|"--provisional"=>{ flags.insert(arg.as_str()); },
+            "--repair"|"--json"|"--revert"|"--current"|"--pin"|"--provisional"=>{ flags.insert(arg.as_str()); },
             "--tool"|"--registry"|"--store"|"--repo"|"--source-commit"|"--gate-run"|"--tree-clean"|"--commit"|"--invoked"|"--cid"|"--closure"|"--launcher"|"--destination"=>{ options.insert(arg.as_str(),iter.next().ok_or_else(|| argument(format!("{arg} needs a value")))?.as_str()); },
             "--help"|"-h"=>return Ok("epr bin <ingest|land|pin|resolve|status|gc|bootstrap|follow|shadows|source-state|launch|install-launcher|migrate> --tool <name> [--registry PATH] [--store PATH] [--json]".into()),
             _ if arg.starts_with('-')=>return Err(argument(format!("unknown flag {arg}"))),
@@ -132,6 +132,9 @@ pub(crate) fn execute(args: &[String]) -> Result<String, Refusal> {
             json!(result)
         }
         "status" => {
+            if flags.contains("--repair") {
+                store.repair_heads()?;
+            }
             let status = store.status(
                 &identity,
                 options.get("--commit").copied(),

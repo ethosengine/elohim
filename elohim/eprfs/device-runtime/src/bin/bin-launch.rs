@@ -12,6 +12,10 @@ fn main() {
     });
     if let Err(error) = result {
         eprintln!("{error}");
-        std::process::exit(127);
+        std::process::exit(if error.kind == "bootstrapping" {
+            75
+        } else {
+            127
+        });
     }
 }

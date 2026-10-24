@@ -628,7 +628,10 @@ fn method_cid() -> String {
     BlobCid::compute_raw(bytes.as_bytes()).to_string()
 }
 
-#[allow(clippy::too_many_arguments)]
+#[allow(
+    clippy::too_many_arguments,
+    reason = "The memory write boundary re-validates the target and forwards each note field to the one session-bound note append; the slots are that append's positional contract"
+)]
 fn record(
     reader: &Reader,
     expected: &FileRef,

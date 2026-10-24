@@ -20,11 +20,16 @@ impl Store {
         create_pin: bool,
         env: &dyn Fn(&str) -> Option<String>,
     ) -> Result<Status> {
+        if create_pin {
+            self.repair_heads()?;
+        }
         let head = self.head("current");
         if create_pin && head.is_some() && identity.session.is_some() {
             self.pin(identity, None, false, None)?;
         }
-        let resolved = self.resolve(None, Some(identity), env, false).ok();
+        let resolved = self
+            .resolve_mode(None, Some(identity), env, false, create_pin)
+            .ok();
         let pin = self.existing_pin(identity).map(|p| p.cid);
         let candidates = self
             .records()
@@ -46,12 +51,14 @@ impl Store {
             resolved_cid: resolved.as_ref().and_then(|r| r.cid.clone()),
             resolved: resolved.map(|r| r.path),
             candidates,
+            head_repair_needed: self.head_repair_needed(),
         })
     }
     /// Keep current, previous, every live owner, and fourteen days of ingest/use history.
     pub fn gc(&self, proc_root: &Path, at: Option<u64>) -> Result<Value> {
         let at = at.unwrap_or_else(files::now_seconds);
         let _lock = files::Lock::acquire(&self.root, files::MUTATION_WAIT)?;
+        self.require_migrated()?;
         let mut keep: BTreeSet<_> = [self.head("current"), self.head("previous")]
             .into_iter()
             .flatten()
@@ -113,10 +120,41 @@ impl Store {
     }
     /// Seed a store locally before attempting builds or downloads. A verified current needs no network.
     pub fn bootstrap(&self, repo: &Path, closure: Option<&Path>) -> Result<Release> {
-        if let Some(cid) = self.head("current").filter(|c| self.verified(c)) {
+        self.repair_heads()?;
+        if let Some(cid) = self
+            .head("current")
+            .filter(|c| self.root.join("current.json").is_file() && self.verified(c))
+        {
             return self
                 .record(&cid)
                 .ok_or_else(|| Refusal::new("unverified-current", "missing current record"));
+        }
+        if self.config.source["kind"] == "repository" {
+            let head = self.git(repo, &["rev-parse", "HEAD"])?;
+            let mut eligible = Vec::new();
+            for record in self.records().into_iter().filter(|r| self.verified(&r.cid)) {
+                for source in std::iter::once(&record.provenance).chain(&record.sources) {
+                    let commit = &source.source_commit;
+                    if source.tree_clean
+                        && self.require_published(repo, commit).is_ok()
+                        && self.descends(repo, commit, &head)?
+                    {
+                        let distance = self
+                            .git(repo, &["rev-list", "--count", &format!("{commit}..{head}")])
+                            .ok()
+                            .and_then(|s| s.parse::<u64>().ok())
+                            .unwrap_or(u64::MAX);
+                        eligible.push((distance, commit.clone(), record.cid.clone()));
+                    }
+                }
+            }
+            eligible.sort();
+            eligible.dedup();
+            for (_, commit, cid) in eligible {
+                if let Ok(record) = self.land_mode(&cid, &commit, repo, false, true) {
+                    return Ok(record);
+                }
+            }
         }
         let state = self.source_state(repo)?;
         if state["clean"] != true {

@@ -855,3 +855,56 @@ pub fn fold(options: &Options, from: &str, root: &str) -> PeerResult<eprfs_peer:
         Ok(folded?)
     })
 }
+
+#[cfg(test)]
+mod status_contract {
+    #[test]
+    fn peer_machine_status_contract_includes_daemon_identity() {
+        use super::*;
+        let cid = eprfs_core::BlobCid::compute_raw(b"daemon").to_string();
+        let value = serde_json::to_value(StatusOutcome {
+            cli_cid: Some(eprfs_core::BlobCid::compute_raw(b"cli").to_string()),
+            daemon_cids: vec![cid],
+            daemon_differs: true,
+            handle: "fixture".into(),
+            chain_root: "fixture".into(),
+            device: "device".into(),
+            node_id: None,
+            own_seq: None,
+            devices: vec![DeviceStatus {
+                device: "other".into(),
+                node_id: "node".into(),
+                seq: Some(1),
+                root: None,
+                age_s: None,
+                events_folded: 0,
+                acked: None,
+            }],
+            dropped: Default::default(),
+            channel: Default::default(),
+            refused_connections: vec![RefusedConnections {
+                node_id: "stranger".into(),
+                device: None,
+                count: 1,
+            }],
+            refused_strangers: 1,
+        })
+        .expect("serialize status");
+        let schema: serde_json::Value = serde_json::from_str(include_str!(
+            "../../../sdk/schemas/v1/views/peer-cli-status.schema.json"
+        ))
+        .expect("status schema");
+        let validator = jsonschema::validator_for(&schema).expect("valid schema");
+        validator
+            .validate(&value)
+            .expect("serialized status matches schema");
+        for field in ["cliCid", "daemonCids", "daemonDiffers"] {
+            let mut bad = value.clone();
+            bad.as_object_mut().expect("object").remove(field);
+            assert!(!validator.is_valid(&bad), "missing {field}");
+        }
+        let mut bad = value;
+        bad["daemonCids"] = serde_json::json!(["sha256:legacy"]);
+        assert!(!validator.is_valid(&bad));
+    }
+}

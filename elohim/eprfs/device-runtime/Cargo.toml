@@ -16,4 +16,5 @@ libc = "0.2"
 eprfs-core = { path = "../eprfs-core" }
 
 [dev-dependencies]
+jsonschema = { version = "0.28", default-features = false }
 tempfile = "3"

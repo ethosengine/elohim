@@ -8,8 +8,8 @@ import re
 import subprocess
 
 SIGNATURES = {
-    'session resolvers': [r'_CODE_SESSION_ID', r'pub fn resolve_with\(', r'def resolve_fallback\(', r'function resolveFallback\('],
-    'proc session ancestry': [r'def proc_ancestry\(', r'while pid > 0'],
+    'session resolvers': [r'_CODE_SESSION_ID', r'CLAUDE_SESSION_ID', r'pub fn resolve_with\(', r'def resolve_fallback\(', r'function resolveFallback\('],
+    'proc session ancestry': [r'def proc_ancestry\(', r'while pid > 0', r'def claude_pid\('],
     'epr/brit lookup paths': [r'def (?:find_epr|_find_epr|find_brit|_find_brit|resolve_epr|resolve_bin|resolve_binary)\(', r'function resolveBinary\(', r'which\(["\x27](?:epr|brit)["\x27]'],
     # Arrival decisions only. Doctor retains governance/projection ABI diagnostics, not device arrival.
     'arrival surfaces': [r'roster bound', r'fold attested', r'berth moored', r'tool.upper\(\)} EVALUATOR'],
@@ -23,8 +23,22 @@ FAMILY_GLOBS = {
     'session resolvers': ['.claude/hooks/*.py', '.claude/scripts/_lib/*.py', 'elohim/eprfs/epr-cli/src/flow/mod.rs', 'elohim/eprfs/epr-cli/src/flow/note.rs', 'elohim/eprfs/device-runtime/src/session.rs', 'genesis/a2o/scripts/lib/*.ts', 'genesis/a2o/src/framework/session.ts', 'genesis/agentic/bin/*'],
     'proc session ancestry': ['.claude/hooks/*.py', '.claude/scripts/_lib/*.py', 'genesis/agentic/bin/*'],
 }
-GLOBS = ['*.py', '*.rs', '*.ts', '*.sh', '*.json', 'genesis/agentic/bin/*']
+# Script module extensions must survive the narrower family selection too.
+for family, patterns in FAMILY_GLOBS.items():
+    patterns.extend(g.rsplit('.', 1)[0] + '.mjs' for g in list(patterns)
+                    if g.endswith(('.py', '.ts')))
+
+GLOBS = ['*.py', '*.rs', '*.ts', '*.mjs', '*.sh', '*.json', 'genesis/agentic/bin/*']
 EXCLUDES = ['*/__tests__/*', '*/tests/*', '*_test.py', '*_test.rs', '*.test.ts', '*.test.mjs', '*/fixtures/*', '*.spec.ts', '*.schema.json', '*node_modules*', '*.worktrees*', '*target/*', '*vendor/*', '*.epr-meta/*', '*.eprfs/*', '*/steps/*', '*.codex/*', '*.agents/*', '*generated/*', '*agent-runtimes.json', '*dup-census', '*local-dev/*']
+
+
+def matching_families(path, body):
+    """Apply the same path and implementation predicates used by the live census."""
+    if not any(fnmatch.fnmatch(path, g) for g in GLOBS) or any(fnmatch.fnmatch(path, g) for g in EXCLUDES):
+        return []
+    return [family for family, patterns in SIGNATURES.items()
+            if any(fnmatch.fnmatch(path, g) for g in FAMILY_GLOBS.get(family, GLOBS))
+            and any(re.search(pattern, body) for pattern in patterns)]
 
 
 def main():
@@ -43,11 +57,8 @@ def main():
             body = subprocess.check_output(['git', 'show', f'{args.ref}:{path}'], cwd=root, stderr=subprocess.DEVNULL).decode(errors='replace') if args.ref else (root / path).read_text(errors='replace')
         except (OSError, subprocess.CalledProcessError):
             continue
-        for family, patterns in SIGNATURES.items():
-            if not any(fnmatch.fnmatch(path, g) for g in FAMILY_GLOBS.get(family, GLOBS)):
-                continue
-            if any(re.search(pattern, body) for pattern in patterns):
-                hits[family].append(path)
+        for family in matching_families(path, body):
+            hits[family].append(path)
     result = {family: {'count': len(paths), 'paths': paths} for family, paths in hits.items()}
     if args.json:
         print(json.dumps(result, indent=2))

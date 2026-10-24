@@ -3100,3 +3100,75 @@ decisionPoints:
   contractTests:
   - {path: elohim/eprfs/device-runtime/src/bin_store/tests.rs, testName: land_refuses_unpublished_initial_forward_and_revert, kind: unit}
   - {path: elohim/eprfs/device-runtime/src/bin_store/tests.rs, testName: land_accepts_either_local_or_remote_published_ref, kind: unit}
+
+- name: bin_store::require_migrated
+  kind: pure-decision-predicate
+  sourceLocation: {file: src/bin_store/migrate.rs, modulePath: elohim_device_runtime::bin_store::Store::require_migrated}
+  summary: A durable pending marker fences GC, ingest, landing and pin publication until explicit migration finishes. Mapping checkpoints and retained legacy bytes make retry idempotent.
+  concernIds: &f2_custody_concerns
+  - {id: C0, status: answered, justification: Existing private B custody; derived C status and symlinks. No DHT or network heads.}
+  - {id: C1, status: answered, justification: Possession alone cannot land; publication and health remain required.}
+  - {id: C2, status: answered, justification: Descent and original provenance survive retries and cache adoption.}
+  - {id: C3, status: answered, justification: A pending migration retains live legacy pins; bounded subprocess execution releases locks.}
+  - {id: C4, status: answered, justification: Named refusals distinguish missing head and missing provenance from an unfinished migration.}
+  - {id: C5, status: answered, justification: Cached bytes are verified; closure provenance is supplied with bytes and checked locally.}
+  - {id: C6a, status: partial, justification: Deadlines cover process exit and pipe draining; store cardinality and output byte budgets remain uncapped.}
+  - {id: C6b, status: answered, justification: One JSON rename publishes heads; migration checkpoints and link repair are repeatable.}
+  - {id: C7, status: n-a, justification: No peer advertisement or remote serving changes.}
+  - {id: C8, status: answered, justification: Schema-covered outputs expose cache selection and needed repairs; refusals name remedies.}
+  - {id: C9, status: answered, justification: Existing raw binary CIDs and session PID/start-time identities are preserved.}
+  - {id: C10, status: answered, justification: Explicit migration and governed output contracts preserve legacy evidence.}
+  - {id: C11, status: answered, justification: Store mutation lock and the existing detached bootstrap flock bound concurrent mutation.}
+  - {id: C12, status: answered, justification: Local operations stay within operator-authorized stores and declared source refs.}
+  - {id: C13, status: answered, justification: Observational status never acquires mutation rights; repair is explicit.}
+  - {id: C14, status: partial, justification: Local tests prove recovery cuts; no cross-device custody or fleet-delivery claim.}
+  contractTests:
+  - {path: elohim/eprfs/device-runtime/src/bin_store/tests.rs, testName: migration_is_idempotent_and_preserves_provenance_and_pins, kind: unit}
+  - {path: elohim/eprfs/device-runtime/src/bin_store/tests.rs, testName: f2_interrupted_migration_fences_gc_pins_and_land, kind: unit}
+- name: bin_store::repair_heads
+  kind: state-transition
+  sourceLocation: {file: src/bin_store/landing.rs, modulePath: elohim_device_runtime::bin_store::Store::repair_heads}
+  summary: current.json atomically names current and previous; symlinks are derived. Read-only status reports headRepairNeeded; status --repair and bootstrap repair links under lock.
+  concernIds: *f2_custody_concerns
+  contractTests:
+  - {path: elohim/eprfs/device-runtime/src/bin_store/tests.rs, testName: f2_atomic_head_record_repairs_torn_links, kind: unit}
+  - {path: elohim/eprfs/device-runtime/src/bin_store/tests.rs, testName: f2_landing_link_failure_is_repaired_by_bootstrap, kind: unit}
+  - {path: elohim/eprfs/device-runtime/src/bin_store/tests.rs, testName: f2_bootstrap_recovers_a_legacy_first_landing_without_metadata, kind: unit}
+- name: bin_store::bootstrap_cached_ancestor
+  kind: state-transition
+  sourceLocation: {file: src/bin_store/lifecycle.rs, modulePath: elohim_device_runtime::bin_store::Store::bootstrap}
+  summary: Before Cargo, try verified clean published cached ancestors nearest HEAD by commit distance. Land with original provenance and source cache; failed health cannot land.
+  concernIds: *f2_custody_concerns
+  contractTests:
+  - {path: elohim/eprfs/device-runtime/src/bin_store/tests.rs, testName: f2_cache_bootstrap_preserves_older_provenance_without_cargo, kind: unit}
+  - {path: elohim/eprfs/device-runtime/src/bin_store/tests.rs, testName: f2_cache_prefers_nearest_ancestor_and_skips_failed_health, kind: unit}
+- name: bin_store::closure_provenance
+  kind: pure-decision-predicate
+  sourceLocation: {file: src/bin_store/ingest.rs, modulePath: elohim_device_runtime::bin_store::Store::ingest}
+  summary: Closures require release.json sourceCommit, treeClean and gateRun. Missing local commit history refuses with a fetch cure; caller overrides never relabel imported bytes.
+  concernIds: *f2_custody_concerns
+  contractTests:
+  - {path: elohim/eprfs/device-runtime/src/bin_store/tests.rs, testName: f2_closure_requires_and_preserves_its_own_provenance, kind: unit}
+- name: bin_store::observational_resolution
+  kind: pure-decision-predicate
+  sourceLocation: {file: src/bin_store/launch.rs, modulePath: elohim_device_runtime::bin_store::Store::resolve_mode}
+  summary: Observations resolve existing pins or current without locking or publishing; explicit mutable status can repair and pin.
+  concernIds: *f2_custody_concerns
+  contractTests:
+  - {path: elohim/eprfs/device-runtime/src/bin_store/tests.rs, testName: f2_observational_status_never_locks_or_publishes, kind: unit}
+- name: bin_store::process_deadline
+  kind: boundary-answer-type
+  sourceLocation: {file: src/bin_store/source.rs, modulePath: elohim_device_runtime::bin_store::SystemRunner::run}
+  summary: The command deadline includes stdout/stderr EOF. Timeout kills the dedicated process group and returns without blocking on reader joins.
+  concernIds: *f2_custody_concerns
+  contractTests:
+  - {path: elohim/eprfs/device-runtime/src/bin_store/tests.rs, testName: f2_deadline_includes_descendant_pipe_drain, kind: unit}
+  - {path: elohim/eprfs/device-runtime/src/bin_store/tests.rs, testName: f2_ingest_deadline_releases_mutation_lock_after_fork, kind: unit}
+- name: bin_store::launcher_recovery
+  kind: state-transition
+  sourceLocation: {file: src/bin_store/launch.rs, modulePath: elohim_device_runtime::bin_store::launch_os}
+  summary: Reject the actual running launcher's canonical path despite redirected stores. For a missing repository head, queue the existing arrival bootstrap entry and refuse with retryable exit 75.
+  concernIds: *f2_custody_concerns
+  contractTests:
+  - {path: elohim/eprfs/device-runtime/tests/launcher.rs, testName: redirected_store_refuses_running_launcher_candidate, kind: integration}
+  - {path: genesis/agentic/native-epr-bootstrap.test.mjs, testName: hookless launcher queues the existing bootstrap and returns EX_TEMPFAIL, kind: integration}

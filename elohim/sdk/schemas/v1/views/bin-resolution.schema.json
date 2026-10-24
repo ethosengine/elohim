@@ -1,0 +1,36 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "epr:schema:view:bin-resolution",
+  "title": "BinResolution",
+  "description": "Device-local CLI output; reconstructed from private custody and runtime observations. No network authority.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "path",
+    "source",
+    "cid"
+  ],
+  "properties": {
+    "path": {
+      "type": "string"
+    },
+    "source": {
+      "type": "string",
+      "enum": [
+        "candidate",
+        "explicit-pin",
+        "session-pin",
+        "current",
+        "current-lock-timeout"
+      ],
+      "description": "Source of truth: device-runtime executable resolution and daemon admission; local operational vocabulary."
+    },
+    "cid": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "pattern": "^baf[k-y]rei[a-z2-7]+$"
+    }
+  }
+}

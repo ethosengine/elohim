@@ -9,7 +9,9 @@ impl Store {
         commit: &str,
         repo: &Path,
         revert: bool,
+        cached: bool,
     ) -> Result<(Release, Option<String>, Value)> {
+        self.require_migrated()?;
         let record = self
             .record(cid)
             .filter(|_| self.verified(cid))
@@ -31,15 +33,25 @@ impl Store {
                 format!("{cid} was ingested from a dirty tree"),
             ));
         }
-        let state = self.source_state(repo)?;
-        if state["head"] != commit {
-            return Err(Refusal::new(
-                "head-mismatch",
-                format!("checkout HEAD {} does not match {commit}", state["head"]),
-            ));
-        }
-        if state["clean"] != true {
-            return Err(Refusal::new("checkout-dirty", repo.display().to_string()));
+        if cached {
+            let head = self.git(repo, &["rev-parse", "HEAD"])?;
+            if !self.descends(repo, commit, &head)? {
+                return Err(Refusal::new(
+                    "non-descendant",
+                    "cached commit is not an ancestor of checkout HEAD",
+                ));
+            }
+        } else {
+            let state = self.source_state(repo)?;
+            if state["head"] != commit {
+                return Err(Refusal::new(
+                    "head-mismatch",
+                    format!("checkout HEAD {} does not match {commit}", state["head"]),
+                ));
+            }
+            if state["clean"] != true {
+                return Err(Refusal::new("checkout-dirty", repo.display().to_string()));
+            }
         }
         // Gitlink publication is a property of the containing repository commit.
         // Its pinned tool commit was checked against source_state above.
@@ -49,7 +61,14 @@ impl Store {
             commit.to_owned()
         };
         self.require_published(repo, &published_commit)?;
-        let old = self.head("current");
+        // A legacy link without metadata is an interrupted first publication, not a
+        // committed head. Admission below still requires explicit verified provenance.
+        let old = self
+            .root
+            .join("current.json")
+            .is_file()
+            .then(|| self.head("current"))
+            .flatten();
         let metadata: Value =
             files::read_json(&self.root.join("current.json")).unwrap_or(Value::Null);
         if let Some(old) = &old {
@@ -74,17 +93,27 @@ impl Store {
     /// Promote a verified, clean, descended and healthy candidate. Health runs outside the lock;
     /// both source state and current metadata are revalidated before committing the move.
     pub fn land(&self, cid: &str, commit: &str, repo: &Path, revert: bool) -> Result<Release> {
+        self.land_mode(cid, commit, repo, revert, false)
+    }
+    pub(super) fn land_mode(
+        &self,
+        cid: &str,
+        commit: &str,
+        repo: &Path,
+        revert: bool,
+        cached: bool,
+    ) -> Result<Release> {
         let outcome = (|| {
             let (mut record, expected, expected_meta) = {
                 let _lock = files::Lock::acquire(&self.root, files::MUTATION_WAIT)?;
-                let state = self.validate_land(cid, commit, repo, revert)?;
+                let state = self.validate_land(cid, commit, repo, revert, cached)?;
                 files::touch(&self.artifact(cid)?.join(".used"))?;
                 state
             };
             self.require_attestation(&mut record, commit, repo, false)?;
             self.health(cid, commit, repo)?;
             let _lock = files::Lock::acquire(&self.root, files::MUTATION_WAIT)?;
-            let (mut latest, old, meta) = self.validate_land(cid, commit, repo, revert)?;
+            let (mut latest, old, meta) = self.validate_land(cid, commit, repo, revert, cached)?;
             if old != expected || meta != expected_meta {
                 return Err(Refusal::new(
                     "current-moved",
@@ -96,15 +125,21 @@ impl Store {
             let at = files::now();
             latest.extra.insert("landedAt".into(), json!(at));
             self.save(&latest)?;
-            if let Some(previous) = old.as_ref().filter(|old| old.as_str() != cid) {
-                files::atomic_link(&self.root.join("previous"), Path::new(previous))?;
+            if cached {
+                latest.extra.insert("source".into(), json!("cache"));
+                self.save(&latest)?;
             }
-            // The lock serializes readers which publish pins; an interrupted metadata pair refuses land.
-            files::atomic_link(&self.root.join("current"), Path::new(cid))?;
+            let previous = if old.as_deref() == Some(cid) {
+                meta["previous"].clone()
+            } else {
+                json!(old)
+            };
+            // One rename commits both heads. Symlinks are disposable projections.
             files::atomic_json(
                 &self.root.join("current.json"),
-                &json!({"cid":cid,"commit":commit,"landedAt":at,"previous":old}),
+                &json!({"cid":cid,"commit":commit,"landedAt":at,"previous":previous}),
             )?;
+            self.repair_heads_locked()?;
             Ok(latest)
         })();
         if let Err(error) = &outcome {
@@ -112,8 +147,43 @@ impl Store {
         }
         outcome
     }
+    pub(super) fn head_repair_needed(&self) -> bool {
+        if !self.root.join("current.json").exists() {
+            return self.root.join("current").symlink_metadata().is_ok();
+        }
+        ["current", "previous"]
+            .iter()
+            .any(|name| files::read_link(&self.root.join(name)) != self.head(name))
+    }
+    /// Repair disposable head links from the atomically committed record.
+    pub fn repair_heads(&self) -> Result<()> {
+        let _lock = files::Lock::acquire(&self.root, files::MUTATION_WAIT)?;
+        self.require_migrated()?;
+        self.repair_heads_locked()
+    }
+    pub(super) fn repair_heads_locked(&self) -> Result<()> {
+        if !self.root.join("current.json").exists() {
+            return Ok(());
+        }
+        let record: Value = files::read_json(&self.root.join("current.json")).ok_or_else(|| {
+            Refusal::new("current-metadata-invalid", "current.json is unreadable")
+        })?;
+        files::require_cid(record["cid"].as_str().unwrap_or(""))?;
+        for name in ["current", "previous"] {
+            let link = self.root.join(name);
+            if let Some(cid) = self.head(name) {
+                if files::read_link(&link).as_deref() != Some(&cid) {
+                    files::atomic_link(&link, Path::new(&cid))?;
+                }
+            } else if link.symlink_metadata().is_ok() {
+                std::fs::remove_file(&link)?;
+                files::sync_parent(&link)?;
+            }
+        }
+        Ok(())
+    }
     pub(super) fn record_refusal(&self, cid: &str, error: &Refusal) {
-        if error.kind == "lock-timeout" {
+        if error.kind == "lock-timeout" || error.kind == "migration-incomplete" {
             return;
         }
         let Ok(_lock) = files::Lock::acquire(&self.root, files::MUTATION_WAIT) else {

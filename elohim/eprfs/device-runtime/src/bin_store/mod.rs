@@ -280,6 +280,8 @@ pub struct Status {
     pub resolved: Option<PathBuf>,
     /// Whether current's files verify against its CID.
     pub verified_current: bool,
+    /// Derived head links differ from the authoritative record; explicit repair is available.
+    pub head_repair_needed: bool,
     /// Ingested candidates matching the optional commit filter.
     pub candidates: Vec<Release>,
 }
@@ -345,6 +347,15 @@ impl Store {
         files::read_json(&self.artifact(cid).ok()?.join("record.json"))
     }
     pub(crate) fn head(&self, name: &str) -> Option<String> {
+        let path = self.root.join("current.json");
+        if path.exists() {
+            let record: Value = files::read_json(&path)?;
+            let key = if name == "current" { "cid" } else { "previous" };
+            return record[key]
+                .as_str()
+                .filter(|s| files::require_cid(s).is_ok())
+                .map(str::to_owned);
+        }
         files::read_link(&self.root.join(name))
     }
     pub(crate) fn records(&self) -> Vec<Release> {

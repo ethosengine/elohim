@@ -11,6 +11,58 @@ impl Store {
     /// Copy to private staging, verify those exact bytes, then atomically publish a candidate.
     /// Ingest never moves current, even if the candidate passed a gate.
     pub fn ingest(&self, source: &Path, options: &IngestOptions) -> Result<Release> {
+        // Closure provenance travels with the bytes; caller overrides never relabel it.
+        let closure_options;
+        let options = if options.closure {
+            let value: Value = files::read_json(&source.join("release.json")).ok_or_else(||
+                Refusal::new("closure-provenance-missing", "include release.json beside sums.cbor or SHA256SUMS with sourceCommit, treeClean and gateRun"))?;
+            let commit = value["sourceCommit"]
+                .as_str()
+                .filter(|s| matches!(s.len(), 40 | 64) && s.bytes().all(|b| b.is_ascii_hexdigit()))
+                .ok_or_else(|| {
+                    Refusal::new(
+                        "closure-provenance-invalid",
+                        "release.json requires a full sourceCommit",
+                    )
+                })?;
+            let clean = value["treeClean"].as_bool().ok_or_else(|| {
+                Refusal::new(
+                    "closure-provenance-invalid",
+                    "release.json requires treeClean",
+                )
+            })?;
+            let gate = value["gateRun"]
+                .as_str()
+                .filter(|s| !s.trim().is_empty())
+                .ok_or_else(|| {
+                    Refusal::new(
+                        "closure-provenance-invalid",
+                        "release.json requires gateRun",
+                    )
+                })?;
+            let repo = self.repo_root(options.repo.as_deref())?;
+            let source_repo = if self.tool == "brit" {
+                self.brit_git_dir(&repo)?
+            } else {
+                repo.clone()
+            };
+            if !self.git_ok(
+                &source_repo,
+                &["cat-file", "-e", &format!("{commit}^{{commit}}")],
+            ) {
+                return Err(Refusal::new("closure-provenance-unverified", "sourceCommit is absent locally; fetch its history before epr bin ingest --closure"));
+            }
+            closure_options = IngestOptions {
+                repo: Some(repo),
+                source_commit: Some(commit.into()),
+                tree_clean: Some(clean),
+                gate_run: Some(gate.into()),
+                closure: true,
+            };
+            &closure_options
+        } else {
+            options
+        };
         let state = if options.source_commit.is_none() || options.tree_clean.is_none() {
             Some(self.source_state(&self.repo_root(options.repo.as_deref())?)?)
         } else {
@@ -25,6 +77,7 @@ impl Store {
             .tree_clean
             .unwrap_or_else(|| state.as_ref().is_some_and(|s| s["clean"] == true));
         let _lock = files::Lock::acquire(&self.root, files::MUTATION_WAIT)?;
+        self.require_migrated()?;
         let stage = files::temporary(&self.root.join("staging"));
         fs::create_dir(&stage)?;
         let result = (|| {
@@ -168,9 +221,13 @@ impl Store {
         let binary = directory.join(&self.config.bins[0]);
         let mut spec = CommandSpec::new(binary.to_string_lossy(), ["--version"]);
         spec.timeout = std::time::Duration::from_secs(15);
-        let out = self
-            .run(&spec)
-            .map_err(|e| Refusal::new("identity-failed", e.detail))?;
+        let out = self.run(&spec).map_err(|e| {
+            if e.kind == "command-timeout" {
+                e
+            } else {
+                Refusal::new("identity-failed", e.detail)
+            }
+        })?;
         if !out.success {
             return Err(Refusal::new("identity-failed", "--version failed"));
         }

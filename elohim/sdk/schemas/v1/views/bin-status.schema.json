@@ -16,7 +16,8 @@
     "resolvedCid",
     "resolved",
     "verifiedCurrent",
-    "candidates"
+    "candidates",
+    "headRepairNeeded"
   ],
   "properties": {
     "tool": {
@@ -26,13 +27,22 @@
       "type": "string"
     },
     "session": {
-      "type": ["string", "null"]
+      "type": [
+        "string",
+        "null"
+      ]
     },
     "sessionCid": {
-      "type": ["string", "null"]
+      "type": [
+        "string",
+        "null"
+      ]
     },
     "head": {
-      "type": ["string", "null"]
+      "type": [
+        "string",
+        "null"
+      ]
     },
     "behind": {
       "type": "boolean"
@@ -41,10 +51,16 @@
       "type": "string"
     },
     "resolvedCid": {
-      "type": ["string", "null"]
+      "type": [
+        "string",
+        "null"
+      ]
     },
     "resolved": {
-      "type": ["string", "null"]
+      "type": [
+        "string",
+        "null"
+      ]
     },
     "verifiedCurrent": {
       "type": "boolean"
@@ -54,88 +70,15 @@
       "items": {
         "$ref": "#/definitions/Release"
       }
+    },
+    "headRepairNeeded": {
+      "type": "boolean",
+      "description": "Derived head links need explicit repair."
     }
   },
   "definitions": {
     "Release": {
-      "type": "object",
-      "properties": {
-        "cid": {
-          "type": "string",
-          "pattern": "^baf[k-y]rei[a-z2-7]+$"
-        },
-        "rcid": {
-          "type": "string"
-        },
-        "tool": {
-          "type": "string"
-        },
-        "bins": {
-          "type": "object",
-          "additionalProperties": {
-            "type": "string",
-            "pattern": "^bafkrei[a-z2-7]+$"
-          }
-        },
-        "version": {
-          "type": ["string", "null"]
-        },
-        "sourceCommit": {
-          "type": "string"
-        },
-        "treeClean": {
-          "type": "boolean"
-        },
-        "gateRun": {
-          "type": ["string", "null"]
-        },
-        "ingestedAt": {
-          "type": "string"
-        },
-        "sources": {
-          "type": "array",
-          "items": {
-            "type": "object",
-            "properties": {
-              "sourceCommit": {
-                "type": "string"
-              },
-              "treeClean": {
-                "type": "boolean"
-              },
-              "gateRun": {
-                "type": ["string", "null"]
-              },
-              "ingestedAt": {
-                "type": "string"
-              }
-            },
-            "required": ["sourceCommit", "treeClean", "gateRun", "ingestedAt"]
-          }
-        },
-        "ring": {
-          "type": "string"
-        },
-        "attestations": {
-          "type": "object",
-          "additionalProperties": true
-        }
-      },
-      "required": [
-        "cid",
-        "rcid",
-        "tool",
-        "bins",
-        "version",
-        "sourceCommit",
-        "treeClean",
-        "gateRun",
-        "ingestedAt",
-        "sources",
-        "ring",
-        "attestations"
-      ],
-      "additionalProperties": true
+      "$ref": "epr:schema:view:bin-release"
     }
   }
 }

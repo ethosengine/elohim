@@ -55,6 +55,7 @@ impl Store {
         provisional: bool,
         repo: Option<&Path>,
     ) -> Result<Pin> {
+        self.require_migrated()?;
         if provisional {
             let cid =
                 cid.ok_or_else(|| Refusal::new("provisional-pin", "--provisional requires --cid"))?;
@@ -96,10 +97,12 @@ impl Store {
         timeout: Duration,
     ) -> Result<Pin> {
         let key=identity.session.as_deref().filter(|_| identity.source!=Source::None).ok_or_else(|| Refusal::new("session-absent","no declared session, registered runtime ancestor, or controlling tty is present"))?;
+        self.require_migrated()?;
         if let Some(pin) = self.existing_pin(identity) {
             return Ok(pin);
         }
         let _lock = files::Lock::acquire(&self.root, timeout)?;
+        self.require_migrated()?;
         if let Some(pin) = self.existing_pin(identity) {
             return Ok(pin);
         }
@@ -149,22 +152,23 @@ impl Store {
         }
         Ok(bin)
     }
-    fn is_launcher(&self, path: &Path) -> bool {
+    fn is_launcher(&self, path: &Path, exec: bool) -> bool {
         let canonical = path.canonicalize().ok();
+        let own = std::env::current_exe()
+            .ok()
+            .and_then(|p| p.canonicalize().ok());
+        if exec && canonical.is_some() && canonical == own {
+            return true;
+        }
         canonical.is_some()
-            && (canonical
+            && canonical
                 == self
                     .root
                     .parent()
                     .map(|p| p.join("bin/bin-launch"))
                     .and_then(|p| p.canonicalize().ok())
-                || canonical
-                    == self
-                        .root
-                        .parent()
-                        .map(|p| p.join("bin").join(&self.tool))
-                        .and_then(|p| p.canonicalize().ok()))
     }
+
     /// Resolve candidate, explicit pin, session pin, then current. When exec is true, no
     /// file hashing or executable identity subprocess runs. Daemons supply no session.
     pub fn resolve(
@@ -173,6 +177,16 @@ impl Store {
         identity: Option<&SessionIdentity>,
         env: &dyn Fn(&str) -> Option<String>,
         exec: bool,
+    ) -> Result<Resolution> {
+        self.resolve_mode(bin, identity, env, exec, true)
+    }
+    pub(super) fn resolve_mode(
+        &self,
+        bin: Option<&str>,
+        identity: Option<&SessionIdentity>,
+        env: &dyn Fn(&str) -> Option<String>,
+        exec: bool,
+        publish: bool,
     ) -> Result<Resolution> {
         let bin = self.bin_name(bin)?;
         if let Some(candidate) = self
@@ -188,7 +202,7 @@ impl Store {
             if !files::executable(&path) {
                 return Err(Refusal::new("binary-unusable", path.display().to_string()));
             }
-            if self.is_launcher(&path) {
+            if self.is_launcher(&path, exec) {
                 return Err(Refusal::new("launcher-alias", path.display().to_string()));
             }
             let path = path.canonicalize()?;
@@ -221,31 +235,38 @@ impl Store {
         }
         if let Some(identity) = identity.filter(|i| i.source != Source::None && i.session.is_some())
         {
-            let pin = match self.pin_with_timeout(
-                identity,
-                None,
-                false,
-                if exec {
-                    files::EXEC_WAIT
-                } else {
-                    files::MUTATION_WAIT
-                },
-            ) {
-                Ok(pin) => pin,
-                Err(e) if exec && e.kind == "lock-timeout" => {
-                    if let Some(pin) = self.existing_pin(identity) {
-                        eprintln!(
+            let pin = if !publish {
+                match self.existing_pin(identity) {
+                    Some(pin) => pin,
+                    None => return self.resolve_current(Some(bin)),
+                }
+            } else {
+                match self.pin_with_timeout(
+                    identity,
+                    None,
+                    false,
+                    if exec {
+                        files::EXEC_WAIT
+                    } else {
+                        files::MUTATION_WAIT
+                    },
+                ) {
+                    Ok(pin) => pin,
+                    Err(e) if exec && e.kind == "lock-timeout" => {
+                        if let Some(pin) = self.existing_pin(identity) {
+                            eprintln!(
                             "WARNING: store lock timed out after 5s; using existing session pin"
                         );
-                        pin
-                    } else {
-                        let mut current = self.resolve_current(Some(bin))?;
-                        current.source = "current-lock-timeout".into();
-                        eprintln!("WARNING: store lock timed out after 5s; using current without publishing a session pin");
-                        return Ok(current);
+                            pin
+                        } else {
+                            let mut current = self.resolve_current(Some(bin))?;
+                            current.source = "current-lock-timeout".into();
+                            eprintln!("WARNING: store lock timed out after 5s; using current without publishing a session pin");
+                            return Ok(current);
+                        }
                     }
+                    Err(e) => return Err(e),
                 }
-                Err(e) => return Err(e),
             };
             if !self.usable(&pin.cid, bin) {
                 return Err(Refusal::new(
@@ -285,6 +306,7 @@ impl Store {
             source: None,
         };
         let _lock = files::Lock::acquire(&self.root, files::EXEC_WAIT)?;
+        self.require_migrated()?;
         files::atomic_json(&self.pin_path(&pin.session)?, &pin)?;
         Ok(Some(pin))
     }
@@ -303,6 +325,7 @@ impl Store {
             .zip(executable.canonicalize().ok())
             .is_some_and(|(candidate, actual)| candidate == actual);
         let _lock = files::Lock::acquire(&self.root, files::EXEC_WAIT)?;
+        self.require_migrated()?;
         let source = if explicit {
             "candidate"
         } else {
@@ -398,22 +421,34 @@ pub fn launch_os(registry: &Registry, invoked: &Path, args: &[std::ffi::OsString
             start.elapsed().as_micros()
         );
     }
-    let resolved = if daemon {
-        // A daemon follows the device head, including when its caller exported an explicit pin.
-        let resolved = store.resolve_current(Some(&bin))?;
-        let cid = resolved
-            .cid
-            .as_deref()
-            .ok_or_else(|| Refusal::new("head-absent", "daemon needs a release"))?;
-        if !store.verified(cid) {
-            return Err(Refusal::new(
-                "identity-mismatch",
-                "daemon release failed the exec floor",
-            ));
+    let resolution = (|| {
+        Ok(if daemon {
+            // A daemon follows the device head, including when its caller exported an explicit pin.
+            let resolved = store.resolve_current(Some(&bin))?;
+            let cid = resolved
+                .cid
+                .as_deref()
+                .ok_or_else(|| Refusal::new("head-absent", "daemon needs a release"))?;
+            if !store.verified(cid) {
+                return Err(Refusal::new(
+                    "identity-mismatch",
+                    "daemon release failed the exec floor",
+                ));
+            }
+            resolved
+        } else {
+            store.resolve(Some(&bin), identity.as_ref(), &files::env, true)?
+        })
+    })();
+    let resolved = match resolution {
+        Ok(resolved) => resolved,
+        Err(error)
+            if error.kind == "head-absent" && store.config.source["kind"] == "repository" =>
+        {
+            queue_bootstrap()?;
+            return Err(Refusal::new("bootstrapping", "retry shortly"));
         }
-        resolved
-    } else {
-        store.resolve(Some(&bin), identity.as_ref(), &files::env, true)?
+        Err(error) => return Err(error),
     };
     if let Some(cid) = &resolved.cid {
         store.touch_used(cid)?;
@@ -441,4 +476,42 @@ pub fn launch_os(registry: &Registry, invoked: &Path, args: &[std::ffi::OsString
         }
     }
     Err(Refusal::new("exec-failed", command.exec().to_string()))
+}
+
+// Reuse the arrival hook's detached, flock-guarded entry; no second build workflow.
+fn queue_bootstrap() -> Result<()> {
+    let start = files::env("EPR_REPO_ROOT")
+        .map(PathBuf::from)
+        .unwrap_or(std::env::current_dir()?);
+    let (root, script) = start
+        .ancestors()
+        .find_map(|root| {
+            let script = root.join("genesis/agentic/native-epr-bootstrap.mjs");
+            script.is_file().then_some((root, script))
+        })
+        .ok_or_else(|| {
+            Refusal::new(
+                "head-absent",
+                "repository bootstrap entry unavailable; set EPR_REPO_ROOT and retry",
+            )
+        })?;
+    let mut child = Command::new("node")
+        .arg(script)
+        .arg(root)
+        .current_dir(root)
+        .stdin(std::process::Stdio::null())
+        .stdout(std::process::Stdio::null())
+        .stderr(std::process::Stdio::null())
+        .process_group(0)
+        .spawn()
+        .map_err(|e| {
+            Refusal::new(
+                "head-absent",
+                format!("bootstrap unavailable: {e}; run epr bin bootstrap"),
+            )
+        })?;
+    std::thread::spawn(move || {
+        let _ = child.wait();
+    });
+    Ok(())
 }

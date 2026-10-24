@@ -145,3 +145,19 @@ fn two_processes_publish_one_pin_using_bin_store_override() {
         1
     );
 }
+
+#[test]
+fn redirected_store_refuses_running_launcher_candidate() {
+    let (tmp, store, bin, _) = setup("epr", Path::new("/bin/echo"));
+    let output = Command::new("timeout")
+        .arg("2")
+        .arg(bin.join("epr"))
+        .env_clear()
+        .env("EPR_STORE", store.root())
+        .env("EPR_BIN", bin.join("epr"))
+        .current_dir(tmp.path())
+        .output()
+        .unwrap();
+    assert_eq!(output.status.code(), Some(127));
+    assert!(String::from_utf8_lossy(&output.stderr).contains("launcher-alias"));
+}

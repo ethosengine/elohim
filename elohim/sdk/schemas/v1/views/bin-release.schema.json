@@ -1,0 +1,102 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "epr:schema:view:bin-release",
+  "title": "BinRelease",
+  "description": "Device-local CLI output; reconstructed from private custody and runtime observations. No network authority.",
+  "type": "object",
+  "properties": {
+    "cid": {
+      "type": "string",
+      "pattern": "^baf[k-y]rei[a-z2-7]+$"
+    },
+    "rcid": {
+      "type": "string"
+    },
+    "tool": {
+      "type": "string"
+    },
+    "bins": {
+      "type": "object",
+      "additionalProperties": {
+        "type": "string",
+        "pattern": "^bafkrei[a-z2-7]+$"
+      }
+    },
+    "version": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "sourceCommit": {
+      "type": "string"
+    },
+    "treeClean": {
+      "type": "boolean"
+    },
+    "gateRun": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "ingestedAt": {
+      "type": "string"
+    },
+    "sources": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "sourceCommit": {
+            "type": "string"
+          },
+          "treeClean": {
+            "type": "boolean"
+          },
+          "gateRun": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "ingestedAt": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "sourceCommit",
+          "treeClean",
+          "gateRun",
+          "ingestedAt"
+        ]
+      }
+    },
+    "ring": {
+      "type": "string"
+    },
+    "attestations": {
+      "type": "object",
+      "additionalProperties": true
+    },
+    "source": {
+      "type": "string",
+      "description": "Adoption route, cache for a verified cached ancestor."
+    }
+  },
+  "required": [
+    "cid",
+    "rcid",
+    "tool",
+    "bins",
+    "version",
+    "sourceCommit",
+    "treeClean",
+    "gateRun",
+    "ingestedAt",
+    "sources",
+    "ring",
+    "attestations"
+  ],
+  "additionalProperties": true
+}

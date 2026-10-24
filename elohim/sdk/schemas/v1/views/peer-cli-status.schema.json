@@ -1,0 +1,231 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "epr:schema:view:peer-cli-status",
+  "title": "PeerCliStatus",
+  "description": "Device-local CLI output; reconstructed from private custody and runtime observations. No network authority.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "cliCid",
+    "daemonCids",
+    "daemonDiffers",
+    "handle",
+    "chainRoot",
+    "device",
+    "nodeId",
+    "ownSeq",
+    "devices",
+    "dropped",
+    "channel",
+    "refusedConnections",
+    "refusedStrangers"
+  ],
+  "properties": {
+    "cliCid": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "pattern": "^baf[k-y]rei[a-z2-7]+$"
+    },
+    "daemonCids": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "pattern": "^baf[k-y]rei[a-z2-7]+$"
+      }
+    },
+    "daemonDiffers": {
+      "type": "boolean"
+    },
+    "handle": {
+      "type": "string"
+    },
+    "chainRoot": {
+      "type": "string"
+    },
+    "device": {
+      "type": "string"
+    },
+    "nodeId": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "ownSeq": {
+      "type": [
+        "integer",
+        "null"
+      ],
+      "minimum": 0
+    },
+    "devices": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "device",
+          "nodeId",
+          "seq",
+          "root",
+          "ageS",
+          "eventsFolded",
+          "acked"
+        ],
+        "properties": {
+          "device": {
+            "type": "string"
+          },
+          "nodeId": {
+            "type": "string"
+          },
+          "seq": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "minimum": 0
+          },
+          "root": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "ageS": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "minimum": 0
+          },
+          "eventsFolded": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "acked": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "minimum": 0
+          }
+        }
+      }
+    },
+    "dropped": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "unadmitted",
+        "forged",
+        "rollback",
+        "replayed",
+        "malformed"
+      ],
+      "properties": {
+        "unadmitted": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "forged": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "rollback": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "replayed": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "malformed": {
+          "type": "integer",
+          "minimum": 0
+        }
+      }
+    },
+    "channel": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "projection_failures",
+        "fold_failures",
+        "oversized_events",
+        "over_budget_folds",
+        "refused_strangers",
+        "last_projection_error",
+        "refused_connections"
+      ],
+      "properties": {
+        "projection_failures": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "fold_failures": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "oversized_events": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "over_budget_folds": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "refused_strangers": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "last_projection_error": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "refused_connections": {
+          "type": "object",
+          "additionalProperties": {
+            "type": "integer",
+            "minimum": 0
+          }
+        }
+      }
+    },
+    "refusedConnections": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "nodeId",
+          "device",
+          "count"
+        ],
+        "properties": {
+          "nodeId": {
+            "type": "string"
+          },
+          "device": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "count": {
+            "type": "integer",
+            "minimum": 0
+          }
+        }
+      }
+    },
+    "refusedStrangers": {
+      "type": "integer",
+      "minimum": 0
+    }
+  }
+}

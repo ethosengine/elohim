@@ -91,9 +91,13 @@ impl Runner for SystemRunner {
         let out = read(out.map(|p| Box::new(p) as Box<dyn std::io::Read + Send>));
         let err = read(err.map(|p| Box::new(p) as Box<dyn std::io::Read + Send>));
         let start = Instant::now();
-        let status = loop {
-            if let Some(status) = child.try_wait()? {
-                break Some(status);
+        let mut status = None;
+        loop {
+            if status.is_none() {
+                status = child.try_wait()?;
+            }
+            if status.is_some() && out.is_finished() && err.is_finished() {
+                break;
             }
             if start.elapsed() >= spec.timeout {
                 // SAFETY: the child was placed in its own group at spawn; the negative pid targets only that group.
@@ -101,10 +105,17 @@ impl Runner for SystemRunner {
                     libc::kill(-(child.id() as i32), libc::SIGKILL);
                 }
                 let _ = child.wait();
-                break None;
+                return Err(Refusal::new(
+                    "command-timeout",
+                    format!(
+                        "{} exceeded {}ms including pipe drain",
+                        spec.program,
+                        spec.timeout.as_millis()
+                    ),
+                ));
             }
             std::thread::sleep(Duration::from_millis(5));
-        };
+        }
         let stdout = String::from_utf8_lossy(&out.join().unwrap_or_default()).into_owned();
         let stderr = String::from_utf8_lossy(&err.join().unwrap_or_default()).into_owned();
         let status = status.ok_or_else(|| {
