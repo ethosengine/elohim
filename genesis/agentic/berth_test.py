@@ -15,6 +15,7 @@ import tempfile
 import time
 import unittest
 from pathlib import Path
+from unittest import mock
 
 REPO = Path(__file__).resolve().parents[2]
 
@@ -829,6 +830,13 @@ class StewardClaimTest(unittest.TestCase):
         self.clock = [SINCE_MS / 1000 + 590]
         self.slept = []
         self.obs = FakeObservation()
+        # An enrolled device by default: its key is where `just status device` looks for it.
+        self.key = root / "device" / "ed25519.seed"
+        self.key.parent.mkdir()
+        self.key.write_bytes(b"\0" * 32)
+        patcher = mock.patch.dict(os.environ, {"ELOHIM_DEVICE_KEY_FILE": str(self.key)})
+        patcher.start()
+        self.addCleanup(patcher.stop)
         self.berth = self.make()
         for session in ("codex-1", "other"):
             self.berth.moor(session)
@@ -1083,9 +1091,11 @@ class StewardClaimTest(unittest.TestCase):
         self.assertIsNone(lease)
         self.assertEqual(reason, f"unconfirmed: {DEVICE_A} last seen 3m ago")
         self.assertNotIn("free", reason)
-        # It waited, polling at most every 250 ms, and asked about its own claim only.
+        # It waited, polling once a second (each poll is an `epr` that parses the whole flow
+        # store), and asked about its own claim only.
         self.assertEqual(len(self.calls()), 3)
-        self.assertTrue(self.slept and all(s <= 0.25 for s in self.slept))
+        self.assertEqual(_NS["POLL_S"], 1.0)
+        self.assertTrue(self.slept and all(s == 1.0 for s in self.slept), self.slept)
         self.assertIn("--json", self.calls()[0])
         # The pending lease does not linger as held.
         self.assertIsNone(self.berth.who("dev-integration"))
@@ -1220,13 +1230,95 @@ class StewardClaimTest(unittest.TestCase):
         self.assertEqual(self.calls(), [])
 
     def test_missing_epr_refuses_a_steward_claim_naming_the_cure(self):
+        # An enrolled device (its key is present) needs `epr` to read the view.
         self.berth.epr = "/nonexistent/epr"
         ok, lease, reason, _ = self.claim()
         self.assertFalse(ok)
         self.assertIsNone(lease)
         self.assertIn("EPR_BIN", reason)
+        self.assertIn("just gate eprfs", reason, "the cure `just status device` names")
         self.assertIsNone(self.berth.who("dev-integration"))
         self.assertEqual(self.rows("claim"), [], "no lease is written that could not be confirmed")
+        self.assertFalse(self.berth.owner_check("dev-integration", "codex-1", "deploy")[0])
+
+    def test_without_epr_a_workspace_with_no_device_key_is_not_a_device(self):
+        # No key where `just status device` looks: not a device, so no `epr` is needed to know it.
+        self.key.unlink()
+        self.berth.epr = "/nonexistent/epr"
+        self.views("EXIT 1 a workspace with no device key is never asked")
+        ok, lease, reason, err = self.claim()
+        self.assertTrue(ok, reason)
+        self.assertEqual(self.berth.who("dev-integration")["holder"], "codex-1")
+        self.assertEqual(err.splitlines(), [
+            "berth: dev-integration is steward-scoped but this workspace is not one of its steward's devices "
+            "(run: just status device); claiming locally only"])
+        self.assertEqual(self.calls(), [])
+        err = io.StringIO()
+        with contextlib.redirect_stderr(err):
+            self.assertTrue(self.berth.owner_check("alpha-fleet", "other", "deploy")[0])
+        self.assertEqual(len(err.getvalue().splitlines()), 1)
+        section = "\n".join(_NS["_other_devices_lines"](self.berth))
+        self.assertIn("other devices: none — this workspace is not one of its steward's devices", section)
+        self.assertIn(str(self.key), section)
+
+    def test_berth_resolves_epr_the_way_status_device_does(self):
+        preflight = _NS["_device_preflight"]()
+        found = Path(self.directory.name) / "path-bin"
+        found.mkdir()
+        (found / "epr").write_text("#!/bin/sh\n")
+        (found / "epr").chmod(0o755)
+        b = self.make()
+        b.epr = None
+        cases = [{"EPR_BIN": str(self.epr), "PATH": str(found)},
+                 {"PATH": str(found)},
+                 {"PATH": "/nonexistent", "CARGO_TARGET_POOL_ROOT": "/nonexistent"}]
+        for env in cases:
+            with mock.patch.dict(os.environ, env):
+                if "EPR_BIN" not in env:
+                    os.environ.pop("EPR_BIN", None)
+                self.assertEqual(b.epr_bin(), preflight.resolve_epr(dict(os.environ)), env)
+                self.assertEqual(Path(b.device_key_path()), preflight.device_key_path(dict(os.environ)))
+        with mock.patch.dict(os.environ, {"PATH": str(found)}):
+            os.environ.pop("EPR_BIN", None)
+            self.assertEqual(b.epr_bin(), str(found / "epr"))
+
+    def test_unconfirmed_with_this_devices_daemon_down_names_epr_peer_serve(self):
+        self.views(view(), view(dev_integration=unconfirmed_a(), serving=False))
+        ok, _, reason, _ = self.claim()
+        self.assertFalse(ok)
+        self.assertEqual(reason.splitlines(), [
+            f"unconfirmed: {DEVICE_A} last seen 3m ago",
+            "(this device's peer daemon is not running: start it with epr peer serve)"])
+        # With the daemon running, the other device's silence is the only reason.
+        self.views(view(), view(dev_integration=unconfirmed_a(), serving=True))
+        self.assertEqual(self.claim()[2], f"unconfirmed: {DEVICE_A} last seen 3m ago")
+        # A view that cannot say (an older epr) adds nothing.
+        self.views(view(), view(dev_integration=unconfirmed_a()))
+        self.assertEqual(self.claim()[2], f"unconfirmed: {DEVICE_A} last seen 3m ago")
+        # --offline-ok still overrides: the line is for a refusal only.
+        self.views(view(), view(dev_integration=unconfirmed_a(), serving=False))
+        ok, _, reason, _ = self.claim(offline_ok=True)
+        self.assertTrue(ok, reason)
+
+    def test_a_failed_epr_call_reports_its_first_line_and_names_a_binary_older_than_the_peer_verbs(self):
+        stale = Path(self.directory.name) / "stale-epr"
+        stale.write_text("#!/bin/sh\n"
+                         "echo 'epr: invalid arguments: unknown command `peer`' >&2\n"
+                         "echo 'usage: epr [--repo PATH] [--json] <setup|doctor|...>' >&2\n"
+                         "exit 2\n")
+        stale.chmod(0o755)
+        self.berth.epr = str(stale)
+        ok, _, reason, _ = self.claim()
+        self.assertFalse(ok)
+        self.assertEqual(reason, "the steward lease view could not be computed: epr: invalid arguments: unknown "
+                                 "command `peer` — rebuild epr (this binary predates the peer verbs)")
+        failing = Path(self.directory.name) / "failing-epr"
+        failing.write_text("#!/bin/sh\necho 'epr peer: the roster does not read' >&2\n"
+                           "echo '  caused by: line 3' >&2\nexit 2\n")
+        failing.chmod(0o755)
+        self.berth.epr = str(failing)
+        self.assertEqual(self.claim()[2],
+                         "the steward lease view could not be computed: epr peer: the roster does not read")
 
     def test_an_enrolled_device_whose_view_fails_is_refused(self):
         self.views("EXIT 2 epr peer: the channel store `/x/.eprfs/status/flows.jsonl` that epr peer serve recorded is gone")
@@ -1297,6 +1389,21 @@ class StewardClaimTest(unittest.TestCase):
         env.update({"BERTH_DIR": self.berth.dir, "EPR_BIN": str(self.epr), "CLAUDE_PROJECT_DIR": str(project)})
         return subprocess.run([sys.executable, str(REPO / "genesis/agentic/bin/berth"), *args], env=env,
                               capture_output=True, text=True, timeout=60)
+
+    def test_cli_names_this_devices_stopped_daemon_on_a_second_line(self):
+        # berth's own main, over this test's berth (its stub epr, emitter and clock). `_NS` is a
+        # copy: main reads the globals it was defined in. The store is a scratch one regardless.
+        self.views(view(), view(dev_integration=unconfirmed_a(last_seen=None), serving=False))
+        err = io.StringIO()
+        main = _NS["main"]
+        with mock.patch.dict(main.__globals__, {"Berth": lambda: self.berth}), \
+                mock.patch.dict(os.environ, {"BERTH_DIR": self.berth.dir}), \
+                contextlib.redirect_stderr(err), contextlib.redirect_stdout(io.StringIO()):
+            code = main(["berth", "claim", "dev-integration", "--session", "codex-1"])
+        self.assertEqual(code, 3, err.getvalue())
+        self.assertEqual(err.getvalue().splitlines(), [
+            f"dev-integration: REFUSED — unconfirmed: {DEVICE_A} never seen",
+            "(this device's peer daemon is not running: start it with epr peer serve)"])
 
     def test_cli_refusal_is_exit_3_with_one_reason_line(self):
         project = Path(self.directory.name) / "project"

@@ -405,10 +405,12 @@ export async function household(): Promise<Fixture> {
   );
   writeFileSync(join(seed, 'README.md'), '# devices-share-one-berth fixture\n');
   writeFileSync(join(seed, '.gitignore'), '.claude/\n.eprfs/status/flows.jsonl\n');
-  copyFileSync(
-    join(repository, 'genesis/agentic/bin/berth'),
-    join(seed, 'genesis/agentic/bin/berth')
-  );
+  // berth, and the `just status device` module it finds `epr` and the device key through.
+  for (const name of ['berth', 'device-preflight'])
+    copyFileSync(
+      join(repository, 'genesis/agentic/bin', name),
+      join(seed, 'genesis/agentic/bin', name)
+    );
   // The checks the real hook runs after its claims, as this fixture repository has them: it holds
   // no Rust, so its style reach gate has nothing to measure, and a push that changes only the
   // roster selects no gate (the real `.ci-ignore` reader over the fixture's own `.ci-ignore`).

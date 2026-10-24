@@ -105,7 +105,7 @@ DEFAULT_RESOURCES = {"mesh": 1, "cargo": 1, "disk-heavy": 1}
 DEFAULT_CLASS = "verify"
 DEFAULT_CONFIRM_WAIT_S = 10
 DEFAULT_FRESHNESS_S = 90
-POLL_S = 0.25  # how often a steward claim re-reads the lease view
+POLL_S = 1.0  # how often a steward claim re-reads the lease view (each read parses the whole flow store)
 PEER_TIMEOUT_S = 10
 OVERRUN_MEASURE = "dev-berth-held-by-measure@1"
 EVENTS_MEASURE = "dev-berth-events@1"
@@ -121,6 +121,31 @@ HOME_CHECKOUT = REPO_ROOT
 # Set by berth_test for its own process and every berth it spawns: under the test runner the real
 # emitter never folds into this berth's own checkout (a suite run once grew it by 13,000 test records).
 UNDER_TEST_ENV = "BERTH_UNDER_TEST"
+
+
+# The line a refusal adds when the claim is unconfirmed while this device's own daemon is down: the
+# other device was never told, so the cure is here, not there.
+DAEMON_DOWN_LINE = "(this device's peer daemon is not running: start it with epr peer serve)"
+# A failed `epr` call whose first line says this: a binary built before `epr peer` existed.
+STALE_EPR_HINT = "rebuild epr (this binary predates the peer verbs)"
+
+_PREFLIGHT = None
+
+
+def _device_preflight():
+    """`just status device`'s own module (genesis/agentic/bin/device-preflight, beside this file):
+    berth finds `epr` and the device key exactly as it does."""
+    global _PREFLIGHT
+    if _PREFLIGHT is None:
+        import importlib.machinery
+        import importlib.util
+        path = os.path.join(os.path.dirname(os.path.realpath(__file__)), "device-preflight")
+        loader = importlib.machinery.SourceFileLoader("berth_device_preflight", path)
+        module = importlib.util.module_from_spec(importlib.util.spec_from_loader(loader.name, loader))
+        sys.modules[loader.name] = module  # its dataclasses look their module up while it loads
+        loader.exec_module(module)
+        _PREFLIGHT = module
+    return _PREFLIGHT
 
 
 class BerthUsage(ValueError):
@@ -990,8 +1015,6 @@ class Berth:
         if self.policy_error:
             return False, [], f"pool-policy {self.policy_error}"
         if self.steward_scoped(resource):
-            if not self.epr_bin():
-                return False, [], self._no_epr()
             view, err = self.peer_leases()
             if err:
                 return False, [], err
@@ -1066,20 +1089,23 @@ class Berth:
             resource.startswith(p) and len(resource) > len(p) for p in self.steward_prefixes)
 
     def epr_bin(self):
-        """The `epr` a steward claim asks, found the way the fold emitter finds it ($EPR_BIN, the gate
-        target, PATH), or None when there is no executable one."""
+        """The `epr` a steward claim asks, found the way `just status device` finds it ($EPR_BIN,
+        PATH, the cargo target pool), or None when there is no executable one."""
         path = self.epr
         if path is None:
-            obs = self.observation()
-            resolve = getattr(obs, "resolve_bin", None) if obs else None
-            path = resolve() if resolve else (os.environ.get("EPR_BIN") or shutil.which("epr"))
+            path = _device_preflight().resolve_epr(dict(os.environ))
         return path if path and os.path.isfile(path) and os.access(path, os.X_OK) else None
 
+    @staticmethod
+    def device_key_path():
+        """Where this workspace's device key is, as `just status device` reads it."""
+        return str(_device_preflight().device_key_path(dict(os.environ)))
+
     def _no_epr(self):
-        where = self.epr or "$EPR_BIN, the gate target or PATH"
-        return (f"no `epr` binary to read the steward lease view (looked at {where}) — build it "
-                f"(`cargo build --manifest-path elohim/eprfs/Cargo.toml -p elohim-epr-cli`) or set EPR_BIN; "
-                f"a steward-scoped claim is never taken unconfirmed")
+        where = self.epr or "EPR_BIN, PATH or the cargo target pool"
+        return (f"no `epr` binary to read the steward lease view (looked at {where}) — build it: "
+                f"`just gate eprfs` (or export EPR_BIN=<path>); this workspace is a device (it has a "
+                f"device key), and a steward-scoped claim is never taken unconfirmed")
 
     @staticmethod
     def _not_a_device_line(resource, doing="claiming"):
@@ -1105,6 +1131,12 @@ class Berth:
     def _read_peer_leases(self, timeout):
         epr = self.epr_bin()
         if not epr:
+            # Without `epr`, the one fact berth can read is the device key: a workspace with none is
+            # not a device (container scope); one with a key needs `epr` to say how it stands.
+            key = self.device_key_path()
+            if not os.path.isfile(key):
+                return {"now": round(self.now() * 1000), "standing": "not_a_device", "device": None,
+                        "store": None, "why": f"this workspace has no device key ({key})"}, None
             return None, self._no_epr()
         try:
             r = subprocess.run([epr, "peer", "leases", "--json", "--root", REPO_ROOT, "--policy", self.policy_path],
@@ -1112,7 +1144,10 @@ class Berth:
         except (OSError, subprocess.TimeoutExpired) as e:
             return None, f"the steward lease view did not answer: {e}"
         if r.returncode != 0:
-            why = (r.stderr.strip().splitlines() or [f"exit {r.returncode}"])[-1]
+            # The first line names what went wrong; later lines are usage or context.
+            why = (r.stderr.strip().splitlines() or [f"exit {r.returncode}"])[0].strip()
+            if "unknown command" in why or why.startswith("usage:"):
+                why = f"{why} — {STALE_EPR_HINT}"
             return None, f"the steward lease view could not be computed: {why}"
         try:
             view = json.loads(r.stdout)
@@ -1139,11 +1174,10 @@ class Berth:
         mine = self._mine(resource, session)
         if mine and mine.get("effective"):
             return True, None, "effective", None
-        if not self.epr_bin():
-            self.record("refuse", resource=resource, session=session, reason="no-epr", **{"class": klass})
-            return True, None, False, self._no_epr()
         view, err = self.peer_leases()
         if err:
+            if not self.epr_bin():
+                self.record("refuse", resource=resource, session=session, reason="no-epr", **{"class": klass})
             return True, None, False, err
         standing = view.get("standing")
         if standing == "not_a_device":
@@ -1223,6 +1257,9 @@ class Berth:
             reason = f"unconfirmed: {waiting} did not acknowledge within {self.confirm_wait_s}s"
         if held or not renewal:
             self.release(resource, session, reason=f"steward: {reason}")
+        if kind in ("unconfirmed", "pending") and (view or {}).get("serving") is False:
+            # Unacknowledged because this device never announced it: the cure is here.
+            reason = f"{reason}\n{DAEMON_DOWN_LINE}"
         return False, None, reason
 
     # ------------------------------------------------------------ notes
@@ -1302,8 +1339,6 @@ def _other_devices_lines(b):
         return []
     if b.policy_error:
         return [f"  other devices: unknown — pool-policy {b.policy_error}"]
-    if not b.epr_bin():
-        return [f"  other devices: unknown — {b._no_epr()}"]
     view, err = b.peer_leases()
     if err:
         return [f"  other devices: unknown — {err}"]
