@@ -376,7 +376,10 @@ seams:
       COMPILE-TIME instance of native extension; the discriminator is direction + bind-time.
     tracks: [T3, T4]
     reach_tier: public
-    registry_crates: [did-bridge, k8s-bridge, jenkins-bridge]
+    # `gitoxide-core` (elohim/brit) is brit's external-Git switch and pull recovery: private Git
+    # bridge state that elects no head and carries no Elohim authority. Routed 2026-10-24 when the
+    # brit pin moved to 76ba95d8a0, whose registry arrived unrouted.
+    registry_crates: [did-bridge, k8s-bridge, jenkins-bridge, gitoxide-core]
     habits: []
     n_a_concerns: []
 
