@@ -1,0 +1,44 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "epr:schema:view:session-identity",
+  "title": "SessionIdentity",
+  "description": "Source of truth: environment and local process table (Ephemeral, Category C). Reconstructed per call; not persisted. Null means no detectable session or live owner at observation time.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "runtime",
+    "session",
+    "ownerPid",
+    "ownerStartTime",
+    "source"
+  ],
+  "properties": {
+    "runtime": {
+      "type": "string"
+    },
+    "session": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "ownerPid": {
+      "type": [
+        "integer",
+        "null"
+      ],
+      "minimum": 1
+    },
+    "ownerStartTime": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "pattern": "^[0-9]+$",
+      "description": "Linux proc start time in clock ticks since boot. u64 encoded as decimal text to preserve precision; null means no detectable live owner."
+    },
+    "source": {
+      "$ref": "../enums/session-source.schema.json"
+    }
+  }
+}

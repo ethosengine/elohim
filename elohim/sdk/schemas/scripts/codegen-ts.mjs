@@ -75,6 +75,11 @@ const ENUM_OUTPUT_PATHS = GENERATED_OUTPUT_DIRS.map((d) => join(d, 'schema-enums
 
 // Interface files to distribute alongside schema-enums.ts
 const INTERFACE_FILES = [
+  {
+    src: 'views/session-identity.ts',
+    dest: 'session-identity.ts',
+    dirs: [resolve(REPO_ROOT, 'elohim/sdk/storage-client-ts/src/generated')],
+  },
   // Publish placement shapes inside the framework-free SDK through the same freshness check.
   {
     src: 'enums/answer-reason.ts',

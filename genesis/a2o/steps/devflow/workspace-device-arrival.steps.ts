@@ -66,7 +66,7 @@ function deviceEnv(f: Fixture, key: string, extra: Record<string, string> = {}):
     // Leave EPR_BIN absent when the fixture is using PATH: the PATH entry may be the stable
     // launcher, while EPR_BIN is reserved for the real candidate supplied by the gate.
     ...(binary === 'epr' ? {} : { EPR_BIN: binary }),
-    CLAUDE_CODE_SESSION_ID: f.session,
+    ELOHIM_SESSION_ID: f.session,
     ...extra,
   };
 }

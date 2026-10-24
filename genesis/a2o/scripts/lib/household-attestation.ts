@@ -15,13 +15,15 @@
  * is keyed by the tree it verified, not by a timestamp.
  *
  * This file is imported both by build-sprint-report.ts (tsx) and by serving-receipt.mjs (node's
- * type stripping), so it imports node builtins only — no relative module specifiers.
+ * type stripping), and its session adapter both use only node builtins at runtime.
  */
 
 import { execFileSync, spawnSync } from 'node:child_process';
 import { createHash, createPrivateKey, createPublicKey, verify as cryptoVerify } from 'node:crypto';
 import { existsSync, readFileSync, statSync } from 'node:fs';
 import { basename, delimiter, dirname, join } from 'node:path';
+
+import { resolve as resolveSession } from '../../src/framework/session.ts';
 
 export const ATTESTATION_STEP = 'a2o-household';
 export const ATTESTATION_REF_PREFIX = `refs/notes/brit/validate/${ATTESTATION_STEP}/`;
@@ -254,7 +256,7 @@ type Env = Readonly<Record<string, string | undefined>>;
 export function resolveMooring(env: Env): Mooring | null {
   // Empty strings count as unset, the way berth resolves them.
   // eslint-disable-next-line @typescript-eslint/prefer-nullish-coalescing
-  const session = env.BERTH_SESSION || env.CLAUDE_SESSION_ID || env.CLAUDE_CODE_SESSION_ID;
+  const session = env.BERTH_SESSION?.trim() || resolveSession({ env }).session;
   if (!session) return null;
   // eslint-disable-next-line @typescript-eslint/prefer-nullish-coalescing
   const dir = env.BERTH_DIR || join(env.CLAUDE_CONFIG_DIR || '/projects/.claude-config', 'berth');

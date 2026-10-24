@@ -382,32 +382,31 @@ class CapabilityTierGateCase(unittest.TestCase):
         self.assertEqual(r.stdout.strip(), "")
         self.assertEqual(r.stderr.strip(), "")
 
-    # ── session key: CLAUDE_CODE_SESSION_ID is the REAL var for this harness ────────────────
-    def test_claude_code_session_id_resolves_a_sidecar_claim(self):
+    # ── session key: the native resolver owns inference ──────────────────────────────────
+    def test_declared_session_resolves_a_sidecar_claim(self):
         session = "cc-sess-1"
         _write_project(
             self.proj,
             FIXTURE_POLICY,
             actor_lines=[_actor_claim_line("agent:implementer@claude-fable-5-1", session)],
         )
-        r = run_hook("git reset --hard abc", self.proj, {"CLAUDE_CODE_SESSION_ID": session})
+        r = run_hook("git reset --hard abc", self.proj, {"ELOHIM_SESSION_ID": session})
         self.assertEqual(r.returncode, 0, r.stderr)
-        self.assertEqual(r.stdout.strip(), "", "CLAUDE_CODE_SESSION_ID must resolve the claim")
+        self.assertEqual(r.stdout.strip(), "", "the declared session must resolve the claim")
 
-    def test_claude_session_id_still_works_as_a_fallback(self):
+    def test_declared_session_resolves_without_a_runtime_ancestor(self):
         session = "legacy-sess-1"
         _write_project(
             self.proj,
             FIXTURE_POLICY,
             actor_lines=[_actor_claim_line("agent:implementer@claude-fable-5-1", session)],
         )
-        r = run_hook("git reset --hard abc", self.proj, {"CLAUDE_SESSION_ID": session})
+        r = run_hook("git reset --hard abc", self.proj, {"ELOHIM_SESSION_ID": session})
         self.assertEqual(r.returncode, 0, r.stderr)
         self.assertEqual(r.stdout.strip(), "")
 
-    def test_claude_code_session_id_takes_priority_over_claude_session_id(self):
-        # A claim under CLAUDE_CODE_SESSION_ID must be found even when CLAUDE_SESSION_ID is ALSO
-        # set to something with no (or a lower) claim.
+    def test_declared_session_takes_priority_over_runtime_environment(self):
+        # A declared claim wins even when a runtime variable names a different claim.
         real_session = "cc-priority-sess"
         _write_project(
             self.proj,
@@ -416,7 +415,7 @@ class CapabilityTierGateCase(unittest.TestCase):
         )
         r = run_hook(
             "git reset --hard abc", self.proj,
-            {"CLAUDE_CODE_SESSION_ID": real_session, "CLAUDE_SESSION_ID": "no-such-session"},
+            {"ELOHIM_SESSION_ID": real_session, "CLAUDE_SESSION_ID": "no-such-session"},
         )
         self.assertEqual(r.returncode, 0, r.stderr)
         self.assertEqual(r.stdout.strip(), "")
@@ -462,7 +461,7 @@ class CapabilityTierGateCase(unittest.TestCase):
             self.proj, FIXTURE_POLICY,
             actor_lines=[_actor_claim_line("human:matthew", session)],
         )
-        r = run_hook("git reset --hard abc", self.proj, {"CLAUDE_CODE_SESSION_ID": session})
+        r = run_hook("git reset --hard abc", self.proj, {"ELOHIM_SESSION_ID": session})
         self.assertEqual(r.returncode, 0, r.stderr)
         self.assertEqual(r.stdout.strip(), "", "a human claim must clear the floor")
 
@@ -472,7 +471,7 @@ class CapabilityTierGateCase(unittest.TestCase):
         _write_project(
             self.proj, unranked, actor_lines=[_actor_claim_line("human:matthew", session)],
         )
-        r = run_hook("git reset --hard abc", self.proj, {"CLAUDE_CODE_SESSION_ID": session})
+        r = run_hook("git reset --hard abc", self.proj, {"ELOHIM_SESSION_ID": session})
         self.assertEqual(r.returncode, 0, r.stderr)
         reason = _deny_reason(r)
         self.assertIn("Resolved tier: human", reason)
@@ -499,7 +498,7 @@ class CapabilityTierGateCase(unittest.TestCase):
             actor_lines=[_actor_claim_line("human:matthew", session)],
         )
         r = run_hook("git reset --hard abc", self.proj,
-                     {"CLAUDE_CODE_SESSION_ID": session, "CLAUDE_MODEL": "claude-haiku-4-5"})
+                     {"ELOHIM_SESSION_ID": session, "CLAUDE_MODEL": "claude-haiku-4-5"})
         self.assertEqual(r.returncode, 0, r.stderr)
         reason = _deny_reason(r)
         self.assertIn("Resolved tier: claude-haiku-4-5", reason)
@@ -526,7 +525,7 @@ class CapabilityTierGateCase(unittest.TestCase):
             self.proj, FIXTURE_POLICY,
             actor_lines=[_actor_claim_line("agent:sweeper@claude-haiku-4-5", session)],
         )
-        r = run_hook("git reset --hard abc", self.proj, {"CLAUDE_CODE_SESSION_ID": session})
+        r = run_hook("git reset --hard abc", self.proj, {"ELOHIM_SESSION_ID": session})
         self.assertIn("Resolved tier: claude-haiku-4-5", _deny_reason(r))
 
     # ── contentHash pin verification (round 1, still asserted) ──────────────────────────────

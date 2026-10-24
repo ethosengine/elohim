@@ -41,6 +41,9 @@ RECORDING = re.compile(r"\bcovenant\s+(record|put)\b")
 SKIP_AGENT_TYPES = {"blind-reader"}
 
 
+sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "scripts"))
+from _lib.session import resolve as resolve_session_identity
+
 def stamp(show: dict) -> str | None:
     """The stamp text for an `epr covenant show` body, or None when nothing is held."""
     variances = [v for v in show.get("variances") or [] if isinstance(v, dict)]
@@ -94,7 +97,7 @@ def main() -> int:
         return 0
     if payload.get("agent_type") in SKIP_AGENT_TYPES:
         return 0
-    session = str(payload.get("session_id") or "") or os.environ.get("CLAUDE_CODE_SESSION_ID")
+    session = str(payload.get("session_id") or "") or resolve_session_identity()["session"]
     project = Path(os.environ.get("CLAUDE_PROJECT_DIR") or payload.get("cwd") or os.getcwd())
     scripts = project / ".claude" / "scripts"
     if str(scripts) not in sys.path:

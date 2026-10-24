@@ -24,7 +24,6 @@ DEFAULT_BASE = Path("/projects/.claude-config/tools/bin-store")
 DEFAULT_STORE = DEFAULT_BASE / "epr"
 DEFAULT_REGISTRY = Path(__file__).resolve().parents[3] / "genesis/agentic/bin-tools.json"
 _ACTIVE_REGISTRY: dict[str, Any] | None = None
-SESSION_ENV = ("ELOHIM_SESSION_ID", "CLAUDE_CODE_SESSION_ID", "CLAUDE_SESSION_ID")
 CID_RE = re.compile(r"sha256:[0-9a-f]{64}\Z")
 GRACE = dt.timedelta(days=14)
 EXEC_LOCK_TIMEOUT_SECONDS = 5.0
@@ -756,7 +755,7 @@ def land(
 
 
 def _default_proc_root(proc_root: Path | None) -> Path:
-    """The process table to walk; ``EPR_PROC_ROOT`` lets tests run under a real Claude ancestor."""
+    """The process table to walk; ``EPR_PROC_ROOT`` lets tests supply an isolated process table."""
     return proc_root if proc_root is not None else Path(os.environ.get("EPR_PROC_ROOT", "/proc"))
 
 
@@ -774,33 +773,19 @@ def session_identity(
     *, proc_root: Path | None = None, start_pid: int | None = None,
     environ: Mapping[str, str] | None = None,
 ) -> dict[str, Any] | None:
-    """Find the nearest ``claude`` ancestor and bind its pid to proc starttime."""
-    proc_root = _default_proc_root(proc_root)
-    pid = os.getppid() if start_pid is None else start_pid
-    seen: set[int] = set()
-    while pid > 0 and pid not in seen:
-        seen.add(pid)
-        fields = _proc_fields(proc_root, pid)
-        if fields is None:
-            break
-        ppid, starttime = fields
-        try:
-            comm = (proc_root / str(pid) / "comm").read_text(encoding="utf-8").strip()
-        except OSError:
-            comm = ""
-        if comm == "claude":
-            return {
-                "session": f"claude-{pid}-{starttime}",
-                "owner_pid": pid,
-                "owner_starttime": starttime,
-            }
-        pid = ppid
-    values = os.environ if environ is None else environ
-    for name in SESSION_ENV:
-        value = values.get(name, "").strip()
-        if value:
-            return {"session": value}
-    return None
+    """Adapt the shared identity to the existing private pin-record shape."""
+    import importlib.util
+
+    spec = importlib.util.spec_from_file_location("bin_store_session", Path(__file__).with_name("session.py"))
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    identity = module.resolve(proc_root=proc_root, start_pid=start_pid, environ=environ)
+    if identity["session"] is None:
+        return None
+    pin = {"session": identity["session"]}
+    if identity["ownerPid"] is not None:
+        pin.update(owner_pid=identity["ownerPid"], owner_starttime=str(identity["ownerStartTime"]))
+    return pin
 
 
 def session_id(
@@ -853,7 +838,7 @@ def pin(
     root = _root(root, tool)
     identity = session_identity(proc_root=proc_root, start_pid=start_pid, environ=environ)
     if identity is None:
-        raise StoreRefusal("session-absent", "no claude ancestor or session environment is present")
+        raise StoreRefusal("session-absent", "no declared session, registered runtime ancestor, or controlling tty is present")
     path = _pin_path(root, str(identity["session"]))
     existing = _read_json(path)
     if _valid_pin(existing):

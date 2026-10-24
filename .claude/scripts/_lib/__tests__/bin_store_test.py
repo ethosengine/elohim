@@ -130,8 +130,9 @@ def clean_env(**extra: str) -> dict[str, str]:
     env = {
         name: value
         for name, value in os.environ.items()
-        if name not in {*bin_store.SESSION_ENV, "EPR_BIN", "EPR_PIN_CID", "EPR_STORE"}
+        if name not in {"ELOHIM_SESSION_ID", "ELOHIM_SESSION_OWNER_PID", "CODEX_SESSION_ID", "CODEX_THREAD_ID", "CLAUDE_CODE_SESSION_ID", "CLAUDE_SESSION_ID", "EPR_BIN", "EPR_PIN_CID", "EPR_STORE"}
     }
+    env["EPR_PROC_ROOT"] = "/nonexistent/session-proc"
     env["BIN_STORE_SKIP_TOOLS"] = "brit"
     env.update(extra)
     return env
@@ -162,6 +163,7 @@ def install_launcher(tmp_path: Path) -> tuple[Path, Path]:
     launcher.write_text(rendered, encoding="utf-8")
     launcher.chmod(0o755)
     shutil.copyfile(LIB / "bin_store.py", root / "bin_store.py")
+    shutil.copyfile(LIB / "session.py", root / "session.py")
     return launcher, root / "bin_store.py"
 
 
@@ -188,11 +190,11 @@ def test_session_key_uses_nearest_claude_ancestor_and_starttime(tmp_path: Path) 
     proc_entry(proc, 100, 1, "claude", "1000")
 
     identity = bin_store.session_identity(
-        proc_root=proc, start_pid=400, environ={"ELOHIM_SESSION_ID": "fallback"}
+        proc_root=proc, start_pid=400, environ={"CLAUDE_CODE_SESSION_ID": "native-session"}
     )
 
     assert identity == {
-        "session": "claude-200-2000", "owner_pid": 200, "owner_starttime": "2000"
+        "session": "native-session", "owner_pid": 200, "owner_starttime": "2000"
     }
 
 
@@ -210,7 +212,7 @@ def test_resolution_order_is_candidate_explicit_session_then_current(
     first = ingest(store, repo, head, fake_epr(tmp_path / "bin/first", "first"))
     second = ingest(store, repo, head, fake_epr(tmp_path / "bin/second", "second"))
     bin_store._atomic_link(store, "current", first["cid"])
-    session_env = clean_env(CLAUDE_CODE_SESSION_ID="session-a")
+    session_env = clean_env(ELOHIM_SESSION_ID="session-a")
     bin_store.pin(root=store, environ=session_env, proc_root=tmp_path / "no-proc", start_pid=9)
     bin_store._atomic_link(store, "current", second["cid"])
 
@@ -316,7 +318,7 @@ def test_launcher_executes_the_python_resolver(
     [
         ({}, "current"),
         ({"EPR_PIN_CID": "{cid}"}, "explicit-pin"),
-        ({"CLAUDE_CODE_SESSION_ID": "lease-session"}, "session-pin"),
+        ({"ELOHIM_SESSION_ID": "lease-session"}, "session-pin"),
     ],
 )
 def test_every_stored_exec_refreshes_the_usage_lease(
@@ -350,7 +352,7 @@ def test_atomic_pin_creation_recovers_an_empty_pin(
     path = store / "sessions/session-a"
     path.parent.mkdir(parents=True)
     path.touch()
-    env = clean_env(CLAUDE_CODE_SESSION_ID="session-a")
+    env = clean_env(ELOHIM_SESSION_ID="session-a")
 
     with mock.patch.object(bin_store.os, "link", wraps=os.link) as link:
         pinned = bin_store.pin(
@@ -369,7 +371,7 @@ def test_two_launcher_processes_publish_one_complete_pin(
     record = ingest(store, repo, head, fake_epr(tmp_path / "candidate", "race"))
     bin_store._atomic_link(store, "current", record["cid"])
     launcher, _ = install_launcher(tmp_path)
-    env = clean_env(EPR_STORE=str(store), CLAUDE_CODE_SESSION_ID="same-session")
+    env = clean_env(EPR_STORE=str(store), ELOHIM_SESSION_ID="same-session")
     processes = [
         subprocess.Popen([str(launcher), "--version"], env=env, text=True,
                          stdout=subprocess.PIPE, stderr=subprocess.PIPE)
@@ -700,7 +702,7 @@ def test_exec_pin_lock_timeout_falls_back_to_current_with_one_warning(
     with mock.patch.object(bin_store, "pin", side_effect=refusal):
         path, source, cid = bin_store.resolve_exec(
             root=store,
-            environ=clean_env(CLAUDE_CODE_SESSION_ID="waiting"),
+            environ=clean_env(ELOHIM_SESSION_ID="waiting"),
             proc_root=tmp_path / "no-proc",
             start_pid=99,
             warn=warnings.append,
@@ -753,7 +755,7 @@ def test_guard_installs_only_after_a_verified_head_into_persistent_device_bin(
     cargo_home = tmp_path / "cargo-home"
     env = clean_env(
         EPR_STORE=str(store), CARGO_HOME=str(cargo_home),
-        CLAUDE_CODE_SESSION_ID="guard-session",
+        ELOHIM_SESSION_ID="guard-session",
     )
 
     result = subprocess.run(

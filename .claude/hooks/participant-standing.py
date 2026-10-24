@@ -64,10 +64,14 @@ CONTESTED_LINE = "contested (roster root differs from this device's pin)"
 
 WITNESS_HINT = (
     "participant: (unwitnessed) — when you know who is present: epr actor witness "
-    "--subject human:<handle> --as <your agent ref> --session $CLAUDE_CODE_SESSION_ID "
+    "--subject human:<handle> --as <your agent ref> "
     "--basis \"<what you know>\""
 )
 
+
+from pathlib import Path
+sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "scripts"))
+from _lib.session import resolve as resolve_session_identity
 
 def _observation_module(project_dir: str):
     """The hooks' shared binary resolver, imported by path (load-project-context.py's idiom)."""
@@ -243,7 +247,7 @@ def main() -> None:
         payload = {}
     project_dir = (os.environ.get("CLAUDE_PROJECT_DIR") or payload.get("cwd") or os.getcwd())
     session = (str(payload.get("session_id") or "")
-               or os.environ.get("CLAUDE_CODE_SESSION_ID", "")
+               or resolve_session_identity()["session"]
                or None)
     try:
         line = participant_line(project_dir, session)

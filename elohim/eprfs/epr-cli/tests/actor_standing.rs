@@ -230,7 +230,7 @@ fn w4_env_session_stamps_source_session_env() {
         root,
         &key_file,
         &named,
-        &[("CLAUDE_CODE_SESSION_ID", "harness-session")],
+        &[("ELOHIM_SESSION_ID", "harness-session")],
     );
     assert!(
         out.status.success(),

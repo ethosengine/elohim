@@ -119,7 +119,7 @@ pub(crate) const STEWARD_SLOT_PREFIX: &str = "steward:";
 pub(crate) const SOURCE_SLOT_PREFIX: &str = "source:";
 
 /// The `source:` value stamped when the session whose claim attributes a note came from the
-/// environment (`ELOHIM_SESSION_ID`, `CLAUDE_CODE_SESSION_ID`, `CLAUDE_SESSION_ID`), so the
+/// native session primitive, so the
 /// inference is visible on the record rather than indistinguishable from an explicit session.
 pub(crate) const SESSION_ENV_SOURCE: &str = "session-env";
 
@@ -312,7 +312,10 @@ fn resolve_closes(kind: NoteKind, closes: Option<&str>) -> FlowResult<Option<Str
 /// tag, subject, `reason:`, optional `switched-to:`, optional `verdict:`, optional `steward:`
 /// LAST. The order is ADDITIVE — a note that carries no verdict emits the same vector it always
 /// did, which is what keeps every existing note's content address where it is.
-#[allow(clippy::too_many_arguments)]
+#[allow(
+    clippy::too_many_arguments,
+    reason = "The positional persisted note slots are assembled in one function to preserve their ordering"
+)]
 fn note_slots(
     kind: NoteKind,
     subject: &str,

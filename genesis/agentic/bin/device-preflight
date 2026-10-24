@@ -43,7 +43,7 @@ FOLD_LAG_DEFAULT = 25
 READ_TIMEOUT_S = 10
 SCRIPT_REPO = Path(__file__).resolve().parents[3]
 sys.path.insert(0, str(SCRIPT_REPO / ".claude/scripts"))
-from _lib import bin_store, epr_client  # noqa: E402
+from _lib import bin_store, epr_client, session  # noqa: E402
 
 
 @dataclass
@@ -309,11 +309,11 @@ def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description="has this workspace arrived as a device?")
     parser.add_argument("--root", default=os.environ.get("EPR_ROOT", "/projects/elohim"))
     parser.add_argument("--handle", help="the human this device stands for (default: the sole roster)")
-    parser.add_argument("--session", default=os.environ.get("CLAUDE_CODE_SESSION_ID") or None)
+    parser.add_argument("--session")
     parser.add_argument("--json", action="store_true")
     args = parser.parse_args(argv)
     env = dict(os.environ)
-    lines = preflight(Path(args.root), env, args.handle, args.session)
+    lines = preflight(Path(args.root), env, args.handle, args.session or session.resolve(environ=env)["session"])
     if args.json:
         print(json.dumps([line.__dict__ for line in lines], indent=1))
     else:

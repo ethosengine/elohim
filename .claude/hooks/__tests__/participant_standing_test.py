@@ -101,9 +101,11 @@ class ParticipantStandingCase(unittest.TestCase):
 
     def run_hook(self, payload, *, stub=True, current=None, claimed=None, **envextra):
         env = {k: v for k, v in os.environ.items()
-               if k not in ("EPR_BIN", "CLAUDE_CODE_SESSION_ID", "CLAUDE_SESSION_ID")}
+               if k not in ("EPR_BIN", "CLAUDE_CODE_SESSION_ID", "CLAUDE_SESSION_ID", "ELOHIM_SESSION_ID")}
         env.update({
             "CLAUDE_PROJECT_DIR": str(self.project),
+            "EPR_PROC_ROOT": str(self.project / "missing-proc"),
+            "EPR_SESSION_RESOLVING": "1",
             "STUB_LOG": str(self.log),
             "STUB_CURRENT": json.dumps(current if current is not None else UNWITNESSED),
             "STUB_CLAIMED": json.dumps(claimed or {}),
@@ -159,7 +161,7 @@ class ParticipantStandingCase(unittest.TestCase):
         self.assertEqual(
             self.line(r),
             "participant: (unwitnessed) — when you know who is present: epr actor witness "
-            "--subject human:<handle> --as <your agent ref> --session $CLAUDE_CODE_SESSION_ID "
+            "--subject human:<handle> --as <your agent ref> "
             "--basis \"<what you know>\"",
         )
 
@@ -184,13 +186,13 @@ class ParticipantStandingCase(unittest.TestCase):
 
     def test_session_id_from_stdin_beats_env(self):
         self.line(self.run_hook({"session_id": "from-stdin"},
-                                CLAUDE_CODE_SESSION_ID="from-env"))
+                                ELOHIM_SESSION_ID="from-env"))
         argv = self.calls()[0]
         self.assertEqual(argv[argv.index("--session") + 1], "from-stdin")
 
     # ── the edges the five imply ─────────────────────────────────────────────────────────────
     def test_env_session_id_when_stdin_has_none(self):
-        self.line(self.run_hook("", CLAUDE_CODE_SESSION_ID="from-env"))
+        self.line(self.run_hook("", ELOHIM_SESSION_ID="from-env"))
         argv = self.calls()[0]
         self.assertEqual(argv[argv.index("--session") + 1], "from-env")
 

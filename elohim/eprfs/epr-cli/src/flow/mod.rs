@@ -1392,19 +1392,6 @@ fn run_observation(opts: &GlobalOpts, rest: &[String], measure: &str) -> FlowRes
     Ok(ExitCode::SUCCESS)
 }
 
-/// The environment variables a session id is read from, in order, after the explicit flag
-/// (ruling R-P17).
-///
-/// `ELOHIM_SESSION_ID` first: it is the one an agent sets for ITSELF, so a subagent can carve its
-/// own session out of the harness's. `CLAUDE_CODE_SESSION_ID` next — the variable this harness
-/// actually exports (the one the capability-tier gate reads), so a hook-emitted note that passes
-/// no `--session` still resolves the session it ran in — then `CLAUDE_SESSION_ID`.
-const SESSION_ENV_KEYS: [&str; 3] = [
-    "ELOHIM_SESSION_ID",
-    "CLAUDE_CODE_SESSION_ID",
-    "CLAUDE_SESSION_ID",
-];
-
 thread_local! {
     /// The session this command resolved from the ENVIRONMENT rather than `--session`, if any —
     /// set by [`resolve_session`], read by the note leg to stamp `source:session-env`. A command
@@ -1419,35 +1406,25 @@ pub(crate) fn session_came_from_env(session: &str) -> bool {
     SESSION_FROM_ENV.with(|cell| cell.borrow().as_deref() == Some(session))
 }
 
-/// The session id a run is acting under: the explicit flag first, then [`SESSION_ENV_KEYS`] in
-/// order.
+/// The session id a run is acting under: the explicit flag first, then the native session primitive.
 ///
 /// A BLANK value at any position is absence, never a session named by the empty string. An
 /// exported-but-empty variable is exactly what an un-sessioned harness looks like, and taking it
 /// literally would send every such run asking the actor sidecar who claimed session `""` — a
 /// question that has one answer for everybody.
 fn resolve_session(explicit: Option<String>) -> Option<String> {
-    let (session, from_env) = resolve_session_origin(explicit, |key| std::env::var(key).ok());
+    let (session, from_env) =
+        resolve_session_origin(explicit, || crate::session::resolve().session);
     SESSION_FROM_ENV.with(|cell| {
         *cell.borrow_mut() = if from_env { session.clone() } else { None };
     });
     session
 }
 
-/// [`resolve_session`] over an injected environment lookup, so the precedence is testable without
-/// mutating the process environment parallel tests share.
-#[cfg(test)]
-fn resolve_session_with(
-    explicit: Option<String>,
-    lookup: impl Fn(&str) -> Option<String>,
-) -> Option<String> {
-    resolve_session_origin(explicit, lookup).0
-}
-
 /// The resolved session and whether it came from the environment (`true`) or the flag.
 fn resolve_session_origin(
     explicit: Option<String>,
-    lookup: impl Fn(&str) -> Option<String>,
+    infer: impl FnOnce() -> Option<String>,
 ) -> (Option<String>, bool) {
     if let Some(flag) = explicit
         .map(|value| value.trim().to_string())
@@ -1455,11 +1432,7 @@ fn resolve_session_origin(
     {
         return (Some(flag), false);
     }
-    let from_env = SESSION_ENV_KEYS
-        .into_iter()
-        .filter_map(lookup)
-        .map(|value| value.trim().to_string())
-        .find(|value| !value.is_empty());
+    let from_env = infer();
     let inferred = from_env.is_some();
     (from_env, inferred)
 }
@@ -1632,7 +1605,7 @@ fn usage() -> String {
      [--purpose acceptance --appointment <ruling-cid> --fulfillment <event-cid> \
      --review <technical-verdict-cid> --report <json-path> [--supersedes <acceptance-cid>]] \
      [--as agent:<role>@<model>] [--session <id>] [--json] [--root DIR] \
-     (omit --session to fall back to ELOHIM_SESSION_ID/CLAUDE_CODE_SESSION_ID/CLAUDE_SESSION_ID, \
+     (omit --session to use the native session identity, \
      stamped source:session-env; an agent-attributed note carries steward:<standing human or \
      collective> as its last slot, never an email)\n  \
      | note --on <target> --kind <kind> \
@@ -2132,63 +2105,18 @@ mod tests {
     use super::*;
 
     #[test]
-    fn w4_elohim_session_id_beats_claude_code_session_id() {
-        let env = |pairs: &'static [(&'static str, &'static str)]| {
-            move |key: &str| {
-                pairs
-                    .iter()
-                    .find(|(k, _)| *k == key)
-                    .map(|(_, v)| v.to_string())
-            }
-        };
-        let all = env(&[
-            ("CLAUDE_CODE_SESSION_ID", "code-session"),
-            ("CLAUDE_SESSION_ID", "claude-session"),
-            ("ELOHIM_SESSION_ID", "elohim-session"),
-        ]);
+    fn session_flag_precedes_native_inference_and_preserves_stamp() {
         assert_eq!(
-            resolve_session_with(None, all).as_deref(),
-            Some("elohim-session"),
-            "the agent-set variable wins, so a subagent can carve its own session"
-        );
-        let harness = env(&[
-            ("CLAUDE_CODE_SESSION_ID", "code-session"),
-            ("CLAUDE_SESSION_ID", "claude-session"),
-        ]);
-        assert_eq!(
-            resolve_session_with(None, harness).as_deref(),
-            Some("code-session"),
-            "then the harness's real variable, over the older name"
+            resolve_session_origin(Some(" flag ".into()), || panic!(
+                "explicit flag must not resolve"
+            )),
+            (Some("flag".into()), false)
         );
         assert_eq!(
-            resolve_session_origin(None, all),
-            (Some("elohim-session".to_string()), true),
-            "an environment session is marked as inferred"
+            resolve_session_origin(Some(" ".into()), || Some("native".into())),
+            (Some("native".into()), true)
         );
-        assert_eq!(
-            resolve_session_origin(Some(" flag ".into()), all),
-            (Some("flag".to_string()), false),
-            "a flag is never marked as inferred"
-        );
-        assert_eq!(
-            resolve_session_with(Some("flag".into()), all).as_deref(),
-            Some("flag"),
-            "the explicit flag still wins over every variable"
-        );
-        // A blank CLAUDE_CODE_SESSION_ID is absence: the next variable answers.
-        let blank = env(&[
-            ("CLAUDE_CODE_SESSION_ID", "  "),
-            ("CLAUDE_SESSION_ID", "claude-session"),
-        ]);
-        assert_eq!(
-            resolve_session_with(None, blank).as_deref(),
-            Some("claude-session")
-        );
-        assert_eq!(
-            resolve_session_with(None, env(&[("ELOHIM_SESSION_ID", "e")])).as_deref(),
-            Some("e")
-        );
-        assert_eq!(resolve_session_with(None, env(&[])), None);
+        assert_eq!(resolve_session_origin(None, || None), (None, false));
     }
 
     fn line(email: &str, ts: &str, trailers: &str) -> String {

@@ -47,6 +47,51 @@ seamLocus: >
   above as pending.
 
 decisionPoints:
+  - name: session::resolve_with
+    kind: pure-decision-predicate
+    sourceLocation:
+      file: src/session.rs
+      modulePath: elohim_epr_cli::session
+    summary: Declared identity precedes the nearest registered ancestor, then controlling TTY leader, then successful none. The walk is cycle-safe and bounded at 256 ancestors.
+    concernIds:
+      - id: C0
+        status: answered
+        justification: Ephemeral local observation; no DHT entity or persistent authority.
+    contractTests:
+      - path: elohim/eprfs/epr-cli/tests/session.rs
+        testName: session_shared_fixture_cases
+        kind: integration
+
+  - name: session::nonblank
+    kind: pure-decision-predicate
+    sourceLocation:
+      file: src/session.rs
+      modulePath: elohim_epr_cli::session
+    summary: Whitespace-only environment values are absence; nonblank values are trimmed before selection.
+    concernIds:
+      - id: C0
+        status: answered
+        justification: Ephemeral local observation; no DHT entity or persistent authority.
+    contractTests:
+      - path: elohim/eprfs/epr-cli/tests/session.rs
+        testName: session_shared_fixture_cases
+        kind: integration
+
+  - name: session::process
+    kind: pure-decision-predicate
+    sourceLocation:
+      file: src/session.rs
+      modulePath: elohim_epr_cli::session
+    summary: A declared session survives a missing or malformed owner process; both owner fields remain null. Process start time binds owner liveness against PID reuse.
+    concernIds:
+      - id: C0
+        status: answered
+        justification: Ephemeral local observation; no DHT entity or persistent authority.
+    contractTests:
+      - path: elohim/eprfs/epr-cli/tests/session.rs
+        testName: session_shared_fixture_cases
+        kind: integration
+
   - name: integrate::integrate
     kind: state-transition
     sourceLocation:

@@ -229,6 +229,8 @@ def _guard_tool(repo: Path, cli: Path, registry_path: Path, tool: str, config: d
     store_module = (persistent_bin / "bin_store.py").resolve()
     installed_registry = (persistent_bin / "bin-tools.json").resolve()
     _write_if_changed((repo / ".claude/scripts/_lib/bin_store.py").read_bytes(), store_module, 0o644)
+    _write_if_changed((repo / ".claude/scripts/_lib/session.py").read_bytes(),
+                      persistent_bin / "session.py", 0o644)
     _write_if_changed(registry_path.read_bytes(), installed_registry, 0o444)
     template = (repo / "genesis/agentic/bin/bin-launch").read_text(encoding="utf-8")
     rendered = (

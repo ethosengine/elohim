@@ -1,0 +1,61 @@
+#!/usr/bin/env python3
+"""Count files implementing fixed duplication signatures; optional committed-tree input."""
+import argparse
+import fnmatch
+import json
+from pathlib import Path
+import re
+import subprocess
+
+SIGNATURES = {
+    'session resolvers': [r'_CODE_SESSION_ID', r'pub fn resolve_with\(', r'def resolve_fallback\(', r'function resolveFallback\('],
+    'proc session ancestry': [r'def proc_ancestry\(', r'while pid > 0'],
+    'epr/brit lookup paths': [r'def (?:find_epr|_find_epr|find_brit|_find_brit|resolve_epr|resolve_bin|resolve_binary)\(', r'function resolveBinary\(', r'which\(["\x27](?:epr|brit)["\x27]'],
+    # device-preflight's lines, epr doctor's tool/hook checks, the SessionStart evaluator guard.
+    'arrival surfaces': [r'roster bound', r'fold attested', r'berth moored', r'fn check_runtime_abis\(', r'tool.upper\(\)} EVALUATOR'],
+    'follow-set declarations': [r'ELOHIM_RELEASE_CHANNELS', r'publishedRef', r'followed_channels'],
+    'runtime-config writers': [r'write.*runtime.config', r'runtime.config.*write', r'fn persist_runtime'],
+    'head verifiers': [r'fn verify_head', r'def verify_head', r'def _verify_head', r'fn verify_channel_head'],
+}
+# A P1 ancestry walk is already counted in session resolvers. This family counts
+# independent consumer ancestry walkers (berth remains until its A2 re-keying).
+FAMILY_GLOBS = {
+    'session resolvers': ['.claude/hooks/*.py', '.claude/scripts/_lib/*.py', 'elohim/eprfs/epr-cli/src/flow/mod.rs', 'elohim/eprfs/epr-cli/src/flow/note.rs', 'elohim/eprfs/epr-cli/src/session.rs', 'genesis/a2o/scripts/lib/*.ts', 'genesis/a2o/src/framework/session.ts', 'genesis/agentic/bin/*'],
+    'proc session ancestry': ['.claude/hooks/*.py', '.claude/scripts/_lib/*.py', 'genesis/agentic/bin/*'],
+}
+GLOBS = ['*.py', '*.rs', '*.ts', '*.sh', '*.json', 'genesis/agentic/bin/*']
+EXCLUDES = ['*/__tests__/*', '*/tests/*', '*_test.py', '*_test.rs', '*.test.ts', '*.test.mjs', '*/fixtures/*', '*.spec.ts', '*.schema.json', '*node_modules*', '*.worktrees*', '*target/*', '*vendor/*', '*.epr-meta/*', '*.eprfs/*', '*/steps/*', '*.codex/*', '*.agents/*', '*generated/*', '*agent-runtimes.json', '*dup-census', '*local-dev/*']
+
+
+def main():
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument('--json', action='store_true')
+    parser.add_argument('--ref', help='Read this git tree without a checkout or stash')
+    args = parser.parse_args()
+    root = Path(subprocess.check_output(['git', 'rev-parse', '--show-toplevel'], text=True).strip())
+    command = ['git', 'ls-tree', '-r', '--name-only', args.ref] if args.ref else ['git', 'ls-files', '--cached', '--others', '--exclude-standard']
+    paths = sorted(set(subprocess.check_output(command, cwd=root, text=True).splitlines()))
+    hits = {family: [] for family in SIGNATURES}
+    for path in paths:
+        if not any(fnmatch.fnmatch(path, g) for g in GLOBS) or any(fnmatch.fnmatch(path, g) for g in EXCLUDES):
+            continue
+        try:
+            body = subprocess.check_output(['git', 'show', f'{args.ref}:{path}'], cwd=root, stderr=subprocess.DEVNULL).decode(errors='replace') if args.ref else (root / path).read_text(errors='replace')
+        except (OSError, subprocess.CalledProcessError):
+            continue
+        for family, patterns in SIGNATURES.items():
+            if not any(fnmatch.fnmatch(path, g) for g in FAMILY_GLOBS.get(family, GLOBS)):
+                continue
+            if any(re.search(pattern, body) for pattern in patterns):
+                hits[family].append(path)
+    result = {family: {'count': len(paths), 'paths': paths} for family, paths in hits.items()}
+    if args.json:
+        print(json.dumps(result, indent=2))
+    else:
+        print(f'{"Family":30} Files')
+        for family, row in result.items():
+            print(f'{family:30} {row["count"]:5}')
+
+
+if __name__ == '__main__':
+    main()

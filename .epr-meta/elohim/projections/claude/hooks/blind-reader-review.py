@@ -21,6 +21,9 @@ from pathlib import Path
 AGENT_ID = "blind-reader"
 
 
+sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "scripts"))
+from _lib.session import resolve as resolve_session_identity
+
 def _repo_root() -> Path | None:
     project_dir = os.environ.get("CLAUDE_PROJECT_DIR")
     return Path(project_dir).resolve() if project_dir else None
@@ -159,7 +162,7 @@ def main() -> int:
 
     # A rule that declares a variance asks this session's covenant (`epr covenant check`, keyed by
     # the session id a subagent inherits) whether the steward of record granted its floor here.
-    session = payload.get("session_id") or os.environ.get("CLAUDE_CODE_SESSION_ID")
+    session = payload.get("session_id") or resolve_session_identity()["session"]
     agent_id = payload.get("agent_id")
     agent_type = payload.get("agent_type")
     held: list[tuple[str, str, dict]] = []

@@ -11,7 +11,8 @@
     "sourceMap": true,
     "paths": {
       "@framework/*": ["./src/framework/*"]
-    }
+    },
+    "rewriteRelativeImportExtensions": true
   },
   "include": ["src/**/*.ts", "steps/**/*.ts", "scripts/**/*.ts"],
   "exclude": ["node_modules", "dist"]

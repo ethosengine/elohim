@@ -22,7 +22,7 @@ tier resolution drops `ANTHROPIC_MODEL`; remedy carries no self-claim hint.
 FIX ROUND 2: DENY ON AMBIGUITY — a wider wrapper/keyword strip set, flexible shell `-c`
 detection, and an unconditional deny (bypassing tier) for a chain that is still indirect after
 unwrapping (command substitution, `xargs`, an interpreter carrying a git/rm word). Session key
-fixed to `CLAUDE_CODE_SESSION_ID` (this harness's real var), `CLAUDE_SESSION_ID` as fallback.
+resolved through the shared native session primitive.
 
 FIX ROUND 3 (third adversarial pass, 25/25 tests still green — two problems, one in each
 direction). STILL ALLOWED: a quote-split word (`g""it reset --hard` — the RAW-STRING pre-filter
@@ -226,6 +226,10 @@ _RM_DESTRUCTIVE_VAR_TARGETS = {
 # ${MODE}` runs a hard reset. Resolved into a substituted variant scanned ALONGSIDE the original.
 _ASSIGNMENT_RE = re.compile(r"^([A-Za-z_][A-Za-z0-9_]*)=(.*)$", re.S)
 
+
+from pathlib import Path
+sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "scripts"))
+from _lib.session import resolve as resolve_session_identity
 
 def _space_operators(text: str) -> str:
     """Insert spaces around shell operators found OUTSIDE quotes and outside backslash escapes,
@@ -925,13 +929,7 @@ def _resolve_tier(session_id: str) -> str:
 
 
 def _session_id_from_env() -> str:
-    # R-P17, the same order `epr` resolves: the agent-set ELOHIM_SESSION_ID (a subagent's own
-    # session), then the harness's CLAUDE_CODE_SESSION_ID, then CLAUDE_SESSION_ID.
-    for key in ("ELOHIM_SESSION_ID", "CLAUDE_CODE_SESSION_ID", "CLAUDE_SESSION_ID"):
-        value = (os.environ.get(key) or "").strip()
-        if value:
-            return value
-    return ""
+    return resolve_session_identity()["session"] or ""
 
 
 # ── classification entry point (DENY ON AMBIGUITY, scoped) ──────────────────────────────────

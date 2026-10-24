@@ -26,6 +26,8 @@ import { basename, dirname, join, resolve } from 'node:path';
 
 import { After, Given, Then, When } from '@cucumber/cucumber';
 
+import { loadRegistry } from '../../src/framework/session.js';
+
 type JsonObject = Record<string, unknown>;
 
 interface Invocation {
@@ -140,8 +142,9 @@ function launcherEnv(state: FollowFixture, extra: NodeJS.ProcessEnv = {}): NodeJ
   env.EPR_BIN = '';
   env.EPR_PIN_CID = '';
   env.ELOHIM_SESSION_ID = '';
-  env.CLAUDE_CODE_SESSION_ID = '';
-  env.CLAUDE_SESSION_ID = '';
+  for (const runtime of loadRegistry(env).runtimes) {
+    for (const key of runtime.sessionEnv) env[key] = '';
+  }
   return { ...env, ...extra };
 }
 

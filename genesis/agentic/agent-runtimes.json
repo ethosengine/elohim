@@ -1,0 +1,17 @@
+{
+  "version": 1,
+  "runtimes": [
+    {
+      "id": "claude-code",
+      "comm": ["claude"],
+      "sessionEnv": ["CLAUDE_CODE_SESSION_ID", "CLAUDE_SESSION_ID"]
+    },
+    {
+      "id": "codex",
+      "comm": ["codex"],
+      "sessionEnv": ["CODEX_SESSION_ID", "CODEX_THREAD_ID"]
+    },
+    { "id": "gemini", "comm": ["gemini"], "sessionEnv": [] },
+    { "id": "antigravity", "comm": ["antigravity"], "sessionEnv": [] }
+  ]
+}

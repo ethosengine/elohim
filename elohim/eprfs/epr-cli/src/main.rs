@@ -30,6 +30,33 @@ fn main() -> ExitCode {
         println!("{}", govern::evaluator_identity());
         return ExitCode::SUCCESS;
     }
+    if raw.first().map(String::as_str) == Some("session") {
+        if raw.get(1).map(String::as_str) != Some("id")
+            || raw[2..].iter().any(|arg| arg != "--json")
+        {
+            println!("epr session id [--json]");
+            return ExitCode::SUCCESS;
+        }
+        let identity = elohim_epr_cli::session::resolve();
+        if raw.iter().any(|arg| arg == "--json") {
+            println!(
+                "{}",
+                serde_json::to_string(&identity).expect("session identity is serializable")
+            );
+        } else {
+            let source = serde_json::to_value(identity.source).expect("source is serializable");
+            println!(
+                "session={} runtime={} source={} owner={}",
+                identity.session.as_deref().unwrap_or("none"),
+                identity.runtime,
+                source.as_str().unwrap_or("none"),
+                identity
+                    .owner_pid
+                    .map_or_else(|| "-".into(), |pid| pid.to_string())
+            );
+        }
+        return ExitCode::SUCCESS;
+    }
     if raw.first().map(String::as_str) == Some("flow") {
         return match flow::run(&raw[1..]) {
             Ok(code) => code,
@@ -340,5 +367,5 @@ fn print_human(report: &Report) {
 }
 
 fn usage() -> &'static str {
-    "usage: epr [--repo PATH] [--json] <setup|doctor|explain PATH|check [PATH...]|govern --path REL ...|ready [--target REF] [--deep]|integrate --acceptance CID [--root DIR]|flow ...|actor <claim --as agent:<role>@<model> --session ID|current --session ID>|canon-lift [--check|--write]|device <ask|redeem|approve> ...|identity <begin|standing> ...|covenant <offer|show|check|record> --session ID ...|peer <id|serve|status> ...>"
+    "epr session id [--json]\n\nusage: epr [--repo PATH] [--json] <setup|doctor|explain PATH|check [PATH...]|govern --path REL ...|ready [--target REF] [--deep]|integrate --acceptance CID [--root DIR]|flow ...|actor <claim --as agent:<role>@<model> --session ID|current --session ID>|canon-lift [--check|--write]|device <ask|redeem|approve> ...|identity <begin|standing> ...|covenant <offer|show|check|record> --session ID ...|peer <id|serve|status> ...>"
 }

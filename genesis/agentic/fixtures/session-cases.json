@@ -1,0 +1,967 @@
+[
+  {
+    "name": "declared wins",
+    "env": {
+      "ELOHIM_SESSION_ID": " declared ",
+      "ELOHIM_SESSION_OWNER_PID": "200"
+    },
+    "processes": [
+      [
+        400,
+        300,
+        "python3",
+        100,
+        0,
+        4000
+      ],
+      [
+        300,
+        200,
+        "bash",
+        100,
+        0,
+        3000
+      ],
+      [
+        200,
+        100,
+        "codex",
+        100,
+        0,
+        2000
+      ],
+      [
+        100,
+        1,
+        "claude",
+        100,
+        0,
+        1000
+      ]
+    ],
+    "startPid": 400,
+    "registry": {
+      "version": 1,
+      "runtimes": [
+        {
+          "id": "claude-code",
+          "comm": [
+            "claude"
+          ],
+          "sessionEnv": [
+            "CLAUDE_CODE_SESSION_ID",
+            "CLAUDE_SESSION_ID"
+          ]
+        },
+        {
+          "id": "codex",
+          "comm": [
+            "codex"
+          ],
+          "sessionEnv": [
+            "CODEX_SESSION_ID",
+            "CODEX_THREAD_ID"
+          ]
+        },
+        {
+          "id": "gemini",
+          "comm": [
+            "gemini"
+          ],
+          "sessionEnv": []
+        },
+        {
+          "id": "antigravity",
+          "comm": [
+            "antigravity"
+          ],
+          "sessionEnv": []
+        }
+      ]
+    },
+    "expected": {
+      "runtime": "declared",
+      "session": "declared",
+      "ownerPid": 200,
+      "ownerStartTime": "2000",
+      "source": "declared"
+    }
+  },
+  {
+    "name": "dead declared owner",
+    "env": {
+      "ELOHIM_SESSION_ID": "yes",
+      "ELOHIM_SESSION_OWNER_PID": "999"
+    },
+    "processes": [
+      [
+        400,
+        300,
+        "python3",
+        100,
+        0,
+        4000
+      ],
+      [
+        300,
+        200,
+        "bash",
+        100,
+        0,
+        3000
+      ],
+      [
+        200,
+        100,
+        "codex",
+        100,
+        0,
+        2000
+      ],
+      [
+        100,
+        1,
+        "claude",
+        100,
+        0,
+        1000
+      ]
+    ],
+    "startPid": 400,
+    "registry": {
+      "version": 1,
+      "runtimes": [
+        {
+          "id": "claude-code",
+          "comm": [
+            "claude"
+          ],
+          "sessionEnv": [
+            "CLAUDE_CODE_SESSION_ID",
+            "CLAUDE_SESSION_ID"
+          ]
+        },
+        {
+          "id": "codex",
+          "comm": [
+            "codex"
+          ],
+          "sessionEnv": [
+            "CODEX_SESSION_ID",
+            "CODEX_THREAD_ID"
+          ]
+        },
+        {
+          "id": "gemini",
+          "comm": [
+            "gemini"
+          ],
+          "sessionEnv": []
+        },
+        {
+          "id": "antigravity",
+          "comm": [
+            "antigravity"
+          ],
+          "sessionEnv": []
+        }
+      ]
+    },
+    "expected": {
+      "runtime": "declared",
+      "session": "yes",
+      "ownerPid": null,
+      "ownerStartTime": null,
+      "source": "declared"
+    }
+  },
+  {
+    "name": "ownerless declared",
+    "env": {
+      "ELOHIM_SESSION_ID": "yes"
+    },
+    "processes": [],
+    "startPid": 400,
+    "registry": {
+      "version": 1,
+      "runtimes": [
+        {
+          "id": "claude-code",
+          "comm": [
+            "claude"
+          ],
+          "sessionEnv": [
+            "CLAUDE_CODE_SESSION_ID",
+            "CLAUDE_SESSION_ID"
+          ]
+        },
+        {
+          "id": "codex",
+          "comm": [
+            "codex"
+          ],
+          "sessionEnv": [
+            "CODEX_SESSION_ID",
+            "CODEX_THREAD_ID"
+          ]
+        },
+        {
+          "id": "gemini",
+          "comm": [
+            "gemini"
+          ],
+          "sessionEnv": []
+        },
+        {
+          "id": "antigravity",
+          "comm": [
+            "antigravity"
+          ],
+          "sessionEnv": []
+        }
+      ]
+    },
+    "expected": {
+      "runtime": "declared",
+      "session": "yes",
+      "ownerPid": null,
+      "ownerStartTime": null,
+      "source": "declared"
+    }
+  },
+  {
+    "name": "blank declared nested nearest",
+    "env": {
+      "ELOHIM_SESSION_ID": "  ",
+      "CODEX_SESSION_ID": " inner ",
+      "CLAUDE_CODE_SESSION_ID": "outer"
+    },
+    "processes": [
+      [
+        400,
+        300,
+        "python3",
+        100,
+        0,
+        4000
+      ],
+      [
+        300,
+        200,
+        "bash",
+        100,
+        0,
+        3000
+      ],
+      [
+        200,
+        100,
+        "codex",
+        100,
+        0,
+        2000
+      ],
+      [
+        100,
+        1,
+        "claude",
+        100,
+        0,
+        1000
+      ]
+    ],
+    "startPid": 400,
+    "registry": {
+      "version": 1,
+      "runtimes": [
+        {
+          "id": "claude-code",
+          "comm": [
+            "claude"
+          ],
+          "sessionEnv": [
+            "CLAUDE_CODE_SESSION_ID",
+            "CLAUDE_SESSION_ID"
+          ]
+        },
+        {
+          "id": "codex",
+          "comm": [
+            "codex"
+          ],
+          "sessionEnv": [
+            "CODEX_SESSION_ID",
+            "CODEX_THREAD_ID"
+          ]
+        },
+        {
+          "id": "gemini",
+          "comm": [
+            "gemini"
+          ],
+          "sessionEnv": []
+        },
+        {
+          "id": "antigravity",
+          "comm": [
+            "antigravity"
+          ],
+          "sessionEnv": []
+        }
+      ]
+    },
+    "expected": {
+      "runtime": "codex",
+      "session": "inner",
+      "ownerPid": 200,
+      "ownerStartTime": "2000",
+      "source": "runtimeAncestor"
+    }
+  },
+  {
+    "name": "blank native first",
+    "env": {
+      "CODEX_SESSION_ID": " ",
+      "CODEX_THREAD_ID": "thread"
+    },
+    "processes": [
+      [
+        400,
+        300,
+        "python3",
+        100,
+        0,
+        4000
+      ],
+      [
+        300,
+        200,
+        "bash",
+        100,
+        0,
+        3000
+      ],
+      [
+        200,
+        100,
+        "codex",
+        100,
+        0,
+        2000
+      ],
+      [
+        100,
+        1,
+        "claude",
+        100,
+        0,
+        1000
+      ]
+    ],
+    "startPid": 400,
+    "registry": {
+      "version": 1,
+      "runtimes": [
+        {
+          "id": "claude-code",
+          "comm": [
+            "claude"
+          ],
+          "sessionEnv": [
+            "CLAUDE_CODE_SESSION_ID",
+            "CLAUDE_SESSION_ID"
+          ]
+        },
+        {
+          "id": "codex",
+          "comm": [
+            "codex"
+          ],
+          "sessionEnv": [
+            "CODEX_SESSION_ID",
+            "CODEX_THREAD_ID"
+          ]
+        },
+        {
+          "id": "gemini",
+          "comm": [
+            "gemini"
+          ],
+          "sessionEnv": []
+        },
+        {
+          "id": "antigravity",
+          "comm": [
+            "antigravity"
+          ],
+          "sessionEnv": []
+        }
+      ]
+    },
+    "expected": {
+      "runtime": "codex",
+      "session": "thread",
+      "ownerPid": 200,
+      "ownerStartTime": "2000",
+      "source": "runtimeAncestor"
+    }
+  },
+  {
+    "name": "runtime generated",
+    "env": {},
+    "processes": [
+      [
+        400,
+        300,
+        "python3",
+        100,
+        0,
+        4000
+      ],
+      [
+        300,
+        200,
+        "bash",
+        100,
+        0,
+        3000
+      ],
+      [
+        200,
+        100,
+        "codex",
+        100,
+        0,
+        2000
+      ],
+      [
+        100,
+        1,
+        "claude",
+        100,
+        0,
+        1000
+      ]
+    ],
+    "startPid": 400,
+    "registry": {
+      "version": 1,
+      "runtimes": [
+        {
+          "id": "claude-code",
+          "comm": [
+            "claude"
+          ],
+          "sessionEnv": [
+            "CLAUDE_CODE_SESSION_ID",
+            "CLAUDE_SESSION_ID"
+          ]
+        },
+        {
+          "id": "codex",
+          "comm": [
+            "codex"
+          ],
+          "sessionEnv": [
+            "CODEX_SESSION_ID",
+            "CODEX_THREAD_ID"
+          ]
+        },
+        {
+          "id": "gemini",
+          "comm": [
+            "gemini"
+          ],
+          "sessionEnv": []
+        },
+        {
+          "id": "antigravity",
+          "comm": [
+            "antigravity"
+          ],
+          "sessionEnv": []
+        }
+      ]
+    },
+    "expected": {
+      "runtime": "codex",
+      "session": "codex-200-2000",
+      "ownerPid": 200,
+      "ownerStartTime": "2000",
+      "source": "runtimeAncestor"
+    }
+  },
+  {
+    "name": "comm parentheses",
+    "env": {},
+    "processes": [
+      [
+        400,
+        200,
+        "child",
+        200,
+        0,
+        4000
+      ],
+      [
+        200,
+        0,
+        "agent ) ( worker",
+        200,
+        0,
+        2000
+      ]
+    ],
+    "startPid": 400,
+    "registry": {
+      "runtimes": [
+        {
+          "id": "odd",
+          "comm": [
+            "agent ) ( worker"
+          ],
+          "sessionEnv": []
+        }
+      ]
+    },
+    "expected": {
+      "runtime": "odd",
+      "session": "odd-200-2000",
+      "ownerPid": 200,
+      "ownerStartTime": "2000",
+      "source": "runtimeAncestor"
+    }
+  },
+  {
+    "name": "tty leader",
+    "env": {},
+    "processes": [
+      [
+        400,
+        200,
+        "shell",
+        200,
+        42,
+        4000
+      ],
+      [
+        200,
+        0,
+        "terminal",
+        200,
+        42,
+        2000
+      ]
+    ],
+    "startPid": 400,
+    "registry": {
+      "version": 1,
+      "runtimes": [
+        {
+          "id": "claude-code",
+          "comm": [
+            "claude"
+          ],
+          "sessionEnv": [
+            "CLAUDE_CODE_SESSION_ID",
+            "CLAUDE_SESSION_ID"
+          ]
+        },
+        {
+          "id": "codex",
+          "comm": [
+            "codex"
+          ],
+          "sessionEnv": [
+            "CODEX_SESSION_ID",
+            "CODEX_THREAD_ID"
+          ]
+        },
+        {
+          "id": "gemini",
+          "comm": [
+            "gemini"
+          ],
+          "sessionEnv": []
+        },
+        {
+          "id": "antigravity",
+          "comm": [
+            "antigravity"
+          ],
+          "sessionEnv": []
+        }
+      ]
+    },
+    "expected": {
+      "runtime": "tty",
+      "session": "tty-200-2000",
+      "ownerPid": 200,
+      "ownerStartTime": "2000",
+      "source": "ttyLeader"
+    }
+  },
+  {
+    "name": "missing tty leader",
+    "env": {},
+    "processes": [
+      [
+        400,
+        0,
+        "shell",
+        200,
+        42,
+        4000
+      ]
+    ],
+    "startPid": 400,
+    "registry": {
+      "version": 1,
+      "runtimes": [
+        {
+          "id": "claude-code",
+          "comm": [
+            "claude"
+          ],
+          "sessionEnv": [
+            "CLAUDE_CODE_SESSION_ID",
+            "CLAUDE_SESSION_ID"
+          ]
+        },
+        {
+          "id": "codex",
+          "comm": [
+            "codex"
+          ],
+          "sessionEnv": [
+            "CODEX_SESSION_ID",
+            "CODEX_THREAD_ID"
+          ]
+        },
+        {
+          "id": "gemini",
+          "comm": [
+            "gemini"
+          ],
+          "sessionEnv": []
+        },
+        {
+          "id": "antigravity",
+          "comm": [
+            "antigravity"
+          ],
+          "sessionEnv": []
+        }
+      ]
+    },
+    "expected": {
+      "runtime": "none",
+      "session": null,
+      "ownerPid": null,
+      "ownerStartTime": null,
+      "source": "none"
+    }
+  },
+  {
+    "name": "none ignores native env without ancestor",
+    "env": {
+      "CODEX_SESSION_ID": "stray"
+    },
+    "processes": [
+      [
+        400,
+        0,
+        "shell",
+        400,
+        0,
+        4000
+      ]
+    ],
+    "startPid": 400,
+    "registry": {
+      "version": 1,
+      "runtimes": [
+        {
+          "id": "claude-code",
+          "comm": [
+            "claude"
+          ],
+          "sessionEnv": [
+            "CLAUDE_CODE_SESSION_ID",
+            "CLAUDE_SESSION_ID"
+          ]
+        },
+        {
+          "id": "codex",
+          "comm": [
+            "codex"
+          ],
+          "sessionEnv": [
+            "CODEX_SESSION_ID",
+            "CODEX_THREAD_ID"
+          ]
+        },
+        {
+          "id": "gemini",
+          "comm": [
+            "gemini"
+          ],
+          "sessionEnv": []
+        },
+        {
+          "id": "antigravity",
+          "comm": [
+            "antigravity"
+          ],
+          "sessionEnv": []
+        }
+      ]
+    },
+    "expected": {
+      "runtime": "none",
+      "session": null,
+      "ownerPid": null,
+      "ownerStartTime": null,
+      "source": "none"
+    }
+  },
+  {
+    "name": "cycle",
+    "env": {},
+    "processes": [
+      [
+        400,
+        300,
+        "shell",
+        400,
+        0,
+        4000
+      ],
+      [
+        300,
+        200,
+        "one",
+        400,
+        0,
+        3000
+      ],
+      [
+        200,
+        300,
+        "two",
+        400,
+        0,
+        2000
+      ]
+    ],
+    "startPid": 400,
+    "registry": {
+      "version": 1,
+      "runtimes": [
+        {
+          "id": "claude-code",
+          "comm": [
+            "claude"
+          ],
+          "sessionEnv": [
+            "CLAUDE_CODE_SESSION_ID",
+            "CLAUDE_SESSION_ID"
+          ]
+        },
+        {
+          "id": "codex",
+          "comm": [
+            "codex"
+          ],
+          "sessionEnv": [
+            "CODEX_SESSION_ID",
+            "CODEX_THREAD_ID"
+          ]
+        },
+        {
+          "id": "gemini",
+          "comm": [
+            "gemini"
+          ],
+          "sessionEnv": []
+        },
+        {
+          "id": "antigravity",
+          "comm": [
+            "antigravity"
+          ],
+          "sessionEnv": []
+        }
+      ]
+    },
+    "expected": {
+      "runtime": "none",
+      "session": null,
+      "ownerPid": null,
+      "ownerStartTime": null,
+      "source": "none"
+    }
+  },
+  {
+    "name": "self cycle never matches current",
+    "env": {},
+    "processes": [
+      [
+        400,
+        400,
+        "codex",
+        400,
+        0,
+        4000
+      ]
+    ],
+    "startPid": 400,
+    "registry": {
+      "version": 1,
+      "runtimes": [
+        {
+          "id": "claude-code",
+          "comm": [
+            "claude"
+          ],
+          "sessionEnv": [
+            "CLAUDE_CODE_SESSION_ID",
+            "CLAUDE_SESSION_ID"
+          ]
+        },
+        {
+          "id": "codex",
+          "comm": [
+            "codex"
+          ],
+          "sessionEnv": [
+            "CODEX_SESSION_ID",
+            "CODEX_THREAD_ID"
+          ]
+        },
+        {
+          "id": "gemini",
+          "comm": [
+            "gemini"
+          ],
+          "sessionEnv": []
+        },
+        {
+          "id": "antigravity",
+          "comm": [
+            "antigravity"
+          ],
+          "sessionEnv": []
+        }
+      ]
+    },
+    "expected": {
+      "runtime": "none",
+      "session": null,
+      "ownerPid": null,
+      "ownerStartTime": null,
+      "source": "none"
+    }
+  },
+  {
+    "name": "missing current",
+    "env": {},
+    "processes": [],
+    "startPid": 400,
+    "registry": {
+      "version": 1,
+      "runtimes": [
+        {
+          "id": "claude-code",
+          "comm": [
+            "claude"
+          ],
+          "sessionEnv": [
+            "CLAUDE_CODE_SESSION_ID",
+            "CLAUDE_SESSION_ID"
+          ]
+        },
+        {
+          "id": "codex",
+          "comm": [
+            "codex"
+          ],
+          "sessionEnv": [
+            "CODEX_SESSION_ID",
+            "CODEX_THREAD_ID"
+          ]
+        },
+        {
+          "id": "gemini",
+          "comm": [
+            "gemini"
+          ],
+          "sessionEnv": []
+        },
+        {
+          "id": "antigravity",
+          "comm": [
+            "antigravity"
+          ],
+          "sessionEnv": []
+        }
+      ]
+    },
+    "expected": {
+      "runtime": "none",
+      "session": null,
+      "ownerPid": null,
+      "ownerStartTime": null,
+      "source": "none"
+    }
+  },
+  {
+    "name": "no registry",
+    "env": {},
+    "processes": [
+      [
+        400,
+        300,
+        "python3",
+        100,
+        0,
+        4000
+      ],
+      [
+        300,
+        200,
+        "bash",
+        100,
+        0,
+        3000
+      ],
+      [
+        200,
+        100,
+        "codex",
+        100,
+        0,
+        2000
+      ],
+      [
+        100,
+        1,
+        "claude",
+        100,
+        0,
+        1000
+      ]
+    ],
+    "startPid": 400,
+    "registry": {
+      "runtimes": []
+    },
+    "expected": {
+      "runtime": "none",
+      "session": null,
+      "ownerPid": null,
+      "ownerStartTime": null,
+      "source": "none"
+    }
+  }
+]
