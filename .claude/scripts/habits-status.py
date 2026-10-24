@@ -57,7 +57,9 @@ from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime, timezone
 from pathlib import Path
 
-from _lib import epr_client
+# The harnesses load this file by path, so its own directory is not on sys.path for them.
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+from _lib import epr_client  # noqa: E402
 
 try:
     import yaml

@@ -31,7 +31,9 @@ import os
 import subprocess
 import sys
 
-from _lib import epr_client
+# A harness may load this file by path; its own directory is not then on sys.path.
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+from _lib import epr_client  # noqa: E402
 
 PROJECT = os.environ.get("CLAUDE_PROJECT_DIR") or os.path.dirname(
     os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
