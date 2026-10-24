@@ -207,6 +207,15 @@ only triggers a local resolve.
   `current_exe()` is the CID binary itself, so self-hashing checks (the recall executor's digest,
   `evaluator_identity()`) see the real bytes. Resolution order: `EPR_BIN` (the candidate under
   test), then an explicit dev-context pin, then the session's pin, then the committed pointer.
+- **The launcher must be the `epr` PATH reaches.** On 2026-10-24 the second workspace showed two
+  ways around it. A `~/.local/bin/epr` linked to an Oct-10 pool build shadowed it from earlier on
+  PATH, and a hand `cargo install` wrote a plain binary over it.
+  - A link into a build output that sits ahead of the launcher is drift. The SessionStart guard
+    repoints it at the launcher.
+  - Any other shadow is reported by name and never touched.
+  - A hand-installed binary is kept as a dev-context build, runnable by pinning its CID, before
+    the launcher takes its path back.
+  - `just status device` refuses while anything shadows the launcher.
 
 ### 5.5 Sessions pin. Switches happen at boundaries.
 
