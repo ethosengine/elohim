@@ -626,6 +626,7 @@ process_start_ticks() { # <pid> — guards a persisted pid against PID reuse
 
 conductor_pid_has_owned_config() { # <pid> [peer-name]
   local pid="$1" only_name="${2:-}" cwd="" value="" canonical_value name
+  local root sandbox config
   local -a argv=()
   local i
   [ -r "/proc/$pid/cmdline" ] || return 1
@@ -652,6 +653,20 @@ conductor_pid_has_owned_config() { # <pid> [peer-name]
       [ -z "$only_name" ] || [ "$name" = "$only_name" ] || continue
       [ "$canonical_value" = "$(readlink -m "$LOCAL_DEV_DIR/$name/conductor-config.yaml")" ] && return 0
     done
+    # Late joiners remain owned after PEERS returns to the boot roster. Only
+    # saved sandboxes inside THIS fixture may extend the shutdown selection.
+    if [ -z "$only_name" ] && [ -r "$LOCAL_DEV_DIR/.hc" ]; then
+      root="$(readlink -m "$LOCAL_DEV_DIR")"
+      while IFS= read -r sandbox || [ -n "$sandbox" ]; do
+        [ -n "$sandbox" ] || continue
+        case "$sandbox" in /*) ;; *) sandbox="$LOCAL_DEV_DIR/$sandbox" ;; esac
+        sandbox="$(readlink -m "$sandbox")"
+        case "$sandbox" in "$root"/*) ;; *) continue ;; esac
+        config="$(readlink -m "$sandbox/conductor-config.yaml")"
+        case "$config" in "$root"/*) ;; *) continue ;; esac
+        [ "$canonical_value" = "$config" ] && return 0
+      done < "$LOCAL_DEV_DIR/.hc"
+    fi
   done
   return 1
 }
@@ -3193,28 +3208,45 @@ clear_mesh_pidfiles() {
 }
 
 stop_all() {
-  local pids=() fallback=() pid
+  local pids=() fallback=() survivors=() pid state deadline
   stop_recorded_arks || return 1
   while IFS= read -r pid; do pids+=("$pid"); done < <(recorded_mesh_pids)
   while IFS= read -r pid; do pids+=("$pid"); done \
     < <(listener_pids_for_ports $(mesh_owned_ports))
   terminate_mesh_pids "${pids[@]}"
 
-  # Pattern matching is deliberately last. It runs only when the exact
-  # ownership paths found nothing or a declared mesh port remains occupied.
-  if [ ${#pids[@]} -eq 0 ] || mesh_ports_busy; then
-    while IFS= read -r pid; do fallback+=("$pid"); done < <(fallback_pattern_pids)
-    if [ ${#fallback[@]} -gt 0 ]; then
-      echo "WARN: PID/port shutdown was incomplete; using validated process-name fallback" >&2
-      terminate_mesh_pids "${fallback[@]}"
-    fi
+  # Always sweep: an unrecorded late joiner can outlive the configured peers
+  # without holding any of their declared ports.
+  while IFS= read -r pid; do fallback+=("$pid"); done < <(fallback_pattern_pids)
+  if [ ${#fallback[@]} -gt 0 ]; then
+    echo "WARN: PID/port shutdown was incomplete; using validated process-name fallback" >&2
+    terminate_mesh_pids "${fallback[@]}"
   fi
 
-  clear_mesh_pidfiles
-  if mesh_ports_busy; then
-    echo "WARN: mesh stopped, but one or more declared mesh ports remain occupied" >&2
+  # SIGKILL may still be settling; zombies have exited and only await reaping.
+  # Keep the registry if any owned process survives so a retry retains evidence.
+  deadline=$((SECONDS + 3))
+  while :; do
+    survivors=()
+    while IFS= read -r pid; do
+      state="$(sed 's/^[^)]*) //' "/proc/$pid/stat" 2>/dev/null | awk '{print $1}')"
+      [ -n "$state" ] && [ "$state" != Z ] && [ "$state" != X ] && survivors+=("$pid")
+    done < <({ recorded_mesh_pids; listener_pids_for_ports $(mesh_owned_ports); fallback_pattern_pids; } | sort -un)
+    [ ${#survivors[@]} -eq 0 ] && break
+    [ "$SECONDS" -lt "$deadline" ] || break
+    sleep 0.1
+  done
+  if [ ${#survivors[@]} -gt 0 ]; then
+    for pid in "${survivors[@]}"; do
+      echo "REFUSED mesh stop: owned process pid=$pid remains; inspect /proc/$pid and retry stop" >&2
+    done
     return 1
   fi
+  if mesh_ports_busy; then
+    echo "REFUSED mesh stop: declared ports remain occupied; inspect their listeners and retry stop" >&2
+    return 1
+  fi
+  clear_mesh_pidfiles
   echo "mesh stopped"
 }
 
@@ -4080,8 +4112,29 @@ restart_conductors() {
   guard_conductor_data_roots conductors-restart || return 1
   cd "$LOCAL_DEV_DIR" || exit 2
 
-  local fports="" aports="" i=0
-  for _ in "${PEERS[@]}"; do
+  local fports="" aports="" i=0 name index sandbox expected
+  local indices=()
+  for name in "${PEERS[@]}"; do
+    if [ "${MESH_CONDUCTOR_LAUNCH:-hc}" != direct ] && [ "${MESH_CONDUCTOR_LAUNCH:-hc}" != ark ]; then
+      # .hc also retains late joiners. Select the configured peers in the same
+      # order as -f, never `run -a`, which would launch every saved sandbox.
+      expected="$(readlink -m "$LOCAL_DEV_DIR/$name")"
+      index=0
+      if [ -r "$LOCAL_DEV_DIR/.hc" ]; then
+        while IFS= read -r sandbox || [ -n "$sandbox" ]; do
+          case "$sandbox" in /*) ;; *) sandbox="$LOCAL_DEV_DIR/$sandbox" ;; esac
+          if [ "$(readlink -m "$sandbox")" = "$expected" ]; then
+            indices+=("$index")
+            break
+          fi
+          index=$((index+1))
+        done < "$LOCAL_DEV_DIR/.hc"
+      fi
+      if [ ${#indices[@]} -ne $((i+1)) ]; then
+        echo "REFUSED conductor resume: $name has no entry in $LOCAL_DEV_DIR/.hc; restore its saved sandbox entry before retrying" >&2
+        return 1
+      fi
+    fi
     fports+="${fports:+,}$(admin_port $i)"; aports+="${aports:+,}$(app_port $i)"; i=$((i+1))
   done
 
@@ -4239,7 +4292,7 @@ CFGEOF
       # storage peer is left with nothing to talk to.
       local _pflag=""
       [ "${MESH_ATTACH_APP_PORTS:-0}" = "1" ] && _pflag=" -p=$aports"
-      setsid nohup sh -c "echo test | hc sandbox --piped -f $fports run -a$_pflag" >> .sandbox_run_log 2>&1 &
+      setsid nohup sh -c "echo test | hc sandbox --piped -f $fports run ${indices[*]}$_pflag" >> .sandbox_run_log 2>&1 &
       record_mesh_pid conductor-supervisor mesh "$!" || true
     )
   fi
