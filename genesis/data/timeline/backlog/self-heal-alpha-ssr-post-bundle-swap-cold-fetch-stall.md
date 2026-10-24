@@ -1168,6 +1168,11 @@ milliseconds, and its `/admin/self-healing` warmup reports
 `Failed to connect to http://elohim-adam-alpha...:8090/api/v1/cache/stream`. That points at adam's
 storage (connect), not at the lookup. The single-flight book may remove the slow-lookup share there
 too (30 "slow name lookup" lines at 854-885 ms on that pod), but it is a separate concern.
+Two bursts on `elohim-adam-alpha` on 2026-10-23, read during the same pass by a second workspace whose
+duplicate fix was discarded in favour of the one applied here, are the instances to re-read after
+the deploy:
+- 09:02:55Z: slow lookups at 854-883 ms;
+- 10:45:38Z: 28 abandoned lookups.
 
 ## Verification
 
