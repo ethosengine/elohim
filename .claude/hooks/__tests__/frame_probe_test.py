@@ -47,6 +47,7 @@ import sys
 import tempfile
 import time
 import unittest
+from unittest import mock
 import uuid
 from pathlib import Path
 
@@ -303,12 +304,13 @@ class FrameProbeCase(unittest.TestCase):
                 "source": "pending", "verdict": "abstain", "nonce": "2c2c2c2c2c2c2c2c"}
         led.write_text(json.dumps(mine) + "\n")
         hook = load_hook()
-        hook.epr_client.resolve_binary = lambda: None
         saved = dict(os.environ)
         os.environ.update(self.env())
+        # Patched for this test only: the module object is shared with every later test.
         try:
-            hook.classify_child(["note.md", "sid-1", mine["ts"], mine["nonce"]],
-                                io.StringIO("The learner is self-sovereign here.\n"))
+            with mock.patch.object(hook.epr_client, "resolve_binary", lambda *_: None):
+                hook.classify_child(["note.md", "sid-1", mine["ts"], mine["nonce"]],
+                                    io.StringIO("The learner is self-sovereign here.\n"))
         finally:
             os.environ.clear()
             os.environ.update(saved)
