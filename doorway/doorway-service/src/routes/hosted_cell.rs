@@ -713,7 +713,7 @@ mod tests {
             window.num_seconds() <= (RUNNER_TERMS.rotation_ttl_days as i64) * 86_400,
             "the runner window must fit inside its rotation lifetime"
         );
-        assert!(RUNNER_TERMS.rate_per_hour > 0);
+        const { assert!(RUNNER_TERMS.rate_per_hour > 0) };
     }
 
     /// The runner's generosity must never leak into the promise made to a

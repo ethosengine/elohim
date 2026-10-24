@@ -21,6 +21,7 @@ build-dev:
 # Run tests
 test:
     cargo test --lib --bins
+    cargo test --test schema_contract
 
 # Type-check without building
 check:
@@ -28,7 +29,7 @@ check:
 
 # Lint with clippy
 clippy:
-    cargo clippy -- -D warnings
+    cargo clippy --all-targets -- -D warnings
 
 # Format code
 fmt:

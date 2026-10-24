@@ -1216,7 +1216,7 @@ mod tests {
         assert!(!ssr_dns_lookup_is_slow(SSR_DNS_SLOW_LOOKUP_MS - 1));
         assert!(ssr_dns_lookup_is_slow(SSR_DNS_SLOW_LOOKUP_MS));
         // A lookup must be named before it can stall a fetch, never after.
-        assert!(SSR_DNS_SLOW_LOOKUP_MS < 1_200);
+        const { assert!(SSR_DNS_SLOW_LOOKUP_MS < 1_200) };
     }
 
     #[tokio::test]
@@ -1407,6 +1407,10 @@ mod tests {
     }
 
     #[tokio::test]
+    #[allow(
+        clippy::await_holding_lock,
+        reason = "the held std guard IS the test's gate: it keeps the blocking-pool lookup parked while the async side is observed; the lookup runs on its own blocking thread, so the guard cannot starve the runtime"
+    )]
     async fn a_burst_of_resolves_for_one_host_shares_one_lookup() {
         let calls = Arc::new(AtomicUsize::new(0));
         let gate = Arc::new(std::sync::Mutex::new(()));
@@ -1446,6 +1450,10 @@ mod tests {
     }
 
     #[tokio::test]
+    #[allow(
+        clippy::await_holding_lock,
+        reason = "the held std guard IS the test's gate: it keeps the blocking-pool lookup parked while the async side is observed; the lookup runs on its own blocking thread, so the guard cannot starve the runtime"
+    )]
     async fn a_cut_waiter_does_not_throw_the_lookup_away() {
         let calls = Arc::new(AtomicUsize::new(0));
         let gate = Arc::new(std::sync::Mutex::new(()));
@@ -1475,6 +1483,10 @@ mod tests {
     }
 
     #[tokio::test]
+    #[allow(
+        clippy::await_holding_lock,
+        reason = "the held std guard IS the test's gate: it keeps the blocking-pool lookup parked while the async side is observed; the lookup runs on its own blocking thread, so the guard cannot starve the runtime"
+    )]
     async fn a_hung_refresh_serves_the_last_good_answer_within_the_grace() {
         let calls = Arc::new(AtomicUsize::new(0));
         let gate = Arc::new(std::sync::Mutex::new(()));

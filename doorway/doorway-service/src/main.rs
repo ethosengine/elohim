@@ -2335,10 +2335,6 @@ mod inbound_max_tests {
     }
 
     #[test]
-    #[allow(
-        clippy::assertions_on_constants,
-        reason = "the const relation IS the pinned invariant"
-    )]
     fn inbound_max_read_floors_and_defaults() {
         std::env::remove_var("DOORWAY_MAX_INFLIGHT_READ");
         assert_eq!(
@@ -2346,10 +2342,12 @@ mod inbound_max_tests {
             DEFAULT_MAX_INFLIGHT_READ,
             "unset => read default (larger than write pool)"
         );
-        assert!(
-            DEFAULT_MAX_INFLIGHT_READ > DEFAULT_MAX_INFLIGHT,
-            "reads get a larger floor than writes"
-        );
+        const {
+            assert!(
+                DEFAULT_MAX_INFLIGHT_READ > DEFAULT_MAX_INFLIGHT,
+                "reads get a larger floor than writes"
+            )
+        };
         std::env::set_var("DOORWAY_MAX_INFLIGHT_READ", "0");
         assert_eq!(inbound_max_read(), MIN_MAX_INFLIGHT, "0 clamped to floor");
         std::env::set_var("DOORWAY_MAX_INFLIGHT_READ", "1024");

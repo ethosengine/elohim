@@ -19,7 +19,8 @@
     "dailyBandwidthLimit",
     "bandwidthPercent",
     "isSteward",
-    "keyExported"
+    "keyExported",
+    "agentPubKey"
   ],
   "properties": {
     "humanId": {
@@ -102,6 +103,23 @@
       "type": "string",
       "format": "date-time",
       "description": "RFC3339 UTC timestamp (seconds precision) of the last login \u2014 see stewardshipAt for why the format is pinned. Absent when never logged in (serde skip_serializing_if)"
+    },
+    "agentPubKey": {
+      "type": "string",
+      "description": "The agent key this account currently answers to (uhCAk\u2026). Always present"
+    },
+    "agencyPhase": {
+      "type": "string",
+      "enum": ["hosted", "doorway", "node", "device"],
+      "description": "Which phase of agency the account is in. Absent on rows older than 2026-10-15 (serde skip_serializing_if)"
+    },
+    "nodeKeyBoundAt": {
+      "type": "string",
+      "description": "RFC3339 timestamp of when the human bound this account onto their own node's key. Absent until bound (serde skip_serializing_if)"
+    },
+    "previousAgentPubKey": {
+      "type": "string",
+      "description": "The agent key the account answered to before the node-key bind. Absent until bound (serde skip_serializing_if)"
     },
     "displayName": {
       "type": "string",

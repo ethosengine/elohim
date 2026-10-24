@@ -78,6 +78,22 @@ export interface AccountResponse {
    */
   lastLoginAt?: string;
   /**
+   * The agent key this account currently answers to (uhCAk…). Always present
+   */
+  agentPubKey: string;
+  /**
+   * Which phase of agency the account is in. Absent on rows older than 2026-10-15 (serde skip_serializing_if)
+   */
+  agencyPhase?: 'hosted' | 'doorway' | 'node' | 'device';
+  /**
+   * RFC3339 timestamp of when the human bound this account onto their own node's key. Absent until bound (serde skip_serializing_if)
+   */
+  nodeKeyBoundAt?: string;
+  /**
+   * The agent key the account answered to before the node-key bind. Absent until bound (serde skip_serializing_if)
+   */
+  previousAgentPubKey?: string;
+  /**
    * The name this human registered under — a doorway-local projection of their Human profile on the DHT, so an account page can greet a person rather than an identifier. Absent on rows that predate the field (serde skip_serializing_if)
    */
   displayName?: string;

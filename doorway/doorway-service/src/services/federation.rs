@@ -3544,12 +3544,14 @@ mod tests {
         #[test]
         fn expiry_lands_within_fifteen_minutes_at_the_configured_cadence() {
             // Probe round = 5 heartbeat ticks (spawn_heartbeat_task).
-            let round_secs = 5 * 60; // FederationConfig::from_args heartbeat
-            assert!(PROBE_ROSTER_EXPIRY_ROUNDS * round_secs <= 15 * 60);
-            assert!(
-                PROBE_ROSTER_EXPIRY_ROUNDS >= 2,
-                "one missed probe is not death"
-            );
+            const ROUND_SECS: u64 = 5 * 60; // FederationConfig::from_args heartbeat
+            const {
+                assert!(PROBE_ROSTER_EXPIRY_ROUNDS * ROUND_SECS <= 15 * 60);
+                assert!(
+                    PROBE_ROSTER_EXPIRY_ROUNDS >= 2,
+                    "one missed probe is not death"
+                );
+            }
         }
 
         #[test]
