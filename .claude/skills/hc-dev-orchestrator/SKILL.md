@@ -440,7 +440,9 @@ PeerStatus heartbeat holds a fourth, unsupervised client — so `/health conduct
 **parked mesh copy** (`/projects/.cargo-target-pool/family/dev/elohim__elohim-storage/mesh-bin/elohim-storage`,
 built with `--features "p2p p2p-iroh"` in the dev slot and copied there, where `just gate`'s
 `cargo test` cannot overwrite it) — `hc-mesh.sh`'s `print_iroh_build_command` prints the exact pair when a
-Rust cure must reach the mesh.
+Rust cure must reach the mesh. With no mesh copy, `mesh preflight` REFUSES the defaulted dev/debug
+slot (2026-10-24: a push's gate rewrote it under the running peers and every storage restart arm
+then refused); `just mesh build storage` installs the copy, and an explicit `STORAGE_BIN` is never refused.
 
 `doorway-restart <a|b|c>` (`just mesh doorway-restart`, 2026-09-26) is the doorway twin: it re-execs one
 doorway on the binary now at its path with its captured environment. The gate's `cargo test` does not
