@@ -1,4 +1,4 @@
-@e2e @devflow @concern:devices-share-one-berth @act:host
+@e2e @devflow @concern:devices-share-one-berth @act:host @requires:epr-cli @local
 Feature: Devices share one berth — a shared resource is held once across all of a person's workspaces
   As a developer who works in two development workspaces that are both my devices
   I want a claim on a resource the two workspaces share to count only after my other device has seen it

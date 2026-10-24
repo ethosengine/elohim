@@ -17,9 +17,10 @@
  *     is a device whose clock differs from the real one, which a device may have; the stamp is the
  *     claim's own record, and both devices then compare those recorded values.
  *
- * The `epr` used is $EPR_BIN, else the eprfs gate target's debug build; it must be newer than every
- * tracked eprfs source, or the scenario fails naming the build command (a stale binary once passed
- * a smoke by luck).
+ * The `epr` used is the one the @requires:epr-cli guard resolves ($EPR_BIN, else `epr` on PATH).
+ * With none the scenario is held (skipped, not failed), as every @requires:epr-cli scenario is; with
+ * one it must be newer than every tracked eprfs source, or the scenario fails naming the build
+ * command (a stale binary once passed a smoke by luck).
  */
 import assert from 'node:assert/strict';
 import { readFileSync, rmSync, writeFileSync } from 'node:fs';
@@ -58,6 +59,7 @@ import {
   verdict,
   waitFor,
 } from './devices-share-one-berth.fixture.js';
+import { holdWithoutEpr } from './epr-binary.js';
 
 const fixtures = new WeakMap<object, Fixture>();
 
@@ -67,8 +69,13 @@ function state(world: object): Fixture {
   return f;
 }
 
-Before({ tags: TAG }, function () {
+// This file loads before the guard, and cucumber skips every later `Before` once one returns
+// 'skipped': so this hook holds the scenario itself, the guard's way, before it checks the binary.
+Before({ tags: TAG }, function (scenario) {
+  const held = holdWithoutEpr(scenario);
+  if (held) return held;
   checkEpr();
+  return undefined;
 });
 
 After({ tags: TAG }, async function () {

@@ -19,55 +19,12 @@
  * `declared.notMeasured` needs it to be. Present-but-broken is out of scope by design — this
  * resolves the binary the same way `spawnSync` will, and nothing more.
  */
-import { accessSync, constants, statSync } from 'node:fs';
-import { delimiter, isAbsolute, join } from 'node:path';
-
 import { Before } from '@cucumber/cucumber';
 
-/** The same spelling every devflow step file uses to name the binary. */
-const binary = process.env.EPR_BIN ?? 'epr';
+import { holdWithoutEpr } from './epr-binary.js';
 
-function isExecutableFile(candidate: string): boolean {
-  try {
-    if (!statSync(candidate).isFile()) return false;
-    accessSync(candidate, constants.X_OK);
-    return true;
-  } catch {
-    return false;
-  }
-}
-
-/**
- * Resolve `binary` exactly the way `spawnSync` would: a name carrying a separator is taken as a
- * path, a bare name is searched along PATH. Computed once — PATH does not change mid-run, and a
- * per-scenario stat storm would buy nothing.
- */
-function resolveEprBinary(): string | null {
-  if (isAbsolute(binary) || binary.includes('/')) {
-    return isExecutableFile(binary) ? binary : null;
-  }
-  for (const entry of (process.env.PATH ?? '').split(delimiter)) {
-    if (entry.length === 0) continue;
-    const candidate = join(entry, binary);
-    if (isExecutableFile(candidate)) return candidate;
-  }
-  return null;
-}
-
-const resolved = resolveEprBinary();
-let announced = false;
-
+// The resolver and the held line live in epr-binary.ts, so a feature whose own `Before` needs the
+// binary resolves it the same way and holds the same way.
 Before({ tags: '@requires:epr-cli' }, function (scenario) {
-  if (resolved !== null) return undefined;
-  if (!announced) {
-    announced = true;
-    // eslint-disable-next-line no-console
-    console.log(
-      `  ⏭️  HELD (@requires:epr-cli): \`${binary}\` is not on PATH in this image — ` +
-        'every scenario carrying this tag is skipped, not failed (not measured, not green).'
-    );
-  }
-  // eslint-disable-next-line no-console
-  console.log(`  ⏭️  HELD (@requires:epr-cli): "${scenario.pickle.name}"`);
-  return 'skipped';
+  return holdWithoutEpr(scenario);
 });

@@ -22,12 +22,14 @@ import {
 import { tmpdir } from 'node:os';
 import { join, relative, resolve } from 'node:path';
 
+import { eprBinary, resolvedEpr } from './epr-binary.js';
+
 export const TAG = '@concern:devices-share-one-berth';
 export const repository = resolve('../..');
 export const HANDLE = 'matthew';
-// The eprfs gate's own debug target; only read (its mtime and the binary), never written here.
-// eslint-disable-next-line sonarjs/publicly-writable-directories
-export const EPR = process.env.EPR_BIN ?? '/tmp/eprfs-gate-target/debug/epr';
+// The `epr` the @requires:epr-cli guard resolves ($EPR_BIN, else `epr` on PATH): one resolver, so
+// a run the guard holds is a run this fixture never starts. Only read (its mtime and the binary).
+export const EPR = resolvedEpr ?? eprBinary;
 export const POLICY = join(repository, 'genesis/agentic/pool-policy.json');
 export const ROSTER = `.eprfs/status/participants/${HANDLE}.jsonl`;
 export const DEV = 'dev-integration';
@@ -341,7 +343,8 @@ export function checkEpr(): void {
   if (eprChecked === EPR) return;
   const build =
     'CARGO_TARGET_DIR=/tmp/eprfs-gate-target RUSTFLAGS= cargo build --manifest-path ' +
-    'elohim/eprfs/Cargo.toml -p elohim-epr-cli --bin epr (or set EPR_BIN)';
+    'elohim/eprfs/Cargo.toml -p elohim-epr-cli --bin epr, then set EPR_BIN=/tmp/eprfs-gate-target/debug/epr ' +
+    '(or put a fresh epr first on PATH)';
   assert.ok(existsSync(EPR), `no epr at ${EPR} — build it: ${build}`);
   const files = must(
     runSync(['git', 'ls-files', ...eprSources()], { cwd: repository }),
