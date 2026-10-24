@@ -228,6 +228,16 @@ only triggers a local resolve.
   carried in the environment. Every hook and tool inside one session therefore runs one CID. A
   gate that publishes a new head does not adopt it mid-session. Its candidate tests already ran
   the new build by explicit path.
+- **A daemon follows the device head, never the session that started it.** `epr peer serve` is
+  the same `epr` binary running as a long-lived process. The registry declares it in
+  `bin-tools.json` under `longRunning`. Two rules apply:
+  - The launcher resolves `current` for it and ignores the launching session's pin.
+  - It writes a lease keyed by the daemon's own pid and start time. `exec` keeps the pid, so gc
+    keeps that build for exactly as long as the daemon runs.
+- **The plain-terminal gap.** A human terminal with no Claude process above it has no session pin,
+  so each call resolves `current`, and two consecutive commands can straddle a landing. A shell-
+  or TTY-level pin closes this later. Until then, that is the one place a mid-sequence switch can
+  happen.
 - Long-running processes (mesh storage, doorway) switch at a restart. The device schedules the
   restart, which is the "scheduling" residual of §4.2. Spawning goes through the exec floor: only a
   verified release, re-hashed at spawn, with the CID that ran recorded.
@@ -251,6 +261,28 @@ rules for that class (`epr-evaluator-guard.py`, `assert_binary_newer_than_source
 deliberate run of an older CID stays possible as a declared pin, recorded the way
 `MESH_ALLOW_STALE_BINARY` overrides are today.
 
+### 5.8 brit follows its attested pin
+
+brit is the second followed tool, and it shares the same store and launcher (`bin-store --tool brit`).
+Only what moves its head differs:
+
+- **The head is a pin.** brit's head is the `elohim/brit` gitlink on published `dev`.
+- **Moving it needs an attestation.** The pin may move only when `gate-attest.mjs` judges `Tests pass`
+  a success on that SHA. A "claimed" result from an unreachable read is not enough. `land` enforces this
+  itself, so every path inherits it.
+- **The release holds three bins plus an alias:** `brit`, `brit-build-ref` and `brit-verify`, plus
+  `rakia`, which is `brit` exec'd under the name `rakia`. The release is addressed by the hash of its
+  canonical `SHA256SUMS`.
+- **Where the bytes come from, in order:**
+  1. The prerelease `brit-build-<sha12>`, which brit's own CI publishes after `ci` succeeds on main
+     (ethosengine/brit PR #3). Every checksum is verified, and `brit --version` must name the pin.
+  2. Otherwise a local build. The cargo credential for Nexus is `CARGO_REGISTRIES_ELOHIM_TOKEN`, or
+     the device's `NPM_TOKEN` passed as `Bearer …`. It travels in the environment only and is never
+     printed.
+  3. Otherwise a refusal naming both cures.
+- **What a session means for brit.** brit's natural session is a gate run or a push. Pinning there
+  is about evidence rather than convenience: one push runs one brit from start to finish.
+
 ## 6. Slices, each admitting the next
 
 The ladder is the elected-content spec's: local → hybrid → mesh → cluster.
@@ -260,7 +292,7 @@ The ladder is the elected-content spec's: local → hybrid → mesh → cluster.
    Delivers the first sentence of the graduation trigger, and cures the smoke incident and the
    recall refusal.
    *Added 2026-10-24 (operator: "resolve them"):* a device that only **pulls** must still
-   converge. So at session start the guard runs `epr-store follow`, which builds and lands the
+   converge. So at session start the guard runs `bin-store --tool epr follow`, which builds and lands the
    checkout's HEAD when all four hold:
    - HEAD is contained in published `origin/dev`;
    - HEAD descends from the landed head's commit;
@@ -315,10 +347,18 @@ CID it ran. A bad build costs one failed health check and nothing else.
 
 ## 9. Left to the builder
 
+- **Slice 3 work for the `epr` daemon:**
+  - restart onto a new head at a boundary, under `ark` and spawned from a verified release, together
+    with `elohim-node`;
+  - `epr peer status` naming the daemon's CID;
+  - tolerance between a pinned CLI and a daemon on another build.
+- **Carrying landed heads on the steward channel.** `epr peer serve` already gossips `ChannelHead`,
+  which is the natural transport for slices 2 and 4.
+
 - `epr integrate`'s atomic fast-forward (`elohim/eprfs/epr-cli/src/flow/integrate.rs`) is a second
   way to land on `dev`. Slice 1 wires the pre-push, because the main tree has `dev` checked out
   and lands by push. Slice 2 should make `integrate` publish too.
-- Slice 1's store and launcher are Python (`.claude/scripts/_lib/epr_store.py`). That is
+- Slice 1's store and launcher are Python (`.claude/scripts/_lib/bin_store.py`). That is
   deliberately a sketch of the local rung, not the durable home: the operator's 2026-10-22 ruling
   gives the lowest-level primitives first-class Rust. They retire into native code at slice 2, when
   following moves into the adoption path and the launcher becomes a native exec. The native launcher
