@@ -906,6 +906,27 @@ def test_source_paths_fall_back_to_the_whole_tree_without_a_cargo_answer(tmp_pat
     assert bin_store.source_paths(tmp_path) == ["."]
 
 
+def test_source_paths_resolve_only_the_host_platform(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    # Unfiltered, an offline resolve needs other platforms' crates and cargo exits 101.
+    calls: list[list[str]] = []
+    crate = tmp_path / "elohim" / "eprfs" / "epr-cli"
+
+    def run(argv: list[str], **_kwargs: object) -> subprocess.CompletedProcess[str]:
+        calls.append(argv)
+        if argv[0] == "rustc":
+            return subprocess.CompletedProcess(argv, 0, "rustc 1.96.1\nhost: x86_64-unknown-linux-gnu\n", "")
+        if "--filter-platform" not in argv:
+            return subprocess.CompletedProcess(argv, 101, "", "--offline was specified")
+        packages = [{"source": None, "manifest_path": str(crate / "Cargo.toml")}]
+        return subprocess.CompletedProcess(argv, 0, json.dumps({"packages": packages}), "")
+
+    monkeypatch.setattr(subprocess, "run", run)
+    assert bin_store.source_paths(tmp_path) == ["elohim/eprfs", "elohim/eprfs/epr-cli"]
+    assert calls[-1][calls[-1].index("--filter-platform") + 1] == "x86_64-unknown-linux-gnu"
+
+
 def test_shadows_lists_every_epr_reached_before_the_launcher(
     scratch: tuple[Path, Path, str], tmp_path: Path
 ) -> None:

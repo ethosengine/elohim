@@ -336,19 +336,29 @@ def source_paths(repo: Path) -> list[str]:
     The main checkout is never wholly clean (hooks append to `.claude/data` ledgers), so
     "clean" must mean epr's own inputs. When cargo cannot answer, the whole tree is the
     scope: a refusal is safer than certifying bytes nobody looked at.
+
+    The graph is filtered to the host that builds epr: unfiltered, an offline resolve needs
+    every platform's crates (android_system_properties, …) that no host build downloads, so
+    cargo exited 101 and every candidate read as a dirty build of the whole tree.
     """
     import json
     import subprocess
 
     try:
+        rustc = subprocess.run(
+            ["rustc", "-vV"], capture_output=True, text=True, timeout=30, check=True
+        )
+        host = next(line.split(":", 1)[1].strip()
+                    for line in rustc.stdout.splitlines() if line.startswith("host:"))
         result = subprocess.run(
             ["cargo", "metadata", "--format-version", "1", "--offline",
+             "--filter-platform", host,
              "--manifest-path", str(repo / EPR_WORKSPACE_MANIFEST)],
             capture_output=True, text=True, timeout=60, check=False,
             env={**os.environ, "RUSTFLAGS": ""},
         )
         packages = json.loads(result.stdout)["packages"] if result.returncode == 0 else None
-    except (OSError, subprocess.SubprocessError, ValueError, KeyError):
+    except (OSError, subprocess.SubprocessError, StopIteration, ValueError, KeyError):
         packages = None
     if not packages:
         return ["."]
