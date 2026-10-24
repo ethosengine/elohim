@@ -48,6 +48,16 @@ const base = {
 export default function () {
   return {
     default: { ...base, paths: ['features/**/*.feature'] },
+    // The real-workspace half uses existing peer daemons; local scenarios keep their own fixtures.
+    'devices-share-one-berth': {
+      requireModule: ['tsx'],
+      require: [
+        'steps/devflow/devices-share-one-berth.steps.ts',
+        'steps/devflow/devices-share-one-berth-workspace.steps.ts',
+      ],
+      paths: ['features/devflow/devices-share-one-berth.feature'],
+      format: ['progress'],
+    },
     // Isolated native fixtures: no deployed environment or global E2E hooks.
     ceremony: {
       requireModule: ['tsx'],

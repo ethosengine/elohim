@@ -61,6 +61,7 @@ import {
 } from './devices-share-one-berth.fixture.js';
 import { holdWithoutEpr } from './epr-binary.js';
 
+const LOCAL_TAG = `${TAG} and not @requires:shem`;
 const fixtures = new WeakMap<object, Fixture>();
 
 // Wall-clock bounds only catch a hang; each `epr` call parses the whole flow store, so a loaded
@@ -76,14 +77,14 @@ function state(world: object): Fixture {
 
 // This file loads before the guard, and cucumber skips every later `Before` once one returns
 // 'skipped': so this hook holds the scenario itself, the guard's way, before it checks the binary.
-Before({ tags: TAG }, function (scenario) {
+Before({ tags: LOCAL_TAG }, function (scenario) {
   const held = holdWithoutEpr(scenario);
   if (held) return held;
   checkEpr();
   return undefined;
 });
 
-After({ tags: TAG }, async function () {
+After({ tags: LOCAL_TAG }, async function () {
   const f = fixtures.get(this);
   if (!f) return;
   await Promise.all(Object.values(f.pending).map(p => p?.outcome));
