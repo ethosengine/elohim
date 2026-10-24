@@ -1,4 +1,5 @@
 use super::{files, Refusal, Result, Store};
+use eprfs_core::BlobCid;
 use serde_json::{json, Value};
 use std::{
     collections::BTreeMap,
@@ -212,14 +213,54 @@ impl Store {
                 .and_then(|s| s.split('\t').next())
                 .filter(|s| s.len() == 40)
                 .ok_or_else(|| Refusal::new("gitlink-invalid", path))?;
-            return Ok(json!({"head":sha,"clean":true,"status":""}));
+            let dirty = self.git(
+                repo,
+                &[
+                    "status",
+                    "--porcelain",
+                    "--untracked-files=normal",
+                    "--",
+                    path,
+                ],
+            )?;
+            let lines = format!("{path}\t{sha}\n");
+            return Ok(json!({"head":sha,"clean":dirty.is_empty(),"status":dirty,
+                "closure":[{"path":path,"tree":sha}],
+                "closureCid":BlobCid::compute_raw(lines.as_bytes()).to_string()}));
         }
         let head = self.git(repo, &["rev-parse", "HEAD"])?;
         let paths = self.source_paths(repo);
         let mut args = vec!["status", "--porcelain", "--untracked-files=normal", "--"];
         args.extend(paths.iter().map(String::as_str));
         let dirty = self.git(repo, &args)?;
-        Ok(json!({"head":head,"clean":dirty.is_empty(),"status":dirty}))
+        let mut closure = Vec::new();
+        let mut lines = String::new();
+        for path in paths {
+            let object = if path == "." {
+                "HEAD^{tree}".into()
+            } else {
+                format!("HEAD:{path}")
+            };
+            let tree = self.git(repo, &["rev-parse", "--verify", &object])?;
+            lines.push_str(&format!("{path}\t{tree}\n"));
+            closure.push(json!({"path":path,"tree":tree}));
+        }
+        Ok(json!({"head":head,"clean":dirty.is_empty(),"status":dirty,
+            "closure":closure,"closureCid":BlobCid::compute_raw(lines.as_bytes()).to_string()}))
+    }
+    pub(super) fn require_published(&self, repo: &Path, commit: &str) -> Result<()> {
+        let published = self.config.source["publishedRef"]
+            .as_array()
+            .is_some_and(|refs| {
+                refs.iter().filter_map(Value::as_str).any(|reference| {
+                    self.git_ok(repo, &["merge-base", "--is-ancestor", commit, reference])
+                })
+            });
+        if published {
+            Ok(())
+        } else {
+            Err(Refusal::new("unpublished", "commit is not contained in any publishedRef; land on dev or fetch origin/dev before epr bin land"))
+        }
     }
     pub(super) fn descends(&self, repo: &Path, ancestor: &str, descendant: &str) -> Result<bool> {
         if self.tool != "brit" {

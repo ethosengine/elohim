@@ -315,13 +315,16 @@ fn runtime() -> PeerResult<tokio::runtime::Runtime> {
 }
 
 fn serve(options: Options) -> PeerResult<ExitCode> {
-    let device = Device::open(&options.root, options.handle.as_deref())?;
-    let _serving = ServeLock::acquire(&device.peer_dir)?;
     crate::bin::daemon_store()?.record_running_daemon(
         &std::env::current_exe()?,
         std::process::id(),
         &crate::bin::daemon_proc_root(),
+        std::env::var_os("EPR_BIN")
+            .as_deref()
+            .map(std::path::Path::new),
     )?;
+    let device = Device::open(&options.root, options.handle.as_deref())?;
+    let _serving = ServeLock::acquire(&device.peer_dir)?;
     let allow = allow_list(&options)?;
     if allow.is_empty() {
         eprintln!(

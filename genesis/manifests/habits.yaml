@@ -112,9 +112,9 @@ habits:
       - "a2o @concern:household-follows-head (genesis/a2o/features/devflow/epr-follows-its-head.feature — Act I host, the binary class of this invariant: a device that missed a landing heals at its next session, a session keeps its pinned CID, a failed health check or a dirty build never becomes the head, and moving back is a revert. Spec genesis/docs/superpowers/specs/2026-10-23-household-follows-latest-design.md, slices 1–2 = epr plus brit following its attested gitlink pin on one workspace)"
     evidence: >
       DELTA 2026-10-24e (RED preserved; device-runtime A.4): pre-native arrival now queues one detached native build/migrate/land/install path; daemon leases record executable CID independently of session pins; clean eprfs gates write tree/toolchain/manifest receipts and pre-push reuses exact matches; renewer process-group cleanup closes the sleeper-assignment signal race. Evidence in genesis/local-dev/device-runtime-a4/: epr-follows-head 8/8 scenarios (57 steps), final new scenarios 2/2 (15 steps), final serialized Rust suites 1208 passed EXIT=0 (one earlier parallel rerun hit the unchanged concurrent-fold test), receipt tests 5/5, prepush-berth 10/10, Python client 3/3 and seam census 47 assertions, fmt/clippy and RS-GOV-04 EXIT=0; full gate-runner has the same 10 missing-submodule failures before and after A.4 (new cases all pass). Dup-census unchanged: session 3, ancestry 1, lookup 4, arrival 1, follow 14, config writers 5, head verifiers 1. A.4 pays down observe()'s unexplained suppression; device-runtime remains strict 0, epr-cli integration debt 28→24. Chain household-follows-head / between legacy installation→native arrival / node: a device without the bin verb can bootstrap using the checkout and then run its landed evaluator; probe epr-follows-its-head.feature pre-native-arrival scenario (green). Blind-reader cost: two rounds, correctness 0/0, interpretability 2/2, preference 0/1; first two findings resolved, final READY; remaining interpretation: explain daemon/lease/recent-build terms and make the retention-expiry trigger explicit. No live-store migration, household delivery, fleet claim or status change.
-    evidence-fingerprint: sha256:00238e3853bf41bb
-    evidence-bytes: 259457
-    evidence-entries: 167
+    evidence-fingerprint: sha256:78d0d86388bf9674
+    evidence-bytes: 260438
+    evidence-entries: 168
     guard: >
       Regression risk = the fleet-safety invariants in sync/projector.rs
       (empty-never-projects, reconcile-offers/events-assert, broadcast-tier reach

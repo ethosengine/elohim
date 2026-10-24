@@ -406,14 +406,7 @@ impl Store {
             return Ok(json!({"followed":false,"why":"the landed head is this checkout's HEAD"}));
         }
         let head = self.git(repo, &["rev-parse", "HEAD"])?;
-        let refs: Vec<&str> = self.config.source["publishedRef"]
-            .as_array()
-            .map(|a| a.iter().filter_map(Value::as_str).collect())
-            .unwrap_or_default();
-        if !refs
-            .iter()
-            .any(|r| self.git_ok(repo, &["merge-base", "--is-ancestor", &head, r]))
-        {
+        if self.require_published(repo, &head).is_err() {
             if self.tool == "brit" {
                 return Err(Refusal::new("unpublished", "HEAD is not published on dev"));
             }

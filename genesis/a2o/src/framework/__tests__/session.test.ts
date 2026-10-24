@@ -13,16 +13,23 @@ const cases = JSON.parse(
   env: Record<string, string>;
   startPid: number;
   registry: Registry;
-  processes: [number, number, string, number, number, number][];
+  processes: [number, number, string, number, number, number, Record<string, string> | null][];
   expected: SessionIdentity;
 }[];
 for (const fixture of cases) {
   await test(`session parity: ${fixture.name}`, () => {
     const root = mkdtempSync(join(tmpdir(), 'session-'));
     try {
-      for (const [pid, parent, comm, leader, tty, start] of fixture.processes) {
+      for (const [pid, parent, comm, leader, tty, start, environ] of fixture.processes) {
         const dir = join(root, String(pid));
         mkdirSync(dir);
+        if (environ !== null)
+          writeFileSync(
+            join(dir, 'environ'),
+            Object.entries(environ)
+              .map(([k, v]) => `${k}=${v}\0`)
+              .join('')
+          );
         const fields = Array<string>(20).fill('0');
         fields[0] = 'S';
         for (const [index, value] of [

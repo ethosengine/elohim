@@ -41,6 +41,14 @@ impl Store {
         if state["clean"] != true {
             return Err(Refusal::new("checkout-dirty", repo.display().to_string()));
         }
+        // Gitlink publication is a property of the containing repository commit.
+        // Its pinned tool commit was checked against source_state above.
+        let published_commit = if self.config.source["kind"] == "gitlink" {
+            self.git(repo, &["rev-parse", "HEAD"])?
+        } else {
+            commit.to_owned()
+        };
+        self.require_published(repo, &published_commit)?;
         let old = self.head("current");
         let metadata: Value =
             files::read_json(&self.root.join("current.json")).unwrap_or(Value::Null);

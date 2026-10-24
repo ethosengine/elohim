@@ -12,6 +12,15 @@ fn cases() -> Vec<Value> {
 fn fixture(root: &Path, case: &Value) {
     for row in case["processes"].as_array().unwrap() {
         let row = row.as_array().unwrap();
+        if let Some(environ) = row[6].as_object() {
+            let bytes: Vec<u8> = environ
+                .iter()
+                .flat_map(|(k, v)| format!("{k}={}\0", v.as_str().unwrap()).into_bytes())
+                .collect();
+            let dir = root.join(row[0].to_string());
+            fs::create_dir_all(&dir).unwrap();
+            fs::write(dir.join("environ"), bytes).unwrap();
+        }
         let mut fields = vec!["0".to_owned(); 20];
         fields[0] = "S".into();
         for (index, col) in [(1, 1), (3, 3), (4, 4), (19, 5)] {

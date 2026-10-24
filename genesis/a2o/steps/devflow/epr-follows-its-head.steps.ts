@@ -303,7 +303,7 @@ Given(
     };
     fixtures.set(this, state);
 
-    git(state, ['init', '-q']);
+    git(state, ['init', '-q', '-b', 'dev']);
     writeFileSync(join(repo, 'source.txt'), 'build A\n');
     state.commitA = commit(state, 'source for build A');
 
@@ -734,4 +734,17 @@ Then('build B remains available for its running daemon', function () {
   assert.ok(Array.isArray(result.kept));
   assert.ok(result.kept.includes(state.cidB));
   assert.ok(existsSync(join(state.store, String(state.cidB), 'epr')));
+});
+
+When('build B is ingested from a clean unpublished feature branch', function () {
+  const state = fixture(this);
+  git(state, ['checkout', '-qb', 'unpublished-feature']);
+  const sourceCommit = nextCleanCommit(state);
+  ingest(state, 'B', sourceCommit, true);
+});
+
+When('Matthew tries to revert to stored build B', function () {
+  const state = fixture(this);
+  assert.ok(state.cidB && state.commitB);
+  state.last = land(state, state.cidB, state.commitB, true);
 });

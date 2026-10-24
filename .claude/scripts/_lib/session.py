@@ -77,8 +77,13 @@ def resolve_fallback(*, environ: Mapping[str, str] | None = None, proc_root: Pat
             break
         for runtime in registry["runtimes"]:
             if process["comm"] in runtime["comm"]:
+                try:
+                    inherited = (root / str(pid) / "environ").read_bytes().split(b"\0")
+                except OSError:
+                    inherited = None
                 session = next((env[k].strip() for k in runtime["sessionEnv"]
-                                if env.get(k, "").strip()), None)
+                                if env.get(k, "").strip() and inherited is not None
+                                and f"{k}={env[k]}".encode() not in inherited), None)
                 return _identity(runtime["id"], session or f'{runtime["id"]}-{pid}-{process["start"]}',
                                  (pid, process["start"]), "runtimeAncestor")
         pid = process["parent"]

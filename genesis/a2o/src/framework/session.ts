@@ -119,9 +119,17 @@ export function resolveFallback(options: Options = {}): SessionIdentity {
     if (!ancestor) break;
     const runtime = registry.runtimes.find(r => r.comm.includes(ancestor.comm));
     if (runtime) {
+      let inherited: string[] | undefined;
+      try {
+        inherited = readFileSync(join(root, String(pid), 'environ'), 'utf8').split('\0');
+      } catch {
+        // Unreadable ancestry cannot establish ownership of a native variable.
+      }
       const session =
-        runtime.sessionEnv.map(k => env[k]?.trim()).find(Boolean) ??
-        `${runtime.id}-${pid}-${ancestor.start}`;
+        runtime.sessionEnv
+          .filter(k => inherited !== undefined && !inherited.includes(`${k}=${env[k]}`))
+          .map(k => env[k]?.trim())
+          .find(Boolean) ?? `${runtime.id}-${pid}-${ancestor.start}`;
       return identity(runtime.id, session, [pid, ancestor.start], 'runtimeAncestor');
     }
     pid = ancestor.parent;

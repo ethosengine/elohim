@@ -75,6 +75,7 @@ struct State {
     dirty: bool,
     descended: bool,
     published: bool,
+    published_ref: Option<String>,
     unchanged: bool,
     health_fail: bool,
     health_dirty: bool,
@@ -116,7 +117,7 @@ impl Runner for Fake {
                 "ls-tree" => out = format!("160000 commit {}\telohim/brit", s.head),
                 "merge-base" => {
                     success = if a.last().unwrap().starts_with("refs/") {
-                        s.published
+                        s.published && s.published_ref.as_ref().is_none_or(|r| Some(r) == a.last())
                     } else {
                         s.descended
                     }
@@ -285,6 +286,7 @@ fn proc_entry(root: &Path, pid: u32, parent: u32, comm: &str, start: u64) {
     fields[0] = "S".into();
     fields[1] = parent.to_string();
     fields[19] = start.to_string();
+    atomic_bytes(&root.join(pid.to_string()).join("environ"), b"", 0o644).unwrap();
     atomic_bytes(
         &root.join(pid.to_string()).join("stat"),
         format!("{pid} ({comm}) {}", fields.join(" ")).as_bytes(),
@@ -683,6 +685,7 @@ fn test_gc_holds_lock_and_keeps_heads_live_pins_and_grace() {
             &f.store.root.join("sessions").join(key),
             &Pin {
                 running_cid: None,
+                source: None,
                 cid: r.cid.clone(),
                 session: key.into(),
                 pinned_at: "2026-10-23T00:00:00Z".into(),
@@ -1490,15 +1493,18 @@ fn install_never_overwrites_an_unrelated_destination_symlink() {
 fn running_daemon_identity_and_gc_follow_live_process_not_session_or_head() {
     let f = Fixture::new("epr");
     let r = f.release("daemon");
+    f.head(&r);
     let proc = f.path("proc");
     proc_entry(&proc, 4242, 1, "epr", 777);
     f.store
-        .record_running_daemon(&f.store.root.join(&r.cid).join("epr"), 4242, &proc)
+        .record_running_daemon(&f.store.root.join(&r.cid).join("epr"), 4242, &proc, None)
         .unwrap();
     let live = f.store.live_daemons(&proc).unwrap();
     assert_eq!(live.len(), 1);
     assert_eq!(live[0].running_cid.as_deref(), Some(r.cid.as_str()));
-    // No head was landed. Far beyond grace, only the live process retains these bytes.
+    assert_eq!(live[0].source.as_deref(), Some("current"));
+    fs::remove_file(f.store.root.join("current")).unwrap();
+    // After head removal, only the live process retains these bytes beyond grace.
     let result = f.store.gc(&proc, Some(4_000_000_000)).unwrap();
     assert!(result["kept"].as_array().unwrap().contains(&json!(r.cid)));
     proc_entry(&proc, 4242, 1, "reused-pid", 778);
@@ -1508,4 +1514,178 @@ fn running_daemon_identity_and_gc_follow_live_process_not_session_or_head() {
         .as_array()
         .unwrap()
         .contains(&json!(r.cid)));
+}
+
+#[test]
+fn land_refuses_unpublished_initial_forward_and_revert() {
+    for mode in ["initial", "forward", "revert"] {
+        let f = Fixture::new("epr");
+        if mode != "initial" {
+            let old = f.release("old");
+            f.head(&old);
+            f.state.lock().unwrap().head = "b".repeat(40);
+        }
+        let next = f.release("next");
+        f.state.lock().unwrap().published = false;
+        let before = f.store.head("current");
+        let error = f
+            .store
+            .land(&next.cid, &f.commit(), f.tmp.path(), mode == "revert")
+            .unwrap_err();
+        assert_eq!(error.kind, "unpublished", "{mode}");
+        assert_eq!(f.store.head("current"), before);
+    }
+}
+
+#[test]
+fn direct_daemon_refuses_unverified_and_noncurrent_bytes() {
+    let f = Fixture::new("epr");
+    proc_entry(&f.path("proc"), 4242, 1, "epr", 900);
+    let unverified = f.path("unverified");
+    fs::write(&unverified, b"unverified").unwrap();
+    assert_eq!(
+        f.store
+            .record_running_daemon(&unverified, 4242, &f.path("proc"), None)
+            .unwrap_err()
+            .kind,
+        "daemon-release-unverified"
+    );
+    let old = f.release("old");
+    let current = f.release("current");
+    f.head(&current);
+    assert_eq!(
+        f.store
+            .record_running_daemon(
+                &f.store.root.join(&old.cid).join("epr"),
+                4242,
+                &f.path("proc"),
+                None
+            )
+            .unwrap_err()
+            .kind,
+        "daemon-not-current"
+    );
+    assert!(f.store.live_daemons(&f.path("proc")).unwrap().is_empty());
+}
+
+#[test]
+fn source_closure_cid_covers_sorted_path_dependencies() {
+    let f = Fixture::new("epr");
+    f.state.lock().unwrap().metadata = Some(json!({"packages":[
+        {"source":null,"manifest_path":f.path("z-external/Cargo.toml")},
+        {"source":null,"manifest_path":f.path("a-external/Cargo.toml")}
+    ]}));
+    let state = f.store.source_state(f.tmp.path()).unwrap();
+    let closure = state["closure"].as_array().expect("native source closure");
+    assert_eq!(
+        closure
+            .iter()
+            .map(|p| p["path"].as_str().unwrap())
+            .collect::<Vec<_>>(),
+        ["a-external", "elohim/eprfs", "z-external"]
+    );
+    let lines = format!(
+        "a-external\t{0}\nelohim/eprfs\t{0}\nz-external\t{0}\n",
+        f.commit()
+    );
+    assert_eq!(
+        state["closureCid"],
+        BlobCid::compute_raw(lines.as_bytes()).to_string()
+    );
+}
+
+#[test]
+fn direct_daemon_candidate_requires_exact_declared_path_and_records_source() {
+    let f = Fixture::new("epr");
+    let proc = f.path("proc");
+    proc_entry(&proc, 4242, 1, "epr", 777);
+    let executable = f.path("candidate");
+    fs::write(&executable, b"candidate bytes").unwrap();
+    fs::copy(&executable, f.path("other")).unwrap();
+    assert_eq!(
+        f.store
+            .record_running_daemon(&executable, 4242, &proc, Some(&f.path("other")))
+            .unwrap_err()
+            .kind,
+        "daemon-release-unverified"
+    );
+    f.store
+        .record_running_daemon(&executable, 4242, &proc, Some(&executable))
+        .unwrap();
+    let leases = f.store.live_daemons(&proc).unwrap();
+    assert_eq!(leases[0].source.as_deref(), Some("candidate"));
+    assert_eq!(leases[0].running_cid, Some(file_cid(&executable).unwrap()));
+}
+
+#[test]
+fn source_state_schema_contract() {
+    let schema: Value = serde_json::from_str(include_str!(
+        "../../../../sdk/schemas/v1/views/source-state.schema.json"
+    ))
+    .unwrap();
+    for tool in ["epr", "brit"] {
+        let f = Fixture::new(tool);
+        let value = f.store.source_state(f.tmp.path()).unwrap();
+        for key in schema["required"].as_array().unwrap() {
+            assert!(value.get(key.as_str().unwrap()).is_some());
+        }
+        assert_eq!(
+            value.as_object().unwrap().len(),
+            schema["properties"].as_object().unwrap().len()
+        );
+        assert!(value["head"].is_string());
+        assert!(value["clean"].is_boolean());
+        assert!(value["status"].is_string());
+        let closure = value["closure"].as_array().unwrap();
+        assert!(!closure.is_empty());
+        let mut lines = String::new();
+        let mut previous = None;
+        for row in closure {
+            assert_eq!(row.as_object().unwrap().len(), 2);
+            let path = row["path"].as_str().unwrap();
+            let tree = row["tree"].as_str().unwrap();
+            assert!(previous.is_none_or(|prev| prev < path));
+            assert_eq!(tree.len(), 40);
+            assert!(tree.bytes().all(|b| b.is_ascii_hexdigit()));
+            previous = Some(path);
+            lines.push_str(&format!("{path}\t{tree}\n"));
+        }
+        assert_eq!(
+            value["closureCid"],
+            BlobCid::compute_raw(lines.as_bytes()).to_string()
+        );
+    }
+}
+
+#[test]
+fn land_accepts_either_local_or_remote_published_ref() {
+    for reference in ["refs/heads/dev", "refs/remotes/origin/dev"] {
+        let f = Fixture::new("epr");
+        f.state.lock().unwrap().published_ref = Some(reference.into());
+        let candidate = f.release("published");
+        f.land(&candidate).unwrap();
+        assert_eq!(f.store.head("current"), Some(candidate.cid));
+    }
+}
+
+#[test]
+fn direct_daemon_rehashes_current_release_before_admission() {
+    let f = Fixture::new("epr");
+    let r = f.release("current");
+    f.head(&r);
+    let executable = f.path("running-copy");
+    let stored = f.store.root.join(&r.cid).join("epr");
+    fs::copy(&stored, &executable).unwrap();
+    fs::set_permissions(&stored, fs::Permissions::from_mode(0o755)).unwrap();
+    fs::write(&stored, b"corrupted store").unwrap();
+    let proc = f.path("proc");
+    proc_entry(&proc, 4242, 1, "epr", 777);
+    assert_eq!(
+        f.store
+            .record_running_daemon(&executable, 4242, &proc, None)
+            .unwrap_err()
+            .kind,
+        "daemon-release-unverified"
+    );
+    assert!(f.store.live_daemons(&proc).unwrap().is_empty());
 }

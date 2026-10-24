@@ -643,7 +643,10 @@ pub fn note_with_options(
 /// A separate entry point rather than a ninth parameter on [`note_with_options`]: every existing
 /// caller keeps its signature, and the one act that carries a closure names it at the call site
 /// instead of threading a `None` through the whole family.
-#[allow(clippy::too_many_arguments)]
+#[allow(
+    clippy::too_many_arguments,
+    reason = "The closing entry point mirrors note_with_options plus the --closes claim so no existing caller threads a None"
+)]
 pub fn note_with_options_closing(
     root: &Path,
     on: &str,
@@ -773,7 +776,10 @@ pub fn observe(
 
 /// A local composition may constrain the resolved attribution, but it cannot replace it.
 /// The guard and event/outcome consume one snapshot, retaining its exact actor-claim CID.
-#[allow(clippy::too_many_arguments)]
+#[allow(
+    clippy::too_many_arguments,
+    reason = "Private forwarder over the one locked append path; the note fields are positional persisted slots, not a reusable struct"
+)]
 fn note_with_options_guard(
     root: &Path,
     on: &str,
@@ -807,7 +813,10 @@ fn note_with_options_guard(
 /// exact claim (CID and identity) that was current in the session when the noted act was
 /// performed. Without it the session arm reads the session's latest claim; with it, a claim
 /// appended later in the same session (a subagent persona, say) cannot take the act.
-#[allow(clippy::too_many_arguments)]
+#[allow(
+    clippy::too_many_arguments,
+    reason = "The single locked append path: every note field plus the pinned claim and guard resolve under one snapshot"
+)]
 fn note_with_claim_guard(
     root: &Path,
     on: &str,

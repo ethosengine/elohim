@@ -14,7 +14,7 @@ import { recordCycle } from './gate-cycle.mjs';
 import { gateEvidence, recordEvidence } from './gate-evidence.mjs';
 import { rakiaAffected, resolveRakiaBin } from './gate-oracle.mjs';
 import { runAttested } from './gate-attest.mjs';
-import { rawCid } from './scripts/brit-attest.mjs';
+import { nativeGateKey } from './gate-source-state.mjs';
 
 // GATE_ROOT lets a fixture repository drive the CLI (the a2o pin-attestation story).
 const ROOT = process.env.GATE_ROOT
@@ -167,22 +167,7 @@ function gitDirs(root) {
 export function receiptKey(project, { root = ROOT, env = process.env, run = spawnSync } = {}) {
   const cargo = cargoEnvOf(gateChildEnv(project, env, root));
   if (cargo.EPR_GATE_RECEIPT !== '1' || !cargo.RUSTUP_TOOLCHAIN) return null;
-  const git = args => {
-    const result = run('git', args, { cwd: root, env, encoding: 'utf8', timeout: 10000 });
-    if (result.status !== 0) throw new Error('receipt git read failed');
-    return result.stdout;
-  };
-  try {
-    // Include untracked files. Never certify an in-progress tree or a different checked-out tree.
-    if (git(['status', '--porcelain', '--untracked-files=all', '--', project.dir]).trim()) return null;
-    const commit = env.GATE_COMMIT || 'HEAD';
-    const tree = git(['rev-parse', `${commit}:${project.dir}`]).trim();
-    if (tree !== git(['rev-parse', `HEAD:${project.dir}`]).trim()) return null;
-    const manifest = `${project.dir}/build-manifest.json`;
-    const bytes = git(['show', `${commit}:${manifest}`]);
-    if (bytes !== readFileSync(resolve(root, manifest), 'utf8')) return null;
-    return { tree, toolchain: cargo.RUSTUP_TOOLCHAIN, manifest: rawCid(Buffer.from(bytes)) };
-  } catch { return null; }
+  return nativeGateKey(project, { root, env, run, toolchain: cargo.RUSTUP_TOOLCHAIN });
 }
 
 export function matchingReceipt(key, ledger) {
@@ -314,6 +299,9 @@ function runProject(project, printOnly, namesOnly) {
       root: ROOT,
       jobs: cargoEnvOf(childEnv).CARGO_BUILD_JOBS,
       dirty: evidence.dirty,
+      nativeKey: evidence.nativeKey,
+      env: process.env,
+      cargoEnv: cargoEnvOf(childEnv),
     });
     const note = put.status === 0
       ? `recorded ${String(put.stdout || '').trim().slice(0, 16)}…`

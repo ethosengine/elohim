@@ -1,3 +1,4 @@
+import { gateEvidence, recordEvidence } from './gate-evidence.mjs';
 import { describe, test } from 'node:test';
 import { strict as assert } from 'node:assert';
 import { readFileSync, mkdtempSync, mkdirSync, writeFileSync, rmSync } from 'node:fs';
@@ -453,15 +454,27 @@ function receiptFixture(t) {
     assert.equal(r.status, 0, r.stderr);
     return r.stdout.trim();
   };
-  git(['init', '-q']); git(['add', dir]); git(['commit', '-qm', 'fixture']);
+  mkdirSync(resolve(root, 'crates/external'), {recursive:true});
+  writeFileSync(resolve(root, dir, 'Cargo.toml'), '[workspace]\nmembers=["."]\n[package]\nname="closure-fixture"\nversion="0.1.0"\nedition="2021"\n[lib]\npath="lib.rs"\n[dependencies]\nexternal={path="../../crates/external"}\n');
+  writeFileSync(resolve(root, dir, 'lib.rs'), 'pub fn fixture() {}');
+  writeFileSync(resolve(root, 'crates/external/Cargo.toml'), '[package]\nname="external"\nversion="0.1.0"\nedition="2021"\n[lib]\npath="lib.rs"\n');
+  writeFileSync(resolve(root, 'crates/external/lib.rs'), 'pub fn external() {}');
+  mkdirSync(resolve(root, 'genesis/agentic'), {recursive:true});
+  writeFileSync(resolve(root, 'genesis/agentic/bin-tools.json'), JSON.stringify({version:1,tools:{epr:{bins:['epr'],source:{kind:'repository'}}}}));
+  env.EPR_STORE = resolve(root, 'store');
+  env.EPR_REPO_ROOT = root;
+  env.EPR_BIN_TOOLS = resolve(root, 'genesis/agentic/bin-tools.json');
+  const metadata = spawnSync('cargo', ['metadata', '--offline', '--format-version', '1', '--manifest-path', resolve(root, dir, 'Cargo.toml')], {env, encoding:'utf8'});
+  assert.equal(metadata.status, 0, metadata.stderr);
+  git(['init', '-q']); git(['add', dir, 'crates/external', 'genesis/agentic']); git(['commit', '-qm', 'fixture']);
   const project = { name:'fixture', dir, run:{cargo:{env:{EPR_GATE_RECEIPT:'1', RUSTUP_TOOLCHAIN:'1.96.1'}}} };
   return {root, env, project, git};
 }
 
-test('receipt key uses clean project tree, resolved toolchain and manifest CID', function receipt_key_uses_clean_project_tree(t) {
+test('receipt key uses clean native closure, resolved toolchain and manifest CID', function receipt_key_uses_clean_project_tree(t) {
   const fx = receiptFixture(t);
   const key = receiptKey(fx.project, fx);
-  assert.equal(key.tree, fx.git(['rev-parse', 'HEAD:elohim/eprfs']));
+  assert.match(key.closureCid, /^bafkrei/);
   assert.equal(key.toolchain, '1.96.1');
   assert.match(key.manifest, /^bafkrei/);
   writeFileSync(resolve(fx.root, 'unrelated.txt'), 'outside project');
@@ -469,13 +482,13 @@ test('receipt key uses clean project tree, resolved toolchain and manifest CID',
   writeFileSync(resolve(fx.root, fx.project.dir, 'untracked.rs'), 'unfinished');
   assert.equal(receiptKey(fx.project, fx), null);
   fx.git(['add', fx.project.dir]); fx.git(['commit', '-qm', 'changed tree']);
-  assert.notEqual(receiptKey(fx.project, fx).tree, key.tree);
+  assert.notEqual(receiptKey(fx.project, fx).closureCid, key.closureCid);
   fx.env.GATE_COMMIT = 'HEAD~1';
   assert.equal(receiptKey(fx.project, fx), null, 'never certify a tree other than the checked-out one');
 });
 
 test('only exact successful native receipt slots attest the gate', function receipt_requires_exact_successful_native_slots() {
-  const key = {tree:'abc', toolchain:'1.96.1', manifest:'bafkreimanifest'};
+  const key = {closureCid:'abc', toolchain:'1.96.1', manifest:'bafkreimanifest'};
   const entry = {cid:'bafkreireceipt', kind:'observation', extra:['measure:gate-receipt@1', 'value:1',
     ...Object.entries(key).map(([k,v]) => `env:${k}=${v}`)]};
   assert.equal(matchingReceipt(key, {entries:[entry]}), entry.cid);
@@ -483,7 +496,7 @@ test('only exact successful native receipt slots attest the gate', function rece
     assert.equal(matchingReceipt({...key, [name]:'different'}, {entries:[entry]}), null, name);
   }
   for (const changed of [ {kind:'ruling'}, {via:'other-commitment'}, {cid:'sha256:abc'},
-    {extra:entry.extra.filter(s => s !== 'value:1')}, {extra:[...entry.extra, 'env:tree=ambiguous']} ]) {
+    {extra:entry.extra.filter(s => s !== 'value:1')}, {extra:[...entry.extra, 'env:closureCid=ambiguous']} ]) {
     assert.equal(matchingReceipt(key, {entries:[{...entry,...changed}]}), null);
   }
   assert.equal(findReceipt({}, key, {run:() => ({status:1})}), null);
@@ -495,13 +508,13 @@ test('receipt writes through epr and refuses changed or dirty finishing trees', 
   const key = receiptKey(fx.project, fx);
   const calls = [];
   const run = (bin, args, options) => {
-    if (bin === 'git') return spawnSync(bin, args, options);
+    if (bin === 'git' || args[0] === 'bin') return spawnSync(bin, args, options);
     calls.push(args);
     return {status:0, stdout:JSON.stringify({record_cid:'bafkreireceipt'})};
   };
   assert.equal(writeReceipt(fx.project, key, {...fx, run}), 'bafkreireceipt');
   assert.deepEqual(calls[0].slice(0, 7), ['flow','note','--kind','observation','--measure','gate-receipt@1','--subject']);
-  assert.ok(calls[0].includes(`tree=${key.tree}`));
+  assert.ok(calls[0].includes(`closureCid=${key.closureCid}`));
   assert.ok(calls[0].includes(`manifest=${key.manifest}`));
   writeFileSync(resolve(fx.root, fx.project.dir, 'build-manifest.json'), '{}');
   assert.equal(writeReceipt(fx.project, key, {...fx, run}), null);
@@ -565,4 +578,44 @@ test('pre-push skips the recipe only for a matching receipt and reruns mismatche
   assert.match(dirty.stdout, /RECIPE-RAN/);
   assert.doesNotMatch(dirty.stdout, /attested: receipt/);
   assert.match(dirty.stdout, /receipt: not written/);
+});
+
+test('receipt rejects a dirty path dependency outside the project directory', t => {
+  const fx = receiptFixture(t);
+  mkdirSync(resolve(fx.root, 'crates/external'), {recursive:true});
+  writeFileSync(resolve(fx.root, 'crates/external/lib.rs'), 'dependency');
+  fx.git(['add', 'crates/external']); fx.git(['commit', '-qm', 'dependency']);
+  assert.ok(receiptKey(fx.project, fx));
+  writeFileSync(resolve(fx.root, 'crates/external/lib.rs'), 'changed dependency');
+  assert.equal(receiptKey(fx.project, fx), null);
+});
+
+
+test('gate evidence rejects dirty external dependency and changes key when it is committed', t => {
+  const fx = receiptFixture(t);
+  const project = {...fx.project, manifestPath: `${fx.project.dir}/build-manifest.json`, steps:['build']};
+  const env = {...fx.env, BRIT_BIN:process.execPath, BRIT_BUILD_REF_BIN:process.execPath};
+  const cargoEnv = {RUSTUP_TOOLCHAIN:'1.96.1'};
+  let puts = 0;
+  const spawn = (bin, args, options) => {
+    if (args[0] === 'build' && args[1] === 'fingerprint') return {status:0, stdout:JSON.stringify({fingerprints:[{step:'build',fingerprint:'unchanged-directory'}]})};
+    if (args[2] === 'build' && args[3] === 'find') return {status:0, stdout:'[]'};
+    if (args[2] === 'build' && args[3] === 'put') { puts++; return {status:0,stdout:'stored'}; }
+    return spawnSync(bin,args,options);
+  };
+  const options = {...fx, env, cargoEnv, spawn, commit:fx.git(['rev-parse','HEAD'])};
+  const before = gateEvidence(project, options);
+  assert.ok(before.key, before.line);
+  writeFileSync(resolve(fx.root,'crates/external/lib.rs'), 'pub fn changed() {}');
+  const dirty = gateEvidence(project, options);
+  assert.equal(dirty.key, undefined, dirty.line);
+  assert.equal(recordEvidence(project,before.key,{...options,...before,success:true,seconds:1}).status,1);
+  assert.equal(puts,0);
+  fx.git(['add','crates/external/lib.rs']); fx.git(['commit','-qm','dependency change']);
+  options.commit = fx.git(['rev-parse','HEAD']);
+  const after = gateEvidence(project, options);
+  assert.ok(after.key, after.line);
+  assert.notEqual(after.key,before.key);
+  assert.equal(recordEvidence(project,after.key,{...options,...after,success:true,seconds:1}).status,0);
+  assert.equal(puts,1);
 });

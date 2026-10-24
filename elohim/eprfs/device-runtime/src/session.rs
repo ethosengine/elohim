@@ -132,10 +132,19 @@ pub fn resolve_with(
             .iter()
             .find(|r| r.comm.contains(&ancestor.comm))
         {
-            let session = runtime
-                .session_env
-                .iter()
-                .find_map(|key| nonblank(env(key)))
+            // /proc exposes the environment P inherited at exec. A child value
+            // already there belongs to an outer session, not to P.
+            let inherited = fs::read(proc_root.join(pid.to_string()).join("environ")).ok();
+            let session = inherited
+                .as_ref()
+                .and_then(|bytes| {
+                    runtime.session_env.iter().find_map(|key| {
+                        let raw = env(key)?;
+                        let value = nonblank(Some(raw.clone()))?;
+                        let entry = format!("{key}={raw}");
+                        (!bytes.split(|b| *b == 0).any(|v| v == entry.as_bytes())).then_some(value)
+                    })
+                })
                 .unwrap_or_else(|| format!("{}-{pid}-{}", runtime.id, ancestor.start));
             return identity(
                 &runtime.id,

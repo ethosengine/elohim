@@ -2984,7 +2984,8 @@ decisionPoints:
     file: src/session.rs
     modulePath: elohim_device_runtime::session
   summary: Declared identity precedes the nearest registered ancestor, then controlling TTY leader, then successful
-    none. The walk is cycle-safe and bounded at 256 ancestors.
+    none. A native variable belongs to the nearest runtime only when absent or different in that
+    runtime's inherited environ; unreadable environ falls back to PID/start-time. The walk is bounded at 256 ancestors.
   concernIds:
   - id: C0
     status: answered
@@ -3047,8 +3048,9 @@ decisionPoints:
   sourceLocation:
     file: src/bin_store/launch.rs
     modulePath: elohim_device_runtime::bin_store::Store::record_running_daemon
-  summary: Observe current_exe bytes in the existing daemon lease. Live PID/start-time owns retention;
-    head and session pins do not describe a daemon.
+  summary: Before serving, admit current_exe only as a verified current release or the exact explicitly
+    declared EPR_BIN candidate. Record current/candidate source and observed CID in the existing lease.
+    Refuse daemon-release-unverified, daemon-not-current or daemon-owner-unavailable with a cure.
   concernIds:
   - id: C0
     status: answered
@@ -3058,8 +3060,8 @@ decisionPoints:
     justification: PID reuse ends liveness; gc releases bytes after death and normal grace.
   - id: C5
     status: answered
-    justification: The launcher verifies current at the exec floor; the daemon hashes its own executable
-      rather than trusting the caller pin.
+    justification: Admission hashes current_exe and verifies store bytes plus current under the mutation
+      lock independently of the launcher. An explicit exact-path candidate is recorded, never promoted.
   - id: C10
     status: answered
     justification: Older leases omit runningCid; readers use their launch CID until the next restart writes
@@ -3068,3 +3070,33 @@ decisionPoints:
   - path: elohim/eprfs/device-runtime/src/bin_store/tests.rs
     testName: running_daemon_identity_and_gc_follow_live_process_not_session_or_head
     kind: unit
+  - {path: elohim/eprfs/device-runtime/src/bin_store/tests.rs, testName: direct_daemon_refuses_unverified_and_noncurrent_bytes, kind: unit}
+  - {path: elohim/eprfs/device-runtime/src/bin_store/tests.rs, testName: direct_daemon_candidate_requires_exact_declared_path_and_records_source, kind: unit}
+
+- name: bin_store::require_published
+  kind: pure-decision-predicate
+  sourceLocation:
+    file: src/bin_store/source.rs
+    modulePath: elohim_device_runtime::bin_store::Store::require_published
+  summary: Initial landing, forward landing and explicit revert require containment in a declared
+    publishedRef. Gitlinks check the containing repository's HEAD, whose pin source_state verifies.
+  concernIds:
+  - {id: C0, status: answered, justification: Device-private publication admission.}
+  - {id: C1, status: answered, justification: Ingest and candidate execution never promote.}
+  - {id: C2, status: answered, justification: All landing modes retain the publication check.}
+  - {id: C3, status: n-a, justification: No lease liveness decision here.}
+  - {id: C4, status: answered, justification: Missing or unreadable refs refuse containment.}
+  - {id: C5, status: answered, justification: Clean provenance alone is not publication.}
+  - {id: C6a, status: answered, justification: Git reads use the bounded runner.}
+  - {id: C6b, status: answered, justification: Read-only containment predicate.}
+  - {id: C7, status: n-a, justification: No advertisement or network serving.}
+  - {id: C8, status: answered, justification: Named unpublished refusal includes a cure.}
+  - {id: C9, status: answered, justification: Checks the verified provenance commit against refs.}
+  - {id: C10, status: answered, justification: Existing publishedRef registry vocabulary.}
+  - {id: C11, status: n-a, justification: No external work queue.}
+  - {id: C12, status: answered, justification: Only declared refs authorize publication.}
+  - {id: C13, status: answered, justification: Revert cannot bypass publication.}
+  - {id: C14, status: partial, justification: Publication can change after the local check; no peer witness is claimed.}
+  contractTests:
+  - {path: elohim/eprfs/device-runtime/src/bin_store/tests.rs, testName: land_refuses_unpublished_initial_forward_and_revert, kind: unit}
+  - {path: elohim/eprfs/device-runtime/src/bin_store/tests.rs, testName: land_accepts_either_local_or_remote_published_ref, kind: unit}

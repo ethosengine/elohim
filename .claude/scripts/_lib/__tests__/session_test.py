@@ -14,9 +14,11 @@ CASES = Path(__file__).resolve().parents[4] / 'genesis/agentic/fixtures/session-
 def test_shared_session_cases(tmp_path):
     for i, case in enumerate(json.loads(CASES.read_text())):
         root = tmp_path / str(i)
-        for pid, parent, comm, leader, tty, start in case['processes']:
+        for pid, parent, comm, leader, tty, start, environ in case['processes']:
             path = root / str(pid)
             path.mkdir(parents=True)
+            if environ is not None:
+                (path / 'environ').write_bytes(b''.join(f'{k}={v}\0'.encode() for k, v in environ.items()))
             fields = ['0'] * 20
             fields[0] = 'S'
             for index, value in [(1, parent), (3, leader), (4, tty), (19, start)]:

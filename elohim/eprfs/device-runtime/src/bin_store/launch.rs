@@ -119,6 +119,7 @@ impl Store {
             owner_start_time: identity.owner_start_time.map(|n| n.to_string()),
             provisional,
             running_cid: None,
+            source: None,
         };
         files::atomic_json(&self.pin_path(key)?, &pin)?;
         Ok(pin)
@@ -281,6 +282,7 @@ impl Store {
             owner_start_time: Some(start.to_string()),
             provisional: false,
             running_cid: None,
+            source: None,
         };
         let _lock = files::Lock::acquire(&self.root, files::EXEC_WAIT)?;
         files::atomic_json(&self.pin_path(&pin.session)?, &pin)?;
@@ -293,13 +295,44 @@ impl Store {
         executable: &Path,
         pid: u32,
         proc_root: &Path,
+        candidate: Option<&Path>,
     ) -> Result<()> {
         let cid = files::file_cid(executable)?;
-        if let Some(mut lease) = self.daemon_lease(&cid, pid, proc_root)? {
-            lease.running_cid = Some(cid);
-            let _lock = files::Lock::acquire(&self.root, files::EXEC_WAIT)?;
-            files::atomic_json(&self.pin_path(&lease.session)?, &lease)?;
-        }
+        let explicit = candidate
+            .and_then(|p| p.canonicalize().ok())
+            .zip(executable.canonicalize().ok())
+            .is_some_and(|(candidate, actual)| candidate == actual);
+        let _lock = files::Lock::acquire(&self.root, files::EXEC_WAIT)?;
+        let source = if explicit {
+            "candidate"
+        } else {
+            if !self.verified(&cid) {
+                return Err(Refusal::new("daemon-release-unverified",
+                    "running executable is not a verified release; run epr device arrive, or set EPR_BIN to this exact candidate path for testing"));
+            }
+            if self.head("current").as_deref() != Some(&cid) {
+                return Err(Refusal::new("daemon-not-current",
+                    "running release is not current; restart with the device current, or set EPR_BIN to this exact candidate path for testing"));
+            }
+            "current"
+        };
+        let start = session::process_start_time(proc_root, pid).ok_or_else(|| {
+            Refusal::new(
+                "daemon-owner-unavailable",
+                "cannot read daemon start time; restore proc access before epr peer serve",
+            )
+        })?;
+        let lease = Pin {
+            cid: cid.clone(),
+            running_cid: Some(cid),
+            source: Some(source.into()),
+            session: format!("daemon-{pid}-{start}"),
+            pinned_at: files::now(),
+            owner_pid: Some(pid),
+            owner_start_time: Some(start.to_string()),
+            provisional: false,
+        };
+        files::atomic_json(&self.pin_path(&lease.session)?, &lease)?;
         Ok(())
     }
     /// Read live daemon leases. PID reuse and stale leases never describe a running daemon.

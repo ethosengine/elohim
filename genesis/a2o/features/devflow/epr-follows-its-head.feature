@@ -98,3 +98,15 @@ Feature: Matthew's workspace follows its landed epr head
     And garbage collection runs while the peer daemon lives
     Then build B remains available for its running daemon
     And the open session still runs build A's CID
+
+  @regression
+  Scenario: An unpublished feature build cannot become the head even with a revert
+    # Ingested clean bytes alone do not prove publication on a declared dev ref.
+    Given clean build A is the landed epr head
+    When build B is ingested from a clean unpublished feature branch
+    And Matthew tries to land build B
+    Then the landing is refused as "unpublished"
+    And build A remains the landed epr head
+    When Matthew tries to revert to stored build B
+    Then the landing is refused as "unpublished"
+    And build A remains the landed epr head

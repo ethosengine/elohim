@@ -241,6 +241,9 @@ pub struct Pin {
     /// Executable identity observed by the daemon itself; absent before exec or on old leases.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub running_cid: Option<String>,
+    /// Admission route for a running daemon; absent on ordinary pins and older leases.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub source: Option<String>,
     /// Stable session id or daemon pid/start-time key.
     pub session: String,
     /// UTC creation timestamp for ownerless grace.

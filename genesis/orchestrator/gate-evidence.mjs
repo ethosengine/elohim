@@ -13,6 +13,7 @@
 // fail-open; a missing brit, a step without a fingerprint, or a refused git read all read as
 // `unavailable (<reason>)`, and the gate runs as it always has.
 
+import { nativeGateKey, usesNativeClosure } from './gate-source-state.mjs';
 import { spawnSync } from 'child_process';
 import { createHash } from 'crypto';
 import { accessSync, constants } from 'fs';
@@ -104,9 +105,10 @@ function sortedObject(value) {
  * The closure key: sha256 over the canonical JSON of everything the verdict is a function
  * of. It is an index key into brit's `inputs_hash` field, not a content address of its own.
  */
-export function closureKey({ project, fingerprints, manifestBlob: blob, cargoEnv }) {
+export function closureKey({ project, fingerprints, manifestBlob: blob, cargoEnv, nativeKey }) {
   const material = sortedObject({
-    v: 1,
+    v: nativeKey ? 2 : 1,
+    ...(nativeKey ? { native: nativeKey } : {}),
     project: project.name,
     run: project.run,
     manifest: blob,
@@ -187,11 +189,14 @@ export function gateEvidence(project, { env = process.env, root, commit, cargoEn
   if (!britBin || !buildRefBin) {
     return { line: `unavailable (${!britBin ? 'brit' : 'brit-build-ref'} not on BRIT_BIN/BRIT_BUILD_REF_BIN or PATH)` };
   }
+  const nativeKey = usesNativeClosure(project)
+    ? nativeGateKey(project, { root, env, run: spawn, toolchain: cargoEnv?.RUSTUP_TOOLCHAIN, commit }) : undefined;
+  if (nativeKey === null) return { line: 'unavailable (source closure dirty, changed, or native evaluator unavailable)', dirty: true };
   const fp = stepFingerprints(project, commit, { britBin, root, spawn });
   if (fp.error) return { line: `unavailable (${fp.error})` };
   const blob = manifestBlob(root, commit, project.manifestPath, spawn);
   if (!blob) return { line: `unavailable (manifest ${project.manifestPath} absent at ${String(commit).slice(0, 9)})` };
-  const key = closureKey({ project, fingerprints: fp.fingerprints, manifestBlob: blob, cargoEnv });
+  const key = closureKey({ project, fingerprints: fp.fingerprints, manifestBlob: blob, cargoEnv, nativeKey });
   const found = findEvidence(project, key, { buildRefBin, root, spawn });
   if (found.error) return { key, line: `unavailable (${found.error})` };
   const dirty = dirtyPaths(project, { root, spawn });
@@ -205,6 +210,7 @@ export function gateEvidence(project, { env = process.env, root, commit, cargoEn
     rows: found.rows,
     line,
     buildRefBin,
+    nativeKey,
     dirty: checkoutMismatch ? true : dirty === null ? null : dirty.length > 0,
   };
 }
@@ -214,9 +220,15 @@ export function gateEvidence(project, { env = process.env, root, commit, cargoEn
  * CID, a stored verdict node as the output, and `--success` as observed (red is stored too —
  * a known-red closure is information). Returns the spawn result; never throws.
  */
-export function recordEvidence(project, key, { success, seconds, commit, buildRefBin, root, jobs, dirty, spawn = spawnSync }) {
+export function recordEvidence(project, key, { success, seconds, commit, buildRefBin, root, jobs, dirty, nativeKey, env = process.env, cargoEnv, spawn = spawnSync }) {
   if (dirty !== false) {
     return { status: 1, stdout: '', stderr: dirty === null ? 'working tree state unknown' : `working tree dirty under ${project.dir}` };
+  }
+  if (usesNativeClosure(project)) {
+    const after = nativeGateKey(project, { root, env, run: spawn, toolchain: cargoEnv?.RUSTUP_TOOLCHAIN, commit });
+    if (!nativeKey || !after || JSON.stringify(nativeKey) !== JSON.stringify(after)) {
+      return { status: 1, stdout: '', stderr: 'source closure dirty, changed, or unavailable after gate' };
+    }
   }
   const verdict = { exit: success ? 0 : 1, seconds: Math.round(seconds), ...(jobs ? { jobs } : {}) };
   const args = [
