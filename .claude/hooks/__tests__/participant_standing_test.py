@@ -105,6 +105,8 @@ class ParticipantStandingCase(unittest.TestCase):
             "STUB_CURRENT": json.dumps(current if current is not None else UNWITNESSED),
             "STUB_CLAIMED": json.dumps(claimed or {}),
             "PATH": str(self.empty_path),
+            # This device's real epr store would answer otherwise: "absent" must mean absent here.
+            "EPR_STORE": str(self.project / "no-epr-store"),
         })
         if stub:
             env["EPR_BIN"] = str(self.stub)

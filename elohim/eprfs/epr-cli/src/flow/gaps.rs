@@ -204,7 +204,6 @@ enum MetaOrder {
 }
 
 /// Clean → (META and tag strip, in the arm's order) → dedupe → push.
-#[allow(clippy::too_many_arguments)]
 fn push_item(
     items: &mut Vec<Gap>,
     seen: &mut Vec<String>,
