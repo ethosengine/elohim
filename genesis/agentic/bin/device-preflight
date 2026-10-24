@@ -150,7 +150,7 @@ def check_epr(env: dict[str, str]) -> tuple[Line, str | None]:
             "epr binary",
             False,
             "no `epr` on EPR_BIN, PATH or the cargo target pool",
-            "build it: `just gate eprfs` (or export EPR_BIN=<path>)",
+            "install it: `cargo install --path elohim/eprfs/epr-cli --locked` (or export EPR_BIN=<path>)",
         ),
         None,
     )
