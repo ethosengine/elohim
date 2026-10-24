@@ -83,10 +83,18 @@ Known gaps live in the guidestar §5 (ranked), not here — notably that a **flo
 algedonic evidence**, because the wire evidence is ceiling-signed and emitting through it would
 produce a signal whose own `crossed()` reads false.
 
-**Device-binding contests (2026-10-23, controller ruling for workspaces-cooperate T7).** A Contest of a
-device's standing row (its binding, or the chain root's genesis) counts only when its signer still
-stands: `Roster::contested` decides those rows over the signer → device graph (`retired_devices`),
-order-independently. Mutual or cyclic contests retire every device in the cycle (fail closed), so a
-retired device can still retaliate against the device that retired it, and both then stand retired;
-the remedy is re-binding the device the person keeps — a human act. Contests of human-standing
-records (witnesses, claims, founding records) keep the membership rule unchanged.
+**Device-binding contests (2026-10-23, controller rulings for workspaces-cooperate T7, round 2).** The
+device-binding plane — members' bindings, the root's genesis, and every member's contest of one of
+them or of another such contest — is decided by a grounded labelling over ROWS (`device_plane`): a
+contest attacks the row it names, and is attacked by whatever attacks its signer's current standing
+row (a contest stands only while its signer stands); undecided rows (pure cycles) are rejected, fail
+closed. A device stands while its current standing row is accepted.
+
+What a retired device can do: contest rows (they are admitted to the file), and so join a cycle — two
+devices that contest only each other both stand retired. It can also contest the root's founding
+RECORD, which is a human-standing contest and keeps the membership rule. What it cannot do: retire a
+device that stands by another's corroboration, or counter the contest of itself (a device cannot
+defend itself). Three remedies restore a retired device: re-binding it (a new binding no contest
+names), its contester withdrawing (contesting its own contest), or a standing member's
+counter-contest. Re-binding relies on T2's "current binding = latest by line": a contest names a CID,
+and nothing in a row says which binding came after it.

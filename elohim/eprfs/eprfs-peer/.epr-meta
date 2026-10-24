@@ -49,9 +49,10 @@ gossip carries heads only (did, root, seq, ack vector), never an event body, whi
 over the tier ALPN to an admitted node id. The upgrade path, if either matters, is a gate on
 `NeighborUp` that drops a neighbour admission does not map to a device.
 
-Admission reads the roster through `elohim-epr-rea`, where a device-binding Contest counts only when
-its signer still stands (see `elohim/epr-rea/.epr-meta`). A retired device can still retaliate against
-the device that retired it: mutual contests retire both, and the remedy is re-binding, a human act.
+Admission reads the roster through `elohim-epr-rea`, whose device-binding plane is decided by a
+grounded labelling over rows (see `elohim/epr-rea/.epr-meta`): a retired device's contests stand only
+while it stands, two devices that contest only each other are both retired, and re-binding, the
+contester's withdrawal, or a standing member's counter-contest restores a device.
 A reload closes the connections this daemon accepted from a device it no longer admits
 (`ConnectionBook`); the ones iroh-gossip dialed on its own are not closable per peer, and heads on
 them are dropped as unadmitted.
