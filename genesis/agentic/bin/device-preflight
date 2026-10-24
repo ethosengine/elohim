@@ -3,15 +3,16 @@
 device-preflight — refuse-before-work: has this workspace ARRIVED as a device?
 
 A Che workspace is one of its human's devices (`elohim/lvi/docs/specs/2026-10-10-workspace-arrival-as-declared-device.md`).
-Arriving is six conditions, each of which today is met by a different undeclared surface (a devfile
+Arriving is seven conditions, each of which today is met by a different undeclared surface (a devfile
 postStart, a SessionStart hook, a hand-run ceremony, a visitor's cache). This script reads them in one
 place and prints one line per condition in the `just mesh preflight` idiom — `ok <name>: <detail>` or
 `REFUSED <name>: <why> — <fix>` — so a REFUSED line always names the command that cures it. Exit 1 on
 any REFUSED, else 0. It never fixes anything itself; the fix commands are the declared arrival ceremony.
 
-The six conditions, in dependency order:
+The seven conditions, in dependency order:
 
-  epr binary     epr-store reports a candidate or committed launcher target (EPR_BIN or PATH)
+  epr binary     bin-store reports a candidate or committed launcher target (EPR_BIN or PATH)
+  brit binary    bin-store reports a candidate or committed launcher target (BRIT_BIN or PATH)
   device key     ${ELOHIM_DEVICE_KEY_FILE:-$XDG_CONFIG_HOME/elohim/device/ed25519.seed} exists (PVC)
   roster bound   `epr actor current --device` reads a standing human: this device is in a roster
   embed model    the model manifest's `resolve` list reaches model.onnx + tokenizer.json
@@ -42,7 +43,7 @@ FOLD_LAG_DEFAULT = 25
 READ_TIMEOUT_S = 10
 SCRIPT_REPO = Path(__file__).resolve().parents[3]
 sys.path.insert(0, str(SCRIPT_REPO / ".claude/scripts"))
-from _lib import epr_client  # noqa: E402
+from _lib import bin_store, epr_client  # noqa: E402
 
 
 @dataclass
@@ -61,6 +62,15 @@ class Line:
 
 def resolve_epr(env: dict[str, str]) -> str | None:
     return epr_client.resolve_binary(env)
+
+
+def resolve_brit(env: dict[str, str]) -> str | None:
+    try:
+        root = bin_store.store_root("brit", env)
+        path, _, _ = bin_store.resolve(tool="brit", bin_name="brit", root=root, environ=env)
+        return str(path)
+    except Exception:  # noqa: BLE001 — absence is the condition this line reports
+        return None
 
 
 def run_json(argv: list[str], cwd: Path, env: dict[str, str]) -> tuple[dict | None, str]:
@@ -114,43 +124,47 @@ def pending_enrollment(root: Path, handle: str) -> Path | None:
     return p if p.is_file() else None
 
 
-def check_epr(root: Path, env: dict[str, str]) -> tuple[Line, str | None]:
-    binary = resolve_epr(env)
+def check_tool(root: Path, env: dict[str, str], tool: str) -> tuple[Line, str | None]:
+    binary = resolve_epr(env) if tool == "epr" else resolve_brit(env)
     if binary and Path(binary).is_file() and os.access(binary, os.X_OK):
-        store_cli = env.get("EPR_STORE_BIN") or str(SCRIPT_REPO / "genesis/agentic/bin/epr-store")
-        value, error = run_json([store_cli, "status", "--json"], root, env)
-        listed, _ = run_json([store_cli, "shadows"], root, env)
+        store_cli = env.get("BIN_STORE_BIN") or str(SCRIPT_REPO / "genesis/agentic/bin/bin-store")
+        value, error = run_json([store_cli, "--tool", tool, "status", "--json"], root, env)
+        listed, _ = run_json([store_cli, "--tool", tool, "shadows"], root, env)
         shadowing = (listed or {}).get("value") or []
         if shadowing:
             names = ", ".join(entry["path"] for entry in shadowing)
             return Line(
-                "epr binary",
+                f"{tool} binary",
                 False,
-                f"PATH reaches {names} before the epr launcher",
+                f"PATH reaches {names} before the {tool} launcher",
                 "start a session (the SessionStart guard repoints stale build links) or remove it",
             ), None
         if value is not None and value.get("resolved"):
             head = value.get("head") or "none"
             running = value.get("session_cid") or value.get("resolved_cid") or "candidate"
             state = "behind" if value.get("behind") else value.get("source", "resolved")
-            return Line("epr binary", True, f"{running} vs head {head} ({state}) via {binary}"), binary
+            return Line(f"{tool} binary", True, f"{running} vs head {head} ({state}) via {binary}"), binary
         if value is not None:
             return Line(
-                "epr binary",
+                f"{tool} binary",
                 False,
-                "epr-store has no resolved candidate, session pin, or committed head",
-                "run `epr-store bootstrap`",
+                f"bin-store has no resolved {tool} candidate, session pin, or committed head",
+                f"run `bin-store --tool {tool} bootstrap`",
             ), None
-        return Line("epr binary", False, f"epr-store status unreadable: {error}", "run `epr-store status`"), None
+        return Line(f"{tool} binary", False, f"bin-store status unreadable: {error}", f"run `bin-store --tool {tool} status`"), None
     return (
         Line(
-            "epr binary",
+            f"{tool} binary",
             False,
-            "no `epr` candidate or launcher on EPR_BIN/PATH",
-            "run `epr-store bootstrap`",
+            f"no `{tool}` candidate or launcher on {tool.upper()}_BIN/PATH",
+            f"run `bin-store --tool {tool} bootstrap`",
         ),
         None,
     )
+
+
+def check_epr(root: Path, env: dict[str, str]) -> tuple[Line, str | None]:
+    return check_tool(root, env, "epr")
 
 
 def check_device_key(env: dict[str, str], handle: str) -> Line:
@@ -279,8 +293,10 @@ def preflight(root: Path, env: dict[str, str], handle: str | None, session: str 
     handles = roster_handles(root)
     handle = handle or (handles[0] if len(handles) == 1 else None) or "<handle>"
     epr_line, binary = check_epr(root, env)
+    brit_line, _ = check_tool(root, env, "brit")
     return [
         epr_line,
+        brit_line,
         check_device_key(env, handle),
         check_roster(root, env, binary, handle),
         check_embed_model(root, env),

@@ -16,6 +16,7 @@ preflight = _NS["preflight"]
 expand_resolve_entry = _NS["expand_resolve_entry"]
 check_fold = _NS["check_fold"]
 check_roster = _NS["check_roster"]
+resolve_brit = _NS["resolve_brit"]
 
 MANIFEST_REL = _NS["MODEL_MANIFEST_REL"]
 MEASURE_REL = _NS["INDEX_MEASURE_REL"]
@@ -33,6 +34,18 @@ def fake_epr(bin_dir: Path, current: dict, status: dict) -> str:
         "a = sys.argv[1:]\n"
         "if a[:2] == ['actor', 'current']: print(CURRENT)\n"
         "elif a[:4] == ['flow', 'memory', 'index', 'status']: print(STATUS)\n"
+        "else: sys.exit(2)\n"
+    )
+    script.chmod(script.stat().st_mode | stat.S_IXUSR)
+    return str(script)
+
+
+def fake_brit(bin_dir: Path) -> str:
+    script = bin_dir / "brit"
+    script.write_text(
+        "#!/usr/bin/env python3\n"
+        "import sys\n"
+        "if sys.argv[1:] == ['--version']: print('brit 0.0.0\\nsource HEAD: ' + '0' * 40)\n"
         "else: sys.exit(2)\n"
     )
     script.chmod(script.stat().st_mode | stat.S_IXUSR)
@@ -62,7 +75,9 @@ class ArrivalTest(unittest.TestCase):
             # `/usr/bin/env python3` resolves while `epr` still resolves to the fake first.
             "PATH": f"{self.bin}{os.pathsep}{os.path.dirname(sys.executable)}",
             "EPR_BIN": str(self.bin / "epr"),
-            "EPR_STORE": str(Path(self.tmp.name) / "epr-store"),
+            "EPR_STORE": str(Path(self.tmp.name) / "store" / "epr"),
+            "BRIT_BIN": str(self.bin / "brit"),
+            "BRIT_STORE": str(Path(self.tmp.name) / "store" / "brit"),
             "HOME": str(Path(self.tmp.name) / "home"),
             "CLAUDE_CONFIG_DIR": str(self.config),
             "ELOHIM_DEVICE_KEY_FILE": str(self.key),
@@ -83,13 +98,14 @@ class ArrivalTest(unittest.TestCase):
             {"standing": {"subject": "matthew", "via": "bound"}},
             {"lag": 3, "last": {"state": {"state": "complete"}}},
         )
+        fake_brit(self.bin)
 
-    def test_every_condition_met_prints_six_ok_lines(self):
+    def test_every_condition_met_prints_seven_ok_lines(self):
         self.arrived()
         lines = preflight(self.root, self.env(), None, "sess")
-        self.assertEqual([l.name for l in lines], ["epr binary", "device key", "roster bound", "embed model", "fold attested", "berth moored"])
+        self.assertEqual([l.name for l in lines], ["epr binary", "brit binary", "device key", "roster bound", "embed model", "fold attested", "berth moored"])
         self.assertTrue(all(l.ok for l in lines), [l.render() for l in lines])
-        self.assertIn("human:matthew", lines[2].render())
+        self.assertIn("human:matthew", lines[3].render())
 
     def test_path_launcher_without_a_resolved_store_head_refuses(self):
         self.arrived()
@@ -98,19 +114,39 @@ class ArrivalTest(unittest.TestCase):
         line = preflight(self.root, env, None, "sess")[0]
         self.assertFalse(line.ok)
         self.assertIn("no `epr` candidate", line.render())
-        self.assertIn("epr-store bootstrap", line.render())
+        self.assertIn("bin-store --tool epr bootstrap", line.render())
+
+    def test_no_brit_binary_names_the_brit_bootstrap(self):
+        self.arrived()
+        (self.bin / "brit").unlink()
+        line = preflight(self.root, self.env(), None, "sess")[1]
+        self.assertFalse(line.ok)
+        self.assertIn("bin-store --tool brit bootstrap", line.render())
+
+    def test_brit_resolution_uses_the_shared_bin_store_override(self):
+        base = Path(self.tmp.name) / "shared-store"
+        store = base / "brit"
+        cid = "sha256:" + "a" * 64
+        artifact = store / cid
+        artifact.mkdir(parents=True)
+        binary = artifact / "brit"
+        binary.write_text("#!/bin/sh\nexit 0\n")
+        binary.chmod(0o755)
+        (store / "current").symlink_to(cid)
+
+        self.assertEqual(resolve_brit({"BIN_STORE": str(base)}), str(binary))
 
     def test_no_key_refuses_and_names_enroll(self):
         self.arrived()
         self.key.unlink()
-        line = preflight(self.root, self.env(), None, "sess")[1]
+        line = preflight(self.root, self.env(), None, "sess")[2]
         self.assertFalse(line.ok)
         self.assertIn("epr actor device enroll --handle matthew", line.render())
 
     def test_unbound_device_names_the_three_commands(self):
         self.arrived()
         fake_epr(self.bin, {"standing": None}, {"lag": 0, "last": {"state": {"state": "complete"}}})
-        line = preflight(self.root, self.env(), None, "sess")[2]
+        line = preflight(self.root, self.env(), None, "sess")[3]
         self.assertFalse(line.ok)
         for verb in ("enroll", "authorize", "bind"):
             self.assertIn(verb, line.render())
@@ -119,7 +155,7 @@ class ArrivalTest(unittest.TestCase):
         self.arrived()
         fake_epr(self.bin, {"standing": None}, {"lag": 0, "last": {"state": {"state": "complete"}}})
         (self.root / PARTICIPANTS_REL / ".enroll-matthew.json").write_text(json.dumps({"controller": "did:key:z6Mkabcdefgh"}))
-        line = preflight(self.root, self.env(), None, "sess")[2]
+        line = preflight(self.root, self.env(), None, "sess")[3]
         self.assertIn("pending", line.render())
         self.assertIn("authorize", line.render())
         self.assertIn("matthew.jsonl", line.render())
@@ -127,14 +163,14 @@ class ArrivalTest(unittest.TestCase):
     def test_missing_model_names_the_provisioner(self):
         self.arrived()
         (self.model_dir / "model.onnx").unlink()
-        line = preflight(self.root, self.env(), None, "sess")[3]
+        line = preflight(self.root, self.env(), None, "sess")[4]
         self.assertFalse(line.ok)
         self.assertIn("embed-model-provision", line.render())
 
     def test_failed_fold_names_why_and_the_model_line(self):
         self.arrived()
         fake_epr(self.bin, {"standing": {"subject": "matthew"}}, {"lag": 2942, "last": {"state": {"state": "failed", "why": "unavailable: no model directory resolves"}}})
-        line = preflight(self.root, self.env(), None, "sess")[4]
+        line = preflight(self.root, self.env(), None, "sess")[5]
         self.assertFalse(line.ok)
         self.assertIn("no model directory resolves", line.render())
         self.assertIn("embed model", line.render())
@@ -142,7 +178,7 @@ class ArrivalTest(unittest.TestCase):
     def test_lag_past_limit_names_a_catch_up_fold(self):
         self.arrived()
         fake_epr(self.bin, {"standing": {"subject": "matthew"}}, {"lag": 400, "last": {"state": {"state": "degraded", "retried": 0}}})
-        line = preflight(self.root, self.env(), None, "sess")[4]
+        line = preflight(self.root, self.env(), None, "sess")[5]
         self.assertFalse(line.ok)
         self.assertIn("--max-files 450", line.render())
 
@@ -151,13 +187,13 @@ class ArrivalTest(unittest.TestCase):
         (self.bin / "epr").unlink()
         lines = preflight(self.root, self.env(), None, "sess")
         self.assertFalse(lines[0].ok)
-        self.assertFalse(lines[2].ok)
-        self.assertFalse(lines[4].ok)
-        self.assertIn("epr binary", lines[2].render())
+        self.assertFalse(lines[3].ok)
+        self.assertFalse(lines[5].ok)
+        self.assertIn("epr binary", lines[3].render())
 
     def test_unmoored_session_names_berth_moor(self):
         self.arrived()
-        line = preflight(self.root, self.env(), None, "other")[5]
+        line = preflight(self.root, self.env(), None, "other")[6]
         self.assertFalse(line.ok)
         self.assertIn("berth moor --session other", line.render())
 

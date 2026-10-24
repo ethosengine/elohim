@@ -39,7 +39,7 @@ import os
 import subprocess
 from pathlib import Path
 
-from . import epr_store
+from . import bin_store
 
 # A hung evaluator must never hang an author's keystroke.
 _TIMEOUT_SECONDS = 10
@@ -49,8 +49,8 @@ def resolve(env: dict[str, str] | None = None) -> tuple[str | None, str | None]:
     """Resolve one executable path/CID pair, never the stable launcher itself."""
     try:
         environment = os.environ if env is None else env
-        root = Path(environment.get("EPR_STORE", epr_store.DEFAULT_STORE)).expanduser().resolve()
-        path, _, cid = epr_store.resolve(root=root, environ=environment)
+        root = bin_store.store_root("epr", environment)
+        path, _, cid = bin_store.resolve(root=root, environ=environment)
         return str(path), cid
     except Exception:  # noqa: BLE001 — resolution is best-effort; absence is a valid answer
         return None, None

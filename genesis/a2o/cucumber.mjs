@@ -75,6 +75,13 @@ export default function () {
       paths: ['features/devflow/workspace-device-arrival.feature'],
       format: ['progress'],
     },
+    // Isolated household-tool fixture: a real evaluator with private git history and bin store.
+    'epr-follows-head': {
+      requireModule: ['tsx'],
+      require: ['steps/devflow/epr-follows-its-head.steps.ts'],
+      paths: ['features/devflow/epr-follows-its-head.feature'],
+      format: ['progress'],
+    },
     // Scoped saga profile: cucumber-js MERGES a profile's paths with CLI
     // positionals instead of replacing them, so running the saga dir under
     // `default` executes ~800+ scenarios (content ingests included) — a heavy

@@ -1,4 +1,4 @@
-"""The epr store keeps heads atomic, sessions immutable, and device state isolated."""
+"""The binary store keeps heads atomic, sessions immutable, and device state isolated."""
 
 from __future__ import annotations
 
@@ -19,9 +19,10 @@ LIB = Path(__file__).resolve().parents[1]
 REPO = LIB.parents[2]
 sys.path.insert(0, str(LIB.parent))
 
-from _lib import epr_client, epr_store  # noqa: E402
+from _lib import epr_client, bin_store  # noqa: E402
 
-LAUNCHER_SOURCE = REPO / "genesis/agentic/bin/epr-launch"
+LAUNCHER_SOURCE = REPO / "genesis/agentic/bin/bin-launch"
+REGISTRY_SOURCE = REPO / "genesis/agentic/bin-tools.json"
 GUARD = REPO / ".claude/hooks/epr-evaluator-guard.py"
 
 
@@ -79,10 +80,47 @@ def fake_epr(path: Path, label: str) -> Path:
     return path
 
 
+def fake_brit_release(path: Path, pin: str, label: str = "release") -> Path:
+    path.mkdir(parents=True, exist_ok=True)
+    programs = {
+        "brit": (
+            f"#!{sys.executable}\n"
+            "import sys\n"
+            f"PIN = {pin!r}\n"
+            f"LABEL = {label!r}\n"
+            "if sys.argv[1:] == ['--version']:\n"
+            "    print(f'brit {LABEL}\\nsource HEAD: {PIN}')\n"
+            "else: raise SystemExit(0)\n"
+        ),
+        "brit-build-ref": f"#!{sys.executable}\n# {label}\n",
+        "brit-verify": f"#!{sys.executable}\n# {label}\n",
+    }
+    checksums = {}
+    for name, content in programs.items():
+        binary = path / name
+        binary.write_text(content, encoding="utf-8")
+        binary.chmod(0o755)
+        checksums[name] = bin_store.hash_file(binary)
+    (path / "SHA256SUMS").write_text(bin_store.canonical_sums(checksums), encoding="utf-8")
+    return path
+
+
+def install_brit_head(store: Path, repo: Path, pin: str, release: Path) -> dict:
+    record = bin_store.ingest(
+        release, tool="brit", root=store, repo=repo, source_commit=pin,
+        gate_run="test", tree_clean=True,
+    )
+    bin_store._atomic_link(store, "current", record["cid"])
+    bin_store._atomic_json(store / "current.json", {
+        "cid": record["cid"], "commit": pin, "landed_at": bin_store.now(), "previous": None,
+    })
+    return record
+
+
 def ingest(
     store: Path, repo: Path, source_commit: str, binary: Path, *, clean: bool = True
 ) -> dict:
-    return epr_store.ingest(
+    return bin_store.ingest(
         binary, root=store, repo=repo, source_commit=source_commit,
         gate_run="test", tree_clean=clean,
     )
@@ -92,8 +130,9 @@ def clean_env(**extra: str) -> dict[str, str]:
     env = {
         name: value
         for name, value in os.environ.items()
-        if name not in {*epr_store.SESSION_ENV, "EPR_BIN", "EPR_PIN_CID", "EPR_STORE"}
+        if name not in {*bin_store.SESSION_ENV, "EPR_BIN", "EPR_PIN_CID", "EPR_STORE"}
     }
+    env["BIN_STORE_SKIP_TOOLS"] = "brit"
     env.update(extra)
     return env
 
@@ -111,16 +150,19 @@ def proc_entry(root: Path, pid: int, ppid: int, comm: str, starttime: str) -> No
 def install_launcher(tmp_path: Path) -> tuple[Path, Path]:
     root = tmp_path / "device/bin"
     root.mkdir(parents=True)
-    launcher = root / "epr-launch"
+    launcher = root / "epr"
+    registry = root / "bin-tools.json"
+    shutil.copyfile(REGISTRY_SOURCE, registry)
     rendered = (
         LAUNCHER_SOURCE.read_text(encoding="utf-8")
-        .replace("@EPR_PYTHON@", str(Path(sys.executable).resolve()))
-        .replace("@EPR_STORE_PY@", str((root / "epr_store.py").resolve()))
+        .replace("@BIN_STORE_PYTHON@", str(Path(sys.executable).resolve()))
+        .replace("@BIN_STORE_PY@", str((root / "bin_store.py").resolve()))
+        .replace("@BIN_TOOLS_JSON@", str(registry.resolve()))
     )
     launcher.write_text(rendered, encoding="utf-8")
     launcher.chmod(0o755)
-    shutil.copyfile(LIB / "epr_store.py", root / "epr_store.py")
-    return launcher, root / "epr_store.py"
+    shutil.copyfile(LIB / "bin_store.py", root / "bin_store.py")
+    return launcher, root / "bin_store.py"
 
 
 def age_record(store: Path, cid: str, when: dt.datetime) -> None:
@@ -145,7 +187,7 @@ def test_session_key_uses_nearest_claude_ancestor_and_starttime(tmp_path: Path) 
     proc_entry(proc, 200, 100, "claude", "2000")
     proc_entry(proc, 100, 1, "claude", "1000")
 
-    identity = epr_store.session_identity(
+    identity = bin_store.session_identity(
         proc_root=proc, start_pid=400, environ={"ELOHIM_SESSION_ID": "fallback"}
     )
 
@@ -155,7 +197,7 @@ def test_session_key_uses_nearest_claude_ancestor_and_starttime(tmp_path: Path) 
 
 
 def test_session_key_falls_back_to_declared_environment(tmp_path: Path) -> None:
-    assert epr_store.session_identity(
+    assert bin_store.session_identity(
         proc_root=tmp_path / "missing", start_pid=9,
         environ={"ELOHIM_SESSION_ID": "declared"},
     ) == {"session": "declared"}
@@ -167,21 +209,21 @@ def test_resolution_order_is_candidate_explicit_session_then_current(
     store, repo, head = scratch
     first = ingest(store, repo, head, fake_epr(tmp_path / "bin/first", "first"))
     second = ingest(store, repo, head, fake_epr(tmp_path / "bin/second", "second"))
-    epr_store._atomic_link(store, "current", first["cid"])
+    bin_store._atomic_link(store, "current", first["cid"])
     session_env = clean_env(CLAUDE_CODE_SESSION_ID="session-a")
-    epr_store.pin(root=store, environ=session_env, proc_root=tmp_path / "no-proc", start_pid=9)
-    epr_store._atomic_link(store, "current", second["cid"])
+    bin_store.pin(root=store, environ=session_env, proc_root=tmp_path / "no-proc", start_pid=9)
+    bin_store._atomic_link(store, "current", second["cid"])
 
-    assert epr_store.resolve(
+    assert bin_store.resolve(
         root=store, environ=clean_env(EPR_BIN=str(tmp_path / "bin/first"))
-    )[1:] == ("candidate", epr_store.hash_file(tmp_path / "bin/first"))
-    assert epr_store.resolve(
+    )[1:] == ("candidate", bin_store.hash_file(tmp_path / "bin/first"))
+    assert bin_store.resolve(
         root=store, environ=clean_env(EPR_PIN_CID=first["cid"])
     )[1:] == ("explicit-pin", first["cid"])
-    assert epr_store.resolve(
+    assert bin_store.resolve(
         root=store, environ=session_env, proc_root=tmp_path / "no-proc", start_pid=9
     )[1:] == ("session-pin", first["cid"])
-    assert epr_store.resolve(root=store, environ=clean_env())[1:] == ("current", second["cid"])
+    assert bin_store.resolve(root=store, environ=clean_env())[1:] == ("current", second["cid"])
 
 
 def test_exec_resolution_checks_executable_without_hashing(
@@ -189,10 +231,10 @@ def test_exec_resolution_checks_executable_without_hashing(
 ) -> None:
     store, repo, head = scratch
     record = ingest(store, repo, head, fake_epr(tmp_path / "candidate", "no-exec-hash"))
-    epr_store._atomic_link(store, "current", record["cid"])
+    bin_store._atomic_link(store, "current", record["cid"])
 
-    with mock.patch.object(epr_store, "hash_file", side_effect=AssertionError("exec hashed")):
-        path, source, cid = epr_store.resolve_exec(root=store, environ=clean_env())
+    with mock.patch.object(bin_store, "hash_file", side_effect=AssertionError("exec hashed")):
+        path, source, cid = bin_store.resolve_exec(root=store, environ=clean_env())
 
     assert (path, source, cid) == (
         store / record["cid"] / "epr", "current", record["cid"]
@@ -204,13 +246,38 @@ def test_client_reports_the_resolved_executable_cid_without_spawning(
 ) -> None:
     store, repo, head = scratch
     record = ingest(store, repo, head, fake_epr(tmp_path / "candidate", "client-cid"))
-    epr_store._atomic_link(store, "current", record["cid"])
+    bin_store._atomic_link(store, "current", record["cid"])
     env = clean_env(EPR_STORE=str(store))
 
-    with mock.patch.object(epr_store, "resolve", wraps=epr_store.resolve) as resolve:
+    with mock.patch.object(bin_store, "resolve", wraps=bin_store.resolve) as resolve:
         assert epr_client.resolve(env) == (str(store / record["cid"] / "epr"), record["cid"])
 
     resolve.assert_called_once()
+
+
+def test_client_uses_the_shared_bin_store_override(
+    scratch: tuple[Path, Path, str], tmp_path: Path
+) -> None:
+    _, repo, head = scratch
+    base = tmp_path / "shared-store"
+    store = base / "epr"
+    record = ingest(store, repo, head, fake_epr(tmp_path / "candidate", "shared-store"))
+    bin_store._atomic_link(store, "current", record["cid"])
+
+    assert epr_client.resolve(clean_env(BIN_STORE=str(base))) == (
+        str(store / record["cid"] / "epr"), record["cid"],
+    )
+
+
+def test_launcher_ignores_an_unrelated_malformed_registry_entry() -> None:
+    registry = {
+        "tools": {
+            "epr": {"bins": ["epr"]},
+            "brit": {"bins": "brit"},
+        }
+    }
+
+    assert bin_store.invoked_tool("/device/bin/epr", registry) == ("epr", "epr", False)
 
 
 def test_launcher_alias_is_refused(tmp_path: Path) -> None:
@@ -220,8 +287,8 @@ def test_launcher_alias_is_refused(tmp_path: Path) -> None:
     cargo_link.parent.mkdir(parents=True)
     cargo_link.symlink_to(launcher)
 
-    with pytest.raises(epr_store.StoreRefusal) as failure:
-        epr_store.resolve(root=store, environ=clean_env(EPR_BIN=str(cargo_link)))
+    with pytest.raises(bin_store.StoreRefusal) as failure:
+        bin_store.resolve(root=store, environ=clean_env(EPR_BIN=str(cargo_link)))
 
     assert failure.value.kind == "launcher-alias"
 
@@ -231,7 +298,7 @@ def test_launcher_executes_the_python_resolver(
 ) -> None:
     store, repo, head = scratch
     record = ingest(store, repo, head, fake_epr(tmp_path / "candidate", "exec"))
-    epr_store._atomic_link(store, "current", record["cid"])
+    bin_store._atomic_link(store, "current", record["cid"])
     launcher, _ = install_launcher(tmp_path)
 
     result = subprocess.run(
@@ -257,7 +324,7 @@ def test_every_stored_exec_refreshes_the_usage_lease(
 ) -> None:
     store, repo, head = scratch
     record = ingest(store, repo, head, fake_epr(tmp_path / "candidate", source))
-    epr_store._atomic_link(store, "current", record["cid"])
+    bin_store._atomic_link(store, "current", record["cid"])
     launcher, _ = install_launcher(tmp_path)
     marker = store / record["cid"] / ".used"
     env_extra = {name: value.replace("{cid}", record["cid"]) for name, value in extra.items()}
@@ -279,14 +346,14 @@ def test_atomic_pin_creation_recovers_an_empty_pin(
 ) -> None:
     store, repo, head = scratch
     record = ingest(store, repo, head, fake_epr(tmp_path / "candidate", "pin"))
-    epr_store._atomic_link(store, "current", record["cid"])
+    bin_store._atomic_link(store, "current", record["cid"])
     path = store / "sessions/session-a"
     path.parent.mkdir(parents=True)
     path.touch()
     env = clean_env(CLAUDE_CODE_SESSION_ID="session-a")
 
-    with mock.patch.object(epr_store.os, "link", wraps=os.link) as link:
-        pinned = epr_store.pin(
+    with mock.patch.object(bin_store.os, "link", wraps=os.link) as link:
+        pinned = bin_store.pin(
             root=store, environ=env, proc_root=tmp_path / "no-proc", start_pid=7
         )
 
@@ -300,7 +367,7 @@ def test_two_launcher_processes_publish_one_complete_pin(
 ) -> None:
     store, repo, head = scratch
     record = ingest(store, repo, head, fake_epr(tmp_path / "candidate", "race"))
-    epr_store._atomic_link(store, "current", record["cid"])
+    bin_store._atomic_link(store, "current", record["cid"])
     launcher, _ = install_launcher(tmp_path)
     env = clean_env(EPR_STORE=str(store), CLAUDE_CODE_SESSION_ID="same-session")
     processes = [
@@ -327,14 +394,48 @@ def test_ingest_hashes_staged_bytes_and_publishes_read_only(
         Path(src).write_text("changed after staging\n", encoding="utf-8")
         return result
 
-    with mock.patch.object(epr_store.shutil, "copyfile", side_effect=copy_then_mutate):
+    with mock.patch.object(bin_store.shutil, "copyfile", side_effect=copy_then_mutate):
         record = ingest(store, repo, head, source)
 
     stored = store / record["cid"] / "epr"
-    assert epr_store.hash_file(stored) == record["cid"]
-    assert epr_store.hash_file(source) != record["cid"]
+    assert bin_store.hash_file(stored) == record["cid"]
+    assert bin_store.hash_file(source) != record["cid"]
     assert stored.stat().st_mode & 0o222 == 0
     assert not any((store / ".staging").iterdir())
+
+
+def test_bootstrap_repairs_a_damaged_existing_artifact_from_verified_staging(
+    scratch: tuple[Path, Path, str], tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    store, repo, head = scratch
+    source = fake_epr(tmp_path / "source-epr", "repair")
+    expected = source.read_bytes()
+    record = ingest(store, repo, head, source)
+    bin_store.land(record["cid"], head, root=store, repo=repo)
+    damaged = store / record["cid"] / "epr"
+    damaged.chmod(0o755)
+    damaged.write_text("damaged\n", encoding="utf-8")
+    target = tmp_path / "target"
+    rebuilt = target / "debug/epr"
+    rebuilt.parent.mkdir(parents=True)
+    rebuilt.write_bytes(expected)
+    rebuilt.chmod(0o755)
+    monkeypatch.setattr(bin_store, "_bootstrap_target", lambda _repo: target)
+    real_run = subprocess.run
+
+    def run(argv, *args, **kwargs):
+        if argv[:2] == ["cargo", "build"]:
+            return subprocess.CompletedProcess(argv, 0, "", "")
+        return real_run(argv, *args, **kwargs)
+
+    monkeypatch.setattr(subprocess, "run", run)
+
+    repaired = bin_store.bootstrap(root=store, repo=repo)
+
+    assert repaired["cid"] == record["cid"]
+    assert damaged.read_bytes() == expected
+    assert damaged.stat().st_mode & 0o222 == 0
+    assert bin_store._read_link(store, "current") == record["cid"]
 
 
 def test_land_updates_heads_under_lock(
@@ -343,11 +444,11 @@ def test_land_updates_heads_under_lock(
     store, repo, head = scratch
     first = ingest(store, repo, head, fake_epr(tmp_path / "a", "a"))
     second = ingest(store, repo, head, fake_epr(tmp_path / "b", "b"))
-    epr_store.land(first["cid"], head, root=store, repo=repo)
-    second_landed = epr_store.land(second["cid"], head, root=store, repo=repo)
+    bin_store.land(first["cid"], head, root=store, repo=repo)
+    second_landed = bin_store.land(second["cid"], head, root=store, repo=repo)
 
-    assert epr_store._read_link(store, "current") == second["cid"]
-    assert epr_store._read_link(store, "previous") == first["cid"]
+    assert bin_store._read_link(store, "current") == second["cid"]
+    assert bin_store._read_link(store, "previous") == first["cid"]
     assert json.loads((store / "current.json").read_text(encoding="utf-8")) == {
         "cid": second["cid"],
         "commit": head,
@@ -362,7 +463,7 @@ def test_reingest_preserves_primary_provenance_and_appends_sources(
     store, repo, first_commit = scratch
     binary = fake_epr(tmp_path / "candidate", "same-bytes")
     first = ingest(store, repo, first_commit, binary)
-    epr_store.land(first["cid"], first_commit, root=store, repo=repo)
+    bin_store.land(first["cid"], first_commit, root=store, repo=repo)
     second_commit = commit(repo, "second\n")
 
     second = ingest(store, repo, second_commit, binary)
@@ -373,7 +474,7 @@ def test_reingest_preserves_primary_provenance_and_appends_sources(
         first_commit,
         second_commit,
     ]
-    landed = epr_store.land(second["cid"], second_commit, root=store, repo=repo)
+    landed = bin_store.land(second["cid"], second_commit, root=store, repo=repo)
     assert landed["cid"] == first["cid"]
     assert json.loads((store / "current.json").read_text())["commit"] == second_commit
 
@@ -383,7 +484,7 @@ def test_land_ancestry_uses_current_json_not_mutable_ingest_provenance(
 ) -> None:
     store, repo, first_commit = scratch
     first = ingest(store, repo, first_commit, fake_epr(tmp_path / "first", "first-current"))
-    epr_store.land(first["cid"], first_commit, root=store, repo=repo)
+    bin_store.land(first["cid"], first_commit, root=store, repo=repo)
     git(repo, "checkout", "--orphan", "divergent-provenance")
     (repo / "tracked").unlink()
     git(repo, "add", "-u")
@@ -400,8 +501,8 @@ def test_land_ancestry_uses_current_json_not_mutable_ingest_provenance(
     current_record["sources"] = [{"source_commit": divergent_commit, "tree_clean": True}]
     current_record_path.write_text(json.dumps(current_record), encoding="utf-8")
 
-    with pytest.raises(epr_store.StoreRefusal) as failure:
-        epr_store.land(divergent["cid"], divergent_commit, root=store, repo=repo)
+    with pytest.raises(bin_store.StoreRefusal) as failure:
+        bin_store.land(divergent["cid"], divergent_commit, root=store, repo=repo)
 
     assert failure.value.kind == "non-descendant"
 
@@ -412,14 +513,14 @@ def test_health_runs_outside_lock_and_checkout_is_revalidated_afterward(
     store, repo, head = scratch
     candidate = ingest(store, repo, head, fake_epr(tmp_path / "candidate", "health-window"))
 
-    def health(_binary: Path, _cid: str, _repo: Path) -> None:
-        with epr_store.store_lock(store, timeout=0.1):
+    def health(_tool: str, _root: Path, _cid: str, _repo: Path) -> None:
+        with bin_store.store_lock(store, timeout=0.1):
             pass
         (repo / "tracked").write_text("changed during health\n", encoding="utf-8")
 
-    with mock.patch.object(epr_store, "_health_check", side_effect=health):
-        with pytest.raises(epr_store.StoreRefusal) as failure:
-            epr_store.land(candidate["cid"], head, root=store, repo=repo)
+    with mock.patch.object(bin_store, "_health_check", side_effect=health):
+        with pytest.raises(bin_store.StoreRefusal) as failure:
+            bin_store.land(candidate["cid"], head, root=store, repo=repo)
 
     assert failure.value.kind == "checkout-dirty"
 
@@ -431,19 +532,19 @@ def test_land_refuses_when_current_moves_during_health(
     first = ingest(store, repo, head, fake_epr(tmp_path / "first", "move-first"))
     candidate = ingest(store, repo, head, fake_epr(tmp_path / "candidate", "move-candidate"))
     raced = ingest(store, repo, head, fake_epr(tmp_path / "raced", "move-raced"))
-    epr_store.land(first["cid"], head, root=store, repo=repo)
+    bin_store.land(first["cid"], head, root=store, repo=repo)
 
-    def health(_binary: Path, _cid: str, _repo: Path) -> None:
-        with epr_store.store_lock(store):
-            epr_store._atomic_link(store, "current", raced["cid"])
-            epr_store._atomic_json(store / "current.json", {
-                "cid": raced["cid"], "commit": head, "landed_at": epr_store.now(),
+    def health(_tool: str, _root: Path, _cid: str, _repo: Path) -> None:
+        with bin_store.store_lock(store):
+            bin_store._atomic_link(store, "current", raced["cid"])
+            bin_store._atomic_json(store / "current.json", {
+                "cid": raced["cid"], "commit": head, "landed_at": bin_store.now(),
                 "previous": first["cid"],
             })
 
-    with mock.patch.object(epr_store, "_health_check", side_effect=health):
-        with pytest.raises(epr_store.StoreRefusal) as failure:
-            epr_store.land(candidate["cid"], head, root=store, repo=repo)
+    with mock.patch.object(bin_store, "_health_check", side_effect=health):
+        with pytest.raises(bin_store.StoreRefusal) as failure:
+            bin_store.land(candidate["cid"], head, root=store, repo=repo)
 
     assert failure.value.kind == "current-moved"
 
@@ -454,13 +555,13 @@ def test_land_refuses_failed_health_without_moving_current(
     store, repo, head = scratch
     good = ingest(store, repo, head, fake_epr(tmp_path / "good", "good"))
     bad = ingest(store, repo, head, fake_epr(tmp_path / "bad", "fail-health"))
-    epr_store.land(good["cid"], head, root=store, repo=repo)
+    bin_store.land(good["cid"], head, root=store, repo=repo)
 
-    with pytest.raises(epr_store.StoreRefusal) as failure:
-        epr_store.land(bad["cid"], head, root=store, repo=repo)
+    with pytest.raises(bin_store.StoreRefusal) as failure:
+        bin_store.land(bad["cid"], head, root=store, repo=repo)
 
     assert failure.value.kind == "health-flow-failed"
-    assert epr_store._read_link(store, "current") == good["cid"]
+    assert bin_store._read_link(store, "current") == good["cid"]
 
 
 def test_land_checks_record_head_and_checkout_cleanliness(
@@ -469,22 +570,22 @@ def test_land_checks_record_head_and_checkout_cleanliness(
     store, repo, head = scratch
     dirty_build = ingest(store, repo, head, fake_epr(tmp_path / "dirty", "dirty"), clean=False)
     clean_build = ingest(store, repo, head, fake_epr(tmp_path / "clean", "clean"))
-    with pytest.raises(epr_store.StoreRefusal) as dirty:
-        epr_store.land(dirty_build["cid"], head, root=store, repo=repo)
+    with pytest.raises(bin_store.StoreRefusal) as dirty:
+        bin_store.land(dirty_build["cid"], head, root=store, repo=repo)
     assert dirty.value.kind == "dirty-build"
-    with pytest.raises(epr_store.StoreRefusal) as record_mismatch:
-        epr_store.land(clean_build["cid"], "0" * 40, root=store, repo=repo)
+    with pytest.raises(bin_store.StoreRefusal) as record_mismatch:
+        bin_store.land(clean_build["cid"], "0" * 40, root=store, repo=repo)
     assert record_mismatch.value.kind == "commit-mismatch"
 
     later = commit(repo, "later\n")
-    with pytest.raises(epr_store.StoreRefusal) as mismatch:
-        epr_store.land(clean_build["cid"], head, root=store, repo=repo)
+    with pytest.raises(bin_store.StoreRefusal) as mismatch:
+        bin_store.land(clean_build["cid"], head, root=store, repo=repo)
     assert mismatch.value.kind == "head-mismatch"
 
     later_build = ingest(store, repo, later, fake_epr(tmp_path / "later", "later"))
     (repo / "tracked").write_text("uncommitted\n", encoding="utf-8")
-    with pytest.raises(epr_store.StoreRefusal) as dirty_checkout:
-        epr_store.land(later_build["cid"], later, root=store, repo=repo)
+    with pytest.raises(bin_store.StoreRefusal) as dirty_checkout:
+        bin_store.land(later_build["cid"], later, root=store, repo=repo)
     assert dirty_checkout.value.kind == "checkout-dirty"
 
 
@@ -493,11 +594,11 @@ def test_land_requires_descent_unless_revert(
 ) -> None:
     store, repo, first_commit = scratch
     first = ingest(store, repo, first_commit, fake_epr(tmp_path / "first", "first"))
-    epr_store.land(first["cid"], first_commit, root=store, repo=repo)
+    bin_store.land(first["cid"], first_commit, root=store, repo=repo)
     main_branch = git(repo, "branch", "--show-current")
     second_commit = commit(repo, "second\n")
     second = ingest(store, repo, second_commit, fake_epr(tmp_path / "second", "second"))
-    epr_store.land(second["cid"], second_commit, root=store, repo=repo)
+    bin_store.land(second["cid"], second_commit, root=store, repo=repo)
 
     git(repo, "checkout", "--orphan", "divergent")
     (repo / "tracked").unlink()
@@ -507,15 +608,15 @@ def test_land_requires_descent_unless_revert(
     git(repo, "commit", "-qm", "divergent")
     divergent_commit = git(repo, "rev-parse", "HEAD")
     divergent = ingest(store, repo, divergent_commit, fake_epr(tmp_path / "divergent", "divergent"))
-    with pytest.raises(epr_store.StoreRefusal) as ancestry:
-        epr_store.land(divergent["cid"], divergent_commit, root=store, repo=repo)
+    with pytest.raises(bin_store.StoreRefusal) as ancestry:
+        bin_store.land(divergent["cid"], divergent_commit, root=store, repo=repo)
     assert ancestry.value.kind == "non-descendant"
 
     git(repo, "checkout", "-q", "--detach", first_commit)
-    reverted = epr_store.land(first["cid"], first_commit, root=store, repo=repo, revert=True)
+    reverted = bin_store.land(first["cid"], first_commit, root=store, repo=repo, revert=True)
     assert reverted["ring"] == "reverted"
-    assert epr_store._read_link(store, "current") == first["cid"]
-    assert epr_store._read_link(store, "previous") == second["cid"]
+    assert bin_store._read_link(store, "current") == first["cid"]
+    assert bin_store._read_link(store, "previous") == second["cid"]
     assert main_branch
 
 
@@ -533,8 +634,8 @@ def test_gc_holds_lock_and_keeps_heads_live_pins_and_grace(
     for record in records.values():
         age_record(store, record["cid"], old)
     age_record(store, records["recent"]["cid"], current_time - dt.timedelta(days=2))
-    epr_store._atomic_link(store, "current", records["current"]["cid"])
-    epr_store._atomic_link(store, "previous", records["previous"]["cid"])
+    bin_store._atomic_link(store, "current", records["current"]["cid"])
+    bin_store._atomic_link(store, "previous", records["previous"]["cid"])
 
     proc = tmp_path / "proc"
     proc_entry(proc, 200, 1, "claude", "live-start")
@@ -556,17 +657,17 @@ def test_gc_holds_lock_and_keeps_heads_live_pins_and_grace(
     }))
 
     calls: list[int] = []
-    real_flock = epr_store.fcntl.flock
+    real_flock = bin_store.fcntl.flock
     with mock.patch.object(
-        epr_store.fcntl, "flock", side_effect=lambda fd, operation: (calls.append(operation), real_flock(fd, operation))[1]
+        bin_store.fcntl, "flock", side_effect=lambda fd, operation: (calls.append(operation), real_flock(fd, operation))[1]
     ):
-        result = epr_store.gc(root=store, proc_root=proc, at=current_time)
+        result = bin_store.gc(root=store, proc_root=proc, at=current_time)
 
     expected = {records[name]["cid"] for name in ("current", "previous", "live", "ownerless", "recent")}
     assert set(result["kept"]) == expected
     assert result["removed"] == [records["garbage"]["cid"]]
     assert "dead" in result["removed_sessions"]
-    assert any(operation & epr_store.fcntl.LOCK_EX for operation in calls)
+    assert any(operation & bin_store.fcntl.LOCK_EX for operation in calls)
 
 
 def test_gc_keeps_an_old_artifact_used_within_fourteen_days(
@@ -581,7 +682,7 @@ def test_gc_keeps_an_old_artifact_used_within_fourteen_days(
     used_at = (current_time - dt.timedelta(days=13)).timestamp()
     os.utime(marker, (used_at, used_at))
 
-    result = epr_store.gc(root=store, at=current_time)
+    result = bin_store.gc(root=store, at=current_time)
 
     assert record["cid"] in result["kept"]
     assert result["removed"] == []
@@ -592,12 +693,12 @@ def test_exec_pin_lock_timeout_falls_back_to_current_with_one_warning(
 ) -> None:
     store, repo, head = scratch
     record = ingest(store, repo, head, fake_epr(tmp_path / "current", "lock-fallback"))
-    epr_store._atomic_link(store, "current", record["cid"])
+    bin_store._atomic_link(store, "current", record["cid"])
     warnings: list[str] = []
-    refusal = epr_store.StoreRefusal("lock-timeout", "busy for 5s")
+    refusal = bin_store.StoreRefusal("lock-timeout", "busy for 5s")
 
-    with mock.patch.object(epr_store, "pin", side_effect=refusal):
-        path, source, cid = epr_store.resolve_exec(
+    with mock.patch.object(bin_store, "pin", side_effect=refusal):
+        path, source, cid = bin_store.resolve_exec(
             root=store,
             environ=clean_env(CLAUDE_CODE_SESSION_ID="waiting"),
             proc_root=tmp_path / "no-proc",
@@ -613,9 +714,9 @@ def test_exec_pin_lock_timeout_falls_back_to_current_with_one_warning(
 
 
 def test_other_lock_waits_refuse_with_a_clear_bound(tmp_path: Path) -> None:
-    with mock.patch.object(epr_store.fcntl, "flock", side_effect=BlockingIOError):
-        with pytest.raises(epr_store.StoreRefusal) as failure:
-            with epr_store.store_lock(tmp_path / "store", timeout=0.01):
+    with mock.patch.object(bin_store.fcntl, "flock", side_effect=BlockingIOError):
+        with pytest.raises(bin_store.StoreRefusal) as failure:
+            with bin_store.store_lock(tmp_path / "store", timeout=0.01):
                 pass
 
     assert failure.value.kind == "lock-timeout"
@@ -623,7 +724,7 @@ def test_other_lock_waits_refuse_with_a_clear_bound(tmp_path: Path) -> None:
 
 
 def test_bootstrap_environment_uses_gate_toolchain_and_resource_caps(tmp_path: Path) -> None:
-    environment = epr_store._bootstrap_environment(REPO, tmp_path / "target")
+    environment = bin_store._bootstrap_environment(REPO, tmp_path / "target")
     assert environment["RUSTUP_TOOLCHAIN"] == "1.96.1"
     assert environment["CARGO_BUILD_JOBS"] == "1"
     assert environment["RUST_TEST_THREADS"] == "1"
@@ -637,10 +738,10 @@ def test_headless_bootstrap_resumes_an_existing_candidate(
     store, repo, head = scratch
     candidate = ingest(store, repo, head, fake_epr(tmp_path / "candidate", "resume"))
 
-    result = epr_store.bootstrap(root=store, repo=repo)
+    result = bin_store.bootstrap(root=store, repo=repo)
 
     assert result["cid"] == candidate["cid"]
-    assert epr_store._read_link(store, "current") == candidate["cid"]
+    assert bin_store._read_link(store, "current") == candidate["cid"]
 
 
 def test_guard_installs_only_after_a_verified_head_into_persistent_device_bin(
@@ -648,7 +749,7 @@ def test_guard_installs_only_after_a_verified_head_into_persistent_device_bin(
 ) -> None:
     store, repo, head = scratch
     record = ingest(store, repo, head, fake_epr(tmp_path / "candidate", "guard"))
-    epr_store._atomic_link(store, "current", record["cid"])
+    bin_store._atomic_link(store, "current", record["cid"])
     cargo_home = tmp_path / "cargo-home"
     env = clean_env(
         EPR_STORE=str(store), CARGO_HOME=str(cargo_home),
@@ -661,13 +762,14 @@ def test_guard_installs_only_after_a_verified_head_into_persistent_device_bin(
     )
 
     assert result.returncode == 0, result.stderr
-    installed = store.parent / "bin/epr-launch"
+    installed = store.parent / "bin/epr"
     installed_text = installed.read_text(encoding="utf-8")
     assert installed_text.count("\n") == 2
     assert "readlink" not in installed_text and "dirname" not in installed_text
     assert str(Path(sys.executable).resolve()) in installed_text
-    assert str((store.parent / "bin/epr_store.py").resolve()) in installed_text
-    assert (store.parent / "bin/epr_store.py").read_bytes() == (LIB / "epr_store.py").read_bytes()
+    assert str((store.parent / "bin/bin_store.py").resolve()) in installed_text
+    assert str((store.parent / "bin/bin-tools.json").resolve()) in installed_text
+    assert (store.parent / "bin/bin_store.py").read_bytes() == (LIB / "bin_store.py").read_bytes()
     assert (cargo_home / "bin/epr").resolve() == installed.resolve()
     launched = subprocess.run(
         [str(cargo_home / "bin/epr"), "--version"],
@@ -678,12 +780,48 @@ def test_guard_installs_only_after_a_verified_head_into_persistent_device_bin(
     assert json.loads(launched.stdout)["cid"] == record["cid"]
 
 
+def test_guard_uses_the_shared_bin_store_override(
+    scratch: tuple[Path, Path, str], tmp_path: Path
+) -> None:
+    _, repo, head = scratch
+    base = tmp_path / "shared-store"
+    store = base / "epr"
+    record = ingest(store, repo, head, fake_epr(tmp_path / "candidate", "shared-guard"))
+    bin_store._atomic_link(store, "current", record["cid"])
+    cargo_home = tmp_path / "cargo-home"
+
+    result = subprocess.run(
+        [sys.executable, str(GUARD)], input="{}",
+        env=clean_env(BIN_STORE=str(base), CARGO_HOME=str(cargo_home)),
+        capture_output=True, text=True, check=False,
+    )
+
+    assert result.returncode == 0, result.stderr
+    assert (base / "bin/epr").is_file()
+    assert (cargo_home / "bin/epr").resolve() == (base / "bin/epr").resolve()
+
+
+def test_guard_registry_initialization_failure_is_fail_open(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    repo = tmp_path / "repo"
+    registry = repo / "genesis/agentic/bin-tools.json"
+    registry.parent.mkdir(parents=True)
+    registry.write_text("not json\n", encoding="utf-8")
+    guard = load_guard()
+
+    with mock.patch.object(guard, "_repo", return_value=repo):
+        guard.main()
+
+    assert "guard initialization error (ignored)" in capsys.readouterr().out
+
+
 def test_guard_expands_relative_install_paths_to_absolute(
     scratch: tuple[Path, Path, str], tmp_path: Path
 ) -> None:
     store, repo, head = scratch
     record = ingest(store, repo, head, fake_epr(tmp_path / "candidate", "relative-guard"))
-    epr_store._atomic_link(store, "current", record["cid"])
+    bin_store._atomic_link(store, "current", record["cid"])
 
     result = subprocess.run(
         [sys.executable, str(GUARD)],
@@ -696,11 +834,11 @@ def test_guard_expands_relative_install_paths_to_absolute(
     )
 
     assert result.returncode == 0, result.stderr
-    installed = tmp_path / "store/../bin/epr-launch"
+    installed = tmp_path / "store/../bin/epr"
     assert installed.resolve().is_file()
     text = installed.read_text(encoding="utf-8")
     assert str(Path(sys.executable).resolve()) in text
-    assert str((tmp_path / "bin/epr_store.py").resolve()) in text
+    assert str((tmp_path / "bin/bin_store.py").resolve()) in text
     assert (tmp_path / "cargo-home/bin/epr").resolve() == installed.resolve()
 
 
@@ -709,7 +847,7 @@ def test_guard_restores_previous_link_when_installed_verification_fails(
 ) -> None:
     store, repo, head = scratch
     record = ingest(store, repo, head, fake_epr(tmp_path / "candidate", "rollback"))
-    epr_store._atomic_link(store, "current", record["cid"])
+    bin_store._atomic_link(store, "current", record["cid"])
     cargo_home = tmp_path / "cargo-home"
     destination = cargo_home / "bin/epr"
     destination.parent.mkdir(parents=True)
@@ -755,17 +893,17 @@ def test_cleanliness_is_judged_over_epr_sources_not_hook_ledgers(
     git(repo, "add", "src")
     git(repo, "commit", "-qm", "source")
     head = git(repo, "rev-parse", "HEAD")
-    monkeypatch.setattr(epr_store, "source_paths", lambda _repo: ["src"])
+    monkeypatch.setattr(bin_store, "source_paths", lambda _repo: ["src"])
 
     (repo / "ledger.jsonl").write_text("{}\n", encoding="utf-8")
-    assert epr_store.git_state(repo) == (head, True)
+    assert bin_store.git_state(repo) == (head, True)
 
     (repo / "src" / "lib.rs").write_text("fn main() { todo!() }\n", encoding="utf-8")
-    assert epr_store.git_state(repo) == (head, False)
+    assert bin_store.git_state(repo) == (head, False)
 
 
 def test_source_paths_fall_back_to_the_whole_tree_without_a_cargo_answer(tmp_path: Path) -> None:
-    assert epr_store.source_paths(tmp_path) == ["."]
+    assert bin_store.source_paths(tmp_path) == ["."]
 
 
 def test_shadows_lists_every_epr_reached_before_the_launcher(
@@ -773,7 +911,7 @@ def test_shadows_lists_every_epr_reached_before_the_launcher(
 ) -> None:
     store, _, _ = scratch
     store.mkdir(parents=True, exist_ok=True)
-    launcher = store.parent / "bin/epr-launch"
+    launcher = store.parent / "bin/epr"
     launcher.parent.mkdir(parents=True, exist_ok=True)
     launcher.write_text("#!/bin/sh\n", encoding="utf-8")
     stale, foreign, ours = tmp_path / "stale", tmp_path / "foreign", tmp_path / "ours"
@@ -786,7 +924,7 @@ def test_shadows_lists_every_epr_reached_before_the_launcher(
     after.mkdir()
     fake_epr(after / "epr", "after-the-launcher")
 
-    found = epr_store.shadows(root=store, path_env=f"{stale}:{foreign}:{ours}:{after}")
+    found = bin_store.shadows(root=store, path_env=f"{stale}:{foreign}:{ours}:{after}")
 
     assert [(Path(entry["path"]).parent.name, entry["superseded"]) for entry in found] == [
         ("stale", True), ("foreign", False),
@@ -798,7 +936,7 @@ def test_guard_keeps_a_hand_installed_binary_and_repoints_stale_shadows(
 ) -> None:
     store, repo, head = scratch
     record = ingest(store, repo, head, fake_epr(tmp_path / "candidate", "head"))
-    epr_store._atomic_link(store, "current", record["cid"])
+    bin_store._atomic_link(store, "current", record["cid"])
     cargo_bin = tmp_path / "cargo-home/bin"
     cargo_bin.mkdir(parents=True)
     hand_built = fake_epr(cargo_bin / "epr", "hand-built-by-cargo-install")
@@ -815,7 +953,7 @@ def test_guard_keeps_a_hand_installed_binary_and_repoints_stale_shadows(
     )
 
     assert result.returncode == 0, result.stderr
-    launcher = (store.parent / "bin/epr-launch").resolve()
+    launcher = (store.parent / "bin/epr").resolve()
     assert (cargo_bin / "epr").resolve() == launcher
     assert (stale / "epr").resolve() == launcher
     kept = json.loads((store / hand_cid / "record.json").read_text(encoding="utf-8"))
@@ -824,9 +962,44 @@ def test_guard_keeps_a_hand_installed_binary_and_repoints_stale_shadows(
     assert "still shadows" not in result.stdout
 
 
+def test_guard_preserves_distinct_plain_alias_bytes_as_separate_candidates(
+    scratch: tuple[Path, Path, str], tmp_path: Path
+) -> None:
+    store, repo, _ = scratch
+    pin = "7" * 40
+    install_brit_head(store, repo, pin, fake_brit_release(tmp_path / "head", pin, "head"))
+    cargo_bin = tmp_path / "cargo-home/bin"
+    cargo_bin.mkdir(parents=True)
+    brit_source = fake_brit_release(tmp_path / "plain-brit", pin, "plain-brit") / "brit"
+    rakia_source = fake_brit_release(tmp_path / "plain-rakia", pin, "plain-rakia") / "brit"
+    shutil.copyfile(brit_source, cargo_bin / "brit")
+    shutil.copyfile(rakia_source, cargo_bin / "rakia")
+    (cargo_bin / "brit").chmod(0o755)
+    (cargo_bin / "rakia").chmod(0o755)
+    guard = load_guard()
+
+    with mock.patch.dict(
+        os.environ,
+        clean_env(BRIT_STORE=str(store), CARGO_HOME=str(tmp_path / "cargo-home")),
+        clear=True,
+    ):
+        adopted = guard._adopt_clobbers(
+            REPO / "genesis/agentic/bin/bin-store", repo, "brit",
+            bin_store.tool_config("brit"), store,
+        )
+
+    brit_kept = Path(adopted["brit"])
+    rakia_kept = Path(adopted["rakia"])
+    assert brit_kept.parent != rakia_kept.parent
+    assert bin_store.hash_file(brit_kept) == bin_store.hash_file(brit_source)
+    assert bin_store.hash_file(rakia_kept) == bin_store.hash_file(rakia_source)
+    assert json.loads((brit_kept.parent / "record.json").read_text())["gate_run"] == "adopted-from-path"
+    assert json.loads((rakia_kept.parent / "record.json").read_text())["gate_run"] == "adopted-from-path"
+
+
 def _landed_at(store: Path, repo: Path, commit_sha: str, label: str, tmp_path: Path) -> dict:
     record = ingest(store, repo, commit_sha, fake_epr(tmp_path / label, label))
-    epr_store.land(record["cid"], commit_sha, root=store, repo=repo)
+    bin_store.land(record["cid"], commit_sha, root=store, repo=repo)
     return record
 
 
@@ -836,13 +1009,13 @@ def test_follow_adopts_a_newer_published_dev_commit_the_checkout_holds(
     store, repo, head = scratch
     _landed_at(store, repo, head, "landed", tmp_path)
     newer = commit(repo, "a newer epr source\n")
-    git(repo, "update-ref", epr_store.PUBLISHED_REF, newer)
+    git(repo, "update-ref", bin_store.PUBLISHED_REF, newer)
     candidate = ingest(store, repo, newer, fake_epr(tmp_path / "newer", "newer"))
 
-    result = epr_store.follow(root=store, repo=repo)
+    result = bin_store.follow(root=store, repo=repo)
 
     assert result["followed"] is True
-    assert epr_store._read_link(store, "current") == candidate["cid"]
+    assert bin_store._read_link(store, "current") == candidate["cid"]
     assert json.loads((store / "current.json").read_text())["commit"] == newer
 
 
@@ -852,14 +1025,14 @@ def test_follow_leaves_the_head_for_an_unpublished_or_unchanged_checkout(
     store, repo, head = scratch
     landed = _landed_at(store, repo, head, "landed", tmp_path)
     local_only = commit(repo, "a local commit nobody landed\n")
-    git(repo, "update-ref", epr_store.PUBLISHED_REF, head)
+    git(repo, "update-ref", bin_store.PUBLISHED_REF, head)
 
-    assert "not published on dev" in epr_store.follow(root=store, repo=repo)["why"]
+    assert "not published on dev" in bin_store.follow(root=store, repo=repo)["why"]
 
-    git(repo, "update-ref", epr_store.PUBLISHED_REF, local_only)
+    git(repo, "update-ref", bin_store.PUBLISHED_REF, local_only)
     (repo / "tracked").write_text("dirty\n", encoding="utf-8")
-    assert "dirty" in epr_store.follow(root=store, repo=repo)["why"]
-    assert epr_store._read_link(store, "current") == landed["cid"]
+    assert "dirty" in bin_store.follow(root=store, repo=repo)["why"]
+    assert bin_store._read_link(store, "current") == landed["cid"]
 
 
 def test_follow_does_nothing_when_epr_sources_did_not_change(
@@ -872,9 +1045,278 @@ def test_follow_does_nothing_when_epr_sources_did_not_change(
     git(repo, "commit", "-qm", "source")
     base = git(repo, "rev-parse", "HEAD")
     landed = _landed_at(store, repo, base, "landed", tmp_path)
-    monkeypatch.setattr(epr_store, "source_paths", lambda _repo: ["src"])
+    monkeypatch.setattr(bin_store, "source_paths", lambda _repo: ["src"])
     docs_only = commit(repo, "a docs-only change\n")
-    git(repo, "update-ref", epr_store.PUBLISHED_REF, docs_only)
+    git(repo, "update-ref", bin_store.PUBLISHED_REF, docs_only)
 
-    assert epr_store.follow(root=store, repo=repo)["why"] == "no epr source change since the landed head"
-    assert epr_store._read_link(store, "current") == landed["cid"]
+    assert bin_store.follow(root=store, repo=repo)["why"] == "no epr source change since the landed head"
+    assert bin_store._read_link(store, "current") == landed["cid"]
+
+
+def test_brit_multibin_ingest_uses_canonical_sums_rcid(
+    scratch: tuple[Path, Path, str], tmp_path: Path
+) -> None:
+    store, repo, _ = scratch
+    pin = "1" * 40
+    release = fake_brit_release(tmp_path / "brit-release", pin)
+
+    record = bin_store.ingest(
+        release, tool="brit", root=store, repo=repo, source_commit=pin,
+        gate_run="test", tree_clean=True,
+    )
+
+    checksums = {name: bin_store.hash_file(release / name)
+                 for name in bin_store.tool_config("brit")["bins"]}
+    assert record["rcid"] == bin_store.hash_bytes(bin_store.canonical_sums(checksums).encode())
+    assert record["cid"] == record["rcid"]
+    assert sorted(path.name for path in (store / record["rcid"]).iterdir()) == [
+        "brit", "brit-build-ref", "brit-verify", "record.json",
+    ]
+    assert all((store / record["rcid"] / name).stat().st_mode & 0o222 == 0 for name in checksums)
+
+
+def test_rakia_alias_execs_brit_with_rakia_as_argv_zero(
+    scratch: tuple[Path, Path, str], tmp_path: Path
+) -> None:
+    store, repo, _ = scratch
+    pin = "2" * 40
+    record = install_brit_head(store, repo, pin, fake_brit_release(tmp_path / "release", pin))
+    calls = []
+
+    bin_store.launch(
+        "/some/bin/rakia", ["affected"],
+        environ=clean_env(BRIT_STORE=str(store)),
+        execv=lambda executable, argv: calls.append((executable, argv)),
+    )
+
+    assert calls == [(str(store / record["cid"] / "brit"), ["rakia", "affected"])]
+
+
+def test_session_pins_are_scoped_per_tool(
+    scratch: tuple[Path, Path, str], tmp_path: Path
+) -> None:
+    epr_store, repo, head = scratch
+    brit_store = tmp_path / "brit-store"
+    epr = ingest(epr_store, repo, head, fake_epr(tmp_path / "epr", "pin"))
+    bin_store._atomic_link(epr_store, "current", epr["cid"])
+    brit = install_brit_head(
+        brit_store, repo, "3" * 40, fake_brit_release(tmp_path / "brit", "3" * 40)
+    )
+    environment = clean_env(ELOHIM_SESSION_ID="shared-session")
+
+    epr_pin = bin_store.pin(root=epr_store, tool="epr", environ=environment)
+    brit_pin = bin_store.pin(root=brit_store, tool="brit", environ=environment)
+
+    assert epr_pin["cid"] == epr["cid"]
+    assert brit_pin["cid"] == brit["cid"]
+    assert (epr_store / "sessions/shared-session").is_file()
+    assert (brit_store / "sessions/shared-session").is_file()
+
+
+def _published_brit_fixture(
+    scratch: tuple[Path, Path, str], tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> tuple[Path, Path, str, str]:
+    store, repo, _ = scratch
+    old_pin, new_pin = "4" * 40, "5" * 40
+    install_brit_head(store, repo, old_pin, fake_brit_release(tmp_path / "old", old_pin))
+    git(repo, "update-ref", bin_store.PUBLISHED_REF, git(repo, "rev-parse", "HEAD"))
+    monkeypatch.setattr(bin_store, "pinned_sha", lambda _repo, _tool: new_pin)
+    return store, repo, old_pin, new_pin
+
+
+def test_brit_follow_refuses_unpublished_head(
+    scratch: tuple[Path, Path, str], tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    store, repo, _, new_pin = _published_brit_fixture(scratch, tmp_path, monkeypatch)
+    published = git(repo, "rev-parse", "HEAD")
+    commit(repo, "local-only\n")
+    git(repo, "update-ref", bin_store.PUBLISHED_REF, published)
+
+    with pytest.raises(bin_store.StoreRefusal) as failure:
+        bin_store.follow(
+            tool="brit", root=store, repo=repo,
+            attestation_judge=lambda *_: pytest.fail("attestation must not run"),
+            downloader=lambda *_: pytest.fail("download must not run"),
+        )
+    assert failure.value.kind == "unpublished"
+    assert new_pin[:12] not in str(failure.value)
+
+
+def test_direct_brit_land_requires_witnessed_success_before_health(
+    scratch: tuple[Path, Path, str], tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    store, repo, _ = scratch
+    pin = "8" * 40
+    monkeypatch.setattr(bin_store, "pinned_sha", lambda _repo, _tool: pin)
+    record = bin_store.ingest(
+        fake_brit_release(tmp_path / "direct", pin), tool="brit", root=store, repo=repo,
+        source_commit=pin, gate_run="test", tree_clean=True,
+    )
+
+    with mock.patch.object(bin_store, "_health_check") as health:
+        with pytest.raises(bin_store.StoreRefusal) as failure:
+            bin_store.land(
+                record["cid"], pin, root=store, repo=repo, tool="brit",
+                attestation_judge=lambda *_: {
+                    "outcome": "pass", "tier": "claimed", "conclusion": "unreachable",
+                },
+            )
+
+    assert failure.value.kind == "attestation-unreachable"
+    health.assert_not_called()
+    assert bin_store._read_link(store, "current") is None
+
+
+@pytest.mark.parametrize("cached", [False, True], ids=["fresh", "cached"])
+@pytest.mark.parametrize("verdict,kind", [
+    ({"outcome": "pass", "tier": "claimed", "conclusion": "unreachable", "line": "attested: claimed — offline"}, "attestation-unreachable"),
+    ({"outcome": "refuse", "tier": "witnessed", "conclusion": "failure", "line": "attested: REFUSED — red"}, "attestation-refused"),
+])
+def test_brit_follow_refuses_unreachable_or_red_attestation_for_every_candidate_source(
+    scratch: tuple[Path, Path, str], tmp_path: Path, monkeypatch: pytest.MonkeyPatch,
+    verdict: dict, kind: str, cached: bool,
+) -> None:
+    store, repo, _, new_pin = _published_brit_fixture(scratch, tmp_path, monkeypatch)
+    monkeypatch.setattr(bin_store, "brit_descends", lambda *_: True)
+    if cached:
+        bin_store.ingest(
+            fake_brit_release(tmp_path / "cached", new_pin), tool="brit", root=store,
+            repo=repo, source_commit=new_pin, gate_run="test", tree_clean=True,
+        )
+
+    def download(pin: str, destination: Path) -> Path:
+        if cached:
+            pytest.fail("cached candidate must not download")
+        return fake_brit_release(destination, pin)
+
+    with mock.patch.object(bin_store, "_health_check") as health:
+        with pytest.raises(bin_store.StoreRefusal) as failure:
+            bin_store.follow(
+                tool="brit", root=store, repo=repo, attestation_judge=lambda *_: verdict,
+                downloader=download,
+            )
+    assert failure.value.kind == kind
+    health.assert_not_called()
+
+
+def test_brit_follow_refuses_a_pin_that_does_not_descend(
+    scratch: tuple[Path, Path, str], tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    store, repo, _, _ = _published_brit_fixture(scratch, tmp_path, monkeypatch)
+    monkeypatch.setattr(bin_store, "brit_descends", lambda *_: False)
+
+    with pytest.raises(bin_store.StoreRefusal) as failure:
+        bin_store.follow(
+            tool="brit", root=store, repo=repo,
+            attestation_judge=lambda *_: pytest.fail("attestation must not run"),
+            downloader=lambda *_: pytest.fail("download must not run"),
+        )
+    assert failure.value.kind == "non-descendant"
+
+
+def test_brit_follow_adopts_verified_fake_release(
+    scratch: tuple[Path, Path, str], tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    store, repo, _, new_pin = _published_brit_fixture(scratch, tmp_path, monkeypatch)
+    monkeypatch.setattr(bin_store, "brit_descends", lambda *_: True)
+
+    def download(pin: str, destination: Path) -> Path:
+        assert pin == new_pin
+        return fake_brit_release(destination, pin, "downloaded")
+
+    followed = bin_store.follow(
+        tool="brit", root=store, repo=repo, downloader=download,
+        attestation_judge=lambda *_: {
+            "outcome": "pass", "tier": "witnessed", "conclusion": "success",
+        },
+    )
+
+    assert followed["followed"] is True
+    assert bin_store._read_json(store / "current.json")["commit"] == new_pin
+    assert bin_store._verified_artifact(store, followed["cid"], "brit")
+
+
+def test_brit_follow_names_both_cures_when_no_bytes_source_exists(
+    scratch: tuple[Path, Path, str], tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    store, repo, _, new_pin = _published_brit_fixture(scratch, tmp_path, monkeypatch)
+    monkeypatch.setattr(bin_store, "brit_descends", lambda *_: True)
+    monkeypatch.delenv("CARGO_REGISTRIES_ELOHIM_TOKEN", raising=False)
+    monkeypatch.delenv("NPM_TOKEN", raising=False)
+
+    with pytest.raises(bin_store.StoreRefusal) as failure:
+        bin_store.follow(
+            tool="brit", root=store, repo=repo, downloader=lambda *_: None,
+            attestation_judge=lambda *_: {
+                "outcome": "pass", "tier": "witnessed", "conclusion": "success",
+            },
+        )
+    assert str(failure.value) == (
+        f"no brit-build-{new_pin[:12]} release and no CARGO_REGISTRIES_ELOHIM_TOKEN or NPM_TOKEN"
+    )
+
+
+def test_brit_headless_bootstrap_requires_attestation_and_uses_the_same_release_source(
+    scratch: tuple[Path, Path, str], tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    store, repo, _ = scratch
+    pin = "6" * 40
+    monkeypatch.setattr(bin_store, "pinned_sha", lambda _repo, _tool: pin)
+    judged = []
+
+    record = bin_store.bootstrap(
+        tool="brit", root=store, repo=repo,
+        downloader=lambda release_pin, destination: fake_brit_release(destination, release_pin),
+        attestation_judge=lambda checkout, judged_pin: (
+            judged.append((checkout, judged_pin))
+            or {"outcome": "pass", "tier": "witnessed", "conclusion": "success"}
+        ),
+    )
+
+    assert judged == [(repo, pin)]
+    assert bin_store._read_link(store, "current") == record["cid"]
+
+
+def test_the_brit_registry_credential_prefers_the_cargo_token_then_npm_token() -> None:
+    assert bin_store._registry_credential({}) == {}
+    from_npm = bin_store._registry_credential({"NPM_TOKEN": " t0k "})
+    assert from_npm["CARGO_REGISTRIES_ELOHIM_TOKEN"] == "Bearer t0k"
+    assert from_npm["CARGO_REGISTRY_GLOBAL_CREDENTIAL_PROVIDERS"] == "cargo:token"
+    explicit = bin_store._registry_credential(
+        {"NPM_TOKEN": "t0k", "CARGO_REGISTRIES_ELOHIM_TOKEN": "Bearer explicit"}
+    )
+    assert explicit["CARGO_REGISTRIES_ELOHIM_TOKEN"] == "Bearer explicit"
+
+
+def test_a_daemon_follows_the_device_head_not_the_launching_session(
+    scratch: tuple[Path, Path, str], tmp_path: Path
+) -> None:
+    store, repo, head = scratch
+    older = ingest(store, repo, head, fake_epr(tmp_path / "older", "older"))
+    bin_store._atomic_link(store, "current", older["cid"])
+    session = clean_env(EPR_STORE=str(store), ELOHIM_SESSION_ID="launching-session")
+    bin_store.pin(root=store, environ=session)
+    newer = ingest(store, repo, head, fake_epr(tmp_path / "newer", "newer"))
+    bin_store._atomic_link(store, "current", newer["cid"])
+    calls = []
+
+    bin_store.launch("/x/epr", ["peer", "serve"], environ=session,
+                     execv=lambda executable, argv: calls.append(executable))
+    bin_store.launch("/x/epr", ["peer", "status"], environ=session,
+                     execv=lambda executable, argv: calls.append(executable))
+
+    assert calls == [str(store / newer["cid"] / "epr"), str(store / older["cid"] / "epr")]
+
+
+def test_a_daemon_lease_is_owned_by_the_daemon_process(tmp_path: Path) -> None:
+    store = tmp_path / "store"
+    store.mkdir()
+    proc = tmp_path / "proc"
+    proc_entry(proc, 4242, 1, "epr", "777")
+    cid = "sha256:" + "a" * 64
+
+    lease = bin_store.daemon_lease(store, cid, pid=4242, proc_root=proc)
+
+    assert lease is not None and lease["owner_pid"] == 4242 and lease["owner_starttime"] == "777"
+    assert bin_store._owner_live(lease, proc) is True
+    assert bin_store.daemon_lease(store, cid, pid=9999, proc_root=proc) is None

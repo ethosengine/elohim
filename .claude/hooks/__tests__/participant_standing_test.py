@@ -85,7 +85,10 @@ class ParticipantStandingCase(unittest.TestCase):
         library = self.project / ".claude" / "scripts" / "_lib"
         library.mkdir(parents=True)
         shutil.copy(HOOKS.parent / "scripts" / "_lib" / "epr_client.py", library)
-        shutil.copy(HOOKS.parent / "scripts" / "_lib" / "epr_store.py", library)
+        shutil.copy(HOOKS.parent / "scripts" / "_lib" / "bin_store.py", library)
+        registry = self.project / "genesis" / "agentic"
+        registry.mkdir(parents=True)
+        shutil.copy(HOOKS.parents[1] / "genesis" / "agentic" / "bin-tools.json", registry / "bin-tools.json")
         (library / "__init__.py").write_text("")
         self.log = self.tmp / "stub.log"
         self.stub = self.tmp / "bin" / "epr"
@@ -106,7 +109,7 @@ class ParticipantStandingCase(unittest.TestCase):
             "STUB_CLAIMED": json.dumps(claimed or {}),
             "PATH": str(self.empty_path),
             # This device's real epr store would answer otherwise: "absent" must mean absent here.
-            "EPR_STORE": str(self.project / "no-epr-store"),
+            "EPR_STORE": str(self.project / "no-epr-tool-store"),
         })
         if stub:
             env["EPR_BIN"] = str(self.stub)

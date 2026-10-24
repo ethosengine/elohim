@@ -17,34 +17,16 @@
 
 set -e
 
-# Locate brit separately from legacy rakia. An explicit BRIT_BIN is a path-scoped
+# An explicit BRIT_BIN is a path-scoped
 # selection: an invalid path must not silently fall back to an older PATH tool.
-# Legacy rakia is accepted only for build planning, with a deprecation warning.
-#
-# REPO_ROOT default of /projects/elohim is the Eclipse Che dev path. CI callers
-# (Jenkins, ci-builder) MUST set REPO_ROOT=$WORKSPACE explicitly. If REPO_ROOT
-# is unset on CI, the fallback path won't exist and the helper degrades to
-# "binary not installed" → WARN + exit 0 (still safe, but the fallback is
-# intentionally dev-only).
 BRIT_BIN_EXPLICIT=0
 if [ "${BRIT_BIN+x}" = x ]; then
     BRIT_BIN_EXPLICIT=1
     [ -n "$BRIT_BIN" ] && [ -f "$BRIT_BIN" ] && [ -x "$BRIT_BIN" ] || BRIT_BIN=""
 elif command -v brit >/dev/null 2>&1; then
     BRIT_BIN=brit
-elif [ -x "${REPO_ROOT:-/projects/elohim}/elohim/brit/target/release/brit" ]; then
-    BRIT_BIN="${REPO_ROOT:-/projects/elohim}/elohim/brit/target/release/brit"
 else
     BRIT_BIN=""
-fi
-
-RAKIA_BIN=""
-if [ "$BRIT_BIN_EXPLICIT" -eq 0 ]; then
-    if command -v rakia >/dev/null 2>&1; then
-        RAKIA_BIN=rakia
-    elif [ -x "${REPO_ROOT:-/projects/elohim}/elohim/brit/target/release/rakia" ]; then
-        RAKIA_BIN="${REPO_ROOT:-/projects/elohim}/elohim/brit/target/release/rakia"
-    fi
 fi
 
 # BRIT_BUILD_REF_BIN set by the caller wins (a local build in a private CARGO_TARGET_DIR).
@@ -53,8 +35,6 @@ if [ -n "$BRIT_BUILD_REF_BIN" ]; then
     [ -x "$BRIT_BUILD_REF_BIN" ] || BRIT_BUILD_REF_BIN=""
 elif command -v brit-build-ref >/dev/null 2>&1; then
     BRIT_BUILD_REF_BIN=brit-build-ref
-elif [ -x "${REPO_ROOT:-/projects/elohim}/elohim/brit/target/release/brit-build-ref" ]; then
-    BRIT_BUILD_REF_BIN="${REPO_ROOT:-/projects/elohim}/elohim/brit/target/release/brit-build-ref"
 fi
 
 # Subcommand routing.
@@ -84,13 +64,6 @@ case "${1:-}" in
             "$BRIT_BIN" build plan "$@" || {
                 rc=$?
                 echo "[brit-helper] WARN: brit build plan exited $rc — advisory only, not failing the build" >&2
-                exit 0
-            }
-        elif [ -n "$RAKIA_BIN" ]; then
-            echo "[brit-helper] WARN: deprecated legacy rakia plan fallback; install unified brit" >&2
-            "$RAKIA_BIN" plan "$@" || {
-                rc=$?
-                echo "[brit-helper] WARN: legacy rakia plan exited $rc — advisory only, not failing the build" >&2
                 exit 0
             }
         elif [ "$BRIT_BIN_EXPLICIT" -eq 1 ] && [ -z "$BRIT_BIN" ]; then

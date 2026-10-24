@@ -43,7 +43,7 @@ from _lib import managed_surfaces as ms  # noqa: E402
 
 def _epr_bin() -> str:
     """How this repository invokes the native cite writer, resolved at nudge time."""
-    return epr_client.resolve_binary() or "epr  # not on PATH — run: epr-store bootstrap\n#"
+    return epr_client.resolve_binary() or "epr  # not on PATH — run: bin-store --tool epr bootstrap\n#"
 
 
 def _unsealed_debt(doc: Path, repo: Path) -> int:

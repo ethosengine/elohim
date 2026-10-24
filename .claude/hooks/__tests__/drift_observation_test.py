@@ -573,7 +573,7 @@ class ObservationHelperCase(unittest.TestCase):
         saved = dict(os.environ)
         os.environ.pop("EPR_BIN", None)
         os.environ["PATH"] = "/nonexistent"
-        os.environ["EPR_STORE"] = "/nonexistent/epr-store"  # the device's real store would answer
+        os.environ["EPR_STORE"] = "/nonexistent/epr-tool-store"  # the device's real store would answer
         try:
             mod.reset_cache()
             self.assertIsNone(mod.resolve_bin())

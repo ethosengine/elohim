@@ -133,7 +133,10 @@ class _StubFixture(unittest.TestCase):
         library = self.project / ".claude" / "scripts" / "_lib"
         library.mkdir(parents=True)
         shutil.copy(HOOKS.parent / "scripts" / "_lib" / "epr_client.py", library)
-        shutil.copy(HOOKS.parent / "scripts" / "_lib" / "epr_store.py", library)
+        shutil.copy(HOOKS.parent / "scripts" / "_lib" / "bin_store.py", library)
+        registry = self.project / "genesis" / "agentic"
+        registry.mkdir(parents=True)
+        shutil.copy(HOOKS.parents[1] / "genesis" / "agentic" / "bin-tools.json", registry / "bin-tools.json")
         (library / "__init__.py").write_text("")
         self.log = self.tmp / "stub.log"
         self.stub = self.tmp / "epr"

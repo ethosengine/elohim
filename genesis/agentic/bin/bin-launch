@@ -1,0 +1,2 @@
+#!/bin/sh
+exec "@BIN_STORE_PYTHON@" -I "@BIN_STORE_PY@" --registry "@BIN_TOOLS_JSON@" launch --invoked "$0" -- "$@"

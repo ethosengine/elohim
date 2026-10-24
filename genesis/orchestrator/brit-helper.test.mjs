@@ -9,7 +9,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { execFileSync, spawnSync } from 'node:child_process';
-import { chmodSync, mkdirSync, mkdtempSync, readFileSync, writeFileSync } from 'node:fs';
+import { chmodSync, existsSync, mkdirSync, mkdtempSync, readFileSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
@@ -177,20 +177,17 @@ test('invalid explicit BRIT_BIN never falls back to old tools or blocks build-re
   assert.equal(readFileSync(log, 'utf8').trim(), 'build-ref');
 });
 
-test('legacy rakia is only a visibly deprecated plan fallback, never Git verify', () => {
-  const dir = mkdtempSync(join(tmpdir(), 'brit-helper-legacy-'));
+test('a brit without `build plan` stays advisory and never falls back to a rakia binary', () => {
+  // `rakia` on PATH is now the bin-store launcher alias for the same pinned brit, so there is no
+  // older plan engine to fall back to: an old brit is reported, and nothing else is executed.
+  const dir = mkdtempSync(join(tmpdir(), 'brit-helper-no-plan-'));
   const log = join(dir, 'argv.log');
-  stub(dir, 'brit', 'exit 2'); // Old Brit has no `build plan` namespace.
+  stub(dir, 'brit', 'exit 2'); // An old brit with no `build plan` namespace.
   stub(dir, 'rakia', `printf 'rakia:%s\\n' "$*" >> '${log}'`);
   const env = { PATH: `${dir}:/usr/bin:/bin`, REPO_ROOT: dir };
   const plan = helper(['plan', '--since', 'origin/dev'], env);
   assert.equal(plan.status, 0, plan.stderr);
-  assert.match(plan.stderr, /deprecated legacy rakia plan fallback/);
-  assert.equal(readFileSync(log, 'utf8').trim(), 'rakia:plan --since origin/dev');
-  const verify = helper(['verify'], env);
-  assert.equal(verify.status, 0);
-  assert.doesNotMatch(verify.stderr, /rakia/);
-  assert.equal(readFileSync(log, 'utf8').trim(), 'rakia:plan --since origin/dev');
+  assert.equal(existsSync(log), false, 'rakia must never be executed as a plan fallback');
 });
 
 test('a failing unified plan remains warn-only, and pre-push supplies --since', () => {

@@ -4,7 +4,7 @@
  * Every scenario owns a temporary device store, rendered launcher, fake process table and git
  * history. The candidates are padded copies of the real epr evaluator selected by EPR_BIN (or the
  * gate's documented build path), while every store transition is driven through the checked-in
- * epr-store CLI. Nothing reaches the persistent device store.
+ * bin-store CLI. Nothing reaches the persistent device store.
  */
 import assert from 'node:assert/strict';
 import { spawnSync } from 'node:child_process';
@@ -53,9 +53,10 @@ interface FollowFixture {
 
 const fixtures = new WeakMap<object, FollowFixture>();
 const repository = resolve('../..');
-const storeCli = join(repository, 'genesis/agentic/bin/epr-store');
-const launcherSource = join(repository, 'genesis/agentic/bin/epr-launch');
-const storeLibrary = join(repository, '.claude/scripts/_lib/epr_store.py');
+const storeCli = join(repository, 'genesis/agentic/bin/bin-store');
+const launcherSource = join(repository, 'genesis/agentic/bin/bin-launch');
+const storeLibrary = join(repository, '.claude/scripts/_lib/bin_store.py');
+const registrySource = join(repository, 'genesis/agentic/bin-tools.json');
 // This reviewed gate path is only a read source; each scenario copies it into a private mkdtemp.
 // eslint-disable-next-line sonarjs/publicly-writable-directories
 const documentedGateBuild = '/tmp/eprfs-gate-target-wt-household-follows-latest/debug/epr';
@@ -145,7 +146,11 @@ function launcherEnv(state: FollowFixture, extra: NodeJS.ProcessEnv = {}): NodeJ
 }
 
 function store(state: FollowFixture, args: string[], env: NodeJS.ProcessEnv = {}): Invocation {
-  return run(state, [storeCli, '--store', state.store, ...args], storeEnv(state, env));
+  return run(
+    state,
+    [storeCli, '--tool', 'epr', '--store', state.store, ...args],
+    storeEnv(state, env)
+  );
 }
 
 function storeOk(state: FollowFixture, args: string[], env: NodeJS.ProcessEnv = {}): Invocation {
@@ -164,6 +169,37 @@ function makeCandidate(state: FollowFixture, label: 'A' | 'B'): string {
   const identity = object(JSON.parse(ok(state, [destination, '--version']).stdout));
   assert.equal(identity.id, 'elohim-epr-cli');
   assert.match(String(identity.cid), /^sha256:[0-9a-f]{64}$/);
+  return destination;
+}
+
+function makeWrongCidCandidate(state: FollowFixture): string {
+  const destination = join(state.base, 'candidates', 'epr-wrong-cid');
+  const counter = join(state.base, 'wrong-cid-version-count');
+  mkdirSync(dirname(destination), { recursive: true });
+  writeFileSync(
+    destination,
+    `#!/usr/bin/env python3
+import hashlib
+import json
+from pathlib import Path
+import sys
+
+here = Path(__file__)
+counter = Path(${JSON.stringify(counter)})
+if sys.argv[1:] == ['--version']:
+    count = int(counter.read_text() or '0') + 1 if counter.exists() else 1
+    counter.write_text(str(count))
+    cid = 'sha256:' + hashlib.sha256(here.read_bytes()).hexdigest()
+    if count > 1:
+        cid = 'sha256:' + '0' * 64
+    print(json.dumps({'id': 'elohim-epr-cli', 'version': 'wrong-cid-fixture', 'cid': cid}))
+elif sys.argv[1:] == ['flow', 'report', 'scope']:
+    print('scope: aligned')
+else:
+    raise SystemExit(2)
+`
+  );
+  chmodSync(destination, 0o755);
   return destination;
 }
 
@@ -240,7 +276,7 @@ Given(
       repo,
       store: storeRoot,
       procRoot,
-      launcher: join(bin, 'epr-launch'),
+      launcher: join(bin, 'epr'),
       commitA: '',
     };
     fixtures.set(this, state);
@@ -249,10 +285,12 @@ Given(
     writeFileSync(join(repo, 'source.txt'), 'build A\n');
     state.commitA = commit(state, 'source for build A');
 
-    copyFileSync(storeLibrary, join(bin, 'epr_store.py'));
+    copyFileSync(storeLibrary, join(bin, 'bin_store.py'));
+    copyFileSync(registrySource, join(bin, 'bin-tools.json'));
     const renderedLauncher = readFileSync(launcherSource, 'utf8')
-      .replace('@EPR_PYTHON@', process.env.PYTHON ?? '/usr/bin/python3')
-      .replace('@EPR_STORE_PY@', join(bin, 'epr_store.py'));
+      .replace('@BIN_STORE_PYTHON@', process.env.PYTHON ?? '/usr/bin/python3')
+      .replace('@BIN_STORE_PY@', join(bin, 'bin_store.py'))
+      .replace('@BIN_TOOLS_JSON@', join(bin, 'bin-tools.json'));
     writeFileSync(state.launcher, renderedLauncher);
     chmodSync(state.launcher, 0o755);
   }
@@ -291,7 +329,7 @@ Then("epr through the launcher reports build B's CID", function () {
   assert.equal(versionThroughLauncher(state, state.sessionEnv).cid, state.cidB);
 });
 
-Then("epr-store resolve reports build B's CID for that session", function () {
+Then("bin-store for epr resolves build B's CID for that session", function () {
   const state = fixture(this);
   assert.ok(state.sessionEnv);
   const resolved = storeOk(state, ['resolve'], state.sessionEnv).stdout.trim();
@@ -310,7 +348,7 @@ Then("the open session still runs build A's CID", function () {
   assert.equal(versionThroughLauncher(state, state.sessionEnv).cid, state.cidA);
 });
 
-Then('epr-store status reports that session behind the head', function () {
+Then('bin-store for epr reports that session behind the head', function () {
   const state = fixture(this);
   assert.ok(state.sessionEnv);
   const status = object(JSON.parse(storeOk(state, ['status', '--json'], state.sessionEnv).stdout));
@@ -328,6 +366,29 @@ When('build B is ingested from a clean commit whose health check fails', functio
   const sourceCommit = nextCleanCommit(state);
   ingest(state, 'B', sourceCommit, true);
 });
+
+When(
+  'build B is ingested from a clean commit but reports the wrong CID during health',
+  function () {
+    const state = fixture(this);
+    const sourceCommit = nextCleanCommit(state);
+    const candidate = makeWrongCidCandidate(state);
+    const result = storeOk(state, [
+      'ingest',
+      candidate,
+      '--source-commit',
+      sourceCommit,
+      '--gate-run',
+      'a2o-build-wrong-cid',
+      '--tree-clean',
+      'true',
+      '--repo',
+      state.repo,
+    ]);
+    state.candidateB = candidate;
+    state.cidB = String(object(JSON.parse(result.stdout)).cid);
+  }
+);
 
 When('Matthew tries to land build B', { timeout: 80_000 }, function () {
   const state = fixture(this);
@@ -390,7 +451,7 @@ When('Matthew tries to land the stored build A', function () {
   state.last = land(state, state.cidA, state.commitA);
 });
 
-When('Matthew lands the stored build A with --revert', function () {
+When('Matthew promotes the stored build A as head with --revert', function () {
   const state = fixture(this);
   assert.ok(state.cidA);
   state.last = land(state, state.cidA, state.commitA, true);
