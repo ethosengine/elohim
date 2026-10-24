@@ -402,12 +402,23 @@ _storage_debug="$POOL/elohim__elohim-storage/dev/debug/elohim-storage"
 # 2026-09-19). The gate never writes here. A copy older than the source is still refused by the
 # staleness check below, so this cannot hide a stale binary; print_iroh_build_command refreshes it.
 _storage_mesh="$POOL/elohim__elohim-storage/mesh-bin/elohim-storage"
+# Set only when the caller passed STORAGE_BIN explicitly (CI, the compute provider): a named
+# binary is the caller's choice, so preflight never refuses it for the slot it sits in.
+STORAGE_BIN_EXPLICIT=0
+[ -n "${STORAGE_BIN:-}" ] && STORAGE_BIN_EXPLICIT=1
 if [ -z "${STORAGE_BIN:-}" ] && [ -x "$_storage_mesh" ]; then
   STORAGE_BIN="$_storage_mesh"
 elif [ -z "${STORAGE_BIN:-}" ] && [ ! -x "$_storage_release" ] && [ -x "$_storage_debug" ]; then
   STORAGE_BIN="$_storage_debug"
 fi
 STORAGE_BIN="${STORAGE_BIN:-$_storage_release}"
+# True when storage resolved, by default, to the slot the gate's `cargo test` rewrites with
+# default features. 2026-10-24: with no mesh copy, a push's gate replaced the running peers'
+# executable mid-run, and every storage restart arm then refused (no p2p-iroh marker, or
+# "differs from the running bytes") — two deliverability scenarios red on an unchanged tree.
+storage_bin_in_gate_slot() {
+  [ "$STORAGE_BIN_EXPLICIT" = "0" ] && [ "$STORAGE_BIN" = "$_storage_debug" ]
+}
 # The doorway's own copy, for the same reason as _storage_mesh: the gate's `cargo test --lib
 # --bins` never refreshes dev/debug/doorway, and a hand build there is overwritten by the next one.
 _doorway_mesh="$POOL/doorway__doorway-service/mesh-bin/doorway"
@@ -4788,11 +4799,14 @@ preflight() {
   fi
 
   # 3. elohim-storage binary (debug slot, same STORAGE_BIN start_all requires).
-  if [ -x "$STORAGE_BIN" ]; then
-    echo "ok elohim-storage binary: $STORAGE_BIN"
-  else
+  if [ ! -x "$STORAGE_BIN" ]; then
     echo "REFUSED elohim-storage binary: not executable ($STORAGE_BIN) — build it: just mesh build storage"
     fail=1
+  elif storage_bin_in_gate_slot; then
+    echo "REFUSED elohim-storage binary: $STORAGE_BIN is the gate's slot — the next \`just gate elohim-storage\` rewrites it under the running peers; install the mesh copy: just mesh build storage (or name one: STORAGE_BIN=<path>)"
+    fail=1
+  else
+    echo "ok elohim-storage binary: $STORAGE_BIN"
   fi
 
   # 4. doorway binary (debug slot), only when this mesh shape launches one.
