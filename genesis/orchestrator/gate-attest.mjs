@@ -7,9 +7,10 @@
 // check refuses — and "the forge has never seen this commit" is absent, not
 // unreachable. Nothing here ever runs the component's suite.
 
-import { accessSync, constants, statSync } from 'fs';
+import { accessSync, constants, readFileSync, statSync } from 'fs';
 import { spawnSync } from 'child_process';
-import { delimiter, isAbsolute, join } from 'path';
+import { delimiter, isAbsolute, join, resolve } from 'path';
+import { fileURLToPath } from 'url';
 
 export const PIN_ATTESTATION_MEASURE = 'pin-attestation@1';
 /** The floor never blocks on the network: a stalled forge read degrades to `claimed`. */
@@ -75,7 +76,10 @@ export function worktreeDirty(root, dir, { spawn = spawnSync, env = process.env 
 
 export function readCheck(attestation, sha, { ghBin, spawn = spawnSync } = {}) {
   if (!ghBin) return { read: 'failed', reason: 'gh not found' };
-  const result = spawn(ghBin, ['api', `repos/${attestation.repo}/commits/${sha}/check-runs?per_page=100`], {
+  // Filter by name on the server: a busy commit carries more check runs than one page holds (brit's
+  // main tip had 132 on 2026-10-24), and a named run past the first page would read as absent.
+  const query = `check_name=${encodeURIComponent(attestation.check)}&per_page=100`;
+  const result = spawn(ghBin, ['api', `repos/${attestation.repo}/commits/${sha}/check-runs?${query}`], {
     encoding: 'utf8',
     timeout: GH_TIMEOUT_MS,
   });
@@ -117,6 +121,23 @@ export function judge(read, attestation, sha) {
   return { outcome: 'refuse', tier: 'witnessed', conclusion: 'failure', line: `attested: REFUSED — ${where} ${label} at ${short} — a pin without its attestation is not a green pin` };
 }
 
+/** Judge one registered gitlink SHA without changing gate semantics or recording an observation. */
+export function judgePin(dir, sha, { root = process.cwd(), env = process.env, spawn = spawnSync } = {}) {
+  const registryPath = resolve(root, 'genesis/agentic/bin-tools.json');
+  let registry;
+  try {
+    registry = JSON.parse(readFileSync(registryPath, 'utf8'));
+  } catch (error) {
+    throw new ManifestError(`cannot read followed-tool registry ${registryPath}: ${error.message}`);
+  }
+  const entry = Object.values(registry.tools || {}).find(tool => tool?.source?.path === dir);
+  const attestation = entry?.source?.attestation;
+  if (!attestation?.provider || !attestation?.repo || !attestation?.check) {
+    throw new ManifestError(`${dir} has no complete followed-tool attestation`);
+  }
+  return judge(readCheck(attestation, sha, { ghBin: resolveGhBin(env), spawn }), attestation, sha);
+}
+
 export function observationArgs(subject, attestation, verdict) {
   return [
     'flow', 'note', '--kind', 'observation',
@@ -154,4 +175,23 @@ export function runAttested(project, { root, env = process.env, spawn = spawnSyn
     record(observationArgs(project.dir, attestation, verdict));
   } catch { /* best-effort; the verdict never depends on the observation */ }
   return verdict.outcome === 'pass' ? 0 : 1;
+}
+
+if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
+  const args = process.argv.slice(2);
+  const dirAt = args.indexOf('--judge');
+  const shaAt = args.indexOf('--sha');
+  if (dirAt < 0 || shaAt < 0 || !args[dirAt + 1] || !/^[0-9a-f]{40}$/.test(args[shaAt + 1])) {
+    process.stderr.write('usage: gate-attest.mjs --judge <gitlink-dir> --sha <full-sha>\n');
+    process.exitCode = 2;
+  } else {
+    try {
+      const verdict = judgePin(args[dirAt + 1], args[shaAt + 1]);
+      process.stdout.write(`${JSON.stringify(verdict)}\n`);
+      process.exitCode = verdict.outcome === 'pass' ? 0 : 1;
+    } catch (error) {
+      process.stderr.write(`${error.message}\n`);
+      process.exitCode = 2;
+    }
+  }
 }

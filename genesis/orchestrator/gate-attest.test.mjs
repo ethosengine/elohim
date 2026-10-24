@@ -1,6 +1,6 @@
 import { describe, test } from 'node:test';
 import { strict as assert } from 'node:assert';
-import { judge, observationArgs, readCheck, runAttested } from './gate-attest.mjs';
+import { judge, judgePin, observationArgs, readCheck, runAttested } from './gate-attest.mjs';
 
 const attestation = { provider: 'github-checks', repo: 'ethosengine/brit', check: 'Tests pass' };
 const SHA = 'b86c5104d3398d89fe56d23199a9393fec534870';
@@ -16,7 +16,7 @@ describe('readCheck — the newest run of the named check', () => {
     const spawn = (bin, args) => { seen = args; return ghReturning([run('Tests pass', 'completed', 'failure', '2026-09-01T00:00:00Z'), run('Tests pass', 'completed', 'success', '2026-09-02T00:00:00Z'), run('lint', 'completed', 'failure', '2026-09-03T00:00:00Z')])(bin, args); };
     const read = readCheck(attestation, SHA, { ghBin: 'gh', spawn });
     assert.deepEqual(read, { read: 'ok', status: 'completed', conclusion: 'success' });
-    assert.deepEqual(seen, ['api', `repos/ethosengine/brit/commits/${SHA}/check-runs?per_page=100`]);
+    assert.deepEqual(seen, ['api', `repos/ethosengine/brit/commits/${SHA}/check-runs?check_name=Tests%20pass&per_page=100`]);
   });
   test('an absent check reads as conclusion "absent"', () => {
     assert.deepEqual(readCheck(attestation, SHA, { ghBin: 'gh', spawn: ghReturning([run('lint', 'completed', 'success', '2026-09-01T00:00:00Z')]) }), { read: 'ok', status: 'absent', conclusion: 'absent' });
@@ -77,6 +77,16 @@ describe('judge — four outcomes', () => {
     assert.equal(v.outcome, 'pass'); assert.equal(v.tier, 'claimed'); assert.equal(v.conclusion, 'unreachable');
     assert.equal(v.line, 'attested: claimed — offline');
   });
+});
+
+test('judgePin resolves the registered gitlink attestation and reuses the same judge', () => {
+  const verdict = judgePin('elohim/brit', SHA, {
+    root: new URL('../..', import.meta.url).pathname,
+    env: { GH_BIN: process.execPath },
+    spawn: ghReturning([run('Tests pass', 'completed', 'success', '2026-09-02T00:00:00Z')]),
+  });
+  assert.equal(verdict.tier, 'witnessed');
+  assert.equal(verdict.conclusion, 'success');
 });
 
 describe('observationArgs', () => {
