@@ -22,7 +22,8 @@
           "elohim/Cargo.toml",
           "elohim/epr-index/**",
           "elohim/sdk/domains/elohim-agent/adapter/**",
-          "crates/consent-grant/**"
+          "crates/consent-grant/**",
+          "vendor/iroh-quinn-proto-0.13.0/**"
         ],
         "buildProcess": []
       },
