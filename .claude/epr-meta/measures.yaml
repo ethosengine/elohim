@@ -1455,6 +1455,41 @@ measures:
     default-authority: observation
     established_by: sense-organ-2026-10-22
 
+  # ── unrouted repetition (algedonic-designer, 2026-10-24; seed 3828531713, draw repetition,interruption,contradiction/9d) ──
+  - id: unrouted-finding-recurrence
+    version: 1
+    family: algedonic-sensing
+    unit: builds-seen
+    procedure: >
+      Over .claude/data/{ci,runtime}-findings.jsonl, take every row with `status: open` and no
+      `concern` field. Resolve its address only from a declared source: find the a2o step whose
+      thrown message template matches the row's `line` (grep genesis/a2o/steps for the literal
+      text after the peer/url placeholders), collect the `@concern:` tags of every .feature that
+      uses that step pattern, and keep the row only when those tags name exactly one concern X
+      that is also a habit id (`<dir>/.epr-meta/X.habit.md`). Fold, per X, the maximum `seen`
+      among its rows: `epr flow note --kind observation --measure unrouted-finding-recurrence@1
+      --subject . --value <max seen> --env concern=X --env fp=<the row's fp> --env job=<job>`.
+      Rows whose tags name zero or several concerns are not folded (honest absence: the
+      algedonic-designer reports them address=absent). Fold 0 for X when its rows close or gain a
+      `concern` — that is the harvester routing them, which is the cure this measure waits on.
+    provenance: >
+      .claude/data/ci-findings.jsonl rows 45e72bbbd9a9 (seen 7), 16b82ec09dc5 (seen 8) and
+      5994059e5a38 (seen 1), job elohim-edge builds 1677-1697, last ts 2026-10-22, all
+      status open with no concern; emitted by genesis/a2o/steps/dataplane.steps.ts ("a visitor
+      asking for the app was handed no page at all") and
+      genesis/a2o/steps/dataplane/epr-app-deliverability.steps.ts ("the app threw while
+      starting"), whose features (served-shell-boots, doorway-fixture-readiness,
+      epr-app-deliverability) all carry @concern:doorway-failover
+    status: active
+    env-sensitivity: [concern, fp, job]
+    default-authority: observation
+    established_by: algedonic-designer-2026-10-24
+    why: >
+      concern_routes.route() routes only ci-no-measure rows; an open ci-failure with no concern
+      is pain that recurs build after build with no address, so the habit it threatens never
+      hears it. The ledger counted elohim.host 503s eight times while doorway-failover's own
+      atom recorded its fleet served-shell-boots clause as unmeasured.
+
 lenses:
   - id: resource-limit-raise-recurrence
     version: 1
@@ -2398,3 +2433,26 @@ lenses:
     superseded_reason: "a concern is a declared entity; the open set is unresolved joins, not grammar variants"
     established_by: sense-organ-2026-10-22
     why: "an open candidate is review owed; zero is the only honest ceiling"
+
+  # ── unrouted repetition bound (algedonic-designer, 2026-10-24) ──
+  - id: unrouted-finding-recurrence-doorway-failover
+    version: 1
+    binding: binding-local
+    class: measure
+    consumes: [unrouted-finding-recurrence@1]
+    env: { concern: doorway-failover }
+    subject: .
+    context: session-headline
+    compare: at-or-above
+    hard: 3
+    concern: doorway-failover
+    retire-when: >
+      when the CI harvester writes `concern:` on every ci-failure row whose step belongs to a
+      single-concern story (or concern_routes.route() resolves them), so no open row reaches a
+      third sighting unaddressed
+    status: active
+    established_by: algedonic-designer-2026-10-24
+    why: >
+      Three sightings is where a fingerprint stops being a flake: one red is noise, two can be a
+      superseded or webhook double-fired run (the CI anti-patterns museum), three distinct builds
+      is the pattern. The live reading is 8 (16b82ec09dc5, builds 1677-1697), so 8 >= 3 reads red.
