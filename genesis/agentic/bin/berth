@@ -89,7 +89,6 @@ the lock or dir) — the only code a wrapper may proceed past, unleased.
 import contextlib
 import errno
 import fcntl
-import glob
 import json
 import os
 import re
@@ -129,27 +128,8 @@ UNDER_TEST_ENV = "BERTH_UNDER_TEST"
 DAEMON_DOWN_LINE = "(this device's peer daemon is not running: start it with epr peer serve)"
 # A failed `epr` call whose first line says "unknown command" or "usage:": a binary built before
 # `epr peer` existed. `{path}` is that binary.
-STALE_EPR_HINT = ("{path} predates the peer verbs: replace it (cargo install --path elohim/eprfs/epr-cli "
-                  "--locked) or export EPR_BIN=<a current epr>")
-
-_PREFLIGHT = None
-
-
-def _device_preflight():
-    """`just status device`'s own module (genesis/agentic/bin/device-preflight, beside this file):
-    berth finds `epr` and the device key exactly as it does."""
-    global _PREFLIGHT
-    if _PREFLIGHT is None:
-        import importlib.machinery
-        import importlib.util
-        path = os.path.join(os.path.dirname(os.path.realpath(__file__)), "device-preflight")
-        loader = importlib.machinery.SourceFileLoader("berth_device_preflight", path)
-        module = importlib.util.module_from_spec(importlib.util.spec_from_loader(loader.name, loader))
-        sys.modules[loader.name] = module  # its dataclasses look their module up while it loads
-        loader.exec_module(module)
-        _PREFLIGHT = module
-    return _PREFLIGHT
-
+STALE_EPR_HINT = ("{path} predates the peer verbs: replace it (epr device arrive installs the native launcher "
+                  "onto PATH) or export EPR_BIN=<a current epr>")
 
 class BerthUsage(ValueError):
     """A claim the caller mis-stated (unknown class, override without a ttl) — exit 2, no record."""
@@ -1093,21 +1073,27 @@ class Berth:
 
     def epr_bin(self):
         """The `epr` a steward claim asks, found the way `just status device` finds it ($EPR_BIN,
-        PATH, the cargo target pool), or None when there is no executable one."""
-        path = self.epr
+        PATH through the native bin store), or None when there is no executable one."""
+        path = self.epr or os.environ.get("EPR_BIN")
         if path is None:
-            path = _device_preflight().resolve_epr(dict(os.environ))
+            sys.path.insert(0, os.path.join(REPO_ROOT, ".claude", "scripts"))
+            from _lib import epr_client
+            path = epr_client.resolve_binary(dict(os.environ))
         return path if path and os.path.isfile(path) and os.access(path, os.X_OK) else None
 
     @staticmethod
     def device_key_path():
         """Where this workspace's device key is, as `just status device` reads it."""
-        return str(_device_preflight().device_key_path(dict(os.environ)))
+        # Key presence remains observable when no evaluator exists. This is only the documented
+        # path convention; reading/validating device identity belongs to native epr.
+        return os.environ.get("ELOHIM_DEVICE_KEY_FILE") or os.path.join(
+            os.environ.get("XDG_CONFIG_HOME") or os.path.expanduser("~/.config"),
+            "elohim", "device", "ed25519.seed")
 
     def _no_epr(self):
-        where = self.epr or "EPR_BIN, PATH or the cargo target pool"
-        return (f"no `epr` binary to read the steward lease view (looked at {where}) — build it: "
-                f"`cargo install --path elohim/eprfs/epr-cli --locked` (or export EPR_BIN=<path>); this workspace is a device (it has a "
+        where = self.epr or "EPR_BIN or the native launcher on PATH"
+        return (f"no `epr` binary to read the steward lease view (looked at {where}) — arrive it: "
+                f"`epr device arrive` (or export EPR_BIN=<path>); this workspace is a device (it has a "
                 f"device key), and a steward-scoped claim is never taken unconfirmed")
 
     @staticmethod
@@ -1143,25 +1129,6 @@ class Berth:
         first = (r.stderr.strip().splitlines() or [""])[0].strip()
         return "unknown command" in first or first.startswith("usage:")
 
-    def _may_fall_through(self):
-        """Only a resolved epr may be replaced: an explicit `self.epr` or $EPR_BIN is honoured."""
-        return self.epr is None and not os.environ.get("EPR_BIN")
-
-    @staticmethod
-    def _pool_candidates():
-        """The cargo-pool `epr` builds `just status device` would consider, newest first."""
-        pre = _device_preflight()
-        pool = os.environ.get("CARGO_TARGET_POOL_ROOT") or pre.POOL_ROOT_DEFAULT
-        found = []
-        for pattern in pre._POOL_GLOBS:
-            for candidate in glob.glob(pattern.format(pool=pool)):
-                try:
-                    if os.access(candidate, os.X_OK):
-                        found.append((os.stat(candidate).st_mtime, candidate))
-                except OSError:
-                    continue
-        return [c for _, c in sorted(found, reverse=True)]
-
     def _read_peer_leases(self, timeout):
         epr = self.epr_bin()
         if not epr:
@@ -1175,14 +1142,6 @@ class Berth:
         r, err = self._run_peer_leases(epr, timeout)
         if err:
             return None, err
-        if r.returncode != 0 and self._is_stale_epr(r) and self._may_fall_through():
-            for candidate in self._pool_candidates():
-                if candidate == epr:
-                    continue
-                alt, alt_err = self._run_peer_leases(candidate, timeout)
-                if not alt_err and alt.returncode == 0:
-                    self.epr, epr, r = candidate, candidate, alt
-                    break
         if r.returncode != 0:
             # The first line names what went wrong; later lines are usage or context.
             why = (r.stderr.strip().splitlines() or [f"exit {r.returncode}"])[0].strip()

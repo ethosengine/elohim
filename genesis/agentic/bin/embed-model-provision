@@ -8,7 +8,7 @@
 # downloads it under $HOME — which a Che workspace wipes on restart. So the fold on a fresh
 # workspace reads `attested failed: no model directory resolves` until somebody puts the bytes on
 # the PVC. This script is that somebody, idempotently: the devfile's `setup-embed-model`
-# postStart command and `device-preflight`'s REFUSED line both name it.
+# postStart command and `epr device status`'s degraded line both name it.
 #
 # Target (the manifest's second resolve entry): $XDG_CACHE_HOME/elohim/embed-models/all-MiniLM-L6-v2/onnx
 # Override with EPR_EMBED_MODEL_DIR (the manifest's first entry) — this script then fills THAT dir.

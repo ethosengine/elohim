@@ -1394,3 +1394,152 @@ decisionPoints:
       - path: elohim/eprfs/epr-cli/tests/flow_scope.rs
         testName: apply_creates_the_baseline_parent_rather_than_failing_after_the_work
         kind: integration
+
+  - name: device::status::epr_binary
+    kind: verdict-fn
+    sourceLocation:
+      file: src/device/arrival.rs
+      modulePath: elohim_epr_cli::device::arrival::tool_check
+    summary: "Candidate, pin and committed head through bin_store; any PATH shadow refuses. An executable without a committed head is degraded."
+    concernIds:
+      - id: C0
+        status: answered
+        justification: Reconstructed local arrival evidence, no DHT entity or published head; unavailable cross-device facts are Unknown, never a local refusal.
+    contractTests:
+      - path: elohim/eprfs/epr-cli/tests/device_arrival.rs
+        testName: status_keeps_dependency_order_and_does_not_mint_a_key
+        kind: integration
+
+  - name: device::status::brit_binary
+    kind: verdict-fn
+    sourceLocation:
+      file: src/device/arrival.rs
+      modulePath: elohim_epr_cli::device::arrival::tool_check
+    summary: "Same custody rule as epr; no GitHub availability is required to read a local candidate."
+    concernIds:
+      - id: C0
+        status: answered
+        justification: Reconstructed local arrival evidence, no DHT entity or published head; unavailable cross-device facts are Unknown, never a local refusal.
+    contractTests:
+      - path: elohim/eprfs/epr-cli/tests/device_arrival.rs
+        testName: status_keeps_dependency_order_and_does_not_mint_a_key
+        kind: integration
+
+  - name: device::status::device_key
+    kind: verdict-fn
+    sourceLocation:
+      file: src/device/arrival.rs
+      modulePath: elohim_epr_cli::device::arrival::key_check
+    summary: "Load and validate the existing key; missing or malformed key refuses without minting."
+    concernIds:
+      - id: C0
+        status: answered
+        justification: Reconstructed local arrival evidence, no DHT entity or published head; unavailable cross-device facts are Unknown, never a local refusal.
+    contractTests:
+      - path: elohim/eprfs/epr-cli/tests/device_arrival.rs
+        testName: status_keeps_dependency_order_and_does_not_mint_a_key
+        kind: integration
+
+  - name: device::status::roster_bound
+    kind: verdict-fn
+    sourceLocation:
+      file: src/device/arrival.rs
+      modulePath: elohim_epr_cli::device::arrival::roster_check
+    summary: "Reuse the signed roster and pinned-root checks; distinguish first-device witness from enrollment on a founded roster."
+    concernIds:
+      - id: C0
+        status: answered
+        justification: Reconstructed local arrival evidence, no DHT entity or published head; unavailable cross-device facts are Unknown, never a local refusal.
+    contractTests:
+      - path: elohim/eprfs/epr-cli/tests/device_arrival.rs
+        testName: status_keeps_dependency_order_and_does_not_mint_a_key
+        kind: integration
+
+  - name: device::status::embed_model
+    kind: verdict-fn
+    sourceLocation:
+      file: src/device/arrival.rs
+      modulePath: elohim_epr_cli::device::arrival::model_check
+    summary: "Read the existing model manifest and resolved bytes; missing semantic enhancement degrades."
+    concernIds:
+      - id: C0
+        status: answered
+        justification: Reconstructed local arrival evidence, no DHT entity or published head; unavailable cross-device facts are Unknown, never a local refusal.
+    contractTests:
+      - path: elohim/eprfs/epr-cli/tests/device_arrival.rs
+        testName: status_keeps_dependency_order_and_does_not_mint_a_key
+        kind: integration
+
+  - name: device::status::fold_attested
+    kind: verdict-fn
+    sourceLocation:
+      file: src/device/arrival.rs
+      modulePath: elohim_epr_cli::device::arrival::fold_check
+    summary: "Use native index status and declared lag ceiling; failed, missing or stale folds degrade with a bounded catch-up cure."
+    concernIds:
+      - id: C0
+        status: answered
+        justification: Reconstructed local arrival evidence, no DHT entity or published head; unavailable cross-device facts are Unknown, never a local refusal.
+    contractTests:
+      - path: elohim/eprfs/epr-cli/tests/device_arrival.rs
+        testName: status_keeps_dependency_order_and_does_not_mint_a_key
+        kind: integration
+
+  - name: device::status::berth_moored
+    kind: verdict-fn
+    sourceLocation:
+      file: src/device/arrival.rs
+      modulePath: elohim_epr_cli::device::arrival::berth_check
+    summary: "Read session fields from the current private berth mooring records; no matching mooring degrades coordinated capacity."
+    concernIds:
+      - id: C0
+        status: answered
+        justification: Reconstructed local arrival evidence, no DHT entity or published head; unavailable cross-device facts are Unknown, never a local refusal.
+    contractTests:
+      - path: elohim/eprfs/epr-cli/tests/device_arrival.rs
+        testName: status_keeps_dependency_order_and_does_not_mint_a_key
+        kind: integration
+
+  - name: device::status::repository_trusted
+    kind: verdict-fn
+    sourceLocation:
+      file: src/device/arrival.rs
+      modulePath: elohim_epr_cli::device::arrival::repository_check
+    summary: "Ask the single git builder; native acceptance or exact canonical device declaration passes. Unaccepted checkout refuses with trust cure."
+    concernIds:
+      - id: C0
+        status: answered
+        justification: Reconstructed local arrival evidence, no DHT entity or published head; unavailable cross-device facts are Unknown, never a local refusal.
+    contractTests:
+      - path: elohim/eprfs/epr-cli/tests/device_arrival.rs
+        testName: status_keeps_dependency_order_and_does_not_mint_a_key
+        kind: integration
+
+  - name: device::arrive
+    kind: state-transition
+    sourceLocation:
+      file: src/device/arrival_work.rs
+      modulePath: elohim_epr_cli::device::arrival_work
+    summary: Verified heads permit launcher install and pinning; bootstrap and follow detach under a device lock. Failures are reported per tool and sessions fail open unless strict status refuses.
+    concernIds:
+      - id: C0
+        status: answered
+        justification: Reuses bin-store custody, provenance and rollback; no second promotion authority.
+    contractTests:
+      - path: elohim/eprfs/epr-cli/tests/device_arrival.rs
+        testName: arrive_bad_registry_fails_open_but_strict_refuses
+        kind: integration
+  - name: git::trust
+    kind: verdict-fn
+    sourceLocation:
+      file: src/git.rs
+      modulePath: elohim_epr_cli::git
+    summary: Device declaration adds one canonical checkout to trusted-checkouts beside its key, with locked append and no global git config mutation. Every epr-cli git command uses this exact-path builder, including bounded bin-store calls.
+    concernIds:
+      - id: C0
+        status: answered
+        justification: Private local authority decision; nested repositories and other worktrees need their own declaration, no remote authority is inferred.
+    contractTests:
+      - path: elohim/eprfs/epr-cli/tests/device_arrival.rs
+        testName: declared_trust_cures_ownership_for_exact_checkout_only
+        kind: integration

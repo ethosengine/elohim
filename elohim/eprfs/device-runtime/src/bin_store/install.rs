@@ -17,10 +17,7 @@ impl Store {
         let Some(base) = self.root.parent() else {
             return found;
         };
-        let mut launchers = vec![
-            base.join("bin/bin-launch"),
-            base.join("bin").join(&self.tool),
-        ];
+        let mut launchers = vec![base.join("bin/bin-launch")];
         launchers = launchers
             .into_iter()
             .filter_map(|p| p.canonicalize().ok())
@@ -34,20 +31,18 @@ impl Store {
                 }
                 let canonical = path.canonicalize().ok();
                 if canonical.as_ref().is_some_and(|p| launchers.contains(p)) {
-                    found.extend(before);
                     break;
                 }
                 let target = fs::read_link(&path).ok();
-                let superseded = target.is_some()
-                    && (canonical.is_none()
-                        || canonical.as_ref().is_some_and(|p| {
-                            p.starts_with("/projects/.cargo-target-pool")
-                                || p.starts_with("/tmp/eprfs-gate-target")
-                                || p.starts_with(&self.root)
-                        }));
+                // An unrelated dangling symlink is still owned by its author. Only links whose
+                // resolved or literal target names a known build output are repairable.
+                let superseded = target.as_ref().is_some_and(|target| {
+                    canonical.as_deref().is_some_and(build_output) || build_output(target)
+                });
                 before
                     .push(json!({"name":name,"path":path,"target":target,"superseded":superseded}));
             }
+            found.extend(before);
         }
         found
     }
@@ -86,6 +81,29 @@ impl Store {
         // All tools share these files. No caller holds a store lock while entering install;
         // serialize adoption, mutation, validation and rollback as one installation.
         let _install_lock = files::Lock::acquire(&base, files::MUTATION_WAIT)?;
+        // Installation owns its launcher and preserved plain binaries, not arbitrary symlinks
+        // placed at the destination. Refuse before changing any file when one is foreign.
+        for name in self.config.bins.iter().chain(self.config.aliases.keys()) {
+            for path in [base.join(name), destination.join(name)] {
+                if let Ok(target) = fs::read_link(&path) {
+                    let canonical = path.canonicalize().ok();
+                    if target != launcher
+                        && canonical.as_ref() != Some(&launcher)
+                        && !build_output(&target)
+                        && !canonical.as_deref().is_some_and(build_output)
+                    {
+                        return Err(Refusal::new(
+                            "path-shadow",
+                            format!(
+                                "{} points to {}; remove this shadow explicitly",
+                                path.display(),
+                                target.display()
+                            ),
+                        ));
+                    }
+                }
+            }
+        }
         let adopted = self.adopt_plain(&destination, repo)?;
         let persistent_adopted = if destination == base {
             BTreeMap::new()
@@ -286,4 +304,10 @@ impl Store {
         let _ = fs::remove_dir_all(stage);
         result
     }
+}
+
+fn build_output(path: &Path) -> bool {
+    path.starts_with("/projects/.cargo-target-pool")
+        || path.starts_with("/tmp/eprfs-gate-target")
+        || path.components().any(|part| part.as_os_str() == "target")
 }

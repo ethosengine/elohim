@@ -58,7 +58,7 @@ use crate::flow::{head_commit_provenance, short_cid};
 const ACTOR_LOG_REL: &str = ".eprfs/status/actors.jsonl";
 
 /// Where the tracked participant rosters live, one `<handle>.jsonl` per human handle.
-const PARTICIPANTS_REL: &str = ".eprfs/status/participants";
+pub(crate) const PARTICIPANTS_REL: &str = ".eprfs/status/participants";
 
 /// The `source` value an attribution records when it comes from this device's standing human
 /// (ruling R-P1: one new value beside `claim | unclaimed`, never a credential).
@@ -896,6 +896,15 @@ pub fn standing_on_device(root: &Path, key_file: &Path) -> Option<Standing> {
 /// Each roster is first checked against the root this device pinned for the handle (R-P15); the
 /// first verified read of a roster this device is a member of writes that pin.
 pub fn device_state(root: &Path, key_file: &Path) -> DeviceState {
+    read_device_state(root, key_file, true)
+}
+
+/// Read standing without creating the first-observation root pin (arrival is observational).
+pub(crate) fn device_state_read_only(root: &Path, key_file: &Path) -> DeviceState {
+    read_device_state(root, key_file, false)
+}
+
+fn read_device_state(root: &Path, key_file: &Path, pin_missing: bool) -> DeviceState {
     let handles = roster_handles(root);
     if handles.is_empty() || !key_file.is_file() {
         return DeviceState::Unwitnessed;
@@ -911,7 +920,14 @@ pub fn device_state(root: &Path, key_file: &Path) -> DeviceState {
     } else {
         Vec::new()
     };
-    device_state_for(root, &handles, &records, &key.did_key(), Some(key_file))
+    device_state_for(
+        root,
+        &handles,
+        &records,
+        &key.did_key(),
+        Some(key_file),
+        pin_missing,
+    )
 }
 
 /// [`device_state`] over already-read records. `key_file` locates the device's root pins; `None`
@@ -922,6 +938,7 @@ fn device_state_for(
     records: &[(Cid, ActorRecord)],
     did: &str,
     key_file: Option<&Path>,
+    pin_missing: bool,
 ) -> DeviceState {
     let verifier = verifier();
     let plain: Vec<ActorRecord> = records.iter().map(|(_, r)| r.clone()).collect();
@@ -955,7 +972,7 @@ fn device_state_for(
                 continue;
             }
         }
-        if pin.is_none() && roster.members(&verifier).contains(did) {
+        if pin_missing && pin.is_none() && roster.members(&verifier).contains(did) {
             if let Some(key_file) = key_file {
                 // First verified read of a roster this device belongs to: pin its root. A pin
                 // that cannot be written leaves the device unpinned, never unstanding.
@@ -1657,7 +1674,14 @@ fn standing_for_handle(
         Vec::new()
     };
     Ok(
-        match device_state_for(root, &[handle.to_string()], &records, did, Some(key_file)) {
+        match device_state_for(
+            root,
+            &[handle.to_string()],
+            &records,
+            did,
+            Some(key_file),
+            true,
+        ) {
             DeviceState::Standing(standing) => Some(standing),
             _ => None,
         },

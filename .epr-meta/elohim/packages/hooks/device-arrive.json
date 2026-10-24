@@ -1,0 +1,47 @@
+{
+  "apiVersion": "elohim-agent/v1alpha1",
+  "kind": "HookPackage",
+  "metadata": {
+    "id": "device-arrive",
+    "name": "device-arrive",
+    "version": "1.0.0",
+    "description": "Fail-open native device arrival; runtimes without a HookPackage backend use lazy launcher bootstrap.",
+    "sourceRuntime": "elohim-agent",
+    "master": "package",
+    "runtimeTargets": [
+      "claude"
+    ],
+    "event": "SessionStart",
+    "matcher": null,
+    "interpreter": "sh",
+    "language": "shell",
+    "assetRefs": [],
+    "governance": {
+      "eprRef": "epr:elohim-agent/hooks/device-arrive",
+      "policy": "capability-governance@1",
+      "gates": [
+        "epr-meta-resolver",
+        "elohim-agent:packages:verify"
+      ],
+      "ledger": ".claude/data/governance-findings.jsonl"
+    }
+  },
+  "source": {
+    "language": "shell",
+    "interpreter": "sh",
+    "path": ".claude/hooks/device-arrive.sh",
+    "body": "#!/bin/sh\n# Arrival is native and fail-open; the launcher supplies lazy bootstrap without a hook.\nepr device arrive || true\n"
+  },
+  "registration": {
+    "event": "SessionStart",
+    "matcher": null,
+    "command": "sh \"$CLAUDE_PROJECT_DIR/.claude/hooks/device-arrive.sh\"",
+    "timeout": 30,
+    "type": "command"
+  },
+  "projections": {
+    "claude": {
+      "path": ".claude/hooks/device-arrive.sh"
+    }
+  }
+}

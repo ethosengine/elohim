@@ -3022,3 +3022,23 @@ decisionPoints:
   - path: elohim/eprfs/device-runtime/tests/session.rs
     testName: session_shared_fixture_cases
     kind: integration
+- name: bin_store::install_launcher::path_shadow
+  kind: verdict-fn
+  sourceLocation:
+    file: src/bin_store/install.rs
+    modulePath: elohim_device_runtime::bin_store::install
+  summary: An unrelated symlink at a launcher destination refuses as path-shadow before installation changes files. Only recognized build-output links are drift repair; plain binaries are ingested before replacement. Missing launchers never hide PATH shadows.
+  concernIds:
+  - id: C0
+    status: answered
+    justification: Local executable custody, no peer or DHT authority.
+  - id: C8
+    status: answered
+    justification: A typed refusal names the untouched path and asks for explicit removal.
+  contractTests:
+  - path: elohim/eprfs/device-runtime/src/bin_store/tests.rs
+    testName: install_never_overwrites_an_unrelated_destination_symlink
+    kind: unit
+  - path: elohim/eprfs/device-runtime/src/bin_store/tests.rs
+    testName: missing_launcher_does_not_hide_shadows_and_only_build_links_are_repairable
+    kind: unit

@@ -611,7 +611,10 @@ pub fn note(
 }
 
 /// Author a note with optional appointed acceptance metadata under the same append lock.
-#[allow(clippy::too_many_arguments)]
+#[allow(
+    clippy::too_many_arguments,
+    reason = "This compatibility entry point forwards the existing note fields plus acceptance metadata to the single locked append path"
+)]
 pub fn note_with_options(
     root: &Path,
     on: &str,

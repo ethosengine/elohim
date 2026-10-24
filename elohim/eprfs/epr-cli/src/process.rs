@@ -17,7 +17,7 @@ pub fn run(program: &str, args: &[&str], cwd: &Path) -> Result<CommandOutput> {
 /// these into every hook's environment, and `epr` runs from `.husky` hooks — so
 /// inheriting them silently redirects a command away from the `cwd` the caller
 /// named, at the outer repo. Cleared on every spawn so `cwd` is authoritative.
-const GIT_LOCATION_ENV: [&str; 8] = [
+pub(crate) const GIT_LOCATION_ENV: [&str; 8] = [
     "GIT_DIR",
     "GIT_WORK_TREE",
     "GIT_INDEX_FILE",
@@ -35,7 +35,11 @@ const GIT_LOCATION_ENV: [&str; 8] = [
 /// caller's `GIT_DIR`, and `epr` runs from git hooks, which is precisely where git
 /// exports it.
 pub fn build_command(program: &str, args: &[&str], cwd: &Path, env: &[(&str, &str)]) -> Command {
-    let mut command = Command::new(program);
+    let mut command = if program == "git" {
+        crate::git::command(cwd)
+    } else {
+        Command::new(program)
+    };
     command.args(args).current_dir(cwd);
     // Clear FIRST, so an explicitly-passed variable still wins below.
     for key in GIT_LOCATION_ENV {

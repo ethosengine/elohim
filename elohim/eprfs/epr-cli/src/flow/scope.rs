@@ -30,7 +30,6 @@
 
 use std::collections::{BTreeMap, BTreeSet};
 use std::path::{Path, PathBuf};
-use std::process::Command;
 
 use serde::Serialize;
 
@@ -917,7 +916,7 @@ fn git_mv(root: &Path, src: &Path, dst: &Path) -> FlowResult<bool> {
     if let Some(parent) = dst.parent() {
         std::fs::create_dir_all(parent)?;
     }
-    let status = Command::new("git")
+    let status = crate::git::command(root)
         .arg("mv")
         .arg(src)
         .arg(dst)
@@ -927,7 +926,7 @@ fn git_mv(root: &Path, src: &Path, dst: &Path) -> FlowResult<bool> {
     if !moved {
         // Not git-tracked → a plain rename, then `git add` so git-as-ledger still holds.
         std::fs::rename(src, dst)?;
-        let _ = Command::new("git")
+        let _ = crate::git::command(root)
             .arg("add")
             .arg(dst)
             .current_dir(root)
@@ -983,7 +982,7 @@ pub fn hold_scope(
         } else {
             let stop = zone_root.join("CLAUDE.md");
             if stop.exists() {
-                let _ = Command::new("git")
+                let _ = crate::git::command(root)
                     .args(["rm", "-q", "--ignore-unmatch"])
                     .arg(&stop)
                     .current_dir(root)
@@ -1212,7 +1211,7 @@ pub fn fold_pending_moves(root: &Path, pending_moves: usize) -> Option<String> {
 }
 
 fn git_head(root: &Path) -> Option<String> {
-    let out = Command::new("git")
+    let out = crate::git::command(root)
         .args(["rev-parse", "--short", "HEAD"])
         .current_dir(root)
         .output()

@@ -134,12 +134,7 @@ impl Store {
         Ok(out.stdout.trim().into())
     }
     pub(super) fn git_output(&self, repo: &Path, args: &[&str]) -> Result<CommandOutput> {
-        let mut spec = CommandSpec::new(
-            "git",
-            ["-c", "safe.directory=*"]
-                .into_iter()
-                .chain(args.iter().copied()),
-        );
+        let mut spec = CommandSpec::new("git", args.iter().copied());
         spec.cwd = Some(repo.into());
         // A hook's git plumbing must not redirect source checks into the superproject.
         for key in ["GIT_DIR", "GIT_WORK_TREE", "GIT_INDEX_FILE", "GIT_PREFIX"] {

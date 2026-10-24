@@ -1,0 +1,40 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://elohim.host/schemas/v1/views/device-status.schema.json",
+  "title": "DeviceStatus",
+  "description": "Ephemeral arrival checks in dependency order. Only refused causes a failing status exit.",
+  "type": "array",
+  "items": {
+    "type": "object",
+    "additionalProperties": false,
+    "required": [
+      "name",
+      "state",
+      "detail",
+      "cure"
+    ],
+    "properties": {
+      "name": {
+        "type": "string"
+      },
+      "state": {
+        "type": "string",
+        "enum": [
+          "ok",
+          "degraded",
+          "refused",
+          "unknown"
+        ]
+      },
+      "detail": {
+        "type": "string"
+      },
+      "cure": {
+        "type": [
+          "string",
+          "null"
+        ]
+      }
+    }
+  }
+}

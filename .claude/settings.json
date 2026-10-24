@@ -60,10 +60,9 @@
           },
           {
             "type": "command",
-            "command": "python3 \"$CLAUDE_PROJECT_DIR/.claude/hooks/epr-evaluator-guard.py\"",
-            "timeout": 900,
-            "statusMessage": "Native governance evaluator...",
-            "async": true
+            "command": "sh \"$CLAUDE_PROJECT_DIR/.claude/hooks/device-arrive.sh\"",
+            "timeout": 30,
+            "statusMessage": "Device arrival..."
           },
           {
             "type": "command",

@@ -7,14 +7,15 @@ invariant: >
   home, the human's roster knows the device (bound through the human's other device, no key
   crossing), the pinned embedding model resolves from a device-owned place, the semantic fold
   is attested within its freshness limit, and the workspace is moored on the machine's berth.
-  One read (`just status device`) prints every condition, and every REFUSED line names the
+  One native read (`epr device status`, also `just status device`) prints eight conditions;
+  model, fold and berth enhancements may be degraded. Every REFUSED line names the
   command that cures it. Nothing about arrival depends on a visitor's cache or on another
   workspace's keystore.
-status: green
+status: red
 active: false
 checks:
-  - "just status device — exit 0 with six `ok` lines on the device the habit is read from (genesis/agentic/bin/device-preflight; unit: python3 -m unittest genesis.agentic.device_preflight_test)"
-  - "a2o @concern:workspace-device-arrival (genesis/a2o/features/devflow/workspace-device-arrival.feature — a keyless workspace is refused by name and nothing else blocks; a second device joins through the first with no key crossing; a missing model names its provisioner; @act:host @requires:epr-cli; the six-ok scenario is @wip pending a fixture-complete fold)"
+  - "just status device — exit 0 with eight ok/degraded lines on the live device; native checks: elohim/eprfs/epr-cli/src/device/arrival.rs and tests/device_arrival.rs"
+  - "a2o @concern:workspace-device-arrival (genesis/a2o/features/devflow/workspace-device-arrival.feature — a keyless workspace is refused by name and nothing else blocks; a second device joins through the first with no key crossing; a missing model names its provisioner; @act:host @requires:epr-cli; all five scenarios are wired, including local candidates with degraded enhancements)"
   - "epr flow report --headline — the `index:` slot reads within the fold-lag ceiling on this device (index-fold-lag-ceiling@1; lag reached its limit once on 2026-10-16), and `participant:` names a standing human by the tracked roster"
 refs:
   - "spec: elohim/lvi/docs/specs/2026-10-10-workspace-arrival-as-declared-device.md (the mapping of every init surface onto DevspaceSeed / Berth / device key / model pin; the three enrollment layers; the record-without-witness seam §6.3)"
@@ -24,8 +25,10 @@ refs:
 retire-when: >
   when lvi's DevspaceSeed and the tevah Berth carry the device key, the roster binding, the
   model pin and the carrying capacity natively, so that arrival is the seed's own COLD→WARM
-  lifecycle and `just status device` reads one berth instead of six stores.
+  lifecycle and `just status device` reads one berth instead of separate stores.
 ---
+DELTA 2026-10-24 (RED, measured A.2): arrival is one native status/arrive surface (dup-census 3→1); 1,132 epr-cli tests, 74 device-runtime tests, 89 berth tests and 5/5 arrival scenarios pass; fmt/clippy/rust-style and 2,228 package assertions pass. Live candidate status exits 1: legacy sha256 current/epr-launch shadows the native launcher and brit has no executable candidate/head (controller review then classed a missing brit as degraded, not refused — only the device's own epr is essential, ground rule 2 — so the remaining refusal is the legacy shadow, which the A.4 pre-native arrival and the post-landing migration cure); key, roster, model and repository trust pass, fold/berth degrade. No live head was promoted from this dirty worktree. Blind reads: round 1 REVISE (1 correctness, 1 interpretability, 0 preference), both resolved; round 2 READY (0 correctness, 0 interpretability, 1 preference). Evidence: genesis/a2o/reports/recovery/device-runtime-a2/.
+
 DELTA 2026-10-16 (GREEN re-measured, no status change): at origin/dev@42941449e, `just status device` at 19:58Z printed five ok lines and `REFUSED fold attested: degraded, 25 files behind (limit 25) — run epr flow memory index fold --max-files 1`; `epr flow memory index status --json --root /projects/elohim` showed `state: degraded, retried 18, attested_by (unclaimed)`. Cure: `epr flow memory index fold --max-files 1` folded 1 file but remained 25 behind, then `epr flow memory index fold --max-files 40` exited 0; `just status device` re-measured at 20:12Z printed all six ok lines, including `ok fold attested: complete, 0 files behind (limit 25)`, exit 0.
 
 DELTA 2026-10-12 (GREEN re-measured, no status change): `just status device` on this workspace at 19:50Z printed six `ok` lines (epr binary, device key, roster bound to human:matthew, embed model, fold attested 0 files behind, berth moored) and exited 0.

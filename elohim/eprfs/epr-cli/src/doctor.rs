@@ -114,7 +114,7 @@ pub(crate) fn run_at(root: &Path, revisions: &[&str]) -> Result<Report> {
         );
     }
 
-    tool(&mut report, root, "git", true);
+    // Repository availability/trust belongs to device::status; these are governance diagnostics.
     tool(&mut report, root, "node", false);
     tool(&mut report, root, "pnpm", false);
     tool(&mut report, root, "python3", false);

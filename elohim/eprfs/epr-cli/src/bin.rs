@@ -28,7 +28,7 @@ pub fn run(args: &[String]) -> i32 {
         }
     }
 }
-fn execute(args: &[String]) -> Result<String, Refusal> {
+pub(crate) fn execute(args: &[String]) -> Result<String, Refusal> {
     let mut options = BTreeMap::new();
     let mut flags = BTreeSet::new();
     let mut positional = Vec::new();
@@ -75,6 +75,7 @@ fn execute(args: &[String]) -> Result<String, Refusal> {
     } else {
         Store::from_environment(tool, &registry)?
     };
+    let store = store.with_runner(std::sync::Arc::new(crate::git::DeviceRunner));
     let repo = || store.repo_root(options.get("--repo").map(Path::new));
     let identity = session::resolve();
     let closure = options.get("--closure").map(Path::new);

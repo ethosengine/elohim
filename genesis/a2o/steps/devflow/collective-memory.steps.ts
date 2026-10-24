@@ -130,9 +130,6 @@ function setup(world: object): MemoryFixture {
   for (const key of ['GIT_DIR', 'GIT_WORK_TREE', 'GIT_INDEX_FILE', 'GIT_COMMON_DIR'])
     delete env[key];
   Object.assign(env, {
-    GIT_CONFIG_COUNT: '1',
-    GIT_CONFIG_KEY_0: 'safe.directory',
-    GIT_CONFIG_VALUE_0: root,
     GIT_AUTHOR_NAME: 'Fixture',
     GIT_AUTHOR_EMAIL: 'fixture@example.test',
     GIT_COMMITTER_NAME: 'Fixture',

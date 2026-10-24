@@ -781,7 +781,7 @@ const NAME_THIS_NODE: &str = "A device can still ask it by name: on that device 
      approve the link it prints here with `epr device approve '<link>'`. This node answers \
      under that address only when ELOHIM_ALLOWED_HOSTS lists it.";
 
-/// What `epr device status` found on this machine, before any word is chosen.
+/// What `epr device approvals` found on this machine, before any word is chosen.
 #[derive(Default)]
 pub(crate) struct StatusFacts {
     pub node: String,
@@ -800,7 +800,7 @@ pub(crate) struct StatusFacts {
     pub kept: Vec<String>,
 }
 
-/// `epr device status` in plain words: which node, which device, whose it is,
+/// `epr device approvals` in plain words: which node, which device, whose it is,
 /// what is waiting on either side, and the one thing to run next.
 pub(crate) fn status_lines(f: &StatusFacts) -> Vec<String> {
     let mut lines = vec![format!("This machine's node is {}.", f.node)];
@@ -852,7 +852,7 @@ pub(crate) fn status_lines(f: &StatusFacts) -> Vec<String> {
     lines
 }
 
-/// `epr device status`: reads only, and never fails on a node that cannot
+/// `epr device approvals`: reads only, and never fails on a node that cannot
 /// say one of these things; what it cannot say is left out or said so.
 pub fn status(args: &[String]) -> Outcome<ExitCode> {
     let opts = Options::parse(args)?;

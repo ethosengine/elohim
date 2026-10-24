@@ -400,7 +400,7 @@ fn load_manifest(root: &Path, rel: &str) -> Option<Manifest> {
 
 /// Every `.epr-meta` manifest of the repository whose bytes contain `needle`, tracked or not.
 fn manifests_containing(root: &Path, needle: &str) -> CovResult<Vec<Manifest>> {
-    let output = Command::new("git")
+    let output = crate::git::command(root)
         .current_dir(root)
         .args([
             "ls-files",

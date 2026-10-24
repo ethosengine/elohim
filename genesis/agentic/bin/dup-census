@@ -11,8 +11,8 @@ SIGNATURES = {
     'session resolvers': [r'_CODE_SESSION_ID', r'pub fn resolve_with\(', r'def resolve_fallback\(', r'function resolveFallback\('],
     'proc session ancestry': [r'def proc_ancestry\(', r'while pid > 0'],
     'epr/brit lookup paths': [r'def (?:find_epr|_find_epr|find_brit|_find_brit|resolve_epr|resolve_bin|resolve_binary)\(', r'function resolveBinary\(', r'which\(["\x27](?:epr|brit)["\x27]'],
-    # device-preflight's lines, epr doctor's tool/hook checks, the SessionStart evaluator guard.
-    'arrival surfaces': [r'roster bound', r'fold attested', r'berth moored', r'fn check_runtime_abis\(', r'tool.upper\(\)} EVALUATOR'],
+    # Arrival decisions only. Doctor retains governance/projection ABI diagnostics, not device arrival.
+    'arrival surfaces': [r'roster bound', r'fold attested', r'berth moored', r'tool.upper\(\)} EVALUATOR'],
     'follow-set declarations': [r'ELOHIM_RELEASE_CHANNELS', r'publishedRef', r'followed_channels'],
     'runtime-config writers': [r'write.*runtime.config', r'runtime.config.*write', r'fn persist_runtime'],
     'head verifiers': [r'fn verify_head', r'def verify_head', r'def _verify_head', r'fn verify_channel_head'],

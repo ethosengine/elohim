@@ -97,7 +97,7 @@ impl Runner for Fake {
         let mut out = String::new();
         let mut success = true;
         if c.program == "git" {
-            let a = &c.args[2..];
+            let a = &c.args[..];
             match a.first().map(String::as_str).unwrap_or("") {
                 "rev-parse" => {
                     out = if a[1] == "--show-toplevel" {
@@ -814,7 +814,11 @@ fn test_guard_restores_previous_link_when_installed_verification_fails() {
     let r = f.release("a");
     f.head(&r);
     fs::create_dir_all(f.path("cargo-bin")).unwrap();
-    symlink("/old/epr", f.path("cargo-bin/epr")).unwrap();
+    symlink(
+        "/tmp/eprfs-gate-target/debug/old-epr",
+        f.path("cargo-bin/epr"),
+    )
+    .unwrap();
     f.state.lock().unwrap().install_fail = true;
     assert_eq!(
         f.install().unwrap_err().kind,
@@ -822,7 +826,7 @@ fn test_guard_restores_previous_link_when_installed_verification_fails() {
     );
     assert_eq!(
         fs::read_link(f.path("cargo-bin/epr")).unwrap(),
-        Path::new("/old/epr")
+        Path::new("/tmp/eprfs-gate-target/debug/old-epr")
     );
 }
 #[test]
@@ -871,7 +875,7 @@ fn test_shadows_lists_every_epr_reached_before_the_launcher() {
         .join(":");
     let rows = f.store.shadows(&path);
     assert_eq!(rows.len(), 2);
-    assert_eq!(rows[0]["superseded"], true);
+    assert_eq!(rows[0]["superseded"], false);
     assert_eq!(rows[1]["superseded"], false);
 }
 #[test]
@@ -1455,4 +1459,28 @@ fn explicit_offline_mode_never_attempts_network_build_or_download() {
         1
     );
     assert!(!state.calls.iter().any(|c| c.program == "gh"));
+}
+
+#[test]
+fn missing_launcher_does_not_hide_shadows_and_only_build_links_are_repairable() {
+    let f = Fixture::new("epr");
+    fs::create_dir_all(f.path("stale")).unwrap();
+    symlink("/tmp/eprfs-gate-target/debug/epr", f.path("stale/epr")).unwrap();
+    let rows = f.store.shadows(&f.path("stale").display().to_string());
+    assert_eq!(rows.len(), 1);
+    assert_eq!(rows[0]["superseded"], true);
+}
+
+#[test]
+fn install_never_overwrites_an_unrelated_destination_symlink() {
+    let f = Fixture::new("epr");
+    let release = f.release("a");
+    f.head(&release);
+    fs::create_dir_all(f.path("cargo-bin")).unwrap();
+    symlink("/unrelated/epr", f.path("cargo-bin/epr")).unwrap();
+    assert_eq!(f.install().unwrap_err().kind, "path-shadow");
+    assert_eq!(
+        fs::read_link(f.path("cargo-bin/epr")).unwrap(),
+        Path::new("/unrelated/epr")
+    );
 }

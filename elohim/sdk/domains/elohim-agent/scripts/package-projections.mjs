@@ -991,7 +991,7 @@ function projectionFixturePathsFor(pkg) {
   // returned object has only a `claude` key, and the write/verify loops iterate
   // Object.keys(...) so they naturally do the right thing for one or two runtimes.
   if (pkg.kind === HOOK_KIND) {
-    return { claude: resolve(PROJECTION_DIR, 'claude/hooks', `${pkg.metadata.id}.py`) };
+    return { claude: resolve(PROJECTION_DIR, 'claude/hooks', basename(pkg.projections.claude.path)) };
   }
   if (pkg.kind === AGENT_DOC_KIND) {
     // An agent-doc has ONE projection for the plant case (its native runtime), but

@@ -37,7 +37,6 @@ interface Fixture {
 const fixtures = new WeakMap<object, Fixture>();
 const repository = resolve('../..');
 const binary = process.env.EPR_BIN ?? 'epr';
-const preflightScript = join(repository, 'genesis/agentic/bin/device-preflight');
 const MODEL_MANIFEST = '.epr-meta/elohim/algorithms/embedding-models/all-minilm-l6-v2.json';
 const INDEX_MEASURE = '.epr-meta/elohim/algorithms/recall-semantic-index.json';
 const HANDLE = 'matthew';
@@ -62,11 +61,13 @@ function deviceEnv(f: Fixture, key: string, extra: Record<string, string> = {}):
     XDG_CACHE_HOME: join(home, '.cache'),
     ELOHIM_DEVICE_KEY_FILE: key,
     CLAUDE_CONFIG_DIR: join(f.base, 'config'),
-    CARGO_TARGET_POOL_ROOT: join(f.base, 'no-pool'),
+    EPR_STORE: join(f.base, 'bin-store/epr'),
+    BRIT_STORE: join(f.base, 'bin-store/brit'),
     // Leave EPR_BIN absent when the fixture is using PATH: the PATH entry may be the stable
     // launcher, while EPR_BIN is reserved for the real candidate supplied by the gate.
     ...(binary === 'epr' ? {} : { EPR_BIN: binary }),
     ELOHIM_SESSION_ID: f.session,
+    EPR_BIN_TOOLS: join(repository, 'genesis/agentic/bin-tools.json'),
     ...extra,
   };
 }
@@ -88,19 +89,14 @@ function epr(f: Fixture, env: NodeJS.ProcessEnv, args: string[], expected: numbe
   return r.stdout.trim() ? object(JSON.parse(r.stdout)) : {};
 }
 function preflight(f: Fixture, env: NodeJS.ProcessEnv): { lines: string[]; status: number } {
-  const r = run(
-    f,
-    ['python3', preflightScript, '--root', f.root, '--handle', HANDLE, '--session', f.session],
-    env,
-    null
-  );
+  const r = run(f, [env.EPR_BIN ?? binary, 'device', 'status', '--root', f.root], env, null);
   assert.notEqual(r.status, null, `preflight did not run\n${r.stderr}`);
   return { lines: r.stdout.trim().split('\n'), status: r.status as number };
 }
 function line(f: Fixture, name: string): string {
   assert.ok(f.preflight, 'the preflight has not run');
-  const found = f.preflight.lines.find(
-    l => l.startsWith(`ok ${name}:`) || l.startsWith(`REFUSED ${name}:`)
+  const found = f.preflight.lines.find(l =>
+    ['ok', 'degraded', 'REFUSED', 'unknown'].some(state => l.startsWith(`${state} ${name}:`))
   );
   assert.ok(found, `no "${name}" line in:\n${f.preflight.lines.join('\n')}`);
   return found;
@@ -144,7 +140,10 @@ Given(
     git(f, ['init', '-q', root]);
     git(f, ['-C', root, 'add', '-A']);
     git(f, ['-C', root, 'commit', '-q', '-m', 'fixture']);
-    writeFileSync(join(base, 'config/berth/moorings', `${f.session}.json`), '{}');
+    writeFileSync(
+      join(base, 'config/berth/moorings', `${f.session}.json`),
+      JSON.stringify({ session: f.session })
+    );
     // The other device witnesses matthew: the roster's genesis row, signed by key A (minted here).
     epr(f, deviceEnv(f, f.keyA), [
       'actor',
@@ -218,7 +217,7 @@ Then('epr still answers, and says this device stands for nobody yet', function (
 });
 
 When(
-  'this workspace enrolls for {string} and receives a signed request to hand to the other device',
+  'this workspace enrolls for {string} and receives an enrollment request to hand to the other device',
   function (handle: string) {
     const f = state(this);
     f.keyStatBefore = { a: statSync(f.keyA).mtimeMs, b: 0 };
@@ -329,10 +328,50 @@ Given('no declared place holds the embedding model', function () {
   );
 });
 
-Given('every arrival condition is met on this workspace', function () {
-  return 'pending';
+Given('the core arrival conditions are met on this workspace', function () {
+  const f = state(this);
+  const request = epr(f, deviceEnv(f, f.keyB), [
+    'actor',
+    'device',
+    'enroll',
+    '--handle',
+    HANDLE,
+    '--json',
+  ]);
+  const authorization = epr(f, deviceEnv(f, f.keyA), [
+    'actor',
+    'device',
+    'authorize',
+    JSON.stringify(request),
+    '--json',
+  ]);
+  epr(f, deviceEnv(f, f.keyB), [
+    'actor',
+    'device',
+    'bind',
+    JSON.stringify(authorization),
+    '--json',
+  ]);
+  // Candidate execution makes a fixture local-first; no downloaded brit release or model needed.
+  f.preflight = preflight(
+    f,
+    deviceEnv(f, f.keyB, {
+      EPR_BIN: binary,
+      BRIT_BIN: binary,
+      PATH: '/usr/local/bin:/usr/bin:/bin',
+    })
+  );
 });
 
-Then('every line reads ok and the preflight exits zero', function () {
-  return 'pending';
+Then('every line reads ok or degraded and the preflight exits zero', function () {
+  const f = state(this);
+  assert.equal(f.preflight?.status, 0, f.preflight?.lines.join('\n'));
+  assert.equal(f.preflight?.lines.length, 8);
+  assert.ok(f.preflight?.lines.every(line => /^(ok|degraded) /.test(line)));
+});
+
+Then('the {string} line is degraded and names {string}', function (name: string, cure: string) {
+  const value = line(state(this), name);
+  assert.ok(value.startsWith('degraded'), value);
+  assert.ok(value.includes(cure), value);
 });

@@ -568,8 +568,8 @@ status view="all":
       # device: has this workspace ARRIVED as one of its human's devices — six ok/REFUSED lines
       # (epr binary · device key · roster bound · embed model · fold attested · berth moored), each
       # REFUSED naming its fix; exit 1 on any REFUSED. Spec: elohim/lvi/docs/specs/2026-10-10-workspace-arrival-as-declared-device.md
-      device) exec python3 "{{ root }}/genesis/agentic/bin/device-preflight" ;;
-      all) runtime; python3 "{{ root }}/genesis/agentic/bin/ram-guard" status --brief || true; python3 "{{ root }}/genesis/agentic/bin/device-preflight" || true; python3 "{{ root }}/.claude/scripts/habits-status.py" ;;
+      device) exec "${EPR_BIN:-epr}" device status --root "{{ root }}" ;;
+      all) runtime; python3 "{{ root }}/genesis/agentic/bin/ram-guard" status --brief || true; "${EPR_BIN:-epr}" device status --root "{{ root }}" || true; python3 "{{ root }}/.claude/scripts/habits-status.py" ;;
       *) echo "status view must be all|runtime|habits|saga|ci|seed|ram|device" >&2; exit 2 ;;
     esac
 

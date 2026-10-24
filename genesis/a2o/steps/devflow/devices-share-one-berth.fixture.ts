@@ -405,12 +405,21 @@ export async function household(): Promise<Fixture> {
   );
   writeFileSync(join(seed, 'README.md'), '# devices-share-one-berth fixture\n');
   writeFileSync(join(seed, '.gitignore'), '.claude/\n.eprfs/status/flows.jsonl\n');
-  // berth, and the `just status device` module it finds `epr` and the device key through.
-  for (const name of ['berth', 'device-preflight'])
+  copyFileSync(
+    join(repository, 'genesis/agentic/bin-tools.json'),
+    join(seed, 'genesis/agentic/bin-tools.json')
+  );
+  // berth consumes the native tool through the shared epr_client shim.
+  for (const name of ['berth'])
     copyFileSync(
       join(repository, 'genesis/agentic/bin', name),
       join(seed, 'genesis/agentic/bin', name)
     );
+  mkdirSync(join(seed, '.claude/scripts/_lib'), { recursive: true });
+  copyFileSync(
+    join(repository, '.claude/scripts/_lib/epr_client.py'),
+    join(seed, '.claude/scripts/_lib/epr_client.py')
+  );
   // The checks the real hook runs after its claims, as this fixture repository has them: it holds
   // no Rust, so its style reach gate has nothing to measure, and a push that changes only the
   // roster selects no gate (the real `.ci-ignore` reader over the fixture's own `.ci-ignore`).

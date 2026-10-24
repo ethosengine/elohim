@@ -1236,7 +1236,7 @@ class StewardClaimTest(unittest.TestCase):
         self.assertFalse(ok)
         self.assertIsNone(lease)
         self.assertIn("EPR_BIN", reason)
-        self.assertIn("cargo install --path elohim/eprfs/epr-cli --locked", reason)
+        self.assertIn("`epr device arrive`", reason)
         self.assertIsNone(self.berth.who("dev-integration"))
         self.assertEqual(self.rows("claim"), [], "no lease is written that could not be confirmed")
         self.assertFalse(self.berth.owner_check("dev-integration", "codex-1", "deploy")[0])
@@ -1261,26 +1261,16 @@ class StewardClaimTest(unittest.TestCase):
         self.assertIn("other devices: none — this workspace is not one of its steward's devices", section)
         self.assertIn(str(self.key), section)
 
-    def test_berth_resolves_epr_the_way_status_device_does(self):
-        preflight = _NS["_device_preflight"]()
-        found = Path(self.directory.name) / "path-bin"
-        found.mkdir()
-        (found / "epr").write_text("#!/bin/sh\n")
-        (found / "epr").chmod(0o755)
+    def test_berth_resolves_epr_through_the_native_shim(self):
+        sys.path.insert(0, str(REPO / ".claude/scripts"))
+        from _lib import epr_client
         b = self.make()
         b.epr = None
-        cases = [{"EPR_BIN": str(self.epr), "PATH": str(found)},
-                 {"PATH": str(found)},
-                 {"PATH": "/nonexistent", "CARGO_TARGET_POOL_ROOT": "/nonexistent"}]
-        for env in cases:
-            with mock.patch.dict(os.environ, env):
-                if "EPR_BIN" not in env:
-                    os.environ.pop("EPR_BIN", None)
-                self.assertEqual(b.epr_bin(), preflight.resolve_epr(dict(os.environ)), env)
-                self.assertEqual(Path(b.device_key_path()), preflight.device_key_path(dict(os.environ)))
-        with mock.patch.dict(os.environ, {"PATH": str(found)}):
-            os.environ.pop("EPR_BIN", None)
-            self.assertEqual(b.epr_bin(), str(found / "epr"))
+        with mock.patch.object(epr_client, "resolve_binary", return_value=str(self.epr)) as resolve:
+            self.assertEqual(b.epr_bin(), str(self.epr))
+            resolve.assert_called_once()
+        with mock.patch.dict(os.environ, {"ELOHIM_DEVICE_KEY_FILE": str(self.key)}):
+            self.assertEqual(Path(b.device_key_path()), self.key)
 
     def test_unconfirmed_with_this_devices_daemon_down_names_epr_peer_serve(self):
         self.views(view(), view(dev_integration=unconfirmed_a(), serving=False))
@@ -1311,8 +1301,8 @@ class StewardClaimTest(unittest.TestCase):
         ok, _, reason, _ = self.claim()
         self.assertFalse(ok)
         self.assertEqual(reason, f"the steward lease view could not be computed: epr: invalid arguments: unknown "
-                                 f"command `peer` \u2014 {stale} predates the peer verbs: replace it (cargo install "
-                                 f"--path elohim/eprfs/epr-cli --locked) or export EPR_BIN=<a current epr>")
+                                 f"command `peer` \u2014 {stale} predates the peer verbs: replace it (epr device arrive "
+                                 f"installs the native launcher onto PATH) or export EPR_BIN=<a current epr>")
         failing = Path(self.directory.name) / "failing-epr"
         failing.write_text("#!/bin/sh\necho 'epr peer: the roster does not read' >&2\n"
                            "echo '  caused by: line 3' >&2\nexit 2\n")
@@ -1348,26 +1338,25 @@ class StewardClaimTest(unittest.TestCase):
         if "EPR_BIN" not in extra:
             os.environ.pop("EPR_BIN", None)
 
-    def test_a_stale_epr_on_path_falls_through_to_a_current_pool_build(self):
+    def test_a_stale_candidate_never_falls_through_to_a_pool_build(self):
         stale = self._stale_path_epr()
         pool, slot = self._pool_epr(STUB_EPR)
-        (slot / "views.jsonl").write_text(json.dumps(view()) + "\n" + json.dumps(view(dev_integration=effective())) + "\n")
         self._env(stale, pool)
-        self.berth.epr = None
-        ok, lease, reason, _ = self.claim()
-        self.assertTrue(ok, reason)
-        self.assertEqual(self.berth.epr, str(slot / "epr"), "the working path is remembered")
+        self.berth.epr = str(stale)
+        ok, _, reason, _ = self.claim()
+        self.assertFalse(ok, reason)
+        self.assertFalse((slot / "calls.log").exists())
 
     def test_a_stale_epr_on_path_and_no_working_pool_build_names_the_path_and_the_cure(self):
         stale = self._stale_path_epr()
         pool, slot = self._pool_epr(self.STALE_STUB)
         self._env(stale, pool)
-        self.berth.epr = None
+        self.berth.epr = str(stale)
         ok, lease, reason, _ = self.claim()
         self.assertFalse(ok)
         self.assertEqual(reason, f"the steward lease view could not be computed: epr: invalid arguments: unknown "
-                                 f"command `peer` \u2014 {stale} predates the peer verbs: replace it (cargo install "
-                                 f"--path elohim/eprfs/epr-cli --locked) or export EPR_BIN=<a current epr>")
+                                 f"command `peer` \u2014 {stale} predates the peer verbs: replace it (epr device arrive "
+                                 f"installs the native launcher onto PATH) or export EPR_BIN=<a current epr>")
         self.assertIsNone(self.berth.who("dev-integration"))
 
     def test_an_explicit_epr_bin_that_is_stale_is_not_fallen_through(self):
@@ -1375,11 +1364,11 @@ class StewardClaimTest(unittest.TestCase):
         pool, slot = self._pool_epr(STUB_EPR)
         (slot / "views.jsonl").write_text(json.dumps(view()) + "\n")
         self._env(stale, pool, EPR_BIN=str(stale))
-        self.berth.epr = None
+        self.berth.epr = str(stale)
         ok, lease, reason, _ = self.claim()
         self.assertFalse(ok)
         self.assertIn(str(stale), reason)
-        self.assertIn("cargo install --path elohim/eprfs/epr-cli --locked", reason)
+        self.assertIn("epr device arrive", reason)
         self.assertFalse((slot / "calls.log").exists(), "the pool build was never asked")
 
     def test_an_enrolled_device_whose_view_fails_is_refused(self):

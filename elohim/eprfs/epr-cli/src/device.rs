@@ -27,6 +27,10 @@
 //! and notarizes the joining record itself, asked over node-local HTTP
 //! (`/auth/device/self`, `/auth/device/enroll`, `/auth/device/announce`).
 
+mod arrival;
+mod arrival_work;
+pub use arrival::{status, Check, State};
+
 use std::fs::{self, OpenOptions};
 use std::io::{Read, Write};
 use std::net::{TcpListener, TcpStream, ToSocketAddrs};
@@ -81,7 +85,7 @@ pub fn usage() -> &'static str {
      epr device pending [--node <this node URL>]\n  \
      epr device approve '<link | number | key fingerprint>' [--only <act>]... [--yes] [--node <this node URL>]\n  \
      epr device approve <number | key fingerprint> --decline\n  \
-     epr device status [--node <this node URL>]\n    \
+     epr device status [--json] [--root <path>]\n  epr device arrive [--strict]\n  epr device trust <path>\n  epr device approvals [--node <this node URL>]\n    \
      (whom this machine's node speaks for, what is waiting, and what to run next)\n\
      This machine's node is --node, else ELOHIM_NODE_URL, else the one node of this machine \
      that answers on 8090/8095/8091/8092/8093.\n\
@@ -101,7 +105,17 @@ const FLAGS: [&str; 7] = [
 ];
 
 /// The device commands, as a person types them.
-const COMMANDS: [&str; 6] = ["join", "ask", "redeem", "pending", "approve", "status"];
+const COMMANDS: [&str; 9] = [
+    "join",
+    "ask",
+    "redeem",
+    "pending",
+    "approve",
+    "status",
+    "arrive",
+    "trust",
+    "approvals",
+];
 
 /// The command a mistyped or guessed word most likely meant: a word people
 /// reach for by habit, else the near one (`hint::nearest`).
@@ -131,7 +145,18 @@ pub fn run(args: &[String]) -> Outcome<ExitCode> {
         Some("ask") => ask(&args[1..]),
         Some("approve") => crate::approver::approve(&args[1..]),
         Some("pending") => crate::approver::pending(&args[1..]),
-        Some("status") => crate::approver::status(&args[1..]),
+        Some("status") => arrival::run(&args[1..], false).map_err(|e| e.to_string()),
+        Some("arrive") => arrival::run(&args[1..], true).map_err(|e| e.to_string()),
+        Some("approvals") => crate::approver::status(&args[1..]),
+        Some("trust") => {
+            let path = args
+                .get(1)
+                .filter(|_| args.len() == 2)
+                .ok_or("usage: epr device trust <path>")?;
+            let root = crate::git::trust(Path::new(path)).map_err(|e| e.to_string())?;
+            println!("ok repository trusted: {}", root.display());
+            Ok(ExitCode::SUCCESS)
+        }
         Some("redeem") => {
             let (pasted, opts) = match args.get(1) {
                 Some(p) if !p.starts_with("--") => (p.clone(), Options::parse(&args[2..])?),

@@ -1,3 +1,4 @@
+//! Repository commands and the device-local, exact-checkout trust declaration.
 use std::{
     collections::BTreeMap,
     path::{Path, PathBuf},
@@ -231,6 +232,140 @@ fn classify(x: char, y: char) -> ChangeKind {
         ChangeKind::Added
     } else {
         ChangeKind::Modified
+    }
+}
+
+/// Construct a git command rooted in `cwd`, granting only explicitly declared checkout trust.
+/// A nested repository has its own boundary; trusting a parent never trusts its submodules.
+pub fn command(cwd: &Path) -> std::process::Command {
+    let mut command = native_command(cwd);
+    if let Some(root) = checkout(cwd) {
+        if trust_file()
+            .ok()
+            .is_some_and(|file| declared_at(&root, &file))
+        {
+            command.args(["-c", &format!("safe.directory={}", root.display())]);
+        }
+    }
+    command
+}
+
+fn native_command(cwd: &Path) -> std::process::Command {
+    let mut command = std::process::Command::new("git");
+    command.current_dir(cwd);
+    for key in crate::process::GIT_LOCATION_ENV {
+        command.env_remove(key);
+    }
+    command
+}
+
+/// Locate a checkout without asking git to trust it first. Worktree `.git` files are boundaries.
+pub(crate) fn checkout(start: &Path) -> Option<PathBuf> {
+    let path = start.canonicalize().ok()?;
+    path.ancestors()
+        .find(|p| p.join(".git").exists())
+        .map(Path::to_owned)
+}
+
+fn trust_file() -> std::io::Result<PathBuf> {
+    let key = crate::device_key::resolve_path()?;
+    key.parent()
+        .map(|p| p.join("trusted-checkouts"))
+        .ok_or_else(|| {
+            std::io::Error::new(
+                std::io::ErrorKind::InvalidInput,
+                "device key has no directory",
+            )
+        })
+}
+
+fn declared_at(root: &Path, file: &Path) -> bool {
+    std::fs::read_to_string(file)
+        .ok()
+        .is_some_and(|text| text.lines().any(|line| Path::new(line) == root))
+}
+
+/// Declare one canonical checkout beside the device key. No global git configuration changes.
+pub fn trust(path: &Path) -> std::io::Result<PathBuf> {
+    let root = checkout(path).ok_or_else(|| {
+        std::io::Error::new(
+            std::io::ErrorKind::InvalidInput,
+            "path is not inside a checkout",
+        )
+    })?;
+    declare_at(&root, &trust_file()?)?;
+    Ok(root)
+}
+
+fn declare_at(root: &Path, file: &Path) -> std::io::Result<()> {
+    use std::io::Write;
+    use std::os::unix::fs::{DirBuilderExt, OpenOptionsExt};
+    let text = root
+        .to_str()
+        .filter(|s| !s.contains(['\n', '\r']))
+        .ok_or_else(|| {
+            std::io::Error::new(
+                std::io::ErrorKind::InvalidInput,
+                "checkout path must be UTF-8 without newlines",
+            )
+        })?;
+    if let Some(parent) = file.parent() {
+        std::fs::DirBuilder::new()
+            .recursive(true)
+            .mode(0o700)
+            .create(parent)?;
+    }
+    let mut output = std::fs::OpenOptions::new()
+        .create(true)
+        .append(true)
+        .mode(0o600)
+        .open(file)?;
+    rustix::fs::flock(&output, rustix::fs::FlockOperation::LockExclusive)?;
+    if !declared_at(root, file) {
+        writeln!(output, "{text}")?;
+        output.sync_all()?;
+    }
+    Ok(())
+}
+
+/// Check native git acceptance or the exact device declaration, without minting trust.
+pub(crate) fn accepted(root: &Path) -> std::io::Result<bool> {
+    Ok(command(root)
+        .args(["rev-parse", "--show-toplevel"])
+        .output()?
+        .status
+        .success())
+}
+
+/// Supply the same git policy to bin-store's bounded subprocess runner.
+pub(crate) struct DeviceRunner;
+impl elohim_device_runtime::bin_store::Runner for DeviceRunner {
+    fn run(
+        &self,
+        spec: &elohim_device_runtime::bin_store::CommandSpec,
+    ) -> std::result::Result<
+        elohim_device_runtime::bin_store::CommandOutput,
+        elohim_device_runtime::bin_store::Refusal,
+    > {
+        use elohim_device_runtime::bin_store::SystemRunner;
+        let mut spec = spec.clone();
+        if spec.program == "git" {
+            let cwd = spec.cwd.clone().unwrap_or_else(|| PathBuf::from("."));
+            let command = command(&cwd);
+            let mut args: Vec<_> = command
+                .get_args()
+                .map(|s| s.to_string_lossy().into_owned())
+                .collect();
+            args.append(&mut spec.args);
+            spec.args = args;
+            for (key, value) in command.get_envs() {
+                spec.env.insert(
+                    key.to_string_lossy().into_owned(),
+                    value.map(|s| s.to_string_lossy().into_owned()),
+                );
+            }
+        }
+        SystemRunner.run(&spec)
     }
 }
 

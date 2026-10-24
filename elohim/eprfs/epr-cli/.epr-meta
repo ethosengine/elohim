@@ -46,3 +46,14 @@ index/OIDs/worktrees or elect a release from storage possession.
 `src/.epr-meta` adds the recall-seam rule) and the integration tests under `tests/`. Those tests
 exercise the `epr flow` verbs, and their `*_parity` gates hold the native readers to the recorded
 outputs of the Python tools they replace.
+
+## Device arrival and repository trust (A.2)
+
+Arrival checks are ephemeral views rebuilt from local custody, the key/roster, model, fold,
+and berth stores. The trust declaration is device-private: `trusted-checkouts` beside the
+resolved device key contains one canonical checkout path per line, never a wildcard. Nested
+checkouts need their own declaration. This changes neither git's global configuration nor peer
+authority. No DHT entry, coordinator, signal, or recurring head is introduced. The first-device
+cure uses the existing human claim plus agent witness ceremony; authorization requires an
+already founded roster. HookPackage currently projects Claude hooks only; Codex/Antigravity
+use the native launcher's lazy bootstrap until their hook registration adapters exist.
