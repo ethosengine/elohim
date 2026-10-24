@@ -24,14 +24,19 @@ export MESH_TRANSPORT_BACKEND=libp2p
 source "$here/../hc-mesh.sh" >/dev/null
 fixture_port=$((23000 + $$ % 1000))
 http_port() { echo "$fixture_port"; }
+sandbox_agent_key() { echo fixture-agent; }
 probe_zome_paths() { return 0; }
 refresh_fixture_pids() { :; }
 mkdir -p "$LOGDIR"
 
-# The current peer is a real process whose argv has the exact shape the restart
-# arm resolves. Its executable is the known-good fallback for a failed slot.
-python3 -c 'import time; marker = "elohim-storage"; time.sleep(300)' \
-  --http-port "$fixture_port" &
+# The current peer must match both comm and argv, as a real storage process does.
+# Its executable is the known-good fallback for a failed slot.
+python3 -c '
+import time
+with open("/proc/self/comm", "w") as comm:
+    comm.write("elohim-storage")
+time.sleep(300)
+' --http-port "$fixture_port" &
 old_pid=$!
 sleep 0.1
 
