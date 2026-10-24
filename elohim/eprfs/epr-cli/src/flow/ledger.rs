@@ -65,6 +65,9 @@ pub struct LedgerEntry {
     pub verdict: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub steward: Option<String>,
+    /// Additive note slots, including structured measurement fields, preserved by the native reader.
+    #[serde(skip_serializing_if = "Vec::is_empty")]
+    pub extra: Vec<String>,
 }
 
 /// The whole ledger for one atom.
@@ -129,6 +132,7 @@ pub fn ledger(root: &Path, target: &str) -> FlowResult<LedgerResult> {
                 switched_to: None,
                 verdict: None,
                 steward: slot(slots, "steward:"),
+                extra: Vec::new(),
             },
         ));
     }
@@ -176,6 +180,7 @@ pub fn ledger(root: &Path, target: &str) -> FlowResult<LedgerResult> {
                 switched_to: view.switched_to,
                 verdict: view.verdict,
                 steward: view.steward,
+                extra: view.extra,
             }
         } else if let Some(via) = event
             .fulfills
@@ -217,6 +222,7 @@ pub fn ledger(root: &Path, target: &str) -> FlowResult<LedgerResult> {
                 switched_to: None,
                 verdict: None,
                 steward: slot(slots, "steward:"),
+                extra: Vec::new(),
             }
         } else {
             continue;

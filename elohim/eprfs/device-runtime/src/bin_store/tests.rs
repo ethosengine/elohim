@@ -682,6 +682,7 @@ fn test_gc_holds_lock_and_keeps_heads_live_pins_and_grace() {
         atomic_json(
             &f.store.root.join("sessions").join(key),
             &Pin {
+                running_cid: None,
                 cid: r.cid.clone(),
                 session: key.into(),
                 pinned_at: "2026-10-23T00:00:00Z".into(),
@@ -1483,4 +1484,28 @@ fn install_never_overwrites_an_unrelated_destination_symlink() {
         fs::read_link(f.path("cargo-bin/epr")).unwrap(),
         Path::new("/unrelated/epr")
     );
+}
+
+#[test]
+fn running_daemon_identity_and_gc_follow_live_process_not_session_or_head() {
+    let f = Fixture::new("epr");
+    let r = f.release("daemon");
+    let proc = f.path("proc");
+    proc_entry(&proc, 4242, 1, "epr", 777);
+    f.store
+        .record_running_daemon(&f.store.root.join(&r.cid).join("epr"), 4242, &proc)
+        .unwrap();
+    let live = f.store.live_daemons(&proc).unwrap();
+    assert_eq!(live.len(), 1);
+    assert_eq!(live[0].running_cid.as_deref(), Some(r.cid.as_str()));
+    // No head was landed. Far beyond grace, only the live process retains these bytes.
+    let result = f.store.gc(&proc, Some(4_000_000_000)).unwrap();
+    assert!(result["kept"].as_array().unwrap().contains(&json!(r.cid)));
+    proc_entry(&proc, 4242, 1, "reused-pid", 778);
+    assert!(f.store.live_daemons(&proc).unwrap().is_empty());
+    let result = f.store.gc(&proc, Some(4_000_000_000)).unwrap();
+    assert!(result["removed"]
+        .as_array()
+        .unwrap()
+        .contains(&json!(r.cid)));
 }

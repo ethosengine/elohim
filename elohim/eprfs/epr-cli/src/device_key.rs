@@ -698,13 +698,15 @@ mod tests {
 
     #[test]
     fn env_override_wins() {
+        let outside = tempfile::tempdir().unwrap();
+        let seed = outside.path().join("key.seed");
         let explicit = resolve_path_with(env(&[
-            (DEVICE_KEY_ENV, "/tmp/elsewhere/key.seed"),
+            (DEVICE_KEY_ENV, seed.to_str().unwrap()),
             ("XDG_CONFIG_HOME", "/xdg"),
             ("HOME", "/home/u"),
         ]))
         .unwrap();
-        assert_eq!(explicit, PathBuf::from("/tmp/elsewhere/key.seed"));
+        assert_eq!(explicit, seed);
 
         let xdg =
             resolve_path_with(env(&[("XDG_CONFIG_HOME", "/xdg"), ("HOME", "/home/u")])).unwrap();

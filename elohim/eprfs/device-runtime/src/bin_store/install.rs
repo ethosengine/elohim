@@ -87,7 +87,16 @@ impl Store {
             for path in [base.join(name), destination.join(name)] {
                 if let Ok(target) = fs::read_link(&path) {
                     let canonical = path.canonicalize().ok();
-                    if target != launcher
+                    // The pre-native managed launcher is an upgrade target, not a foreign PATH shadow.
+                    let legacy = base.join("epr-launch");
+                    let managed_legacy = self.tool == "epr"
+                        && !legacy.is_symlink()
+                        && legacy.is_file()
+                        && canonical
+                            .as_ref()
+                            .is_some_and(|path| Some(path) == legacy.canonicalize().ok().as_ref());
+                    if !managed_legacy
+                        && target != launcher
                         && canonical.as_ref() != Some(&launcher)
                         && !build_output(&target)
                         && !canonical.as_deref().is_some_and(build_output)

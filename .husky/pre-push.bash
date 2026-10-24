@@ -162,7 +162,7 @@ HOOK_ON_EXIT="$HOOK_ON_EXIT berth_release_claims"
 # long landing never outlives its lease (the other devices read a lease past since + ttl as dead).
 # A renew whose record did not cross prints berth's line and keeps going; a renew refused outright
 # prints berth's line and stops the push (at the end of the gate step then running). The loop is
-# stopped on every exit, before the release, and lets an in-flight renew finish first, so nothing
+# stopped with its subprocess group on every exit, before releasing the claims, so nothing
 # renews a lease after the push gave it back.
 BERTH_TTL_S="${BERTH_PREPUSH_TTL_S:-1800}"
 BERTH_HOOK_PID=$$
@@ -170,10 +170,11 @@ BERTH_RENEW_PID=""
 berth_renew_loop() {
   local interval=$((BERTH_TTL_S / 3)) sleeper="" res out rc
   [ "$interval" -ge 1 ] || interval=1
+  set +m # descendants share this renewer's process group
   trap - EXIT INT HUP
-  trap '[ -n "$sleeper" ] && kill "$sleeper" 2>/dev/null; exit 0' TERM
+  trap 'trap "" TERM; kill -TERM -- "-$BASHPID" 2>/dev/null; wait; exit 0' TERM
   while :; do
-    sleep "$interval" &
+    sleep "$interval" </dev/null >/dev/null 2>&1 &
     sleeper=$!
     wait "$sleeper"
     sleeper=""
@@ -193,7 +194,7 @@ berth_renew_loop() {
 }
 berth_stop_renewing() {
   [ -n "$BERTH_RENEW_PID" ] || return 0
-  kill -TERM "$BERTH_RENEW_PID" 2>/dev/null
+  kill -TERM -- "-$BERTH_RENEW_PID" 2>/dev/null
   wait "$BERTH_RENEW_PID" 2>/dev/null
   BERTH_RENEW_PID=""
 }
@@ -263,8 +264,11 @@ if [ -n "$BERTH_TARGETS" ] && [ -f "$BERTH_BIN" ]; then
     esac
   done
   if [ -n "$BERTH_HELD" ]; then
-    berth_renew_loop &
+    # Bash establishes the group before running the subshell; no setsid startup race.
+    set -m
+    berth_renew_loop </dev/null &
     BERTH_RENEW_PID=$!
+    set +m
   fi
 fi
 # ── Berth: claims taken ───────────────────────────────────────────

@@ -118,6 +118,7 @@ impl Store {
             owner_pid: identity.owner_pid,
             owner_start_time: identity.owner_start_time.map(|n| n.to_string()),
             provisional,
+            running_cid: None,
         };
         files::atomic_json(&self.pin_path(key)?, &pin)?;
         Ok(pin)
@@ -279,10 +280,56 @@ impl Store {
             owner_pid: Some(pid),
             owner_start_time: Some(start.to_string()),
             provisional: false,
+            running_cid: None,
         };
         let _lock = files::Lock::acquire(&self.root, files::EXEC_WAIT)?;
         files::atomic_json(&self.pin_path(&pin.session)?, &pin)?;
         Ok(Some(pin))
+    }
+    /// Record the bytes actually executing in the existing PID/start-time daemon lease.
+    /// Direct invocations use the same lease as launcher invocations, never a head-table row.
+    pub fn record_running_daemon(
+        &self,
+        executable: &Path,
+        pid: u32,
+        proc_root: &Path,
+    ) -> Result<()> {
+        let cid = files::file_cid(executable)?;
+        if let Some(mut lease) = self.daemon_lease(&cid, pid, proc_root)? {
+            lease.running_cid = Some(cid);
+            let _lock = files::Lock::acquire(&self.root, files::EXEC_WAIT)?;
+            files::atomic_json(&self.pin_path(&lease.session)?, &lease)?;
+        }
+        Ok(())
+    }
+    /// Read live daemon leases. PID reuse and stale leases never describe a running daemon.
+    pub fn live_daemons(&self, proc_root: &Path) -> Result<Vec<Pin>> {
+        let directory = self.root.join("sessions");
+        let entries = match std::fs::read_dir(directory) {
+            Ok(entries) => entries,
+            Err(error) if error.kind() == std::io::ErrorKind::NotFound => return Ok(Vec::new()),
+            Err(error) => return Err(error.into()),
+        };
+        let mut leases = Vec::new();
+        for entry in entries {
+            let entry = entry?;
+            let Some(pin) = files::read_json::<Pin>(&entry.path()) else {
+                continue;
+            };
+            if pin.session.starts_with("daemon-")
+                && files::require_cid(&pin.cid).is_ok()
+                && pin
+                    .owner_pid
+                    .zip(pin.owner_start_time.as_deref())
+                    .is_some_and(|(pid, start)| {
+                        session::process_start_time(proc_root, pid)
+                            .is_some_and(|now| now.to_string() == start)
+                    })
+            {
+                leases.push(pin);
+            }
+        }
+        Ok(leases)
     }
     /// Refresh the usage grace for an executable about to run.
     pub fn touch_used(&self, cid: &str) -> Result<()> {
@@ -318,7 +365,23 @@ pub fn launch_os(registry: &Registry, invoked: &Path, args: &[std::ffi::OsString
             start.elapsed().as_micros()
         );
     }
-    let resolved = store.resolve(Some(&bin), identity.as_ref(), &files::env, true)?;
+    let resolved = if daemon {
+        // A daemon follows the device head, including when its caller exported an explicit pin.
+        let resolved = store.resolve_current(Some(&bin))?;
+        let cid = resolved
+            .cid
+            .as_deref()
+            .ok_or_else(|| Refusal::new("head-absent", "daemon needs a release"))?;
+        if !store.verified(cid) {
+            return Err(Refusal::new(
+                "identity-mismatch",
+                "daemon release failed the exec floor",
+            ));
+        }
+        resolved
+    } else {
+        store.resolve(Some(&bin), identity.as_ref(), &files::env, true)?
+    };
     if let Some(cid) = &resolved.cid {
         store.touch_used(cid)?;
         if daemon {

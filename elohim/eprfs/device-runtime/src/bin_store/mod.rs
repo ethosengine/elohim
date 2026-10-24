@@ -238,6 +238,9 @@ impl Release {
 pub struct Pin {
     /// Release retained by this owner.
     pub cid: String,
+    /// Executable identity observed by the daemon itself; absent before exec or on old leases.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub running_cid: Option<String>,
     /// Stable session id or daemon pid/start-time key.
     pub session: String,
     /// UTC creation timestamp for ownerless grace.

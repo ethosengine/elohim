@@ -1,12 +1,13 @@
 import { describe, test } from 'node:test';
 import { strict as assert } from 'node:assert';
-import { readFileSync } from 'node:fs';
+import { readFileSync, mkdtempSync, mkdirSync, writeFileSync, rmSync } from 'node:fs';
+import { tmpdir } from 'node:os';
 import { spawnSync } from 'node:child_process';
 import { resolve, dirname } from 'path';
 import { fileURLToPath } from 'url';
 import { loadGateRegistry } from './pipeline-registry.mjs';
 import { loadManifests } from './manifest-utils.mjs';
-import { gateChildEnv, oracleMode, projectsForChanges, selectGateProjects, worktreeTargetDir } from './gate-runner.mjs';
+import { receiptKey, matchingReceipt, findReceipt, writeReceipt, gateChildEnv, oracleMode, projectsForChanges, selectGateProjects, worktreeTargetDir } from './gate-runner.mjs';
 import { resolveRakiaBin } from './gate-oracle.mjs';
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '../..');
@@ -436,4 +437,132 @@ describe('a shared cargo slot never serves another checkout its compiled crates'
       rmSync(target, { recursive: true, force: true });
     }
   });
+});
+
+
+function receiptFixture(t) {
+  const root = mkdtempSync(resolve(tmpdir(), 'gate-receipt-'));
+  t.after(() => rmSync(root, { recursive: true, force: true }));
+  const dir = 'elohim/eprfs';
+  mkdirSync(resolve(root, dir), { recursive: true });
+  writeFileSync(resolve(root, dir, 'build-manifest.json'), '{"fixture":1}\n');
+  const env = { ...process.env };
+  for (const key of ['GIT_DIR', 'GIT_WORK_TREE', 'GIT_INDEX_FILE', 'GIT_PREFIX', 'GATE_COMMIT']) delete env[key];
+  const git = args => {
+    const r = spawnSync('git', ['-c', 'user.name=Fixture', '-c', 'user.email=fixture@example.test', ...args], {cwd:root, env, encoding:'utf8'});
+    assert.equal(r.status, 0, r.stderr);
+    return r.stdout.trim();
+  };
+  git(['init', '-q']); git(['add', dir]); git(['commit', '-qm', 'fixture']);
+  const project = { name:'fixture', dir, run:{cargo:{env:{EPR_GATE_RECEIPT:'1', RUSTUP_TOOLCHAIN:'1.96.1'}}} };
+  return {root, env, project, git};
+}
+
+test('receipt key uses clean project tree, resolved toolchain and manifest CID', function receipt_key_uses_clean_project_tree(t) {
+  const fx = receiptFixture(t);
+  const key = receiptKey(fx.project, fx);
+  assert.equal(key.tree, fx.git(['rev-parse', 'HEAD:elohim/eprfs']));
+  assert.equal(key.toolchain, '1.96.1');
+  assert.match(key.manifest, /^bafkrei/);
+  writeFileSync(resolve(fx.root, 'unrelated.txt'), 'outside project');
+  assert.deepEqual(receiptKey(fx.project, fx), key);
+  writeFileSync(resolve(fx.root, fx.project.dir, 'untracked.rs'), 'unfinished');
+  assert.equal(receiptKey(fx.project, fx), null);
+  fx.git(['add', fx.project.dir]); fx.git(['commit', '-qm', 'changed tree']);
+  assert.notEqual(receiptKey(fx.project, fx).tree, key.tree);
+  fx.env.GATE_COMMIT = 'HEAD~1';
+  assert.equal(receiptKey(fx.project, fx), null, 'never certify a tree other than the checked-out one');
+});
+
+test('only exact successful native receipt slots attest the gate', function receipt_requires_exact_successful_native_slots() {
+  const key = {tree:'abc', toolchain:'1.96.1', manifest:'bafkreimanifest'};
+  const entry = {cid:'bafkreireceipt', kind:'observation', extra:['measure:gate-receipt@1', 'value:1',
+    ...Object.entries(key).map(([k,v]) => `env:${k}=${v}`)]};
+  assert.equal(matchingReceipt(key, {entries:[entry]}), entry.cid);
+  for (const name of Object.keys(key)) {
+    assert.equal(matchingReceipt({...key, [name]:'different'}, {entries:[entry]}), null, name);
+  }
+  for (const changed of [ {kind:'ruling'}, {via:'other-commitment'}, {cid:'sha256:abc'},
+    {extra:entry.extra.filter(s => s !== 'value:1')}, {extra:[...entry.extra, 'env:tree=ambiguous']} ]) {
+    assert.equal(matchingReceipt(key, {entries:[{...entry,...changed}]}), null);
+  }
+  assert.equal(findReceipt({}, key, {run:() => ({status:1})}), null);
+  assert.equal(findReceipt({}, key, {run:() => ({status:0, stdout:'bad-json'})}), null);
+});
+
+test('receipt writes through epr and refuses changed or dirty finishing trees', function receipt_refuses_changed_finishing_tree(t) {
+  const fx = receiptFixture(t);
+  const key = receiptKey(fx.project, fx);
+  const calls = [];
+  const run = (bin, args, options) => {
+    if (bin === 'git') return spawnSync(bin, args, options);
+    calls.push(args);
+    return {status:0, stdout:JSON.stringify({record_cid:'bafkreireceipt'})};
+  };
+  assert.equal(writeReceipt(fx.project, key, {...fx, run}), 'bafkreireceipt');
+  assert.deepEqual(calls[0].slice(0, 7), ['flow','note','--kind','observation','--measure','gate-receipt@1','--subject']);
+  assert.ok(calls[0].includes(`tree=${key.tree}`));
+  assert.ok(calls[0].includes(`manifest=${key.manifest}`));
+  writeFileSync(resolve(fx.root, fx.project.dir, 'build-manifest.json'), '{}');
+  assert.equal(writeReceipt(fx.project, key, {...fx, run}), null);
+  assert.equal(calls.length, 1);
+});
+
+test('native flow note round-trips a receipt through the ledger reader', t => {
+  if (!process.env.EPR_BIN) return t.skip('set EPR_BIN to the built native CLI');
+  const fx = receiptFixture(t);
+  mkdirSync(resolve(fx.root, '.claude/epr-meta'), {recursive:true});
+  writeFileSync(resolve(fx.root, '.claude/epr-meta/measures.yaml'),
+    'measures:\n  - id: gate-receipt\n    version: 1\n    unit: passes\n');
+  mkdirSync(resolve(fx.root, '.epr-meta'), {recursive:true});
+  writeFileSync(resolve(fx.root, '.epr-meta/repository.yaml'), 'version: 1\nagent: repo:ethosengine/elohim\n');
+  fx.env.EPR_BIN = process.env.EPR_BIN;
+  const key = receiptKey(fx.project, fx);
+  let diagnostic = '';
+  const run = (bin, args, options) => {
+    const result = spawnSync(bin, args, options);
+    if (result.status !== 0) diagnostic += result.stderr;
+    return result;
+  };
+  const written = writeReceipt(fx.project, key, {...fx, run});
+  assert.match(written ?? '', /^baf/, diagnostic);
+  assert.equal(findReceipt(fx.project, key, fx), written);
+  assert.equal(findReceipt(fx.project, {...key, toolchain:'another-toolchain'}, fx), null);
+});
+
+test('pre-push skips the recipe only for a matching receipt and reruns mismatches', t => {
+  if (!process.env.EPR_BIN) return t.skip('set EPR_BIN to the built native CLI');
+  const fx = receiptFixture(t);
+  fx.project.run.kind = 'root-just';
+  fx.project.run.recipe = 'fixture-gate';
+  writeFileSync(resolve(fx.root, fx.project.dir, 'build-manifest.json'), JSON.stringify({
+    pipeline:'fixture', steps:{}, gate:{projects:{fixture:fx.project}},
+  }));
+  mkdirSync(resolve(fx.root, 'genesis/orchestrator'), {recursive:true});
+  writeFileSync(resolve(fx.root, 'genesis/orchestrator/rust-style.sh'), 'exit 0\n');
+  writeFileSync(resolve(fx.root, 'genesis/orchestrator/run-local-gate.sh'), 'echo RECIPE-RAN\nexit 0\n');
+  mkdirSync(resolve(fx.root, '.claude/epr-meta'), {recursive:true});
+  writeFileSync(resolve(fx.root, '.claude/epr-meta/measures.yaml'),
+    'measures:\n  - id: gate-receipt\n    version: 1\n    unit: passes\n');
+  mkdirSync(resolve(fx.root, '.epr-meta'), {recursive:true});
+  writeFileSync(resolve(fx.root, '.epr-meta/repository.yaml'), 'version: 1\nagent: repo:ethosengine/elohim\n');
+  fx.git(['add', fx.project.dir]); fx.git(['commit','-qm','gate manifest']);
+  fx.env.EPR_BIN = process.env.EPR_BIN;
+  const cli = () => spawnSync(process.execPath, [resolve(ROOT, 'genesis/orchestrator/gate-runner.mjs'), '--target', 'fixture'], {
+    cwd:fx.root, env:{...fx.env, GATE_ROOT:fx.root, GATE_RUN_KIND:'pre-push'}, encoding:'utf8', timeout:15000,
+  });
+  const first = cli();
+  assert.equal(first.status, 0, first.stderr);
+  assert.match(first.stdout, /RECIPE-RAN/);
+  assert.match(first.stdout, /receipt: baf/);
+  const second = cli();
+  assert.equal(second.status, 0, second.stderr);
+  assert.match(second.stdout, /attested: receipt baf/);
+  assert.doesNotMatch(second.stdout, /RECIPE-RAN/);
+  writeFileSync(resolve(fx.root, fx.project.dir, 'unfinished.rs'), 'dirty');
+  const dirty = cli();
+  assert.equal(dirty.status, 0, dirty.stderr);
+  assert.match(dirty.stdout, /RECIPE-RAN/);
+  assert.doesNotMatch(dirty.stdout, /attested: receipt/);
+  assert.match(dirty.stdout, /receipt: not written/);
 });

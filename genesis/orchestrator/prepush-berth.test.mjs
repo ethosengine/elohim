@@ -84,7 +84,7 @@ function fixture(t, message, answers = {}) {
 }
 
 /** Run the hook's block for one pushed ref, then `after` (the gates that follow it). */
-function runBlock(fx, { ref = "refs/heads/dev", after = "echo GATES-RAN", env = {} } = {}) {
+function runBlock(fx, { ref = "refs/heads/dev", after = "echo GATES-RAN", env = {}, transform = block => block } = {}) {
   const preamble = [
     // The hook sets pipefail before this block; the block runs under it.
     "set -o pipefail",
@@ -94,8 +94,9 @@ function runBlock(fx, { ref = "refs/heads/dev", after = "echo GATES-RAN", env = 
     `PUSH_LINES=('refs/heads/feature ${fx.head} ${ref} ${fx.base}')`,
     "",
   ].join("\n");
-  const result = spawnSync("bash", ["-c", `${preamble}${hookBlock()}${after}`], {
+  const result = spawnSync("bash", ["-c", `${preamble}${transform(hookBlock())}${after}`], {
     cwd: fx.dir,
+    timeout: 8000,
     encoding: "utf8",
     env: { ...cleanEnv, BERTH_OFFLINE_OK: "", ...env },
   });
@@ -322,4 +323,25 @@ test("prepush_renew_refused_outright_stops_the_push", (t) => {
   assert.match(r.out, /REFUSED: renewing dev-integration while the gates ran was refused/);
   assert.deepEqual(r.calls.slice(-1), ["release dev-integration"]);
   assert.deepEqual(settledCalls(fx), r.calls, "nothing renews after the push ends");
+});
+
+
+test("signal between sleeper spawn and assignment leaves no orphan or held pipe", (t) => {
+  const fx = fixture(t, "feat: land it");
+  const started = Date.now();
+  const result = runBlock(fx, {
+    after: 'sleep 0.5; echo GATES-RAN',
+    transform: block => block.replace('    sleeper=$!', `    echo "$!" > "${fx.dir}/sleeper.pid"
+    kill -TERM "$BERTH_HOOK_PID"
+    sleeper=$!`),
+  });
+  assert.equal(result.error, undefined, result.out);
+  assert.ok(Date.now() - started < 4000, 'no inherited pipe waits for the 600 second sleep');
+  assert.equal(result.status, 143, result.out);
+  const pid = readFileSync(join(fx.dir, 'sleeper.pid'), 'utf8').trim();
+  // A zombie awaiting the container's reaper owns neither a process nor any pipe.
+  let state = '';
+  try { state = readFileSync(`/proc/${pid}/stat`, 'utf8').split(') ')[1][0]; } catch {}
+  assert.ok(!state || state === 'Z', `orphan sleeper ${pid} is still ${state}`);
+  assert.deepEqual(result.calls.slice(-1), ['release dev-integration']);
 });

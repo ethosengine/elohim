@@ -42,6 +42,10 @@ pub const POLICY_REL: &str = "genesis/agentic/pool-policy.json";
 /// Why an `epr peer` verb could not run.
 #[derive(Debug, thiserror::Error)]
 pub enum PeerCliError {
+    /// The device bin store could not observe this daemon.
+    #[error("{0}")]
+    BinStore(#[from] elohim_device_runtime::bin_store::Refusal),
+
     #[error("invalid arguments: {0}")]
     InvalidArguments(String),
 
@@ -313,6 +317,11 @@ fn runtime() -> PeerResult<tokio::runtime::Runtime> {
 fn serve(options: Options) -> PeerResult<ExitCode> {
     let device = Device::open(&options.root, options.handle.as_deref())?;
     let _serving = ServeLock::acquire(&device.peer_dir)?;
+    crate::bin::daemon_store()?.record_running_daemon(
+        &std::env::current_exe()?,
+        std::process::id(),
+        &crate::bin::daemon_proc_root(),
+    )?;
     let allow = allow_list(&options)?;
     if allow.is_empty() {
         eprintln!(
@@ -384,6 +393,9 @@ struct DeviceStatus {
 #[derive(Debug, Serialize)]
 #[serde(rename_all = "camelCase")]
 struct StatusOutcome {
+    cli_cid: Option<String>,
+    daemon_cids: Vec<String>,
+    daemon_differs: bool,
     handle: String,
     chain_root: String,
     device: String,
@@ -452,7 +464,19 @@ fn status(options: &Options) -> PeerResult<ExitCode> {
         })
         .collect();
     let refused_strangers = table.channel.refused_strangers;
+    let cli_cid = crate::govern::evaluator_identity()["cid"]
+        .as_str()
+        .map(str::to_owned);
+    let daemon_cids: Vec<_> = crate::bin::daemon_store()?
+        .live_daemons(&crate::bin::daemon_proc_root())?
+        .into_iter()
+        .map(|pin| pin.running_cid.unwrap_or(pin.cid))
+        .collect();
+    let daemon_differs = daemon_cids.iter().any(|cid| Some(cid) != cli_cid.as_ref());
     let outcome = StatusOutcome {
+        cli_cid,
+        daemon_cids,
+        daemon_differs,
         refused_strangers,
         handle: device.lineage.handle.clone(),
         chain_root: device.lineage.chain_root.clone(),
@@ -473,6 +497,23 @@ fn status(options: &Options) -> PeerResult<ExitCode> {
 }
 
 fn render(outcome: &StatusOutcome) {
+    println!(
+        "CLI CID: {}",
+        outcome.cli_cid.as_deref().unwrap_or("unknown")
+    );
+    println!(
+        "peer daemon CID: {}{}",
+        if outcome.daemon_cids.is_empty() {
+            "no daemon running".into()
+        } else {
+            outcome.daemon_cids.join(", ")
+        },
+        if outcome.daemon_differs {
+            " (differs from this CLI)"
+        } else {
+            ""
+        }
+    );
     println!(
         "this device  {}  head seq {}  ({}'s devices)",
         short(&outcome.device),

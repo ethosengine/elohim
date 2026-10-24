@@ -118,7 +118,51 @@ pub(crate) fn status_at(root: &Path) -> Vec<Check> {
         ),
         berth_check(&berth_dir(), identity.session.as_deref()),
         repository_check(root),
+        peer_daemon_check(),
     ]
+}
+
+fn peer_daemon_check() -> Check {
+    let observed = (|| {
+        let store = crate::bin::daemon_store()?;
+        let leases = store.live_daemons(&crate::bin::daemon_proc_root())?;
+        let head = store.resolve_current(None).ok().and_then(|r| r.cid);
+        Ok::<_, elohim_device_runtime::bin_store::Refusal>((leases, head))
+    })();
+    match observed {
+        Ok((leases, head)) => {
+            let stale: Vec<_> = leases
+                .into_iter()
+                .map(|pin| pin.running_cid.unwrap_or(pin.cid))
+                .filter(|cid| Some(cid) != head.as_ref())
+                .collect();
+            if stale.is_empty() {
+                Check::new(
+                    "peer daemon",
+                    State::Ok,
+                    "at current or no daemon running",
+                    None,
+                )
+            } else {
+                Check::new(
+                    "peer daemon",
+                    State::Degraded,
+                    format!(
+                        "running {}; current {}",
+                        stale.join(", "),
+                        head.as_deref().unwrap_or("absent")
+                    ),
+                    Some("restart epr peer serve to follow current".into()),
+                )
+            }
+        }
+        Err(error) => Check::new(
+            "peer daemon",
+            State::Unknown,
+            error.to_string(),
+            Some("restore access to the epr bin store".into()),
+        ),
+    }
 }
 
 fn tool_check(

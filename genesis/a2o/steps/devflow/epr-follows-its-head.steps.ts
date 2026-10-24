@@ -7,7 +7,8 @@
  * bin-store CLI. Nothing reaches the persistent device store.
  */
 import assert from 'node:assert/strict';
-import { spawnSync } from 'node:child_process';
+import { spawn, spawnSync, type ChildProcess } from 'node:child_process';
+import { createHash } from 'node:crypto';
 import {
   appendFileSync,
   chmodSync,
@@ -23,6 +24,7 @@ import {
 } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { basename, dirname, join, resolve } from 'node:path';
+import { setTimeout as delay } from 'node:timers/promises';
 
 import { After, Given, Then, When } from '@cucumber/cucumber';
 
@@ -51,6 +53,9 @@ interface FollowFixture {
   sessionEnv?: NodeJS.ProcessEnv;
   launchedCid?: string;
   last?: Invocation;
+  daemon?: ChildProcess;
+  daemonEnv?: NodeJS.ProcessEnv;
+  bootstrapEnv?: NodeJS.ProcessEnv;
 }
 
 const fixtures = new WeakMap<object, FollowFixture>();
@@ -312,8 +317,13 @@ Given(
   }
 );
 
-After(function () {
+After(async function () {
   const state = fixtures.get(this);
+  if (state?.daemon?.exitCode === null) {
+    const exited = new Promise<void>(done => state.daemon?.once('exit', () => done()));
+    state.daemon.kill('SIGTERM');
+    await exited;
+  }
   if (state) rmSync(state.base, { recursive: true, force: true });
 });
 
@@ -479,4 +489,249 @@ Then('the revert succeeds and build A is the landed epr head again', function ()
   assert.equal(state.last.status, 0, `${state.last.stdout}\n${state.last.stderr}`);
   assert.equal(object(JSON.parse(state.last.stdout)).ring, 'reverted');
   assert.equal(landedCid(state), state.cidA);
+});
+
+Given(
+  "Matthew's device has a legacy sha256 store and a launcher without the bin verb",
+  function () {
+    const state = fixture(this);
+    const target = join(state.base, 'cargo-target');
+    const mockBin = join(state.base, 'bootstrap-bin');
+    mkdirSync(mockBin, { recursive: true });
+    mkdirSync(join(state.repo, 'elohim/eprfs'), { recursive: true });
+    const manifest = object(
+      JSON.parse(readFileSync(join(repository, 'elohim/eprfs/build-manifest.json'), 'utf8'))
+    );
+    const cargo = object(object(object(object(object(manifest.gate).projects).eprfs).run).cargo);
+    cargo.targetDir = target;
+    cargo.env = { RUSTUP_TOOLCHAIN: '1.96.1' };
+    writeFileSync(join(state.repo, 'elohim/eprfs/build-manifest.json'), JSON.stringify(manifest));
+    writeFileSync(join(state.repo, '.gitignore'), 'genesis/local-dev/\n.eprfs/\n');
+    git(state, ['add', '.gitignore', 'elohim/eprfs/build-manifest.json']);
+    state.commitA = commit(state, 'bootstrap fixture inputs');
+    // Compile is isolated at the cargo boundary; both installed binaries are real offline gate builds.
+    writeFileSync(
+      join(mockBin, 'cargo'),
+      `#!/usr/bin/env python3
+import os, pathlib, shutil, sys
+assert sys.argv[1:] == ['build', '--manifest-path', 'elohim/eprfs/Cargo.toml', '-p', 'elohim-epr-cli', '-p', 'elohim-device-runtime', '--bins']
+assert os.environ['RUSTUP_TOOLCHAIN'] == '1.96.1'
+assert os.environ['RUSTFLAGS'] == ''
+out = pathlib.Path(os.environ['CARGO_TARGET_DIR']) / 'debug'
+out.mkdir(parents=True, exist_ok=True)
+shutil.copy2(${JSON.stringify(candidateSource)}, out / 'epr')
+shutil.copy2(${JSON.stringify(launcherSource)}, out / 'bin-launch')
+`
+    );
+    chmodSync(join(mockBin, 'cargo'), 0o755);
+    const legacy = '#!/bin/sh\necho "unknown command bin" >&2\nexit 2\n';
+    const sha = 'sha256:' + createHash('sha256').update(legacy).digest('hex');
+    const old = join(state.store, sha);
+    mkdirSync(old, { recursive: true });
+    writeFileSync(join(old, 'epr'), legacy);
+    chmodSync(join(old, 'epr'), 0o755);
+    writeFileSync(
+      join(old, 'record.json'),
+      JSON.stringify({
+        cid: sha,
+        rcid: sha,
+        tool: 'epr',
+        bins: { epr: sha },
+        version: 'legacy',
+        source_commit: state.commitA,
+        tree_clean: true,
+        gate_run: 'fixture',
+        ingested_at: '2026-10-23T00:00:00Z',
+      })
+    );
+    symlinkSync(sha, join(state.store, 'current'));
+    writeFileSync(
+      join(state.store, 'current.json'),
+      JSON.stringify({ cid: sha, commit: state.commitA })
+    );
+    const managed = join(dirname(state.store), 'bin');
+    mkdirSync(managed, { recursive: true });
+    writeFileSync(join(managed, 'epr-launch'), legacy);
+    chmodSync(join(managed, 'epr-launch'), 0o755);
+    symlinkSync(join(managed, 'epr-launch'), join(managed, 'epr'));
+    rmSync(state.launcher);
+    symlinkSync(join(managed, 'epr-launch'), state.launcher);
+    state.bootstrapEnv = launcherEnv(state, {
+      PATH: `${mockBin}:${dirname(state.launcher)}:${process.env.PATH}`,
+      CARGO_HOME: dirname(dirname(state.launcher)),
+      EPR_BIN_TOOLS: registrySource,
+      CARGO_NET_OFFLINE: 'true',
+      GIT_CEILING_DIRECTORIES: '/tmp',
+    });
+    // Use the projected hook bytes with the fixture checkout as its root.
+    mkdirSync(join(state.repo, '.claude/hooks'), { recursive: true });
+    copyFileSync(
+      join(repository, '.claude/hooks/device-arrive.sh'),
+      join(state.repo, '.claude/hooks/device-arrive.sh')
+    );
+    mkdirSync(join(state.repo, 'genesis/agentic'), { recursive: true });
+    writeFileSync(
+      join(state.repo, 'genesis/agentic/native-epr-bootstrap.mjs'),
+      `import ${JSON.stringify(join(repository, 'genesis/agentic/native-epr-bootstrap.mjs'))};\n`
+    );
+    git(state, [
+      'add',
+      '.claude/hooks/device-arrive.sh',
+      'genesis/agentic/native-epr-bootstrap.mjs',
+    ]);
+    commit(state, 'projected arrival hook');
+  }
+);
+
+When("the device's start hook queues a native bootstrap", function () {
+  const state = fixture(this);
+  const start = Date.now();
+  ok(state, ['sh', join(state.repo, '.claude/hooks/device-arrive.sh')], state.bootstrapEnv);
+  assert.ok(Date.now() - start < 3000, 'hook returns without waiting for a build');
+});
+
+Then(
+  'the detached bootstrap lands a bafkrei CID and replaces the legacy launcher',
+  { timeout: 30000 },
+  async function () {
+    const state = fixture(this);
+    const log = join(state.repo, 'genesis/local-dev/native-epr-bootstrap/bootstrap.log');
+    let body = '';
+    for (let n = 0; n < 100; n++) {
+      body = existsSync(log) ? readFileSync(log, 'utf8') : '';
+      if (body.includes('native evaluator ready:')) break;
+      if (body.includes('native evaluator bootstrap:')) assert.fail(body);
+      await delay(100);
+    }
+    assert.match(body, /native evaluator ready: bafkrei/, body);
+    assert.match(landedCid(state), /^bafkrei/);
+
+    assert.equal(
+      readFileSync(join(dirname(state.store), 'bin/bin-launch')).equals(
+        readFileSync(launcherSource)
+      ),
+      true
+    );
+  }
+);
+
+Then('the replacement launcher runs the landed native evaluator', function () {
+  const state = fixture(this);
+  assert.equal(versionThroughLauncher(state, state.bootstrapEnv ?? {}).cid, landedCid(state));
+});
+
+When('that pinned session starts the peer daemon', { timeout: 30000 }, async function () {
+  const state = fixture(this);
+  assert.ok(state.sessionEnv);
+  appendFileSync(join(state.repo, '.git/info/exclude'), '\n.eprfs/\n');
+  state.daemonEnv = {
+    ...state.sessionEnv,
+    EPR_PROC_ROOT: '/proc',
+    EPR_BIN_TOOLS: registrySource,
+    ELOHIM_DEVICE_KEY_FILE: join(state.base, 'keys/seed'),
+    XDG_CONFIG_HOME: join(state.base, 'config'),
+    GIT_CEILING_DIRECTORIES: '/tmp',
+    EPR_PEER_RELAY_URL: '',
+    EPR_PIN_CID: state.cidA,
+  };
+  const native = (args: string[]) =>
+    ok(state, [storeCli, ...args, '--root', state.repo], state.daemonEnv);
+  native([
+    'actor',
+    'witness',
+    '--subject',
+    'human:matthew',
+    '--as',
+    'agent:fixture@a2o',
+    '--session',
+    'fixture',
+    '--basis',
+    'fixture operator present',
+  ]);
+  const id = ok(state, [storeCli, 'peer', 'id'], state.daemonEnv).stdout.trim();
+  native(['actor', 'device', 'endpoint', '--node-id', id]);
+  const peerPolicy = join(state.base, 'peer-policy.json');
+  writeFileSync(peerPolicy, JSON.stringify({ berth: { channel: { crosses: {} } } }));
+  state.daemon = spawn(
+    state.launcher,
+    ['peer', 'serve', '--root', state.repo, '--listen', '127.0.0.1:0', '--policy', peerPolicy],
+    {
+      cwd: state.repo,
+      env: state.daemonEnv,
+      stdio: ['ignore', 'ignore', 'pipe'],
+    }
+  );
+  let errors = '';
+  state.daemon.stderr?.on('data', bytes => {
+    errors += String(bytes);
+  });
+  for (let n = 0; n < 100; n++) {
+    assert.equal(state.daemon.exitCode, null, errors);
+    const leases = readdirSync(join(state.store, 'sessions')).filter(name =>
+      name.startsWith('daemon-')
+    );
+    if (
+      leases.some(
+        name =>
+          object(JSON.parse(readFileSync(join(state.store, 'sessions', name), 'utf8')))
+            .runningCid === state.cidB
+      )
+    )
+      return;
+    await delay(100);
+  }
+  assert.fail('daemon did not record its running CID: ' + errors);
+});
+
+Then("the daemon's live lease names build B's running CID", function () {
+  const state = fixture(this);
+  const leases = readdirSync(join(state.store, 'sessions')).filter(name =>
+    name.startsWith('daemon-')
+  );
+  const lease = object(JSON.parse(readFileSync(join(state.store, 'sessions', leases[0]), 'utf8')));
+  assert.equal(lease.cid, state.cidB);
+  assert.equal(lease.runningCid, state.cidB);
+  assert.equal(lease.ownerPid, state.daemon?.pid);
+  const status = object(
+    JSON.parse(
+      ok(state, [state.launcher, 'peer', 'status', '--root', state.repo, '--json'], {
+        ...state.daemonEnv,
+        EPR_PIN_CID: '',
+      }).stdout
+    )
+  );
+  assert.equal(status.cliCid, state.cidA);
+  assert.deepEqual(status.daemonCids, [state.cidB]);
+  assert.equal(status.daemonDiffers, true);
+});
+
+When('the device no longer retains build B as a head or a recent build', function () {
+  const state = fixture(this);
+  // Make B rely solely on its live lease: no head, previous head, or grace-period retention.
+  git(state, ['checkout', '-q', '--detach', state.commitA]);
+  assert.ok(state.cidA);
+  const reverted = land(state, state.cidA, state.commitA, true);
+  assert.equal(reverted.status, 0, reverted.stderr);
+  rmSync(join(state.store, 'previous'), { force: true });
+  for (const cid of [state.cidA, state.cidB]) {
+    assert.ok(cid);
+    const path = join(state.store, cid, 'record.json');
+    const record = object(JSON.parse(readFileSync(path, 'utf8')));
+    record.ingestedAt = '2000-01-01T00:00:00Z';
+    writeFileSync(path, JSON.stringify(record));
+    rmSync(join(state.store, cid, '.used'), { force: true });
+  }
+});
+
+When('garbage collection runs while the peer daemon lives', function () {
+  const state = fixture(this);
+  state.last = storeOk(state, ['gc'], { EPR_PROC_ROOT: '/proc' });
+});
+
+Then('build B remains available for its running daemon', function () {
+  const state = fixture(this);
+  const result = object(JSON.parse(state.last?.stdout ?? '{}'));
+  assert.ok(Array.isArray(result.kept));
+  assert.ok(result.kept.includes(state.cidB));
+  assert.ok(existsSync(join(state.store, String(state.cidB), 'epr')));
 });

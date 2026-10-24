@@ -3042,3 +3042,29 @@ decisionPoints:
   - path: elohim/eprfs/device-runtime/src/bin_store/tests.rs
     testName: missing_launcher_does_not_hide_shadows_and_only_build_links_are_repairable
     kind: unit
+- name: running-daemon-cid
+  kind: state-transition
+  sourceLocation:
+    file: src/bin_store/launch.rs
+    modulePath: elohim_device_runtime::bin_store::Store::record_running_daemon
+  summary: Observe current_exe bytes in the existing daemon lease. Live PID/start-time owns retention;
+    head and session pins do not describe a daemon.
+  concernIds:
+  - id: C0
+    status: answered
+    justification: Ephemeral C observation in the existing private lease; no HeadTable or DHT addition.
+  - id: C3
+    status: answered
+    justification: PID reuse ends liveness; gc releases bytes after death and normal grace.
+  - id: C5
+    status: answered
+    justification: The launcher verifies current at the exec floor; the daemon hashes its own executable
+      rather than trusting the caller pin.
+  - id: C10
+    status: answered
+    justification: Older leases omit runningCid; readers use their launch CID until the next restart writes
+      an observed CID.
+  contractTests:
+  - path: elohim/eprfs/device-runtime/src/bin_store/tests.rs
+    testName: running_daemon_identity_and_gc_follow_live_process_not_session_or_head
+    kind: unit

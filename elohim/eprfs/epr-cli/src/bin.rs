@@ -202,3 +202,19 @@ pub(crate) fn execute(args: &[String]) -> Result<String, Refusal> {
     };
     serde_json::to_string(&value).map_err(|e| argument(e.to_string()))
 }
+
+/// Open the epr custody store shared by daemon and device status.
+pub(crate) fn daemon_store(
+) -> Result<elohim_device_runtime::bin_store::Store, elohim_device_runtime::bin_store::Refusal> {
+    elohim_device_runtime::bin_store::Store::from_environment(
+        "epr",
+        &elohim_device_runtime::bin_store::Registry::discover()?,
+    )
+}
+
+/// Process table used to observe daemon owner lifetimes.
+pub(crate) fn daemon_proc_root() -> PathBuf {
+    std::env::var_os("EPR_PROC_ROOT")
+        .map(PathBuf::from)
+        .unwrap_or_else(|| PathBuf::from("/proc"))
+}

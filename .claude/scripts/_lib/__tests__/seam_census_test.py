@@ -520,4 +520,16 @@ check("LIVE: the last-resort fallback never CONTRADICTS the schema — it may la
       sc._VOCAB_FALLBACK["kind"] <= set(_dp["kind"]["enum"])
       and sc._VOCAB_FALLBACK["test_kind"] <= set(_ct["kind"]["enum"]))
 
+
+# Node receipt decisions use named callbacks so the same symbol-based citation discipline applies.
+with tempfile.TemporaryDirectory() as td:
+    root = _with_schema(Path(td))
+    _w(root / "gate.test.mjs", "test('receipt behavior', function receipt_contract() { return true; });")
+    point = {"name": "matchingReceipt", "contractTests": [{"path": "gate.test.mjs", "testName": "receipt_contract", "kind": "unit"}]}
+    verified, findings = sc._check_contract_tests(root, "gate-runner", point)
+    check("Node named test callback resolves", verified and not findings)
+    point["contractTests"][0]["testName"] = "missing_contract"
+    verified, findings = sc._check_contract_tests(root, "gate-runner", point)
+    check("Node phantom callback refuses", not verified and any("missing-contract-test" in str(f) for f in findings))
+
 print(f"\n  {_passed} assertions passed ✅")

@@ -26,6 +26,11 @@ Feature: Matthew's workspace follows its landed epr head
   `EPR_PIN_CID` is different: it is a deliberate explicit pin for one launch inside the same
   session. It creates no session and moves neither that session's pin nor the device head.
 
+  Older devices may still use a Python launcher and addresses beginning with sha256:.
+  Their installed epr has no bin command for managing the native store. Arrival queues a
+  background build, then the new native commands migrate the store and install its launcher.
+  Native single-binary CIDs begin with bafkrei; Matthew can then run the landed evaluator.
+
   Background:
     Given Matthew's workspace has an isolated empty epr store, launcher, and source history
 
@@ -76,3 +81,20 @@ Feature: Matthew's workspace follows its landed epr head
     Then the landing is refused as "non-descendant"
     When Matthew promotes the stored build A as head with --revert
     Then the revert succeeds and build A is the landed epr head again
+
+  Scenario: A device on a pre-native epr arrives on the native store
+    Given Matthew's device has a legacy sha256 store and a launcher without the bin verb
+    When the device's start hook queues a native bootstrap
+    Then the detached bootstrap lands a bafkrei CID and replaces the legacy launcher
+    And the replacement launcher runs the landed native evaluator
+
+  Scenario: A daemon follows the device head, not the session that started it
+    Given clean build A is the landed epr head
+    And Matthew's open session has run epr through the launcher
+    And clean build B lands from the next source commit
+    When that pinned session starts the peer daemon
+    Then the daemon's live lease names build B's running CID
+    When the device no longer retains build B as a head or a recent build
+    And garbage collection runs while the peer daemon lives
+    Then build B remains available for its running daemon
+    And the open session still runs build A's CID

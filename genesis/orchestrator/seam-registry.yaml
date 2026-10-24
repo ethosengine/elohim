@@ -1,0 +1,227 @@
+seamRegistryVersion: 1
+crate: gate-runner
+crateRoot: genesis/orchestrator
+seamLocus: Local gate evidence reused by identity, read and written through the native flow API.
+decisionPoints:
+- name: receiptKey
+  kind: pure-decision-predicate
+  sourceLocation:
+    file: gate-runner.mjs
+    modulePath: receiptKey
+  summary: Refuse dirty or non-checked-out trees; compute the project tree hash, resolved toolchain and
+    raw manifest CID.
+  concernIds:
+  - id: C0
+    status: answered
+    justification: Local private B evidence in existing flow notes; clean source-tree identity is not
+      a release head or a DHT fact. No network head cost.
+  - id: C1
+    status: answered
+    justification: Only success after running the opted-in project gate records a receipt; lookup alone
+      cannot mint success.
+  - id: C2
+    status: answered
+    justification: Exact tree/toolchain/manifest equality decides reuse. No timestamp ranks receipts or
+      advances a head.
+  - id: C3
+    status: answered
+    justification: Absent or unusable evidence runs the gate automatically; failed or dirty runs can never
+      suppress the next gate.
+  - id: C4
+    status: answered
+    justification: Missing, malformed or unavailable reads cannot attest. Dirty or changed trees produce
+      no receipt; the gate still runs.
+  - id: C5
+    status: answered
+    justification: The receiver reconstructs all three key fields and requires native observation slots,
+      value 1 and an unambiguous match.
+  - id: C6a
+    status: answered
+    justification: Git and epr reads have ten-second deadlines; ledger output is capped at four MiB. Overflow
+      falls back to execution.
+  - id: C6b
+    status: answered
+    justification: The existing flow note writer content-addresses and deduplicates identical observations.
+  - id: C7
+    status: n-a
+    justification: No peer advertisement, network inventory or server capability is introduced.
+  - id: C8
+    status: partial
+    justification: Console names an accepted receipt CID or why no receipt was written; no new typed decision
+      counter is introduced in this local runner.
+  - id: C9
+    status: n-a
+    justification: This local reuse key identifies build inputs, not human or device identity. Attribution
+      remains in the native flow writer.
+  - id: C10
+    status: answered
+    justification: Older ledger readers lacking extra slots and malformed observation slots cannot authorize
+      reuse.
+  - id: C11
+    status: answered
+    justification: A bounded ledger read that cannot complete reruns the gate; it never queues indefinite
+      evidence requests.
+  - id: C12
+    status: n-a
+    justification: User-authorized local validation only; no remote grant, role assignment or publication
+      occurs.
+  - id: C13
+    status: n-a
+    justification: No social-tier authority gate. This opt-in local optimization does not replace a remote
+      attestation.
+  - id: C14
+    status: partial
+    justification: Unexpected read errors fall back to normal gate execution. Console records unavailable
+      writes; no cross-device diagnostic capsule is created.
+  contractTests:
+  - path: genesis/orchestrator/gate-runner.test.mjs
+    testName: receipt_key_uses_clean_project_tree
+    kind: integration
+- name: matchingReceipt
+  kind: pure-decision-predicate
+  sourceLocation:
+    file: gate-runner.mjs
+    modulePath: matchingReceipt
+  summary: Accept exactly one successful native observation with every key component equal; otherwise
+    rerun.
+  concernIds:
+  - id: C0
+    status: answered
+    justification: Local private B evidence in existing flow notes; clean source-tree identity is not
+      a release head or a DHT fact. No network head cost.
+  - id: C1
+    status: answered
+    justification: Only success after running the opted-in project gate records a receipt; lookup alone
+      cannot mint success.
+  - id: C2
+    status: answered
+    justification: Exact tree/toolchain/manifest equality decides reuse. No timestamp ranks receipts or
+      advances a head.
+  - id: C3
+    status: answered
+    justification: Absent or unusable evidence runs the gate automatically; failed or dirty runs can never
+      suppress the next gate.
+  - id: C4
+    status: answered
+    justification: Missing, malformed or unavailable reads cannot attest. Dirty or changed trees produce
+      no receipt; the gate still runs.
+  - id: C5
+    status: answered
+    justification: The receiver reconstructs all three key fields and requires native observation slots,
+      value 1 and an unambiguous match.
+  - id: C6a
+    status: answered
+    justification: Git and epr reads have ten-second deadlines; ledger output is capped at four MiB. Overflow
+      falls back to execution.
+  - id: C6b
+    status: answered
+    justification: The existing flow note writer content-addresses and deduplicates identical observations.
+  - id: C7
+    status: n-a
+    justification: No peer advertisement, network inventory or server capability is introduced.
+  - id: C8
+    status: partial
+    justification: Console names an accepted receipt CID or why no receipt was written; no new typed decision
+      counter is introduced in this local runner.
+  - id: C9
+    status: n-a
+    justification: This local reuse key identifies build inputs, not human or device identity. Attribution
+      remains in the native flow writer.
+  - id: C10
+    status: answered
+    justification: Older ledger readers lacking extra slots and malformed observation slots cannot authorize
+      reuse.
+  - id: C11
+    status: answered
+    justification: A bounded ledger read that cannot complete reruns the gate; it never queues indefinite
+      evidence requests.
+  - id: C12
+    status: n-a
+    justification: User-authorized local validation only; no remote grant, role assignment or publication
+      occurs.
+  - id: C13
+    status: n-a
+    justification: No social-tier authority gate. This opt-in local optimization does not replace a remote
+      attestation.
+  - id: C14
+    status: partial
+    justification: Unexpected read errors fall back to normal gate execution. Console records unavailable
+      writes; no cross-device diagnostic capsule is created.
+  contractTests:
+  - path: genesis/orchestrator/gate-runner.test.mjs
+    testName: receipt_requires_exact_successful_native_slots
+    kind: integration
+- name: writeReceipt
+  kind: pure-decision-predicate
+  sourceLocation:
+    file: gate-runner.mjs
+    modulePath: writeReceipt
+  summary: Record a success only if the finishing clean key equals the starting key; notes remain owned
+    by epr.
+  concernIds:
+  - id: C0
+    status: answered
+    justification: Local private B evidence in existing flow notes; clean source-tree identity is not
+      a release head or a DHT fact. No network head cost.
+  - id: C1
+    status: answered
+    justification: Only success after running the opted-in project gate records a receipt; lookup alone
+      cannot mint success.
+  - id: C2
+    status: answered
+    justification: Exact tree/toolchain/manifest equality decides reuse. No timestamp ranks receipts or
+      advances a head.
+  - id: C3
+    status: answered
+    justification: Absent or unusable evidence runs the gate automatically; failed or dirty runs can never
+      suppress the next gate.
+  - id: C4
+    status: answered
+    justification: Missing, malformed or unavailable reads cannot attest. Dirty or changed trees produce
+      no receipt; the gate still runs.
+  - id: C5
+    status: answered
+    justification: The receiver reconstructs all three key fields and requires native observation slots,
+      value 1 and an unambiguous match.
+  - id: C6a
+    status: answered
+    justification: Git and epr reads have ten-second deadlines; ledger output is capped at four MiB. Overflow
+      falls back to execution.
+  - id: C6b
+    status: answered
+    justification: The existing flow note writer content-addresses and deduplicates identical observations.
+  - id: C7
+    status: n-a
+    justification: No peer advertisement, network inventory or server capability is introduced.
+  - id: C8
+    status: partial
+    justification: Console names an accepted receipt CID or why no receipt was written; no new typed decision
+      counter is introduced in this local runner.
+  - id: C9
+    status: n-a
+    justification: This local reuse key identifies build inputs, not human or device identity. Attribution
+      remains in the native flow writer.
+  - id: C10
+    status: answered
+    justification: Older ledger readers lacking extra slots and malformed observation slots cannot authorize
+      reuse.
+  - id: C11
+    status: answered
+    justification: A bounded ledger read that cannot complete reruns the gate; it never queues indefinite
+      evidence requests.
+  - id: C12
+    status: n-a
+    justification: User-authorized local validation only; no remote grant, role assignment or publication
+      occurs.
+  - id: C13
+    status: n-a
+    justification: No social-tier authority gate. This opt-in local optimization does not replace a remote
+      attestation.
+  - id: C14
+    status: partial
+    justification: Unexpected read errors fall back to normal gate execution. Console records unavailable
+      writes; no cross-device diagnostic capsule is created.
+  contractTests:
+  - path: genesis/orchestrator/gate-runner.test.mjs
+    testName: receipt_refuses_changed_finishing_tree
+    kind: integration

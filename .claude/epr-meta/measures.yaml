@@ -362,6 +362,16 @@ measures:
     status: active
     established_by: memory-kit-replacement-station-1-2026-09-10
 
+  - id: gate-receipt
+    version: 1
+    family: dev-cycle
+    unit: passes
+    procedure: "gate-runner records a successful clean project tree, resolved RUSTUP_TOOLCHAIN and raw manifest CID via flow note; pre-push reads flow ledger and reuses only an exact match. Dirty, unavailable or mismatched evidence reruns the gate."
+    provenance: "Device runtime A.4: local gate proof survives the pre-push boundary."
+    default-authority: observation
+    status: active
+    established_by: operator-requested-2026-10-24
+
   - id: gate-cycle-seconds
     version: 1
     family: dev-cycle

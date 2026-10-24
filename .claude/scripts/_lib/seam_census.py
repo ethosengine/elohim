@@ -342,8 +342,8 @@ def _manual_decision_point(item) -> list[str]:
     if item.get("kind") not in _kinds:
         errs.append(f"`kind` must be one of {sorted(_kinds)}")
     sl = item.get("sourceLocation")
-    if not isinstance(sl, dict) or not isinstance(sl.get("file"), str) or not sl.get("file", "").endswith(".rs"):
-        errs.append("`sourceLocation.file` must be a string ending in .rs")
+    if not isinstance(sl, dict) or not isinstance(sl.get("file"), str) or not sl.get("file", "").endswith((".rs", ".mjs")):
+        errs.append("`sourceLocation.file` must be a string ending in .rs or .mjs")
     cids = item.get("concernIds")
     if not isinstance(cids, list) or not cids:
         errs.append("`concernIds` must be a non-empty array")
@@ -377,7 +377,7 @@ def _manual_decision_point(item) -> list[str]:
                 # The schema constrains `path` too; the fallback used not to, so a non-Rust
                 # citation passed here and then failed the census's fn-resolution with a far
                 # less legible message.
-                errs.append(f"contractTests[{j}].path `{ct['path']}` must be a repo-relative .rs file")
+                errs.append(f"contractTests[{j}].path `{ct['path']}` must be a repo-relative .rs or .mjs file")
     else:
         errs.append("`contractTests` must be an array or null")
     return errs
@@ -629,7 +629,8 @@ def _check_contract_tests(repo_root: Path, crate: str, point: dict) -> tuple[boo
             findings.append(_finding("error", "missing-contract-test", crate, name,
                                       f"cited test file unreadable: {path_s} ({e})"))
             continue
-        if not re.search(rf"\bfn\s+{re.escape(test_name)}\s*\(", text):
+        declaration = "function" if f.suffix == ".mjs" else "fn"
+        if not re.search(rf"\b{declaration}\s+{re.escape(test_name)}\s*\(", text):
             findings.append(_finding("error", "missing-contract-test", crate, name,
                                       f"test `{test_name}` not found in {path_s} "
                                       f"(citation to a nonexistent test)"))

@@ -1543,3 +1543,21 @@ decisionPoints:
       - path: elohim/eprfs/epr-cli/tests/device_arrival.rs
         testName: declared_trust_cures_ownership_for_exact_checkout_only
         kind: integration
+
+  - name: device::status::peer_daemon
+    kind: verdict-fn
+    sourceLocation:
+      file: src/device/arrival.rs
+      modulePath: elohim_epr_cli::device::arrival::peer_daemon_check
+    summary: Compare live daemon lease identities with current; a mismatch degrades with a restart cure.
+    concernIds:
+      - id: C0
+        status: answered
+        justification: Ephemeral device observation, never a HeadTable entry or a network head.
+      - id: C4
+        status: answered
+        justification: Store access errors are Unknown; no live lease is healthy absence.
+    contractTests:
+      - path: elohim/eprfs/epr-cli/tests/device_arrival.rs
+        testName: peer_daemon_status_compares_live_lease_with_current
+        kind: integration

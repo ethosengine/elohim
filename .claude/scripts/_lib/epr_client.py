@@ -51,8 +51,11 @@ def resolve(env: dict[str, str] | None = None) -> tuple[str | None, str | None]:
         result = subprocess.run(
             [environment.get("EPR_BIN") or "epr", "bin", "status", "--tool", "epr", "--json"],
             env=dict(environment), capture_output=True, text=True, timeout=_TIMEOUT_SECONDS,
-            check=True,
+            check=False,
         )
+        if result.returncode != 0:
+            bootstrap(environment)
+            return None, None
         status = json.loads(result.stdout)
         path, cid = status.get("resolved"), status.get("resolvedCid")
         if isinstance(path, str) and isinstance(cid, str) and cid.startswith("bafkrei"):
@@ -60,6 +63,21 @@ def resolve(env: dict[str, str] | None = None) -> tuple[str | None, str | None]:
         return None, None
     except Exception:  # noqa: BLE001 — resolution is best-effort; absence is a valid answer
         return None, None
+
+
+def bootstrap(environment: dict[str, str]) -> None:
+    """Queue the shared pre-native worker without retaining the evaluator's pipes."""
+    global DEGRADED_NOTICE
+    DEGRADED_NOTICE = (
+        "[.epr-meta] native evaluator bootstrapping — the Python evaluator answers alone "
+        "until the native store is ready; the cross-host check did not run."
+    )
+    root = Path(__file__).resolve().parents[3]
+    subprocess.Popen(
+        ["node", str(root / "genesis/agentic/native-epr-bootstrap.mjs"), str(root)],
+        env=dict(environment), stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL,
+        stderr=subprocess.DEVNULL, start_new_session=True,
+    )
 
 
 def resolve_binary(env: dict[str, str] | None = None) -> str | None:

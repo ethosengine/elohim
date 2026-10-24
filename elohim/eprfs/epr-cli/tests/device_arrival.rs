@@ -108,7 +108,8 @@ fn status_keeps_dependency_order_and_does_not_mint_a_key() {
             "embed model",
             "fold attested",
             "berth moored",
-            "repository trusted"
+            "repository trusted",
+            "peer daemon"
         ]
     );
     assert_eq!(checks[2]["state"], "refused");
@@ -136,4 +137,42 @@ fn detached_arrival_closes_parent_pipes_and_returns_summary() {
     assert!(start.elapsed() < std::time::Duration::from_secs(10));
     assert!(String::from_utf8_lossy(&result.stdout).contains("repository trusted:"));
     // Only skipped fixture tools exist: no cargo process or live tool installation can start.
+}
+
+#[test]
+fn peer_daemon_status_compares_live_lease_with_current() {
+    use std::os::unix::{fs::symlink, fs::PermissionsExt};
+    let temp = fixture();
+    let base = temp.path();
+    let store = base.join("store/epr");
+    let current = eprfs_core::BlobCid::compute_raw(b"current").to_string();
+    let older = eprfs_core::BlobCid::compute_raw(b"older").to_string();
+    fs::create_dir_all(store.join(&current)).unwrap();
+    fs::create_dir_all(store.join("sessions")).unwrap();
+    let executable = store.join(&current).join("epr");
+    fs::write(&executable, "fixture").unwrap();
+    fs::set_permissions(&executable, fs::Permissions::from_mode(0o755)).unwrap();
+    symlink(&current, store.join("current")).unwrap();
+    let pid = std::process::id();
+    let start =
+        elohim_device_runtime::session::process_start_time(Path::new("/proc"), pid).unwrap();
+    let lease = store.join("sessions/daemon-fixture");
+    let write = |cid: &str, start: u64| {
+        fs::write(
+            &lease,
+            json!({"cid":cid,"runningCid":cid,"session":"daemon-fixture",
+            "pinnedAt":"2026-10-24T00:00:00Z","ownerPid":pid,"ownerStartTime":start.to_string()})
+            .to_string(),
+        )
+        .unwrap();
+    };
+    write(&older, start);
+    let (_, rows) = checks(base);
+    let peer = rows.iter().find(|r| r["name"] == "peer daemon").unwrap();
+    assert_eq!(peer["state"], "degraded");
+    assert!(peer["cure"].as_str().unwrap().contains("restart"));
+    write(&current, start);
+    assert_eq!(checks(base).1.last().unwrap()["state"], "ok");
+    write(&older, start + 1);
+    assert_eq!(checks(base).1.last().unwrap()["state"], "ok");
 }

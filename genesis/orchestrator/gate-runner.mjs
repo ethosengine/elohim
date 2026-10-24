@@ -14,6 +14,7 @@ import { recordCycle } from './gate-cycle.mjs';
 import { gateEvidence, recordEvidence } from './gate-evidence.mjs';
 import { rakiaAffected, resolveRakiaBin } from './gate-oracle.mjs';
 import { runAttested } from './gate-attest.mjs';
+import { rawCid } from './scripts/brit-attest.mjs';
 
 // GATE_ROOT lets a fixture repository drive the CLI (the a2o pin-attestation story).
 const ROOT = process.env.GATE_ROOT
@@ -161,6 +162,63 @@ function gitDirs(root) {
   return gitDir && commonDir ? { gitDir, commonDir } : null;
 }
 
+// These notes are local evidence, not a grant or a release head. Only opted-in gates use them.
+// All failures (including an old epr without the ledger slots) mean run the gate again.
+export function receiptKey(project, { root = ROOT, env = process.env, run = spawnSync } = {}) {
+  const cargo = cargoEnvOf(gateChildEnv(project, env, root));
+  if (cargo.EPR_GATE_RECEIPT !== '1' || !cargo.RUSTUP_TOOLCHAIN) return null;
+  const git = args => {
+    const result = run('git', args, { cwd: root, env, encoding: 'utf8', timeout: 10000 });
+    if (result.status !== 0) throw new Error('receipt git read failed');
+    return result.stdout;
+  };
+  try {
+    // Include untracked files. Never certify an in-progress tree or a different checked-out tree.
+    if (git(['status', '--porcelain', '--untracked-files=all', '--', project.dir]).trim()) return null;
+    const commit = env.GATE_COMMIT || 'HEAD';
+    const tree = git(['rev-parse', `${commit}:${project.dir}`]).trim();
+    if (tree !== git(['rev-parse', `HEAD:${project.dir}`]).trim()) return null;
+    const manifest = `${project.dir}/build-manifest.json`;
+    const bytes = git(['show', `${commit}:${manifest}`]);
+    if (bytes !== readFileSync(resolve(root, manifest), 'utf8')) return null;
+    return { tree, toolchain: cargo.RUSTUP_TOOLCHAIN, manifest: rawCid(Buffer.from(bytes)) };
+  } catch { return null; }
+}
+
+export function matchingReceipt(key, ledger) {
+  if (!key || !Array.isArray(ledger?.entries)) return null;
+  for (const entry of ledger.entries.toReversed()) {
+    if (entry.kind !== 'observation' || entry.via || !/^baf[a-z2-7]+$/.test(entry.cid)) continue;
+    const slots = entry.extra;
+    if (!Array.isArray(slots) || !slots.includes('measure:gate-receipt@1') || !slots.includes('value:1')) continue;
+    if (Object.entries(key).every(([name, value]) => slots.filter(s => s.startsWith(`env:${name}=`)).length === 1
+      && slots.includes(`env:${name}=${value}`))) return entry.cid;
+  }
+  return null;
+}
+
+export function findReceipt(project, key, { root = ROOT, env = process.env, run = spawnSync } = {}) {
+  if (!key) return null;
+  try {
+    const result = run(env.EPR_BIN || 'epr', ['flow', 'ledger', `${project.dir}/build-manifest.json`, '--json', '--root', root], {
+      cwd: root, env, encoding: 'utf8', timeout: 10000, maxBuffer: 4 * 1024 * 1024,
+    });
+    return result.status === 0 ? matchingReceipt(key, JSON.parse(result.stdout)) : null;
+  } catch { return null; }
+}
+
+export function writeReceipt(project, before, { root = ROOT, env = process.env, run = spawnSync } = {}) {
+  const after = receiptKey(project, { root, env, run });
+  if (!before || JSON.stringify(before) !== JSON.stringify(after)) return null;
+  const args = ['flow', 'note', '--kind', 'observation', '--measure', 'gate-receipt@1',
+    '--subject', `${project.dir}/build-manifest.json`, '--value', '1', '--unit', 'passes', '--json', '--root', root];
+  for (const [key, value] of Object.entries(before)) args.push('--env', `${key}=${value}`);
+  try {
+    const result = run(env.EPR_BIN || 'epr', args, { cwd: root, env, encoding: 'utf8', timeout: 10000 });
+    return result.status === 0 ? JSON.parse(result.stdout).record_cid : null;
+  } catch { return null; }
+}
+
 function runProject(project, printOnly, namesOnly) {
   const cargo = project.run.cargo || {};
   const args = [
@@ -211,6 +269,14 @@ function runProject(project, printOnly, namesOnly) {
     if (style.status !== 0) return style.status || 2;
   }
 
+  const receipt = receiptKey(project);
+  if (process.env.GATE_RUN_KIND === 'pre-push') {
+    const accepted = findReceipt(project, receipt);
+    if (accepted) {
+      process.stdout.write(`[gate] ${project.name} attested: receipt ${accepted}\n`);
+      return 0;
+    }
+  }
   process.stdout.write(`\n[gate] ${project.name} (${project.dir})\n`);
   const childEnv = gateChildEnv(project, process.env);
   // Evidence by input closure (gate-evidence.mjs): has THIS closure — the step's declared
@@ -234,6 +300,10 @@ function runProject(project, printOnly, namesOnly) {
   });
   const status = result.status ?? 1;
   const seconds = Number(process.hrtime.bigint() - started) / 1e9;
+  if (status === 0 && cargoEnvOf(childEnv).EPR_GATE_RECEIPT === '1') {
+    const cid = writeReceipt(project, receipt);
+    process.stdout.write(`[gate] ${project.name} receipt: ${cid || 'not written (dirty, changed, or evaluator unavailable)'}\n`);
+  }
   // The verdict is recorded against the closure — red too; a known-red closure is information.
   if (evidence.key && evidence.buildRefBin) {
     const put = recordEvidence(project, evidence.key, {

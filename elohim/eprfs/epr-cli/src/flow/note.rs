@@ -682,7 +682,10 @@ pub fn note_with_options_closing(
 /// The subject IS the target: a measurement is *of* something, so there is no second `--on`.
 /// `--kind` is accepted for symmetry with the prose arms but must be `observation`; a correction
 /// or a verdict carrying a magnitude would be a record whose kind and content disagree.
-#[allow(clippy::too_many_arguments)]
+#[allow(
+    clippy::too_many_arguments,
+    reason = "The CLI observation adapter accepts independent optional wire fields and delegates all validation to the native note writer"
+)]
 pub fn observe(
     root: &Path,
     kind: &str,

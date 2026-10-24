@@ -30,7 +30,7 @@
     "language": "shell",
     "interpreter": "sh",
     "path": ".claude/hooks/device-arrive.sh",
-    "body": "#!/bin/sh\n# Arrival is native and fail-open; the launcher supplies lazy bootstrap without a hook.\nepr device arrive || true\n"
+    "body": "#!/bin/sh\n# Pre-native launchers cannot call device arrive: queue the shared bootstrap first.\nroot=$(CDPATH= cd -- \"$(dirname -- \"$0\")/../..\" && pwd) || exit 0\nif \"${EPR_BIN:-epr}\" bin status --tool epr --json >/dev/null 2>&1; then\n  \"${EPR_BIN:-epr}\" device arrive || true\nelse\n  node \"$root/genesis/agentic/native-epr-bootstrap.mjs\" \"$root\" || true\nfi\n"
   },
   "registration": {
     "event": "SessionStart",
