@@ -85,31 +85,25 @@ Then(
   }
 );
 
-Then(
-  "the holder releases the lane after seeing the contender's refusal mooring",
-  function () {
-    const r = half(this).receipt;
-    if (r.role === 'holder') {
-      assert.ok(r.folds.some(f => f.phase === 'refusal-crossed'));
-      assert.ok(r.release && r.folds.some(f => f.phase === 'release-crossed'));
-    } else {
-      assert.ok(r.folds.some(f => f.phase === 'holder-released'));
-    }
+Then("the holder releases the lane after seeing the contender's refusal mooring", function () {
+  const r = half(this).receipt;
+  if (r.role === 'holder') {
+    assert.ok(r.folds.some(f => f.phase === 'refusal-crossed'));
+    assert.ok(r.release && r.folds.some(f => f.phase === 'release-crossed'));
+  } else {
+    assert.ok(r.folds.some(f => f.phase === 'holder-released'));
   }
-);
+});
 
-Then(
-  "the contender's fresh claim after that release exits 0 and is released",
-  function () {
-    const r = half(this).receipt;
-    if (r.role === 'contender') {
-      assert.equal(r.commands.find(c => c.phase === 'contender-post-release-claim')?.exitCode, 0);
-      assert.ok(r.release && r.folds.some(f => f.phase === 'release-crossed'));
-    } else {
-      assert.ok(r.folds.some(f => f.phase === 'contender-released'));
-    }
+Then("the contender's fresh claim after that release exits 0 and is released", function () {
+  const r = half(this).receipt;
+  if (r.role === 'contender') {
+    assert.equal(r.commands.find(c => c.phase === 'contender-post-release-claim')?.exitCode, 0);
+    assert.ok(r.release && r.folds.some(f => f.phase === 'release-crossed'));
+  } else {
+    assert.ok(r.folds.some(f => f.phase === 'contender-released'));
   }
-);
+});
 
 Then(
   "the berth status each half captured while the other's lease was held lists the other's moorings and leases, read from its own fold",
