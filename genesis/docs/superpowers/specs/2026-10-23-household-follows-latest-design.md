@@ -371,3 +371,48 @@ CID it ran. A bad build costs one failed health check and nothing else.
 - Whether slice 1's local flip lives in `epr` itself or in the gate step.
 - How the a2o scenario that proves the graduation trigger is phrased, and its `@concern:` tag,
   which joins `dataplane-convergence`'s `checks:`.
+
+## 10. The device runtime, slice A: the native core (design note, 2026-10-24)
+
+Slices 1 and 2a proved the local rung in Python. Slice A moves its primitives into `epr-cli` as
+library modules with thin CLI adapters, and deletes the copies other subsystems grew. It lands in
+four commits, each passing the device-runtime plan's clean-code gates on its own.
+
+**A.1 Session identity (`elohim_epr_cli::session`).** `session::resolve()` answers one value,
+`(runtime, session, owner pid + start time?, source)`, in a fixed order:
+
+1. a declared `ELOHIM_SESSION_ID`, with `ELOHIM_SESSION_OWNER_PID` as its optional owner;
+2. the nearest ancestor whose `comm` is listed in `genesis/agentic/agent-runtimes.json`, labelled
+   with that runtime's native session variable when it is set;
+3. the controlling terminal's session leader (pid + start time), which closes §5.5's
+   plain-terminal gap;
+4. `none`, which is an answer and exits 0.
+
+The registry, not the code, names runtimes. It starts with claude-code, codex, gemini and
+antigravity. `epr session id --json` renders the value under the `session-identity` view schema.
+Python and TypeScript reach it through one stdlib shim each (`.claude/scripts/_lib/session.py`,
+`genesis/a2o/src/framework/session.ts`). Each shim calls `epr session id --json` and falls back
+to its own re-implementation only when `epr` is absent; a parity test runs both against the same
+fixture `/proc`. Every resolver the census counts moves to a shim in the same commit, and its
+private copy is deleted. `genesis/agentic/bin/dup-census` lands here with the slice-A baseline.
+
+**A.2 Arrival (`epr device status`).** `device::status() -> Vec<Check>` has three states: `ok`;
+`degraded`, where an enhancement is missing and the line names its cure; and `REFUSED`, where the
+device cannot work. It exits 1 only on REFUSED. It absorbs `device-preflight`'s six lines, adds
+`repository trusted`, and reads cross-device facts as `unknown` when they are unreachable. The git
+layer takes one declared trust rule for the device's own checkout, which retires the per-call
+`safe.directory=*`.
+
+**A.3 The bin store (`elohim_epr_cli::bin_store`, `epr bin <verb>`, `bin-launch`).** A
+behaviour-for-behaviour port of `bin_store.py`, whose test cases become Rust tests. Release
+identity becomes CIDv1 (`bafkrei…` for one file, `bafyrei…` for a sums manifest), and
+`evaluator_identity()` changes with it. The bootstrap order is local-first: verified `current`,
+then any verified CID in the store, `epr bin ingest --closure`, `cargo build --offline`, a
+networked build, and finally a refusal naming every cure. `bin-launch` is a separate tiny binary.
+It does no hashing for session-pinned CLI tools; daemons keep the exec floor.
+
+**A.4 Receipts and carry-overs.** The gate-receipt leg, the daemon's running CID in its lease,
+and the fix for the pre-push renew-loop race.
+
+Slice A decides nothing that crosses devices (slice B), nothing about the manifest (slice M) and
+nothing about supervision (slice C).
