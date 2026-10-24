@@ -119,6 +119,16 @@ def check_epr(root: Path, env: dict[str, str]) -> tuple[Line, str | None]:
     if binary and Path(binary).is_file() and os.access(binary, os.X_OK):
         store_cli = env.get("EPR_STORE_BIN") or str(SCRIPT_REPO / "genesis/agentic/bin/epr-store")
         value, error = run_json([store_cli, "status", "--json"], root, env)
+        listed, _ = run_json([store_cli, "shadows"], root, env)
+        shadowing = (listed or {}).get("value") or []
+        if shadowing:
+            names = ", ".join(entry["path"] for entry in shadowing)
+            return Line(
+                "epr binary",
+                False,
+                f"PATH reaches {names} before the epr launcher",
+                "start a session (the SessionStart guard repoints stale build links) or remove it",
+            ), None
         if value is not None and value.get("resolved"):
             head = value.get("head") or "none"
             running = value.get("session_cid") or value.get("resolved_cid") or "candidate"

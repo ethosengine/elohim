@@ -59,9 +59,62 @@ def _write_if_changed(content: bytes, destination: Path, mode: int) -> None:
         temporary.unlink(missing_ok=True)
 
 
-def _install_link(launcher: Path) -> tuple[Path, str | None, bool]:
+def _cargo_bin_epr() -> Path:
     cargo_home = Path(os.environ.get("CARGO_HOME", Path.home() / ".cargo")).expanduser().resolve()
-    destination = cargo_home / "bin/epr"
+    return cargo_home / "bin/epr"
+
+
+def _adopt_clobber(cli: Path, repo: Path, destination: Path) -> str | None:
+    """A plain binary where the launcher belongs was written by a hand `cargo install`.
+
+    Keep it as a dev-context build (runnable by pinning its CID) before the launcher takes the
+    path back, so a hand-built epr is never lost — and say so. Returns the store path it now
+    lives at, which is what a failed install restores to.
+    """
+    if destination.is_symlink() or not destination.is_file():
+        return None
+    adopted = _run(cli, repo, "ingest", str(destination), "--source-commit", "unknown",
+                   "--tree-clean", "false", "--gate-run", "adopted-from-path")
+    if adopted.returncode != 0:
+        raise RuntimeError(f"{destination} is a plain binary the store refused: {_detail(adopted)}")
+    import json
+
+    record = json.loads(adopted.stdout)
+    store = Path(os.environ["EPR_STORE"])
+    _say(f"kept the binary at {destination} as dev-context {record['cid']} "
+         f"(run it with EPR_PIN_CID={record['cid']})")
+    return str(store / record["cid"] / "epr")
+
+
+def _repoint_shadows(cli: Path, repo: Path, launcher: Path) -> list[str]:
+    """Repoint stale links ahead of the launcher on PATH; report anything else by name."""
+    import json
+
+    listed = _run(cli, repo, "shadows")
+    if listed.returncode != 0:
+        return [f"shadow check failed: {_detail(listed)}"]
+    for shadow in json.loads(listed.stdout or "[]"):
+        path = Path(shadow["path"])
+        if not shadow["superseded"]:
+            continue
+        temporary = path.with_name(f".epr-launch.{os.getpid()}.{time.time_ns()}")
+        temporary.symlink_to(launcher)
+        try:
+            os.replace(temporary, path)
+        finally:
+            temporary.unlink(missing_ok=True)
+        _say(f"repointed stale {path} (was → {shadow['target']}) at the launcher")
+    # Re-list: a repointed link may now be the first `epr` on PATH, hiding what came after it.
+    relisted = _run(cli, repo, "shadows")
+    return [
+        f"{shadow['path']} (not a build-output link; remove it or move it after "
+        f"{_cargo_bin_epr().parent} on PATH)"
+        for shadow in json.loads(relisted.stdout or "[]")
+    ] if relisted.returncode == 0 else [f"shadow re-check failed: {_detail(relisted)}"]
+
+
+def _install_link(launcher: Path, adopted: str | None = None) -> tuple[Path, str | None, bool]:
+    destination = _cargo_bin_epr()
     destination.parent.mkdir(parents=True, exist_ok=True)
     try:
         if destination.is_symlink() and destination.resolve() == launcher.resolve():
@@ -71,7 +124,7 @@ def _install_link(launcher: Path) -> tuple[Path, str | None, bool]:
     try:
         previous_target = os.readlink(destination)
     except OSError:
-        previous_target = None
+        previous_target = adopted
     temporary = destination.with_name(f".epr-launch.{os.getpid()}.{time.time_ns()}")
     temporary.symlink_to(launcher)
     try:
@@ -138,12 +191,15 @@ def main() -> None:
         .encode()
     )
     _write_if_changed(rendered, launcher.resolve(), 0o755)
-    destination, previous_target, changed = _install_link(launcher.resolve())
+    adopted = _adopt_clobber(cli, repo, _cargo_bin_epr())
+    destination, previous_target, changed = _install_link(launcher.resolve(), adopted)
     healthy, detail = _installed_healthy(destination, store)
     if not healthy:
         _restore_link(destination, previous_target, changed)
         _say(f"⚠ installed launcher verification failed; previous link restored: {detail}")
         return
+    for remaining in _repoint_shadows(cli, repo, launcher.resolve()):
+        _say(f"⚠ an epr ahead of the launcher on PATH still shadows it: {remaining}")
 
     pinned = _run(cli, repo, "pin")
     if pinned.returncode == 0:

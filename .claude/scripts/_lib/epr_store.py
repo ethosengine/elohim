@@ -623,6 +623,41 @@ def _launcher_aliases(root: Path) -> set[str]:
     return {os.path.realpath(candidate) for candidate in candidates}
 
 
+# Build outputs the launcher supersedes: a PATH link into one of these is drift, never a choice.
+_SUPERSEDED_ROOTS = ("/projects/.cargo-target-pool/", "/tmp/eprfs-gate-target")
+
+
+def shadows(*, root: Path | None = None, path_env: str | None = None) -> list[dict[str, Any]]:
+    """Every ``epr`` on PATH that a caller would reach before the launcher.
+
+    The launcher only works if it is the one PATH answers with: a stale link ahead of it (a
+    ``~/.local/bin/epr`` into an old pool build) silently brings back every drift it retires.
+    ``superseded`` marks a link into a build output, safe to repoint; anything else is a
+    binary someone put there, which is reported and never touched.
+    """
+    root = _root(root)
+    aliases = _launcher_aliases(root)
+    found: list[dict[str, Any]] = []
+    for directory in (path_env if path_env is not None else os.environ.get("PATH", "")).split(":"):
+        if not directory:
+            continue
+        candidate = Path(directory) / "epr"
+        if not (candidate.is_symlink() or candidate.exists()):
+            continue
+        if os.path.realpath(candidate) in aliases:
+            return found
+        target = os.readlink(candidate) if candidate.is_symlink() else None
+        dangling = target is not None and not candidate.exists()
+        superseded = target is not None and (
+            dangling or os.path.realpath(candidate).startswith(_SUPERSEDED_ROOTS)
+            or os.path.realpath(candidate).startswith(str(root) + "/")
+        )
+        found.append({"path": str(candidate), "target": target, "superseded": superseded})
+    # No launcher on PATH at all: nothing is shadowed — whatever PATH reaches simply runs, and
+    # `status` already says whether a head exists. Shadowing needs a launcher behind it.
+    return []
+
+
 def _candidate_override(root: Path, value: str) -> tuple[Path, str, str]:
     candidate = Path(value).expanduser()
     if not candidate.is_file() or not os.access(candidate, os.X_OK):
@@ -946,6 +981,7 @@ def parser() -> argparse.ArgumentParser:
     status_parser.add_argument("--commit")
     status_parser.add_argument("--pin", action="store_true")
     verbs.add_parser("gc")
+    verbs.add_parser("shadows")
     source_parser = verbs.add_parser("source-state")
     source_parser.add_argument("--repo", type=Path)
     bootstrap_parser = verbs.add_parser("bootstrap")
@@ -1001,6 +1037,8 @@ def main(argv: list[str] | None = None) -> int:
             print(json.dumps(value, sort_keys=True) if args.json else _status_text(value))
         elif args.verb == "gc":
             print(json.dumps(gc(root=root), sort_keys=True))
+        elif args.verb == "shadows":
+            print(json.dumps(shadows(root=root), sort_keys=True))
         elif args.verb == "source-state":
             checkout = repo_root(args.repo)
             head, clean = git_state(checkout)

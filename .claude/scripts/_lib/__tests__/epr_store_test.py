@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import datetime as dt
+import hashlib
 import importlib.util
 import json
 import os
@@ -765,3 +766,59 @@ def test_cleanliness_is_judged_over_epr_sources_not_hook_ledgers(
 
 def test_source_paths_fall_back_to_the_whole_tree_without_a_cargo_answer(tmp_path: Path) -> None:
     assert epr_store.source_paths(tmp_path) == ["."]
+
+
+def test_shadows_lists_every_epr_reached_before_the_launcher(
+    scratch: tuple[Path, Path, str], tmp_path: Path
+) -> None:
+    store, _, _ = scratch
+    store.mkdir(parents=True, exist_ok=True)
+    launcher = store.parent / "bin/epr-launch"
+    launcher.parent.mkdir(parents=True, exist_ok=True)
+    launcher.write_text("#!/bin/sh\n", encoding="utf-8")
+    stale, foreign, ours = tmp_path / "stale", tmp_path / "foreign", tmp_path / "ours"
+    for directory in (stale, foreign, ours):
+        directory.mkdir()
+    (stale / "epr").symlink_to(tmp_path / "gone/debug/epr")
+    fake_epr(foreign / "epr", "foreign")
+    (ours / "epr").symlink_to(launcher)
+    after = tmp_path / "after"
+    after.mkdir()
+    fake_epr(after / "epr", "after-the-launcher")
+
+    found = epr_store.shadows(root=store, path_env=f"{stale}:{foreign}:{ours}:{after}")
+
+    assert [(Path(entry["path"]).parent.name, entry["superseded"]) for entry in found] == [
+        ("stale", True), ("foreign", False),
+    ]
+
+
+def test_guard_keeps_a_hand_installed_binary_and_repoints_stale_shadows(
+    scratch: tuple[Path, Path, str], tmp_path: Path
+) -> None:
+    store, repo, head = scratch
+    record = ingest(store, repo, head, fake_epr(tmp_path / "candidate", "head"))
+    epr_store._atomic_link(store, "current", record["cid"])
+    cargo_bin = tmp_path / "cargo-home/bin"
+    cargo_bin.mkdir(parents=True)
+    hand_built = fake_epr(cargo_bin / "epr", "hand-built-by-cargo-install")
+    hand_cid = "sha256:" + hashlib.sha256(hand_built.read_bytes()).hexdigest()
+    stale = tmp_path / "local-bin"
+    stale.mkdir()
+    (stale / "epr").symlink_to(tmp_path / "old-pool/debug/epr")
+
+    result = subprocess.run(
+        [sys.executable, str(GUARD)], input="{}",
+        env=clean_env(EPR_STORE=str(store), CARGO_HOME=str(tmp_path / "cargo-home"),
+                      PATH=f"{stale}:{cargo_bin}:/usr/bin:/bin"),
+        capture_output=True, text=True, check=False,
+    )
+
+    assert result.returncode == 0, result.stderr
+    launcher = (store.parent / "bin/epr-launch").resolve()
+    assert (cargo_bin / "epr").resolve() == launcher
+    assert (stale / "epr").resolve() == launcher
+    kept = json.loads((store / hand_cid / "record.json").read_text(encoding="utf-8"))
+    assert kept["gate_run"] == "adopted-from-path" and kept["tree_clean"] is False
+    assert f"EPR_PIN_CID={hand_cid}" in result.stdout
+    assert "still shadows" not in result.stdout
