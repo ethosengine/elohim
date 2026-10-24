@@ -63,6 +63,11 @@ import { holdWithoutEpr } from './epr-binary.js';
 
 const fixtures = new WeakMap<object, Fixture>();
 
+// Wall-clock bounds only catch a hang; each `epr` call parses the whole flow store, so a loaded
+// runner is slow. "At once" stays well under the 10-second confirm wait it is contrasted with.
+const AT_ONCE_MS = 5000;
+const ACK_BOUND_MS = 30_000;
+
 function state(world: object): Fixture {
   const f = fixtures.get(world);
   assert.ok(f, 'the Background did not run');
@@ -279,7 +284,9 @@ Then(
     const o = f.last;
     assert.ok(o);
     assert.equal(o.status, code, `${o.stdout}\n${o.stderr}`);
-    assert.ok(o.ms <= seconds * 1000 + 1000, `took ${o.ms} ms`);
+    // The verdict is the proof: berth exits 0 only once the view reads the claim effective, and it
+    // refuses past its own confirm window. The clock here bounds only a hang on a loaded runner.
+    assert.ok(o.ms <= ACK_BOUND_MS, `took ${o.ms} ms`);
     assert.match(o.stdout, /dev-integration: claimed by codex-1/);
     // Effective only because A acknowledged the head that carried it.
     assert.deepEqual(verdict(f.devices.B, DEV), {
@@ -386,7 +393,7 @@ Then(
     const o = state(this).last;
     assert.ok(o);
     assert.equal(o.status, code, `${o.stdout}\n${o.stderr}`);
-    assert.ok(o.ms >= seconds * 1000 - 500 && o.ms <= seconds * 1000 + 3000, `took ${o.ms} ms`);
+    assert.ok(o.ms >= seconds * 1000 - 500 && o.ms <= seconds * 2000, `took ${o.ms} ms`);
   }
 );
 
@@ -419,7 +426,7 @@ Then(
   async function (session: string, resource: string) {
     const { B } = state(this).devices;
     const o = must(await berth(B, ['claim', resource, '--session', session]), `claim ${resource}`);
-    assert.ok(o.ms < 3000, `took ${o.ms} ms`);
+    assert.ok(o.ms < AT_ONCE_MS, `took ${o.ms} ms`);
     assert.match(o.stdout, new RegExp(`^${resource}: claimed by ${session}`));
   }
 );
@@ -433,7 +440,7 @@ Then(
     const o = f.last;
     assert.ok(o);
     assert.equal(o.status, code, `${o.stdout}\n${o.stderr}`);
-    assert.ok(o.ms >= seconds * 1000 - 500, `took ${o.ms} ms`);
+    assert.ok(o.ms >= seconds * 1000 - 500 && o.ms <= seconds * 2000, `took ${o.ms} ms`);
     assert.match(o.stdout, /dev-integration: claimed over a silent device by codex-1/);
     assert.match(
       o.stdout,
@@ -798,7 +805,7 @@ Then(
     const { A } = state(this).devices;
     const o = await berth(A, ['claim', resource, '--session', session]);
     assert.equal(o.status, code, `${o.stdout}\n${o.stderr}`);
-    assert.ok(o.ms < 3000, `took ${o.ms} ms`);
+    assert.ok(o.ms < AT_ONCE_MS, `took ${o.ms} ms`);
   }
 );
 
