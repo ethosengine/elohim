@@ -1024,7 +1024,9 @@ class StewardClaimTest(unittest.TestCase):
         section = render_status(self.berth).split("other devices", 1)[1]
         self.assertIn("      moored claude-1 since ", section)
         self.assertNotIn("      moored claude-old", section)
-        self.assertIn("      STALE claude-old — last moored ", section)
+        self.assertIn(f"      STALE claude-old — no moor record within the {self.berth.mooring_ttl_s}s mooring "
+                      f"ttl (last ", section)
+        self.assertNotIn("not live", section)
 
     def test_status_says_why_there_is_no_other_devices_section(self):
         self.views(not_a_device())

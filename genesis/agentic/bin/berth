@@ -1334,12 +1334,12 @@ def _other_devices_lines(b):
                 head += f" — SILENT past {b.freshness_s}s"
         lines.append(f"    device {did}  {head}")
         for session, since in sorted((info.get("moorings") or {}).items()):
-            # A folded mooring is the device's latest moor record; past the mooring ttl with no
-            # newer one (its session died unmoored, or never moored again), it is not live.
+            # A folded mooring is that device's latest moor record. Touches do not cross, so a long
+            # session can be alive past the ttl; the label says only what the record shows.
             age = now_ms - since
             if age > b.mooring_ttl_s * 1000:
-                lines.append(f"      STALE {session} — last moored {_peer_age(age)} ago, past the "
-                             f"{b.mooring_ttl_s}s mooring ttl")
+                lines.append(f"      STALE {session} — no moor record within the {b.mooring_ttl_s}s mooring "
+                             f"ttl (last {_peer_age(age)} ago)")
             else:
                 lines.append(f"      moored {session} since {_rfc3339(since)}")
         for res, verdict in sorted(held.get(did, []), key=lambda item: item[0]):

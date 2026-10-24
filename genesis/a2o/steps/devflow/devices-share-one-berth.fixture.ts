@@ -13,13 +13,14 @@ import {
   mkdirSync,
   mkdtempSync,
   openSync,
+  readdirSync,
   readFileSync,
   statSync,
   symlinkSync,
   writeFileSync,
 } from 'node:fs';
 import { tmpdir } from 'node:os';
-import { join, resolve } from 'node:path';
+import { join, relative, resolve } from 'node:path';
 
 export const TAG = '@concern:devices-share-one-berth';
 export const repository = resolve('../..');
@@ -306,20 +307,34 @@ export function holds(d: Device, resource: string, session: string): boolean {
 let eprChecked: string | null = null;
 
 /**
- * Every tree `epr` builds from: the eprfs workspace and each of its Cargo path dependencies
- * (`grep path = elohim/eprfs/*\/Cargo.toml`), the roster and contest admission among them.
+ * Every tree `epr` builds from, derived from the Cargo path dependencies: start at the eprfs
+ * workspace's manifests and follow every `path = "…"` that names a directory holding a
+ * `Cargo.toml`, transitively (the roster and contest admission in `elohim/epr-rea` among them).
+ * Repository-relative.
  */
-const EPR_SOURCES = [
-  'elohim/eprfs',
-  'elohim/epr',
-  'elohim/epr-rea',
-  'elohim/epr-index',
-  'vendor/iroh-quinn-proto-0.13.0',
-  'crates/seam-contracts',
-  'crates/consent-grant',
-  'bridges/did/did-bridge',
-  'genesis/orchestrator/rust-style',
-];
+function eprSources(): string[] {
+  const seen = new Set<string>();
+  const queue = ['elohim/eprfs'];
+  for (const entry of readdirSync(join(repository, 'elohim/eprfs'), { withFileTypes: true })) {
+    if (
+      entry.isDirectory() &&
+      existsSync(join(repository, 'elohim/eprfs', entry.name, 'Cargo.toml'))
+    )
+      queue.push(`elohim/eprfs/${entry.name}`);
+  }
+  while (queue.length > 0) {
+    const dir = queue.shift() as string;
+    if (seen.has(dir)) continue;
+    seen.add(dir);
+    const manifest = readFileSync(join(repository, dir, 'Cargo.toml'), 'utf8');
+    for (const match of manifest.matchAll(/\bpath\s*=\s*"([^"]+)"/g)) {
+      const target = relative(repository, resolve(repository, dir, match[1]));
+      if (existsSync(join(repository, target, 'Cargo.toml')) && !seen.has(target))
+        queue.push(target);
+    }
+  }
+  return [...seen].sort((x, y) => x.localeCompare(y));
+}
 
 /** The `epr` must exist and be newer than every tracked source it builds from: fail loudly otherwise. */
 export function checkEpr(): void {
@@ -329,7 +344,7 @@ export function checkEpr(): void {
     'elohim/eprfs/Cargo.toml -p elohim-epr-cli --bin epr (or set EPR_BIN)';
   assert.ok(existsSync(EPR), `no epr at ${EPR} — build it: ${build}`);
   const files = must(
-    runSync(['git', 'ls-files', ...EPR_SOURCES], { cwd: repository }),
+    runSync(['git', 'ls-files', ...eprSources()], { cwd: repository }),
     'git ls-files'
   ).stdout.split('\n');
   let newest = 0;
