@@ -179,12 +179,18 @@ async fn two_daemons_fold_each_others_heads_and_drop_a_contested_device() {
     .await;
 
     // A contests B's binding in its own checkout: no restart, and B's heads are dropped.
+    let dropped_before = side_a.table().dropped.unadmitted;
+    let folded_before = side_a.table().devices[&b.did].seq;
     SidecarRoster::open(side_a.checkout.dir.path(), HANDLE)
         .expect("roster")
         .append(contest(&a, &bound))
         .expect("contest");
-    let dropped_before = side_a.table().dropped.unadmitted;
-    let folded_before = side_a.table().devices[&b.did].seq;
+    // The reload forgets B's last head: heads.json, and every head A announces after it, stop
+    // naming a device A no longer admits.
+    eventually("A's head table forgets B", || {
+        !side_a.table().devices.contains_key(&b.did)
+    })
+    .await;
     side_b
         .checkout
         .append(berth_event("claim", "alpha-fleet", "sb", "2.0"));
@@ -231,7 +237,10 @@ async fn two_daemons_fold_each_others_heads_and_drop_a_contested_device() {
             .is_some_and(|own| own.seq > folded_before + 1),
         "B kept announcing while A was contested"
     );
-    assert_eq!(side_a.table().devices[&b.did].seq, folded_before);
+    assert!(
+        !side_a.table().devices.contains_key(&b.did),
+        "no head of a contested device is recorded again"
+    );
     assert_eq!(
         eprfs_peer::folded_from(&side_a.checkout.store(), &b.did)
             .expect("known")
@@ -536,6 +545,53 @@ async fn a_projection_failure_is_recorded_where_status_reads_it() {
     assert!(side.table().channel.projection_failures >= 1);
 
     daemon.shutdown().await;
+}
+
+#[test]
+fn a_failing_projection_is_retried_with_backoff_until_the_store_changes() {
+    use eprfs_peer::{ProjectionRetry, PROJECTION_RETRY_FIRST, PROJECTION_RETRY_MAX};
+    use std::time::{Duration, Instant};
+
+    let start = Instant::now();
+    let mut retry = ProjectionRetry::default();
+    // Nothing has failed: every state of the store is projected at once.
+    assert!(retry.due(&1u8, start));
+    // The first failure of a state is counted once; the same state waits, doubling, to the cap.
+    assert!(
+        retry.failed(1u8, start),
+        "the first failure of a state is new"
+    );
+    let mut at = start;
+    let mut delay = PROJECTION_RETRY_FIRST;
+    let mut waits = Vec::new();
+    for _ in 0..8 {
+        assert!(!retry.due(&1u8, at + delay - Duration::from_millis(1)));
+        assert!(retry.due(&1u8, at + delay));
+        at += delay;
+        waits.push(delay);
+        assert!(!retry.failed(1u8, at), "the same state is counted once");
+        delay = (delay * 2).min(PROJECTION_RETRY_MAX);
+    }
+    assert_eq!(waits.first(), Some(&PROJECTION_RETRY_FIRST));
+    assert_eq!(waits.last(), Some(&PROJECTION_RETRY_MAX), "{waits:?}");
+    // At the 250 ms tick, a minute of one failing state re-parses the store a handful of times,
+    // not 240.
+    let tries = waits
+        .iter()
+        .scan(Duration::ZERO, |sum, wait| {
+            *sum += *wait;
+            Some(*sum)
+        })
+        .take_while(|sum| *sum <= Duration::from_secs(60))
+        .count();
+    assert!(tries <= 6, "{tries} retries within a minute");
+    // A change to the store resets the wait: the new state is projected on the next tick.
+    assert!(retry.due(&2u8, at));
+    assert!(retry.failed(2u8, at), "a new state's failure is new");
+    assert!(!retry.due(&2u8, at + PROJECTION_RETRY_FIRST - Duration::from_millis(1)));
+    // A success forgets the failure.
+    retry.succeeded();
+    assert!(retry.due(&2u8, at));
 }
 
 /// A real channel tier whose answers wait until the test opens a gate: a fold stalled mid-fetch.

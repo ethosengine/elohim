@@ -208,6 +208,18 @@ impl ServeLock {
             Err(errno) => Err(PeerCliError::Io(errno.into())),
         }
     }
+
+    /// Whether a daemon holds this device's serve lock now: `Some(true)` when it is held,
+    /// `Some(false)` when it is free, `None` when the lock could not be probed. The probe takes
+    /// the lock without waiting and drops it at once, so it never keeps a daemon from starting.
+    #[must_use]
+    pub fn held(peer_dir: &Path) -> Option<bool> {
+        match ServeLock::acquire(peer_dir) {
+            Ok(_probe) => Some(false),
+            Err(PeerCliError::Serving(_)) => Some(true),
+            Err(_) => None,
+        }
+    }
 }
 
 /// This device as a member of its lineage: its device key, its lineage and its peer directory.
@@ -621,6 +633,11 @@ fn leases(options: &Options) -> PeerResult<ExitCode> {
     );
     out.insert("seen".into(), seen.into());
     out.insert("others".into(), serde_json::to_value(others)?);
+    // Whether this device's own daemon runs: an unconfirmed claim with none names that cure.
+    out.insert(
+        "serving".into(),
+        ServeLock::held(&device.peer_dir).map_or(serde_json::Value::Null, Into::into),
+    );
     if options.json {
         for (resource, verdict) in view {
             out.insert(resource, serde_json::to_value(verdict)?);

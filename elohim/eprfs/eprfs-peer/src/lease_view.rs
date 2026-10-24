@@ -3,9 +3,10 @@
 //! (spec §3.4).
 //!
 //! A lease is replayed from berth's `dev-berth-events@1` records (T1), each device's in the order
-//! that device wrote them — its own in store order; another device's by the record counter berth
-//! stamps on each (`dseq`; older records by record time, first), since a fold appends a head's
-//! events in its tree's (CID) order: a `claim` opens it, a
+//! that device wrote them: by the record counter berth stamps on each (`dseq`; older records by
+//! record time, first) — since a fold appends a head's events in its tree's (CID) order, and two
+//! berth processes on one device can reach its store in the other order from the one they
+//! recorded in: a `claim` opens it, a
 //! `renew` extends it, a `release` (its own, or a forced one naming it) and an `unmoor` close it,
 //! and a claim that took over from another session closes that session's lease. A lease with a
 //! ttl stops binding `ttl_s` after it was claimed or last renewed. Leases folded from a device the
@@ -309,7 +310,7 @@ impl Lease {
     }
 }
 
-/// Replay one device's lease records, in store order, into its open leases by
+/// Replay one device's lease records, in the order it wrote them, into its open leases by
 /// `(resource, session)`.
 fn replay<'e>(
     device: &str,
@@ -418,11 +419,17 @@ pub fn steward_lease_view(
             .map(|((resource, _), lease)| (resource, lease))
             .collect::<Vec<_>>()
     };
+    // This device's own records replay by its record counter too: two berth processes can flush
+    // their folds in the other order from the one they recorded in (a release can reach the store
+    // before the claim it closes). Each lease keeps its store position (`written`) for `carried`.
+    let mut mine: Vec<&LeaseEvent> = store
+        .own
+        .iter()
+        .filter(|event| event.via.is_none())
+        .collect();
+    mine.sort_by_key(|event| device_order(event));
     let mut own: BTreeMap<Resource, Lease> = BTreeMap::new();
-    for (resource, lease) in live(replay(
-        me,
-        store.own.iter().filter(|event| event.via.is_none()),
-    )) {
+    for (resource, lease) in live(replay(me, mine)) {
         match own.get(&resource) {
             Some(held) if held.precedence() <= lease.precedence() => {}
             _ => {
@@ -488,7 +495,7 @@ pub fn steward_lease_view(
     Ok(view)
 }
 
-/// The order another device wrote its records in. A fold appends a head's events in its channel
+/// The order a device wrote its records in. A fold appends a head's events in its channel
 /// tree's order (by CID), not the order its device wrote them: replay them by the device's record
 /// counter, which a clock step cannot reorder; records from before the counter by record time,
 /// first.

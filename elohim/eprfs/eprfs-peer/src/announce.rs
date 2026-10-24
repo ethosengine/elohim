@@ -189,6 +189,24 @@ impl Channel {
         }
     }
 
+    /// Forget the last head of every device `admitted` no longer admits, returning their
+    /// did:keys: a contested device's seq is no longer recorded or carried in this device's
+    /// heads. Called after a roster reload that read the roster (an unreadable roster admits
+    /// nobody, and forgetting every device on it would cost every acknowledgement).
+    pub fn forget_unadmitted(&mut self, admitted: impl Fn(&str) -> bool) -> Vec<String> {
+        let forgotten: Vec<String> = self
+            .table
+            .devices
+            .keys()
+            .filter(|device| !admitted(device))
+            .cloned()
+            .collect();
+        for device in &forgotten {
+            self.table.devices.remove(device);
+        }
+        forgotten
+    }
+
     /// This device's channel root is now `root`; a change is announced after the debounce.
     pub fn changed(&mut self, root: BlobCid, now: Instant) {
         if self.root.as_ref() != Some(&root) {

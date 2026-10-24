@@ -6,7 +6,8 @@
 //! - re-reads the roster when the file changed, so a Contest written in this checkout drops its
 //!   device at once, with no restart;
 //! - re-projects the channel tree when the flow store changed, and installs it in the store the
-//!   tier serves (a failure is recorded in the head table, where `epr peer status` reads it);
+//!   tier serves (a failure is recorded in the head table, where `epr peer status` reads it, and
+//!   the same state of the store is retried with a growing wait: [`ProjectionRetry`]);
 //! - announces this device's signed head when one is due ([`Channel::due`]), persisting it first:
 //!   a head whose seq could not be persisted is never sent, and the loop ends saying why.
 //!
@@ -53,6 +54,57 @@ use crate::tier::{TierLimits, TierProtocol, TIER_ALPN};
 
 /// How often the daemon looks at its roster and flow store and asks whether a head is due.
 pub const TICK: Duration = Duration::from_millis(250);
+
+/// How long a projection that failed waits before it re-reads the same state of the flow store.
+pub const PROJECTION_RETRY_FIRST: Duration = Duration::from_secs(1);
+
+/// The longest wait between retries of one failing state of the flow store.
+pub const PROJECTION_RETRY_MAX: Duration = Duration::from_secs(30);
+
+/// When a projection that failed is tried again. A projection re-parses the whole flow store, so a
+/// state of the store that keeps failing is retried after [`PROJECTION_RETRY_FIRST`], then after
+/// twice as long each time up to [`PROJECTION_RETRY_MAX`], not on every tick. A change to the
+/// store (a new key) is projected at once and starts the wait over; a success forgets the failure.
+#[derive(Debug, Clone)]
+pub struct ProjectionRetry<K> {
+    failing: Option<(K, Duration, Instant)>,
+}
+
+impl<K> Default for ProjectionRetry<K> {
+    fn default() -> Self {
+        ProjectionRetry { failing: None }
+    }
+}
+
+impl<K: PartialEq> ProjectionRetry<K> {
+    /// Whether the state `key` is to be projected at `now`: always for a state that has not
+    /// failed, and for the failing one once its wait is over.
+    #[must_use]
+    pub fn due(&self, key: &K, now: Instant) -> bool {
+        match &self.failing {
+            Some((failed, _, next)) if failed == key => now >= *next,
+            _ => true,
+        }
+    }
+
+    /// Record that projecting `key` failed at `now`. True when this is the state's first failure
+    /// (count and report it once); the wait doubles while the same state keeps failing.
+    pub fn failed(&mut self, key: K, now: Instant) -> bool {
+        let (first, wait) = match &self.failing {
+            Some((failed, wait, _)) if *failed == key => {
+                (false, wait.saturating_mul(2).min(PROJECTION_RETRY_MAX))
+            }
+            _ => (true, PROJECTION_RETRY_FIRST),
+        };
+        self.failing = Some((key, wait, now + wait));
+        first
+    }
+
+    /// Forget the failure: the store projected.
+    pub fn succeeded(&mut self) {
+        self.failing = None;
+    }
+}
 
 /// How long one fold may take before it is abandoned (and retried on the device's next head). A
 /// fold runs off the loop, so this bounds only that device's own fold.
@@ -176,7 +228,7 @@ impl PeerDaemon {
             joined: bootstrap,
             roster_stamp: stamp(&config.roster),
             flow_stamp: None,
-            failed_stamp: None,
+            retry: ProjectionRetry::default(),
             tree: limits.tree,
             folds_tx,
             in_flight: HashMap::new(),
@@ -314,8 +366,9 @@ struct Run {
     joined: Vec<NodeId>,
     roster_stamp: Stamp,
     flow_stamp: Stamp,
-    /// The state of the log the last failed projection read, so a failure is counted once.
-    failed_stamp: Option<Stamp>,
+    /// The state of the log the last failed projection read, counted once and retried with a
+    /// growing wait rather than re-parsed every tick.
+    retry: ProjectionRetry<Stamp>,
     tree: TreeLimits,
     folds_tx: mpsc::UnboundedSender<FoldDone>,
     /// Per device, the seq of the head whose fold is in flight, and its task (aborted when a
@@ -455,11 +508,11 @@ impl Run {
             return;
         }
         self.roster_stamp = now;
-        let rows = match roster_rows_from_file(&self.config.roster) {
-            Ok(rows) => rows,
+        let (rows, read) = match roster_rows_from_file(&self.config.roster) {
+            Ok(rows) => (rows, true),
             Err(e) => {
                 self.log(&format!("roster unreadable, admitting nobody: {e}"));
-                Vec::new()
+                (Vec::new(), false)
             }
         };
         self.book
@@ -475,6 +528,9 @@ impl Run {
             }
         }
         self.drop_unadmitted_folds();
+        if read {
+            self.forget_unadmitted_heads();
+        }
         let me = self.endpoint.node_id();
         let fresh: Vec<NodeId> = others(&self.admission, me)
             .into_iter()
@@ -517,6 +573,29 @@ impl Run {
         }
     }
 
+    /// Drop from the head table every device the roster no longer admits, and persist it: its
+    /// last seq is no longer carried in this device's heads (spent of `MAX_HEAD_BYTES`) or kept.
+    fn forget_unadmitted_heads(&mut self) {
+        let admission = self.admission.clone();
+        let admitted = |device: &str| {
+            admission
+                .read()
+                .is_ok_and(|admission| admission.admits_device(device))
+        };
+        let forgotten = self.channel.forget_unadmitted(admitted);
+        if forgotten.is_empty() {
+            return;
+        }
+        self.log(&format!(
+            "forgot the last head of {} device(s) no longer admitted: {}",
+            forgotten.len(),
+            forgotten.join(", ")
+        ));
+        if let Err(e) = self.save() {
+            self.log(&format!("head table not saved after forgetting: {e}"));
+        }
+    }
+
     /// Re-project the channel tree when the flow store changed. A failure is recorded where
     /// `epr peer status` reads it; the last good root stays served and announced.
     fn reproject(&mut self) -> Result<(), PeerError> {
@@ -524,12 +603,15 @@ impl Run {
         if now.is_some() && now == self.flow_stamp {
             return Ok(());
         }
+        if !self.retry.due(&now, Instant::now()) {
+            return Ok(());
+        }
         match project_channel(&self.flow, &self.config.allow) {
             Ok(tree) => {
                 // Only a projection that succeeded settles this state of the log; a failed one
-                // is retried on the next tick.
+                // is retried after a growing wait, or at once when the log changes.
                 self.flow_stamp = now;
-                self.failed_stamp = None;
+                self.retry.succeeded();
                 self.store.install(&tree);
                 self.channel.changed(tree.root().clone(), Instant::now());
                 self.channel
@@ -545,9 +627,8 @@ impl Run {
                 }
             }
             Err(e) => {
-                // Counted and saved once per state of the log, though retried every tick.
-                if self.failed_stamp != Some(now) {
-                    self.failed_stamp = Some(now);
+                // Counted and saved once per state of the log, though retried.
+                if self.retry.failed(now, Instant::now()) {
                     self.log(&format!("channel not projected: {e}"));
                     let counters = self.channel.counters_mut();
                     counters.projection_failures += 1;

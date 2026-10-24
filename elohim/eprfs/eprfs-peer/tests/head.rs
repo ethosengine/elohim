@@ -250,6 +250,30 @@ fn folding_a_newer_head_reannounces_with_updated_ack() {
 }
 
 #[test]
+fn a_device_no_longer_admitted_is_forgotten_and_its_ack_leaves_the_next_head() {
+    let h = household();
+    let mut channel = Channel::new(h.a.did.clone(), HeadTable::default());
+    let signer = h.a.signer();
+    let t0 = Instant::now();
+    channel.changed(root("a1"), t0);
+    channel.folded(&head_of(&h, true, 7, "b1"), 1, 3, t0);
+    // Still admitted: nothing is forgotten.
+    assert!(channel.forget_unadmitted(|_| true).is_empty());
+    assert!(channel.table().devices.contains_key(&h.b.did));
+    // B's binding was contested: its entry goes, and the next head no longer carries it.
+    assert_eq!(
+        channel.forget_unadmitted(|device| device != h.b.did),
+        vec![h.b.did.clone()]
+    );
+    assert!(channel.table().devices.is_empty());
+    let next = channel
+        .announce(t0 + ANNOUNCE_DEBOUNCE, 2, &signer)
+        .expect("announce")
+        .expect("a head");
+    assert!(next.folded.is_empty(), "{:?}", next.folded);
+}
+
+#[test]
 fn the_topic_is_blake3_of_the_named_chain_root() {
     let chain_root = "did:key:zDeviceA";
     let expected = blake3::hash(format!("elohim/steward-channel/1/{chain_root}").as_bytes());

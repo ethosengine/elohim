@@ -374,6 +374,53 @@ fn another_devices_records_are_replayed_in_its_order_not_the_order_they_were_fol
     );
 }
 
+#[test]
+fn this_devices_own_records_are_replayed_in_its_order_not_the_order_they_reached_its_store() {
+    let h = household();
+    let admission = h.admission();
+    // A push is interrupted while its claim is being taken: the hook's release (counter 2) reaches
+    // the store before the claim it closes (counter 1), because the two berth processes flushed
+    // their folds in the other order. Replayed by counter, the lease is closed, here as on B.
+    let s = store(vec![
+        own(counted(record("release", "claude-1", T0 + 1.0, &[]), 2)),
+        own(counted(claim("claude-1", T0), 1)),
+    ]);
+    let heads = table(&h.a.did, &[(3, 2)], &s, &[(&h.b.did, 3, ms(T0) + 2_000)]);
+    assert_eq!(
+        verdict(&h.a.did, &s, &heads, &admission, ms(T0) + 3_000),
+        None,
+        "no ghost lease"
+    );
+    // The session's next claim is not refused by that ghost. It is carried by the first head
+    // projected from its own store position (4), not by its place in the counter order.
+    let s = store(vec![
+        own(counted(record("release", "claude-1", T0 + 1.0, &[]), 2)),
+        own(counted(claim("claude-1", T0), 1)),
+        own(counted(record("note", "claude-1", T0 + 2.0, &[]), 3)),
+        own(counted(claim("codex-2", T0 + 5.0), 4)),
+    ]);
+    let heads = table(
+        &h.a.did,
+        &[(3, 3), (4, 4)],
+        &s,
+        &[(&h.b.did, 3, ms(T0) + 6_000)],
+    );
+    assert!(matches!(
+        verdict(&h.a.did, &s, &heads, &admission, ms(T0) + 6_000),
+        Some(LeaseVerdict::Pending { ref session, .. }) if session == "codex-2"
+    ));
+    let heads = table(
+        &h.a.did,
+        &[(3, 3), (4, 4)],
+        &s,
+        &[(&h.b.did, 4, ms(T0) + 6_000)],
+    );
+    assert_eq!(
+        verdict(&h.a.did, &s, &heads, &admission, ms(T0) + 6_000),
+        Some(effective("codex-2"))
+    );
+}
+
 /// Both devices claim with the link down, so each wrote its claim before folding the other's;
 /// then each folds the other's. The view, run from each side over the same records, names the
 /// same winner.

@@ -535,6 +535,31 @@ fn peer_leases_prints_the_steward_view_while_serve_holds_its_lock() {
 }
 
 #[test]
+fn peer_leases_says_whether_this_devices_daemon_is_serving() {
+    let (keys, _a, b) = household();
+    let policy = steward_policy(keys.path());
+    append(
+        b.checkout.path(),
+        [berth_record(
+            "claim",
+            "cargo",
+            "codex-1",
+            "1792769290.000",
+            None,
+        )],
+    );
+    // No daemon: an unconfirmed claim's cure is this device's own `epr peer serve`.
+    let view = leases_json(&b, b.root(), &policy);
+    assert_eq!(view["serving"], false, "{view}");
+    // The probe took nothing it kept: a daemon can still take the lock after it.
+    let serving = elohim_epr_cli::peer::ServeLock::acquire(&b.peer_dir()).expect("lock");
+    let view = leases_json(&b, b.root(), &policy);
+    assert_eq!(view["serving"], true, "{view}");
+    drop(serving);
+    assert_eq!(leases_json(&b, b.root(), &policy)["serving"], false);
+}
+
+#[test]
 fn peer_leases_reads_the_channel_store_the_daemon_serves_not_the_callers() {
     let (keys, a, b) = household();
     let policy = steward_policy(keys.path());

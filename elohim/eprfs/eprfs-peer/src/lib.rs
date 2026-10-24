@@ -58,7 +58,10 @@ pub use channel::{
     channel_tier_id, project_channel, ChannelStore, ChannelTree, CHANNEL_EVENTS, RETAINED_ROOTS,
 };
 pub use connections::{ConnectionBook, NOT_ADMITTED};
-pub use daemon::{PeerConfig, PeerDaemon, FOLD_DEADLINE, TICK};
+pub use daemon::{
+    PeerConfig, PeerDaemon, ProjectionRetry, FOLD_DEADLINE, PROJECTION_RETRY_FIRST,
+    PROJECTION_RETRY_MAX, TICK,
+};
 pub use endpoint::{bind, bind_on, peer_from_arg, relay_from_env, relay_from_value, RELAY_ENV};
 pub use error::PeerError;
 pub use fold::{
