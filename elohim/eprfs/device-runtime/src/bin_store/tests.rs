@@ -37,6 +37,7 @@
 // test_guard_leaves_existing_path_entry_untouched_when_bootstrap_refuses -> test_guard_leaves_existing_path_entry_untouched_when_bootstrap_refuses
 // test_cleanliness_is_judged_over_epr_sources_not_hook_ledgers -> test_cleanliness_is_judged_over_epr_sources_not_hook_ledgers
 // test_source_paths_fall_back_to_the_whole_tree_without_a_cargo_answer -> test_source_paths_fall_back_to_the_whole_tree_without_a_cargo_answer
+// test_source_paths_resolve_only_the_host_platform -> test_source_paths_resolve_only_the_host_platform (ported from ec89ad25e)
 // test_shadows_lists_every_epr_reached_before_the_launcher -> test_shadows_lists_every_epr_reached_before_the_launcher
 // test_guard_keeps_a_hand_installed_binary_and_repoints_stale_shadows -> test_guard_keeps_a_hand_installed_binary_and_repoints_stale_shadows
 // test_guard_preserves_distinct_plain_alias_bytes_as_separate_candidates -> test_guard_preserves_distinct_plain_alias_bytes_as_separate_candidates
@@ -129,9 +130,14 @@ impl Runner for Fake {
                 "cat-file" | "worktree" => {}
                 _ => success = false,
             }
+        } else if c.program == "rustc" {
+            out = "rustc 1.96.1\nhost: x86_64-unknown-linux-gnu\n".into();
         } else if c.program == "cargo" {
             if c.args[0] == "metadata" {
-                if let Some(m) = &s.metadata {
+                if !c.args.iter().any(|a| a == "--filter-platform") {
+                    // An unfiltered offline resolve needs every platform's crates and fails.
+                    success = false;
+                } else if let Some(m) = &s.metadata {
                     out = m.to_string();
                 } else {
                     success = false;
@@ -877,6 +883,27 @@ fn test_cleanliness_is_judged_over_epr_sources_not_hook_ledgers() {
 fn test_source_paths_fall_back_to_the_whole_tree_without_a_cargo_answer() {
     let f = Fixture::new("epr");
     assert_eq!(f.store.source_paths(f.tmp.path()), ["."]);
+}
+#[test]
+fn test_source_paths_resolve_only_the_host_platform() {
+    let f = Fixture::new("epr");
+    let crate_dir = f.tmp.path().join("elohim/eprfs/epr-cli");
+    fs::create_dir_all(&crate_dir).unwrap();
+    f.state.lock().unwrap().metadata = Some(json!({"packages":[
+        {"source": null, "manifest_path": crate_dir.join("Cargo.toml").display().to_string()}
+    ]}));
+    assert_eq!(
+        f.store.source_paths(f.tmp.path()),
+        ["elohim/eprfs", "elohim/eprfs/epr-cli"]
+    );
+    let s = f.state.lock().unwrap();
+    let metadata = s.calls.iter().rev().find(|c| c.program == "cargo").unwrap();
+    let at = metadata
+        .args
+        .iter()
+        .position(|a| a == "--filter-platform")
+        .unwrap();
+    assert_eq!(metadata.args[at + 1], "x86_64-unknown-linux-gnu");
 }
 #[test]
 fn test_shadows_lists_every_epr_reached_before_the_launcher() {

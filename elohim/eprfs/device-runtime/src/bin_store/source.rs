@@ -170,6 +170,12 @@ impl Store {
     }
     /// Source closure from Cargo metadata, falling back conservatively to the entire checkout.
     pub fn source_paths(&self, repo: &Path) -> Vec<String> {
+        // Resolve for the host that builds epr only: unfiltered, an offline resolve needs every
+        // platform's crates (android_system_properties, …) that no host build downloads, so cargo
+        // exits 101 and every candidate reads as a dirty build of the whole tree.
+        let Some(host) = self.host_triple() else {
+            return vec![".".into()];
+        };
         let manifest = repo.join("elohim/eprfs/Cargo.toml");
         let mut spec = CommandSpec::new(
             "cargo",
@@ -178,6 +184,8 @@ impl Store {
                 "--format-version",
                 "1",
                 "--offline",
+                "--filter-platform",
+                &host,
                 "--manifest-path",
                 &manifest.to_string_lossy(),
             ],
@@ -211,6 +219,19 @@ impl Store {
             paths.insert(relative.to_string_lossy().into_owned());
         }
         paths.into_iter().collect()
+    }
+    /// The host target triple `rustc -vV` reports, or None when rustc cannot answer.
+    fn host_triple(&self) -> Option<String> {
+        let output = self
+            .run(&CommandSpec::new("rustc", ["-vV"]))
+            .ok()
+            .filter(|o| o.success)?;
+        output
+            .stdout
+            .lines()
+            .find_map(|line| line.strip_prefix("host:"))
+            .map(|host| host.trim().to_owned())
+            .filter(|host| !host.is_empty())
     }
     /// Committed source identity and cleanliness; hook ledgers outside the build closure do not count.
     pub fn source_state(&self, repo: &Path) -> Result<Value> {
