@@ -5,7 +5,6 @@ from __future__ import annotations
 import fnmatch
 import json
 import os
-import shutil
 import subprocess
 import sys
 from pathlib import Path
@@ -19,6 +18,7 @@ for _ in range(8):
         break
     _here = _here.parent
 from _lib import frontmatter as fm  # noqa: E402
+from _lib import epr_client  # noqa: E402
 
 CONVENTION = (
     "[valueflow-observer] convention: task-*-brief.md frontmatter requires gap and actor; "
@@ -55,7 +55,7 @@ def _read_document(path: Path) -> tuple[dict, str] | None:
 
 
 def _epr(root: Path, args: list[str]) -> None:
-    executable = shutil.which("epr")
+    executable = epr_client.resolve_binary()
     if executable is None:
         print("epr: command not found")
         return

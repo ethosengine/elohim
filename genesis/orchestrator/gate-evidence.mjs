@@ -198,7 +198,15 @@ export function gateEvidence(project, { env = process.env, root, commit, cargoEn
   let line = describeEvidence(found.rows, now);
   if (dirty === null) line += '; working tree state unknown, nothing will be recorded';
   else if (dirty.length > 0) line += `; working tree dirty under ${project.dir} (${dirty.length} path${dirty.length === 1 ? '' : 's'}): the evidence names the commit, not these bytes, and nothing will be recorded`;
-  return { key, rows: found.rows, line, buildRefBin, dirty: dirty === null ? null : dirty.length > 0 };
+  const checkoutMismatch = env.GATE_EVIDENCE_RECORD === '0';
+  if (checkoutMismatch) line += '; pushed commit is not checked out, nothing will be recorded';
+  return {
+    key,
+    rows: found.rows,
+    line,
+    buildRefBin,
+    dirty: checkoutMismatch ? true : dirty === null ? null : dirty.length > 0,
+  };
 }
 
 /**

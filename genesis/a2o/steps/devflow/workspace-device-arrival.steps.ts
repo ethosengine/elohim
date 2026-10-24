@@ -63,22 +63,12 @@ function deviceEnv(f: Fixture, key: string, extra: Record<string, string> = {}):
     ELOHIM_DEVICE_KEY_FILE: key,
     CLAUDE_CONFIG_DIR: join(f.base, 'config'),
     CARGO_TARGET_POOL_ROOT: join(f.base, 'no-pool'),
-    EPR_BIN: binary === 'epr' ? (whichEpr() ?? 'epr') : binary,
+    // Leave EPR_BIN absent when the fixture is using PATH: the PATH entry may be the stable
+    // launcher, while EPR_BIN is reserved for the real candidate supplied by the gate.
+    ...(binary === 'epr' ? {} : { EPR_BIN: binary }),
     CLAUDE_CODE_SESSION_ID: f.session,
     ...extra,
   };
-}
-/** The `epr` the shell would run, found by walking PATH ourselves (no shell is spawned). */
-function whichEpr(): string | undefined {
-  for (const dir of (process.env.PATH ?? '').split(':').filter(Boolean)) {
-    const candidate = join(dir, 'epr');
-    try {
-      if (statSync(candidate).isFile()) return candidate;
-    } catch {
-      // not here
-    }
-  }
-  return undefined;
 }
 function run(f: Fixture, argv: string[], env: NodeJS.ProcessEnv, expected: number | null = 0) {
   const result = spawnSync(argv[0], argv.slice(1), {

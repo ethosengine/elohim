@@ -28,57 +28,42 @@ is not a half-measure:
 FALLBACK POLICY. When `epr` cannot be resolved the Python evaluator decides, and
 the degradation is announced rather than swallowed. This satisfies the polarity
 law — the gate never SILENTLY permits when governance could not be evaluated —
-without betting the authoring loop on a build artifact: `epr` is not on PATH by
-default, it is compiled into a branch-scoped cargo-pool slot, so "refer when the
-binary is missing" would fire on essentially every governed write rather than in
-some rare outage. Referring is reserved for the case where NEITHER host can
-answer, which is the genuine absence the law is about.
+without betting the authoring loop on a mutable build artifact: the stable PATH
+launcher resolves a content-addressed store and the cargo pool is never a
+fallback. `EPR_BIN` remains only the explicit candidate-under-test override.
+Referring is reserved for the case where NEITHER host can answer, which is the
+genuine absence the law is about.
 """
 import json
 import os
-import shutil
 import subprocess
 from pathlib import Path
+
+from . import epr_store
 
 # A hung evaluator must never hang an author's keystroke.
 _TIMEOUT_SECONDS = 10
 
-# Where a compiled `epr` plausibly lives, in resolution order. `EPR_BIN` wins so
-# an operator (or CI) can pin one explicitly; PATH is next; the cargo target pool
-# is the local-dev reality, globbed rather than derived because the family
-# segment is branch-scoped and a wrong guess is indistinguishable from absence.
-_POOL_GLOBS = (
-    "/projects/.cargo-target-pool/family/*/elohim__eprfs/*/release/epr",
-    "/projects/.cargo-target-pool/family/*/elohim__eprfs/*/debug/epr",
-)
 
-
-def resolve_binary() -> str | None:
-    """Path to a usable `epr`, or None. Never raises."""
+def resolve(env: dict[str, str] | None = None) -> tuple[str | None, str | None]:
+    """Resolve one executable path/CID pair, never the stable launcher itself."""
     try:
-        pinned = os.environ.get("EPR_BIN")
-        if pinned and Path(pinned).is_file() and os.access(pinned, os.X_OK):
-            return pinned
-        found = shutil.which("epr")
-        if found:
-            return found
-        newest, newest_mtime = None, -1.0
-        for pattern in _POOL_GLOBS:
-            root = Path(pattern.split("*")[0])
-            if not root.is_dir():
-                continue
-            for candidate in root.parent.glob(pattern[len(str(root.parent)) + 1:]):
-                try:
-                    if not (candidate.is_file() and os.access(candidate, os.X_OK)):
-                        continue
-                    mtime = candidate.stat().st_mtime
-                except OSError:
-                    continue
-                if mtime > newest_mtime:
-                    newest, newest_mtime = str(candidate), mtime
-        return newest
+        environment = os.environ if env is None else env
+        root = Path(environment.get("EPR_STORE", epr_store.DEFAULT_STORE)).expanduser().resolve()
+        path, _, cid = epr_store.resolve(root=root, environ=environment)
+        return str(path), cid
     except Exception:  # noqa: BLE001 — resolution is best-effort; absence is a valid answer
-        return None
+        return None, None
+
+
+def resolve_binary(env: dict[str, str] | None = None) -> str | None:
+    """Compatibility accessor for callers that need only the path."""
+    return resolve(env)[0]
+
+
+def resolved_cid(env: dict[str, str] | None = None) -> str | None:
+    """Compatibility accessor for callers that need only the CID."""
+    return resolve(env)[1]
 
 
 def govern(root: Path, path: str, content, is_new: bool, is_new_subdir: bool, *,

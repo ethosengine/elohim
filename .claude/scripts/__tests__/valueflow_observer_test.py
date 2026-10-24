@@ -5,16 +5,21 @@ from __future__ import annotations
 import json
 import os
 import subprocess
+import sys
 import tempfile
 import unittest
 from pathlib import Path
 
 REPO = Path(__file__).resolve().parents[3]
 HOOK = REPO / ".claude" / "hooks" / "valueflow-observer.py"
-EPR = Path("/opt/rust/cargo/bin/epr")
+sys.path.insert(0, str(REPO / ".claude/scripts"))
+from _lib import epr_client  # noqa: E402
+
+_EPR = epr_client.resolve_binary()
+EPR = Path(_EPR) if _EPR else None
 
 
-@unittest.skipUnless(EPR.is_file(), "real /opt/rust/cargo/bin/epr is not installed")
+@unittest.skipUnless(EPR and EPR.is_file(), "epr is not available through EPR_BIN or PATH")
 class ValueflowObserverTest(unittest.TestCase):
     def setUp(self) -> None:
         self.tempdir = tempfile.TemporaryDirectory()
@@ -35,6 +40,10 @@ recipes:
         paths: ["gap-items/*.json"]
     edges: []
 """,
+        )
+        self._write(
+            ".epr-meta/repository.yaml",
+            "version: 1\nagent: repo:test/valueflow-observer\n",
         )
         self._write("plans/epic.md", "---\nid: fixture-epic\n---\n# Fixture epic\n")
         self._write(
@@ -175,7 +184,11 @@ recipes:
             text=True,
             check=False,
         )
-        self.assertEqual(observed.stdout, direct.stdout, "an epr refusal is printed verbatim")
+        observed_json = json.loads(observed.stdout)
+        direct_json = json.loads(direct.stdout)
+        self.assertTrue(observed_json.pop("appended"))
+        self.assertFalse(direct_json.pop("appended"))
+        self.assertEqual(observed_json, direct_json, "the epr outcome is printed verbatim")
         self.assertEqual(observed.returncode, 0, "the hook never blocks the completed write")
 
     def test_missing_frontmatter_names_the_convention_without_blocking(self) -> None:

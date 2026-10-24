@@ -373,7 +373,7 @@ export function publishHouseholdEvidence(opts: {
   if (env.A2O_POST_REPORT === '0') return lines;
   if (report.env?.lane !== 'household') return lines;
 
-  const epr = resolveBinary('epr', env.EPR_BIN, env.PATH);
+  const epr = env.EPR_BIN ?? resolveBinary('epr', undefined, env.PATH);
   if (epr) {
     const r = run(epr, ['flow', 'fulfill', reportPath, '--root', repoRoot], repoRoot);
     log(

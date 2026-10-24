@@ -25,15 +25,16 @@ Usage:  prep-brainstorm.py "doorway ssr routing"
 from __future__ import annotations
 
 import json
-import os
-import shutil
 import subprocess
 import sys
 from pathlib import Path
 
 HERE = Path(__file__).resolve().parent
 REPO = Path(__file__).resolve().parents[4]
-EPR = os.environ.get("EPR_BIN") or shutil.which("epr") or "epr"
+sys.path.insert(0, str(REPO / ".claude/scripts"))
+from _lib import epr_client  # noqa: E402
+
+EPR = epr_client.resolve_binary() or "epr"
 ARGS = [a for a in sys.argv[1:] if not a.startswith("--")]
 CHECK_DRIFT = "--check-drift" in sys.argv[1:]
 TOPIC = " ".join(ARGS).strip()

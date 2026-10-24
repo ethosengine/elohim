@@ -120,7 +120,7 @@ def run_plane_lines(root: Path, payload: dict) -> list[str]:
     obs = _observation_module()
     binary = obs.resolve_bin() if obs else None
     if not binary:
-        return ["bootstrap: skipped — no epr binary resolved ($EPR_BIN, gate target, PATH)"]
+        return ["bootstrap: skipped — no epr binary resolved ($EPR_BIN or PATH)"]
     session = "bootstrap-" + obs.bootstrap_session_id(root, payload)
     try:
         r = subprocess.run(

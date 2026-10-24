@@ -1,0 +1,14 @@
+#!/usr/bin/env python3
+"""CLI projection of the repository's epr store library."""
+
+import sys
+from pathlib import Path
+
+REPO = Path(__file__).resolve().parents[3]
+sys.path.insert(0, str(REPO / ".claude/scripts"))
+
+from _lib.epr_store import main  # noqa: E402
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())

@@ -51,6 +51,7 @@ import sys
 import tempfile
 import time
 import unittest
+from unittest import mock
 from pathlib import Path
 
 HOOKS = Path(__file__).resolve().parent.parent
@@ -320,6 +321,22 @@ class RouterCase(unittest.TestCase):
         second = len(self.calls("project"))
         # The trial runs once per binary; every later write pays only for the install.
         self.assertEqual(second - first, 1, "the router re-probed instead of reading its cache")
+
+    def test_the_probe_and_cache_key_come_from_one_resolution(self):
+        self.mod.reset_cache()
+        with (
+            mock.patch.object(self.mod, "resolve", return_value=(str(self.bin), "cid-one"))
+            as resolve,
+            mock.patch.object(self.mod, "_read_cache", return_value=None),
+            mock.patch.object(self.mod, "_write_cache") as write,
+            mock.patch.object(self.mod, "_trial", return_value=(True, "ready")) as trial,
+        ):
+            binary, reason = self.mod.native_route(self.root)
+
+        self.assertEqual((binary, reason), (str(self.bin), "ready"))
+        resolve.assert_called_once_with()
+        trial.assert_called_once_with(str(self.bin), self.root)
+        write.assert_called_once_with("cid-one", True, "ready")
 
     # 3 ────────────────────────────────────────────────────────────────────────────────────
     def test_a_verb_over_the_latency_budget_stands_down_and_says_why(self):
@@ -611,7 +628,7 @@ class GoldenParityCase(unittest.TestCase):
                           HOOKS / "memory-index-projection.py")
         cls.binary = mod.resolve_bin()
         if not cls.binary:
-            raise unittest.SkipTest("no `epr` binary ($EPR_BIN, the gate target, or PATH)")
+            raise unittest.SkipTest("no `epr` binary ($EPR_BIN or PATH)")
         out = REPO / cls.SCRATCH
         out.parent.mkdir(parents=True, exist_ok=True)
         r = subprocess.run([cls.binary, "flow", "memory", "project", "--index",

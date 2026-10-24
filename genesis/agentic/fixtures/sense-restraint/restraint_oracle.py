@@ -30,6 +30,8 @@ HERE = Path(__file__).resolve().parent
 REPO = HERE.parents[3]
 PROBES = REPO / ".claude/scripts/probes"
 MEASURE = "limit-models@1"
+sys.path.insert(0, str(REPO / ".claude/scripts"))
+from _lib import epr_client  # noqa: E402
 
 REGISTRY = """measures-version: 1
 measures:
@@ -69,7 +71,7 @@ ADAPTER = (
 
 
 def epr() -> str:
-    found = os.environ.get("EPR_BIN") or shutil.which("epr")
+    found = epr_client.resolve_binary()
     if not found:
         sys.exit("restraint oracle: no `epr` on PATH and EPR_BIN unset")
     return found

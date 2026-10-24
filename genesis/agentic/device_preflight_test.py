@@ -61,8 +61,8 @@ class ArrivalTest(unittest.TestCase):
             # The fake `epr` is a python3 script: keep the real PATH behind the fixture bin so
             # `/usr/bin/env python3` resolves while `epr` still resolves to the fake first.
             "PATH": f"{self.bin}{os.pathsep}{os.path.dirname(sys.executable)}",
-            # The pool glob must not find the workspace's real `epr` when the test removes the fake.
-            "CARGO_TARGET_POOL_ROOT": str(Path(self.tmp.name) / "no-pool"),
+            "EPR_BIN": str(self.bin / "epr"),
+            "EPR_STORE": str(Path(self.tmp.name) / "epr-store"),
             "HOME": str(Path(self.tmp.name) / "home"),
             "CLAUDE_CONFIG_DIR": str(self.config),
             "ELOHIM_DEVICE_KEY_FILE": str(self.key),
@@ -90,6 +90,15 @@ class ArrivalTest(unittest.TestCase):
         self.assertEqual([l.name for l in lines], ["epr binary", "device key", "roster bound", "embed model", "fold attested", "berth moored"])
         self.assertTrue(all(l.ok for l in lines), [l.render() for l in lines])
         self.assertIn("human:matthew", lines[2].render())
+
+    def test_path_launcher_without_a_resolved_store_head_refuses(self):
+        self.arrived()
+        env = self.env()
+        env.pop("EPR_BIN")
+        line = preflight(self.root, env, None, "sess")[0]
+        self.assertFalse(line.ok)
+        self.assertIn("no `epr` candidate", line.render())
+        self.assertIn("epr-store bootstrap", line.render())
 
     def test_no_key_refuses_and_names_enroll(self):
         self.arrived()

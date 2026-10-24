@@ -51,12 +51,13 @@ Deterministic, read-only, no network. Statuses are DECLARED in habits.yaml (cove
 import json
 import os
 import re
-import shutil
 import subprocess
 import sys
 from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime, timezone
 from pathlib import Path
+
+from _lib import epr_client
 
 try:
     import yaml
@@ -170,7 +171,6 @@ COST_REGISTRIES = [
     _ROOT / ".claude" / "epr-meta" / "measures.yaml",
     _ROOT / ".claude" / "epr-meta" / "policies.yaml",
 ]
-_GATE_TARGET_BIN = "/tmp/eprfs-gate-target/debug/epr"  # same resolution order as the hooks
 _BOUND_TIMEOUT = 15
 
 
@@ -199,12 +199,7 @@ def cost_bounds() -> dict:
 
 
 def _epr_bin():
-    env = os.environ.get("EPR_BIN")
-    if env and os.path.isfile(env) and os.access(env, os.X_OK):
-        return env
-    if os.path.isfile(_GATE_TARGET_BIN) and os.access(_GATE_TARGET_BIN, os.X_OK):
-        return _GATE_TARGET_BIN
-    return shutil.which("epr")
+    return epr_client.resolve_binary()
 
 
 def _read_bound_native(bound_id: str):

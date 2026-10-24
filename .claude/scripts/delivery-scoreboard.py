@@ -28,9 +28,10 @@ Usage:  python3 .claude/scripts/delivery-scoreboard.py [--json]
 
 import json
 import os
-import shutil
 import subprocess
 import sys
+
+from _lib import epr_client
 
 PROJECT = os.environ.get("CLAUDE_PROJECT_DIR") or os.path.dirname(
     os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
@@ -147,16 +148,14 @@ def doc_budget():
     """The budget headline verbatim — its gate lines now self-report liveness.
 
     Owner since station one of the memory-kit replacement: `epr flow report --headline`,
-    switched here 2026-09-11 (station six round (a)). Binary resolution mirrors the hooks':
-    $EPR_BIN, the eprfs gate target, then PATH. No kit fallback — the native verb is the owner,
+    switched here 2026-09-11 (station six round (a)). Binary resolution is the shared client:
+    $EPR_BIN, then the stable launcher on PATH. No kit fallback — the native verb is the owner,
     and a missing binary is reported as a gate-error rather than silently answered by a tool
     this plan is retiring.
     """
-    binary = (os.environ.get("EPR_BIN")
-              or next((c for c in ("/tmp/eprfs-gate-target/debug/epr",) if os.path.isfile(c)), None)
-              or shutil.which("epr"))
+    binary = epr_client.resolve_binary()
     if not binary:
-        return ["⚠ gate-error (epr binary not found: $EPR_BIN, the gate target, or PATH)"]
+        return ["⚠ gate-error (epr binary not found: $EPR_BIN or PATH)"]
     out = subprocess.run([binary, "flow", "report", "--headline", "--root", PROJECT],
                          capture_output=True, text=True, timeout=30, cwd=PROJECT)
     if out.returncode != 0:

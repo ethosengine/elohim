@@ -7,7 +7,7 @@
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { mkdtempSync, writeFileSync, chmodSync, rmSync } from 'node:fs';
+import { mkdtempSync, writeFileSync, chmodSync, rmSync, readFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import {
@@ -174,6 +174,54 @@ test('a dirty working tree under the project is named on the line and blocks the
   } finally {
     rmSync(dir, { recursive: true, force: true });
   }
+});
+
+test('a pushed commit that is not checked out can be inspected but never recorded', () => {
+  const dir = mkdtempSync(join(tmpdir(), 'gate-evidence-'));
+  try {
+    for (const name of ['brit', 'brit-build-ref']) {
+      writeFileSync(join(dir, name), '#!/bin/sh\nexit 0\n');
+      chmodSync(join(dir, name), 0o755);
+    }
+    const env = {
+      BRIT_BIN: join(dir, 'brit'),
+      BRIT_BUILD_REF_BIN: join(dir, 'brit-build-ref'),
+      GATE_EVIDENCE_RECORD: '0',
+      PATH: '',
+    };
+    const { spawn } = fakeSpawn([
+      [isFingerprint, fingerprintReply('bafy-a')],
+      [isRevParse, { status: 0, stdout: 'blob1\n', stderr: '' }],
+      [isStatus, { status: 0, stdout: '', stderr: '' }],
+      [isFind, { status: 0, stdout: '[]', stderr: '' }],
+      [isPut, { status: 0, stdout: 'must-not-land', stderr: '' }],
+    ]);
+
+    const result = gateEvidence(project, {
+      env, root: '/repo', commit: 'pushed-not-head', cargoEnv: {}, spawn,
+    });
+    assert.equal(result.dirty, true);
+    assert.match(result.line, /pushed commit is not checked out, nothing will be recorded/);
+    const put = recordEvidence(project, result.key, {
+      success: true,
+      seconds: 1,
+      commit: 'pushed-not-head',
+      buildRefBin: env.BRIT_BUILD_REF_BIN,
+      root: '/repo',
+      dirty: result.dirty,
+      spawn,
+    });
+    assert.notEqual(put.status, 0);
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test('pre-push disables evidence recording when the pushed SHA differs from HEAD', () => {
+  const hook = readFileSync(new URL('../../.husky/pre-push.bash', import.meta.url), 'utf8');
+  assert.match(hook, /if \[ -n "\$GATE_COMMIT" \] && \[ "\$GATE_COMMIT" != "\$CHECKED_OUT_HEAD" \]; then/);
+  assert.match(hook, /export GATE_EVIDENCE_RECORD=0/);
+  assert.match(hook, /gate evidence will not be recorded: pushed SHA/);
 });
 
 test('gateEvidence is fail-open: no brit, an attested project, or a refused read all read as unavailable', () => {

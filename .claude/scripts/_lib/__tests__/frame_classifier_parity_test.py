@@ -234,7 +234,7 @@ def compare_frame_refs() -> None:
 def main() -> int:
     binary = epr_client.resolve_binary()
     if binary is None:
-        print("  ⏭  SKIP — no `epr` binary resolves (EPR_BIN, PATH, the cargo pool); the frame "
+        print("  ⏭  SKIP — no `epr` binary resolves (EPR_BIN or PATH); the frame "
               "classifier's native↔Python parity is UNPROVEN, not passed. Build elohim-epr-cli.")
         return 0
     print(f"  epr: {binary}")

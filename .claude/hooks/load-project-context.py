@@ -89,7 +89,7 @@ def _epr_headline(project_dir: str) -> str:
     The bounds themselves live in .claude/epr-meta/{measures,policies}.yaml; this verb folds
     each one against the observations the drift hooks append and prints the same headline
     lines the SessionStart headline is made of. Returns "" when the verb is absent or fails;
-    there is no second producer to fall back to. Binary resolution: $EPR_BIN, gate target, PATH.
+    there is no second producer to fall back to. Binary resolution: $EPR_BIN, then PATH.
     """
     import subprocess
     obs = _observation_module(project_dir)
@@ -154,7 +154,7 @@ def _epr_bootstrap_block(project_dir: str, data: dict) -> str:
     obs = _observation_module(project_dir)
     binary = obs.resolve_bin() if obs else None
     if not binary:
-        return "bootstrap: skipped — no epr binary resolved ($EPR_BIN, gate target, PATH)"
+        return "bootstrap: skipped — no epr binary resolved ($EPR_BIN or PATH)"
     session_id = obs.bootstrap_session_id(project_dir, data)
     try:
         r = subprocess.run(

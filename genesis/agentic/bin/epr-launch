@@ -1,0 +1,2 @@
+#!/bin/sh
+exec "@EPR_PYTHON@" -I "@EPR_STORE_PY@" exec -- "$@"

@@ -28,6 +28,7 @@ import subprocess
 import sys
 import tempfile
 import unittest
+from unittest import mock
 from pathlib import Path
 
 HOOKS = Path(__file__).resolve().parent.parent
@@ -551,13 +552,27 @@ class DriftObservationCase(unittest.TestCase):
 
 
 class ObservationHelperCase(unittest.TestCase):
+    def test_probe_uses_one_coherent_path_cid_resolution(self):
+        mod = load_module("observation_single_resolution", HOOKS / "_observation.py")
+        with (
+            mock.patch.object(mod.epr_client, "resolve", return_value=("/candidate/a", "cid-a"))
+            as resolve,
+            mock.patch.object(mod, "_read_disk_cache", return_value=None),
+            mock.patch.object(mod, "_write_disk_cache"),
+            mock.patch.object(mod, "_probe", return_value=True) as probe,
+        ):
+            mod.reset_cache()
+            self.assertTrue(mod.available())
+
+        resolve.assert_called_once_with()
+        probe.assert_called_once_with("/candidate/a")
+        self.assertEqual(mod._probe_memo["key"], "cid-a")
+
     def test_missing_binary_costs_no_subprocess(self):
         mod = load_module("observation_under_test", HOOKS / "_observation.py")
         saved = dict(os.environ)
-        saved_target = mod._GATE_TARGET_BIN
-        os.environ["EPR_BIN"] = "/nonexistent/epr"
+        os.environ.pop("EPR_BIN", None)
         os.environ["PATH"] = "/nonexistent"
-        mod._GATE_TARGET_BIN = "/nonexistent/gate-target-epr"
         try:
             mod.reset_cache()
             self.assertIsNone(mod.resolve_bin())
@@ -566,7 +581,6 @@ class ObservationHelperCase(unittest.TestCase):
         finally:
             os.environ.clear()
             os.environ.update(saved)
-            mod._GATE_TARGET_BIN = saved_target
             mod.reset_cache()
 
 
@@ -589,7 +603,7 @@ class GoldenReportCase(unittest.TestCase):
         mod.reset_cache()
         cls.binary = mod.resolve_bin()
         if not cls.binary:
-            raise unittest.SkipTest("no `epr` binary ($EPR_BIN, the gate target, or PATH)")
+            raise unittest.SkipTest("no `epr` binary ($EPR_BIN or PATH)")
         probe = subprocess.run([cls.binary, "flow", "note", "--help"],
                                capture_output=True, text=True, timeout=20)
         if "--measure" not in (probe.stdout + probe.stderr):

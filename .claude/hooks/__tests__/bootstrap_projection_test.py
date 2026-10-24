@@ -49,7 +49,7 @@ What is asserted:
      fallback) so a same-day re-run of this file never resumes a prior test's session and
      silently drops the `top red:` orientation line that a resumed `open` omits.
 
-Run: EPR_BIN=/tmp/eprfs-gate-target/debug/epr python3 -m unittest discover \
+Run: EPR_BIN=/path/to/candidate/epr python3 -m unittest discover \
        -s .claude/hooks/__tests__ -p 'bootstrap_projection_test.py'
 """
 from __future__ import annotations
@@ -130,6 +130,11 @@ class _StubFixture(unittest.TestCase):
         self.project = self.tmp / "project"
         (self.project / ".claude" / "hooks").mkdir(parents=True)
         shutil.copy(HOOKS / "_observation.py", self.project / ".claude" / "hooks")
+        library = self.project / ".claude" / "scripts" / "_lib"
+        library.mkdir(parents=True)
+        shutil.copy(HOOKS.parent / "scripts" / "_lib" / "epr_client.py", library)
+        shutil.copy(HOOKS.parent / "scripts" / "_lib" / "epr_store.py", library)
+        (library / "__init__.py").write_text("")
         self.log = self.tmp / "stub.log"
         self.stub = self.tmp / "epr"
         self.stub.write_text(STUB)
@@ -216,7 +221,7 @@ class HeadlineStubCase(_StubFixture):
         mod = load_module("load_project_context_for_missing_bin", HOOKS / "load-project-context.py")
         mod._observation_module = lambda project_dir: None  # simulates the module being absent
         out = mod._epr_bootstrap_block(str(self.project), {"session_id": "missing-fixture"})
-        self.assertEqual(out, "bootstrap: skipped — no epr binary resolved ($EPR_BIN, gate target, PATH)")
+        self.assertEqual(out, "bootstrap: skipped — no epr binary resolved ($EPR_BIN or PATH)")
 
     def test_session_id_prefers_the_payload_via_the_shared_helper(self):
         obs = load_module("obs_for_lpc_session_id", HOOKS / "_observation.py")
@@ -287,8 +292,7 @@ class RunPlaneStubCase(_StubFixture):
         mod = load_module("run_projection_for_missing_obs", HOOKS / "run-projection.py")
         mod._observation_module = lambda: None
         lines = mod.run_plane_lines(self.project, {})
-        self.assertEqual(lines, ["bootstrap: skipped — no epr binary resolved "
-                                 "($EPR_BIN, gate target, PATH)"])
+        self.assertEqual(lines, ["bootstrap: skipped — no epr binary resolved ($EPR_BIN or PATH)"])
 
     def test_session_id_prefers_the_payload_via_the_shared_helper(self):
         obs = load_module("obs_for_rp_session_id", HOOKS / "_observation.py")
@@ -326,7 +330,7 @@ class BootstrapProjectionGoldenCase(unittest.TestCase):
         mod = load_module("obs_for_bootstrap_golden", HOOKS / "_observation.py")
         cls.binary = mod.resolve_bin()
         if not cls.binary:
-            raise unittest.SkipTest("no `epr` binary ($EPR_BIN, the gate target, or PATH)")
+            raise unittest.SkipTest("no `epr` binary ($EPR_BIN or PATH)")
         r = subprocess.run([cls.binary, "flow", "memory", "recall", "--help"],
                            capture_output=True, text=True, timeout=10)
         if "open" not in (r.stdout + r.stderr):

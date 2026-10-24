@@ -15,9 +15,10 @@ this hook is a ROUTER, not a second projector: it never renders a row itself.
 Three things it does that a bare command line in settings.json cannot, and each is why it exists:
 
 1. **Probe before spending.** Same discipline as `_observation.py`: resolve the binary
-   ($EPR_BIN, the gate target, PATH), try the native verb ONCE under a hard timeout, and cache
-   the verdict on disk keyed by the binary's path+mtime+size. A rebuilt binary re-probes; an
-   unchanged one never spawns the trial again; a missing binary costs zero subprocesses.
+   ($EPR_BIN, then the content-addressed store), try the native verb ONCE under a hard timeout,
+   and cache the verdict on disk keyed by the resolved executable CID. A different pin re-probes;
+   an unchanged one never spawns the trial again; a missing binary costs zero subprocesses and
+   never writes a negative cache entry.
 
 2. **A LATENCY budget, not just a capability probe.** Re-measured 2026-09-11 (station six
    round (a)) on the installed binary: the native projection takes **1.0s**, not the ~119s
@@ -100,7 +101,7 @@ from pathlib import Path
 
 HOOKS = Path(__file__).resolve().parent
 sys.path.insert(0, str(HOOKS))
-from _observation import resolve_bin  # noqa: E402  (shared binary resolution, one owner)
+from _observation import resolve, resolve_bin  # noqa: E402  (one resolver owner)
 
 INDEX_REL = ".claude/memory/MEMORY.md"
 BUDGET_MEASURE = "memory-index-bytes@1"
@@ -134,14 +135,6 @@ def _repo() -> Path:
     if env and Path(env).is_dir():
         return Path(env).resolve()
     return HOOKS.parent.parent
-
-
-def _binary_key(path: str) -> str:
-    try:
-        st = os.stat(path)
-        return f"{path}:{int(st.st_mtime)}:{st.st_size}"
-    except OSError:
-        return f"{path}:?:?"
 
 
 def _cache_path(key: str) -> str:
@@ -193,14 +186,13 @@ def native_route(root: Path) -> tuple[str | None, str]:
     """(binary, reason) when the native leg is usable right now, else (None, reason)."""
     global _probe_memo
     forced = os.environ.get("MEMORY_INDEX_NATIVE")
-    binary = resolve_bin()
-    if not binary:
-        return None, "no `epr` binary ($EPR_BIN, the gate target, or PATH)"
+    binary, key = resolve()
+    if not binary or not key:
+        return None, "no `epr` binary ($EPR_BIN or PATH)"
     if forced == "0":
         return None, "MEMORY_INDEX_NATIVE=0 stands this hook down"
     if forced == "1":
         return binary, "MEMORY_INDEX_NATIVE=1 pins the native projection"
-    key = _binary_key(binary)
     if _probe_memo and _probe_memo.get("key") == key:
         usable, reason = _probe_memo["usable"], _probe_memo["reason"]
     else:

@@ -299,6 +299,12 @@ CID it ran. A bad build costs one failed health check and nothing else.
 - `epr integrate`'s atomic fast-forward (`elohim/eprfs/epr-cli/src/flow/integrate.rs`) is a second
   way to land on `dev`. Slice 1 wires the pre-push, because the main tree has `dev` checked out
   and lands by push. Slice 2 should make `integrate` publish too.
+- Slice 1's store and launcher are Python (`.claude/scripts/_lib/epr_store.py`). That is
+  deliberately a sketch of the local rung, not the durable home: the operator's 2026-10-22 ruling
+  gives the lowest-level primitives first-class Rust. They retire into native code at slice 2, when
+  following moves into the adoption path and the launcher becomes a native exec. The native launcher
+  also removes the interpreter's per-call cost, measured on 2026-10-24 at about 40 ms over the
+  bare binary.
 
 - The pointer and store layout and the exact path.
 - The health-check command for each class.

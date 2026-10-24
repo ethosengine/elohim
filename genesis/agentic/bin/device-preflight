@@ -11,7 +11,7 @@ any REFUSED, else 0. It never fixes anything itself; the fix commands are the de
 
 The six conditions, in dependency order:
 
-  epr binary     the native evaluator is reachable (EPR_BIN, PATH, or the cargo target pool)
+  epr binary     epr-store reports a candidate or committed launcher target (EPR_BIN or PATH)
   device key     ${ELOHIM_DEVICE_KEY_FILE:-$XDG_CONFIG_HOME/elohim/device/ed25519.seed} exists (PVC)
   roster bound   `epr actor current --device` reads a standing human: this device is in a roster
   embed model    the model manifest's `resolve` list reaches model.onnx + tokenizer.json
@@ -28,10 +28,8 @@ Run:   python3 -m unittest genesis.agentic.device_preflight_test
 from __future__ import annotations
 
 import argparse
-import glob
 import json
 import os
-import shutil
 import subprocess
 import sys
 from dataclasses import dataclass
@@ -42,16 +40,9 @@ INDEX_MEASURE_REL = ".epr-meta/elohim/algorithms/recall-semantic-index.json"
 PARTICIPANTS_REL = ".eprfs/status/participants"
 FOLD_LAG_DEFAULT = 25
 READ_TIMEOUT_S = 10
-
-# Where a compiled `epr` plausibly lives when it is on neither EPR_BIN nor PATH (the symlink in
-# $HOME that usually carries it is wiped on a Che restart). Same globs as
-# .claude/scripts/_lib/epr_client.py — duplicated rather than imported so this workspace-runtime
-# script never reaches into the harness-side library.
-_POOL_GLOBS = (
-    "{pool}/family/*/elohim__eprfs/*/release/epr",
-    "{pool}/family/*/elohim__eprfs/*/debug/epr",
-)
-POOL_ROOT_DEFAULT = "/projects/.cargo-target-pool"
+SCRIPT_REPO = Path(__file__).resolve().parents[3]
+sys.path.insert(0, str(SCRIPT_REPO / ".claude/scripts"))
+from _lib import epr_client  # noqa: E402
 
 
 @dataclass
@@ -69,25 +60,7 @@ class Line:
 
 
 def resolve_epr(env: dict[str, str]) -> str | None:
-    pinned = env.get("EPR_BIN")
-    if pinned and Path(pinned).is_file() and os.access(pinned, os.X_OK):
-        return pinned
-    found = shutil.which("epr", path=env.get("PATH"))
-    if found:
-        return found
-    newest, newest_mtime = None, -1.0
-    pool = env.get("CARGO_TARGET_POOL_ROOT") or POOL_ROOT_DEFAULT
-    for pattern in _POOL_GLOBS:
-        for candidate in glob.glob(pattern.format(pool=pool)):
-            try:
-                if not os.access(candidate, os.X_OK):
-                    continue
-                mtime = os.stat(candidate).st_mtime
-            except OSError:
-                continue
-            if mtime > newest_mtime:
-                newest, newest_mtime = candidate, mtime
-    return newest
+    return epr_client.resolve_binary(env)
 
 
 def run_json(argv: list[str], cwd: Path, env: dict[str, str]) -> tuple[dict | None, str]:
@@ -141,16 +114,30 @@ def pending_enrollment(root: Path, handle: str) -> Path | None:
     return p if p.is_file() else None
 
 
-def check_epr(env: dict[str, str]) -> tuple[Line, str | None]:
+def check_epr(root: Path, env: dict[str, str]) -> tuple[Line, str | None]:
     binary = resolve_epr(env)
-    if binary:
-        return Line("epr binary", True, binary), binary
+    if binary and Path(binary).is_file() and os.access(binary, os.X_OK):
+        store_cli = env.get("EPR_STORE_BIN") or str(SCRIPT_REPO / "genesis/agentic/bin/epr-store")
+        value, error = run_json([store_cli, "status", "--json"], root, env)
+        if value is not None and value.get("resolved"):
+            head = value.get("head") or "none"
+            running = value.get("session_cid") or value.get("resolved_cid") or "candidate"
+            state = "behind" if value.get("behind") else value.get("source", "resolved")
+            return Line("epr binary", True, f"{running} vs head {head} ({state}) via {binary}"), binary
+        if value is not None:
+            return Line(
+                "epr binary",
+                False,
+                "epr-store has no resolved candidate, session pin, or committed head",
+                "run `epr-store bootstrap`",
+            ), None
+        return Line("epr binary", False, f"epr-store status unreadable: {error}", "run `epr-store status`"), None
     return (
         Line(
             "epr binary",
             False,
-            "no `epr` on EPR_BIN, PATH or the cargo target pool",
-            "install it: `cargo install --path elohim/eprfs/epr-cli --locked` (or export EPR_BIN=<path>)",
+            "no `epr` candidate or launcher on EPR_BIN/PATH",
+            "run `epr-store bootstrap`",
         ),
         None,
     )
@@ -281,7 +268,7 @@ def check_berth(env: dict[str, str], session: str | None) -> Line:
 def preflight(root: Path, env: dict[str, str], handle: str | None, session: str | None) -> list[Line]:
     handles = roster_handles(root)
     handle = handle or (handles[0] if len(handles) == 1 else None) or "<handle>"
-    epr_line, binary = check_epr(env)
+    epr_line, binary = check_epr(root, env)
     return [
         epr_line,
         check_device_key(env, handle),

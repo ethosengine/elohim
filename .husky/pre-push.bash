@@ -271,6 +271,8 @@ fi
 
 CHANGED=""
 PUSH_TARGETS=""
+LAST_LOCAL_SHA=""
+DEV_LOCAL_SHA=""
 for PUSH_LINE in "${PUSH_LINES[@]}"; do
   read -r LOCAL_REF LOCAL_SHA REMOTE_REF REMOTE_SHA <<<"$PUSH_LINE"
   # Skip delete pushes
@@ -280,11 +282,10 @@ for PUSH_LINE in "${PUSH_LINES[@]}"; do
 
   # Track push targets — sweettest tiering keys off "is this the dev push?"
   PUSH_TARGETS="$PUSH_TARGETS $REMOTE_REF"
-  # The commit being pushed is what the gate's evidence is keyed on (gate-evidence.mjs reads
-  # GATE_COMMIT; HEAD is only what this checkout happens to have). Last ref wins when a push
-  # carries several — the gate selection below is already the union of their diffs.
-  GATE_COMMIT="$LOCAL_SHA"
-  export GATE_COMMIT
+  LAST_LOCAL_SHA="$LOCAL_SHA"
+  if [ "$REMOTE_REF" = "refs/heads/dev" ]; then
+    DEV_LOCAL_SHA="$LOCAL_SHA"
+  fi
 
   # Check EACH pushed object against its actual destination before filters or PVC
   # deferral. Never substitute the dirty checkout or last ref for the pushed tree.
@@ -311,6 +312,18 @@ for PUSH_LINE in "${PUSH_LINES[@]}"; do
     CHANGED=$(printf '%s\n%s' "$CHANGED" "$NEW_CHANGED")
   fi
 done
+
+# Gate evidence and household landing follow the exact object destined for dev. For pushes that
+# do not include dev, preserve the former last-ref behavior for the ordinary union gate.
+GATE_COMMIT="${DEV_LOCAL_SHA:-$LAST_LOCAL_SHA}"
+export GATE_COMMIT
+CHECKED_OUT_HEAD=$(git rev-parse HEAD 2>/dev/null || echo "")
+if [ -n "$GATE_COMMIT" ] && [ "$GATE_COMMIT" != "$CHECKED_OUT_HEAD" ]; then
+  export GATE_EVIDENCE_RECORD=0
+  echo "[pre-push] gate evidence will not be recorded: pushed SHA $GATE_COMMIT is not checked-out HEAD $CHECKED_OUT_HEAD"
+else
+  unset GATE_EVIDENCE_RECORD
+fi
 
 # Nothing changed — let it through
 if [ -z "$CHANGED" ]; then
@@ -952,6 +965,42 @@ if command -v cargo-deny >/dev/null 2>&1; then
     exit 1
   fi
   echo "── end cargo deny check ───────────────────────────────────────"
+fi
+
+# A gate makes an epr build available in the device store. Only a clean, green commit actually
+# landing on dev may move the household head; every refusal here is advisory to the push.
+EPR_STORE_CLI="$HOOK_WORK_TREE/genesis/agentic/bin/epr-store"
+EPR_LAND_REASON=""
+if [ -z "$DEV_LOCAL_SHA" ]; then
+  EPR_LAND_REASON="push does not target refs/heads/dev"
+fi
+if [ -z "$EPR_LAND_REASON" ] && ! echo " $PROJECTS " | grep -q " eprfs "; then
+  EPR_LAND_REASON="eprfs was not among the green gates"
+fi
+# Cleanliness is judged by `epr-store land` over epr's own source closure; the main checkout's
+# hook ledgers are always dirty and say nothing about the bytes being landed.
+if [ -z "$EPR_LAND_REASON" ] && [ "$(git rev-parse HEAD 2>/dev/null)" != "$DEV_LOCAL_SHA" ]; then
+  EPR_LAND_REASON="HEAD does not equal the SHA targeting dev"
+fi
+if [ -z "$EPR_LAND_REASON" ] && [ ! -x "$EPR_STORE_CLI" ]; then
+  EPR_LAND_REASON="epr-store is not executable"
+fi
+if [ -z "$EPR_LAND_REASON" ]; then
+  EPR_CANDIDATE_CID=$(
+    "$EPR_STORE_CLI" status --commit "$DEV_LOCAL_SHA" --json 2>/dev/null |
+      python3 -c 'import json,sys; rows=json.load(sys.stdin).get("candidates", []); print(rows[0].get("cid", "") if rows else "")' \
+      2>/dev/null || true
+  )
+  if [ -z "$EPR_CANDIDATE_CID" ]; then
+    EPR_LAND_REASON="no ingested epr candidate names the SHA targeting dev"
+  elif "$EPR_STORE_CLI" land "$EPR_CANDIDATE_CID" --commit "$DEV_LOCAL_SHA" --repo "$HOOK_WORK_TREE" >/dev/null 2>&1; then
+    echo "[pre-push] epr household head landed: $EPR_CANDIDATE_CID"
+  else
+    EPR_LAND_REASON="epr-store refused candidate health or provenance"
+  fi
+fi
+if [ -n "$EPR_LAND_REASON" ]; then
+  echo "[pre-push] epr household head not landed: $EPR_LAND_REASON"
 fi
 
 # Stage 1a: advisory brit checks (never fail the push).

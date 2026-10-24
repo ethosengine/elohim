@@ -647,7 +647,25 @@ _gate-epr-ts:
 _gate-eprfs:
     cd elohim/eprfs && cargo fmt --check
     cd elohim/eprfs && cargo clippy --workspace --all-targets -- -D warnings
-    cd elohim/eprfs && cargo test --workspace
+    # gate-runner gives each linked worktree a -wt-<basename> target suffix, so another
+    # worktree cannot replace this tested artifact before the staging copy below.
+    # Accepted residual: a concurrent rebuild in this same worktree can still replace debug/epr.
+    # "Clean" is judged over epr's own source closure (epr-store source-state), not the whole
+    # tree: hooks keep `.claude/data` ledgers dirty in the main checkout.
+    @before="$("{{ root }}/genesis/agentic/bin/epr-store" source-state 2>/dev/null || echo none)"; \
+      tested_head="$(git rev-parse HEAD)"; \
+      (cd elohim/eprfs && cargo test --workspace) || exit $?; \
+      after="$("{{ root }}/genesis/agentic/bin/epr-store" source-state 2>/dev/null || echo none)"; \
+      tree_clean=false; \
+      if [[ "$before" == "$after" && "$before" == *'"clean": true'* ]]; then tree_clean=true; fi; \
+      if [[ -x "$CARGO_TARGET_DIR/debug/epr" ]]; then \
+        "{{ root }}/genesis/agentic/bin/epr-store" ingest "$CARGO_TARGET_DIR/debug/epr" \
+          --source-commit "$tested_head" --tree-clean "$tree_clean" \
+          --gate-run "${GATE_RUN_KIND:-local-gate}" \
+          >/dev/null || echo "[gate] epr dev-context ingest skipped (store refused; gate remains green)"; \
+      else \
+        echo "[gate] epr dev-context ingest skipped ($CARGO_TARGET_DIR/debug/epr was not built)"; \
+      fi
 
 # Exercise the agent journey against the same native binary just built in the
 # manifest-selected pool slot; the Cucumber profile owns isolated local fixtures.

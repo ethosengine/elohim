@@ -1,11 +1,14 @@
 #!/usr/bin/env python3
 """Advisory native seam guidance; normalization and classification belong to epr."""
 import json
-import os
 from pathlib import Path
 import subprocess
 import sys
 import time
+
+root = Path(__file__).resolve().parents[2]
+sys.path.insert(0, str(root / ".claude/scripts"))
+from _lib import epr_client  # noqa: E402
 
 
 def main():
@@ -15,13 +18,15 @@ def main():
         if len(raw) > 1572864:
             raise ValueError("event exceeds size limit")
         event = json.loads(raw)
-        root = Path(__file__).resolve().parents[2]
         harness = sys.argv[1] if len(sys.argv) > 1 else "unknown"
         remaining = 1.8 - (time.monotonic() - started)
         if remaining <= 0:
             raise TimeoutError("normalization deadline")
+        binary = epr_client.resolve_binary()
+        if binary is None:
+            raise FileNotFoundError("epr launcher is not on PATH")
         result = subprocess.run(
-            [os.environ.get("EPR_SEAM_BIN", "epr"), "govern", "seam", "--repo", str(root)],
+            [binary, "govern", "seam", "--repo", str(root)],
             input=json.dumps({"harness": harness, "event": event}),
             text=True, capture_output=True, timeout=remaining, check=True,
         )

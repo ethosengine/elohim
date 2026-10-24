@@ -24,6 +24,12 @@ fn main() -> ExitCode {
         println!("{}", usage());
         return ExitCode::SUCCESS;
     }
+    // Identity must be answerable outside a worktree: launchers and artifact stores use this
+    // before deciding whether the binary may become a committed head.
+    if matches!(raw.first().map(String::as_str), Some("--version" | "-V")) {
+        println!("{}", govern::evaluator_identity());
+        return ExitCode::SUCCESS;
+    }
     if raw.first().map(String::as_str) == Some("flow") {
         return match flow::run(&raw[1..]) {
             Ok(code) => code,

@@ -81,20 +81,16 @@ class ParticipantStandingCase(unittest.TestCase):
         self.project = self.tmp / "project"
         hooks = self.project / ".claude" / "hooks"
         hooks.mkdir(parents=True)
-        # The fixture's `_observation` resolves no gate-target binary, so the ONLY `epr` the
-        # hook can find is the one a test puts on $EPR_BIN (the real gate target on this host
-        # would otherwise answer `binary_absent`).
-        obs = (HOOKS / "_observation.py").read_text()
-        self.assertIn('_GATE_TARGET_BIN = "', obs)
-        obs = obs.replace(
-            obs[obs.index('_GATE_TARGET_BIN = "'):].split("\n", 1)[0],
-            '_GATE_TARGET_BIN = "/nonexistent/participant-standing-test/epr"',
-        )
-        (hooks / "_observation.py").write_text(obs)
+        shutil.copy(HOOKS / "_observation.py", hooks)
+        library = self.project / ".claude" / "scripts" / "_lib"
+        library.mkdir(parents=True)
+        shutil.copy(HOOKS.parent / "scripts" / "_lib" / "epr_client.py", library)
+        shutil.copy(HOOKS.parent / "scripts" / "_lib" / "epr_store.py", library)
+        (library / "__init__.py").write_text("")
         self.log = self.tmp / "stub.log"
         self.stub = self.tmp / "bin" / "epr"
         self.stub.parent.mkdir()
-        # An absolute interpreter: $PATH is emptied so no real `epr` can be found on it.
+        # An absolute interpreter: $PATH is emptied so only EPR_BIN can resolve.
         self.stub.write_text(STUB.replace("#!/usr/bin/env python3", f"#!{sys.executable}", 1))
         self.stub.chmod(0o755)
         self.empty_path = self.tmp / "empty-path"

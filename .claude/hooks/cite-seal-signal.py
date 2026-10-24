@@ -26,7 +26,6 @@ from __future__ import annotations
 
 import json
 import os
-import shutil
 import sys
 from pathlib import Path
 
@@ -37,28 +36,14 @@ for _ in range(8):
         break
     _here = _here.parent
 from _lib import cite_graph as cg  # noqa: E402
+from _lib import epr_client  # noqa: E402
 from _lib import frontmatter as fm  # noqa: E402
 from _lib import managed_surfaces as ms  # noqa: E402
 
 
 def _epr_bin() -> str:
-    """How this repository invokes the native cite writer, resolved at nudge time.
-
-    `EPR_BIN` wins, then whatever is on PATH, then the cargo bin dir the gate installs into. When
-    none of those resolve the nudge says so and names the build, because pointing an agent at a
-    binary that is not there is worse than pointing it at the build that produces one — and the
-    Python cite scripts this replaced are gone, so there is no script to fall back to."""
-    override = os.environ.get("EPR_BIN")
-    if override and Path(override).exists():
-        return override
-    found = shutil.which("epr")
-    if found:
-        return "epr"
-    cargo_bin = Path("/opt/rust/cargo/bin/epr")
-    if cargo_bin.exists():
-        return str(cargo_bin)
-    return ("epr  # not on PATH — build it: env RUSTFLAGS= CARGO_TARGET_DIR=/tmp/eprfs-gate-target "
-            "cargo build --manifest-path elohim/eprfs/Cargo.toml -p elohim-epr-cli\n#")
+    """How this repository invokes the native cite writer, resolved at nudge time."""
+    return epr_client.resolve_binary() or "epr  # not on PATH — run: epr-store bootstrap\n#"
 
 
 def _unsealed_debt(doc: Path, repo: Path) -> int:

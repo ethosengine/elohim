@@ -29,9 +29,9 @@ silent, and why a hook must never depend on its return value to do its own job.
 Nothing is printed on either path: these hooks are best-effort and must never block or narrate.
 
 Probe cost discipline: the hooks run on EVERY Edit|Write under a tight budget, so the probe
-result is cached in-process AND on disk, keyed by the binary's path+mtime+size. A rebuilt binary
-re-probes; an unchanged one never spawns a subprocess again. A missing binary costs zero
-subprocesses.
+result is cached in-process AND on disk, keyed by the resolved executable CID. A different pin
+re-probes; an unchanged artifact never spawns the trial again. A missing binary costs zero
+subprocesses and never writes a negative cache entry.
 """
 
 from __future__ import annotations
@@ -39,17 +39,18 @@ from __future__ import annotations
 import json
 import os
 import re
-import shutil
 import subprocess
 import sys
 import tempfile
 from pathlib import Path
 
-__all__ = ["resolve_bin", "available", "emit", "reset_cache", "bound_count",
+__all__ = ["resolve", "resolve_bin", "resolved_cid", "available", "emit", "reset_cache", "bound_count",
            "bootstrap_session_id"]
 
-# Resolution order is the one the plan fixes: $EPR_BIN, the gate target, then PATH.
-_GATE_TARGET_BIN = "/tmp/eprfs-gate-target/debug/epr"
+_scripts = Path(__file__).resolve().parents[1] / "scripts"
+if str(_scripts) not in sys.path:
+    sys.path.insert(0, str(_scripts))
+from _lib import epr_client  # noqa: E402
 
 _PROBE_TIMEOUT = 4  # seconds; a slow/hung binary must degrade to the JSON fallback
 _EMIT_TIMEOUT = 5
@@ -65,12 +66,17 @@ def reset_cache() -> None:
 
 def resolve_bin() -> str | None:
     """The `epr` binary this hook should talk to, or None when there is none."""
-    env = os.environ.get("EPR_BIN")
-    if env and os.path.isfile(env) and os.access(env, os.X_OK):
-        return env
-    if os.path.isfile(_GATE_TARGET_BIN) and os.access(_GATE_TARGET_BIN, os.X_OK):
-        return _GATE_TARGET_BIN
-    return shutil.which("epr")
+    return epr_client.resolve_binary()
+
+
+def resolve() -> tuple[str | None, str | None]:
+    """The executable and its CID from one store resolution."""
+    return epr_client.resolve()
+
+
+def resolved_cid() -> str | None:
+    """The content identity behind ``resolve_bin``, without executing it."""
+    return epr_client.resolved_cid()
 
 
 def bootstrap_session_id(project_dir, payload: dict) -> str:
@@ -96,14 +102,6 @@ def bootstrap_session_id(project_dir, payload: dict) -> str:
     from datetime import date
     basis = f"{project_dir}:{date.today().isoformat()}"
     return hashlib.sha256(basis.encode()).hexdigest()[:16]
-
-
-def _binary_key(path: str) -> str:
-    try:
-        st = os.stat(path)
-        return f"{path}:{int(st.st_mtime)}:{st.st_size}"
-    except OSError:
-        return f"{path}:?:?"
 
 
 def _disk_cache_path(key: str) -> str:
@@ -153,11 +151,9 @@ def _probe(binary: str) -> bool:
 def available() -> bool:
     """Whether structured observations can be appended natively right now."""
     global _probe_memo
-    binary = resolve_bin()
-    if not binary:
-        _probe_memo = {"bin": None, "key": None, "available": False}
+    binary, key = resolve()
+    if not binary or not key:
         return False
-    key = _binary_key(binary)
     if _probe_memo and _probe_memo.get("key") == key:
         return bool(_probe_memo["available"])
     cached = _read_disk_cache(key)
