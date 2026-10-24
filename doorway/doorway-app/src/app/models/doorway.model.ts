@@ -532,13 +532,8 @@ export interface PortalHostResponse {
  */
 import type { AccountResponse as AccountWireResponse } from '../generated/account-response';
 
-/** Account-key fields supplied by the node-key ceremony. */
-export type AccountResponse = AccountWireResponse & {
-  agentPubKey?: string;
-  agencyPhase?: 'hosted' | 'doorway' | 'node' | 'device';
-  nodeKeyBoundAt?: string | null;
-  previousAgentPubKey?: string | null;
-};
+/** Schema-pinned account wire shape, including the node-key ceremony fields. */
+export type AccountResponse = AccountWireResponse;
 
 /**
  * Response to `POST /auth/close-account` (three-reds plan S2 Task 9 /

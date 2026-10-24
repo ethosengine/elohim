@@ -27,6 +27,7 @@ import { AUTH_TOKEN_KEY } from './doorway-session-token.store';
 // (flat wire shape; auth-wire plan Task 4 retired the nested duplicate).
 const STEWARD_ACCOUNT: AccountResponse = {
   humanId: 'human-1',
+  agentPubKey: 'uhCAk-steward-key',
   identifier: 'operator@example.com',
   permissionLevel: 'ADMIN',
   storageBytes: 0,

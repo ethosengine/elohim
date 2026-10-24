@@ -28,6 +28,7 @@ describe('DoorwayAccountComponent — hosted-steward is an in-between state', ()
 
   const BASE_ACCOUNT: AccountResponse = {
     humanId: 'human-matthew',
+    agentPubKey: 'uhCAk-matthew-hosted-key',
     identifier: 'matthew@alpha.elohim.host',
     permissionLevel: 'AUTHENTICATED',
     storageBytes: 1024,
@@ -334,6 +335,7 @@ describe('DoorwayAccountComponent — closing an account and the hosting strip',
    */
   const HOSTED: AccountResponse = {
     humanId: 'human-stranger',
+    agentPubKey: 'uhCAk-stranger-hosted-key',
     identifier: 'stranger@alpha.elohim.host',
     permissionLevel: 'AUTHENTICATED',
     storageBytes: 0,
@@ -547,6 +549,7 @@ describe('DoorwayAccountComponent — the agency pipeline a hosted human sees', 
   /** A freshly registered hosted human, exactly as `/auth/account` answers. */
   const FRESHLY_HOSTED: AccountResponse = {
     humanId: 'human-newcomer',
+    agentPubKey: 'uhCAk-newcomer-hosted-key',
     identifier: 'newcomer@alpha.elohim.host',
     permissionLevel: 'AUTHENTICATED',
     storageBytes: 0,
