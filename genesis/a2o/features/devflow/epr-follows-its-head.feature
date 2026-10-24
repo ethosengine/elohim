@@ -5,48 +5,57 @@ Feature: Matthew's workspace follows its landed epr head
   changes what those operations accept. Matthew's development workspace is one of his devices. It
   keeps epr builds by CID (content identifier: the hash of the build's bytes) and one landed head:
   the build a new session should run. A build is first ingested into that store, then landed as
-  the head only if it came from a clean commit, passes its health check (it names its own CID and
-  answers a read-only flow command) and descends from the current head: its source commit has the
-  head's source commit in its git history. "Lands" below means both steps; a build ingested but
-  not landed stays in the store, available to pin or to revert to. The store and its verbs
-  (ingest, land, resolve, status) are `bin-store`, the device's tool for every followed binary;
-  `epr` on PATH is a launcher that asks the same store which build to run. The first launcher
-  resolution in a session pins that head, so a gate may land a newer build without changing the
-  evaluator underneath work already in progress. A build ingested from an unfinished, dirty tree
-  remains available for deliberate testing, but it cannot silently become the device's head.
+  the head only if all four hold: it came from a clean commit (built with no uncommitted changes); that commit is published, meaning
+  it is contained in the development branch the device follows (its own `dev` or the remote's);
+  it descends from the current head, so its source commit has the head's source commit in its git
+  history; and it passes its health check (it names its own CID and answers a read-only flow
+  command). "Lands" below means both steps; a build ingested but not landed stays in the store,
+  available to pin or to revert to. A revert moves the head backward deliberately, and only to a
+  published build. The store's verbs (ingest, land, resolve, status, gc) are `epr bin`; `epr` on
+  PATH is a launcher that asks the same store which build to run. The first launcher resolution
+  in a session pins that head, so a gate may land a newer build without changing the evaluator
+  underneath work already in progress. A build ingested from an unfinished, dirty tree remains
+  available for deliberate testing, but it cannot silently become the device's head.
 
-  In this first slice, “everywhere” means its two selection surfaces agree: running `epr` through
-  the stable launcher and asking `bin-store --tool epr resolve`. In these scenarios the launcher and store
-  live in a temporary device directory, with no prior head or session pin, and the source history
-  lives in a temporary git repository. Builds A and B are real epr evaluator copies padded with
-  different trailing bytes, so each has a distinct CID and `epr --version` names what actually ran.
-  A session normally takes its identity from the Claude Code agent process it runs under; a
-  session with no such process above it ("no Claude ancestor") keys its pin by the session ID it
-  declares in ELOHIM_SESSION_ID.
+  "Everywhere" means the two selection surfaces agree: running `epr` through the stable launcher
+  and asking the store which build it resolves. In these scenarios the launcher and store live in
+  a temporary device directory and the source history lives in a temporary git repository.
+  Builds A and B are real epr evaluator copies padded with different trailing bytes, so each has a
+  distinct CID and `epr --version` names what actually ran. A session normally takes its identity
+  from the agent runtime process it runs under (Claude Code, Codex, …); a session with no agent
+  runtime above it keys its pin by the session ID it declares in ELOHIM_SESSION_ID.
   `EPR_PIN_CID` is different: it is a deliberate explicit pin for one launch inside the same
   session. It creates no session and moves neither that session's pin nor the device head.
 
-  Older devices may still use a Python launcher and addresses beginning with sha256:.
-  Their installed epr has no bin command for managing the native store. Arrival queues a
+  The peer daemon is the same epr binary running as a long-lived background process (`epr peer
+  serve`, the device's link to its human's other devices). Because it outlives any session, it
+  runs the device's landed head, never the pin of the session that started it, and it holds a
+  lease on the build it runs: a record in the store naming that build, kept while the daemon's
+  process lives. Garbage collection removes stored builds the device no longer needs. It keeps
+  the head, the previous head, builds ingested within the last 14 days, and every build a live
+  session pin or daemon lease names.
+
+  Older devices may still use a Python launcher and addresses beginning with sha256:. Their
+  installed epr has no bin command for managing the native store. Their start hook queues a
   background build, then the new native commands migrate the store and install its launcher.
   Native single-binary CIDs begin with bafkrei; Matthew can then run the landed evaluator.
 
   Background:
-    Given Matthew's workspace has an isolated empty epr store, launcher, and source history
+    Given Matthew's workspace has an isolated device directory and source history
 
   Scenario: A new session runs the landed head everywhere
     Given clean build A is the landed epr head
     When clean build B lands from the next source commit
-    And Matthew opens a fresh session with no Claude ancestor
+    And Matthew opens a fresh session with no agent runtime above it
     Then epr through the launcher reports build B's CID
-    And bin-store for epr resolves build B's CID for that session
+    And the store resolves build B's CID for that session
 
   Scenario: An open session keeps its pin
     Given clean build A is the landed epr head
     And Matthew's open session has run epr through the launcher
     When clean build B lands from the next source commit
     Then the open session still runs build A's CID
-    And bin-store for epr reports that session behind the head
+    And the store reports that session behind the head
 
   Scenario: A build that fails its health check never becomes the head
     Given clean build A is the landed epr head
@@ -70,7 +79,7 @@ Feature: Matthew's workspace follows its landed epr head
     And a fresh unpinned session runs build A's CID
     When Matthew launches build B with "EPR_PIN_CID"
     Then the launcher reports build B's CID
-    And that session remains pinned to build A's CID
+    And that session's own launcher resolution is still build A's CID
     And build A remains the landed epr head
 
   Scenario: Moving backward needs a revert
@@ -83,7 +92,7 @@ Feature: Matthew's workspace follows its landed epr head
     Then the revert succeeds and build A is the landed epr head again
 
   Scenario: A device on a pre-native epr arrives on the native store
-    Given Matthew's device has a legacy sha256 store and a launcher without the bin verb
+    Given instead Matthew's device has a legacy sha256 store and a launcher without the bin verb
     When the device's start hook queues a native bootstrap
     Then the detached bootstrap lands a bafkrei CID and replaces the legacy launcher
     And the replacement launcher runs the landed native evaluator
@@ -93,15 +102,20 @@ Feature: Matthew's workspace follows its landed epr head
     And Matthew's open session has run epr through the launcher
     And clean build B lands from the next source commit
     When that pinned session starts the peer daemon
-    Then the daemon's live lease names build B's running CID
-    When the device no longer retains build B as a head or a recent build
-    And garbage collection runs while the peer daemon lives
-    Then build B remains available for its running daemon
+    Then the peer daemon's lease and status name build B as its running build
     And the open session still runs build A's CID
+
+  Scenario: A running daemon's build survives garbage collection
+    Given clean build A is the landed epr head
+    And Matthew's open session has run epr through the launcher
+    And clean build B lands from the next source commit
+    And that pinned session starts the peer daemon
+    When the head is reverted to build A and build B ages past the 14-day history
+    And garbage collection runs while the peer daemon lives
+    Then build B remains in the store, held by the daemon's lease
 
   @regression
   Scenario: An unpublished feature build cannot become the head even with a revert
-    # Ingested clean bytes alone do not prove publication on a declared dev ref.
     Given clean build A is the landed epr head
     When build B is ingested from a clean unpublished feature branch
     And Matthew tries to land build B

@@ -282,40 +282,37 @@ function versionThroughLauncher(state: FollowFixture, env: NodeJS.ProcessEnv): J
   return object(JSON.parse(ok(state, [state.launcher, '--version'], env).stdout));
 }
 
-Given(
-  "Matthew's workspace has an isolated empty epr store, launcher, and source history",
-  function () {
-    const base = mkdtempSync(join(scratchBase, 'epr-follows-head-'));
-    const repo = join(base, 'repo');
-    const storeRoot = join(base, 'device/store/epr');
-    const procRoot = join(base, 'proc');
-    const bin = join(base, 'device/bin');
-    mkdirSync(repo, { recursive: true });
-    mkdirSync(procRoot, { recursive: true });
-    mkdirSync(bin, { recursive: true });
-    const state: FollowFixture = {
-      base,
-      repo,
-      store: storeRoot,
-      procRoot,
-      launcher: join(bin, 'epr'),
-      commitA: '',
-    };
-    fixtures.set(this, state);
+Given("Matthew's workspace has an isolated device directory and source history", function () {
+  const base = mkdtempSync(join(scratchBase, 'epr-follows-head-'));
+  const repo = join(base, 'repo');
+  const storeRoot = join(base, 'device/store/epr');
+  const procRoot = join(base, 'proc');
+  const bin = join(base, 'device/bin');
+  mkdirSync(repo, { recursive: true });
+  mkdirSync(procRoot, { recursive: true });
+  mkdirSync(bin, { recursive: true });
+  const state: FollowFixture = {
+    base,
+    repo,
+    store: storeRoot,
+    procRoot,
+    launcher: join(bin, 'epr'),
+    commitA: '',
+  };
+  fixtures.set(this, state);
 
-    git(state, ['init', '-q', '-b', 'dev']);
-    writeFileSync(join(repo, 'source.txt'), 'build A\n');
-    state.commitA = commit(state, 'source for build A');
+  git(state, ['init', '-q', '-b', 'dev']);
+  writeFileSync(join(repo, 'source.txt'), 'build A\n');
+  state.commitA = commit(state, 'source for build A');
 
-    copyFileSync(registrySource, join(bin, 'bin-tools.json'));
-    copyFileSync(
-      join(repository, 'genesis/agentic/agent-runtimes.json'),
-      join(bin, 'agent-runtimes.json')
-    );
-    copyFileSync(launcherSource, state.launcher);
-    chmodSync(state.launcher, 0o755);
-  }
-);
+  copyFileSync(registrySource, join(bin, 'bin-tools.json'));
+  copyFileSync(
+    join(repository, 'genesis/agentic/agent-runtimes.json'),
+    join(bin, 'agent-runtimes.json')
+  );
+  copyFileSync(launcherSource, state.launcher);
+  chmodSync(state.launcher, 0o755);
+});
 
 After(async function () {
   const state = fixtures.get(this);
@@ -343,7 +340,7 @@ When('clean build B lands from the next source commit', function () {
   assert.equal(result.status, 0, `${result.stdout}\n${result.stderr}`);
 });
 
-Given('Matthew opens a fresh session with no Claude ancestor', function () {
+Given('Matthew opens a fresh session with no agent runtime above it', function () {
   const state = fixture(this);
   state.sessionEnv = launcherEnv(state, { ELOHIM_SESSION_ID: 'fresh-session-b' });
   assert.deepEqual(readdirSync(state.procRoot), []);
@@ -355,7 +352,7 @@ Then("epr through the launcher reports build B's CID", function () {
   assert.equal(versionThroughLauncher(state, state.sessionEnv).cid, state.cidB);
 });
 
-Then("bin-store for epr resolves build B's CID for that session", function () {
+Then("the store resolves build B's CID for that session", function () {
   const state = fixture(this);
   assert.ok(state.sessionEnv);
   const resolved = storeOk(state, ['resolve'], state.sessionEnv).stdout.trim();
@@ -374,7 +371,7 @@ Then("the open session still runs build A's CID", function () {
   assert.equal(versionThroughLauncher(state, state.sessionEnv).cid, state.cidA);
 });
 
-Then('bin-store for epr reports that session behind the head', function () {
+Then('the store reports that session behind the head', function () {
   const state = fixture(this);
   assert.ok(state.sessionEnv);
   const status = object(JSON.parse(storeOk(state, ['status', '--json'], state.sessionEnv).stdout));
@@ -460,7 +457,7 @@ Then("the launcher reports build B's CID", function () {
   assert.equal(state.launchedCid, state.cidB);
 });
 
-Then("that session remains pinned to build A's CID", function () {
+Then("that session's own launcher resolution is still build A's CID", function () {
   const state = fixture(this);
   assert.ok(state.sessionEnv);
   assert.equal(versionThroughLauncher(state, state.sessionEnv).cid, state.cidA);
@@ -492,7 +489,7 @@ Then('the revert succeeds and build A is the landed epr head again', function ()
 });
 
 Given(
-  "Matthew's device has a legacy sha256 store and a launcher without the bin verb",
+  "instead Matthew's device has a legacy sha256 store and a launcher without the bin verb",
   function () {
     const state = fixture(this);
     const target = join(state.base, 'cargo-target');
@@ -683,7 +680,7 @@ When('that pinned session starts the peer daemon', { timeout: 30000 }, async fun
   assert.fail('daemon did not record its running CID: ' + errors);
 });
 
-Then("the daemon's live lease names build B's running CID", function () {
+Then("the peer daemon's lease and status name build B as its running build", function () {
   const state = fixture(this);
   const leases = readdirSync(join(state.store, 'sessions')).filter(name =>
     name.startsWith('daemon-')
@@ -705,7 +702,7 @@ Then("the daemon's live lease names build B's running CID", function () {
   assert.equal(status.daemonDiffers, true);
 });
 
-When('the device no longer retains build B as a head or a recent build', function () {
+When('the head is reverted to build A and build B ages past the 14-day history', function () {
   const state = fixture(this);
   // Make B rely solely on its live lease: no head, previous head, or grace-period retention.
   git(state, ['checkout', '-q', '--detach', state.commitA]);
@@ -728,12 +725,23 @@ When('garbage collection runs while the peer daemon lives', function () {
   state.last = storeOk(state, ['gc'], { EPR_PROC_ROOT: '/proc' });
 });
 
-Then('build B remains available for its running daemon', function () {
+Then("build B remains in the store, held by the daemon's lease", function () {
   const state = fixture(this);
   const result = object(JSON.parse(state.last?.stdout ?? '{}'));
   assert.ok(Array.isArray(result.kept));
   assert.ok(result.kept.includes(state.cidB));
   assert.ok(existsSync(join(state.store, String(state.cidB), 'epr')));
+  // The lease is the reason it was kept: a live daemon's record still names build B.
+  const leases = readdirSync(join(state.store, 'sessions')).filter(name =>
+    name.startsWith('daemon-')
+  );
+  assert.ok(
+    leases.some(name => {
+      const lease = object(JSON.parse(readFileSync(join(state.store, 'sessions', name), 'utf8')));
+      return lease.cid === state.cidB && lease.ownerPid === state.daemon?.pid;
+    }),
+    'no live daemon lease names build B'
+  );
 });
 
 When('build B is ingested from a clean unpublished feature branch', function () {
