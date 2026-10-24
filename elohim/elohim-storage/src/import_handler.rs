@@ -1021,7 +1021,10 @@ impl ImportHandler {
     // ========================================================================
 
     /// Call process_import_chunk on zome and wait for response
-    #[allow(clippy::too_many_arguments)]
+    #[allow(
+        clippy::too_many_arguments,
+        reason = "each argument is one field of the zome-call envelope (cell, batch, chunk, finality, payload); a struct used only here would add a name, not a meaning"
+    )]
     async fn call_process_chunk<S>(
         &self,
         ws: &mut S,
