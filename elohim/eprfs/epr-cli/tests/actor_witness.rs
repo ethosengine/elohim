@@ -643,7 +643,7 @@ fn device_contest_revokes_another_devices_binding_and_admission_drops_it() {
     assert_eq!(outcome["handle"], "matthew");
     assert_eq!(outcome["device"], b_did);
     assert_eq!(outcome["by"], a.did_key());
-    assert_eq!(outcome["targetCid"], binding_cid);
+    assert_eq!(outcome["targetCids"], serde_json::json!([binding_cid]));
     let rows = roster_rows(root, "matthew");
     let ParticipantRow::Contest {
         target_cid,
@@ -685,6 +685,67 @@ fn device_contest_revokes_another_devices_binding_and_admission_drops_it() {
         before,
         "nothing appended"
     );
+}
+
+#[test]
+fn device_contest_names_every_binding_of_the_target() {
+    let dir = fixture();
+    let keys = TempDir::new().unwrap();
+    let root = dir.path();
+    let (_, a) = device(&keys, "a");
+    let (_, b) = device(&keys, "b");
+    witness(root, SUBJECT, WITNESS, SESSION, BASIS, false, &a).unwrap();
+    bind_second_device(root, &a, &b);
+    // B bound a second time (a re-binding): a valid binding row both devices sign.
+    let mut again = ParticipantRow::Binding {
+        handle: "matthew".into(),
+        chain_root: a.did_key(),
+        controller: b.did_key(),
+        authorized_by: a.did_key(),
+        sig_a: String::new(),
+        sig_b: String::new(),
+        nonce: "a-second-binding".into(),
+    };
+    let message = again.signing_message().unwrap();
+    let hex = |bytes: Vec<u8>| bytes.iter().map(|x| format!("{x:02x}")).collect::<String>();
+    if let ParticipantRow::Binding { sig_a, sig_b, .. } = &mut again {
+        *sig_a = hex(a.sign(&message));
+        *sig_b = hex(b.sign(&message));
+    }
+    SidecarRoster::open(root, "matthew")
+        .unwrap()
+        .append(again)
+        .unwrap();
+    device_endpoint(root, None, NODE_A, &a).unwrap();
+    device_endpoint(root, None, NODE_B, &b).unwrap();
+    let bindings: Vec<String> = SidecarRoster::open(root, "matthew")
+        .unwrap()
+        .read()
+        .unwrap()
+        .rows()
+        .iter()
+        .filter(|(_, row)| {
+            matches!(row, ParticipantRow::Binding { controller, .. } if *controller == b.did_key())
+        })
+        .map(|(cid, _)| cid.to_string())
+        .collect();
+    assert_eq!(bindings.len(), 2);
+
+    // One command, one Contest per binding: B stands on neither, so it is retired.
+    let outcome = device_contest(root, None, &b.did_key(), "retired", &a).expect("contests");
+    let mut named = outcome.target_cids.clone();
+    named.sort();
+    let mut want = bindings.clone();
+    want.sort();
+    assert_eq!(named, want);
+    assert_eq!(outcome.row_cids.len(), 2);
+    let rows = roster_rows(root, "matthew");
+    assert_eq!(
+        admitted_endpoints(&rows, &a.did_key(), &device_key::verify),
+        BTreeMap::from([(NODE_A.to_string(), a.did_key())])
+    );
+    let err = device_contest(root, None, &b.did_key(), "again", &a).expect_err("none left");
+    assert!(err.to_string().contains("already contested"), "{err}");
 }
 
 #[test]

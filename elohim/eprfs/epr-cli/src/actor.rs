@@ -2155,19 +2155,21 @@ pub struct DeviceContestOutcome {
     pub handle: String,
     /// The contested device, `did:key:…`.
     pub device: String,
-    /// The row the contested device stood on (its binding, or its genesis for the chain root).
-    pub target_cid: String,
+    /// The rows the contested device stood on (each binding, or the genesis for the chain root),
+    /// one Contest each.
+    pub target_cids: Vec<String>,
     /// This device, `did:key:…` — the contest row's signer.
     pub by: String,
     pub basis: String,
-    /// CID of the appended `Contest` row.
-    pub row_cid: String,
+    /// CIDs of the appended `Contest` rows.
+    pub row_cids: Vec<String>,
     pub roster_path: String,
 }
 
 /// `epr actor device contest --device <did:key> --basis "<line>"` — retire another device of
-/// this lineage: a `Contest` row naming the roster row that device stands on (its binding, or the
-/// genesis for the chain root), signed by THIS device. Admission reads the roster in each
+/// this lineage: one `Contest` row for each roster row that device stands on and no contest yet
+/// names (each of its bindings, or the genesis for the chain root) — a device stands while any of
+/// them is accepted — all signed by THIS device in one command. Admission reads the roster in each
 /// checkout, so the contested device stops being admitted here at once (spec §3.1) and on the
 /// other devices when the row reaches them by git. Its access to the repository is a separate
 /// matter.
@@ -2218,7 +2220,9 @@ pub fn device_contest(
             short_did(&did)
         )));
     }
-    let Some(standing) = roster.device_standing_row(target, &verifier) else {
+    // A device stands while any of its bindings is accepted: contest every one not yet contested.
+    let targets = roster.uncontested_standing_rows(target, &verifier);
+    if targets.is_empty() {
         return Err(ActorError::InvalidArguments(
             if roster.members(&verifier).contains(target) {
                 format!(
@@ -2232,25 +2236,28 @@ pub fn device_contest(
                 )
             },
         ));
-    };
-    let row = signed_row(
-        ParticipantRow::Contest {
-            handle: handle.clone(),
-            target_cid: standing.row_cid.clone(),
-            by: did.clone(),
-            basis: basis.to_string(),
-            signature: String::new(),
-        },
-        device,
-    )?;
-    let row_cid = roster_tx.append(row)?;
+    }
+    let mut row_cids = Vec::with_capacity(targets.len());
+    for target_cid in &targets {
+        let row = signed_row(
+            ParticipantRow::Contest {
+                handle: handle.clone(),
+                target_cid: target_cid.clone(),
+                by: did.clone(),
+                basis: basis.to_string(),
+                signature: String::new(),
+            },
+            device,
+        )?;
+        row_cids.push(roster_tx.append(row)?.to_string());
+    }
     Ok(DeviceContestOutcome {
         handle: handle.clone(),
         device: target.to_string(),
-        target_cid: standing.row_cid,
+        target_cids: targets,
         by: did,
         basis: basis.to_string(),
-        row_cid: row_cid.to_string(),
+        row_cids,
         roster_path: roster_rel(&handle),
     })
 }

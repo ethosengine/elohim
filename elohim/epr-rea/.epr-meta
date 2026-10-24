@@ -83,18 +83,19 @@ Known gaps live in the guidestar §5 (ranked), not here — notably that a **flo
 algedonic evidence**, because the wire evidence is ceiling-signed and emitting through it would
 produce a signal whose own `crossed()` reads false.
 
-**Device-binding contests (2026-10-23, controller rulings for workspaces-cooperate T7, round 2).** The
-device-binding plane — members' bindings, the root's genesis, and every member's contest of one of
-them or of another such contest — is decided by a grounded labelling over ROWS (`device_plane`): a
-contest attacks the row it names, and is attacked by whatever attacks its signer's current standing
-row (a contest stands only while its signer stands); undecided rows (pure cycles) are rejected, fail
-closed. A device stands while its current standing row is accepted.
+**Device-binding contests (2026-10-23/24, controller rulings for workspaces-cooperate T7, rounds 2
+and 2b).** The device-binding plane — members' bindings, the root's genesis, and every member's contest
+of one of them or of another such contest — is decided by a grounded labelling over ROWS
+(`device_plane`): a contest attacks the row it names; a device stands while ANY of its standing rows
+is accepted; a contest stands only while its signer stands; undecided rows (pure cycles) are
+rejected, fail closed. The order of the rows never decides. `epr actor device contest` therefore
+writes one Contest per binding of the target that no contest names yet.
 
 What a retired device can do: contest rows (they are admitted to the file), and so join a cycle — two
 devices that contest only each other both stand retired. It can also contest the root's founding
 RECORD, which is a human-standing contest and keeps the membership rule. What it cannot do: retire a
-device that stands by another's corroboration, or counter the contest of itself (a device cannot
-defend itself). Three remedies restore a retired device: re-binding it (a new binding no contest
-names), its contester withdrawing (contesting its own contest), or a standing member's
-counter-contest. Re-binding relies on T2's "current binding = latest by line": a contest names a CID,
-and nothing in a row says which binding came after it.
+device that stands by another's corroboration, or counter the contest of itself — no self-defence (a
+contest naming a contest of one of its own signer's rows attacks nothing; ruled 2026-10-24). Three
+remedies restore a retired device: re-binding it (a new binding no contest names, whatever its line
+position), its contester withdrawing (contesting its own contest), or a standing member's
+counter-contest.

@@ -751,53 +751,10 @@ impl Roster {
         // person's admitted devices") is decided by its own grounded labelling over rows, which
         // the general rule above cannot express: membership ignores contests.
         let devices = self.device_rows(verifier, &members);
-        let current = self.current_standing_rows(verifier, &members);
-        let (plane, rejected) = device_plane(&self.rows, &devices, &current, &members, verifier);
+        let (plane, rejected) = device_plane(&self.rows, &devices, &members, verifier);
         contested.retain(|cid| !plane.contains(cid));
         contested.extend(rejected);
         contested
-    }
-
-    /// Each member's CURRENT standing row: the chain root's first verifying genesis, and every
-    /// other member's latest verifying binding under this root — the rows `device_standing_row`
-    /// stands a device on (T2: a device's current binding is its latest by line).
-    fn current_standing_rows(
-        &self,
-        verifier: &dyn SignatureVerifier,
-        members: &BTreeSet<String>,
-    ) -> HashMap<String, String> {
-        let Some(root) = self.chain_root(verifier) else {
-            return HashMap::new();
-        };
-        let mut current = HashMap::new();
-        for (cid, row) in &self.rows {
-            match row {
-                ParticipantRow::Genesis {
-                    chain_root,
-                    signer,
-                    signature,
-                    ..
-                } if chain_root == &root
-                    && !current.contains_key(&root)
-                    && row_signature_verifies(verifier, row, signer, signature) =>
-                {
-                    current.insert(root.clone(), cid.to_string());
-                }
-                ParticipantRow::Binding {
-                    chain_root,
-                    controller,
-                    ..
-                } if chain_root == &root
-                    && controller != &root
-                    && members.contains(controller)
-                    && verify_binding(row, verifier).is_ok() =>
-                {
-                    current.insert(controller.clone(), cid.to_string());
-                }
-                _ => {}
-            }
-        }
-        current
     }
 
     /// Each verifying device-standing row of this lineage, by CID, and the device it stands:
@@ -880,6 +837,28 @@ impl Roster {
         self.chain_root(verifier).as_deref() == Some(pin)
     }
 
+    /// Every row `device` stands on that no accepted contest names: the root's verifying genesis
+    /// rows, or the device's verifying bindings under this root, by CID in line order. A device
+    /// stands while any is accepted, so retiring it means contesting each of them.
+    pub fn uncontested_standing_rows(
+        &self,
+        device: &str,
+        verifier: &dyn SignatureVerifier,
+    ) -> Vec<String> {
+        let members = self.members(verifier);
+        if !members.contains(device) {
+            return Vec::new();
+        }
+        let contested = self.contested(verifier);
+        self.device_rows(verifier, &members)
+            .into_iter()
+            .filter(|(cid, owner)| owner == device && !contested.contains(cid))
+            .map(|(cid, _)| cid)
+            .collect::<BTreeSet<_>>()
+            .into_iter()
+            .collect()
+    }
+
     /// The roster row `signer_did` stands on by the roster ALONE — for a device reading a
     /// checkout that lacks the actor records (a fresh worktree on a witnessed device, ruling
     /// R-P16): the chain root stands on its genesis row, a bound controller on its latest
@@ -900,6 +879,8 @@ impl Roster {
         }
         let root = self.chain_root(verifier)?;
         let contested = self.contested(verifier);
+        // Any accepted standing row stands the device (a re-binding restores a retired device,
+        // whatever the line order); the latest such binding is the one reported.
         let found = if signer_did == root {
             self.rows.iter().find_map(|(cid, row)| match row {
                 ParticipantRow::Genesis {
@@ -909,6 +890,7 @@ impl Roster {
                     signature,
                     ..
                 } if chain_root == &root
+                    && !contested.contains(&cid.to_string())
                     && row_signature_verifies(verifier, row, signer, signature) =>
                 {
                     Some(RosterStanding {
@@ -927,6 +909,7 @@ impl Roster {
                     ..
                 } if chain_root == &root
                     && controller == signer_did
+                    && !contested.contains(&cid.to_string())
                     && verify_binding(row, verifier).is_ok() =>
                 {
                     Some(RosterStanding {
@@ -946,28 +929,27 @@ impl Roster {
 }
 
 /// The device-binding plane of a roster and the rows of it rejected (spec §3.1). Its rows are
-/// every device-standing row (`devices`: genesis rows of the root, members' bindings) and every
-/// admissible contest (a member's, verifying) of one of them or of another such contest. It is an
-/// argumentation framework decided by its grounded labelling:
+/// every device-standing row (`devices`: genesis rows of the root, members' bindings, each mapped
+/// to its device) and every admissible contest (a member's, verifying) of one of them or of
+/// another such contest. It is decided by a grounded labelling:
 ///
 /// - a contest attacks the row it names (a standing row, a contest it counters, or its author's
 ///   own contest it withdraws);
-/// - a contest is also attacked by every contest of its signer's CURRENT standing row (`current`),
-///   since a contest stands only while its signer stands — except that a device cannot defend
-///   itself: a contest of a contest that names its own signer's current row attacks nothing (the
-///   retired device cannot counter the contest of itself);
-/// - accept every row whose attackers are all rejected, reject every row an accepted row attacks,
-///   to a fixed point; a row still undecided (a pure cycle: mutual contests, a self-contest) is
-///   rejected — fail closed.
+/// - a device stands while ANY of its standing rows is accepted, and a contest stands only while
+///   its signer stands: a contest is rejected once every standing row of its signer is;
+/// - no self-defence: a contest naming a contest of one of its own signer's standing rows attacks
+///   nothing (the retired device cannot counter the contest of itself);
+/// - a row is accepted when its attackers are all rejected (and, for a contest, some standing row
+///   of its signer is accepted); rejected when an accepted row attacks it (or, for a contest, every
+///   standing row of its signer is rejected); to a fixed point. A row still undecided (a pure
+///   cycle: mutual contests, a self-contest) is rejected — fail closed.
 ///
-/// A device stands while its current standing row is accepted, so a retirement is per row:
-/// re-binding (a new binding no contest names), a withdrawal by the contest's author, or a standing
-/// member's counter-contest restores the device. Nothing here depends on the order of rows except
-/// which binding is a device's current one (T2: its latest by line). Returns (plane, rejected).
+/// Retirement is per row: re-binding (a new binding no contest names), a withdrawal by the
+/// contest's author, or a standing member's counter-contest restores the device. The order of
+/// the rows never changes the answer. Returns (plane, rejected).
 fn device_plane(
     rows: &[(Cid, ParticipantRow)],
     devices: &HashMap<String, String>,
-    current: &HashMap<String, String>,
     members: &BTreeSet<String>,
     verifier: &dyn SignatureVerifier,
 ) -> (BTreeSet<String>, BTreeSet<String>) {
@@ -1001,46 +983,51 @@ fn device_plane(
             break;
         }
     }
+    // Each device's standing rows.
+    let mut standing: HashMap<&str, Vec<&str>> = HashMap::new();
+    for (cid, device) in devices {
+        standing
+            .entry(device.as_str())
+            .or_default()
+            .push(cid.as_str());
+    }
     let plane: BTreeSet<String> = devices.keys().chain(contests.keys()).cloned().collect();
-    let mut direct: BTreeMap<String, BTreeSet<String>> = plane
+    let mut attackers: BTreeMap<&str, BTreeSet<&str>> = plane
         .iter()
-        .map(|cid| (cid.clone(), BTreeSet::new()))
+        .map(|cid| (cid.as_str(), BTreeSet::new()))
         .collect();
-    for (cid, (target, _)) in &contests {
-        if let Some(attackers) = direct.get_mut(target) {
-            attackers.insert(cid.clone());
-        }
-    }
-    let mut attackers = direct.clone();
     for (cid, (target, by)) in &contests {
-        let Some(own) = current.get(by) else {
+        // No self-defence: a contest of a contest that names one of its signer's own rows.
+        let defends_itself = contests
+            .get(target)
+            .is_some_and(|(named, _)| devices.get(named).is_some_and(|device| device == by));
+        if defends_itself {
             continue;
-        };
-        // The signer's standing row's attackers attack the contest too.
-        let against_signer = direct.get(own).cloned().unwrap_or_default();
-        if let Some(set) = attackers.get_mut(cid) {
-            set.extend(against_signer.iter().cloned());
         }
-        // No self-defence: countering a contest of one's own current row attacks nothing.
-        if against_signer.contains(target) {
-            if let Some(set) = attackers.get_mut(target) {
-                set.remove(cid);
-            }
+        if let Some(set) = attackers.get_mut(target.as_str()) {
+            set.insert(cid.as_str());
         }
     }
-    let mut accepted: BTreeSet<String> = BTreeSet::new();
-    let mut rejected: BTreeSet<String> = BTreeSet::new();
+    let mut accepted: BTreeSet<&str> = BTreeSet::new();
+    let mut rejected: BTreeSet<&str> = BTreeSet::new();
     loop {
         let mut changed = false;
-        for (cid, by) in &attackers {
+        for (&cid, by) in &attackers {
             if accepted.contains(cid) || rejected.contains(cid) {
                 continue;
             }
-            if by.iter().any(|a| accepted.contains(a)) {
-                rejected.insert(cid.clone());
+            let signer_rows: &[&str] = contests
+                .get(cid)
+                .and_then(|(_, signer)| standing.get(signer.as_str()))
+                .map_or(&[], Vec::as_slice);
+            let is_contest = contests.contains_key(cid);
+            let signer_in = !is_contest || signer_rows.iter().any(|r| accepted.contains(r));
+            let signer_out = is_contest && signer_rows.iter().all(|r| rejected.contains(r));
+            if by.iter().any(|a| accepted.contains(a)) || signer_out {
+                rejected.insert(cid);
                 changed = true;
-            } else if by.iter().all(|a| rejected.contains(a)) {
-                accepted.insert(cid.clone());
+            } else if signer_in && by.iter().all(|a| rejected.contains(a)) {
+                accepted.insert(cid);
                 changed = true;
             }
         }
@@ -1049,7 +1036,11 @@ fn device_plane(
         }
     }
     // Undecided rows (pure cycles) are rejected: fail closed.
-    let rejected = plane.difference(&accepted).cloned().collect();
+    let rejected = plane
+        .iter()
+        .filter(|cid| !accepted.contains(cid.as_str()))
+        .cloned()
+        .collect();
     (plane, rejected)
 }
 
@@ -2342,13 +2333,36 @@ mod tests {
         rows.push(contest(&bind_b, &a));
         assert_eq!(admitted_devices(&rows, &a, &v), set(&[&a, &c]));
         rows.push(rebinding(&a, &b, "nonce-2"));
-        // The original binding (row 1) and the re-binding (the last row) keep their line order:
-        // T2's current binding of a device is its latest by line.
-        let pinned = [1, rows.len() - 1];
+        // A device stands while any of its bindings is accepted: line order never decides.
         assert_eq!(
-            admitted_in_every_order(&rows, &a, &v, &pinned),
+            admitted_in_every_order(&rows, &a, &v, &[]),
             set(&[&a, &b, &c])
         );
+    }
+
+    #[test]
+    fn n1_4b_a_contest_written_before_a_rebind_never_retires_the_new_binding() {
+        let (a, b, c) = three();
+        let v = verifier(&[&a, &b, &c]);
+        let (mut rows, [_, bind_b, _]) = three_device_rows(&a, &b, &c);
+        let retire = contest(&bind_b, &a);
+        let rebind = rebinding(&a, &b, "nonce-2");
+        let rebind_cid = cid_of(&rebind);
+        rows.push(retire);
+        rows.push(rebind);
+        for seed in 0..=24 {
+            let order = if seed == 0 {
+                rows.clone()
+            } else {
+                shuffled(&rows, seed, &[])
+            };
+            let roster = roster_of(&order);
+            let standing = roster.device_standing_row(&b.did, &v).expect("B stands");
+            assert_eq!(
+                standing.row_cid, rebind_cid,
+                "order {seed}: B stands on its new binding"
+            );
+        }
     }
 
     #[test]
