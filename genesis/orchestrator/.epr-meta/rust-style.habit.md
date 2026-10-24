@@ -50,3 +50,5 @@ All 15 repository-validator tests and the native host's Clippy `-D warnings` pas
 that installed host. Build-manifest validation reports 24 manifests, 45 steps, zero errors.
 Durable local receipts: `genesis/a2o/reports/recovery/rust-style/`. The feature-branch CI checkout
 now explicitly fetches its integration ref; no history or hook-availability gap is called clean.
+
+DELTA 2026-10-24 (ownership diagnostic): `python3 -m unittest discover -s genesis/orchestrator/rust-style -p hook_test.py` passed 8 tests; normal and `--hook` entrypoints now name the safe.directory cure and exit 2 before pool/Cargo on Git ownership refusal. No Cargo build or full native gate was run in this bounded fix; habit status unchanged.

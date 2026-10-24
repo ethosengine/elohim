@@ -165,7 +165,8 @@ components:
           value: /usr/local/bin/chrome
         - name: CHROME_PATH
           value: /opt/chrome-linux64/chrome
-        # Rust toolchain (installed to /opt/rust in Dockerfile)
+        # Rust toolchain (also declared by the image). Container env reaches non-interactive
+        # background shells too; do not move these declarations into ~/.bashrc.
         - name: RUSTUP_HOME
           value: /opt/rust/rustup
         - name: CARGO_HOME
@@ -273,6 +274,19 @@ components:
     volume:
       size: 220Gi
 commands:
+  - id: setup-git
+    exec:
+      component: tools
+      workingDir: /projects/elohim
+      commandLine: |
+        set -e
+        # $HOME is ephemeral; restore trust after every start, before Git-backed setup.
+        if ! git config --global --get-all safe.directory | grep -Fxq '*'; then
+          git config --global --add safe.directory '*'
+        fi
+        # Also works before pnpm install, when Husky's generated shims are absent.
+        node .husky/hooks-path.mjs
+
   - id: setup-pnpm
     exec:
       component: tools
@@ -405,8 +419,22 @@ commands:
         # Claude Code's per-workspace auto-memory → .claude/memory/device/ (gitignored) so the
         # device's own fold indexes it and nothing tracked ever carries it.
         bash genesis/agentic/bin/device-memory-sync || true
+
+  # On demand only: serving this device is an operator action, never workspace arrival.
+  - id: peer-serve
+    exec:
+      component: tools
+      workingDir: /projects/elohim
+      commandLine: |
+        export EPR_PEER_RELAY_URL="${EPR_PEER_RELAY_URL:-https://relay.alpha.elohim.host}"
+        set -- peer serve --root /projects/elohim --handle matthew --listen "0.0.0.0:${EPR_PEER_PORT:-7777}"
+        if [ -n "${EPR_PEER_ADDRESS:-}" ]; then
+          set -- "$@" --peer "$EPR_PEER_ADDRESS"
+        fi
+        exec "${EPR_BIN:-epr}" "$@"
 events:
   postStart:
+    - setup-git
     - setup-pnpm
     - setup-vscode-cli
     - setup-claude-mcp

@@ -95,5 +95,31 @@ class CiBaseline(unittest.TestCase):
             self.assertEqual(selected("feature/style").returncode, 2)
 
 
+class GateGit(unittest.TestCase):
+    def test_ownership_failure_names_cure_before_pool_or_cargo(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            script = root / "genesis/orchestrator/rust-style.sh"
+            script.parent.mkdir(parents=True)
+            script.write_text((ROOT / "genesis/orchestrator/rust-style.sh").read_text())
+            # No pool or Cargo executable is provided: the refusal must precede both.
+            env = {
+                "PATH": os.environ["PATH"],
+                "GIT_CONFIG_NOSYSTEM": "1",
+                "GIT_CONFIG_GLOBAL": "/dev/null",
+                "GIT_TEST_ASSUME_DIFFERENT_OWNER": "1",
+            }
+            subprocess.run(["git", "init", "-q", str(root)], env=env, check=True)
+            for args in ([], ["--hook"]):
+                with self.subTest(args=args):
+                    result = subprocess.run(["bash", str(script), *args], cwd=root,
+                                            env=env, text=True, capture_output=True)
+                    self.assertEqual(result.returncode, 2, result.stderr)
+                    self.assertIn("Rust style UNMEASURED", result.stderr)
+                    self.assertIn("dubious ownership", result.stderr)
+                    self.assertIn("git config --global --add safe.directory '*'", result.stderr)
+                    self.assertIn("setup-git", result.stderr)
+
+
 if __name__ == "__main__":
     unittest.main()

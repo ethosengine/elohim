@@ -2,6 +2,14 @@
 # The same native checker runs locally, before push, in CI and behind agent adapters.
 set -euo pipefail
 style_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
+# Ownership failures must be diagnosed before pool discovery or any Cargo invocation.
+if ! style_git="$(git -C "$style_root" rev-parse --show-toplevel 2>&1)"; then
+  echo "Rust style UNMEASURED: Git cannot read $style_root: $style_git" >&2
+  if [[ "$style_git" == *"dubious ownership"* ]]; then
+    echo "Cure in this Che workspace: git config --global --add safe.directory '*' (or rerun devfile setup-git)." >&2
+  fi
+  exit 2
+fi
 source "$style_root/genesis/agentic/bin/pool-lib.sh"
 style_family="$(detect_family "$style_root")"
 style_target="$(slot_path "$style_family" genesis__orchestrator__rust-style dev)"

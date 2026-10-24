@@ -2181,16 +2181,10 @@ habits:
       - "a2o @concern:rust-style: cd genesis/a2o && pnpm exec cucumber-js --profile rust-style (three isolated-Git acceptance scenarios)"
       - "node --test genesis/orchestrator/rust-toolchain-pin.test.mjs (CI/local checker toolchain agreement)"
     evidence: >
-      DELTA 2026-10-22 (final hardening): `just gate rust-style` remains GREEN with 19 native
-      tests, including new-child strict-scope shadowing refusal, plus seven adapter/baseline tests.
-      All 15 repository-validator tests and the native host's Clippy `-D warnings` pass. The tested
-      `epr` executable is installed on the shared PATH; live strict refuse/permit probes pass through
-      that installed host. Build-manifest validation reports 24 manifests, 45 steps, zero errors.
-      Durable local receipts: `genesis/a2o/reports/recovery/rust-style/`. The feature-branch CI checkout
-      now explicitly fetches its integration ref; no history or hook-availability gap is called clean.
-    evidence-fingerprint: sha256:e90ce003e158de83
-    evidence-bytes: 2080
-    evidence-entries: 2
+      DELTA 2026-10-24 (ownership diagnostic): `python3 -m unittest discover -s genesis/orchestrator/rust-style -p hook_test.py` passed 8 tests; normal and `--hook` entrypoints now name the safe.directory cure and exit 2 before pool/Cargo on Git ownership refusal. No Cargo build or full native gate was run in this bounded fix; habit status unchanged.
+    evidence-fingerprint: sha256:36684d35fdeccd85
+    evidence-bytes: 2428
+    evidence-entries: 3
     guard: >
       Never equate equal counts with no new findings; never use dirty source for a pushed object;
       never call a missing baseline or a stale checker clean. Scope and owner moves cannot transfer
