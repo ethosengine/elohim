@@ -340,15 +340,22 @@ RUN sed -i \
 # eprfs-core + eprfs-serve inherit from elohim/eprfs/Cargo.toml's [workspace.package] and
 # [workspace.dependencies] — inline them. Their `registry = "elohim"` keys name the publish
 # registry, which is configured only in the repo's .cargo/config.toml (not in this context), so
-# they are dropped; the path wins for an in-tree build either way.
-RUN sed -i \
-    -e 's|version.workspace = true|version = "0.2.0"|' \
+# they are dropped; the path wins for an in-tree build either way. The family version is read from
+# the eprfs workspace manifest, so a version bump needs no edit here (a hardcoded "0.2.0" broke
+# edge #1707 at the 0.3.0 bump). A key form no rule inlines fails here by name instead of as
+# cargo's "failed to find a workspace root".
+COPY elohim/eprfs/Cargo.toml /eprfs-workspace/Cargo.toml
+RUN EPRFS_VERSION="$(sed -n 's/^version = "\(.*\)"$/\1/p' /eprfs-workspace/Cargo.toml | head -n1)" && \
+    test -n "$EPRFS_VERSION" && \
+    sed -i \
+    -e "s|version.workspace = true|version = \"$EPRFS_VERSION\"|" \
     -e 's|edition.workspace = true|edition = "2021"|' \
     -e 's|license.workspace = true|license = "Apache-2.0"|' \
     -e 's|authors.workspace = true|authors = ["Elohim Protocol"]|' \
     -e 's|repository.workspace = true|repository = "https://github.com/ethosengine/elohim"|' \
     -e 's|async-trait.workspace = true|async-trait = "0.1"|' \
     -e 's|bytes.workspace = true|bytes = "1"|' \
+    -e 's|bytes = { workspace = true, features = \["serde"\] }|bytes = { version = "1", features = ["serde"] }|' \
     -e 's|serde.workspace = true|serde = { version = "1", features = ["derive"] }|' \
     -e 's|serde_json.workspace = true|serde_json = "1"|' \
     -e 's|serde_json = { workspace = true, optional = true }|serde_json = { version = "1", optional = true }|' \
@@ -356,7 +363,10 @@ RUN sed -i \
     -e 's|tokio.workspace = true|tokio = { version = "1", features = ["macros", "rt-multi-thread"] }|' \
     -e 's|path = "../../../crates/seam-contracts"|path = "../../crates/seam-contracts"|' \
     -e 's|, registry = "elohim"||' \
-    eprfs/eprfs-core/Cargo.toml eprfs/eprfs-serve/Cargo.toml
+    eprfs/eprfs-core/Cargo.toml eprfs/eprfs-serve/Cargo.toml && \
+    if grep -nE 'workspace *= *true' eprfs/eprfs-core/Cargo.toml eprfs/eprfs-serve/Cargo.toml; then \
+      echo "eprfs-core/eprfs-serve still inherit from the eprfs workspace (lines above); add an inline rule to this RUN" >&2; exit 1; \
+    fi
 
 # elohim-epr-index inherits its dependency versions from elohim/Cargo.toml's
 # [workspace.dependencies] — inline them (its rusqlite stays feature-less: the one SQLite in
