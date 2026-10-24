@@ -240,6 +240,14 @@ The small-N answer the code gives is that capture at small N is a **parameter-or
 
 ---
 
+## The Charter a Community Brings — Open Networked Earth
+
+[Open Networked Earth (O.N.E.)](https://github.com/kyberlex/ONE) is a pseudonymous systems engineer's AI-assisted corpus, public since 2026-09-19: a 46-article constitution for a post-work commons (usufruct, sortition assemblies, physical-unit accounting), staged seed-node blueprints, a six-volume novel series, a browser sim, and a Julia co-simulator. It is read here as a **collaboration**, with Elohim as the enabling architecture. ONE's institutions translate into a charter layer, lenses, measures, an app, and content. Each mechanism is held as one plural governed artifact among others (middot measures, mishpat lenses), never as the right answer, ours or theirs. The shared need the map surfaces is architectural: pin any procedure (a draw, a threshold, a consequence ladder), run it reproducibly, witness it, and hold several side by side.
+
+[Translation map →](epr:kyberlex-one-translation-map-2026-10-24) (includes *where Kyberlex is coming from*: lineage through Bauwens/P2P Foundation, Ostrom, Cockshott, Bookchin and Robinson; their own words on method and doubt) · manifest clones: `kyberlex-one`, `one-commons-portal` · mint pass proposed, not yet folded
+
+---
+
 ## The Ancestor — Secure Scuttlebutt
 
 Secure Scuttlebutt (2014–~2024) is the offline-first, gossip-replicated social protocol that most of today's local-first field descends from: identity was a bare cryptographic keypair, each identity published one append-only signed feed, replication followed the friendship graph, and everything hard — account recovery, moderation, economics, deletion, using two devices — was deliberately left out of the protocol for the social layer to absorb. We engaged it because it is a *completed* experiment whose own architects wrote the post-mortem before moving on: its refusals are, item for item, this protocol's feature list, which makes SSB the control group for our whole design. The retrospective (surveyed August 2026, from five cloned ssbc repos and the successor ecosystem) compares ten axes and sorts the results into what we **take** (they shipped private-message encryption for a decade while our encryption layer remains unbuilt — the one axis where they are decisively ahead; their replication-bandwidth disciplines; their USB-stick offline story, which we lack entirely), what we **watch** (their volunteer relay servers were designed to fade in importance and became de-facto infrastructure anyway — the same trap our doorway gateways face; their hour-long gigabytes-heavy first sync capped growth at tens of thousands of users, a ceiling our full-replication conductors share the shape of), and what we **leave** (key-as-identity with no recovery path, feeds that break permanently when two devices write at once, permanence so absolute that users feared their own posts).

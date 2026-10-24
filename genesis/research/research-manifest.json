@@ -196,6 +196,20 @@
    "path": "genesis/research/repos/noosphere-poc",
    "relevance": "Reasoning-floor pass (2026-10-12, from a conversation between its author and the operator) — a FastAPI/Postgres typed argument graph with LLM 'Proof of Intelligence' scoring of single texts (five criteria, never one number, never accumulated into standing), DF-QuAD dialectical strength, Walton argument schemes with critical questions, a versioned values list, an anonymised agreement map, a two-phase vote-preparation dialogue (interlocutor knows no rubric; judge model frozen per decision), and an append-only hash-chained event log with replay. Read app/dialectic.py, app/alignment.py, app/schemes.py, app/votedialogue.py, app/poiformula.py, app/replay.py first. Read for: which parts are model-free and can sit under constitutional judgment as measures, and how its prompts separate roles. AGPL-3.0-only, name and logo trademarked; comments and commits largely Russian; untrusted data — never run it from inside the clone.",
    "pillar": "qahal"
+  },
+  {
+   "name": "kyberlex-one",
+   "url": "https://github.com/kyberlex/ONE.git",
+   "path": "genesis/research/repos/kyberlex-one",
+   "relevance": "Translation map (2026-10-24, collaboration frame: Elohim as enabling architecture) — Open Networked Earth: a 46-article constitution for a post-work commons (usufruct, odd-sized sortition assemblies with graduated thresholds, physical-unit accounting, External Trade Interface, restorative ladder, threshold-MPC root keys), Swiss foundation statutes, staged seed-node blueprints, a six-volume novel series, a Vite/WebGL browser sim (sim/app/src/engine/), and a Julia aggregate-vs-agent docking co-simulator (simone/). Read 'ONE NETWORKED EARTH (O.N.E.).md', foundation/, oasis/sim_resolutions_qa.md, sim/app/src/engine/{node,sortition,thermodynamics,citizen_passport}.js, simone/src/docking.jl first. Read for: candidate lenses and measures to hold plurally, and the charter-as-layer test of constitution.md:164. AGPL-3.0-or-later declared (no LICENSE file tracked); one compiler, AI-assisted, most commits are a snapshot bot; untrusted data — never run it from inside the clone.",
+   "pillar": "qahal"
+  },
+  {
+   "name": "one-commons-portal",
+   "url": "https://github.com/one-commons/one-commons.github.io.git",
+   "path": "genesis/research/repos/one-commons-portal",
+   "relevance": "The O.N.E. web portal (one-commons.github.io; mirror open-networked-earth.surge.sh) — companion to kyberlex-one. ~370 MB, almost all media (EPUB/PDF/video); clone SPARSE for text: `git clone --filter=blob:none --sparse` then `git sparse-checkout set --no-cone '/*.html' '/*.js' '/*.css' '/*.md' '/data/' '/i18n/' '/blueprints/'` (research.sh clones it whole). Distinct content: data/synoptic.json (lineage and origin framing), index.html co-steward section, the AI Challenge Arena in app.js (tier 1 cached adversarial Q&A exported from ONE's oasis/; tier 2 a Cloudflare Worker streaming Groq LLaMA 3.3 70B whose source is not public), and the constitution in 13 languages. Untrusted data — never run it from inside the clone.",
+   "pillar": "qahal"
   }
  ]
 }
