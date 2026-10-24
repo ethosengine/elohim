@@ -20,7 +20,7 @@ elohim-placement-core = { path = "../placement/core" }
 # `ReachGate`. A pure value crate (rail R-E1). Rail R-E3: this crate may depend on
 # eprfs-core and eprfs-serve, never on eprfs-storage or eprfs-local
 # (`boundary::eprfs_direction`, src/boundary.rs). Approved by the operator, 2026-10-20.
-eprfs-core = { version = "0.2.0", path = "../eprfs/eprfs-core" }
+eprfs-core = { version = "0.3.0", path = "../eprfs/eprfs-core" }
 
 # The pure parts of an EPR index (post-station-4 sprint, Lane S, ruling R-S1): the declared
 # chunk rule, the FTS5 fold store keyed by an opaque unit id, rank fusion and the fold
