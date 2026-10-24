@@ -30,7 +30,7 @@ def _say(line: str) -> None:
 def _run(cli: Path, repo: Path, *args: str) -> subprocess.CompletedProcess[str]:
     return subprocess.run(
         [str(cli), *args], cwd=repo, capture_output=True, text=True,
-        timeout=900 if args[:1] == ("bootstrap",) else 20, check=False,
+        timeout=900 if args[:1] in (("bootstrap",), ("follow",)) else 20, check=False,
     )
 
 
@@ -170,6 +170,13 @@ def main() -> None:
     os.environ["EPR_STORE"] = str(store)
     cli = repo / "genesis/agentic/bin/epr-store"
     head = _run(cli, repo, "resolve", "--current")
+    if head.returncode == 0:
+        # A device that only pulled a newer published dev still converges: build and land it.
+        followed = _run(cli, repo, "follow", "--repo", str(repo))
+        if followed.returncode != 0:
+            _say(f"⚠ could not follow published dev; the landed head stays: {_detail(followed)}")
+        elif '"followed": true' in followed.stdout:
+            _say("followed published dev: built and landed this checkout's HEAD")
     if head.returncode != 0:
         bootstrap = _run(cli, repo, "bootstrap", "--repo", str(repo))
         if bootstrap.returncode != 0:

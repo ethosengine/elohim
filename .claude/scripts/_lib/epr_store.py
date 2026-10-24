@@ -932,16 +932,60 @@ def bootstrap(*, root: Path | None = None, repo: Path | None = None) -> dict[str
         if (isinstance(cid, str) and source is not None
                 and source.get("tree_clean") is True and _verified_artifact(root, cid)):
             return land(cid, commit, root=root, repo=checkout)
+    return _build_and_land(root, checkout, commit, gate_run="bootstrap")
+
+
+def _build_and_land(root: Path, checkout: Path, commit: str, *, gate_run: str) -> dict[str, Any]:
+    import subprocess
+
     target = _bootstrap_target(checkout)
     result = subprocess.run(
         ["cargo", "build", "--locked", "--bin", "epr"], cwd=checkout / "elohim/eprfs",
         env=_bootstrap_environment(checkout, target), check=False,
     )
     if result.returncode != 0:
-        raise StoreRefusal("bootstrap-build-failed", f"cargo build exited {result.returncode}")
+        raise StoreRefusal(f"{gate_run}-build-failed", f"cargo build exited {result.returncode}")
     record = ingest(target / "debug/epr", root=root, repo=checkout, source_commit=commit,
-                    gate_run="bootstrap", tree_clean=clean)
+                    gate_run=gate_run, tree_clean=True)
     return land(record["cid"], commit, root=root, repo=checkout)
+
+
+PUBLISHED_REF = "refs/remotes/origin/dev"
+
+
+def follow(*, root: Path | None = None, repo: Path | None = None) -> dict[str, Any]:
+    """Adopt a newer published dev commit this checkout already holds.
+
+    Landing on dev publishes to the household; a device that only pulled must still converge, so
+    at session start it builds and lands the checkout's HEAD when all of these hold: HEAD is
+    contained in the published dev ref (someone landed it), it descends from the landed head's
+    commit, epr's own sources changed between them, and those sources are clean. Anything else
+    answers why it did nothing, and the head stays where it is.
+    """
+    root = _root(root)
+    landed = _read_json(root / "current.json") or {}
+    head_commit = landed.get("commit")
+    if not isinstance(head_commit, str) or _read_link(root, "current") is None:
+        return {"followed": False, "why": "no landed head; bootstrap seeds the first one"}
+    checkout = repo_root(repo)
+    commit, clean = git_state(checkout)
+    if commit == head_commit:
+        return {"followed": False, "why": "the landed head is this checkout's HEAD"}
+    if not _git_succeeds(checkout, "merge-base", "--is-ancestor", commit, PUBLISHED_REF):
+        return {"followed": False, "why": f"HEAD {commit[:12]} is not published on dev"}
+    if not _git_succeeds(checkout, "merge-base", "--is-ancestor", head_commit, commit):
+        return {"followed": False, "why": f"HEAD does not descend from the landed {head_commit[:12]}"}
+    if _git_succeeds(checkout, "diff", "--quiet", head_commit, commit, "--", *source_paths(checkout)):
+        return {"followed": False, "why": "no epr source change since the landed head"}
+    if not clean:
+        return {"followed": False, "why": "epr sources are dirty in this checkout"}
+    for record in _records(root):
+        cid = record.get("cid")
+        source = _source_for_commit(record, commit)
+        if (isinstance(cid, str) and source is not None
+                and source.get("tree_clean") is True and _verified_artifact(root, cid)):
+            return {"followed": True, **land(cid, commit, root=root, repo=checkout)}
+    return {"followed": True, **_build_and_land(root, checkout, commit, gate_run="follow")}
 
 
 def _parse_bool(value: str) -> bool:
@@ -984,6 +1028,8 @@ def parser() -> argparse.ArgumentParser:
     verbs.add_parser("shadows")
     source_parser = verbs.add_parser("source-state")
     source_parser.add_argument("--repo", type=Path)
+    follow_parser = verbs.add_parser("follow")
+    follow_parser.add_argument("--repo", type=Path)
     bootstrap_parser = verbs.add_parser("bootstrap")
     bootstrap_parser.add_argument("--repo", type=Path)
     return cli
@@ -1045,6 +1091,8 @@ def main(argv: list[str] | None = None) -> int:
             dirty = _git(checkout, "status", "--porcelain", "--untracked-files=normal", "--",
                          *source_paths(checkout))
             print(json.dumps({"head": head, "clean": clean, "status": dirty}, sort_keys=True))
+        elif args.verb == "follow":
+            print(json.dumps(follow(root=root, repo=args.repo), sort_keys=True))
         elif args.verb == "bootstrap":
             print(json.dumps(bootstrap(root=root, repo=args.repo), sort_keys=True))
     except StoreRefusal as refusal:

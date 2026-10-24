@@ -259,6 +259,16 @@ The ladder is the elected-content spec's: local → hybrid → mesh → cluster.
    The local rung's "channel" is this device's own store and pointer, and the green gate flips it.
    Delivers the first sentence of the graduation trigger, and cures the smoke incident and the
    recall refusal.
+   *Added 2026-10-24 (operator: "resolve them"):* a device that only **pulls** must still
+   converge. So at session start the guard runs `epr-store follow`, which builds and lands the
+   checkout's HEAD when all four hold:
+   - HEAD is contained in published `origin/dev`;
+   - HEAD descends from the landed head's commit;
+   - epr's own sources changed between the two;
+   - those sources are clean.
+
+   Until slice 4 moves bytes between devices, this is how the second workspace follows the first.
+   It costs one background cargo build per device for each published change to epr's sources.
 2. **Channel publish.** The same CID published as a staging release on `runtime:tooling:household:latest`
    (exact naming is the builder's call, inside §3's grammar), and the workspace follows it through
    the adoption path instead of a local flip.

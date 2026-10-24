@@ -822,3 +822,59 @@ def test_guard_keeps_a_hand_installed_binary_and_repoints_stale_shadows(
     assert kept["gate_run"] == "adopted-from-path" and kept["tree_clean"] is False
     assert f"EPR_PIN_CID={hand_cid}" in result.stdout
     assert "still shadows" not in result.stdout
+
+
+def _landed_at(store: Path, repo: Path, commit_sha: str, label: str, tmp_path: Path) -> dict:
+    record = ingest(store, repo, commit_sha, fake_epr(tmp_path / label, label))
+    epr_store.land(record["cid"], commit_sha, root=store, repo=repo)
+    return record
+
+
+def test_follow_adopts_a_newer_published_dev_commit_the_checkout_holds(
+    scratch: tuple[Path, Path, str], tmp_path: Path
+) -> None:
+    store, repo, head = scratch
+    _landed_at(store, repo, head, "landed", tmp_path)
+    newer = commit(repo, "a newer epr source\n")
+    git(repo, "update-ref", epr_store.PUBLISHED_REF, newer)
+    candidate = ingest(store, repo, newer, fake_epr(tmp_path / "newer", "newer"))
+
+    result = epr_store.follow(root=store, repo=repo)
+
+    assert result["followed"] is True
+    assert epr_store._read_link(store, "current") == candidate["cid"]
+    assert json.loads((store / "current.json").read_text())["commit"] == newer
+
+
+def test_follow_leaves_the_head_for_an_unpublished_or_unchanged_checkout(
+    scratch: tuple[Path, Path, str], tmp_path: Path
+) -> None:
+    store, repo, head = scratch
+    landed = _landed_at(store, repo, head, "landed", tmp_path)
+    local_only = commit(repo, "a local commit nobody landed\n")
+    git(repo, "update-ref", epr_store.PUBLISHED_REF, head)
+
+    assert "not published on dev" in epr_store.follow(root=store, repo=repo)["why"]
+
+    git(repo, "update-ref", epr_store.PUBLISHED_REF, local_only)
+    (repo / "tracked").write_text("dirty\n", encoding="utf-8")
+    assert "dirty" in epr_store.follow(root=store, repo=repo)["why"]
+    assert epr_store._read_link(store, "current") == landed["cid"]
+
+
+def test_follow_does_nothing_when_epr_sources_did_not_change(
+    scratch: tuple[Path, Path, str], tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    store, repo, head = scratch
+    (repo / "src").mkdir()
+    (repo / "src" / "lib.rs").write_text("fn main() {}\n", encoding="utf-8")
+    git(repo, "add", "src")
+    git(repo, "commit", "-qm", "source")
+    base = git(repo, "rev-parse", "HEAD")
+    landed = _landed_at(store, repo, base, "landed", tmp_path)
+    monkeypatch.setattr(epr_store, "source_paths", lambda _repo: ["src"])
+    docs_only = commit(repo, "a docs-only change\n")
+    git(repo, "update-ref", epr_store.PUBLISHED_REF, docs_only)
+
+    assert epr_store.follow(root=store, repo=repo)["why"] == "no epr source change since the landed head"
+    assert epr_store._read_link(store, "current") == landed["cid"]
