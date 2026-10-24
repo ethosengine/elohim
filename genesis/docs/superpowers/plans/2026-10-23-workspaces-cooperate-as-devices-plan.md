@@ -9,7 +9,7 @@ serves: [devices-share-one-berth, ledgers-fold-once]
 domain: D5
 sprint: Sprint-2
 cites:
-  - "workspaces-cooperate-as-devices-design | the spec this plan lanes; read §3 before any task | sha256:88c203269b34f963 | path: genesis/docs/superpowers/specs/2026-10-23-workspaces-cooperate-as-devices-design.md"
+  - "workspaces-cooperate-as-devices-design | the spec this plan lanes; read §3 before any task | sha256:28296e002122f501 | path: genesis/docs/superpowers/specs/2026-10-23-workspaces-cooperate-as-devices-design.md"
   - genesis/data/timeline/backlog/native-peer-dev-channel-and-collective-memory-seed.md
   - "placement-contract-architecture-plan | sibling plan: eprfs tier/walk lanes this link serves over iroh | sha256:5417b3363dffdc44 | path: genesis/docs/superpowers/plans/2026-10-20-placement-contract-architecture-plan.md"
   - "elohim-rust-style-guide | Global Constraints: strict-from-birth eprfs-peer, RS-GOV-02 paydown per touched crate | sha256:30c95d2e27e9087f | path: genesis/docs/rust-style-guide.md"

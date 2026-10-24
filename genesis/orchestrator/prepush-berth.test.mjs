@@ -25,14 +25,16 @@ function hookBlock() {
   return hook.slice(start, end);
 }
 
-// A stub berth: logs `<args>` per call; a claim answers from `answers` (`<resource> <code>`):
+// A stub berth: logs `<args>` per call; a claim answers from `answers` (`<resource> <code>...`, the
+// nth claim of a resource taking the nth code, the last repeating):
 // 0 claimed, R renewed (exit 0), 3 held by device A, 4 no session, I interrupted (Ctrl-C reaches the
 // hook while that claim is in flight); anything unlisted is claimed.
 const STUB_BERTH = `#!/usr/bin/env bash
 here="$(cd "$(dirname "$0")" && pwd)"
 echo "$*" >> "$here/calls.log"
 if [ "$1" = claim ]; then
-  code=$(awk -v r="$2" '$1 == r { print $2 }' "$here/answers" 2>/dev/null | head -1)
+  n=$(grep -c "^claim $2 " "$here/calls.log")
+  code=$(awk -v r="$2" -v n="$n" '$1 == r { print $((n + 1 <= NF) ? n + 1 : NF) }' "$here/answers" 2>/dev/null | head -1)
   case "\${code:-0}" in
     0) echo "$2: claimed by codex-1 (session from env)"; exit 0 ;;
     R) echo "$2: renewed by codex-1 (session from env)"; exit 0 ;;
@@ -75,7 +77,7 @@ function fixture(t, message, answers = {}) {
   writeFileSync(
     join(bin, "answers"),
     Object.entries(answers)
-      .map(([resource, code]) => `${resource} ${code}\n`)
+      .map(([resource, codes]) => `${resource} ${[codes].flat().join(" ")}\n`)
       .join(""),
   );
   return { dir, base, head, bin };
@@ -261,4 +263,63 @@ test("prepush_exit_1_is_a_renew_only_on_berths_own_line", (t) => {
     "release dev-integration",
     "release alpha-fleet",
   ]);
+});
+
+// The hook's lease outlives the gates it protects: while they run, every claim it holds is renewed
+// every ttl/3 (here a 3 s ttl, so once a second), and the renewing stops on every exit before the
+// release, so nothing renews a lease after the push gave it back.
+const RENEW = (resource) => `claim ${resource} --class verify --ttl 3`;
+const SHORT_TTL = { BERTH_PREPUSH_TTL_S: "3" };
+
+function settledCalls(fx) {
+  // Long enough for a renewer that outlived the hook to have renewed again.
+  spawnSync("sleep", ["1.5"]);
+  return readFileSync(join(fx.bin, "calls.log"), "utf8").trim().split("\n");
+}
+
+test("prepush_renews_its_claims_while_the_gates_run", (t) => {
+  const fx = fixture(t, "a build [build:app]");
+  const r = runBlock(fx, { after: "sleep 3.5; echo GATES-RAN", env: SHORT_TTL });
+  assert.equal(r.status, 0, r.out);
+  assert.ok(r.out.includes("GATES-RAN"));
+  const calls = r.calls.map((c) => c.split(" --note")[0]);
+  assert.deepEqual(calls.slice(0, 2), [RENEW("dev-integration"), RENEW("jenkins-dispatch")]);
+  const renews = calls.slice(2, -2);
+  assert.ok(renews.length >= 4, `renewed while the gates ran: ${calls}`);
+  assert.ok(
+    renews.every((c) => c === RENEW("dev-integration") || c === RENEW("jenkins-dispatch")),
+    `${calls}`,
+  );
+  assert.deepEqual(calls.slice(-2), ["release dev-integration", "release jenkins-dispatch"]);
+  assert.deepEqual(settledCalls(fx), r.calls, "nothing renews after the push ends");
+
+  // A gate that fails, and an interrupt mid-gate, stop the renewing the same way.
+  const interrupt = ["kill", "-INT", "$$"].join(" ");
+  for (const after of ["sleep 1.5; exit 1", `sleep 1.5; ${interrupt}; sleep 5`]) {
+    const fx2 = fixture(t, "feat: land it");
+    const ended = runBlock(fx2, { after, env: SHORT_TTL });
+    assert.notEqual(ended.status, 0, ended.out);
+    assert.deepEqual(ended.calls.slice(-1), ["release dev-integration"]);
+    assert.deepEqual(settledCalls(fx2), ended.calls, `${after}: nothing renews after the push ends`);
+  }
+});
+
+test("prepush_renew_that_does_not_cross_keeps_going", (t) => {
+  const fx = fixture(t, "feat: land it", { "dev-integration": ["0", "U"] });
+  const r = runBlock(fx, { after: "sleep 2.5; echo GATES-RAN", env: SHORT_TTL });
+  assert.equal(r.status, 0, r.out);
+  assert.ok(r.out.includes("GATES-RAN"));
+  assert.match(r.out, /dev-integration: renewed here, but the renew record did not reach/);
+  assert.ok(r.calls.filter((c) => c.startsWith("claim")).length >= 3, `${r.calls}`);
+});
+
+test("prepush_renew_refused_outright_stops_the_push", (t) => {
+  const fx = fixture(t, "feat: land it", { "dev-integration": ["0", "3"] });
+  const r = runBlock(fx, { after: "sleep 1.5; sleep 1.5; echo PUSHED", env: SHORT_TTL });
+  assert.notEqual(r.status, 0, r.out);
+  assert.ok(!r.out.includes("PUSHED"), r.out);
+  assert.ok(r.out.split("\n").includes(HELD_LINE), `berth's reason line verbatim:\n${r.out}`);
+  assert.match(r.out, /REFUSED: renewing dev-integration while the gates ran was refused/);
+  assert.deepEqual(r.calls.slice(-1), ["release dev-integration"]);
+  assert.deepEqual(settledCalls(fx), r.calls, "nothing renews after the push ends");
 });

@@ -202,7 +202,9 @@ them required.
 ### 3.5 Integration over the channel
 
 - The pre-push hook claims `dev-integration` (class `verify`, ttl 1800 s) for a push to `dev` or
-  `main`, and releases it when the push ends. A refusal stops the push and names the holder.
+  `main`, renews every claim it holds every ttl/3 while the gates run (so a long landing never
+  outlives its lease), and releases them when the push ends. A refusal, at the claim or at a
+  renew, stops the push and names the holder.
 - A commit carrying `[build:edge]` also needs `alpha-fleet`. A `[build:*]` tag also needs
   `jenkins-dispatch`. The hook holds every claim only for the duration of the push. A session that
   watches a build or deploy through to the end takes its own explicit `berth claim` on that resource

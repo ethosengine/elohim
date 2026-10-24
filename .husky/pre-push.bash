@@ -101,7 +101,8 @@ done
 #
 # A push to dev or main lands on the branch every device of this person integrates on, so it holds
 # the steward-scoped `dev-integration` through berth for the life of the push (class verify, ttl
-# 1800 s — a steward lease with no ttl would bind until released). A pushed commit carrying
+# 1800 s, renewed every 600 s while the gates run — a steward lease with no ttl would bind until
+# released, and an unrenewed one would lapse under a long landing). A pushed commit carrying
 # `[build:edge]` (or a tag list naming edge, or `[build:all]`) also needs `alpha-fleet`, since it
 # deploys to the test fleet; any `[build:*]` tag also needs `jenkins-dispatch`. Spec
 # 2026-10-23-workspaces-cooperate-as-devices-design.md §3.5. Every pushed commit's message is read
@@ -157,6 +158,47 @@ berth_release_claims() {
 }
 HOOK_ON_EXIT="$HOOK_ON_EXIT berth_release_claims"
 
+# While the gates run, every claim this push took is renewed every ttl/3 by a background loop, so a
+# long landing never outlives its lease (the other devices read a lease past since + ttl as dead).
+# A renew whose record did not cross prints berth's line and keeps going; a renew refused outright
+# prints berth's line and stops the push (at the end of the gate step then running). The loop is
+# stopped on every exit, before the release, and lets an in-flight renew finish first, so nothing
+# renews a lease after the push gave it back.
+BERTH_TTL_S="${BERTH_PREPUSH_TTL_S:-1800}"
+BERTH_HOOK_PID=$$
+BERTH_RENEW_PID=""
+berth_renew_loop() {
+  local interval=$((BERTH_TTL_S / 3)) sleeper="" res out rc
+  [ "$interval" -ge 1 ] || interval=1
+  trap - EXIT INT HUP
+  trap '[ -n "$sleeper" ] && kill "$sleeper" 2>/dev/null; exit 0' TERM
+  while :; do
+    sleep "$interval" &
+    sleeper=$!
+    wait "$sleeper"
+    sleeper=""
+    for res in $BERTH_HELD; do
+      out=$("$BERTH_BIN" claim "$res" "${BERTH_FLAGS[@]}" 2>&1)
+      rc=$?
+      [ "$rc" -eq 0 ] && continue
+      [ -n "$out" ] && printf '%s\n' "$out" >&2
+      if [ "$rc" -eq 1 ] && grep -q "^$res: renewed here, but " <<<"$out"; then
+        continue
+      fi
+      echo "[pre-push] REFUSED: renewing $res while the gates ran was refused (above). The push stops." >&2
+      kill -TERM "$BERTH_HOOK_PID" 2>/dev/null
+      exit 0
+    done
+  done
+}
+berth_stop_renewing() {
+  [ -n "$BERTH_RENEW_PID" ] || return 0
+  kill -TERM "$BERTH_RENEW_PID" 2>/dev/null
+  wait "$BERTH_RENEW_PID" 2>/dev/null
+  BERTH_RENEW_PID=""
+}
+HOOK_ON_EXIT="berth_stop_renewing $HOOK_ON_EXIT"
+
 BERTH_TARGETS=""
 BERTH_MESSAGES=""
 for PUSH_LINE in "${PUSH_LINES[@]}"; do
@@ -183,7 +225,7 @@ if [ -n "$BERTH_TARGETS" ] && [ -f "$BERTH_BIN" ]; then
   if grep -qiE '\[build:[a-z,-]+\]' <<<"$BERTH_MESSAGES"; then
     BERTH_NEEDS="$BERTH_NEEDS jenkins-dispatch"
   fi
-  BERTH_FLAGS=(--class verify --ttl 1800 --note "pre-push to${BERTH_TARGETS}")
+  BERTH_FLAGS=(--class verify --ttl "$BERTH_TTL_S" --note "pre-push to${BERTH_TARGETS}")
   [ "${BERTH_OFFLINE_OK-}" = "1" ] && BERTH_FLAGS+=(--offline-ok)
   for BERTH_RES in $BERTH_NEEDS; do
     BERTH_CLAIMING="$BERTH_RES"
@@ -220,6 +262,10 @@ if [ -n "$BERTH_TARGETS" ] && [ -f "$BERTH_BIN" ]; then
         ;;
     esac
   done
+  if [ -n "$BERTH_HELD" ]; then
+    berth_renew_loop &
+    BERTH_RENEW_PID=$!
+  fi
 fi
 # ── Berth: claims taken ───────────────────────────────────────────
 
