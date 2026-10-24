@@ -817,7 +817,6 @@ pub fn epr_meta_coverage(root: &Path, tuning: &Tuning) -> f64 {
     }
 }
 
-#[allow(clippy::too_many_arguments)]
 fn visit_census(
     root: &Path,
     dir: &Path,
