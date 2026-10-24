@@ -9,6 +9,11 @@ description = "A device's iroh peer: its persisted peer key, its endpoint, admis
 # Consumed by path from epr-cli; no pipeline publishes it, so it does not claim to be released.
 publish = false
 
+[features]
+# Tests only: the endpoint skips relay certificate verification so it can home to iroh's
+# in-process self-signed test relay. Never enabled by a consumer.
+testing = ["iroh/test-utils"]
+
 [dependencies]
 # The channel store is an EprfsStorage adapter.
 async-trait.workspace = true
@@ -41,6 +46,7 @@ tokio = { workspace = true, features = ["rt", "sync", "time"] }
 url = "2"
 
 [dev-dependencies]
+eprfs-peer = { path = ".", features = ["testing"] }
 elohim-epr = { path = "../../epr" }
 eprfs-serve = { path = "../eprfs-serve", features = ["testing"] }
 tempfile = "3"

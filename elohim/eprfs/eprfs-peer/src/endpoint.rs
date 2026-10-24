@@ -58,6 +58,10 @@ pub async fn bind_on(
     if let Some(listen) = listen {
         builder = builder.bind_addr_v4(listen);
     }
+    #[cfg(feature = "testing")]
+    {
+        builder = builder.insecure_skip_relay_cert_verify(true);
+    }
     builder
         .bind()
         .await

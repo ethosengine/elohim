@@ -253,6 +253,64 @@ async fn two_daemons_fold_each_others_heads_and_drop_a_contested_device() {
     daemon_b.shutdown().await;
 }
 
+/// Two admitted devices homed to one relay, with no `--peer` direct address on either side, find
+/// each other's heads: the roster's bare node ids are seeded with the relay URL at start.
+#[tokio::test(flavor = "multi_thread")]
+async fn two_daemons_find_each_other_through_the_relay_with_no_peer_address() {
+    let (_map, relay_url, _relay) = iroh::test_utils::run_relay_server()
+        .await
+        .expect("in-process relay");
+    let relay: url::Url = relay_url.into();
+    let a = device("DeviceA", 1);
+    let b = device("DeviceB", 2);
+    let (key_dir_a, key_dir_b) = (tempfile::tempdir().unwrap(), tempfile::tempdir().unwrap());
+    let (key_a, key_b) = (load_key(key_dir_a.path()), load_key(key_dir_b.path()));
+    let rows = vec![
+        genesis(&a),
+        binding(&a, &b),
+        endpoint_row(&a, &a, &key_a),
+        endpoint_row(&a, &b, &key_b),
+    ];
+    let (side_a, side_b) = (Side::new(&rows), Side::new(&rows));
+    let with_relay = |mut cfg: PeerConfig| {
+        cfg.relay = Some(relay.clone());
+        cfg.listen = None;
+        cfg
+    };
+    let daemon_a = PeerDaemon::start(with_relay(config(
+        &a,
+        &a.did,
+        key_a,
+        &side_a,
+        &[&a, &b],
+        Vec::new(),
+        local(0),
+    )))
+    .await
+    .expect("A starts");
+    let daemon_b = PeerDaemon::start(with_relay(config(
+        &b,
+        &a.did,
+        key_b,
+        &side_b,
+        &[&a, &b],
+        Vec::new(),
+        local(0),
+    )))
+    .await
+    .expect("B starts");
+    eventually("A holds B's head through the relay", || {
+        side_a.table().devices.contains_key(&b.did)
+    })
+    .await;
+    eventually("B holds A's head through the relay", || {
+        side_b.table().devices.contains_key(&a.did)
+    })
+    .await;
+    daemon_a.shutdown().await;
+    daemon_b.shutdown().await;
+}
+
 /// A device whose tier accepts a connection and never answers: an admitted peer that stalls.
 #[derive(Debug, Clone, Default)]
 struct StallingTier {

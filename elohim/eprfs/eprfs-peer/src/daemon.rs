@@ -202,13 +202,18 @@ impl PeerDaemon {
 
         let mut peers = HashMap::new();
         for addr in &config.peers {
-            if let Err(e) = endpoint.add_node_addr(addr.clone()) {
-                (config.log)(&format!("peer {}: address not added: {e}", addr.node_id));
-            }
             peers.insert(addr.node_id, addr.clone());
         }
         let me = endpoint.node_id();
         let bootstrap = others(&admission, me);
+        // Before the topic is joined: the first head is found through these addresses.
+        seed_endpoint(
+            &endpoint,
+            config.relay.as_ref(),
+            &bootstrap,
+            &peers,
+            &*config.log,
+        );
         let topic = topic_for(&config.chain_root);
         let (sender, receiver) = subscribe(&gossip, topic, bootstrap.clone()).await?;
         let (folds_tx, folds_rx) = mpsc::unbounded_channel();
@@ -308,6 +313,36 @@ fn others(admission: &SharedAdmission, me: NodeId) -> Vec<NodeId> {
         .into_iter()
         .filter(|node| *node != me)
         .collect()
+}
+
+/// Tell `endpoint` how to reach every device in `admitted`, and every `--peer` address given.
+///
+/// With a relay configured, each admitted node id becomes a [`NodeAddr`] carrying that relay URL
+/// (merged with its `--peer` direct addresses, when it has them), so a gossip join or a tier
+/// dial to a bare roster node id finds the peer through our own relay with no `--peer`. With no
+/// relay a node known only by its id stays unaddressed, as before.
+fn seed_endpoint(
+    endpoint: &Endpoint,
+    relay: Option<&Url>,
+    admitted: &[NodeId],
+    peers: &HashMap<NodeId, NodeAddr>,
+    log: &(dyn Fn(&str) + Send + Sync),
+) {
+    let mut addrs: HashMap<NodeId, NodeAddr> = peers.clone();
+    if let Some(relay) = relay {
+        for node in admitted {
+            addrs.entry(*node).or_insert_with(|| NodeAddr::new(*node));
+        }
+        for addr in addrs.values_mut() {
+            addr.relay_url = Some(relay.clone().into());
+        }
+    }
+    for addr in addrs.into_values() {
+        let node = addr.node_id;
+        if let Err(e) = endpoint.add_node_addr(addr) {
+            log(&format!("peer {node}: address not added: {e}"));
+        }
+    }
 }
 
 /// A file's length and modification time, to notice it changed.
@@ -532,7 +567,15 @@ impl Run {
             self.forget_unadmitted_heads();
         }
         let me = self.endpoint.node_id();
-        let fresh: Vec<NodeId> = others(&self.admission, me)
+        let admitted = others(&self.admission, me);
+        seed_endpoint(
+            &self.endpoint,
+            self.config.relay.as_ref(),
+            &admitted,
+            &self.peers,
+            &*self.config.log,
+        );
+        let fresh: Vec<NodeId> = admitted
             .into_iter()
             .filter(|node| !self.joined.contains(node))
             .collect();
