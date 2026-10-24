@@ -55,14 +55,13 @@ interface FollowFixture {
 
 const fixtures = new WeakMap<object, FollowFixture>();
 const repository = resolve('../..');
-const storeCli = join(repository, 'genesis/agentic/bin/bin-store');
-const launcherSource = join(repository, 'genesis/agentic/bin/bin-launch');
-const storeLibrary = join(repository, '.claude/scripts/_lib/bin_store.py');
 const registrySource = join(repository, 'genesis/agentic/bin-tools.json');
 // This reviewed gate path is only a read source; each scenario copies it into a private mkdtemp.
 // eslint-disable-next-line sonarjs/publicly-writable-directories
-const documentedGateBuild = '/tmp/eprfs-gate-target-wt-household-follows-latest/debug/epr';
+const documentedGateBuild = '/tmp/eprfs-gate-target/debug/epr';
 const candidateSource = process.env.EPR_BIN ?? documentedGateBuild;
+const storeCli = candidateSource;
+const launcherSource = process.env.BIN_LAUNCH_BIN ?? join(dirname(candidateSource), 'bin-launch');
 const scratchBase = process.env.A2O_TMPDIR ?? tmpdir();
 
 function fixture(world: object): FollowFixture {
@@ -114,7 +113,11 @@ function git(state: FollowFixture, args: string[]): string {
 }
 
 function commit(state: FollowFixture, message: string): string {
-  git(state, ['add', '-A']);
+  git(state, [
+    'add',
+    'source.txt',
+    ...(existsSync(join(state.repo, 'genesis')) ? ['genesis'] : []),
+  ]);
   git(state, [
     '-c',
     'user.name=Epr Follow Fixture',
@@ -151,7 +154,17 @@ function launcherEnv(state: FollowFixture, extra: NodeJS.ProcessEnv = {}): NodeJ
 function store(state: FollowFixture, args: string[], env: NodeJS.ProcessEnv = {}): Invocation {
   return run(
     state,
-    [storeCli, '--tool', 'epr', '--store', state.store, ...args],
+    [
+      storeCli,
+      'bin',
+      '--registry',
+      registrySource,
+      '--tool',
+      'epr',
+      '--store',
+      state.store,
+      ...args,
+    ],
     storeEnv(state, env)
   );
 }
@@ -171,7 +184,7 @@ function makeCandidate(state: FollowFixture, label: 'A' | 'B'): string {
   chmodSync(destination, 0o755);
   const identity = object(JSON.parse(ok(state, [destination, '--version']).stdout));
   assert.equal(identity.id, 'elohim-epr-cli');
-  assert.match(String(identity.cid), /^sha256:[0-9a-f]{64}$/);
+  assert.match(String(identity.cid), /^bafkrei[a-z2-7]+$/);
   return destination;
 }
 
@@ -182,7 +195,7 @@ function makeWrongCidCandidate(state: FollowFixture): string {
   writeFileSync(
     destination,
     `#!/usr/bin/env python3
-import hashlib
+import subprocess
 import json
 from pathlib import Path
 import sys
@@ -192,9 +205,10 @@ counter = Path(${JSON.stringify(counter)})
 if sys.argv[1:] == ['--version']:
     count = int(counter.read_text() or '0') + 1 if counter.exists() else 1
     counter.write_text(str(count))
-    cid = 'sha256:' + hashlib.sha256(here.read_bytes()).hexdigest()
+    result = subprocess.run([${JSON.stringify(candidateSource)}, 'bin', 'resolve', '--tool', 'epr', '--registry', ${JSON.stringify(registrySource)}, '--json'], env={**__import__('os').environ, 'EPR_BIN': str(here)}, capture_output=True, text=True, check=True)
+    cid = json.loads(result.stdout)['cid']
     if count > 1:
-        cid = 'sha256:' + '0' * 64
+        cid = 'bafkreiaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa'
     print(json.dumps({'id': 'elohim-epr-cli', 'version': 'wrong-cid-fixture', 'cid': cid}))
 elif sys.argv[1:] == ['flow', 'report', 'scope']:
     print('scope: aligned')
@@ -288,13 +302,12 @@ Given(
     writeFileSync(join(repo, 'source.txt'), 'build A\n');
     state.commitA = commit(state, 'source for build A');
 
-    copyFileSync(storeLibrary, join(bin, 'bin_store.py'));
     copyFileSync(registrySource, join(bin, 'bin-tools.json'));
-    const renderedLauncher = readFileSync(launcherSource, 'utf8')
-      .replace('@BIN_STORE_PYTHON@', process.env.PYTHON ?? '/usr/bin/python3')
-      .replace('@BIN_STORE_PY@', join(bin, 'bin_store.py'))
-      .replace('@BIN_TOOLS_JSON@', join(bin, 'bin-tools.json'));
-    writeFileSync(state.launcher, renderedLauncher);
+    copyFileSync(
+      join(repository, 'genesis/agentic/agent-runtimes.json'),
+      join(bin, 'agent-runtimes.json')
+    );
+    copyFileSync(launcherSource, state.launcher);
     chmodSync(state.launcher, 0o755);
   }
 );
@@ -355,7 +368,7 @@ Then('bin-store for epr reports that session behind the head', function () {
   const state = fixture(this);
   assert.ok(state.sessionEnv);
   const status = object(JSON.parse(storeOk(state, ['status', '--json'], state.sessionEnv).stdout));
-  assert.equal(status.session_cid, state.cidA);
+  assert.equal(status.sessionCid, state.cidA);
   assert.equal(status.head, state.cidB);
   assert.equal(status.behind, true);
 });

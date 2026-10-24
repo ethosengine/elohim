@@ -748,7 +748,10 @@ fn add_usage(total: &mut Value, more: &Value) {
 /// MemPalace is optional and reports its unknowns as unknowns: the declaration carries `ranking`,
 /// `version` and `freshness` as nulls, and this function copies that declaration into the result
 /// rather than papering over it. A candidate is a route to verify, never an answer.
-#[allow(clippy::too_many_arguments)]
+#[allow(
+    clippy::too_many_arguments,
+    reason = "Recall execution keeps its explicit recipe, state and evidence inputs at one admission boundary"
+)]
 pub fn retrieve(
     root: &Path,
     contract: &Contract,
@@ -1390,7 +1393,7 @@ pub fn run(argv: &[String]) -> FlowResult<ExitCode> {
     let executor_digest = std::env::current_exe()
         .ok()
         .and_then(|path| std::fs::read(path).ok())
-        .map(|bytes| hex(&Sha256::digest(&bytes)));
+        .map(|bytes| eprfs_core::BlobCid::compute_raw(&bytes).to_string());
 
     let mut execution = match Execution::open(
         &args.root,

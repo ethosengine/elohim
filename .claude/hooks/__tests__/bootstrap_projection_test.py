@@ -78,6 +78,9 @@ REPO = HOOKS.parent.parent
 STUB = '''#!/usr/bin/env python3
 import json, os, sys, time
 argv = sys.argv[1:]
+if sys.argv[1:3] == ["bin", "status"]:
+    print(json.dumps({"resolved": __file__, "resolvedCid": "bafkreifixture"}))
+    sys.exit(0)
 with open(os.environ["STUB_LOG"], "a") as fh:
     fh.write(json.dumps(argv) + "\\n")
 if os.environ.get("SLOW") == "1":
@@ -133,7 +136,6 @@ class _StubFixture(unittest.TestCase):
         library = self.project / ".claude" / "scripts" / "_lib"
         library.mkdir(parents=True)
         shutil.copy(HOOKS.parent / "scripts" / "_lib" / "epr_client.py", library)
-        shutil.copy(HOOKS.parent / "scripts" / "_lib" / "bin_store.py", library)
         registry = self.project / "genesis" / "agentic"
         registry.mkdir(parents=True)
         shutil.copy(HOOKS.parents[1] / "genesis" / "agentic" / "bin-tools.json", registry / "bin-tools.json")

@@ -1,0 +1,3024 @@
+seamRegistryVersion: 1
+crate: elohim-device-runtime
+crateRoot: elohim/eprfs/device-runtime
+seamLocus: Local executable custody, session ownership and explicit promotion. The store holds private B records
+  and reconstructs ephemeral C status, with no network head-plane cost.
+decisionPoints:
+- name: path-invalid
+  kind: verdict-fn
+  sourceLocation:
+    file: src/bin_store/files.rs
+    modulePath: elohim_device_runtime::bin_store::files::absolute
+  summary: 'path-invalid: returns a typed refusal with local context; never promotes an unverified candidate.'
+  concernIds:
+  - id: C0
+    status: answered
+    justification: Device-private local custody; status and session identity are rebuilt views. No DHT head or transport.
+  - id: C1
+    status: answered
+    justification: Possession and ingest cannot promote current; only land can validate and promote.
+  - id: C2
+    status: answered
+    justification: Land compares source descent and revalidates current metadata; timestamps never rank heads.
+  - id: C3
+    status: answered
+    justification: PID plus process start time binds liveness; ownerless pins have bounded grace.
+  - id: C4
+    status: answered
+    justification: Refusal kind/detail distinguish unavailable bytes, invalid evidence and an absent session.
+  - id: C5
+    status: answered
+    justification: Attestation cache records witnessed success by repo/SHA/check; claimed evidence cannot land.
+  - id: C6a
+    status: answered
+    justification: Store locks and external commands have finite elapsed-time bounds.
+  - id: C6b
+    status: answered
+    justification: Ingest is content addressed, pins publish under lock, migration checkpoints its mapping.
+  - id: C7
+    status: n-a
+    justification: No peer advertisement or serving surface in this local crate.
+  - id: C8
+    status: answered
+    justification: Typed refusals return to the CLI; landing failures append to existing release evidence.
+  - id: C9
+    status: answered
+    justification: Session module binds owner start time; alias names resolve to registered release files.
+  - id: C10
+    status: answered
+    justification: CID migration is explicit; normal readers reject legacy addresses. Status schema names camelCase
+      fields.
+  - id: C11
+    status: partial
+    justification: Build concurrency follows pool policy; cross-device backpressure belongs to slice B.
+  - id: C12
+    status: n-a
+    justification: No new remote authority or consent; operator invokes device-local verbs.
+  - id: C13
+    status: answered
+    justification: Provisional pin is an explicit local choice and never authorizes current.
+  - id: C14
+    status: partial
+    justification: Legacy bytes are retained for running executables; cross-device custody is not implemented in
+      slice A.
+  contractTests: null
+  gapNote: Covered by the command/operation parity suite where exercised; no dedicated per-kind assertion is claimed.
+- name: invalid-cid
+  kind: verdict-fn
+  sourceLocation:
+    file: src/bin_store/files.rs
+    modulePath: elohim_device_runtime::bin_store::files::require_cid
+  summary: 'invalid-cid: returns a typed refusal with local context; never promotes an unverified candidate.'
+  concernIds:
+  - id: C0
+    status: answered
+    justification: Device-private local custody; status and session identity are rebuilt views. No DHT head or transport.
+  - id: C1
+    status: answered
+    justification: Possession and ingest cannot promote current; only land can validate and promote.
+  - id: C2
+    status: answered
+    justification: Land compares source descent and revalidates current metadata; timestamps never rank heads.
+  - id: C3
+    status: answered
+    justification: PID plus process start time binds liveness; ownerless pins have bounded grace.
+  - id: C4
+    status: answered
+    justification: Refusal kind/detail distinguish unavailable bytes, invalid evidence and an absent session.
+  - id: C5
+    status: answered
+    justification: Attestation cache records witnessed success by repo/SHA/check; claimed evidence cannot land.
+  - id: C6a
+    status: answered
+    justification: Store locks and external commands have finite elapsed-time bounds.
+  - id: C6b
+    status: answered
+    justification: Ingest is content addressed, pins publish under lock, migration checkpoints its mapping.
+  - id: C7
+    status: n-a
+    justification: No peer advertisement or serving surface in this local crate.
+  - id: C8
+    status: answered
+    justification: Typed refusals return to the CLI; landing failures append to existing release evidence.
+  - id: C9
+    status: answered
+    justification: Session module binds owner start time; alias names resolve to registered release files.
+  - id: C10
+    status: answered
+    justification: CID migration is explicit; normal readers reject legacy addresses. Status schema names camelCase
+      fields.
+  - id: C11
+    status: partial
+    justification: Build concurrency follows pool policy; cross-device backpressure belongs to slice B.
+  - id: C12
+    status: n-a
+    justification: No new remote authority or consent; operator invokes device-local verbs.
+  - id: C13
+    status: answered
+    justification: Provisional pin is an explicit local choice and never authorizes current.
+  - id: C14
+    status: partial
+    justification: Legacy bytes are retained for running executables; cross-device custody is not implemented in
+      slice A.
+  contractTests: null
+  gapNote: Covered by the command/operation parity suite where exercised; no dedicated per-kind assertion is claimed.
+- name: manifest-invalid
+  kind: verdict-fn
+  sourceLocation:
+    file: src/bin_store/files.rs
+    modulePath: elohim_device_runtime::bin_store::files::sums_manifest
+  summary: 'manifest-invalid: returns a typed refusal with local context; never promotes an unverified candidate.'
+  concernIds:
+  - id: C0
+    status: answered
+    justification: Device-private local custody; status and session identity are rebuilt views. No DHT head or transport.
+  - id: C1
+    status: answered
+    justification: Possession and ingest cannot promote current; only land can validate and promote.
+  - id: C2
+    status: answered
+    justification: Land compares source descent and revalidates current metadata; timestamps never rank heads.
+  - id: C3
+    status: answered
+    justification: PID plus process start time binds liveness; ownerless pins have bounded grace.
+  - id: C4
+    status: answered
+    justification: Refusal kind/detail distinguish unavailable bytes, invalid evidence and an absent session.
+  - id: C5
+    status: answered
+    justification: Attestation cache records witnessed success by repo/SHA/check; claimed evidence cannot land.
+  - id: C6a
+    status: answered
+    justification: Store locks and external commands have finite elapsed-time bounds.
+  - id: C6b
+    status: answered
+    justification: Ingest is content addressed, pins publish under lock, migration checkpoints its mapping.
+  - id: C7
+    status: n-a
+    justification: No peer advertisement or serving surface in this local crate.
+  - id: C8
+    status: answered
+    justification: Typed refusals return to the CLI; landing failures append to existing release evidence.
+  - id: C9
+    status: answered
+    justification: Session module binds owner start time; alias names resolve to registered release files.
+  - id: C10
+    status: answered
+    justification: CID migration is explicit; normal readers reject legacy addresses. Status schema names camelCase
+      fields.
+  - id: C11
+    status: partial
+    justification: Build concurrency follows pool policy; cross-device backpressure belongs to slice B.
+  - id: C12
+    status: n-a
+    justification: No new remote authority or consent; operator invokes device-local verbs.
+  - id: C13
+    status: answered
+    justification: Provisional pin is an explicit local choice and never authorizes current.
+  - id: C14
+    status: partial
+    justification: Legacy bytes are retained for running executables; cross-device custody is not implemented in
+      slice A.
+  contractTests: null
+  gapNote: Covered by the command/operation parity suite where exercised; no dedicated per-kind assertion is claimed.
+- name: lock-timeout
+  kind: verdict-fn
+  sourceLocation:
+    file: src/bin_store/files.rs
+    modulePath: elohim_device_runtime::bin_store::files::acquire
+  summary: 'lock-timeout: returns a typed refusal with local context; never promotes an unverified candidate.'
+  concernIds:
+  - id: C0
+    status: answered
+    justification: Device-private local custody; status and session identity are rebuilt views. No DHT head or transport.
+  - id: C1
+    status: answered
+    justification: Possession and ingest cannot promote current; only land can validate and promote.
+  - id: C2
+    status: answered
+    justification: Land compares source descent and revalidates current metadata; timestamps never rank heads.
+  - id: C3
+    status: answered
+    justification: PID plus process start time binds liveness; ownerless pins have bounded grace.
+  - id: C4
+    status: answered
+    justification: Refusal kind/detail distinguish unavailable bytes, invalid evidence and an absent session.
+  - id: C5
+    status: answered
+    justification: Attestation cache records witnessed success by repo/SHA/check; claimed evidence cannot land.
+  - id: C6a
+    status: answered
+    justification: Store locks and external commands have finite elapsed-time bounds.
+  - id: C6b
+    status: answered
+    justification: Ingest is content addressed, pins publish under lock, migration checkpoints its mapping.
+  - id: C7
+    status: n-a
+    justification: No peer advertisement or serving surface in this local crate.
+  - id: C8
+    status: answered
+    justification: Typed refusals return to the CLI; landing failures append to existing release evidence.
+  - id: C9
+    status: answered
+    justification: Session module binds owner start time; alias names resolve to registered release files.
+  - id: C10
+    status: answered
+    justification: CID migration is explicit; normal readers reject legacy addresses. Status schema names camelCase
+      fields.
+  - id: C11
+    status: partial
+    justification: Build concurrency follows pool policy; cross-device backpressure belongs to slice B.
+  - id: C12
+    status: n-a
+    justification: No new remote authority or consent; operator invokes device-local verbs.
+  - id: C13
+    status: answered
+    justification: Provisional pin is an explicit local choice and never authorizes current.
+  - id: C14
+    status: partial
+    justification: Legacy bytes are retained for running executables; cross-device custody is not implemented in
+      slice A.
+  contractTests:
+  - path: elohim/eprfs/device-runtime/src/bin_store/tests.rs
+    testName: test_other_lock_waits_refuse_with_a_clear_bound
+    kind: unit
+- name: source-mismatch
+  kind: verdict-fn
+  sourceLocation:
+    file: src/bin_store/ingest.rs
+    modulePath: elohim_device_runtime::bin_store::ingest::ingest
+  summary: 'source-mismatch: returns a typed refusal with local context; never promotes an unverified candidate.'
+  concernIds:
+  - id: C0
+    status: answered
+    justification: Device-private local custody; status and session identity are rebuilt views. No DHT head or transport.
+  - id: C1
+    status: answered
+    justification: Possession and ingest cannot promote current; only land can validate and promote.
+  - id: C2
+    status: answered
+    justification: Land compares source descent and revalidates current metadata; timestamps never rank heads.
+  - id: C3
+    status: answered
+    justification: PID plus process start time binds liveness; ownerless pins have bounded grace.
+  - id: C4
+    status: answered
+    justification: Refusal kind/detail distinguish unavailable bytes, invalid evidence and an absent session.
+  - id: C5
+    status: answered
+    justification: Attestation cache records witnessed success by repo/SHA/check; claimed evidence cannot land.
+  - id: C6a
+    status: answered
+    justification: Store locks and external commands have finite elapsed-time bounds.
+  - id: C6b
+    status: answered
+    justification: Ingest is content addressed, pins publish under lock, migration checkpoints its mapping.
+  - id: C7
+    status: n-a
+    justification: No peer advertisement or serving surface in this local crate.
+  - id: C8
+    status: answered
+    justification: Typed refusals return to the CLI; landing failures append to existing release evidence.
+  - id: C9
+    status: answered
+    justification: Session module binds owner start time; alias names resolve to registered release files.
+  - id: C10
+    status: answered
+    justification: CID migration is explicit; normal readers reject legacy addresses. Status schema names camelCase
+      fields.
+  - id: C11
+    status: partial
+    justification: Build concurrency follows pool policy; cross-device backpressure belongs to slice B.
+  - id: C12
+    status: n-a
+    justification: No new remote authority or consent; operator invokes device-local verbs.
+  - id: C13
+    status: answered
+    justification: Provisional pin is an explicit local choice and never authorizes current.
+  - id: C14
+    status: partial
+    justification: Legacy bytes are retained for running executables; cross-device custody is not implemented in
+      slice A.
+  contractTests: null
+  gapNote: Covered by the command/operation parity suite where exercised; no dedicated per-kind assertion is claimed.
+- name: binary-unusable
+  kind: verdict-fn
+  sourceLocation:
+    file: src/bin_store/ingest.rs
+    modulePath: elohim_device_runtime::bin_store::ingest::ingest
+  summary: 'binary-unusable: returns a typed refusal with local context; never promotes an unverified candidate.'
+  concernIds:
+  - id: C0
+    status: answered
+    justification: Device-private local custody; status and session identity are rebuilt views. No DHT head or transport.
+  - id: C1
+    status: answered
+    justification: Possession and ingest cannot promote current; only land can validate and promote.
+  - id: C2
+    status: answered
+    justification: Land compares source descent and revalidates current metadata; timestamps never rank heads.
+  - id: C3
+    status: answered
+    justification: PID plus process start time binds liveness; ownerless pins have bounded grace.
+  - id: C4
+    status: answered
+    justification: Refusal kind/detail distinguish unavailable bytes, invalid evidence and an absent session.
+  - id: C5
+    status: answered
+    justification: Attestation cache records witnessed success by repo/SHA/check; claimed evidence cannot land.
+  - id: C6a
+    status: answered
+    justification: Store locks and external commands have finite elapsed-time bounds.
+  - id: C6b
+    status: answered
+    justification: Ingest is content addressed, pins publish under lock, migration checkpoints its mapping.
+  - id: C7
+    status: n-a
+    justification: No peer advertisement or serving surface in this local crate.
+  - id: C8
+    status: answered
+    justification: Typed refusals return to the CLI; landing failures append to existing release evidence.
+  - id: C9
+    status: answered
+    justification: Session module binds owner start time; alias names resolve to registered release files.
+  - id: C10
+    status: answered
+    justification: CID migration is explicit; normal readers reject legacy addresses. Status schema names camelCase
+      fields.
+  - id: C11
+    status: partial
+    justification: Build concurrency follows pool policy; cross-device backpressure belongs to slice B.
+  - id: C12
+    status: n-a
+    justification: No new remote authority or consent; operator invokes device-local verbs.
+  - id: C13
+    status: answered
+    justification: Provisional pin is an explicit local choice and never authorizes current.
+  - id: C14
+    status: partial
+    justification: Legacy bytes are retained for running executables; cross-device custody is not implemented in
+      slice A.
+  contractTests: null
+  gapNote: Covered by the command/operation parity suite where exercised; no dedicated per-kind assertion is claimed.
+- name: checksums-mismatch
+  kind: verdict-fn
+  sourceLocation:
+    file: src/bin_store/ingest.rs
+    modulePath: elohim_device_runtime::bin_store::ingest::ingest
+  summary: 'checksums-mismatch: returns a typed refusal with local context; never promotes an unverified candidate.'
+  concernIds:
+  - id: C0
+    status: answered
+    justification: Device-private local custody; status and session identity are rebuilt views. No DHT head or transport.
+  - id: C1
+    status: answered
+    justification: Possession and ingest cannot promote current; only land can validate and promote.
+  - id: C2
+    status: answered
+    justification: Land compares source descent and revalidates current metadata; timestamps never rank heads.
+  - id: C3
+    status: answered
+    justification: PID plus process start time binds liveness; ownerless pins have bounded grace.
+  - id: C4
+    status: answered
+    justification: Refusal kind/detail distinguish unavailable bytes, invalid evidence and an absent session.
+  - id: C5
+    status: answered
+    justification: Attestation cache records witnessed success by repo/SHA/check; claimed evidence cannot land.
+  - id: C6a
+    status: answered
+    justification: Store locks and external commands have finite elapsed-time bounds.
+  - id: C6b
+    status: answered
+    justification: Ingest is content addressed, pins publish under lock, migration checkpoints its mapping.
+  - id: C7
+    status: n-a
+    justification: No peer advertisement or serving surface in this local crate.
+  - id: C8
+    status: answered
+    justification: Typed refusals return to the CLI; landing failures append to existing release evidence.
+  - id: C9
+    status: answered
+    justification: Session module binds owner start time; alias names resolve to registered release files.
+  - id: C10
+    status: answered
+    justification: CID migration is explicit; normal readers reject legacy addresses. Status schema names camelCase
+      fields.
+  - id: C11
+    status: partial
+    justification: Build concurrency follows pool policy; cross-device backpressure belongs to slice B.
+  - id: C12
+    status: n-a
+    justification: No new remote authority or consent; operator invokes device-local verbs.
+  - id: C13
+    status: answered
+    justification: Provisional pin is an explicit local choice and never authorizes current.
+  - id: C14
+    status: partial
+    justification: Legacy bytes are retained for running executables; cross-device custody is not implemented in
+      slice A.
+  contractTests:
+  - path: elohim/eprfs/device-runtime/src/bin_store/tests.rs
+    testName: wrong_sum_and_old_cid_readers_refuse
+    kind: unit
+- name: checksums-absent
+  kind: verdict-fn
+  sourceLocation:
+    file: src/bin_store/ingest.rs
+    modulePath: elohim_device_runtime::bin_store::ingest::verify_source_manifest
+  summary: 'checksums-absent: returns a typed refusal with local context; never promotes an unverified candidate.'
+  concernIds:
+  - id: C0
+    status: answered
+    justification: Device-private local custody; status and session identity are rebuilt views. No DHT head or transport.
+  - id: C1
+    status: answered
+    justification: Possession and ingest cannot promote current; only land can validate and promote.
+  - id: C2
+    status: answered
+    justification: Land compares source descent and revalidates current metadata; timestamps never rank heads.
+  - id: C3
+    status: answered
+    justification: PID plus process start time binds liveness; ownerless pins have bounded grace.
+  - id: C4
+    status: answered
+    justification: Refusal kind/detail distinguish unavailable bytes, invalid evidence and an absent session.
+  - id: C5
+    status: answered
+    justification: Attestation cache records witnessed success by repo/SHA/check; claimed evidence cannot land.
+  - id: C6a
+    status: answered
+    justification: Store locks and external commands have finite elapsed-time bounds.
+  - id: C6b
+    status: answered
+    justification: Ingest is content addressed, pins publish under lock, migration checkpoints its mapping.
+  - id: C7
+    status: n-a
+    justification: No peer advertisement or serving surface in this local crate.
+  - id: C8
+    status: answered
+    justification: Typed refusals return to the CLI; landing failures append to existing release evidence.
+  - id: C9
+    status: answered
+    justification: Session module binds owner start time; alias names resolve to registered release files.
+  - id: C10
+    status: answered
+    justification: CID migration is explicit; normal readers reject legacy addresses. Status schema names camelCase
+      fields.
+  - id: C11
+    status: partial
+    justification: Build concurrency follows pool policy; cross-device backpressure belongs to slice B.
+  - id: C12
+    status: n-a
+    justification: No new remote authority or consent; operator invokes device-local verbs.
+  - id: C13
+    status: answered
+    justification: Provisional pin is an explicit local choice and never authorizes current.
+  - id: C14
+    status: partial
+    justification: Legacy bytes are retained for running executables; cross-device custody is not implemented in
+      slice A.
+  contractTests: null
+  gapNote: Covered by the command/operation parity suite where exercised; no dedicated per-kind assertion is claimed.
+- name: identity-failed
+  kind: verdict-fn
+  sourceLocation:
+    file: src/bin_store/ingest.rs
+    modulePath: elohim_device_runtime::bin_store::ingest::identity
+  summary: 'identity-failed: returns a typed refusal with local context; never promotes an unverified candidate.'
+  concernIds:
+  - id: C0
+    status: answered
+    justification: Device-private local custody; status and session identity are rebuilt views. No DHT head or transport.
+  - id: C1
+    status: answered
+    justification: Possession and ingest cannot promote current; only land can validate and promote.
+  - id: C2
+    status: answered
+    justification: Land compares source descent and revalidates current metadata; timestamps never rank heads.
+  - id: C3
+    status: answered
+    justification: PID plus process start time binds liveness; ownerless pins have bounded grace.
+  - id: C4
+    status: answered
+    justification: Refusal kind/detail distinguish unavailable bytes, invalid evidence and an absent session.
+  - id: C5
+    status: answered
+    justification: Attestation cache records witnessed success by repo/SHA/check; claimed evidence cannot land.
+  - id: C6a
+    status: answered
+    justification: Store locks and external commands have finite elapsed-time bounds.
+  - id: C6b
+    status: answered
+    justification: Ingest is content addressed, pins publish under lock, migration checkpoints its mapping.
+  - id: C7
+    status: n-a
+    justification: No peer advertisement or serving surface in this local crate.
+  - id: C8
+    status: answered
+    justification: Typed refusals return to the CLI; landing failures append to existing release evidence.
+  - id: C9
+    status: answered
+    justification: Session module binds owner start time; alias names resolve to registered release files.
+  - id: C10
+    status: answered
+    justification: CID migration is explicit; normal readers reject legacy addresses. Status schema names camelCase
+      fields.
+  - id: C11
+    status: partial
+    justification: Build concurrency follows pool policy; cross-device backpressure belongs to slice B.
+  - id: C12
+    status: n-a
+    justification: No new remote authority or consent; operator invokes device-local verbs.
+  - id: C13
+    status: answered
+    justification: Provisional pin is an explicit local choice and never authorizes current.
+  - id: C14
+    status: partial
+    justification: Legacy bytes are retained for running executables; cross-device custody is not implemented in
+      slice A.
+  contractTests: null
+  gapNote: Covered by the command/operation parity suite where exercised; no dedicated per-kind assertion is claimed.
+- name: identity-invalid
+  kind: verdict-fn
+  sourceLocation:
+    file: src/bin_store/ingest.rs
+    modulePath: elohim_device_runtime::bin_store::ingest::identity
+  summary: 'identity-invalid: returns a typed refusal with local context; never promotes an unverified candidate.'
+  concernIds:
+  - id: C0
+    status: answered
+    justification: Device-private local custody; status and session identity are rebuilt views. No DHT head or transport.
+  - id: C1
+    status: answered
+    justification: Possession and ingest cannot promote current; only land can validate and promote.
+  - id: C2
+    status: answered
+    justification: Land compares source descent and revalidates current metadata; timestamps never rank heads.
+  - id: C3
+    status: answered
+    justification: PID plus process start time binds liveness; ownerless pins have bounded grace.
+  - id: C4
+    status: answered
+    justification: Refusal kind/detail distinguish unavailable bytes, invalid evidence and an absent session.
+  - id: C5
+    status: answered
+    justification: Attestation cache records witnessed success by repo/SHA/check; claimed evidence cannot land.
+  - id: C6a
+    status: answered
+    justification: Store locks and external commands have finite elapsed-time bounds.
+  - id: C6b
+    status: answered
+    justification: Ingest is content addressed, pins publish under lock, migration checkpoints its mapping.
+  - id: C7
+    status: n-a
+    justification: No peer advertisement or serving surface in this local crate.
+  - id: C8
+    status: answered
+    justification: Typed refusals return to the CLI; landing failures append to existing release evidence.
+  - id: C9
+    status: answered
+    justification: Session module binds owner start time; alias names resolve to registered release files.
+  - id: C10
+    status: answered
+    justification: CID migration is explicit; normal readers reject legacy addresses. Status schema names camelCase
+      fields.
+  - id: C11
+    status: partial
+    justification: Build concurrency follows pool policy; cross-device backpressure belongs to slice B.
+  - id: C12
+    status: n-a
+    justification: No new remote authority or consent; operator invokes device-local verbs.
+  - id: C13
+    status: answered
+    justification: Provisional pin is an explicit local choice and never authorizes current.
+  - id: C14
+    status: partial
+    justification: Legacy bytes are retained for running executables; cross-device custody is not implemented in
+      slice A.
+  contractTests: null
+  gapNote: Covered by the command/operation parity suite where exercised; no dedicated per-kind assertion is claimed.
+- name: identity-mismatch
+  kind: verdict-fn
+  sourceLocation:
+    file: src/bin_store/ingest.rs
+    modulePath: elohim_device_runtime::bin_store::ingest::identity
+  summary: 'identity-mismatch: returns a typed refusal with local context; never promotes an unverified candidate.'
+  concernIds:
+  - id: C0
+    status: answered
+    justification: Device-private local custody; status and session identity are rebuilt views. No DHT head or transport.
+  - id: C1
+    status: answered
+    justification: Possession and ingest cannot promote current; only land can validate and promote.
+  - id: C2
+    status: answered
+    justification: Land compares source descent and revalidates current metadata; timestamps never rank heads.
+  - id: C3
+    status: answered
+    justification: PID plus process start time binds liveness; ownerless pins have bounded grace.
+  - id: C4
+    status: answered
+    justification: Refusal kind/detail distinguish unavailable bytes, invalid evidence and an absent session.
+  - id: C5
+    status: answered
+    justification: Attestation cache records witnessed success by repo/SHA/check; claimed evidence cannot land.
+  - id: C6a
+    status: answered
+    justification: Store locks and external commands have finite elapsed-time bounds.
+  - id: C6b
+    status: answered
+    justification: Ingest is content addressed, pins publish under lock, migration checkpoints its mapping.
+  - id: C7
+    status: n-a
+    justification: No peer advertisement or serving surface in this local crate.
+  - id: C8
+    status: answered
+    justification: Typed refusals return to the CLI; landing failures append to existing release evidence.
+  - id: C9
+    status: answered
+    justification: Session module binds owner start time; alias names resolve to registered release files.
+  - id: C10
+    status: answered
+    justification: CID migration is explicit; normal readers reject legacy addresses. Status schema names camelCase
+      fields.
+  - id: C11
+    status: partial
+    justification: Build concurrency follows pool policy; cross-device backpressure belongs to slice B.
+  - id: C12
+    status: n-a
+    justification: No new remote authority or consent; operator invokes device-local verbs.
+  - id: C13
+    status: answered
+    justification: Provisional pin is an explicit local choice and never authorizes current.
+  - id: C14
+    status: partial
+    justification: Legacy bytes are retained for running executables; cross-device custody is not implemented in
+      slice A.
+  contractTests:
+  - path: elohim/eprfs/device-runtime/src/bin_store/tests.rs
+    testName: test_land_refuses_failed_health_without_moving_current
+    kind: unit
+- name: tool-unknown
+  kind: verdict-fn
+  sourceLocation:
+    file: src/bin_store/ingest.rs
+    modulePath: elohim_device_runtime::bin_store::ingest::identity
+  summary: 'tool-unknown: returns a typed refusal with local context; never promotes an unverified candidate.'
+  concernIds:
+  - id: C0
+    status: answered
+    justification: Device-private local custody; status and session identity are rebuilt views. No DHT head or transport.
+  - id: C1
+    status: answered
+    justification: Possession and ingest cannot promote current; only land can validate and promote.
+  - id: C2
+    status: answered
+    justification: Land compares source descent and revalidates current metadata; timestamps never rank heads.
+  - id: C3
+    status: answered
+    justification: PID plus process start time binds liveness; ownerless pins have bounded grace.
+  - id: C4
+    status: answered
+    justification: Refusal kind/detail distinguish unavailable bytes, invalid evidence and an absent session.
+  - id: C5
+    status: answered
+    justification: Attestation cache records witnessed success by repo/SHA/check; claimed evidence cannot land.
+  - id: C6a
+    status: answered
+    justification: Store locks and external commands have finite elapsed-time bounds.
+  - id: C6b
+    status: answered
+    justification: Ingest is content addressed, pins publish under lock, migration checkpoints its mapping.
+  - id: C7
+    status: n-a
+    justification: No peer advertisement or serving surface in this local crate.
+  - id: C8
+    status: answered
+    justification: Typed refusals return to the CLI; landing failures append to existing release evidence.
+  - id: C9
+    status: answered
+    justification: Session module binds owner start time; alias names resolve to registered release files.
+  - id: C10
+    status: answered
+    justification: CID migration is explicit; normal readers reject legacy addresses. Status schema names camelCase
+      fields.
+  - id: C11
+    status: partial
+    justification: Build concurrency follows pool policy; cross-device backpressure belongs to slice B.
+  - id: C12
+    status: n-a
+    justification: No new remote authority or consent; operator invokes device-local verbs.
+  - id: C13
+    status: answered
+    justification: Provisional pin is an explicit local choice and never authorizes current.
+  - id: C14
+    status: partial
+    justification: Legacy bytes are retained for running executables; cross-device custody is not implemented in
+      slice A.
+  contractTests: null
+  gapNote: Covered by the command/operation parity suite where exercised; no dedicated per-kind assertion is claimed.
+- name: unverified-current
+  kind: verdict-fn
+  sourceLocation:
+    file: src/bin_store/install.rs
+    modulePath: elohim_device_runtime::bin_store::install::install_launcher
+  summary: 'unverified-current: returns a typed refusal with local context; never promotes an unverified candidate.'
+  concernIds:
+  - id: C0
+    status: answered
+    justification: Device-private local custody; status and session identity are rebuilt views. No DHT head or transport.
+  - id: C1
+    status: answered
+    justification: Possession and ingest cannot promote current; only land can validate and promote.
+  - id: C2
+    status: answered
+    justification: Land compares source descent and revalidates current metadata; timestamps never rank heads.
+  - id: C3
+    status: answered
+    justification: PID plus process start time binds liveness; ownerless pins have bounded grace.
+  - id: C4
+    status: answered
+    justification: Refusal kind/detail distinguish unavailable bytes, invalid evidence and an absent session.
+  - id: C5
+    status: answered
+    justification: Attestation cache records witnessed success by repo/SHA/check; claimed evidence cannot land.
+  - id: C6a
+    status: answered
+    justification: Store locks and external commands have finite elapsed-time bounds.
+  - id: C6b
+    status: answered
+    justification: Ingest is content addressed, pins publish under lock, migration checkpoints its mapping.
+  - id: C7
+    status: n-a
+    justification: No peer advertisement or serving surface in this local crate.
+  - id: C8
+    status: answered
+    justification: Typed refusals return to the CLI; landing failures append to existing release evidence.
+  - id: C9
+    status: answered
+    justification: Session module binds owner start time; alias names resolve to registered release files.
+  - id: C10
+    status: answered
+    justification: CID migration is explicit; normal readers reject legacy addresses. Status schema names camelCase
+      fields.
+  - id: C11
+    status: partial
+    justification: Build concurrency follows pool policy; cross-device backpressure belongs to slice B.
+  - id: C12
+    status: n-a
+    justification: No new remote authority or consent; operator invokes device-local verbs.
+  - id: C13
+    status: answered
+    justification: Provisional pin is an explicit local choice and never authorizes current.
+  - id: C14
+    status: partial
+    justification: Legacy bytes are retained for running executables; cross-device custody is not implemented in
+      slice A.
+  contractTests:
+  - path: elohim/eprfs/device-runtime/src/bin_store/tests.rs
+    testName: test_guard_installs_only_after_a_verified_head_into_persistent_device_bin
+    kind: unit
+- name: launcher-absent
+  kind: verdict-fn
+  sourceLocation:
+    file: src/bin_store/install.rs
+    modulePath: elohim_device_runtime::bin_store::install::install_launcher
+  summary: 'launcher-absent: returns a typed refusal with local context; never promotes an unverified candidate.'
+  concernIds:
+  - id: C0
+    status: answered
+    justification: Device-private local custody; status and session identity are rebuilt views. No DHT head or transport.
+  - id: C1
+    status: answered
+    justification: Possession and ingest cannot promote current; only land can validate and promote.
+  - id: C2
+    status: answered
+    justification: Land compares source descent and revalidates current metadata; timestamps never rank heads.
+  - id: C3
+    status: answered
+    justification: PID plus process start time binds liveness; ownerless pins have bounded grace.
+  - id: C4
+    status: answered
+    justification: Refusal kind/detail distinguish unavailable bytes, invalid evidence and an absent session.
+  - id: C5
+    status: answered
+    justification: Attestation cache records witnessed success by repo/SHA/check; claimed evidence cannot land.
+  - id: C6a
+    status: answered
+    justification: Store locks and external commands have finite elapsed-time bounds.
+  - id: C6b
+    status: answered
+    justification: Ingest is content addressed, pins publish under lock, migration checkpoints its mapping.
+  - id: C7
+    status: n-a
+    justification: No peer advertisement or serving surface in this local crate.
+  - id: C8
+    status: answered
+    justification: Typed refusals return to the CLI; landing failures append to existing release evidence.
+  - id: C9
+    status: answered
+    justification: Session module binds owner start time; alias names resolve to registered release files.
+  - id: C10
+    status: answered
+    justification: CID migration is explicit; normal readers reject legacy addresses. Status schema names camelCase
+      fields.
+  - id: C11
+    status: partial
+    justification: Build concurrency follows pool policy; cross-device backpressure belongs to slice B.
+  - id: C12
+    status: n-a
+    justification: No new remote authority or consent; operator invokes device-local verbs.
+  - id: C13
+    status: answered
+    justification: Provisional pin is an explicit local choice and never authorizes current.
+  - id: C14
+    status: partial
+    justification: Legacy bytes are retained for running executables; cross-device custody is not implemented in
+      slice A.
+  contractTests: null
+  gapNote: Covered by the command/operation parity suite where exercised; no dedicated per-kind assertion is claimed.
+- name: launcher-verification-failed
+  kind: verdict-fn
+  sourceLocation:
+    file: src/bin_store/install.rs
+    modulePath: elohim_device_runtime::bin_store::install::install_launcher
+  summary: 'launcher-verification-failed: returns a typed refusal with local context; never promotes an unverified
+    candidate.'
+  concernIds:
+  - id: C0
+    status: answered
+    justification: Device-private local custody; status and session identity are rebuilt views. No DHT head or transport.
+  - id: C1
+    status: answered
+    justification: Possession and ingest cannot promote current; only land can validate and promote.
+  - id: C2
+    status: answered
+    justification: Land compares source descent and revalidates current metadata; timestamps never rank heads.
+  - id: C3
+    status: answered
+    justification: PID plus process start time binds liveness; ownerless pins have bounded grace.
+  - id: C4
+    status: answered
+    justification: Refusal kind/detail distinguish unavailable bytes, invalid evidence and an absent session.
+  - id: C5
+    status: answered
+    justification: Attestation cache records witnessed success by repo/SHA/check; claimed evidence cannot land.
+  - id: C6a
+    status: answered
+    justification: Store locks and external commands have finite elapsed-time bounds.
+  - id: C6b
+    status: answered
+    justification: Ingest is content addressed, pins publish under lock, migration checkpoints its mapping.
+  - id: C7
+    status: n-a
+    justification: No peer advertisement or serving surface in this local crate.
+  - id: C8
+    status: answered
+    justification: Typed refusals return to the CLI; landing failures append to existing release evidence.
+  - id: C9
+    status: answered
+    justification: Session module binds owner start time; alias names resolve to registered release files.
+  - id: C10
+    status: answered
+    justification: CID migration is explicit; normal readers reject legacy addresses. Status schema names camelCase
+      fields.
+  - id: C11
+    status: partial
+    justification: Build concurrency follows pool policy; cross-device backpressure belongs to slice B.
+  - id: C12
+    status: n-a
+    justification: No new remote authority or consent; operator invokes device-local verbs.
+  - id: C13
+    status: answered
+    justification: Provisional pin is an explicit local choice and never authorizes current.
+  - id: C14
+    status: partial
+    justification: Legacy bytes are retained for running executables; cross-device custody is not implemented in
+      slice A.
+  contractTests: null
+  gapNote: Covered by the command/operation parity suite where exercised; no dedicated per-kind assertion is claimed.
+- name: head-absent
+  kind: verdict-fn
+  sourceLocation:
+    file: src/bin_store/install.rs
+    modulePath: elohim_device_runtime::bin_store::install::adopt_plain
+  summary: 'head-absent: returns a typed refusal with local context; never promotes an unverified candidate.'
+  concernIds:
+  - id: C0
+    status: answered
+    justification: Device-private local custody; status and session identity are rebuilt views. No DHT head or transport.
+  - id: C1
+    status: answered
+    justification: Possession and ingest cannot promote current; only land can validate and promote.
+  - id: C2
+    status: answered
+    justification: Land compares source descent and revalidates current metadata; timestamps never rank heads.
+  - id: C3
+    status: answered
+    justification: PID plus process start time binds liveness; ownerless pins have bounded grace.
+  - id: C4
+    status: answered
+    justification: Refusal kind/detail distinguish unavailable bytes, invalid evidence and an absent session.
+  - id: C5
+    status: answered
+    justification: Attestation cache records witnessed success by repo/SHA/check; claimed evidence cannot land.
+  - id: C6a
+    status: answered
+    justification: Store locks and external commands have finite elapsed-time bounds.
+  - id: C6b
+    status: answered
+    justification: Ingest is content addressed, pins publish under lock, migration checkpoints its mapping.
+  - id: C7
+    status: n-a
+    justification: No peer advertisement or serving surface in this local crate.
+  - id: C8
+    status: answered
+    justification: Typed refusals return to the CLI; landing failures append to existing release evidence.
+  - id: C9
+    status: answered
+    justification: Session module binds owner start time; alias names resolve to registered release files.
+  - id: C10
+    status: answered
+    justification: CID migration is explicit; normal readers reject legacy addresses. Status schema names camelCase
+      fields.
+  - id: C11
+    status: partial
+    justification: Build concurrency follows pool policy; cross-device backpressure belongs to slice B.
+  - id: C12
+    status: n-a
+    justification: No new remote authority or consent; operator invokes device-local verbs.
+  - id: C13
+    status: answered
+    justification: Provisional pin is an explicit local choice and never authorizes current.
+  - id: C14
+    status: partial
+    justification: Legacy bytes are retained for running executables; cross-device custody is not implemented in
+      slice A.
+  contractTests: null
+  gapNote: Covered by the command/operation parity suite where exercised; no dedicated per-kind assertion is claimed.
+- name: candidate-absent
+  kind: verdict-fn
+  sourceLocation:
+    file: src/bin_store/landing.rs
+    modulePath: elohim_device_runtime::bin_store::landing::validate_land
+  summary: 'candidate-absent: returns a typed refusal with local context; never promotes an unverified candidate.'
+  concernIds:
+  - id: C0
+    status: answered
+    justification: Device-private local custody; status and session identity are rebuilt views. No DHT head or transport.
+  - id: C1
+    status: answered
+    justification: Possession and ingest cannot promote current; only land can validate and promote.
+  - id: C2
+    status: answered
+    justification: Land compares source descent and revalidates current metadata; timestamps never rank heads.
+  - id: C3
+    status: answered
+    justification: PID plus process start time binds liveness; ownerless pins have bounded grace.
+  - id: C4
+    status: answered
+    justification: Refusal kind/detail distinguish unavailable bytes, invalid evidence and an absent session.
+  - id: C5
+    status: answered
+    justification: Attestation cache records witnessed success by repo/SHA/check; claimed evidence cannot land.
+  - id: C6a
+    status: answered
+    justification: Store locks and external commands have finite elapsed-time bounds.
+  - id: C6b
+    status: answered
+    justification: Ingest is content addressed, pins publish under lock, migration checkpoints its mapping.
+  - id: C7
+    status: n-a
+    justification: No peer advertisement or serving surface in this local crate.
+  - id: C8
+    status: answered
+    justification: Typed refusals return to the CLI; landing failures append to existing release evidence.
+  - id: C9
+    status: answered
+    justification: Session module binds owner start time; alias names resolve to registered release files.
+  - id: C10
+    status: answered
+    justification: CID migration is explicit; normal readers reject legacy addresses. Status schema names camelCase
+      fields.
+  - id: C11
+    status: partial
+    justification: Build concurrency follows pool policy; cross-device backpressure belongs to slice B.
+  - id: C12
+    status: n-a
+    justification: No new remote authority or consent; operator invokes device-local verbs.
+  - id: C13
+    status: answered
+    justification: Provisional pin is an explicit local choice and never authorizes current.
+  - id: C14
+    status: partial
+    justification: Legacy bytes are retained for running executables; cross-device custody is not implemented in
+      slice A.
+  contractTests:
+  - path: elohim/eprfs/device-runtime/src/bin_store/tests.rs
+    testName: test_resolution_order_is_candidate_explicit_session_then_current
+    kind: unit
+- name: commit-mismatch
+  kind: verdict-fn
+  sourceLocation:
+    file: src/bin_store/landing.rs
+    modulePath: elohim_device_runtime::bin_store::landing::validate_land
+  summary: 'commit-mismatch: returns a typed refusal with local context; never promotes an unverified candidate.'
+  concernIds:
+  - id: C0
+    status: answered
+    justification: Device-private local custody; status and session identity are rebuilt views. No DHT head or transport.
+  - id: C1
+    status: answered
+    justification: Possession and ingest cannot promote current; only land can validate and promote.
+  - id: C2
+    status: answered
+    justification: Land compares source descent and revalidates current metadata; timestamps never rank heads.
+  - id: C3
+    status: answered
+    justification: PID plus process start time binds liveness; ownerless pins have bounded grace.
+  - id: C4
+    status: answered
+    justification: Refusal kind/detail distinguish unavailable bytes, invalid evidence and an absent session.
+  - id: C5
+    status: answered
+    justification: Attestation cache records witnessed success by repo/SHA/check; claimed evidence cannot land.
+  - id: C6a
+    status: answered
+    justification: Store locks and external commands have finite elapsed-time bounds.
+  - id: C6b
+    status: answered
+    justification: Ingest is content addressed, pins publish under lock, migration checkpoints its mapping.
+  - id: C7
+    status: n-a
+    justification: No peer advertisement or serving surface in this local crate.
+  - id: C8
+    status: answered
+    justification: Typed refusals return to the CLI; landing failures append to existing release evidence.
+  - id: C9
+    status: answered
+    justification: Session module binds owner start time; alias names resolve to registered release files.
+  - id: C10
+    status: answered
+    justification: CID migration is explicit; normal readers reject legacy addresses. Status schema names camelCase
+      fields.
+  - id: C11
+    status: partial
+    justification: Build concurrency follows pool policy; cross-device backpressure belongs to slice B.
+  - id: C12
+    status: n-a
+    justification: No new remote authority or consent; operator invokes device-local verbs.
+  - id: C13
+    status: answered
+    justification: Provisional pin is an explicit local choice and never authorizes current.
+  - id: C14
+    status: partial
+    justification: Legacy bytes are retained for running executables; cross-device custody is not implemented in
+      slice A.
+  contractTests: null
+  gapNote: Covered by the command/operation parity suite where exercised; no dedicated per-kind assertion is claimed.
+- name: dirty-build
+  kind: verdict-fn
+  sourceLocation:
+    file: src/bin_store/landing.rs
+    modulePath: elohim_device_runtime::bin_store::landing::validate_land
+  summary: 'dirty-build: returns a typed refusal with local context; never promotes an unverified candidate.'
+  concernIds:
+  - id: C0
+    status: answered
+    justification: Device-private local custody; status and session identity are rebuilt views. No DHT head or transport.
+  - id: C1
+    status: answered
+    justification: Possession and ingest cannot promote current; only land can validate and promote.
+  - id: C2
+    status: answered
+    justification: Land compares source descent and revalidates current metadata; timestamps never rank heads.
+  - id: C3
+    status: answered
+    justification: PID plus process start time binds liveness; ownerless pins have bounded grace.
+  - id: C4
+    status: answered
+    justification: Refusal kind/detail distinguish unavailable bytes, invalid evidence and an absent session.
+  - id: C5
+    status: answered
+    justification: Attestation cache records witnessed success by repo/SHA/check; claimed evidence cannot land.
+  - id: C6a
+    status: answered
+    justification: Store locks and external commands have finite elapsed-time bounds.
+  - id: C6b
+    status: answered
+    justification: Ingest is content addressed, pins publish under lock, migration checkpoints its mapping.
+  - id: C7
+    status: n-a
+    justification: No peer advertisement or serving surface in this local crate.
+  - id: C8
+    status: answered
+    justification: Typed refusals return to the CLI; landing failures append to existing release evidence.
+  - id: C9
+    status: answered
+    justification: Session module binds owner start time; alias names resolve to registered release files.
+  - id: C10
+    status: answered
+    justification: CID migration is explicit; normal readers reject legacy addresses. Status schema names camelCase
+      fields.
+  - id: C11
+    status: partial
+    justification: Build concurrency follows pool policy; cross-device backpressure belongs to slice B.
+  - id: C12
+    status: n-a
+    justification: No new remote authority or consent; operator invokes device-local verbs.
+  - id: C13
+    status: answered
+    justification: Provisional pin is an explicit local choice and never authorizes current.
+  - id: C14
+    status: partial
+    justification: Legacy bytes are retained for running executables; cross-device custody is not implemented in
+      slice A.
+  contractTests:
+  - path: elohim/eprfs/device-runtime/src/bin_store/tests.rs
+    testName: test_land_checks_record_head_and_checkout_cleanliness
+    kind: unit
+- name: head-mismatch
+  kind: verdict-fn
+  sourceLocation:
+    file: src/bin_store/landing.rs
+    modulePath: elohim_device_runtime::bin_store::landing::validate_land
+  summary: 'head-mismatch: returns a typed refusal with local context; never promotes an unverified candidate.'
+  concernIds:
+  - id: C0
+    status: answered
+    justification: Device-private local custody; status and session identity are rebuilt views. No DHT head or transport.
+  - id: C1
+    status: answered
+    justification: Possession and ingest cannot promote current; only land can validate and promote.
+  - id: C2
+    status: answered
+    justification: Land compares source descent and revalidates current metadata; timestamps never rank heads.
+  - id: C3
+    status: answered
+    justification: PID plus process start time binds liveness; ownerless pins have bounded grace.
+  - id: C4
+    status: answered
+    justification: Refusal kind/detail distinguish unavailable bytes, invalid evidence and an absent session.
+  - id: C5
+    status: answered
+    justification: Attestation cache records witnessed success by repo/SHA/check; claimed evidence cannot land.
+  - id: C6a
+    status: answered
+    justification: Store locks and external commands have finite elapsed-time bounds.
+  - id: C6b
+    status: answered
+    justification: Ingest is content addressed, pins publish under lock, migration checkpoints its mapping.
+  - id: C7
+    status: n-a
+    justification: No peer advertisement or serving surface in this local crate.
+  - id: C8
+    status: answered
+    justification: Typed refusals return to the CLI; landing failures append to existing release evidence.
+  - id: C9
+    status: answered
+    justification: Session module binds owner start time; alias names resolve to registered release files.
+  - id: C10
+    status: answered
+    justification: CID migration is explicit; normal readers reject legacy addresses. Status schema names camelCase
+      fields.
+  - id: C11
+    status: partial
+    justification: Build concurrency follows pool policy; cross-device backpressure belongs to slice B.
+  - id: C12
+    status: n-a
+    justification: No new remote authority or consent; operator invokes device-local verbs.
+  - id: C13
+    status: answered
+    justification: Provisional pin is an explicit local choice and never authorizes current.
+  - id: C14
+    status: partial
+    justification: Legacy bytes are retained for running executables; cross-device custody is not implemented in
+      slice A.
+  contractTests: null
+  gapNote: Covered by the command/operation parity suite where exercised; no dedicated per-kind assertion is claimed.
+- name: checkout-dirty
+  kind: verdict-fn
+  sourceLocation:
+    file: src/bin_store/landing.rs
+    modulePath: elohim_device_runtime::bin_store::landing::validate_land
+  summary: 'checkout-dirty: returns a typed refusal with local context; never promotes an unverified candidate.'
+  concernIds:
+  - id: C0
+    status: answered
+    justification: Device-private local custody; status and session identity are rebuilt views. No DHT head or transport.
+  - id: C1
+    status: answered
+    justification: Possession and ingest cannot promote current; only land can validate and promote.
+  - id: C2
+    status: answered
+    justification: Land compares source descent and revalidates current metadata; timestamps never rank heads.
+  - id: C3
+    status: answered
+    justification: PID plus process start time binds liveness; ownerless pins have bounded grace.
+  - id: C4
+    status: answered
+    justification: Refusal kind/detail distinguish unavailable bytes, invalid evidence and an absent session.
+  - id: C5
+    status: answered
+    justification: Attestation cache records witnessed success by repo/SHA/check; claimed evidence cannot land.
+  - id: C6a
+    status: answered
+    justification: Store locks and external commands have finite elapsed-time bounds.
+  - id: C6b
+    status: answered
+    justification: Ingest is content addressed, pins publish under lock, migration checkpoints its mapping.
+  - id: C7
+    status: n-a
+    justification: No peer advertisement or serving surface in this local crate.
+  - id: C8
+    status: answered
+    justification: Typed refusals return to the CLI; landing failures append to existing release evidence.
+  - id: C9
+    status: answered
+    justification: Session module binds owner start time; alias names resolve to registered release files.
+  - id: C10
+    status: answered
+    justification: CID migration is explicit; normal readers reject legacy addresses. Status schema names camelCase
+      fields.
+  - id: C11
+    status: partial
+    justification: Build concurrency follows pool policy; cross-device backpressure belongs to slice B.
+  - id: C12
+    status: n-a
+    justification: No new remote authority or consent; operator invokes device-local verbs.
+  - id: C13
+    status: answered
+    justification: Provisional pin is an explicit local choice and never authorizes current.
+  - id: C14
+    status: partial
+    justification: Legacy bytes are retained for running executables; cross-device custody is not implemented in
+      slice A.
+  contractTests: null
+  gapNote: Covered by the command/operation parity suite where exercised; no dedicated per-kind assertion is claimed.
+- name: current-metadata-invalid
+  kind: verdict-fn
+  sourceLocation:
+    file: src/bin_store/landing.rs
+    modulePath: elohim_device_runtime::bin_store::landing::validate_land
+  summary: 'current-metadata-invalid: returns a typed refusal with local context; never promotes an unverified candidate.'
+  concernIds:
+  - id: C0
+    status: answered
+    justification: Device-private local custody; status and session identity are rebuilt views. No DHT head or transport.
+  - id: C1
+    status: answered
+    justification: Possession and ingest cannot promote current; only land can validate and promote.
+  - id: C2
+    status: answered
+    justification: Land compares source descent and revalidates current metadata; timestamps never rank heads.
+  - id: C3
+    status: answered
+    justification: PID plus process start time binds liveness; ownerless pins have bounded grace.
+  - id: C4
+    status: answered
+    justification: Refusal kind/detail distinguish unavailable bytes, invalid evidence and an absent session.
+  - id: C5
+    status: answered
+    justification: Attestation cache records witnessed success by repo/SHA/check; claimed evidence cannot land.
+  - id: C6a
+    status: answered
+    justification: Store locks and external commands have finite elapsed-time bounds.
+  - id: C6b
+    status: answered
+    justification: Ingest is content addressed, pins publish under lock, migration checkpoints its mapping.
+  - id: C7
+    status: n-a
+    justification: No peer advertisement or serving surface in this local crate.
+  - id: C8
+    status: answered
+    justification: Typed refusals return to the CLI; landing failures append to existing release evidence.
+  - id: C9
+    status: answered
+    justification: Session module binds owner start time; alias names resolve to registered release files.
+  - id: C10
+    status: answered
+    justification: CID migration is explicit; normal readers reject legacy addresses. Status schema names camelCase
+      fields.
+  - id: C11
+    status: partial
+    justification: Build concurrency follows pool policy; cross-device backpressure belongs to slice B.
+  - id: C12
+    status: n-a
+    justification: No new remote authority or consent; operator invokes device-local verbs.
+  - id: C13
+    status: answered
+    justification: Provisional pin is an explicit local choice and never authorizes current.
+  - id: C14
+    status: partial
+    justification: Legacy bytes are retained for running executables; cross-device custody is not implemented in
+      slice A.
+  contractTests: null
+  gapNote: Covered by the command/operation parity suite where exercised; no dedicated per-kind assertion is claimed.
+- name: non-descendant
+  kind: verdict-fn
+  sourceLocation:
+    file: src/bin_store/landing.rs
+    modulePath: elohim_device_runtime::bin_store::landing::validate_land
+  summary: 'non-descendant: returns a typed refusal with local context; never promotes an unverified candidate.'
+  concernIds:
+  - id: C0
+    status: answered
+    justification: Device-private local custody; status and session identity are rebuilt views. No DHT head or transport.
+  - id: C1
+    status: answered
+    justification: Possession and ingest cannot promote current; only land can validate and promote.
+  - id: C2
+    status: answered
+    justification: Land compares source descent and revalidates current metadata; timestamps never rank heads.
+  - id: C3
+    status: answered
+    justification: PID plus process start time binds liveness; ownerless pins have bounded grace.
+  - id: C4
+    status: answered
+    justification: Refusal kind/detail distinguish unavailable bytes, invalid evidence and an absent session.
+  - id: C5
+    status: answered
+    justification: Attestation cache records witnessed success by repo/SHA/check; claimed evidence cannot land.
+  - id: C6a
+    status: answered
+    justification: Store locks and external commands have finite elapsed-time bounds.
+  - id: C6b
+    status: answered
+    justification: Ingest is content addressed, pins publish under lock, migration checkpoints its mapping.
+  - id: C7
+    status: n-a
+    justification: No peer advertisement or serving surface in this local crate.
+  - id: C8
+    status: answered
+    justification: Typed refusals return to the CLI; landing failures append to existing release evidence.
+  - id: C9
+    status: answered
+    justification: Session module binds owner start time; alias names resolve to registered release files.
+  - id: C10
+    status: answered
+    justification: CID migration is explicit; normal readers reject legacy addresses. Status schema names camelCase
+      fields.
+  - id: C11
+    status: partial
+    justification: Build concurrency follows pool policy; cross-device backpressure belongs to slice B.
+  - id: C12
+    status: n-a
+    justification: No new remote authority or consent; operator invokes device-local verbs.
+  - id: C13
+    status: answered
+    justification: Provisional pin is an explicit local choice and never authorizes current.
+  - id: C14
+    status: partial
+    justification: Legacy bytes are retained for running executables; cross-device custody is not implemented in
+      slice A.
+  contractTests:
+  - path: elohim/eprfs/device-runtime/src/bin_store/tests.rs
+    testName: test_land_requires_descent_unless_revert
+    kind: unit
+- name: current-moved
+  kind: verdict-fn
+  sourceLocation:
+    file: src/bin_store/landing.rs
+    modulePath: elohim_device_runtime::bin_store::landing::land
+  summary: 'current-moved: returns a typed refusal with local context; never promotes an unverified candidate.'
+  concernIds:
+  - id: C0
+    status: answered
+    justification: Device-private local custody; status and session identity are rebuilt views. No DHT head or transport.
+  - id: C1
+    status: answered
+    justification: Possession and ingest cannot promote current; only land can validate and promote.
+  - id: C2
+    status: answered
+    justification: Land compares source descent and revalidates current metadata; timestamps never rank heads.
+  - id: C3
+    status: answered
+    justification: PID plus process start time binds liveness; ownerless pins have bounded grace.
+  - id: C4
+    status: answered
+    justification: Refusal kind/detail distinguish unavailable bytes, invalid evidence and an absent session.
+  - id: C5
+    status: answered
+    justification: Attestation cache records witnessed success by repo/SHA/check; claimed evidence cannot land.
+  - id: C6a
+    status: answered
+    justification: Store locks and external commands have finite elapsed-time bounds.
+  - id: C6b
+    status: answered
+    justification: Ingest is content addressed, pins publish under lock, migration checkpoints its mapping.
+  - id: C7
+    status: n-a
+    justification: No peer advertisement or serving surface in this local crate.
+  - id: C8
+    status: answered
+    justification: Typed refusals return to the CLI; landing failures append to existing release evidence.
+  - id: C9
+    status: answered
+    justification: Session module binds owner start time; alias names resolve to registered release files.
+  - id: C10
+    status: answered
+    justification: CID migration is explicit; normal readers reject legacy addresses. Status schema names camelCase
+      fields.
+  - id: C11
+    status: partial
+    justification: Build concurrency follows pool policy; cross-device backpressure belongs to slice B.
+  - id: C12
+    status: n-a
+    justification: No new remote authority or consent; operator invokes device-local verbs.
+  - id: C13
+    status: answered
+    justification: Provisional pin is an explicit local choice and never authorizes current.
+  - id: C14
+    status: partial
+    justification: Legacy bytes are retained for running executables; cross-device custody is not implemented in
+      slice A.
+  contractTests: null
+  gapNote: Covered by the command/operation parity suite where exercised; no dedicated per-kind assertion is claimed.
+- name: health-identity-mismatch
+  kind: verdict-fn
+  sourceLocation:
+    file: src/bin_store/landing.rs
+    modulePath: elohim_device_runtime::bin_store::landing::health
+  summary: 'health-identity-mismatch: returns a typed refusal with local context; never promotes an unverified candidate.'
+  concernIds:
+  - id: C0
+    status: answered
+    justification: Device-private local custody; status and session identity are rebuilt views. No DHT head or transport.
+  - id: C1
+    status: answered
+    justification: Possession and ingest cannot promote current; only land can validate and promote.
+  - id: C2
+    status: answered
+    justification: Land compares source descent and revalidates current metadata; timestamps never rank heads.
+  - id: C3
+    status: answered
+    justification: PID plus process start time binds liveness; ownerless pins have bounded grace.
+  - id: C4
+    status: answered
+    justification: Refusal kind/detail distinguish unavailable bytes, invalid evidence and an absent session.
+  - id: C5
+    status: answered
+    justification: Attestation cache records witnessed success by repo/SHA/check; claimed evidence cannot land.
+  - id: C6a
+    status: answered
+    justification: Store locks and external commands have finite elapsed-time bounds.
+  - id: C6b
+    status: answered
+    justification: Ingest is content addressed, pins publish under lock, migration checkpoints its mapping.
+  - id: C7
+    status: n-a
+    justification: No peer advertisement or serving surface in this local crate.
+  - id: C8
+    status: answered
+    justification: Typed refusals return to the CLI; landing failures append to existing release evidence.
+  - id: C9
+    status: answered
+    justification: Session module binds owner start time; alias names resolve to registered release files.
+  - id: C10
+    status: answered
+    justification: CID migration is explicit; normal readers reject legacy addresses. Status schema names camelCase
+      fields.
+  - id: C11
+    status: partial
+    justification: Build concurrency follows pool policy; cross-device backpressure belongs to slice B.
+  - id: C12
+    status: n-a
+    justification: No new remote authority or consent; operator invokes device-local verbs.
+  - id: C13
+    status: answered
+    justification: Provisional pin is an explicit local choice and never authorizes current.
+  - id: C14
+    status: partial
+    justification: Legacy bytes are retained for running executables; cross-device custody is not implemented in
+      slice A.
+  contractTests: null
+  gapNote: Covered by the command/operation parity suite where exercised; no dedicated per-kind assertion is claimed.
+- name: health-flow-failed
+  kind: verdict-fn
+  sourceLocation:
+    file: src/bin_store/landing.rs
+    modulePath: elohim_device_runtime::bin_store::landing::health
+  summary: 'health-flow-failed: returns a typed refusal with local context; never promotes an unverified candidate.'
+  concernIds:
+  - id: C0
+    status: answered
+    justification: Device-private local custody; status and session identity are rebuilt views. No DHT head or transport.
+  - id: C1
+    status: answered
+    justification: Possession and ingest cannot promote current; only land can validate and promote.
+  - id: C2
+    status: answered
+    justification: Land compares source descent and revalidates current metadata; timestamps never rank heads.
+  - id: C3
+    status: answered
+    justification: PID plus process start time binds liveness; ownerless pins have bounded grace.
+  - id: C4
+    status: answered
+    justification: Refusal kind/detail distinguish unavailable bytes, invalid evidence and an absent session.
+  - id: C5
+    status: answered
+    justification: Attestation cache records witnessed success by repo/SHA/check; claimed evidence cannot land.
+  - id: C6a
+    status: answered
+    justification: Store locks and external commands have finite elapsed-time bounds.
+  - id: C6b
+    status: answered
+    justification: Ingest is content addressed, pins publish under lock, migration checkpoints its mapping.
+  - id: C7
+    status: n-a
+    justification: No peer advertisement or serving surface in this local crate.
+  - id: C8
+    status: answered
+    justification: Typed refusals return to the CLI; landing failures append to existing release evidence.
+  - id: C9
+    status: answered
+    justification: Session module binds owner start time; alias names resolve to registered release files.
+  - id: C10
+    status: answered
+    justification: CID migration is explicit; normal readers reject legacy addresses. Status schema names camelCase
+      fields.
+  - id: C11
+    status: partial
+    justification: Build concurrency follows pool policy; cross-device backpressure belongs to slice B.
+  - id: C12
+    status: n-a
+    justification: No new remote authority or consent; operator invokes device-local verbs.
+  - id: C13
+    status: answered
+    justification: Provisional pin is an explicit local choice and never authorizes current.
+  - id: C14
+    status: partial
+    justification: Legacy bytes are retained for running executables; cross-device custody is not implemented in
+      slice A.
+  contractTests: null
+  gapNote: Covered by the command/operation parity suite where exercised; no dedicated per-kind assertion is claimed.
+- name: session-invalid
+  kind: verdict-fn
+  sourceLocation:
+    file: src/bin_store/launch.rs
+    modulePath: elohim_device_runtime::bin_store::launch::pin_path
+  summary: 'session-invalid: returns a typed refusal with local context; never promotes an unverified candidate.'
+  concernIds:
+  - id: C0
+    status: answered
+    justification: Device-private local custody; status and session identity are rebuilt views. No DHT head or transport.
+  - id: C1
+    status: answered
+    justification: Possession and ingest cannot promote current; only land can validate and promote.
+  - id: C2
+    status: answered
+    justification: Land compares source descent and revalidates current metadata; timestamps never rank heads.
+  - id: C3
+    status: answered
+    justification: PID plus process start time binds liveness; ownerless pins have bounded grace.
+  - id: C4
+    status: answered
+    justification: Refusal kind/detail distinguish unavailable bytes, invalid evidence and an absent session.
+  - id: C5
+    status: answered
+    justification: Attestation cache records witnessed success by repo/SHA/check; claimed evidence cannot land.
+  - id: C6a
+    status: answered
+    justification: Store locks and external commands have finite elapsed-time bounds.
+  - id: C6b
+    status: answered
+    justification: Ingest is content addressed, pins publish under lock, migration checkpoints its mapping.
+  - id: C7
+    status: n-a
+    justification: No peer advertisement or serving surface in this local crate.
+  - id: C8
+    status: answered
+    justification: Typed refusals return to the CLI; landing failures append to existing release evidence.
+  - id: C9
+    status: answered
+    justification: Session module binds owner start time; alias names resolve to registered release files.
+  - id: C10
+    status: answered
+    justification: CID migration is explicit; normal readers reject legacy addresses. Status schema names camelCase
+      fields.
+  - id: C11
+    status: partial
+    justification: Build concurrency follows pool policy; cross-device backpressure belongs to slice B.
+  - id: C12
+    status: n-a
+    justification: No new remote authority or consent; operator invokes device-local verbs.
+  - id: C13
+    status: answered
+    justification: Provisional pin is an explicit local choice and never authorizes current.
+  - id: C14
+    status: partial
+    justification: Legacy bytes are retained for running executables; cross-device custody is not implemented in
+      slice A.
+  contractTests: null
+  gapNote: Covered by the command/operation parity suite where exercised; no dedicated per-kind assertion is claimed.
+- name: provisional-pin
+  kind: verdict-fn
+  sourceLocation:
+    file: src/bin_store/launch.rs
+    modulePath: elohim_device_runtime::bin_store::launch::pin
+  summary: 'provisional-pin: returns a typed refusal with local context; never promotes an unverified candidate.'
+  concernIds:
+  - id: C0
+    status: answered
+    justification: Device-private local custody; status and session identity are rebuilt views. No DHT head or transport.
+  - id: C1
+    status: answered
+    justification: Possession and ingest cannot promote current; only land can validate and promote.
+  - id: C2
+    status: answered
+    justification: Land compares source descent and revalidates current metadata; timestamps never rank heads.
+  - id: C3
+    status: answered
+    justification: PID plus process start time binds liveness; ownerless pins have bounded grace.
+  - id: C4
+    status: answered
+    justification: Refusal kind/detail distinguish unavailable bytes, invalid evidence and an absent session.
+  - id: C5
+    status: answered
+    justification: Attestation cache records witnessed success by repo/SHA/check; claimed evidence cannot land.
+  - id: C6a
+    status: answered
+    justification: Store locks and external commands have finite elapsed-time bounds.
+  - id: C6b
+    status: answered
+    justification: Ingest is content addressed, pins publish under lock, migration checkpoints its mapping.
+  - id: C7
+    status: n-a
+    justification: No peer advertisement or serving surface in this local crate.
+  - id: C8
+    status: answered
+    justification: Typed refusals return to the CLI; landing failures append to existing release evidence.
+  - id: C9
+    status: answered
+    justification: Session module binds owner start time; alias names resolve to registered release files.
+  - id: C10
+    status: answered
+    justification: CID migration is explicit; normal readers reject legacy addresses. Status schema names camelCase
+      fields.
+  - id: C11
+    status: partial
+    justification: Build concurrency follows pool policy; cross-device backpressure belongs to slice B.
+  - id: C12
+    status: n-a
+    justification: No new remote authority or consent; operator invokes device-local verbs.
+  - id: C13
+    status: answered
+    justification: Provisional pin is an explicit local choice and never authorizes current.
+  - id: C14
+    status: partial
+    justification: Legacy bytes are retained for running executables; cross-device custody is not implemented in
+      slice A.
+  contractTests:
+  - path: elohim/eprfs/device-runtime/src/bin_store/tests.rs
+    testName: witnessed_attestation_is_cached_and_provisional_never_lands
+    kind: unit
+- name: session-absent
+  kind: verdict-fn
+  sourceLocation:
+    file: src/bin_store/launch.rs
+    modulePath: elohim_device_runtime::bin_store::launch::pin_with_timeout
+  summary: 'session-absent: returns a typed refusal with local context; never promotes an unverified candidate.'
+  concernIds:
+  - id: C0
+    status: answered
+    justification: Device-private local custody; status and session identity are rebuilt views. No DHT head or transport.
+  - id: C1
+    status: answered
+    justification: Possession and ingest cannot promote current; only land can validate and promote.
+  - id: C2
+    status: answered
+    justification: Land compares source descent and revalidates current metadata; timestamps never rank heads.
+  - id: C3
+    status: answered
+    justification: PID plus process start time binds liveness; ownerless pins have bounded grace.
+  - id: C4
+    status: answered
+    justification: Refusal kind/detail distinguish unavailable bytes, invalid evidence and an absent session.
+  - id: C5
+    status: answered
+    justification: Attestation cache records witnessed success by repo/SHA/check; claimed evidence cannot land.
+  - id: C6a
+    status: answered
+    justification: Store locks and external commands have finite elapsed-time bounds.
+  - id: C6b
+    status: answered
+    justification: Ingest is content addressed, pins publish under lock, migration checkpoints its mapping.
+  - id: C7
+    status: n-a
+    justification: No peer advertisement or serving surface in this local crate.
+  - id: C8
+    status: answered
+    justification: Typed refusals return to the CLI; landing failures append to existing release evidence.
+  - id: C9
+    status: answered
+    justification: Session module binds owner start time; alias names resolve to registered release files.
+  - id: C10
+    status: answered
+    justification: CID migration is explicit; normal readers reject legacy addresses. Status schema names camelCase
+      fields.
+  - id: C11
+    status: partial
+    justification: Build concurrency follows pool policy; cross-device backpressure belongs to slice B.
+  - id: C12
+    status: n-a
+    justification: No new remote authority or consent; operator invokes device-local verbs.
+  - id: C13
+    status: answered
+    justification: Provisional pin is an explicit local choice and never authorizes current.
+  - id: C14
+    status: partial
+    justification: Legacy bytes are retained for running executables; cross-device custody is not implemented in
+      slice A.
+  contractTests: null
+  gapNote: Covered by the command/operation parity suite where exercised; no dedicated per-kind assertion is claimed.
+- name: launcher-alias
+  kind: verdict-fn
+  sourceLocation:
+    file: src/bin_store/launch.rs
+    modulePath: elohim_device_runtime::bin_store::launch::resolve
+  summary: 'launcher-alias: returns a typed refusal with local context; never promotes an unverified candidate.'
+  concernIds:
+  - id: C0
+    status: answered
+    justification: Device-private local custody; status and session identity are rebuilt views. No DHT head or transport.
+  - id: C1
+    status: answered
+    justification: Possession and ingest cannot promote current; only land can validate and promote.
+  - id: C2
+    status: answered
+    justification: Land compares source descent and revalidates current metadata; timestamps never rank heads.
+  - id: C3
+    status: answered
+    justification: PID plus process start time binds liveness; ownerless pins have bounded grace.
+  - id: C4
+    status: answered
+    justification: Refusal kind/detail distinguish unavailable bytes, invalid evidence and an absent session.
+  - id: C5
+    status: answered
+    justification: Attestation cache records witnessed success by repo/SHA/check; claimed evidence cannot land.
+  - id: C6a
+    status: answered
+    justification: Store locks and external commands have finite elapsed-time bounds.
+  - id: C6b
+    status: answered
+    justification: Ingest is content addressed, pins publish under lock, migration checkpoints its mapping.
+  - id: C7
+    status: n-a
+    justification: No peer advertisement or serving surface in this local crate.
+  - id: C8
+    status: answered
+    justification: Typed refusals return to the CLI; landing failures append to existing release evidence.
+  - id: C9
+    status: answered
+    justification: Session module binds owner start time; alias names resolve to registered release files.
+  - id: C10
+    status: answered
+    justification: CID migration is explicit; normal readers reject legacy addresses. Status schema names camelCase
+      fields.
+  - id: C11
+    status: partial
+    justification: Build concurrency follows pool policy; cross-device backpressure belongs to slice B.
+  - id: C12
+    status: n-a
+    justification: No new remote authority or consent; operator invokes device-local verbs.
+  - id: C13
+    status: answered
+    justification: Provisional pin is an explicit local choice and never authorizes current.
+  - id: C14
+    status: partial
+    justification: Legacy bytes are retained for running executables; cross-device custody is not implemented in
+      slice A.
+  contractTests: null
+  gapNote: Covered by the command/operation parity suite where exercised; no dedicated per-kind assertion is claimed.
+- name: usage-lease-failed
+  kind: verdict-fn
+  sourceLocation:
+    file: src/bin_store/launch.rs
+    modulePath: elohim_device_runtime::bin_store::launch::touch_used
+  summary: 'usage-lease-failed: returns a typed refusal with local context; never promotes an unverified candidate.'
+  concernIds:
+  - id: C0
+    status: answered
+    justification: Device-private local custody; status and session identity are rebuilt views. No DHT head or transport.
+  - id: C1
+    status: answered
+    justification: Possession and ingest cannot promote current; only land can validate and promote.
+  - id: C2
+    status: answered
+    justification: Land compares source descent and revalidates current metadata; timestamps never rank heads.
+  - id: C3
+    status: answered
+    justification: PID plus process start time binds liveness; ownerless pins have bounded grace.
+  - id: C4
+    status: answered
+    justification: Refusal kind/detail distinguish unavailable bytes, invalid evidence and an absent session.
+  - id: C5
+    status: answered
+    justification: Attestation cache records witnessed success by repo/SHA/check; claimed evidence cannot land.
+  - id: C6a
+    status: answered
+    justification: Store locks and external commands have finite elapsed-time bounds.
+  - id: C6b
+    status: answered
+    justification: Ingest is content addressed, pins publish under lock, migration checkpoints its mapping.
+  - id: C7
+    status: n-a
+    justification: No peer advertisement or serving surface in this local crate.
+  - id: C8
+    status: answered
+    justification: Typed refusals return to the CLI; landing failures append to existing release evidence.
+  - id: C9
+    status: answered
+    justification: Session module binds owner start time; alias names resolve to registered release files.
+  - id: C10
+    status: answered
+    justification: CID migration is explicit; normal readers reject legacy addresses. Status schema names camelCase
+      fields.
+  - id: C11
+    status: partial
+    justification: Build concurrency follows pool policy; cross-device backpressure belongs to slice B.
+  - id: C12
+    status: n-a
+    justification: No new remote authority or consent; operator invokes device-local verbs.
+  - id: C13
+    status: answered
+    justification: Provisional pin is an explicit local choice and never authorizes current.
+  - id: C14
+    status: partial
+    justification: Legacy bytes are retained for running executables; cross-device custody is not implemented in
+      slice A.
+  contractTests: null
+  gapNote: Covered by the command/operation parity suite where exercised; no dedicated per-kind assertion is claimed.
+- name: exec-failed
+  kind: verdict-fn
+  sourceLocation:
+    file: src/bin_store/launch.rs
+    modulePath: elohim_device_runtime::bin_store::launch::launch_os
+  summary: 'exec-failed: returns a typed refusal with local context; never promotes an unverified candidate.'
+  concernIds:
+  - id: C0
+    status: answered
+    justification: Device-private local custody; status and session identity are rebuilt views. No DHT head or transport.
+  - id: C1
+    status: answered
+    justification: Possession and ingest cannot promote current; only land can validate and promote.
+  - id: C2
+    status: answered
+    justification: Land compares source descent and revalidates current metadata; timestamps never rank heads.
+  - id: C3
+    status: answered
+    justification: PID plus process start time binds liveness; ownerless pins have bounded grace.
+  - id: C4
+    status: answered
+    justification: Refusal kind/detail distinguish unavailable bytes, invalid evidence and an absent session.
+  - id: C5
+    status: answered
+    justification: Attestation cache records witnessed success by repo/SHA/check; claimed evidence cannot land.
+  - id: C6a
+    status: answered
+    justification: Store locks and external commands have finite elapsed-time bounds.
+  - id: C6b
+    status: answered
+    justification: Ingest is content addressed, pins publish under lock, migration checkpoints its mapping.
+  - id: C7
+    status: n-a
+    justification: No peer advertisement or serving surface in this local crate.
+  - id: C8
+    status: answered
+    justification: Typed refusals return to the CLI; landing failures append to existing release evidence.
+  - id: C9
+    status: answered
+    justification: Session module binds owner start time; alias names resolve to registered release files.
+  - id: C10
+    status: answered
+    justification: CID migration is explicit; normal readers reject legacy addresses. Status schema names camelCase
+      fields.
+  - id: C11
+    status: partial
+    justification: Build concurrency follows pool policy; cross-device backpressure belongs to slice B.
+  - id: C12
+    status: n-a
+    justification: No new remote authority or consent; operator invokes device-local verbs.
+  - id: C13
+    status: answered
+    justification: Provisional pin is an explicit local choice and never authorizes current.
+  - id: C14
+    status: partial
+    justification: Legacy bytes are retained for running executables; cross-device custody is not implemented in
+      slice A.
+  contractTests: null
+  gapNote: Covered by the command/operation parity suite where exercised; no dedicated per-kind assertion is claimed.
+- name: bootstrap-dirty
+  kind: verdict-fn
+  sourceLocation:
+    file: src/bin_store/lifecycle.rs
+    modulePath: elohim_device_runtime::bin_store::lifecycle::bootstrap
+  summary: 'bootstrap-dirty: returns a typed refusal with local context; never promotes an unverified candidate.'
+  concernIds:
+  - id: C0
+    status: answered
+    justification: Device-private local custody; status and session identity are rebuilt views. No DHT head or transport.
+  - id: C1
+    status: answered
+    justification: Possession and ingest cannot promote current; only land can validate and promote.
+  - id: C2
+    status: answered
+    justification: Land compares source descent and revalidates current metadata; timestamps never rank heads.
+  - id: C3
+    status: answered
+    justification: PID plus process start time binds liveness; ownerless pins have bounded grace.
+  - id: C4
+    status: answered
+    justification: Refusal kind/detail distinguish unavailable bytes, invalid evidence and an absent session.
+  - id: C5
+    status: answered
+    justification: Attestation cache records witnessed success by repo/SHA/check; claimed evidence cannot land.
+  - id: C6a
+    status: answered
+    justification: Store locks and external commands have finite elapsed-time bounds.
+  - id: C6b
+    status: answered
+    justification: Ingest is content addressed, pins publish under lock, migration checkpoints its mapping.
+  - id: C7
+    status: n-a
+    justification: No peer advertisement or serving surface in this local crate.
+  - id: C8
+    status: answered
+    justification: Typed refusals return to the CLI; landing failures append to existing release evidence.
+  - id: C9
+    status: answered
+    justification: Session module binds owner start time; alias names resolve to registered release files.
+  - id: C10
+    status: answered
+    justification: CID migration is explicit; normal readers reject legacy addresses. Status schema names camelCase
+      fields.
+  - id: C11
+    status: partial
+    justification: Build concurrency follows pool policy; cross-device backpressure belongs to slice B.
+  - id: C12
+    status: n-a
+    justification: No new remote authority or consent; operator invokes device-local verbs.
+  - id: C13
+    status: answered
+    justification: Provisional pin is an explicit local choice and never authorizes current.
+  - id: C14
+    status: partial
+    justification: Legacy bytes are retained for running executables; cross-device custody is not implemented in
+      slice A.
+  contractTests: null
+  gapNote: Covered by the command/operation parity suite where exercised; no dedicated per-kind assertion is claimed.
+- name: bootstrap-unavailable
+  kind: verdict-fn
+  sourceLocation:
+    file: src/bin_store/lifecycle.rs
+    modulePath: elohim_device_runtime::bin_store::lifecycle::adopt
+  summary: 'bootstrap-unavailable: returns a typed refusal with local context; never promotes an unverified candidate.'
+  concernIds:
+  - id: C0
+    status: answered
+    justification: Device-private local custody; status and session identity are rebuilt views. No DHT head or transport.
+  - id: C1
+    status: answered
+    justification: Possession and ingest cannot promote current; only land can validate and promote.
+  - id: C2
+    status: answered
+    justification: Land compares source descent and revalidates current metadata; timestamps never rank heads.
+  - id: C3
+    status: answered
+    justification: PID plus process start time binds liveness; ownerless pins have bounded grace.
+  - id: C4
+    status: answered
+    justification: Refusal kind/detail distinguish unavailable bytes, invalid evidence and an absent session.
+  - id: C5
+    status: answered
+    justification: Attestation cache records witnessed success by repo/SHA/check; claimed evidence cannot land.
+  - id: C6a
+    status: answered
+    justification: Store locks and external commands have finite elapsed-time bounds.
+  - id: C6b
+    status: answered
+    justification: Ingest is content addressed, pins publish under lock, migration checkpoints its mapping.
+  - id: C7
+    status: n-a
+    justification: No peer advertisement or serving surface in this local crate.
+  - id: C8
+    status: answered
+    justification: Typed refusals return to the CLI; landing failures append to existing release evidence.
+  - id: C9
+    status: answered
+    justification: Session module binds owner start time; alias names resolve to registered release files.
+  - id: C10
+    status: answered
+    justification: CID migration is explicit; normal readers reject legacy addresses. Status schema names camelCase
+      fields.
+  - id: C11
+    status: partial
+    justification: Build concurrency follows pool policy; cross-device backpressure belongs to slice B.
+  - id: C12
+    status: n-a
+    justification: No new remote authority or consent; operator invokes device-local verbs.
+  - id: C13
+    status: answered
+    justification: Provisional pin is an explicit local choice and never authorizes current.
+  - id: C14
+    status: partial
+    justification: Legacy bytes are retained for running executables; cross-device custody is not implemented in
+      slice A.
+  contractTests: null
+  gapNote: Covered by the command/operation parity suite where exercised; no dedicated per-kind assertion is claimed.
+- name: build-failed
+  kind: verdict-fn
+  sourceLocation:
+    file: src/bin_store/lifecycle.rs
+    modulePath: elohim_device_runtime::bin_store::lifecycle::build_release
+  summary: 'build-failed: returns a typed refusal with local context; never promotes an unverified candidate.'
+  concernIds:
+  - id: C0
+    status: answered
+    justification: Device-private local custody; status and session identity are rebuilt views. No DHT head or transport.
+  - id: C1
+    status: answered
+    justification: Possession and ingest cannot promote current; only land can validate and promote.
+  - id: C2
+    status: answered
+    justification: Land compares source descent and revalidates current metadata; timestamps never rank heads.
+  - id: C3
+    status: answered
+    justification: PID plus process start time binds liveness; ownerless pins have bounded grace.
+  - id: C4
+    status: answered
+    justification: Refusal kind/detail distinguish unavailable bytes, invalid evidence and an absent session.
+  - id: C5
+    status: answered
+    justification: Attestation cache records witnessed success by repo/SHA/check; claimed evidence cannot land.
+  - id: C6a
+    status: answered
+    justification: Store locks and external commands have finite elapsed-time bounds.
+  - id: C6b
+    status: answered
+    justification: Ingest is content addressed, pins publish under lock, migration checkpoints its mapping.
+  - id: C7
+    status: n-a
+    justification: No peer advertisement or serving surface in this local crate.
+  - id: C8
+    status: answered
+    justification: Typed refusals return to the CLI; landing failures append to existing release evidence.
+  - id: C9
+    status: answered
+    justification: Session module binds owner start time; alias names resolve to registered release files.
+  - id: C10
+    status: answered
+    justification: CID migration is explicit; normal readers reject legacy addresses. Status schema names camelCase
+      fields.
+  - id: C11
+    status: partial
+    justification: Build concurrency follows pool policy; cross-device backpressure belongs to slice B.
+  - id: C12
+    status: n-a
+    justification: No new remote authority or consent; operator invokes device-local verbs.
+  - id: C13
+    status: answered
+    justification: Provisional pin is an explicit local choice and never authorizes current.
+  - id: C14
+    status: partial
+    justification: Legacy bytes are retained for running executables; cross-device custody is not implemented in
+      slice A.
+  contractTests: null
+  gapNote: Covered by the command/operation parity suite where exercised; no dedicated per-kind assertion is claimed.
+- name: brit-build-failed
+  kind: verdict-fn
+  sourceLocation:
+    file: src/bin_store/lifecycle.rs
+    modulePath: elohim_device_runtime::bin_store::lifecycle::build_release
+  summary: 'brit-build-failed: returns a typed refusal with local context; never promotes an unverified candidate.'
+  concernIds:
+  - id: C0
+    status: answered
+    justification: Device-private local custody; status and session identity are rebuilt views. No DHT head or transport.
+  - id: C1
+    status: answered
+    justification: Possession and ingest cannot promote current; only land can validate and promote.
+  - id: C2
+    status: answered
+    justification: Land compares source descent and revalidates current metadata; timestamps never rank heads.
+  - id: C3
+    status: answered
+    justification: PID plus process start time binds liveness; ownerless pins have bounded grace.
+  - id: C4
+    status: answered
+    justification: Refusal kind/detail distinguish unavailable bytes, invalid evidence and an absent session.
+  - id: C5
+    status: answered
+    justification: Attestation cache records witnessed success by repo/SHA/check; claimed evidence cannot land.
+  - id: C6a
+    status: answered
+    justification: Store locks and external commands have finite elapsed-time bounds.
+  - id: C6b
+    status: answered
+    justification: Ingest is content addressed, pins publish under lock, migration checkpoints its mapping.
+  - id: C7
+    status: n-a
+    justification: No peer advertisement or serving surface in this local crate.
+  - id: C8
+    status: answered
+    justification: Typed refusals return to the CLI; landing failures append to existing release evidence.
+  - id: C9
+    status: answered
+    justification: Session module binds owner start time; alias names resolve to registered release files.
+  - id: C10
+    status: answered
+    justification: CID migration is explicit; normal readers reject legacy addresses. Status schema names camelCase
+      fields.
+  - id: C11
+    status: partial
+    justification: Build concurrency follows pool policy; cross-device backpressure belongs to slice B.
+  - id: C12
+    status: n-a
+    justification: No new remote authority or consent; operator invokes device-local verbs.
+  - id: C13
+    status: answered
+    justification: Provisional pin is an explicit local choice and never authorizes current.
+  - id: C14
+    status: partial
+    justification: Legacy bytes are retained for running executables; cross-device custody is not implemented in
+      slice A.
+  contractTests: null
+  gapNote: Covered by the command/operation parity suite where exercised; no dedicated per-kind assertion is claimed.
+- name: brit-bytes-unavailable
+  kind: verdict-fn
+  sourceLocation:
+    file: src/bin_store/lifecycle.rs
+    modulePath: elohim_device_runtime::bin_store::lifecycle::build_release
+  summary: 'brit-bytes-unavailable: returns a typed refusal with local context; never promotes an unverified candidate.'
+  concernIds:
+  - id: C0
+    status: answered
+    justification: Device-private local custody; status and session identity are rebuilt views. No DHT head or transport.
+  - id: C1
+    status: answered
+    justification: Possession and ingest cannot promote current; only land can validate and promote.
+  - id: C2
+    status: answered
+    justification: Land compares source descent and revalidates current metadata; timestamps never rank heads.
+  - id: C3
+    status: answered
+    justification: PID plus process start time binds liveness; ownerless pins have bounded grace.
+  - id: C4
+    status: answered
+    justification: Refusal kind/detail distinguish unavailable bytes, invalid evidence and an absent session.
+  - id: C5
+    status: answered
+    justification: Attestation cache records witnessed success by repo/SHA/check; claimed evidence cannot land.
+  - id: C6a
+    status: answered
+    justification: Store locks and external commands have finite elapsed-time bounds.
+  - id: C6b
+    status: answered
+    justification: Ingest is content addressed, pins publish under lock, migration checkpoints its mapping.
+  - id: C7
+    status: n-a
+    justification: No peer advertisement or serving surface in this local crate.
+  - id: C8
+    status: answered
+    justification: Typed refusals return to the CLI; landing failures append to existing release evidence.
+  - id: C9
+    status: answered
+    justification: Session module binds owner start time; alias names resolve to registered release files.
+  - id: C10
+    status: answered
+    justification: CID migration is explicit; normal readers reject legacy addresses. Status schema names camelCase
+      fields.
+  - id: C11
+    status: partial
+    justification: Build concurrency follows pool policy; cross-device backpressure belongs to slice B.
+  - id: C12
+    status: n-a
+    justification: No new remote authority or consent; operator invokes device-local verbs.
+  - id: C13
+    status: answered
+    justification: Provisional pin is an explicit local choice and never authorizes current.
+  - id: C14
+    status: partial
+    justification: Legacy bytes are retained for running executables; cross-device custody is not implemented in
+      slice A.
+  contractTests: null
+  gapNote: Covered by the command/operation parity suite where exercised; no dedicated per-kind assertion is claimed.
+- name: unpublished
+  kind: verdict-fn
+  sourceLocation:
+    file: src/bin_store/lifecycle.rs
+    modulePath: elohim_device_runtime::bin_store::lifecycle::follow
+  summary: 'unpublished: returns a typed refusal with local context; never promotes an unverified candidate.'
+  concernIds:
+  - id: C0
+    status: answered
+    justification: Device-private local custody; status and session identity are rebuilt views. No DHT head or transport.
+  - id: C1
+    status: answered
+    justification: Possession and ingest cannot promote current; only land can validate and promote.
+  - id: C2
+    status: answered
+    justification: Land compares source descent and revalidates current metadata; timestamps never rank heads.
+  - id: C3
+    status: answered
+    justification: PID plus process start time binds liveness; ownerless pins have bounded grace.
+  - id: C4
+    status: answered
+    justification: Refusal kind/detail distinguish unavailable bytes, invalid evidence and an absent session.
+  - id: C5
+    status: answered
+    justification: Attestation cache records witnessed success by repo/SHA/check; claimed evidence cannot land.
+  - id: C6a
+    status: answered
+    justification: Store locks and external commands have finite elapsed-time bounds.
+  - id: C6b
+    status: answered
+    justification: Ingest is content addressed, pins publish under lock, migration checkpoints its mapping.
+  - id: C7
+    status: n-a
+    justification: No peer advertisement or serving surface in this local crate.
+  - id: C8
+    status: answered
+    justification: Typed refusals return to the CLI; landing failures append to existing release evidence.
+  - id: C9
+    status: answered
+    justification: Session module binds owner start time; alias names resolve to registered release files.
+  - id: C10
+    status: answered
+    justification: CID migration is explicit; normal readers reject legacy addresses. Status schema names camelCase
+      fields.
+  - id: C11
+    status: partial
+    justification: Build concurrency follows pool policy; cross-device backpressure belongs to slice B.
+  - id: C12
+    status: n-a
+    justification: No new remote authority or consent; operator invokes device-local verbs.
+  - id: C13
+    status: answered
+    justification: Provisional pin is an explicit local choice and never authorizes current.
+  - id: C14
+    status: partial
+    justification: Legacy bytes are retained for running executables; cross-device custody is not implemented in
+      slice A.
+  contractTests: null
+  gapNote: Covered by the command/operation parity suite where exercised; no dedicated per-kind assertion is claimed.
+- name: migration-invalid
+  kind: verdict-fn
+  sourceLocation:
+    file: src/bin_store/migrate.rs
+    modulePath: elohim_device_runtime::bin_store::migrate::preserve_legacy_executable
+  summary: 'migration-invalid: returns a typed refusal with local context; never promotes an unverified candidate.'
+  concernIds:
+  - id: C0
+    status: answered
+    justification: Device-private local custody; status and session identity are rebuilt views. No DHT head or transport.
+  - id: C1
+    status: answered
+    justification: Possession and ingest cannot promote current; only land can validate and promote.
+  - id: C2
+    status: answered
+    justification: Land compares source descent and revalidates current metadata; timestamps never rank heads.
+  - id: C3
+    status: answered
+    justification: PID plus process start time binds liveness; ownerless pins have bounded grace.
+  - id: C4
+    status: answered
+    justification: Refusal kind/detail distinguish unavailable bytes, invalid evidence and an absent session.
+  - id: C5
+    status: answered
+    justification: Attestation cache records witnessed success by repo/SHA/check; claimed evidence cannot land.
+  - id: C6a
+    status: answered
+    justification: Store locks and external commands have finite elapsed-time bounds.
+  - id: C6b
+    status: answered
+    justification: Ingest is content addressed, pins publish under lock, migration checkpoints its mapping.
+  - id: C7
+    status: n-a
+    justification: No peer advertisement or serving surface in this local crate.
+  - id: C8
+    status: answered
+    justification: Typed refusals return to the CLI; landing failures append to existing release evidence.
+  - id: C9
+    status: answered
+    justification: Session module binds owner start time; alias names resolve to registered release files.
+  - id: C10
+    status: answered
+    justification: CID migration is explicit; normal readers reject legacy addresses. Status schema names camelCase
+      fields.
+  - id: C11
+    status: partial
+    justification: Build concurrency follows pool policy; cross-device backpressure belongs to slice B.
+  - id: C12
+    status: n-a
+    justification: No new remote authority or consent; operator invokes device-local verbs.
+  - id: C13
+    status: answered
+    justification: Provisional pin is an explicit local choice and never authorizes current.
+  - id: C14
+    status: partial
+    justification: Legacy bytes are retained for running executables; cross-device custody is not implemented in
+      slice A.
+  contractTests: null
+  gapNote: Covered by the command/operation parity suite where exercised; no dedicated per-kind assertion is claimed.
+- name: migration-pin-conflict
+  kind: verdict-fn
+  sourceLocation:
+    file: src/bin_store/migrate.rs
+    modulePath: elohim_device_runtime::bin_store::migrate::migrate
+  summary: 'migration-pin-conflict: returns a typed refusal with local context; never promotes an unverified candidate.'
+  concernIds:
+  - id: C0
+    status: answered
+    justification: Device-private local custody; status and session identity are rebuilt views. No DHT head or transport.
+  - id: C1
+    status: answered
+    justification: Possession and ingest cannot promote current; only land can validate and promote.
+  - id: C2
+    status: answered
+    justification: Land compares source descent and revalidates current metadata; timestamps never rank heads.
+  - id: C3
+    status: answered
+    justification: PID plus process start time binds liveness; ownerless pins have bounded grace.
+  - id: C4
+    status: answered
+    justification: Refusal kind/detail distinguish unavailable bytes, invalid evidence and an absent session.
+  - id: C5
+    status: answered
+    justification: Attestation cache records witnessed success by repo/SHA/check; claimed evidence cannot land.
+  - id: C6a
+    status: answered
+    justification: Store locks and external commands have finite elapsed-time bounds.
+  - id: C6b
+    status: answered
+    justification: Ingest is content addressed, pins publish under lock, migration checkpoints its mapping.
+  - id: C7
+    status: n-a
+    justification: No peer advertisement or serving surface in this local crate.
+  - id: C8
+    status: answered
+    justification: Typed refusals return to the CLI; landing failures append to existing release evidence.
+  - id: C9
+    status: answered
+    justification: Session module binds owner start time; alias names resolve to registered release files.
+  - id: C10
+    status: answered
+    justification: CID migration is explicit; normal readers reject legacy addresses. Status schema names camelCase
+      fields.
+  - id: C11
+    status: partial
+    justification: Build concurrency follows pool policy; cross-device backpressure belongs to slice B.
+  - id: C12
+    status: n-a
+    justification: No new remote authority or consent; operator invokes device-local verbs.
+  - id: C13
+    status: answered
+    justification: Provisional pin is an explicit local choice and never authorizes current.
+  - id: C14
+    status: partial
+    justification: Legacy bytes are retained for running executables; cross-device custody is not implemented in
+      slice A.
+  contractTests:
+  - path: elohim/eprfs/device-runtime/src/bin_store/tests.rs
+    testName: migration_is_idempotent_and_preserves_provenance_and_pins
+    kind: unit
+- name: registry-invalid
+  kind: verdict-fn
+  sourceLocation:
+    file: src/bin_store/mod.rs
+    modulePath: elohim_device_runtime::bin_store::mod::load
+  summary: 'registry-invalid: returns a typed refusal with local context; never promotes an unverified candidate.'
+  concernIds:
+  - id: C0
+    status: answered
+    justification: Device-private local custody; status and session identity are rebuilt views. No DHT head or transport.
+  - id: C1
+    status: answered
+    justification: Possession and ingest cannot promote current; only land can validate and promote.
+  - id: C2
+    status: answered
+    justification: Land compares source descent and revalidates current metadata; timestamps never rank heads.
+  - id: C3
+    status: answered
+    justification: PID plus process start time binds liveness; ownerless pins have bounded grace.
+  - id: C4
+    status: answered
+    justification: Refusal kind/detail distinguish unavailable bytes, invalid evidence and an absent session.
+  - id: C5
+    status: answered
+    justification: Attestation cache records witnessed success by repo/SHA/check; claimed evidence cannot land.
+  - id: C6a
+    status: answered
+    justification: Store locks and external commands have finite elapsed-time bounds.
+  - id: C6b
+    status: answered
+    justification: Ingest is content addressed, pins publish under lock, migration checkpoints its mapping.
+  - id: C7
+    status: n-a
+    justification: No peer advertisement or serving surface in this local crate.
+  - id: C8
+    status: answered
+    justification: Typed refusals return to the CLI; landing failures append to existing release evidence.
+  - id: C9
+    status: answered
+    justification: Session module binds owner start time; alias names resolve to registered release files.
+  - id: C10
+    status: answered
+    justification: CID migration is explicit; normal readers reject legacy addresses. Status schema names camelCase
+      fields.
+  - id: C11
+    status: partial
+    justification: Build concurrency follows pool policy; cross-device backpressure belongs to slice B.
+  - id: C12
+    status: n-a
+    justification: No new remote authority or consent; operator invokes device-local verbs.
+  - id: C13
+    status: answered
+    justification: Provisional pin is an explicit local choice and never authorizes current.
+  - id: C14
+    status: partial
+    justification: Legacy bytes are retained for running executables; cross-device custody is not implemented in
+      slice A.
+  contractTests: null
+  gapNote: Covered by the command/operation parity suite where exercised; no dedicated per-kind assertion is claimed.
+- name: launcher-name-invalid
+  kind: verdict-fn
+  sourceLocation:
+    file: src/bin_store/mod.rs
+    modulePath: elohim_device_runtime::bin_store::mod::invoked
+  summary: 'launcher-name-invalid: returns a typed refusal with local context; never promotes an unverified candidate.'
+  concernIds:
+  - id: C0
+    status: answered
+    justification: Device-private local custody; status and session identity are rebuilt views. No DHT head or transport.
+  - id: C1
+    status: answered
+    justification: Possession and ingest cannot promote current; only land can validate and promote.
+  - id: C2
+    status: answered
+    justification: Land compares source descent and revalidates current metadata; timestamps never rank heads.
+  - id: C3
+    status: answered
+    justification: PID plus process start time binds liveness; ownerless pins have bounded grace.
+  - id: C4
+    status: answered
+    justification: Refusal kind/detail distinguish unavailable bytes, invalid evidence and an absent session.
+  - id: C5
+    status: answered
+    justification: Attestation cache records witnessed success by repo/SHA/check; claimed evidence cannot land.
+  - id: C6a
+    status: answered
+    justification: Store locks and external commands have finite elapsed-time bounds.
+  - id: C6b
+    status: answered
+    justification: Ingest is content addressed, pins publish under lock, migration checkpoints its mapping.
+  - id: C7
+    status: n-a
+    justification: No peer advertisement or serving surface in this local crate.
+  - id: C8
+    status: answered
+    justification: Typed refusals return to the CLI; landing failures append to existing release evidence.
+  - id: C9
+    status: answered
+    justification: Session module binds owner start time; alias names resolve to registered release files.
+  - id: C10
+    status: answered
+    justification: CID migration is explicit; normal readers reject legacy addresses. Status schema names camelCase
+      fields.
+  - id: C11
+    status: partial
+    justification: Build concurrency follows pool policy; cross-device backpressure belongs to slice B.
+  - id: C12
+    status: n-a
+    justification: No new remote authority or consent; operator invokes device-local verbs.
+  - id: C13
+    status: answered
+    justification: Provisional pin is an explicit local choice and never authorizes current.
+  - id: C14
+    status: partial
+    justification: Legacy bytes are retained for running executables; cross-device custody is not implemented in
+      slice A.
+  contractTests: null
+  gapNote: Covered by the command/operation parity suite where exercised; no dedicated per-kind assertion is claimed.
+- name: command-unavailable
+  kind: verdict-fn
+  sourceLocation:
+    file: src/bin_store/source.rs
+    modulePath: elohim_device_runtime::bin_store::source::run
+  summary: 'command-unavailable: returns a typed refusal with local context; never promotes an unverified candidate.'
+  concernIds:
+  - id: C0
+    status: answered
+    justification: Device-private local custody; status and session identity are rebuilt views. No DHT head or transport.
+  - id: C1
+    status: answered
+    justification: Possession and ingest cannot promote current; only land can validate and promote.
+  - id: C2
+    status: answered
+    justification: Land compares source descent and revalidates current metadata; timestamps never rank heads.
+  - id: C3
+    status: answered
+    justification: PID plus process start time binds liveness; ownerless pins have bounded grace.
+  - id: C4
+    status: answered
+    justification: Refusal kind/detail distinguish unavailable bytes, invalid evidence and an absent session.
+  - id: C5
+    status: answered
+    justification: Attestation cache records witnessed success by repo/SHA/check; claimed evidence cannot land.
+  - id: C6a
+    status: answered
+    justification: Store locks and external commands have finite elapsed-time bounds.
+  - id: C6b
+    status: answered
+    justification: Ingest is content addressed, pins publish under lock, migration checkpoints its mapping.
+  - id: C7
+    status: n-a
+    justification: No peer advertisement or serving surface in this local crate.
+  - id: C8
+    status: answered
+    justification: Typed refusals return to the CLI; landing failures append to existing release evidence.
+  - id: C9
+    status: answered
+    justification: Session module binds owner start time; alias names resolve to registered release files.
+  - id: C10
+    status: answered
+    justification: CID migration is explicit; normal readers reject legacy addresses. Status schema names camelCase
+      fields.
+  - id: C11
+    status: partial
+    justification: Build concurrency follows pool policy; cross-device backpressure belongs to slice B.
+  - id: C12
+    status: n-a
+    justification: No new remote authority or consent; operator invokes device-local verbs.
+  - id: C13
+    status: answered
+    justification: Provisional pin is an explicit local choice and never authorizes current.
+  - id: C14
+    status: partial
+    justification: Legacy bytes are retained for running executables; cross-device custody is not implemented in
+      slice A.
+  contractTests: null
+  gapNote: Covered by the command/operation parity suite where exercised; no dedicated per-kind assertion is claimed.
+- name: command-timeout
+  kind: verdict-fn
+  sourceLocation:
+    file: src/bin_store/source.rs
+    modulePath: elohim_device_runtime::bin_store::source::run
+  summary: 'command-timeout: returns a typed refusal with local context; never promotes an unverified candidate.'
+  concernIds:
+  - id: C0
+    status: answered
+    justification: Device-private local custody; status and session identity are rebuilt views. No DHT head or transport.
+  - id: C1
+    status: answered
+    justification: Possession and ingest cannot promote current; only land can validate and promote.
+  - id: C2
+    status: answered
+    justification: Land compares source descent and revalidates current metadata; timestamps never rank heads.
+  - id: C3
+    status: answered
+    justification: PID plus process start time binds liveness; ownerless pins have bounded grace.
+  - id: C4
+    status: answered
+    justification: Refusal kind/detail distinguish unavailable bytes, invalid evidence and an absent session.
+  - id: C5
+    status: answered
+    justification: Attestation cache records witnessed success by repo/SHA/check; claimed evidence cannot land.
+  - id: C6a
+    status: answered
+    justification: Store locks and external commands have finite elapsed-time bounds.
+  - id: C6b
+    status: answered
+    justification: Ingest is content addressed, pins publish under lock, migration checkpoints its mapping.
+  - id: C7
+    status: n-a
+    justification: No peer advertisement or serving surface in this local crate.
+  - id: C8
+    status: answered
+    justification: Typed refusals return to the CLI; landing failures append to existing release evidence.
+  - id: C9
+    status: answered
+    justification: Session module binds owner start time; alias names resolve to registered release files.
+  - id: C10
+    status: answered
+    justification: CID migration is explicit; normal readers reject legacy addresses. Status schema names camelCase
+      fields.
+  - id: C11
+    status: partial
+    justification: Build concurrency follows pool policy; cross-device backpressure belongs to slice B.
+  - id: C12
+    status: n-a
+    justification: No new remote authority or consent; operator invokes device-local verbs.
+  - id: C13
+    status: answered
+    justification: Provisional pin is an explicit local choice and never authorizes current.
+  - id: C14
+    status: partial
+    justification: Legacy bytes are retained for running executables; cross-device custody is not implemented in
+      slice A.
+  contractTests: null
+  gapNote: Covered by the command/operation parity suite where exercised; no dedicated per-kind assertion is claimed.
+- name: git-unavailable
+  kind: verdict-fn
+  sourceLocation:
+    file: src/bin_store/source.rs
+    modulePath: elohim_device_runtime::bin_store::source::git
+  summary: 'git-unavailable: returns a typed refusal with local context; never promotes an unverified candidate.'
+  concernIds:
+  - id: C0
+    status: answered
+    justification: Device-private local custody; status and session identity are rebuilt views. No DHT head or transport.
+  - id: C1
+    status: answered
+    justification: Possession and ingest cannot promote current; only land can validate and promote.
+  - id: C2
+    status: answered
+    justification: Land compares source descent and revalidates current metadata; timestamps never rank heads.
+  - id: C3
+    status: answered
+    justification: PID plus process start time binds liveness; ownerless pins have bounded grace.
+  - id: C4
+    status: answered
+    justification: Refusal kind/detail distinguish unavailable bytes, invalid evidence and an absent session.
+  - id: C5
+    status: answered
+    justification: Attestation cache records witnessed success by repo/SHA/check; claimed evidence cannot land.
+  - id: C6a
+    status: answered
+    justification: Store locks and external commands have finite elapsed-time bounds.
+  - id: C6b
+    status: answered
+    justification: Ingest is content addressed, pins publish under lock, migration checkpoints its mapping.
+  - id: C7
+    status: n-a
+    justification: No peer advertisement or serving surface in this local crate.
+  - id: C8
+    status: answered
+    justification: Typed refusals return to the CLI; landing failures append to existing release evidence.
+  - id: C9
+    status: answered
+    justification: Session module binds owner start time; alias names resolve to registered release files.
+  - id: C10
+    status: answered
+    justification: CID migration is explicit; normal readers reject legacy addresses. Status schema names camelCase
+      fields.
+  - id: C11
+    status: partial
+    justification: Build concurrency follows pool policy; cross-device backpressure belongs to slice B.
+  - id: C12
+    status: n-a
+    justification: No new remote authority or consent; operator invokes device-local verbs.
+  - id: C13
+    status: answered
+    justification: Provisional pin is an explicit local choice and never authorizes current.
+  - id: C14
+    status: partial
+    justification: Legacy bytes are retained for running executables; cross-device custody is not implemented in
+      slice A.
+  contractTests: null
+  gapNote: Covered by the command/operation parity suite where exercised; no dedicated per-kind assertion is claimed.
+- name: gitlink-invalid
+  kind: verdict-fn
+  sourceLocation:
+    file: src/bin_store/source.rs
+    modulePath: elohim_device_runtime::bin_store::source::source_state
+  summary: 'gitlink-invalid: returns a typed refusal with local context; never promotes an unverified candidate.'
+  concernIds:
+  - id: C0
+    status: answered
+    justification: Device-private local custody; status and session identity are rebuilt views. No DHT head or transport.
+  - id: C1
+    status: answered
+    justification: Possession and ingest cannot promote current; only land can validate and promote.
+  - id: C2
+    status: answered
+    justification: Land compares source descent and revalidates current metadata; timestamps never rank heads.
+  - id: C3
+    status: answered
+    justification: PID plus process start time binds liveness; ownerless pins have bounded grace.
+  - id: C4
+    status: answered
+    justification: Refusal kind/detail distinguish unavailable bytes, invalid evidence and an absent session.
+  - id: C5
+    status: answered
+    justification: Attestation cache records witnessed success by repo/SHA/check; claimed evidence cannot land.
+  - id: C6a
+    status: answered
+    justification: Store locks and external commands have finite elapsed-time bounds.
+  - id: C6b
+    status: answered
+    justification: Ingest is content addressed, pins publish under lock, migration checkpoints its mapping.
+  - id: C7
+    status: n-a
+    justification: No peer advertisement or serving surface in this local crate.
+  - id: C8
+    status: answered
+    justification: Typed refusals return to the CLI; landing failures append to existing release evidence.
+  - id: C9
+    status: answered
+    justification: Session module binds owner start time; alias names resolve to registered release files.
+  - id: C10
+    status: answered
+    justification: CID migration is explicit; normal readers reject legacy addresses. Status schema names camelCase
+      fields.
+  - id: C11
+    status: partial
+    justification: Build concurrency follows pool policy; cross-device backpressure belongs to slice B.
+  - id: C12
+    status: n-a
+    justification: No new remote authority or consent; operator invokes device-local verbs.
+  - id: C13
+    status: answered
+    justification: Provisional pin is an explicit local choice and never authorizes current.
+  - id: C14
+    status: partial
+    justification: Legacy bytes are retained for running executables; cross-device custody is not implemented in
+      slice A.
+  contractTests: null
+  gapNote: Covered by the command/operation parity suite where exercised; no dedicated per-kind assertion is claimed.
+- name: brit-fetch-failed
+  kind: verdict-fn
+  sourceLocation:
+    file: src/bin_store/source.rs
+    modulePath: elohim_device_runtime::bin_store::source::descends
+  summary: 'brit-fetch-failed: returns a typed refusal with local context; never promotes an unverified candidate.'
+  concernIds:
+  - id: C0
+    status: answered
+    justification: Device-private local custody; status and session identity are rebuilt views. No DHT head or transport.
+  - id: C1
+    status: answered
+    justification: Possession and ingest cannot promote current; only land can validate and promote.
+  - id: C2
+    status: answered
+    justification: Land compares source descent and revalidates current metadata; timestamps never rank heads.
+  - id: C3
+    status: answered
+    justification: PID plus process start time binds liveness; ownerless pins have bounded grace.
+  - id: C4
+    status: answered
+    justification: Refusal kind/detail distinguish unavailable bytes, invalid evidence and an absent session.
+  - id: C5
+    status: answered
+    justification: Attestation cache records witnessed success by repo/SHA/check; claimed evidence cannot land.
+  - id: C6a
+    status: answered
+    justification: Store locks and external commands have finite elapsed-time bounds.
+  - id: C6b
+    status: answered
+    justification: Ingest is content addressed, pins publish under lock, migration checkpoints its mapping.
+  - id: C7
+    status: n-a
+    justification: No peer advertisement or serving surface in this local crate.
+  - id: C8
+    status: answered
+    justification: Typed refusals return to the CLI; landing failures append to existing release evidence.
+  - id: C9
+    status: answered
+    justification: Session module binds owner start time; alias names resolve to registered release files.
+  - id: C10
+    status: answered
+    justification: CID migration is explicit; normal readers reject legacy addresses. Status schema names camelCase
+      fields.
+  - id: C11
+    status: partial
+    justification: Build concurrency follows pool policy; cross-device backpressure belongs to slice B.
+  - id: C12
+    status: n-a
+    justification: No new remote authority or consent; operator invokes device-local verbs.
+  - id: C13
+    status: answered
+    justification: Provisional pin is an explicit local choice and never authorizes current.
+  - id: C14
+    status: partial
+    justification: Legacy bytes are retained for running executables; cross-device custody is not implemented in
+      slice A.
+  contractTests: null
+  gapNote: Covered by the command/operation parity suite where exercised; no dedicated per-kind assertion is claimed.
+- name: bootstrap-pool-unavailable
+  kind: verdict-fn
+  sourceLocation:
+    file: src/bin_store/source.rs
+    modulePath: elohim_device_runtime::bin_store::source::build_target
+  summary: 'bootstrap-pool-unavailable: returns a typed refusal with local context; never promotes an unverified
+    candidate.'
+  concernIds:
+  - id: C0
+    status: answered
+    justification: Device-private local custody; status and session identity are rebuilt views. No DHT head or transport.
+  - id: C1
+    status: answered
+    justification: Possession and ingest cannot promote current; only land can validate and promote.
+  - id: C2
+    status: answered
+    justification: Land compares source descent and revalidates current metadata; timestamps never rank heads.
+  - id: C3
+    status: answered
+    justification: PID plus process start time binds liveness; ownerless pins have bounded grace.
+  - id: C4
+    status: answered
+    justification: Refusal kind/detail distinguish unavailable bytes, invalid evidence and an absent session.
+  - id: C5
+    status: answered
+    justification: Attestation cache records witnessed success by repo/SHA/check; claimed evidence cannot land.
+  - id: C6a
+    status: answered
+    justification: Store locks and external commands have finite elapsed-time bounds.
+  - id: C6b
+    status: answered
+    justification: Ingest is content addressed, pins publish under lock, migration checkpoints its mapping.
+  - id: C7
+    status: n-a
+    justification: No peer advertisement or serving surface in this local crate.
+  - id: C8
+    status: answered
+    justification: Typed refusals return to the CLI; landing failures append to existing release evidence.
+  - id: C9
+    status: answered
+    justification: Session module binds owner start time; alias names resolve to registered release files.
+  - id: C10
+    status: answered
+    justification: CID migration is explicit; normal readers reject legacy addresses. Status schema names camelCase
+      fields.
+  - id: C11
+    status: partial
+    justification: Build concurrency follows pool policy; cross-device backpressure belongs to slice B.
+  - id: C12
+    status: n-a
+    justification: No new remote authority or consent; operator invokes device-local verbs.
+  - id: C13
+    status: answered
+    justification: Provisional pin is an explicit local choice and never authorizes current.
+  - id: C14
+    status: partial
+    justification: Legacy bytes are retained for running executables; cross-device custody is not implemented in
+      slice A.
+  contractTests: null
+  gapNote: Covered by the command/operation parity suite where exercised; no dedicated per-kind assertion is claimed.
+- name: attestation-unreachable
+  kind: verdict-fn
+  sourceLocation:
+    file: src/bin_store/landing.rs
+    modulePath: elohim_device_runtime::bin_store::Store::require_attestation
+  summary: Claimed or unsuccessful attestation never moves current.
+  concernIds:
+  - id: C0
+    status: answered
+    justification: Device-private local custody; status and session identity are rebuilt views. No DHT head or transport.
+  - id: C1
+    status: answered
+    justification: Possession and ingest cannot promote current; only land can validate and promote.
+  - id: C2
+    status: answered
+    justification: Land compares source descent and revalidates current metadata; timestamps never rank heads.
+  - id: C3
+    status: answered
+    justification: PID plus process start time binds liveness; ownerless pins have bounded grace.
+  - id: C4
+    status: answered
+    justification: Refusal kind/detail distinguish unavailable bytes, invalid evidence and an absent session.
+  - id: C5
+    status: answered
+    justification: Attestation cache records witnessed success by repo/SHA/check; claimed evidence cannot land.
+  - id: C6a
+    status: answered
+    justification: Store locks and external commands have finite elapsed-time bounds.
+  - id: C6b
+    status: answered
+    justification: Ingest is content addressed, pins publish under lock, migration checkpoints its mapping.
+  - id: C7
+    status: n-a
+    justification: No peer advertisement or serving surface in this local crate.
+  - id: C8
+    status: answered
+    justification: Typed refusals return to the CLI; landing failures append to existing release evidence.
+  - id: C9
+    status: answered
+    justification: Session module binds owner start time; alias names resolve to registered release files.
+  - id: C10
+    status: answered
+    justification: CID migration is explicit; normal readers reject legacy addresses. Status schema names camelCase
+      fields.
+  - id: C11
+    status: partial
+    justification: Build concurrency follows pool policy; cross-device backpressure belongs to slice B.
+  - id: C12
+    status: n-a
+    justification: No new remote authority or consent; operator invokes device-local verbs.
+  - id: C13
+    status: answered
+    justification: Provisional pin is an explicit local choice and never authorizes current.
+  - id: C14
+    status: partial
+    justification: Legacy bytes are retained for running executables; cross-device custody is not implemented in
+      slice A.
+  contractTests:
+  - path: elohim/eprfs/device-runtime/src/bin_store/tests.rs
+    testName: test_direct_brit_land_requires_witnessed_success_before_health
+    kind: unit
+- name: attestation-refused
+  kind: verdict-fn
+  sourceLocation:
+    file: src/bin_store/landing.rs
+    modulePath: elohim_device_runtime::bin_store::Store::require_attestation
+  summary: Claimed or unsuccessful attestation never moves current.
+  concernIds:
+  - id: C0
+    status: answered
+    justification: Device-private local custody; status and session identity are rebuilt views. No DHT head or transport.
+  - id: C1
+    status: answered
+    justification: Possession and ingest cannot promote current; only land can validate and promote.
+  - id: C2
+    status: answered
+    justification: Land compares source descent and revalidates current metadata; timestamps never rank heads.
+  - id: C3
+    status: answered
+    justification: PID plus process start time binds liveness; ownerless pins have bounded grace.
+  - id: C4
+    status: answered
+    justification: Refusal kind/detail distinguish unavailable bytes, invalid evidence and an absent session.
+  - id: C5
+    status: answered
+    justification: Attestation cache records witnessed success by repo/SHA/check; claimed evidence cannot land.
+  - id: C6a
+    status: answered
+    justification: Store locks and external commands have finite elapsed-time bounds.
+  - id: C6b
+    status: answered
+    justification: Ingest is content addressed, pins publish under lock, migration checkpoints its mapping.
+  - id: C7
+    status: n-a
+    justification: No peer advertisement or serving surface in this local crate.
+  - id: C8
+    status: answered
+    justification: Typed refusals return to the CLI; landing failures append to existing release evidence.
+  - id: C9
+    status: answered
+    justification: Session module binds owner start time; alias names resolve to registered release files.
+  - id: C10
+    status: answered
+    justification: CID migration is explicit; normal readers reject legacy addresses. Status schema names camelCase
+      fields.
+  - id: C11
+    status: partial
+    justification: Build concurrency follows pool policy; cross-device backpressure belongs to slice B.
+  - id: C12
+    status: n-a
+    justification: No new remote authority or consent; operator invokes device-local verbs.
+  - id: C13
+    status: answered
+    justification: Provisional pin is an explicit local choice and never authorizes current.
+  - id: C14
+    status: partial
+    justification: Legacy bytes are retained for running executables; cross-device custody is not implemented in
+      slice A.
+  contractTests:
+  - path: elohim/eprfs/device-runtime/src/bin_store/tests.rs
+    testName: test_brit_follow_refuses_unreachable_or_red_attestation_for_every_candidate_source
+    kind: unit
+- name: session::resolve_with
+  kind: pure-decision-predicate
+  sourceLocation:
+    file: src/session.rs
+    modulePath: elohim_device_runtime::session
+  summary: Declared identity precedes the nearest registered ancestor, then controlling TTY leader, then successful
+    none. The walk is cycle-safe and bounded at 256 ancestors.
+  concernIds:
+  - id: C0
+    status: answered
+    justification: Ephemeral local observation; no DHT entity or persistent authority.
+  contractTests:
+  - path: elohim/eprfs/device-runtime/tests/session.rs
+    testName: session_shared_fixture_cases
+    kind: integration
+- name: session::nonblank
+  kind: pure-decision-predicate
+  sourceLocation:
+    file: src/session.rs
+    modulePath: elohim_device_runtime::session
+  summary: Whitespace-only environment values are absence; nonblank values are trimmed before selection.
+  concernIds:
+  - id: C0
+    status: answered
+    justification: Ephemeral local observation; no DHT entity or persistent authority.
+  contractTests:
+  - path: elohim/eprfs/device-runtime/tests/session.rs
+    testName: session_shared_fixture_cases
+    kind: integration
+- name: session::process
+  kind: pure-decision-predicate
+  sourceLocation:
+    file: src/session.rs
+    modulePath: elohim_device_runtime::session
+  summary: A declared session survives a missing or malformed owner process; both owner fields remain null. Process
+    start time binds owner liveness against PID reuse.
+  concernIds:
+  - id: C0
+    status: answered
+    justification: Ephemeral local observation; no DHT entity or persistent authority.
+  contractTests:
+  - path: elohim/eprfs/device-runtime/tests/session.rs
+    testName: session_shared_fixture_cases
+    kind: integration

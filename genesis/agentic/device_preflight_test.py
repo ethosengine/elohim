@@ -16,7 +16,7 @@ preflight = _NS["preflight"]
 expand_resolve_entry = _NS["expand_resolve_entry"]
 check_fold = _NS["check_fold"]
 check_roster = _NS["check_roster"]
-resolve_brit = _NS["resolve_brit"]
+check_tool = _NS["check_tool"]
 
 MANIFEST_REL = _NS["MODEL_MANIFEST_REL"]
 MEASURE_REL = _NS["INDEX_MEASURE_REL"]
@@ -28,12 +28,17 @@ def fake_epr(bin_dir: Path, current: dict, status: dict) -> str:
     script = bin_dir / "epr"
     script.write_text(
         "#!/usr/bin/env python3\n"
-        "import json, sys\n"
+        "import json, sys, os\n"
         f"CURRENT = {json.dumps(current)!r}\n"
         f"STATUS = {json.dumps(status)!r}\n"
         "a = sys.argv[1:]\n"
         "if a[:2] == ['actor', 'current']: print(CURRENT)\n"
         "elif a[:4] == ['flow', 'memory', 'index', 'status']: print(STATUS)\n"
+        "elif a[:2] == ['bin', 'shadows']: print('[]')\n"
+        "elif a[:2] == ['bin', 'status']:\n"
+        "    tool = a[a.index('--tool') + 1]\n"
+        "    binary = os.environ.get(tool.upper() + '_BIN')\n"
+        "    print(json.dumps({'resolved': binary, 'resolvedCid': 'bafkreifixture', 'source': 'candidate', 'head': None}))\n"
         "else: sys.exit(2)\n"
     )
     script.chmod(script.stat().st_mode | stat.S_IXUSR)
@@ -114,27 +119,20 @@ class ArrivalTest(unittest.TestCase):
         line = preflight(self.root, env, None, "sess")[0]
         self.assertFalse(line.ok)
         self.assertIn("no `epr` candidate", line.render())
-        self.assertIn("bin-store --tool epr bootstrap", line.render())
+        self.assertIn("epr bin bootstrap --tool epr", line.render())
 
     def test_no_brit_binary_names_the_brit_bootstrap(self):
         self.arrived()
         (self.bin / "brit").unlink()
         line = preflight(self.root, self.env(), None, "sess")[1]
         self.assertFalse(line.ok)
-        self.assertIn("bin-store --tool brit bootstrap", line.render())
+        self.assertIn("epr bin bootstrap --tool brit", line.render())
 
-    def test_brit_resolution_uses_the_shared_bin_store_override(self):
-        base = Path(self.tmp.name) / "shared-store"
-        store = base / "brit"
-        cid = "sha256:" + "a" * 64
-        artifact = store / cid
-        artifact.mkdir(parents=True)
-        binary = artifact / "brit"
-        binary.write_text("#!/bin/sh\nexit 0\n")
-        binary.chmod(0o755)
-        (store / "current").symlink_to(cid)
-
-        self.assertEqual(resolve_brit({"BIN_STORE": str(base)}), str(binary))
+    def test_brit_status_is_read_through_native_cli(self):
+        self.arrived()
+        line, binary = check_tool(self.root, self.env(), "brit")
+        self.assertTrue(line.ok)
+        self.assertEqual(binary, str(self.bin / "brit"))
 
     def test_no_key_refuses_and_names_enroll(self):
         self.arrived()

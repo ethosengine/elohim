@@ -23,6 +23,7 @@ default = ["peer"]
 peer = ["dep:eprfs-peer", "dep:tokio"]
 
 [dependencies]
+elohim-device-runtime = { path = "../device-runtime" }
 elohim-rust-style = { path = "../../../genesis/orchestrator/rust-style" }
 eprfs-core = { path = "../eprfs-core" }
 eprfs-agent = { path = "../eprfs-agent" }

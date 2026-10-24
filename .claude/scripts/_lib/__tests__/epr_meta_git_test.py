@@ -144,7 +144,7 @@ def _native(evidence):
         verdict["evidence"] = evidence
     return {"decision": "permit", "winningClass": "dispatch", "ruleId": "sovereignty-ontology-guard",
             "reason": _REASON, "referReason": None, "verdicts": [verdict],
-            "evaluator": {"id": "stub", "version": "0", "cid": "sha256:stub"}}
+            "evaluator": {"id": "stub", "version": "0", "cid": "bafkreifzjut3te2nhyekklss27nh3k72ysco7y32koao5eei66wof36n5e"}}
 
 
 def _run_gate(native):

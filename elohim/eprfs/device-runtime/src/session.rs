@@ -7,37 +7,54 @@ use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
+/// A session and its process owner, reconstructed on this device.
 pub struct SessionIdentity {
+    /// Registry runtime id, or declared, tty, or none.
     pub runtime: String,
+    /// Stable session key when an owner or declaration exists.
     pub session: Option<String>,
+    /// Owner pid, paired with its start time to reject pid reuse.
     pub owner_pid: Option<u32>,
     #[serde(
         serialize_with = "serialize_ticks",
         deserialize_with = "deserialize_ticks"
     )]
+    /// Linux process start time in clock ticks.
     pub owner_start_time: Option<u64>,
+    /// How the identity was resolved.
     pub source: Source,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
+/// Origin of an ephemeral session identity.
 pub enum Source {
+    /// Explicit harness declaration.
     Declared,
+    /// Nearest registered runtime process.
     RuntimeAncestor,
+    /// Controlling terminal session leader.
     TtyLeader,
+    /// No session can be inferred.
     None,
 }
 
 #[derive(Debug, Default, Deserialize)]
+/// Agent runtime names and their session environment variables.
 pub struct Registry {
+    /// Registered runtime descriptions.
     pub runtimes: Vec<Runtime>,
 }
 
 #[derive(Debug, Deserialize)]
 #[serde(rename_all = "camelCase")]
+/// One agent runtime description.
 pub struct Runtime {
+    /// Runtime identifier.
     pub id: String,
+    /// Process comm names identifying this runtime.
     pub comm: Vec<String>,
+    /// Environment variables containing native session ids.
     pub session_env: Vec<String>,
 }
 
@@ -142,11 +159,19 @@ pub fn resolve_with(
     identity("none", None, None, Source::None)
 }
 
+/// Resolve the current process using the environment and runtime registry.
 pub fn resolve() -> SessionIdentity {
     let env = |key: &str| std::env::var(key).ok();
     let proc_root = nonblank(env("EPR_PROC_ROOT")).unwrap_or_else(|| "/proc".into());
     let registry_path = nonblank(env("EPR_AGENT_RUNTIMES"))
         .map(std::path::PathBuf::from)
+        .or_else(|| {
+            let path = std::env::current_exe()
+                .ok()?
+                .parent()?
+                .join("agent-runtimes.json");
+            path.is_file().then_some(path)
+        })
         .or_else(|| {
             std::env::current_dir()
                 .ok()?
@@ -175,4 +200,9 @@ fn deserialize_ticks<'de, D: serde::Deserializer<'de>>(
     Option::<String>::deserialize(deserializer)?
         .map(|value| value.parse().map_err(serde::de::Error::custom))
         .transpose()
+}
+
+/// Read a process start time without walking its ancestry; used for lease liveness.
+pub fn process_start_time(root: &Path, pid: u32) -> Option<u64> {
+    process(root, pid).map(|p| p.start)
 }

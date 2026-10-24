@@ -20,7 +20,7 @@ SIGNATURES = {
 # A P1 ancestry walk is already counted in session resolvers. This family counts
 # independent consumer ancestry walkers (berth remains until its A2 re-keying).
 FAMILY_GLOBS = {
-    'session resolvers': ['.claude/hooks/*.py', '.claude/scripts/_lib/*.py', 'elohim/eprfs/epr-cli/src/flow/mod.rs', 'elohim/eprfs/epr-cli/src/flow/note.rs', 'elohim/eprfs/epr-cli/src/session.rs', 'genesis/a2o/scripts/lib/*.ts', 'genesis/a2o/src/framework/session.ts', 'genesis/agentic/bin/*'],
+    'session resolvers': ['.claude/hooks/*.py', '.claude/scripts/_lib/*.py', 'elohim/eprfs/epr-cli/src/flow/mod.rs', 'elohim/eprfs/epr-cli/src/flow/note.rs', 'elohim/eprfs/device-runtime/src/session.rs', 'genesis/a2o/scripts/lib/*.ts', 'genesis/a2o/src/framework/session.ts', 'genesis/agentic/bin/*'],
     'proc session ancestry': ['.claude/hooks/*.py', '.claude/scripts/_lib/*.py', 'genesis/agentic/bin/*'],
 }
 GLOBS = ['*.py', '*.rs', '*.ts', '*.sh', '*.json', 'genesis/agentic/bin/*']

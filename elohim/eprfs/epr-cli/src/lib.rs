@@ -32,4 +32,5 @@ pub mod setup;
 pub use error::{Error, Result};
 pub use report::{Finding, FindingStatus, Report};
 
-pub mod session;
+pub use elohim_device_runtime::session;
+pub mod bin;

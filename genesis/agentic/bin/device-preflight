@@ -43,7 +43,7 @@ FOLD_LAG_DEFAULT = 25
 READ_TIMEOUT_S = 10
 SCRIPT_REPO = Path(__file__).resolve().parents[3]
 sys.path.insert(0, str(SCRIPT_REPO / ".claude/scripts"))
-from _lib import bin_store, epr_client, session  # noqa: E402
+from _lib import epr_client, session  # noqa: E402
 
 
 @dataclass
@@ -59,18 +59,6 @@ class Line:
         tail = f" — {self.fix}" if self.fix else ""
         return f"REFUSED {self.name}: {self.detail}{tail}"
 
-
-def resolve_epr(env: dict[str, str]) -> str | None:
-    return epr_client.resolve_binary(env)
-
-
-def resolve_brit(env: dict[str, str]) -> str | None:
-    try:
-        root = bin_store.store_root("brit", env)
-        path, _, _ = bin_store.resolve(tool="brit", bin_name="brit", root=root, environ=env)
-        return str(path)
-    except Exception:  # noqa: BLE001 — absence is the condition this line reports
-        return None
 
 
 def run_json(argv: list[str], cwd: Path, env: dict[str, str]) -> tuple[dict | None, str]:
@@ -125,11 +113,11 @@ def pending_enrollment(root: Path, handle: str) -> Path | None:
 
 
 def check_tool(root: Path, env: dict[str, str], tool: str) -> tuple[Line, str | None]:
-    binary = resolve_epr(env) if tool == "epr" else resolve_brit(env)
+    cli = env.get("EPR_BIN") or "epr"
+    value, error = run_json([cli, "bin", "status", "--tool", tool, "--json"], root, env)
+    binary = (value or {}).get("resolved")
     if binary and Path(binary).is_file() and os.access(binary, os.X_OK):
-        store_cli = env.get("BIN_STORE_BIN") or str(SCRIPT_REPO / "genesis/agentic/bin/bin-store")
-        value, error = run_json([store_cli, "--tool", tool, "status", "--json"], root, env)
-        listed, _ = run_json([store_cli, "--tool", tool, "shadows"], root, env)
+        listed, _ = run_json([cli, "bin", "shadows", "--tool", tool], root, env)
         shadowing = (listed or {}).get("value") or []
         if shadowing:
             names = ", ".join(entry["path"] for entry in shadowing)
@@ -141,7 +129,7 @@ def check_tool(root: Path, env: dict[str, str], tool: str) -> tuple[Line, str | 
             ), None
         if value is not None and value.get("resolved"):
             head = value.get("head") or "none"
-            running = value.get("session_cid") or value.get("resolved_cid") or "candidate"
+            running = value.get("sessionCid") or value.get("resolvedCid") or "candidate"
             state = "behind" if value.get("behind") else value.get("source", "resolved")
             return Line(f"{tool} binary", True, f"{running} vs head {head} ({state}) via {binary}"), binary
         if value is not None:
@@ -149,15 +137,15 @@ def check_tool(root: Path, env: dict[str, str], tool: str) -> tuple[Line, str | 
                 f"{tool} binary",
                 False,
                 f"bin-store has no resolved {tool} candidate, session pin, or committed head",
-                f"run `bin-store --tool {tool} bootstrap`",
+                f"run `epr bin bootstrap --tool {tool}`",
             ), None
-        return Line(f"{tool} binary", False, f"bin-store status unreadable: {error}", f"run `bin-store --tool {tool} status`"), None
+        return Line(f"{tool} binary", False, f"bin-store status unreadable: {error}", f"run `epr bin status --tool {tool}`"), None
     return (
         Line(
             f"{tool} binary",
             False,
             f"no `{tool}` candidate or launcher on {tool.upper()}_BIN/PATH",
-            f"run `bin-store --tool {tool} bootstrap`",
+            f"run `epr bin bootstrap --tool {tool}`",
         ),
         None,
     )

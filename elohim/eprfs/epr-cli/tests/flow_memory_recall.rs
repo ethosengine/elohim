@@ -992,12 +992,13 @@ fn a_changed_executor_refuses_the_session_and_adopt_carries_both_digests() {
         .as_str()
         .expect("the session pins the running executor")
         .to_string();
-    assert_eq!(running.len(), 64);
+    assert!(eprfs_core::BlobCid::parse(&running).is_ok());
+    assert!(running.starts_with("bafkrei"));
     let totals = before["totals"].clone();
     let attempts = before["attempts"].as_u64().expect("attempts");
 
     // Stand in for a rebuilt binary by moving the recorded pin, exactly as a rebuild would.
-    let stale = "0".repeat(64);
+    let stale = eprfs_core::BlobCid::compute_raw(b"different executor").to_string();
     let mut tampered = before.clone();
     tampered["executor_digest"] = json!(stale);
     std::fs::write(

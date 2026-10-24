@@ -98,6 +98,15 @@ impl BlobCid {
         s
     }
 
+    /// Encode a serializable manifest as canonical DAG-CBOR and address those exact bytes.
+    pub fn encode_manifest<T: Serialize>(
+        value: &T,
+    ) -> Result<(Self, Vec<u8>), serde_ipld_dagcbor::EncodeError<std::collections::TryReserveError>>
+    {
+        let bytes = serde_ipld_dagcbor::to_vec(value)?;
+        Ok((Self::compute(&bytes), bytes))
+    }
+
     /// Parse a canonical CID string (base32 `bafy…` / `bafk…`). Errors on a non-CID string — the
     /// boundary guard against a stringly-typed fingerprint re-entering.
     pub fn parse(s: &str) -> Result<Self, cid::Error> {

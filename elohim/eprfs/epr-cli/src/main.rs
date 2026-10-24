@@ -26,6 +26,9 @@ fn main() -> ExitCode {
     }
     // Identity must be answerable outside a worktree: launchers and artifact stores use this
     // before deciding whether the binary may become a committed head.
+    if raw.first().map(String::as_str) == Some("bin") {
+        std::process::exit(elohim_epr_cli::bin::run(&raw[1..]));
+    }
     if matches!(raw.first().map(String::as_str), Some("--version" | "-V")) {
         println!("{}", govern::evaluator_identity());
         return ExitCode::SUCCESS;

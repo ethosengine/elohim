@@ -2,8 +2,8 @@
 
 use std::{fs, process::Command};
 
+use eprfs_core::BlobCid;
 use serde_json::Value;
-use sha2::{Digest, Sha256};
 
 #[test]
 fn version_names_the_binary_from_outside_a_worktree() {
@@ -31,7 +31,7 @@ fn version_names_the_binary_from_outside_a_worktree() {
 
     let identity: Value = serde_json::from_str(stdout.trim()).expect("version is JSON");
     let bytes = fs::read(binary).expect("read the tested executable");
-    let expected = format!("sha256:{:x}", Sha256::digest(bytes));
+    let expected = BlobCid::compute_raw(&bytes).to_string();
     assert_eq!(identity["id"], "elohim-epr-cli");
     assert_eq!(identity["cid"], expected);
 

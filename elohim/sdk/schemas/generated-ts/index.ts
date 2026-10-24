@@ -110,6 +110,7 @@ export * from './views/attestation-view';
 export * from './views/auth-discovery';
 export * from './views/auth-response';
 export * from './views/authority-ref';
+export * from './views/bin-status';
 export * from './views/bounds-validation-result-view';
 export * from './views/capability-extensions';
 export * from './views/challenge-outcome-view';

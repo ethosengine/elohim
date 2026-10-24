@@ -299,9 +299,12 @@ def _stub_epr(dirpath: Path, evidence) -> Path:
     payload = {"decision": "permit", "winningClass": "dispatch", "ruleId": "sov-guard",
                "reason": verdict["reason"], "referReason": None, "diagnostics": [],
                "verdicts": [verdict],
-               "evaluator": {"id": "stub-epr", "version": "0", "cid": "sha256:stub"}}
+               "evaluator": {"id": "stub-epr", "version": "0", "cid": "bafkreifzjut3te2nhyekklss27nh3k72ysco7y32koao5eei66wof36n5e"}}
     stub = dirpath / "epr-stub"
-    stub.write_text("#!/usr/bin/env python3\nimport sys\nsys.stdin.read()\n"
+    stub.write_text("#!/usr/bin/env python3\nimport sys,json\n"
+                    "if sys.argv[1:3] == ['bin', 'status']:\n"
+                    " print(json.dumps({'resolved':__file__, 'resolvedCid':'bafkreifzjut3te2nhyekklss27nh3k72ysco7y32koao5eei66wof36n5e'})); sys.exit(0)\n"
+                    "sys.stdin.read()\n"
                     f"print({json.dumps(json.dumps(payload))})\n")
     stub.chmod(0o755)
     return stub

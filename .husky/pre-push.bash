@@ -969,7 +969,7 @@ fi
 
 # A gate makes an epr build available in the device store. Only a clean, green commit actually
 # landing on dev may move the household head; every refusal here is advisory to the push.
-BIN_STORE_CLI="$HOOK_WORK_TREE/genesis/agentic/bin/bin-store"
+BIN_STORE_CLI="${EPR_BIN:-$(command -v epr || true)}"
 EPR_LAND_REASON=""
 if [ -z "$DEV_LOCAL_SHA" ]; then
   EPR_LAND_REASON="push does not target refs/heads/dev"
@@ -977,7 +977,7 @@ fi
 if [ -z "$EPR_LAND_REASON" ] && ! echo " $PROJECTS " | grep -q " eprfs "; then
   EPR_LAND_REASON="eprfs was not among the green gates"
 fi
-# Cleanliness is judged by `bin-store --tool epr land` over epr's own source closure; the main checkout's
+# Cleanliness is judged by `epr bin land --tool epr` over epr's own source closure; the main checkout's
 # hook ledgers are always dirty and say nothing about the bytes being landed.
 if [ -z "$EPR_LAND_REASON" ] && [ "$(git rev-parse HEAD 2>/dev/null)" != "$DEV_LOCAL_SHA" ]; then
   EPR_LAND_REASON="HEAD does not equal the SHA targeting dev"
@@ -987,13 +987,13 @@ if [ -z "$EPR_LAND_REASON" ] && [ ! -x "$BIN_STORE_CLI" ]; then
 fi
 if [ -z "$EPR_LAND_REASON" ]; then
   EPR_CANDIDATE_CID=$(
-    "$BIN_STORE_CLI" --tool epr status --commit "$DEV_LOCAL_SHA" --json 2>/dev/null |
+    "$BIN_STORE_CLI" bin --tool epr status --commit "$DEV_LOCAL_SHA" --json 2>/dev/null |
       python3 -c 'import json,sys; rows=json.load(sys.stdin).get("candidates", []); print(rows[0].get("cid", "") if rows else "")' \
       2>/dev/null || true
   )
   if [ -z "$EPR_CANDIDATE_CID" ]; then
     EPR_LAND_REASON="no ingested epr candidate names the SHA targeting dev"
-  elif "$BIN_STORE_CLI" --tool epr land "$EPR_CANDIDATE_CID" --commit "$DEV_LOCAL_SHA" --repo "$HOOK_WORK_TREE" >/dev/null 2>&1; then
+  elif "$BIN_STORE_CLI" bin --tool epr land "$EPR_CANDIDATE_CID" --commit "$DEV_LOCAL_SHA" --repo "$HOOK_WORK_TREE" >/dev/null 2>&1; then
     echo "[pre-push] epr household head landed: $EPR_CANDIDATE_CID"
   else
     EPR_LAND_REASON="bin-store refused epr candidate health or provenance"

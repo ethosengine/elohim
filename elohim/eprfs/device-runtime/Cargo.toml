@@ -1,0 +1,19 @@
+[package]
+name = "elohim-device-runtime"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+publish = false
+
+[[bin]]
+name = "bin-launch"
+path = "src/bin/bin-launch.rs"
+
+[dependencies]
+serde.workspace = true
+serde_json.workspace = true
+libc = "0.2"
+eprfs-core = { path = "../eprfs-core" }
+
+[dev-dependencies]
+tempfile = "3"

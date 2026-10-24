@@ -1225,6 +1225,17 @@ dependencies = [
 ]
 
 [[package]]
+name = "elohim-device-runtime"
+version = "0.3.0"
+dependencies = [
+ "eprfs-core",
+ "libc",
+ "serde",
+ "serde_json",
+ "tempfile",
+]
+
+[[package]]
 name = "elohim-epr"
 version = "0.1.0"
 dependencies = [
@@ -1253,6 +1264,7 @@ dependencies = [
  "cid",
  "did-bridge",
  "elohim-consent-grant",
+ "elohim-device-runtime",
  "elohim-epr",
  "elohim-epr-index",
  "elohim-epr-rea",

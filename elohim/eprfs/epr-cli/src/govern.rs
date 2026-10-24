@@ -30,11 +30,8 @@ use std::{
 };
 
 use elohim_epr_rea::{ActorClaim, ActorStore, SidecarActorStore};
-use eprfs_meta::{
-    evaluate_path_with, hex_lower, resolve_decision, GovernanceWrite, ValidatorProvider,
-};
+use eprfs_meta::{evaluate_path_with, resolve_decision, GovernanceWrite, ValidatorProvider};
 use serde_json::{json, Value};
-use sha2::{Digest, Sha256};
 
 use crate::{
     error::{Error, Result},
@@ -66,11 +63,7 @@ pub fn evaluator_identity() -> Value {
             let cid = std::env::current_exe()
                 .ok()
                 .and_then(|path| std::fs::read(path).ok())
-                .map(|bytes| {
-                    let mut hasher = Sha256::new();
-                    hasher.update(&bytes);
-                    format!("sha256:{}", hex_lower(&hasher.finalize()))
-                });
+                .map(|bytes| eprfs_core::BlobCid::compute_raw(&bytes).to_string());
             json!({
                 "id": "elohim-epr-cli",
                 "version": env!("CARGO_PKG_VERSION"),
