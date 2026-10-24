@@ -707,6 +707,39 @@ impl RendererRegistry {
         self.reconcile_ctx.as_ref().map(|c| c.storage_url.clone())
     }
 
+    /// Decide whether the tick loop should SKIP this pass, returning the
+    /// upstream (in the breaker map's key form) that justified the skip.
+    ///
+    /// Reads the AUTHORITATIVE `state.upstream_breakers` map — the one request
+    /// traffic records into, the half-open probe heals, and `/health/startup`
+    /// reports — never the warm-stream's private `WarmStreamHealth`. That one
+    /// records outcomes at a fixed tick 0, so its cooldown never elapses and
+    /// once cold-start failures open it nothing ever closes it: gating on it
+    /// parked adoption forever (backlog doorway-ssr-late-adoption-tick-silent).
+    ///
+    /// The map is keyed by the trimmed `args.storage_url`; the reconcile
+    /// upstream is the raw `SSR_STORAGE_URL`/`STORAGE_URL`, so it is trimmed the
+    /// same way or a trailing `/` would read as an untracked (closed) key.
+    ///
+    /// Bounded, so it cannot wedge: the breaker is healed only by the guarded
+    /// probe (disableable via `DOORWAY_BREAKER_PROBE_DISABLED`) or by request
+    /// traffic, and this tick records no outcome of its own. After
+    /// [`MAX_CONSECUTIVE_RECONCILE_SKIPS`] consecutive skips the pass runs
+    /// anyway: one cheap bounded GET per adoption poll is the price of never
+    /// parking adoption behind a breaker nobody is healing.
+    pub fn reconcile_skip_upstream(
+        &self,
+        breakers: &crate::routes::UpstreamBreakers,
+        consecutive_skips: u32,
+    ) -> Option<String> {
+        if consecutive_skips >= MAX_CONSECUTIVE_RECONCILE_SKIPS {
+            return None;
+        }
+        let upstream = self.reconcile_upstream()?;
+        let key = upstream.trim_end_matches('/');
+        breakers.would_shed(key).then(|| key.to_string())
+    }
+
     /// The shared storage-declared head table. The `BundleHeadsReconciler`
     /// writes it; [`Self::reconcile`] reads the server head from it.
     pub fn bundle_heads(&self) -> Arc<crate::render::bundle_heads::BundleHeadStore> {
@@ -1315,6 +1348,11 @@ pub const DEFAULT_SSR_BOOT_BUDGET_SECS: u64 = 20;
 
 pub const BUNDLE_ADOPTION_POLL_SECS: u64 = 30;
 
+/// Consecutive reconcile passes the tick may skip behind an open upstream
+/// breaker before it runs one regardless (see
+/// [`RendererRegistry::reconcile_skip_upstream`]).
+pub const MAX_CONSECUTIVE_RECONCILE_SKIPS: u32 = 1;
+
 /// Pure adoption-target decision: the CONFIGURED slugs this doorway is not yet
 /// serving a bundle head for. These are exactly the slugs the heads-keyed
 /// reconcile walk cannot see — each needs a declared-head re-check (and, once
@@ -1786,6 +1824,75 @@ mod tests {
             1,
             "only the adopted slug has a head"
         );
+    }
+
+    // ── reconcile_skip_upstream: the tick gate reads the live breaker map ────
+
+    fn reconcile_registry(storage_url: &str) -> RendererRegistry {
+        let mut reg = RendererRegistry::with_entries(None, None, vec![]);
+        reg.reconcile_ctx = Some(ReconcileCtx {
+            storage_url: storage_url.to_string(),
+            bundle_parent: PathBuf::from("/nonexistent"),
+            soft_budget_ms: 1,
+            slugs: vec!["elohim-host-landing".to_string()],
+        });
+        reg
+    }
+
+    /// The cold-start wedge: warm-stream failures recorded at tick 0 open its
+    /// private breaker for good, while the authoritative map is closed. The old
+    /// gate (`warmup_state.health.is_circuit_open(&upstream)`) skipped every
+    /// pass here forever; the pass must now run so the deferred slug is adopted.
+    #[test]
+    fn warm_stream_breaker_open_does_not_skip_reconcile() {
+        let reg = reconcile_registry("http://storage:8090");
+        let upstream = reg.reconcile_upstream().unwrap();
+        let warm = crate::projection::warm_stream::WarmStreamHealth::new(3, 10);
+        for _ in 0..3 {
+            warm.record_outcome(&upstream, false, 0);
+        }
+        assert!(
+            warm.is_circuit_open(&upstream),
+            "precondition: the old gate would skip this pass"
+        );
+        let breakers = crate::routes::UpstreamBreakers::default();
+        assert_eq!(reg.reconcile_skip_upstream(&breakers, 0), None);
+    }
+
+    #[test]
+    fn authoritative_open_breaker_skips_with_normalized_key() {
+        // A trailing slash in the env value must still hit the trimmed key.
+        let reg = reconcile_registry("http://storage:8090/");
+        let breakers = crate::routes::UpstreamBreakers::default();
+        for _ in 0..3 {
+            breakers.record("http://storage:8090", false);
+        }
+        assert_eq!(
+            reg.reconcile_skip_upstream(&breakers, 0).as_deref(),
+            Some("http://storage:8090")
+        );
+    }
+
+    #[test]
+    fn consecutive_skips_are_bounded_so_adoption_cannot_wedge() {
+        let reg = reconcile_registry("http://storage:8090");
+        let breakers = crate::routes::UpstreamBreakers::default();
+        for _ in 0..3 {
+            breakers.record("http://storage:8090", false);
+        }
+        assert!(reg.reconcile_skip_upstream(&breakers, 0).is_some());
+        assert_eq!(
+            reg.reconcile_skip_upstream(&breakers, MAX_CONSECUTIVE_RECONCILE_SKIPS),
+            None,
+            "an open breaker nobody heals must not park adoption forever"
+        );
+    }
+
+    #[test]
+    fn registry_without_reconcile_never_skips() {
+        let reg = RendererRegistry::with_entries(None, None, vec![]);
+        let breakers = crate::routes::UpstreamBreakers::default();
+        assert_eq!(reg.reconcile_skip_upstream(&breakers, 0), None);
     }
 
     // ── decide_reconcile: current / stale / safe-degrade arms ────────────────

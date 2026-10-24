@@ -1819,6 +1819,7 @@ async fn async_main(worker_threads: usize) -> anyhow::Result<()> {
                 let adoption_period = std::time::Duration::from_secs(
                     doorway::render::registry::BUNDLE_ADOPTION_POLL_SECS,
                 );
+                let mut consecutive_skips: u32 = 0;
                 loop {
                     let sleep_for = if reconcile_state.renderer_registry.awaiting_adoption() {
                         std::cmp::min(period, adoption_period)
@@ -1826,23 +1827,31 @@ async fn async_main(worker_threads: usize) -> anyhow::Result<()> {
                         period
                     };
                     tokio::time::sleep(sleep_for).await;
-                    // Respect the warm-stream upstream breaker: when the circuit
-                    // for the reconcile upstream is open, skip this pass (retry
-                    // next tick) rather than stack more GETs on a peer already
-                    // judged failing. Read-only probe — never perturbs the
-                    // breaker, and an untracked upstream reads closed.
-                    if let (Some(ws), Some(upstream)) = (
-                        reconcile_state.warmup_state.as_ref(),
-                        reconcile_state.renderer_registry.reconcile_upstream(),
-                    ) {
-                        if ws.health.is_circuit_open(&upstream) {
-                            tracing::debug!(
-                                upstream = %upstream,
-                                "SSR bundle reconcile: upstream circuit open — skipping tick"
-                            );
-                            continue;
-                        }
+                    // Respect the AUTHORITATIVE upstream breaker
+                    // (`state.upstream_breakers`, the map /health/startup
+                    // reports): when its circuit for the reconcile upstream is
+                    // not closed, skip this pass rather than stack more GETs on
+                    // a peer already judged failing. NOT the warm-stream's
+                    // private `WarmStreamHealth`: it records at a fixed tick 0,
+                    // so its cooldown never elapses and a cold-start trip stays
+                    // open forever — the tick went silent and a deferred slug
+                    // was never adopted. Read-only (`would_shed`), bounded to
+                    // MAX_CONSECUTIVE_RECONCILE_SKIPS so an unhealed breaker
+                    // cannot park adoption either.
+                    if let Some(upstream) =
+                        reconcile_state.renderer_registry.reconcile_skip_upstream(
+                            &reconcile_state.upstream_breakers,
+                            consecutive_skips,
+                        )
+                    {
+                        consecutive_skips += 1;
+                        info!(
+                            upstream = %upstream,
+                            "SSR bundle reconcile: upstream_breakers circuit not closed — skipping tick"
+                        );
+                        continue;
                     }
+                    consecutive_skips = 0;
                     let outcomes = reconcile_state
                         .renderer_registry
                         .reconcile(&reconcile_state.cache)
@@ -1877,8 +1886,9 @@ async fn async_main(worker_threads: usize) -> anyhow::Result<()> {
                 }
             });
             info!(
-                "SSR bundle-head reconcile tick started: every {}s",
-                reconcile_secs
+                "SSR bundle-head reconcile tick started: every {}s, every {}s while a slug awaits adoption",
+                reconcile_secs,
+                doorway::render::registry::BUNDLE_ADOPTION_POLL_SECS
             );
         }
     }
@@ -2325,7 +2335,10 @@ mod inbound_max_tests {
     }
 
     #[test]
-    #[allow(clippy::assertions_on_constants)] // the const relation IS the pinned invariant
+    #[allow(
+        clippy::assertions_on_constants,
+        reason = "the const relation IS the pinned invariant"
+    )]
     fn inbound_max_read_floors_and_defaults() {
         std::env::remove_var("DOORWAY_MAX_INFLIGHT_READ");
         assert_eq!(
