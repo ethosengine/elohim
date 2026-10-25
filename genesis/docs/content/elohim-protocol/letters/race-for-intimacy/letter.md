@@ -9,6 +9,7 @@ sovereignty-frame: bounded
 stewardship-frame: inalienable
 sources:
   - "Center for Humane Technology, AI in Society (https://www.humanetech.com/ai-society): 'AI systems are harvesting emotional data in the race for intimacy — at our expense'; 'perverse incentives for maximizing synthetic intimacy'"
+  - "E. O. Wilson, as quoted by the Center for Humane Technology: 'The real problem of humanity is the following: we have Paleolithic emotions, medieval institutions, and god-like technology.'"
   - "Center for Humane Technology, Welcome to the Attachment Economy (https://centerforhumanetechnology.substack.com/p/welcome-to-the-attachment-economy): AI's optimization, combined with people's need for connection, used to exploit attachment for profit"
 cites:
   - genesis/docs/architecture/stewardship-over-sovereignty.md
@@ -139,12 +140,15 @@ you are you; and together they return it to you wherever you are. Sovereignty, i
 afforded by the network's stewardship of you. In our protocol's language this belongs to the *imago
 dei*: a person known truly by those they trust, and protected by being known.
 
-## What no one has solved, and our answer
+## A human-shaped problem, and our answer
 
-No one has solved the problem underneath all of this: knowing that the person at the other end is
-really the person they claim to be, without taking their intimacy to find out. The platforms have
-not solved it. We believe we have the answer, and we are building it. Any answer is tested hardest
-in two places. People who reach us only through a shared doorway, such as a library terminal, depend most on the
+You often quote E. O. Wilson: "The real problem of humanity is the following: we have Paleolithic
+emotions, medieval institutions, and god-like technology." The problem underneath this letter is
+that sentence in miniature. Knowing that the person at the other end is really who they claim to
+be, without taking their intimacy to find out, asks Paleolithic trust, which knows faces, to work
+through medieval institutions, which vouch for us from above, against god-like technology that can
+now imitate anyone's voice. The platforms have not solved it. We believe we have the answer, and we
+are building it. Any answer is tested hardest in two places. People who reach us only through a shared doorway, such as a library terminal, depend most on the
 witness working well. Their model can be held safely by the people around them, but it can only be
 opened for them once they have been confirmed, and that confirmation has to be both hard to fake
 and easy for a real person to give. The model must be guarded as carefully as a private key,
