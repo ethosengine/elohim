@@ -160,9 +160,21 @@ it presents itself to be. Pointed the right way, that is exactly the faculty a w
 one that can look within a person's private context, without exposing it, and notice that the voice
 at the doorway is not theirs.
 
-Where blockchains anchor trust in proof of work, which is spent energy, or proof of stake, which is
-held wealth, we are betting on something closer to a proof of wisdom: trust earned through
-discernment that is observable, governed and open to challenge, put to work protecting the image of
+Every way people have ever organized trust is the same mechanism underneath: an architecture for
+answering *who are you, and who will vouch for you?* A tribe answered it through kinship, because
+everyone knew your face and your mother. A kingdom answered it through fealty, with the serf vouched
+for by the lord whose land they worked. A government answers it with law and the seal of the state.
+A platform answers it with an account and its terms of service. A blockchain answers it with proof
+of work, which is spent energy, or proof of stake, which is held wealth. Each one put the vouching
+somewhere, in an elder, a lord, a state, a company or a ledger, and whoever held the vouching held
+power over the people it vouched for. The tribe came closest to the truth, that we are known
+through the people who know us, but it could not reach past the edge of the village without
+handing the vouching to a lord.
+
+We are betting on something closer to a proof of wisdom: the tribe's way of knowing, carried past
+the edge of the village without a lord. The vouching stays with the people who know you, and it
+reaches as far as the network does, through discernment that is observable, governed and open to
+challenge, put to work protecting the image of
 God in each person, the values of the constitutional network, and the stewardship of the system's
 own evolution. Every verdict names exactly which model gave it, and any verdict can be contested.
 
