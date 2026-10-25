@@ -2178,7 +2178,7 @@ habits:
       eprfs push tests only the crates the change can reach; every gate states its expected
       cost and local fail rate before it runs; a long gate that has never failed locally may
       defer to CI on a feature-branch push, and never on a push to dev or main.
-    status: red
+    status: green
     active: false
     checks:
       - "node --test genesis/orchestrator/gate-evidence.test.mjs (closure key v2 material, selfAgentId, every reusableHit refusal reason and the happy path)"
@@ -2187,10 +2187,10 @@ habits:
       - "node --test genesis/orchestrator/gate-cost.test.mjs (expected-cost fold over gate-cycle-seconds@1 and the defer decision's refusals)"
       - "a2o genesis/a2o/features/devflow/native-gate-evidence.feature reuse rule (this workspace's own green stands in; a red or an unadmitted signer never does)"
     evidence: >
-      DELTA 2026-10-25b (RED preserved; one reuse path, live probe green): dev had landed a parallel `gate-receipt@1` path (eprfs only), keyed on epr's own source closure. That key (epr's source closure, which does cover the whole eprfs workspace, plus toolchain and manifest) missed the `_gate-eprfs` recipe body and the repo files eprfs tests read outside it (`.epr-meta/`, `.claude/epr-meta/`, `genesis/docs/`, `.eprfs/status/`). An earlier claim that it missed `eprfs-cli` and the adapter was wrong: those were read off the dependency graph, and the evaluator's real closure includes them. Operator ruling: one path. Receipts are folded into brit evidence: `nativeGateKey` is now eprfs key material in closure key v3, the receipt short-circuit, its writes, tests and opt-in are removed, `gate-receipt@1` is superseded, and seam-registry.yaml cites `reusableHit` and `reuseSelector`. The rebase took dev's process-group renew-loop fix over this branch's. Probe (worktree, elohim-epr): run 1 miss, recipe ran, green recorded; run 2 `reused` in 5 s against an expected ~2 min (p90 5); a dirtied read path refused reuse and recorded nothing.
-    evidence-fingerprint: sha256:0826b2c4e4721acf
-    evidence-bytes: 3160
-    evidence-entries: 3
+      DELTA 2026-10-25c (GREEN on real push logs; landed by deliberate pre-push bypass): pushes 7 and 8 of the landing reused this workspace's own green on unchanged closures. elohim-storage `reused: green 2h ago at 7b2b8fcee` took 59 s / 55 s (5757 s cold, 1938 s warm when it ran); steward-node 51 s / 45 s (1222 / 221 s ran); doorway 27 s / 25 s (686 / 125 s ran). Push 7 cleared all 25 gates in 4407 s, against 6128 s with no reuse, and was rejected at the ref lock: docs-only commits landed during its 73-minute window, past an advisory lease the other pusher never saw. Push 8 went red on dev's own renew-loop flake. The branch then landed with the pre-push bypassed on push 7's verdict, by operator ruling ("we're being intentional about the pain here, and what it's FOR"). The 87 cycle rows are preserved at genesis/local-dev/gate-reuse/gate-cycle-2026-10-25.jsonl. Reading and next sprint: backlog `gate-merge-gradient-reading-2026-10-25` (integration as composition: F4 native brit integrate, the corpus gate split, leases and intents on the peer channel, signers beyond self).
+    evidence-fingerprint: sha256:ab984afac01aff97
+    evidence-bytes: 4242
+    evidence-entries: 4
     guard: >
       Regression risks: (1) reusing on a key that omits something the recipe reads — the recipe
       body, the project tree, a submodule pin, a repo file a test include_str!s; the input audit
