@@ -11,7 +11,7 @@ invariant: >
   model, fold and berth enhancements may be degraded. Every REFUSED line names the
   command that cures it. Nothing about arrival depends on a visitor's cache or on another
   workspace's keystore.
-status: red
+status: green
 active: false
 checks:
   - "just status device — exit 0 with eight ok/degraded lines on the live device; native checks: elohim/eprfs/epr-cli/src/device/arrival.rs and tests/device_arrival.rs"
@@ -27,6 +27,8 @@ retire-when: >
   model pin and the carrying capacity natively, so that arrival is the seed's own COLD→WARM
   lifecycle and `just status device` reads one berth instead of separate stores.
 ---
+DELTA 2026-10-25 (RED → GREEN, evidence): slice A landed on dev at 8bc6f0d0e (pre-push ALL CLEAR, 1943 s). The device store was already CIDv1 and the native `bin-launch` already installed; its head was a pre-rebase, never-published build (d5890c062), landed during development before landing required publication. `epr bin follow` correctly refused it as a non-descendant. The pre-push build of 8bc6f0d0e was ingested as bafkreigoah43… and landed with an explicit `--revert` (publication still checked), and the launcher was reinstalled from the same build. A fresh session's `just status device` then exited 0: ok epr binary (session pin = head bafkreigoah43…), device key, roster (human:matthew), embed model, repository trust and peer daemon; degraded brit (no head — `epr bin bootstrap --tool brit`), fold lag and berth (no mooring for the synthetic session). A session started before the landing keeps its older pin, which lacks `device status --root`, until it restarts. Pre-push did not land the head itself: a worktree push runs the main checkout's hook, which was 135 commits behind dev.
+
 DELTA 2026-10-24 (RED, measured A.2): arrival is one native status/arrive surface (dup-census 3→1); 1,132 epr-cli tests, 74 device-runtime tests, 89 berth tests and 5/5 arrival scenarios pass; fmt/clippy/rust-style and 2,228 package assertions pass. Live candidate status exits 1: legacy sha256 current/epr-launch shadows the native launcher and brit has no executable candidate/head (controller review then classed a missing brit as degraded, not refused — only the device's own epr is essential, ground rule 2 — so the remaining refusal is the legacy shadow, which the A.4 pre-native arrival and the post-landing migration cure); key, roster, model and repository trust pass, fold/berth degrade. No live head was promoted from this dirty worktree. Blind reads: round 1 REVISE (1 correctness, 1 interpretability, 0 preference), both resolved; round 2 READY (0 correctness, 0 interpretability, 1 preference). Evidence: genesis/a2o/reports/recovery/device-runtime-a2/.
 
 DELTA 2026-10-16 (GREEN re-measured, no status change): at origin/dev@42941449e, `just status device` at 19:58Z printed five ok lines and `REFUSED fold attested: degraded, 25 files behind (limit 25) — run epr flow memory index fold --max-files 1`; `epr flow memory index status --json --root /projects/elohim` showed `state: degraded, retried 18, attested_by (unclaimed)`. Cure: `epr flow memory index fold --max-files 1` folded 1 file but remained 25 behind, then `epr flow memory index fold --max-files 40` exited 0; `just status device` re-measured at 20:12Z printed all six ok lines, including `ok fold attested: complete, 0 files behind (limit 25)`, exit 0.
