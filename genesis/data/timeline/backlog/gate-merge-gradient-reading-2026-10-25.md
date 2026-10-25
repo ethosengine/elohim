@@ -75,6 +75,14 @@ on every rebase, even a docs-only one.
 WASM gate; the pinned toolchain lacked the wasm32 target; a fresh worktree had no built
 storage-client dist; and a test that dev's own session-envelope commit broke.
 
+**CI's verdict on `b2130d38b`, read job by job (lane 0, 2026-10-25 21:45Z).** Orchestrator #2150
+carries it; #2149 is the baseline. eprfs (#67 vs #66) failed in both, holochain passed in both, and
+edge and genesis were UNSTABLE in both. Only `elohim/dev` #1777 differs: UNSTABLE on its
+`release.adopt adam` leg. That is a peer-adoption timeout ("delivered, not yet proven"), red since
+#1757, which predates the landing, and the app wasn't dispatched in #2149 at all. So the difference
+is environment and dispatch, not code. `131130a4b` (lanes A and D) has no orchestrator build yet;
+#2151 is running at `09f68a04e`.
+
 ## The gradient reading
 
 The paths are read with `/gradient-reading`; tag definitions are in `CONVENTIONS.md`.

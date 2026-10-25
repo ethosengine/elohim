@@ -3,7 +3,7 @@ title: "Sprint plan — two peers land on dev without racing or re-gating"
 id: gate-merge-sprint-plan-20261025
 date: 2026-10-25
 status: active
-author: "claude-opus-5-5 (Che workspace, ethosengine), with the operator (steward of record)"
+author: "claude-opus-5-5 (Che workspace shem, device z6Mkm5de…, peer 4370a806…), with the operator (steward of record)"
 habits: [devices-share-one-berth, push-gate-pays-once]
 cites:
   - genesis/data/timeline/backlog/gate-merge-gradient-reading-2026-10-25.md
@@ -49,8 +49,10 @@ references are against that commit.
   admitted on this roster`. Two consequences:
   - The docs pushes that raced push 7 were made on this device. They could only have passed a held
     lease by going `UNLEASED` or bypassing the hook, so **A2 cures the race itself**.
-  - The other workspace can see nothing until its device is admitted on this roster. **Roster
-    admission gates A4.** It is the operator's item.
+  - The other workspace, ethosengine, can see nothing until its device is admitted on this roster.
+    ethosengine holds the chain-root key (`z6MkpZRh…`, peer `95e41161…`), so its own PeerEndpoint
+    row admits it (`epr actor device endpoint`). Only ethosengine can sign that row, so **A4 is
+    ethosengine running that step**, with the operator's confirmation in that session.
 - **The race recurred live, 19:00Z.** While `2e8f68b9` held `dev-integration` (renewed every
   10 min since 17:19Z), `f74cccbb9` and `8c97287ff` from session `01C86Tki…` (device-runtime)
   landed on dev. The ledger shows no claim by any other holder in that window. Those commits went
@@ -61,6 +63,17 @@ references are against that commit.
   device could see. Its device is not admitted here, so to this roster the lease was invisible
   rather than missing. The waiting push restarted for the second time (push 8). A2 can't cure
   this; only A4 can.
+- **A live push ran unleased for 37 min, 20:32–21:09Z.** Push 7 was killed (TaskStop) without a
+  release. Push 8's claim came back `renewed`, and the hook treated a renew as a lease it hadn't
+  taken, so it started no renewer. Fixed in `131130a4b` (BERTH_KEPT). Two berth questions stay
+  open:
+  - That `renewed` wrote no ledger row. `dseq` 157 (20:24:34 renew) runs straight into 158
+    (21:09:41 claim), and no other berth directory exists. Every renew path in `berth` records a
+    row under its lock, so the reply came from a path that renews nothing.
+  - The 21:09:41 claim records `expired_after_s 2238`, so the lease expired at 20:32:23. That is
+    within a minute of push 7's kill, not at its TTL: the 20:24:34 renew set 1800 s, which runs to
+    20:54:34. The lease's liveness seems to follow the killed hook's process. A holder still alive in
+    the same session then sees its own lease as dead.
 - **F4 is closer than the plan assumed.** `epr integrate` already advances the ref atomically with
   `update-ref` and an expected-old value (`elohim/eprfs/epr-cli/src/integrate.rs:295`). What blocks it:
   - preconditions for a clean checkout and HEAD at the source (`:146`);
@@ -92,7 +105,7 @@ environment or code. Append the result to the backlog item's "What was measured"
 | A1 | `hook_on_exit` releases only in the shell that owns the lease (`BASHPID` guard) | `prepush_releases_on_gate_failure`, plus a case where the renewer is terminated before its trap reset, asserting one release per lease |
 | A2 | A dev/main push with no resolvable session refuses, naming the cure, instead of going `UNLEASED`; an intent written from a worktree goes to the served channel store | `prepush-berth.test.mjs` refusal case; `berth_test.py::worktree_intent_reaches_peer_before_first_claim` |
 | A3 | The lease record carries closure fingerprint, task and expiry; `lease_view.rs` keeps them; `berth status` shows a remote holder's closure and expiry. Local holders get the same treatment: the line shows the last renew and the expiry, not only the time held. On 2026-10-25 a peer read `held … for 72m (ttl 30m)` as an expired lease; the ledger showed renews every 10 min | `peer_sees_closure_and_expiry_before_push` (berth + lease_view tests) |
-| A4 | Both T8 halves run between the real workspaces: shem's endpoint is live and the ethosengine holder half is seeded | `@concern:devices-share-one-berth and @requires:shem`, joined T8 receipt |
+| A4 | Both T8 halves run between the real workspaces. Shem's endpoint is row 3 and its daemon serves; ethosengine writes its own PeerEndpoint row (the 4th) and runs the holder half | `@concern:devices-share-one-berth and @requires:shem`, joined T8 receipt |
 
 A3 changes `eprfs-peer` (Rust), which is outside this session's write-set. If the remote view
 can't carry the fields without it, A3 stops at the berth half and names the Rust half for lane B's
