@@ -139,11 +139,12 @@ you are you; and together they return it to you wherever you are. Sovereignty, i
 afforded by the network's stewardship of you. In our protocol's language this belongs to the *imago
 dei*: a person known truly by those they trust, and protected by being known.
 
-## What no one has solved, and the answer we are building on
+## What no one has solved, and our answer
 
 No one has solved the problem underneath all of this: knowing that the person at the other end is
 really the person they claim to be, without taking their intimacy to find out. The platforms have
-not solved it, and neither have we. Here is where it bites hardest for us. People who reach us only through a shared doorway, such as a library terminal, depend most on the
+not solved it. We believe we have the answer, and we are building it. Any answer is tested hardest
+in two places. People who reach us only through a shared doorway, such as a library terminal, depend most on the
 witness working well. Their model can be held safely by the people around them, but it can only be
 opened for them once they have been confirmed, and that confirmation has to be both hard to fake
 and easy for a real person to give. The model must be guarded as carefully as a private key,
@@ -151,8 +152,7 @@ because a readable copy in the wrong hands would make imitation easier. That is 
 network keeps is encrypted, and why opening it always waits for a witness. And the line between
 witnessing and watching has to be drawn again and again, in public.
 
-We are not waiting for someone else to solve it. This is the answer we are building on, and it
-starts with something the field mostly treats as a fear. The most capable models can increasingly tell
+Our answer starts with something the field mostly treats as a fear. The most capable models can increasingly tell
 when they are being tested. Read in the wrong frame, that is an unsettling, unrealized power. We
 read it differently. A model formed by training on the vast record of human expression acquires a
 discernment that can itself be observed and inspected: it can recognize when something is not what
@@ -173,8 +173,8 @@ that reason the thing most likely to be mistaken for more than us; it stays a se
 becomes a god that fails. The bet is on what the mirror reflects. "In the beginning was the Word"
 (John 1:1). We are wagering that the durable investment in our humanity lies there, in the Word and
 in the image of God it makes known in every person, and that the best our tools can do is help us
-recognize it in one another and protect it. We would rather name that bet now, in the open, than
-discover in the market that we had made a different one.
+recognize it in one another and protect it. We name that bet in the open, so anyone can
+hold us to it.
 
 ## Our ask
 
