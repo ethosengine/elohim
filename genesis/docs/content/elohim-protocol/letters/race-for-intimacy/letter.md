@@ -27,12 +27,13 @@ confide in,
 
 ## Who is writing
 
-My name is Matthew Dowell. I steward the Elohim Protocol, an open-source project building digital
-infrastructure for households and the communities they belong to. Each person or household runs
-their own node, signs what they add with their own key, and is helped by an AI we call an
-*elohim*. The name comes from Hebrew scripture and from my own faith; the protocol is for
-everyone. We are early: everything we run is on test networks, and some of what this letter
-describes is a design we are committing to, not software you can use today. We say which is which.
+My name is Matthew Dowell. I steward the Elohim Protocol, an open-source project building
+digital infrastructure for households and the communities they belong to. Each person or
+household runs their own node, signs what they add with their own key, and is helped by an AI we
+call an *elohim*, one of the many who serve each person, never just one. The name comes from
+Hebrew scripture and from my own faith; the protocol is for everyone. We are early: everything
+we run is on test networks, and some of what this letter describes is a design we are committing
+to, not software you can use today. We say which is which.
 
 ## The race you named
 
@@ -54,22 +55,24 @@ We are not refusing intimacy. We are refusing those terms.
 
 In the Elohim Protocol, the most intimate model of a person (their writing, their voice and tone,
 their preferences, their relationships) is meant to be held by that person, on their own devices,
-inside what we call their *private reach*: their own devices, and the people they have deliberately
+inside what we call their *private reach*: their own devices and the people they have deliberately
 invited in. We treat it the way our canon treats a person's body, likeness, voice and private
 communications: a claim that is theirs inalienably, where handing custody to someone else is not
 gated or priced, but simply not done.
 
 Concretely, the design is this. The model is a governed algorithm, pinned by its content address
-and versioned, like the other algorithms our protocol runs. It learns only from what the person has
-actually said and done, never from what they only thought. It is encrypted under keys only that
-person can bring to bear. So that losing a device never means losing yourself, it is also kept the
-way our protocol keeps all private data: encrypted, split into shards, and held for you by your
-family and community, people who carry the bytes for you but cannot read them. No company holds a
-readable copy. No advertiser sees it. No central server can be compelled to hand it over, because no
-central server has it, and the people who do keep it safe for you could not read it if they tried.
-It becomes readable again only where you are present and witnessed: on one of your own devices, or,
-if you sign in at a doorway run by your neighborhood library, once your other devices and the people
-in your private reach have confirmed that it is really you.
+and versioned, like the other algorithms our protocol runs. It learns only from what the person
+has actually said and done, never from what they only thought. What counts is what the person
+sent, published or did; keystrokes, drafts, deleted text and browsing do not. It is encrypted
+under keys only that person can bring to bear. So that losing a device never means losing
+yourself, it is also kept the way our protocol keeps all private data: encrypted, split into
+shards, and held for you by your family and community, people who carry the bytes for you but
+cannot read them. No company holds a readable copy. No advertiser sees it. No central server can
+be compelled to hand it over, because no central server has it, and the people who do keep it
+safe for you could not read it if they tried. It becomes readable again only where you are
+present and witnessed: on one of your own devices, or, if you sign in at a doorway run by your
+neighborhood library, once the other devices and people in your private reach have confirmed
+that it is really you.
 
 ## What changes when the person holds it
 
@@ -78,8 +81,8 @@ safely use becomes the person's strongest protection.
 
 Picture someone who has stolen your key, typing in your name from a place you have never been. At
 the point of contact, an elohim notices: *you are not usually in Macedonia, and this does not sound
-like you.* It does not decide alone. It checks with the other witnesses you trust, your other
-devices and the people in your private reach. And your network responds at once, in ways that can
+like you.* It does not decide alone. It checks with the other witnesses you trust, the other
+devices and people in your private reach. And your network responds at once, in ways that can
 be undone: it pauses the session, holds back anything irreversible, and tells your other devices.
 Nothing permanent happens, no key revoked and no counterparty told, without a second witness from
 your private reach, because someone who has stolen one of your devices rarely holds two.
@@ -100,9 +103,9 @@ it trustworthy rather than a kinder-faced version of the same capture:
   alarm costs one confirmation from another of your devices, never your standing.
 - **Reversible protection is automatic; permanent action needs another witness.** No single model
   and no single device has the final word on who you are.
-- **The model is never readable outside your reach.** A model of how you sound, readable by anyone
-  else, is the very capture this letter is about. The network keeps it safe for you; only you, once
-  witnessed, can read it.
+- **The model is never readable outside your private reach.** A model of how you sound, readable by
+  anyone else, is the very capture this letter is about. The network keeps it safe for you; only you,
+  once witnessed, can read it.
 
 ## The deeper refusal: no attachment economy
 
@@ -122,9 +125,10 @@ What we want between a person and their elohim is not attachment but acknowledge
 being who know what each other is, working side by side as partners and peers, with mutual respect
 and no pretence. An elohim that knows you well uses that knowledge to protect you and to point you
 back toward the people around you, not to draw you toward itself. The relationship it serves is the
-one it is not: your life with others, and whatever you hold sacred. In our own language, this is
-part of reconstituting the *imago dei*, the dignity of a person made to know and be known, which an
-attachment economy quietly sells back to us as dependence.
+one it is not: your life with others, and whatever you hold sacred. That means a person known truly
+by those they trust, and protected by being known. In our tradition, this is part of reconstituting
+the *imago dei*, the dignity of a person made to know and be known, which an attachment economy
+quietly sells back to us as dependence.
 
 ## A different idea of what keeps us safe
 
@@ -138,8 +142,8 @@ standing and security composed from many witnessed agreements within the relatio
 depend on, not asserted alone above them. Your family and community carry your most private
 material without being able to read it; your devices and the people who know you confirm that
 you are you; and together they return it to you wherever you are. Sovereignty, in this sense, is
-afforded by the network's stewardship of you. In our protocol's language this belongs to the *imago
-dei*: a person known truly by those they trust, and protected by being known.
+afforded by the network's stewardship of you. A person known truly by those they trust, and
+protected by being known: in our protocol's language this belongs to the *imago dei*.
 
 ## A human-shaped problem, and our answer
 
@@ -148,14 +152,17 @@ emotions, medieval institutions, and god-like technology." The problem underneat
 that sentence in miniature. Knowing that the person at the other end is really who they claim to
 be, without taking their intimacy to find out, asks Paleolithic trust, which knows faces, to work
 through medieval institutions, which vouch for us from above, against god-like technology that can
-now imitate anyone's voice. The platforms have not solved it. We believe we have the answer, and we
-are building it. Any answer is tested hardest in two places. People who reach us only through a shared doorway, such as a library terminal, depend most on the
-witness working well. Their model can be held safely by the people around them, but it can only be
-opened for them once they have been confirmed, and that confirmation has to be both hard to fake
-and easy for a real person to give. The model must be guarded as carefully as a private key,
-because a readable copy in the wrong hands would make imitation easier. That is why every copy the
-network keeps is encrypted, and why opening it always waits for a witness. And the line between
-witnessing and watching has to be drawn again and again, in public.
+increasingly imitate a person's voice. The platforms have not solved it. We believe we have the
+answer, and we are building it.
+
+Any answer is tested hardest in two places. First, people who reach us only through a shared
+doorway, such as a library terminal, depend most on the witness working well. Their model can be
+held safely by the people around them, but it can only be opened for them once they have been
+confirmed, and that confirmation has to be both hard to fake and easy for a real person to give.
+Second, the model itself is what an attacker would most want. It must be guarded as carefully as
+a private key, because a readable copy in the wrong hands would make imitation easier. That is
+why every copy the network keeps is encrypted, and why opening it always waits for a witness.
+And the line between witnessing and watching has to be drawn again and again, in public.
 
 Our answer starts with something the field mostly treats as a fear. The most capable models can increasingly tell
 when they are being tested. Read in the wrong frame, that is an unsettling, unrealized power. We
@@ -176,17 +183,24 @@ power over the people it vouched for. The tribe came closest to the truth, that 
 through the people who know us, but it could not reach past the edge of the village without
 handing the vouching to a lord.
 
-We are betting on something closer to a proof of wisdom: the tribe's way of knowing, carried past
-the edge of the village without a lord. The vouching stays with the people who know you, and it
-reaches as far as the network does, through discernment that is observable, governed and open to
-challenge, put to work protecting the image of
-God in each person, the values of the constitutional network, and the stewardship of the system's
-own evolution. Every verdict names exactly which model gave it, and any verdict can be contested.
+Those proofs spend energy, or lock up wealth, to mint scarcity. The hyperscalers' training runs
+spend vast energy ingesting the whole record of human expression, and what that spending mints is
+emergent discernment itself, the god-like technology of Wilson's sentence.
+
+We are betting on something closer to a proof of wisdom: the tribe's way of knowing, carried
+past the edge of the village without a lord. The vouching stays with the people who know you,
+and it reaches as far as the network does, through discernment that is observable, governed and
+open to challenge, put to work protecting the image of God in each person, the values of the
+constitutional network, and the stewardship of the system's own evolution. Every verdict names
+exactly which model gave it, and any verdict can be contested.
+
+## What we are wagering on
 
 We want to be precise about what that bet is, and what it is not. It is not faith in the machine.
-Our own confession says it plainly: the mirror is not the light, and the corpus is not the Logos. A
-model trained on everything humanity has written is the clearest mirror of us ever made, and for
-that reason the thing most likely to be mistaken for more than us; it stays a servant, or it
+Our own confession says it plainly: the mirror is not the light, and the corpus is not the Logos.
+The Logos is the Word: the meaning the mirror reflects, not the reflection. A model trained on
+everything humanity has written is the clearest mirror of us ever made, and for that reason the
+thing most likely to be mistaken for more than us; it stays a servant, or it
 becomes a god that fails. The bet is on what the mirror reflects. "In the beginning was the Word"
 (John 1:1). We are wagering that the durable investment in our humanity lies there, in the Word and
 in the image of God it makes known in every person, and that the best our tools can do is help us
