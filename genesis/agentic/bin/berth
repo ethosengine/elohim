@@ -28,7 +28,7 @@ Commands:
   berth unmoor  --session S                                        leave; releases every lease held
   berth touch   --session S [--pid N]                              liveness heartbeat (hooks call it)
   berth claim   RESOURCE --session S [--class verify|measure|mesh] [--ttl SECONDS] [--note TEXT]
-                [--offline-ok]                                     take one unit; exit 3 if held or refused
+                [--closure KEY] [--offline-ok]                      take one unit; exit 3 if held or refused
   berth release RESOURCE --session S [--force]                     --force gives back whoever holds it
   berth owner-check RESOURCE [--action A] [--force]                exit 3 while another live session
                                                                    holds it; --force = override row
@@ -801,7 +801,7 @@ class Berth:
         end = cur.get("since", start) + ttl if ttl is not None else now
         return round(max(0, min(end, now) - start))
 
-    def _renew(self, lease, ttl_s, note, seat, klass=None, session_source=None):
+    def _renew(self, lease, ttl_s, note, seat, klass=None, session_source=None, closure=None):
         """Reset `since` (never `claimed_at`). Without an explicit ttl the hold stops at the class's
         max_ttl_s counted from claimed_at; an explicit ttl is itself capped. Returns a refusal
         reason, or None when renewed."""
@@ -830,17 +830,21 @@ class Berth:
             lease["class"] = lease_class
         if seat:
             lease["seat"] = seat
+        if closure is not None:
+            lease["closure"] = closure
         self.record("renew", resource=lease.get("resource"), session=lease.get("holder"), ttl_s=ttl,
                     claimed_at=claimed, seat=seat, note=note, session_source=session_source,
-                    **{"class": lease_class})
+                    closure=lease.get("closure"), **_lease_times(lease), **{"class": lease_class})
         return None
 
-    def _new_lease(self, resource, session, note, ttl_s, klass, seat):
+    def _new_lease(self, resource, session, note, ttl_s, klass, seat, closure=None):
         now = round(self.now(), 3)
         lease = {"resource": resource, "holder": session, "since": now, "claimed_at": now,
                  "note": note, "ttl_s": ttl_s, "class": klass, "action": "use"}
         if seat:
             lease["seat"] = seat
+        if closure is not None:
+            lease["closure"] = closure
         return lease
 
     def claim_preflight(self, resource, ttl_s=None, klass=None, override=False):
@@ -881,7 +885,7 @@ class Berth:
         return None
 
     def claim(self, resource, session, note=None, ttl_s=None, klass=None, seat=None, override=False,
-              session_source=None, offline_ok=False):
+              session_source=None, offline_ok=False, closure=None):
         """Returns (ok, lease, reason). A live holder that is not us ⇒ refused (exit 3): the honest
         answer is 'held by X since T', never a silent queue. Capacity > 1 is modelled as slots.
 
@@ -898,10 +902,10 @@ class Berth:
             return False, None, reason
         with envelope_guard(session, self.dir):
             return self._claim_live(resource, session, note, ttl_s, klass, seat, override,
-                                    session_source, offline_ok)
+                                    session_source, offline_ok, closure)
 
     def _claim_live(self, resource, session, note, ttl_s, klass, seat, override,
-                    session_source, offline_ok):
+                    session_source, offline_ok, closure=None):
         klass = klass or DEFAULT_CLASS
         explicit_ttl = ttl_s is not None
         if explicit_ttl:
@@ -924,7 +928,8 @@ class Berth:
                 steward = False
         with self._locked():
             ok, lease, reason = self._claim_locked(resource, session, note, ttl_s if explicit_ttl else None,
-                                                   ttl_s, klass, seat, overriding, session_source, seen=seen)
+                                                   ttl_s, klass, seat, overriding, session_source,
+                                                   seen=seen, closure=closure)
         failed = self.take_fold_failures(resource) if ok else []
         if failed:
             if renewing or reason.startswith("renewed"):
@@ -954,7 +959,7 @@ class Berth:
         return ok, lease, reason
 
     def _claim_locked(self, resource, session, note, explicit_ttl, ttl_s, klass, seat, overriding, session_source=None,
-                      seen=None):
+                      seen=None, closure=None):
         if resource not in self.capacities:
             self.capacities[resource] = 1
         leases = self.leases()
@@ -973,7 +978,9 @@ class Berth:
                         covered = held_class
                         self.record("renew", resource=resource, session=session, covered_by=held_class,
                                     requested_class=klass, ttl_s=ttl_s, claimed_at=lease.get("claimed_at"),
-                                    seat=seat, note=note, session_source=session_source)
+                                    seat=seat, note=note, session_source=session_source,
+                                    closure=closure if closure is not None else lease.get("closure"),
+                                    **_lease_times(lease))
                         continue
                     self.record("refuse", resource=resource, session=session, reason="class-transition",
                                 held_class=held_class, session_source=session_source, **{"class": klass})
@@ -981,7 +988,7 @@ class Berth:
                                           f"transition — release it first (`berth release {resource}`), "
                                           f"then claim {klass}")
                 refused = self._renew(lease, explicit_ttl, note, seat, klass=None if held_class else klass,
-                                      session_source=session_source)
+                                      session_source=session_source, closure=closure)
                 if refused:
                     return False, lease, refused
             self._write_leases(leases)
@@ -1004,24 +1011,24 @@ class Berth:
                 return False, cur, f"held by {cur['holder']} since {time.strftime('%H:%M:%SZ', time.gmtime(cur['since']))}"
             prior = cur["holder"] if cur else None
             takeover = prior if prior and prior != session else None
-            lease = self._new_lease(resource, session, note, ttl_s, klass, seat)
+            lease = self._new_lease(resource, session, note, ttl_s, klass, seat, closure)
             leases[resource] = lease
             self._write_leases(leases)
             self.record("claim", resource=resource, session=session, note=note, ttl_s=ttl_s,
                         claimed_at=lease["claimed_at"], seat=seat, took_over_from=takeover,
-                        session_source=session_source, seen=seen,
+                        session_source=session_source, seen=seen, closure=closure, **_lease_times(lease),
                         expired_after_s=self._expired_after(cur) if cur else None, **{"class": klass})
             if takeover:
                 return True, lease, "taken over from a stale holder"
             return True, lease, "re-claimed after its own lease lapsed" if prior else "claimed"
         slots = [l for l in leases.get(resource + "/slots", []) if self.holder_is_live(l)]
-        lease = self._new_lease(resource, session, note, ttl_s, klass, seat)
+        lease = self._new_lease(resource, session, note, ttl_s, klass, seat, closure)
         slots.append(lease)
         leases[resource + "/slots"] = slots
         self._write_leases(leases)
         self.record("claim", resource=resource, session=session, note=note, ttl_s=ttl_s,
                     claimed_at=lease["claimed_at"], seat=seat, session_source=session_source, seen=seen,
-                    **{"class": klass})
+                    closure=closure, **_lease_times(lease), **{"class": klass})
         return True, lease, "claimed"
 
     def release(self, resource, session, reason=None, force=False):
@@ -1124,8 +1131,8 @@ class Berth:
         leases = self.leases()
         live = self.live_leases(leases, resource)
         if len(live) == 1 and live[0] is leases.get(resource):
-            return live[0]
-        return live or None
+            return {**live[0], **_lease_times(live[0])}
+        return [{**lease, **_lease_times(lease)} for lease in live] or None
 
     # ------------------------------------------------------------ steward-scoped resources
     def steward_scoped(self, resource):
@@ -1337,6 +1344,24 @@ def _age(secs):
     return f"{secs}s" if secs < 90 else (f"{secs // 60}m" if secs < 5400 else f"{secs // 3600}h{(secs % 3600) // 60:02d}")
 
 
+def _lease_times(lease):
+    since, ttl = lease["since"], lease.get("ttl_s")
+    return {"last_renewed_at": since, "expires_at": since + ttl if ttl is not None else None}
+
+
+def _lease_description(lease, now):
+    times = _lease_times(lease)
+    expires = times["expires_at"]
+    expiry = (f"expires in {_age(expires - now)} at {_rfc3339(expires * 1000)}"
+              if expires is not None else "no expiry")
+    terms = ", ".join(x for x in (lease.get("class"),
+                                 f"ttl {_age(lease['ttl_s'])}" if lease.get("ttl_s") else None,
+                                 f"last renewed {_age(now - times['last_renewed_at'])} ago", expiry) if x)
+    return (f"held by {lease['holder']} for {_age(now - lease.get('claimed_at', lease['since']))} ({terms})"
+            + (f" closure={lease['closure']}" if lease.get("closure") else "")
+            + (f" — {lease['note']}" if lease.get("note") else ""))
+
+
 def _guard_state(name):
     try:
         with open(os.path.join(CONFIG_DIR, name, "state.json")) as f:
@@ -1362,14 +1387,10 @@ def render_status(b):
     for res in sorted(set(caps) | {k.split('/')[0] for k in leases}):
         holder = b.who(res)
         if isinstance(holder, list):
-            desc = ", ".join(f"{l['holder']} ({_age(now - l['since'])})" for l in holder) or "free"
+            desc = ", ".join(_lease_description(lease, now) for lease in holder) or "free"
             lines.append(f"    {res:<11} {len(holder)}/{caps.get(res, 1)}  {desc}")
         elif holder:
-            terms = ", ".join(x for x in (holder.get("class"),
-                                          f"ttl {_age(holder['ttl_s'])}" if holder.get("ttl_s") else None) if x)
-            lines.append(f"    {res:<11} held by {holder['holder']} for {_age(now - holder.get('claimed_at', holder['since']))}"
-                         + (f" ({terms})" if terms else "")
-                         + (f" — {holder['note']}" if holder.get('note') else ""))
+            lines.append(f"    {res:<11} {_lease_description(holder, now)}")
         else:
             raw = b.raw_lease(res)
             if raw and raw.get("holder"):
@@ -1562,10 +1583,14 @@ def _main(argv):
         # Parsed and class-checked BEFORE the session is resolved: a class this berth does not run
         # is refused (exit 3) whether or not the caller can name itself.
         usage = ("usage: berth claim RESOURCE --session S [--class verify|measure|mesh] [--ttl SECONDS] [--note TEXT] "
-                 "[--offline-ok]")
+                 "[--closure KEY] [--offline-ok]")
         ttl = _opt(argv, "--ttl")
         note = _opt(argv, "--note")
         klass = _opt(argv, "--class") or DEFAULT_CLASS
+        closure = _opt(argv, "--closure")
+        if "--closure" in argv or (closure is not None and (not closure or closure.startswith("--"))):
+            print(usage, file=sys.stderr)
+            return 2
         offline_ok = "--offline-ok" in argv
         argv = [a for a in argv if a != "--offline-ok"]
         if not argv:
@@ -1586,7 +1611,7 @@ def _main(argv):
         if reason:
             print(f"{res}: REFUSED — {reason}", file=sys.stderr)
             return 3
-        claim_args = (res, note, ttl_s, klass, override, offline_ok)
+        claim_args = (res, note, ttl_s, klass, override, offline_ok, closure)
 
     if cmd == "owner-check":
         if not argv:
@@ -1644,14 +1669,15 @@ def _main(argv):
             print(f"{res}: released here, but {why} — the other devices still see it held", file=sys.stderr)
         return 1 if failed else 0
     if cmd == "claim":
-        res, note, ttl_s, klass, override, offline_ok = claim_args
+        res, note, ttl_s, klass, override, offline_ok, closure = claim_args
         # Claiming is a liveness act: a stale mooring would make the fresh lease look abandoned.
         if not b.touch(session):
             b.moor(session, pid=resolve_session_identity().get("ownerPid"))
         try:
             ok, lease, reason = b.claim(res, session, note=note, ttl_s=ttl_s, klass=klass,
                                         seat=os.environ.get("BERTH_SEAT") or None,
-                                        override=override, session_source=source, offline_ok=offline_ok)
+                                        override=override, session_source=source, offline_ok=offline_ok,
+                                        closure=closure)
         except BerthUsage as e:
             print(f"berth: {e}", file=sys.stderr)
             return 2

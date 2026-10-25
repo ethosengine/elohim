@@ -82,6 +82,21 @@ class CapacityTransitionTest(unittest.TestCase):
         self.assertTrue(self.berth.claim("cargo", "third")[0])
         self.assertEqual(self.holders(), {"second", "third"})
 
+    def test_each_slot_shows_renewal_expiry_and_closure(self):
+        self.berth.capacities["cargo"] = 2
+        for session in ("first", "second"):
+            self.berth.claim("cargo", session, ttl_s=600, closure=f"key-{session}")
+        self.berth.now = lambda: 400
+        self.berth.claim("cargo", "first", ttl_s=600)
+        status = render_status(self.berth)
+        self.assertIn("cargo       2/2", status)
+        self.assertIn("last renewed 0s ago, expires in 10m at 1970-01-01T00:16:40Z) closure=key-first", status)
+        self.assertIn("last renewed 5m ago, expires in 5m at 1970-01-01T00:11:40Z) closure=key-second", status)
+        holders = self.berth.who("cargo")
+        self.assertEqual([(l["last_renewed_at"], l["expires_at"]) for l in holders], [(400, 1000), (100, 700)])
+        claims = [r for r in self.berth.ledger(100) if r["kind"] == "claim"]
+        self.assertEqual([r["closure"] for r in claims], ["key-first", "key-second"])
+
 
 
 class FakeObservation:
@@ -344,6 +359,81 @@ class LeaseClassTest(unittest.TestCase):
         renew = self.rows("renew")[-1]
         self.assertEqual((renew["seat"], renew["claimed_at"], renew["class"]), ("che-a", 1000.0, "verify"))
 
+    def test_renewed_lease_renders_last_renew_and_expiry_after_original_ttl(self):
+        self.berth.claim("mesh", "dev", ttl_s=1800, note="pre-push to dev", closure="key-a3")
+        for _ in range(9):
+            self.clock[0] += 600
+            self.assertTrue(self.berth.claim("mesh", "dev", ttl_s=1800)[0])
+        self.clock[0] += 60
+        status = render_status(self.berth)
+        self.assertIn("mesh        held by dev for 1h31 (verify, ttl 30m, last renewed 60s ago, "
+                      "expires in 29m at 1970-01-01T02:16:40Z) closure=key-a3 — pre-push to dev", status)
+        self.assertNotIn("EXPIRED dev", status)
+        self.assertFalse(self.berth.claim("mesh", "other")[0])
+
+    def test_renewed_lease_past_expiry_keeps_expired_wording(self):
+        self.berth.claim("mesh", "dev", ttl_s=60, closure="key-a3")
+        self.clock[0] += 30
+        self.berth.claim("mesh", "dev", ttl_s=60)
+        self.clock[0] += 61
+        status = render_status(self.berth)
+        self.assertIn("mesh        EXPIRED dev — held 1m of a 60s verify ttl (takeover on next claim)", status)
+        self.assertNotIn("held by dev", status)
+        self.assertIsNone(self.berth.who("mesh"))
+        ok, lease, _ = self.berth.claim("mesh", "other")
+        self.assertTrue(ok)
+        self.assertNotIn("closure", lease)
+
+    def test_closure_and_times_cross_on_claim_and_renew(self):
+        self.berth.claim("mesh", "dev", ttl_s=600, closure="key-first")
+        claim = self.rows("claim")[-1]
+        self.assertEqual((claim["closure"], claim["last_renewed_at"], claim["expires_at"]),
+                         ("key-first", 1000, 1600))
+        self.clock[0] += 300
+        self.berth.claim("mesh", "dev", ttl_s=600, closure="key-second")
+        self.clock[0] += 300
+        self.berth.claim("mesh", "dev", ttl_s=600)
+        self.assertEqual(self.berth.raw_lease("mesh")["closure"], "key-second")
+        renew = self.rows("renew")[-1]
+        self.assertEqual((renew["closure"], renew["last_renewed_at"], renew["expires_at"]),
+                         ("key-second", 1600, 2200))
+        events = [e["env"] for e in self.obs.events if e["reason"] in ("claim", "renew")]
+        self.assertEqual([e["closure"] for e in events], ["key-first", "key-second", "key-second"])
+        self.assertEqual(float(events[-1]["expires_at"]), 2200)
+
+    def test_cli_claim_accepts_closure_and_who_adds_times(self):
+        main = _NS["main"]
+        with mock.patch.dict(main.__globals__, {"Berth": lambda: self.berth}):
+            with contextlib.redirect_stdout(io.StringIO()):
+                self.assertEqual(main(["berth", "claim", "mesh", "--session", "dev",
+                                       "--ttl", "600", "--closure", "key-cli"]), 0)
+                self.clock[0] += 300
+                self.assertEqual(main(["berth", "claim", "mesh", "--session", "dev",
+                                       "--ttl", "600", "--closure", "key-renew"]), 0)
+            output = io.StringIO()
+            with contextlib.redirect_stdout(output):
+                self.assertEqual(main(["berth", "who", "mesh"]), 0)
+        holder = json.loads(output.getvalue())
+        raw = self.berth.raw_lease("mesh")
+        self.assertEqual({k: holder[k] for k in raw}, raw)
+        self.assertEqual((holder["closure"], holder["last_renewed_at"], holder["expires_at"]),
+                         ("key-renew", 1300, 1900))
+
+    def test_cli_closure_requires_a_key(self):
+        main = _NS["main"]
+        with mock.patch.dict(main.__globals__, {"Berth": lambda: self.berth}):
+            for args in (["--closure"], ["--closure", ""], ["--closure", "--offline-ok"]):
+                with self.subTest(args=args), contextlib.redirect_stderr(io.StringIO()):
+                    self.assertEqual(main(["berth", "claim", "cargo", "--session", "dev", *args]), 2)
+        self.assertIsNone(self.berth.who("cargo"))
+
+    def test_legacy_lease_without_closure_gets_derived_json_times(self):
+        legacy = {"resource": "cargo", "holder": "dev", "since": 900, "ttl_s": 600}
+        self.berth._write_leases({"cargo": legacy})
+        self.assertEqual(self.berth.who("cargo"), {**legacy, "last_renewed_at": 900, "expires_at": 1500})
+        self.assertIn("last renewed 1m ago, expires in 8m at 1970-01-01T00:25:00Z", render_status(self.berth))
+        self.assertEqual(self.berth.raw_lease("cargo"), legacy)
+
     def test_renew_without_ttl_stops_at_the_class_cap(self):
         self.berth.claim("mesh", "dev", ttl_s=1800)
         self.clock[0] += 1500
@@ -513,6 +603,15 @@ class DaemonClassTest(unittest.TestCase):
         self.assertTrue(ok)
         self.assertIsNone(lease["ttl_s"])
 
+    def test_daemon_renders_no_expiry_and_json_uses_null(self):
+        self.berth.claim("mesh", "dev", klass="mesh")
+        self.clock[0] += 600
+        self.assertIn("mesh        held by dev for 10m (mesh, last renewed 10m ago, no expiry)",
+                      render_status(self.berth))
+        holder = self.berth.who("mesh")
+        self.assertEqual(holder["last_renewed_at"], 1000)
+        self.assertIsNone(holder["expires_at"])
+
     def test_daemon_lease_never_expires_while_its_holder_lives(self):
         self.berth.claim("mesh", "dev", klass="mesh")
         self.clock[0] += 100000
@@ -527,12 +626,15 @@ class DaemonClassTest(unittest.TestCase):
         self.assertEqual(reason, "taken over from a stale holder")
 
     def test_a_lane_under_the_holders_own_daemon_lease_is_covered(self):
-        self.berth.claim("mesh", "dev", klass="mesh")
-        ok, _, reason = self.berth.claim("mesh", "dev", klass="verify", ttl_s=1800)
+        self.berth.claim("mesh", "dev", klass="mesh", closure="key-daemon")
+        ok, _, reason = self.berth.claim("mesh", "dev", klass="verify", ttl_s=1800, closure="key-lane")
         self.assertTrue(ok)
         self.assertIn("renewed — covered by your mesh daemon lease", reason)
         self.assertEqual(self.berth.raw_lease("mesh")["class"], "mesh")
         self.assertIsNone(self.berth.raw_lease("mesh")["ttl_s"])
+        self.assertEqual(self.berth.raw_lease("mesh")["closure"], "key-daemon")
+        renew = [r for r in self.berth.ledger(100) if r["kind"] == "renew"][-1]
+        self.assertEqual(renew["closure"], "key-lane")
 
     def test_class_transition_on_a_held_lease_is_refused(self):
         self.berth.claim("mesh", "dev", klass="verify")
