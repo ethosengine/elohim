@@ -147,7 +147,8 @@ export class WorkspaceHalf {
 
   private async command(
     phase: string,
-    argv: string[]
+    argv: string[],
+    extraEnv: Record<string, string> = {}
   ): Promise<{ entry: T8Command; stdout: string }> {
     const startedAt = new Date().toISOString();
     const output = await new Promise<{ code: number | null; stdout: string; stderr: string }>(
@@ -157,7 +158,7 @@ export class WorkspaceHalf {
           argv.slice(1),
           {
             cwd: ROOT,
-            env: { ...process.env, EPR_BIN: this.epr, CLAUDE_PROJECT_DIR: ROOT },
+            env: { ...process.env, EPR_BIN: this.epr, CLAUDE_PROJECT_DIR: ROOT, ...extraEnv },
             timeout: 30_000,
             maxBuffer: 8 * 1024 * 1024,
             encoding: 'utf8',
@@ -210,13 +211,13 @@ export class WorkspaceHalf {
     args: string[],
     session = this.receipt.session
   ): Promise<T8Command> {
-    const { entry } = await this.command(phase, [
-      'python3',
-      join(ROOT, 'genesis/agentic/bin/berth'),
-      ...args,
-      '--session',
-      session,
-    ]);
+    // On an envelope-capable device a session acts only for itself: this process declares the
+    // session it moors and owns that declaration, so native resolution answers with it.
+    const { entry } = await this.command(
+      phase,
+      ['python3', join(ROOT, 'genesis/agentic/bin/berth'), ...args, '--session', session],
+      { ELOHIM_SESSION_ID: session, ELOHIM_SESSION_OWNER_PID: String(process.pid) }
+    );
     return entry;
   }
 
