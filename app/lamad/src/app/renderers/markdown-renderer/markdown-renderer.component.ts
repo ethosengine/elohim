@@ -13,6 +13,7 @@ import {
   OnDestroy,
   inject,
   ChangeDetectionStrategy,
+  ChangeDetectorRef,
 } from '@angular/core';
 import { DomSanitizer, SafeHtml } from '@angular/platform-browser';
 import { Router } from '@angular/router';
@@ -150,6 +151,7 @@ export class MarkdownRendererComponent implements OnChanges, AfterViewInit, OnDe
   private scrollListener?: () => void;
   private eprClickListener?: (e: Event) => void;
   private headingElements: HTMLElement[] = [];
+  private readonly cdr = inject(ChangeDetectorRef);
   private readonly storageClient = inject(LAMAD_STORAGE_CLIENT);
   private readonly eprResolver: ILamadEprResolver = inject(LAMAD_EPR_RESOLVER);
   private readonly eprNav: ILamadEprNav = inject(LAMAD_EPR_NAV);
@@ -328,6 +330,9 @@ export class MarkdownRendererComponent implements OnChanges, AfterViewInit, OnDe
     // Security: HTML is generated from trusted markdown content stored in backend
     // eslint-disable-next-line sonarjs/no-angular-bypass-sanitization
     this.renderedContent = this.sanitizer.bypassSecurityTrustHtml(processedHtml);
+    // The parse resolves outside any check; inside an OnPush host (the EPR focal slot) nothing
+    // else would re-check this view, and the article would stay empty.
+    this.cdr.markForCheck();
     this.tocGenerated.emit(toc);
 
     // Update heading elements after view updates

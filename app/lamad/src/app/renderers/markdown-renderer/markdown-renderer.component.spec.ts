@@ -2,7 +2,13 @@ import { vi } from 'vitest';
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { provideHttpClient } from '@angular/common/http';
 import { provideHttpClientTesting } from '@angular/common/http/testing';
-import { SimpleChange } from '@angular/core';
+import {
+  ChangeDetectionStrategy,
+  Component,
+  SimpleChange,
+  ViewChild,
+  ViewContainerRef,
+} from '@angular/core';
 
 import { of } from 'rxjs';
 
@@ -16,6 +22,16 @@ import {
 } from '../../interfaces/cross-pillar.interface';
 import { PathService } from '../../services/path.service';
 import { PathContextService } from '../../services/path-context.service';
+
+/** The EPR focal slot's shape: an OnPush host that creates the renderer dynamically. */
+@Component({
+  standalone: true,
+  changeDetection: ChangeDetectionStrategy.OnPush,
+  template: '<ng-container #host></ng-container>',
+})
+class OnPushFocalHostComponent {
+  @ViewChild('host', { read: ViewContainerRef, static: true }) host!: ViewContainerRef;
+}
 
 describe('MarkdownRendererComponent', () => {
   let component: MarkdownRendererComponent;
@@ -98,6 +114,20 @@ describe('MarkdownRendererComponent', () => {
   });
 
   describe('markdown rendering', () => {
+    it('shows the parsed article inside an OnPush host that created it dynamically', async () => {
+      const hostFixture = TestBed.createComponent(OnPushFocalHostComponent);
+      hostFixture.autoDetectChanges();
+      const ref = hostFixture.componentInstance.host.createComponent(MarkdownRendererComponent);
+      ref.setInput('node', createContentNode('# Hello World\n\nThis is a test.'));
+      await hostFixture.whenStable();
+      await new Promise(resolve => setTimeout(resolve, 0));
+      await hostFixture.whenStable();
+
+      const article = (ref.location.nativeElement as HTMLElement).querySelector('.markdown-content');
+      expect(article?.textContent).toContain('Hello World');
+      ref.destroy();
+    });
+
     it('should render basic markdown', async () => {
       component.node = createContentNode('# Hello World\n\nThis is a test.');
       component.ngOnChanges({
