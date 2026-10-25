@@ -423,7 +423,8 @@ export function runProject(project, printOnly, namesOnly, { root = ROOT, env = p
   }
   // Cycle time is observed here because this is the one place every gate runs.
   // The ceiling, the reviewer and its charter are declared in measures.yaml.
-  recordCycle(project, seconds, status, cycleEnv, cycleDeps);
+  // Inherited output is unavailable, not evidence that no tests ran.
+  recordCycle(project, seconds, status, cycleEnv, cycleDeps, { signal: result.signal });
   return status;
 }
 

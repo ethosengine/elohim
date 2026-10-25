@@ -24,11 +24,13 @@ import {
   observationArgs,
   subjectFor,
   runKind,
+  classifyFailure,
   readCeiling,
   judgeCycle,
   fingerprint,
   recordCycle,
 } from './gate-cycle.mjs';
+import { readCycleRows } from './gate-cost.mjs';
 
 const project = { name: 'elohim-storage', dir: 'elohim/elohim-storage' };
 
@@ -66,6 +68,70 @@ function sandbox() {
   return { dir, measures, ledger: join(dir, 'architecture-findings.jsonl') };
 }
 
+const failures = [
+  ['leaked toolchain in a WASM gate', 2, { preflight: 'refused', recipeStarted: false }, 'environment'],
+  ['missing wasm32 target', 2, { preflight: 'refused', recipeStarted: false }, 'environment'],
+  ['missing storage-client dist', 2, { preflight: 'refused', recipeStarted: false }, 'environment'],
+  ['session-envelope assertion failure', 1, { recipeStarted: true, assertionFailed: true, testOutput: true }, 'code'],
+  ['143 shed before test output', 143, { recipeStarted: true, testOutput: false }, 'environment'],
+  ['SIGTERM shed before test output', null, { signal: 'SIGTERM', testOutput: false }, 'environment'],
+  ['signal 15 shed before test output', null, { signal: 15, testOutput: false }, 'environment'],
+  ['compiler diagnostic', 101, { recipeStarted: true, compilerError: true }, 'code'],
+  ['unexplained exit 1', 1, {}, 'unknown'],
+  ['unexplained exit 2', 2, {}, 'unknown'],
+  ['unexplained cargo exit 101', 101, {}, 'unknown'],
+  ['143 with unavailable output', 143, {}, 'unknown'],
+  ['143 after test output', 143, { recipeStarted: true, testOutput: true }, 'unknown'],
+  ['143 after an assertion failure', 143, { recipeStarted: true, assertionFailed: true, testOutput: true }, 'code'],
+  ['failure without a started recipe', 1, { recipeStarted: false, assertionFailed: true }, 'unknown'],
+  ['successful run', 0, { preflight: 'refused', assertionFailed: true }, undefined],
+];
+
+for (const [name, status, signals, expected] of failures) {
+  test(`failure classification: ${name}`, () => {
+    const before = structuredClone(signals);
+    assert.equal(classifyFailure(status, signals), expected);
+    assert.deepEqual(signals, before, 'classification does not mutate its evidence');
+  });
+}
+
+test('recordCycle carries failure evidence through env fields, omitting it on success', () => {
+  const { dir, measures, ledger } = sandbox();
+  try {
+    for (const [name, status, signals, expected] of failures) {
+      const notes = [];
+      recordCycle(project, 1, status, {}, {
+        root: dir, measuresPath: measures, ledgerPath: ledger,
+        runEpr: args => notes.push(args), print: () => {}, now: () => 't',
+      }, signals);
+      assert.equal(notes.length, 1, name);
+      const args = notes[0];
+      assert.deepEqual(args.filter(arg => arg.startsWith('failure_class=')),
+        expected ? [`failure_class=${expected}`] : [], name);
+      if (expected) assert.equal(args[args.indexOf(`failure_class=${expected}`) - 1], '--env', name);
+      assert.deepEqual(args.slice(-2), ['--env', 'project=elohim-storage']);
+    }
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test('gate-cost accepts legacy rows and rows with each failure class', () => {
+  const record = {
+    occurredAt: '2026-10-25T18:00:00Z',
+    classifiedAs: ['run:observation', '.', `measure:${GATE_CYCLE_MEASURE}`,
+      'value:1', 'env:run-kind=full-gate', 'env:exit=fail', 'env:project=elohim-storage'],
+  };
+  const data = [undefined, 'environment', 'code', 'unknown'].map(failureClass => JSON.stringify({
+    record: { ...record, classifiedAs: [...record.classifiedAs,
+      ...(failureClass ? [`env:failure_class=${failureClass}`] : [])] },
+  })).join('\n');
+  const { rows, skipped } = readCycleRows('fixture', () => data);
+  assert.equal(skipped, 0);
+  assert.equal(rows.length, 4);
+  for (const row of rows) assert.deepEqual(row, rows[0]);
+});
+
 test('the observation names the measure, the subject, the run kind, and the project last', () => {
   const args = observationArgs('elohim/elohim-storage/justfile', 1980.4, { kind: 'full-gate', exit: 'ok', jobs: '1', project: project.name });
   assert.deepEqual(args, [
@@ -84,6 +150,11 @@ test('the observation names the measure, the subject, the run kind, and the proj
 test('the project env slot is last even when jobs is absent', () => {
   const args = observationArgs('.', 1, { kind: 'pre-push', exit: 'ok', project: 'rakia-validate' });
   assert.deepEqual(args.slice(-4), ['--env', 'exit=ok', '--env', 'project=rakia-validate']);
+});
+
+test('successful observations omit even a supplied failure class', () => {
+  const args = observationArgs('.', 1, { kind: 'full-gate', exit: 'ok', failureClass: 'code' });
+  assert.ok(!args.some(arg => arg.startsWith('failure_class=')));
 });
 
 test('the subject is a FILE — the gate recipe itself — because the sidecar addresses a subject by its bytes', () => {
@@ -197,6 +268,7 @@ test('a failed gate is recorded but never judged — it stopped early, its durat
   try {
     recordCycle(project, 5000, 1, {}, deps);
     assert.ok(notes[0].includes('exit=fail'));
+    assert.ok(notes[0].includes('failure_class=unknown'));
     assert.deepEqual(notes[0].slice(-2), ['--env', 'project=elohim-storage']);
     assert.equal(existsSync(ledger), false);
   } finally {

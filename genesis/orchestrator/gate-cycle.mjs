@@ -23,6 +23,17 @@ export function runKind(env) {
   return declared || 'full-gate';
 }
 
+/** Missing evidence stays unknown; an exit status alone never proves a code failure. */
+export function classifyFailure(status, signals = {}) {
+  if (status === 0) return undefined;
+  if (signals.preflight === 'refused') return 'environment';
+  if (signals.recipeStarted === true &&
+      (signals.assertionFailed === true || signals.compilerError === true)) return 'code';
+  const terminated = signals.signal === 'SIGTERM' || signals.signal === 15 || status === 143;
+  if (terminated && signals.testOutput === false) return 'environment';
+  return 'unknown';
+}
+
 /**
  * The sidecar addresses a subject by its bytes, so it must be a FILE (or `.`).
  * The gate recipe that was timed is the honest one; fall back to the package
@@ -47,6 +58,7 @@ export function observationArgs(subject, seconds, run) {
     '--env', `exit=${run.exit}`,
   ];
   if (run.jobs) args.push('--env', `jobs=${run.jobs}`);
+  if (run.exit !== 'ok') args.push('--env', `failure_class=${run.failureClass || 'unknown'}`);
   if (run.project) args.push('--env', `project=${run.project}`);
   return args;
 }
@@ -119,13 +131,16 @@ function directive(project, seconds, ceiling, kind) {
  * `status` is the gate's exit status; a failed gate stopped early, so its
  * duration is recorded (exit=fail) and never judged.
  */
-export function recordCycle(project, seconds, status, env, deps) {
+export function recordCycle(project, seconds, status, env, deps, signals = {}) {
   try {
     const kind = runKind(env);
     const exit = status === 0 ? 'ok' : 'fail';
     try {
       const subject = subjectFor(project, deps.root || process.cwd());
-      deps.runEpr(observationArgs(subject, seconds, { kind, exit, jobs: env.CARGO_BUILD_JOBS, project: project.name }));
+      deps.runEpr(observationArgs(subject, seconds, {
+        kind, exit, jobs: env.CARGO_BUILD_JOBS, project: project.name,
+        failureClass: classifyFailure(status, signals),
+      }));
     } catch { /* the observation is best-effort; the verdict below does not need it */ }
     if (exit !== 'ok') return;
 
