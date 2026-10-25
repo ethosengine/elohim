@@ -64,7 +64,7 @@ fn main() -> ExitCode {
         return ExitCode::SUCCESS;
     }
     if env::var_os("EPR_SESSION_LAZY").is_some() {
-        if let Err(error) = elohim_epr_cli::session_envelope::open(None) {
+        if let Err(error) = elohim_epr_cli::session_envelope::open_lazily() {
             eprintln!("epr session: {error}");
             return ExitCode::from(2);
         }

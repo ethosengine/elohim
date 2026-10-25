@@ -7,6 +7,7 @@ import {
   readFileSync,
   rmSync,
   statSync,
+  symlinkSync,
   writeFileSync,
 } from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -17,6 +18,8 @@ import { After, Given, Then, When } from '@cucumber/cucumber';
 type RecordValue = Record<string, unknown>;
 interface Fixture {
   root: string;
+  /** Holds `epr` -> the binary under test, first on PATH (see createFixture). */
+  shims?: string;
   env: NodeJS.ProcessEnv;
   view: RecordValue;
   opened?: RecordValue;
@@ -174,7 +177,15 @@ function createFixture(world: object): Fixture {
     GIT_COMMITTER_NAME: 'Fixture',
     GIT_COMMITTER_EMAIL: 'fixture@example.test',
   });
-  const state: Fixture = { root, env, view: {} };
+  // A prepared action names a bare `epr`. Without this shim it would run the device's launcher
+  // (the landed build, under the live session's envelope) instead of the candidate under test.
+  let shims: string | undefined;
+  if (binary !== 'epr') {
+    shims = mkdtempSync(join(tmpdir(), 'ceremony-bin-'));
+    symlinkSync(resolve(binary), join(shims, 'epr'));
+    env.PATH = `${shims}:${env.PATH ?? ''}`;
+  }
+  const state: Fixture = { root, shims, env, view: {} };
   fixtures.set(world, state);
   write(state, '.epr-meta/repository.yaml', 'version: 1\nagent: repo:ethosengine/elohim\n');
   write(
@@ -637,6 +648,7 @@ Then(
 After(function () {
   const state = fixtures.get(this);
   if (state) rmSync(state.root, { recursive: true, force: true });
+  if (state?.shims) rmSync(state.shims, { recursive: true, force: true });
   fixtures.delete(this);
 });
 

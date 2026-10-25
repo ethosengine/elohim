@@ -146,15 +146,7 @@ impl Store {
     }
     /// Validate a P1 key without sanitizing it into another session's name.
     pub fn path(&self, id: &str) -> Result<PathBuf> {
-        if id.is_empty()
-            || !id.as_bytes()[0].is_ascii_alphanumeric()
-            || id.len() > 96
-            || id == "."
-            || id == ".."
-            || !id
-                .bytes()
-                .all(|b| b.is_ascii_alphanumeric() || b"_.-".contains(&b))
-        {
+        if !is_envelope_id(id) {
             return Err(Refusal::new(
                 "session-invalid",
                 "P1 id must be a simple local name (1–96 characters)",
@@ -292,6 +284,21 @@ pub fn model(
                 .find(|s| !s.is_empty())
         })
 }
+/// Whether `id` can name an envelope: a P1 session id is a simple local name of 1–96
+/// characters. A label outside this shape (an explicit `--session` such as
+/// `participant-standing:device-read`) can never be bound, so it has no envelope to validate.
+#[must_use]
+pub fn is_envelope_id(id: &str) -> bool {
+    !id.is_empty()
+        && id.as_bytes()[0].is_ascii_alphanumeric()
+        && id.len() <= 96
+        && id != "."
+        && id != ".."
+        && id
+            .bytes()
+            .all(|b| b.is_ascii_alphanumeric() || b"_.-".contains(&b))
+}
+
 /// UTC timestamp shared with the bin store's durable records.
 pub fn now() -> String {
     files::now()

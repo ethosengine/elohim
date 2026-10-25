@@ -194,7 +194,8 @@ pub fn live_guard(id: Option<&str>, destination: &Path) -> Result<FacetGuard> {
         .canonicalize()
         .map_err(err)?;
     let mut guard = FacetGuard { root, _store: None };
-    let Some(id) = id else {
+    // A label that cannot name an envelope has no binding, exactly like an unbound P1 id.
+    let Some(id) = id.filter(|id| envelope::is_envelope_id(id)) else {
         return Ok(guard);
     };
     let key = home()?;
@@ -279,6 +280,16 @@ fn berth_path(record: &Envelope) -> Result<Option<PathBuf>> {
 
 // Called before any shared mutation guard: lazy creation and reference binding both
 // need the exclusive lock. The caller then takes the shared lock and revalidates.
+/// The launcher's lazy open, for a runtime with no start hook. A session already bound, from any
+/// checkout, is left as it is: re-proposing it from another repository (a fixture, a second
+/// project) would read that repository's roster and refuse a session that is already open.
+pub fn open_lazily() -> Result<()> {
+    if device_scoped_binding(&current_id()?)? {
+        return Ok(());
+    }
+    open(None).map(drop)
+}
+
 /// Berth's store is device-scoped: a lease taken from any checkout, the main one or a linked
 /// worktree, belongs to the same envelope. Only an unbound session is opened here, because
 /// `open` proposes the current checkout and would refuse a bound one called from a worktree.
