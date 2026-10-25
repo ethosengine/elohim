@@ -132,8 +132,8 @@ done
 # core.hooksPath is absolute (.husky/hooks-path.mjs), so a push from a linked worktree runs the MAIN
 # checkout's copy of this script against the worktree: until the main checkout carries this block,
 # such a push claims nothing. The hook on dev governs pushes to dev.
-HOOK_OWNER_PID=$BASHPID
 HOOK_ON_EXIT=""
+HOOK_OWNER_PID=$BASHPID
 hook_on_exit() {
   # A renewer can exit before resetting its inherited traps; only this shell owns the claims.
   [ "$BASHPID" = "$HOOK_OWNER_PID" ] || return 0
