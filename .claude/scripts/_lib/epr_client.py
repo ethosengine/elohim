@@ -38,6 +38,7 @@ import base64
 import hashlib
 import json
 import os
+import shutil
 import subprocess
 from pathlib import Path
 
@@ -59,7 +60,8 @@ def resolve(env: dict[str, str] | None = None) -> tuple[str | None, str | None]:
             check=False,
         )
         if result.returncode != 0:
-            bootstrap(environment)
+            if _arrival_owed(result.returncode, environment):
+                bootstrap(environment)
             return None, None
         status = json.loads(result.stdout)
         path, cid = status.get("resolved"), status.get("resolvedCid")
@@ -68,6 +70,18 @@ def resolve(env: dict[str, str] | None = None) -> tuple[str | None, str | None]:
         return None, None
     except Exception:  # noqa: BLE001 — resolution is best-effort; absence is a valid answer
         return None, None
+
+
+def _arrival_owed(returncode: int, environment) -> bool:
+    """Whether a failed resolution is a device that has not arrived, rather than an old release.
+
+    Behind the native launcher a session may stay pinned to a release older than `epr bin`; it
+    refuses the subcommand, and that is the session's pin, not a pre-native device. Only a
+    legacy launcher, or a native one that cannot resolve at all (127), owes the bootstrap.
+    """
+    launcher = shutil.which("epr", path=environment.get("PATH"))
+    native = launcher is not None and os.path.basename(os.path.realpath(launcher)) == "bin-launch"
+    return not native or returncode == 127
 
 
 def _candidate(value: str) -> tuple[str | None, str | None]:
