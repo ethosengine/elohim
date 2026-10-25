@@ -46,6 +46,7 @@ describe('gate expectations and feature-branch CI deferral', () => {
         ...(row.project === undefined ? [] : [`env:project=${row.project}`])],
     } })).join('\n'));
     return {
+      root,
       flowsPath,
       run(gate = project, env = pushEnv, printOnly = false, namesOnly = false) {
         const calls = [];
@@ -114,6 +115,32 @@ describe('gate expectations and feature-branch CI deferral', () => {
     const result = f.run(other);
     assert.equal(result.status, 0);
     assert.ok(result.output.includes(expected.replace('fixture:', 'other:')));
+  });
+
+  test('two ledgers retain append order with the current checkout last despite older author dates', t => {
+    const main = fixture(t, { samples: Array.from({ length: 25 }, (_, i) => ({
+      ...rows[0], value: i < 15 ? 9000 : 660, exit: i < 5 ? 'fail' : 'ok',
+      occurredAt: new Date(Date.UTC(2026, 9, 25, 0, 25 - i)).toISOString(),
+    })) });
+    const current = fixture(t, { samples: [
+      { ...rows[0], value: 1200 },
+      { ...rows[0], exit: 'fail' },
+    ] });
+    const commonDir = resolve(main.root, '.git');
+    const gitDir = resolve(commonDir, 'worktrees/fixture');
+    for (const dir of ['objects', 'refs', 'worktrees/fixture']) {
+      mkdirSync(resolve(commonDir, dir), { recursive: true });
+    }
+    writeFileSync(resolve(commonDir, 'HEAD'), 'ref: refs/heads/main\n');
+    writeFileSync(resolve(gitDir, 'HEAD'), 'ref: refs/heads/fixture\n');
+    writeFileSync(resolve(gitDir, 'commondir'), '../..\n');
+    writeFileSync(resolve(gitDir, 'gitdir'), `${resolve(current.root, '.git')}\n`);
+    writeFileSync(resolve(current.root, '.git'), `gitdir: ${gitDir}\n`);
+
+    const result = current.run();
+    assert.ok(result.output.includes('[gate] fixture: expect ~12 min (p90 11 min, max 20 min; 10 runs) · failed locally 1 of last 20'), result.output);
+    assert.equal(result.status, 7, 'the current checkout failure keeps the recipe local');
+    assert.doesNotMatch(result.output, /deferred to CI/);
   });
 
   test('an unreadable sidecar stays silent and keeps the local recipe, without retrying', t => {

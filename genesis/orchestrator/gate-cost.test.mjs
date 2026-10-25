@@ -31,7 +31,7 @@ function row(index, overrides = {}) {
 }
 
 test('mean, nearest-rank p90 and max use the latest ten of twelve successful runs', () => {
-  const rows = Array.from({ length: 12 }, (_, i) => row(i + 1)).reverse();
+  const rows = Array.from({ length: 12 }, (_, i) => row(i + 1));
   const before = structuredClone(rows);
   assert.deepEqual(costOf(rows, scope), { runs: 10, mean: 450, p90: 660, max: 720, fails: 0, window: 12 });
   assert.deepEqual(rows, before, 'folding does not reorder the caller rows');
@@ -50,9 +50,25 @@ test('local failures use the last twenty full runs, including failures and both 
     kind: i % 2 ? 'full-gate' : 'pre-push',
     exit: i < 5 || i === 9 || i === 24 ? 'fail' : 'ok',
     value: i < 5 || i === 9 || i === 24 ? 9999 : 60,
-  })).reverse();
+  }));
   assert.deepEqual(costOf(rows, scope), { runs: 10, mean: 60, p90: 60, max: 60, fails: 2, window: 20 });
 });
+
+for (const [name, minute] of [
+  ['descending', i => 25 - i],
+  ['repeated', i => i % 3],
+]) {
+  test(`duration and failure windows follow append order with ${name} author dates`, () => {
+    const rows = Array.from({ length: 25 }, (_, i) => row(i + 1, {
+      kind: i % 2 ? 'full-gate' : 'pre-push',
+      exit: i < 5 || i === 9 || i === 24 ? 'fail' : 'ok',
+      occurredAt: new Date(Date.UTC(2026, 9, 1, 0, minute(i))).toISOString(),
+    }));
+    const before = structuredClone(rows);
+    assert.deepEqual(costOf(rows, scope), { runs: 10, mean: 1170, p90: 1380, max: 1440, fails: 2, window: 20 });
+    assert.deepEqual(rows, before, 'folding does not reorder the caller rows');
+  });
+}
 
 test('the project env slot is authoritative even when subjects differ or collide', () => {
   const rows = [

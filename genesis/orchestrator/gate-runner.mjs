@@ -278,8 +278,10 @@ export function runProject(project, printOnly, namesOnly, { root = ROOT, env = p
     // The sidecar is device-local and gitignored: a linked worktree's holds only its own runs,
     // and the history lives in the main checkout's. Read both; an unreadable one is skipped.
     // Each observation is written to exactly one sidecar, so the two never overlap.
+    // Rows have author dates, not append timestamps, so cross-ledger recency is unknown.
+    // Preserve each ledger's order and put the current checkout last.
     const dirs = gitDirs(root);
-    const roots = [root, ...(dirs && dirs.gitDir !== dirs.commonDir ? [dirname(dirs.commonDir)] : [])];
+    const roots = [...(dirs && dirs.gitDir !== dirs.commonDir ? [dirname(dirs.commonDir)] : []), root];
     let rows = null;
     for (const at of roots) {
       try {

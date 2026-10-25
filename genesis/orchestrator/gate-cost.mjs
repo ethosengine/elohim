@@ -40,11 +40,11 @@ export function readCycleRows(flowsPath, readFile = readFileSync) {
 
 /** Legacy subjects count only when the caller has established they are unshared. */
 export function costOf(rows, { project, subjectFallback }) {
+  // occurredAt is the commit's author clock, which survives rebases; use ledger append order.
   const counted = rows.filter(row =>
     (row.project === project.name ||
       (row.project === undefined && subjectFallback != null && row.subject === subjectFallback)) &&
-    ['full-gate', 'pre-push'].includes(row.kind))
-    .sort((a, b) => Date.parse(a.occurredAt) - Date.parse(b.occurredAt));
+    ['full-gate', 'pre-push'].includes(row.kind));
   const successful = counted.filter(row => row.exit === 'ok').slice(-10)
     .map(row => row.value).sort((a, b) => a - b);
   const recent = counted.slice(-20);
