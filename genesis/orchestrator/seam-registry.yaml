@@ -50,7 +50,8 @@ decisionPoints:
     justification: No peer advertisement, network inventory or server capability is introduced.
   - id: C8
     status: answered
-    justification: Each gate prints its evidence line, its closure scope, and either `reused` or
+    justification: >-
+      Each gate prints its evidence line, its closure scope, and either `reused` or
       `not reused: <why>`; a reused run records gate-cycle-seconds@1 with run-kind=reused.
   - id: C9
     status: answered
