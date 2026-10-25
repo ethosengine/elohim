@@ -374,11 +374,14 @@ CID it ran. A bad build costs one failed health check and nothing else.
 
 ## 10. The device runtime, slice A: the native core (design note, 2026-10-24)
 
-Slices 1 and 2a proved the local rung in Python. Slice A moves its primitives into `epr-cli` as
-library modules with thin CLI adapters, and deletes the copies other subsystems grew. It lands in
-four commits, each passing the device-runtime plan's clean-code gates on its own.
+Slices 1 and 2a proved the local rung in Python. Slice A moves its primitives into native library
+modules with thin `epr-cli` adapters, and deletes the copies other subsystems grew. The session
+and bin-store modules live in their own strict crate, `elohim-device-runtime`
+(`elohim/eprfs/device-runtime`), which `epr-cli` and `bin-launch` both depend on; arrival stays in
+`epr-cli`. It lands in four commits, each passing the device-runtime plan's clean-code gates on
+its own.
 
-**A.1 Session identity (`elohim_epr_cli::session`).** `session::resolve()` answers one value,
+**A.1 Session identity (`elohim_device_runtime::session`).** `session::resolve()` answers one value,
 `(runtime, session, owner pid + start time?, source)`, in a fixed order:
 
 1. a declared `ELOHIM_SESSION_ID`, with `ELOHIM_SESSION_OWNER_PID` as its optional owner;
@@ -403,7 +406,7 @@ device cannot work. It exits 1 only on REFUSED. It absorbs `device-preflight`'s 
 layer takes one declared trust rule for the device's own checkout, which retires the per-call
 `safe.directory=*`.
 
-**A.3 The bin store (`elohim_epr_cli::bin_store`, `epr bin <verb>`, `bin-launch`).** A
+**A.3 The bin store (`elohim_device_runtime::bin_store`, `epr bin <verb>`, `bin-launch`).** A
 behaviour-for-behaviour port of `bin_store.py`, whose test cases become Rust tests. Release
 identity becomes CIDv1 (`bafkrei…` for one file, `bafyrei…` for a sums manifest), and
 `evaluator_identity()` changes with it. The bootstrap order is local-first: verified `current`,
@@ -416,3 +419,61 @@ and the fix for the pre-push renew-loop race.
 
 Slice A decides nothing that crosses devices (slice B), nothing about the manifest (slice M) and
 nothing about supervision (slice C).
+
+## 11. The session envelope, slice A2 (design note, 2026-10-25)
+
+Slice A gave a session one identity (§10 A.1). Slice A2 makes that identity the only key an
+agent's facets are found by, so no verb takes a session id by hand and every facet closes once.
+The envelope is a key and a read model. It holds no facet's authority: a claim stays a fold, a
+lease stays a berth record, a covenant clause stays steward-granted, a tier claim stays an actor
+claim.
+
+**The envelope id is the P1 session string.** No second id is minted. `epr session open` writes
+one Private (B) record, `<device dir>/sessions/<id>.json`, beside the device key, because the device
+directory survives a `$HOME` wipe and never travels. The record binds:
+
+- identity: the P1 value (runtime, session, owner pid + start time, source), the device
+  did:key (read from the key, never minting one), the steward (the roster's standing human), and
+  the model — from `--model`, else the runtime row's optional `modelEnv` in
+  `genesis/agentic/agent-runtimes.json`, else absent;
+- context: the recall session (the envelope id, opened through the existing recall verb) and the
+  tool CIDs this session pinned in the bin store.
+
+`open` is idempotent for the same live owner. `show --json` (view schema
+`session-envelope.schema.json`) joins the live facet stores by the id: berth leases, valueflow
+claims, covenant clauses, the capability tier, standing, recall and pins. It copies none of them.
+
+**Re-keying.** berth `moor | claim`, `epr flow claim`, `epr covenant`, recall `open`, the bootstrap
+recall session and the tier gate stop resolving sessions themselves; an omitted `--session` means
+the envelope id. Their record formats do not change. berth's private `/proc` ancestry walk is
+deleted for the Python shim, so the census family `proc session ancestry` reaches 0.
+
+**Ending.** `epr session close` releases the berth leases the envelope holds, seals its covenant
+record and writes one `epr flow note` witness. gc finds envelopes whose owner (pid + start time) is
+dead and closes them through the same function, so a killed session is released by liveness, the
+rule pins and leases already use.
+
+**The start hook** for every projected runtime becomes `epr device arrive && epr session open`.
+A runtime with no hook gets the envelope opened lazily on its first `epr` call.
+
+**Why every session's recall bootstrap refuses (diagnosed 2026-10-25).** The UserPromptSubmit
+hook prints `executor bytes changed (recorded 769a28fc1ca4…, running bafkreibvo7g…)` on every turn.
+The running executor is `/tmp/eprfs-gate-target/debug/epr`, whose raw CID is `bafkreibvo7g…`. The
+hooks Claude Code runs come from the main checkout, and that checkout's `_observation.resolve_bin`
+prefers that cargo target path to `PATH`. The path is a mutable build output, so every
+`cargo build` there changes the executor under a live session. The recorded value is also spelled
+as bare sha256 hex from before §10 A.3. A CIDv1 can never equal it, even for the same bytes.
+Slice A already removed the fallback on dev: the client asks the stable launcher, which execs the
+session's pinned artifact. A2 makes the bootstrap recall session the envelope id and takes the
+executor's identity from the session's pinned CID. A test runs two hook invocations against one
+fixture store, rebuilds the cargo target between them, and shows both read the same executor.
+A continuation recorded under the old spelling is adopted explicitly through the printed
+`adopt` pointer. There is no silent compatibility arm.
+
+**The scenario** serves `dataplane-convergence`, through this spec's graduation trigger (one
+session runs one pinned CID everywhere it reaches the tool), not `devices-share-one-berth`, whose
+invariant is steward-scoped claims across devices (slice B). A Codex session and a Claude session
+each open an envelope under fake runtime ancestors (`EPR_PROC_ROOT`), hold their own leases and
+claims, and close; a killed one is released by liveness.
+
+A2 decides nothing about what crosses devices: the envelope travels in slice B.
