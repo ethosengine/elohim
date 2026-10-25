@@ -644,6 +644,10 @@ function receiptFixture(t) {
     const current = spawnSync('epr', ['bin', '--tool', 'epr', 'resolve', '--current'], {env, encoding:'utf8'});
     if (current.status === 0 && current.stdout.trim()) env.EPR_BIN = current.stdout.trim();
   }
+  // A launcher older than the verb would fail every closure assertion below as if the code were wrong.
+  const verb = spawnSync(env.EPR_BIN || 'epr', ['bin', 'source-state', '--help'], {env, encoding:'utf8'});
+  assert.equal(verb.status, 0, `environment: ${env.EPR_BIN || 'epr on PATH'} has no \`epr bin source-state\`; ` +
+    'set EPR_BIN to a bin-store build from dev (`epr bin --tool epr resolve --current` names one when the device head is current)');
   env.EPR_STORE = resolve(root, 'store');
   env.EPR_REPO_ROOT = root;
   env.EPR_BIN_TOOLS = resolve(root, 'genesis/agentic/bin-tools.json');

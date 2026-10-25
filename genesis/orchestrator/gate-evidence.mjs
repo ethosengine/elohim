@@ -13,7 +13,7 @@
 // reads are fail-open; a missing brit, fingerprint, or required git object reads as
 // `unavailable (<reason>)`, and the gate runs as it always has.
 
-import { nativeGateKey, usesNativeClosure } from './gate-source-state.mjs';
+import { nativeGateKey, nativeGateState, usesNativeClosure } from './gate-source-state.mjs';
 import { spawnSync } from 'child_process';
 import { createHash, createPrivateKey, createPublicKey } from 'crypto';
 import { accessSync, constants, readFileSync } from 'fs';
@@ -317,9 +317,10 @@ export function gateEvidence(project, { env = process.env, root, commit, cargoEn
   if (!britBin || !buildRefBin) {
     return { line: `unavailable (${!britBin ? 'brit' : 'brit-build-ref'} not on BRIT_BIN/BRIT_BUILD_REF_BIN or PATH)` };
   }
-  const nativeKey = usesNativeClosure(project)
-    ? nativeGateKey(project, { root, env, run: spawn, toolchain: cargoEnv?.RUSTUP_TOOLCHAIN, commit }) : undefined;
-  if (nativeKey === null) return { line: 'unavailable (source closure dirty, changed, or native evaluator unavailable)', dirty: true };
+  const native = usesNativeClosure(project)
+    ? nativeGateState(project, { root, env, run: spawn, toolchain: cargoEnv?.RUSTUP_TOOLCHAIN, commit }) : undefined;
+  if (native?.miss) return { line: `unavailable (${native.miss})`, dirty: true };
+  const nativeKey = native?.key;
   const fp = stepFingerprints(project, commit, { britBin, root, spawn });
   if (fp.error) return { line: `unavailable (${fp.error})` };
   const blob = manifestBlob(root, commit, project.manifestPath, spawn);

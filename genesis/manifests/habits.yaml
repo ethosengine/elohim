@@ -2187,10 +2187,10 @@ habits:
       - "node --test genesis/orchestrator/gate-cost.test.mjs (expected-cost fold over gate-cycle-seconds@1 and the defer decision's refusals)"
       - "a2o genesis/a2o/features/devflow/native-gate-evidence.feature reuse rule (this workspace's own green stands in; a red or an unadmitted signer never does)"
     evidence: >
-      DELTA 2026-10-25c (GREEN on real push logs; landed by deliberate pre-push bypass): pushes 7 and 8 of the landing reused this workspace's own green on unchanged closures. elohim-storage `reused: green 2h ago at 7b2b8fcee` took 59 s / 55 s (5757 s cold, 1938 s warm when it ran); steward-node 51 s / 45 s (1222 / 221 s ran); doorway 27 s / 25 s (686 / 125 s ran). Push 7 cleared all 25 gates in 4407 s, against 6128 s with no reuse, and was rejected at the ref lock: docs-only commits landed during its 73-minute window, past an advisory lease the other pusher never saw. Push 8 went red on dev's own renew-loop flake. The branch then landed with the pre-push bypassed on push 7's verdict, by operator ruling ("we're being intentional about the pain here, and what it's FOR"). The 87 cycle rows are preserved at genesis/local-dev/gate-reuse/gate-cycle-2026-10-25.jsonl. Reading and next sprint: backlog `gate-merge-gradient-reading-2026-10-25` (integration as composition: F4 native brit integrate, the corpus gate split, leases and intents on the peer channel, signers beyond self).
-    evidence-fingerprint: sha256:c20f79ac78c53287
-    evidence-bytes: 4770
-    evidence-entries: 5
+      DELTA 2026-10-25d (GREEN held; sprint gate-merge lane D4): an epr older than `epr bin source-state` now names itself. A peer's push 6 was refused because the bin-store `current` (sha256:0d4141…, landed 20:09Z from 0db953233) and every epr on PATH predate the verb, and the miss read as a red closure test. Now the evidence line prints `native evaluator <bin> predates …; set EPR_BIN`, and the closure fixture refuses with `environment:`. Probe: `evaluator_miss_names_the_device` (gate-evidence 39/39); the closure test fails with the environment line on the stale epr and passes on bafkreih7…; gate-runner 93 pass, with 11 failures, the known uninitialised-submodule set.
+    evidence-fingerprint: sha256:0bdb1acb8d9c20ea
+    evidence-bytes: 5448
+    evidence-entries: 6
     guard: >
       Regression risks: (1) reusing on a key that omits something the recipe reads — the recipe
       body, the project tree, a submodule pin, a repo file a test include_str!s; the input audit

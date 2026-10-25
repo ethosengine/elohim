@@ -11,6 +11,7 @@ import { mkdtempSync, mkdirSync, writeFileSync, chmodSync, rmSync, readFileSync 
 import { createHash } from 'node:crypto';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
+import { nativeGateState } from './gate-source-state.mjs';
 import {
   attestationStep,
   closureKey,
@@ -670,4 +671,20 @@ test('runProject keeps running and recording in report mode or with an unreadabl
     if (mode === 'reuse') assert.match(lines.join(''), /not reused: project not enabled for reuse/);
     else assert.doesNotMatch(lines.join(''), /not reused:|reused:/);
   }
+});
+
+test('a native evaluator older than the verb names itself, not the closure', function evaluator_miss_names_the_device(t) {
+  const project = { dir: 'elohim/eprfs' };
+  const fake = result => () => ({ status: 2, stdout: '', stderr: '', ...result });
+  const old = nativeGateState(project, { root: '/nowhere', env: { EPR_BIN: '/old/epr' }, toolchain: '1.96.1',
+    run: fake({ stderr: 'epr: invalid arguments: unknown command `bin`\nusage: epr ...' }) });
+  assert.match(old.miss, /\/old\/epr predates `epr bin source-state`; set EPR_BIN/);
+  assert.equal(old.key, undefined);
+  const absent = nativeGateState(project, { root: '/nowhere', env: { EPR_BIN: '/no/epr' }, toolchain: '1.96.1',
+    run: fake({ error: Object.assign(new Error('spawn ENOENT'), { code: 'ENOENT' }) }) });
+  assert.match(absent.miss, /\/no\/epr did not run \(ENOENT\)/);
+  const dirty = nativeGateState(project, { root: '/nowhere', env: { EPR_BIN: '/new/epr' }, toolchain: '1.96.1',
+    run: fake({ status: 0, stdout: JSON.stringify({ clean: false, status: ' M x', closureCid: '', closure: [] }) }) });
+  assert.equal(dirty.miss, 'source closure dirty');
+  assert.equal(nativeGateState(project, { root: '/nowhere', env: {} }).miss, 'no toolchain declared');
 });
