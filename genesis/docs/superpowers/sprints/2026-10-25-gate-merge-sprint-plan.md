@@ -51,6 +51,11 @@ references are against that commit.
     lease by going `UNLEASED` or bypassing the hook, so **A2 cures the race itself**.
   - The other workspace can see nothing until its device is admitted on this roster. **Roster
     admission gates A4.** It is the operator's item.
+- **The race recurred live, 19:00Z.** While `2e8f68b9` held `dev-integration` (renewed every
+  10 min since 17:19Z), `f74cccbb9` and `8c97287ff` from session `01C86Tki…` (device-runtime)
+  landed on dev. The ledger shows no claim by any other holder in that window. Those commits went
+  in from an unadmitted device or unleased, so the waiting push now has to rebase. A2 closes the
+  same-device path; A4 (roster admission) closes the cross-device path.
 - **F4 is closer than the plan assumed.** `epr integrate` already advances the ref atomically with
   `update-ref` and an expected-old value (`elohim/eprfs/epr-cli/src/integrate.rs:295`). What blocks it:
   - preconditions for a clean checkout and HEAD at the source (`:146`);
