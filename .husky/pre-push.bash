@@ -189,7 +189,9 @@ berth_renew_loop() {
   [ "$interval" -ge 1 ] || interval=1
   set +m # descendants share this renewer's process group
   trap - EXIT INT HUP
-  trap 'trap "" TERM; kill -TERM -- "-$BASHPID" 2>/dev/null; wait; exit 0' TERM
+  # A sleeper forked but not yet exec'd still runs this trap's handler, swallows the group TERM and
+  # then sleeps the full interval under `wait`; KILL cannot be caught in that window.
+  trap 'trap "" TERM; [ -z "$sleeper" ] || kill -KILL "$sleeper" 2>/dev/null; kill -TERM -- "-$BASHPID" 2>/dev/null; wait; exit 0' TERM
   while :; do
     sleep "$interval" </dev/null >/dev/null 2>&1 &
     sleeper=$!
