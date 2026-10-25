@@ -892,6 +892,22 @@ class WorktreeIntentTest(unittest.TestCase):
                 self.assertEqual(event["env"]["dseq"], str(row["dseq"]))
                 self.assertEqual(b.leases(), {}, "the intent crosses before any claim")
 
+    def test_worktree_mooring_crosses_before_the_channel_is_cached(self):
+        # 2026-10-25 T8 run t8-20261025-02: the holder ran in a worktree on a device admitted minutes
+        # earlier. Its lease crossed but its mooring folded into the worktree, so the contender never
+        # saw it.
+        b = self.make()
+        Path(b._channel_cache_path()).unlink(missing_ok=True)
+        self.peer_run.reset_mock()
+        out = view()
+        out["store"] = str(self.main)
+        self.answer(out)
+        b._fold("moor", {"kind": "moor", "session": "t8-holder", "dseq": 8})
+        self.assertEqual(self.peer_run.call_count, 1, "asked once, from a worktree with nothing cached")
+        self.assertEqual(self.obs.events[-1]["root"], str(self.main), "the store the peer serves")
+        b._fold("moor", {"kind": "moor", "session": "t8-contender", "dseq": 9})
+        self.assertEqual(self.peer_run.call_count, 1, "a known store is never asked again")
+
     def test_worktree_intents_refresh_a_stale_channel_cache(self):
         Path(self.berth._channel_cache_path()).write_text(str(self.worktree) + "\n")
         out = view()

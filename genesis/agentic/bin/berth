@@ -575,8 +575,14 @@ class Berth:
         resource = ev.get("resource")
         if ev.get("kind") in MOORING_KINDS and resource is None:
             # A mooring crosses when this workspace is a device whose channel store is known (this
-            # process read it, or an earlier one did); it never asks `epr` for it, and never fails.
-            return self.channel_root or self.cached_channel_root() or REPO_ROOT, None
+            # process read it, or an earlier one did), and never fails. Only a worktree with nothing
+            # known yet asks `epr` once, because its own store is never the one served: a device
+            # admitted minutes ago would otherwise moor where no peer can see it.
+            root = self.channel_root or self.cached_channel_root()
+            if not root and not self._channel_read and main_checkout(REPO_ROOT) != REPO_ROOT:
+                self.peer_leases()
+                root = self.channel_root
+            return root or REPO_ROOT, None
         note = (ev.get("kind") == "note" and resource is None
                 and bool(self.steward_names or self.steward_prefixes))
         if not (note or isinstance(resource, str) and self.steward_scoped(resource)):
