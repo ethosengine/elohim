@@ -1,0 +1,138 @@
+---
+title: "Sprint plan — two peers land on dev without racing or re-gating"
+id: gate-merge-sprint-plan-20261025
+date: 2026-10-25
+status: active
+author: "claude-opus-5-5 (Che workspace, ethosengine), with the operator (steward of record)"
+habits: [devices-share-one-berth, push-gate-pays-once]
+cites:
+  - genesis/data/timeline/backlog/gate-merge-gradient-reading-2026-10-25.md
+  - genesis/data/timeline/backlog/native-peer-dev-channel-and-collective-memory-seed.md
+  - genesis/agentic/.epr-meta/devices-share-one-berth.habit.md
+  - genesis/orchestrator/.epr-meta/push-gate-pays-once.habit.md
+---
+
+# Sprint plan — two peers land on dev without racing or re-gating
+
+This sprint carries out backlog item `gate-merge-gradient-reading-2026-10-25`. The logjam it
+answers: landing one branch took eight gated pushes. Push 7 cleared all 25 gates and still lost the
+ref race, because docs commits from another workspace landed past an `dev-integration` lease that
+workspace never saw.
+
+Operator rulings, 2026-10-25 (covenant session 46e7b111, clauses `bafyreibk4rc2…` steward and
+`bafyreid2jkbf…` purpose):
+
+- Coordination between peers leads, then integration as composition.
+- F4 lands first in `epr integrate`, which already advances the ref by compare-and-swap. Linking it
+  into brit (the 10-14 plan's decision 1) follows and changes no visible behaviour.
+- This session's write-set covers lanes A and D. Lanes B and C are planned here and run under a
+  later grant.
+
+## What the grounding found
+
+These were four read-only Codex legs against `b2130d38b`, spot-checked by hand. File:line
+references are against that commit.
+
+- **The lease is already shared, but it isn't visible.** `dev-integration` is scoped to the steward
+  (`genesis/agentic/pool-policy.json:116`). Berth writes it to the device's channel store, and every
+  claim reads `epr peer leases --json` (`genesis/agentic/bin/berth:329,1148`). `epr peer serve`
+  carries signed channel heads over iroh, and `epr flow fold --from <device> --root <cid>` receives
+  them. The peer missed the lease for four reasons:
+  - only one peer endpoint is declared, and it is served on demand;
+  - a push with no resolvable session goes ahead `UNLEASED` (`.husky/pre-push.bash:118,257`);
+  - a `berth say` intent written from a worktree can miss the store that is served;
+  - the remote lease view drops task, closure and expiry
+    (`elohim/eprfs/eprfs-peer/src/lease_view.rs:102,276`).
+- **Live reading, 18:35 UTC.** Run on this device, `berth status` shows
+  `dev-integration held by 2e8f68b9 … for 72m (verify, ttl 30m) — pre-push to dev`, so sessions on one
+  device do see each other's lease. Under "other devices" it prints `none — no other device is
+  admitted on this roster`. Two consequences:
+  - The docs pushes that raced push 7 were made on this device. They could only have passed a held
+    lease by going `UNLEASED` or bypassing the hook, so **A2 cures the race itself**.
+  - The other workspace can see nothing until its device is admitted on this roster. **Roster
+    admission gates A4.** It is the operator's item.
+- **F4 is closer than the plan assumed.** `epr integrate` already advances the ref atomically with
+  `update-ref` and an expected-old value (`elohim/eprfs/epr-cli/src/integrate.rs:295`). What blocks it:
+  - preconditions for a clean checkout and HEAD at the source (`:146`);
+  - it runs the pinned gate instead of asking for evidence;
+  - the evidence lookup (`gate-evidence.mjs:248`, `brit-build-ref build find`) is already at brit
+    pin `76ba95d8a`, but it does not verify signatures.
+  The plan cites `rakia-brit/src/baselines.rs` for `MustExistAndMatch`, and that citation is wrong
+  (it uses `PreviousValue::Any`).
+- **The corpus split is on F4's critical path.** When a read can't be resolved, the whole commit
+  tree goes into the eprfs closure key (`gate-evidence.mjs:113,329`). So a docs-only delta misses
+  eprfs, and integrate would refuse it. The "lands in under 60 s" probe needs C1.
+- **The double-release flake.** The renew loop inherits the cleanup trap until it resets it
+  (`.husky/pre-push.bash:174`). If the gate fails at once, TERM arrives before that reset, so the
+  child runs the parent's cleanup and the parent then releases its own copy.
+- **CI's reading.** Orchestrator #2144–#2148 were all FAILURE or UNSTABLE before `b2130d38b` was
+  queued. A red on that push says nothing on its own; it has to be read job by job against #2149.
+
+## Lanes
+
+### 0. Read CI's verdict on `b2130d38b`
+
+Compare each job against #2149. Record which jobs differ and whether each difference is
+environment or code. Append the result to the backlog item's "What was measured" section.
+
+### A. Peer coordination (habit `devices-share-one-berth`, red)
+
+| Slice | Change | Probe |
+|---|---|---|
+| A1 | `hook_on_exit` releases only in the shell that owns the lease (`BASHPID` guard) | `prepush_releases_on_gate_failure`, plus a case where the renewer is terminated before its trap reset, asserting one release per lease |
+| A2 | A dev/main push with no resolvable session refuses, naming the cure, instead of going `UNLEASED`; an intent written from a worktree goes to the served channel store | `prepush-berth.test.mjs` refusal case; `berth_test.py::worktree_intent_reaches_peer_before_first_claim` |
+| A3 | The lease record carries closure fingerprint, task and expiry; `lease_view.rs` keeps them; `berth status` shows a remote holder's closure and expiry. Local holders get the same treatment: the line shows the last renew and the expiry, not only the time held. On 2026-10-25 a peer read `held … for 72m (ttl 30m)` as an expired lease; the ledger showed renews every 10 min | `peer_sees_closure_and_expiry_before_push` (berth + lease_view tests) |
+| A4 | Both T8 halves run between the real workspaces: shem's endpoint is live and the ethosengine holder half is seeded | `@concern:devices-share-one-berth and @requires:shem`, joined T8 receipt |
+
+A3 changes `eprfs-peer` (Rust), which is outside this session's write-set. If the remote view
+can't carry the fields without it, A3 stops at the berth half and names the Rust half for lane B's
+grant. A4 needs the other workspace, so it is the operator's item to schedule.
+
+### B. Integration as composition (planned; later grant)
+
+1. B1, an evidence adapter that only inspects: it reuses `gateEvidence()` → `reusableHit()` and
+   never runs a recipe. Probe: `inspection_never_runs_recipe`, and the newest-red, signer and
+   selector refusals still hold.
+2. B2, `epr integrate --dry-run` prints the compare-and-swap plan and each gate's evidence hit or
+   miss. Probe: `dry_run_reports_cas_and_misses_without_mutation`.
+3. B3, a ref compare-and-swap on cached evidence only: drop the checkout preconditions, refuse any
+   miss, and keep git's checked-out-branch rule. Probe:
+   `integrate_fast_forwards_target_ref_without_touching_index_head_or_worktree`, plus a
+   target-race refusal.
+4. Later, link epr-cli into brit-cli. It is a library call with no visible behaviour change.
+
+### C. Corpus split (planned; later grant)
+
+1. C1, a `corpus-conformance` gate (`genesis/corpus-conformance/build-manifest.json`) takes the
+   corpus tests out of eprfs (about 15 tests across `epr-cli/tests/{live_manifest_integrity,
+   flow_cites,flow_scope,flow_memory_affiliations,flow_memory_sponsorship}.rs`). It declares the
+   corpus inventories and the evaluator code as its inputs. Tests that read both code and corpus
+   (`flow_parity`, `flow_edge_parity`, `canon_lift_parity`) go to the corpus gate with the
+   evaluator code declared. Probe: a docs-only mutation leaves the eprfs key unchanged; a corpus
+   mutation moves only the corpus key.
+2. C2, memory-ceremony gets a real step and declared reads, and enrolls in reuse only after its
+   attribution parity check is snapshotted or excluded.
+
+### D. Measurement (this session)
+
+| Slice | Change | Probe |
+|---|---|---|
+| D1 | `gate-cost.mjs` uses ledger append order, not `occurredAt` (author clock, `gate-cost.mjs:42`); the main-checkout and worktree ledgers have a declared precedence | fixtures with descending and repeated author dates, and two ledgers |
+| D2 | Cycle rows carry `failure_class=environment\|code` from structured preflight and test outcomes | four classifier fixtures (leaked toolchain, missing wasm32 target, missing dist, assertion failure) |
+| D3 | A reuse miss names the closure component that moved | change recipe, compiler, gitlink and reads one at a time; each is named and reuse stays refused |
+
+D3 needs a brit verb that fetches the previous verdict for a project without filtering on the
+exact key. Until brit has one, it prints "comparison unavailable".
+
+### Next sprint: signers beyond self
+
+Brit's `build find` verifies signatures; verdicts are signed with the device identity; roster
+devices are admitted from contest-aware admission. All of this needs a brit landing plus a pin move,
+and a pin move rolls the fleet, so it rides the next planned bump.
+
+## Done means
+
+- `devices-share-one-berth` moves toward green: A1–A3 have landed with their probes, and A4 is
+  scheduled with the other workspace.
+- Lane D's rows say why a cycle failed and why reuse missed.
+- Each slice adds a DELTA line to its habit atom, and the register is re-projected.
