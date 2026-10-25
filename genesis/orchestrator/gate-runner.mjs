@@ -275,8 +275,18 @@ export function runProject(project, printOnly, namesOnly, { root = ROOT, env = p
 
   write(`\n[gate] ${project.name} (${project.dir})\n`);
   if (!cycleRowsByRoot.has(root)) {
-    try { cycleRowsByRoot.set(root, readCycleRows(resolve(root, '.eprfs/status/flows.jsonl')).rows); }
-    catch { cycleRowsByRoot.set(root, null); }
+    // The sidecar is device-local and gitignored: a linked worktree's holds only its own runs,
+    // and the history lives in the main checkout's. Read both; an unreadable one is skipped.
+    // Each observation is written to exactly one sidecar, so the two never overlap.
+    const dirs = gitDirs(root);
+    const roots = [root, ...(dirs && dirs.gitDir !== dirs.commonDir ? [dirname(dirs.commonDir)] : [])];
+    let rows = null;
+    for (const at of roots) {
+      try {
+        rows = [...(rows || []), ...readCycleRows(resolve(at, '.eprfs/status/flows.jsonl')).rows];
+      } catch { /* An absent sidecar contributes nothing. */ }
+    }
+    cycleRowsByRoot.set(root, rows);
   }
   const rows = cycleRowsByRoot.get(root);
   let costDecision = null;

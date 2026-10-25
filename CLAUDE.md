@@ -117,6 +117,14 @@ cargo's default parallelism and is shed by the workspace RAM guard; at one job i
 peaks at 5.4 GB for ~12% wall-clock. DNA/WASM workspaces remain plain Cargo because
 Holochain packing requires their in-tree `./target`.
 
+**A gate pays once per closure.** Every gate keys its verdict on its input closure: the step's declared inputs, the manifest, the recipe file, `run-local-gate.sh`, the project tree, `rustc -vV`, submodule gitlinks, and every repo path its code reads. `gate-input-audit.mjs` finds those reads; a genuine walk declares itself with `// gate-reads: <path>`, and any read it cannot name keys the whole commit tree. Never declare such reads in a manifest's step `sources`, which drive CI dispatch. Gate knobs:
+- `GATE_EVIDENCE=reuse`: this workspace's own newest green attestation stands in for the recipe, for projects listed in `pool-policy.json gate_reuse`. Red, dirty inputs, another signer, a selecting change since the attested commit, or no rakia oracle each run the gate.
+- `GATE_NARROW=shadow|on|off`: eprfs tests only the reverse dependencies of changed packages. The default `shadow` prints the set and runs the full workspace.
+- `GATE_DEFER=off`: a gate whose p90 is at least 600 s and that has not failed locally in 10+ runs may defer to CI on a CI-built feature branch, never on dev or main. This switch disables that.
+- `HARNESS_JOBS`: agentic-library harness parallelism, default 4.
+
+Habit `push-gate-pays-once` in `genesis/orchestrator/.epr-meta/`.
+
 **Submodule pins are attested, not re-tested.** A gate project whose `run.kind` is
 `attested` (brit, rakia, sophia — each declares itself in its own repo's manifest with
 the gitlink path as the step input) runs no local recipe: `gate-runner.mjs` dispatches it

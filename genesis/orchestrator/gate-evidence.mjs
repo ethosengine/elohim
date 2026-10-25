@@ -279,7 +279,8 @@ export function reusableHit(evidence, { selfId, enabled, mode, selectorCheck }) 
   const row = [...(evidence.rows || [])].sort(
     (a, b) => Date.parse(b.attestation?.builtAt || 0) - Date.parse(a.attestation?.builtAt || 0)
   )[0];
-  if (row?.attestation?.success !== true) return { reuse: false, why: 'newest attestation is red' };
+  if (!row) return { reuse: false, why: 'no attestation for this closure yet' };
+  if (row.attestation?.success !== true) return { reuse: false, why: 'newest attestation is red' };
   if (row.attestation.agentId !== selfId) return { reuse: false, why: `signer ${String(row.attestation.agentId || 'unsigned').slice(0, 12)} is not this workspace` };
   if (evidence.dirty !== false) return { reuse: false, why: evidence.dirty === true ? 'declared inputs dirty' : 'working tree state unknown' };
   const selected = selectorCheck(row.commit);

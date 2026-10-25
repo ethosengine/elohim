@@ -434,9 +434,13 @@ test('reusableHit refuses a missing workspace key before checking rows', () => {
 
 test('reusableHit refuses the newest red even when an older attestation is green', () => {
   const newer = { commit: 'bbbbbbbbb2', attestation: { success: false, agentId: 'other', builtAt: '2026-10-24T13:00:00Z' } };
-  for (const rows of [[greenRow, newer], [newer, greenRow], []]) {
+  for (const rows of [[greenRow, newer], [newer, greenRow]]) {
     assert.deepEqual(reusableHit({ rows, dirty: true }, { ...reuseContext, selectorCheck: unexpectedSelector }), { reuse: false, why: 'newest attestation is red' });
   }
+});
+
+test('reusableHit names a closure with no attestation as a miss, not as red', () => {
+  assert.deepEqual(reusableHit({ rows: [], dirty: false }, { ...reuseContext, selectorCheck: unexpectedSelector }), { reuse: false, why: 'no attestation for this closure yet' });
 });
 
 test('reusableHit refuses another signer before checking dirty inputs', () => {
