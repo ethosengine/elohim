@@ -4,6 +4,7 @@ to: The Center for Humane Technology, and everyone building AI that people confi
 from: Matthew Dowell, steward of the Elohim Protocol
 date: 2026-10-25
 status: draft
+reach: commons
 lede: We will not take intimacy on the industry's terms. The most intimate model of a person belongs with that person, where it can protect them instead of being sold.
 sovereignty-frame: bounded
 stewardship-frame: inalienable
