@@ -56,6 +56,11 @@ references are against that commit.
   landed on dev. The ledger shows no claim by any other holder in that window. Those commits went
   in from an unadmitted device or unleased, so the waiting push now has to rebase. A2 closes the
   same-device path; A4 (roster admission) closes the cross-device path.
+- **A third time, 20:11Z, with the lease taken on the other device.** While `2e8f68b9` held
+  `dev-integration` for push 7, device-runtime's `09f68a04e` landed under a lease that only its own
+  device could see. Its device is not admitted here, so to this roster the lease was invisible
+  rather than missing. The waiting push restarted for the second time (push 8). A2 can't cure
+  this; only A4 can.
 - **F4 is closer than the plan assumed.** `epr integrate` already advances the ref atomically with
   `update-ref` and an expected-old value (`elohim/eprfs/epr-cli/src/integrate.rs:295`). What blocks it:
   - preconditions for a clean checkout and HEAD at the source (`:146`);
