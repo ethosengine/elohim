@@ -1175,13 +1175,13 @@ fn m8_current_device_reads_the_device_under_no_claimable_session() {
     actor::claim(
         root,
         "agent:scribe@opus-5",
-        "participant-standing:device-read",
+        "participant-standing-device-read",
     )
     .unwrap();
     let hidden = current_json(
         root,
         &key_file,
-        &["--session", "participant-standing:device-read"],
+        &["--session", "participant-standing-device-read"],
     );
     assert!(
         hidden["standing"].is_null(),
@@ -1199,4 +1199,21 @@ fn m8_current_device_reads_the_device_under_no_claimable_session() {
         &["actor", "current", "--device", "--session", "s"],
     );
     assert!(!both.status.success(), "--device consults no session");
+}
+
+#[test]
+fn a_claim_under_a_label_no_envelope_could_have_is_refused() {
+    // Facet stores key records by session: brit's covenant refs nest a `/` under another
+    // session's prefix, so `victim/x` would write into session `victim`'s clauses.
+    let dir = fixture();
+    let root = dir.path();
+    for label in ["victim/x", "a:b", ".."] {
+        let refused = actor::claim(root, "agent:scribe@opus-5", label)
+            .expect_err("a label outside the P1 shape is refused");
+        assert!(
+            refused.to_string().contains("session-invalid"),
+            "{label}: {refused}"
+        );
+    }
+    actor::claim(root, "agent:scribe@opus-5", "victim").expect("a P1 id claims");
 }

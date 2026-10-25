@@ -285,8 +285,8 @@ pub fn model(
         })
 }
 /// Whether `id` can name an envelope: a P1 session id is a simple local name of 1–96
-/// characters. A label outside this shape (an explicit `--session` such as
-/// `participant-standing:device-read`) can never be bound, so it has no envelope to validate.
+/// characters (ASCII letters, digits, `_`, `.`, `-`; not `.` or `..`). Facet writers key their
+/// records by session, so they refuse any other label, bound or not.
 #[must_use]
 pub fn is_envelope_id(id: &str) -> bool {
     !id.is_empty()

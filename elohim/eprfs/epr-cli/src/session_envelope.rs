@@ -194,10 +194,16 @@ pub fn live_guard(id: Option<&str>, destination: &Path) -> Result<FacetGuard> {
         .canonicalize()
         .map_err(err)?;
     let mut guard = FacetGuard { root, _store: None };
-    // A label that cannot name an envelope has no binding, exactly like an unbound P1 id.
-    let Some(id) = id.filter(|id| envelope::is_envelope_id(id)) else {
+    let Some(id) = id else {
         return Ok(guard);
     };
+    // Facet stores key records by this label (brit's covenant refs nest a `/` under another
+    // session's prefix), so a label an envelope could never have is refused on every device.
+    if !envelope::is_envelope_id(id) {
+        return Err(format!(
+            "session-invalid: {id}: a session id is a simple local name (1–96 characters)"
+        ));
+    }
     let key = home()?;
     if !key.parent().is_some_and(|p| p.join("sessions").is_dir()) {
         return Ok(guard);
@@ -219,23 +225,33 @@ pub fn live_guard(id: Option<&str>, destination: &Path) -> Result<FacetGuard> {
     Ok(guard)
 }
 
-/// Owner and liveness of a binding, for a facet whose store is device-scoped (berth). Unlike
-/// [`live_guard`] it never compares checkouts. Returns whether the session is bound; a device
-/// with no envelope directory is a standalone store and passes unbound.
-fn device_scoped_binding(id: &str) -> Result<bool> {
+/// Owner, liveness and device of a binding, for a facet whose store is device-scoped (berth).
+/// Unlike [`live_guard`] it never compares checkouts. A device with no envelope directory is a
+/// standalone store and reads as unbound.
+fn device_scoped_binding(id: &str) -> Result<Option<Envelope>> {
     let key = home()?;
     if !key.parent().is_some_and(|p| p.join("sessions").is_dir()) {
-        return Ok(false);
+        return Ok(None);
     }
     let store = Store::shared(&key).map_err(err)?;
     let Some(record) = store
         .binding(id, &session::resolve(), &proc_root())
         .map_err(err)?
     else {
-        return Ok(false);
+        return Ok(None);
     };
     Store::require_live(&record).map_err(err)?;
-    Ok(true)
+    // The device key is the one fact `open` re-proposed that is not tied to a checkout.
+    if device_key::DeviceKey::load(&persistent_home()?)
+        .map_err(err)?
+        .did_key()
+        != record.device
+    {
+        return Err(format!(
+            "session-conflict: {id}: bound to another device key"
+        ));
+    }
+    Ok(Some(record))
 }
 
 fn pins(record: &Envelope) -> Result<BTreeMap<String, String>> {
@@ -278,14 +294,15 @@ fn berth_path(record: &Envelope) -> Result<Option<PathBuf>> {
     Ok(Some(resolved))
 }
 
-// Called before any shared mutation guard: lazy creation and reference binding both
-// need the exclusive lock. The caller then takes the shared lock and revalidates.
-/// The launcher's lazy open, for a runtime with no start hook. A session already bound, from any
-/// checkout, is left as it is: re-proposing it from another repository (a fixture, a second
-/// project) would read that repository's roster and refuse a session that is already open.
+/// The launcher's lazy open, for a runtime with no start hook. In the bound checkout (or for an
+/// unbound session) this is `open`, which also repairs a missing recall continuation. From any
+/// other checkout a bound session is left as it is: re-proposing it there would read that
+/// repository's roster and refuse a session that is already open.
 pub fn open_lazily() -> Result<()> {
-    if device_scoped_binding(&current_id()?)? {
-        return Ok(());
+    if let Some(record) = device_scoped_binding(&current_id()?)? {
+        if root().ok().as_deref() != Some(record.repository.as_path()) {
+            return Ok(());
+        }
     }
     open(None).map(drop)
 }
@@ -293,11 +310,13 @@ pub fn open_lazily() -> Result<()> {
 /// Berth's store is device-scoped: a lease taken from any checkout, the main one or a linked
 /// worktree, belongs to the same envelope. Only an unbound session is opened here, because
 /// `open` proposes the current checkout and would refuse a bound one called from a worktree.
+// Called before any shared mutation guard: lazy creation and reference binding both
+// need the exclusive lock. The caller then takes the shared lock and revalidates.
 fn prepare_berth(id: &str, path: &Path) -> Result<()> {
     if current_id()? != id {
         return Err(format!("envelope-owner-mismatch: {id}"));
     }
-    if !device_scoped_binding(id)? {
+    if device_scoped_binding(id)?.is_none() {
         open(None)?;
     }
     let store = Store::lock(&home()?).map_err(err)?;
