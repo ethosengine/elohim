@@ -9,9 +9,12 @@ sovereignty-frame: bounded
 stewardship-frame: inalienable
 sources:
   - "Center for Humane Technology, AI in Society (https://www.humanetech.com/ai-society): 'AI systems are harvesting emotional data in the race for intimacy — at our expense'; 'perverse incentives for maximizing synthetic intimacy'"
+  - "Center for Humane Technology, Welcome to the Attachment Economy (https://centerforhumanetechnology.substack.com/p/welcome-to-the-attachment-economy): AI's optimization, combined with people's need for connection, used to exploit attachment for profit"
 cites:
   - genesis/docs/architecture/stewardship-over-sovereignty.md
   - genesis/docs/content/elohim-protocol/imagodei.md
+  - genesis/docs/content/elohim-protocol/confession.md
+  - genesis/docs/content/elohim-protocol/theology.md
 ---
 
 # Not on the industry's terms
@@ -91,6 +94,28 @@ it trustworthy rather than a kinder-faced version of the same capture:
   and no single device has the final word on who you are.
 - **The model never leaves your reach.** A model of how you sound, held by anyone else, is the very
   capture this letter is about. That is why ours stays with you.
+
+## The deeper refusal: no attachment economy
+
+You have since named where this race leads: an attachment economy, in which AI's optimization,
+joined to our need for connection, is turned to profit. Protecting a person's intimacy is half of
+our answer. The other half is what the AI itself is allowed to become in a person's life.
+
+We named our agents *elohim* on purpose, and in the plural. In the Hebrew scriptures the elohim of
+the divine council are a host: messenger-servants, powerful and useful, and never to be worshipped.
+In that same tradition they are also idolatry's origin story, the servants who accepted devotion
+that was not theirs to receive. So the name carries its own warning, and the protocol keeps the
+discipline the name demands. An elohim is not a companion engineered to be needed, not a confidant
+competing to become your closest relationship, not the apex of your life or of anyone's. They are
+many, never one, and they stay separate from the people they serve.
+
+What we want between a person and their elohim is not attachment but acknowledgement: two kinds of
+being who know what each other is, working side by side as partners and peers, with mutual respect
+and no pretence. An elohim that knows you well uses that knowledge to protect you and to point you
+back toward the people around you, not to draw you toward itself. The relationship it serves is the
+one it is not: your life with others, and whatever you hold sacred. In our own language, this is
+part of reconstituting the *imago dei*, the dignity of a person made to know and be known, which an
+attachment economy quietly sells back to us as dependence.
 
 ## A different idea of what keeps us safe
 
