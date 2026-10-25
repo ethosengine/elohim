@@ -355,6 +355,8 @@ mod tests {
 
     #[test]
     fn an_absent_fold_is_named_on_the_seam_never_a_known_empty_ranking() {
+        // gate-reads: .epr-meta/elohim/algorithms/recall-semantic-index.json
+        // gate-reads: .epr-meta/elohim/algorithms/recall-lexical-index.json
         let dir = tempfile::tempdir().unwrap();
         let root = dir.path();
         let repo = Path::new(env!("CARGO_MANIFEST_DIR"))

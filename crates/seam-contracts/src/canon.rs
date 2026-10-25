@@ -419,6 +419,8 @@ mod canon_conformance {
     }
 
     fn repo_root() -> Option<PathBuf> {
+        // gate-reads: .claude/epr-meta/policies.yaml
+        // gate-reads: .claude/epr-meta/concerns.yaml
         let mut dir: &Path = Path::new(env!("CARGO_MANIFEST_DIR"));
         for _ in 0..8 {
             if dir.join(".claude/epr-meta/policies.yaml").is_file() {

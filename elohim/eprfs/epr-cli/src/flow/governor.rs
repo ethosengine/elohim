@@ -635,6 +635,7 @@ mod tests {
     /// (`.claude/epr-meta/governors.yaml`); `None` when not running inside the tree (a
     /// packaging/extraction context) — the dogfood test skips gracefully rather than failing.
     fn find_repo_root() -> Option<PathBuf> {
+        // gate-reads: .claude/epr-meta/governors.yaml
         let mut dir = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
         loop {
             if dir.join(".claude/epr-meta/governors.yaml").is_file() {

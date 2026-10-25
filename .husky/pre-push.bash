@@ -274,6 +274,8 @@ fi
 # ── Berth: claims taken ───────────────────────────────────────────
 
 CHANGED=""
+UNFILTERED_CHANGED=""
+GATE_NARROW_BASE=ok
 PUSH_TARGETS=""
 LAST_LOCAL_SHA=""
 DEV_LOCAL_SHA=""
@@ -306,21 +308,47 @@ for PUSH_LINE in "${PUSH_LINES[@]}"; do
   # Determine what changed
   if [ "$REMOTE_SHA" = "$ZERO_SHA" ]; then
     # New branch - check recent commits against remote
+    # HEAD~10 is a heuristic for detection, never a real narrowing base.
+    GATE_NARROW_BASE=none
     NEW_CHANGED=$(git diff --name-only HEAD~10 HEAD 2>/dev/null || echo "")
   else
-    NEW_CHANGED=$(git diff --name-only "$REMOTE_SHA" "$LOCAL_SHA" 2>/dev/null || echo "")
+    if ! NEW_CHANGED=$(git diff --name-only "$REMOTE_SHA" "$LOCAL_SHA" 2>/dev/null); then
+      GATE_NARROW_BASE=none
+      NEW_CHANGED=""
+    fi
   fi
 
   # Accumulate changed files across all refs
   if [ -n "$NEW_CHANGED" ]; then
     CHANGED=$(printf '%s\n%s' "$CHANGED" "$NEW_CHANGED")
+    UNFILTERED_CHANGED=$(printf '%s\n%s' "$UNFILTERED_CHANGED" "$NEW_CHANGED")
   fi
 done
+
+# Keep the unfiltered union for package selection after .ci-ignore changes CHANGED.
+GATE_CHANGED_FILES=$(mktemp)
+gate_remove_changed_files() {
+  [ -z "$GATE_CHANGED_FILES" ] || rm -f -- "$GATE_CHANGED_FILES"
+}
+HOOK_ON_EXIT="$HOOK_ON_EXIT gate_remove_changed_files"
+if [ -z "$GATE_CHANGED_FILES" ] || ! printf '%s\n' "$UNFILTERED_CHANGED" > "$GATE_CHANGED_FILES"; then
+  GATE_NARROW_BASE=none
+fi
+export GATE_CHANGED_FILES GATE_NARROW_BASE
 
 # Gate evidence and household landing follow the exact object destined for dev. For pushes that
 # do not include dev, preserve the former last-ref behavior for the ordinary union gate.
 GATE_COMMIT="${DEV_LOCAL_SHA:-$LAST_LOCAL_SHA}"
 export GATE_COMMIT
+GATE_PUSH_TARGETS="${PUSH_TARGETS# }"
+GATE_PUSH_BRANCHES=""
+for GATE_PUSH_TARGET in $GATE_PUSH_TARGETS; do
+  case "$GATE_PUSH_TARGET" in
+    refs/heads/*) GATE_PUSH_BRANCHES="${GATE_PUSH_BRANCHES:+$GATE_PUSH_BRANCHES }${GATE_PUSH_TARGET#refs/heads/}" ;;
+    *) GATE_PUSH_BRANCHES=""; break ;;
+  esac
+done
+export GATE_PUSH_TARGETS GATE_PUSH_BRANCHES
 CHECKED_OUT_HEAD=$(git rev-parse HEAD 2>/dev/null || echo "")
 if [ -n "$GATE_COMMIT" ] && [ "$GATE_COMMIT" != "$CHECKED_OUT_HEAD" ]; then
   export GATE_EVIDENCE_RECORD=0
@@ -472,18 +500,47 @@ if echo "$CHANGED" | grep -qE "^\.claude/scripts/"; then
   if command -v python3 >/dev/null 2>&1 && [ -d .claude/scripts/_lib/__tests__ ]; then
     lib_tests_ran=0
     lib_failed=""
+    lib_parallel_tests=()
+    lib_serial_tests=()
+    if [[ ! "${HARNESS_JOBS:-4}" =~ ^[1-9][0-9]*$ ]]; then
+      echo "[pre-push] ERROR: HARNESS_JOBS must be a positive integer."
+      exit 1
+    fi
     echo "[pre-push] Running agentic-library harnesses (.claude/scripts/_lib/__tests__)..."
     for lib_test in .claude/scripts/_lib/__tests__/*_test.py .claude/scripts/_lib/__tests__/test_*.py; do
       [ -f "$lib_test" ] || continue
       lib_tests_ran=$((lib_tests_ran + 1))
-      # git exports GIT_DIR/GIT_WORK_TREE/GIT_INDEX_FILE/GIT_PREFIX into hooks; a harness that
-      # spawns git inside a temp repo would then act on THIS repo (epr_habits_test red only under
-      # the hook, 2026-09-11) — the same scrub gate-runner.mjs applies to gate children.
+      # SERIAL holds repo-relative paths, with reason comments on separate lines. With one
+      # worker, keep the original glob order; otherwise defer these until all workers finish.
+      if [ "${HARNESS_JOBS:-4}" != 1 ] && [ -f .claude/scripts/_lib/__tests__/SERIAL ] &&
+        grep -Fxq -- "$lib_test" .claude/scripts/_lib/__tests__/SERIAL; then
+        lib_serial_tests+=("$lib_test")
+      else
+        lib_parallel_tests+=("$lib_test")
+      fi
+    done
+    # git exports GIT_DIR/GIT_WORK_TREE/GIT_INDEX_FILE/GIT_PREFIX into hooks; a harness that
+    # spawns git inside a temp repo would then act on THIS repo (epr_habits_test red only under
+    # the hook, 2026-09-11) — the same scrub gate-runner.mjs applies to gate children.
+    if [ "${#lib_parallel_tests[@]}" -gt 0 ]; then
+      if ! lib_failed=$(printf '%s\0' "${lib_parallel_tests[@]}" |
+        xargs -0 -n 1 -P "${HARNESS_JOBS:-4}" bash -c '
+          lib_test=$1
+          if ! env -u GIT_DIR -u GIT_WORK_TREE -u GIT_INDEX_FILE -u GIT_PREFIX python3 "$lib_test" >/dev/null 2>&1; then
+            printf "%s\n" "$lib_test"
+          fi
+        ' _); then
+        echo "[pre-push] ERROR: agentic-library harness workers could not complete."
+        exit 1
+      fi
+    fi
+    for lib_test in "${lib_serial_tests[@]}"; do
       if ! env -u GIT_DIR -u GIT_WORK_TREE -u GIT_INDEX_FILE -u GIT_PREFIX python3 "$lib_test" >/dev/null 2>&1; then
         lib_failed="$lib_failed $lib_test"
       fi
     done
     if [ -n "$lib_failed" ]; then
+      lib_failed=$(printf '%s\n' $lib_failed | LC_ALL=C sort)
       echo ""
       echo "!!============================================================!!"
       echo "!! AGENTIC-LIBRARY HARNESS FAILED:"

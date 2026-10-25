@@ -47,6 +47,7 @@ export function observationArgs(subject, seconds, run) {
     '--env', `exit=${run.exit}`,
   ];
   if (run.jobs) args.push('--env', `jobs=${run.jobs}`);
+  if (run.project) args.push('--env', `project=${run.project}`);
   return args;
 }
 
@@ -98,7 +99,7 @@ function writeLedger(path, rows) {
   writeFileSync(path, rows.map(row => (row.raw !== undefined ? row.raw : JSON.stringify(row))).join('\n') + '\n');
 }
 
-function minutes(seconds) {
+export function minutes(seconds) {
   return `${Math.round(seconds / 60)} min`;
 }
 
@@ -124,7 +125,7 @@ export function recordCycle(project, seconds, status, env, deps) {
     const exit = status === 0 ? 'ok' : 'fail';
     try {
       const subject = subjectFor(project, deps.root || process.cwd());
-      deps.runEpr(observationArgs(subject, seconds, { kind, exit, jobs: env.CARGO_BUILD_JOBS }));
+      deps.runEpr(observationArgs(subject, seconds, { kind, exit, jobs: env.CARGO_BUILD_JOBS, project: project.name }));
     } catch { /* the observation is best-effort; the verdict below does not need it */ }
     if (exit !== 'ok') return;
 

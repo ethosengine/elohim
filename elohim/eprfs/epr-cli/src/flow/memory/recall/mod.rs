@@ -476,6 +476,7 @@ pub mod tests_support {
     /// provider. `ceremony.measurements` is stripped the same way the integration fixture strips
     /// it: nothing here exercises the paired footprint lens.
     pub fn minimal_contract() -> Value {
+        // gate-reads: .epr-meta/elohim/algorithms/recall-contract.json
         let repo_root = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
             .join("../../..")
             .canonicalize()

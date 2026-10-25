@@ -67,6 +67,7 @@ fn frontmatter_body(text: &str) -> Option<&str> {
 
 #[test]
 fn live_manifests_are_integrity_clean() {
+    // gate-reads: .
     let root = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
         .join("../../..")
         .canonicalize()

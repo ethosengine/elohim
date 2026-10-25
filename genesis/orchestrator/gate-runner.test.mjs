@@ -1,17 +1,164 @@
 import { gateEvidence, recordEvidence } from './gate-evidence.mjs';
 import { describe, test } from 'node:test';
 import { strict as assert } from 'node:assert';
-import { readFileSync, mkdtempSync, mkdirSync, writeFileSync, rmSync } from 'node:fs';
-import { tmpdir } from 'node:os';
+import { mkdtempSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { spawnSync } from 'node:child_process';
+import { tmpdir } from 'node:os';
 import { resolve, dirname } from 'path';
 import { fileURLToPath } from 'url';
 import { loadGateRegistry } from './pipeline-registry.mjs';
 import { loadManifests } from './manifest-utils.mjs';
-import { receiptKey, matchingReceipt, findReceipt, writeReceipt, gateChildEnv, oracleMode, projectsForChanges, selectGateProjects, worktreeTargetDir } from './gate-runner.mjs';
+import { costLineAndDefer, gateChildEnv, oracleMode, projectsForChanges, runProject, selectGateProjects, worktreeTargetDir } from './gate-runner.mjs';
 import { resolveRakiaBin } from './gate-oracle.mjs';
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '../..');
+
+describe('gate expectations and feature-branch CI deferral', () => {
+  const project = { name: 'fixture', dir: 'fixture', steps: ['build'], run: { kind: 'just', recipe: 'gate' } };
+  const rows = Array.from({ length: 10 }, (_, i) => ({
+    project: project.name, subject: 'fixture/justfile', value: 660,
+    kind: 'full-gate', exit: 'ok', occurredAt: new Date(Date.UTC(2026, 9, 1, 0, i)).toISOString(),
+  }));
+  const pushEnv = {
+    GATE_RUN_KIND: 'pre-push',
+    GATE_PUSH_TARGETS: ' refs/heads/feat-cost\trefs/heads/feat-other ',
+    GATE_PUSH_BRANCHES: ' feat-cost\nfeat-other ',
+  };
+  const expected = '[gate] fixture: expect ~11 min (p90 11 min, max 11 min; 10 runs) · failed locally 0 of last 10';
+
+  function fixture(t, { samples = rows, projects = [project] } = {}) {
+    const root = mkdtempSync(resolve(tmpdir(), 'gate-cost-runner-'));
+    t.after(() => rmSync(root, { recursive: true, force: true }));
+    for (const p of projects) {
+      mkdirSync(resolve(root, p.dir), { recursive: true });
+      writeFileSync(resolve(root, p.dir, 'justfile'), 'gate:\n');
+    }
+    writeFileSync(resolve(root, 'build-manifest.json'), JSON.stringify({
+      pipeline: 'fixture', steps: { build: {} },
+      gate: { projects: Object.fromEntries(projects.map(p => [p.name, p])) },
+    }));
+    mkdirSync(resolve(root, '.eprfs/status'), { recursive: true });
+    const flowsPath = resolve(root, '.eprfs/status/flows.jsonl');
+    writeFileSync(flowsPath, samples.map(row => JSON.stringify({ record: {
+      occurredAt: row.occurredAt,
+      classifiedAs: ['run:observation', row.subject, 'measure:gate-cycle-seconds@1',
+        `value:${row.value}`, `env:run-kind=${row.kind}`, `env:exit=${row.exit}`,
+        ...(row.project === undefined ? [] : [`env:project=${row.project}`])],
+    } })).join('\n'));
+    return {
+      flowsPath,
+      run(gate = project, env = pushEnv, printOnly = false, namesOnly = false) {
+        const calls = [];
+        let output = '';
+        const status = runProject(gate, printOnly, namesOnly, {
+          root, env: { PATH: '', EPR_BIN: 'fixture-epr', ...env },
+          write: text => { output += text; },
+          spawn: (command, args) => {
+            calls.push({ command, args });
+            return { status: command === 'fixture-epr' ? 0 : 7, stdout: '', stderr: '' };
+          },
+        });
+        return { status, output, calls };
+      },
+    };
+  }
+
+  test('the pure decision formats fixture costs and splits push refs on whitespace', () => {
+    const decision = costLineAndDefer(project, { rows, env: pushEnv });
+    assert.equal(decision.line, expected);
+    assert.equal(decision.defer, true);
+  });
+
+  test('a qualifying feat push writes the expectation and returns zero without spawning the recipe or evidence', t => {
+    const result = fixture(t).run();
+    assert.equal(result.status, 0);
+    assert.ok(result.output.startsWith(`\n[gate] fixture (fixture)\n${expected}\n`));
+    assert.match(result.output, /\[gate\] fixture deferred to CI: feature-branch CI covers this push/);
+    assert.doesNotMatch(result.output, /evidence:/);
+    assert.equal(result.calls.length, 1, 'only the cycle observation is spawned');
+    assert.equal(result.calls[0].command, 'fixture-epr');
+    assert.deepEqual(result.calls[0].args.slice(0, 4), ['flow', 'note', '--kind', 'observation']);
+    assert.ok(result.calls[0].args.includes('run-kind=deferred'));
+    assert.ok(result.calls[0].args.includes('exit=ok'));
+    assert.ok(result.calls[0].args.includes('project=fixture'));
+  });
+
+  for (const [name, gate, env, reason] of [
+    ['a dev target', project, { ...pushEnv, GATE_PUSH_TARGETS: 'refs/heads/feat-cost refs/heads/dev', GATE_PUSH_BRANCHES: 'feat-cost dev' }, /refs\/heads\/dev requires local gates/],
+    ['a main target', project, { ...pushEnv, GATE_PUSH_TARGETS: 'refs/heads/main', GATE_PUSH_BRANCHES: 'main' }, /refs\/heads\/main requires local gates/],
+    ['empty pipeline steps', { ...project, steps: [] }, pushEnv, /no CI pipeline steps/],
+    ['missing pipeline steps', { ...project, steps: undefined }, pushEnv, /no CI pipeline steps/],
+    ['a full-gate run', project, { ...pushEnv, GATE_RUN_KIND: 'full-gate' }, /only pre-push runs defer/],
+    ['an undeclared run kind', project, { ...pushEnv, GATE_RUN_KIND: undefined }, /only pre-push runs defer/],
+    ['a tag push', project, { ...pushEnv, GATE_PUSH_TARGETS: 'refs/tags/v1', GATE_PUSH_BRANCHES: '' }, /no CI branch supplied/],
+  ]) {
+    test(`${name} never defers and prints no refusal noise`, t => {
+      const decision = costLineAndDefer(gate, { rows, env });
+      assert.equal(decision.defer, false);
+      assert.match(decision.why, reason);
+      const result = fixture(t).run(gate, env);
+      assert.equal(result.status, 7, 'the recipe result is returned');
+      assert.ok(result.output.includes(expected));
+      assert.doesNotMatch(result.output, /deferred to CI/);
+      assert.ok(!result.output.includes(decision.why));
+      assert.ok(result.calls.some(call => call.command === 'bash' && call.args[0].endsWith('/run-local-gate.sh')));
+      assert.ok(result.calls.some(call => call.command === 'fixture-epr' && call.args.includes('exit=fail')));
+    });
+  }
+
+  test('cycle rows are read once for multiple projects in the same process', t => {
+    const other = { ...project, name: 'other' };
+    const f = fixture(t, { projects: [project, other], samples: [...rows, ...rows.map(row => ({ ...row, project: 'other' }))] });
+    assert.equal(f.run().status, 0);
+    rmSync(f.flowsPath);
+    const result = f.run(other);
+    assert.equal(result.status, 0);
+    assert.ok(result.output.includes(expected.replace('fixture:', 'other:')));
+  });
+
+  test('an unreadable sidecar stays silent and keeps the local recipe, without retrying', t => {
+    const f = fixture(t);
+    rmSync(f.flowsPath);
+    const first = f.run();
+    writeFileSync(f.flowsPath, '');
+    for (const result of [first, f.run()]) {
+      assert.equal(result.status, 7);
+      assert.doesNotMatch(result.output, /expect ~|no recorded runs|deferred to CI/);
+      assert.ok(result.calls.some(call => call.command === 'bash'));
+    }
+  });
+
+  test('a readable empty sidecar prints no recorded runs and keeps the recipe', t => {
+    const result = fixture(t, { samples: [] }).run();
+    assert.equal(result.status, 7);
+    assert.match(result.output, /\[gate\] fixture: no recorded runs yet/);
+  });
+
+  test('legacy subjects count only when no other registered project records that subject', t => {
+    for (const dir of ['fixture', '.']) {
+      const gate = { ...project, dir };
+      const samples = rows.map(row => ({ ...row, project: undefined, subject: dir === '.' ? '.' : 'fixture/justfile' }));
+      const unique = fixture(t, { samples, projects: [gate] }).run(gate);
+      assert.equal(unique.status, 0);
+      assert.ok(unique.output.includes(expected));
+      const shared = fixture(t, { samples, projects: [gate, { ...gate, name: 'other' }] }).run(gate);
+      assert.equal(shared.status, 7);
+      assert.match(shared.output, /no recorded runs yet/);
+    }
+  });
+
+  test('print and names modes stay free of expectation and deferral output', t => {
+    const f = fixture(t);
+    for (const [printOnly, namesOnly] of [[true, false], [false, true]]) {
+      const result = f.run(project, pushEnv, printOnly, namesOnly);
+      assert.equal(result.status, 0);
+      assert.deepEqual(result.calls, []);
+      assert.doesNotMatch(result.output, /expect ~|no recorded runs|deferred to CI/);
+      if (namesOnly) assert.equal(result.output, 'fixture\n');
+      else assert.equal(JSON.parse(result.output).name, 'fixture');
+    }
+  });
+});
 
 test('Rust style selects new crates and inherited lint configuration', () => {
   for (const changed of ['new-crate/src/lib.rs', '.cargo/config.toml', 'some/crate/clippy.toml']) {
@@ -441,6 +588,7 @@ describe('a shared cargo slot never serves another checkout its compiled crates'
 });
 
 
+// A scratch eprfs-shaped project: its gate evidence carries the native source closure.
 function receiptFixture(t) {
   const root = mkdtempSync(resolve(tmpdir(), 'gate-receipt-'));
   t.after(() => rmSync(root, { recursive: true, force: true }));
@@ -477,126 +625,6 @@ function receiptFixture(t) {
   const project = { name:'fixture', dir, run:{cargo:{env:{EPR_GATE_RECEIPT:'1', RUSTUP_TOOLCHAIN:'1.96.1'}}} };
   return {root, env, project, git};
 }
-
-test('receipt key uses clean native closure, resolved toolchain and manifest CID', function receipt_key_uses_clean_project_tree(t) {
-  const fx = receiptFixture(t);
-  const key = receiptKey(fx.project, fx);
-  assert.match(key.closureCid, /^bafkrei/);
-  assert.equal(key.toolchain, '1.96.1');
-  assert.match(key.manifest, /^bafkrei/);
-  writeFileSync(resolve(fx.root, 'unrelated.txt'), 'outside project');
-  assert.deepEqual(receiptKey(fx.project, fx), key);
-  writeFileSync(resolve(fx.root, fx.project.dir, 'untracked.rs'), 'unfinished');
-  assert.equal(receiptKey(fx.project, fx), null);
-  fx.git(['add', fx.project.dir]); fx.git(['commit', '-qm', 'changed tree']);
-  assert.notEqual(receiptKey(fx.project, fx).closureCid, key.closureCid);
-  fx.env.GATE_COMMIT = 'HEAD~1';
-  assert.equal(receiptKey(fx.project, fx), null, 'never certify a tree other than the checked-out one');
-});
-
-test('only exact successful native receipt slots attest the gate', function receipt_requires_exact_successful_native_slots() {
-  const key = {closureCid:'abc', toolchain:'1.96.1', manifest:'bafkreimanifest'};
-  const entry = {cid:'bafkreireceipt', kind:'observation', extra:['measure:gate-receipt@1', 'value:1',
-    ...Object.entries(key).map(([k,v]) => `env:${k}=${v}`)]};
-  assert.equal(matchingReceipt(key, {entries:[entry]}), entry.cid);
-  for (const name of Object.keys(key)) {
-    assert.equal(matchingReceipt({...key, [name]:'different'}, {entries:[entry]}), null, name);
-  }
-  for (const changed of [ {kind:'ruling'}, {via:'other-commitment'}, {cid:'sha256:abc'},
-    {extra:entry.extra.filter(s => s !== 'value:1')}, {extra:[...entry.extra, 'env:closureCid=ambiguous']} ]) {
-    assert.equal(matchingReceipt(key, {entries:[{...entry,...changed}]}), null);
-  }
-  assert.equal(findReceipt({}, key, {run:() => ({status:1})}), null);
-  assert.equal(findReceipt({}, key, {run:() => ({status:0, stdout:'bad-json'})}), null);
-});
-
-test('receipt writes through epr and refuses changed or dirty finishing trees', function receipt_refuses_changed_finishing_tree(t) {
-  const fx = receiptFixture(t);
-  const key = receiptKey(fx.project, fx);
-  const calls = [];
-  const run = (bin, args, options) => {
-    if (bin === 'git' || args[0] === 'bin') return spawnSync(bin, args, options);
-    calls.push(args);
-    return {status:0, stdout:JSON.stringify({record_cid:'bafkreireceipt'})};
-  };
-  assert.equal(writeReceipt(fx.project, key, {...fx, run}), 'bafkreireceipt');
-  assert.deepEqual(calls[0].slice(0, 7), ['flow','note','--kind','observation','--measure','gate-receipt@1','--subject']);
-  assert.ok(calls[0].includes(`closureCid=${key.closureCid}`));
-  assert.ok(calls[0].includes(`manifest=${key.manifest}`));
-  writeFileSync(resolve(fx.root, fx.project.dir, 'build-manifest.json'), '{}');
-  assert.equal(writeReceipt(fx.project, key, {...fx, run}), null);
-  assert.equal(calls.length, 1);
-});
-
-test('native flow note round-trips a receipt through the ledger reader', t => {
-  if (!process.env.EPR_BIN) return t.skip('set EPR_BIN to the built native CLI');
-  const fx = receiptFixture(t);
-  mkdirSync(resolve(fx.root, '.claude/epr-meta'), {recursive:true});
-  writeFileSync(resolve(fx.root, '.claude/epr-meta/measures.yaml'),
-    'measures:\n  - id: gate-receipt\n    version: 1\n    unit: passes\n');
-  mkdirSync(resolve(fx.root, '.epr-meta'), {recursive:true});
-  writeFileSync(resolve(fx.root, '.epr-meta/repository.yaml'), 'version: 1\nagent: repo:ethosengine/elohim\n');
-  fx.env.EPR_BIN = process.env.EPR_BIN;
-  const key = receiptKey(fx.project, fx);
-  let diagnostic = '';
-  const run = (bin, args, options) => {
-    const result = spawnSync(bin, args, options);
-    if (result.status !== 0) diagnostic += result.stderr;
-    return result;
-  };
-  const written = writeReceipt(fx.project, key, {...fx, run});
-  assert.match(written ?? '', /^baf/, diagnostic);
-  assert.equal(findReceipt(fx.project, key, fx), written);
-  assert.equal(findReceipt(fx.project, {...key, toolchain:'another-toolchain'}, fx), null);
-});
-
-test('pre-push skips the recipe only for a matching receipt and reruns mismatches', t => {
-  if (!process.env.EPR_BIN) return t.skip('set EPR_BIN to the built native CLI');
-  const fx = receiptFixture(t);
-  fx.project.run.kind = 'root-just';
-  fx.project.run.recipe = 'fixture-gate';
-  writeFileSync(resolve(fx.root, fx.project.dir, 'build-manifest.json'), JSON.stringify({
-    pipeline:'fixture', steps:{}, gate:{projects:{fixture:fx.project}},
-  }));
-  mkdirSync(resolve(fx.root, 'genesis/orchestrator'), {recursive:true});
-  writeFileSync(resolve(fx.root, 'genesis/orchestrator/rust-style.sh'), 'exit 0\n');
-  writeFileSync(resolve(fx.root, 'genesis/orchestrator/run-local-gate.sh'), 'echo RECIPE-RAN\nexit 0\n');
-  mkdirSync(resolve(fx.root, '.claude/epr-meta'), {recursive:true});
-  writeFileSync(resolve(fx.root, '.claude/epr-meta/measures.yaml'),
-    'measures:\n  - id: gate-receipt\n    version: 1\n    unit: passes\n');
-  mkdirSync(resolve(fx.root, '.epr-meta'), {recursive:true});
-  writeFileSync(resolve(fx.root, '.epr-meta/repository.yaml'), 'version: 1\nagent: repo:ethosengine/elohim\n');
-  fx.git(['add', fx.project.dir]); fx.git(['commit','-qm','gate manifest']);
-  fx.env.EPR_BIN = process.env.EPR_BIN;
-  const cli = () => spawnSync(process.execPath, [resolve(ROOT, 'genesis/orchestrator/gate-runner.mjs'), '--target', 'fixture'], {
-    cwd:fx.root, env:{...fx.env, GATE_ROOT:fx.root, GATE_RUN_KIND:'pre-push'}, encoding:'utf8', timeout:15000,
-  });
-  const first = cli();
-  assert.equal(first.status, 0, first.stderr);
-  assert.match(first.stdout, /RECIPE-RAN/);
-  assert.match(first.stdout, /receipt: baf/);
-  const second = cli();
-  assert.equal(second.status, 0, second.stderr);
-  assert.match(second.stdout, /attested: receipt baf/);
-  assert.doesNotMatch(second.stdout, /RECIPE-RAN/);
-  writeFileSync(resolve(fx.root, fx.project.dir, 'unfinished.rs'), 'dirty');
-  const dirty = cli();
-  assert.equal(dirty.status, 0, dirty.stderr);
-  assert.match(dirty.stdout, /RECIPE-RAN/);
-  assert.doesNotMatch(dirty.stdout, /attested: receipt/);
-  assert.match(dirty.stdout, /receipt: not written/);
-});
-
-test('receipt rejects a dirty path dependency outside the project directory', t => {
-  const fx = receiptFixture(t);
-  mkdirSync(resolve(fx.root, 'crates/external'), {recursive:true});
-  writeFileSync(resolve(fx.root, 'crates/external/lib.rs'), 'dependency');
-  fx.git(['add', 'crates/external']); fx.git(['commit', '-qm', 'dependency']);
-  assert.ok(receiptKey(fx.project, fx));
-  writeFileSync(resolve(fx.root, 'crates/external/lib.rs'), 'changed dependency');
-  assert.equal(receiptKey(fx.project, fx), null);
-});
-
 
 test('gate evidence rejects dirty external dependency and changes key when it is committed', t => {
   const fx = receiptFixture(t);

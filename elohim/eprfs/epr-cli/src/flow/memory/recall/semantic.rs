@@ -513,6 +513,7 @@ mod tests {
     /// and the same provider over a fold is a known ranking with nothing unresolved.
     #[test]
     fn the_provider_seam_carries_absence_and_a_known_ranking() {
+        // gate-reads: .epr-meta/elohim/algorithms/recall-semantic-index.json
         use super::super::index::{self, FoldOptions, FoldRun};
         let repo = Path::new(env!("CARGO_MANIFEST_DIR"))
             .join("../../..")

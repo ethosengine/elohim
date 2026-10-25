@@ -66,8 +66,8 @@ function sandbox() {
   return { dir, measures, ledger: join(dir, 'architecture-findings.jsonl') };
 }
 
-test('the observation names the measure, the project as subject, and what kind of run it was', () => {
-  const args = observationArgs('elohim/elohim-storage/justfile', 1980.4, { kind: 'full-gate', exit: 'ok', jobs: '1' });
+test('the observation names the measure, the subject, the run kind, and the project last', () => {
+  const args = observationArgs('elohim/elohim-storage/justfile', 1980.4, { kind: 'full-gate', exit: 'ok', jobs: '1', project: project.name });
   assert.deepEqual(args, [
     'flow', 'note', '--kind', 'observation',
     '--measure', GATE_CYCLE_MEASURE,
@@ -77,7 +77,13 @@ test('the observation names the measure, the project as subject, and what kind o
     '--env', 'run-kind=full-gate',
     '--env', 'exit=ok',
     '--env', 'jobs=1',
+    '--env', 'project=elohim-storage',
   ]);
+});
+
+test('the project env slot is last even when jobs is absent', () => {
+  const args = observationArgs('.', 1, { kind: 'pre-push', exit: 'ok', project: 'rakia-validate' });
+  assert.deepEqual(args.slice(-4), ['--env', 'exit=ok', '--env', 'project=rakia-validate']);
 });
 
 test('the subject is a FILE — the gate recipe itself — because the sidecar addresses a subject by its bytes', () => {
@@ -144,6 +150,7 @@ test('over the hard ceiling: one finding, one directive — and silence the seco
     recordCycle(project, 1980, 0, { CARGO_BUILD_JOBS: '1' }, deps);
     assert.equal(notes.length, 1, 'the duration is recorded as an observation');
     assert.equal(notes[0][notes[0].indexOf('--subject') + 1], '.', 'no anchor file in this sandbox');
+    assert.deepEqual(notes[0].slice(-2), ['--env', 'project=elohim-storage']);
     const rows = readFileSync(ledger, 'utf8').trim().split('\n').map(l => JSON.parse(l));
     assert.equal(rows.length, 1);
     assert.equal(rows[0].fp, fingerprint('gate-cycle-full-ceiling@1', project.dir, 'full-gate'));
@@ -190,6 +197,7 @@ test('a failed gate is recorded but never judged — it stopped early, its durat
   try {
     recordCycle(project, 5000, 1, {}, deps);
     assert.ok(notes[0].includes('exit=fail'));
+    assert.deepEqual(notes[0].slice(-2), ['--env', 'project=elohim-storage']);
     assert.equal(existsSync(ledger), false);
   } finally {
     rmSync(dir, { recursive: true, force: true });

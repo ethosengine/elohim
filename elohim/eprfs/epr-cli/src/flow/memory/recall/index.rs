@@ -1291,6 +1291,7 @@ mod tests {
     /// fold after that reuses the v3 store it built.
     #[test]
     fn a_v2_store_is_rebuilt_under_schema_v3() {
+        // gate-reads: .epr-meta/elohim/algorithms/recall-semantic-index.json
         let repo = Path::new(env!("CARGO_MANIFEST_DIR"))
             .join("../../..")
             .canonicalize()

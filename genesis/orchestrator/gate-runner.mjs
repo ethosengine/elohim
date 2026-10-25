@@ -10,11 +10,13 @@ import { loadManifests } from './manifest-utils.mjs';
 import { loadGateRegistry } from './pipeline-registry.mjs';
 import { projectsFromStale, walkGraph } from './graph-walker.mjs';
 import { filterChanged } from './ci-ignore.mjs';
-import { recordCycle } from './gate-cycle.mjs';
-import { gateEvidence, recordEvidence } from './gate-evidence.mjs';
+import { recordCycle, subjectFor } from './gate-cycle.mjs';
+import { CI_BRANCH_PATTERN, costOf, deferDecision, formatExpectation, readCycleRows } from './gate-cost.mjs';
+import { ageOf, gateEvidence, recordEvidence, reusableHit, selfAgentId } from './gate-evidence.mjs';
 import { rakiaAffected, resolveRakiaBin } from './gate-oracle.mjs';
 import { runAttested } from './gate-attest.mjs';
-import { nativeGateKey } from './gate-source-state.mjs';
+import { affectedPackages, loadMetadata } from './cargo-affected.mjs';
+import { readSet } from './gate-input-audit.mjs';
 
 // GATE_ROOT lets a fixture repository drive the CLI (the a2o pin-attestation story).
 const ROOT = process.env.GATE_ROOT
@@ -70,10 +72,12 @@ export function projectsForChanges(root, changedFiles, opts = {}) {
 
   const byPath = walkGraph(manifests, files).projects;
   let chosen = byPath;
+  let oracleAvailable = false;
 
   if (mode !== 'path') {
-    const ask = opts.rakia || (() => rakiaAffected(root, files, { rakiaBin: resolveRakiaBin(env) }));
+    const ask = opts.rakia || (() => rakiaAffected(root, files, { rakiaBin: resolveRakiaBin(env), spawn: opts.spawn || spawnSync }));
     const stale = ask();
+    oracleAvailable = stale !== null;
     if (stale === null) {
       // Said in both modes: in shadow mode an absent binary would otherwise mean the
       // flip evidence silently never arrives.
@@ -88,12 +92,43 @@ export function projectsForChanges(root, changedFiles, opts = {}) {
       }
     }
   }
+  // Keep the array contract; reuse callers also need to know whether selection fell back.
+  opts.onOracle?.(oracleAvailable);
 
   return chosen.map(project => {
     const registered = registry.get(project.name);
     if (!registered) throw new Error(`Detected unregistered gate project: ${project.name}`);
     return { ...registered, reasons: project.reasons };
   });
+}
+
+/** Reuse needs the dependency oracle for changes outside the attested closure too. */
+export function reuseSelector(project, gateCommit, { root = ROOT, env = process.env, spawn = spawnSync } = {}) {
+  return commit => {
+    let diff;
+    try {
+      if (!commit) return { ok: false, message: 'attested commit unreadable' };
+      diff = spawn('git', ['diff', '--name-only', commit, gateCommit], { cwd: root, encoding: 'utf8' });
+      if (diff.status !== 0) return { ok: false, message: 'attested commit unreadable' };
+    } catch {
+      return { ok: false, message: 'attested commit unreadable' };
+    }
+    const files = diff.stdout.split('\n').filter(Boolean);
+    if (files.length === 0) return { ok: true };
+    try {
+      let oracleAvailable = false;
+      const projects = projectsForChanges(root, files, {
+        env, spawn, oracle: 'rakia', onOracle: available => { oracleAvailable = available; },
+      });
+      if (!oracleAvailable) return { ok: false, message: 'rakia oracle unavailable; reuse needs it' };
+      if (projects.some(p => p.name === project.name)) {
+        return { ok: false, message: `changed since attested commit and selects this gate: ${files[0]}` };
+      }
+      return { ok: true };
+    } catch {
+      return { ok: false, message: 'rakia oracle unavailable; reuse needs it' };
+    }
+  };
 }
 
 // The rakia-validated manifest schema accepts `run.cargo.env` since rakia 2b2cedb
@@ -103,7 +138,7 @@ export function projectsForChanges(root, changedFiles, opts = {}) {
 // fatal to the gate.
 function loadPoolPolicy(root) {
   try {
-    return JSON.parse(readFileSync(resolve(root, 'genesis/agentic/pool-policy.json'), 'utf8'));
+    return JSON.parse(readFileSync(resolve(root, 'genesis/agentic/pool-policy.json'), 'utf8')) || {};
   } catch {
     return {};
   }
@@ -162,56 +197,33 @@ function gitDirs(root) {
   return gitDir && commonDir ? { gitDir, commonDir } : null;
 }
 
-// These notes are local evidence, not a grant or a release head. Only opted-in gates use them.
-// All failures (including an old epr without the ledger slots) mean run the gate again.
-export function receiptKey(project, { root = ROOT, env = process.env, run = spawnSync } = {}) {
-  const cargo = cargoEnvOf(gateChildEnv(project, env, root));
-  if (cargo.EPR_GATE_RECEIPT !== '1' || !cargo.RUSTUP_TOOLCHAIN) return null;
-  return nativeGateKey(project, { root, env, run, toolchain: cargo.RUSTUP_TOOLCHAIN });
-}
+// One snapshot per repository per process, including unreadable sidecars.
+const cycleRowsByRoot = new Map();
 
-export function matchingReceipt(key, ledger) {
-  if (!key || !Array.isArray(ledger?.entries)) return null;
-  for (const entry of ledger.entries.toReversed()) {
-    if (entry.kind !== 'observation' || entry.via || !/^baf[a-z2-7]+$/.test(entry.cid)) continue;
-    const slots = entry.extra;
-    if (!Array.isArray(slots) || !slots.includes('measure:gate-receipt@1') || !slots.includes('value:1')) continue;
-    if (Object.entries(key).every(([name, value]) => slots.filter(s => s.startsWith(`env:${name}=`)).length === 1
-      && slots.includes(`env:${name}=${value}`))) return entry.cid;
-  }
-  return null;
-}
-
-export function findReceipt(project, key, { root = ROOT, env = process.env, run = spawnSync } = {}) {
-  if (!key) return null;
-  try {
-    const result = run(env.EPR_BIN || 'epr', ['flow', 'ledger', `${project.dir}/build-manifest.json`, '--json', '--root', root], {
-      cwd: root, env, encoding: 'utf8', timeout: 10000, maxBuffer: 4 * 1024 * 1024,
-    });
-    return result.status === 0 ? matchingReceipt(key, JSON.parse(result.stdout)) : null;
-  } catch { return null; }
-}
-
-export function writeReceipt(project, before, { root = ROOT, env = process.env, run = spawnSync } = {}) {
-  const after = receiptKey(project, { root, env, run });
-  if (!before || JSON.stringify(before) !== JSON.stringify(after)) return null;
-  const args = ['flow', 'note', '--kind', 'observation', '--measure', 'gate-receipt@1',
-    '--subject', `${project.dir}/build-manifest.json`, '--value', '1', '--unit', 'passes', '--json', '--root', root];
-  for (const [key, value] of Object.entries(before)) args.push('--env', `${key}=${value}`);
-  try {
-    const result = run(env.EPR_BIN || 'epr', args, { cwd: root, env, encoding: 'utf8', timeout: 10000 });
-    return result.status === 0 ? JSON.parse(result.stdout).record_cid : null;
-  } catch { return null; }
+export function costLineAndDefer(project, { rows, subjectFallback = null, env = {} }) {
+  const cost = costOf(rows, { project, subjectFallback });
+  const decision = env.GATE_RUN_KIND !== 'pre-push'
+    ? { defer: false, why: 'only pre-push runs defer' }
+    : !(project.steps?.length > 0)
+      ? { defer: false, why: 'project has no CI pipeline steps' }
+      : deferDecision({
+        cost,
+        targets: (env.GATE_PUSH_TARGETS || '').split(/\s+/).filter(Boolean),
+        branches: (env.GATE_PUSH_BRANCHES || '').split(/\s+/).filter(Boolean),
+        ciBranchPattern: CI_BRANCH_PATTERN,
+        env,
+      });
+  return { line: formatExpectation(project.name, cost), ...decision };
 }
 
 // `recipe` runs another recipe of the project in the gate's exact cargo slot and env, with no
-// receipt, evidence or cycle record: a receipt carries a test verdict across commits, never the
-// bytes, so pre-push uses this to build what it lands (eprfs's `_eprfs-deliver`).
-function runProject(project, printOnly, namesOnly, recipe = null) {
+// evidence or cycle record: evidence carries a test verdict across commits, never the bytes, so
+// pre-push uses this to build what it lands (eprfs's `_eprfs-deliver`).
+export function runProject(project, printOnly, namesOnly, { root = ROOT, env = process.env, spawn = spawnSync, write = text => process.stdout.write(text), readsOf, recipe = null } = {}) {
   const cargo = project.run.cargo || {};
-  const targetDir = worktreeTargetDir(cargo.targetDir || '');
+  const targetDir = worktreeTargetDir(cargo.targetDir || '', root);
   const args = [
-    ROOT,
+    root,
     project.name,
     project.dir,
     project.run.kind,
@@ -223,16 +235,16 @@ function runProject(project, printOnly, namesOnly, recipe = null) {
   ];
 
   if (namesOnly) {
-    process.stdout.write(`${project.name}\n`);
+    write(`${project.name}\n`);
     return 0;
   }
   if (printOnly) {
     // resolvedCargoEnv is the same manifest∪pool-policy merge gateChildEnv would send
     // to run-local-gate.sh — a dry-run rail so `--print` proves the cap without
     // claiming the cargo berth (no spawnSync).
-    const resolvedEnv = gateChildEnv(project, {}).GATE_CARGO_ENV;
+    const resolvedEnv = gateChildEnv(project, {}, root).GATE_CARGO_ENV;
     const resolvedCargoEnv = resolvedEnv ? JSON.parse(resolvedEnv) : {};
-    process.stdout.write(`${JSON.stringify({ name: project.name, dir: project.dir, run: project.run, resolvedCargoEnv, resolvedTargetDir: targetDir || null, reasons: project.reasons || [] })}\n`);
+    write(`${JSON.stringify({ name: project.name, dir: project.dir, run: project.run, resolvedCargoEnv, resolvedTargetDir: targetDir || null, reasons: project.reasons || [] })}\n`);
     return 0;
   }
 
@@ -241,71 +253,142 @@ function runProject(project, printOnly, namesOnly, recipe = null) {
       process.stderr.write(`gate ${project.name}: an attested project has no local recipe to run\n`);
       return 2;
     }
-    process.stdout.write(`\n[gate] ${project.name} (${project.dir}) — recipe ${recipe}\n`);
-    return spawnSync('bash', [resolve(ROOT, 'genesis/orchestrator/run-local-gate.sh'), ...args], {
-      cwd: ROOT,
+    write(`\n[gate] ${project.name} (${project.dir}) — recipe ${recipe}\n`);
+    return spawn('bash', [resolve(root, 'genesis/orchestrator/run-local-gate.sh'), ...args], {
+      cwd: root,
       stdio: 'inherit',
-      env: gateChildEnv(project, process.env),
+      env: gateChildEnv(project, env, root),
     }).status ?? 1;
   }
 
   if (project.run.kind === 'attested') {
     // No local recipe: the pinned commit's own upstream attestation is the gate.
     // Never reaches run-local-gate.sh (which keeps refusing unknown kinds).
-    process.stdout.write(`\n[gate] ${project.name} (${project.dir}) — attested, no local recipe\n`);
+    write(`\n[gate] ${project.name} (${project.dir}) — attested, no local recipe\n`);
     return runAttested(project, {
-      root: ROOT,
-      env: process.env,
-      log: line => process.stdout.write(`${line}\n`),
-      runEpr: eprArgs => spawnSync(process.env.EPR_BIN || 'epr', eprArgs, { cwd: ROOT, stdio: 'ignore', timeout: 30000 }).status,
+      root,
+      env,
+      log: line => write(`${line}\n`),
+      runEpr: eprArgs => spawn(env.EPR_BIN || 'epr', eprArgs, { cwd: root, stdio: 'ignore', timeout: 30000 }).status,
     });
+  }
+
+  write(`\n[gate] ${project.name} (${project.dir})\n`);
+  if (!cycleRowsByRoot.has(root)) {
+    try { cycleRowsByRoot.set(root, readCycleRows(resolve(root, '.eprfs/status/flows.jsonl')).rows); }
+    catch { cycleRowsByRoot.set(root, null); }
+  }
+  const rows = cycleRowsByRoot.get(root);
+  let costDecision = null;
+  if (rows !== null) {
+    let subjectFallback = null;
+    try {
+      const subject = subjectFor(project, root);
+      const shared = [...loadGateRegistry(root).values()].some(other =>
+        other.name !== project.name && subjectFor(other, root) === subject);
+      if (!shared) subjectFallback = subject;
+    } catch { /* Without the registry, only explicitly named project rows are safe. */ }
+    costDecision = costLineAndDefer(project, { rows, subjectFallback, env });
+    write(`${costDecision.line}\n`);
+  }
+  const childEnv = gateChildEnv(project, env, root);
+  const started = process.hrtime.bigint();
+  const cycleEnv = { ...env, ...cargoEnvOf(childEnv) };
+  const cycleDeps = {
+    root,
+    measuresPath: resolve(root, '.claude/epr-meta/measures.yaml'),
+    ledgerPath: resolve(root, '.claude/data/architecture-findings.jsonl'),
+    runEpr: eprArgs => spawn(env.EPR_BIN || 'epr', eprArgs, { cwd: root, stdio: 'ignore', timeout: 30000 }).status,
+    print: line => write(`${line}\n`),
+    now: () => new Date().toISOString().replace(/\.\d+Z$/, 'Z'),
+  };
+  if (costDecision?.defer) {
+    write(`[gate] ${project.name} deferred to CI: ${costDecision.why}\n`);
+    const seconds = Number(process.hrtime.bigint() - started) / 1e9;
+    recordCycle(project, seconds, 0, { ...cycleEnv, GATE_RUN_KIND: 'deferred' }, cycleDeps);
+    return 0;
   }
 
   // Explicit crate gates carry the same style floor as changed-project selection.
   if (project.run.cargo && project.name !== 'rust-style') {
-    const styleArgs = [resolve(ROOT, 'genesis/orchestrator/rust-style.sh'), '--scope', project.dir];
-    if (process.env.GATE_COMMIT) styleArgs.push('--head', process.env.GATE_COMMIT);
-    const style = spawnSync('bash', styleArgs, {
-      cwd: ROOT, stdio: 'inherit', env: gateChildEnv(project, process.env),
+    const styleArgs = [resolve(root, 'genesis/orchestrator/rust-style.sh'), '--scope', project.dir];
+    if (env.GATE_COMMIT) styleArgs.push('--head', env.GATE_COMMIT);
+    const style = spawn('bash', styleArgs, {
+      cwd: root, stdio: 'inherit', env: gateChildEnv(project, env, root),
     });
     if (style.status !== 0) return style.status || 2;
   }
 
-  const receipt = receiptKey(project);
-  if (process.env.GATE_RUN_KIND === 'pre-push') {
-    const accepted = findReceipt(project, receipt);
-    if (accepted) {
-      process.stdout.write(`[gate] ${project.name} attested: receipt ${accepted}\n`);
-      return 0;
+  // A selection belongs to this project and this push, never to the caller's environment.
+  delete childEnv.GATE_CARGO_PACKAGES;
+  const narrowProjects = loadPoolPolicy(root).gate_narrow?.projects;
+  if (Array.isArray(narrowProjects) && narrowProjects.includes(project.name)) {
+    const mode = ['off', 'shadow', 'on'].includes(env.GATE_NARROW) ? env.GATE_NARROW : 'shadow';
+    let selection = { packages: null, why: 'no push base' };
+    let metadata = null;
+    let files = null;
+    if (env.GATE_NARROW_BASE === 'ok' && env.GATE_CHANGED_FILES) {
+      try { files = readFileSync(env.GATE_CHANGED_FILES, 'utf8').split('\n').filter(Boolean); }
+      catch { /* An unreadable push range must keep the full workspace. */ }
     }
+    if (files && mode === 'off') selection.why = 'narrowing disabled';
+    else if (files) {
+      try {
+        const workspaceDir = cargo.workspace || project.dir;
+        const metadataEnv = { ...childEnv, ...cargoEnvOf(childEnv), RUSTC_WRAPPER: '' };
+        delete metadataEnv.CARGO_TARGET_DIR;
+        if (Object.hasOwn(cargo, 'rustflags')) metadataEnv.RUSTFLAGS = cargo.rustflags;
+        metadata = loadMetadata({ root, workspaceDir,
+          spawn: (command, argv, options) => spawn(command, argv, { ...options, env: metadataEnv }),
+        });
+        selection = affectedPackages({ root, workspaceDir, files, metadata,
+          readsOf: readsOf || (dir => readSet({ root, sources: [`${dir}/**`] }).paths),
+        });
+      } catch (error) {
+        selection = { packages: null, why: `narrowing unavailable (${String(error?.message || error).split('\n')[0]})` };
+      }
+    }
+    const { packages, why } = selection;
+    write(`[gate] ${project.name} narrow (${mode}): ${packages === null
+      ? `full workspace — ${why}`
+      : `${packages.join(' ')} (${packages.length} of ${metadata.workspace_members.length} members)`}\n`);
+    if (mode === 'on' && packages !== null) childEnv.GATE_CARGO_PACKAGES = packages.join(' ');
   }
-  process.stdout.write(`\n[gate] ${project.name} (${project.dir})\n`);
-  const childEnv = gateChildEnv(project, process.env);
   // Evidence by input closure (gate-evidence.mjs): has THIS closure — the step's declared
   // input bytes at the pushed commit, the recipe, the resolved cargo env — already been
-  // gated, by whom, and when? REPORT-ONLY in this slice: the line is printed and the gate
-  // runs regardless. GATE_COMMIT is the commit being pushed (pre-push exports it); a human
+  // gated, by whom, and when? Reuse requires an audited project and this workspace's signer.
+  // GATE_COMMIT is the commit being pushed (pre-push exports it); a human
   // running `just gate` is asking about HEAD. Fail-open: an exception here is one line.
-  const gateCommit = (process.env.GATE_COMMIT || '').trim() || 'HEAD';
+  const gateCommit = (env.GATE_COMMIT || '').trim() || 'HEAD';
   let evidence = { line: 'unavailable (evidence lookup threw)' };
   try {
-    evidence = gateEvidence(project, { env: process.env, root: ROOT, commit: gateCommit, cargoEnv: cargoEnvOf(childEnv) });
+    evidence = gateEvidence(project, { env: childEnv, root, commit: gateCommit, cargoEnv: cargoEnvOf(childEnv), spawn });
   } catch (error) {
     evidence = { line: `unavailable (${String(error?.message || error).split('\n')[0]})` };
   }
-  process.stdout.write(`[gate] ${project.name} evidence: ${evidence.line}\n`);
-  const started = process.hrtime.bigint();
-  const result = spawnSync('bash', [resolve(ROOT, 'genesis/orchestrator/run-local-gate.sh'), ...args], {
-    cwd: ROOT,
+  write(`[gate] ${project.name} evidence: ${evidence.line}\n`);
+  const enabled = loadPoolPolicy(root).gate_reuse?.projects;
+  const decision = reusableHit(evidence, {
+    mode: env.GATE_EVIDENCE,
+    enabled: Array.isArray(enabled) && enabled.includes(project.name),
+    selfId: env.GATE_EVIDENCE === 'reuse' ? selfAgentId(root, spawn) : null,
+    selectorCheck: reuseSelector(project, gateCommit, { root, env: childEnv, spawn }),
+  });
+  if (decision.reuse) {
+    const row = decision.row;
+    write(`[gate] ${project.name} reused: green ${ageOf(row.attestation.builtAt)} at ${String(row.commit).slice(0, 9)} (signer this workspace)\n`);
+    const seconds = Number(process.hrtime.bigint() - started) / 1e9;
+    recordCycle(project, seconds, 0, { ...cycleEnv, GATE_RUN_KIND: 'reused' }, cycleDeps);
+    return 0;
+  }
+  if (env.GATE_EVIDENCE === 'reuse') write(`[gate] ${project.name} not reused: ${decision.why}\n`);
+  const result = spawn('bash', [resolve(root, 'genesis/orchestrator/run-local-gate.sh'), ...args], {
+    cwd: root,
     stdio: 'inherit',
     env: childEnv,
   });
   const status = result.status ?? 1;
   const seconds = Number(process.hrtime.bigint() - started) / 1e9;
-  if (status === 0 && cargoEnvOf(childEnv).EPR_GATE_RECEIPT === '1') {
-    const cid = writeReceipt(project, receipt);
-    process.stdout.write(`[gate] ${project.name} receipt: ${cid || 'not written (dirty, changed, or evaluator unavailable)'}\n`);
-  }
   // The verdict is recorded against the closure — red too; a known-red closure is information.
   if (evidence.key && evidence.buildRefBin) {
     const put = recordEvidence(project, evidence.key, {
@@ -313,28 +396,22 @@ function runProject(project, printOnly, namesOnly, recipe = null) {
       seconds,
       commit: gateCommit,
       buildRefBin: evidence.buildRefBin,
-      root: ROOT,
+      root,
       jobs: cargoEnvOf(childEnv).CARGO_BUILD_JOBS,
       dirty: evidence.dirty,
       nativeKey: evidence.nativeKey,
-      env: process.env,
+      env,
       cargoEnv: cargoEnvOf(childEnv),
+      spawn,
     });
     const note = put.status === 0
       ? `recorded ${String(put.stdout || '').trim().slice(0, 16)}…`
       : `not recorded (${String(put.stderr || '').trim().split('\n').pop() || `exit ${put.status}`})`;
-    process.stdout.write(`[gate] ${project.name} evidence: ${note}\n`);
+    write(`[gate] ${project.name} evidence: ${note}\n`);
   }
   // Cycle time is observed here because this is the one place every gate runs.
   // The ceiling, the reviewer and its charter are declared in measures.yaml.
-  recordCycle(project, seconds, status, { ...process.env, ...cargoEnvOf(childEnv) }, {
-    root: ROOT,
-    measuresPath: resolve(ROOT, '.claude/epr-meta/measures.yaml'),
-    ledgerPath: resolve(ROOT, '.claude/data/architecture-findings.jsonl'),
-    runEpr: eprArgs => spawnSync(process.env.EPR_BIN || 'epr', eprArgs, { cwd: ROOT, stdio: 'ignore', timeout: 30000 }).status,
-    print: line => process.stdout.write(`${line}\n`),
-    now: () => new Date().toISOString().replace(/\.\d+Z$/, 'Z'),
-  });
+  recordCycle(project, seconds, status, cycleEnv, cycleDeps);
   return status;
 }
 
@@ -395,6 +472,6 @@ if (isMain) {
     process.exit(2);
   }
   let failed = 0;
-  for (const project of projects) failed |= runProject(project, printOnly, namesOnly, recipe);
+  for (const project of projects) failed |= runProject(project, printOnly, namesOnly, { recipe });
   process.exit(failed ? 1 : 0);
 }

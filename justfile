@@ -646,7 +646,9 @@ _gate-epr-ts:
 # recipe lives here so the manifest's typed contract has a real target.
 _gate-eprfs:
     cd elohim/eprfs && cargo fmt --check
-    cd elohim/eprfs && cargo clippy --workspace --all-targets -- -D warnings
+    @set -- --workspace; \
+      if [ -n "${GATE_CARGO_PACKAGES:-}" ]; then set --; for package in $GATE_CARGO_PACKAGES; do set -- "$@" -p "$package"; done; fi; \
+      cd elohim/eprfs && cargo clippy "$@" --all-targets -- -D warnings
     @just _eprfs-ingest-around test
 
 # Build epr and bin-launch at HEAD in the eprfs gate's slot and ingest the build. Pre-push runs
@@ -668,7 +670,10 @@ _eprfs-ingest-around mode:
     @before="$("$CARGO_TARGET_DIR/debug/epr" bin --tool epr source-state 2>/dev/null || "${EPR_BIN:-epr}" bin --tool epr source-state 2>/dev/null || echo none)"; \
       tested_head="$(git rev-parse HEAD)"; \
       if [[ "{{mode}}" == test ]]; then \
-        (cd elohim/eprfs && cargo test --workspace) || exit $?; \
+        set -- --workspace; \
+        if [ -n "${GATE_CARGO_PACKAGES:-}" ]; then set --; for package in $GATE_CARGO_PACKAGES; do set -- "$@" -p "$package"; done; fi; \
+        (cd elohim/eprfs && cargo test "$@") || exit $?; \
+        if [ -n "${GATE_CARGO_PACKAGES:-}" ]; then (cd elohim/eprfs && cargo build -p elohim-epr-cli --bin epr) || exit $?; fi; \
       else \
         (cd elohim/eprfs && cargo build -p elohim-epr-cli --bin epr -p elohim-device-runtime --bin bin-launch) || exit $?; \
       fi; \
