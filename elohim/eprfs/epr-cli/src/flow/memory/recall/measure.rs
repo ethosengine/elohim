@@ -31,7 +31,10 @@ fn sample_balance(
 }
 
 /// Run an EXPLICIT external lens script, bounded like any other foreign provider.
-#[allow(clippy::too_many_arguments)]
+#[allow(
+    clippy::too_many_arguments,
+    reason = "each argument is one bounded input the foreign lens script receives on its command line"
+)]
 fn external_sample(
     root: &Path,
     contract: &Contract,

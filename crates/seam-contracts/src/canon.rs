@@ -584,7 +584,10 @@ mod canon_conformance {
     #[test]
     fn superseded_rows_are_carried_as_deprecated_pins() {
         let Some(rows) = live_rows() else { return };
-        #[allow(deprecated)]
+        #[allow(
+            deprecated,
+            reason = "the test names the superseded pins on purpose: they are the deprecated consts it checks"
+        )]
         let deprecated_pins = [PIN_C2_MONOTONIC_AUTHORITY_V1, PIN_C6A_BOUNDED_WORK_V1];
         for pin in deprecated_pins {
             let row = canon_rows(&rows)
