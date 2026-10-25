@@ -12,11 +12,11 @@ sources:
   - "E. O. Wilson, as quoted by the Center for Humane Technology: 'The real problem of humanity is the following: we have Paleolithic emotions, medieval institutions, and god-like technology.'"
   - "Center for Humane Technology, Welcome to the Attachment Economy (https://centerforhumanetechnology.substack.com/p/welcome-to-the-attachment-economy): AI's optimization, combined with people's need for connection, used to exploit attachment for profit"
 cites:
-  - genesis/docs/architecture/stewardship-over-sovereignty.md
-  - genesis/docs/content/elohim-protocol/imagodei.md
-  - genesis/docs/content/elohim-protocol/confession.md
-  - genesis/docs/content/elohim-protocol/theology.md
-  - genesis/docs/content/elohim-protocol/resilience/README.md
+  - "stewardship-over-sovereignty | stewardship-over-sovereignty | sha256:5186f53fbeb95a65 | path: genesis/docs/architecture/stewardship-over-sovereignty.md"
+  - "imago-dei-identity-framework | Imago Dei | sha256:457e45152c688704 | path: genesis/docs/content/elohim-protocol/imagodei.md"
+  - "confession | confession | sha256:dff3a6835bfa3802 | path: genesis/docs/content/elohim-protocol/confession.md"
+  - "theology | theology | sha256:8f0d807e135521ee | path: genesis/docs/content/elohim-protocol/theology.md"
+  - "resilience-protocol-spec | README | sha256:396d7d7a2b8b354c | path: genesis/docs/content/elohim-protocol/resilience/README.md"
 ---
 
 # Not on the industry's terms
