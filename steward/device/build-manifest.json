@@ -34,6 +34,8 @@
           "elohim/eprfs/Cargo.toml",
           "elohim/eprfs/eprfs-core/**",
           "elohim/eprfs/eprfs-serve/**",
+          "elohim/eprfs/device-runtime/**",
+          "genesis/orchestrator/manifests/runtime/workspace-device.manifest.json",
           "elohim/elohim-cache-core/**",
           "elohim/elohim-chrome-asset/**",
           "elohim/elohim-compute/**",

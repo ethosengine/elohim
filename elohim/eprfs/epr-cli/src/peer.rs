@@ -467,9 +467,9 @@ fn status(options: &Options) -> PeerResult<ExitCode> {
         })
         .collect();
     let refused_strangers = table.channel.refused_strangers;
-    let cli_cid = crate::govern::evaluator_identity()["cid"]
-        .as_str()
-        .map(str::to_owned);
+    let cli_cid = std::env::current_exe()
+        .ok()
+        .and_then(|path| crate::bin::daemon_store().ok()?.executable_cid(&path).ok());
     let daemon_cids: Vec<_> = crate::bin::daemon_store()?
         .live_daemons(&crate::bin::daemon_proc_root())?
         .into_iter()

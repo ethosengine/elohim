@@ -85,16 +85,27 @@ pub struct Tool {
 impl Registry {
     /// Load an explicitly selected registry.
     pub fn load(path: &Path) -> Result<Self> {
-        serde_json::from_slice(
-            &std::fs::read(path).map_err(|e| {
-                Refusal::new("registry-invalid", format!("{}: {e}", path.display()))
-            })?,
-        )
-        .map_err(|e| Refusal::new("registry-invalid", e.to_string()))
+        let text = std::fs::read_to_string(path)
+            .map_err(|e| Refusal::new("registry-invalid", format!("{}: {e}", path.display())))?;
+        let value: Value = serde_json::from_str(&text)
+            .map_err(|e| Refusal::new("registry-invalid", e.to_string()))?;
+        if value.get("kind").and_then(Value::as_str) == Some("runtime-manifest") {
+            let manifest = ark_core::RuntimeManifest::from_json(&text)
+                .map_err(|e| Refusal::new("manifest-invalid", e.to_string()))?;
+            return crate::manifest_store::registry(&manifest);
+        }
+        serde_json::from_value(value).map_err(|e| Refusal::new("registry-invalid", e.to_string()))
     }
     /// Load the environment override, installed sibling, or repository registry.
     pub fn discover() -> Result<Self> {
-        Self::load(&Self::path()?)
+        let path = match Self::path() {
+            Ok(path) => path,
+            Err(_) if files::env("EPR_BIN_TOOLS").is_none() => {
+                return crate::manifest_store::registry(&crate::manifest_store::workspace_base()?)
+            }
+            Err(e) => return Err(e),
+        };
+        Self::load(&path)
     }
     pub(crate) fn path() -> Result<PathBuf> {
         if let Some(p) = files::env("EPR_BIN_TOOLS") {
@@ -111,7 +122,9 @@ impl Registry {
         let start = std::env::current_dir()?;
         start
             .ancestors()
-            .map(|p| p.join("genesis/agentic/bin-tools.json"))
+            .map(|p| {
+                p.join("genesis/orchestrator/manifests/runtime/workspace-device.manifest.json")
+            })
             .find(|p| p.is_file())
             .ok_or_else(|| Refusal::new("registry-invalid", "set EPR_BIN_TOOLS to bin-tools.json"))
     }
@@ -335,6 +348,36 @@ impl Store {
         self.runner = runner;
         self
     }
+    /// Name a running stored executable by its verified release; standalone candidates
+    /// keep their raw byte CID. Path binding prevents equal bytes elsewhere claiming custody.
+    pub fn executable_cid(&self, executable: &Path) -> Result<String> {
+        let actual = executable.canonicalize()?;
+        if let (Some(parent), Some(name)) = (actual.parent(), actual.file_name()) {
+            if let Some(cid) = parent.file_name().and_then(|s| s.to_str()) {
+                if self.verified(cid)
+                    && self.artifact(cid)?.join(name).canonicalize().ok().as_ref() == Some(&actual)
+                {
+                    return Ok(cid.to_owned());
+                }
+            }
+        }
+        files::file_cid(&actual)
+    }
+
+    /// Resolve the verified device current, without session pinning or candidate overrides.
+    pub fn current_artifact(&self) -> Result<(String, PathBuf)> {
+        let cid = self
+            .head("current")
+            .filter(|cid| self.verified(cid))
+            .ok_or_else(|| Refusal::new("unverified-current", "no verified device current"))?;
+        let name = self
+            .config
+            .bins
+            .first()
+            .ok_or_else(|| Refusal::new("registry-invalid", "tool has no executable"))?;
+        Ok((cid.clone(), self.artifact(&cid)?.join(name)))
+    }
+
     /// Absolute store root, for native filesystem adapters only.
     pub fn root(&self) -> &Path {
         &self.root

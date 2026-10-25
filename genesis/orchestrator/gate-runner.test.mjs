@@ -651,6 +651,11 @@ function receiptFixture(t) {
   env.EPR_STORE = resolve(root, 'store');
   env.EPR_REPO_ROOT = root;
   env.EPR_BIN_TOOLS = resolve(root, 'genesis/agentic/bin-tools.json');
+  // Slice M embeds this committed base in epr's source closure, even in a
+  // minimal Cargo fixture. A missing blob must still make the evaluator refuse.
+  const base = 'genesis/orchestrator/manifests/runtime/workspace-device.manifest.json';
+  mkdirSync(dirname(resolve(root, base)), { recursive: true });
+  writeFileSync(resolve(root, base), readFileSync(resolve(ROOT, base)));
   const metadata = spawnSync('cargo', ['metadata', '--offline', '--format-version', '1', '--manifest-path', resolve(root, dir, 'Cargo.toml')], {env, encoding:'utf8'});
   assert.equal(metadata.status, 0, metadata.stderr);
   // Closure key v3 reads the recipe's justfile and the gate runner at the commit.

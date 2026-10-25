@@ -1092,7 +1092,7 @@ pub fn parse(text: &str) -> BTreeMap<String, String> {
 // home; this just lets a peer edit its own copy of it through its own API
 // instead of requiring a shell on the box.
 
-/// Rewrite exactly the `key = "value"` line of a runtime-config text, carrying
+/// Return text with exactly the `key = "value"` line replaced, carrying
 /// every other line through verbatim. Pure — no I/O, so the whole rule is
 /// testable without a filesystem.
 ///
@@ -1145,99 +1145,6 @@ pub fn rewrite_key_line(text: &str, key: &str, value: Option<&str>) -> String {
     let mut rendered = out.join("\n");
     rendered.push('\n');
     rendered
-}
-
-/// Why a [`set_watched_key`] call could not happen.
-#[derive(Debug, Clone)]
-pub enum SetKeyError {
-    /// No watched file is configured ([`PATH_ENV`] unset) — there is nothing to
-    /// write, and inventing a path would create a file nothing reads.
-    NotWatched,
-    /// The read, write or rename failed. The file is left exactly as it was:
-    /// the new bytes only ever become visible through the final `rename(2)`.
-    Io(String),
-}
-
-impl std::fmt::Display for SetKeyError {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self {
-            SetKeyError::NotWatched => write!(
-                f,
-                "no runtime-config file is watched on this node ({PATH_ENV} is unset)"
-            ),
-            SetKeyError::Io(e) => write!(f, "runtime-config write failed: {e}"),
-        }
-    }
-}
-
-/// Set (or remove, with `value: None`) ONE key in the WATCHED file and reload.
-///
-/// Atomic by construction: the rewritten text is written to a sibling temp file
-/// and `rename(2)`d over the target, so a reader — the poller, another seat, a
-/// `kubectl exec cat` — never observes a half-written file, and a failure
-/// anywhere before the rename leaves the original bytes untouched.
-///
-/// A MISSING file is not an error: it is the "no overrides yet" state, and the
-/// first `follow` on a fresh peer legitimately creates it.
-///
-/// The reload is not an optimisation — it is what makes the call OBSERVABLE.
-/// Without it the caller would have to sleep out a poll interval before
-/// `/admin/adoption` could confirm anything, which is exactly the wait this
-/// route exists to remove.
-pub fn set_watched_key(
-    key: &str,
-    value: Option<&str>,
-) -> Result<(PathBuf, ReloadOutcome), SetKeyError> {
-    let path = config_path().ok_or(SetKeyError::NotWatched)?;
-
-    let current = match std::fs::read_to_string(&path) {
-        Ok(text) => text,
-        Err(e) if e.kind() == std::io::ErrorKind::NotFound => String::new(),
-        Err(e) => return Err(SetKeyError::Io(format!("read {}: {e}", path.display()))),
-    };
-    let next = rewrite_key_line(&current, key, value);
-
-    if let Some(parent) = path.parent() {
-        if !parent.as_os_str().is_empty() {
-            std::fs::create_dir_all(parent)
-                .map_err(|e| SetKeyError::Io(format!("create {}: {e}", parent.display())))?;
-        }
-    }
-
-    // Sibling temp so the rename stays within one filesystem (a rename across
-    // devices is not atomic and would fail outright); pid-suffixed so two
-    // processes sharing a mount cannot collide on it.
-    let file_name = path
-        .file_name()
-        .map(|n| n.to_string_lossy().to_string())
-        .unwrap_or_else(|| "runtime-config".to_string());
-    let tmp = path.with_file_name(format!(".{file_name}.tmp-{}", std::process::id()));
-    std::fs::write(&tmp, next.as_bytes())
-        .map_err(|e| SetKeyError::Io(format!("write {}: {e}", tmp.display())))?;
-    if let Err(e) = std::fs::rename(&tmp, &path) {
-        let _ = std::fs::remove_file(&tmp);
-        return Err(SetKeyError::Io(format!(
-            "rename {} -> {}: {e}",
-            tmp.display(),
-            path.display()
-        )));
-    }
-
-    // Keep the poller from re-reading the very file we just wrote and logging a
-    // spurious "file change detected" for our own edit. Best-effort: if the
-    // signature read fails the poller simply reloads once more, which is
-    // idempotent.
-    *WATCH.last_signature.lock().unwrap() = signature(&path);
-
-    let outcome = reload_now();
-    info!(
-        path = %path.display(),
-        key,
-        removed = value.is_none(),
-        applied = outcome.changed,
-        "runtime-config: key rewritten through the operator seat and reloaded"
-    );
-    Ok((path, outcome))
 }
 
 // ─── watcher ─────────────────────────────────────────────────────────────────
@@ -1925,18 +1832,6 @@ not a pair
             Some("runtime:coordinators:elohim:x=canary"),
             "what the writer emits is exactly what the reader reads back"
         );
-    }
-
-    #[test]
-    fn set_watched_key_refuses_when_no_file_is_watched() {
-        // Guard, not a filesystem test: with the watcher off there is nothing to
-        // edit, and a silent success would write to a path nothing reads.
-        if config_path().is_none() {
-            assert!(matches!(
-                set_watched_key(CH, Some("a=observe")),
-                Err(SetKeyError::NotWatched)
-            ));
-        }
     }
 
     // ─── the runtime half of the boot assertion ──────────────────────────────

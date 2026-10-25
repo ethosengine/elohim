@@ -315,3 +315,104 @@ fn run_then_kill_child_then_witness_ls_shows_one() {
     });
     assert_eq!(status.code(), Some(0));
 }
+
+#[test]
+fn bin_channel_runs_verified_device_current_and_passport_observes_it() {
+    use elohim_device_runtime::{
+        bin_store::{IngestOptions, Store},
+        manifest_store,
+    };
+    use std::os::unix::fs::{symlink, PermissionsExt};
+    let root = tempfile::tempdir().unwrap();
+    let source = root.path().join("source");
+    fs::create_dir(&source).unwrap();
+    for bin in ["epr", "bin-launch"] {
+        let path = source.join(bin);
+        fs::write(&path, b"#!/bin/sh\necho booted\nexec sleep 300\n").unwrap();
+        fs::set_permissions(path, fs::Permissions::from_mode(0o755)).unwrap();
+    }
+    let base = manifest_store::workspace_base().unwrap();
+    let registry = manifest_store::registry(&base).unwrap();
+    let bins = root.path().join("bins");
+    struct IdentityRunner;
+    impl elohim_device_runtime::bin_store::Runner for IdentityRunner {
+        fn run(
+            &self,
+            command: &elohim_device_runtime::bin_store::CommandSpec,
+        ) -> Result<
+            elohim_device_runtime::bin_store::CommandOutput,
+            elohim_device_runtime::bin_store::Refusal,
+        > {
+            Ok(elohim_device_runtime::bin_store::CommandOutput { success: true,
+                stdout: json!({"cid":elohim_device_runtime::bin_store::file_cid(Path::new(&command.program))?,"version":"fixture"}).to_string(), stderr: String::new() })
+        }
+    }
+    let store = Store::new(bins.join("epr"), "epr", &registry)
+        .unwrap()
+        .with_runner(std::sync::Arc::new(IdentityRunner));
+    let release = store
+        .ingest(
+            &source.join("epr"),
+            &IngestOptions {
+                source_commit: Some("a".repeat(40)),
+                tree_clean: Some(true),
+                gate_run: Some("fixture".into()),
+                ..Default::default()
+            },
+        )
+        .unwrap();
+    symlink(&release.cid, store.root().join("current")).unwrap();
+    fs::write(
+        store.root().join("current.json"),
+        serde_json::to_vec(&json!({"cid":release.cid})).unwrap(),
+    )
+    .unwrap();
+    manifest_store::write_registry(&bins.join("bin/bin-tools.json"), &registry).unwrap();
+    let mut manifest = manifest_json("child");
+    manifest["processes"][0]["artifact"] = json!({"channel":{"channel_id":"bin:epr"}});
+    manifest["follows"] = serde_json::to_value(&base.follows).unwrap();
+    manifest["tools"] = serde_json::to_value(&base.tools).unwrap();
+    let cid = manifest_cid(&manifest);
+    let (manifest_path, berth_path) = write_declarations(root.path(), &manifest, &cid);
+    let child = Command::new(ARK)
+        .args(["run", "--manifest"])
+        .arg(manifest_path)
+        .arg("--berth")
+        .arg(berth_path)
+        .env_remove("EPR_STORE")
+        .env_remove("BRIT_STORE")
+        .env("BIN_STORE", &bins)
+        .env("EPR_BIN_TOOLS", bins.join("bin/bin-tools.json"))
+        .env("EPR_PROC_ROOT", root.path().join("proc"))
+        .env("ELOHIM_DEVICE_KEY_FILE", root.path().join("key"))
+        .env("ELOHIM_SESSION_ID", "manifest-fixture")
+        .env_remove("EPR_SESSION_LAZY")
+        .stdout(Stdio::null())
+        .stderr(Stdio::null())
+        .spawn()
+        .unwrap();
+    let mut process = ArkProcess(child);
+    let passport = wait_until("channel child", Duration::from_secs(10), || {
+        let bytes = fs::read(root.path().join("ark/passport.json")).ok()?;
+        let value: Value = serde_json::from_slice(&bytes).ok()?;
+        value["processes"][0]["ready"].as_bool()?.then_some(value)
+    });
+    assert_eq!(passport["tools"][1]["tool"], "epr");
+    assert_eq!(passport["tools"][1]["appliedRelease"], release.cid);
+    assert_eq!(passport["follows"][0]["appliedRelease"], release.cid);
+    assert_eq!(passport["manifest"], cid);
+    assert_eq!(
+        passport["processes"][0]["artifact_path"],
+        store
+            .root()
+            .join(&release.cid)
+            .join("epr")
+            .to_str()
+            .unwrap()
+    );
+    kill(process.pid(), Signal::SIGTERM).unwrap();
+    let status = wait_until("ark stopped", Duration::from_secs(5), || {
+        process.0.try_wait().unwrap()
+    });
+    assert!(status.success());
+}

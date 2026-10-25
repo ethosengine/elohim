@@ -234,7 +234,9 @@ impl Supervisor {
             if process.kind == ProcessKind::Delegated {
                 continue;
             }
-            if !berth.artifacts.contains_key(&process.name) {
+            if !matches!(&process.artifact, ark_core::ArtifactRef::Channel { channel_id } if channel_id.starts_with("bin:"))
+                && !berth.artifacts.contains_key(&process.name)
+            {
                 return Err(SupervisorError::ArtifactNotPlaced {
                     process: process.name.clone(),
                 });
@@ -408,6 +410,8 @@ impl Supervisor {
 
     fn initial_passport(&self, incarnation: u64) -> Result<Passport, SupervisorError> {
         let tier = self.driver.fingerprint().effective_tier;
+        let observation = elohim_device_runtime::manifest_store::observe_local(&self.manifest)
+            .unwrap_or_default();
         Ok(Passport {
             schema: RECORD_SCHEMA,
             kind: PASSPORT_KIND.to_string(),
@@ -430,6 +434,8 @@ impl Supervisor {
                     deaths_in_window: 0,
                 })
                 .collect(),
+            follows: observation.follows,
+            tools: observation.tools,
             last_verdict: None,
             updated_at_epoch_ms: self.clock.now_epoch_ms(),
         })

@@ -46,8 +46,8 @@ class CensusTest(unittest.TestCase):
             'session-facet keys': 'elohim/eprfs/epr-cli/src/session_envelope.rs',
             'epr/brit lookup paths': '.claude/scripts/_lib/epr_client.py',
             'arrival surfaces': 'elohim/eprfs/epr-cli/src/device/arrival.rs',
-            'follow-set declarations': 'genesis/agentic/bin-tools.json',
-            'runtime-config writers': 'elohim/elohim-settings/src/runtime_config.rs',
+            'follow-set declarations': 'genesis/orchestrator/manifests/runtime/workspace-device.manifest.json',
+            'runtime-config writers': 'elohim/eprfs/device-runtime/src/manifest_store.rs',
             'head verifiers': 'elohim/holochain/dna/elohim/zomes/content_store/src/head_delegation.rs',
         }
         for family, path in examples.items():

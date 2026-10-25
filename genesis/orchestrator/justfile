@@ -40,6 +40,13 @@ gate: lint test-jenkinsfile-lints test-suite
 
 # Full orchestrator node --test suite (registry, gate runner, graph walker, …).
 test-suite:
+    #!/usr/bin/env bash
+    set -euo pipefail
+    if [[ -z "${EPR_BIN:-}" ]]; then
+      : "${CARGO_TARGET_DIR:?EPR_BIN absent: run just gate orchestrator to resolve its native cargo slot}"
+      cargo build --manifest-path ../../elohim/eprfs/Cargo.toml --locked -p elohim-epr-cli --bin epr
+      export EPR_BIN="$CARGO_TARGET_DIR/debug/epr"
+    fi
     pnpm test
 
 # Regenerate pipeline-list.json from build-manifest.json / pipeline-registry.mjs.

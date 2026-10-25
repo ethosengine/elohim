@@ -146,6 +146,9 @@ COPY elohim/epr-index ./epr-index
 COPY elohim/placement/core ./placement/core
 COPY elohim/eprfs/eprfs-core ./eprfs/eprfs-core
 COPY elohim/eprfs/eprfs-serve ./eprfs/eprfs-serve
+# The private declaration writer and its embedded offline base travel with storage.
+COPY elohim/eprfs/device-runtime ./eprfs/device-runtime
+COPY genesis/orchestrator/manifests/runtime/workspace-device.manifest.json /genesis/orchestrator/manifests/runtime/workspace-device.manifest.json
 # Wave 3 — valueflows bridge crates (hREA / VF-GraphQL interop) are
 # unconditional path-deps in Cargo.toml; copy them in so the
 # build-context contains their source.
@@ -210,6 +213,7 @@ RUN sed -i 's|path = "../../crates/doorway-client"|path = "crates/doorway-client
     sed -i 's|path = "../placement/core"|path = "placement/core"|' Cargo.toml && \
     sed -i 's|path = "../eprfs/eprfs-core"|path = "eprfs/eprfs-core"|' Cargo.toml && \
     sed -i 's|path = "../eprfs/eprfs-serve"|path = "eprfs/eprfs-serve"|' Cargo.toml && \
+    sed -i 's|path = "../eprfs/device-runtime"|path = "eprfs/device-runtime"|' Cargo.toml && \
     sed -i 's|path = "../../bridges/valueflows/valueflows-bridge"|path = "bridges/valueflows/valueflows-bridge"|' Cargo.toml && \
     sed -i 's|path = "../../bridges/valueflows/valueflows-types"|path = "bridges/valueflows/valueflows-types"|' Cargo.toml && \
     sed -i 's|path = "../../bridges/did/did-bridge"|path = "bridges/did/did-bridge"|' Cargo.toml && \
@@ -363,9 +367,9 @@ RUN EPRFS_VERSION="$(sed -n 's/^version = "\(.*\)"$/\1/p' /eprfs-workspace/Cargo
     -e 's|tokio.workspace = true|tokio = { version = "1", features = ["macros", "rt-multi-thread"] }|' \
     -e 's|path = "../../../crates/seam-contracts"|path = "../../crates/seam-contracts"|' \
     -e 's|, registry = "elohim"||' \
-    eprfs/eprfs-core/Cargo.toml eprfs/eprfs-serve/Cargo.toml && \
-    if grep -nE 'workspace *= *true' eprfs/eprfs-core/Cargo.toml eprfs/eprfs-serve/Cargo.toml; then \
-      echo "eprfs-core/eprfs-serve still inherit from the eprfs workspace (lines above); add an inline rule to this RUN" >&2; exit 1; \
+    eprfs/eprfs-core/Cargo.toml eprfs/eprfs-serve/Cargo.toml eprfs/device-runtime/Cargo.toml && \
+    if grep -nE 'workspace *= *true' eprfs/eprfs-core/Cargo.toml eprfs/eprfs-serve/Cargo.toml eprfs/device-runtime/Cargo.toml; then \
+      echo "eprfs crates still inherit from the eprfs workspace (lines above); add an inline rule to this RUN" >&2; exit 1; \
     fi
 
 # elohim-epr-index inherits its dependency versions from elohim/Cargo.toml's

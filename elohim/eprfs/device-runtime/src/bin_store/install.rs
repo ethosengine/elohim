@@ -22,7 +22,13 @@ impl Store {
             .into_iter()
             .filter_map(|p| p.canonicalize().ok())
             .collect();
-        for name in self.config.bins.iter().chain(self.config.aliases.keys()) {
+        for name in self
+            .config
+            .bins
+            .iter()
+            .chain(self.config.aliases.keys())
+            .filter(|name| name.as_str() != "bin-launch")
+        {
             let mut before = Vec::new();
             for directory in path_env.split(':').filter(|s| !s.is_empty()) {
                 let path = Path::new(directory).join(name);
@@ -52,7 +58,7 @@ impl Store {
         &self,
         native: &Path,
         destination: &Path,
-        registry: &Registry,
+        _registry: &Registry,
         repo: &Path,
     ) -> Result<Value> {
         let head = self
@@ -83,7 +89,13 @@ impl Store {
         let _install_lock = files::Lock::acquire(&base, files::MUTATION_WAIT)?;
         // Installation owns its launcher and preserved plain binaries, not arbitrary symlinks
         // placed at the destination. Refuse before changing any file when one is foreign.
-        for name in self.config.bins.iter().chain(self.config.aliases.keys()) {
+        for name in self
+            .config
+            .bins
+            .iter()
+            .chain(self.config.aliases.keys())
+            .filter(|name| name.as_str() != "bin-launch")
+        {
             for path in [base.join(name), destination.join(name)] {
                 if let Ok(target) = fs::read_link(&path) {
                     let canonical = path.canonicalize().ok();
@@ -120,11 +132,7 @@ impl Store {
             self.adopt_plain(&base, repo)?
         };
         // Snapshot every shared installed file before any mutation, including absence.
-        let managed = [
-            launcher.clone(),
-            base.join("bin-tools.json"),
-            base.join("agent-runtimes.json"),
-        ];
+        let managed = [launcher.clone(), base.join("agent-runtimes.json")];
         let snapshots: Vec<_> = managed
             .iter()
             .map(|p| (p.clone(), fs::read(p).ok()))
@@ -135,7 +143,6 @@ impl Store {
             if native.canonicalize().ok() != launcher.canonicalize().ok() {
                 copy_executable(native, &launcher)?;
             }
-            files::atomic_json(&base.join("bin-tools.json"), registry)?;
             let runtimes = repo.join("genesis/agentic/agent-runtimes.json");
             if runtimes.is_file() {
                 files::atomic_bytes(
@@ -144,7 +151,13 @@ impl Store {
                     0o444,
                 )?;
             }
-            for name in self.config.bins.iter().chain(self.config.aliases.keys()) {
+            for name in self
+                .config
+                .bins
+                .iter()
+                .chain(self.config.aliases.keys())
+                .filter(|name| name.as_str() != "bin-launch")
+            {
                 for path in [base.join(name), destination.join(name)] {
                     if path == launcher {
                         continue;
@@ -319,4 +332,34 @@ fn build_output(path: &Path) -> bool {
     path.starts_with("/projects/.cargo-target-pool")
         || path.starts_with("/tmp/eprfs-gate-target")
         || path.components().any(|part| part.as_os_str() == "target")
+}
+
+impl Store {
+    /// Resolve the launcher carried by the verified epr release, never a mutable build output.
+    pub fn landed_launcher(&self) -> Result<PathBuf> {
+        let sibling;
+        let store = if self.tool == "epr" {
+            self
+        } else {
+            let root = self
+                .root
+                .parent()
+                .ok_or_else(|| Refusal::new("path-invalid", "store has no parent"))?;
+            let registry = Registry::load(&root.join("bin/bin-tools.json"))?;
+            sibling = Store::new(root.join("epr"), "epr", &registry)?;
+            &sibling
+        };
+        let cid = store
+            .head("current")
+            .filter(|cid| store.verified(cid))
+            .ok_or_else(|| Refusal::new("unverified-current", "epr has no verified current"))?;
+        let path = store.artifact(&cid)?.join("bin-launch");
+        if !files::executable(&path) {
+            return Err(Refusal::new(
+                "launcher-absent",
+                "land an epr release carrying bin-launch",
+            ));
+        }
+        Ok(path)
+    }
 }

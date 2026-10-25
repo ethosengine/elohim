@@ -13,6 +13,12 @@
       "inputs": {
         "sources": [
           "elohim/eprfs/**",
+          "elohim/ark/core/**",
+          "elohim/placement/core/**",
+          "elohim/elohim-compute/**",
+          "elohim/elohim-settings/**",
+          "elohim/elohim-cache-core/**",
+          "genesis/orchestrator/manifests/runtime/workspace-device.manifest.json",
           "genesis/orchestrator/rust-style/**",
           "elohim/sdk/domains/elohim-agent/adapter/**",
           "elohim/epr/**",

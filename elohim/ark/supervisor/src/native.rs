@@ -89,21 +89,33 @@ impl Driver for NativeDriver {
             return Err(DriverError::UnsupportedKind(spec.kind.clone()));
         }
 
-        let pinned = match &spec.artifact {
+        let (pinned, declared) = match &spec.artifact {
             ArtifactRef::Channel { channel_id } => {
-                return Err(DriverError::ChannelUnresolvedInS0 {
-                    channel_id: channel_id.clone(),
-                })
+                let tool = channel_id.strip_prefix("bin:").ok_or_else(|| {
+                    DriverError::ChannelUnresolvedInS0 {
+                        channel_id: channel_id.clone(),
+                    }
+                })?;
+                let resolve = || -> Result<_, elohim_device_runtime::bin_store::Refusal> {
+                    let registry = elohim_device_runtime::bin_store::Registry::discover()?;
+                    let store =
+                        elohim_device_runtime::bin_store::Store::from_environment(tool, &registry)?;
+                    store.current_artifact()
+                };
+                let (_, path) = resolve().map_err(|error| DriverError::Spawn(error.to_string()))?;
+                let digest =
+                    sha256_file(&path).map_err(|error| DriverError::Spawn(error.to_string()))?;
+                (digest, path)
             }
-            ArtifactRef::Pinned { sha256, .. } => sha256.clone(),
+            ArtifactRef::Pinned { sha256, .. } => (
+                sha256.clone(),
+                berth
+                    .artifacts
+                    .get(&spec.name)
+                    .cloned()
+                    .ok_or_else(|| DriverError::ArtifactMissing(PathBuf::new()))?,
+            ),
         };
-
-        let declared = berth
-            .artifacts
-            .get(&spec.name)
-            .cloned()
-            // No entry at all: there is no path to name, which the empty path records.
-            .ok_or_else(|| DriverError::ArtifactMissing(PathBuf::new()))?;
         // Absolutised BEFORE the hash, so that the file hashed here and the file `exec`ed
         // below cannot be two different files. The child is spawned with
         // `current_dir(data_root)`, and a relative program is resolved by the kernel against

@@ -826,6 +826,15 @@ fn reconcile_deployments(root: &Path, drift: &[DeploymentDrift]) -> FlowResult<(
         return Ok(());
     }
     let path = deployments_path(root);
+    // Same persistent inode and kernel flock as runtime-declaration-render.mjs.
+    // Keep the descriptor alive through read/modify/rename; never unlink the lock.
+    let lock = std::fs::OpenOptions::new()
+        .read(true)
+        .write(true)
+        .create(true)
+        .truncate(false)
+        .open(path.with_extension("json.lock"))?;
+    lock.lock()?;
     // A write the caller asked for that silently does nothing is the failure this arm must not have:
     // `--apply` would print APPLIED having reconciled nothing. Refuse by name instead.
     let text = std::fs::read_to_string(&path).map_err(|err| {
@@ -898,7 +907,11 @@ fn reconcile_deployments(root: &Path, drift: &[DeploymentDrift]) -> FlowResult<(
             path.display()
         ))
     })?;
-    std::fs::write(&path, new)?;
+    use std::io::Write;
+    let mut temporary = tempfile::NamedTempFile::new_in(path.parent().expect("deployment parent"))?;
+    temporary.write_all(new.as_bytes())?;
+    temporary.as_file().sync_all()?;
+    temporary.persist(&path).map_err(|err| err.error)?;
     Ok(())
 }
 
@@ -1755,6 +1768,105 @@ impl FocusBaseline {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn deployment_scope_and_renderer_serialize_without_lost_updates() {
+        use std::{
+            io::Read,
+            os::unix::fs::PermissionsExt,
+            process::{Command, Stdio},
+            time::Duration,
+        };
+        let dir = tempfile::tempdir().unwrap();
+        let root = dir.path();
+        let path = deployments_path(root);
+        std::fs::create_dir_all(path.parent().unwrap()).unwrap();
+        std::fs::write(
+            &path,
+            serde_json::to_vec_pretty(&serde_json::json!({"humans": [{
+                "name": "fixture", "runtimeManifest": {"path": "base.json", "cid": "old"},
+                "runtimeConfig": {"ELOHIM_RELEASE_CHANNELS": "old"}
+            }]}))
+            .unwrap(),
+        )
+        .unwrap();
+        let ready = root.join("render-ready");
+        let release = root.join("render-release");
+        let stub = root.join("epr-stub");
+        std::fs::write(&stub, r#"#!/usr/bin/env python3
+import os, pathlib, sys, time
+pathlib.Path(os.environ['RENDER_READY']).touch()
+while not pathlib.Path(os.environ['RENDER_RELEASE']).exists():
+    time.sleep(0.01)
+print('{"manifestCid":"new-cid"}' if '--json' in sys.argv else 'ELOHIM_RELEASE_CHANNELS = "bin:epr=apply"')
+"#).unwrap();
+        std::fs::set_permissions(&stub, std::fs::Permissions::from_mode(0o755)).unwrap();
+        let repo = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../..");
+        let renderer = repo.join("genesis/orchestrator/runtime-declaration-render.mjs");
+        // Start through the public renderer, so removal of its lock fails this test too.
+        let mut render = Command::new("node").arg("--input-type=module").arg("-e")
+            .arg("const [module, root, file, binary] = process.argv.slice(1); const {updateDeclarations} = await import(module); updateDeclarations(root, file, binary, true);")
+            .args([renderer.as_os_str(), root.as_os_str(), path.as_os_str(), stub.as_os_str()])
+            .env("RENDER_READY", &ready).env("RENDER_RELEASE", &release)
+            .stdin(Stdio::null()).stdout(Stdio::null()).stderr(Stdio::inherit()).spawn().unwrap();
+        for _ in 0..500 {
+            if ready.exists() {
+                break;
+            }
+            std::thread::sleep(Duration::from_millis(10));
+        }
+        if !ready.exists() {
+            let _ = render.kill();
+            let _ = render.wait();
+            panic!("renderer failed before acquiring lock and reading deployment");
+        }
+        let mut before = std::fs::File::open(&path).unwrap();
+        std::thread::scope(|scope| {
+            let (sent, done) = std::sync::mpsc::channel();
+            let writer = scope.spawn(move || {
+                sent.send(reconcile_deployments(
+                    root,
+                    &[DeploymentDrift {
+                        name: "fixture".into(),
+                        action: "suspend".into(),
+                        caps: vec!["shem".into()],
+                    }],
+                ))
+                .unwrap();
+            });
+            let blocked = done.recv_timeout(Duration::from_millis(150)).is_err();
+            std::fs::write(&release, "go").unwrap();
+            assert!(render.wait().unwrap().success());
+            writer.join().unwrap();
+            assert!(blocked, "scope must wait for the renderer transaction");
+            done.recv_timeout(Duration::from_secs(5)).unwrap().unwrap();
+        });
+        let new: serde_json::Value =
+            serde_json::from_slice(&std::fs::read(&path).unwrap()).unwrap();
+        assert_eq!(new["humans"][0]["suspended"], true);
+        assert_eq!(new["humans"][0]["runtimeManifest"]["cid"], "new-cid");
+        assert_eq!(
+            new["humans"][0]["runtimeConfig"]["ELOHIM_RELEASE_CHANNELS"],
+            "bin:epr=apply"
+        );
+        // Scope's own replacement is atomic too, independently of the renderer's rename.
+        let mut rendered = std::fs::File::open(&path).unwrap();
+        reconcile_deployments(
+            root,
+            &[DeploymentDrift {
+                name: "fixture".into(),
+                action: "unsuspend".into(),
+                caps: vec![],
+            }],
+        )
+        .unwrap();
+        let mut retained = String::new();
+        rendered.read_to_string(&mut retained).unwrap();
+        assert!(retained.contains("suspended"));
+        let mut old = String::new();
+        before.read_to_string(&mut old).unwrap();
+        assert!(!old.contains("new-cid"));
+    }
 
     fn set(items: &[&str]) -> BTreeSet<String> {
         items.iter().map(|s| s.to_string()).collect()

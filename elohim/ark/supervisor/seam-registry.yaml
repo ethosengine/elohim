@@ -74,3 +74,28 @@ decisionPoints:
       - path: elohim/ark/supervisor/tests/supervise_death.rs
         testName: missing_driver_identity_never_falls_back_to_the_spawn_digest
         kind: integration
+  - name: declared_bin_current
+    kind: boundary-answer-type
+    sourceLocation:
+      file: src/native.rs
+      modulePath: ark_supervisor::native::NativeDriver::start
+    summary: A bin channel starts the verified local current through device-runtime custody; the passport observes the same registry and per-tool store selection.
+    concernIds:
+      - { id: C0, status: answered, justification: "Private device custody and ephemeral process observation; no network authority." }
+      - { id: C1, status: n-a, justification: "No candidate selection or promotion; only current is resolved." }
+      - { id: C2, status: answered, justification: "The selected immutable release path is fixed before spawn and rehashed by the native driver." }
+      - { id: C3, status: answered, justification: "Missing custody follows existing bounded restart/readiness policy." }
+      - { id: C4, status: answered, justification: "Absent or corrupt current refuses; unknown observation stays null." }
+      - { id: C5, status: answered, justification: "The existing device-runtime verifier checks the complete release; no second verifier is added." }
+      - { id: C6a, status: answered, justification: "Local release verification only; no build, fetch or network call on the launch path." }
+      - { id: C6b, status: answered, justification: "Reading current creates no session pin and moves no head." }
+      - { id: C7, status: n-a, justification: "No advertisement." }
+      - { id: C8, status: answered, justification: "Passport binds the unchanged manifest CID to the actual executable path, hash and observed tool release." }
+      - { id: C9, status: answered, justification: "Non-bin unresolved channels retain the existing explicit refusal." }
+      - { id: C10, status: answered, justification: "Pure ark-core stays free of runtime dependencies; the I/O supervisor reuses device-runtime." }
+      - { id: C11, status: n-a, justification: "No new scheduling policy." }
+      - { id: C12, status: answered, justification: "Only local configured custody is eligible; ambient candidates and session pins cannot replace current." }
+      - { id: C13, status: n-a, justification: "No trust-tier grant." }
+      - { id: C14, status: answered, justification: "Existing supervisor teardown owns child lifetime and evidence." }
+    contractTests:
+      - { path: elohim/ark/cli/tests/cli_smoke.rs, testName: bin_channel_runs_verified_device_current_and_passport_observes_it, kind: integration }

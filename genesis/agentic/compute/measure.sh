@@ -377,8 +377,8 @@ guest_writable() { # <path>
   fi
 }
 
-# The cause a bare "not writable" hides for runtime-config.toml: elohim-storage rewrites it by
-# temp file + rename(2) (elohim/elohim-settings/src/runtime_config.rs set_key) whenever a peer is
+# The manifest projection needs a writable parent for atomic rename. The worker grants
+# access to that parent; elohim-device-runtime owns the write whenever a peer is
 # enrolled in a release channel — `just mesh start`/prologue and every a2o `follow` ceremony. The
 # new inode is created under the storage's umask (0644), so every enrollment silently withdraws
 # the o+w grant. Re-applying the grant at hc-mesh.sh launch would not hold (the rewrite lands

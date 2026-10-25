@@ -53,5 +53,16 @@
       "conductor"
     ],
     "shed_order": []
-  }
+  },
+  "supersedes": "bafyreiaaebz37gnblcarqiwmr7a7znlwom2cc24whm7z327ivx4ze7w7vu",
+  "follows": [
+    {
+      "channel": "runtime:coordinators:elohim:workspace",
+      "mode": "observe"
+    },
+    {
+      "channel": "runtime:app-bundle:alpha:dev",
+      "mode": "canary"
+    }
+  ]
 }

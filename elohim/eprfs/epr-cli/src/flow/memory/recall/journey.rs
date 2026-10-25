@@ -661,7 +661,10 @@ fn prior_state(args: &Args, state_limit: usize) -> FlowResult<Value> {
 /// `(view, resolved_lens)`: `render()` (station 1.2) takes the resolved [`lens::LensView`]
 /// itself, not a re-parse of `view["lens"]`, so the honesty floor renders correctly even for the
 /// output-budget "narrow" fallback in `mod.rs::run`, whose trimmed view drops the `lens` key.
-#[allow(clippy::too_many_lines)]
+#[allow(
+    clippy::too_many_lines,
+    reason = "The journey's stations run in one fixed order over the execution's shared budget and receipt state; extracting each station into its own function is open work, not a design choice"
+)]
 pub(super) fn execute(
     args: &Args,
     contract: &Contract,

@@ -20,5 +20,6 @@ serde_json = { workspace = true }
 nix = { workspace = true }
 
 [dev-dependencies]
+elohim-device-runtime = { path = "../../eprfs/device-runtime" }
 sha2 = { workspace = true }
 tempfile = { workspace = true }

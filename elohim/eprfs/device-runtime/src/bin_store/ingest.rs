@@ -82,8 +82,13 @@ impl Store {
         fs::create_dir(&stage)?;
         let result = (|| {
             for name in &self.config.bins {
-                let file = if self.config.bins.len() == 1 && source.is_file() {
+                let file = if source.is_file() && self.config.bins.first() == Some(name) {
                     source.to_owned()
+                } else if source.is_file() {
+                    source
+                        .parent()
+                        .ok_or_else(|| Refusal::new("path-invalid", "binary has no parent"))?
+                        .join(name)
                 } else {
                     source.join(name)
                 };
@@ -224,7 +229,7 @@ impl Store {
     pub(super) fn identity(
         &self,
         directory: &Path,
-        cid: &str,
+        _cid: &str,
         commit: &str,
     ) -> Result<Option<String>> {
         let binary = directory.join(&self.config.bins[0]);
@@ -244,10 +249,13 @@ impl Store {
             let identity: Value = serde_json::from_str(&out.stdout).map_err(|_| {
                 Refusal::new("identity-invalid", "epr --version did not return JSON")
             })?;
-            if identity["cid"] != cid {
+            // --version identifies the executable, while a multi-bin release is the
+            // CID of its sums manifest. Verify both identities at their own boundaries.
+            let binary_cid = files::file_cid(&binary)?;
+            if identity["cid"] != binary_cid {
                 return Err(Refusal::new(
                     "identity-mismatch",
-                    format!("binary reports {}, bytes are {cid}", identity["cid"]),
+                    format!("binary reports {}, bytes are {binary_cid}", identity["cid"]),
                 ));
             }
             Ok(identity["version"].as_str().map(str::to_owned))
@@ -283,7 +291,13 @@ impl Store {
         if record.tool != self.tool
             || record.cid != cid
             || record.rcid != cid
-            || names != record.bins.keys().collect()
+            || (names != record.bins.keys().collect()
+                && !(self.tool == "epr"
+                    && names.len() == 2
+                    && names.iter().any(|name| name.as_str() == "epr")
+                    && names.iter().any(|name| name.as_str() == "bin-launch")
+                    && record.bins.len() == 1
+                    && record.bins.contains_key("epr")))
         {
             return false;
         }
@@ -303,6 +317,17 @@ impl Store {
         }
         self.release_cid(&record.bins)
             .is_ok_and(|computed| computed == cid)
+    }
+    /// Admission requires the complete declared inventory; old session custody does not.
+    pub(super) fn admissible(&self, cid: &str) -> bool {
+        self.verified(cid)
+            && self.record(cid).is_some_and(|record| {
+                self.config
+                    .bins
+                    .iter()
+                    .chain(self.config.aliases.keys())
+                    .all(|bin| record.bins.contains_key(bin))
+            })
     }
     pub(super) fn usable(&self, cid: &str, bin: &str) -> bool {
         self.artifact(cid)

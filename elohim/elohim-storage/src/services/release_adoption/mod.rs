@@ -18,7 +18,7 @@
 //!
 //! **T4 (`task-release-apply-vehicles`, 2026-09-01) landed the second half.**
 //! [`apply`] now implements one [`ApplyVehicle`] per artifact class, and
-//! `mode: apply` is a legal declaration in `ELOHIM_RELEASE_CHANNELS`. What did
+//! `mode: apply` is a legal declaration in `RuntimeManifest.follows`. What did
 //! NOT change is the direction of the safety argument: observe is still the
 //! default; a vehicle is still handed a [`VerifiedRelease`] and nothing else;
 //! and every vehicle routes to machinery that already existed and was already
@@ -40,7 +40,7 @@
 //! # The shape of one sweep
 //!
 //! ```text
-//!   followed channels (runtime-config: ELOHIM_RELEASE_CHANNELS)
+//!   followed channels (the device manifest projection)
 //!        │
 //!   [watch]   resolve THIS node's conductor for the channel's canonical head
 //!        │    (I1 — a peer hint may trigger a resolve, never supply the answer)

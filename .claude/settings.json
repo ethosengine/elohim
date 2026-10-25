@@ -102,6 +102,11 @@
             "type": "command",
             "command": "python3 \"$CLAUDE_PROJECT_DIR/.claude/hooks/ram-guard.py\" --event prompt",
             "timeout": 5
+          },
+          {
+            "type": "command",
+            "command": "ELOHIM_HOOK_RUNTIME_PID=$PPID python3 \"$CLAUDE_PROJECT_DIR/.claude/hooks/device-head-notice.py\"",
+            "timeout": 5
           }
         ]
       }

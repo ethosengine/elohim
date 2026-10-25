@@ -57,5 +57,15 @@
       "memory_bytes": 1073741824
     }
   },
-  "supersedes": "bafyreifiryuwoxfz4sese43gyqrc7ocodu4oohkx5qxhogx2lbxxxwvtom"
+  "supersedes": "bafyreicpwvp3p3nab5n2eat555ewf4p44fr7uw5ycu34vyk2fczeidnrle",
+  "follows": [
+    {
+      "channel": "runtime:coordinators:elohim:workspace",
+      "mode": "observe"
+    },
+    {
+      "channel": "runtime:app-bundle:alpha:dev",
+      "mode": "canary"
+    }
+  ]
 }

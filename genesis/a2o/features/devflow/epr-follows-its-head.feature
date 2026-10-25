@@ -3,12 +3,12 @@ Feature: Matthew's workspace follows its landed epr head
   epr is the protocol's command-line evaluator: a session's governance checks, flow commands and
   memory recall all run through it, so a session that silently runs the wrong build silently
   changes what those operations accept. Matthew's development workspace is one of his devices. It
-  keeps epr builds by CID (content identifier: the hash of the build's bytes) and one landed head:
+  keeps epr releases by CID (content identifier: the hash of the release's executable inventory) and one landed head:
   the build a new session should run. A build is first ingested into that store, then landed as
   the head only if all four hold: it came from a clean commit (built with no uncommitted changes); that commit is published, meaning
   it is contained in the development branch the device follows (its own `dev` or the remote's);
   it descends from the current head, so its source commit has the head's source commit in its git
-  history; and it passes its health check (it names its own CID and answers a read-only flow
+  history; and it passes its health check (the evaluator names its own executable CID and answers a read-only flow
   command). "Lands" below means both steps; a build ingested but not landed stays in the store,
   available to pin or to revert to. A revert moves the head backward deliberately, and only to a
   published build. The store's verbs (ingest, land, resolve, status, gc) are `epr bin`; `epr` on
@@ -17,11 +17,14 @@ Feature: Matthew's workspace follows its landed epr head
   underneath work already in progress. A build ingested from an unfinished, dirty tree remains
   available for deliberate testing, but it cannot silently become the device's head.
 
+  "Reports build B's CID" below means the reported executable CID matches the epr entry in
+  build B's release inventory; the store itself resolves the release CID.
   "Everywhere" means the two selection surfaces agree: running `epr` through the stable launcher
   and asking the store which build it resolves. In these scenarios the launcher and store live in
   a temporary device directory and the source history lives in a temporary git repository.
   Builds A and B are real epr evaluator copies padded with different trailing bytes, so each has a
-  distinct CID and `epr --version` names what actually ran. A session normally takes its identity
+  distinct release CID. Each release carries epr and bin-launch; `epr --version` names the
+  executable bytes, which must match that release's inventory. A session normally takes its identity
   from the agent runtime process it runs under (Claude Code, Codex, …); a session with no agent
   runtime above it keys its pin by the session ID it declares in ELOHIM_SESSION_ID.
   `EPR_PIN_CID` is different: it is a deliberate explicit pin for one launch inside the same
@@ -38,7 +41,8 @@ Feature: Matthew's workspace follows its landed epr head
   Older devices may still use a Python launcher and addresses beginning with sha256:. Their
   installed epr has no bin command for managing the native store. Their start hook queues a
   background build, then the new native commands migrate the store and install its launcher.
-  Native single-binary CIDs begin with bafkrei; Matthew can then run the landed evaluator.
+  Historical single-executable releases remain valid; the new release carries both epr and its
+  launcher. Matthew can then run the landed evaluator.
 
   Background:
     Given Matthew's workspace has an isolated device directory and source history
@@ -56,6 +60,9 @@ Feature: Matthew's workspace follows its landed epr head
     When clean build B lands from the next source commit
     Then the open session still runs build A's CID
     And the store reports that session behind the head
+    And the open session receives one notice naming the landed release
+    When Matthew explicitly pins build B for that session
+    Then epr through the launcher reports build B's CID
 
   Scenario: A build that fails its health check never becomes the head
     Given clean build A is the landed epr head
@@ -94,8 +101,15 @@ Feature: Matthew's workspace follows its landed epr head
   Scenario: A device on a pre-native epr arrives on the native store
     Given instead Matthew's device has a legacy sha256 store and a launcher without the bin verb
     When the device's start hook queues a native bootstrap
-    Then the detached bootstrap lands a bafkrei CID and replaces the legacy launcher
+    Then the detached bootstrap lands a native release CID and replaces the legacy launcher
     And the replacement launcher runs the landed native evaluator
+
+  Scenario: A changed executable inventory upgrades a release from the same source commit
+    Given the gate stored paired build B before an older arrival landed single-file build A from that same commit
+    And Matthew's open session has run epr through the launcher
+    When the device applies and follows its declared epr inventory
+    Then the device lands the paired release and installs its launcher
+    And the open session still runs build A's CID
 
   Scenario: A daemon follows the device head, not the session that started it
     Given clean build A is the landed epr head
@@ -110,7 +124,7 @@ Feature: Matthew's workspace follows its landed epr head
     And Matthew's open session has run epr through the launcher
     And clean build B lands from the next source commit
     And that pinned session starts the peer daemon
-    When the head is reverted to build A and build B ages past the 14-day history
+    When the head is reverted to build A and build B loses previous-head and 14-day history protection
     And garbage collection runs while the peer daemon lives
     Then build B remains in the store, held by the daemon's lease
 

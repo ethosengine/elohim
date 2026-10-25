@@ -1,0 +1,67 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "epr:schema:view:runtime-observation",
+  "title": "RuntimeObservation",
+  "description": "Device-private declaration or reconstructed observation. No network authority. Source of truth: elohim/ark/core/src/passport.rs (RuntimeObservation).",
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "follows": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "channel": {
+            "type": "string"
+          },
+          "mode": {
+            "type": "string",
+            "enum": [
+              "observe",
+              "canary",
+              "apply"
+            ]
+          },
+          "appliedRelease": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "required": [
+          "channel",
+          "mode",
+          "appliedRelease"
+        ]
+      }
+    },
+    "tools": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "tool": {
+            "type": "string"
+          },
+          "appliedRelease": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "required": [
+          "tool",
+          "appliedRelease"
+        ]
+      }
+    }
+  },
+  "required": [
+    "follows",
+    "tools"
+  ]
+}

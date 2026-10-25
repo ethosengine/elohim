@@ -802,6 +802,21 @@ async fn async_main(
     // ELOHIM_RUNTIME_CONFIG_PATH names a file; when active, a flag flip lands on
     // this RUNNING node within one poll instead of costing a pod roll. Provenance
     // and the boot-only knobs are readable at GET /admin/runtime-config.
+    // A declared fleet node renders from its mounted committed base into its private PVC.
+    // Local route/config-release acts and boot repair share exactly the same writer.
+    let runtime_base = std::env::var_os("ELOHIM_RUNTIME_MANIFEST_PATH")
+        .filter(|p| !p.is_empty())
+        .map(std::path::PathBuf::from);
+    let runtime_path = elohim_storage::runtime_config::config_path();
+    let seed = std::env::var("ELOHIM_RUNTIME_CONFIG_SEED_PATH")
+        .ok()
+        .map(std::fs::read_to_string)
+        .transpose()?;
+    elohim_device_runtime::manifest_store::boot_runtime_config(
+        runtime_path.as_deref(),
+        runtime_base.as_deref(),
+        seed.as_deref(),
+    )?;
     elohim_storage::runtime_config_watch::spawn_watcher();
 
     // BACKOFF LEDGER PERSISTENCE. Restore before any sweep runs, then snapshot
@@ -3229,7 +3244,10 @@ async fn async_main(
     // sync plane (pure Iroh). Both planes offer into the same gate, so a Dual
     // node never runs two workers against one DocStore.
     #[cfg(feature = "p2p-iroh")]
-    #[allow(unused_mut)]
+    #[allow(
+        unused_mut,
+        reason = "only libp2p/dual builds assign the optional head adoption gate before iroh setup"
+    )]
     let mut head_adoption_gate: Option<
         Arc<elohim_storage::services::head_adoption_trigger::TriggerGate>,
     > = None;
@@ -6253,7 +6271,7 @@ async fn async_main(
     // stage established (the blob store, the conductor bridges, the admin
     // websocket, the declared-stakes resolver), and it must never be the reason
     // one of them is constructed. `watch::spawn` is a no-op when
-    // ELOHIM_RELEASE_CHANNELS names nothing, which is the default — so a node
+    // the declared follow set names nothing, which is the default — so a node
     // that follows no channel pays exactly nothing for this block.
     {
         use elohim_storage::services::release_adoption::{apply, watch};

@@ -14,7 +14,7 @@ impl Store {
         self.require_migrated()?;
         let record = self
             .record(cid)
-            .filter(|_| self.verified(cid))
+            .filter(|_| self.admissible(cid))
             .ok_or_else(|| {
                 Refusal::new(
                     "candidate-absent",
@@ -120,9 +120,18 @@ impl Store {
                     "committed head moved during health check",
                 ));
             }
+            if old.as_deref() == Some(cid) {
+                // Health/admission still run, but this is maintenance, not a landing.
+                self.repair_heads_locked()?;
+                return Ok(latest);
+            }
             latest.attestations.extend(record.attestations);
             latest.ring = if revert { "reverted" } else { "landed" }.into();
-            let at = files::now();
+            let nanos = std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .unwrap_or_default()
+                .subsec_nanos();
+            let at = format!("{}.{nanos:09}Z", files::now().trim_end_matches('Z'));
             latest.extra.insert("landedAt".into(), json!(at));
             self.save(&latest)?;
             if cached {
@@ -135,9 +144,12 @@ impl Store {
                 json!(old)
             };
             // One rename commits both heads. Symlinks are disposable projections.
+            let subject = self
+                .git(repo, &["show", "-s", "--format=%s", commit])
+                .unwrap_or_default();
             files::atomic_json(
                 &self.root.join("current.json"),
-                &json!({"cid":cid,"commit":commit,"landedAt":at,"previous":previous}),
+                &json!({"cid":cid,"commit":commit,"subject":subject.trim(),"landedAt":at,"previous":previous}),
             )?;
             self.repair_heads_locked()?;
             Ok(latest)
@@ -196,7 +208,11 @@ impl Store {
             }
             if let Some(list) = list.as_array_mut() {
                 // A repeated refusal refreshes its row; the record names each reason once.
-                let at = files::now();
+                let nanos = std::time::SystemTime::now()
+                    .duration_since(std::time::UNIX_EPOCH)
+                    .unwrap_or_default()
+                    .subsec_nanos();
+                let at = format!("{}.{nanos:09}Z", files::now().trim_end_matches('Z'));
                 match list.iter_mut().find(|row| {
                     row["kind"] == error.kind.as_str() && row["detail"] == error.detail.as_str()
                 }) {

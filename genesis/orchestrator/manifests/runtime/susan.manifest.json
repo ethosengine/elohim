@@ -54,5 +54,11 @@
     ],
     "shed_order": []
   },
-  "supersedes": "bafyreifiryuwoxfz4sese43gyqrc7ocodu4oohkx5qxhogx2lbxxxwvtom"
+  "supersedes": "bafyreieyjdxxe2okmoyawuybbi2hsdefcyoa42oykremnxxs4z34jwx5yy",
+  "follows": [
+    {
+      "channel": "runtime:coordinators:elohim:workspace",
+      "mode": "observe"
+    }
+  ]
 }

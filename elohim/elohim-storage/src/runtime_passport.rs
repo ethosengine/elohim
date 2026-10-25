@@ -31,6 +31,9 @@ pub struct RuntimeVersionResponse {
 #[derive(Debug, Clone, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct RuntimePassport {
+    /// Current controller receipts and locally verified tool custody, rebuilt per request.
+    #[serde(flatten)]
+    pub runtime: ark_core::passport::RuntimeObservation,
     pub service: ServicePassport,
     pub conductor: ConductorPassport,
     pub happ: HappPassport,
@@ -385,6 +388,7 @@ pub async fn assemble_storage_passport(ctx: StoragePassportContext) -> RuntimeVe
     RuntimeVersionResponse {
         build: build.clone(),
         passport: RuntimePassport {
+            runtime: crate::services::release_adoption::state::runtime_observation(),
             service: ServicePassport {
                 build,
                 compiled_features: CompiledFeatures {

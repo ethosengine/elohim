@@ -87,7 +87,7 @@ class _StubFixture(unittest.TestCase):
         shutil.copy(HOOKS.parent / "scripts" / "_lib" / "session.py", library)
         registry = self.project / "genesis" / "agentic"
         registry.mkdir(parents=True)
-        shutil.copy(HOOKS.parents[1] / "genesis" / "agentic" / "bin-tools.json", registry / "bin-tools.json")
+        shutil.copy(HOOKS.parents[1] / "genesis" / "orchestrator" / "manifests" / "runtime" / "workspace-device.manifest.json", registry / "bin-tools.json")
         (library / "__init__.py").write_text("")
         self.log = self.tmp / "stub.log"
         self.stub = self.tmp / "epr"

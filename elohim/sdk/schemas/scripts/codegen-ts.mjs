@@ -75,6 +75,10 @@ const ENUM_OUTPUT_PATHS = GENERATED_OUTPUT_DIRS.map((d) => join(d, 'schema-enums
 
 // Interface files to distribute alongside schema-enums.ts
 const INTERFACE_FILES = [
+  { src: 'views/runtime-declaration.ts', dest: 'runtime-declaration.ts', dirs: [resolve(REPO_ROOT, 'elohim/sdk/storage-client-ts/src/generated')] },
+  { src: 'views/runtime-observation.ts', dest: 'runtime-observation.ts', dirs: [resolve(REPO_ROOT, 'elohim/sdk/storage-client-ts/src/generated')] },
+  { src: 'views/runtime-manifest.ts', dest: 'runtime-manifest.ts', dirs: [resolve(REPO_ROOT, 'elohim/sdk/storage-client-ts/src/generated')] },
+  { src: 'views/bin-tools.ts', dest: 'bin-tools.ts', dirs: [resolve(REPO_ROOT, 'elohim/sdk/storage-client-ts/src/generated')] },
   { src: 'views/bin-resolution.ts', dest: 'bin-resolution.ts', dirs: [resolve(REPO_ROOT, 'elohim/sdk/storage-client-ts/src/generated')] },
   { src: 'views/bin-pin.ts', dest: 'bin-pin.ts', dirs: [resolve(REPO_ROOT, 'elohim/sdk/storage-client-ts/src/generated')] },
   { src: 'views/bin-release.ts', dest: 'bin-release.ts', dirs: [resolve(REPO_ROOT, 'elohim/sdk/storage-client-ts/src/generated')] },

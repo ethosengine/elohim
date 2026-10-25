@@ -132,7 +132,11 @@ impl Store {
         if self.config.source["kind"] == "repository" {
             let head = self.git(repo, &["rev-parse", "HEAD"])?;
             let mut eligible = Vec::new();
-            for record in self.records().into_iter().filter(|r| self.verified(&r.cid)) {
+            for record in self
+                .records()
+                .into_iter()
+                .filter(|r| self.admissible(&r.cid))
+            {
                 for source in std::iter::once(&record.provenance).chain(&record.sources) {
                     let commit = &source.source_commit;
                     if source.tree_clean
@@ -175,9 +179,41 @@ impl Store {
         closure: Option<&Path>,
         gate: &str,
     ) -> Result<Release> {
-        for record in self.records() {
-            if record.source(commit).is_some_and(|s| s.tree_clean) && self.verified(&record.cid) {
-                return self.land(&record.cid, commit, repo, false);
+        self.prepare_declared(
+            repo,
+            commit,
+            closure,
+            gate,
+            ark_core::declaration::FollowMode::Apply,
+            None,
+        )
+    }
+    fn prepare_declared(
+        &self,
+        repo: &Path,
+        commit: &str,
+        closure: Option<&Path>,
+        gate: &str,
+        mode: ark_core::declaration::FollowMode,
+        pin: Option<&str>,
+    ) -> Result<Release> {
+        let mut records = self.records();
+        if let Some(pin) = pin {
+            records.sort_by_key(|record| record.cid != pin);
+        }
+        for record in records {
+            // Historical closures remain valid custody for existing sessions, but
+            // following a changed declaration must supply every declared executable.
+            let complete = self
+                .config
+                .bins
+                .iter()
+                .all(|bin| record.bins.contains_key(bin));
+            if record.source(commit).is_some_and(|s| s.tree_clean)
+                && (complete || pin == Some(record.cid.as_str()))
+                && self.verified(&record.cid)
+            {
+                return self.finish_declared(record, commit, repo, mode, pin);
             }
         }
         let mut attempts=vec!["verified current unavailable (epr bin status --tool <tool> --json)".to_owned(),"no verified stored candidate for wanted commit (epr bin status --tool <tool> --commit <sha> --json)".into()];
@@ -192,7 +228,7 @@ impl Store {
                     closure: true,
                 },
             ) {
-                Ok(record) => return self.land(&record.cid, commit, repo, false),
+                Ok(record) => return self.finish_declared(record, commit, repo, mode, pin),
                 Err(e) => attempts.push(format!(
                     "local closure: {}; epr bin ingest --tool {} --closure {}",
                     e.kind,
@@ -206,12 +242,62 @@ impl Store {
             );
         }
         match self.build_release(repo, commit, gate, &mut attempts, &files::env) {
-            Ok(record) => self.land(&record.cid, commit, repo, false),
+            Ok(record) => self.finish_declared(record, commit, repo, mode, pin),
             Err(e) => {
                 attempts.push(format!("{}: {}", e.kind, e.detail));
                 Err(Refusal::new("bootstrap-unavailable", attempts.join("; ")))
             }
         }
+    }
+    fn finish_declared(
+        &self,
+        mut record: Release,
+        commit: &str,
+        repo: &Path,
+        mode: ark_core::declaration::FollowMode,
+        pin: Option<&str>,
+    ) -> Result<Release> {
+        if pin.is_some_and(|pin| pin != record.cid) {
+            return Err(Refusal::new(
+                "release-pin-mismatch",
+                "candidate differs from the device manifest pin",
+            ));
+        }
+        if mode.applies() {
+            return self.land(&record.cid, commit, repo, false);
+        }
+        self.require_published(repo, commit)?;
+        self.require_attestation(&mut record, commit, repo, false)?;
+        self.save(&record)?;
+        Ok(record)
+    }
+    /// Stage and verify an observed head without moving current; canary/apply retain the
+    /// existing attestation and health floor before landing. A pin constrains the release.
+    pub fn follow_declared(
+        &self,
+        repo: &Path,
+        closure: Option<&Path>,
+        follow: &ark_core::declaration::Follow,
+    ) -> Result<Value> {
+        if follow.mode.applies() && follow.pin.is_none() {
+            return self.follow(repo, closure);
+        }
+        let state = self.source_state(repo)?;
+        let commit = state["head"]
+            .as_str()
+            .ok_or_else(|| Refusal::new("source-mismatch", "no source HEAD"))?;
+        if state["clean"] != true {
+            return Err(Refusal::new("checkout-dirty", repo.display().to_string()));
+        }
+        let record = self.prepare_declared(
+            repo,
+            commit,
+            closure,
+            "follow",
+            follow.mode,
+            follow.pin.as_deref(),
+        )?;
+        Ok(json!({"followed":follow.mode.applies(), "observed":record.cid, "mode":follow.mode}))
     }
     pub(super) fn build_release(
         &self,
@@ -440,7 +526,16 @@ impl Store {
         let commit = state["head"]
             .as_str()
             .ok_or_else(|| Refusal::new("source-mismatch", "no source HEAD"))?;
-        if commit == old {
+        let inventory_complete = self
+            .head("current")
+            .and_then(|cid| self.record(&cid))
+            .is_some_and(|record| {
+                self.config
+                    .bins
+                    .iter()
+                    .all(|bin| record.bins.contains_key(bin))
+            });
+        if commit == old && inventory_complete {
             return Ok(json!({"followed":false,"why":"the landed head is this checkout's HEAD"}));
         }
         let head = self.git(repo, &["rev-parse", "HEAD"])?;
@@ -461,7 +556,7 @@ impl Store {
                 json!({"followed":false,"why":"HEAD does not descend from the landed head"}),
             );
         }
-        if self.tool == "epr" {
+        if self.tool == "epr" && inventory_complete {
             let paths = self.source_paths(repo);
             let mut args = vec!["diff", "--quiet", old, commit, "--"];
             args.extend(paths.iter().map(String::as_str));

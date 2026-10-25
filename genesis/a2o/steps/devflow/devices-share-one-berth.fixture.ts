@@ -406,8 +406,8 @@ export async function household(): Promise<Fixture> {
   writeFileSync(join(seed, 'README.md'), '# devices-share-one-berth fixture\n');
   writeFileSync(join(seed, '.gitignore'), '.claude/\n.eprfs/status/flows.jsonl\n');
   copyFileSync(
-    join(repository, 'genesis/agentic/bin-tools.json'),
-    join(seed, 'genesis/agentic/bin-tools.json')
+    join(repository, 'genesis/orchestrator/manifests/runtime/workspace-device.manifest.json'),
+    join(seed, 'genesis/orchestrator/manifests/runtime/workspace-device.manifest.json')
   );
   // berth consumes the native tool through the shared epr_client shim.
   for (const name of ['berth'])

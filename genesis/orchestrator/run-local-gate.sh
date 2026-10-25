@@ -46,7 +46,13 @@ if [[ -n "$target_dir" ]]; then
   # An unmarked slot predates this guard: its owner is unknown, so it is treated as foreign once.
   previous="$(cat "$owner_file" 2>/dev/null || echo 'an unknown checkout')"
   if [[ "$previous" != "$owner" ]]; then
-    members="$(cd "$repo_root/$project_dir" && cargo metadata --no-deps --format-version 1 2>/dev/null \
+    # A non-Rust consumer can build a declared native workspace (the renderer's
+    # epr). Invalidate that workspace's members, not the consumer directory.
+    cargo_dir="$repo_root/$project_dir"
+    if [[ -n "$workspace" && -f "$repo_root/$workspace/Cargo.toml" ]]; then
+      cargo_dir="$repo_root/$workspace"
+    fi
+    members="$(cd "$cargo_dir" && cargo metadata --no-deps --format-version 1 2>/dev/null \
       | python3 -c 'import json,sys; print("\n".join(p["name"] for p in json.load(sys.stdin)["packages"]))' 2>/dev/null || true)"
     dropped=0
     while IFS= read -r name; do

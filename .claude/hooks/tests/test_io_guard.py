@@ -109,6 +109,8 @@ class Clock:
 
 def _berth(tmp):
     os.environ["CLAUDE_PROJECT_DIR"] = "/nonexistent"  # no policy file → default capacities
+    # A standalone store, not this machine's device: its session envelopes would refuse s-a.
+    os.environ["ELOHIM_DEVICE_KEY_FILE"] = os.path.join(str(tmp), "no-device", "ed25519.seed")
     clock = Clock()
     b = berth.Berth(d=str(tmp), now=clock)
     return b, clock

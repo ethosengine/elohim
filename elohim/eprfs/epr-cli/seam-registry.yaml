@@ -1675,3 +1675,76 @@ decisionPoints:
     - path: elohim/eprfs/device-runtime/tests/envelope.rs
       testName: binding_is_idempotent_private_and_cannot_be_reused_or_traverse
       kind: integration
+  - name: device-declaration-cli
+    kind: verdict-fn
+    sourceLocation:
+      file: src/device/declaration.rs
+      modulePath: elohim_epr_cli::device::declaration::run
+    summary: 'Device-owned declared target: canonical versions and rebuildable projections.'
+    concernIds:
+    - id: C0
+      status: answered
+      justification: Private device declaration; projections and observed passports
+        carry no network authority.
+    - id: C1
+      status: answered
+      justification: Ingest and observed availability cannot advance a declaration head;
+        explicit acts alone supersede.
+    - id: C2
+      status: answered
+      justification: A chain lock serializes acts; supersedes names the exact previous
+        CID, with no timestamp ordering.
+    - id: C3
+      status: answered
+      justification: Apply replays disk state after interruption; no remote party is
+        needed for progress.
+    - id: C4
+      status: answered
+      justification: Only absent head uses the committed base; corrupt heads and missing
+        pinned content refuse explicitly.
+    - id: C5
+      status: answered
+      justification: Passport application is nullable and observed; declarations never
+        claim successful execution.
+    - id: C6a
+      status: partial
+      justification: Chain lock wait is bounded at 30 seconds; declarations are local
+        trusted inputs, without a size quota.
+    - id: C6b
+      status: answered
+      justification: Apply repairs projections without minting another act; versions
+        and head use synced atomic replacement.
+    - id: C7
+      status: n-a
+      justification: No advertisement or peer serving surface is introduced.
+    - id: C8
+      status: answered
+      justification: Each refused operation returns an error; show exposes current and
+        superseded CID.
+    - id: C9
+      status: answered
+      justification: Canonical DAG-CBOR preserves historical manifest CIDs when added
+        fields are empty.
+    - id: C10
+      status: answered
+      justification: Schema 1 remains stable; additive fields omit empty values and
+        view schemas declare camelCase outputs.
+    - id: C11
+      status: n-a
+      justification: This local declaration writer accepts no externally scheduled work.
+    - id: C12
+      status: answered
+      justification: Only explicitly local device acts mutate the private directory;
+        the existing node-local route delegates.
+    - id: C13
+      status: n-a
+      justification: No new trust tier or remote authority is introduced.
+    - id: C14
+      status: partial
+      justification: Orphan immutable versions may remain after interruption; head and
+        replay remain authoritative; collection is outside Slice M.
+    contractTests:
+    - path: elohim/eprfs/epr-cli/tests/device_declaration.rs
+      testName: explicit_root_retains_its_base_and_refused_options_never_mutate
+      kind: integration
+      mirrorRisk: false

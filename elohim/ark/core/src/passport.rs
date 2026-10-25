@@ -50,6 +50,28 @@ pub struct ProcessPassport {
     pub deaths_in_window: u32,
 }
 
+/// Observed follow mode and the release this runtime actually applied.
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq)]
+#[serde(rename_all = "camelCase")]
+pub struct FollowPassport {
+    /// Channel being watched.
+    pub channel: String,
+    /// Observed participation mode.
+    pub mode: crate::declaration::FollowMode,
+    /// Applied release identity; null means no application observed.
+    pub applied_release: Option<String>,
+}
+
+/// Observed executable release, independent of any running session's pin.
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq)]
+#[serde(rename_all = "camelCase")]
+pub struct ToolPassport {
+    /// Registry tool name.
+    pub tool: String,
+    /// Verified local current release; null means unknown or unavailable.
+    pub applied_release: Option<String>,
+}
+
 /// Current live projection of one berth and all of its processes.
 ///
 /// KEPT rather than projected onto [`elohim_epr_rea::model::Process`]: a VF process groups
@@ -72,6 +94,12 @@ pub struct Passport {
     pub ark_version: String,
     /// Live process projections.
     pub processes: Vec<ProcessPassport>,
+    /// Channels observed by the runtime's adoption controller.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub follows: Vec<FollowPassport>,
+    /// Tools observed in local custody.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub tools: Vec<ToolPassport>,
     /// Most recent restart-policy verdict.
     pub last_verdict: Option<RestartVerdict>,
     /// Wall-clock time of the latest update.
@@ -92,6 +120,8 @@ mod tests {
             incarnation: 1,
             ark_version: "0.1.0".to_string(),
             processes: Vec::new(),
+            follows: Vec::new(),
+            tools: Vec::new(),
             last_verdict: None,
             updated_at_epoch_ms: 1_000,
         };
@@ -102,4 +132,14 @@ mod tests {
         assert_eq!(json["kind"], "runtime-passport");
         assert_eq!(PASSPORT_KIND, "runtime-passport");
     }
+}
+
+/// The adoption observation shared by device and storage views. Rebuilt, never authoritative.
+#[derive(Serialize, Deserialize, Clone, Debug, Default, PartialEq)]
+#[serde(rename_all = "camelCase")]
+pub struct RuntimeObservation {
+    /// Channels watched by the reporting runtime.
+    pub follows: Vec<FollowPassport>,
+    /// Tools currently applied to local custody.
+    pub tools: Vec<ToolPassport>,
 }

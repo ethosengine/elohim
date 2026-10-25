@@ -39,6 +39,12 @@ pub struct RuntimeManifest {
     /// Device archetype selecting the outward renderer's request floor.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub archetype: Option<String>,
+    /// Device-private channel declarations; absent on historical manifests.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub follows: Vec<crate::declaration::Follow>,
+    /// Executable registry owned by this declaration.
+    #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
+    pub tools: BTreeMap<String, crate::declaration::ToolSpec>,
 }
 
 impl Default for RuntimeManifest {
@@ -51,6 +57,8 @@ impl Default for RuntimeManifest {
             processes: Vec::new(),
             envelope: None,
             archetype: None,
+            follows: Vec::new(),
+            tools: BTreeMap::new(),
         }
     }
 }
@@ -469,6 +477,14 @@ impl RuntimeManifest {
         Ok(manifest)
     }
 
+    /// Decode an immutable version from the private chain and validate it.
+    pub fn from_cbor(bytes: &[u8]) -> Result<Self, ManifestError> {
+        let manifest: Self = serde_ipld_dagcbor::from_slice(bytes)
+            .map_err(|error| ManifestError::Encode(error.to_string()))?;
+        manifest.validate()?;
+        Ok(manifest)
+    }
+
     /// Encodes this record as dag-cbor bytes.
     pub fn canonical_bytes(&self) -> Result<Vec<u8>, ManifestError> {
         serde_ipld_dagcbor::to_vec(self).map_err(|error| ManifestError::Encode(error.to_string()))
@@ -494,7 +510,7 @@ impl RuntimeManifest {
         })
     }
 
-    fn validate(&self) -> Result<(), ManifestError> {
+    pub fn validate(&self) -> Result<(), ManifestError> {
         if self.schema != MANIFEST_SCHEMA {
             return Err(ManifestError::Schema(format!(
                 "expected {MANIFEST_SCHEMA}, got {}",
@@ -507,7 +523,8 @@ impl RuntimeManifest {
                 self.kind
             )));
         }
-        if self.processes.is_empty() {
+        crate::declaration::validate(self)?;
+        if self.processes.is_empty() && self.tools.is_empty() && self.follows.is_empty() {
             return Err(ManifestError::Invalid(
                 "at least one process is required".to_string(),
             ));

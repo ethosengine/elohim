@@ -22,19 +22,48 @@ fn call(root: &Path, tool: &str, verb: &str) -> Result<String> {
 }
 fn each_tool(root: &Path, long: bool) -> Result<()> {
     let registry = Registry::discover()?;
+    let manifest = super::declaration::store(None, None, None)
+        .and_then(|s| s.read().map_err(|e| e.to_string()))
+        .map_err(|detail| Refusal {
+            kind: "manifest-read".into(),
+            detail,
+        })?;
     let skipped = std::env::var("BIN_STORE_SKIP_TOOLS").unwrap_or_default();
     for tool in registry
         .tools
         .keys()
         .filter(|tool| !skipped.split(',').any(|s| s == *tool))
     {
+        let Some(follow) = manifest
+            .follows
+            .iter()
+            .find(|f| f.channel == format!("bin:{tool}"))
+        else {
+            continue;
+        };
         let result = (|| {
             let store = Store::from_environment(tool, &registry)?;
+            if follow.mode == ark_core::declaration::FollowMode::Observe {
+                if long {
+                    store.follow_declared(root, None, follow)?;
+                }
+                return Ok(());
+            }
             if !long
                 && !store
                     .status(&session::resolve(), None, false, &|k| std::env::var(k).ok())?
                     .verified_current
             {
+                return Ok(());
+            }
+            if follow.pin.is_some() {
+                if long {
+                    store.follow_declared(root, None, follow)?;
+                }
+                // A pinned apply/canary must install the launcher from the matching landed
+                // release; bootstrap would be an unconstrained adoption before that check.
+                call(root, tool, "install-launcher")?;
+                store.status(&session::resolve(), None, true, &|k| std::env::var(k).ok())?;
                 return Ok(());
             }
             if !maintain(long, &mut |verb| call(root, tool, verb), &mut |line| {
@@ -53,6 +82,10 @@ fn each_tool(root: &Path, long: bool) -> Result<()> {
 }
 /// Heal already available heads before returning; queue builds without holding the hook's pipes.
 pub(super) fn start(root: &Path) -> Result<()> {
+    super::declaration::apply_at_arrival().map_err(|detail| Refusal {
+        kind: "manifest-apply".into(),
+        detail,
+    })?;
     each_tool(root, false)?;
     let dir = worker_dir()?;
     fs::create_dir_all(&dir)?;

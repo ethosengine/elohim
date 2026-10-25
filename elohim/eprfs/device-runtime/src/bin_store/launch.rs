@@ -46,7 +46,7 @@ impl Store {
         let pin: Pin = files::read_json(&self.pin_path(key).ok()?)?;
         (pin.session == key && files::require_cid(&pin.cid).is_ok()).then_some(pin)
     }
-    /// Publish an immutable session pin from current; no session means an explicit refusal.
+    /// Pin current once, or deliberately switch with an explicit CID; no session refuses.
     /// Provisional pins require verified bytes and an unreachable attestation, and never move current.
     pub fn pin(
         &self,
@@ -56,6 +56,14 @@ impl Store {
         repo: Option<&Path>,
     ) -> Result<Pin> {
         self.require_migrated()?;
+        if let Some(cid) = cid {
+            if !self.verified(cid) {
+                return Err(Refusal::new(
+                    "candidate-absent",
+                    "explicit pin requires verified bytes",
+                ));
+            }
+        }
         if provisional {
             let cid =
                 cid.ok_or_else(|| Refusal::new("provisional-pin", "--provisional requires --cid"))?;
@@ -98,12 +106,12 @@ impl Store {
     ) -> Result<Pin> {
         let key=identity.session.as_deref().filter(|_| identity.source!=Source::None).ok_or_else(|| Refusal::new("session-absent","no declared session, registered runtime ancestor, or controlling tty is present"))?;
         self.require_migrated()?;
-        if let Some(pin) = self.existing_pin(identity) {
+        if let Some(pin) = self.existing_pin(identity).filter(|_| cid.is_none()) {
             return Ok(pin);
         }
         let _lock = files::Lock::acquire(&self.root, timeout)?;
         self.require_migrated()?;
-        if let Some(pin) = self.existing_pin(identity) {
+        if let Some(pin) = self.existing_pin(identity).filter(|_| cid.is_none()) {
             return Ok(pin);
         }
         let cid = cid
@@ -319,11 +327,15 @@ impl Store {
         proc_root: &Path,
         candidate: Option<&Path>,
     ) -> Result<()> {
-        let cid = files::file_cid(executable)?;
         let explicit = candidate
             .and_then(|p| p.canonicalize().ok())
             .zip(executable.canonicalize().ok())
             .is_some_and(|(candidate, actual)| candidate == actual);
+        let cid = if explicit {
+            files::file_cid(executable)?
+        } else {
+            self.executable_cid(executable)?
+        };
         let _lock = files::Lock::acquire(&self.root, files::EXEC_WAIT)?;
         self.require_migrated()?;
         let source = if explicit {

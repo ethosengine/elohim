@@ -90,56 +90,7 @@ pub const TERMINAL_BACKOFF_SECS: u64 = BACKOFF_LADDER_SECS[BACKOFF_LADDER_SECS.l
 /// `Canary` is what closes that loop: it adopts a STAGING head (no threshold
 /// enforced — the soak IS the evidence being gathered) as well as an EARNED
 /// one (threshold enforced, exactly like `Apply`).
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
-#[serde(rename_all = "lowercase")]
-pub enum AdoptionMode {
-    /// Watch, fetch, verify, report. Applies nothing, ever.
-    Observe,
-    /// Everything `Observe` does, and then routes a release that passed the
-    /// whole floor to the vehicle its artifact class names
-    /// (`super::apply`) — but only an EARNED head. Idempotent on
-    /// `(channelId, releaseCid)`.
-    Apply,
-    /// Everything `Observe` does, and applies a verified release of EITHER
-    /// tier: a STAGING head starts this peer's soak window (attestation
-    /// threshold read and reported, never enforced), an EARNED head applies
-    /// with the threshold enforced exactly as `Apply`. Idempotent on
-    /// `(channelId, releaseCid)` exactly like `Apply`.
-    Canary,
-}
-
-impl AdoptionMode {
-    pub fn label(self) -> &'static str {
-        match self {
-            AdoptionMode::Observe => "observe",
-            AdoptionMode::Apply => "apply",
-            AdoptionMode::Canary => "canary",
-        }
-    }
-
-    /// Whether this mode may hand a verified release to a vehicle.
-    pub fn applies(self) -> bool {
-        matches!(self, AdoptionMode::Apply | AdoptionMode::Canary)
-    }
-
-    /// Parse a mode from the runtime-config value.
-    ///
-    /// An unknown mode is an ERROR, not a fallback to `observe`. Falling back
-    /// would make a peer that asked for `apply`/`canary` look like it was
-    /// following instructions while doing something else — the config-lever
-    /// failure mode this crate has already paid for once. The inverse matters
-    /// just as much now that both are legal: a TYPO must never silently
-    /// become one of them, which is why the match is exact and there is no
-    /// prefix or fuzzy leg.
-    pub fn parse(raw: &str) -> Result<Self, RefusalReason> {
-        match raw.trim().to_ascii_lowercase().as_str() {
-            "observe" => Ok(AdoptionMode::Observe),
-            "apply" => Ok(AdoptionMode::Apply),
-            "canary" => Ok(AdoptionMode::Canary),
-            _ => Err(RefusalReason::ModeNotPermitted),
-        }
-    }
-}
+pub use ark_core::declaration::FollowMode as AdoptionMode;
 
 /// One channel this peer follows.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize)]
@@ -176,159 +127,26 @@ pub struct FollowedChannels {
 /// SAME channel with the same mode collapse — idempotent config is not an
 /// error.
 pub fn parse_followed_channels(raw: &str) -> FollowedChannels {
-    let mut out = FollowedChannels::default();
-    for entry in raw
-        .split([',', '\n', ';'])
-        .map(str::trim)
-        .filter(|e| !e.is_empty())
-    {
-        let (channel_id, mode_raw) = match entry.split_once('=') {
-            Some((c, m)) => (c.trim(), m.trim()),
-            None => (entry, "observe"),
-        };
-        if channel_id.is_empty() {
-            out.refused.push(ChannelConfigRefusal {
-                entry: entry.to_string(),
-                refusal: AdoptionRefusal::new(
-                    RefusalReason::ModeNotPermitted,
-                    "empty channel id in ELOHIM_RELEASE_CHANNELS",
-                ),
-            });
-            continue;
-        }
-        let mode = match AdoptionMode::parse(mode_raw) {
-            Ok(m) => m,
-            Err(reason) => {
-                out.refused.push(ChannelConfigRefusal {
-                    entry: entry.to_string(),
-                    refusal: AdoptionRefusal::new(
-                        reason,
-                        format!(
-                            "mode '{mode_raw}' is not a mode — legal values are 'observe' \
-                             (the default) and 'apply'"
-                        ),
-                    ),
-                });
-                continue;
-            }
-        };
-        if let Some(existing) = out.channels.iter().find(|c| c.channel_id == channel_id) {
-            if existing.mode != mode {
-                out.refused.push(ChannelConfigRefusal {
-                    entry: entry.to_string(),
-                    refusal: AdoptionRefusal::new(
-                        RefusalReason::ModeNotPermitted,
-                        format!(
-                            "channel '{channel_id}' declared twice with conflicting modes \
-                             ('{}' then '{}') — the first declaration stands",
-                            existing.mode.label(),
-                            mode.label()
-                        ),
-                    ),
-                });
-            }
-            continue;
-        }
-        out.channels.push(FollowedChannel {
-            channel_id: channel_id.to_string(),
-            mode,
-        });
+    let parsed = ark_core::declaration::parse_followed_channels(raw);
+    FollowedChannels {
+        channels: parsed
+            .follows
+            .into_iter()
+            .filter(|f| !f.channel.starts_with("bin:"))
+            .map(|f| FollowedChannel {
+                channel_id: f.channel,
+                mode: f.mode,
+            })
+            .collect(),
+        refused: parsed
+            .refused
+            .into_iter()
+            .map(|r| ChannelConfigRefusal {
+                entry: r.entry,
+                refusal: AdoptionRefusal::new(RefusalReason::ModeNotPermitted, r.detail),
+            })
+            .collect(),
     }
-    out
-}
-
-// ---------------------------------------------------------------------------
-// Editing the follow set (the operator seat behind POST /admin/runtime-config/follow)
-// ---------------------------------------------------------------------------
-
-/// Characters a channel id may NOT contain, because each one would change what
-/// the VALUE means once written back into `ELOHIM_RELEASE_CHANNELS`.
-///
-/// `,` `;` and a newline are entry separators; `=` separates a channel from its
-/// mode; `"` would terminate the TOML-subset value early; `#` would start a
-/// trailing comment on an unquoted read. An id carrying any of them cannot
-/// round-trip through this file, so it is refused BY NAME at the door rather
-/// than written and silently re-parsed as something else.
-const CHANNEL_ID_FORBIDDEN: [char; 7] = [',', ';', '\n', '\r', '=', '"', '#'];
-
-/// The longest channel id this seat will write. The live ids are ~45 chars
-/// (`runtime:coordinators:elohim:workspace`); the cap exists so a malformed
-/// caller cannot grow the watched file without bound, not to constrain naming.
-pub const MAX_CHANNEL_ID_LEN: usize = 256;
-
-/// Validate a channel id for WRITING into the follow set.
-///
-/// Deliberately stricter than [`parse_followed_channels`], which must remain
-/// tolerant of whatever is already on disk. Reading is forgiving; writing is
-/// not — this is the only place the file grows an entry, so it is the only
-/// place that can keep the file parseable.
-pub fn validate_channel_id(raw: &str) -> Result<&str, String> {
-    let id = raw.trim();
-    if id.is_empty() {
-        return Err("channel id is empty".to_string());
-    }
-    if id.len() > MAX_CHANNEL_ID_LEN {
-        return Err(format!(
-            "channel id is {} chars, over the {MAX_CHANNEL_ID_LEN}-char limit",
-            id.len()
-        ));
-    }
-    if let Some(bad) = id
-        .chars()
-        .find(|c| CHANNEL_ID_FORBIDDEN.contains(c) || (c.is_whitespace() || c.is_control()))
-    {
-        return Err(format!(
-            "channel id '{id}' contains {bad:?}, which cannot round-trip through \
-             {RELEASE_CHANNELS_KEY}"
-        ));
-    }
-    Ok(id)
-}
-
-/// Merge one follow declaration into a raw `ELOHIM_RELEASE_CHANNELS` value.
-///
-/// `mode: Some(m)` sets (or replaces) `channel_id`'s entry **in place**, so a
-/// mode switch never reorders the operator's list; `mode: None` removes it.
-/// Duplicate entries for the named channel collapse to one, exactly as
-/// [`crate::runtime_config::rewrite_key_line`] collapses duplicate KEY lines —
-/// the file must not keep a loser that [`parse_followed_channels`] would refuse.
-///
-/// **Every entry this call did not name is carried through VERBATIM** — mode
-/// text and all, even one `AdoptionMode::parse` would refuse. That is
-/// deliberate: this seat is asked about ONE channel, and silently repairing (or
-/// dropping) a neighbouring entry it was not asked about is how a config lever
-/// destroys state an operator was mid-way through. A malformed neighbour keeps
-/// showing up as a typed refusal on `/admin/adoption`, which is where it
-/// belongs.
-pub fn merge_follow_entry(raw: &str, channel_id: &str, mode: Option<AdoptionMode>) -> String {
-    let mut out: Vec<String> = Vec::new();
-    let mut seen = false;
-    for entry in raw
-        .split([',', '\n', ';'])
-        .map(str::trim)
-        .filter(|e| !e.is_empty())
-    {
-        let id = match entry.split_once('=') {
-            Some((c, _)) => c.trim(),
-            None => entry,
-        };
-        if id == channel_id {
-            if !seen {
-                seen = true;
-                if let Some(m) = mode {
-                    out.push(format!("{channel_id}={}", m.label()));
-                }
-            }
-            continue;
-        }
-        out.push(entry.to_string());
-    }
-    if !seen {
-        if let Some(m) = mode {
-            out.push(format!("{channel_id}={}", m.label()));
-        }
-    }
-    out.join(",")
 }
 
 // ---------------------------------------------------------------------------
@@ -942,6 +760,54 @@ pub fn snapshot() -> Vec<ChannelAdoptionState> {
         .collect()
 }
 
+/// Rebuild runtime facts from the controller receipts and verified local tool custody.
+pub fn runtime_observation() -> ark_core::passport::RuntimeObservation {
+    let channels = snapshot();
+    let mut observed = ark_core::passport::RuntimeObservation {
+        follows: channels
+            .iter()
+            .map(|channel| ark_core::passport::FollowPassport {
+                channel: channel.channel_id.clone(),
+                mode: channel.mode,
+                applied_release: channel.applied_release.as_ref().map(|r| r.cid.clone()),
+            })
+            .collect(),
+        tools: Vec::new(),
+    };
+    if let (Some(path), Some(bin_root)) = (
+        crate::runtime_config::config_path(),
+        std::env::var_os("BIN_STORE"),
+    ) {
+        if let Ok(manifest) = elohim_device_runtime::manifest_store::for_runtime_config(&path)
+            .and_then(|store| store.read())
+        {
+            let applied = observed
+                .follows
+                .iter()
+                .filter_map(|f| {
+                    f.applied_release
+                        .as_ref()
+                        .map(|cid| (f.channel.clone(), cid.clone()))
+                })
+                .collect();
+            if let Ok(custody) = elohim_device_runtime::manifest_store::observe(
+                &manifest,
+                std::path::Path::new(&bin_root),
+                &applied,
+            ) {
+                observed.tools = custody.tools;
+                observed.follows.extend(
+                    custody
+                        .follows
+                        .into_iter()
+                        .filter(|f| f.channel.starts_with("bin:")),
+                );
+            }
+        }
+    }
+    observed
+}
+
 /// Body for `GET /admin/adoption`.
 ///
 /// **T6's receipt input — extend only additively.** Every field here is either
@@ -949,6 +815,7 @@ pub fn snapshot() -> Vec<ChannelAdoptionState> {
 /// authority claim.
 pub fn report_json() -> serde_json::Value {
     let channels = snapshot();
+    let observed = runtime_observation();
     let config_refusals = REGISTRY.config_refusals.lock().unwrap().clone();
     serde_json::json!({
         "controller": {
@@ -979,6 +846,7 @@ pub fn report_json() -> serde_json::Value {
             "lastSweepUnixSecs": *REGISTRY.last_sweep_unix.lock().unwrap(),
         },
         "channels": channels,
+        "runtimeObservation": observed,
         // What this peer runs, per role — the map every release is verified
         // against. `null` until the controller's first passport read.
         "installedReality": REGISTRY
@@ -1024,103 +892,6 @@ mod tests {
             channel_id: id.to_string(),
             mode: AdoptionMode::Observe,
         }
-    }
-
-    // ─── merge_follow_entry / validate_channel_id (the operator seat) ────────
-
-    #[test]
-    fn merge_sets_a_channel_in_place_and_leaves_its_neighbours_alone() {
-        let raw = "a=observe,b=canary,c=apply";
-        assert_eq!(
-            merge_follow_entry(raw, "b", Some(AdoptionMode::Apply)),
-            "a=observe,b=apply,c=apply",
-            "a mode switch must not reorder the operator's list"
-        );
-    }
-
-    #[test]
-    fn merge_appends_a_new_channel_and_removes_a_named_one() {
-        assert_eq!(
-            merge_follow_entry("a=observe", "b", Some(AdoptionMode::Canary)),
-            "a=observe,b=canary"
-        );
-        assert_eq!(
-            merge_follow_entry("a=observe,b=canary", "b", None),
-            "a=observe"
-        );
-        // Removing the last entry leaves an EMPTY follow set, spelled out.
-        assert_eq!(merge_follow_entry("a=observe", "a", None), "");
-        // Removing an absent channel is a no-op, not an error.
-        assert_eq!(merge_follow_entry("a=observe", "zz", None), "a=observe");
-        // An empty starting value simply becomes the one entry.
-        assert_eq!(
-            merge_follow_entry("", "a", Some(AdoptionMode::Observe)),
-            "a=observe"
-        );
-    }
-
-    #[test]
-    fn merge_collapses_duplicates_of_the_named_channel() {
-        assert_eq!(
-            merge_follow_entry(
-                "a=observe,b=canary,a=apply",
-                "a",
-                Some(AdoptionMode::Canary)
-            ),
-            "a=canary,b=canary"
-        );
-        assert_eq!(merge_follow_entry("a=observe,a=apply", "a", None), "");
-    }
-
-    #[test]
-    fn merge_carries_a_malformed_neighbour_through_verbatim() {
-        // This seat was asked about `a`. Repairing — or dropping — `b=aply` is
-        // how a config lever destroys state an operator was mid-way through;
-        // the typo keeps showing up as a typed refusal on /admin/adoption.
-        let out = merge_follow_entry("b=aply,a=observe", "a", Some(AdoptionMode::Canary));
-        assert_eq!(out, "b=aply,a=canary");
-        let parsed = parse_followed_channels(&out);
-        assert_eq!(parsed.refused.len(), 1);
-        assert_eq!(
-            parsed.channels,
-            vec![FollowedChannel {
-                channel_id: "a".to_string(),
-                mode: AdoptionMode::Canary
-            }]
-        );
-    }
-
-    #[test]
-    fn merge_output_round_trips_through_the_parser() {
-        let out = merge_follow_entry(
-            "",
-            "runtime:coordinators:elohim:workspace",
-            Some(AdoptionMode::Canary),
-        );
-        let parsed = parse_followed_channels(&out);
-        assert!(parsed.refused.is_empty());
-        assert_eq!(
-            parsed.channels,
-            vec![FollowedChannel {
-                channel_id: "runtime:coordinators:elohim:workspace".to_string(),
-                mode: AdoptionMode::Canary,
-            }]
-        );
-    }
-
-    #[test]
-    fn validate_channel_id_refuses_anything_that_cannot_round_trip() {
-        assert_eq!(
-            validate_channel_id("  runtime:coordinators:elohim:workspace  ").unwrap(),
-            "runtime:coordinators:elohim:workspace"
-        );
-        for bad in ["", "   ", "a,b", "a;b", "a=b", "a\"b", "a#b", "a b", "a\nb"] {
-            assert!(
-                validate_channel_id(bad).is_err(),
-                "'{bad}' must be refused — it changes what the VALUE means"
-            );
-        }
-        assert!(validate_channel_id(&"x".repeat(MAX_CHANNEL_ID_LEN + 1)).is_err());
     }
 
     #[test]

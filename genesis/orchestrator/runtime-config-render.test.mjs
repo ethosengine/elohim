@@ -22,6 +22,9 @@ import { join } from "node:path";
 import { test } from "node:test";
 import assert from "node:assert/strict";
 
+import { requireEpr } from "./runtime-declaration-render.mjs";
+
+const EPR_BIN = requireEpr();
 const ROOT = new URL("../../", import.meta.url);
 const read = (rel) => readFileSync(new URL(rel, ROOT), "utf8");
 
@@ -311,5 +314,164 @@ test("every active pin renders the exact CID in both pod templates without alter
 test("runtime manifest annotation rejects sed and shell injection", () => {
   for (const cid of ["", "abc", "bafyre&bad", "bafyre|bad", "bafyre'bad", "bafyre\nbad"]) {
     assert.throws(() => manifestSedExpr({ cid }));
+  }
+});
+
+test("fleet follow strings and pinned CIDs are fresh projections of runtime manifests", async () => {
+  const { renderDeclarations } = await import('./runtime-declaration-render.mjs');
+  const { fileURLToPath } = await import('node:url');
+  const projected = renderDeclarations(fileURLToPath(ROOT), deployments, EPR_BIN);
+  assert.deepEqual(projected, deployments);
+});
+
+test("manifest-backed fleet nodes receive their base and a writable watched projection", () => {
+  assert.match(jenkinsfile, /readFile\(file: path, encoding: 'Base64'\)/);
+  assert.match(jenkinsfile, /runtimeManifestBodySedExpr\(humanConfig\),/);
+  assert.match(jenkinsfile, /\/data\/device\/runtime-config\.toml/);
+  for (const text of [template, adam]) {
+    assert.match(text, /binaryData:\n  runtime-manifest.json: RUNTIME_MANIFEST_BODY_PLACEHOLDER/);
+    assert.match(text, /name: ELOHIM_RUNTIME_MANIFEST_PATH\n\s+value: "RUNTIME_MANIFEST_PATH_PLACEHOLDER"/);
+    assert.match(text, /mountPath: \/etc\/elohim\/runtime-manifest.json\n\s+subPath: runtime-manifest.json/);
+    assert.match(text, /name: ELOHIM_RUNTIME_CONFIG_PATH\n\s+value: "RUNTIME_CONFIG_PATH_PLACEHOLDER"/);
+  }
+  for (const human of deployments.humans.filter(h => h.runtimeManifest)) {
+    const source = read(human.runtimeManifest.path);
+    const encoded = Buffer.from(source).toString('base64');
+    const rendered = renderWithSed(template, `s|RUNTIME_MANIFEST_BODY_PLACEHOLDER|${encoded}|`);
+    const body = rendered.match(/runtime-manifest.json: (\S+)/)[1];
+    assert.equal(Buffer.from(body, 'base64').toString(), source);
+  }
+});
+
+test("deployment writes lock the transaction and replace atomically; hand edits refuse", async () => {
+  const { updateDeclarations } =
+    await import("./runtime-declaration-render.mjs");
+  const { openSync, closeSync, readSync, rmSync } =
+    await import("node:fs");
+  const { fileURLToPath } = await import("node:url");
+  const scratch = mkdtempSync(join(tmpdir(), "runtime-atomic-"));
+  const file = join(scratch, "deployments.json");
+  const changed = structuredClone(deployments);
+  changed.humans.find(
+    (h) => h.runtimeManifest,
+  ).runtimeConfig.ELOHIM_RELEASE_CHANNELS = "hand-edit";
+  const before = JSON.stringify(changed);
+  writeFileSync(file, before);
+  try {
+    assert.throws(
+      () => updateDeclarations(fileURLToPath(ROOT), file, EPR_BIN),
+      /projection drift/,
+    );
+    // An open descriptor retains the complete old document across atomic replacement.
+    const fd = openSync(file, "r");
+    try {
+      updateDeclarations(fileURLToPath(ROOT), file, EPR_BIN, true);
+      const bytes = Buffer.alloc(Buffer.byteLength(before));
+      assert.equal(readSync(fd, bytes, 0, bytes.length, 0), bytes.length);
+      assert.equal(bytes.toString(), before);
+    } finally {
+      closeSync(fd);
+    }
+    assert.deepEqual(JSON.parse(readFileSync(file)), deployments);
+    assert.deepEqual(readdirSync(scratch).sort(), ["deployments.json", "deployments.json.lock"]);
+  } finally {
+    rmSync(scratch, { recursive: true, force: true });
+  }
+});
+
+test("SIGKILL releases the deployment kernel lock for the next renderer", async () => {
+  const { spawn } = await import("node:child_process");
+  const { existsSync, rmSync, chmodSync } = await import("node:fs");
+  const { once } = await import("node:events");
+  const { setTimeout: delay } = await import("node:timers/promises");
+  const { updateDeclarations } = await import("./runtime-declaration-render.mjs");
+  const scratch = mkdtempSync(join(tmpdir(), "runtime-killed-"));
+  const file = join(scratch, "deployments.json");
+  const ready = join(scratch, "ready");
+  const release = join(scratch, "release");
+  const stub = join(scratch, "epr-stub");
+  writeFileSync(stub, `#!/usr/bin/env node
+const fs = require('fs');
+fs.writeFileSync(${JSON.stringify(ready)}, 'held');
+while (!fs.existsSync(${JSON.stringify(release)})) Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, 10);
+console.log(process.argv.includes('--json') ? '{"manifestCid":"new"}' : 'ELOHIM_RELEASE_CHANNELS = "bin:epr=apply"');
+`);
+  chmodSync(stub, 0o755);
+  writeFileSync(file, JSON.stringify({ humans: [{ name: "fixture",
+    runtimeManifest: { path: "unused", cid: "old" } }] }));
+  const child = spawn(process.execPath, ["--input-type=module", "-e",
+    `import { updateDeclarations } from ${JSON.stringify(new URL("./runtime-declaration-render.mjs", import.meta.url).href)};
+     updateDeclarations(...process.argv.slice(1), true);`, scratch, file, stub],
+    { stdio: "ignore" });
+  try {
+    for (let i = 0; i < 200 && !existsSync(ready); i++) await delay(10);
+    assert.ok(existsSync(ready), "holder must acquire before being killed");
+    const exited = once(child, "exit");
+    child.kill("SIGKILL");
+    await exited;
+    assert.ok(existsSync(`${file}.lock`), "lock inode must remain stable");
+    writeFileSync(release, "go"); // release the killed holder's native-render child too
+    updateDeclarations(scratch, file, stub, true);
+    assert.equal(JSON.parse(readFileSync(file)).humans[0].runtimeManifest.cid, "new");
+  } finally {
+    child.kill("SIGKILL");
+    writeFileSync(release, "go");
+    await delay(50);
+    rmSync(scratch, { recursive: true, force: true });
+  }
+});
+
+
+test("renderer refuses an unnamed EPR_BIN even when epr is on PATH", async () => {
+  const { renderDeclarations, updateDeclarations } = await import("./runtime-declaration-render.mjs");
+  assert.throws(() => requireEpr("epr"), /REFUSED EPR_BIN/);
+  const previous = process.env.EPR_BIN;
+  delete process.env.EPR_BIN;
+  try {
+    assert.throws(() => renderDeclarations('.', { humans: [] }), /REFUSED EPR_BIN/);
+    assert.throws(() => updateDeclarations('.', '/not-a-file'), /REFUSED EPR_BIN/);
+  } finally {
+    process.env.EPR_BIN = previous;
+  }
+});
+
+test("orchestrator gate supplies its declared native epr instead of a PATH launcher", async () => {
+  const { chmodSync, rmSync } = await import("node:fs");
+  const { fileURLToPath } = await import("node:url");
+  const run = JSON.parse(read("genesis/orchestrator/build-manifest.json")).gate.projects.orchestrator.run;
+  assert.equal(run.cargo.workspace, "elohim/eprfs");
+  assert.equal(run.cargo.rustflags, "");
+  const scratch = mkdtempSync(join(tmpdir(), "orchestrator-epr-"));
+  try {
+    // Stand in only for build and suite execution: exercise the actual typed
+    // executor and recipe, including slot export and absence of EPR_BIN.
+    for (const [name, body] of Object.entries({
+      cargo: `if [ "$1" = metadata ]; then pwd > "$M_METADATA_DIR"; printf '{"packages":[]}\n'; else printf '%s\n' "$*" > "$M_BUILD_ARGS"; fi`,
+      pnpm: 'printf "%s\\n" "$EPR_BIN" > "$M_SELECTED_EPR"',
+      epr: 'echo "PATH launcher must not run" >&2; exit 99',
+    })) {
+      writeFileSync(join(scratch, name), `#!/bin/sh\n${body}\n`);
+      chmodSync(join(scratch, name), 0o755);
+    }
+    const env = { ...process.env, PATH: `${scratch}:${process.env.PATH}`, EPR_BIN: "",
+      GATE_CARGO_ENV: "{}", CARGO_TARGET_POOL_ROOT: join(scratch, "pool"), POOL_PARENT_REPO: fileURLToPath(ROOT),
+      M_METADATA_DIR: join(scratch, "metadata-dir"), M_BUILD_ARGS: join(scratch, "build"), M_SELECTED_EPR: join(scratch, "selected") };
+    execFileSync("bash", [fileURLToPath(new URL("run-local-gate.sh", import.meta.url)),
+      fileURLToPath(ROOT), "orchestrator", "genesis/orchestrator", run.kind, "test-suite",
+      run.cargo.workspace, "", "dev", run.cargo.rustflags], { env });
+    const selected = readFileSync(env.M_SELECTED_EPR, "utf8").trim();
+    assert.ok(selected.startsWith(env.CARGO_TARGET_POOL_ROOT + "/"));
+    assert.ok(selected.endsWith("/elohim__eprfs/dev/debug/epr"));
+    assert.equal(readFileSync(env.M_METADATA_DIR, "utf8").trim(), fileURLToPath(new URL("elohim/eprfs", ROOT)));
+    assert.match(readFileSync(env.M_BUILD_ARGS, "utf8"), /build .*--locked -p elohim-epr-cli --bin epr/);
+    env.EPR_BIN = "/explicit/lane/epr";
+    rmSync(env.M_BUILD_ARGS);
+    execFileSync("bash", [fileURLToPath(new URL("run-local-gate.sh", import.meta.url)),
+      fileURLToPath(ROOT), "orchestrator", "genesis/orchestrator", run.kind, "test-suite",
+      run.cargo.workspace, "", "dev", run.cargo.rustflags], { env });
+    assert.equal(readFileSync(env.M_SELECTED_EPR, "utf8").trim(), env.EPR_BIN);
+    assert.ok(!readdirSync(scratch).includes("build"), "explicit lane does not rebuild");
+  } finally {
+    rmSync(scratch, { recursive: true, force: true });
   }
 });

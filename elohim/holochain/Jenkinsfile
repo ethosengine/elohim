@@ -1402,6 +1402,14 @@ def runtimeManifestSedExpr(Map humanConfig) {
     return "s|RUNTIME_MANIFEST_CID_PLACEHOLDER|${cid}|"
 }
 
+// The committed declaration travels beside its rendered settings. Base64 keeps
+// arbitrary manifest JSON out of shell/sed quoting; ConfigMap decodes binaryData.
+def runtimeManifestBodySedExpr(Map humanConfig) {
+    def path = humanConfig.runtimeManifest?.path
+    def body = path ? readFile(file: path, encoding: 'Base64').trim() : 'e30='
+    return "s|RUNTIME_MANIFEST_BODY_PLACEHOLDER|${body}|"
+}
+
 /**
  * Per-human runtime-config body (rung 4 canary knob). `deployments.json`
  * `runtimeConfig` is a map KEY -> string rendered as TOML `KEY = "value"` lines
@@ -1542,6 +1550,9 @@ def humanManifestSedArgs(Map humanConfig, versions, String deployVersion, String
         // Per-human runtime-config body (canary knob) — see runtimeConfigSedExpr.
         runtimeConfigSedExpr(humanConfig),
         runtimeManifestSedExpr(humanConfig),
+        runtimeManifestBodySedExpr(humanConfig),
+        "s|RUNTIME_MANIFEST_PATH_PLACEHOLDER|${humanConfig.runtimeManifest ? '/etc/elohim/runtime-manifest.json' : ''}|g",
+        "s|RUNTIME_CONFIG_PATH_PLACEHOLDER|${humanConfig.runtimeManifest ? '/data/device/runtime-config.toml' : '/etc/elohim/runtime-config.toml'}|g",
         // k2Gossip round-timeout / accepted-rounds (consolidated template only).
         // Defaults 60000/4 preserve the household slow-WAN profile baked into
         // the template for every human that doesn't override — an unset node

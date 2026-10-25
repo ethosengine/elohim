@@ -40,6 +40,31 @@
           }
         }
       ]
+    },
+    {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "followed": {
+          "type": "boolean"
+        },
+        "observed": {
+          "type": "string"
+        },
+        "mode": {
+          "type": "string",
+          "enum": [
+            "observe",
+            "canary",
+            "apply"
+          ]
+        }
+      },
+      "required": [
+        "followed",
+        "observed",
+        "mode"
+      ]
     }
   ]
 }

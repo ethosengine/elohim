@@ -47,6 +47,12 @@ const base = {
 
 export default function () {
   return {
+    'device-declared-target': {
+      requireModule: ['tsx'],
+      require: ['steps/devflow/device-declared-target.steps.ts'],
+      paths: ['features/devflow/device-declared-target.feature'],
+      format: ['progress'],
+    },
     default: { ...base, paths: ['features/**/*.feature'] },
     // The real-workspace half uses existing peer daemons; local scenarios keep their own fixtures.
     'devices-share-one-berth': {

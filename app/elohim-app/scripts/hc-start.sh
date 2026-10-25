@@ -42,7 +42,7 @@
 #   MONGOD_BIN/MONGO_PORT    Account + projection store for the secure posture
 #                            (defaults: first mongod on PATH / 27017)
 #   CONDUCTOR_RELEASE_CHANNELS  join-alpha only: passed through as
-#                            ELOHIM_RELEASE_CHANNELS into ONLY the storage
+#                            the device follow declaration for the storage
 #                            process's environment (format: channelId or
 #                            channelId=observe|apply|canary). Unset = this
 #                            peer follows no release channel. See GET
@@ -922,20 +922,13 @@ else
     # --http-port flag (verified 2026-08-16; the old export was a silent no-op
     # that only worked because 8090 is also the binary's default).
     #
-    # Release-channel passthrough (T3 device-peer rung): CONDUCTOR_RELEASE_CHANNELS
-    # is the operator-facing knob (matches the CONDUCTOR_* naming of the rest of
-    # this join-alpha section); elohim-storage's runtime-config reads
-    # ELOHIM_RELEASE_CHANNELS (services/release_adoption/state.rs). The rename
-    # rides a command prefix, not `export`, so it lands ONLY in the storage
-    # process's environment — never globally in this shell (the doorway launch
-    # below must not inherit it).
+    # The device declaration owns the follow set; storage watches its projection.
     if [ -n "${CONDUCTOR_RELEASE_CHANNELS:-}" ]; then
-        echo "   following: $CONDUCTOR_RELEASE_CHANNELS"
-        ELOHIM_RELEASE_CHANNELS="$CONDUCTOR_RELEASE_CHANNELS" "$STORAGE_BIN" --http-port "$STORAGE_PORT" "${STORAGE_HAPP_ARGS[@]}" &
+        "${EPR_BIN:-epr}" device follow --root "${STORAGE_DIR:-$LOCAL_DEV_DIR/storage}" --channels "$CONDUCTOR_RELEASE_CHANNELS" >/dev/null || exit $?
     else
-        echo "   following: (none — set CONDUCTOR_RELEASE_CHANNELS=<channel>=observe to ride a release channel)"
-        "$STORAGE_BIN" --http-port "$STORAGE_PORT" "${STORAGE_HAPP_ARGS[@]}" &
+        "${EPR_BIN:-epr}" device apply --root "${STORAGE_DIR:-$LOCAL_DEV_DIR/storage}" >/dev/null || exit $?
     fi
+    ELOHIM_RUNTIME_CONFIG_PATH="${STORAGE_DIR:-$LOCAL_DEV_DIR/storage}/runtime-config.toml" "$STORAGE_BIN" --http-port "$STORAGE_PORT" "${STORAGE_HAPP_ARGS[@]}" &
 
     echo -n "   ⏳ Waiting for storage"
     for i in {1..15}; do

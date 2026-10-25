@@ -1,0 +1,117 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "epr:schema:view:bin-tools",
+  "title": "BinTools",
+  "description": "Device-private declaration or reconstructed observation. No network authority. Source of truth: elohim/ark/core/src/declaration.rs (render_bin_tools).",
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "version": {
+      "const": 1
+    },
+    "tools": {
+      "type": "object",
+      "additionalProperties": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "bins": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "aliases": {
+            "type": "object",
+            "additionalProperties": {
+              "type": "string"
+            }
+          },
+          "candidateEnv": {
+            "type": "object",
+            "additionalProperties": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            }
+          },
+          "longRunning": {
+            "type": "array",
+            "items": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            }
+          },
+          "source": {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "kind": {
+                "enum": [
+                  "repository",
+                  "gitlink"
+                ]
+              },
+              "manifest": {
+                "type": "string"
+              },
+              "path": {
+                "type": "string"
+              },
+              "publishedRef": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              },
+              "repo": {
+                "type": "string"
+              },
+              "releasePrefix": {
+                "type": "string"
+              },
+              "attestation": {
+                "type": "object",
+                "additionalProperties": false,
+                "properties": {
+                  "provider": {
+                    "type": "string"
+                  },
+                  "repo": {
+                    "type": "string"
+                  },
+                  "check": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "provider",
+                  "repo",
+                  "check"
+                ]
+              }
+            },
+            "required": [
+              "kind",
+              "publishedRef"
+            ]
+          }
+        },
+        "required": [
+          "bins",
+          "aliases",
+          "candidateEnv",
+          "longRunning",
+          "source"
+        ]
+      }
+    }
+  },
+  "required": [
+    "version",
+    "tools"
+  ]
+}

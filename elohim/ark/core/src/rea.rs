@@ -751,6 +751,8 @@ mod tests {
                 effective_tier: EffectiveTier::None,
                 deaths_in_window: 2,
             }],
+            follows: Vec::new(),
+            tools: Vec::new(),
             last_verdict: Some(RestartVerdict::Stop),
             updated_at_epoch_ms: 2_000,
         }

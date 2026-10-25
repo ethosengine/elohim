@@ -203,7 +203,11 @@ impl Store {
         else {
             return vec![".".into()];
         };
-        let mut paths = std::collections::BTreeSet::from(["elohim/eprfs".into()]);
+        // This committed base is embedded by include_str! outside Cargo's package roots.
+        let mut paths = std::collections::BTreeSet::from([
+            "elohim/eprfs".into(),
+            "genesis/orchestrator/manifests/runtime/workspace-device.manifest.json".into(),
+        ]);
         let root = repo.canonicalize().unwrap_or(repo.into());
         for package in packages.iter().filter(|v| v["source"].is_null()) {
             let Some(manifest) = package["manifest_path"].as_str() else {

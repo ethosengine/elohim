@@ -14,7 +14,24 @@
         "sources": [
           "**/Jenkinsfile*",
           "genesis/orchestrator/**",
-          "genesis/agentic/compute/**"
+          "genesis/agentic/compute/**",
+          "elohim/eprfs/**",
+          "elohim/sdk/domains/elohim-agent/adapter/**",
+          "elohim/ark/core/**",
+          "elohim/placement/core/**",
+          "elohim/elohim-compute/**",
+          "elohim/elohim-settings/**",
+          "elohim/elohim-cache-core/**",
+          "elohim/epr/**",
+          "elohim/epr-rea/**",
+          "elohim/epr-index/**",
+          "elohim/Cargo.toml",
+          "bridges/did/Cargo.toml",
+          "bridges/did/did-bridge/**",
+          "bridges/did/did-types/**",
+          "crates/consent-grant/**",
+          "crates/seam-contracts/**",
+          "vendor/iroh-quinn-proto-0.13.0/**"
         ],
         "buildProcess": []
       },
@@ -50,7 +67,8 @@
         },
         "run": {
           "kind": "just",
-          "recipe": "gate"
+          "recipe": "gate",
+          "cargo": { "workspace": "elohim/eprfs", "profile": "dev", "rustflags": "" }
         }
       },
       "rakia-codegen": {

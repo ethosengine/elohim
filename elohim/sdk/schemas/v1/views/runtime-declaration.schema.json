@@ -1,0 +1,196 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "epr:schema:view:runtime-declaration",
+  "title": "RuntimeDeclaration",
+  "description": "Device-private declaration or reconstructed observation. No network authority. Source of truth: elohim/ark/core/src/declaration.rs (ManifestView).",
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "manifestCid": {
+      "type": "string"
+    },
+    "supersedes": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "follows": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "channel": {
+            "type": "string"
+          },
+          "mode": {
+            "type": "string",
+            "enum": [
+              "observe",
+              "canary",
+              "apply"
+            ]
+          },
+          "pin": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "channel",
+          "mode"
+        ]
+      }
+    },
+    "tools": {
+      "type": "object",
+      "additionalProperties": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "bins": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "aliases": {
+            "type": "object",
+            "additionalProperties": {
+              "type": "string"
+            }
+          },
+          "candidateEnv": {
+            "type": "object",
+            "additionalProperties": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            }
+          },
+          "longRunning": {
+            "type": "array",
+            "items": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            }
+          },
+          "source": {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "kind": {
+                "enum": [
+                  "repository",
+                  "gitlink"
+                ]
+              },
+              "manifest": {
+                "type": "string"
+              },
+              "path": {
+                "type": "string"
+              },
+              "publishedRef": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              },
+              "repo": {
+                "type": "string"
+              },
+              "releasePrefix": {
+                "type": "string"
+              },
+              "attestation": {
+                "type": "object",
+                "additionalProperties": false,
+                "properties": {
+                  "provider": {
+                    "type": "string"
+                  },
+                  "repo": {
+                    "type": "string"
+                  },
+                  "check": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "provider",
+                  "repo",
+                  "check"
+                ]
+              }
+            },
+            "required": [
+              "kind",
+              "publishedRef"
+            ]
+          }
+        },
+        "required": [
+          "bins",
+          "aliases",
+          "candidateEnv",
+          "longRunning",
+          "source"
+        ]
+      }
+    },
+    "processes": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "name": {
+            "type": "string"
+          },
+          "channelId": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "artifactCid": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "artifactSha256": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "argv": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        },
+        "required": [
+          "name",
+          "channelId",
+          "artifactCid",
+          "artifactSha256",
+          "argv"
+        ]
+      }
+    }
+  },
+  "required": [
+    "manifestCid",
+    "supersedes",
+    "follows",
+    "tools",
+    "processes"
+  ]
+}

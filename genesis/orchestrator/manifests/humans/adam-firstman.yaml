@@ -37,6 +37,8 @@ data:
     # is deleted, not blanked). This is the fleet's canary knob: e.g.
     #   "runtimeConfig": { "ELOHIM_RELEASE_CHANNELS": "runtime:coordinators:elohim:<channel>=canary" }
     RUNTIME_CONFIG_BODY_PLACEHOLDER
+binaryData:
+  runtime-manifest.json: RUNTIME_MANIFEST_BODY_PLACEHOLDER
 ---
 apiVersion: v1
 kind: ConfigMap
@@ -251,6 +253,10 @@ spec:
             # Rung 4: where the runtime-config watcher reads (mounted from the
             # elohim-adam-alpha-runtime-config ConfigMap; see its header).
             - name: ELOHIM_RUNTIME_CONFIG_PATH
+              value: "RUNTIME_CONFIG_PATH_PLACEHOLDER"
+            - name: ELOHIM_RUNTIME_MANIFEST_PATH
+              value: "RUNTIME_MANIFEST_PATH_PLACEHOLDER"
+            - name: ELOHIM_RUNTIME_CONFIG_SEED_PATH
               value: "/etc/elohim/runtime-config.toml"
             # Evidence-absent backoff — same conservative 6h bake as the
             # template (see its inline comment).
@@ -350,15 +356,16 @@ spec:
               mountPath: /etc/elohim/peer-policy.toml
               subPath: peer-policy.toml
               readOnly: true
-            # Rung 4 (config as runtime surface): a watched config file the
-            # RUNNING node re-reads — kubelet propagates ConfigMap edits to
-            # this mount without a pod restart, and the in-process watcher
-            # (src/runtime_config.rs, ELOHIM_RUNTIME_CONFIG_PATH) applies
-            # hot-reloadable settings in seconds. A flag flip is a ConfigMap
-            # edit + apply, never a roll.
+            # Deployment seed and committed base are read-only. Manifest-backed
+            # nodes render their watched file and private chain on the /data PVC.
+            # The manifest CID annotation rolls a changed committed base into boot.
             - name: runtime-config
               mountPath: /etc/elohim/runtime-config.toml
               subPath: runtime-config.toml
+              readOnly: true
+            - name: runtime-config
+              mountPath: /etc/elohim/runtime-manifest.json
+              subPath: runtime-manifest.json
               readOnly: true
           # Generous-probe pattern (2026-05-27) — mirrors the consolidated
           # template; see _edgenode-consolidated.template.yaml for the

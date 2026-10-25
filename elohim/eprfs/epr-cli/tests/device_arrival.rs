@@ -14,6 +14,10 @@ fn epr(base: &Path, args: &[&str]) -> Output {
         .env("XDG_CONFIG_HOME", base.join("config"))
         .env("ELOHIM_DEVICE_KEY_FILE", base.join("device/seed"))
         .env("EPR_BIN_TOOLS", base.join("registry.json"))
+        .env("BIN_STORE", base.join("store"))
+        .env("EPR_PROC_ROOT", base.join("proc"))
+        .env_remove("ELOHIM_SESSION_OWNER_PID")
+        .env_remove("EPR_SESSION_LAZY")
         .env("EPR_STORE", base.join("store/epr"))
         .env("BRIT_STORE", base.join("store/brit"))
         .env("EPR_BIN", env!("CARGO_BIN_EXE_epr"))
@@ -155,9 +159,18 @@ fn peer_daemon_status_compares_live_lease_with_current() {
     fs::write(&executable, "fixture").unwrap();
     fs::set_permissions(&executable, fs::Permissions::from_mode(0o755)).unwrap();
     symlink(&current, store.join("current")).unwrap();
-    let pid = std::process::id();
-    let start =
-        elohim_device_runtime::session::process_start_time(Path::new("/proc"), pid).unwrap();
+    let pid = 42;
+    let start = 77;
+    fs::create_dir_all(base.join("proc/42")).unwrap();
+    let mut fields = vec!["0".to_owned(); 20];
+    fields[0] = "S".into();
+    fields[1] = "1".into();
+    fields[19] = start.to_string();
+    fs::write(
+        base.join("proc/42/stat"),
+        format!("42 (epr) {}", fields.join(" ")),
+    )
+    .unwrap();
     let lease = store.join("sessions/daemon-fixture");
     let write = |cid: &str, start: u64| {
         fs::write(

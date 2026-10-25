@@ -2011,16 +2011,9 @@ impl ApplyVehicle for ConfigEprVehicle {
             .filter(|k| !known.contains(&k.as_str()))
             .collect();
 
-        // The release IS the config document — written wholesale, not merged.
-        // A merge would silently keep a key the release deliberately removed,
-        // and "the file says what the elected head says" is the only rule that
-        // makes a revert converge.
-        write_atomic(&config_path, payload.as_bytes()).map_err(|e| {
-            AdoptionRefusal::new(
-                RefusalReason::ApplyFailed,
-                format!("could not write {}: {e}", config_path.display()),
-            )
-        })?;
+        elohim_device_runtime::manifest_store::for_runtime_config(&config_path)
+            .and_then(|store| store.config_release(&payload))
+            .map_err(|e| AdoptionRefusal::new(RefusalReason::ApplyFailed, e.to_string()))?;
 
         // Same PID, immediately — rather than waiting up to POLL_INTERVAL_SECS
         // for the watcher. The watcher stays the backstop; this is what makes

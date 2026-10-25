@@ -435,6 +435,161 @@ mod tests {
         );
     }
 
+    #[tokio::test]
+    async fn external_projection_owner_enforces_release_pin_in_adoption() {
+        use ark_core::declaration::{FollowMode, ManifestAct};
+        use elohim_device_runtime::manifest_store::{self, ManifestStore, Projections};
+        const CHILD: &str = "M_EXTERNAL_PIN_CHILD";
+        if std::env::var_os(CHILD).is_none() {
+            let dir = tempfile::tempdir().unwrap();
+            let output = std::process::Command::new(std::env::current_exe().unwrap())
+                .args(["--exact", "services::release_adoption::watch::settled_rest::tests::external_projection_owner_enforces_release_pin_in_adoption", "--nocapture"])
+                .env(CHILD, "1")
+                .env("ELOHIM_RUNTIME_CONFIG_PATH", dir.path().join("external/runtime.toml"))
+                .env_remove("ELOHIM_RUNTIME_MANIFEST_PATH")
+                .output().unwrap();
+            assert!(
+                output.status.success(),
+                "{}\n{}",
+                String::from_utf8_lossy(&output.stdout),
+                String::from_utf8_lossy(&output.stderr)
+            );
+            assert!(String::from_utf8_lossy(&output.stdout).contains("1 passed"));
+            return;
+        }
+        let dir = tempfile::tempdir().unwrap();
+        let config = crate::runtime_config::config_path().unwrap();
+        let channel = "runtime:config:test:external-pin";
+        let a = elohim_device_runtime::manifest_store::workspace_base()
+            .unwrap()
+            .cid()
+            .unwrap();
+        let b = eprfs_core::BlobCid::compute_raw(b"release B").to_string();
+        let store = ManifestStore::workspace(
+            dir.path().join("device"),
+            Projections {
+                runtime_config: Some(config.clone()),
+                bin_tools: None,
+            },
+        )
+        .unwrap();
+        // The same Follow act the CLI's `device follow --pin A` dispatches.
+        let declare = |pin| {
+            store
+                .act(ManifestAct::Follow {
+                    channel: channel.into(),
+                    mode: Some(FollowMode::Canary),
+                    pin,
+                })
+                .unwrap()
+        };
+        // The native Follow act `device follow --pin A` dispatches. Never an ambient EPR_BIN:
+        // a lane's binary can predate the verb, and epr-cli tests the CLI path itself.
+        declare(Some(a.clone()));
+        assert!(!config
+            .parent()
+            .unwrap()
+            .join("runtime-manifest.json")
+            .exists());
+        manifest_store::boot_runtime_config(Some(&config), None, None).unwrap();
+
+        let payload =
+            format!("ELOHIM_RELEASE_CHANNELS = \"{channel}=canary\"\nM_PIN_PROBE = \"B\"\n");
+        let blobs = Arc::new(BlobStore::new_memory());
+        let blob = blobs.store(payload.as_bytes()).await.unwrap();
+        let mut body: serde_json::Value = serde_json::from_str(include_str!(
+            "../../../../../../genesis/a2o/scripts/__tests__/fixtures/release-manifest-config-epr.json"
+        )).unwrap();
+        body["channelId"] = serde_json::json!(channel);
+        body["artifacts"][0]["blobCid"] = serde_json::json!(blob.cid);
+        body["artifacts"][0]["bytes"] = serde_json::json!(payload.len());
+        body["artifacts"][0]["sha256"] = serde_json::json!(sha256_hex(payload.as_bytes()));
+        let manifest = verify::verify_shape(&body).unwrap();
+        struct FixtureReality(InstalledReality);
+        #[async_trait::async_trait]
+        impl InstalledRealitySource for FixtureReality {
+            async fn read(&self) -> Answer<InstalledReality> {
+                Answer::Present(self.0.clone())
+            }
+        }
+        let reality = InstalledReality {
+            app_id: "fixture".into(),
+            roles: manifest
+                .applies_to
+                .roles
+                .iter()
+                .map(|(role, binding)| {
+                    (
+                        role.clone(),
+                        verify::InstalledRole {
+                            role: role.clone(),
+                            dna_hash: binding.dna_hash.clone(),
+                            coordinator_zomes: binding.coordinator_zomes.clone().unwrap(),
+                            constitution_root: None,
+                        },
+                    )
+                })
+                .collect(),
+        };
+        let metadata =
+            serde_json::json!({"kind": RELEASE_MANIFEST_KIND, "manifest": body}).to_string();
+        let heads = Arc::new(ScriptedHeads::default());
+        let mut offered = head(channel, "uhCkkReleaseB", Some(false), None, &metadata);
+        offered.content.blob_cid = Some(b);
+        heads.answer(channel, Some(offered));
+        let vehicles = super::super::super::apply::ApplyRegistry::new()
+            .with(Arc::new(super::super::super::apply::ConfigEprVehicle::new()));
+        let controller = controller(&dir, &heads)
+            .with_artifact_source(Arc::new(BlobStoreArtifactSource::new(blobs)))
+            .with_installed_reality(Arc::new(FixtureReality(reality)))
+            .with_apply_vehicles(Arc::new(vehicles));
+        let followed = state::parse_followed_channels(&format!("{channel}=canary"));
+        state::reconcile_followed(&followed);
+        assert!(state::applied_release(channel).is_none());
+        let check = || async {
+            let mut bytes = u64::MAX;
+            let mut reads = 10;
+            let mut settled = None;
+            controller
+                .check_channel(
+                    &followed.channels[0],
+                    1_000,
+                    &mut bytes,
+                    &mut reads,
+                    &mut settled,
+                )
+                .await
+        };
+        match check().await {
+            CheckOutcome::Checked {
+                verdict: Verdict::Refused { refusal },
+                ..
+            } => {
+                assert_eq!(refusal.reason_code(), RefusalReason::ModeNotPermitted);
+                assert!(refusal.detail.contains(&a), "{}", refusal.detail);
+            }
+            other => panic!("external owner pin was ignored: {other:?}"),
+        }
+        declare(None);
+        let unpinned = check().await;
+        assert!(
+            matches!(
+                unpinned,
+                CheckOutcome::Checked {
+                    verdict: Verdict::Applied {
+                        already_current: false,
+                        ..
+                    },
+                    ..
+                }
+            ),
+            "the same B must be admissible without the pin: {unpinned:?}"
+        );
+        assert!(std::fs::read_to_string(config)
+            .unwrap()
+            .contains("M_PIN_PROBE"));
+    }
+
     /// **The station.** A head that carries no release is settled: asked on
     /// the first sweep, skipped for `RESTED_SWEEPS`, asked again — one resolve
     /// per three sweeps, and a skipped sweep is not a check.

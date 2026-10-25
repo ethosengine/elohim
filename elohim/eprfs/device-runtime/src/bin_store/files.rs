@@ -46,7 +46,7 @@ pub(super) fn absolute(path: &Path) -> Result<PathBuf> {
     }
     Ok(result)
 }
-pub(super) fn require_cid(text: &str) -> Result<BlobCid> {
+pub(crate) fn require_cid(text: &str) -> Result<BlobCid> {
     let cid = BlobCid::parse(text).map_err(|_| Refusal::new("invalid-cid", text))?;
     if cid.to_string() != text || !(text.starts_with("bafkrei") || text.starts_with("bafyrei")) {
         return Err(Refusal::new("invalid-cid", text));

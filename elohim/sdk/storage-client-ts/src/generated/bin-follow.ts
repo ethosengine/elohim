@@ -12,7 +12,12 @@ export type BinFollow =
   | (BinRelease & {
       followed: true;
       [k: string]: unknown;
-    });
+    })
+  | {
+      followed: boolean;
+      observed: string;
+      mode: 'observe' | 'canary' | 'apply';
+    };
 
 /**
  * Device-local CLI output; reconstructed from private custody and runtime observations. No network authority.

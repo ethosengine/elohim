@@ -65,6 +65,25 @@ mod tests {
 
     #[test]
     fn activates_only_the_clone_local_checked_in_hook() {
+        // `git -c …` exports its overrides to every child as GIT_CONFIG_PARAMETERS, so a
+        // test run under `git -c core.hooksPath=… push` would read that override instead
+        // of the clone-local setting. Re-run this test alone without it.
+        if std::env::var_os("GIT_CONFIG_PARAMETERS").is_some() {
+            let output = std::process::Command::new(std::env::current_exe().unwrap())
+                .args([
+                    "--exact",
+                    "setup::tests::activates_only_the_clone_local_checked_in_hook",
+                ])
+                .env_remove("GIT_CONFIG_PARAMETERS")
+                .output()
+                .unwrap();
+            assert!(
+                output.status.success(),
+                "{}",
+                String::from_utf8_lossy(&output.stdout)
+            );
+            return;
+        }
         let dir = TempDir::new().unwrap();
         process::require("git", &["init", "-q"], dir.path()).unwrap();
         for path in ["AGENTS.md", "CLAUDE.md"] {

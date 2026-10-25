@@ -168,28 +168,36 @@ pub(crate) fn execute(args: &[String]) -> Result<String, Refusal> {
         "shadows" => json!(store.shadows(&std::env::var("PATH").unwrap_or_default())),
         "source-state" => store.source_state(&repo()?)?,
         "bootstrap" => json!(store.bootstrap(&repo()?, closure)?),
-        "follow" => store.follow(&repo()?, closure)?,
+        "follow" => {
+            let head = crate::device::declaration::store(None, None, None)
+                .map_err(argument)?
+                .read()?;
+            match head
+                .follows
+                .iter()
+                .find(|f| f.channel == format!("bin:{tool}"))
+            {
+                Some(follow) => store.follow_declared(&repo()?, closure, follow)?,
+                None => {
+                    serde_json::json!({"followed":false,"why":"device does not follow this tool"})
+                }
+            }
+        }
         "migrate" => store.migrate()?,
         "install-launcher" => {
-            let native = options
-                .get("--launcher")
-                .map(PathBuf::from)
-                .or_else(|| std::env::var_os("BIN_LAUNCH_BIN").map(PathBuf::from))
-                .or_else(|| {
-                    std::env::current_exe()
-                        .ok()?
-                        .parent()
-                        .map(|p| p.join("bin-launch"))
-                        .filter(|p| p.is_file())
-                })
-                .or_else(|| {
-                    store
-                        .root()
-                        .parent()
-                        .map(|p| p.join("bin/bin-launch"))
-                        .filter(|p| p.is_file())
-                })
-                .ok_or_else(|| argument("pass --launcher PATH"))?;
+            if !options.contains_key("--registry") {
+                let bins = store
+                    .root()
+                    .parent()
+                    .map(|root| root.join("bin/bin-tools.json"));
+                crate::device::declaration::store_with_bins(None, None, None, bins)
+                    .map_err(argument)?
+                    .apply()?;
+            }
+            let native = match options.get("--launcher") {
+                Some(path) => PathBuf::from(path),
+                None => store.landed_launcher()?,
+            };
             let destination = options
                 .get("--destination")
                 .map(PathBuf::from)

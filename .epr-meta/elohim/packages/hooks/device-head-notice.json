@@ -1,0 +1,47 @@
+{
+  "apiVersion": "elohim-agent/v1alpha1",
+  "kind": "HookPackage",
+  "metadata": {
+    "id": "device-head-notice",
+    "name": "device-head-notice",
+    "version": "1.0.0",
+    "description": "Observe a landed tool once per session without spawning a resolver.",
+    "sourceRuntime": "elohim-agent",
+    "master": "package",
+    "runtimeTargets": [
+      "claude"
+    ],
+    "event": "UserPromptSubmit",
+    "matcher": null,
+    "interpreter": "python3",
+    "language": "python",
+    "assetRefs": [],
+    "governance": {
+      "eprRef": "epr:elohim-agent/hooks/device-head-notice",
+      "policy": "capability-governance@1",
+      "gates": [
+        "epr-meta-resolver",
+        "elohim-agent:packages:verify"
+      ],
+      "ledger": ".claude/data/governance-findings.jsonl"
+    }
+  },
+  "source": {
+    "language": "python",
+    "interpreter": "python3",
+    "path": ".claude/hooks/device-head-notice.py",
+    "body": "#!/usr/bin/env python3\n\"\"\"Prompt adapter: the payload or environment names this session directly.\"\"\"\nimport importlib.util\nimport json\nimport os\nfrom pathlib import Path\nimport sys\n\nroot = Path(__file__).resolve().parents[2]\ntry:\n    payload = json.load(sys.stdin)\nexcept (ValueError, OSError):\n    payload = {}\n# The installed command names the nearest runtime; its payload names that session.\n# An ownerless declaration is only a fallback when the runtime supplies no session.\ndef nonblank(value):\n    return value.strip() if isinstance(value, str) else \"\"\n\n\ndeclared = nonblank(os.environ.get(\"ELOHIM_SESSION_ID\"))\nowner = nonblank(os.environ.get(\"ELOHIM_SESSION_OWNER_PID\"))\nparent = nonblank(os.environ.get(\"ELOHIM_HOOK_RUNTIME_PID\", str(os.getppid())))\nowner_matches = (\n    owner.isascii() and owner.isdecimal() and 0 < int(owner) <= 4294967295\n    and parent.isascii() and parent.isdecimal() and int(owner) == int(parent)\n)\nexplicit = declared if owner_matches else \"\"\nownerless = declared if not owner else \"\"\nruntime_keys = (\"CLAUDE_SESSION_ID\", \"CLAUDE_CODE_SESSION_ID\", \"CODEX_THREAD_ID\", \"CODEX_SESSION_ID\")\nsession = explicit or nonblank(payload.get(\"session_id\")) or ownerless or next(\n    (value for key in runtime_keys if (value := nonblank(os.environ.get(key)))), \"\"\n)\n\nspec = importlib.util.spec_from_file_location(\"head_notice\", root / \"genesis/agentic/bin-head-notice.py\")\nmodule = importlib.util.module_from_spec(spec)\nspec.loader.exec_module(module)\nfor line in module.notices(os.environ.get(\"BIN_STORE\", \"/projects/.claude-config/tools/bin-store\"), session):\n    print(line)\n"
+  },
+  "registration": {
+    "event": "UserPromptSubmit",
+    "matcher": null,
+    "command": "ELOHIM_HOOK_RUNTIME_PID=$PPID python3 \"$CLAUDE_PROJECT_DIR/.claude/hooks/device-head-notice.py\"",
+    "timeout": 5,
+    "type": "command"
+  },
+  "projections": {
+    "claude": {
+      "path": ".claude/hooks/device-head-notice.py"
+    }
+  }
+}

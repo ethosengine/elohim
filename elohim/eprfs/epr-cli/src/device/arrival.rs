@@ -78,7 +78,8 @@ pub(crate) fn status_at(root: &Path) -> Vec<Check> {
     let identity = session::resolve();
     let registry = Registry::discover();
     let env = |key: &str| std::env::var(key).ok();
-    let binary = |tool| match &registry {
+    let binary = |tool| {
+        match &registry {
         Ok(registry) => match Store::from_environment(tool, registry) {
             Ok(store) => tool_check(tool, &store, &identity, &env),
             Err(error) => Check::new(
@@ -92,8 +93,9 @@ pub(crate) fn status_at(root: &Path) -> Vec<Check> {
             &format!("{tool} binary"),
             State::Refused,
             error.to_string(),
-            Some("restore genesis/agentic/bin-tools.json or set EPR_BIN_TOOLS".into()),
+            Some("restore genesis/orchestrator/manifests/runtime/workspace-device.manifest.json or set EPR_BIN_TOOLS".into()),
         ),
+    }
     };
     let key = device_key::resolve_path();
     let handle = sole_handle(root).unwrap_or_else(|| "<handle>".into());
@@ -191,9 +193,9 @@ fn tool_check(
                 .is_some_and(|p| crate::doctor::is_executable(p)) =>
         {
             let running = if tool == "epr" {
-                crate::govern::evaluator_identity()["cid"]
-                    .as_str()
-                    .map(str::to_owned)
+                std::env::current_exe()
+                    .ok()
+                    .and_then(|path| store.executable_cid(&path).ok())
             } else {
                 view.resolved_cid.clone()
             };

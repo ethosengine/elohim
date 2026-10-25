@@ -67,7 +67,10 @@ function deviceEnv(f: Fixture, key: string, extra: Record<string, string> = {}):
     // launcher, while EPR_BIN is reserved for the real candidate supplied by the gate.
     ...(binary === 'epr' ? {} : { EPR_BIN: binary }),
     ELOHIM_SESSION_ID: f.session,
-    EPR_BIN_TOOLS: join(repository, 'genesis/agentic/bin-tools.json'),
+    EPR_BIN_TOOLS: join(
+      repository,
+      'genesis/orchestrator/manifests/runtime/workspace-device.manifest.json'
+    ),
     ...extra,
   };
 }

@@ -5655,3 +5655,31 @@ decisionPoints:
       - { path: elohim/elohim-storage/src/api/hosted_custody.rs, testName: two_runners_never_share_a_lease, kind: unit }
       - { path: elohim/elohim-storage/src/api/hosted_custody.rs, testName: hosted_custody_is_never_open_ended, kind: unit }
       - { path: elohim/elohim-storage/src/http.rs, testName: build_manifest_declares_compute_payload_custody_but_not_tasks_or_grants, kind: unit }
+
+  - name: device_declared_follow
+    kind: verdict-fn
+    sourceLocation:
+      file: src/api/runtime_config_follow.rs
+      modulePath: api::runtime_config_follow::decide
+    summary: Node-local follow requests delegate to the private manifest chain; release pins constrain the existing elected head and never nominate another head.
+    concernIds:
+      - { id: C0, status: answered, justification: "Private B device intent; actual channel application remains an ephemeral controller observation." }
+      - { id: C1, status: answered, justification: "A pin is a local admission constraint; canonical and staging selection remain in the existing controller." }
+      - { id: C2, status: answered, justification: "ManifestStore serializes local acts; the watcher checks constraints before idempotent applied exits." }
+      - { id: C3, status: n-a, justification: "No new network protocol or retry loop." }
+      - { id: C4, status: answered, justification: "Missing fleet base, invalid manifest and pin mismatch refuse explicitly; no workspace fallback for existing fleet config." }
+      - { id: C5, status: answered, justification: "Existing release evidence remains required; the declaration does not certify application." }
+      - { id: C6a, status: answered, justification: "The shared chain lock has a 30-second bound; no additional remote call except resolving a pinned canary candidate." }
+      - { id: C6b, status: answered, justification: "The shared writer repairs projections at boot; an unchanged declared base does not mint a new version." }
+      - { id: C7, status: n-a, justification: "No publication or peer advertisement is added." }
+      - { id: C8, status: answered, justification: "RuntimePassport reports controller receipts and verified local tools; unknown application is null." }
+      - { id: C9, status: answered, justification: "Follow grammar is shared with ark-core; the existing node-local response remains compatible." }
+      - { id: C10, status: answered, justification: "Fleet base bytes are delivered in the ConfigMap and the writable chain lives on the existing PVC." }
+      - { id: C11, status: n-a, justification: "No new work dispatch or scheduler." }
+      - { id: C12, status: answered, justification: "The existing node-local admin boundary delegates; no manifest HTTP resource is exposed." }
+      - { id: C13, status: n-a, justification: "No trust-tier promotion." }
+      - { id: C14, status: partial, justification: "Private immutable chain versions persist; collection remains outside this slice." }
+    contractTests:
+      - { path: elohim/elohim-storage/src/api/runtime_config_follow.rs, testName: a_malformed_channel_id_is_refused_even_on_remove, kind: unit }
+      - { path: elohim/eprfs/device-runtime/tests/manifest_store.rs, testName: fleet_route_reads_saved_base_and_never_guesses_workspace_defaults, kind: integration }
+      - { path: elohim/ark/core/tests/declaration_contract.rs, testName: release_pin_requires_the_content_identity_even_when_the_head_exists, kind: integration }

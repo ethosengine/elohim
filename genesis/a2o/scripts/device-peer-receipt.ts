@@ -19,7 +19,7 @@
  *   HTTP, and reading `/proc/<pid>/stat` would need a PID lookup this
  *   script is deliberately not doing.
  * - **following** reads `/admin/adoption` for the release channel(s)
- *   `CONDUCTOR_RELEASE_CHANNELS` passed through as `ELOHIM_RELEASE_CHANNELS`
+ *   `CONDUCTOR_RELEASE_CHANNELS` declared through `epr device follow`
  *   on the storage launch. Not following is not a failure, so it SKIPs.
  * - **station 2 (pulled)** and **station 3 (recognised)** are structurally
  *   unmeasurable from this peer today — `sovereign-peer-network-read-no-

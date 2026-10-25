@@ -297,6 +297,8 @@ mod tests {
                 node: Some("human-jessica".to_string()),
                 incarnation: 1,
                 ark_version: "0.1.0".to_string(),
+                follows: vec![],
+                tools: Default::default(),
                 processes: vec![ProcessPassport {
                     name: "conductor".to_string(),
                     artifact_sha256: "ab".repeat(32),

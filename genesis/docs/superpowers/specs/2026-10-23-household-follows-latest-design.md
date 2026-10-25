@@ -575,7 +575,9 @@ after the health check; `observe` fetches and verifies but adopts nothing. Every
 running session when its pin falls behind. The bin store already keeps
 `<store>/<tool>/current.json` (`{cid, commit, landedAt, previous}`, written by `epr bin land`) and
 each session's pin under `<store>/<tool>/sessions/`. The UserPromptSubmit hook compares the two
-with no process spawned and prints one line per new head per session, naming the old and new CIDs,
+without spawning `epr`, reading only `current.json` and the pin of the session it names, and prints
+one line per head transition per session (re-landing the current CID is no transition), naming the
+old and new CIDs,
 the commit subject and the switch (`/clear`, or `epr bin pin --cid`). A session pinned to a
 dev-context build sees the same line when a landed head is available. Slice B adds peers' heads
 and peers' artifacts as further sources of the same line.

@@ -104,6 +104,21 @@ impl Store {
             let mut sums = BTreeMap::new();
             let mut legacy_sums = String::new();
             let mut names = self.config.bins.clone();
+            // Before the launcher joined the release, epr shipped alone. Preserve
+            // that immutable closure and its session pins; never invent a launcher.
+            if self.tool == "epr"
+                && names.len() == 2
+                && names.iter().any(|name| name == "epr")
+                && names.iter().any(|name| name == "bin-launch")
+                && self.config.aliases.is_empty()
+                && !dir.join("bin-launch").exists()
+                && record.get("bins").is_none_or(|bins| {
+                    bins.as_object()
+                        .is_some_and(|bins| bins.len() == 1 && bins.contains_key("epr"))
+                })
+            {
+                names = vec!["epr".into()];
+            }
             names.sort();
             for name in &names {
                 let path = dir.join(name);

@@ -43,8 +43,15 @@
     {
       "name": "compute-worker",
       "kind": "delegated",
-      "artifact": { "channel": { "channel_id": "runtime:compute-worker:adam" } },
-      "argv": ["bash", "/opt/compute/worker-start.sh"],
+      "artifact": {
+        "channel": {
+          "channel_id": "runtime:compute-worker:adam"
+        }
+      },
+      "argv": [
+        "bash",
+        "/opt/compute/worker-start.sh"
+      ],
       "quota": {
         "memory_max_bytes": 25769803776,
         "cpu_share_millis": 8000
@@ -53,8 +60,14 @@
     {
       "name": "ws-proxy",
       "kind": "delegated",
-      "artifact": { "channel": { "channel_id": "runtime:conductor-ws-proxy:adam" } },
-      "argv": ["socat"],
+      "artifact": {
+        "channel": {
+          "channel_id": "runtime:conductor-ws-proxy:adam"
+        }
+      },
+      "argv": [
+        "socat"
+      ],
       "quota": {
         "memory_max_bytes": 67108864,
         "cpu_share_millis": 200
@@ -72,7 +85,19 @@
     "protected": [
       "conductor"
     ],
-    "shed_order": ["compute-worker"]
+    "shed_order": [
+      "compute-worker"
+    ]
   },
-  "supersedes": "bafyreiapd5vu2vnk3tontaccwwvrtgziljpgfwmmudypi3pp2x76guzrta"
+  "supersedes": "bafyreiahsppuqbxie2hcw3zmj3p6fvvz2ufw7zis46du46jgoeykskg2ri",
+  "follows": [
+    {
+      "channel": "runtime:coordinators:elohim:workspace",
+      "mode": "observe"
+    },
+    {
+      "channel": "runtime:app-bundle:alpha:dev",
+      "mode": "canary"
+    }
+  ]
 }

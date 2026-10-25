@@ -3693,7 +3693,7 @@ storage_ark_env() { # <peer-name>
 # here. It writes no channel entry and never edits the file again: since rung 5
 # Task 2 a peer is ENROLLED in a channel by being asked
 # (`POST <peer>/admin/runtime-config/follow` with {channel, mode}), which
-# rewrites exactly the ELOHIM_RELEASE_CHANNELS line of this file and reloads it.
+# records a device follow act and reloads its projection.
 # The a2o ceremonies (steps/delivery/{runtime-upgrade-propagation,
 # happ-lineage-migration}.steps.ts) go through that route. A peer started
 # WITHOUT the path answers `/admin/adoption` with `sweeps: 0, channels: []`
@@ -3792,7 +3792,7 @@ peer_index_of() { # <peer-name> -> prints the index in PEERS, or returns 1
 
 runtime_config_path_for() { # <peer-name> -> prints the path (file guaranteed to exist)
   local f="$MESH_DIR/$1/runtime-config.toml"
-  mkdir -p "$MESH_DIR/$1"; [ -f "$f" ] || : > "$f"
+  "${EPR_BIN:-epr}" device apply --root "$MESH_DIR/$1" >/dev/null || return $?
   echo "$f"
 }
 

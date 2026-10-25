@@ -11,6 +11,7 @@ name = "ark_supervisor"
 path = "src/lib.rs"
 
 [dependencies]
+elohim-device-runtime = { path = "../../eprfs/device-runtime" }
 elohim-ark-core = { path = "../core" }
 elohim-epr = { path = "../../epr" }
 elohim-epr-rea = { path = "../../epr-rea" }

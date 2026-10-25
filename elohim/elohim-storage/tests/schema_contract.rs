@@ -14,7 +14,10 @@
 // tasks within a single runtime — the deadlock pattern `await_holding_lock`
 // guards against doesn't apply. Switching to `tokio::sync::Mutex` would be a
 // task-level mutex (wrong granularity for cross-runtime env-var contention).
-#![allow(clippy::await_holding_lock)]
+#![allow(
+    clippy::await_holding_lock,
+    reason = "the test lock serializes process environment across independent OS-thread Tokio runtimes"
+)]
 
 use elohim_storage::p2p::acquisition::{PullState, PullStatusInfo};
 use elohim_storage::p2p::projection_reconcile::ProjectionReconcileStatus;
@@ -7122,4 +7125,13 @@ fn create_relationship_input_matches_schema_and_carries_reach() {
     ] {
         assert!(!compiled.is_valid(&bad), "schema must refuse {bad}");
     }
+}
+
+#[test]
+fn runtime_observation_matches_schema() {
+    let observed = elohim_storage::services::release_adoption::state::runtime_observation();
+    validate_against_schema(
+        "views/runtime-observation.schema.json",
+        &serde_json::to_value(observed).unwrap(),
+    );
 }

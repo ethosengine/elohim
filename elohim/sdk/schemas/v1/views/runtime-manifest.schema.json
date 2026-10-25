@@ -1,0 +1,177 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "epr:schema:view:runtime-manifest",
+  "title": "RuntimeManifest",
+  "description": "Device-private declaration or reconstructed observation. No network authority. Source of truth: elohim/ark/core/src/manifest.rs (RuntimeManifest native ABI).",
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "schema": {
+      "const": 1
+    },
+    "kind": {
+      "const": "runtime-manifest"
+    },
+    "supersedes": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "reach": {
+      "type": "string"
+    },
+    "processes": {
+      "type": "array",
+      "items": {
+        "type": "object"
+      }
+    },
+    "envelope": {
+      "type": [
+        "object",
+        "null"
+      ]
+    },
+    "archetype": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "follows": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "channel": {
+            "type": "string"
+          },
+          "mode": {
+            "type": "string",
+            "enum": [
+              "observe",
+              "canary",
+              "apply"
+            ]
+          },
+          "pin": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "channel",
+          "mode"
+        ]
+      }
+    },
+    "tools": {
+      "type": "object",
+      "additionalProperties": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "bins": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "aliases": {
+            "type": "object",
+            "additionalProperties": {
+              "type": "string"
+            }
+          },
+          "candidateEnv": {
+            "type": "object",
+            "additionalProperties": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            }
+          },
+          "longRunning": {
+            "type": "array",
+            "items": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            }
+          },
+          "source": {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "kind": {
+                "enum": [
+                  "repository",
+                  "gitlink"
+                ]
+              },
+              "manifest": {
+                "type": "string"
+              },
+              "path": {
+                "type": "string"
+              },
+              "publishedRef": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              },
+              "repo": {
+                "type": "string"
+              },
+              "releasePrefix": {
+                "type": "string"
+              },
+              "attestation": {
+                "type": "object",
+                "additionalProperties": false,
+                "properties": {
+                  "provider": {
+                    "type": "string"
+                  },
+                  "repo": {
+                    "type": "string"
+                  },
+                  "check": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "provider",
+                  "repo",
+                  "check"
+                ]
+              }
+            },
+            "required": [
+              "kind",
+              "publishedRef"
+            ]
+          }
+        },
+        "required": [
+          "bins",
+          "aliases",
+          "candidateEnv",
+          "longRunning",
+          "source"
+        ]
+      }
+    }
+  },
+  "required": [
+    "schema",
+    "kind",
+    "supersedes",
+    "reach",
+    "processes"
+  ]
+}

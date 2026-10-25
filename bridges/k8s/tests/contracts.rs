@@ -178,15 +178,15 @@ fn missing_pin_is_unpinned_and_suspended_humans_are_skipped() {
 #[test]
 fn absent_envelope_renders_empty_object_and_keeps_live_cid() {
     let mut m = manifest("family-node-base");
+    assert_eq!(
+        m.cid().unwrap(),
+        "bafyreigad4auceaylqzykxan5u2upsxamlohkhdi3hqgaxvs4kvpgjuscy"
+    );
     m.envelope = None;
     m.archetype = None;
     assert_eq!(
         serde_json::to_string(&render_envelope(&m).unwrap()).unwrap(),
         "{}"
-    );
-    assert_eq!(
-        m.cid().unwrap(),
-        "bafyreihagg75knog3e2fkiygpghcgqge35ovzka3vxken2zjleqnerdcaa"
     );
 }
 
@@ -222,9 +222,15 @@ fn unknown_schema_or_archetype_and_invalid_requests_refuse() {
 #[test]
 fn superseding_manifest_pins_request_override_and_archetype_lineage() {
     let m = manifest("jessica");
+    // Slice M adds follows on top of Jessica's request override. Reconstruct
+    // that predecessor and verify both links back to the archetype.
+    let mut predecessor = m.clone();
+    predecessor.follows.clear();
+    predecessor.supersedes = Some(manifest("recycled-laptop").cid().unwrap());
+    assert_eq!(m.supersedes, Some(predecessor.cid().unwrap()));
     assert_eq!(
-        m.supersedes,
-        Some(manifest("recycled-laptop").cid().unwrap())
+        predecessor.cid().unwrap(),
+        "bafyreicpwvp3p3nab5n2eat555ewf4p44fr7uw5ycu34vyk2fczeidnrle"
     );
     assert_eq!(
         render_envelope(&m).unwrap().edgenode_memory_request,
@@ -349,12 +355,12 @@ fn native_runtime_budgets_keep_the_snapshot_when_adam_adds_delegated_capacity() 
                 .collect();
             assert_eq!(slices["compute-worker"], (24 * GIB, 8_000));
             assert_eq!(slices["ws-proxy"], (64 * 1024 * 1024, 200));
-            let mut native = serde_json::to_value(&rendered).unwrap();
-            native.as_object_mut().unwrap().remove("delegated");
-            let expected: Value = serde_json::from_str(&golden[name]).unwrap();
+            let mut native = rendered;
+            native.delegated.clear();
             assert_eq!(
-                native, expected,
-                "Adam's native budget must remain unchanged"
+                serde_json::to_string(&native).unwrap(),
+                golden[name],
+                "Adam's native budget must remain byte-identical"
             );
         } else {
             assert!(manifest

@@ -198,10 +198,12 @@ struct Fixture {
 impl Fixture {
     fn new(tool: &str) -> Self {
         let tmp = tempfile::tempdir().unwrap();
-        let registry: Registry = serde_json::from_str(include_str!(
-            "../../../../../genesis/agentic/bin-tools.json"
-        ))
-        .unwrap();
+        let mut registry =
+            crate::manifest_store::registry(&crate::manifest_store::workspace_base().unwrap())
+                .unwrap();
+        // These parity cases exercise the historical one-file epr fixture. The separate
+        // manifest contract suite covers the new epr + bin-launch release.
+        registry.tools.get_mut("epr").unwrap()["bins"] = json!(["epr"]);
         let state = Arc::new(Mutex::new(State {
             head: "a".repeat(40),
             descended: true,
@@ -280,6 +282,8 @@ impl Fixture {
     }
     fn install(&self) -> Result<Value> {
         atomic_bytes(&self.path("native"), b"#!/bin/sh\nexit 0\n", 0o755).unwrap();
+        crate::manifest_store::write_registry(&self.path("bin/bin-tools.json"), &self.registry)
+            .unwrap();
         self.store.install_launcher(
             &self.path("native"),
             &self.path("cargo-bin"),
@@ -515,6 +519,52 @@ fn test_atomic_pin_creation_recovers_an_empty_pin() {
     assert!(v["cid"].is_string());
 }
 #[test]
+fn an_explicit_pin_switches_verified_bytes_while_automatic_resolution_stays_pinned() {
+    let f = Fixture::new("epr");
+    let old = f.release("old");
+    let new = f.release("new");
+    f.head(&old);
+    f.store
+        .pin(&identity("session"), None, false, None)
+        .unwrap();
+    f.head(&new);
+    assert_eq!(
+        f.store
+            .pin(&identity("session"), None, false, None)
+            .unwrap()
+            .cid,
+        old.cid
+    );
+    assert_eq!(
+        f.store
+            .pin(&identity("session"), Some(&new.cid), false, None)
+            .unwrap()
+            .cid,
+        new.cid
+    );
+    assert_eq!(
+        f.store
+            .pin(&identity("session"), None, false, None)
+            .unwrap()
+            .cid,
+        new.cid
+    );
+    let tampered = f.store.root.join(&old.cid).join("epr");
+    fs::set_permissions(&tampered, fs::Permissions::from_mode(0o755)).unwrap();
+    fs::write(tampered, b"tampered").unwrap();
+    assert!(f
+        .store
+        .pin(&identity("session"), Some(&old.cid), false, None)
+        .is_err());
+    assert_eq!(
+        f.store
+            .pin(&identity("session"), None, false, None)
+            .unwrap()
+            .cid,
+        new.cid
+    );
+}
+#[test]
 fn test_two_launcher_processes_publish_one_complete_pin() {
     let f = Fixture::new("epr");
     let r = f.release("a");
@@ -588,7 +638,10 @@ fn test_retried_ingest_and_refusal_refresh_their_rows_instead_of_growing() {
     for _ in 0..3 {
         assert_eq!(f.release("a").cid, a.cid);
     }
-    let unpublished = Refusal::new("unpublished", "commit is not contained in any publishedRef");
+    let unpublished = Refusal::new(
+        "unpublished",
+        "commit is not contained in any published reference",
+    );
     for _ in 0..3 {
         f.store.record_refusal(&a.cid, &unpublished);
     }
@@ -919,7 +972,11 @@ fn test_source_paths_resolve_only_the_host_platform() {
     ]}));
     assert_eq!(
         f.store.source_paths(f.tmp.path()),
-        ["elohim/eprfs", "elohim/eprfs/epr-cli"]
+        [
+            "elohim/eprfs",
+            "elohim/eprfs/epr-cli",
+            "genesis/orchestrator/manifests/runtime/workspace-device.manifest.json"
+        ]
     );
     let s = f.state.lock().unwrap();
     let metadata = s.calls.iter().rev().find(|c| c.program == "cargo").unwrap();
@@ -1294,7 +1351,10 @@ fn wrong_sum_and_old_cid_readers_refuse() {
 }
 #[test]
 fn migration_is_idempotent_and_preserves_provenance_and_pins() {
-    let f = Fixture::new("epr");
+    let mut f = Fixture::new("epr");
+    // The current declaration ships a pair; historical releases and live pins
+    // still refer to the single executable that was actually shipped.
+    f.store.config.bins.push("bin-launch".into());
     let bytes = b"#!/bin/sh\nexit 0\n";
     let raw = eprfs_core::BlobCid::compute_raw(bytes);
     let old = format!(
@@ -1683,10 +1743,15 @@ fn source_closure_cid_covers_sorted_path_dependencies() {
             .iter()
             .map(|p| p["path"].as_str().unwrap())
             .collect::<Vec<_>>(),
-        ["a-external", "elohim/eprfs", "z-external"]
+        [
+            "a-external",
+            "elohim/eprfs",
+            "genesis/orchestrator/manifests/runtime/workspace-device.manifest.json",
+            "z-external"
+        ]
     );
     let lines = format!(
-        "a-external\t{0}\nelohim/eprfs\t{0}\nz-external\t{0}\n",
+        "a-external\t{0}\nelohim/eprfs\t{0}\ngenesis/orchestrator/manifests/runtime/workspace-device.manifest.json\t{0}\nz-external\t{0}\n",
         f.commit()
     );
     assert_eq!(
@@ -2111,4 +2176,233 @@ fn f2_bootstrap_recovers_a_legacy_first_landing_without_metadata() {
     assert_eq!(committed["cid"], release.cid);
     assert_eq!(committed["commit"], f.commit());
     f.land(&release).unwrap();
+}
+
+#[test]
+fn following_a_paired_declaration_upgrades_same_commit_legacy_custody() {
+    use ark_core::declaration::{Follow, FollowMode};
+    let mut f = Fixture::new("epr");
+    let mut old = f.release("old-single");
+    f.land(&old).unwrap();
+    f.store
+        .pin(&identity("existing"), None, false, None)
+        .unwrap();
+    f.store.config.bins.push("bin-launch".into());
+    let pair = f.release("new-pair");
+    // An old worker may ingest its single-file release after a new gate has
+    // already ingested the pair for this same source commit.
+    old.provenance.ingested_at = "2099-01-01T00:00:00Z".into();
+    f.store.save(&old).unwrap();
+    f.store
+        .follow_declared(
+            f.tmp.path(),
+            None,
+            &Follow {
+                channel: "bin:epr".into(),
+                mode: FollowMode::Apply,
+                pin: None,
+            },
+        )
+        .unwrap();
+    assert_eq!(f.store.head("current"), Some(pair.cid.clone()));
+    f.store
+        .follow_declared(
+            f.tmp.path(),
+            None,
+            &Follow {
+                channel: "bin:epr".into(),
+                mode: FollowMode::Apply,
+                pin: Some(pair.cid.clone()),
+            },
+        )
+        .unwrap();
+    assert_eq!(f.store.head("current"), Some(pair.cid));
+    assert_eq!(
+        f.store.existing_pin(&identity("existing")).unwrap().cid,
+        old.cid
+    );
+    assert!(f.store.verified(&old.cid));
+}
+
+#[test]
+fn observe_verifies_without_landing_and_pin_refuses_another_release() {
+    use ark_core::declaration::{Follow, FollowMode};
+    let f = Fixture::new("epr");
+    let old = f.release("old");
+    f.land(&old).unwrap();
+    f.state.lock().unwrap().head = "b".repeat(40);
+    let new = f.release("new");
+    let mut follow = Follow {
+        channel: "bin:epr".into(),
+        mode: FollowMode::Observe,
+        pin: None,
+    };
+    let result = f
+        .store
+        .follow_declared(f.tmp.path(), None, &follow)
+        .unwrap();
+    assert_eq!(result["observed"], new.cid);
+    assert_eq!(result["followed"], false);
+    assert_eq!(f.store.head("current"), Some(old.cid.clone()));
+    follow.mode = FollowMode::Canary;
+    follow.pin = Some(old.cid.clone());
+    assert_eq!(
+        f.store
+            .follow_declared(f.tmp.path(), None, &follow)
+            .unwrap_err()
+            .kind,
+        "release-pin-mismatch"
+    );
+    assert_eq!(f.store.head("current"), Some(old.cid));
+    follow.pin = Some(new.cid.clone());
+    f.store
+        .follow_declared(f.tmp.path(), None, &follow)
+        .unwrap();
+    assert_eq!(f.store.head("current"), Some(new.cid));
+}
+
+#[test]
+fn epr_release_carries_its_launcher_and_resolves_from_explicit_custody() {
+    let mut f = Fixture::new("epr");
+    f.registry.tools.get_mut("epr").unwrap()["bins"] = json!(["epr", "bin-launch"]);
+    f.store = Store::new(f.tmp.path().join("store"), "epr", &f.registry)
+        .unwrap()
+        .with_runner(Arc::new(Fake {
+            root: f.tmp.path().into(),
+            state: f.state.clone(),
+            tool: "epr".into(),
+        }));
+    let release = f.release("pair");
+    f.land(&release).unwrap();
+    let launcher = f.store.landed_launcher().unwrap();
+    assert_eq!(launcher, f.store.root.join(&release.cid).join("bin-launch"));
+    assert_eq!(f.store.current_artifact().unwrap().0, release.cid);
+    let executable = f.store.root.join(&release.cid).join("epr");
+    assert_eq!(f.store.executable_cid(&executable).unwrap(), release.cid);
+    let proc = f.path("proc");
+    proc_entry(&proc, 42, 1, "epr", 77);
+    f.store
+        .record_running_daemon(&executable, 42, &proc, None)
+        .unwrap();
+    assert_eq!(
+        f.store.live_daemons(&proc).unwrap()[0]
+            .running_cid
+            .as_deref(),
+        Some(release.cid.as_str())
+    );
+    // Corrupting the landed launcher invalidates the complete release, including epr.
+    fs::set_permissions(&launcher, fs::Permissions::from_mode(0o755)).unwrap();
+    fs::write(&launcher, b"wrong bytes").unwrap();
+    assert!(f.store.landed_launcher().is_err());
+    assert!(f.store.current_artifact().is_err());
+}
+
+#[test]
+fn historical_pin_resolves_but_land_and_bootstrap_require_full_inventory() {
+    let mut f = Fixture::new("epr");
+    let old = f.release("legacy-only");
+    f.land(&old).unwrap();
+    f.store
+        .pin(&identity("old-session"), None, false, None)
+        .unwrap();
+    f.store.config.bins.push("bin-launch".into());
+    assert!(f.store.verified(&old.cid));
+    assert!(f
+        .store
+        .resolve(None, Some(&identity("old-session")), &|_| None, false)
+        .is_ok());
+    assert_eq!(f.land(&old).unwrap_err().kind, "candidate-absent");
+    assert_eq!(
+        f.store.landed_launcher().unwrap_err().kind,
+        "launcher-absent"
+    );
+    fs::remove_file(f.store.root.join("current.json")).unwrap();
+    fs::remove_file(f.store.root.join("current")).unwrap();
+    assert!(f.store.bootstrap(f.tmp.path(), None).is_err());
+    assert!(f.store.head("current").is_none());
+    let pair = f.release("complete-pair");
+    f.store.bootstrap(f.tmp.path(), None).unwrap();
+    assert_eq!(f.store.head("current"), Some(pair.cid));
+    assert_eq!(
+        f.store.existing_pin(&identity("old-session")).unwrap().cid,
+        old.cid
+    );
+}
+
+#[test]
+fn a_return_to_an_earlier_head_has_a_distinct_landing_transition() {
+    let f = Fixture::new("epr");
+    let a = f.release("return-a");
+    let b = f.release("return-b");
+    f.land(&a).unwrap();
+    let first: Value = read_json(&f.store.root.join("current.json")).unwrap();
+    assert!(first["landedAt"].as_str().unwrap().contains('.'));
+    f.land(&b).unwrap();
+    f.store
+        .land(&a.cid, &f.commit(), f.tmp.path(), true)
+        .unwrap();
+    let returned: Value = read_json(&f.store.root.join("current.json")).unwrap();
+    assert_eq!(first["cid"], returned["cid"]);
+    assert_ne!(first["landedAt"], returned["landedAt"]);
+}
+
+#[test]
+fn repeated_landings_preserve_the_head_and_notice_only_transitions() {
+    let f = Fixture::new("epr");
+    let a = f.release("notice-a");
+    let b = f.release("notice-b");
+    let c = f.release("notice-c");
+    f.land(&a).unwrap();
+    f.store
+        .pin(&identity("notice-session"), None, false, None)
+        .unwrap();
+    let script =
+        Path::new(env!("CARGO_MANIFEST_DIR")).join("../../../genesis/agentic/bin-head-notice.py");
+    let notice = || {
+        let output = std::process::Command::new("python3").arg("-c").arg(
+            "import importlib.util,sys; s=importlib.util.spec_from_file_location('notice',sys.argv[1]); m=importlib.util.module_from_spec(s); s.loader.exec_module(m); print(len(m.notices(sys.argv[2], 'notice-session')))"
+        ).arg(&script).arg(f.store.root.parent().unwrap()).output().unwrap();
+        assert!(
+            output.status.success(),
+            "{}",
+            String::from_utf8_lossy(&output.stderr)
+        );
+        String::from_utf8(output.stdout)
+            .unwrap()
+            .trim()
+            .parse::<usize>()
+            .unwrap()
+    };
+    // The notice adapter addresses <BIN_STORE>/epr, while this native fixture uses store/.
+    std::os::unix::fs::symlink(&f.store.root, f.store.root.parent().unwrap().join("epr")).unwrap();
+    f.land(&b).unwrap();
+    let head = fs::read(f.store.root.join("current.json")).unwrap();
+    let release = f.store.record(&b.cid).unwrap();
+    assert_eq!(notice(), 1);
+    for mode in [
+        ark_core::declaration::FollowMode::Apply,
+        ark_core::declaration::FollowMode::Canary,
+    ] {
+        f.land(&b).unwrap();
+        f.store
+            .follow_declared(
+                f.tmp.path(),
+                None,
+                &ark_core::declaration::Follow {
+                    channel: "bin:epr".into(),
+                    mode,
+                    pin: Some(b.cid.clone()),
+                },
+            )
+            .unwrap();
+        assert_eq!(fs::read(f.store.root.join("current.json")).unwrap(), head);
+        assert_eq!(f.store.record(&b.cid).unwrap().ring, release.ring);
+        assert_eq!(notice(), 0);
+    }
+    f.land(&c).unwrap(); // no prompt while C is current
+    f.store
+        .land(&b.cid, &f.commit(), f.tmp.path(), true)
+        .unwrap();
+    assert_eq!(notice(), 1);
+    assert_eq!(notice(), 0);
 }

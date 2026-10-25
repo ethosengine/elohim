@@ -44,6 +44,7 @@ interface FollowFixture {
   store: string;
   procRoot: string;
   launcher: string;
+  wrapper: string;
   commitA: string;
   commitB?: string;
   cidA?: string;
@@ -60,7 +61,10 @@ interface FollowFixture {
 
 const fixtures = new WeakMap<object, FollowFixture>();
 const repository = resolve('../..');
-const registrySource = join(repository, 'genesis/agentic/bin-tools.json');
+const registrySource = join(
+  repository,
+  'genesis/orchestrator/manifests/runtime/workspace-device.manifest.json'
+);
 // This reviewed gate path is only a read source; each scenario copies it into a private mkdtemp.
 // eslint-disable-next-line sonarjs/publicly-writable-directories
 const documentedGateBuild = '/tmp/eprfs-gate-target/debug/epr';
@@ -86,9 +90,14 @@ function run(
   env: NodeJS.ProcessEnv = {},
   cwd = state.repo
 ): Invocation {
-  const result = spawnSync(argv[0], argv.slice(1), {
+  const result = spawnSync(state.wrapper, argv, {
     cwd,
-    env: { ...process.env, ...env },
+    env: {
+      ...process.env,
+      ...env,
+      EPR_PROC_ROOT: state.procRoot,
+      EPR_FIXTURE_OWNER_PID: String(process.pid),
+    },
     encoding: 'utf8',
     timeout: 75_000,
     maxBuffer: 8 * 1024 * 1024,
@@ -113,7 +122,7 @@ function ok(
 
 function git(state: FollowFixture, args: string[]): string {
   return ok(state, ['git', '-c', 'core.hooksPath=/dev/null', ...args], {
-    HOME: state.base,
+    HOME: join(state.base, 'home'),
   }).stdout.trim();
 }
 
@@ -121,6 +130,7 @@ function commit(state: FollowFixture, message: string): string {
   git(state, [
     'add',
     'source.txt',
+    ...(existsSync(join(state.repo, '.epr-meta')) ? ['.epr-meta'] : []),
     ...(existsSync(join(state.repo, 'genesis')) ? ['genesis'] : []),
   ]);
   git(state, [
@@ -139,8 +149,15 @@ function commit(state: FollowFixture, message: string): string {
 function storeEnv(state: FollowFixture, extra: NodeJS.ProcessEnv = {}): NodeJS.ProcessEnv {
   return {
     EPR_STORE: state.store,
+    BIN_STORE: dirname(state.store),
+    ELOHIM_DEVICE_KEY_FILE: join(state.base, 'keys/device.seed'),
+    EPR_SESSION_LAZY: undefined,
+    ELOHIM_RUNTIME_CONFIG_PATH: undefined,
+    ELOHIM_RUNTIME_MANIFEST_PATH: undefined,
+    ELOHIM_SESSION_ID: 'head-fixture',
+    ELOHIM_SESSION_OWNER_PID: String(process.pid),
     EPR_PROC_ROOT: state.procRoot,
-    HOME: state.base,
+    HOME: join(state.base, 'home'),
     ...extra,
   };
 }
@@ -185,6 +202,10 @@ function makeCandidate(state: FollowFixture, label: 'A' | 'B'): string {
   const destination = join(state.base, 'candidates', `epr-${label.toLowerCase()}`);
   mkdirSync(dirname(destination), { recursive: true });
   copyFileSync(candidateSource, destination);
+  const candidateLauncher = join(dirname(destination), 'bin-launch');
+  copyFileSync(launcherSource, candidateLauncher);
+  chmodSync(candidateLauncher, 0o755);
+  appendFileSync(candidateLauncher, `\nEPR-A2O-LAUNCHER-${label}\n`);
   appendFileSync(destination, `\nEPR-A2O-BUILD-${label}\n`);
   chmodSync(destination, 0o755);
   const identity = object(JSON.parse(ok(state, [destination, '--version']).stdout));
@@ -279,7 +300,18 @@ function nextCleanCommit(state: FollowFixture): string {
 }
 
 function versionThroughLauncher(state: FollowFixture, env: NodeJS.ProcessEnv): JsonObject {
-  return object(JSON.parse(ok(state, [state.launcher, '--version'], env).stdout));
+  const identity = object(JSON.parse(ok(state, [state.launcher, '--version'], env).stdout));
+  const resolved = object(JSON.parse(storeOk(state, ['resolve', '--json'], env).stdout));
+  if (resolved.source === 'candidate') return identity;
+  const release = object(
+    JSON.parse(readFileSync(join(state.store, String(resolved.cid), 'record.json'), 'utf8'))
+  );
+  assert.equal(
+    identity.cid,
+    object(release.bins).epr,
+    'the executing binary matches the verified release member'
+  );
+  return { ...identity, cid: resolved.cid };
 }
 
 Given("Matthew's workspace has an isolated device directory and source history", function () {
@@ -290,6 +322,10 @@ Given("Matthew's workspace has an isolated device directory and source history",
   const bin = join(base, 'device/bin');
   mkdirSync(repo, { recursive: true });
   mkdirSync(procRoot, { recursive: true });
+  mkdirSync(join(procRoot, 'self/ns'), { recursive: true });
+  mkdirSync(join(procRoot, 'sys/kernel/random'), { recursive: true });
+  writeFileSync(join(procRoot, 'self/ns/pid'), 'fixture namespace');
+  writeFileSync(join(procRoot, 'sys/kernel/random/boot_id'), 'head-fixture-boot');
   mkdirSync(bin, { recursive: true });
   const state: FollowFixture = {
     base,
@@ -297,11 +333,25 @@ Given("Matthew's workspace has an isolated device directory and source history",
     store: storeRoot,
     procRoot,
     launcher: join(bin, 'epr'),
+    wrapper: join(base, 'fixture-process'),
     commitA: '',
   };
   fixtures.set(this, state);
+  // Expose only the fixture owner and its own children. exec retains the child's
+  // PID/start time; no session resolver can walk into the host's agent ancestry.
+  writeFileSync(
+    state.wrapper,
+    '#!/bin/sh\nset -eu\nmkdir -p "$EPR_PROC_ROOT/$$" "$EPR_PROC_ROOT/$EPR_FIXTURE_OWNER_PID"\ncp --remove-destination "/proc/$$/stat" "/proc/$$/cmdline" "$EPR_PROC_ROOT/$$/"\ncp --remove-destination "/proc/$EPR_FIXTURE_OWNER_PID/stat" "/proc/$EPR_FIXTURE_OWNER_PID/cmdline" "$EPR_PROC_ROOT/$EPR_FIXTURE_OWNER_PID/"\nexec "$@"\n'
+  );
+  chmodSync(state.wrapper, 0o755);
 
   git(state, ['init', '-q', '-b', 'dev']);
+  const algorithms = join(repo, '.epr-meta/elohim/algorithms');
+  mkdirSync(algorithms, { recursive: true });
+  copyFileSync(
+    join(repository, '.epr-meta/elohim/algorithms/recall-contract.json'),
+    join(algorithms, 'recall-contract.json')
+  );
   writeFileSync(join(repo, 'source.txt'), 'build A\n');
   state.commitA = commit(state, 'source for build A');
 
@@ -343,7 +393,11 @@ When('clean build B lands from the next source commit', function () {
 Given('Matthew opens a fresh session with no agent runtime above it', function () {
   const state = fixture(this);
   state.sessionEnv = launcherEnv(state, { ELOHIM_SESSION_ID: 'fresh-session-b' });
-  assert.deepEqual(readdirSync(state.procRoot), []);
+  const identity = object(
+    JSON.parse(ok(state, [storeCli, 'session', 'id', '--json'], state.sessionEnv).stdout)
+  );
+  assert.equal(identity.source, 'declared');
+  assert.equal(identity.session, 'fresh-session-b');
 });
 
 Then("epr through the launcher reports build B's CID", function () {
@@ -378,6 +432,28 @@ Then('the store reports that session behind the head', function () {
   assert.equal(status.sessionCid, state.cidA);
   assert.equal(status.head, state.cidB);
   assert.equal(status.behind, true);
+});
+
+Then('the open session receives one notice naming the landed release', function () {
+  const state = fixture(this);
+  assert.ok(state.sessionEnv);
+  const settings = JSON.parse(readFileSync(resolve('../../.claude/settings.json'), 'utf8'));
+  const hook = settings.hooks.UserPromptSubmit.flatMap(
+    (entry: { hooks: { command: string }[] }) => entry.hooks
+  ).find((entry: { command: string }) => entry.command.includes('device-head-notice.py')).command;
+  const hookEnv = { ...state.sessionEnv, CLAUDE_PROJECT_DIR: resolve('../..') };
+  const first = ok(state, ['sh', '-c', hook], hookEnv).stdout;
+  assert.ok(first.includes(state.cidA ?? '') && first.includes(state.cidB ?? ''), first);
+  assert.match(first, /Switch: \/clear or epr bin pin/);
+  storeOk(state, ['gc'], state.sessionEnv);
+  assert.equal(ok(state, ['sh', '-c', hook], hookEnv).stdout, '');
+  assert.equal(versionThroughLauncher(state, state.sessionEnv).cid, state.cidA);
+});
+
+When('Matthew explicitly pins build B for that session', function () {
+  const state = fixture(this);
+  assert.ok(state.sessionEnv && state.cidB);
+  storeOk(state, ['pin', '--cid', state.cidB], state.sessionEnv);
 });
 
 When('build B is ingested from a clean commit whose health check fails', function () {
@@ -588,7 +664,7 @@ When("the device's start hook queues a native bootstrap", function () {
 });
 
 Then(
-  'the detached bootstrap lands a bafkrei CID and replaces the legacy launcher',
+  'the detached bootstrap lands a native release CID and replaces the legacy launcher',
   { timeout: 30000 },
   async function () {
     const state = fixture(this);
@@ -600,8 +676,8 @@ Then(
       if (body.includes('native evaluator bootstrap:')) assert.fail(body);
       await delay(100);
     }
-    assert.match(body, /native evaluator ready: bafkrei/, body);
-    assert.match(landedCid(state), /^bafkrei/);
+    assert.match(body, /native evaluator ready: bafyrei/, body);
+    assert.match(landedCid(state), /^bafyrei/);
 
     assert.equal(
       readFileSync(join(dirname(state.store), 'bin/bin-launch')).equals(
@@ -617,19 +693,130 @@ Then('the replacement launcher runs the landed native evaluator', function () {
   assert.equal(versionThroughLauncher(state, state.bootstrapEnv ?? {}).cid, landedCid(state));
 });
 
+Given(
+  'the gate stored paired build B before an older arrival landed single-file build A from that same commit',
+  function () {
+    const state = fixture(this);
+    ingest(state, 'B', state.commitA, true);
+    const legacy = JSON.parse(readFileSync(registrySource, 'utf8')) as {
+      tools: { epr: { bins: string[] } };
+    };
+    legacy.tools.epr.bins = ['epr'];
+    const legacyPath = join(state.base, 'old-manifest.json');
+    writeFileSync(legacyPath, JSON.stringify(legacy));
+    const call = (args: string[]) =>
+      ok(
+        state,
+        [
+          storeCli,
+          'bin',
+          '--registry',
+          legacyPath,
+          '--tool',
+          'epr',
+          '--store',
+          state.store,
+          ...args,
+        ],
+        storeEnv(state)
+      );
+    const candidate = makeCandidate(state, 'A');
+    state.cidA = String(
+      object(
+        JSON.parse(
+          call(['ingest', candidate, '--source-commit', state.commitA, '--tree-clean', 'true'])
+            .stdout
+        )
+      ).cid
+    );
+    call(['land', state.cidA, '--commit', state.commitA, '--repo', state.repo]);
+    // Model an installed launcher link, rather than the standalone launcher copy
+    // used by scenarios that never exercise installation's plain-binary adoption.
+    const managedLauncher = join(dirname(state.store), 'bin/bin-launch');
+    mkdirSync(dirname(managedLauncher), { recursive: true });
+    copyFileSync(launcherSource, managedLauncher);
+    chmodSync(managedLauncher, 0o755);
+    appendFileSync(managedLauncher, '\nold launcher bytes\n');
+    rmSync(state.launcher);
+    symlinkSync(managedLauncher, state.launcher);
+    // A historical current remains executable but cannot supply an unrelated launcher.
+    const refused = store(state, [
+      'install-launcher',
+      '--destination',
+      dirname(state.launcher),
+      '--repo',
+      state.repo,
+    ]);
+    assert.equal(refused.status, 2);
+    assert.match(refused.stderr, /launcher-absent/);
+    assert.ok(readFileSync(managedLauncher).includes(Buffer.from('old launcher bytes')));
+    // Separate the two fixture arrival times even on filesystems with coarse timestamps.
+    const recordPath = join(state.store, state.cidA, 'record.json');
+    const record = object(JSON.parse(readFileSync(recordPath, 'utf8')));
+    record.ingestedAt = '2099-01-01T00:00:00Z';
+    writeFileSync(recordPath, JSON.stringify(record));
+  }
+);
+
+When('the device applies and follows its declared epr inventory', function () {
+  const state = fixture(this);
+  ok(state, [storeCli, 'device', 'follow', 'bin:private', '--mode', 'observe'], storeEnv(state));
+  storeOk(state, ['follow', '--repo', state.repo]);
+  const registry = join(dirname(state.store), 'bin/bin-tools.json');
+  const before = readFileSync(registry, 'utf8');
+  ok(
+    state,
+    [
+      storeCli,
+      'bin',
+      '--tool',
+      'epr',
+      '--store',
+      state.store,
+      'install-launcher',
+      '--destination',
+      dirname(state.launcher),
+      '--repo',
+      state.repo,
+    ],
+    storeEnv(state)
+  );
+  assert.equal(readFileSync(registry, 'utf8'), before);
+  assert.equal(readFileSync(`${registry}.owner`, 'utf8'), join(state.base, 'keys/manifest'));
+  const declared = object(
+    JSON.parse(ok(state, [storeCli, 'device', 'show', '--json'], storeEnv(state)).stdout)
+  );
+  assert.ok(JSON.stringify(declared).includes('bin:private'));
+});
+
+Then('the device lands the paired release and installs its launcher', function () {
+  const state = fixture(this);
+  assert.equal(landedCid(state), state.cidB);
+  assert.ok(state.cidB);
+  assert.notDeepEqual(
+    readFileSync(join(state.store, state.cidB, 'bin-launch')),
+    readFileSync(launcherSource)
+  );
+  assert.deepEqual(
+    readFileSync(join(dirname(state.store), 'bin/bin-launch')),
+    readFileSync(join(state.store, state.cidB, 'bin-launch'))
+  );
+});
+
 When('that pinned session starts the peer daemon', { timeout: 30000 }, async function () {
   const state = fixture(this);
   assert.ok(state.sessionEnv);
   appendFileSync(join(state.repo, '.git/info/exclude'), '\n.eprfs/\n');
   state.daemonEnv = {
     ...state.sessionEnv,
-    EPR_PROC_ROOT: '/proc',
+    EPR_PROC_ROOT: state.procRoot,
     EPR_BIN_TOOLS: registrySource,
     ELOHIM_DEVICE_KEY_FILE: join(state.base, 'keys/seed'),
     XDG_CONFIG_HOME: join(state.base, 'config'),
     GIT_CEILING_DIRECTORIES: '/tmp',
     EPR_PEER_RELAY_URL: '',
     EPR_PIN_CID: state.cidA,
+    EPR_FIXTURE_OWNER_PID: String(process.pid),
   };
   const native = (args: string[]) =>
     ok(state, [storeCli, ...args, '--root', state.repo], state.daemonEnv);
@@ -650,8 +837,18 @@ When('that pinned session starts the peer daemon', { timeout: 30000 }, async fun
   const peerPolicy = join(state.base, 'peer-policy.json');
   writeFileSync(peerPolicy, JSON.stringify({ berth: { channel: { crosses: {} } } }));
   state.daemon = spawn(
-    state.launcher,
-    ['peer', 'serve', '--root', state.repo, '--listen', '127.0.0.1:0', '--policy', peerPolicy],
+    state.wrapper,
+    [
+      state.launcher,
+      'peer',
+      'serve',
+      '--root',
+      state.repo,
+      '--listen',
+      '127.0.0.1:0',
+      '--policy',
+      peerPolicy,
+    ],
     {
       cwd: state.repo,
       env: state.daemonEnv,
@@ -702,27 +899,34 @@ Then("the peer daemon's lease and status name build B as its running build", fun
   assert.equal(status.daemonDiffers, true);
 });
 
-When('the head is reverted to build A and build B ages past the 14-day history', function () {
-  const state = fixture(this);
-  // Make B rely solely on its live lease: no head, previous head, or grace-period retention.
-  git(state, ['checkout', '-q', '--detach', state.commitA]);
-  assert.ok(state.cidA);
-  const reverted = land(state, state.cidA, state.commitA, true);
-  assert.equal(reverted.status, 0, reverted.stderr);
-  rmSync(join(state.store, 'previous'), { force: true });
-  for (const cid of [state.cidA, state.cidB]) {
-    assert.ok(cid);
-    const path = join(state.store, cid, 'record.json');
-    const record = object(JSON.parse(readFileSync(path, 'utf8')));
-    record.ingestedAt = '2000-01-01T00:00:00Z';
-    writeFileSync(path, JSON.stringify(record));
-    rmSync(join(state.store, cid, '.used'), { force: true });
+When(
+  'the head is reverted to build A and build B loses previous-head and 14-day history protection',
+  function () {
+    const state = fixture(this);
+    // Make B rely solely on its live lease: no head, previous head, or grace-period retention.
+    git(state, ['checkout', '-q', '--detach', state.commitA]);
+    assert.ok(state.cidA);
+    const reverted = land(state, state.cidA, state.commitA, true);
+    assert.equal(reverted.status, 0, reverted.stderr);
+    rmSync(join(state.store, 'previous'), { force: true });
+    const currentPath = join(state.store, 'current.json');
+    const current = object(JSON.parse(readFileSync(currentPath, 'utf8')));
+    delete current.previous;
+    writeFileSync(currentPath, JSON.stringify(current));
+    for (const cid of [state.cidA, state.cidB]) {
+      assert.ok(cid);
+      const path = join(state.store, cid, 'record.json');
+      const record = object(JSON.parse(readFileSync(path, 'utf8')));
+      record.ingestedAt = '2000-01-01T00:00:00Z';
+      writeFileSync(path, JSON.stringify(record));
+      rmSync(join(state.store, cid, '.used'), { force: true });
+    }
   }
-});
+);
 
 When('garbage collection runs while the peer daemon lives', function () {
   const state = fixture(this);
-  state.last = storeOk(state, ['gc'], { EPR_PROC_ROOT: '/proc' });
+  state.last = storeOk(state, ['gc']);
 });
 
 Then("build B remains in the store, held by the daemon's lease", function () {

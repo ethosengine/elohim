@@ -29,6 +29,7 @@
 
 mod arrival;
 mod arrival_work;
+pub(crate) mod declaration;
 pub use arrival::{status, Check, State};
 
 use std::fs::{self, OpenOptions};
@@ -141,6 +142,7 @@ fn unknown_command(word: &str) -> String {
 
 pub fn run(args: &[String]) -> Outcome<ExitCode> {
     match args.first().map(String::as_str) {
+        Some("follow" | "run" | "show" | "apply") => declaration::run(args),
         Some("join") => join(&args[1..]),
         Some("ask") => ask(&args[1..]),
         Some("approve") => crate::approver::approve(&args[1..]),

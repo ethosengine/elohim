@@ -195,6 +195,8 @@ fn passport(tiers: &[EffectiveTier]) -> Passport {
                 deaths_in_window: 0,
             })
             .collect(),
+        follows: Vec::new(),
+        tools: Vec::new(),
         last_verdict: None,
         updated_at_epoch_ms: 1,
     }

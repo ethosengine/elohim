@@ -138,6 +138,8 @@ mod tests {
                 effective_tier: EffectiveTier::None,
                 deaths_in_window: 1,
             }],
+            follows: Vec::new(),
+            tools: Vec::new(),
             last_verdict: None,
             updated_at_epoch_ms,
         }

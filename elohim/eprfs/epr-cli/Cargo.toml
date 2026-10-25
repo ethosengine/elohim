@@ -23,6 +23,7 @@ default = ["peer"]
 peer = ["dep:eprfs-peer", "dep:tokio"]
 
 [dependencies]
+ark-core = { package = "elohim-ark-core", path = "../../ark/core" }
 elohim-device-runtime = { path = "../device-runtime" }
 elohim-rust-style = { path = "../../../genesis/orchestrator/rust-style" }
 eprfs-core = { path = "../eprfs-core" }
@@ -76,9 +77,11 @@ thiserror.workspace = true
 # version elohim-storage already carries, so this adds no new vetting surface.
 unicode-normalization = "0.1.25"
 
+# Same-directory atomic replacement for the deployment projection.
+tempfile = "3"
+
 [dev-dependencies]
 jsonschema = { version = "0.28", default-features = false }
 # The index-parity harness pins the projector's expected bytes by digest, so a fixture that
 # silently changes fails loudly rather than re-baselining itself.
 sha2 = "0.10"
-tempfile = "3"

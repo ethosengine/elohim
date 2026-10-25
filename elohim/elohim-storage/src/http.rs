@@ -2742,7 +2742,7 @@ impl HttpServer {
             // Rung 5, Task 2: a peer JOINS (or leaves) a release channel through
             // its OWN API instead of somebody editing its file. Body:
             // `{"channel":"<id>", "mode":"observe|canary|apply", "remove":false}`.
-            // Rewrites exactly the `ELOHIM_RELEASE_CHANNELS` line of the WATCHED
+            // Records a device-manifest act and applies the watched
             // file (temp + rename), reloads, and reports the new follow set.
             //
             // The follow set is node-local OPERATOR CONFIGURATION (Ephemeral,

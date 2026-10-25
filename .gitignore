@@ -200,3 +200,6 @@ genesis/research/repos/
 # tracked contributions dir is shared through git, so device-local entries get a sibling the
 # index projection and git never read.
 .eprfs/status/memory/device-contributions/
+
+# Persistent kernel-lock inode shared by deployment projection writers.
+/genesis/orchestrator/data/deployments.json.lock

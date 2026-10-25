@@ -123,7 +123,7 @@ export function judge(read, attestation, sha) {
 
 /** Judge one registered gitlink SHA without changing gate semantics or recording an observation. */
 export function judgePin(dir, sha, { root = process.cwd(), env = process.env, spawn = spawnSync } = {}) {
-  const registryPath = resolve(root, 'genesis/agentic/bin-tools.json');
+  const registryPath = resolve(root, 'genesis/orchestrator/manifests/runtime/workspace-device.manifest.json');
   let registry;
   try {
     registry = JSON.parse(readFileSync(registryPath, 'utf8'));

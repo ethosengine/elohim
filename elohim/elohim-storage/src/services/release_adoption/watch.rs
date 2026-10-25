@@ -1460,10 +1460,42 @@ impl AdoptionController {
         // is byte-identical to before.
         // Decided BEFORE the match, so the borrow of `head` and `applied` is
         // plainly over before an arm moves either of them.
+        let declaration = crate::runtime_config::config_path().map(|path| {
+            let base = std::env::var_os("ELOHIM_RUNTIME_MANIFEST_PATH")
+                .filter(|p| !p.is_empty())
+                .map(std::path::PathBuf::from);
+            elohim_device_runtime::manifest_store::discover_runtime_config(&path, base.as_deref())
+                .and_then(|store| store.map(|store| store.read()).transpose())
+        });
+        let declaration = match declaration.transpose().map(Option::flatten) {
+            Ok(value) => value,
+            Err(error) => {
+                return CheckOutcome::Checked {
+                    head: None,
+                    verdict: Verdict::Refused {
+                        refusal: AdoptionRefusal::new(
+                            RefusalReason::ModeNotPermitted,
+                            error.to_string(),
+                        ),
+                    },
+                    attestations: None,
+                }
+            }
+        };
+        let pinned = declaration.as_ref().is_some_and(|manifest| {
+            manifest
+                .follows
+                .iter()
+                .any(|f| f.channel == channel.channel_id && f.pin.is_some())
+        });
         let follow = classify_candidate_follow(
             channel.mode,
             &head,
-            applied.as_ref().map(|a| a.cid.as_str()),
+            if pinned {
+                None
+            } else {
+                applied.as_ref().map(|a| a.cid.as_str())
+            },
         );
         // A candidate this canary could not read is unfinished business: the
         // exits below must not rest on the winner while it stands.
@@ -1518,6 +1550,26 @@ impl AdoptionController {
                 }
             }
         };
+
+        // Legacy channel entries without a content CID cannot satisfy a content-addressed pin.
+        if let Some(declaration) = &declaration {
+            if let Err(error) = ark_core::declaration::require_release_pin(
+                declaration,
+                &channel.channel_id,
+                head.content.blob_cid.as_deref(),
+            ) {
+                return CheckOutcome::Checked {
+                    head: None,
+                    verdict: Verdict::Refused {
+                        refusal: AdoptionRefusal::new(
+                            RefusalReason::ModeNotPermitted,
+                            error.to_string(),
+                        ),
+                    },
+                    attestations: None,
+                };
+            }
+        }
 
         let release_cid = head.head_action_hash.0.clone();
         let resolved = ResolvedHead {

@@ -2,4 +2,5 @@
 #![warn(missing_docs)]
 pub mod bin_store;
 pub mod envelope;
+pub mod manifest_store;
 pub mod session;
