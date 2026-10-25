@@ -152,7 +152,8 @@ and again, in public. We would rather name these problems now than discover them
 ## Our ask
 
 The race for intimacy assumes intimacy must be harvested to be useful. We are betting on the
-opposite: that intimacy is most useful, and safest, when it never leaves the person it belongs to.
+opposite: that intimacy is most useful, and safest, when it stays the person's own: kept by the
+people who love them, readable by no one but them.
 We would welcome your scrutiny of that bet, especially where you think it fails, and we would be
 glad to share our designs as they mature.
 
