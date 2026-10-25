@@ -3,8 +3,9 @@
  * Pins: slug → load → nodeLoaded; null → notFound; error → failed; a registered
  * renderer is created with the node as input; no renderer → format fallback.
  */
+import { Component, input } from '@angular/core';
 import { ComponentFixture, TestBed } from '@angular/core/testing';
-import { of, throwError } from 'rxjs';
+import { of, Subject, throwError } from 'rxjs';
 import { describe, expect, it, vi, beforeEach } from 'vitest';
 
 import { ContentService } from '@app/lamad/services/content.service';
@@ -12,6 +13,11 @@ import { RendererRegistryService } from '@app/lamad/renderers/renderer-registry.
 
 import { ContentBackendService } from '../../services/content.service';
 import { EprFocalComponent } from './epr-focal.component';
+
+@Component({ selector: 'app-test-markdown-renderer', template: '<p class="rendered">rendered</p>' })
+class TestMarkdownRendererComponent {
+  readonly node = input<unknown>();
+}
 
 const mockNode = {
   id: 'manifesto',
@@ -118,5 +124,19 @@ describe('EprFocalComponent', () => {
     );
     setSlug('manifesto');
     expect(fixture.nativeElement.querySelector('.fallback-content h1')).toBeNull();
+  });
+  it('creates a registered renderer as the node arrives and never shows the raw fallback', () => {
+    // An /epr/<id> markdown page showed its raw text when the node arrived after the view was
+    // initialized: the renderer was created only in a later ngAfterViewChecked, and until then
+    // (or for good, when no further change detection came) the template's fallback was true.
+    const arrives = new Subject<typeof mockNode>();
+    contentServiceSpy.getContentBySlug.mockReturnValue(arrives);
+    registrySpy.getRenderer.mockReturnValue(TestMarkdownRendererComponent);
+    setSlug('letter');
+    arrives.next({ ...mockNode, contentFormat: 'markdown', content: '## Who is writing' });
+    expect(fixture.componentInstance.hasRegisteredRenderer).toBe(true);
+    fixture.detectChanges();
+    expect(fixture.nativeElement.querySelector('.fallback-content')).toBeNull();
+    expect(fixture.nativeElement.querySelector('.rendered')?.textContent).toBe('rendered');
   });
 });

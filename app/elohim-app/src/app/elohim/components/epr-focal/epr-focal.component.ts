@@ -122,7 +122,14 @@ export class EprFocalComponent implements OnChanges, AfterViewChecked, OnDestroy
             return;
           }
           this.node = node;
-          this.pendingRendererLoad = true;
+          // The registry is synchronous, so decide here: the template must never show the raw
+          // fallback for a format that has a renderer while creation waits for a later check.
+          this.hasRegisteredRenderer = this.rendererRegistry.getRenderer(node) !== null;
+          if (this.rendererHost) {
+            this.loadRenderer();
+          } else {
+            this.pendingRendererLoad = true;
+          }
           this.nodeLoaded.emit(node);
           this.cdr.markForCheck();
         },
