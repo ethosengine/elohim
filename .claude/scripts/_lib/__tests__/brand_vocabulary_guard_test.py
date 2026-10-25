@@ -98,6 +98,8 @@ with tempfile.TemporaryDirectory() as td:
         "qahal": "QahalCollectiveStore",
         "shefa": "ShefaEconomicEvent",
         "mishpat": "MishpatSignal",
+        "chesed": "ChesedDeclineGate",
+        "hatznea": "HatzneaChromeMode",
     }
     for term, symbol in brand_symbols.items():
         v = verdict(merged, tmp_write(tmp, f"src/{term}.ts", None, f"export class {symbol} {{}}\n"))

@@ -99,6 +99,8 @@ Warm, direct, second-person, unhurried. The voice of a neighbor explaining somet
 | Engagement | Participation | Presence by choice, not by design pattern |
 | Scale | Spread | Organic growth like seed, not mechanical replication |
 | Sovereignty | Agency | Self-determination within community, not autonomous dominion. Sovereignty implies a king; agency implies a person in relationship. |
+| Love (when we mean the protocol's) | Chesed | Steadfast love that keeps faith. It forgives, and it can still decline; kindness with a spine, not sentiment |
+| Humility (as posture) | Hatznea | Micah's *ve'hatznea lechet*, "walk humbly": alongside, unshowy, never claiming the seat. A gait, not a mood |
 
 ### Vocabulary Avoidance
 

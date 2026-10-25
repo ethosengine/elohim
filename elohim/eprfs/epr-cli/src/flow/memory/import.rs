@@ -499,7 +499,10 @@ pub fn run(root: &Path, opts: &Options) -> FlowResult<Value> {
 }
 
 /// Import one entry. Every refusal is named, and no refusal reads further than it must.
-#[allow(clippy::too_many_arguments)]
+#[allow(
+    clippy::too_many_arguments,
+    reason = "One entry's import reads the walk's shared context (paths, collective, steward, reach pair, acts, options) and appends to its supersession record; a bundle struct would have no other user"
+)]
 fn one(
     root: &Path,
     rel: &Path,

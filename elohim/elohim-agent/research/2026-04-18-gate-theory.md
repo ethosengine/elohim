@@ -203,7 +203,7 @@ Standing back from the mechanics, the architecture makes several things possible
 
 **Legible governance.** Every gate declaration (DAG, rule set, escalation target) is a governable artifact. Challenges apply at every layer. Community members can contest the DAG itself, the app's choice to use it, the binding to a specific content type. Governance is not a meta-process riding on top of the system; it is embedded in the artifacts that constitute the system.
 
-**Structural refusal.** The elohim can decline. Firm-boundary activation — the point at which hesed operates at full character by refusing — is architecturally available. The gate's `Decline` and `Escalate` return paths make this first-class. Wisdom is not a maximum-permissiveness engine; it can say no, it can ask for review, it can bind a decision pending appeal.
+**Structural refusal.** The elohim can decline. Firm-boundary activation — the point at which chesed operates at full character by refusing — is architecturally available. The gate's `Decline` and `Escalate` return paths make this first-class. Wisdom is not a maximum-permissiveness engine; it can say no, it can ask for review, it can bind a decision pending appeal.
 
 **Composition with rakia, brit, qahal, shefa.** Decision-attestations are structurally similar to brit's build-attestations (both are reasoned decisions → notarized events). The indemnification process borrows from qahal governance primitives. Minted value flows through shefa's REA economy. Content-addressed artifacts (rules, aggregation specs, DAGs) reuse lamad's existing ContentNode infrastructure. The gate doesn't demand new DNA entry types (except possibly GateDecisionAttestation in mishpat, which has ample headroom); it composes with what exists.
 
@@ -231,7 +231,7 @@ What the gate is not:
 
 And what it enables, once fully present: a protocol whose power and wisdom are structurally coupled, whose decisions are accountable peer-to-peer, whose mistakes are remediable, whose private spaces are preserved, and whose judgment gets wiser as its capability grows.
 
-*Do justice. Love kindness. Walk humbly.* The gate is what the third clause looks like in code.
+*Do justice. Love kindness. Walk humbly.* The gate is what the third clause, *ve'hatznea lechet*, looks like in code.
 
 ---
 

@@ -82,10 +82,12 @@ The vocabulary register from the design spec (§3):
 | Onboarding | Welcome | Hospitality, not enrollment |
 | Engagement | Participation | Presence by choice |
 | Sovereignty | Agency | Self-determination within community |
+| Love (the protocol's) | Chesed | Steadfast love that keeps faith: it forgives, and it can still decline |
+| Humility (as posture) | Hatznea | Walking humbly: alongside, unshowy, never claiming the seat |
 
 Voice: warm, direct, second-person, unhurried. Prophetic-practical — grounded conviction expressed in practical action. Never preachy. Never SaaS-pastoral ("we're on a journey together"). Never crypto-jargon.
 
-**Protocol vocabulary stays in every locale.** `elohim`, `qahal`, `shefa`, `lamad`, `imagodei`, `mishpat`, `avodah`, `pantry`, `quilt`, `shard`, `RS` are proper nouns. Prose around them translates; the terms themselves do not.
+**Protocol vocabulary stays in every locale.** `elohim`, `qahal`, `shefa`, `lamad`, `imagodei`, `mishpat`, `avodah`, `chesed`, `hatznea`, `pantry`, `quilt`, `shard`, `RS` are proper nouns. Prose around them translates; the terms themselves do not.
 
 ## Library B storybook discipline
 

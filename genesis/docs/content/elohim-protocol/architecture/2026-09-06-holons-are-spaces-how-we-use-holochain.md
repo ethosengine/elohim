@@ -227,8 +227,9 @@ contextual judgment at authoring, relay, and consumption, near the people concer
 iroh/libp2p, and doorways provide separable infrastructure for that judgment. Deploying the same
 model at many endpoints is not sufficient evidence that judgment or authority is independent.
 
-This is **trustful scaling**: trustworthy participation should reduce redundant discovery and
-verification work and improve useful distribution, while carrying reciprocal duties and consequences.
+This is **trustful scaling**, *chesed* (steadfast, faith-keeping love) worked into the substrate:
+trustworthy participation should reduce redundant discovery and verification work and improve
+useful distribution, while carrying reciprocal duties and consequences.
 That benefit must not become a permanent incumbent privilege. New voices, local relationships,
 recovery, and constitutional protections need their declared floors even when standing is low.
 Amortized work must preserve the applicable integrity and authorization checks.

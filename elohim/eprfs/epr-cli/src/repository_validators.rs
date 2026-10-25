@@ -195,6 +195,16 @@ fn brand_entries() -> &'static [(&'static str, &'static str)] {
             "mishpat",
             "governance, judgment, decision, policy, commitment, authority, or recovery quorum",
         ),
+        // Micah 6:8 completes mishpat: chesed (steadfast love) and hatznea (walking humbly) are
+        // voice words for prose, never names for a capability.
+        (
+            "chesed",
+            "care, kindness, forgiveness, grace, or a boundary held kindly (decline)",
+        ),
+        (
+            "hatznea",
+            "humility, restraint, deference, quiet, or minimal presence",
+        ),
     ]
 }
 
