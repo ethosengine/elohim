@@ -647,14 +647,31 @@ _gate-epr-ts:
 _gate-eprfs:
     cd elohim/eprfs && cargo fmt --check
     cd elohim/eprfs && cargo clippy --workspace --all-targets -- -D warnings
-    # gate-runner gives each linked worktree a -wt-<basename> target suffix, so another
-    # worktree cannot replace this tested artifact before the staging copy below.
-    # Accepted residual: a concurrent rebuild in this same worktree can still replace debug/epr.
-    # "Clean" is judged over epr's own source closure (epr bin source-state), not the whole
-    # tree: hooks keep `.claude/data` ledgers dirty in the main checkout.
-    @before="$("$CARGO_TARGET_DIR/debug/epr" bin --tool epr source-state 2>/dev/null || echo none)"; \
+    @just _eprfs-ingest-around test
+
+# Build epr and bin-launch at HEAD in the eprfs gate's slot and ingest the build. Pre-push runs
+# this (`gate-runner.mjs --target eprfs --recipe _eprfs-deliver`) when the gate was satisfied by
+# a receipt: the receipt carries the test verdict for this exact epr source closure across
+# commits, but not the bytes, so without it the pushed commit has no candidate to land.
+_eprfs-deliver:
+    @just _eprfs-ingest-around build
+
+# Run `cargo test --workspace` (test) or build the device binaries (build), then ingest debug/epr
+# at HEAD into the device store as a dev-context candidate.
+# gate-runner gives each linked worktree a -wt-<basename> target suffix, so another
+# worktree cannot replace this tested artifact before the staging copy below.
+# Accepted residual: a concurrent rebuild in this same worktree can still replace debug/epr.
+# "Clean" is judged over epr's own source closure (epr bin source-state), not the whole
+# tree: hooks keep `.claude/data` ledgers dirty in the main checkout. Before the slot's first
+# build there is no debug/epr to judge with, so the device's own epr reads the "before" state.
+_eprfs-ingest-around mode:
+    @before="$("$CARGO_TARGET_DIR/debug/epr" bin --tool epr source-state 2>/dev/null || "${EPR_BIN:-epr}" bin --tool epr source-state 2>/dev/null || echo none)"; \
       tested_head="$(git rev-parse HEAD)"; \
-      (cd elohim/eprfs && cargo test --workspace) || exit $?; \
+      if [[ "{{mode}}" == test ]]; then \
+        (cd elohim/eprfs && cargo test --workspace) || exit $?; \
+      else \
+        (cd elohim/eprfs && cargo build -p elohim-epr-cli --bin epr -p elohim-device-runtime --bin bin-launch) || exit $?; \
+      fi; \
       after="$("$CARGO_TARGET_DIR/debug/epr" bin --tool epr source-state 2>/dev/null || echo none)"; \
       tree_clean=false; \
       if [[ "$before" == "$after" && "$before" == *'"clean":true'* ]]; then tree_clean=true; fi; \

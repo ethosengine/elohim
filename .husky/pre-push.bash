@@ -971,8 +971,12 @@ if command -v cargo-deny >/dev/null 2>&1; then
   echo "── end cargo deny check ───────────────────────────────────────"
 fi
 
+# ── Household head: land the pushed epr ─────────────────────────────
 # A gate makes an epr build available in the device store. Only a clean, green commit actually
 # landing on dev may move the household head; every refusal here is advisory to the push.
+# The eprfs gate ingests what it tested (`_gate-eprfs`). When pre-push accepted a gate receipt
+# instead, the receipt proved this commit's epr source closure was tested but built nothing, so
+# `_eprfs-deliver` builds and ingests the pushed commit in the gate's own slot before landing.
 BIN_STORE_CLI="${EPR_BIN:-$(command -v epr || true)}"
 EPR_LAND_REASON=""
 if [ -z "$DEV_LOCAL_SHA" ]; then
@@ -989,16 +993,39 @@ fi
 if [ -z "$EPR_LAND_REASON" ] && [ ! -x "$BIN_STORE_CLI" ]; then
   EPR_LAND_REASON="bin-store is not executable"
 fi
+epr_candidate_at_sha() {
+  "$BIN_STORE_CLI" bin --tool epr status --commit "$DEV_LOCAL_SHA" --json 2>/dev/null |
+    python3 -c 'import json,sys; rows=json.load(sys.stdin).get("candidates", []); print(rows[0].get("cid", "") if rows else "")' \
+    2>/dev/null || true
+}
 if [ -z "$EPR_LAND_REASON" ]; then
-  EPR_CANDIDATE_CID=$(
-    "$BIN_STORE_CLI" bin --tool epr status --commit "$DEV_LOCAL_SHA" --json 2>/dev/null |
-      python3 -c 'import json,sys; rows=json.load(sys.stdin).get("candidates", []); print(rows[0].get("cid", "") if rows else "")' \
-      2>/dev/null || true
-  )
+  EPR_CANDIDATE_CID=$(epr_candidate_at_sha)
+  if [ -z "$EPR_CANDIDATE_CID" ]; then
+    echo "[pre-push] no epr candidate names $DEV_LOCAL_SHA; building it in the eprfs gate slot"
+    GATE_RUN_KIND=pre-push node genesis/orchestrator/gate-runner.mjs --target eprfs --recipe _eprfs-deliver
+    EPR_CANDIDATE_CID=$(epr_candidate_at_sha)
+  fi
   if [ -z "$EPR_CANDIDATE_CID" ]; then
     EPR_LAND_REASON="no ingested epr candidate names the SHA targeting dev"
   elif "$BIN_STORE_CLI" bin --tool epr land "$EPR_CANDIDATE_CID" --commit "$DEV_LOCAL_SHA" --repo "$HOOK_WORK_TREE" >/dev/null 2>&1; then
     echo "[pre-push] epr household head landed: $EPR_CANDIDATE_CID"
+    # The launcher is built beside the landed epr in the gate's slot. A session's PATH execs it,
+    # so a changed bin-launch is installed by the epr just landed (install-launcher verifies current).
+    EPR_SLOT=$(node genesis/orchestrator/gate-runner.mjs --target eprfs --print 2>/dev/null |
+      python3 -c 'import json,sys; print(json.loads(sys.stdin.readline()).get("resolvedTargetDir") or "")' 2>/dev/null || true)
+    EPR_STORE=$("$BIN_STORE_CLI" bin --tool epr status --json 2>/dev/null |
+      python3 -c 'import json,sys; print(json.load(sys.stdin).get("store") or "")' 2>/dev/null || true)
+    EPR_LANDED=$("$BIN_STORE_CLI" bin --tool epr resolve --current 2>/dev/null || true)
+    EPR_NEW_LAUNCHER="$EPR_SLOT/debug/bin-launch"
+    if [ -z "$EPR_SLOT" ] || [ ! -x "$EPR_NEW_LAUNCHER" ] || [ -z "$EPR_STORE" ] || [ ! -x "$EPR_LANDED" ]; then
+      echo "[pre-push] epr launcher not checked: no built bin-launch, store or landed epr to install it with"
+    elif cmp -s "$EPR_NEW_LAUNCHER" "$(dirname "$EPR_STORE")/bin/bin-launch"; then
+      :
+    elif "$EPR_LANDED" bin --tool epr install-launcher --launcher "$EPR_NEW_LAUNCHER" --repo "$HOOK_WORK_TREE" >/dev/null 2>&1; then
+      echo "[pre-push] epr launcher installed from $EPR_NEW_LAUNCHER"
+    else
+      echo "[pre-push] epr launcher not installed: bin-store refused (run: epr bin install-launcher --launcher $EPR_NEW_LAUNCHER)"
+    fi
   else
     EPR_LAND_REASON="bin-store refused epr candidate health or provenance"
   fi
@@ -1006,6 +1033,7 @@ fi
 if [ -n "$EPR_LAND_REASON" ]; then
   echo "[pre-push] epr household head not landed: $EPR_LAND_REASON"
 fi
+# ── Household head: end ────────────────────────────────────────────
 
 # Stage 1a: advisory brit checks (never fail the push).
 brit_advisory

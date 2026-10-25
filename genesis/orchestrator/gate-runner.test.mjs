@@ -461,6 +461,13 @@ function receiptFixture(t) {
   writeFileSync(resolve(root, 'crates/external/lib.rs'), 'pub fn external() {}');
   mkdirSync(resolve(root, 'genesis/agentic'), {recursive:true});
   writeFileSync(resolve(root, 'genesis/agentic/bin-tools.json'), JSON.stringify({version:1,tools:{epr:{bins:['epr'],source:{kind:'repository'}}}}));
+  // EPR_STORE below names the store under test. The `epr` on PATH is the device launcher, which
+  // would resolve ITSELF from that empty store and refuse, so the CLI under test is the device's
+  // landed build unless the caller names a candidate.
+  if (!env.EPR_BIN) {
+    const current = spawnSync('epr', ['bin', '--tool', 'epr', 'resolve', '--current'], {env, encoding:'utf8'});
+    if (current.status === 0 && current.stdout.trim()) env.EPR_BIN = current.stdout.trim();
+  }
   env.EPR_STORE = resolve(root, 'store');
   env.EPR_REPO_ROOT = root;
   env.EPR_BIN_TOOLS = resolve(root, 'genesis/agentic/bin-tools.json');
@@ -618,4 +625,34 @@ test('gate evidence rejects dirty external dependency and changes key when it is
   assert.notEqual(after.key,before.key);
   assert.equal(recordEvidence(project,after.key,{...options,...after,success:true,seconds:1}).status,0);
   assert.equal(puts,1);
+});
+
+test('--recipe runs another recipe of one project in its gate slot, never through a receipt', t => {
+  const root = mkdtempSync(resolve(tmpdir(), 'gate-recipe-'));
+  t.after(() => rmSync(root, { recursive: true, force: true }));
+  const project = { dir:'tool', steps:[],
+    run:{ kind:'root-just', recipe:'_gate-tool', cargo:{ targetDir:'/tmp/tool-gate-target', rustflags:'' } } };
+  mkdirSync(resolve(root, 'tool'), { recursive:true });
+  writeFileSync(resolve(root, 'tool/build-manifest.json'), JSON.stringify({ pipeline:'tool', steps:{}, gate:{ projects:{ tool:project } } }));
+  mkdirSync(resolve(root, 'genesis/orchestrator'), { recursive:true });
+  writeFileSync(resolve(root, 'genesis/orchestrator/run-local-gate.sh'), 'echo "RAN recipe=$5 target=$7"\n');
+  const env = { ...process.env, GATE_ROOT:root, GATE_RUN_KIND:'pre-push' };
+  for (const key of ['GIT_DIR', 'GIT_WORK_TREE', 'GIT_INDEX_FILE', 'GIT_PREFIX']) delete env[key];
+  const cli = (...args) => spawnSync(process.execPath, [resolve(ROOT, 'genesis/orchestrator/gate-runner.mjs'), '--target', 'tool', ...args],
+    { cwd:root, env, encoding:'utf8', timeout:15000 });
+
+  const run = cli('--recipe', '_tool-deliver');
+  assert.equal(run.status, 0, run.stderr);
+  assert.match(run.stdout, /\[gate\] tool \(tool\) — recipe _tool-deliver/);
+  assert.match(run.stdout, /RAN recipe=_tool-deliver target=\/tmp\/tool-gate-target/);
+  assert.doesNotMatch(run.stdout, /receipt|evidence/);
+
+  const printed = JSON.parse(cli('--print').stdout.trim().split('\n')[0]);
+  assert.equal(printed.resolvedTargetDir, '/tmp/tool-gate-target');
+
+  for (const bad of [['--recipe'], ['--recipe', 'x; rm -rf /']]) {
+    const refused = cli(...bad);
+    assert.equal(refused.status, 2, `${bad.join(' ')} must refuse`);
+    assert.doesNotMatch(refused.stdout, /RAN/);
+  }
 });

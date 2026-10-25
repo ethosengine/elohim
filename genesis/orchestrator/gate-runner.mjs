@@ -204,16 +204,20 @@ export function writeReceipt(project, before, { root = ROOT, env = process.env, 
   } catch { return null; }
 }
 
-function runProject(project, printOnly, namesOnly) {
+// `recipe` runs another recipe of the project in the gate's exact cargo slot and env, with no
+// receipt, evidence or cycle record: a receipt carries a test verdict across commits, never the
+// bytes, so pre-push uses this to build what it lands (eprfs's `_eprfs-deliver`).
+function runProject(project, printOnly, namesOnly, recipe = null) {
   const cargo = project.run.cargo || {};
+  const targetDir = worktreeTargetDir(cargo.targetDir || '');
   const args = [
     ROOT,
     project.name,
     project.dir,
     project.run.kind,
-    project.run.recipe,
+    recipe || project.run.recipe,
     cargo.workspace || '',
-    worktreeTargetDir(cargo.targetDir || ''),
+    targetDir,
     cargo.profile || 'dev',
     Object.hasOwn(cargo, 'rustflags') ? cargo.rustflags : '__inherit__',
   ];
@@ -228,8 +232,21 @@ function runProject(project, printOnly, namesOnly) {
     // claiming the cargo berth (no spawnSync).
     const resolvedEnv = gateChildEnv(project, {}).GATE_CARGO_ENV;
     const resolvedCargoEnv = resolvedEnv ? JSON.parse(resolvedEnv) : {};
-    process.stdout.write(`${JSON.stringify({ name: project.name, dir: project.dir, run: project.run, resolvedCargoEnv, reasons: project.reasons || [] })}\n`);
+    process.stdout.write(`${JSON.stringify({ name: project.name, dir: project.dir, run: project.run, resolvedCargoEnv, resolvedTargetDir: targetDir || null, reasons: project.reasons || [] })}\n`);
     return 0;
+  }
+
+  if (recipe) {
+    if (project.run.kind === 'attested') {
+      process.stderr.write(`gate ${project.name}: an attested project has no local recipe to run\n`);
+      return 2;
+    }
+    process.stdout.write(`\n[gate] ${project.name} (${project.dir}) — recipe ${recipe}\n`);
+    return spawnSync('bash', [resolve(ROOT, 'genesis/orchestrator/run-local-gate.sh'), ...args], {
+      cwd: ROOT,
+      stdio: 'inherit',
+      env: gateChildEnv(project, process.env),
+    }).status ?? 1;
   }
 
   if (project.run.kind === 'attested') {
@@ -332,7 +349,7 @@ function cargoEnvOf(childEnv) {
 }
 
 function usage() {
-  console.error('usage: gate-runner.mjs (--target <project-or-path> | --changed-file-list | --list) [--print] [--names]');
+  console.error('usage: gate-runner.mjs (--target <project-or-path> | --changed-file-list | --list) [--print] [--names] [--recipe <name>]');
   console.error('  env: GATE_ORACLE=rakia|shadow|path (default rakia; without a rakia binary every mode is path-only) · RAKIA_BIN · GATE_ROOT (fixture repository root)');
 }
 
@@ -371,7 +388,13 @@ if (isMain) {
     process.exit(0);
   }
 
+  const recipeIndex = args.indexOf('--recipe');
+  const recipe = recipeIndex >= 0 ? args[recipeIndex + 1] : null;
+  if (recipeIndex >= 0 && (!recipe || !/^[A-Za-z0-9_-]+$/.test(recipe) || projects.length !== 1)) {
+    console.error('gate-runner: --recipe takes one recipe name and exactly one --target project');
+    process.exit(2);
+  }
   let failed = 0;
-  for (const project of projects) failed |= runProject(project, printOnly, namesOnly);
+  for (const project of projects) failed |= runProject(project, printOnly, namesOnly, recipe);
   process.exit(failed ? 1 : 0);
 }

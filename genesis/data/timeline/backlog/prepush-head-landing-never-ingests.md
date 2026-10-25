@@ -34,18 +34,22 @@ Both times the device head was moved by hand: `epr bin ingest` of the eprfs gate
 
 ## Cause
 
-The landing block in `.husky/pre-push.bash` asks `epr bin status --commit <sha>` for an ingested
-candidate and lands it. Nothing in pre-push ingests one: the eprfs gate builds `epr` into its
-cargo slot and stops. The block can therefore only land when someone ingested that exact SHA by
-hand beforehand.
+The first diagnosis here ("nothing in pre-push ingests one") was wrong: `_gate-eprfs` ingests the
+build it tested. The 33ab3925c push log shows the real cause, `[gate] eprfs attested: receipt
+bafyreibvog4h…`. The pre-rebase push (090d68a03) had recorded a gate receipt for epr's source
+closure; the rebase left that closure unchanged, so pre-push accepted the receipt and skipped the
+recipe, ingest included. The receipt carries the test verdict across commits, not the bytes, so
+no candidate ever named the pushed SHA. (cbdb065b4 is the other case: the hook that ran was the
+main checkout's, with no landing block.)
 
-## Fix shape
+## Fix (2026-10-25)
 
-After the eprfs gate is green, pre-push ingests the gate's own build (the slot path the gate
-prints as `[eprfs] cargo target:`) with `--commit <sha> --gate-run pre-push`, then lands it — the
-gate-receipt path from slice A.4 already names the build it tested. Install the launcher from the
-same slot when `bin-launch` changed. A regression test drives the hook's landing block with a fake
-gate slot and asserts the head moves.
+When no candidate names the pushed SHA, the landing block runs
+`gate-runner.mjs --target eprfs --recipe _eprfs-deliver`. That builds `epr` and `bin-launch` at
+HEAD in the gate's own slot and env and ingests the build with `--gate-run pre-push`, which is
+honest because the receipt proved this closure was tested. It then lands the build and installs
+the launcher with the landed epr when the slot's `bin-launch` differs from the installed one.
+`genesis/orchestrator/prepush-head-landing.test.mjs` drives the hook's actual block.
 
 ## Done when
 
