@@ -925,7 +925,7 @@ At some point, do we become like children being governed by wise parents? Is tha
 **The Protocol's Answer**:
 We don't know yet. We'll decide together when we get there. The Constitutional Conventions (every 7 years) will grapple with this.
 
-For now, we build trust incrementally. We remain humble. We preserve human override even when it's suboptimal.
+For now, we build trust incrementally. We remain humble, *hatznea* in the prophet Micah's word: walking alongside, not ahead. We preserve human override even when it's suboptimal.
 
 Because dignity matters more than efficiency.
 
@@ -1140,7 +1140,7 @@ Global principles immutable; local implementation flexible. This enables unity w
 AI sees patterns humans miss. Humans have wisdom AI can't encode. Genuine partnership—neither dominating—achieves what neither could alone.
 
 **6. Love Can Be Protocol**
-"Love as committed action toward flourishing" isn't vague philosophy. It's operational definition embedded in every agent decision. Cryptographically verifiable. Constitutionally immutable. Actually possible.
+"Love as committed action toward flourishing" isn't vague philosophy. Hebrew calls it *chesed*, steadfast love that keeps faith. It's operational definition embedded in every agent decision. Cryptographically verifiable. Constitutionally immutable. Actually possible.
 
 ---
 

@@ -185,7 +185,7 @@ The feedback profile determines what amplification mechanisms are even *possible
    - Authors can hide harmful reactions
    - Critical reactions require reasoning
 
-3. **INTELLECTUAL HUMILITY** (Micah 6:8 - "walk humbly"):
+3. **INTELLECTUAL HUMILITY** (Micah 6:8 - "walk humbly", *hatznea*):
    - Profiles can UPGRADE through trust-building
    - Profiles can DOWNGRADE through new evidence (retractions, new research)
    - The system acknowledges it could be wrong

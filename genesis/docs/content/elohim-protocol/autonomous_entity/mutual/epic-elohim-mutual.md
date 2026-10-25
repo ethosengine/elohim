@@ -96,7 +96,7 @@ The Elohim adjuster:
 
 - **Has access to the same information the member has.** No asymmetry to exploit. The Observer protocol and REA ledger are transparent to all parties.
 
-- **Is constitutionally bound to interpret coverage generously within terms.** "Love as flourishing" operationalized: when ambiguity exists, resolve toward making the member whole.
+- **Is constitutionally bound to interpret coverage generously within terms.** "Love as flourishing" operationalized, in the covenantal sense of *chesed* (loyal love that reads the terms generously): when ambiguity exists, resolve toward making the member whole.
 
 - **Can explain every decision in plain language.** The constitutional basis for yes or no is human-readable, not buried in policy exclusion subsection 14.3.2(b)(iv).
 

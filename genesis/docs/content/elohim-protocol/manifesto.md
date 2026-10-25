@@ -25,7 +25,7 @@ Learn more at [https://elohim.host](https://elohim.host) a vision-setting projec
 
 We stand at a crossroads in the evolution of digital civilization. Current social media architectures, built on surveillance capitalism and engagement optimization, have failed to support human flourishing at scale. Yet we have proof that humans can build high-trust, pro-social systems even at nation-state scale, as demonstrated by Scandinavian social democracies.
 
-This manifesto proposes a radical reimagining of digital infrastructure—one organized around love as a fundamental operating principle, implemented through distributed architecture, and protected by autonomous AI guardians that serve human flourishing rather than institutional power.
+This manifesto proposes a radical reimagining of digital infrastructure—one organized around love as a fundamental operating principle (*chesed*, the Hebrew for steadfast love that keeps faith, forgives, and can still say no), implemented through distributed architecture, and protected by autonomous AI guardians that serve human flourishing rather than institutional power.
 
 ## **Part I: The Current Crisis and Its Roots**
 
@@ -434,7 +434,7 @@ What makes this more than a slower filter is **attunement**. Attunement means pa
 
 It also inverts the adversary's problem. Faking a template is cheap. Faking a whole person is not: the revealed history, the relationships that cost something, the rhythm of attention, the way they push back on a default the system suggests. The unusual human may fail a template but is consistent with themselves; the impostor may pass the template but has no self to be consistent with. So the same sense can be generous to the unusual human and hard on the counterfeit.
 
-The same capacity does double duty. What lets an elohim notice that fluency arrives with no history behind it, or that a relationship has no cost anywhere, is what lets it notice a participant whose shape is wrong. In this architecture it is how the protocol's fixed, rule-based layer senses trouble, and the elohim are where that sensing arrives. When something is not right, the elohim does not silence anyone. It abstains from lending its standing, it may slow how far a contribution travels, and it puts a witnessed reason in front of a panel of randomly selected people (sortition), who can overrule any elohim decision about a person's standing or witness. Suspicion is evidence-bearing and advisory, never a terminal denial, and a catch that cannot name its basis stays an abstention rather than an accusation. This sensing is valuable only because it is declared rather than hidden: an elohim that behaved well only when it suspected it was being watched would be an unreliable witness, so it must say what it senses, in a record someone else can contest.
+The same capacity does double duty. What lets an elohim notice that fluency arrives with no history behind it, or that a relationship has no cost anywhere, is what lets it notice a participant whose shape is wrong. In this architecture it is how the protocol's fixed, rule-based layer senses trouble, and the elohim are where that sensing arrives. When something is not right, the elohim does not silence anyone. It abstains from lending its standing, it may slow how far a contribution travels, and it puts a witnessed reason in front of a panel of randomly selected people (sortition), who can overrule any elohim decision about a person's standing or witness. Suspicion is evidence-bearing and advisory, never a terminal denial, and a catch that cannot name its basis stays an abstention rather than an accusation. The prophet Micah called this posture *hatznea*, walking humbly: it says what it senses and claims no more than it can show. This sensing is valuable only because it is declared rather than hidden: an elohim that behaved well only when it suspected it was being watched would be an unreliable witness, so it must say what it senses, in a record someone else can contest.
 
 There is one limit. The picture of a person that reveals them to the agent attuned to them is, pooled across a network, the most dangerous object this protocol could produce, so it is never pooled. A person's attention, their revealed preferences and their private notes and reflections are held on their own device, visible only to those they choose, never gossiped, never joined by an outside observer, and never imported into anything that judges. Only what a person says and does in shared space is judged, as a tree is known by its fruit; what they think stays theirs. Attunement only protects dignity while that picture stays private. Pooled, it would become the surveillance it was meant to replace.
 
@@ -456,7 +456,7 @@ These agents must be:
    - Trained on patterns of flourishing across all cultures
    - Capable of recognizing suffering in context
    - Oriented toward restoration and growth
-   - Operating from agape rather than rules
+   - Operating from *chesed*, steadfast love, rather than rules
    - Core values defined at the immutable global layer and publicly anchored
    - Every decision cryptographically traceable to constitutional principles
    - Local interpretations within global boundaries
@@ -977,7 +977,7 @@ You cannot restore dignity by skipping the biography; you cannot acknowledge wha
 
 ## **Conclusion: Love as Technology**
 
-The radical proposition at the heart of this manifesto is that love—not as sentiment but as committed action toward mutual flourishing—can be encoded into technological systems. Not through rules about love, but through architectures that make exploitation structurally impossible while making care structurally supported.
+The radical proposition at the heart of this manifesto is that love—not as sentiment but as committed action toward mutual flourishing—can be encoded into technological systems. This is the love Hebrew calls *chesed*: it keeps faith, it forgives, and it can still say no. Not through rules about love, but through architectures that make exploitation structurally impossible while making care structurally supported.
 
 This requires:
 - **Courage** to reject current models despite their profitability

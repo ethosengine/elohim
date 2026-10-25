@@ -145,7 +145,7 @@ When Bob's cousin Sarah reads his take and writes a correction with citations, t
 
 The path back is not silence and time. The path back is repair. Bob can publish his own correction, acknowledging the harm, citing Sarah's evidence. Sarah may sign a vouch attesting to his good faith, and so the person harmed becomes a witness in the recovery. He can tend other people's contributions in good faith, answering newcomers' questions in the garden co-op's space or finding the source a neighbor's claim was missing before anyone passes it on, and the people he works alongside see it. Gradually that brings back the ones who stopped carrying him. The community doesn't need to convene a tribunal. Bob's own actions, and others' willingness to witness them, do the work.
 
-The system designs redemption paths instead of exile. Standing recovers when people choose to carry Bob again, and that requires him to do something a community can see. Dietrich Bonhoeffer worried about stupidity as a moral capture that spreads under upsurges of power; the architecture worries about the same thing, and answers it with a durable invitation to come back through repair instead of permanent quarantine.
+The system designs redemption paths instead of exile. This is *chesed*, the Hebrew for steadfast love: it does not pretend the harm away, and it never closes the way back. Standing recovers when people choose to carry Bob again, and that requires him to do something a community can see. Dietrich Bonhoeffer worried about stupidity as a moral capture that spreads under upsurges of power; the architecture worries about the same thing, and answers it with a durable invitation to come back through repair instead of permanent quarantine.
 
 ### The Honest Ledger
 

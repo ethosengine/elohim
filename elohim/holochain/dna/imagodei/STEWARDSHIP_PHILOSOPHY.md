@@ -840,7 +840,7 @@ The ancient prophets knew this:
 
 > *"What does the Lord require of you? To act justly, to love mercy, and to walk humbly with your God."* - Micah 6:8
 
-Not to walk proudly, certain of our own righteousness. **Humbly.** Aware that we too can be captured. Willing to be corrected.
+Not to walk proudly, certain of our own righteousness. **Humbly** (*hatznea*: modestly, without display). Aware that we too can be captured. Willing to be corrected.
 
 And the summary of all law and prophets:
 

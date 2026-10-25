@@ -12,7 +12,7 @@
  *    - Emotional reactions require context selection
  *    - All engagement mechanisms are Elohim-gated
  *
- * 2. INTELLECTUAL HUMILITY (Micah 6:8 - "walk humbly")
+ * 2. INTELLECTUAL HUMILITY (Micah 6:8 - "walk humbly", hatznea)
  *    - Profiles can UPGRADE through trust-building (attestations, peer review)
  *    - Profiles can DOWNGRADE through new evidence (research, retractions)
  *    - The system must acknowledge it could be wrong
@@ -471,7 +471,7 @@ export const EMOTIONAL_REACTION_DESCRIPTIONS: Record<EmotionalReactionType, stri
  * FeedbackProfile - Governs what engagement mechanisms are permitted for content.
  *
  * Profiles are DYNAMIC - they can be upgraded OR downgraded.
- * This flexibility embodies intellectual humility (Micah 6:8 - "walk humbly"):
+ * This flexibility embodies intellectual humility (Micah 6:8 - "walk humbly", hatznea):
  * - New research may invalidate previously trusted content
  * - Authors may retract based on new information
  * - The system must acknowledge it could be wrong
