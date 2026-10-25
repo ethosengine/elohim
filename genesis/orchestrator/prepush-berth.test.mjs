@@ -162,6 +162,32 @@ test("prepush_releases_on_gate_failure", (t) => {
   assert.deepEqual(passed.calls.slice(-1), ["release dev-integration"]);
 });
 
+test("prepush_releases_once_when_renewer_stops_before_trap_reset", (t) => {
+  const fx = fixture(t, "feat: a build [build:app]");
+  const failed = runBlock(fx, {
+    after: `while [ ! -f "$HOOK_WORK_TREE/renewer-started" ]; do sleep 0.01; done
+echo GATES-RAN
+exit 1`,
+    // Hold the renewer before it resets inherited traps; fail the gate only once it is there.
+    transform: (block) => {
+      const start = "berth_renew_loop() {\n";
+      assert.ok(block.includes(start), "pause the actual renewer before its first command");
+      return block.replace(start, `${start}  echo ready > "$HOOK_WORK_TREE/renewer-started"
+  while :; do :; done
+`);
+    },
+  });
+  assert.equal(failed.error, undefined, failed.out);
+  assert.equal(failed.status, 1, failed.out);
+  assert.ok(failed.out.includes("GATES-RAN"));
+  assert.deepEqual(failed.calls.map((c) => c.split(" --note")[0]), [
+    CLAIM("dev-integration"),
+    CLAIM("jenkins-dispatch"),
+    "release dev-integration",
+    "release jenkins-dispatch",
+  ]);
+});
+
 test("build_edge_requires_alpha_fleet", (t) => {
   const fx = fixture(t, "deploy the fix [build:edge]");
   const r = runBlock(fx);
