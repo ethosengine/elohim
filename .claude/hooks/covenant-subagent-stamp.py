@@ -97,7 +97,7 @@ def main() -> int:
         return 0
     if payload.get("agent_type") in SKIP_AGENT_TYPES:
         return 0
-    session = str(payload.get("session_id") or "") or resolve_session_identity()["session"]
+    session = resolve_session_identity()["session"]
     project = Path(os.environ.get("CLAUDE_PROJECT_DIR") or payload.get("cwd") or os.getcwd())
     scripts = project / ".claude" / "scripts"
     if str(scripts) not in sys.path:

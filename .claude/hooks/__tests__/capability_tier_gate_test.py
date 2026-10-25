@@ -175,7 +175,27 @@ def run_hook(command: str, project_dir: Path, env_extra: "dict | None" = None):
     env["CLAUDE_PROJECT_DIR"] = str(project_dir)
     if env_extra:
         env.update(env_extra)
-    return subprocess.run(
+    # Classifier fixtures supply claim and harness model independently; native tests cover the real view.
+    session = env.get("ELOHIM_SESSION_ID") or "tier-fixture"
+    env["ELOHIM_SESSION_ID"] = session
+    env["ELOHIM_SESSION_OWNER_PID"] = str(os.getpid())
+    payload["model"] = env.get("CLAUDE_MODEL", "").strip() or None
+    tier = ""
+    if not tier:
+        actors = project_dir / ".eprfs/status/actors.jsonl"
+        for line in actors.read_text().splitlines() if actors.exists() else []:
+            record = json.loads(line).get("record", {})
+            if record.get("session") == session and record.get("kind") == "claim":
+                claimed = record.get("claimed", "")
+                tier = "human" if claimed.startswith("human:") else claimed.partition("@")[2]
+    view = {"live": True, "envelope": {"identity": {"session": session}, "closedAt": None}, "capabilityTier": tier or "unknown"}
+    import tempfile
+    scratch = tempfile.TemporaryDirectory(prefix="tier-envelope-")
+    stub = Path(scratch.name) / "epr-view-fixture"
+    stub.write_text("#!/usr/bin/env python3\nprint(" + repr(json.dumps(view)) + ")\n")
+    stub.chmod(0o755)
+    env["EPR_BIN"] = str(stub)
+    result = subprocess.run(
         [sys.executable, str(HOOK)],
         input=json.dumps(payload),
         capture_output=True,
@@ -183,6 +203,8 @@ def run_hook(command: str, project_dir: Path, env_extra: "dict | None" = None):
         env=env,
         timeout=10,
     )
+    scratch.cleanup()
+    return result
 
 
 def _deny_reason(result) -> str:
@@ -491,7 +513,7 @@ class CapabilityTierGateCase(unittest.TestCase):
 
     def test_running_model_tier_beats_inherited_human_claim(self):
         # R-P17: a haiku subagent inherits its parent's session, whose claim is `human:matthew`
-        # (the top tier). The running model — CLAUDE_MODEL — must win: the deny names haiku.
+        # (the top tier). The harness payload caps that claim: the deny names haiku.
         session = "inherited-human-sess"
         _write_project(
             self.proj, FIXTURE_POLICY,

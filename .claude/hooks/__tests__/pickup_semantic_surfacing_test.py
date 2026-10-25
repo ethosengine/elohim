@@ -132,6 +132,9 @@ class SurfacingTest(unittest.TestCase):
     def env(self, **extra: str) -> dict:
         env = dict(os.environ)
         env.update(
+            ELOHIM_SESSION_ID=self.session,
+            ELOHIM_SESSION_OWNER_PID=str(os.getpid()),
+            EPR_SESSION_RESOLVING="1",
             EPR_BIN=str(self.stub),
             CLAUDE_PROJECT_DIR=str(self.root),
             STUB_LOG=str(self.log),

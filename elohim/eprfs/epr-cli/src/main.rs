@@ -34,11 +34,14 @@ fn main() -> ExitCode {
         return ExitCode::SUCCESS;
     }
     if raw.first().map(String::as_str) == Some("session") {
-        if raw.get(1).map(String::as_str) != Some("id")
-            || raw[2..].iter().any(|arg| arg != "--json")
-        {
-            println!("epr session id [--json]");
-            return ExitCode::SUCCESS;
+        if raw.get(1).map(String::as_str) != Some("id") {
+            return match elohim_epr_cli::session_envelope::run(&raw[1..]) {
+                Ok(code) => code,
+                Err(error) => {
+                    eprintln!("epr session: {error}");
+                    ExitCode::from(2)
+                }
+            };
         }
         let identity = elohim_epr_cli::session::resolve();
         if raw.iter().any(|arg| arg == "--json") {
@@ -59,6 +62,12 @@ fn main() -> ExitCode {
             );
         }
         return ExitCode::SUCCESS;
+    }
+    if env::var_os("EPR_SESSION_LAZY").is_some() {
+        if let Err(error) = elohim_epr_cli::session_envelope::open(None) {
+            eprintln!("epr session: {error}");
+            return ExitCode::from(2);
+        }
     }
     if raw.first().map(String::as_str) == Some("flow") {
         return match flow::run(&raw[1..]) {
@@ -370,5 +379,5 @@ fn print_human(report: &Report) {
 }
 
 fn usage() -> &'static str {
-    "epr session id [--json]\n\nusage: epr [--repo PATH] [--json] <setup|doctor|explain PATH|check [PATH...]|govern --path REL ...|ready [--target REF] [--deep]|integrate --acceptance CID [--root DIR]|flow ...|actor <claim --as agent:<role>@<model> --session ID|current --session ID>|canon-lift [--check|--write]|device <ask|redeem|approve> ...|identity <begin|standing> ...|covenant <offer|show|check|record> --session ID ...|peer <id|serve|status> ...>"
+    "epr session id|open [--model MODEL]|show|close|gc [--json]\n\nusage: epr [--repo PATH] [--json] <setup|doctor|explain PATH|check [PATH...]|govern --path REL ...|ready [--target REF] [--deep]|integrate --acceptance CID [--root DIR]|flow ...|actor <claim --as agent:<role>@<model> [--session ID]|current [--session ID]>|canon-lift [--check|--write]|device <ask|redeem|approve> ...|identity <begin|standing> ...|covenant <offer|show|check|record> [--session ID] ...|peer <id|serve|status> ...>"
 }

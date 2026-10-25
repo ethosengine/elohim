@@ -461,6 +461,20 @@ pub fn launch_os(registry: &Registry, invoked: &Path, args: &[std::ffi::OsString
         }
     }
     let mut command = Command::new(&resolved.path);
+    // Identity, custody, and arrival verbs must work before an envelope can exist.
+    if tool == "epr"
+        && !daemon
+        && identity.as_ref().is_some_and(|i| i.session.is_some())
+        && !args.first().is_some_and(|a| {
+            ["session", "bin", "device", "--version", "--help"]
+                .iter()
+                .any(|v| a == v)
+        })
+        && (args.first().is_none_or(|a| a != "actor") || args.get(1).is_some_and(|a| a == "claim"))
+    {
+        command.env("EPR_SESSION_LAZY", "1");
+    }
+
     command
         .arg0(invoked.file_name().unwrap_or_default())
         .args(args);

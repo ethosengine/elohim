@@ -281,14 +281,13 @@ class LeaseClassTest(unittest.TestCase):
         self.assertIn("measure-class work does not run on the dev berth", reason)
         self.assertIn("`just measure <scope>`", reason)
         self.assertIn("rung A: --on adam", reason)
-        refuse = self.rows("refuse")[-1]
-        self.assertEqual((refuse["reason"], refuse["class"]), ("class", "measure"))
+        self.assertEqual(self.rows("refuse"), [])
         self.assertIsNone(self.berth.raw_lease("mesh"))
         self.assertEqual(self.obs.emits, [])
 
     def test_measure_refused_through_the_cli_with_exit_3(self):
         main = _NS["main"]
-        env = {"BERTH_DIR": self.directory.name, "BERTH_SESSION": "dev"}
+        env = {"BERTH_DIR": self.directory.name, "ELOHIM_SESSION_ID": "dev"}
         old = {k: os.environ.get(k) for k in (*env, "MEASURE_ON_DEV_BERTH")}
         os.environ.update(env)
         os.environ.pop("MEASURE_ON_DEV_BERTH", None)
@@ -306,7 +305,7 @@ class LeaseClassTest(unittest.TestCase):
         ok, _, reason = self.berth.claim("mesh", "dev", klass="verify", ttl_s=7200)
         self.assertFalse(ok)
         self.assertIn("declare it measure", reason)
-        self.assertEqual(self.rows("refuse")[-1]["reason"], "ttl")
+        self.assertEqual(self.rows("refuse"), [])
         self.assertTrue(self.berth.claim("mesh", "dev", klass="verify", ttl_s=3600)[0])
 
     def test_unknown_class_is_a_usage_error(self):
@@ -471,85 +470,27 @@ class LedgerSafetyTest(unittest.TestCase):
             json.load(f)
 
 
-class AncestryResolutionTest(unittest.TestCase):
-    """Runtime-asserted identity: a Claude session moors with the Claude pid; a shell it spawned
-    (a Bash-tool command, `just test mesh`) resolves to that session through its process ancestry."""
+class EnvelopeResolutionTest(unittest.TestCase):
+    """Berth consumes the one P1 identity; mooring age cannot choose another session."""
+    def test_shared_shim_selects_owner_and_records_source(self):
+        from unittest.mock import patch
+        with tempfile.TemporaryDirectory() as directory:
+            berth = Berth(directory, obs=FakeObservation(), policy_path=MISSING_POLICY)
+            berth.moor("newer-unrelated")
+            identity = {"session": "codex-p1", "ownerPid": None}
+            with patch.dict(_NS["main"].__globals__, {"Berth": lambda: berth, "resolve_session_identity": lambda: identity}):
+                self.assertEqual(_NS["main"](["berth", "claim", "cargo"]), 0)
+            row = [r for r in berth.ledger(100) if r["kind"] == "claim"][-1]
+            self.assertEqual((row["session"], row["session_source"]), ("codex-p1", "envelope"))
 
-    CLAUDE, OTHER_CLAUDE = 4242, 5151
-
-    def setUp(self):
-        self.directory = tempfile.TemporaryDirectory()
-        self.addCleanup(self.directory.cleanup)
-        self.clock = [1000.0]
-        self.berth = Berth(self.directory.name, obs=FakeObservation(), now=lambda: self.clock[0], policy_path=MISSING_POLICY)
-        # fake pids: liveness by kill(0) would fail, so is_live consults last_seen only
-        self.berth.is_live = lambda m: bool(m) and (self.clock[0] - m.get("last_seen", 0)) < m.get("ttl_s", 10800)
-
-    def run_main(self, ancestry, *args):
-        main = _NS["main"]
-        g = main.__globals__
-        saved = (g["proc_ancestry"], g["Berth"])
-        berth = self.berth
-        g["proc_ancestry"] = lambda: list(ancestry)
-        g["Berth"] = lambda *a, **k: berth
-        env_saved = {k: os.environ.pop(k, None) for k in ("BERTH_SESSION", "CLAUDE_SESSION_ID")}
-        try:
-            return main(["berth", *args])
-        finally:
-            g["proc_ancestry"], g["Berth"] = saved
-            for k, v in env_saved.items():
-                if v is not None:
-                    os.environ[k] = v
-
-    def test_moored_pid_is_an_ancestor_resolves(self):
-        self.berth.moor("sess-claude", pid=self.CLAUDE)
-        self.assertEqual(self.berth.session_by_ancestry([777, 778, self.CLAUDE, 3753]), "sess-claude")
-        rc = self.run_main([777, 778, self.CLAUDE, 3753], "claim", "mesh", "--ttl", "60", "--note", "probe")
-        self.assertEqual(rc, 0)
-        row = [r for r in self.berth.ledger(100) if r["kind"] == "claim"][-1]
-        self.assertEqual((row["session"], row["session_source"]), ("sess-claude", "ancestry"))
-
-    def test_no_ancestor_mooring_is_exit_2(self):
-        self.berth.moor("sess-claude", pid=self.CLAUDE)
-        self.assertIsNone(self.berth.session_by_ancestry([777, 3753]))
-        self.assertEqual(self.run_main([777, 3753], "claim", "mesh"), 4)
-        self.assertIsNone(self.berth.raw_lease("mesh"))
-
-    def test_the_ancestor_wins_not_the_newest(self):
-        self.berth.moor("sess-mine", pid=self.CLAUDE)
-        self.clock[0] += 50
-        self.berth.moor("sess-newer", pid=self.OTHER_CLAUDE)
-        self.assertEqual(self.berth.session_by_ancestry([777, self.CLAUDE, 1]), "sess-mine")
-
-    def test_a_stale_ancestor_mooring_does_not_resolve(self):
-        self.berth.moor("sess-claude", pid=self.CLAUDE)
-        self.clock[0] += 20000
-        self.assertIsNone(self.berth.session_by_ancestry([self.CLAUDE]))
-
-    def test_explicit_env_wins_and_is_recorded(self):
-        self.berth.moor("sess-claude", pid=self.CLAUDE)
-        os.environ["BERTH_SESSION"] = "sess-env"
-        try:
-            main = _NS["main"]
-            g = main.__globals__
-            saved = g["Berth"]
-            berth = self.berth
-            g["Berth"] = lambda *a, **k: berth
-            try:
-                self.assertEqual(main(["berth", "claim", "mesh"]), 0)
-            finally:
-                g["Berth"] = saved
-        finally:
-            os.environ.pop("BERTH_SESSION", None)
-        row = [r for r in self.berth.ledger(100) if r["kind"] == "claim"][-1]
-        self.assertEqual((row["session"], row["session_source"]), ("sess-env", "env"))
-
-    def test_real_proc_walk_reaches_this_process_parent(self):
-        chain = _NS["proc_ancestry"]()
-        if os.getppid() > 1:
-            self.assertEqual(chain[0], os.getppid())
-        self.assertLessEqual(len(chain), 32)
-
+    def test_absent_p1_never_uses_newest_mooring(self):
+        from unittest.mock import patch
+        with tempfile.TemporaryDirectory() as directory:
+            berth = Berth(directory, obs=FakeObservation(), policy_path=MISSING_POLICY)
+            berth.moor("unrelated")
+            with patch.dict(_NS["main"].__globals__, {"Berth": lambda: berth, "resolve_session_identity": lambda: {"session": None}}):
+                self.assertEqual(_NS["main"](["berth", "claim", "cargo"]), 4)
+            self.assertIsNone(berth.raw_lease("cargo"))
 
 
 class DaemonClassTest(unittest.TestCase):
@@ -634,32 +575,10 @@ class IncarnationTest(unittest.TestCase):
         m = self.berth.moor("sess", pid=4242)
         self.assertEqual((m["pid"], m["pid_start"]), (4242, 111))
         self.assertTrue(self.berth.is_live(self.berth.mooring("sess")))
-        self.assertEqual(self.berth.session_by_ancestry([9, 4242]), "sess")
         self.starts[4242] = 222  # the Claude process died; the pid now names another process
         self.assertFalse(self.berth.is_live(self.berth.mooring("sess")))
-        self.assertIsNone(self.berth.session_by_ancestry([9, 4242]))
         self.berth.touch("sess", pid=4242)  # the hook re-asserts: new incarnation recorded
         self.assertTrue(self.berth.is_live(self.berth.mooring("sess")))
-
-    def test_two_moorings_on_the_nearest_ancestor_are_ambiguous(self):
-        self.berth.moor("a", pid=4242)
-        self.berth.moor("b", pid=4242)
-        with self.assertRaises(_NS["BerthAmbiguous"]):
-            self.berth.session_by_ancestry([9, 4242])
-        main = _NS["main"]
-        g = main.__globals__
-        saved = (g["proc_ancestry"], g["Berth"])
-        berth = self.berth
-        g["proc_ancestry"], g["Berth"] = (lambda: [9, 4242]), (lambda *a, **k: berth)
-        env_saved = {k: os.environ.pop(k, None) for k in ("BERTH_SESSION", "CLAUDE_SESSION_ID")}
-        try:
-            self.assertEqual(main(["berth", "claim", "mesh"]), 4)
-        finally:
-            g["proc_ancestry"], g["Berth"] = saved
-            for k, v in env_saved.items():
-                if v is not None:
-                    os.environ[k] = v
-        self.assertIsNone(self.berth.raw_lease("mesh"))
 
 
 class _FileObservation:
@@ -757,6 +676,9 @@ STUB_EPR = r"""#!/usr/bin/env python3
 # repeats) and logs every leases call; anything else (the fold emitter) succeeds silently.
 import json, os, sys
 here = os.path.dirname(os.path.abspath(__file__))
+if sys.argv[1:3] == ["session", "prepare-berth"]:
+    # Match preparation's filesystem contract; ownership is covered by native fixtures.
+    os.makedirs(os.path.join(os.path.dirname(os.environ["ELOHIM_DEVICE_KEY_FILE"]), "sessions"), exist_ok=True)
 if sys.argv[1:3] != ["peer", "leases"]:
     sys.exit(0)
 with open(os.path.join(here, "calls.log"), "a") as f:
@@ -837,6 +759,13 @@ class StewardClaimTest(unittest.TestCase):
         patcher = mock.patch.dict(os.environ, {"ELOHIM_DEVICE_KEY_FILE": str(self.key)})
         patcher.start()
         self.addCleanup(patcher.stop)
+        # Peer/actor authority is stubbed here, without a real envelope owner.
+        # The native session_envelope suite covers the real lifecycle guard.
+        guard = mock.patch.dict(Berth.moor.__globals__, {
+            "envelope_guard": lambda session, store: contextlib.nullcontext(),
+        })
+        guard.start()
+        self.addCleanup(guard.stop)
         self.berth = self.make()
         for session in ("codex-1", "other"):
             self.berth.moor(session)
@@ -1436,7 +1365,7 @@ class StewardClaimTest(unittest.TestCase):
         project = Path(self.directory.name) / "project"
         (project / "genesis" / "agentic").mkdir(parents=True, exist_ok=True)
         (project / "genesis" / "agentic" / "pool-policy.json").write_text(json.dumps(STEWARD_POLICY))
-        env = {k: v for k, v in os.environ.items() if k not in ("BERTH_SESSION", "CLAUDE_SESSION_ID")}
+        env = {k: v for k, v in os.environ.items() if k not in ("ELOHIM_SESSION_ID", "CLAUDE_SESSION_ID")}
         env.update({"BERTH_DIR": self.berth.dir, "EPR_BIN": str(self.epr), "CLAUDE_PROJECT_DIR": str(project)})
         return subprocess.run([sys.executable, str(REPO / "genesis/agentic/bin/berth"), *args], env=env,
                               capture_output=True, text=True, timeout=60)
@@ -1461,7 +1390,7 @@ class StewardClaimTest(unittest.TestCase):
         (project / "genesis" / "agentic").mkdir(parents=True)
         (project / "genesis" / "agentic" / "pool-policy.json").write_text(json.dumps(STEWARD_POLICY))
         self.views(view(dev_integration=held_by_a()))
-        env = {k: v for k, v in os.environ.items() if k not in ("BERTH_SESSION", "CLAUDE_SESSION_ID")}
+        env = {k: v for k, v in os.environ.items() if k not in ("ELOHIM_SESSION_ID", "CLAUDE_SESSION_ID")}
         env.update({"BERTH_DIR": os.path.join(self.directory.name, "cli-berth"), "EPR_BIN": str(self.epr),
                     "CLAUDE_PROJECT_DIR": str(project)})
         for extra in ([], ["--offline-ok"]):
@@ -1488,7 +1417,7 @@ class StoreUnavailableTest(unittest.TestCase):
         os.chmod(self.store, 0o755)
 
     def run_berth(self, *args, preexec=None, **env):
-        e = {k: v for k, v in os.environ.items() if k not in ("BERTH_SESSION", "CLAUDE_SESSION_ID")}
+        e = {k: v for k, v in os.environ.items() if k not in ("ELOHIM_SESSION_ID", "CLAUDE_SESSION_ID")}
         e.update(env)
         return subprocess.run([sys.executable, str(REPO / "genesis/agentic/bin/berth"), *args], env=e,
                               capture_output=True, text=True, timeout=30, preexec_fn=preexec, cwd="/")
@@ -1500,7 +1429,7 @@ class StoreUnavailableTest(unittest.TestCase):
             os.setgid(65534)
             os.setuid(65534)
         r = self.run_berth("claim", "mesh", "--ttl", "60", "--note", "stage lane", preexec=as_guest,
-                           BERTH_DIR=self.store, BERTH_SESSION="stage:probe")
+                           BERTH_DIR=self.store, ELOHIM_SESSION_ID="stage:probe")
         self.assertEqual(r.returncode, 4, r.stderr)
         self.assertNotIn("Traceback", r.stderr)
         self.assertIn("berth: store unavailable (EACCES", r.stderr)
@@ -1509,17 +1438,17 @@ class StoreUnavailableTest(unittest.TestCase):
 
     def test_help_prints_usage_and_never_takes_a_lease(self):
         for args in (("claim", "--help"), ("release", "-h"), ("--help",), ("who", "--help")):
-            r = self.run_berth(*args, BERTH_DIR=self.store, BERTH_SESSION="dev")
+            r = self.run_berth(*args, BERTH_DIR=self.store, ELOHIM_SESSION_ID="dev")
             self.assertEqual(r.returncode, 0, (args, r.stderr))
             self.assertIn("berth claim", r.stdout, args)
-        r = self.run_berth("who", "--", BERTH_DIR=self.store, BERTH_SESSION="dev")
+        r = self.run_berth("who", "--", BERTH_DIR=self.store, ELOHIM_SESSION_ID="dev")
         self.assertEqual(r.stdout.strip(), "null")
         leases = os.path.join(self.store, "leases")
         self.assertFalse(os.path.exists(leases) and any("help" in n for n in os.listdir(leases)))
 
     def test_a_store_that_cannot_be_created_exits_4(self):
         missing = "/proc/berth-no-such-store"  # mkdir under /proc fails for every uid, root included
-        r = self.run_berth("claim", "mesh", "--ttl", "60", BERTH_DIR=missing, BERTH_SESSION="stage:probe")
+        r = self.run_berth("claim", "mesh", "--ttl", "60", BERTH_DIR=missing, ELOHIM_SESSION_ID="stage:probe")
         self.assertEqual(r.returncode, 4, r.stderr)
         self.assertNotIn("Traceback", r.stderr)
         self.assertIn(f"berth: store unavailable (", r.stderr)
@@ -1571,11 +1500,12 @@ fi
             (self.app / "scripts" / name).write_text(stub)
             (self.app / "scripts" / name).chmod(0o755)
         self.env = {k: v for k, v in os.environ.items() if k not in (
-            "BERTH_SESSION", "CLAUDE_SESSION_ID", "BERTH_CLASS", "BERTH_TTL", "MEASURE_ON_DEV_BERTH",
+            "ELOHIM_SESSION_ID", "CLAUDE_SESSION_ID", "BERTH_CLASS", "BERTH_TTL", "MEASURE_ON_DEV_BERTH",
             "MESH_STOP_FORCE", "BERTH_FENCED")}
         self.env.update({"BERTH_DIR": str(self.berth_dir), "EPR_BIN": "/nonexistent-epr",
+                         "ELOHIM_DEVICE_KEY_FILE": str(root / "no-device" / "ed25519.seed"),
                          "PATH": f"{REPO / 'genesis/agentic/bin'}:/usr/local/bin:/usr/bin:/bin",
-                         "MESH_DIR": str(root / "no-mesh")})
+                         "EPR_PROC_ROOT": str(root / "no-proc"), "MESH_DIR": str(root / "no-mesh")})
 
     def just(self, *args, **env):
         e = dict(self.env, **env)
@@ -1590,7 +1520,7 @@ fi
         cases = [({"BERTH_CLASS": "measure"}, 3), ({"BERTH_CLASS": "bogus"}, 2), ({"BERTH_CLASS": "mesh"}, 2),
                  ({"BERTH_TTL": "0"}, 2), ({"BERTH_TTL": "7200"}, 3), ({"BERTH_TTL": "soon"}, 2)]
         for env, want in cases:
-            r = self.just("test", "mesh", "x.feature", BERTH_SESSION="me", **env)
+            r = self.just("test", "mesh", "x.feature", ELOHIM_SESSION_ID="me", **env)
             self.assertEqual(r.returncode, want, (env, r.stderr[-400:]))
         self.assertFalse(self.reached.exists())
 
@@ -1602,18 +1532,18 @@ fi
 
     def test_measure_recipes_are_refused_on_the_dev_berth(self):
         for action in ("matrix", "recovery", "recovery-matrix"):
-            r = self.just("mesh", action, BERTH_SESSION="me")
+            r = self.just("mesh", action, ELOHIM_SESSION_ID="me")
             self.assertEqual(r.returncode, 3, (action, r.stderr[-300:]))
             self.assertIn("just measure <scope>", r.stderr)
         self.assertFalse(self.reached.exists())
 
     def test_stop_is_refused_under_another_live_holder_unless_forced(self):
         self.assertEqual(self.berth("claim", "mesh", "--class", "mesh", "--session", "rival").returncode, 0)
-        r = self.just("mesh", "stop", BERTH_SESSION="me")
+        r = self.just("mesh", "stop", ELOHIM_SESSION_ID="me")
         self.assertEqual(r.returncode, 3, r.stderr[-300:])
         self.assertIn("held by rival", r.stderr)
         self.assertFalse(self.reached.exists())
-        r = self.just("mesh", "stop", BERTH_SESSION="me", MESH_STOP_FORCE="1")
+        r = self.just("mesh", "stop", ELOHIM_SESSION_ID="me", MESH_STOP_FORCE="1")
         self.assertEqual(r.returncode, 0, r.stderr[-300:])
         self.assertTrue(self.reached.exists())
         self.assertIsNone(json.loads(self.berth("who", "mesh").stdout))
@@ -1621,7 +1551,7 @@ fi
     def test_an_overlong_verify_lane_is_killed_at_its_ttl_then_the_berth_is_free(self):
         proc = subprocess.Popen(["just", "--justfile", str(REPO / "justfile"), f"app_dir={self.app}",
                                  "test", "mesh", "x.feature"],
-                                env=dict(self.env, BERTH_SESSION="me", BERTH_TTL="3", STUB_MODE="overlong"),
+                                env=dict(self.env, ELOHIM_SESSION_ID="me", BERTH_TTL="3", STUB_MODE="overlong"),
                                 stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
         deadline = time.time() + 10
         while not self.lane_pid.exists() and time.time() < deadline:
@@ -1636,6 +1566,71 @@ fi
         self.assertFalse(os.path.exists(f"/proc/{lane}"), "the fenced lane outlived its lease")
         rival = self.berth("claim", "mesh", "--session", "rival", "--ttl", "60")
         self.assertEqual(rival.returncode, 0, rival.stderr)
+
+
+class EnvelopeGuardTest(unittest.TestCase):
+    """The real lifecycle guard, which the other berth suites stub out."""
+
+    def test_a_device_with_no_envelope_store_and_an_epr_older_than_envelopes_is_not_fenced(self):
+        # Pre-push on 2026-10-25: the device key existed, no envelope had ever been opened, and the
+        # `epr` on hand predated envelopes — it printed usage for `session prepare-berth` and exited
+        # 0. The guard then opened <device>/sessions/.lock in a directory nobody had created.
+        with tempfile.TemporaryDirectory() as base:
+            key = Path(base) / "device" / "ed25519.seed"
+            key.parent.mkdir()
+            key.write_bytes(b"\0" * 32)
+            old_epr = Path(base) / "epr"
+            old_epr.write_text("#!/bin/sh\necho 'epr session id [--json]'\nexit 0\n")
+            old_epr.chmod(0o755)
+            guard = Berth.moor.__globals__["envelope_guard"]
+            with mock.patch.dict(os.environ, {"ELOHIM_DEVICE_KEY_FILE": str(key), "EPR_BIN": str(old_epr)}):
+                with guard("claude-code-1-2", str(Path(base) / "berth")):
+                    entered = True
+            self.assertTrue(entered)
+            self.assertFalse((key.parent / "sessions").exists(), "the guard must not invent an envelope store")
+
+    def test_a_session_pinned_to_an_epr_with_no_session_verb_is_not_fenced(self):
+        # Every live session on a device keeps its pin across the landing that brings envelopes.
+        with tempfile.TemporaryDirectory() as base:
+            key = Path(base) / "device" / "ed25519.seed"
+            key.parent.mkdir()
+            key.write_bytes(b"\0" * 32)
+            (key.parent / "sessions").mkdir()  # another, newer session opened an envelope here
+            old_epr = Path(base) / "epr"
+            old_epr.write_text("#!/bin/sh\necho 'epr: invalid arguments: unknown command `session`' >&2\nexit 2\n")
+            old_epr.chmod(0o755)
+            guard = Berth.moor.__globals__["envelope_guard"]
+            with mock.patch.dict(os.environ, {"ELOHIM_DEVICE_KEY_FILE": str(key), "EPR_BIN": str(old_epr)}):
+                with guard("claude-code-1-2", str(Path(base) / "berth")):
+                    entered = True
+            self.assertTrue(entered)
+
+    def test_a_device_with_no_epr_at_all_is_not_fenced(self):
+        with tempfile.TemporaryDirectory() as base:
+            key = Path(base) / "device" / "ed25519.seed"
+            key.parent.mkdir()
+            key.write_bytes(b"\0" * 32)
+            guard = Berth.moor.__globals__["envelope_guard"]
+            with mock.patch.dict(os.environ, {"ELOHIM_DEVICE_KEY_FILE": str(key),
+                                              "EPR_BIN": str(Path(base) / "absent-epr")}):
+                with guard("claude-code-1-2", str(Path(base) / "berth")):
+                    entered = True
+            self.assertTrue(entered)
+
+    def test_a_current_epr_that_refuses_preparation_still_refuses(self):
+        with tempfile.TemporaryDirectory() as base:
+            key = Path(base) / "device" / "ed25519.seed"
+            key.parent.mkdir()
+            key.write_bytes(b"\0" * 32)
+            epr = Path(base) / "epr"
+            epr.write_text("#!/bin/sh\necho 'envelope-owner-mismatch: claude-code-1-2' >&2\nexit 1\n")
+            epr.chmod(0o755)
+            guard = Berth.moor.__globals__["envelope_guard"]
+            with mock.patch.dict(os.environ, {"ELOHIM_DEVICE_KEY_FILE": str(key), "EPR_BIN": str(epr)}):
+                with self.assertRaises(Exception) as refused:
+                    with guard("claude-code-1-2", str(Path(base) / "berth")):
+                        pass
+            self.assertIn("envelope-owner-mismatch", str(refused.exception))
 
 
 if __name__ == "__main__":

@@ -117,6 +117,8 @@ class ParticipantStandingCase(unittest.TestCase):
         })
         if stub:
             env["EPR_BIN"] = str(self.stub)
+        if isinstance(payload, dict) and payload.get("session_id"):
+            env["ELOHIM_SESSION_ID"] = payload["session_id"]
         env.update(envextra)
         return subprocess.run(
             [sys.executable, str(HOOK)],
@@ -150,6 +152,16 @@ class ParticipantStandingCase(unittest.TestCase):
         return [argv for argv in self.calls() if argv[:2] == ["actor", "current"]]
 
     # ── the five named cases ─────────────────────────────────────────────────────────────────
+    def test_p1_key_wins_over_payload_in_offer_and_recording_prompt(self):
+        r = self.run_hook({"session_id": "wrong-payload-key"}, current=STANDING,
+                          ELOHIM_SESSION_ID="envelope-key", STUB_OFFER=json.dumps(self.OFFER))
+        text = "\n".join(self.lines(r))
+        self.assertIn("--session envelope-key", text)
+        self.assertNotIn("wrong-payload-key", text)
+        for call in self.calls():
+            if "--session" in call:
+                self.assertEqual(call[call.index("--session") + 1], "envelope-key")
+
     def test_prints_standing_line_from_current_json(self):
         r = self.run_hook({"session_id": "sess-a"}, current=STANDING)
         self.assertEqual(
@@ -186,11 +198,11 @@ class ParticipantStandingCase(unittest.TestCase):
         self.assertEqual(self.line(r), "participant: (unknown — epr binary not found)")
         self.assertEqual(self.calls(), [])
 
-    def test_session_id_from_stdin_beats_env(self):
+    def test_p1_session_id_beats_stdin(self):
         self.line(self.run_hook({"session_id": "from-stdin"},
                                 ELOHIM_SESSION_ID="from-env"))
         argv = self.calls()[0]
-        self.assertEqual(argv[argv.index("--session") + 1], "from-stdin")
+        self.assertEqual(argv[argv.index("--session") + 1], "from-env")
 
     # ── the edges the five imply ─────────────────────────────────────────────────────────────
     def test_env_session_id_when_stdin_has_none(self):

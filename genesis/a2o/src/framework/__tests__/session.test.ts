@@ -57,7 +57,13 @@ for (const fixture of cases) {
 }
 await test('session absent native binary falls back', () => {
   assert.equal(
-    resolve({ env: { EPR_BIN: '/no/such/epr', ELOHIM_SESSION_ID: 'local' } }).session,
+    resolve({
+      env: {
+        EPR_BIN: '/no/such/epr',
+        ELOHIM_SESSION_ID: 'local',
+        ELOHIM_SESSION_OWNER_PID: String(process.pid),
+      },
+    }).session,
     'local'
   );
 });

@@ -149,7 +149,8 @@ fn epr_with_env(root: &Path, key_file: &Path, args: &[&str], envs: &[(&str, &str
         .env(device_key::DEVICE_KEY_ENV, key_file)
         .env_remove("CLAUDE_CODE_SESSION_ID")
         .env_remove("CLAUDE_SESSION_ID")
-        .env_remove("ELOHIM_SESSION_ID");
+        .env_remove("ELOHIM_SESSION_ID")
+        .env("ELOHIM_SESSION_OWNER_PID", std::process::id().to_string());
     for (key, value) in envs {
         command.env(key, value);
     }

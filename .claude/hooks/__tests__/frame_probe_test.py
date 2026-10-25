@@ -173,7 +173,13 @@ class FrameProbeCase(unittest.TestCase):
     def env(self, **extra: str) -> dict:
         env = dict(os.environ)
         env.update(CLAUDE_PROJECT_DIR=str(self.project), EPR_BIN=str(self.stub),
-                   STUB_LOG=str(self.log), TMPDIR=str(self.probe_tmp))
+                   STUB_LOG=str(self.log), TMPDIR=str(self.probe_tmp),
+                   # P1 resolves the session: hide this machine's real agent runtimes from it
+                   # and declare the payload's session.
+                   EPR_PROC_ROOT=str(self.tmp / "no-proc"), ELOHIM_SESSION_ID=self.session)
+        for name in ("CLAUDE_CODE_SESSION_ID", "CLAUDE_SESSION_ID", "CODEX_SESSION_ID",
+                     "CODEX_THREAD_ID", "ELOHIM_SESSION_OWNER_PID"):
+            env.pop(name, None)
         env.update(extra)
         return env
 

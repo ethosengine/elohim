@@ -17,7 +17,7 @@ class RamSessionTest(unittest.TestCase):
         with patch.object(hook, '_session_identity', return_value=identity), patch.object(hook.subprocess, 'run', side_effect=AssertionError('no subprocess')):
             self.assertEqual(1234, hook.owner_pid())
             self.assertEqual('codex-1234-7', hook.session_key({}))
-            self.assertEqual('hook-session', hook.session_key({'session_id': 'hook-session'}))
+            self.assertEqual('codex-1234-7', hook.session_key({'session_id': 'hook-session'}))
 
     def test_unobserved_owner_preserves_parent_and_default_fallbacks(self):
         with patch.object(hook, '_session_identity', return_value={'ownerPid': None, 'session': None}), patch.object(hook.os, 'getppid', return_value=321):

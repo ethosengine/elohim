@@ -58,14 +58,14 @@ def resolve_fallback(*, environ: Mapping[str, str] | None = None, proc_root: Pat
     start_pid = os.getpid() if start_pid is None else start_pid
     registry = load_registry(env) if registry is None else registry
     declared = env.get("ELOHIM_SESSION_ID", "").strip()
-    if declared:
-        try:
-            pid = int(env.get("ELOHIM_SESSION_OWNER_PID", ""))
-            process = _process(root, pid)
-        except ValueError:
-            process = None
-        return _identity("declared", declared, (pid, process["start"]) if process else None, "declared")
+    owner_raw = env.get("ELOHIM_SESSION_OWNER_PID", "").strip()
+    try:
+        owner_pid = int(owner_raw)
+    except ValueError:
+        owner_pid = None
     current = _process(root, start_pid)
+    if declared and owner_pid == start_pid and current:
+        return _identity("declared", declared, (start_pid, current["start"]), "declared")
     pid = current["parent"] if current else 0
     seen = {start_pid}
     for _ in range(256):
@@ -75,6 +75,8 @@ def resolve_fallback(*, environ: Mapping[str, str] | None = None, proc_root: Pat
         process = _process(root, pid)
         if process is None:
             break
+        if declared and owner_pid == pid:
+            return _identity("declared", declared, (pid, process["start"]), "declared")
         for runtime in registry["runtimes"]:
             if process["comm"] in runtime["comm"]:
                 try:
@@ -87,6 +89,8 @@ def resolve_fallback(*, environ: Mapping[str, str] | None = None, proc_root: Pat
                 return _identity(runtime["id"], session or f'{runtime["id"]}-{pid}-{process["start"]}',
                                  (pid, process["start"]), "runtimeAncestor")
         pid = process["parent"]
+    if declared and not owner_raw:
+        return _identity("declared", declared, source="declared")
     if current and current["tty"]:
         leader = _process(root, current["leader"])
         if leader:
@@ -112,3 +116,15 @@ def resolve(*, environ: Mapping[str, str] | None = None, proc_root: Path | None 
         except (OSError, ValueError, subprocess.SubprocessError):
             pass
     return resolve_fallback(environ=env, proc_root=proc_root, start_pid=start_pid)
+
+
+def envelope(*, environ: Mapping[str, str] | None = None) -> dict | None:
+    """Read the native facet view. Absence never grants a capability tier."""
+    env = dict(os.environ if environ is None else environ)
+    try:
+        result = subprocess.run([env.get("EPR_BIN") or "epr", "session", "show", "--json"],
+                                env=env, capture_output=True, text=True, timeout=5, check=True)
+        view = json.loads(result.stdout)
+        return view if isinstance(view, dict) else None
+    except (OSError, ValueError, subprocess.SubprocessError):
+        return None

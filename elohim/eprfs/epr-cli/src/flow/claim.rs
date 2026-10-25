@@ -137,6 +137,9 @@ fn short_cid_str(cid: &str) -> String {
 /// happens in Phase 1, so a refused claim leaves the sidecar byte-identical.
 pub fn claim(root: &Path, request: &ClaimRequest) -> FlowResult<ClaimOutcome> {
     // ── Phase 1: resolve. Nothing below this line touches the sidecar until Phase 2. ──
+    let envelope = crate::session_envelope::live_guard(request.actor.session.as_deref(), root)
+        .map_err(FlowError::InvalidArguments)?;
+    let root = envelope.root.as_path();
     let on = non_empty(request.on, "--on")?;
     let named = named_identity(request.actor.as_ref.as_deref())?;
 
@@ -195,6 +198,9 @@ pub fn claim(root: &Path, request: &ClaimRequest) -> FlowResult<ClaimOutcome> {
     }
     if let Some(habit) = &habit {
         classified_as.push(format!("{HABIT_SLOT_PREFIX}{habit}"));
+    }
+    if let Some(session) = &request.actor.session {
+        classified_as.push(format!("session:{session}"));
     }
     attribution.append_slots(&mut classified_as);
 

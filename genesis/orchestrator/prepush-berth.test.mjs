@@ -39,7 +39,7 @@ if [ "$1" = claim ]; then
     0) echo "$2: claimed by codex-1 (session from env)"; exit 0 ;;
     R) echo "$2: renewed by codex-1 (session from env)"; exit 0 ;;
     3) echo "$2: REFUSED — held by did:key:z6MkDeviceA/claude-1 since 2026-10-23T15:28:09Z" >&2; exit 3 ;;
-    4) echo "berth: no session (pass --session, or set BERTH_SESSION / CLAUDE_SESSION_ID)" >&2; exit 4 ;;
+    4) echo "berth: no session (pass --session, or set ELOHIM_SESSION_ID / CLAUDE_SESSION_ID)" >&2; exit 4 ;;
     I) kill -INT "$HOOK_PID"; exit 130 ;;
     U) echo "$2: renewed here, but the renew record did not reach this device's channel store (/x): y" >&2; exit 1 ;;
     E) echo "Traceback (most recent call last): KeyError" >&2; exit 1 ;;

@@ -14,6 +14,7 @@ loader.exec_module(census)
 class CensusTest(unittest.TestCase):
     def test_known_implementation_per_family(self):
         fixtures = {
+            'session-facet keys': ('.claude/hooks/rogue.py', 'session = "bootstrap-" + session_id'),
             'session resolvers': ('.claude/hooks/ram-guard.py', 'session = data.get("session_id") or os.environ.get("CLAUDE_SESSION_ID") or "default"'),
             'proc session ancestry': ('.claude/hooks/ram-guard.py', 'def claude_pid():\n    pid = os.getppid()\n    for _ in range(3):\n        with open(f"/proc/{pid}/stat") as f:\n            pid = int(f.read().rsplit(")", 1)[1].split()[1])'),
             'epr/brit lookup paths': ('.claude/scripts/_lib/bin_store.py', 'def resolve_binary(tool, env):'),
@@ -27,10 +28,22 @@ class CensusTest(unittest.TestCase):
             with self.subTest(family=family):
                 self.assertIn(family, census.matching_families(path, body))
 
+    def test_review_regressions_are_visible_in_every_facet(self):
+        for path, body in [
+            ('elohim/eprfs/epr-cli/src/covenant.rs', 'let session = std::env::var("CLAUDE_SESSION_ID");'),
+            ('elohim/eprfs/epr-cli/src/flow/memory/recall/mod.rs', 'let key = format!("bootstrap-{id}");'),
+            ('.claude/hooks/rogue.py', 'session = os.environ.get("ELOHIM_SESSION_ID")'),
+            ('.claude/hooks/participant-standing.py', 'session = payload.get("session_id", "")'),
+            ('.claude/hooks/covenant-subagent-stamp.py', 'session = payload["session_id"]'),
+            ('.claude/hooks/blind-reader-review.py', "session = payload.get('session_id')"),
+        ]:
+            with self.subTest(path=path):
+                self.assertIn('session-facet keys', census.matching_families(path, body))
+
     def test_repository_implementations_remain_visible(self):
         examples = {
             'session resolvers': '.claude/scripts/_lib/session.py',
-            'proc session ancestry': 'genesis/agentic/bin/berth',
+            'session-facet keys': 'elohim/eprfs/epr-cli/src/session_envelope.rs',
             'epr/brit lookup paths': '.claude/scripts/_lib/epr_client.py',
             'arrival surfaces': 'elohim/eprfs/epr-cli/src/device/arrival.rs',
             'follow-set declarations': 'genesis/agentic/bin-tools.json',

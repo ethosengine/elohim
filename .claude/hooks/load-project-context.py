@@ -160,7 +160,7 @@ def _epr_bootstrap_block(project_dir: str, data: dict) -> str:
         r = subprocess.run(
             [binary, 'flow', 'memory', 'recall', 'open',
              '--purpose', 'bootstrap', '--lens', 'minimal',
-             '--session', f'bootstrap-{session_id}', '--root', project_dir],
+             '--session', session_id, '--root', project_dir],
             capture_output=True, text=True, timeout=RECALL_TIMEOUT_S,
         )
     except subprocess.TimeoutExpired:
@@ -215,7 +215,8 @@ def main():
         # Get project directory
         project_dir = os.environ.get('CLAUDE_PROJECT_DIR', '/projects/elohim')
 
-        session_id = str(data.get('session_id') or 'nosess')
+        obs = _observation_module(project_dir)
+        session_id = obs.bootstrap_session_id(project_dir, data) if obs else ""
         seed_memory_injection_flag(session_id)
 
         context_parts = []

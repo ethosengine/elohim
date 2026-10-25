@@ -3172,3 +3172,141 @@ decisionPoints:
   contractTests:
   - {path: elohim/eprfs/device-runtime/tests/launcher.rs, testName: redirected_store_refuses_running_launcher_candidate, kind: integration}
   - {path: genesis/agentic/native-epr-bootstrap.test.mjs, testName: hooklessLauncherQueuesTheExistingBootstrap, kind: integration}
+- name: envelope-owner-dead
+  kind: verdict-fn
+  sourceLocation:
+    file: src/envelope.rs
+    modulePath: Envelope::owner_dead
+  summary: Only a missing or replaced pid/start pair is dead; unknown owners remain open.
+  concernIds: &a2_session_concerns
+  - id: C0
+    status: answered
+    justification: Private device-local binding and view; no DHT heads, network advertising or remote
+      authority.
+  - id: C1
+    status: answered
+    justification: P1 is the join key. Standing, claims, leases and grants retain their existing authorities.
+  - id: C2
+    status: n-a
+    justification: No peer head selection or convergence ordering is introduced.
+  - id: C3
+    status: answered
+    justification: Liveness compares pid and start time. Missing owner evidence never closes an envelope.
+  - id: C4
+    status: answered
+    justification: Invalid identity, conflicting binding, missing standing and sealed sessions refuse
+      explicitly.
+  - id: C5
+    status: n-a
+    justification: No remote custody attestation; standing is read from the existing device roster.
+  - id: C6a
+    status: partial
+    justification: Envelope locks time out at five seconds; invoked berth still uses its existing local
+      execution bounds.
+  - id: C6b
+    status: answered
+    justification: Lifecycle lock serializes binding and closure. Seal and witness checkpoints support
+      retry.
+  - id: C7
+    status: n-a
+    justification: No serving surface or peer advertisements.
+  - id: C8
+    status: answered
+    justification: Errors return to the caller. Closure records a harness witness without fulfilling work
+      claims.
+  - id: C9
+    status: answered
+    justification: P1 owner evidence and the existing device did:key bind identity; unsafe local names
+      refuse.
+  - id: C10
+    status: answered
+    justification: Unprefixed P1 key; executor raw CID comes from the pinned release. Old hex requires
+      explicit adoption.
+  - id: C11
+    status: n-a
+    justification: No shared compute resource or network backpressure is introduced.
+  - id: C12
+    status: answered
+    justification: The envelope reads steward standing and covenant clauses; it cannot grant either.
+  - id: C13
+    status: answered
+    justification: Absent runtime model stays absent. The view cannot elevate missing tier evidence.
+  - id: C14
+    status: answered
+    justification: Closed bindings and exact covenant snapshots remain private beside the device key.
+  contractTests:
+  - path: elohim/eprfs/epr-cli/tests/session_envelope.rs
+    testName: session_envelope_native_facets_and_hook_pin_regressions
+    kind: integration
+  - path: elohim/eprfs/device-runtime/tests/envelope.rs
+    testName: binding_is_idempotent_private_and_cannot_be_reused_or_traverse
+    kind: integration
+- name: envelope-open-conflict
+  kind: verdict-fn
+  sourceLocation:
+    file: src/envelope.rs
+    modulePath: Store::open
+  summary: Idempotent matching live binding; refuse owner, device, steward, checkout or closed-state conflicts.
+  concernIds: *a2_session_concerns
+  contractTests:
+  - path: elohim/eprfs/epr-cli/tests/session_envelope.rs
+    testName: session_envelope_native_facets_and_hook_pin_regressions
+    kind: integration
+  - path: elohim/eprfs/device-runtime/tests/envelope.rs
+    testName: binding_is_idempotent_private_and_cannot_be_reused_or_traverse
+    kind: integration
+- name: envelope-path-valid
+  kind: verdict-fn
+  sourceLocation:
+    file: src/envelope.rs
+    modulePath: Store::path
+  summary: Validate P1 without sanitization; refuse traversal, overlong names and symlink records.
+  concernIds: *a2_session_concerns
+  contractTests:
+  - path: elohim/eprfs/epr-cli/tests/session_envelope.rs
+    testName: session_envelope_native_facets_and_hook_pin_regressions
+    kind: integration
+  - path: elohim/eprfs/device-runtime/tests/envelope.rs
+    testName: binding_is_idempotent_private_and_cannot_be_reused_or_traverse
+    kind: integration
+- name: envelope-model-source
+  kind: verdict-fn
+  sourceLocation:
+    file: src/envelope.rs
+    modulePath: model
+  summary: Explicit model, then declared runtime exports, otherwise absent.
+  concernIds: *a2_session_concerns
+  contractTests:
+  - path: elohim/eprfs/epr-cli/tests/session_envelope.rs
+    testName: session_envelope_native_facets_and_hook_pin_regressions
+    kind: integration
+  - path: elohim/eprfs/device-runtime/tests/envelope.rs
+    testName: binding_is_idempotent_private_and_cannot_be_reused_or_traverse
+    kind: integration
+- name: session-lazy-open
+  kind: verdict-fn
+  sourceLocation:
+    file: src/bin_store/launch.rs
+    modulePath: launch_os
+  summary: Launch epr ordinary session work with lazy envelope opening; identity, bootstrap and installation
+    commands remain usable before enrollment.
+  concernIds: *a2_session_concerns
+  contractTests:
+  - path: elohim/eprfs/epr-cli/tests/session_envelope.rs
+    testName: session_envelope_native_facets_and_hook_pin_regressions
+    kind: integration
+  - path: elohim/eprfs/device-runtime/tests/envelope.rs
+    testName: binding_is_idempotent_private_and_cannot_be_reused_or_traverse
+    kind: integration
+
+- name: envelope-live
+  kind: verdict-fn
+  sourceLocation:
+    file: src/envelope.rs
+    modulePath: Envelope::is_live
+  summary: Neither sealed nor closed; the shared predicate behind require_live and the session view.
+  concernIds: *a2_session_concerns
+  contractTests:
+  - path: elohim/eprfs/device-runtime/tests/envelope.rs
+    testName: liveness_and_guard_agree_at_every_close_checkpoint
+    kind: integration

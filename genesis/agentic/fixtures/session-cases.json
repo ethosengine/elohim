@@ -176,11 +176,11 @@
       ]
     },
     "expected": {
-      "runtime": "declared",
-      "session": "yes",
-      "ownerPid": null,
-      "ownerStartTime": null,
-      "source": "declared"
+      "runtime": "codex",
+      "session": "codex-200-2000",
+      "ownerPid": 200,
+      "ownerStartTime": "2000",
+      "source": "runtimeAncestor"
     }
   },
   {
@@ -1361,6 +1361,456 @@
     "expected": {
       "runtime": "codex",
       "session": "inner",
+      "ownerPid": 200,
+      "ownerStartTime": "2000",
+      "source": "runtimeAncestor"
+    }
+  },
+  {
+    "name": "nested Codex rejects inherited Claude declaration",
+    "env": {
+      "ELOHIM_SESSION_ID": "declared",
+      "ELOHIM_SESSION_OWNER_PID": "100"
+    },
+    "processes": [
+      [
+        400,
+        300,
+        "python3",
+        100,
+        0,
+        4000,
+        {}
+      ],
+      [
+        300,
+        200,
+        "bash",
+        100,
+        0,
+        3000,
+        {}
+      ],
+      [
+        200,
+        100,
+        "codex",
+        100,
+        0,
+        2000,
+        {}
+      ],
+      [
+        100,
+        1,
+        "claude",
+        100,
+        0,
+        1000,
+        {}
+      ]
+    ],
+    "startPid": 400,
+    "registry": {
+      "version": 1,
+      "runtimes": [
+        {
+          "id": "claude-code",
+          "comm": [
+            "claude"
+          ],
+          "sessionEnv": [
+            "CLAUDE_CODE_SESSION_ID",
+            "CLAUDE_SESSION_ID"
+          ]
+        },
+        {
+          "id": "codex",
+          "comm": [
+            "codex"
+          ],
+          "sessionEnv": [
+            "CODEX_SESSION_ID",
+            "CODEX_THREAD_ID"
+          ]
+        },
+        {
+          "id": "gemini",
+          "comm": [
+            "gemini"
+          ],
+          "sessionEnv": []
+        },
+        {
+          "id": "antigravity",
+          "comm": [
+            "antigravity"
+          ],
+          "sessionEnv": []
+        }
+      ]
+    },
+    "expected": {
+      "runtime": "codex",
+      "session": "codex-200-2000",
+      "ownerPid": 200,
+      "ownerStartTime": "2000",
+      "source": "runtimeAncestor"
+    }
+  },
+  {
+    "name": "ownerless declaration cannot cross runtime",
+    "env": {
+      "ELOHIM_SESSION_ID": "declared"
+    },
+    "processes": [
+      [
+        400,
+        300,
+        "python3",
+        100,
+        0,
+        4000,
+        {}
+      ],
+      [
+        300,
+        200,
+        "bash",
+        100,
+        0,
+        3000,
+        {}
+      ],
+      [
+        200,
+        100,
+        "codex",
+        100,
+        0,
+        2000,
+        {}
+      ],
+      [
+        100,
+        1,
+        "claude",
+        100,
+        0,
+        1000,
+        {}
+      ]
+    ],
+    "startPid": 400,
+    "registry": {
+      "version": 1,
+      "runtimes": [
+        {
+          "id": "claude-code",
+          "comm": [
+            "claude"
+          ],
+          "sessionEnv": [
+            "CLAUDE_CODE_SESSION_ID",
+            "CLAUDE_SESSION_ID"
+          ]
+        },
+        {
+          "id": "codex",
+          "comm": [
+            "codex"
+          ],
+          "sessionEnv": [
+            "CODEX_SESSION_ID",
+            "CODEX_THREAD_ID"
+          ]
+        },
+        {
+          "id": "gemini",
+          "comm": [
+            "gemini"
+          ],
+          "sessionEnv": []
+        },
+        {
+          "id": "antigravity",
+          "comm": [
+            "antigravity"
+          ],
+          "sessionEnv": []
+        }
+      ]
+    },
+    "expected": {
+      "runtime": "codex",
+      "session": "codex-200-2000",
+      "ownerPid": 200,
+      "ownerStartTime": "2000",
+      "source": "runtimeAncestor"
+    }
+  },
+  {
+    "name": "plain CI subprocess keeps declared owner",
+    "env": {
+      "ELOHIM_SESSION_ID": "declared",
+      "ELOHIM_SESSION_OWNER_PID": "300"
+    },
+    "processes": [
+      [
+        400,
+        300,
+        "python3",
+        0,
+        0,
+        4000,
+        {}
+      ],
+      [
+        300,
+        0,
+        "bash",
+        0,
+        0,
+        3000,
+        {}
+      ]
+    ],
+    "startPid": 400,
+    "registry": {
+      "version": 1,
+      "runtimes": [
+        {
+          "id": "claude-code",
+          "comm": [
+            "claude"
+          ],
+          "sessionEnv": [
+            "CLAUDE_CODE_SESSION_ID",
+            "CLAUDE_SESSION_ID"
+          ]
+        },
+        {
+          "id": "codex",
+          "comm": [
+            "codex"
+          ],
+          "sessionEnv": [
+            "CODEX_SESSION_ID",
+            "CODEX_THREAD_ID"
+          ]
+        },
+        {
+          "id": "gemini",
+          "comm": [
+            "gemini"
+          ],
+          "sessionEnv": []
+        },
+        {
+          "id": "antigravity",
+          "comm": [
+            "antigravity"
+          ],
+          "sessionEnv": []
+        }
+      ]
+    },
+    "expected": {
+      "runtime": "declared",
+      "session": "declared",
+      "ownerPid": 300,
+      "ownerStartTime": "3000",
+      "source": "declared"
+    }
+  },
+  {
+    "name": "declaring process keeps own identity",
+    "env": {
+      "ELOHIM_SESSION_ID": "declared",
+      "ELOHIM_SESSION_OWNER_PID": "400"
+    },
+    "processes": [
+      [
+        400,
+        300,
+        "python3",
+        100,
+        0,
+        4000,
+        {}
+      ],
+      [
+        300,
+        200,
+        "bash",
+        100,
+        0,
+        3000,
+        {}
+      ],
+      [
+        200,
+        100,
+        "codex",
+        100,
+        0,
+        2000,
+        {}
+      ],
+      [
+        100,
+        1,
+        "claude",
+        100,
+        0,
+        1000,
+        {}
+      ]
+    ],
+    "startPid": 400,
+    "registry": {
+      "version": 1,
+      "runtimes": [
+        {
+          "id": "claude-code",
+          "comm": [
+            "claude"
+          ],
+          "sessionEnv": [
+            "CLAUDE_CODE_SESSION_ID",
+            "CLAUDE_SESSION_ID"
+          ]
+        },
+        {
+          "id": "codex",
+          "comm": [
+            "codex"
+          ],
+          "sessionEnv": [
+            "CODEX_SESSION_ID",
+            "CODEX_THREAD_ID"
+          ]
+        },
+        {
+          "id": "gemini",
+          "comm": [
+            "gemini"
+          ],
+          "sessionEnv": []
+        },
+        {
+          "id": "antigravity",
+          "comm": [
+            "antigravity"
+          ],
+          "sessionEnv": []
+        }
+      ]
+    },
+    "expected": {
+      "runtime": "declared",
+      "session": "declared",
+      "ownerPid": 400,
+      "ownerStartTime": "4000",
+      "source": "declared"
+    }
+  },
+  {
+    "name": "unrelated readable owner grants no declaration",
+    "env": {
+      "ELOHIM_SESSION_ID": "declared",
+      "ELOHIM_SESSION_OWNER_PID": "500"
+    },
+    "processes": [
+      [
+        400,
+        300,
+        "python3",
+        100,
+        0,
+        4000,
+        {}
+      ],
+      [
+        300,
+        200,
+        "bash",
+        100,
+        0,
+        3000,
+        {}
+      ],
+      [
+        200,
+        100,
+        "codex",
+        100,
+        0,
+        2000,
+        {}
+      ],
+      [
+        100,
+        1,
+        "claude",
+        100,
+        0,
+        1000,
+        {}
+      ],
+      [
+        500,
+        0,
+        "bash",
+        0,
+        0,
+        5000,
+        {}
+      ]
+    ],
+    "startPid": 400,
+    "registry": {
+      "version": 1,
+      "runtimes": [
+        {
+          "id": "claude-code",
+          "comm": [
+            "claude"
+          ],
+          "sessionEnv": [
+            "CLAUDE_CODE_SESSION_ID",
+            "CLAUDE_SESSION_ID"
+          ]
+        },
+        {
+          "id": "codex",
+          "comm": [
+            "codex"
+          ],
+          "sessionEnv": [
+            "CODEX_SESSION_ID",
+            "CODEX_THREAD_ID"
+          ]
+        },
+        {
+          "id": "gemini",
+          "comm": [
+            "gemini"
+          ],
+          "sessionEnv": []
+        },
+        {
+          "id": "antigravity",
+          "comm": [
+            "antigravity"
+          ],
+          "sessionEnv": []
+        }
+      ]
+    },
+    "expected": {
+      "runtime": "codex",
+      "session": "codex-200-2000",
       "ownerPid": 200,
       "ownerStartTime": "2000",
       "source": "runtimeAncestor"

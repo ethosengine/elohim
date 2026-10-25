@@ -102,7 +102,7 @@ pub(super) fn sync_parent(path: &Path) -> Result<()> {
     }
     Ok(())
 }
-pub(super) fn atomic_bytes(path: &Path, bytes: &[u8], mode: u32) -> Result<()> {
+pub(crate) fn atomic_bytes(path: &Path, bytes: &[u8], mode: u32) -> Result<()> {
     if let Some(parent) = path.parent() {
         fs::create_dir_all(parent)?;
     }
@@ -121,7 +121,7 @@ pub(super) fn atomic_bytes(path: &Path, bytes: &[u8], mode: u32) -> Result<()> {
     let _ = fs::remove_file(temp);
     result
 }
-pub(super) fn atomic_json(path: &Path, value: &impl Serialize) -> Result<()> {
+pub(crate) fn atomic_json(path: &Path, value: &impl Serialize) -> Result<()> {
     atomic_bytes(path, &serde_json::to_vec(value)?, 0o600)
 }
 pub(super) fn atomic_link(path: &Path, target: &Path) -> Result<()> {
@@ -137,9 +137,15 @@ pub(super) fn atomic_link(path: &Path, target: &Path) -> Result<()> {
     let _ = fs::remove_file(temp);
     result
 }
-pub(super) struct Lock(File);
+pub(crate) struct Lock(File);
 impl Lock {
-    pub(super) fn acquire(root: &Path, timeout: Duration) -> Result<Self> {
+    pub(crate) fn acquire(root: &Path, timeout: Duration) -> Result<Self> {
+        Self::acquire_mode(root, timeout, libc::LOCK_EX)
+    }
+    pub(crate) fn shared(root: &Path, timeout: Duration) -> Result<Self> {
+        Self::acquire_mode(root, timeout, libc::LOCK_SH)
+    }
+    fn acquire_mode(root: &Path, timeout: Duration, mode: libc::c_int) -> Result<Self> {
         fs::create_dir_all(root)?;
         let file = OpenOptions::new()
             .create(true)
@@ -148,7 +154,7 @@ impl Lock {
         let start = Instant::now();
         loop {
             // SAFETY: the fd is open and owned for the lifetime of Lock; flock doesn't retain pointers.
-            if unsafe { libc::flock(file.as_raw_fd(), libc::LOCK_EX | libc::LOCK_NB) } == 0 {
+            if unsafe { libc::flock(file.as_raw_fd(), mode | libc::LOCK_NB) } == 0 {
                 return Ok(Self(file));
             }
             let error = std::io::Error::last_os_error();
@@ -179,7 +185,7 @@ pub(super) fn now_seconds() -> u64 {
         .unwrap_or_default()
         .as_secs()
 }
-pub(super) fn now() -> String {
+pub(crate) fn now() -> String {
     let seconds = now_seconds() as libc::time_t;
     let mut tm = std::mem::MaybeUninit::<libc::tm>::uninit();
     // SAFETY: gmtime_r writes to tm and reads a valid time_t. Check success before reading tm.

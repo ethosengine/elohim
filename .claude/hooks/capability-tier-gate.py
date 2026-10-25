@@ -144,7 +144,6 @@ import sys
 
 PROJECT_DIR = os.environ.get("CLAUDE_PROJECT_DIR", "/projects/elohim")
 POLICY_FILE = os.path.join(PROJECT_DIR, ".claude", "epr-meta", "policies.yaml")
-ACTORS_FILE = os.path.join(PROJECT_DIR, ".eprfs", "status", "actors.jsonl")
 
 POLICY_ID = "destructive-git-requires-tier"
 POLICY_VERSION = 1
@@ -229,7 +228,7 @@ _ASSIGNMENT_RE = re.compile(r"^([A-Za-z_][A-Za-z0-9_]*)=(.*)$", re.S)
 
 from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "scripts"))
-from _lib.session import resolve as resolve_session_identity
+from _lib.session import resolve as resolve_session_identity, envelope as session_envelope
 
 def _space_operators(text: str) -> str:
     """Insert spaces around shell operators found OUTSIDE quotes and outside backslash escapes,
@@ -880,52 +879,24 @@ def _verify_pin(row: dict):
     return True, None
 
 
-def _latest_claim(session_id: str) -> "str | None":
-    try:
-        with open(ACTORS_FILE) as f:
-            lines = f.readlines()
-    except Exception:
-        return None
-    latest = None
-    for line in lines:
-        line = line.strip()
-        if not line:
-            continue
-        try:
-            obj = json.loads(line)
-        except Exception:
-            continue
-        record = obj.get("record") if isinstance(obj, dict) else None
-        if not isinstance(record, dict) or record.get("kind") != "claim":
-            continue
-        if record.get("session") != session_id:
-            continue
-        claimed = record.get("claimed")
-        if isinstance(claimed, str) and claimed:
-            latest = claimed
-    return latest
-
-
-def _resolve_tier(session_id: str) -> str:
-    # R-P17: the RUNNING model's tier is resolved before any claim. A subagent inherits its
-    # parent's session id, and with it the parent's claim — possibly `human:<handle>`, the top
-    # tier. `CLAUDE_MODEL` names the model actually executing, so it wins over whatever claim
-    # the inherited session carries; a claim only answers when no running model is declared.
-    env_tier = os.environ.get("CLAUDE_MODEL")
-    if env_tier and env_tier.strip():
-        return env_tier.strip()
-    if session_id:
-        claimed = _latest_claim(session_id)
-        if claimed and claimed.startswith("human:"):
-            # R-P7: a human claim carries no `@model` — it resolves to the tier `human`, which
-            # the declared tier-order ranks above every model tier (the operator IS the team
-            # check the remedy asks for).
-            return "human"
-        if claimed:
-            _, _, model = claimed.partition("@")
-            if model:
-                return model
-    return "unknown"
+def _resolve_tier(session_id: str, model: str | None, tier_order: list[str], *, subagent: bool = False) -> str:
+    view = session_envelope()
+    if not view or view.get("envelope", {}).get("identity", {}).get("session") != session_id:
+        return "unknown"
+    if view.get("live") is not True:
+        return "unknown"
+    claim = view.get("capabilityTier") or "unknown"
+    # Only the harness payload observes this tool's executing model. The envelope's
+    # descriptive model and inherited environment never change this ceiling.
+    if not model:
+        return tier_order[0] if subagent else claim
+    if model not in tier_order:
+        return "unknown"
+    if claim == "unknown":
+        return "unknown" if view.get("standing", {}).get("claim") else model
+    if claim not in tier_order:
+        return claim
+    return min((claim, model), key=tier_order.index)
 
 
 def _session_id_from_env() -> str:
@@ -1125,7 +1096,9 @@ def main():
         return
 
     session_id = _session_id_from_env()
-    tier = _resolve_tier(session_id)
+    tier = _resolve_tier(session_id, data.get("model"), row["tier_order"],
+                         subagent=any(data.get(key) for key in
+                                      ("agent_id", "agent_type", "subagent_id", "subagent_type")))
 
     tier_order = row["tier_order"]
     floor = row["tier_floor"]

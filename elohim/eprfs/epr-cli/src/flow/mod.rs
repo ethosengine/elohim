@@ -1414,7 +1414,7 @@ pub(crate) fn session_came_from_env(session: &str) -> bool {
 /// question that has one answer for everybody.
 fn resolve_session(explicit: Option<String>) -> Option<String> {
     let (session, from_env) =
-        resolve_session_origin(explicit, || crate::session::resolve().session);
+        resolve_session_origin(explicit, || crate::session_envelope::current_id().ok());
     SESSION_FROM_ENV.with(|cell| {
         *cell.borrow_mut() = if from_env { session.clone() } else { None };
     });

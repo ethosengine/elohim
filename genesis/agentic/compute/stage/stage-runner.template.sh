@@ -104,7 +104,8 @@ export A2O_SPRINT_REPORT_JSON="$SCRATCH/sprint-report-stage.json"
 export A2O_SPRINT_REPORT_MD="$SCRATCH/sprint-report-stage.md"
 # So the inner mesh berth claim is attributable to this stage, not to whatever ambient
 # session (or none) launched the guest process.
-export BERTH_SESSION="stage:$STAGE_NAME"
+export ELOHIM_SESSION_ID="stage-$STAGE_NAME-$$"
+export ELOHIM_SESSION_OWNER_PID="$$"
 export BERTH_CLASS="verify"
 CUCUMBER_JSON_REPORT="$REPORT" "$JUST_BIN" test mesh "$FEATURE"
 rc=$?

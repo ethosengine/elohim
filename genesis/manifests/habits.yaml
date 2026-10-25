@@ -100,6 +100,7 @@ habits:
     status: red
     active: true
     checks:
+      - "a2o @concern:dataplane-convergence (genesis/a2o/features/devflow/session-envelope.feature — Act I host: one P1 session, one pinned executor CID; independent lease/claim joins and once-only explicit or observed-owner closure)"
       - "a2o @concern:federation-deploy (genesis/a2o/features/dataplane/federation-deploy.feature — deploy uniformity, Act II; and genesis/a2o/features/dataplane/federation-version-convergence.feature — version convergence, Act I, runnable on the household mesh)"
       - "a2o @concern:content-sync, @concern:blob-replication, @concern:peer-mesh, @concern:epr-projection-fallback, @concern:reconcile-inventory (edge Dataplane Validation stage)"
       - "cargo test --test p2p sync_libp2p_convergence (elohim/elohim-storage; the module lives in tests/p2p/sync_libp2p_convergence.rs inside the consolidated `p2p` test binary — there is no target named sync_libp2p_convergence)"
@@ -111,10 +112,10 @@ habits:
       - "a2o @concern:hub-carries-edit (genesis/a2o/features/dataplane/hub-carries-edit.feature — RED-FIRST 2026-09-22, runnable on the household mesh with A2O_ALLOW_DESTRUCTIVE=1: a write through doorway alpha reaches the peer that stays up within 5s and a stopped peer after restart with nothing written to it. Seam of the local-first shared-sheet vision, features/federation/local-first-shared-sheet.feature)"
       - "a2o @concern:household-follows-head (genesis/a2o/features/devflow/epr-follows-its-head.feature — Act I host, the binary class of this invariant: a device that missed a landing heals at its next session, a session keeps its pinned CID, a failed health check or a dirty build never becomes the head, and moving back is a revert. Spec genesis/docs/superpowers/specs/2026-10-23-household-follows-latest-design.md, slices 1–2 = epr plus brit following its attested gitlink pin on one workspace)"
     evidence: >
-      DELTA 2026-10-24c (RED preserved; the epr head had never landed on shem (`bin-store status`: `head: null`), now it can): `bin-store` judged cleanliness over the whole tree on every ingest, because `source_paths` ran `cargo metadata --offline` unfiltered, which needs every platform's crates (`android_system_properties`) that no host build downloads. Cargo exited 101, the whole-tree fallback took over, and the hooks' own `.claude/data` ledgers made each pre-push candidate a `dirty-build` (e8b8ec499: "bin-store refused epr candidate health or provenance"). The resolve is now filtered to the rustc host, which keeps the 20 in-repo path packages and nothing outside the repo; `source-state` on e8b8ec499 reads `clean: true`. Proof: `bin_store_test.py` 61 passed (new: the host-platform filter). The head itself lands at the next eprfs-gated push. NO status change.
-    evidence-fingerprint: sha256:c710960b7d543f36
-    evidence-bytes: 262487
-    evidence-entries: 170
+      DELTA 2026-10-25-A2 (RED preserved; device-runtime A2, the session envelope): one P1 session id now keys every facet an agent holds — berth leases, work and tier claims, covenant clauses, recall and pinned tool CIDs — through one device-local envelope beside the device key, which holds none of their authority; explicit close and dead-owner collection share one release, one covenant seal and one witness. The recall bootstrap's per-turn refusal was diagnosed (the main checkout's hooks ran a mutable cargo target, and the recorded digest predated CIDv1) and is cured by the session's pinned executor (regression: two hooks, one rebuild, one CID). Census: session-facet keys 13→1, proc ancestry walkers 1→0, resolvers 4→3. Proof: 1,237 Rust tests (20 envelope regressions), berth 84, tier 69, a2o session-envelope 2 scenarios/10 steps, schemas and projections, all exit 0. Code review (gpt-6-astra, fresh reader per round): REVISE 7 (4 P1), 6 (5 P1), 5 (4 P1), 4 (3 P1), all fixed; the round-4 fixes were not re-reviewed: the controller read the tier-gate fix, and the other three rest on their regressions and the pre-push gates. Story review (fresh blind reader per round): REVISE 0c/6i/1p, REVISE 0c/5i/3p, READY 1c/1i/3p (fixed), READY 0c/5i/1p. Still red: one session's pinned CID is not yet proved on the household or across devices (slice B).
+    evidence-fingerprint: sha256:55734eb17d9b1d67
+    evidence-bytes: 263849
+    evidence-entries: 171
     guard: >
       Regression risk = the fleet-safety invariants in sync/projector.rs
       (empty-never-projects, reconcile-offers/events-assert, broadcast-tier reach

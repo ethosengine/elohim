@@ -236,12 +236,26 @@ describe('writer: one attestation per measured concern of a household run', () =
         join(dir, 'moorings', 'sess-1.json'),
         JSON.stringify({ session: 'sess-1', principal: 'root', recipient: { model: 'opus' } })
       );
-      assert.deepEqual(resolveMooring({ BERTH_DIR: dir, BERTH_SESSION: 'sess-1' }), {
-        session: 'sess-1',
-        principal: 'root',
-        recipient: { model: 'opus' },
-      });
-      assert.equal(resolveMooring({ BERTH_DIR: dir, BERTH_SESSION: 'nobody' }), null);
+      assert.deepEqual(
+        resolveMooring({
+          BERTH_DIR: dir,
+          ELOHIM_SESSION_ID: 'sess-1',
+          ELOHIM_SESSION_OWNER_PID: String(process.pid),
+        }),
+        {
+          session: 'sess-1',
+          principal: 'root',
+          recipient: { model: 'opus' },
+        }
+      );
+      assert.equal(
+        resolveMooring({
+          BERTH_DIR: dir,
+          ELOHIM_SESSION_ID: 'nobody',
+          ELOHIM_SESSION_OWNER_PID: String(process.pid),
+        }),
+        null
+      );
       assert.equal(resolveMooring({ BERTH_DIR: dir }), null);
     } finally {
       rmSync(dir, { recursive: true, force: true });

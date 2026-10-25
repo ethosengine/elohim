@@ -584,7 +584,7 @@ The storage instruments now have focused native verification: 41 runtime-setting
 and process identity). This supersedes the earlier interrupted-test frontier. They are still not
 evidence from a rebuilt household binary; do not scrape an old binary expecting the new series.
 
-After the cargo lane is empty and you have moored/claimed it with a unique `BERTH_SESSION`, run
+After the cargo lane is empty and you have moored/claimed it with a unique `ELOHIM_SESSION_ID` and `ELOHIM_SESSION_OWNER_PID=$$`, run
 from the repository root (pool path is this workspace's resolved storage slot):
 
 ```bash

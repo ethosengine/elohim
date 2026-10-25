@@ -77,6 +77,13 @@ export default function () {
       paths: ['features/devflow/rust-style.feature'],
       format: ['progress'],
     },
+    // Native envelopes, facet stores and runtime ancestry are isolated fixtures.
+    'session-envelope': {
+      requireModule: ['tsx'],
+      require: ['steps/devflow/session-envelope.steps.ts'],
+      paths: ['features/devflow/session-envelope.feature'],
+      format: ['progress'],
+    },
     // A workspace arriving as one of its person's devices: the real `epr` against a temp
     // repository and two key files outside it (the ceremony's "no key crosses" is checkable).
     'device-arrival': {

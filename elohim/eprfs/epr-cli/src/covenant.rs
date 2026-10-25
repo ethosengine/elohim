@@ -108,12 +108,21 @@ pub fn run(args: &[String]) -> CovResult<ExitCode> {
         None => std::env::current_dir()
             .map_err(|e| format!("cannot read the working directory: {e}"))?,
     };
-    let root = git::discover_root(&start).map_err(|e| e.to_string())?;
     let session = args
         .session
         .clone()
         .filter(|s| !s.is_empty())
-        .ok_or("--session is required")?;
+        .or_else(|| crate::session_envelope::current_id().ok())
+        .ok_or("no P1 session is available")?;
+    let _envelope = if matches!(verb, "record" | "check") {
+        Some(crate::session_envelope::live_guard(Some(&session), &start)?)
+    } else {
+        None
+    };
+    let root = match &_envelope {
+        Some(guard) => guard.root.clone(),
+        None => git::discover_root(&start).map_err(|e| e.to_string())?,
+    };
     let value = match verb {
         "offer" => offer(&root, &session)?,
         "show" => show(&root, &session)?,
@@ -778,7 +787,7 @@ fn offer(root: &Path, session: &str) -> CovResult<Value> {
 // show
 // ---------------------------------------------------------------------------
 
-fn show(root: &Path, session: &str) -> CovResult<Value> {
+pub(crate) fn show(root: &Path, session: &str) -> CovResult<Value> {
     let brit = Brit::resolve(root)?;
     let covenant = Covenant::read(root, session, &brit)?;
     let verdicts = covenant.verdicts()?;

@@ -1,60 +1,9 @@
 #!/usr/bin/env python3
-"""Task 2.2: the SessionStart headline and the per-turn run-plane line are projections of
-`epr flow memory recall open --purpose bootstrap` at lenses `minimal` and `simple`.
-
-Station two of the governed-discovery plan (2026-09-11): `load-project-context.py`'s
-`get_habits_status` (a bespoke `habits-status.py --headline` re-scan) and `run-projection.py`'s
-whole habits.yaml / flows.jsonl / commitments-stock derivation + its private cache are RETIRED.
-Both hooks become thin renderers of ONE native recall session — declared in
-`.claude/hooks/.epr-meta` (two exact-filename rules,
-`bootstrapping-head-is-recall-open-run-projection` and
-`bootstrapping-head-is-recall-open-load-project-context`) — never a second orientation.
-
-**Fix round 1 (2026-09-11 review)** changed the shape this file asserts against:
-
-  1. `.claude/hooks/.epr-meta`'s single `write: "*project*.py"` rule ALSO matched
-     `memory-index-projection.py` (fnmatch has no alternation; `"project"` is a substring of
-     `"projection"`) — split into two exact-filename rules. Asserted at the resolver level in
-     this task's own commit-time proof, not re-asserted here (this file has no `.epr-meta`
-     fixture of its own).
-  2. The session-id fallback formula moved to ONE place — `_observation.bootstrap_session_id
-     (project_dir, payload)` — imported by both hooks instead of duplicated. Both hooks now
-     use `_observation_module()` (a defensive try/except import) rather than a hard top-level
-     `from _observation import resolve_bin`.
-  3. `load-project-context.py`'s BOOTSTRAP block moved INSIDE the `hookSpecificOutput.
-     additionalContext` JSON wrapper (the documented SessionStart landing path) instead of a
-     second plain-text print after it. `run-projection.py --event session` (registered
-     `async: true`) is now a NO-OP — nothing derived, nothing printed — since an async hook's
-     stdout is not read by anything; `--event prompt` (and no `--event` at all) is unaffected.
-
-What is asserted:
-
-  1. FUNCTION-LEVEL, stubbed `epr` or a monkeypatched `_observation_module`: a missing binary,
-     a refusing binary, and a run past budget all produce exactly one `bootstrap: skipped —
-     <reason>` line — honest absence, never a fallback renderer. Also: the exact argv shape
-     each hook shells out with (`--purpose bootstrap`, the lens, `--session bootstrap-<id>`),
-     the session-id derivation (payload `session_id` wins; absent that, both hooks route
-     through the SAME shared `_observation.bootstrap_session_id`), and that `--event session`
-     is a true no-op for `run-projection.py`.
-  2. GOLDEN, against the REAL gate binary (skipped when unavailable): the two properties the
-     brief's own failing test names verbatim — the headline block (now read out of the JSON
-     wrapper's `additionalContext`) is the `minimal` lens under 2,000 bytes (mirrors the lens
-     table's `minimal` density; Task 2.1 round 2 added `last delta:`/`atom:` lines, moving the
-     right-sized block to ~1,730 bytes, and Task 3.1 moves the contract's declared density to
-     2,000 in its next bump) carrying `recipe bafk…`, `lens bafk…`, `top red:`, `last delta:`,
-     `atom:` and exactly one `  epr flow memory recall ` select line; the run-plane block is
-     the `simple` lens and never re-derives
-     (`re-derived this turn from habits.yaml` — the retired hook's own banner — must not
-     appear). Golden tests use a session id unique per test run (never the bare `input="{}"`
-     fallback) so a same-day re-run of this file never resumes a prior test's session and
-     silently drops the `top red:` orientation line that a resumed `open` omits.
-
-Run: EPR_BIN=/path/to/candidate/epr python3 -m unittest discover \
-       -s .claude/hooks/__tests__ -p 'bootstrap_projection_test.py'
+"""Bootstrap hooks share the P1 envelope identity and the session-pinned recall executor.
+Stub tests check rendering and honest refusal. Native proof uses private fixture stores.
 """
 from __future__ import annotations
 
-import hashlib
 import importlib.util
 import json
 import os
@@ -63,8 +12,7 @@ import subprocess
 import sys
 import tempfile
 import unittest
-import uuid
-from datetime import date
+from unittest.mock import patch
 from pathlib import Path
 
 HOOKS = Path(__file__).resolve().parent.parent
@@ -136,6 +84,7 @@ class _StubFixture(unittest.TestCase):
         library = self.project / ".claude" / "scripts" / "_lib"
         library.mkdir(parents=True)
         shutil.copy(HOOKS.parent / "scripts" / "_lib" / "epr_client.py", library)
+        shutil.copy(HOOKS.parent / "scripts" / "_lib" / "session.py", library)
         registry = self.project / "genesis" / "agentic"
         registry.mkdir(parents=True)
         shutil.copy(HOOKS.parents[1] / "genesis" / "agentic" / "bin-tools.json", registry / "bin-tools.json")
@@ -153,6 +102,8 @@ class _StubFixture(unittest.TestCase):
             "CLAUDE_PROJECT_DIR": str(self.project),
             "EPR_BIN": str(self.stub),
             "STUB_LOG": str(self.log),
+            "ELOHIM_SESSION_ID": "fixture-p1",
+            "ELOHIM_SESSION_OWNER_PID": str(os.getpid()),
             "TMPDIR": str(self.probe_tmp),
         })
         e.update(extra)
@@ -228,17 +179,16 @@ class HeadlineStubCase(_StubFixture):
         out = mod._epr_bootstrap_block(str(self.project), {"session_id": "missing-fixture"})
         self.assertEqual(out, "bootstrap: skipped — no epr binary resolved ($EPR_BIN or PATH)")
 
-    def test_session_id_prefers_the_payload_via_the_shared_helper(self):
+    def test_session_id_uses_p1_and_ignores_the_payload(self):
         obs = load_module("obs_for_lpc_session_id", HOOKS / "_observation.py")
-        got = obs.bootstrap_session_id(str(self.project), {"session_id": "abc-123"})
-        self.assertEqual(got, "abc-123")
+        with patch.dict(os.environ, self.env()):
+            got = obs.bootstrap_session_id(str(self.project), {"session_id": "abc-123"})
+        self.assertEqual(got, "fixture-p1")
 
-    def test_session_id_falls_back_to_a_hash_of_project_dir_and_date(self):
-        obs = load_module("obs_for_lpc_session_hash", HOOKS / "_observation.py")
-        got = obs.bootstrap_session_id(str(self.project), {})
-        expected = hashlib.sha256(
-            f"{self.project}:{date.today().isoformat()}".encode()).hexdigest()[:16]
-        self.assertEqual(got, expected)
+    def test_session_id_without_payload_still_uses_p1(self):
+        obs = load_module("obs_for_lpc_session_key", HOOKS / "_observation.py")
+        with patch.dict(os.environ, self.env()):
+            self.assertEqual(obs.bootstrap_session_id(str(self.project), {}), "fixture-p1")
 
 
 # ── run-projection.py (per-turn run-plane) ───────────────────────────────────────────────────
@@ -299,10 +249,11 @@ class RunPlaneStubCase(_StubFixture):
         lines = mod.run_plane_lines(self.project, {})
         self.assertEqual(lines, ["bootstrap: skipped — no epr binary resolved ($EPR_BIN or PATH)"])
 
-    def test_session_id_prefers_the_payload_via_the_shared_helper(self):
+    def test_session_id_uses_p1_and_ignores_the_payload(self):
         obs = load_module("obs_for_rp_session_id", HOOKS / "_observation.py")
-        got = obs.bootstrap_session_id(self.project, {"session_id": "abc-123"})
-        self.assertEqual(got, "abc-123")
+        with patch.dict(os.environ, self.env()):
+            got = obs.bootstrap_session_id(self.project, {"session_id": "abc-123"})
+        self.assertEqual(got, "fixture-p1")
 
     def test_both_hooks_route_to_the_one_shared_bootstrap_session_id(self):
         """Fix round 1, finding 2: the session-id fallback formula used to be duplicated
@@ -324,94 +275,18 @@ class RunPlaneStubCase(_StubFixture):
         self.assertEqual(got_run, got_lpc)
 
 
-# ── golden: the real gate binary, the real worktree ──────────────────────────────────────────
 class BootstrapProjectionGoldenCase(unittest.TestCase):
-    """Asserted against the REAL binary and the REAL corpus, or not at all. Every session id
-    used here is unique per run so a same-day re-run of this file never resumes a session a
-    prior run already opened (a resumed `open` omits the `top red:` orientation line)."""
+    """Real hooks and executable; all records and pins remain in a disposable fixture."""
 
-    @classmethod
-    def setUpClass(cls):
-        mod = load_module("obs_for_bootstrap_golden", HOOKS / "_observation.py")
-        cls.binary = mod.resolve_bin()
-        if not cls.binary:
-            raise unittest.SkipTest("no `epr` binary ($EPR_BIN or PATH)")
-        r = subprocess.run([cls.binary, "flow", "memory", "recall", "--help"],
-                           capture_output=True, text=True, timeout=10)
-        if "open" not in (r.stdout + r.stderr):
-            raise unittest.SkipTest(f"`{cls.binary}` predates `flow memory recall open`")
-        cls.tag = uuid.uuid4().hex[:12]
-
-    def env(self, session_id: str) -> dict:
-        e = dict(os.environ)
-        e["CLAUDE_PROJECT_DIR"] = str(REPO)
-        e["EPR_BIN"] = self.binary
-        e["_BOOTSTRAP_TEST_SESSION"] = session_id  # not read by the hook; documents intent
-        return e
-
-    def _rmsession(self, session_id: str):
-        shutil.rmtree(REPO / ".eprfs" / "status" / "recall" / f"bootstrap-{session_id}",
-                      ignore_errors=True)
-
-    def test_headline_block_is_the_minimal_lens_of_recall_open(self):
-        session_id = f"golden-headline-{self.tag}"
-        self.addCleanup(self._rmsession, session_id)
-        out = subprocess.run(
-            [sys.executable, str(HOOKS / "load-project-context.py")],
-            input=json.dumps({"session_id": session_id}), capture_output=True, text=True,
-            env=self.env(session_id), timeout=60).stdout
-        block = _bootstrap_block(out)
-        # Cap 2,000 bytes: mirrors the lens table's `minimal` density (Task 2.1 round 2 added
-        # `last delta:` and `atom:` lines to the minimal rendering, moving the right-sized block
-        # from ~1,500 to ~1,730 bytes; Task 3.1 moves the contract's declared `minimal` density
-        # to 2,000 in its next bump, so this cap tracks that rather than the pre-round-2 figure).
-        self.assertLess(len(block.encode()), 2000)
-        self.assertIn("recipe bafk", block)
-        self.assertIn("lens bafk", block)
-        self.assertIn("top red:", block)
-        self.assertIn("last delta:", block)
-        self.assertIn("atom:", block)
-        self.assertEqual(block.count("\n  epr flow memory recall "), 1)
-
-    def test_run_plane_is_the_simple_lens_and_names_no_second_renderer(self):
-        session_id = f"golden-runplane-{self.tag}"
-        self.addCleanup(self._rmsession, session_id)
-        out = subprocess.run(
-            [sys.executable, str(HOOKS / "run-projection.py"), "--event", "prompt"],
-            input=json.dumps({"session_id": session_id}), capture_output=True, text=True,
-            env=self.env(session_id), timeout=60).stdout
-        self.assertIn("lens bafk", out)
-        self.assertNotIn("re-derived this turn from habits.yaml", out)
-
-    def test_both_hooks_derive_the_same_session_label_for_the_same_payload_id(self):
-        """Continuity: an explicit `session_id` in the payload makes both hooks address the
-        SAME recall session, so the per-turn `open` resumes the orientation the SessionStart
-        `open` already established rather than starting a second, disconnected one. Observable
-        proof: a FRESH `open` carries the `Bootstrap: top red:` line; a RESUMED `open` on the
-        same session does not (the native executor's own resume semantics) — so seeing the
-        line on the first call and NOT on the second, same-session call is continuity, not a
-        coincidence of two independent fresh sessions."""
-        session_id = f"golden-parity-{self.tag}"
-        self.addCleanup(self._rmsession, session_id)
-        session_dir = REPO / ".eprfs" / "status" / "recall" / f"bootstrap-{session_id}"
-        self.assertFalse(session_dir.exists(), "a stale fixture session was not cleaned up")
-
-        headline_out = subprocess.run(
-            [sys.executable, str(HOOKS / "load-project-context.py")],
-            input=json.dumps({"session_id": session_id}), capture_output=True, text=True,
-            env=self.env(session_id), timeout=60).stdout
-        self.assertIn("top red:", _bootstrap_block(headline_out))
-        self.assertTrue(session_dir.is_dir(),
-                        "the SessionStart open did not create the expected session directory")
-
-        run_out = subprocess.run(
-            [sys.executable, str(HOOKS / "run-projection.py"), "--event", "prompt"],
-            input=json.dumps({"session_id": session_id}), capture_output=True, text=True,
-            env=self.env(session_id), timeout=60).stdout
-        self.assertIn("lens bafk", run_out)
-        self.assertNotIn("top red:", run_out,
-                         "the per-turn open did not resume the SessionStart session — it "
-                         "looks like a second, independent orientation was derived")
+    def test_hooks_share_a_pinned_executor_across_rebuild(self):
+        binary = os.environ.get("EPR_BIN")
+        if not binary or not Path(binary).is_file():
+            self.skipTest("set EPR_BIN to the candidate executable")
+        fixtures = load_module("envelope_bootstrap_fixture", REPO / "genesis/agentic/session_envelope_test.py")
+        with tempfile.TemporaryDirectory(prefix="bootstrap-native-") as base:
+            fixture = fixtures.Fixture(base)
+            fixture.setup()
+            fixture.hooks()
 
 
 if __name__ == "__main__":

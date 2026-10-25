@@ -103,13 +103,12 @@ export function resolveFallback(options: Options = {}): SessionIdentity {
   const startPid = options.startPid ?? process.pid;
   const registry = options.registry ?? loadRegistry(env);
   const declared = env.ELOHIM_SESSION_ID?.trim();
-  if (declared) {
-    const raw = env.ELOHIM_SESSION_OWNER_PID?.trim() ?? '';
-    const pid = /^\+?\d+$/.test(raw) ? Number(raw) : 0;
-    const owner = readProcess(root, pid);
-    return identity('declared', declared, owner ? [pid, owner.start] : null, 'declared');
-  }
+  const ownerRaw = env.ELOHIM_SESSION_OWNER_PID?.trim() ?? '';
+  const ownerPid = /^\+?\d+$/.test(ownerRaw) ? Number(ownerRaw) : 0;
   const current = readProcess(root, startPid);
+  if (declared && ownerPid === startPid && current) {
+    return identity('declared', declared, [startPid, current.start], 'declared');
+  }
   let pid = current?.parent ?? 0;
   const seen = new Set([startPid]);
   for (let hop = 0; hop < 256; hop++) {
@@ -117,6 +116,9 @@ export function resolveFallback(options: Options = {}): SessionIdentity {
     seen.add(pid);
     const ancestor = readProcess(root, pid);
     if (!ancestor) break;
+    if (declared && ownerPid === pid) {
+      return identity('declared', declared, [pid, ancestor.start], 'declared');
+    }
     const runtime = registry.runtimes.find(r => r.comm.includes(ancestor.comm));
     if (runtime) {
       const session = ownedSessionEnv(root, pid, runtime.sessionEnv, env);
@@ -129,6 +131,7 @@ export function resolveFallback(options: Options = {}): SessionIdentity {
     }
     pid = ancestor.parent;
   }
+  if (declared && !ownerRaw) return identity('declared', declared, null, 'declared');
   return ttyIdentity(root, current) ?? identity();
 }
 

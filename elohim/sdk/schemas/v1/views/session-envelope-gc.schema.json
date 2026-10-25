@@ -1,0 +1,17 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "epr:schema:view:session-envelope-gc",
+  "title": "SessionEnvelopeGc",
+  "description": "Actual epr session gc --json output; private device-local lifecycle result.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["closed"],
+  "properties": {
+    "closed": {
+      "type": "array",
+      "items": {
+        "$ref": "epr:schema:view:session-envelope#/properties/envelope"
+      }
+    }
+  }
+}

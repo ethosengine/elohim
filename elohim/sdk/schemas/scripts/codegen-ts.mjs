@@ -102,6 +102,26 @@ const INTERFACE_FILES = [
     dirs: [resolve(REPO_ROOT, 'elohim/sdk/storage-client-ts/src/generated')],
   },
   {
+    src: 'views/session-envelope.ts',
+    dest: 'session-envelope.ts',
+    dirs: [resolve(REPO_ROOT, 'elohim/sdk/storage-client-ts/src/generated')],
+  },
+  {
+    src: 'views/session-envelope-open.ts',
+    dest: 'session-envelope-open.ts',
+    dirs: [resolve(REPO_ROOT, 'elohim/sdk/storage-client-ts/src/generated')],
+  },
+  {
+    src: 'views/session-envelope-close.ts',
+    dest: 'session-envelope-close.ts',
+    dirs: [resolve(REPO_ROOT, 'elohim/sdk/storage-client-ts/src/generated')],
+  },
+  {
+    src: 'views/session-envelope-gc.ts',
+    dest: 'session-envelope-gc.ts',
+    dirs: [resolve(REPO_ROOT, 'elohim/sdk/storage-client-ts/src/generated')],
+  },
+  {
     src: 'views/session-identity.ts',
     dest: 'session-identity.ts',
     dirs: [resolve(REPO_ROOT, 'elohim/sdk/storage-client-ts/src/generated')],

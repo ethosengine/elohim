@@ -1,0 +1,7 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "epr:schema:view:session-envelope-close",
+  "title": "SessionEnvelopeClose",
+  "description": "Actual epr session close --json output; private device-local lifecycle result.",
+  "$ref": "epr:schema:view:session-envelope#/properties/envelope"
+}

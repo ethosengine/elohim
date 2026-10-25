@@ -384,7 +384,7 @@ its own.
 **A.1 Session identity (`elohim_device_runtime::session`).** `session::resolve()` answers one value,
 `(runtime, session, owner pid + start time?, source)`, in a fixed order:
 
-1. a declared `ELOHIM_SESSION_ID`, with `ELOHIM_SESSION_OWNER_PID` as its optional owner;
+1. a declared `ELOHIM_SESSION_ID` only when its readable `ELOHIM_SESSION_OWNER_PID` is at or below the nearest registered runtime ancestor, or when neither an owner nor a runtime ancestor exists; otherwise the nearest registered runtime wins;
 2. the nearest ancestor whose `comm` is listed in `genesis/agentic/agent-runtimes.json`, labelled
    with that runtime's native session variable when it is set;
 3. the controlling terminal's session leader (pid + start time), which closes §5.5's

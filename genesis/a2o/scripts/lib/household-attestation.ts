@@ -254,9 +254,7 @@ type Env = Readonly<Record<string, string | undefined>>;
 
 /** The berth mooring of this session (genesis/agentic/bin/berth), or null when none is on record. */
 export function resolveMooring(env: Env): Mooring | null {
-  // Empty strings count as unset, the way berth resolves them.
-  // eslint-disable-next-line @typescript-eslint/prefer-nullish-coalescing
-  const session = env.BERTH_SESSION?.trim() || resolveSession({ env }).session;
+  const session = resolveSession({ env }).session;
   if (!session) return null;
   // eslint-disable-next-line @typescript-eslint/prefer-nullish-coalescing
   const dir = env.BERTH_DIR || join(env.CLAUDE_CONFIG_DIR || '/projects/.claude-config', 'berth');

@@ -277,7 +277,10 @@ class RouterCase(unittest.TestCase):
                  **envextra) -> subprocess.CompletedProcess:
         payload = {"tool_input": {"file_path": str(self.root / ".claude" / "memory" / edited)}}
         if session:
-            payload["session_id"] = session
+            payload["session_id"] = "ignored-payload"
+            envextra["ELOHIM_SESSION_ID"] = session
+            envextra["ELOHIM_SESSION_OWNER_PID"] = str(os.getpid())
+            envextra["EPR_SESSION_RESOLVING"] = "1"
         payload = json.dumps(payload)
         return subprocess.run(
             [sys.executable, str(HOOKS / "memory-index-projection.py"), "--hook"],

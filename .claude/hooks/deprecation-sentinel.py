@@ -56,6 +56,10 @@ import os
 import re
 import shlex
 import sys
+
+sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "scripts"))
+from _lib.session import resolve as resolve_session_identity
+
 from datetime import datetime, timezone
 
 MAX_SCAN_BYTES = 200_000  # bound the regex scan on huge outputs
@@ -1399,7 +1403,7 @@ def main() -> None:
 
     if reencountered:
         # Deterministic backlog citation: once per session per fingerprint.
-        cited_path = session_cited_path(str(payload.get("session_id", "")))
+        cited_path = session_cited_path(resolve_session_identity()["session"] or "")
         cited = load_session_cited(cited_path)
         fresh = [e for e in reencountered if e["fp"] not in cited][:MAX_CITED_PER_CALL]
         if fresh:

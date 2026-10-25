@@ -316,7 +316,7 @@ def owner_pid():
 
 def session_key(data):
     """The hook event's explicit session wins; otherwise use shared runtime attribution."""
-    return data.get("session_id") or _session_identity().get("session") or "default"
+    return _session_identity().get("session") or "default"
 
 
 _BERTH_MOD = None
@@ -332,10 +332,10 @@ def _berth():
 
 
 def berth_touch(session):
-    """Liveness heartbeat for this session's mooring, re-asserting the Claude pid (+ its start time)
-    so a resumed session in a new process is not read as dead and a Bash-tool command resolves to
-    this session by process ancestry. Goes through `Berth.touch` — under the berth lock, written
-    tmp + os.replace — so a concurrent claimant never reads a half-written mooring as a dead holder."""
+    """Heartbeat through Berth's native owner/lifecycle guard and atomic berth writer.
+    A replacement owner cannot refresh a reused session's mooring or its leases.
+    Refusal is best-effort for the hook, but never bypasses the mutation guard.
+    """
     try:
         _berth().Berth().touch(session or "default", pid=owner_pid())
     except Exception:

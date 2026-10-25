@@ -1,5 +1,6 @@
 """The native and both fallback shims consume exactly these process-table fixtures."""
 import json
+import os
 from pathlib import Path
 import sys
 from unittest.mock import patch
@@ -37,12 +38,12 @@ def test_native_answer_and_failure_fallback():
         assert run.call_args.kwargs['env']['EPR_SESSION_RESOLVING'] == '1'
     for error in [FileNotFoundError(), subprocess.TimeoutExpired('epr', 2), subprocess.CalledProcessError(2, 'epr')]:
         with patch.object(subprocess, 'run', side_effect=error):
-            assert session.resolve(environ={'ELOHIM_SESSION_ID': 'local'})['session'] == 'local'
+            assert session.resolve(environ={'ELOHIM_SESSION_ID': 'local', 'ELOHIM_SESSION_OWNER_PID': str(os.getpid())})['session'] == 'local'
 
 
 def test_recursion_guard_and_bad_registry(tmp_path):
     with patch.object(subprocess, 'run', side_effect=AssertionError('recursive spawn')):
-        assert session.resolve(environ={'EPR_SESSION_RESOLVING': '1', 'ELOHIM_SESSION_ID': 'guard'})['session'] == 'guard'
+        assert session.resolve(environ={'EPR_SESSION_RESOLVING': '1', 'ELOHIM_SESSION_ID': 'guard', 'ELOHIM_SESSION_OWNER_PID': str(os.getpid())})['session'] == 'guard'
     for body in ['invalid', '{}', '{"runtimes":null}', '{"runtimes":[{}]}']:
         path = tmp_path / 'registry.json'
         path.write_text(body)

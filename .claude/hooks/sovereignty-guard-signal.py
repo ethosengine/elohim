@@ -447,7 +447,8 @@ def main(argv: list[str] | None = None) -> int:
         pre = post.replace(new, old) if ti.get("replace_all") else post.replace(new, old, 1)
     else:  # Write — no reliable prior state post-hoc; score the whole file as introduced (conservative)
         pre = ""
-    session = str(data.get("session_id") or "")
+    from _lib.session import resolve as resolve_session
+    session = resolve_session()["session"] or ""
     try:
         found = frame_atoms.classify(
             {"content": post, "prior_content": pre, "is_new": False, "path": rel}, _SOV_REF)

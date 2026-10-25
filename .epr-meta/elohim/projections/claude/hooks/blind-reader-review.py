@@ -162,7 +162,7 @@ def main() -> int:
 
     # A rule that declares a variance asks this session's covenant (`epr covenant check`, keyed by
     # the session id a subagent inherits) whether the steward of record granted its floor here.
-    session = payload.get("session_id") or resolve_session_identity()["session"]
+    session = resolve_session_identity()["session"]
     agent_id = payload.get("agent_id")
     agent_type = payload.get("agent_type")
     held: list[tuple[str, str, dict]] = []

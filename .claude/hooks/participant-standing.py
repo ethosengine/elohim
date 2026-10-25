@@ -246,9 +246,7 @@ def main() -> None:
     except Exception:
         payload = {}
     project_dir = (os.environ.get("CLAUDE_PROJECT_DIR") or payload.get("cwd") or os.getcwd())
-    session = (str(payload.get("session_id") or "")
-               or resolve_session_identity()["session"]
-               or None)
+    session = resolve_session_identity()["session"] or None
     try:
         line = participant_line(project_dir, session)
     except Exception as e:  # fail-open, but spoken

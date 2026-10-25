@@ -75,9 +75,8 @@ with a different start time is a dead mooring. `claimed_at` is set once; a renew
 as a `renew` row carrying $BERTH_SEAT, and cannot carry the hold past the class's max_ttl_s without
 an explicit --ttl, which is itself capped.
 
-Session id resolution: --session, else $BERTH_SESSION, else $CLAUDE_SESSION_ID, else ANCESTRY — the live
-mooring whose runtime-asserted pid (ram-guard moors/touches with the Claude process's pid) is this
-process's nearest ancestor; claim rows record `session_source: flag|env|ancestry`. A mooring expires
+Session id resolution: an explicit fixture/operator flag, else the shared P1 shim. No berth-specific
+ancestry or runtime environment key participates. A mooring expires
 `ttl` seconds after its last touch (pool-policy `berth.mooring_ttl_s`, default 3 h); a lease expires
 `ttl_s` after its last claim or renew. An expired lease can be taken over, and the takeover is on the
 record with `expired_after_s`. Exit codes: 0 ok · 1 a renew, release or unmoor done here whose record
@@ -116,6 +115,62 @@ MOORING_KINDS = ("moor", "unmoor")
 # The measure emitter lives beside the hooks; bin/berth → genesis/agentic → genesis → repo root.
 REPO_ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(os.path.realpath(__file__)))))
 HOOKS_DIR = os.path.join(REPO_ROOT, ".claude", "hooks")
+sys.path.insert(0, os.path.join(REPO_ROOT, ".claude", "scripts"))
+from _lib.session import resolve as resolve_session_identity
+
+def _predates_envelopes(result):
+    """Whether `epr session prepare-berth` was answered by a build older than envelopes.
+
+    A build with no `session` verb refuses it by name; slice A's `session` knew only `id` and
+    printed that usage with exit 0 for any other verb.
+    """
+    if result.returncode:
+        return "unknown command `session`" in result.stderr
+    return result.stdout.startswith("epr session id")
+
+
+@contextlib.contextmanager
+def envelope_guard(session, berth_store):
+    """Hold the native lifecycle flock across mutations, including direct Berth callers.
+
+    Native validation owns the binding and closure predicates. Standalone berth stores
+    without a device retain their existing behavior. Initialize before taking the lock.
+    """
+    key = os.environ.get("ELOHIM_DEVICE_KEY_FILE")
+    config = os.environ.get("XDG_CONFIG_HOME", "")
+    if not key:
+        config = config if os.path.isabs(config) else os.path.expanduser("~/.config")
+        key = os.path.join(config, "elohim/device/ed25519.seed")
+    directory = os.path.join(os.path.dirname(key), "sessions")
+    if not os.path.isdir(directory) and not os.path.isfile(key):
+        yield
+        return
+    try:
+        result = subprocess.run(
+            [os.environ.get("EPR_BIN") or "epr", "session", "prepare-berth",
+             "--session", session, "--store", os.path.realpath(berth_store)],
+            capture_output=True, text=True, timeout=30)
+    except FileNotFoundError:
+        result = None  # no `epr` at all: it cannot have opened an envelope either
+    if result is None or _predates_envelopes(result):
+        # A session runs only its pinned `epr`, and only an envelope-capable `epr` can open an
+        # envelope, so a session pinned to an older build has none and no close can race this
+        # mutation. Sessions keep their pins across a landing, so this is every live session on a
+        # device the moment envelopes land.
+        yield
+        return
+    if result.returncode:
+        raise BerthUsage(result.stderr.strip() or "envelope preparation failed")
+    with open(os.path.join(directory, ".lock"), "a") as lock:
+        fcntl.flock(lock, fcntl.LOCK_SH)
+        result = subprocess.run(
+            [os.environ.get("EPR_BIN") or "epr", "session", "validate", "--session", session],
+            capture_output=True, text=True, timeout=10)
+        if result.returncode:
+            raise BerthUsage(result.stderr.strip() or "envelope validation failed")
+        yield
+
+
 # The checkout this berth lives in, fixed at load (tests may repoint REPO_ROOT; this never moves).
 HOME_CHECKOUT = REPO_ROOT
 # Set by berth_test for its own process and every berth it spawns: under the test runner the real
@@ -260,24 +315,6 @@ def steward_reason(verdict, now_ms):
         return f"unconfirmed: {verdict['device']} never seen"
     return f"unconfirmed: {verdict['device']} last seen {_peer_age(now_ms - seen)} ago"
 
-
-def proc_ancestry(pid=None, hops=32):
-    """This process's ancestors, nearest first, read from the /proc/<pid>/stat ppid chain (bounded).
-    A Bash-tool command and a hook are both descendants of the Claude process that moored."""
-    pid = pid or os.getpid()
-    out = []
-    for _ in range(hops):
-        try:
-            with open(f"/proc/{pid}/stat") as f:
-                stat = f.read()
-            ppid = int(stat.rsplit(")", 1)[1].split()[1])  # comm may hold spaces/parens
-        except (OSError, ValueError, IndexError):
-            break
-        if ppid <= 1:
-            break
-        out.append(ppid)
-        pid = ppid
-    return out
 
 
 def _safe(name):
@@ -623,27 +660,6 @@ class Berth:
                     return False  # the pid was reused by another process
         return (self.now() - m.get("last_seen", 0)) < m.get("ttl_s", self.mooring_ttl_s)
 
-    def session_by_ancestry(self, ancestry):
-        """The session of the live mooring whose runtime-asserted pid (and incarnation) is this
-        process's NEAREST ancestor — never merely the newest mooring. None if none; BerthAmbiguous
-        when two live moorings claim that same nearest ancestor (a heartbeat is not an identity)."""
-        rank = {pid: i for i, pid in reversed(list(enumerate(ancestry)))}
-        found = {}
-        for session, m in self.moorings().items():
-            try:
-                pid = int(m.get("pid") or 0)
-            except (TypeError, ValueError):
-                continue
-            if pid in rank and self.is_live(m):
-                found.setdefault(rank[pid], []).append(session)
-        if not found:
-            return None
-        nearest = found[min(found)]
-        if len(nearest) > 1:
-            raise BerthAmbiguous(f"moorings {', '.join(sorted(nearest))} all name ancestor pid "
-                                 f"{ancestry[min(found)]} — pass --session to say which one you are")
-        return nearest[0]
-
     def _read_mooring(self, session):
         try:
             with open(self._moor_path(session)) as f:
@@ -661,7 +677,7 @@ class Berth:
                 m.pop("pid_start", None)
 
     def moor(self, session, **fields):
-        with self._locked():
+        with envelope_guard(session, self.dir), self._locked():
             return self._moor_locked(session, **fields)
 
     def _moor_locked(self, session, **fields):
@@ -691,7 +707,7 @@ class Berth:
         """Heartbeat (and, from a hook, re-assert the runtime pid + incarnation). Serialized with every
         other mooring/lease writer and published atomically, so a concurrent claimant never reads a
         half-written mooring as a dead holder."""
-        with self._locked():
+        with envelope_guard(session, self.dir), self._locked():
             m = self._read_mooring(session)
             if not m:
                 return None
@@ -701,13 +717,18 @@ class Berth:
             return m
 
     def unmoor(self, session):
+        with envelope_guard(session, self.dir):
+            return self._unmoor(session)
+
+    def _unmoor(self, session):
+        """Cleanup under a caller-held lifecycle guard (including native close/GC)."""
         for res in {key.removesuffix("/slots") for key in self.leases()}:
-            self.release(res, session, reason="unmoor")
+            self._release(res, session, reason="unmoor")
         with self._locked():
             try:
                 os.remove(self._moor_path(session))
             except FileNotFoundError:
-                pass
+                return
             self.record("unmoor", session=session)
 
     # ------------------------------------------------------------ leases
@@ -802,6 +823,43 @@ class Berth:
             lease["seat"] = seat
         return lease
 
+    def claim_preflight(self, resource, ttl_s=None, klass=None, override=False):
+        """Pure refusals precede session resolution and all lifecycle locking."""
+        klass = klass or DEFAULT_CLASS
+        if self.policy_error:
+            return (f"pool-policy {self.policy_error} — no claim is taken while the policy cannot "
+                                 f"say which resources are shared")
+        explicit_ttl = ttl_s is not None
+        if explicit_ttl:
+            ttl_s = int(ttl_s)
+            if ttl_s <= 0:
+                raise BerthUsage("--ttl must be a positive number of seconds")
+        spec = self.class_spec(resource, klass)
+        if spec is not None:
+            if spec.get("allowed") is False:
+                alt = spec.get("alternative") or "a measurement peer"
+                if not override:
+                    return (f"{klass}-class work does not run on the dev berth — author it with "
+                                         f"`{alt}` (rung H: --on jessica; rung A: --on adam)")
+                if not explicit_ttl:
+                    raise BerthUsage(f"a declared override declares its hold: MEASURE_ON_DEV_BERTH=1 berth claim "
+                                     f"{resource} --class {klass} --ttl SECONDS --note '<why>'")
+            if spec.get("daemon"):
+                # The daemon lease is the household being UP, not a bounded run: no ttl, never taken
+                # over by expiry — only when its holder's mooring is dead.
+                if explicit_ttl:
+                    raise BerthUsage(f"the {klass} class on {resource} is a daemon lease and takes no --ttl "
+                                     f"(a bounded run claims verify)")
+                ttl_s = None
+            elif not explicit_ttl and spec.get("default_ttl_s"):
+                ttl_s = int(spec["default_ttl_s"])
+            cap = spec.get("max_ttl_s")
+            if cap and explicit_ttl and ttl_s > int(cap):
+                return (f"a {klass} lease on {resource} holds at most {int(cap)}s and --ttl {ttl_s} is "
+                                     f"longer — declare it measure (`just measure <scope>`, or "
+                                     f"MEASURE_ON_DEV_BERTH=1 --class measure --ttl {ttl_s})")
+        return None
+
     def claim(self, resource, session, note=None, ttl_s=None, klass=None, seat=None, override=False,
               session_source=None, offline_ok=False):
         """Returns (ok, lease, reason). A live holder that is not us ⇒ refused (exit 3): the honest
@@ -815,45 +873,25 @@ class Berth:
         A steward record that cannot reach the device's channel store refuses a claim, and leaves a
         renew held but returns ok=None: kept here, not confirmed to the other devices.
         Raises BerthUsage for a mis-stated claim (unknown class, override without --ttl)."""
+        reason = self.claim_preflight(resource, ttl_s, klass, override)
+        if reason:
+            return False, None, reason
+        with envelope_guard(session, self.dir):
+            return self._claim_live(resource, session, note, ttl_s, klass, seat, override,
+                                    session_source, offline_ok)
+
+    def _claim_live(self, resource, session, note, ttl_s, klass, seat, override,
+                    session_source, offline_ok):
         klass = klass or DEFAULT_CLASS
-        if self.policy_error:
-            return False, None, (f"pool-policy {self.policy_error} — no claim is taken while the policy cannot "
-                                 f"say which resources are shared")
         explicit_ttl = ttl_s is not None
         if explicit_ttl:
             ttl_s = int(ttl_s)
-            if ttl_s <= 0:
-                raise BerthUsage("--ttl must be a positive number of seconds")
-        spec = self.class_spec(resource, klass)
-        overriding = False
-        if spec is not None:
-            if spec.get("allowed") is False:
-                alt = spec.get("alternative") or "a measurement peer"
-                if not override:
-                    self.record("refuse", resource=resource, session=session, reason="class", alternative=alt,
-                                note=note, session_source=session_source, **{"class": klass})
-                    return False, None, (f"{klass}-class work does not run on the dev berth — author it with "
-                                         f"`{alt}` (rung H: --on jessica; rung A: --on adam)")
-                if not explicit_ttl:
-                    raise BerthUsage(f"a declared override declares its hold: MEASURE_ON_DEV_BERTH=1 berth claim "
-                                     f"{resource} --class {klass} --ttl SECONDS --note '<why>'")
-                overriding = True
-            if spec.get("daemon"):
-                # The daemon lease is the household being UP, not a bounded run: no ttl, never taken
-                # over by expiry — only when its holder's mooring is dead.
-                if explicit_ttl:
-                    raise BerthUsage(f"the {klass} class on {resource} is a daemon lease and takes no --ttl "
-                                     f"(a bounded run claims verify)")
-                ttl_s = None
-            elif not explicit_ttl and spec.get("default_ttl_s"):
-                ttl_s = int(spec["default_ttl_s"])
-            cap = spec.get("max_ttl_s")
-            if cap and explicit_ttl and ttl_s > int(cap):
-                self.record("refuse", resource=resource, session=session, reason="ttl", ttl_s=ttl_s,
-                            max_ttl_s=int(cap), note=note, **{"class": klass})
-                return False, None, (f"a {klass} lease on {resource} holds at most {int(cap)}s and --ttl {ttl_s} is "
-                                     f"longer — declare it measure (`just measure <scope>`, or "
-                                     f"MEASURE_ON_DEV_BERTH=1 --class measure --ttl {ttl_s})")
+        spec = self.class_spec(resource, klass) or {}
+        overriding = spec.get("allowed") is False and override
+        if spec.get("daemon"):
+            ttl_s = None
+        elif not explicit_ttl and spec.get("default_ttl_s"):
+            ttl_s = int(spec["default_ttl_s"])
         steward = self.steward_scoped(resource)
         seen = None
         renewing = False
@@ -873,7 +911,7 @@ class Berth:
                 # The lease stays: it was held before. Its renew did not cross, so say so.
                 return None, lease, (f"renewed here, but {failed[0]} — the other devices still hold its "
                                      f"earlier terms")
-            self.release(resource, session, reason=f"steward: {failed[0]}")
+            self._release(resource, session, reason=f"steward: {failed[0]}")
             self.take_fold_failures(resource)
             return False, None, failed[0]
         if ok and steward:
@@ -969,6 +1007,11 @@ class Berth:
     def release(self, resource, session, reason=None, force=False):
         """Give back this session's lease. `force` gives back WHOEVER holds it (a forced `mesh stop`
         took the household down under them) and says so on the record."""
+        with envelope_guard(session, self.dir):
+            return self._release(resource, session, reason, force)
+
+    def _release(self, resource, session, reason=None, force=False):
+        """Release under the lifecycle guard held by claim, unmoor or release."""
         with self._locked():
             leases = self.leases()
             changed = []
@@ -1195,7 +1238,7 @@ class Berth:
                         holder=f"{verdict['device']}/{verdict['session']}", **{"class": klass})
             if mine:
                 # This session's own unsettled lease lost: it must not linger here or on the channel.
-                self.release(resource, session, reason=f"steward: {reason}")
+                self._release(resource, session, reason=f"steward: {reason}")
             return True, None, False, reason
         seen = view.get("seen") if isinstance(view.get("seen"), dict) else {}
         return True, seen, "pending" if mine else False, None
@@ -1247,7 +1290,7 @@ class Berth:
                             **{"class": lease.get("class")})
                 failed = self.take_fold_failures(resource)
                 if failed:
-                    self.release(resource, session, reason=f"steward: {failed[0]}")
+                    self._release(resource, session, reason=f"steward: {failed[0]}")
                     return False, None, failed[0]
                 self._mark_effective(resource, session)
                 return True, lease, f"claimed over a silent device; {reason} — override on the record"
@@ -1255,7 +1298,7 @@ class Berth:
             waiting = (verdict.get("waiting_on") or ["another device"])[0]
             reason = f"unconfirmed: {waiting} did not acknowledge within {self.confirm_wait_s}s"
         if held or not renewal:
-            self.release(resource, session, reason=f"steward: {reason}")
+            self._release(resource, session, reason=f"steward: {reason}")
         if kind in ("unconfirmed", "pending") and (view or {}).get("serving") is False:
             # Unacknowledged because this device never announced it: the cure is here.
             reason = f"{reason}\n{DAEMON_DOWN_LINE}"
@@ -1462,9 +1505,6 @@ def _main(argv):
     b = Berth()
     session = _opt(argv, "--session")
     source = "flag" if session else None
-    if not session:
-        session = os.environ.get("BERTH_SESSION") or os.environ.get("CLAUDE_SESSION_ID")
-        source = "env" if session else None
     if cmd == "status":
         print(render_status(b))
         return 0
@@ -1489,17 +1529,12 @@ def _main(argv):
         print(json.dumps(b.who(argv[0])))
         return 0
     def resolve():
-        """--session / env first; else ancestry. Returns (session, source, error-or-None)."""
         if session:
             return session, source, None
-        try:
-            found = b.session_by_ancestry(proc_ancestry())
-        except BerthAmbiguous as e:
-            return None, None, f"berth: ambiguous session — {e}"
-        if found:
-            return found, "ancestry", None
-        return None, None, ("berth: no session (pass --session, or set BERTH_SESSION / CLAUDE_SESSION_ID) "
-                            "(no ancestor mooring; from a non-Claude shell pass --session)")
+        identity = resolve_session_identity()
+        if identity["session"]:
+            return identity["session"], "envelope", None
+        return None, None, "berth: no P1 session; open an envelope in a registered runtime"
 
     claim_args = None
     if cmd == "claim":
@@ -1523,12 +1558,11 @@ def _main(argv):
         res = argv[0]
         override = os.environ.get("MEASURE_ON_DEV_BERTH") == "1"
         try:
-            spec = b.class_spec(res, klass)
+            reason = b.claim_preflight(res, ttl_s, klass, override)
         except BerthUsage as e:
             print(f"berth: {e}", file=sys.stderr)
             return 2
-        if spec is not None and spec.get("allowed") is False and not override:
-            ok, lease, reason = b.claim(res, session, note=note, ttl_s=ttl_s, klass=klass, session_source=source)
+        if reason:
             print(f"{res}: REFUSED — {reason}", file=sys.stderr)
             return 3
         claim_args = (res, note, ttl_s, klass, override, offline_ok)
@@ -1557,6 +1591,14 @@ def _main(argv):
     if not session:
         print(err, file=sys.stderr)
         return EXIT_NO_SESSION
+    if cmd == "session-show":
+        with b._locked():
+            leases = {k: ([v for v in value if v.get("holder") == session] if isinstance(value, list)
+                           else value) for k, value in b.leases().items()
+                      if (any(v.get("holder") == session for v in value) if isinstance(value, list)
+                          else value.get("holder") == session)}
+            print(json.dumps({"mooring": b.mooring(session), "leases": leases}))
+        return 0
     if cmd == "moor":
         writes = _opt(argv, "--writes")
         # _opt consumes the flag it reads, so each value is read exactly once.
@@ -1584,7 +1626,7 @@ def _main(argv):
         res, note, ttl_s, klass, override, offline_ok = claim_args
         # Claiming is a liveness act: a stale mooring would make the fresh lease look abandoned.
         if not b.touch(session):
-            b.moor(session)
+            b.moor(session, pid=resolve_session_identity().get("ownerPid"))
         try:
             ok, lease, reason = b.claim(res, session, note=note, ttl_s=ttl_s, klass=klass,
                                         seat=os.environ.get("BERTH_SEAT") or None,

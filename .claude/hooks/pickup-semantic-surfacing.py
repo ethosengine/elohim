@@ -43,6 +43,10 @@ import os
 import re
 import subprocess
 import sys
+
+sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "scripts"))
+from _lib.session import resolve as resolve_session_identity
+
 import time
 from pathlib import Path
 
@@ -88,8 +92,8 @@ def project_dir() -> Path:
 
 
 def session_key(payload: dict) -> str:
-    key = payload.get("session_id") or os.environ.get("CLAUDE_PICKUP_TEST_KEY") or str(os.getppid())
-    return re.sub(r"[^A-Za-z0-9_-]", "_", str(key))[:64]
+    return resolve_session_identity()["session"] or ""
+
 
 
 def state_path(kind: str, key: str) -> Path:
@@ -364,6 +368,8 @@ def inject(root: Path, key: str, query: str, via: str) -> None:
 
 def handle_prompt(payload: dict) -> None:
     key = session_key(payload)
+    if not key:
+        return
     prompt = (payload.get("prompt") or "").strip()
     if not prompt:
         return
@@ -392,6 +398,8 @@ def distilled_tool_query(payload: dict) -> str:
 
 def handle_tool(payload: dict) -> None:
     key = session_key(payload)
+    if not key:
+        return
     if state_path("surfaced", key).exists():
         return  # (a) an injection already happened
     first_flag = state_path("firstsearch", key)

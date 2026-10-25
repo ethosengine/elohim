@@ -118,12 +118,14 @@ pub fn run(args: &[String]) -> ActorResult<ExitCode> {
                         .into(),
                 )
             })?;
-            let session = take_opt(&rest, "--session")?.ok_or_else(|| {
-                ActorError::InvalidArguments(
+            let session = take_opt(&rest, "--session")?
+                .or_else(|| crate::session_envelope::current_id().ok())
+                .ok_or_else(|| {
+                    ActorError::InvalidArguments(
                     "claim needs --session <id> — a claim scoped to no run cannot be superseded"
                         .into(),
                 )
-            })?;
+                })?;
             // Only a human claim is signed, and only the human's own act opens (or first mints)
             // the device key. A key that cannot be opened leaves the claim unsigned — the floor.
             let device = match parse_participant_ref(&claimed) {
@@ -153,7 +155,11 @@ pub fn run(args: &[String]) -> ActorResult<ExitCode> {
         "current" => {
             let (opts, rest) = parse_global(&args[1..])?;
             let device_only = rest.iter().any(|a| a == "--device");
-            let session = take_opt(&rest, "--session")?;
+            let session = take_opt(&rest, "--session")?.or_else(|| {
+                (!device_only)
+                    .then(|| crate::session_envelope::current_id().ok())
+                    .flatten()
+            });
             let key_file = device_key::resolve_path().ok();
             let outcome = match (device_only, session) {
                 // `--device`: the device's standing alone, consulting no session at all — the
@@ -491,6 +497,9 @@ fn claim_bound(
     under: Option<&str>,
     recorded_at: Option<&str>,
 ) -> ActorResult<ClaimOutcome> {
+    let envelope = crate::session_envelope::live_guard(Some(session), root)
+        .map_err(ActorError::InvalidArguments)?;
+    let root = envelope.root.as_path();
     // ── Phase 1: resolve. Nothing below this line touches the sidecar until Phase 2. ──
 
     // Shape first, so a malformed `--as` never even opens the store. The refusal is

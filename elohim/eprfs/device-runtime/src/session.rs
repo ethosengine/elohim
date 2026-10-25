@@ -56,6 +56,9 @@ pub struct Runtime {
     pub comm: Vec<String>,
     /// Environment variables containing native session ids.
     pub session_env: Vec<String>,
+    /// Verified model exports, in preference order; empty means unknown.
+    #[serde(default)]
+    pub model_env: Vec<String>,
 }
 
 struct Process {
@@ -111,13 +114,20 @@ pub fn resolve_with(
     start_pid: u32,
     registry: &Registry,
 ) -> SessionIdentity {
-    if let Some(session) = nonblank(env("ELOHIM_SESSION_ID")) {
-        let owner = nonblank(env("ELOHIM_SESSION_OWNER_PID"))
-            .and_then(|pid| pid.parse::<u32>().ok())
-            .and_then(|pid| process(proc_root, pid).map(|p| (pid, p.start)));
-        return identity("declared", Some(session), owner, Source::Declared);
-    }
+    let declared = nonblank(env("ELOHIM_SESSION_ID"));
+    let owner_raw = nonblank(env("ELOHIM_SESSION_OWNER_PID"));
+    let owner_pid = owner_raw.as_ref().and_then(|pid| pid.parse::<u32>().ok());
     let current = process(proc_root, start_pid);
+    if owner_pid == Some(start_pid) {
+        if let (Some(session), Some(current)) = (&declared, &current) {
+            return identity(
+                "declared",
+                Some(session.clone()),
+                Some((start_pid, current.start)),
+                Source::Declared,
+            );
+        }
+    }
     let mut pid = current.as_ref().map_or(0, |p| p.parent);
     let mut seen = HashSet::from([start_pid]);
     for _ in 0..256 {
@@ -127,6 +137,17 @@ pub fn resolve_with(
         let Some(ancestor) = process(proc_root, pid) else {
             break;
         };
+        // A declaration belongs only to this side of the nearest runtime boundary.
+        if owner_pid == Some(pid) {
+            if let Some(session) = &declared {
+                return identity(
+                    "declared",
+                    Some(session.clone()),
+                    Some((pid, ancestor.start)),
+                    Source::Declared,
+                );
+            }
+        }
         if let Some(runtime) = registry
             .runtimes
             .iter()
@@ -155,6 +176,11 @@ pub fn resolve_with(
         }
         pid = ancestor.parent;
     }
+    if owner_raw.is_none() {
+        if let Some(session) = declared {
+            return identity("declared", Some(session), None, Source::Declared);
+        }
+    }
     if let Some(current) = current.filter(|p| p.tty != 0) {
         if let Some(leader) = process(proc_root, current.leader) {
             return identity(
@@ -172,6 +198,13 @@ pub fn resolve_with(
 pub fn resolve() -> SessionIdentity {
     let env = |key: &str| std::env::var(key).ok();
     let proc_root = nonblank(env("EPR_PROC_ROOT")).unwrap_or_else(|| "/proc".into());
+    let registry = registry();
+    resolve_with(&env, Path::new(&proc_root), std::process::id(), &registry)
+}
+
+/// Load the same runtime registry used by identity and model resolution.
+pub fn registry() -> Registry {
+    let env = |key: &str| std::env::var(key).ok();
     let registry_path = nonblank(env("EPR_AGENT_RUNTIMES"))
         .map(std::path::PathBuf::from)
         .or_else(|| {
@@ -188,11 +221,10 @@ pub fn resolve() -> SessionIdentity {
                 .find(|p| p.join("genesis/agentic").is_dir())
                 .map(|p| p.join("genesis/agentic/agent-runtimes.json"))
         });
-    let registry = registry_path
+    registry_path
         .and_then(|p| fs::read(p).ok())
         .and_then(|bytes| serde_json::from_slice(&bytes).ok())
-        .unwrap_or_default();
-    resolve_with(&env, Path::new(&proc_root), std::process::id(), &registry)
+        .unwrap_or_default()
 }
 
 // Proc ticks use the view convention for u64: decimal text keeps JavaScript lossless.

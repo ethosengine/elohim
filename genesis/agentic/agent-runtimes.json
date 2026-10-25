@@ -4,14 +4,26 @@
     {
       "id": "claude-code",
       "comm": ["claude"],
-      "sessionEnv": ["CLAUDE_CODE_SESSION_ID", "CLAUDE_SESSION_ID"]
+      "sessionEnv": ["CLAUDE_CODE_SESSION_ID", "CLAUDE_SESSION_ID"],
+      "modelEnv": []
     },
     {
       "id": "codex",
       "comm": ["codex"],
-      "sessionEnv": ["CODEX_SESSION_ID", "CODEX_THREAD_ID"]
+      "sessionEnv": ["CODEX_SESSION_ID", "CODEX_THREAD_ID"],
+      "modelEnv": []
     },
-    { "id": "gemini", "comm": ["gemini"], "sessionEnv": [] },
-    { "id": "antigravity", "comm": ["antigravity"], "sessionEnv": [] }
+    {
+      "id": "gemini",
+      "comm": ["gemini"],
+      "sessionEnv": [],
+      "modelEnv": []
+    },
+    {
+      "id": "antigravity",
+      "comm": ["antigravity"],
+      "sessionEnv": [],
+      "modelEnv": []
+    }
   ]
 }

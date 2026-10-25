@@ -95,6 +95,10 @@ import os
 import re
 import subprocess
 import sys
+
+sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "scripts"))
+from _lib.session import resolve as resolve_session_identity
+
 import tempfile
 import time
 from pathlib import Path
@@ -736,7 +740,7 @@ def hook(payload_text: str) -> int:
 
     # (4) The harness's own record of this edit, FIRST and synchronously: the exact bytes, this
     # session, the instant it saw them. Nothing here reads the entry's frontmatter.
-    session = payload.get("session_id")
+    session = resolve_session_identity()["session"]
     witness(root, target, session)
 
     report = attribution(binary, root, timeout=_budget())

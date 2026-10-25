@@ -63,10 +63,17 @@ class CovenantHooksCase(unittest.TestCase):
         env = {k: v for k, v in os.environ.items()
                if k not in ("STUB_CHECK", "STUB_SHOW", "CLAUDE_CODE_SESSION_ID")}
         env.update({"CLAUDE_PROJECT_DIR": str(REPO), "EPR_BIN": str(self.stub),
-                    "STUB_LOG": str(self.log), "COVENANT_WITNESS_ROOT": str(self.tmp)})
+                    "STUB_LOG": str(self.log), "COVENANT_WITNESS_ROOT": str(self.tmp),
+                    "ELOHIM_SESSION_ID": "envelope-key", "ELOHIM_SESSION_OWNER_PID": str(os.getpid()), "EPR_SESSION_RESOLVING": "1"})
         env.update({k: (json.dumps(v) if isinstance(v, dict) else v) for k, v in env_extra.items()})
-        return subprocess.run([sys.executable, str(hook)], input=json.dumps(payload),
+        result = subprocess.run([sys.executable, str(hook)], input=json.dumps(payload),
                               capture_output=True, text=True, env=env, timeout=60)
+        if self.log.exists():
+            for line in self.log.read_text().splitlines():
+                call = json.loads(line)
+                if "--session" in call:
+                    self.assertEqual(call[call.index("--session") + 1], "envelope-key")
+        return result
 
     def context(self, result, event: str) -> str:
         self.assertEqual(result.returncode, 0, result.stderr)
@@ -94,7 +101,7 @@ class CovenantHooksCase(unittest.TestCase):
         self.assertIn("offer the steward of record that floor as ONE question", ctx)
         self.assertIn("never take the floor yourself", ctx)
         check = next(a for a in self.calls() if a[:2] == ["covenant", "check"])
-        self.assertEqual(check[check.index("--session") + 1], "sess-1")
+        self.assertEqual(check[check.index("--session") + 1], "envelope-key")
         self.assertEqual(check[check.index("--rule") + 1], "a2o-story-blind-reader-review")
         self.assertEqual(check[check.index("--path") + 1],
                          "genesis/a2o/features/compute/ci-runner-stewarded.feature")

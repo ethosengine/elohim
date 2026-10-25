@@ -551,7 +551,7 @@ touching the mesh — the mesh is one per workspace, so this is the router, not 
 3600 s — a longer hold is a measure and is refused as one). A live holder in another session
 refuses in under a second (exit 3), naming the holder. Exit 4 (no session resolvable — a mooring
 carries the Claude pid and its start time, and a claim resolves by process ancestry; from a
-non-Claude shell pass `--session` or `BERTH_SESSION`) is the ONLY exit code a caller proceeds
+non-Claude shell pass `--session` or `ELOHIM_SESSION_ID + ELOHIM_SESSION_OWNER_PID`) is the ONLY exit code a caller proceeds
 past unleased; every other failure propagates.
 
 A `verify` lane is fenced by `timeout` at its TTL: the lane re-enters under `timeout --signal=INT

@@ -1080,7 +1080,10 @@ a second seat's verdict over a sampled journey, refused when the seat is the jou
     )
 }
 
-#[allow(clippy::too_many_lines)]
+#[allow(
+    clippy::too_many_lines,
+    reason = "The recall parser keeps the closed flag vocabulary and per-operation validation in one dispatch boundary"
+)]
 fn parse_args(argv: &[String]) -> FlowResult<(Args, bool, bool, Option<String>)> {
     let mut root = PathBuf::from(".");
     // `--root` is read first so every default derived from it (contract, lens) is right.
@@ -1244,6 +1247,9 @@ fn parse_args(argv: &[String]) -> FlowResult<(Args, bool, bool, Option<String>)>
         }
         i += 2;
     }
+    if args.session.is_empty() {
+        args.session = crate::session_envelope::current_id().unwrap_or_default();
+    }
     if !(1..=100).contains(&args.limit) {
         return Err(refused(
             "offsets must be nonnegative and limit between 1 and 100",
@@ -1320,6 +1326,37 @@ fn take_flag(argv: &[String], flag: &str) -> Option<String> {
 }
 
 /// `epr flow memory recall …`.
+/// Complete recall's own open operation for a hookless session, including its usage.
+pub fn initialize(root: &Path, session: &str, executor: &str) -> FlowResult<()> {
+    let argv = [
+        "open",
+        "--root",
+        &root.to_string_lossy(),
+        "--session",
+        session,
+        "--need",
+        "Session context",
+    ]
+    .map(str::to_owned);
+    let (args, _, _, _) = parse_args(&argv)?;
+    let contract = Contract::load(&args.contract_path)?;
+    let method = contract.method_cid();
+    let limit = contract
+        .value
+        .pointer("/limits/session_bytes")
+        .and_then(Value::as_u64)
+        .unwrap_or(1_048_576) as usize;
+    let mut execution = Execution::open(root, session, &args.need, &method, Some(executor), limit)?;
+    let began = Instant::now();
+    let (mut view, _) = execute(&args, &contract, &mut execution, &method)?;
+    add_usage(
+        &mut view["usage"],
+        &json!({"elapsed_seconds": (began.elapsed().as_secs_f64() * 1e6).round() / 1e6}),
+    );
+    execution.charge(&view["usage"])?;
+    Ok(())
+}
+
 pub fn run(argv: &[String]) -> FlowResult<ExitCode> {
     if argv.iter().any(|a| a == "--help" || a == "-h") && argv.len() == 1 {
         println!("{}", usage());
@@ -1390,10 +1427,10 @@ pub fn run(argv: &[String]) -> FlowResult<ExitCode> {
     // Resolved BEFORE the session is opened, because it is one of the two pins the session refuses
     // on. An executor that cannot read its own bytes reports no digest rather than a guess, and a
     // session with no recorded digest adopts whatever ran it first.
-    let executor_digest = std::env::current_exe()
-        .ok()
-        .and_then(|path| std::fs::read(path).ok())
-        .map(|bytes| eprfs_core::BlobCid::compute_raw(&bytes).to_string());
+    let executor_digest = match crate::session_envelope::executor_cid() {
+        Ok(cid) => Some(cid),
+        Err(error) => return print_refusal(&error, &args.session, Some(output_limit), args.json),
+    };
 
     let mut execution = match Execution::open(
         &args.root,

@@ -1,0 +1,142 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "epr:schema:view:session-envelope",
+  "title": "SessionEnvelope",
+  "description": "Private (B) device-local P1 binding plus read-only joins of authoritative facet stores. No new grants, DHT entries or public surface.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "live",
+    "envelope",
+    "berth",
+    "claims",
+    "covenant",
+    "standing",
+    "capabilityTier",
+    "recallSession",
+    "pinnedTools"
+  ],
+  "properties": {
+    "live": {
+      "type": "boolean",
+      "description": "Native lifecycle predicate: neither sealed nor closed. Source of truth: Envelope::is_live."
+    },
+    "envelope": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "identity",
+        "device",
+        "steward",
+        "model",
+        "repository",
+        "openedAt",
+        "closedAt",
+        "covenantSeal",
+        "witness",
+        "ownerPidNamespace",
+        "ownerBootId",
+        "berthStore"
+      ],
+      "properties": {
+        "identity": {
+          "title": "SessionIdentity",
+          "description": "P1 identity observed at opening and retained as a private binding. Current owner liveness is checked against pid and start time.",
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "runtime",
+            "session",
+            "ownerPid",
+            "ownerStartTime",
+            "source"
+          ],
+          "properties": {
+            "runtime": {
+              "type": "string"
+            },
+            "session": {
+              "type": "string",
+              "pattern": "^[A-Za-z0-9][A-Za-z0-9_.-]{0,95}$"
+            },
+            "ownerPid": {
+              "type": ["integer", "null"],
+              "minimum": 1
+            },
+            "ownerStartTime": {
+              "type": ["string", "null"],
+              "pattern": "^[0-9]+$",
+              "description": "Linux proc start time in clock ticks since boot. u64 encoded as decimal text to preserve precision; null means no detectable live owner."
+            },
+            "source": {
+              "enum": ["declared", "runtimeAncestor", "ttyLeader", "none"]
+            }
+          }
+        },
+        "device": {
+          "type": "string"
+        },
+        "steward": {
+          "type": "string"
+        },
+        "model": {
+          "type": ["string", "null"]
+        },
+        "repository": {
+          "type": "string"
+        },
+        "openedAt": {
+          "type": "string"
+        },
+        "closedAt": {
+          "type": ["string", "null"]
+        },
+        "covenantSeal": {
+          "type": ["string", "null"]
+        },
+        "witness": {
+          "type": ["string", "null"]
+        },
+        "ownerPidNamespace": {
+          "type": ["string", "null"],
+          "description": "PID namespace inode from the opening proc root; null means unobserved."
+        },
+        "ownerBootId": {
+          "type": ["string", "null"],
+          "description": "Boot identity from the opening proc root; null means unobserved."
+        },
+        "berthStore": {
+          "type": ["string", "null"],
+          "description": "Canonical berth authority store bound before the first mooring or lease; null means unused."
+        }
+      }
+    },
+    "berth": {
+      "type": "object"
+    },
+    "claims": {
+      "type": "array",
+      "items": {
+        "type": "object"
+      }
+    },
+    "covenant": {
+      "type": "object"
+    },
+    "standing": {
+      "type": "object"
+    },
+    "capabilityTier": {
+      "type": "string"
+    },
+    "recallSession": {
+      "type": "string"
+    },
+    "pinnedTools": {
+      "type": "object",
+      "additionalProperties": {
+        "type": "string"
+      }
+    }
+  }
+}

@@ -8,6 +8,7 @@ import re
 import subprocess
 
 SIGNATURES = {
+    'session-facet keys': [r'pub fn current_id\(', r'["\x27]bootstrap-', r'(?:CLAUDE|ELOHIM)_SESSION_ID', r'(?:data|payload)\s*(?:\.get\(\s*|\[\s*)["\x27]session_id["\x27]'],
     'session resolvers': [r'_CODE_SESSION_ID', r'CLAUDE_SESSION_ID', r'pub fn resolve_with\(', r'def resolve_fallback\(', r'function resolveFallback\('],
     'proc session ancestry': [r'def proc_ancestry\(', r'while pid > 0', r'def claude_pid\('],
     'epr/brit lookup paths': [r'def (?:find_epr|_find_epr|find_brit|_find_brit|resolve_epr|resolve_bin|resolve_binary)\(', r'function resolveBinary\(', r'which\(["\x27](?:epr|brit)["\x27]'],
@@ -18,8 +19,9 @@ SIGNATURES = {
     'head verifiers': [r'fn verify_head', r'def verify_head', r'def _verify_head', r'fn verify_channel_head'],
 }
 # A P1 ancestry walk is already counted in session resolvers. This family counts
-# independent consumer ancestry walkers (berth remains until its A2 re-keying).
+# independent consumer ancestry walkers; all facets now delegate to P1.
 FAMILY_GLOBS = {
+    'session-facet keys': ['.claude/hooks/*.py', 'genesis/agentic/bin/berth', 'elohim/eprfs/epr-cli/src/session_envelope.rs', 'elohim/eprfs/epr-cli/src/actor.rs', 'elohim/eprfs/epr-cli/src/covenant.rs', 'elohim/eprfs/epr-cli/src/flow/claim.rs', 'elohim/eprfs/epr-cli/src/flow/memory/recall/*.rs', '.claude/hooks/*.sh'],
     'session resolvers': ['.claude/hooks/*.py', '.claude/scripts/_lib/*.py', 'elohim/eprfs/epr-cli/src/flow/mod.rs', 'elohim/eprfs/epr-cli/src/flow/note.rs', 'elohim/eprfs/device-runtime/src/session.rs', 'genesis/a2o/scripts/lib/*.ts', 'genesis/a2o/src/framework/session.ts', 'genesis/agentic/bin/*'],
     'proc session ancestry': ['.claude/hooks/*.py', '.claude/scripts/_lib/*.py', 'genesis/agentic/bin/*'],
 }

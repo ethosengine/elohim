@@ -127,7 +127,12 @@ class DriftObservationCase(unittest.TestCase):
             "EPR_BIN": str(self.stub),
             "STUB_LOG": str(self.log),
             "TMPDIR": str(self.probe_tmp),
+            # P1 resolves the session: hide this machine's real agent runtimes from it.
+            "EPR_PROC_ROOT": str(self.tmp / "no-proc"),
         })
+        for name in ("CLAUDE_CODE_SESSION_ID", "CLAUDE_SESSION_ID", "CODEX_SESSION_ID",
+                     "CODEX_THREAD_ID", "ELOHIM_SESSION_OWNER_PID"):
+            e.pop(name, None)
         e.update(extra)
         return e
 
@@ -135,7 +140,8 @@ class DriftObservationCase(unittest.TestCase):
         return subprocess.run(
             [sys.executable, str(HOOKS / hook)],
             input=json.dumps(payload), capture_output=True, text=True,
-            env=self.env(**envextra), timeout=60,
+            env=self.env(**{"ELOHIM_SESSION_ID": str(payload.get("session_id") or ""), **envextra}),
+            timeout=60,
         )
 
     def stub_calls(self) -> list[list[str]]:

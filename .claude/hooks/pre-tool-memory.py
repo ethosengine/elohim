@@ -25,6 +25,10 @@ from __future__ import annotations
 import json
 import os
 import sys
+
+sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "scripts"))
+from _lib.session import resolve as resolve_session_identity
+
 import time
 from pathlib import Path
 
@@ -81,16 +85,11 @@ def sweep_stale_flags() -> None:
         pass
 
 
-def session_id_from_stdin() -> str:
-    try:
-        payload = json.load(sys.stdin)
-        return str(payload.get("session_id") or "nosess")[:64]
-    except (json.JSONDecodeError, ValueError):
-        return "nosess"
-
 
 def main() -> int:
-    sid = session_id_from_stdin()
+    sid = resolve_session_identity()["session"]
+    if not sid:
+        return 0
     flag = flag_path(sid)
     if flag_fresh(flag):
         return 0

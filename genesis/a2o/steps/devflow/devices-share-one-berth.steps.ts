@@ -315,7 +315,7 @@ When(
     // The push runs the checkout's real pre-push hook, as session `session` of device B.
     f.push = await run(['git', 'push', 'origin', 'HEAD:dev'], {
       cwd: B.repo,
-      env: env(B, { BERTH_SESSION: session }),
+      env: env(B, { ELOHIM_SESSION_ID: session, ELOHIM_SESSION_OWNER_PID: String(process.pid) }),
     });
   }
 );
@@ -846,7 +846,7 @@ Then(
     must(git(B.repo, ['commit', '-q', '-m', 'feat: a change from device B']), 'commit');
     const o = await run(['git', 'push', 'origin', 'HEAD:dev'], {
       cwd: B.repo,
-      env: env(B, { BERTH_SESSION: session }),
+      env: env(B, { ELOHIM_SESSION_ID: session, ELOHIM_SESSION_OWNER_PID: String(process.pid) }),
     });
     assert.notEqual(o.status, 0);
     assert.match(refusalLine(o, DEV), new RegExp(`REFUSED — unconfirmed: ${A.did} last seen `));
@@ -863,7 +863,7 @@ Then(
     must(git(A.repo, ['commit', '-q', '-m', 'roster: retire device B']), 'commit');
     const o = await run(['git', 'push', 'origin', 'HEAD:dev'], {
       cwd: A.repo,
-      env: env(A, { BERTH_SESSION: 'claude-1' }),
+      env: env(A, { ELOHIM_SESSION_ID: 'claude-1', ELOHIM_SESSION_OWNER_PID: String(process.pid) }),
     });
     assert.equal(o.status, 0, `${o.stdout}\n${o.stderr}`);
     assert.match(`${o.stdout}\n${o.stderr}`, new RegExp(`${DEV}: claimed by claude-1`));

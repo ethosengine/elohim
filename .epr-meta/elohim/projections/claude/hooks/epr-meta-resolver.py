@@ -320,7 +320,8 @@ def main():
                  checks=["malformed stdin JSON — failing open"])
         sys.exit(0)  # malformed stdin -> fail open, never silently (polarity law)
 
-    session_id = data.get("session_id")
+    from _lib.session import resolve as resolve_session
+    session_id = resolve_session()["session"]
 
     tool = data.get("tool_name", "")
     if tool not in ("Write", "Edit"):

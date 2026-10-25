@@ -218,7 +218,8 @@ test("inner household publication is disabled and the inner berth claim is attri
   assert.match(runner, /export A2O_SPRINT_REPORT_JSON="\$SCRATCH\//);
   assert.match(runner, /export A2O_SPRINT_REPORT_MD="\$SCRATCH\//);
   assert.ok(runner.indexOf("A2O_SPRINT_REPORT_JSON") < runner.indexOf('"$JUST_BIN" test mesh'));
-  assert.match(runner, /export BERTH_SESSION="stage:/);
+  assert.match(runner, /export ELOHIM_SESSION_ID="stage-\$STAGE_NAME-\$\$"/);
+  assert.match(runner, /export ELOHIM_SESSION_OWNER_PID="\$\$"/);
   assert.match(runner, /export BERTH_CLASS="verify"/);
 
   // The publication guard and berth attribution must land BEFORE `just test mesh` runs.
