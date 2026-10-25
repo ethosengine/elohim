@@ -195,7 +195,14 @@ impl Store {
                 *list = json!([]);
             }
             if let Some(list) = list.as_array_mut() {
-                list.push(json!({"kind":error.kind,"detail":error.detail,"at":files::now()}));
+                // A repeated refusal refreshes its row; the record names each reason once.
+                let at = files::now();
+                match list.iter_mut().find(|row| {
+                    row["kind"] == error.kind.as_str() && row["detail"] == error.detail.as_str()
+                }) {
+                    Some(row) => row["at"] = json!(at),
+                    None => list.push(json!({"kind":error.kind,"detail":error.detail,"at":at})),
+                }
             }
             let _ = self.save(&record);
         }

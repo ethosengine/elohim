@@ -1,5 +1,5 @@
 {
-  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "epr:schema:view:source-state",
   "title": "SourceState",
   "description": "Ephemeral local source view. Cargo metadata path packages supply the repository source closure; unavailable metadata conservatively selects the whole checkout. Git trees describe HEAD, and clean/status cover those same paths. No persisted authority or network head.",

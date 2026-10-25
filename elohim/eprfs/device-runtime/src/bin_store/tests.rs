@@ -582,6 +582,31 @@ fn test_reingest_preserves_primary_provenance_and_appends_sources() {
     f.land(&b).unwrap();
 }
 #[test]
+fn test_retried_ingest_and_refusal_refresh_their_rows_instead_of_growing() {
+    let f = Fixture::new("epr");
+    let a = f.release("a");
+    for _ in 0..3 {
+        assert_eq!(f.release("a").cid, a.cid);
+    }
+    let unpublished = Refusal::new("unpublished", "commit is not contained in any publishedRef");
+    for _ in 0..3 {
+        f.store.record_refusal(&a.cid, &unpublished);
+    }
+    f.store.record_refusal(
+        &a.cid,
+        &Refusal::new("dirty-build", "ingested from a dirty tree"),
+    );
+    let record = f.store.record(&a.cid).unwrap();
+    assert_eq!(record.sources.len(), 1, "{:?}", record.sources);
+    let kinds: Vec<_> = record.extra["refusals"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .map(|row| row["kind"].as_str().unwrap().to_owned())
+        .collect();
+    assert_eq!(kinds, ["unpublished", "dirty-build"]);
+}
+#[test]
 fn test_land_ancestry_uses_current_json_not_mutable_ingest_provenance() {
     let f = Fixture::new("epr");
     let mut a = f.release("a");

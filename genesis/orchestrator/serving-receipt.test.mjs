@@ -601,6 +601,9 @@ function fixtureRepo() {
     "genesis/orchestrator/scripts/serving-receipt.mjs",
     "genesis/a2o/scripts/lib/sut.ts",
     "genesis/a2o/scripts/lib/household-attestation.ts",
+    // The attestation names its session through the shared resolver and its registry.
+    "genesis/a2o/src/framework/session.ts",
+    "genesis/agentic/agent-runtimes.json",
   ]) {
     mkdirSync(join(root, file, ".."), { recursive: true });
     writeFileSync(join(root, file), readFileSync(join(REPO, file), "utf8"));

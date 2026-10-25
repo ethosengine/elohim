@@ -34,6 +34,8 @@ fallback. `EPR_BIN` remains only the explicit candidate-under-test override.
 Referring is reserved for the case where NEITHER host can answer, which is the
 genuine absence the law is about.
 """
+import base64
+import hashlib
 import json
 import os
 import subprocess
@@ -48,8 +50,11 @@ def resolve(env: dict[str, str] | None = None) -> tuple[str | None, str | None]:
     """Resolve one executable path/CID pair, never the stable launcher itself."""
     try:
         environment = os.environ if env is None else env
+        candidate = environment.get("EPR_BIN", "").strip()
+        if candidate:
+            return _candidate(candidate)
         result = subprocess.run(
-            [environment.get("EPR_BIN") or "epr", "bin", "status", "--tool", "epr", "--json"],
+            ["epr", "bin", "status", "--tool", "epr", "--json"],
             env=dict(environment), capture_output=True, text=True, timeout=_TIMEOUT_SECONDS,
             check=False,
         )
@@ -63,6 +68,27 @@ def resolve(env: dict[str, str] | None = None) -> tuple[str | None, str | None]:
         return None, None
     except Exception:  # noqa: BLE001 — resolution is best-effort; absence is a valid answer
         return None, None
+
+
+def _candidate(value: str) -> tuple[str | None, str | None]:
+    """An explicit `EPR_BIN` is the answer itself: never asked to read a store, never a bootstrap.
+
+    The candidate is not executed to learn its identity (a test stub need not speak `bin
+    status`), and a refused or absent candidate is an absence: it must not queue a bootstrap
+    that ingests into the live device store from whatever checkout the caller runs in.
+    """
+    path = os.path.realpath(os.path.expanduser(value))
+    if not os.path.isfile(path) or not os.access(path, os.X_OK):
+        return None, None
+    if os.path.basename(path) == "bin-launch":
+        return None, None
+    digest = hashlib.sha256()
+    with open(path, "rb") as source:
+        for chunk in iter(lambda: source.read(1024 * 1024), b""):
+            digest.update(chunk)
+    # CIDv1, codec raw (0x55), sha2-256 (0x12, 32 bytes): the store's spelling of one binary.
+    raw = bytes([0x01, 0x55, 0x12, 0x20]) + digest.digest()
+    return path, "b" + base64.b32encode(raw).decode("ascii").lower().rstrip("=")
 
 
 def bootstrap(environment: dict[str, str]) -> None:

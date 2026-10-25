@@ -162,7 +162,16 @@ impl Store {
                 release.sources.push(release.provenance.clone());
             }
             release.provenance.ingested_at = provenance.ingested_at.clone();
-            release.sources.push(provenance);
+            // The same bytes from the same source and run refresh their row; a retrying
+            // bootstrap must not grow the record once per attempt.
+            match release.sources.iter_mut().find(|row| {
+                row.source_commit == provenance.source_commit
+                    && row.tree_clean == provenance.tree_clean
+                    && row.gate_run == provenance.gate_run
+            }) {
+                Some(row) => row.ingested_at = provenance.ingested_at,
+                None => release.sources.push(provenance),
+            }
             if release.ring != "landed" {
                 release.ring = "dev-context".into();
             }

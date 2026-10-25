@@ -119,32 +119,56 @@ export function resolveFallback(options: Options = {}): SessionIdentity {
     if (!ancestor) break;
     const runtime = registry.runtimes.find(r => r.comm.includes(ancestor.comm));
     if (runtime) {
-      let inherited: string[] | undefined;
-      try {
-        inherited = readFileSync(join(root, String(pid), 'environ'), 'utf8').split('\0');
-      } catch {
-        // Unreadable ancestry cannot establish ownership of a native variable.
-      }
-      const session =
-        runtime.sessionEnv
-          .filter(k => inherited !== undefined && !inherited.includes(`${k}=${env[k]}`))
-          .map(k => env[k]?.trim())
-          .find(Boolean) ?? `${runtime.id}-${pid}-${ancestor.start}`;
-      return identity(runtime.id, session, [pid, ancestor.start], 'runtimeAncestor');
+      const session = ownedSessionEnv(root, pid, runtime.sessionEnv, env);
+      return identity(
+        runtime.id,
+        session ?? `${runtime.id}-${pid}-${ancestor.start}`,
+        [pid, ancestor.start],
+        'runtimeAncestor'
+      );
     }
     pid = ancestor.parent;
   }
-  if (current?.tty) {
-    const leader = readProcess(root, current.leader);
-    if (leader)
-      return identity(
-        'tty',
-        `tty-${current.leader}-${leader.start}`,
-        [current.leader, leader.start],
-        'ttyLeader'
-      );
+  return ttyIdentity(root, current) ?? identity();
+}
+
+/**
+ * @returns The first session variable this process holds that the runtime ancestor did not
+ * itself inherit, or undefined when none is owned (or the ancestry is unreadable).
+ */
+function ownedSessionEnv(
+  root: string,
+  pid: number,
+  names: string[],
+  env: NodeJS.ProcessEnv
+): string | undefined {
+  let inherited: string[];
+  try {
+    inherited = readFileSync(join(root, String(pid), 'environ'), 'utf8').split('\0');
+  } catch {
+    // Unreadable ancestry cannot establish ownership of a native variable.
+    return undefined;
   }
-  return identity();
+  return names
+    .filter(k => !inherited.includes(`${k}=${env[k]}`))
+    .map(k => env[k]?.trim())
+    .find(Boolean);
+}
+
+/** @returns The TTY session leader's identity, or null when there is no readable leader. */
+function ttyIdentity(
+  root: string,
+  current: ReturnType<typeof readProcess>
+): SessionIdentity | null {
+  if (!current?.tty) return null;
+  const leader = readProcess(root, current.leader);
+  if (!leader) return null;
+  return identity(
+    'tty',
+    `tty-${current.leader}-${leader.start}`,
+    [current.leader, leader.start],
+    'ttyLeader'
+  );
 }
 
 export function resolve(options: Options = {}): SessionIdentity {

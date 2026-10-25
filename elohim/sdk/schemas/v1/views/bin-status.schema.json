@@ -1,5 +1,5 @@
 {
-  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "epr:schema:view:bin-status",
   "title": "BinStatus",
   "description": "Ephemeral projection of device-private releases and session pins. CIDv1 addresses; paths are native resolution results, never reconstructed by clients.",
@@ -68,7 +68,7 @@
     "candidates": {
       "type": "array",
       "items": {
-        "$ref": "#/definitions/Release"
+        "$ref": "#/$defs/Release"
       }
     },
     "headRepairNeeded": {
@@ -76,7 +76,7 @@
       "description": "Derived head links need explicit repair."
     }
   },
-  "definitions": {
+  "$defs": {
     "Release": {
       "$ref": "epr:schema:view:bin-release"
     }

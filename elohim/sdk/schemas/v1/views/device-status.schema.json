@@ -1,5 +1,5 @@
 {
-  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://elohim.host/schemas/v1/views/device-status.schema.json",
   "title": "DeviceStatus",
   "description": "Ephemeral arrival checks in dependency order. Only refused causes a failing status exit.",

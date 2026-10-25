@@ -25,6 +25,8 @@ fn epr(base: &Path, args: &[&str]) -> Output {
         .env("GIT_CONFIG_GLOBAL", "/dev/null")
         .env("GIT_CONFIG_NOSYSTEM", "1")
         .env("GIT_CONFIG_COUNT", "0")
+        // `git -c safe.directory=*` reaches children through this; the fixture owns its trust.
+        .env_remove("GIT_CONFIG_PARAMETERS")
         .env("GIT_TEST_ASSUME_DIFFERENT_OWNER", "1")
         .output()
         .unwrap()
