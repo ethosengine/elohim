@@ -437,12 +437,15 @@ async fn a_stalled_device_holds_back_neither_another_devices_fold_nor_our_announ
         .checkout
         .append(berth_event("claim", "dev-integration", "sb", "1.0"));
     let fast = Duration::from_secs(8);
+    // The device table is projected from the folded events, so wait for both: under a loaded
+    // full-workspace run the event can land a beat before its table row.
     tokio::time::timeout(fast, async {
         while !side_a
             .checkout
             .events()
             .iter()
             .any(|(_, e)| via_device(e) == Some(b.did.as_str()))
+            || !side_a.table().devices.contains_key(&b.did)
         {
             tokio::time::sleep(Duration::from_millis(100)).await;
         }
