@@ -494,6 +494,29 @@ else: b.touch(session,pid=4101)
                 assert 'fixture-codex' in json.loads((store_a/'leases.json').read_text())
                 assert sentinel.read_text()=='{"unrelated":true}'
 
+    def test_berth_from_a_linked_worktree_keeps_the_session(self):
+        # Berth's store is device-scoped, so a lease taken from any checkout belongs to the same
+        # envelope: pre-push runs berth from the worktree being pushed (2026-10-25, the push was
+        # refused `session-conflict`). Checkout-scoped facets keep the bound checkout.
+        with tempfile.TemporaryDirectory(prefix='envelope-worktree-') as base:
+            f=Fixture(base); f.setup()
+            opened=f.epr('session','open','--json')
+            worktree=f.base/'worktree'
+            f.run(['git','worktree','add','-q','--detach',worktree],native=False)
+            def from_worktree(*args):
+                return subprocess.run([sys.executable,str(f.base/'exec.py'),*map(str,args)],
+                    cwd=worktree,env=f.env(),capture_output=True,text=True,timeout=45)
+            r=from_worktree(REPO/'genesis/agentic/bin/berth','claim','fixture-worktree')
+            assert r.returncode==0, r
+            leases=json.loads((f.base/'berth/leases.json').read_text())
+            assert leases['fixture-worktree']['holder']==f.id('claude'), leases
+            record=json.loads((f.base/f'config-home/elohim/device/sessions/{f.id("claude")}.json').read_text())
+            assert record['repository']==opened['repository'] and record['berthStore']==str(f.base/'berth')
+            r=from_worktree(BINARY,'flow','claim','--on','envelope#1','--json')
+            assert r.returncode!=0 and 'envelope-checkout-mismatch' in r.stderr, r
+            f.epr('session','close','--json')
+            assert 'fixture-worktree' not in json.loads((f.base/'berth/leases.json').read_text())
+
     def test_hookless_berth_initializes_before_shared_guard(self):
         with tempfile.TemporaryDirectory(prefix='envelope-first-berth-') as base:
             f=Fixture(base); f.setup()

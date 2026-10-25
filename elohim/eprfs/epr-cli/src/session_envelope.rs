@@ -218,6 +218,25 @@ pub fn live_guard(id: Option<&str>, destination: &Path) -> Result<FacetGuard> {
     Ok(guard)
 }
 
+/// Owner and liveness of a binding, for a facet whose store is device-scoped (berth). Unlike
+/// [`live_guard`] it never compares checkouts. Returns whether the session is bound; a device
+/// with no envelope directory is a standalone store and passes unbound.
+fn device_scoped_binding(id: &str) -> Result<bool> {
+    let key = home()?;
+    if !key.parent().is_some_and(|p| p.join("sessions").is_dir()) {
+        return Ok(false);
+    }
+    let store = Store::shared(&key).map_err(err)?;
+    let Some(record) = store
+        .binding(id, &session::resolve(), &proc_root())
+        .map_err(err)?
+    else {
+        return Ok(false);
+    };
+    Store::require_live(&record).map_err(err)?;
+    Ok(true)
+}
+
 fn pins(record: &Envelope) -> Result<BTreeMap<String, String>> {
     let registry = bin_store::Registry::discover().map_err(err)?;
     let mut pins = BTreeMap::new();
@@ -260,11 +279,16 @@ fn berth_path(record: &Envelope) -> Result<Option<PathBuf>> {
 
 // Called before any shared mutation guard: lazy creation and reference binding both
 // need the exclusive lock. The caller then takes the shared lock and revalidates.
+/// Berth's store is device-scoped: a lease taken from any checkout, the main one or a linked
+/// worktree, belongs to the same envelope. Only an unbound session is opened here, because
+/// `open` proposes the current checkout and would refuse a bound one called from a worktree.
 fn prepare_berth(id: &str, path: &Path) -> Result<()> {
     if current_id()? != id {
         return Err(format!("envelope-owner-mismatch: {id}"));
     }
-    open(None)?;
+    if !device_scoped_binding(id)? {
+        open(None)?;
+    }
     let store = Store::lock(&home()?).map_err(err)?;
     let mut record = store
         .binding(id, &session::resolve(), &proc_root())
@@ -467,10 +491,7 @@ pub fn run(args: &[String]) -> Result<ExitCode> {
     // Internal, output-free validation used by the Python adapter while it holds the
     // same shared lifecycle flock. All owner and seal decisions stay in this lookup.
     if verb == "validate" {
-        let _guard = live_guard(
-            Some(&explicit_session.map(Ok).unwrap_or_else(current_id)?),
-            &std::env::current_dir().map_err(err)?,
-        )?;
+        device_scoped_binding(&explicit_session.map(Ok).unwrap_or_else(current_id)?)?;
         return Ok(ExitCode::SUCCESS);
     }
     let value = if verb == "open" {

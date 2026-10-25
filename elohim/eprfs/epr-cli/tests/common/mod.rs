@@ -19,7 +19,11 @@ use eprfs_core::BlobCid;
 use serde_json::{json, Value};
 use tempfile::TempDir;
 
-#[allow(dead_code)]
+#[allow(
+    dead_code,
+    reason = "only the binaries that glob-import common (flow_memory_recall, _lens) read SESSION; \
+              the others include this file for its helpers and never reach it"
+)]
 pub const SESSION: &str = "station-five";
 
 pub fn repo_root() -> PathBuf {
