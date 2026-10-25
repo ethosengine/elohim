@@ -32,6 +32,8 @@ function hookBlock() {
 const STUB_BERTH = `#!/usr/bin/env bash
 here="$(cd "$(dirname "$0")" && pwd)"
 echo "$*" >> "$here/calls.log"
+printf '%s %s %s\\n' "$1" "\${ELOHIM_SESSION_ID-}" "\${ELOHIM_SESSION_OWNER_PID-}" >> "$here/owners.log"
+[ "$1" = moor ] && exit "\${MOOR_RC:-0}"
 if [ "$1" = claim ]; then
   n=$(grep -c "^claim $2 " "$here/calls.log")
   code=$(awk -v r="$2" -v n="$n" '$1 == r { print $((n + 1 <= NF) ? n + 1 : NF) }' "$here/answers" 2>/dev/null | head -1)
@@ -65,6 +67,7 @@ function fixture(t, message, answers = {}) {
     return r.stdout.trim();
   };
   git("init", "--quiet");
+  git("config", "user.email", "fixture@example.test");
   const id = ["-c", "user.name=Fixture", "-c", "user.email=fixture@example.test"];
   git(...id, "commit", "--quiet", "--allow-empty", "-m", "base");
   const base = git("rev-parse", "HEAD");
@@ -84,21 +87,28 @@ function fixture(t, message, answers = {}) {
 }
 
 /** Run the hook's block for one pushed ref, then `after` (the gates that follow it). */
-function runBlock(fx, { ref = "refs/heads/dev", after = "echo GATES-RAN", env = {}, transform = block => block } = {}) {
+function runBlock(fx, { ref = "refs/heads/dev", local = fx.head, after = "echo GATES-RAN", env = {}, transform = block => block } = {}) {
   const preamble = [
     // The hook sets pipefail before this block; the block runs under it.
     "set -o pipefail",
     "export HOOK_PID=$$",
     `ZERO_SHA=${ZERO}`,
     `HOOK_WORK_TREE='${fx.dir}'`,
-    `PUSH_LINES=('refs/heads/feature ${fx.head} ${ref} ${fx.base}')`,
+    `PUSH_LINES=('refs/heads/feature ${local} ${ref} ${fx.base}')`,
     "",
   ].join("\n");
   const result = spawnSync("bash", ["-c", `${preamble}${transform(hookBlock())}${after}`], {
     cwd: fx.dir,
     timeout: 8000,
     encoding: "utf8",
-    env: { ...cleanEnv, BERTH_OFFLINE_OK: "", ...env },
+    env: {
+      ...cleanEnv,
+      BERTH_OFFLINE_OK: "",
+      ELOHIM_SESSION_ID: "",
+      ELOHIM_SESSION_OWNER_PID: "",
+      MOOR_RC: "",
+      ...env,
+    },
   });
   let calls = [];
   try {
@@ -232,7 +242,98 @@ test("build_edge_requires_alpha_fleet", (t) => {
   assert.deepEqual(feature.calls, []);
 });
 
-test("prepush_offline_ok_no_session_and_a_renewed_watch", (t) => {
+test("prepush_no_session_claims_with_a_hook_holder", (t) => {
+  for (const ref of ["refs/heads/dev", "refs/heads/main"]) {
+    const fx = fixture(t, "feat: land it", { "dev-integration": [4, 0] });
+    const r = runBlock(fx, { ref });
+    assert.equal(r.status, 0, r.out);
+    assert.ok(r.out.includes("GATES-RAN"));
+    assert.ok(!r.out.includes("UNLEASED"));
+    const owners = readFileSync(join(fx.bin, "owners.log"), "utf8").trim().split("\n")
+      .map((line) => line.split(" "));
+    const [, holder, pid] = owners[1];
+    assert.match(holder, new RegExp(`^pre-push-${pid}-`));
+    assert.deepEqual(r.calls, [
+      `${CLAIM("dev-integration")} --note pre-push to ${ref.split("/").at(-1)}`,
+      `moor --session ${holder} --pid ${pid} --runtime git-hook --principal fixture@example.test --task pre-push to ${ref.split("/").at(-1)}`,
+      `${CLAIM("dev-integration")} --note pre-push to ${ref.split("/").at(-1)}`,
+      "release dev-integration",
+      `unmoor --session ${holder}`,
+    ]);
+    assert.ok(owners.slice(1).every(([, session, owner]) => session === holder && owner === pid),
+      "moor, claim, release and unmoor use the hook's declared P1 owner");
+  }
+});
+
+test("prepush_no_session_still_refuses_a_held_lease_or_unavailable_store", (t) => {
+  for (const code of [3, 4]) {
+    const r = runBlock(fixture(t, "feat: land it", { "dev-integration": [4, code] }));
+    assert.equal(r.status, 1, r.out);
+    assert.ok(!r.out.includes("GATES-RAN"));
+    assert.match(r.out, /REFUSED/);
+    assert.ok(!r.calls.some((c) => c.startsWith("release")), "no lease was taken");
+    assert.match(r.calls.at(-1), /^unmoor --session pre-push-/);
+    if (code === 3) assert.ok(r.out.split("\n").includes(HELD_LINE));
+    else assert.match(r.out, /repair berth's session\/store error/);
+  }
+  const failedMoor = runBlock(fixture(t, "feat: land it", { "dev-integration": 4 }),
+    { env: { MOOR_RC: "4" } });
+  assert.equal(failedMoor.status, 1, failedMoor.out);
+  assert.ok(!failedMoor.out.includes("GATES-RAN"));
+  assert.match(failedMoor.out, /could not moor a hook holder/);
+  assert.equal(failedMoor.calls.filter((c) => c.startsWith("claim")).length, 1);
+});
+
+test("prepush_hook_holder_is_cleaned_up_on_failure_and_interrupt", (t) => {
+  for (const after of ["exit 1", "kill -INT $$; sleep 5; echo NOT-REACHED"]) {
+    const r = runBlock(fixture(t, "feat: land it", { "dev-integration": [4, 0] }), { after });
+    assert.notEqual(r.status, 0, r.out);
+    assert.ok(!r.out.includes("NOT-REACHED"));
+    assert.equal(r.calls.at(-2), "release dev-integration");
+    assert.match(r.calls.at(-1), /^unmoor --session pre-push-/);
+    assert.equal(r.calls.filter((c) => c.startsWith("unmoor")).length, 1);
+  }
+});
+
+test("prepush_feature_branch_is_unchanged_without_a_session", (t) => {
+  const r = runBlock(fixture(t, "wip [build:edge]", { "dev-integration": 4 }),
+    { ref: "refs/heads/feat/x" });
+  assert.equal(r.status, 0, r.out);
+  assert.ok(r.out.includes("GATES-RAN"));
+  assert.deepEqual(r.calls, []);
+});
+
+test("prepush_integration_requires_berth_and_every_requested_lease", (t) => {
+  const fx = fixture(t, "feat: land it");
+  rmSync(join(fx.bin, "berth"));
+  for (const ref of ["refs/heads/dev", "refs/heads/main"]) {
+    const r = runBlock(fx, { ref });
+    assert.equal(r.status, 1, r.out);
+    assert.ok(!r.out.includes("GATES-RAN"));
+    assert.match(r.out, /restore executable/);
+  }
+  assert.equal(runBlock(fx, { ref: "refs/heads/feat/x" }).status, 0);
+  const lost = runBlock(fixture(t, "deploy [build:edge]", { "alpha-fleet": 4 }));
+  assert.equal(lost.status, 1, lost.out);
+  assert.ok(!lost.out.includes("GATES-RAN"));
+  assert.deepEqual(lost.calls.filter((c) => c.startsWith("release")), ["release dev-integration"]);
+  assert.ok(!lost.calls.some((c) => c.startsWith("moor")), "never switch an existing holder");
+});
+
+test("prepush_integration_deletion_also_requires_a_lease", (t) => {
+  for (const ref of ["refs/heads/dev", "refs/heads/main"]) {
+    const r = runBlock(fixture(t, "feat: land it", { "dev-integration": [4, 3] }),
+      { ref, local: ZERO });
+    assert.equal(r.status, 1, r.out);
+    assert.ok(!r.out.includes("GATES-RAN"));
+    assert.ok(r.out.split("\n").includes(HELD_LINE));
+  }
+  const feature = runBlock(fixture(t, "wip"), { ref: "refs/heads/feat/x", local: ZERO });
+  assert.equal(feature.status, 0, feature.out);
+  assert.deepEqual(feature.calls, []);
+});
+
+test("prepush_offline_ok_and_a_renewed_watch", (t) => {
   // BERTH_OFFLINE_OK=1 makes each claim an explicit --offline-ok; the hook never adds it itself.
   const fx = fixture(t, "deploy [build:edge]");
   const r = runBlock(fx, { env: { BERTH_OFFLINE_OK: "1" } });
@@ -241,13 +342,6 @@ test("prepush_offline_ok_no_session_and_a_renewed_watch", (t) => {
     assert.ok(c.includes("--offline-ok"), c);
   }
   assert.ok(runBlock(fixture(t, "x")).calls.every((c) => !c.includes("--offline-ok")));
-
-  // Exit 4: no session resolvable — the push proceeds unleased and says so.
-  const none = runBlock(fixture(t, "feat: land it", { "dev-integration": 4 }));
-  assert.equal(none.status, 0, none.out);
-  assert.ok(none.out.includes("GATES-RAN"));
-  assert.match(none.out, /UNLEASED/);
-  assert.ok(!none.calls.some((c) => c.startsWith("release")));
 
   // A session already watching a deploy holds alpha-fleet: the push renews it, and does not give
   // back at its end what it did not take.

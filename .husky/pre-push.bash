@@ -115,7 +115,7 @@ done
 #                 Ctrl-C); a claim that only RENEWED a lease this session already held (a session
 #                 watching a deploy) is left to that session, never released here
 #   berth exit 3  the push is refused before any check runs; berth's reason line is printed as is
-#   berth exit 4  no session resolvable: the push proceeds UNLEASED and says so
+#   berth exit 4  no session resolvable: moor a hook-owned holder and retry; refuse if still unleased
 #   berth exit 1  only for berth's own "renewed here, but …" line (a renew of a lease this session
 #                 held, whose record did not reach the channel: still held, earlier terms); any
 #                 other exit 1 is an error and refuses the push
@@ -126,8 +126,8 @@ done
 #
 # The hook never overrides a silent device on its own: BERTH_OFFLINE_OK=1, set by the pushing
 # session, makes each claim an explicit `--offline-ok` (it overrides `unconfirmed` only, never
-# `held by`, and leaves an override record). Fail-open only for a checkout with no berth (a branch
-# predating it). HUSKY=0 still bypasses the whole hook.
+# `held by`, and leaves an override record). A checkout with no berth refuses integration pushes.
+# HUSKY=0 still bypasses the whole hook.
 #
 # core.hooksPath is absolute (.husky/hooks-path.mjs), so a push from a linked worktree runs the MAIN
 # checkout's copy of this script against the worktree: until the main checkout carries this block,
@@ -150,6 +150,16 @@ trap 'exit 129' HUP
 BERTH_BIN="$HOOK_WORK_TREE/genesis/agentic/bin/berth"
 BERTH_HELD=""
 BERTH_CLAIMING=""
+BERTH_HOOK_SESSION=""
+berth_moor_hook() {
+  local principal
+  principal=$(git config user.email || git config user.name || id -un) || return 1
+  BERTH_HOOK_SESSION="pre-push-${HOOK_OWNER_PID}-${EPOCHREALTIME//./}-$RANDOM"
+  # Declare the same P1 owner to berth and native envelope validation; the parent is unchanged.
+  export ELOHIM_SESSION_ID="$BERTH_HOOK_SESSION" ELOHIM_SESSION_OWNER_PID="$HOOK_OWNER_PID"
+  "$BERTH_BIN" moor --session "$BERTH_HOOK_SESSION" --pid "$HOOK_OWNER_PID" \
+    --runtime git-hook --principal "$principal" --task "pre-push to${BERTH_TARGETS}"
+}
 berth_release_claims() {
   local res
   # A claim still in flight when the push ends (Ctrl-C mid-settle) may have written its lease.
@@ -158,6 +168,10 @@ berth_release_claims() {
       echo "[pre-push] berth: $res released here, but did not reach the channel — run: berth release $res" >&2
   done
   BERTH_HELD=""
+  if [ -n "$BERTH_HOOK_SESSION" ]; then
+    "$BERTH_BIN" unmoor --session "$BERTH_HOOK_SESSION" >/dev/null 2>&1 ||
+      echo "[pre-push] berth: hook mooring cleanup failed — run: berth unmoor --session $BERTH_HOOK_SESSION" >&2
+  fi
 }
 HOOK_ON_EXIT="$HOOK_ON_EXIT berth_release_claims"
 
@@ -207,12 +221,12 @@ BERTH_TARGETS=""
 BERTH_MESSAGES=""
 for PUSH_LINE in "${PUSH_LINES[@]}"; do
   read -r _ B_LOCAL B_REMOTE_REF B_REMOTE <<<"$PUSH_LINE"
-  [ "$B_LOCAL" = "$ZERO_SHA" ] && continue
   case "$B_REMOTE_REF" in
     refs/heads/dev | refs/heads/main) ;;
     *) continue ;;
   esac
   BERTH_TARGETS="$BERTH_TARGETS ${B_REMOTE_REF#refs/heads/}"
+  [ "$B_LOCAL" = "$ZERO_SHA" ] && continue
   if [ "$B_REMOTE" != "$ZERO_SHA" ] && git cat-file -e "$B_REMOTE^{commit}" 2>/dev/null; then
     BERTH_MESSAGES="$BERTH_MESSAGES$(git log --format=%B "$B_REMOTE..$B_LOCAL" 2>/dev/null)"$'\n'
   else
@@ -220,7 +234,11 @@ for PUSH_LINE in "${PUSH_LINES[@]}"; do
   fi
 done
 
-if [ -n "$BERTH_TARGETS" ] && [ -f "$BERTH_BIN" ]; then
+if [ -n "$BERTH_TARGETS" ]; then
+  if [ ! -x "$BERTH_BIN" ]; then
+    echo "[pre-push] REFUSED: this push needs dev-integration; restore executable $BERTH_BIN."
+    exit 1
+  fi
   # The orchestrator's own tag grammar (genesis/orchestrator/commit-tag-parser.mjs): [build:a,b-c].
   BERTH_NEEDS="dev-integration"
   if grep -qiE '\[build:([a-z,-]*,)?(edge|all)(,[a-z,-]*)?\]' <<<"$BERTH_MESSAGES"; then
@@ -235,6 +253,15 @@ if [ -n "$BERTH_TARGETS" ] && [ -f "$BERTH_BIN" ]; then
     BERTH_CLAIMING="$BERTH_RES"
     BERTH_OUT=$("$BERTH_BIN" claim "$BERTH_RES" "${BERTH_FLAGS[@]}" 2>&1)
     BERTH_RC=$?
+    if [ "$BERTH_RC" -eq 4 ] && [ "$BERTH_RES" = dev-integration ]; then
+      [ -n "$BERTH_OUT" ] && printf '%s\n' "$BERTH_OUT" >&2
+      if ! berth_moor_hook; then
+        echo "[pre-push] REFUSED: could not moor a hook holder; repair berth's session/store error above, or push from a moored session."
+        exit 1
+      fi
+      BERTH_OUT=$("$BERTH_BIN" claim "$BERTH_RES" "${BERTH_FLAGS[@]}" 2>&1)
+      BERTH_RC=$?
+    fi
     BERTH_CLAIMING=""
     [ -n "$BERTH_OUT" ] && printf '%s\n' "$BERTH_OUT" >&2
     case "$BERTH_RC" in
@@ -257,7 +284,8 @@ if [ -n "$BERTH_TARGETS" ] && [ -f "$BERTH_BIN" ]; then
         exit 1
         ;;
       4)
-        echo "[pre-push] berth: no session resolvable — this push proceeds UNLEASED on $BERTH_RES."
+        echo "[pre-push] REFUSED: this push needs $BERTH_RES; repair berth's session/store error above, or push from a moored session."
+        exit 1
         ;;
       *)
         echo "[pre-push] REFUSED: berth claim $BERTH_RES exited $BERTH_RC (above). Bypass all gates: HUSKY=0 git push"

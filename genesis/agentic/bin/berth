@@ -231,6 +231,24 @@ def store_dir():
     return os.environ.get("BERTH_DIR") or os.path.join(CONFIG_DIR, "berth")
 
 
+def main_checkout(root):
+    """A linked worktree's main checkout, without relying on the hook's exported Git context.
+    A separate git dir or submodule is not a main checkout; keep the supplied root there."""
+    try:
+        with open(os.path.join(root, ".git")) as f:
+            marker = f.read().strip()
+        if not marker.startswith("gitdir: "):
+            return root
+        git_dir = os.path.realpath(os.path.join(root, marker[8:]))
+        with open(os.path.join(git_dir, "commondir")) as f:
+            common = os.path.realpath(os.path.join(git_dir, f.read().strip()))
+        if os.path.basename(common) == ".git" and os.path.isdir(common):
+            return os.path.dirname(common)
+    except OSError:
+        pass
+    return root
+
+
 def load_policy(path=POLICY_FILE):
     """(capacities, mooring_ttl_s, classes) from pool-policy.json; defaults on any miss."""
     caps = dict(DEFAULT_RESOURCES)
@@ -523,13 +541,13 @@ class Berth:
 
     def _fold_refused_under_test(self, root):
         """Under the test runner ($BERTH_UNDER_TEST=1), the real emitter never writes into the checkout
-        this berth lives in: a test record is not this workspace's record. An injected emitter, or a
-        scratch checkout, is unaffected."""
+        this berth lives in or its main checkout: a test record is not this workspace's record.
+        An injected emitter, or a scratch checkout, is unaffected."""
         if os.environ.get(UNDER_TEST_ENV) != "1" or self._obs_injected or not root:
             return False
         # The checkout this file lives in, fixed at load: a test that repoints REPO_ROOT at a
         # scratch checkout folds there.
-        return os.path.realpath(root) == os.path.realpath(HOME_CHECKOUT)
+        return os.path.realpath(root) in (os.path.realpath(HOME_CHECKOUT), main_checkout(HOME_CHECKOUT))
 
     def _fold_failed(self, kind, ev, why):
         if kind in CROSSING_KINDS:
@@ -550,8 +568,8 @@ class Berth:
         return mine
 
     def _fold_root(self, ev):
-        """(root, unreachable): where a record folds. A steward-scoped resource's records go to the
-        device's channel store (the one `epr peer serve` projects), so they cross; everything else, and
+        """(root, unreachable): where a record folds. Notes and steward-scoped resource records go to
+        the device's channel store (the one `epr peer serve` projects), so they cross; everything else, and
         every record of a workspace that is not one of its steward's devices, to this checkout. A
         device whose channel store cannot be read gets no root, never this checkout's in its place."""
         resource = ev.get("resource")
@@ -559,7 +577,9 @@ class Berth:
             # A mooring crosses when this workspace is a device whose channel store is known (this
             # process read it, or an earlier one did); it never asks `epr` for it, and never fails.
             return self.channel_root or self.cached_channel_root() or REPO_ROOT, None
-        if not (isinstance(resource, str) and self.steward_scoped(resource)):
+        note = (ev.get("kind") == "note" and resource is None
+                and bool(self.steward_names or self.steward_prefixes))
+        if not (note or isinstance(resource, str) and self.steward_scoped(resource)):
             return REPO_ROOT, None
         if not self._channel_read:
             self.peer_leases()
@@ -1162,7 +1182,8 @@ class Berth:
 
     def _run_peer_leases(self, epr, timeout):
         try:
-            return subprocess.run([epr, "peer", "leases", "--json", "--root", REPO_ROOT, "--policy", self.policy_path],
+            return subprocess.run([epr, "peer", "leases", "--json", "--root", main_checkout(REPO_ROOT),
+                                   "--policy", self.policy_path],
                                   capture_output=True, text=True, timeout=max(0.1, timeout)), None
         except (OSError, subprocess.TimeoutExpired) as e:
             return None, f"the steward lease view did not answer: {e}"

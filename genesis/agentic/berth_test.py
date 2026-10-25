@@ -729,6 +729,91 @@ def effective(session="codex-1"):
     return {"verdict": "effective", "session": session}
 
 
+class WorktreeIntentTest(unittest.TestCase):
+    def setUp(self):
+        self.directory = tempfile.TemporaryDirectory()
+        self.addCleanup(self.directory.cleanup)
+        root = Path(self.directory.name)
+        self.main = root / "main checkout"
+        self.worktree = root / "linked worktree"
+        self.worktree.mkdir()
+        git_dir = self.main / ".git" / "worktrees" / "linked"
+        git_dir.mkdir(parents=True)
+        (git_dir / "commondir").write_text("../..\n")
+        (self.worktree / ".git").write_text(f"gitdir: {git_dir}\n")
+        self.policy = root / "pool-policy.json"
+        self.policy.write_text(json.dumps(STEWARD_POLICY))
+        self.epr = root / "epr"
+        self.epr.touch()
+        self.epr.chmod(0o755)
+        self.obs = FakeObservation()
+        self.berth = self.make()
+        # An existing device counter must not accidentally resolve the store for the note.
+        (Path(self.berth.dir) / "dseq").write_text("7\n")
+        patcher = mock.patch.dict(Berth._fold_root.__globals__, {"REPO_ROOT": str(self.worktree)})
+        patcher.start()
+        self.addCleanup(patcher.stop)
+        runner = mock.patch("subprocess.run")
+        self.peer_run = runner.start()
+        self.addCleanup(runner.stop)
+
+    def make(self):
+        b = Berth(str(Path(self.directory.name) / "berth"), obs=self.obs,
+                  policy_path=str(self.policy))
+        b.epr = str(self.epr)
+        return b
+
+    def answer(self, out):
+        self.peer_run.return_value = subprocess.CompletedProcess([], 0, json.dumps(out), "")
+
+    def test_worktree_intent_reaches_peer_before_first_claim(self):
+        for relative in (False, True):
+            with self.subTest(relative_gitdir=relative):
+                if relative:
+                    (self.worktree / ".git").write_text("gitdir: ../main checkout/.git/worktrees/linked\n")
+                b = self.make()
+                Path(b._channel_cache_path()).unlink(missing_ok=True)
+                self.peer_run.reset_mock()
+                out = view()
+                out["store"] = str(self.main)
+                self.answer(out)
+                intent = "/intent land slice A2 after the current holder releases"
+                row = b.say("hook-session", intent, to="peer-session")
+                self.peer_run.assert_called_once_with(
+                    [str(self.epr), "peer", "leases", "--json", "--root", str(self.main),
+                     "--policy", str(self.policy)],
+                    capture_output=True, text=True, timeout=10)
+                event = self.obs.events[-1]
+                self.assertEqual(event["root"], str(self.main), "the store the peer serves")
+                self.assertEqual((event["reason"], event["env"]["text"], event["env"]["to"]),
+                                 ("note", intent, "peer-session"))
+                self.assertEqual(event["env"]["dseq"], str(row["dseq"]))
+                self.assertEqual(b.leases(), {}, "the intent crosses before any claim")
+
+    def test_worktree_intents_refresh_a_stale_channel_cache(self):
+        Path(self.berth._channel_cache_path()).write_text(str(self.worktree) + "\n")
+        out = view()
+        served = Path(self.directory.name) / "served checkout"
+        out["store"] = str(served)
+        self.answer(out)
+        self.berth.say("session", "/intent first")
+        self.make().say("session", "/intent next")
+        self.assertEqual(self.peer_run.call_count, 2, "each process resolves the currently served store")
+        self.assertEqual(self.berth.cached_channel_root(), str(served))
+        self.assertEqual([e["root"] for e in self.obs.events], [str(served), str(served)])
+
+    def test_unknown_device_store_never_folds_an_intent_into_the_worktree(self):
+        self.peer_run.return_value = subprocess.CompletedProcess([], 1, "", "channel store unavailable")
+        self.berth.say("session", "/intent blocked")
+        self.assertEqual(self.obs.events, [])
+        self.assertIn("channel store unavailable", self.berth.fold_failures[-1][2])
+
+    def test_non_device_intents_stay_in_the_checkout(self):
+        self.answer(not_a_device())
+        self.berth.say("session", "/intent local")
+        self.assertEqual(self.obs.events[-1]["root"], str(self.worktree))
+
+
 class StewardClaimTest(unittest.TestCase):
     """Steward-scoped resources (dev-integration, jenkins-dispatch, alpha-fleet, lane:<id>) are shared
     by every device of one person. A claim first reads `epr peer leases --json`: another device's
