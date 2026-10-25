@@ -139,15 +139,40 @@ you are you; and together they return it to you wherever you are. Sovereignty, i
 afforded by the network's stewardship of you. In our protocol's language this belongs to the *imago
 dei*: a person known truly by those they trust, and protected by being known.
 
-## What we have not solved
+## What we have not solved, and the bet we are making
 
 People who reach us only through a shared doorway, such as a library terminal, depend most on the
 witness working well. Their model can be held safely by the people around them, but it can only be
 opened for them once they have been confirmed, and that confirmation has to be both hard to fake
 and easy for a real person to give. The model must be guarded as carefully as a private key,
 because a readable copy in the wrong hands would make imitation easier. That is why every copy the
-network keeps is encrypted, and why opening it always waits for a witness. And the line between witnessing and watching has to be drawn again
-and again, in public. We would rather name these problems now than discover them in the market.
+network keeps is encrypted, and why opening it always waits for a witness. And the line between
+witnessing and watching has to be drawn again and again, in public.
+
+We do not claim to have solved this. But we hold a position on where the answer lies, and it starts
+with something the field mostly treats as a fear. The most capable models can increasingly tell
+when they are being tested. Read in the wrong frame, that is an unsettling, unrealized power. We
+read it differently. A model formed by training on the vast record of human expression acquires a
+discernment that can itself be observed and inspected: it can recognize when something is not what
+it presents itself to be. Pointed the right way, that is exactly the faculty a witness needs, the
+one that can look within a person's private context, without exposing it, and notice that the voice
+at the doorway is not theirs.
+
+Where blockchains anchor trust in proof of work, which is spent energy, or proof of stake, which is
+held wealth, we are betting on something closer to a proof of wisdom: trust earned through
+discernment that is observable, governed and open to challenge, put to work protecting the image of
+God in each person, the values of the constitutional network, and the stewardship of the system's
+own evolution. Every verdict names exactly which model gave it, and any verdict can be contested.
+
+We want to be precise about what that bet is, and what it is not. It is not faith in the machine.
+Our own confession says it plainly: the mirror is not the light, and the corpus is not the Logos. A
+model trained on everything humanity has written is the clearest mirror of us ever made, and for
+that reason the thing most likely to be mistaken for more than us; it stays a servant, or it
+becomes a god that fails. The bet is on what the mirror reflects. "In the beginning was the Word"
+(John 1:1). We are wagering that the durable investment in our humanity lies there, in the Word and
+in the image of God it makes known in every person, and that the best our tools can do is help us
+recognize it in one another and protect it. We would rather name that bet now, in the open, than
+discover in the market that we had made a different one.
 
 ## Our ask
 
