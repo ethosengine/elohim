@@ -1031,8 +1031,8 @@ fi
 # ── Household head: land the pushed epr ─────────────────────────────
 # A gate makes an epr build available in the device store. Only a clean, green commit actually
 # landing on dev may move the household head; every refusal here is advisory to the push.
-# The eprfs gate ingests what it tested (`_gate-eprfs`). When pre-push accepted a gate receipt
-# instead, the receipt proved this commit's epr source closure was tested but built nothing, so
+# The eprfs gate ingests what it tested (`_gate-eprfs`). When pre-push reused gate evidence
+# instead (GATE_EVIDENCE=reuse), the evidence proved this closure was tested but built nothing, so
 # `_eprfs-deliver` builds and ingests the pushed commit in the gate's own slot before landing.
 BIN_STORE_CLI="${EPR_BIN:-$(command -v epr || true)}"
 EPR_LAND_REASON=""
