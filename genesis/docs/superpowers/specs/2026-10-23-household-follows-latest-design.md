@@ -477,3 +477,119 @@ each open an envelope under fake runtime ancestors (`EPR_PROC_ROOT`), hold their
 claims, and close; a killed one is released by liveness.
 
 A2 decides nothing about what crosses devices: the envelope travels in slice B.
+
+## 12. The declared target, slice M (design note, 2026-10-25)
+
+Slices A and A2 made a session run one pinned build and hold one envelope. Slice M says what a
+device should follow and run, in one record, so the follow set stops living in fifteen files. The
+plan's §M ruling stands: ark's `RuntimeManifest` is extended, and no sibling manifest is minted.
+
+**The record.** `RuntimeManifest` (`elohim/ark/core/src/manifest.rs`) already carries `supersedes`
+(the previous manifest's CID), `processes`, `envelope` and `archetype`. It gains two fields, both
+`#[serde(default)]` and skipped when empty:
+
+- `follows: Vec<Follow>`, where `Follow { channel: String, mode: FollowMode, pin: Option<String> }`
+  and `FollowMode` is `observe | canary | apply`. `channel` is `runtime:<class>:<net>:<name>` or the
+  dev-scope `bin:<tool>`. The grammar is the one `parse_followed_channels`
+  (`elohim/elohim-storage/src/services/release_adoption/state.rs:171`) reads from
+  `ELOHIM_RELEASE_CHANNELS` today: entries separated by `,`, newline or `;`; `channel=mode`, with a
+  bare channel meaning `observe`; an empty channel or unknown mode refused; a duplicate with the same
+  mode collapsed and one with a conflicting mode refused. That parser and its renderer move into
+  ark-core beside `Follow`, and storage calls them, so the rendered line and the field cannot
+  disagree.
+- `tools: BTreeMap<String, ToolSpec>`, the registry `genesis/agentic/bin-tools.json` holds today,
+  field for field: `bins: Vec<String>`, `aliases: BTreeMap<String, String>`,
+  `candidate_env: BTreeMap<String, Vec<String>>`, `long_running: Vec<Vec<String>>`, and
+  `source: ToolSource { kind: repository | gitlink, manifest: Option<String>, path: Option<String>,
+  published_ref: Vec<String>, repo: Option<String>, release_prefix: Option<String>,
+  attestation: Option<Attestation { provider, repo, check }> }`. The rendered `bin-tools.json`
+  keeps today's camelCase keys, so `Registry::load` reads it unchanged. `tools.epr.bins` gains
+  `bin-launch`. A release then carries its launcher, and arrival's `install-launcher` installs
+  the landed one. Today a release carries only `epr`, so arrival reinstalls the launcher that is
+  already there, and `bin-launch` changes only by hand (measured 2026-10-25: the 16af7710f landing
+  left the 12:00 launcher in place).
+
+Adding them leaves `MANIFEST_SCHEMA` (same file) at 1 and moves no existing manifest's CID: a test
+pins every committed manifest's CID, as `manifest_cid_is_unmoved_by_the_child_spec_rename` does for
+the `ChildSpec` rename. A change of declaration is a new manifest whose `supersedes` names the last.
+
+**Truth class and homes.** Private (B), owned by the steward's device. It is not an HTTP resource,
+it never crosses as authority (slice B may carry a version to the steward's other devices only as a
+submission they may adopt), and a secret appears only by name. Both homes work offline:
+
+- *A workspace device* keeps its chain in `<device dir>/manifest/` (the device dir holds the device
+  key, survives a `$HOME` wipe and never travels): each version as DAG-CBOR named by its CID, plus a
+  `head` file naming the current one. Its first version supersedes a committed base,
+  `genesis/orchestrator/manifests/runtime/workspace-device.manifest.json`, which M creates: `tools`
+  copied from today's `bin-tools.json`, and `follows` = `bin:epr=apply`, `bin:brit=apply`. A device
+  with no chain reads the base, so a fresh device needs no network and no hand-edited registry.
+- *A fleet human* keeps the committed manifest `deployments.json` already names
+  (`humans[].runtimeManifest {cid, path}`, under `genesis/orchestrator/manifests/runtime/`). Its
+  follows move into that file. The manifest is the source: an edit to it re-renders both the
+  pinned `cid` and the `runtimeConfig.ELOHIM_RELEASE_CHANNELS` string in `deployments.json`, never
+  the other way round.
+
+**One writer, and where it lives.** `epr device follow <channel> --mode <m> [--pin <cid>]
+[--unfollow]`, `run <tool> [--stop]`, `show [--json | --render runtime-config | --render
+bin-tools]` and `apply`. Each act takes the chain's lock, reads `head`, writes the superseding
+version, then moves `head` by atomic rename; a crash leaves the old head. `--root <device dir>`
+addresses another device's directory, which is how the mesh harness declares each peer. The code
+splits in two:
+
+- *Pure* (types, grammar, `supersede(head, act) -> RuntimeManifest`, the three renderers): ark-core,
+  which must stay free of filesystem and runtime dependencies (its `boundary` tests).
+- *The chain store and `apply`* (lock, versions, `head`, writing the projections): a
+  `manifest_store` module in `elohim-device-runtime`, beside `bin_store`, reusing its lock and
+  atomic-write helpers. `epr-cli` calls it, and elohim-storage takes `elohim-device-runtime` as a
+  dependency for the follow route. That is within rail R-E3 (placement-contract interfaces spec,
+  2026-10-20, §rails), which only forbids eprfs-storage, eprfs-local, eprfs-serve and eprfs-agent
+  depending on elohim-storage, and elohim-storage depending on eprfs-storage or eprfs-local. If
+  elohim-storage's own boundary test refuses the new edge, the builder stops and reports it rather
+  than copying the writer.
+
+**Rendering, and what is deleted.** `apply` (run at boot by `epr device arrive`, and after every
+act) renders from the head and is the only writer of each projection:
+
+- the watched runtime-config file's `ELOHIM_RELEASE_CHANNELS` line. `app/elohim-app/scripts/hc-mesh.sh`
+  and `hc-start.sh` stop writing it and call `epr device follow --root <peer>` then `apply`;
+- `deployments.json`'s `runtimeConfig.ELOHIM_RELEASE_CHANNELS`, through the existing render path
+  (`genesis/orchestrator/runtime-config-render.test.mjs`), with a freshness test that refuses a
+  hand edit;
+- `bin-tools.json` beside the launcher, where `epr bin install-launcher` already puts it. The
+  hand-edited `genesis/agentic/bin-tools.json` is deleted; `Registry::discover`'s checkout fallback
+  reads the committed base manifest instead.
+
+The follow route (`elohim/elohim-storage/src/api/runtime_config_follow.rs`,
+`POST /admin/runtime-config/follow`), `ConfigEprVehicle`
+(`elohim/elohim-storage/src/services/release_adoption/apply.rs:1911`, which applies a config-epr
+release) and `genesis/agentic/compute/measure.sh` (which writes a worker's runtime config) become
+callers of the act: a config-epr release is an input to a new manifest version, never a second
+write of the file.
+
+**Modes, and the notice.** `apply` adopts a new head for new sessions, as today; `canary` adopts
+after the health check; `observe` fetches and verifies but adopts nothing. Every mode tells a
+running session when its pin falls behind. The bin store already keeps
+`<store>/<tool>/current.json` (`{cid, commit, landedAt, previous}`, written by `epr bin land`) and
+each session's pin under `<store>/<tool>/sessions/`. The UserPromptSubmit hook compares the two
+with no process spawned and prints one line per new head per session, naming the old and new CIDs,
+the commit subject and the switch (`/clear`, or `epr bin pin --cid`). A session pinned to a
+dev-context build sees the same line when a landed head is available. Slice B adds peers' heads
+and peers' artifacts as further sources of the same line.
+
+**Census** (`genesis/agentic/bin/dup-census`). The `follow-set declarations` family reads 15 and
+`runtime-config writers` reads 5. After M, every file `follow-set declarations` still counts either
+reads the one declaration or is its writer: the hand-written declarations in `bin-tools.json`,
+`hc-mesh.sh`, `hc-start.sh`, `genesis/a2o/scripts/device-peer-receipt.ts` and the
+`deployments.json` strings are gone, so it falls to at most 10. `runtime-config writers` falls to
+1, the `manifest_store` module. The builder reports both path lists.
+
+**The scenario**, `genesis/a2o/features/devflow/device-declared-target.feature`, tagged
+`@concern:dataplane-convergence`, serves that habit through this spec's graduation trigger: a green
+gate reaches a device only through what the device follows. With fixture stores and no network, a
+device declares `bin:epr` at `apply` and a runtime channel at `observe`; `show --render
+runtime-config` prints the line the storage watcher then reads; a pin falling behind prints the
+notice once; deleting the device's chain returns it to the committed base, not to an empty follow
+set.
+
+M decides nothing about what crosses devices. Slice B carries presence, heads and the rakia
+artifact inventory between the steward's devices, and slice C the supervised restarts.

@@ -6,7 +6,7 @@ status: handoff
 author: "claude-opus-5-5 (Che workspace, ethosengine), at the operator's direction"
 habits: [dataplane-convergence, workspace-device-arrival]
 cites:
-  - "household-follows-latest-design | The household follows latest | sha256:e23c1d03016b4baf | path: genesis/docs/superpowers/specs/2026-10-23-household-follows-latest-design.md"
+  - "household-follows-latest-design | The household follows latest | sha256:7a60d62e64a44ee5 | path: genesis/docs/superpowers/specs/2026-10-23-household-follows-latest-design.md"
   - genesis/data/timeline/backlog/prepush-head-landing-never-ingests.md
 ---
 
