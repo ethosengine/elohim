@@ -15,6 +15,7 @@ cites:
   - genesis/docs/content/elohim-protocol/imagodei.md
   - genesis/docs/content/elohim-protocol/confession.md
   - genesis/docs/content/elohim-protocol/theology.md
+  - genesis/docs/content/elohim-protocol/resilience/README.md
 ---
 
 # Not on the industry's terms
@@ -58,10 +59,15 @@ gated or priced, but simply not done.
 
 Concretely, the design is this. The model is a governed algorithm, pinned by its content address
 and versioned, like the other algorithms our protocol runs. It learns only from what the person has
-actually said and done, never from what they only thought. It is encrypted under the key of the
-device that holds it, is never exported, and moves only from one of the person's devices to
-another. No company holds it. No advertiser sees it. No central server can be compelled to hand it
-over, because no central server has it.
+actually said and done, never from what they only thought. It is encrypted under keys only that
+person can bring to bear. So that losing a device never means losing yourself, it is also kept the
+way our protocol keeps all private data: encrypted, split into shards, and held for you by your
+family and community, people who carry the bytes for you but cannot read them. No company holds a
+readable copy. No advertiser sees it. No central server can be compelled to hand it over, because no
+central server has it, and the people who do keep it safe for you could not read it if they tried.
+It becomes readable again only where you are present and witnessed: on one of your own devices, or,
+if you sign in at a doorway run by your neighborhood library, once your other devices and the people
+in your private reach have confirmed that it is really you.
 
 ## What changes when the person holds it
 
@@ -92,8 +98,9 @@ it trustworthy rather than a kinder-faced version of the same capture:
   alarm costs one confirmation from another of your devices, never your standing.
 - **Reversible protection is automatic; permanent action needs another witness.** No single model
   and no single device has the final word on who you are.
-- **The model never leaves your reach.** A model of how you sound, held by anyone else, is the very
-  capture this letter is about. That is why ours stays with you.
+- **The model is never readable outside your reach.** A model of how you sound, readable by anyone
+  else, is the very capture this letter is about. The network keeps it safe for you; only you, once
+  witnessed, can read it.
 
 ## The deeper refusal: no attachment economy
 
@@ -126,15 +133,20 @@ reconstructed from many small, signed, contestable acts of witness that pass bet
 devices and the people who know them. We think of it as an early form of sovereignty that the
 network affords rather than one that a single key or a single server grants: a person's
 standing and security composed from many witnessed agreements within the relationships they
-depend on, not asserted alone above them. In our protocol's language this belongs to the *imago
+depend on, not asserted alone above them. Your family and community carry your most private
+material without being able to read it; your devices and the people who know you confirm that
+you are you; and together they return it to you wherever you are. Sovereignty, in this sense, is
+afforded by the network's stewardship of you. In our protocol's language this belongs to the *imago
 dei*: a person known truly by those they trust, and protected by being known.
 
 ## What we have not solved
 
-People whose only device is a hosted gateway need a home of their own for this model before they
-can fully benefit from it; until then they get the simpler signals (device, place and time) and not
-the intimate ones. The model must be guarded as carefully as a private key, because a stolen copy
-would make imitation easier. And the line between witnessing and watching has to be drawn again
+People who reach us only through a shared doorway, such as a library terminal, depend most on the
+witness working well. Their model can be held safely by the people around them, but it can only be
+opened for them once they have been confirmed, and that confirmation has to be both hard to fake
+and easy for a real person to give. The model must be guarded as carefully as a private key,
+because a readable copy in the wrong hands would make imitation easier. That is why every copy the
+network keeps is encrypted, and why opening it always waits for a witness. And the line between witnessing and watching has to be drawn again
 and again, in public. We would rather name these problems now than discover them in the market.
 
 ## Our ask
