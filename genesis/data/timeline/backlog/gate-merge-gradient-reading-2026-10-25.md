@@ -115,6 +115,14 @@ missing node B: integrate composes attested closures and advances the head by on
 current state: absent; heads advance only through a client-side pre-push that re-gates everything
 ```
 
+A data point from the device-runtime session (2026-10-25) that supports this reading. Pre-push
+cannot land a device's epr head from a worktree. At hook time the pushed SHA is on neither
+`refs/heads/dev` (a linked worktree's `dev` is the main checkout's) nor `origin/dev` (the push has not
+completed), and the bin store correctly refuses to land an unpublished commit. The landing happens
+after publication: the next session arrival's `follow` adopts the gate's ingested candidate for the
+published HEAD with no rebuild (`Store::adopt`; first observed for 16af7710f, landed 13:23:59Z). Work
+that must follow publication belongs with the integrator, not the pre-push.
+
 ## Next sprint, in order
 
 1. **F4, native `brit integrate`**
