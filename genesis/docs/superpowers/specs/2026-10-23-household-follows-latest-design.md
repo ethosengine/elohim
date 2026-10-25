@@ -415,7 +415,11 @@ networked build, and finally a refusal naming every cure. `bin-launch` is a sepa
 It does no hashing for session-pinned CLI tools; daemons keep the exec floor.
 
 **A.4 Receipts and carry-overs.** The gate-receipt leg, the daemon's running CID in its lease,
-and the fix for the pre-push renew-loop race.
+and the fix for the pre-push renew-loop race. *Superseded in part, 2026-10-25:* the gate-receipt
+leg is folded into brit closure evidence (`genesis/orchestrator/gate-evidence.mjs` `reusableHit`;
+habit `push-gate-pays-once`), the only gate-reuse path. That was the operator's ruling, because the
+receipt key missed the recipe body and the repo files eprfs tests read outside epr's source closure.
+`nativeGateKey` survives as eprfs key material.
 
 Slice A decides nothing that crosses devices (slice B), nothing about the manifest (slice M) and
 nothing about supervision (slice C).

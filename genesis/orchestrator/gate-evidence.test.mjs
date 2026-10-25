@@ -432,7 +432,7 @@ test('reusableHit refuses a missing workspace key before checking rows', () => {
   assert.deepEqual(reusableHit({}, { ...reuseContext, selfId: null, selectorCheck: unexpectedSelector }), { reuse: false, why: 'no workspace key' });
 });
 
-test('reusableHit refuses the newest red even when an older attestation is green', () => {
+test('reusableHit refuses the newest red even when an older attestation is green', function reuse_never_overrules_a_newer_red() {
   const newer = { commit: 'bbbbbbbbb2', attestation: { success: false, agentId: 'other', builtAt: '2026-10-24T13:00:00Z' } };
   for (const rows of [[greenRow, newer], [newer, greenRow]]) {
     assert.deepEqual(reusableHit({ rows, dirty: true }, { ...reuseContext, selectorCheck: unexpectedSelector }), { reuse: false, why: 'newest attestation is red' });
@@ -465,14 +465,14 @@ test('reusableHit preserves the selector refusal message', () => {
   } }), { reuse: false, why: 'attested commit unreadable' });
 });
 
-test('reusableHit accepts only the newest green self-signed row without mutating evidence', () => {
+test('reusableHit accepts only the newest green self-signed row without mutating evidence', function reuse_accepts_only_self_signed_newest_green() {
   const older = { ...greenRow, attestation: { ...greenRow.attestation, success: false, builtAt: '2026-10-24T11:00:00Z' } };
   const rows = Object.freeze([older, greenRow]);
   assert.deepEqual(reusableHit({ ...cleanEvidence, rows }, reuseContext), { reuse: true, row: greenRow });
   assert.equal(rows[0], older);
 });
 
-test('closure key v2 includes every new piece of material and is deterministic', () => {
+test('closure key v3 includes every new piece of material and is deterministic', () => {
   const base = { project, fingerprints: [], manifestBlob: 'manifest', cargoEnv: {}, ...closureMaterial, rustc: 'compiler', gitlinks: [{ path: 'elohim/brit', sha: 'abc' }], packages: [] };
   const key = closureKey(base);
   assert.equal(closureKey({ ...base }), key);
@@ -484,7 +484,7 @@ test('closure key v2 includes every new piece of material and is deterministic',
   }
   const canonical = value => Array.isArray(value) ? value.map(canonical)
     : value && typeof value === 'object' ? Object.fromEntries(Object.keys(value).sort().map(k => [k, canonical(value[k])])) : value;
-  const material = { v: 2, project: project.name, run: project.run, manifest: 'manifest', steps: [], env: {}, ...closureMaterial, rustc: 'compiler', gitlinks: base.gitlinks, packages: [] };
+  const material = { v: 3, project: project.name, run: project.run, manifest: 'manifest', steps: [], env: {}, ...closureMaterial, rustc: 'compiler', gitlinks: base.gitlinks, packages: [] };
   assert.equal(key, createHash('sha256').update(JSON.stringify(canonical(material))).digest('hex'));
 });
 
@@ -592,7 +592,7 @@ test('an unreadable step declaration leaves the working tree state unknown', t =
   assert.equal(gateEvidence(project, { root, env, commit: 'abc', spawn }).dirty, null);
 });
 
-test('reuseSelector requires a readable diff and a real oracle answer when files changed', async t => {
+test('reuseSelector requires a readable diff and a real oracle answer when files changed', async function reuse_selector_requires_the_oracle(t) {
   const { reuseSelector } = await import('./gate-runner.mjs');
   const { root, env } = evidenceFixture(t);
   writeFileSync(join(root, 'build-manifest.json'), JSON.stringify({

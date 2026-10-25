@@ -1,4 +1,4 @@
-// Native source closure is shared by receipts and eprfs gate evidence. JS never walks Cargo.
+// Native source closure: key material for eprfs gate evidence (gate-evidence.mjs). JS never walks Cargo.
 import { spawnSync } from 'node:child_process';
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';

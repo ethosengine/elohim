@@ -51,7 +51,7 @@
         "run": {
           "kind": "root-just",
           "recipe": "_gate-eprfs",
-          "cargo": { "targetDir": "/tmp/eprfs-gate-target", "profile": "dev", "rustflags": "", "env": { "EPR_GATE_RECEIPT": "1" } }
+          "cargo": { "targetDir": "/tmp/eprfs-gate-target", "profile": "dev", "rustflags": "" }
         }
       }
     }
