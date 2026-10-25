@@ -149,6 +149,7 @@ trap 'exit 129' HUP
 
 BERTH_BIN="$HOOK_WORK_TREE/genesis/agentic/bin/berth"
 BERTH_HELD=""
+BERTH_KEPT="" # leases this session already held: renewed while the gates run, never released
 BERTH_CLAIMING=""
 BERTH_HOOK_SESSION=""
 berth_moor_hook() {
@@ -175,7 +176,7 @@ berth_release_claims() {
 }
 HOOK_ON_EXIT="$HOOK_ON_EXIT berth_release_claims"
 
-# While the gates run, every claim this push took is renewed every ttl/3 by a background loop, so a
+# While the gates run, every lease this push needs (taken or already held) is renewed every ttl/3 by a background loop, so a
 # long landing never outlives its lease (the other devices read a lease past since + ttl as dead).
 # A renew whose record did not cross prints berth's line and keeps going; a renew refused outright
 # prints berth's line and stops the push (at the end of the gate step then running). The loop is
@@ -197,7 +198,7 @@ berth_renew_loop() {
     sleeper=$!
     wait "$sleeper"
     sleeper=""
-    for res in $BERTH_HELD; do
+    for res in $BERTH_HELD $BERTH_KEPT; do
       out=$("$BERTH_BIN" claim "$res" "${BERTH_FLAGS[@]}" 2>&1)
       rc=$?
       [ "$rc" -eq 0 ] && continue
@@ -268,8 +269,13 @@ if [ -n "$BERTH_TARGETS" ]; then
     [ -n "$BERTH_OUT" ] && printf '%s\n' "$BERTH_OUT" >&2
     case "$BERTH_RC" in
       0)
-        # A renew is a lease this session already held (it watches that build or deploy): its own.
-        grep -q "^$BERTH_RES: renewed" <<<"$BERTH_OUT" || BERTH_HELD="$BERTH_HELD $BERTH_RES"
+        # A renew is a lease this session already held (it watches that build or deploy, or an
+        # earlier push of it was killed): not this push's to give back, but the gates still need it.
+        if grep -q "^$BERTH_RES: renewed" <<<"$BERTH_OUT"; then
+          BERTH_KEPT="$BERTH_KEPT $BERTH_RES"
+        else
+          BERTH_HELD="$BERTH_HELD $BERTH_RES"
+        fi
         ;;
       1)
         if grep -q "^$BERTH_RES: renewed here, but " <<<"$BERTH_OUT"; then
@@ -296,7 +302,7 @@ if [ -n "$BERTH_TARGETS" ]; then
         ;;
     esac
   done
-  if [ -n "$BERTH_HELD" ]; then
+  if [ -n "$BERTH_HELD$BERTH_KEPT" ]; then
     # Bash establishes the group before running the subshell; no setsid startup race.
     set -m
     berth_renew_loop </dev/null &

@@ -425,6 +425,19 @@ test("prepush_renews_its_claims_while_the_gates_run", (t) => {
   }
 });
 
+test("prepush_renews_a_lease_it_already_held_and_leaves_it_held", (t) => {
+  // 2026-10-25: push 7 was killed and left its session's dev-integration lease; push 8's claim came
+  // back "renewed", no renewer started, and the lease lapsed 37 min into a live push, silently.
+  const fx = fixture(t, "feat: land it", { "dev-integration": "R" });
+  const r = runBlock(fx, { after: "sleep 2.5; echo GATES-RAN", env: SHORT_TTL });
+  assert.equal(r.status, 0, r.out);
+  assert.ok(r.out.includes("GATES-RAN"));
+  const calls = r.calls.map((c) => c.split(" --note")[0]);
+  assert.ok(calls.filter((c) => c === RENEW("dev-integration")).length >= 3, `renewed while the gates ran: ${calls}`);
+  assert.ok(!calls.includes("release dev-integration"), `a lease the push did not take stays held: ${calls}`);
+  assert.deepEqual(settledCalls(fx), r.calls, "nothing renews after the push ends");
+});
+
 test("prepush_renew_that_does_not_cross_keeps_going", (t) => {
   const fx = fixture(t, "feat: land it", { "dev-integration": ["0", "U"] });
   const r = runBlock(fx, { after: "sleep 2.5; echo GATES-RAN", env: SHORT_TTL });
