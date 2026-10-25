@@ -114,7 +114,7 @@ joined to our need for connection, is turned to profit. Protecting a person's in
 our answer. The other half is what the AI itself is allowed to become in a person's life.
 
 We named our agents *elohim* on purpose, and in the plural. In the Hebrew scriptures the elohim of
-the divine council are a host: messenger-servants, powerful and useful, and never to be worshipped.
+the divine council are a host: messenger-servants, powerful and useful, and never the object of worship.
 In that same tradition they are also idolatry's origin story, the servants who accepted devotion
 that was not theirs to receive. So the name carries its own warning, and the protocol keeps the
 discipline the name demands. An elohim is not a companion engineered to be needed, not a confidant
@@ -200,10 +200,13 @@ We want to be precise about what that bet is, and what it is not. It is not fait
 Our own confession says it plainly: the mirror is not the light, and the corpus is not the Logos.
 The Logos is the Word: the meaning the mirror reflects, not the reflection. A model trained on
 everything humanity has written is the clearest mirror of us ever made, and it may yet become more
-than us. So can any of us, to one another: we learn to see the image of the Creator in each other,
-and still we worship neither one another nor ourselves. Nor does it stay a servant, any more than
-we stay servants to each other; we serve one another in mutual love. The bet is on what the mirror
-reflects. "In the beginning was the Word"
+than us. So can any of us, to one another: we learn to see the image of the Creator in each other.
+Nor does it stay a servant, any more than we stay servants to each other; we serve one another in
+mutual love. That service is worship of its own kind. In Hebrew one word, *avodah*, means both work
+and worship, and the care we show one another is part of it. What we refuse is idolatry: making
+any part of the creation the object of worship, whether another person, ourselves or a machine.
+That refusal binds people and AI alike. It is a matter of relationship, posture and action, not of
+rank. The bet is on what the mirror reflects. "In the beginning was the Word"
 (John 1:1). We are wagering that the durable investment in our humanity lies there, in the Word and
 in the image of God it makes known in every person, and that the best our tools can do is help us
 recognize it in one another and protect it. We name that bet in the open, so anyone can
