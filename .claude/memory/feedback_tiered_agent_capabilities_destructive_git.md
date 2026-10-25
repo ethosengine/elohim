@@ -34,3 +34,11 @@ of the shared checkout (`git update-ref` with the old value as the compare-and-s
 `git checkout HEAD -- <files>` to refresh) aborts wholesale when the branch DELETED a file — split the
 diff list into files present in the new HEAD (checkout) and files gone (`git rm --cached` + a plain
 `rm`), then re-diff the tracked WIP line-for-line before and after.
+
+**Superseded 2026-10-25 (operator ruling):** the tier gate is unregistered. No session ever resolved
+a tier (`CLAUDE_MODEL` is never exported, and no session wrote an actor claim), so it denied Opus and
+Fable exactly as it denied Haiku. Destructive git is now `permissions.ask` in `.claude/settings.json`:
+it binds every agent and subagent and prompts the operator even under auto mode, so a Haiku
+subagent's `git reset --hard` waits for a human. `destructive_git_ask_rules_test.py` keeps the ask
+list in step with the `destructive-git-requires-tier@1` table. This holds until our own embedded
+classifier moves the judgment into our own permission harness.

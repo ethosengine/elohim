@@ -119,7 +119,7 @@ rules:
         - "git branch -D"
         - "git worktree remove --force"
         - "destructive-git-requires-tier"
-    dedupe-of: ".claude/epr-meta/policies.yaml row `destructive-git-requires-tier@1` (the declared pattern / tier-order / tier-floor / remedy table; read directly by .claude/hooks/capability-tier-gate.py, the ONE PreToolUse enforcer)"
+    dedupe-of: ".claude/epr-meta/policies.yaml row `destructive-git-requires-tier@1` (the declared pattern table; enforced since 2026-10-25 by `.claude/settings.json` `permissions.ask`, held to the table by .claude/scripts/_lib/__tests__/destructive_git_ask_rules_test.py; .claude/hooks/capability-tier-gate.py is unregistered, kept as the reference for our own classifier)"
     why: >
       this edit is writing destructive-git command text into a `.py` file in this tree — exactly
       the shape of a second, hand-authored copy of the pattern table
@@ -195,3 +195,14 @@ across `\`-newline continuations, split on operators, unwrapped through `sudo`/`
 denies on ambiguity only when the unresolvable text sits inside a destructive form (a glued
 `git${IFS}reset`, a `$VAR` flag on `reset`), never on a `${VAR}` in an ordinary commit message.
 None of the five blocks; each retires on a counted condition.
+
+Operator ruling 2026-10-25: the tier gate is unregistered from `.claude/settings.json`. It resolved
+the acting tier from `CLAUDE_MODEL`, which this harness never exports, or from a self-asserted
+actor claim no session wrote, so every session read `unknown` and was denied: Opus and Fable as
+surely as Haiku. Until our own embedded classifier carries this judgment into our own permission
+harness, Claude Code's permission system holds it: every row rule is a `permissions.ask` pattern
+(`git *<sub> <flag>*`, which also catches `git -C <dir> …`). An ask rule binds every agent and
+subagent and still prompts the operator under auto mode, so a Haiku subagent's destructive git
+waits for a human. `destructive_git_ask_rules_test.py` derives one example per row rule and fails
+when no ask rule catches it. The hook stays in the tree, with its adversarial test tables, as the
+reference corpus for that classifier.
