@@ -7,13 +7,13 @@ title: "Pre-push's household-head landing can never land: nothing ingests the ca
 slug: "prepush-head-landing-never-ingests"
 written: "2026-10-25"
 author: "claude-opus-5-5 (device-runtime slices A and A2)"
-status: "open"
+status: "resolved"
 priority: "high"
 tags: [device-runtime, bin-store, pre-push, landing, household-follows-latest, epr]
 cites:
   - .husky/pre-push.bash
   - elohim/eprfs/device-runtime/src/bin_store/landing.rs
-  - "household-follows-latest-design | The household follows latest | sha256:e23c1d03016b4baf | path: genesis/docs/superpowers/specs/2026-10-23-household-follows-latest-design.md"
+  - "household-follows-latest-design | The household follows latest | sha256:7a60d62e64a44ee5 | path: genesis/docs/superpowers/specs/2026-10-23-household-follows-latest-design.md"
 ---
 
 # Pre-push's head landing never finds a candidate to land
@@ -55,3 +55,14 @@ the launcher with the landed epr when the slot's `bin-launch` differs from the i
 
 A green push to `dev` that changes eprfs moves this device's head to the pushed commit's build
 with no hand step, and `just status device` from a fresh session reads that head.
+
+## Resolved (2026-10-25)
+
+The push of 16af7710f moved this device's head to that commit's gated build with no hand step,
+and a fresh session reads it. It happened at session arrival, not in pre-push: pre-push's land was
+refused `unpublished`, because during the hook the commit is on neither `refs/heads/dev` (from a
+worktree) nor `origin/dev` (not yet pushed), and the store rightly refuses to land an unpublished
+commit. Arrival's `follow` lands a verified clean stored candidate for the published HEAD before
+it would build (`Store::adopt`). Pre-push's land still succeeds for a push from the main checkout,
+whose `refs/heads/dev` is the pushed SHA; from a worktree it now says it is deferred to arrival.
+Evidence: the 16af7710f push log and `.epr-meta/workspace-device-arrival.habit.md` DELTA 2026-10-25b.

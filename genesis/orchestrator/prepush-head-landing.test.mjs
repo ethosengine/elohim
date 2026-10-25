@@ -37,7 +37,10 @@ case "$1" in
     else
       printf '{"store":"%s/store/epr"}\\n' "$here"
     fi ;;
-  land) exit 0 ;;
+  land)
+    if [ -f "$here/unpublished" ]; then
+      echo "REFUSED unpublished: commit is not contained in any publishedRef" >&2; exit 2
+    fi ;;
   resolve) echo "$here/epr" ;;
   install-launcher) exit 0 ;;
 esac
@@ -67,7 +70,7 @@ const cleanEnv = Object.fromEntries(
 );
 
 /** A scratch checkout at the pushed commit, with a stub store and gate-runner. */
-function fixture(t, { candidate = "", deliver = CID, slotLauncher = null, installed = "old launcher" } = {}) {
+function fixture(t, { candidate = "", deliver = CID, slotLauncher = null, installed = "old launcher", unpublished = false } = {}) {
   const dir = mkdtempSync(join(tmpdir(), "prepush-head-landing-"));
   t.after(() => rmSync(dir, { recursive: true, force: true }));
   const git = (...args) => {
@@ -85,6 +88,7 @@ function fixture(t, { candidate = "", deliver = CID, slotLauncher = null, instal
   writeFileSync(join(bin, "store/bin/bin-launch"), installed);
   if (candidate) writeFileSync(join(bin, "candidate"), candidate);
   if (deliver) writeFileSync(join(bin, "deliver"), deliver);
+  if (unpublished) writeFileSync(join(bin, "unpublished"), "");
   mkdirSync(join(dir, "genesis/orchestrator"), { recursive: true });
   writeFileSync(join(dir, "genesis/orchestrator/gate-runner.mjs"), STUB_GATE_RUNNER);
   if (slotLauncher !== null) {
@@ -144,6 +148,20 @@ test("a_gate_that_ran_lands_its_own_ingest_without_rebuilding", (t) => {
   assert.ok(r.out.includes(`[pre-push] epr household head landed: ${CID}`), r.out);
   assert.ok(!r.calls.some((c) => c.includes("--recipe")), "the gate's own ingest is landed as is");
   assert.ok(!r.calls.some((c) => c.includes("install-launcher")), "an unchanged launcher is left alone");
+});
+
+test("a_worktree_push_defers_the_landing_to_arrival_until_the_commit_is_on_dev", (t) => {
+  // During the hook the pushed commit is on neither refs/heads/dev nor origin/dev, so the store
+  // refuses `unpublished`; the ingested candidate is landed by the next session arrival.
+  const fx = fixture(t, { unpublished: true });
+  const r = runBlock(fx);
+  assert.equal(r.status, 0, r.out);
+  assert.ok(
+    r.out.includes(`[pre-push] epr household head deferred: ${CID} lands at the next session arrival once ${fx.head} is on dev`),
+    r.out,
+  );
+  assert.ok(!r.out.includes("not landed"), r.out);
+  assert.ok(!r.calls.some((c) => c.includes("install-launcher")), "nothing landed, so no launcher");
 });
 
 test("a_delivery_that_ingests_nothing_says_so_and_never_lands", (t) => {

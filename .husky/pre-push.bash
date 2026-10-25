@@ -1007,7 +1007,7 @@ if [ -z "$EPR_LAND_REASON" ]; then
   fi
   if [ -z "$EPR_CANDIDATE_CID" ]; then
     EPR_LAND_REASON="no ingested epr candidate names the SHA targeting dev"
-  elif "$BIN_STORE_CLI" bin --tool epr land "$EPR_CANDIDATE_CID" --commit "$DEV_LOCAL_SHA" --repo "$HOOK_WORK_TREE" >/dev/null 2>&1; then
+  elif EPR_LAND_ERROR=$("$BIN_STORE_CLI" bin --tool epr land "$EPR_CANDIDATE_CID" --commit "$DEV_LOCAL_SHA" --repo "$HOOK_WORK_TREE" 2>&1 >/dev/null); then
     echo "[pre-push] epr household head landed: $EPR_CANDIDATE_CID"
     # The launcher is built beside the landed epr in the gate's slot. A session's PATH execs it,
     # so a changed bin-launch is installed by the epr just landed (install-launcher verifies current).
@@ -1026,6 +1026,10 @@ if [ -z "$EPR_LAND_REASON" ]; then
     else
       echo "[pre-push] epr launcher not installed: bin-store refused (run: epr bin install-launcher --launcher $EPR_NEW_LAUNCHER)"
     fi
+  elif echo "$EPR_LAND_ERROR" | grep -q unpublished; then
+    # From a worktree the commit is on neither refs/heads/dev nor origin/dev until this push
+    # completes. The candidate is ingested; the next session arrival's `follow` lands it.
+    echo "[pre-push] epr household head deferred: $EPR_CANDIDATE_CID lands at the next session arrival once $DEV_LOCAL_SHA is on dev"
   else
     EPR_LAND_REASON="bin-store refused epr candidate health or provenance"
   fi
