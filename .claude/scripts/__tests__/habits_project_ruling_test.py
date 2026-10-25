@@ -119,6 +119,20 @@ class HabitFlipRulingTest(unittest.TestCase):
         self.assertEqual(exit_code, 0, output)
         self.assertIn("genesis/manifests/habits.yaml is current", output)
 
+    def test_a_ruling_after_a_rebase_is_judged_on_the_author_clock_it_carries(self) -> None:
+        # A rebase rewrote the committer date; the ruling is dated by HEAD's author date.
+        env = {**os.environ, "GIT_COMMITTER_DATE": "2026-09-05T12:00:00Z"}
+        subprocess.run(["git", "commit", "-q", "--amend", "--no-edit", "--reset-author"],
+                       cwd=self.root, check=True,
+                       env={**env, "GIT_AUTHOR_DATE": "2026-09-04T12:00:00Z",
+                            "GIT_AUTHOR_NAME": "Fixture Author",
+                            "GIT_AUTHOR_EMAIL": "fixture@example.test",
+                            "GIT_COMMITTER_NAME": "Fixture Author",
+                            "GIT_COMMITTER_EMAIL": "fixture@example.test"})
+        self._write_ruling("2026-09-04T13:00:00Z")
+        exit_code, output = self._check()
+        self.assertEqual(exit_code, 0, output)
+
 
 if __name__ == "__main__":
     unittest.main()

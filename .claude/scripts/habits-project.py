@@ -87,8 +87,10 @@ def _last_commit_at(root: Path, path: Path) -> datetime | None:
         label = path.resolve().relative_to(root.resolve()).as_posix()
     except (OSError, ValueError):
         return None
+    # Author date, the clock `epr flow note` dates a ruling by (HEAD's %aI): a rebase rewrites
+    # every committer date and would otherwise outdate a ruling written after it.
     result = subprocess.run(
-        ["git", "log", "-1", "--format=%cI", "--", label],
+        ["git", "log", "-1", "--format=%aI", "--", label],
         cwd=root,
         capture_output=True,
         text=True,
