@@ -594,7 +594,8 @@ function receiptFixture(t) {
   t.after(() => rmSync(root, { recursive: true, force: true }));
   const dir = 'elohim/eprfs';
   mkdirSync(resolve(root, dir), { recursive: true });
-  writeFileSync(resolve(root, dir, 'build-manifest.json'), '{"fixture":1}\n');
+  writeFileSync(resolve(root, dir, 'build-manifest.json'),
+    '{"steps":{"build":{"inputs":{"sources":["elohim/eprfs/**","crates/external/**"]}}}}\n');
   const env = { ...process.env };
   for (const key of ['GIT_DIR', 'GIT_WORK_TREE', 'GIT_INDEX_FILE', 'GIT_PREFIX', 'GATE_COMMIT']) delete env[key];
   const git = args => {
@@ -621,8 +622,12 @@ function receiptFixture(t) {
   env.EPR_BIN_TOOLS = resolve(root, 'genesis/agentic/bin-tools.json');
   const metadata = spawnSync('cargo', ['metadata', '--offline', '--format-version', '1', '--manifest-path', resolve(root, dir, 'Cargo.toml')], {env, encoding:'utf8'});
   assert.equal(metadata.status, 0, metadata.stderr);
-  git(['init', '-q']); git(['add', dir, 'crates/external', 'genesis/agentic']); git(['commit', '-qm', 'fixture']);
-  const project = { name:'fixture', dir, run:{cargo:{env:{EPR_GATE_RECEIPT:'1', RUSTUP_TOOLCHAIN:'1.96.1'}}} };
+  // Closure key v3 reads the recipe's justfile and the gate runner at the commit.
+  writeFileSync(resolve(root, 'justfile'), '_gate-fixture:\n    true\n');
+  mkdirSync(resolve(root, 'genesis/orchestrator'), {recursive:true});
+  writeFileSync(resolve(root, 'genesis/orchestrator/run-local-gate.sh'), 'exit 0\n');
+  git(['init', '-q']); git(['add', dir, 'crates/external', 'genesis/agentic', 'genesis/orchestrator', 'justfile']); git(['commit', '-qm', 'fixture']);
+  const project = { name:'fixture', dir, run:{kind:'root-just', recipe:'_gate-fixture', cargo:{env:{RUSTUP_TOOLCHAIN:'1.96.1'}}} };
   return {root, env, project, git};
 }
 
