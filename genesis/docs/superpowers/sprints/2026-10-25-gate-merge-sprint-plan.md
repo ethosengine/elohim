@@ -133,6 +133,12 @@ grant. A4 needs the other workspace, so it is the operator's item to schedule.
    (`flow_parity`, `flow_edge_parity`, `canon_lift_parity`) go to the corpus gate with the
    evaluator code declared. Probe: a docs-only mutation leaves the eprfs key unchanged; a corpus
    mutation moves only the corpus key.
+   Live evidence, 2026-10-26: a docs-only push (6061e04e7, the restart-to-connected plan) carried
+   one bare-path cite. Its pre-push selected no gate, because no project reads the sprint docs as
+   a declared input. eprfs's `flow_cites live_corpus_migrate_reports_zero_pending` then failed every
+   eprfs gate on dev, until `5ac2681ef` sealed the cite. C1 selects that test from the docs
+   change itself. Until C1 lands, run `epr flow cites seal <doc>` before pushing any doc with
+   `cites:`.
 2. C2, memory-ceremony gets a real step and declared reads, and enrolls in reuse only after its
    attribution parity check is snapshotted or excluded.
 
