@@ -68,7 +68,7 @@ pub use explain::{explain, Explanation, NotCarried, NotCarriedKind, NotCarriedRe
 pub use floor::{affected, Floor, PassOutcome, PortError, Ports, Trigger};
 pub use kind::{
     required_scope, Charge, GrantScope, KindId, KindRegistry, MethodRegistry, MishpatAction,
-    PlacementKind,
+    PlacementKind, GATE_METHOD_PREFIX,
 };
 pub use manifest::{
     needs_from_manifest, ClosureKey, ComputeBounds, ComputeNeed, GrantRequest, ManifestContext,

@@ -14,12 +14,24 @@ path = "src/main.rs"
 elohim-ark-core = { path = "../core" }
 elohim-ark-supervisor = { path = "../supervisor" }
 elohim-epr = { path = "../../epr" }
+elohim-epr-rea = { path = "../../epr-rea", default-features = false }
 cid = { workspace = true }
 clap = { workspace = true }
+serde = { workspace = true }
 serde_json = { workspace = true }
 nix = { workspace = true }
+# `ark task` (src/task.rs): a device's own task placed through placement's floor, its input an
+# eprfs tree, its derivation looked up in brit through eprfs-core's `DerivationIndex`
+# (src/brit_index.rs), and its answer the `PendingStatus` channel of seam-contracts.
+eprfs-core = { path = "../../eprfs/eprfs-core" }
+elohim-placement-core = { path = "../../placement/core" }
+elohim-seam-contracts = { path = "../../../crates/seam-contracts", features = ["serde"] }
+async-trait = { workspace = true }
+futures = { workspace = true }
+chrono = { workspace = true }
+sha2 = { workspace = true }
+hex = { workspace = true }
 
 [dev-dependencies]
 elohim-device-runtime = { path = "../../eprfs/device-runtime" }
-sha2 = { workspace = true }
 tempfile = { workspace = true }

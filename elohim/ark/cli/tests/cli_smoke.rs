@@ -416,3 +416,263 @@ fn bin_channel_runs_verified_device_current_and_passport_observes_it() {
     });
     assert!(status.success());
 }
+
+// ---- ark task: a device's own gate as a placement Task ---------------------------------------------
+
+/// A task fixture: a child script, a closure material, a fake `brit-build-ref` answering `rows`,
+/// and the spec `ark task spec` built for them, all under `root`.
+struct TaskFixture {
+    root: PathBuf,
+    spec: PathBuf,
+    material: PathBuf,
+    child: PathBuf,
+    status: PathBuf,
+    brit: PathBuf,
+}
+
+fn task_fixture(root: &Path, method: &str, script: &str, rows: &Value) -> TaskFixture {
+    let child = root.join("child.sh");
+    fs::write(&child, format!("#!/bin/sh\n{script}\n")).unwrap();
+    let material = root.join("material.json");
+    fs::write(&material, r#"{"project":"fixture","v":3}"#).unwrap();
+    let brit = root.join("brit-build-ref");
+    fs::write(&brit, format!("#!/bin/sh\ncat <<'ROWS'\n{rows}\nROWS\n")).unwrap();
+    for path in [&child, &brit] {
+        Command::new("chmod").arg("+x").arg(path).status().unwrap();
+    }
+    let sha = format!("{:x}", Sha256::digest(fs::read(&child).unwrap()));
+    let request = root.join("request.json");
+    fs::write(
+        &request,
+        json!({
+            "method": {"name": method, "step": "gate:fixture", "deterministic": true},
+            "child": {"artifact": {"pinned": {"sha256": sha}}, "argv": ["child.sh"]},
+        })
+        .to_string(),
+    )
+    .unwrap();
+    let made = ark(&[
+        "task",
+        "spec",
+        "--request",
+        request.to_str().unwrap(),
+        "--material",
+        material.to_str().unwrap(),
+    ]);
+    assert!(
+        made.status.success(),
+        "{}",
+        String::from_utf8_lossy(&made.stderr)
+    );
+    let made: Value = serde_json::from_slice(&made.stdout).unwrap();
+    for cid in ["method", "input"] {
+        assert!(made["derivation"][cid]
+            .as_str()
+            .unwrap()
+            .starts_with("bafyrei"));
+    }
+    let spec = root.join("spec.json");
+    fs::write(&spec, made["spec"].to_string()).unwrap();
+    TaskFixture {
+        root: root.to_path_buf(),
+        spec,
+        material,
+        child,
+        status: root.join("status.jsonl"),
+        brit,
+    }
+}
+
+impl TaskFixture {
+    fn command(&self, reuse: Option<&Value>) -> Command {
+        let mut command = Command::new(ARK);
+        command
+            .args(["task", "run", "--spec"])
+            .arg(&self.spec)
+            .arg("--material")
+            .arg(&self.material)
+            .arg("--artifact")
+            .arg(&self.child)
+            .arg("--status")
+            .arg(&self.status)
+            .arg("--repo")
+            .arg(&self.root)
+            .args(["--device", "me"])
+            .env("BRIT_BUILD_REF_BIN", &self.brit);
+        if let Some(reuse) = reuse {
+            let path = self.root.join("reuse.json");
+            fs::write(&path, reuse.to_string()).unwrap();
+            command.arg("--reuse").arg(path);
+        }
+        command
+    }
+
+    fn statuses(&self) -> Vec<Value> {
+        fs::read_to_string(&self.status)
+            .unwrap_or_default()
+            .lines()
+            .map(|line| serde_json::from_str(line).unwrap())
+            .collect()
+    }
+}
+
+/// A miss runs the child: its bytes pass through unchanged, the exit is the child's, and the
+/// status goes queued then answered (failed, not a hit) with a local completion.
+#[test]
+fn task_run_passes_the_child_through_and_answers_its_exit() {
+    let root = tempfile::tempdir().unwrap();
+    let task = task_fixture(
+        root.path(),
+        "brit-gate:fixture",
+        "printf 'out line\\npartial'; echo 'err line' >&2; exit 3",
+        &json!([]),
+    );
+    let out = task.command(None).output().unwrap();
+    assert_eq!(out.status.code(), Some(3));
+    assert_eq!(out.stdout, b"out line\npartial");
+    assert!(String::from_utf8_lossy(&out.stderr).contains("err line"));
+    let statuses = task.statuses();
+    assert_eq!(statuses[0], json!({"status": "queued"}));
+    let answer = &statuses[1]["value"];
+    assert_eq!(statuses[1]["status"], "answered");
+    assert_eq!(
+        (answer["outcome"].as_str(), answer["hit"].as_bool()),
+        (Some("failed"), Some(false))
+    );
+    assert_eq!(
+        answer["completion"],
+        json!({"by": "local", "device": "me", "at": answer["completion"]["at"]})
+    );
+    assert_eq!(answer["record"], Value::Null);
+}
+
+/// A green attestation by this workspace for an unchanged tree answers the task: no child runs.
+/// The same attestation under report-only mode is not reused.
+#[test]
+fn task_run_reuses_an_admitted_attestation_and_runs_nothing() {
+    let root = tempfile::tempdir().unwrap();
+    let git = |args: &[&str]| {
+        let out = Command::new("git")
+            .arg("-C")
+            .arg(root.path())
+            .args(args)
+            .output()
+            .unwrap();
+        assert!(out.status.success(), "git {args:?}");
+        String::from_utf8(out.stdout).unwrap().trim().to_string()
+    };
+    git(&["init", "-q"]);
+    git(&[
+        "-c",
+        "user.name=t",
+        "-c",
+        "user.email=t@t",
+        "commit",
+        "-q",
+        "--allow-empty",
+        "-m",
+        "a",
+    ]);
+    let head = git(&["rev-parse", "HEAD"]);
+    let output = elohim_epr::cid::compute_cid(b"verdict").to_bytes();
+    let rows = json!([{"commit": head, "attestation": {
+        "agentId": "me", "builtAt": "2026-10-26T10:00:00Z", "success": true,
+        "outputCid": output, "signature": "sig",
+    }}]);
+    let task = task_fixture(root.path(), "brit-gate:fixture", "touch ran; exit 0", &rows);
+    let reuse =
+        json!({"mode": "reuse", "enabled": true, "selfId": "me", "dirty": false, "commit": head});
+    let out = task.command(Some(&reuse)).output().unwrap();
+    assert_eq!(
+        out.status.code(),
+        Some(0),
+        "{}",
+        String::from_utf8_lossy(&out.stderr)
+    );
+    assert!(!root.path().join("ran").exists(), "a hit runs no child");
+    let statuses = task.statuses();
+    assert_eq!(statuses[1]["value"]["hit"], true);
+    assert_eq!(statuses[1]["value"]["outcome"], "done");
+    assert_eq!(statuses[1]["value"]["record"]["computedBy"], "me");
+
+    fs::remove_file(&task.status).unwrap();
+    let report_only =
+        json!({"mode": null, "enabled": true, "selfId": "me", "dirty": false, "commit": head});
+    let out = task.command(Some(&report_only)).output().unwrap();
+    assert_eq!(out.status.code(), Some(0));
+    assert!(String::from_utf8_lossy(&out.stderr).contains("not reused: report-only"));
+    assert!(root.path().join("ran").exists());
+    assert_eq!(task.statuses()[1]["value"]["hit"], false);
+}
+
+/// SIGTERM to ark mid-run reaches the child and its own children, and the answer is unanswered
+/// with ruling 7's three parts, never answered.
+#[test]
+fn task_run_interrupted_is_unanswered_with_three_parts() {
+    let root = tempfile::tempdir().unwrap();
+    let task = task_fixture(
+        root.path(),
+        "brit-gate:fixture",
+        "echo started; (sleep 77; touch grandchild) & sleep 78",
+        &json!([]),
+    );
+    let mut child: Child = task.command(None).stdout(Stdio::piped()).spawn().unwrap();
+    let mut stdout = child.stdout.take().unwrap();
+    let mut first = [0u8; 8];
+    stdout.read_exact(&mut first).unwrap();
+    assert_eq!(&first, b"started\n");
+    kill(Pid::from_raw(child.id() as i32), Signal::SIGTERM).unwrap();
+    let status = child.wait().unwrap();
+    assert_eq!(status.code(), Some(143));
+    let statuses = task.statuses();
+    let last = statuses.last().unwrap();
+    assert_eq!(last["status"], "unanswered");
+    for part in ["why", "comeBack", "meanwhile"] {
+        assert!(!last["value"][part].is_null(), "{part}");
+    }
+    assert!(!statuses.iter().any(|s| s["status"] == "answered"));
+    thread::sleep(Duration::from_millis(300));
+    assert!(!root.path().join("grandchild").exists());
+}
+
+/// Only a device's own task runs here; a measure stage is refused before anything is written.
+#[test]
+fn task_run_refuses_a_task_that_is_not_the_devices_own() {
+    let root = tempfile::tempdir().unwrap();
+    let task = task_fixture(root.path(), "a2o-stage:x", "exit 0", &json!([]));
+    let out = task.command(None).output().unwrap();
+    assert_eq!(out.status.code(), Some(65));
+    assert!(task.statuses().is_empty());
+}
+
+/// ark is the subreaper of a task's tree, so it reaps the orphans that exit while the task runs;
+/// none is left a zombie holding a pid until ark exits.
+#[test]
+fn task_run_reaps_orphans_while_the_task_runs() {
+    let root = tempfile::tempdir().unwrap();
+    let task = task_fixture(
+        root.path(),
+        "brit-gate:fixture",
+        "for i in 1 2 3 4 5; do (sleep 0.1 &); done; echo spawned; sleep 3",
+        &json!([]),
+    );
+    let mut child: Child = task.command(None).stdout(Stdio::piped()).spawn().unwrap();
+    let mut stdout = child.stdout.take().unwrap();
+    let mut first = [0u8; 8];
+    stdout.read_exact(&mut first).unwrap();
+    thread::sleep(Duration::from_millis(1500));
+    let ark = child.id().to_string();
+    let zombies = fs::read_dir("/proc")
+        .unwrap()
+        .flatten()
+        .filter_map(|entry| fs::read_to_string(entry.path().join("stat")).ok())
+        .filter(|stat| {
+            let fields: Vec<&str> = stat
+                .rsplit_once(')')
+                .map_or(vec![], |(_, rest)| rest.split_whitespace().collect());
+            fields.first() == Some(&"Z") && fields.get(1) == Some(&ark.as_str())
+        })
+        .count();
+    assert_eq!(zombies, 0, "orphans left unreaped under ark");
+    assert_eq!(child.wait().unwrap().code(), Some(0));
+}

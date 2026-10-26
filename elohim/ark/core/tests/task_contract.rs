@@ -7,8 +7,8 @@ use std::path::PathBuf;
 use ark_core::manifest::{ArtifactRef, ResourceQuota, Restart, RuntimeEnvelope, StdinSource};
 use ark_core::{
     eprfs_depth, placement_depth, Berth, BerthOffer, EffectiveTier, ExitClass, PassphraseSource,
-    Passport, ProcessPassport, RuntimeManifest, TaskChild, TaskKind, TaskOutcome, TaskSpec,
-    MAX_OFFER_HOLDS,
+    Passport, ProcessPassport, RuntimeManifest, TaskChild, TaskCompletion, TaskKind, TaskOutcome,
+    TaskSpec, MAX_OFFER_HOLDS,
 };
 use cid::Cid;
 use elohim_epr::Reach;
@@ -921,6 +921,53 @@ fn consent_receiver_and_named_carriers() {
     .is_ok());
 }
 
+/// A `brit-gate:` method is a local gate: it derives the own-envelope scope (never the historical
+/// sweettest default), its own envelope carries it with no grant, and no other berth does, even
+/// one offering the scope and holding a grant that names it.
+#[test]
+fn a_gate_runs_in_its_own_envelope_and_nowhere_else() {
+    let c = child();
+    let gate = TaskSpec::new(
+        method("brit-gate:orchestrator", &c, None),
+        root("closure"),
+        None,
+        c,
+        None,
+        outputs(),
+    )
+    .unwrap();
+    assert_eq!(gate.scope(), Some(GrantScope::OwnEnvelope));
+    let kind = kind_for(&gate);
+    let need = need_of(&gate, None);
+    assert_scope_is_derived(&kind, &need);
+
+    let own = offer(&agent("requester"), vec![], &[GrantScope::OwnEnvelope]);
+    let own_candidate = candidate(&own, Some(Consent::NotNeeded));
+    let domain = FailureDomain::of(Some("A"), &agent("requester"));
+    let terms = &own_candidate.posture.offers[&KindId::Task];
+    assert!(admit(
+        &kind,
+        &need,
+        &own_candidate,
+        Some(&domain),
+        &Capacity::of_offer(terms),
+        NOW
+    )
+    .is_ok());
+
+    let remote = offer(&agent("b"), vec![], &[GrantScope::OwnEnvelope]);
+    for consent in [
+        Some(Consent::NotNeeded),
+        Some(grant(GrantScope::OwnEnvelope)),
+    ] {
+        assert_eq!(
+            refusal(&kind, &need, &candidate(&remote, consent.clone())),
+            IneligibleReason::NoConsent,
+            "{consent:?}"
+        );
+    }
+}
+
 /// Admits every candidate it can and ranks them with `NearestBytes`, best first, as carriers.
 fn ranked(kind: &TaskKind, need: &Need, candidates: &[Candidate]) -> Vec<AgentRef> {
     let domain = FailureDomain::of(Some("A"), &agent("requester"));
@@ -1044,8 +1091,9 @@ fn a_failed_run_records_no_derivation() {
     let output = root("output");
     let projected: ProjectedRoot =
         serde_json::from_value(serde_json::json!(root("projected").to_string())).unwrap();
+    let key = s.derivation_key(&projected).unwrap();
     let record = DerivationRecord {
-        key: s.derivation_key(&projected).unwrap(),
+        key: key.clone(),
         output: output.clone(),
         computed_by: "uhCAk-b".into(),
         basis: DerivationBasis::UnderGrant {
@@ -1054,18 +1102,22 @@ fn a_failed_run_records_no_derivation() {
         deterministic: false,
         witness: Witness::Signature { sig: "sig".into() },
     };
+    let provider = || TaskCompletion::Provider {
+        event: "event".into(),
+    };
     let ok = TaskOutcome::new(
         task,
+        key.clone(),
         ExitClass::Exited { code: 0 },
         Some(output.clone()),
         Some(record.clone()),
-        "event".into(),
+        provider(),
     )
     .unwrap();
-    assert!(ok.succeeded());
+    assert!(ok.succeeded() && !ok.hit());
     assert_eq!(ok.record(), Some(&record));
     assert_eq!(ok.output(), Some(&output));
-    assert_eq!((ok.task(), ok.completion_event()), (&task, "event"));
+    assert_eq!((ok.task(), ok.completion_event()), (&task, Some("event")));
     for exit in [
         ExitClass::Exited { code: 1 },
         ExitClass::Signaled {
@@ -1077,29 +1129,133 @@ fn a_failed_run_records_no_derivation() {
     ] {
         assert!(TaskOutcome::new(
             task,
+            key.clone(),
             exit,
             Some(output.clone()),
             Some(record.clone()),
-            "event".into()
+            provider()
         )
         .is_err());
-        let failed = TaskOutcome::new(task, exit, None, None, "event".into()).unwrap();
+        let failed = TaskOutcome::new(task, key.clone(), exit, None, None, provider()).unwrap();
         assert!(!failed.succeeded() && failed.record().is_none());
     }
     assert!(TaskOutcome::new(
         task,
+        key.clone(),
         ExitClass::Exited { code: 0 },
         Some(root("other")),
         Some(record.clone()),
-        "event".into()
+        provider()
     )
     .is_err());
     assert!(TaskOutcome::new(
         task,
+        key.clone(),
         ExitClass::Exited { code: 0 },
         None,
+        Some(record.clone()),
+        provider()
+    )
+    .is_err());
+    // A record keyed as another derivation never rides on this task's outcome.
+    let elsewhere: ProjectedRoot =
+        serde_json::from_value(serde_json::json!(root("elsewhere").to_string())).unwrap();
+    assert!(TaskOutcome::new(
+        task,
+        s.derivation_key(&elsewhere).unwrap(),
+        ExitClass::Exited { code: 0 },
+        Some(output),
         Some(record),
-        "event".into()
+        provider()
+    )
+    .is_err());
+}
+
+/// A device's own task completes offline with no event reference: the local form names the device
+/// and the time and claims no provider event, a failed local run still records nothing, and a hit
+/// answers from the accepted record with no child run.
+#[test]
+fn a_local_run_completes_without_a_provider_event() {
+    let s = spec();
+    let task = s.cid().unwrap();
+    let projected: ProjectedRoot =
+        serde_json::from_value(serde_json::json!(root("projected").to_string())).unwrap();
+    let key = s.derivation_key(&projected).unwrap();
+    let local = TaskCompletion::Local {
+        device: "uhCAk-device".into(),
+        at: 1_790_000_000,
+    };
+    let done = TaskOutcome::new(
+        task,
+        key.clone(),
+        ExitClass::Exited { code: 0 },
+        None,
+        None,
+        local.clone(),
+    )
+    .unwrap();
+    assert_eq!(done.completion_event(), None);
+    assert_eq!(done.completion(), &local);
+    assert!(done.succeeded() && !done.hit() && done.record().is_none());
+    let failed = TaskOutcome::new(
+        task,
+        key.clone(),
+        ExitClass::Exited { code: 101 },
+        None,
+        None,
+        local.clone(),
+    )
+    .unwrap();
+    assert!(!failed.succeeded() && failed.record().is_none());
+    let wire = serde_json::to_value(&failed).unwrap();
+    assert_eq!(wire["outcome"], "failed");
+    assert_eq!(wire["hit"], false);
+    assert_eq!(wire["key"]["method"], key.method.to_string());
+    assert_eq!(wire["completion"]["by"], "local");
+
+    let record = DerivationRecord {
+        key: key.clone(),
+        output: root("verdict"),
+        computed_by: "uhCAk-device".into(),
+        basis: DerivationBasis::Computed,
+        deterministic: true,
+        witness: Witness::Signature { sig: "sig".into() },
+    };
+    let hit = TaskOutcome::reused(task, record.clone(), local);
+    assert!(hit.hit() && hit.succeeded());
+    assert_eq!(hit.output(), Some(&record.output));
+    assert_eq!(hit.key(), &key);
+    assert_eq!(serde_json::to_value(&hit).unwrap()["outcome"], "done");
+}
+
+/// The two completion forms' wire shapes, pinned: the provider form carries only its event
+/// reference, the local form the device and the time, and an unknown field is refused.
+#[test]
+fn completion_forms_have_one_wire_shape_each() {
+    let provider = TaskCompletion::Provider {
+        event: "uhCkk-event".into(),
+    };
+    assert_eq!(
+        serde_json::to_string(&provider).unwrap(),
+        r#"{"by":"provider","event":"uhCkk-event"}"#
+    );
+    let local = TaskCompletion::Local {
+        device: "uhCAk-device".into(),
+        at: 7,
+    };
+    assert_eq!(
+        serde_json::to_string(&local).unwrap(),
+        r#"{"by":"local","device":"uhCAk-device","at":7}"#
+    );
+    for completion in [provider, local] {
+        let json = serde_json::to_string(&completion).unwrap();
+        assert_eq!(
+            serde_json::from_str::<TaskCompletion>(&json).unwrap(),
+            completion
+        );
+    }
+    assert!(serde_json::from_str::<TaskCompletion>(
+        r#"{"by":"provider","event":"e","device":"d"}"#
     )
     .is_err());
 }

@@ -912,37 +912,67 @@ impl PlacementKind for TaskKind {
 
 // ---- the outcome --------------------------------------------------------------------------------
 
-/// Settles onto the existing provider-authored `rakia-compute-complete-v1` EconomicEvent (F11), not
-/// a parallel record. `completion_event` names that event.
+/// Who completed a task, and so what evidences its completion.
 ///
-/// Build it with [`TaskOutcome::new`], which refuses a derivation record for a run that did not
-/// exit cleanly: a failed run never short-circuits a later request (spec §F step 6). The fields are
-/// private, read through getters, so a built outcome cannot acquire a record or a failing exit
-/// afterwards (Codex review 1; the spec showed `pub` fields):
+/// A berth carrying a task for another person settles onto the provider-authored
+/// `rakia-compute-complete-v1` EconomicEvent (F11). A device running its own task in its own
+/// envelope (the own-envelope scope, a local gate) has no provider and authors no event: it
+/// completes offline, and saying so is the honest form, never an invented event reference.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(
+    rename_all = "kebab-case",
+    rename_all_fields = "camelCase",
+    tag = "by",
+    deny_unknown_fields
+)]
+pub enum TaskCompletion {
+    /// The provider-authored `rakia-compute-complete-v1` EconomicEvent the outcome settles onto.
+    Provider { event: String },
+    /// The device ran it for itself: `device` is its agent key, `at` when the run ended (seconds
+    /// since the Unix epoch, supplied by the caller; ark-core reads no clock).
+    Local { device: String, at: u64 },
+}
+
+/// The answer to a task: what ran (or what record answered it), how it ended, and who completed
+/// it. A provider's completion settles onto the existing `rakia-compute-complete-v1` EconomicEvent
+/// (F11), not a parallel record; a local one is [`TaskCompletion::Local`].
+///
+/// Build it with [`TaskOutcome::new`] for a run, which refuses a derivation record for a run that
+/// did not exit cleanly (a failed run never short-circuits a later request, spec §F step 6), or
+/// [`TaskOutcome::reused`] for a derivation hit, where no child ran. The fields are private, read
+/// through getters, so a built outcome cannot acquire a record or a failing exit afterwards (Codex
+/// review 1; the spec showed `pub` fields):
 ///
 /// ```compile_fail,E0616
 /// fn fail(outcome: &mut ark_core::TaskOutcome) {
 ///     outcome.exit = ark_core::ExitClass::Unknown;
 /// }
 /// ```
+///
+/// Serialized (for a task's status channel) with `outcome` (`done` or `failed`) beside its
+/// fields; nothing decodes it back, so no historical bytes exist to keep.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct TaskOutcome {
     task: Cid,
+    key: DerivationKey,
     exit: ExitClass,
     output: Option<BlobCid>,
     record: Option<eprfs_core::DerivationRecord>,
-    completion_event: String,
+    completion: TaskCompletion,
+    hit: bool,
 }
 
 impl TaskOutcome {
-    /// Refuses a record on any exit but `Exited { code: 0 }`, a record without an output, and a
-    /// record whose output is not the outcome's.
+    /// A run's outcome under the task's derivation `key`. Refuses a record on any exit but
+    /// `Exited { code: 0 }`, a record without an output, a record whose output is not the
+    /// outcome's, and a record keyed other than the outcome.
     pub fn new(
         task: Cid,
+        key: DerivationKey,
         exit: ExitClass,
         output: Option<BlobCid>,
         record: Option<eprfs_core::DerivationRecord>,
-        completion_event: String,
+        completion: TaskCompletion,
     ) -> Result<Self, ManifestError> {
         if let Some(record) = &record {
             if !matches!(exit, ExitClass::Exited { code: 0 }) {
@@ -955,18 +985,49 @@ impl TaskOutcome {
                     "a derivation record's output must be the task's sealed output".into(),
                 ));
             }
+            if record.key != key {
+                return Err(ManifestError::Invalid(
+                    "a derivation record must be keyed as the task's derivation".into(),
+                ));
+            }
         }
         Ok(Self {
             task,
+            key,
             exit,
             output,
             record,
-            completion_event,
+            completion,
+            hit: false,
         })
+    }
+
+    /// A derivation hit: an accepted `record` answers the task and no child ran. The exit is the
+    /// clean exit the record attests (a record exists only for one), the output is the record's,
+    /// and `completion` is the completion of the run that wrote it.
+    pub fn reused(
+        task: Cid,
+        record: eprfs_core::DerivationRecord,
+        completion: TaskCompletion,
+    ) -> Self {
+        Self {
+            task,
+            key: record.key.clone(),
+            exit: ExitClass::Exited { code: 0 },
+            output: Some(record.output.clone()),
+            record: Some(record),
+            completion,
+            hit: true,
+        }
     }
 
     pub fn task(&self) -> &Cid {
         &self.task
+    }
+
+    /// (method CID, input): what the outcome answers.
+    pub fn key(&self) -> &DerivationKey {
+        &self.key
     }
 
     pub fn exit(&self) -> &ExitClass {
@@ -977,18 +1038,60 @@ impl TaskOutcome {
         self.output.as_ref()
     }
 
-    /// Present only for a clean exit, and then its output is the outcome's.
+    /// Present only for a clean exit, and then its output is the outcome's and its key the
+    /// outcome's.
     pub fn record(&self) -> Option<&eprfs_core::DerivationRecord> {
         self.record.as_ref()
     }
 
-    /// The `rakia-compute-complete-v1` EconomicEvent this outcome settles onto (F11).
-    pub fn completion_event(&self) -> &str {
-        &self.completion_event
+    pub fn completion(&self) -> &TaskCompletion {
+        &self.completion
     }
 
-    /// Whether the run exited cleanly.
+    /// The `rakia-compute-complete-v1` EconomicEvent a provider's outcome settles onto (F11);
+    /// `None` for a local completion, which authors none.
+    pub fn completion_event(&self) -> Option<&str> {
+        match &self.completion {
+            TaskCompletion::Provider { event } => Some(event),
+            TaskCompletion::Local { .. } => None,
+        }
+    }
+
+    /// Whether an accepted record answered the task, so no child ran.
+    pub fn hit(&self) -> bool {
+        self.hit
+    }
+
+    /// Whether the run exited cleanly (for a hit, the run the record attests).
     pub fn succeeded(&self) -> bool {
         matches!(self.exit, ExitClass::Exited { code: 0 })
+    }
+}
+
+impl Serialize for TaskOutcome {
+    fn serialize<S: serde::Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
+        #[derive(Serialize)]
+        #[serde(rename_all = "camelCase")]
+        struct Wire<'a> {
+            task: String,
+            outcome: &'static str,
+            key: &'a DerivationKey,
+            hit: bool,
+            exit: &'a ExitClass,
+            output: Option<&'a BlobCid>,
+            record: Option<&'a eprfs_core::DerivationRecord>,
+            completion: &'a TaskCompletion,
+        }
+        Wire {
+            task: self.task.to_string(),
+            outcome: if self.succeeded() { "done" } else { "failed" },
+            key: &self.key,
+            hit: self.hit,
+            exit: &self.exit,
+            output: self.output.as_ref(),
+            record: self.record.as_ref(),
+            completion: &self.completion,
+        }
+        .serialize(serializer)
     }
 }

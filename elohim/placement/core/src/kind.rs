@@ -63,9 +63,12 @@ impl KindId {
     }
 }
 
-/// Mirrors `enums/grant-scope.schema.json` and elohim-storage's `GRANT_SCOPES` (a test there asserts
-/// equality). The compute-grant scopes only; delegates-compute's own `scope` stays an open string
-/// (finding 12).
+/// The scope a task spends. The grantable scopes mirror `enums/grant-scope.schema.json` and
+/// elohim-storage's `GRANT_SCOPES` (a test there asserts equality with [`GrantScope::ALL`]); they
+/// are the compute-grant scopes only, and delegates-compute's own `scope` stays an open string
+/// (finding 12). [`GrantScope::OwnEnvelope`] is the one scope no grant can name: the device's own
+/// envelope spends it for the device's own task, so it never leaves the device and is in neither
+/// list.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord, Serialize, Deserialize)]
 #[serde(rename_all = "kebab-case")]
 #[non_exhaustive]
@@ -73,10 +76,15 @@ pub enum GrantScope {
     SweettestFeedback,
     HostedCell,
     MeasureStage,
+    /// A task the device runs in its own envelope for itself (a local gate). Consent is
+    /// `NotNeeded` there and nowhere else: the floor refuses it on every other carrier, granted or
+    /// not, so it is never spent on another person's capacity.
+    OwnEnvelope,
 }
 
 impl GrantScope {
-    /// Every scope, in `GRANT_SCOPES` order (`compute_grants.rs:46`).
+    /// Every grantable scope, in `GRANT_SCOPES` order (`compute_grants.rs:46`). Not
+    /// [`GrantScope::OwnEnvelope`], which no grant names ([`GrantScope::grantable`]).
     pub const ALL: &'static [GrantScope] = &[
         GrantScope::SweettestFeedback,
         GrantScope::HostedCell,
@@ -89,6 +97,18 @@ impl GrantScope {
             GrantScope::SweettestFeedback => "sweettest-feedback",
             GrantScope::HostedCell => "hosted-cell",
             GrantScope::MeasureStage => "measure-stage",
+            GrantScope::OwnEnvelope => "own-envelope",
+        }
+    }
+
+    /// Whether a delegates-compute grant can name this scope: every scope but
+    /// [`GrantScope::OwnEnvelope`]. An exhaustive match, so a new variant decides here.
+    pub fn grantable(self) -> bool {
+        match self {
+            GrantScope::SweettestFeedback | GrantScope::HostedCell | GrantScope::MeasureStage => {
+                true
+            }
+            GrantScope::OwnEnvelope => false,
         }
     }
 }
@@ -96,13 +116,19 @@ impl GrantScope {
 /// The project prefix that marks a peer-executed a2o stage (`compute_tasks.rs::STAGE_PROJECT_PREFIX`).
 pub const STAGE_PROJECT_PREFIX: &str = "a2o-stage:";
 
+/// The method-name prefix of a local gate, `brit-gate:<gate project>`: a gate the device runs in
+/// its own envelope and whose verdict brit attests (`genesis/orchestrator/gate-evidence.mjs`).
+pub const GATE_METHOD_PREFIX: &str = "brit-gate:";
+
 /// `compute_tasks.rs::required_scope`, moved here as the one-way mapping onto a scope (§F, F1): a
 /// requester-supplied project prefix selects the scope a grant must name, so granted authority is
-/// never derived from the requester's own bytes. Absent or any other project → the historical
-/// `sweettest-feedback`.
+/// never derived from the requester's own bytes. `a2o-stage:` → `measure-stage`; `brit-gate:` →
+/// `own-envelope`, so a gate is never labelled a sweettest; absent or any other project → the
+/// historical `sweettest-feedback`.
 pub fn required_scope(project: Option<&str>) -> GrantScope {
     match project {
         Some(p) if p.starts_with(STAGE_PROJECT_PREFIX) => GrantScope::MeasureStage,
+        Some(p) if p.starts_with(GATE_METHOD_PREFIX) => GrantScope::OwnEnvelope,
         _ => GrantScope::SweettestFeedback,
     }
 }
@@ -433,6 +459,36 @@ mod tests {
             GrantScope::SweettestFeedback
         );
         assert_eq!(required_scope(None), GrantScope::SweettestFeedback);
+    }
+
+    /// A gate is its own family: never the historical `sweettest-feedback` default, and only the
+    /// prefix selects it, so a look-alike name falls to the default rather than to the gate scope.
+    #[test]
+    fn a_gate_method_derives_the_own_envelope_scope() {
+        assert_eq!(
+            required_scope(Some("brit-gate:orchestrator")),
+            GrantScope::OwnEnvelope
+        );
+        for lookalike in ["brit-gate", "gate:orchestrator", "x-brit-gate:orchestrator"] {
+            assert_eq!(
+                required_scope(Some(lookalike)),
+                GrantScope::SweettestFeedback,
+                "{lookalike}"
+            );
+        }
+    }
+
+    /// `ALL` is the grantable list `GRANT_SCOPES` and the schema mirror; the own-envelope scope is
+    /// outside it, with its own label, and serde spells every label as `label` does.
+    #[test]
+    fn the_own_envelope_scope_is_never_grantable() {
+        assert!(GrantScope::ALL.iter().all(|scope| scope.grantable()));
+        assert!(!GrantScope::OwnEnvelope.grantable());
+        assert!(!GrantScope::ALL.contains(&GrantScope::OwnEnvelope));
+        assert_eq!(
+            serde_json::to_string(&GrantScope::OwnEnvelope).unwrap(),
+            format!("\"{}\"", GrantScope::OwnEnvelope.label())
+        );
     }
 
     fn task_need(declared: GrantScope) -> Need {

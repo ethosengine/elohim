@@ -766,7 +766,10 @@ mod canon_conformance {
     /// Every pin's `content_hash` is a well-formed `sha256:<64 hex>` seal.
     #[test]
     fn pin_hashes_are_well_formed() {
-        #[allow(deprecated)]
+        #[allow(
+            deprecated,
+            reason = "the superseded pins are still published consts, so their seals are checked too"
+        )]
         let all = ALL_PINS
             .iter()
             .copied()

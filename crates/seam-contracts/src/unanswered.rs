@@ -236,7 +236,21 @@ impl<R: ReasonLabel> Unanswered<R> {
 /// **Contract test:** `only_answered_and_withdrawn_are_terminal` and `tests/unanswered.rs`.
 ///
 /// Terminal states are `Answered` and `Withdrawn`; see [`PendingStatus::is_terminal`].
+///
+/// The `serde` form, like [`Unanswered`]'s, is the internal convenience form: adjacently tagged,
+/// `{"status": "<kebab-case variant>", "value": <payload>}`, with no `value` on `queued` and
+/// `withdrawn`, so an answer's own fields never collide with the tag.
 #[derive(Debug, Clone, PartialEq, Eq)]
+#[cfg_attr(
+    feature = "serde",
+    derive(serde::Serialize, serde::Deserialize),
+    serde(
+        rename_all = "kebab-case",
+        rename_all_fields = "camelCase",
+        tag = "status",
+        content = "value"
+    )
+)]
 pub enum PendingStatus<T, R> {
     /// Accepted and waiting its turn.
     Queued,
@@ -501,5 +515,6 @@ mod unanswered_tests {
         both::<ComeBack>();
         both::<Meanwhile>();
         both::<Escalation>();
+        both::<PendingStatus<u8, AnswerReason>>();
     }
 }

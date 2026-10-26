@@ -47,7 +47,7 @@ use elohim_epr_rea::AgentRef;
 use seam_contracts::{Answer, ComeBack, Meanwhile, ReasonLabel, Unanswered};
 use serde::Serialize;
 
-use crate::kind::{Charge, PlacementKind};
+use crate::kind::{Charge, GrantScope, PlacementKind};
 use crate::need::{AgentRefKey, Need, NeedKey, NeedTerms};
 use crate::offer::{
     Candidate, Capacity, CidString, Consent, EpochSecs, EprScope, FailureDomain, OfferTerms,
@@ -324,6 +324,11 @@ fn stage_consent(
     let Some(required) = required else {
         return Ok(()); // a declared posture suffices (R3)
     };
+    // The own-envelope scope is never granted (`GrantScope::grantable`): only the receiver's own
+    // carrier spends it, so a consent map or a grant naming it cannot carry it anywhere else.
+    if required == GrantScope::OwnEnvelope && carrier != &need.receiver {
+        return Err(IneligibleReason::NoConsent);
+    }
     match consent {
         Answer::Present(Consent::NotNeeded) if carrier == &need.receiver => Ok(()),
         Answer::Present(Consent::NotNeeded) => Err(IneligibleReason::NoConsent),
@@ -1127,6 +1132,54 @@ mod tests {
                 .map(|i| i.why.why),
             Some(IneligibleReason::NoConsent)
         );
+    }
+
+    /// The own-envelope scope (a local gate) runs on the receiver's own carrier with no grant, and
+    /// on no other carrier, even one holding a grant that names it.
+    #[test]
+    fn the_own_envelope_scope_is_carried_only_by_the_receivers_own_envelope() {
+        let lenient = Lenient(KindId::Task, Some(GrantScope::OwnEnvelope));
+        let task_cid = elohim_epr::cid::compute_cid(b"gate");
+        let mut n = need(Reach::Private);
+        n.kind = KindId::Task;
+        n.key = NeedKey::Task(task_cid);
+        n.terms = NeedTerms::Task {
+            input_root: CidString::from(&task_cid),
+            scope: GrantScope::OwnEnvelope,
+            base_root: None,
+        };
+        let offering = |name: &str, consent: Consent| {
+            let mut c = candidate(name, "A", Answer::Present(Reach::Private));
+            c.posture.offers.insert(
+                KindId::Task,
+                OfferTerms {
+                    scopes: [GrantScope::OwnEnvelope].into_iter().collect(),
+                    ..OfferTerms::default()
+                },
+            );
+            c.consent
+                .insert(AgentRefKey::of(&n.receiver), Answer::Present(consent));
+            c
+        };
+        let own = offering("uhCAk-r", Consent::NotNeeded);
+        assert!(admit(&lenient, &n, &own, Some(&hh("A")), &room(), 5).is_ok());
+        let granted = Consent::Granted {
+            grant: "g".into(),
+            scope: GrantScope::OwnEnvelope,
+            recipient: AgentRefKey::of(&n.receiver),
+            valid_from: 0,
+            valid_until: 100,
+            epr_scope: EprScope::All,
+        };
+        for consent in [Consent::NotNeeded, granted] {
+            let other = offering("uhCAk-b", consent);
+            assert_eq!(
+                admit(&lenient, &n, &other, Some(&hh("A")), &room(), 5)
+                    .err()
+                    .map(|i| i.why.why),
+                Some(IneligibleReason::NoConsent)
+            );
+        }
     }
 
     #[test]

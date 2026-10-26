@@ -1,0 +1,63 @@
+# Schema: elohim/sdk/schemas/v1/manifest/seam-registry.schema.json
+seamRegistryVersion: 1
+crate: elohim-placement-core
+crateRoot: elohim/placement/core
+seamLocus: The placement contract's pure core (L1) — kinds, grant scopes and the eligibility floor every carrier
+  is admitted through; adapters in the crates that own carriers translate rows into these types.
+decisionPoints:
+# Added 2026-10-26 (gate-live, piece 1): a local gate is its own method family. Before this, any
+# method name but `a2o-stage:` derived `sweettest-feedback`, so a gate placed as a task would have been
+# labelled a sweettest and could have spent a sweettest grant.
+- name: required_scope
+  kind: pure-decision-predicate
+  sourceLocation:
+    file: src/kind.rs
+    modulePath: placement_core::kind
+  summary: One way from a method or project name onto the scope it spends; `a2o-stage:` is measure-stage,
+    `brit-gate:` is own-envelope, anything else the historical sweettest-feedback.
+  concernIds:
+  - id: C0
+    status: answered
+    justification: Pure mapping over a name; no entry type, head or route.
+  - id: C1
+    status: answered
+    justification: The scope is derived from the method, never read from the requester's own declaration (F1).
+  - id: C4
+    status: answered
+    justification: A gate is never mislabelled as a sweettest; a look-alike name falls to the default, not to
+      the gate scope.
+  - id: C10
+    status: answered
+    justification: Grantable labels and their order are unchanged; own-envelope is outside `GrantScope::ALL`,
+      so `GRANT_SCOPES` and enums/grant-scope.schema.json do not move.
+  contractTests:
+  - path: elohim/placement/core/src/kind.rs
+    testName: a_gate_method_derives_the_own_envelope_scope
+    kind: unit
+  - path: elohim/placement/core/src/kind.rs
+    testName: the_own_envelope_scope_is_never_grantable
+    kind: unit
+  - path: elohim/placement/core/src/kind.rs
+    testName: required_scope_is_one_way_from_the_project
+    kind: unit
+- name: stage_consent
+  kind: pure-decision-predicate
+  sourceLocation:
+    file: src/eligibility.rs
+    modulePath: placement_core::eligibility
+  summary: The own-envelope scope is carried only by the receiver's own carrier, where consent is NotNeeded;
+    any other carrier is NoConsent, granted or not.
+  concernIds:
+  - id: C0
+    status: answered
+    justification: Pure floor stage; no entry type, head or route.
+  - id: C1
+    status: answered
+    justification: No grant or consent map confers authority to spend another device's own envelope.
+  - id: C4
+    status: answered
+    justification: The refusal is the existing NoConsent reason with R7's three parts, never a silent drop.
+  contractTests:
+  - path: elohim/placement/core/src/eligibility.rs
+    testName: the_own_envelope_scope_is_carried_only_by_the_receivers_own_envelope
+    kind: unit

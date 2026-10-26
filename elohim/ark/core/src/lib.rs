@@ -40,8 +40,8 @@ pub use sample::ProcessSample;
 pub use sink::{Clock, SinkError, WitnessSink};
 pub use tally::{DeathRecord, DeathTally};
 pub use task::{
-    eprfs_depth, placement_depth, BerthOffer, TaskChild, TaskKind, TaskOutcome, TaskSpec,
-    MAX_OFFER_HOLDS, TASK_CHILD_NAME, TASK_TERMS,
+    eprfs_depth, placement_depth, BerthOffer, TaskChild, TaskCompletion, TaskKind, TaskOutcome,
+    TaskSpec, MAX_OFFER_HOLDS, TASK_CHILD_NAME, TASK_TERMS,
 };
 pub use verdict::{
     BoundedBy, GiveUpReason, RestartContext, RestartGovernor, RestartGrant, RestartRequest,

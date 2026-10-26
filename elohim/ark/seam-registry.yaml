@@ -218,3 +218,108 @@ decisionPoints:
   - path: elohim/ark/core/tests/declaration_contract.rs
     testName: run_launch_refuses_what_it_cannot_honour
     kind: unit
+# Added 2026-10-26 (gate-live, piece 2): a device's own task completes offline. TaskOutcome named a
+# provider event string only; a local gate has no provider and must not invent an event reference.
+- name: TaskOutcome::new
+  kind: pure-decision-predicate
+  sourceLocation:
+    file: core/src/task.rs
+    modulePath: ark_core::task
+  summary: A run's outcome keeps a derivation record only for a clean exit whose output and key are the
+    outcome's; completion is the provider's event or the device's own local completion; a hit is built
+    from the accepted record with no run.
+  concernIds:
+  - id: C0
+    status: answered
+    justification: Pure value; a local completion is Private (B) to the device and mints no entry, head or route.
+  - id: C1
+    status: answered
+    justification: The local form names the device and the time only; it claims no provider event and confers
+      no authority.
+  - id: C4
+    status: answered
+    justification: A failed run records no derivation, a record keyed elsewhere is refused, and a local
+      completion says it has no event rather than carrying an empty or invented one.
+  - id: C10
+    status: answered
+    justification: TaskOutcome had no serialized form before; the provider completion keeps one wire shape,
+      pinned, and an unknown field is refused on decode.
+  contractTests:
+  - path: elohim/ark/core/tests/task_contract.rs
+    testName: a_failed_run_records_no_derivation
+    kind: unit
+  - path: elohim/ark/core/tests/task_contract.rs
+    testName: a_local_run_completes_without_a_provider_event
+    kind: unit
+  - path: elohim/ark/core/tests/task_contract.rs
+    testName: completion_forms_have_one_wire_shape_each
+    kind: unit
+  - path: elohim/ark/core/tests/task_contract.rs
+    testName: a_gate_runs_in_its_own_envelope_and_nowhere_else
+    kind: unit
+# Added 2026-10-26 (gate-live, pieces 3 and 5): the first DerivationIndex, and the verb that runs a
+# device's own gate as a Task. brit's attestation stays the one verdict store; nothing here writes it.
+- name: brit_index::reusable
+  kind: pure-decision-predicate
+  sourceLocation:
+    file: cli/src/brit_index.rs
+    modulePath: ark::brit_index
+  summary: Admits a brit build attestation as a derivation record only under gate-evidence.mjs reusableHit's
+    rules, in its order and words; an attested commit with another tree is refused rather than judged.
+  concernIds:
+  - id: C0
+    status: answered
+    justification: Reads brit's existing notes refs on this device; no entry type, head, route or second store.
+  - id: C1
+    status: answered
+    justification: Only this workspace's own green signature is admitted; another signer is refused by name.
+  - id: C4
+    status: answered
+    justification: Every refusal names its reason; an unreadable brit is IndexUnreachable with come-back and
+      run-here, and the gate runs.
+  - id: C5
+    status: answered
+    justification: Stricter than reusableHit where ark cannot consult rakia (changed tree refused), never looser.
+  contractTests:
+  - path: elohim/ark/cli/src/brit_index.rs
+    testName: reuse_follows_reusable_hit_rule_for_rule
+    kind: unit
+  - path: elohim/ark/cli/src/brit_index.rs
+    testName: an_attested_commit_with_another_tree_is_never_reused
+    kind: unit
+  - path: elohim/ark/cli/tests/cli_smoke.rs
+    testName: task_run_reuses_an_admitted_attestation_and_runs_nothing
+    kind: integration
+- name: task::run
+  kind: verdict-fn
+  sourceLocation:
+    file: cli/src/task.rs
+    modulePath: ark::task
+  summary: A device's own task is placed through decide_private and the floor against its own offer, answered
+    from an admitted derivation with no run, or run under the native driver; the status channel is queued,
+    then answered, or unanswered with three parts on interrupt.
+  concernIds:
+  - id: C0
+    status: answered
+    justification: Device-local Private (B) run; status lines live under .eprfs/status and are never published.
+  - id: C3
+    status: answered
+    justification: Every run ends answered or unanswered with a named come-back; an interrupt never reads as
+      passed.
+  - id: C4
+    status: answered
+    justification: A task that is not the device's own is refused before anything is written; the floor's own
+      refusal is carried as not-carried with its come-back and meanwhile.
+  - id: C7
+    status: answered
+    justification: The berth's disk bound is a declaration read from statvfs; EffectiveTier stays None.
+  contractTests:
+  - path: elohim/ark/cli/tests/cli_smoke.rs
+    testName: task_run_passes_the_child_through_and_answers_its_exit
+    kind: integration
+  - path: elohim/ark/cli/tests/cli_smoke.rs
+    testName: task_run_interrupted_is_unanswered_with_three_parts
+    kind: integration
+  - path: elohim/ark/cli/tests/cli_smoke.rs
+    testName: task_run_refuses_a_task_that_is_not_the_devices_own
+    kind: integration

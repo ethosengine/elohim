@@ -1139,13 +1139,22 @@ dependencies = [
 name = "elohim-ark"
 version = "0.1.0"
 dependencies = [
+ "async-trait",
+ "chrono",
  "cid",
  "clap",
  "elohim-ark-core",
  "elohim-ark-supervisor",
  "elohim-device-runtime",
  "elohim-epr",
+ "elohim-epr-rea",
+ "elohim-placement-core",
+ "elohim-seam-contracts",
+ "eprfs-core",
+ "futures",
+ "hex",
  "nix",
+ "serde",
  "serde_json",
  "sha2 0.10.9",
  "tempfile",

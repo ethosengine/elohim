@@ -1,5 +1,9 @@
 //! `ark` — run a RuntimeManifest in a Berth and inspect its local evidence.
 
+mod brit_index;
+mod material;
+mod task;
+
 use std::{
     collections::BTreeMap,
     env, fs,
@@ -83,6 +87,51 @@ enum Command {
     Manifest {
         #[command(subcommand)]
         command: ManifestCommand,
+    },
+    /// Place a device's own task (a local gate) in its own envelope.
+    Task {
+        #[command(subcommand)]
+        command: TaskCommand,
+    },
+}
+
+#[derive(Subcommand, Debug)]
+enum TaskCommand {
+    /// Print the TaskSpec for a request over a closure material (CIDs are computed here).
+    Spec {
+        /// Path to the task request JSON: the method's identity, the child and its outputs.
+        #[arg(long)]
+        request: PathBuf,
+        /// Path to the closure material: canonical JSON, the task's input.
+        #[arg(long)]
+        material: PathBuf,
+    },
+    /// Validate, place, look up and run a task; append its status lines to --status.
+    Run {
+        /// Path to the TaskSpec JSON (`ark task spec`).
+        #[arg(long)]
+        spec: PathBuf,
+        /// Path to the closure material the spec's input root addresses.
+        #[arg(long)]
+        material: PathBuf,
+        /// The local file the child's pinned artifact resolves to.
+        #[arg(long)]
+        artifact: PathBuf,
+        /// Where PendingStatus JSON lines are appended.
+        #[arg(long)]
+        status: PathBuf,
+        /// The reuse context JSON (mode, enabled, selfId, dirty, commit); absent reuses nothing.
+        #[arg(long)]
+        reuse: Option<PathBuf>,
+        /// The repository brit attests in (default: the current directory).
+        #[arg(long)]
+        repo: Option<PathBuf>,
+        /// The berth's data root, the child's working directory (default: the repository).
+        #[arg(long)]
+        data_root: Option<PathBuf>,
+        /// The device's agent key, named in a local completion.
+        #[arg(long)]
+        device: Option<String>,
     },
 }
 
@@ -173,6 +222,35 @@ fn execute(command: Command) -> Result<u8, Failure> {
         Command::Hash { file } => hash(&file),
         Command::Manifest { command } => match command {
             ManifestCommand::Cid { manifest } => manifest_cid(&manifest),
+        },
+        Command::Task { command } => match command {
+            TaskCommand::Spec { request, material } => task::spec(&request, &material),
+            TaskCommand::Run {
+                spec,
+                material,
+                artifact,
+                status,
+                reuse,
+                repo,
+                data_root,
+                device,
+            } => {
+                let repo = match repo {
+                    Some(repo) => repo,
+                    None => env::current_dir()
+                        .map_err(|error| Failure::data(format!("current directory: {error}")))?,
+                };
+                task::run(task::RunArgs {
+                    spec,
+                    material,
+                    artifact,
+                    status,
+                    reuse,
+                    data_root: data_root.unwrap_or_else(|| repo.clone()),
+                    repo,
+                    device,
+                })
+            }
         },
     }
 }
