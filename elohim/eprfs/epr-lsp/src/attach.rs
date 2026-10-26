@@ -4,7 +4,7 @@
 //! The proxy watches the client's frames only to learn whether the client sent `exit`: when the
 //! daemon closes the connection after the client's `exit`, the shim's work is done; when it
 //! closes without one, the shared server died, and the shim exits non-zero so the editor's
-//! restart-on-crash brings up a fresh attach (and with it a fresh daemon).
+//! restart-on-crash brings up a fresh attach to the resident its supervisor restarts.
 
 use std::cell::Cell;
 
@@ -28,9 +28,12 @@ pub enum ProxyEnd {
 
 /// Proxy bytes both ways until either side ends.
 ///
+/// A socket error (a reset when the supervisor restarts the mux, a broken pipe) ends the
+/// session the same way as a close: the daemon is gone.
+///
 /// # Errors
 ///
-/// An I/O error on either side.
+/// An I/O error on the client's own stdio.
 pub async fn proxy<I, O>(
     mut stdin: I,
     mut stdout: O,
@@ -42,6 +45,13 @@ where
 {
     let (mut from_daemon, mut to_daemon) = stream.into_split();
     let saw_exit = Cell::new(false);
+    let daemon_gone = || {
+        if saw_exit.get() {
+            ProxyEnd::ClientExited
+        } else {
+            ProxyEnd::ServerClosed
+        }
+    };
     let up = async {
         let mut buffer = vec![0_u8; 16 << 10];
         let mut decoder = Some(Decoder::default());
@@ -49,7 +59,7 @@ where
             let read = stdin.read(&mut buffer).await?;
             if read == 0 {
                 let _ = to_daemon.shutdown().await;
-                return Ok::<(), std::io::Error>(());
+                return Ok::<ProxyEnd, std::io::Error>(ProxyEnd::ClientClosed);
             }
             // Decode before forwarding, so `exit` is known before the daemon can react to it.
             if let Some(active) = decoder.as_mut() {
@@ -71,22 +81,26 @@ where
                     }
                 }
             }
-            to_daemon.write_all(&buffer[..read]).await?;
+            if to_daemon.write_all(&buffer[..read]).await.is_err() {
+                return Ok(daemon_gone());
+            }
         }
     };
     let down = async {
-        tokio::io::copy(&mut from_daemon, &mut stdout).await?;
-        stdout.flush().await
+        let mut buffer = vec![0_u8; 16 << 10];
+        loop {
+            let read = match from_daemon.read(&mut buffer).await {
+                Ok(0) | Err(_) => break,
+                Ok(read) => read,
+            };
+            stdout.write_all(&buffer[..read]).await?;
+        }
+        stdout.flush().await?;
+        Ok::<ProxyEnd, std::io::Error>(daemon_gone())
     };
     tokio::select! {
-        result = up => result.map(|()| ProxyEnd::ClientClosed),
-        result = down => result.map(|()| {
-            if saw_exit.get() {
-                ProxyEnd::ClientExited
-            } else {
-                ProxyEnd::ServerClosed
-            }
-        }),
+        result = up => result,
+        result = down => result,
     }
 }
 
@@ -263,5 +277,21 @@ mod tests {
             assert_eq!(end, expected);
             drop(client_feed);
         }
+    }
+
+    #[tokio::test]
+    async fn proxy_reads_a_daemon_dying_mid_write_as_a_server_death_not_an_error() {
+        let (ours, theirs) = UnixStream::pair().unwrap();
+        let (client_in, mut client_feed) = tokio::io::duplex(1 << 16);
+        let (client_out, _client_read) = tokio::io::duplex(1 << 16);
+        let feeder = tokio::spawn(async move {
+            let frame =
+                encode(&json!({"jsonrpc": "2.0", "method": "x", "params": "y".repeat(4096)}));
+            while client_feed.write_all(&frame).await.is_ok() {}
+        });
+        drop(theirs);
+        let end = proxy(client_in, client_out, ours).await;
+        feeder.abort();
+        assert_eq!(end.unwrap(), ProxyEnd::ServerClosed);
     }
 }
