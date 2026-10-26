@@ -24,7 +24,8 @@ cites:
 
 | Scheme | Meaning | Home section |
 |---|---|---|
-| C-n (C1–C9) | Interface contracts, including C9 — Berth presence | Appendix B (authoritative) |
+| C-n (C1–C9, plus C6b) | Interface contracts, including C9 — Berth presence. A lettered sub-contract such as C6b has its parent's authority | Appendix B (authoritative) |
+| Rule N | The numbered rules of `.claude/hooks/cargo-disk-guard.py`. Only Rule 4's yield is specified here (C6b); Rules 1–3 and 5 already exist and are outside this spec | `.claude/hooks/cargo-disk-guard.py`; C6b |
 | CC-n | Concern-canon criteria from `.claude/epr-meta/concerns.yaml`, with evaluable criteria in `.claude/epr-meta/policies.yaml` | Appendix A maps their applicability here |
 | D-n (D1–D22) | Design decisions | §Decisions taken |
 
@@ -60,6 +61,7 @@ and `holder_is_live`); the pool terms follow `genesis/agentic/bin/pool-lib.sh`
 | cite sealing | `epr flow cites seal <doc>` assigns an ID if absent, converts eligible `cites:` references to content-addressed envelopes, and verifies them; slugs, fingerprints and locators are tool-managed (`.claude/skills/semantic-links/SKILL.md`). |
 | epr / eprfs | `eprfs` is the native filesystem projection layer; its `elohim/eprfs` workspace also builds the `epr` device CLI (`elohim/eprfs/README.md`, `elohim/eprfs/epr-cli/Cargo.toml`). Shared hooks resolve it through `.claude/hooks/_observation.py` → `.claude/scripts/_lib/epr_client.py` (`EPR_BIN`, otherwise `epr bin status --tool epr --json`); the edit hook uses `EPR_BIN` or PATH (`.claude/hooks/lsp-edit-event.py`), while the attach shim tries `EPR_BIN`, `bin-launch`, pool debug binary, then PATH (`genesis/agentic/bin/lsp-attach`). |
 | berth | The workspace's capacity register: it tracks present sessions, resource holders and their notes. `berth status` shows moorings, leases and capacity. |
+| mux | The multiplexer inside the resident: it accepts each session's attach connection, routes LSP traffic between sessions and the one server child for that root, and applies attribution and delivery (§4, §5). |
 | mooring / synthetic mooring | A mooring registers a session with its PID and process start time, refreshed by a heartbeat so dead or reused PIDs cannot retain ownership. A synthetic mooring gives a background process its own session label and PID instead of borrowing an editor's lifetime, using the same `berth moor --session … --pid …` interface (precedent: `.husky/pre-push.bash`, `berth_moor_hook`). |
 | lease | A record that one session holds one unit of a named resource. Releasing or unmooring gives it back; expiry or a dead mooring permits takeover. |
 | claim | `berth claim` requests a lease: refusal exits 3 without queueing; no resolvable session (also an inaccessible store) exits 4. Only exit 4 lets a wrapper proceed unleased, subject here to C6's run lock and yield checks. |
@@ -117,11 +119,14 @@ idle retirement leaves the resident up
 The operator-approved declaration is:
 
 ```text
-epr device run epr -- lsp serve --device --ready-line "epr-lsp: listening"
+epr device run epr --ready-line "epr-lsp: listening" --restart permanent -- lsp serve --device
 ```
 
-Until device-declaration integration lands, start the resident directly from the checkout
-with `epr lsp serve --device` and keep it running in the foreground; `--root <dir>` selects
+Launch flags (`--ready-line`, `--restart`) come before `--`; everything after `--` is the
+resident's own argument list.
+
+On this branch alone, before the merge into `feat/gate-live`, start the resident directly
+from the checkout with `epr lsp serve --device` and keep it running in the foreground; `--root <dir>` selects
 an explicit root. The command binds the socket, requires berth admission, then prints and
 flushes `epr-lsp: listening <socket>` (`elohim/eprfs/epr-cli/src/lsp.rs:349 (serve)`).
 
@@ -137,12 +142,13 @@ enforcement remains later work. Readiness uses ark's existing `StdoutLine`
 `Permanent` is ark's default child restart policy
 (`elohim/ark/core/src/manifest.rs:329`).
 
-**Integration status:** the declaration above is the approved target, not a verified
-command in this tree. The device parser currently rejects `--` and has no
-`--ready-line` option (`elohim/eprfs/epr-cli/src/device/declaration.rs:89`).
-The LSP side already prints and flushes `epr-lsp: listening <socket>` after bind and
-successful berth claim (`elohim/eprfs/epr-cli/src/lsp.rs:379`).
-Verification records the missing integration as PENDING.
+**Integration status:** the declaration form is implemented on `feat/gate-live` in
+06dd6c51c (`elohim/eprfs/epr-cli/src/device/declaration.rs` there); this branch alone predates
+it. The LSP side prints and flushes `epr-lsp: listening <socket>` after bind and successful
+berth claim (`elohim/eprfs/epr-cli/src/lsp.rs:379`). The ready line is required: as of
+`feat/gate-live` a3dfff3c7, ark never marks a resident declared without one ready, and the
+arrival line counts such a child as waiting only while it has no live process.
+Verification records the installed, supervised run as PENDING.
 
 ```text
 ark device root envelope
@@ -577,8 +583,11 @@ External sets never replace the server's set; full diagnostics carry `data.epr.s
 where C7/D16 permits stamping, with opaque data and folds retaining C8's exceptions
 (`elohim/eprfs/epr-lsp/src/deliver.rs:289 (stamp)`). Sets for a root with no running
 server are dropped without starting one (`elohim/eprfs/epr-lsp/src/daemon.rs:482 (Device::on_event)`).
-Appendix B, C8 retains the API and set-lifetime contract; gate-live producer wiring remains
-pending.
+Appendix B, C8 retains the API and set-lifetime contract. The producer is landing on
+`feat/gate-live` as an additive `gatefeed` module in epr-lsp: it tails
+`<main checkout>/.eprfs/status/gate-live/runs/*.jsonl` and publishes reds whose locus is a `.rs`
+file through `ExternalFeed::publish(lang, root, "gate-live", uri, diags)`, with attribution in
+`data.epr`. Only the `--device` mux runs it.
 
 ## 6. P2P design gate
 
@@ -728,9 +737,10 @@ variables, not arbitrary environment variables
 `elohim/eprfs/epr-cli/src/lsp.rs:316`;
 `elohim/eprfs/epr-lsp/src/server.rs:157`).
 
-Pre-push skipping resident-descended rust-analyzers while still pausing strays is a
-**peer-session dependency**, not this slice's work. The inspected hook still selects all
-`pgrep -f rust-analyzer` matches (`.husky/pre-push.bash:948`); completion is PENDING.
+Pre-push skips the resident's rust-analyzers and still pauses strays. This landed on
+`feat/gate-live` in 5bb980361: `ra_strays()` in `.husky/pre-push.bash` skips any
+rust-analyzer whose `/proc/<pid>/environ` carries `ELOHIM_SESSION_ID=lsp-device`, and leaves
+the yield of the resident's flychecks to cargo-disk-guard Rule 4 rather than to a lease.
 The mux's child-spawn path establishes the ancestry the peer change must recognize
 (`elohim/eprfs/epr-lsp/src/server.rs:259`).
 Flycheck admission and Rule 4 yielding are authoritative in Appendix B, C6/C6b.
@@ -881,7 +891,7 @@ No item has recorded acceptance evidence yet; all 23 items are listed under (c) 
 3. **Foreground entry and supervision (§2, §9).** Exercise today's foreground
    `epr lsp serve --device`, including rejection without `--device`, a refused berth
    claim and readiness only after bind/claim. Complete and verify the approved
-   `epr device run epr -- lsp serve --device --ready-line "epr-lsp: listening"` integration,
+   `epr device run epr --ready-line "epr-lsp: listening" --restart permanent -- lsp serve --device` integration,
    the `["lsp","serve"]` long-running declaration and `epr device supervise` dispatch.
    Prove installation as an own child with `Permanent` restart plus `StdoutLine` and
    `ExecutableIdentity` readiness. Native resource enforcement is later scope.
@@ -980,8 +990,8 @@ No item has recorded acceptance evidence yet; all 23 items are listed under (c) 
 #### Rust policy, admission and foreground yielding (16–19)
 
 16. **Rust policy and environment (C5, D2, D18–D20).** Verify native 1.96.1, one Cargo job,
-    the LSP slot in the Cargo child's environment, `cargo.targetDir:false`, disabled cache
-    priming, proc macros, save checks and both overrides. Test WASM toolchain unsetting,
+    the LSP slot in the Cargo child's environment, `cargo.targetDir:false`; cache priming
+    disabled; proc macros enabled; check on save enabled; and both `overrideCommand`s present. Test WASM toolchain unsetting,
     checkout-top and nested/family slots, relative override resolution then checkout
     fallback, and unchanged bare names/`$saved_file`. Verify registered session-variable
     removal and resident identity injection. Preserve classless Cargo behavior with the
@@ -1021,8 +1031,8 @@ No item has recorded acceptance evidence yet; all 23 items are listed under (c) 
 20. **External feed (C8).** Test the in-process handle, source/URI set isolation, empty-set
     clearing, full-diagnostic source tags where stampable, opaque-data preservation and
     untagged folds. Verify root paths must match, missing-root sets are dropped without
-    spawning, and the bool reports enqueue success only. Complete gate-live producer
-    wiring and prove it uses the same attribution/delivery path.
+    spawning, and the bool reports enqueue success only. Prove the `gatefeed`
+    producer (landing on `feat/gate-live`) uses the same attribution/delivery path.
 21. **Governance and observability (§6, Appendix A).** Run native governance evaluation
     and exercise the required evidence paths for every applicable Appendix A criterion:
     CC-0, CC-3, CC-4, CC-5, CC-6a, CC-6b, CC-7, CC-8, CC-10, CC-11 and CC-14. Compare each
@@ -1118,11 +1128,9 @@ The main-checkout gate-live source is absent from this worktree.
 
 ### (c) Prompt/code differences and PENDING
 
-- The approved `epr device run epr -- … --ready-line` form is not implemented by the
-  inspected parser. `epr device supervise` is supplied by the device-floor integration
-  on `feat/gate-live`, commit `06dd6c51c`, not dispatched on this branch alone (C4)
-  (`elohim/eprfs/epr-cli/src/device/declaration.rs:89`;
-  `elohim/eprfs/epr-cli/src/device.rs:143`).
+- The declaration form (launch flags before `--`) and `epr device supervise` are supplied by
+  `feat/gate-live` 06dd6c51c; this branch alone has neither (C4)
+  (`elohim/eprfs/epr-cli/src/device.rs:143` here).
 - Socket discovery is main-checkout/worktree scoped, not global across independent
   repositories (`elohim/eprfs/epr-cli/src/lsp.rs:187`). C2's filter is path-prefix based:
   sibling roots are excluded, but a nested worktree beneath the served root is not
@@ -1152,11 +1160,11 @@ The main-checkout gate-live source is absent from this worktree.
   (`elohim/eprfs/epr-lsp/src/attach.rs:37 (proxy)`,
   `elohim/eprfs/epr-cli/src/lsp.rs:233 (attach)`).
 - C8 is an in-process API. True means enqueued, even when a missing-root set is later
-  dropped; no existing gate-live producer was found in the specified LSP source
+  dropped; the gate-live producer (`gatefeed`) is landing on `feat/gate-live`, not on this branch
   (`elohim/eprfs/epr-lsp/src/daemon.rs:195`,
   `elohim/eprfs/epr-lsp/src/daemon.rs:561`).
-- Pre-push still has the unfiltered rust-analyzer match; its resident exemption is the
-  peer dependency, not work claimed here (`.husky/pre-push.bash:948`).
+- The pre-push resident exemption landed on `feat/gate-live` (5bb980361, `ra_strays()`);
+  this branch alone still has the unfiltered match (`.husky/pre-push.bash:948`).
 - C2 serializes writers but does not coordinate pruning with readers; it cannot promise
   lossless retention or absence of torn lines (Appendix B, C2).
 - Commit `97ea46685` adds the device-wide run lock before flycheck's berth claim, enforcing
@@ -1171,9 +1179,8 @@ The main-checkout gate-live source is absent from this worktree.
   argument as the script path (Appendix B, C6b).
 
 **PENDING:** all acceptance items (a) 1–23; none has recorded acceptance evidence yet.
-Outstanding integration includes: merge the device-floor integration supplying supervise dispatch (C4), complete
-declaration/ready-line wiring and installed restart/readiness proof; peer pre-push exemption;
-gate-live producer wiring; live idle/lease/pin and
+Outstanding integration includes: merge the device-floor integration supplying supervise dispatch (C4), prove the installed
+declaration, restart and readiness under `epr device supervise`; the `gatefeed` producer landing; live idle/lease/pin and
 attribution probes; D4 live concurrent-arrival acceptance under the real resident
 (two roots, one device);
 native gates and owning acceptance execution.
@@ -1649,10 +1656,24 @@ gets no tag. Folds group by area/owner and have no source tag
 (`elohim/eprfs/epr-lsp/src/deliver.rs:289`,
 `elohim/eprfs/epr-lsp/src/deliver.rs:236`,
 `elohim/eprfs/epr-lsp/src/deliver.rs:408`).
-Gate-live is the intended producer; its wiring to this Rust handle remains PENDING.
+Gate-live's `gatefeed` module is the producer, landing on `feat/gate-live`; only the
+`--device` mux runs it.
 No CLI or external wire protocol is implied.
 
 ## C9 — Berth presence
+
+Two different berth claims carry the word `lsp`, and both are needed. The resident holds
+resource `toolchain:lsp` for its life (this contract), which proves there is one resident per
+device. Each flycheck holds resource `cargo`, class `lsp`, for one check (C6), which shares build
+capacity with gates and other builds.
+
+Policy extract (`genesis/agentic/pool-policy.json`, `berth`):
+
+```json
+"resources": { "toolchain:lsp": 1 },
+"classes": { "toolchain:lsp": { "lsp": { "daemon": true } } },
+"mooring_ttl_s": 10800
+```
 
 The resident uses synthetic mooring `lsp-device` with its own PID and claims resource
 `toolchain:lsp`, class `lsp`, once for its whole serving lifetime. Policy sets capacity
