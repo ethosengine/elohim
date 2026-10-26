@@ -690,6 +690,18 @@ test('formatEvent renders compact failure, detail, step, verdict, and close line
       failure: { class: 'test', fingerprint: 'abc', locus: { file: 'src/head.rs', line: 41, test: 'parses_head' }, nth: 1, excerpt: 'test parses_head ... FAILED' },
     }, '[gate-live] RED storage test src/head.rs:41 parses_head — test parses_head ... FAILED'],
     [{
+      kind: 'failure',
+      project: 'storage',
+      failure: { class: 'test', locus: { file: 'src/head.rs', line: 41 }, excerpt: 'boom',
+        attribution: { label: 'other', sessions: ['0123456789abcdef'] } },
+    }, '[gate-live] RED storage test src/head.rs:41 [other: 01234567] — boom'],
+    [{
+      kind: 'failure',
+      project: 'storage',
+      failure: { class: 'test', locus: { file: 'src/head.rs', line: 41 }, excerpt: 'boom',
+        attribution: { label: 'mine', sessions: ['me'] } },
+    }, '[gate-live] RED storage test src/head.rs:41 [mine] — boom'],
+    [{
       kind: 'gate-verdict',
       project: 'storage',
       verdict: { exit: 1, seconds: 738, failure_class: 'code', failures: 2 },

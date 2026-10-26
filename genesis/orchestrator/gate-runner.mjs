@@ -231,7 +231,7 @@ const TAP = resolve(dirname(fileURLToPath(import.meta.url)), 'gate-tap.mjs');
 function gateSpawn(project, command, argv, options, { spawn, env, tap }) {
   if (!tap || env.GATE_TAP === 'off') return { result: spawn(command, argv, options), tapped: null };
   const live = env.GATE_LIVE_RUN ? ['--run', env.GATE_LIVE_RUN] : [];
-  const result = spawn(process.execPath, [TAP, '--project', project.name, ...live, '--', command, ...argv],
+  const result = spawn(process.execPath, [TAP, '--project', project.name, '--dir', project.dir, ...live, '--', command, ...argv],
     { ...options, stdio: ['inherit', 'inherit', 'inherit', 'pipe'] });
   let tapped = null;
   try { tapped = JSON.parse(String(result.output?.[3] || '').trim().split('\n').pop()); } catch { /* no summary */ }

@@ -1,11 +1,11 @@
 import { describe, test } from 'node:test';
 import { strict as assert } from 'node:assert';
-import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { spawnSync } from 'node:child_process';
 import { tmpdir } from 'node:os';
 import { resolve, dirname } from 'path';
 import { fileURLToPath } from 'url';
-import { lineSplitter, tapChildEnv } from './gate-tap.mjs';
+import { attributor, lineSplitter, tapChildEnv } from './gate-tap.mjs';
 
 const TAP = resolve(dirname(fileURLToPath(import.meta.url)), 'gate-tap.mjs');
 
@@ -146,5 +146,43 @@ describe('gate-tap', () => {
     assert.ok(result.stderr === line, 'stderr bytes are unchanged');
     assert.equal(events.length, 1);
     assert.equal(Buffer.byteLength(events[0].failure.excerpt), 64 * 1024);
+  });
+});
+
+describe('gate-tap attribution', () => {
+  function journal(t) {
+    const root = mkdtempSync(resolve(tmpdir(), 'gate-tap-attr-'));
+    t.after(() => rmSync(root, { recursive: true, force: true }));
+    spawnSync('git', ['init', '-q'], { cwd: root });
+    mkdirSync(resolve(root, 'crate/src'), { recursive: true });
+    writeFileSync(resolve(root, 'crate/src/head.rs'), 'fn f() {}\n');
+    mkdirSync(resolve(root, '.eprfs/status/lsp'), { recursive: true });
+    mkdirSync(resolve(root, '.eprfs/status/gate-live/runs'), { recursive: true });
+    const run = resolve(root, '.eprfs/status/gate-live/runs/r.jsonl');
+    const openedAt = new Date(Date.now() - 60_000).toISOString();
+    writeFileSync(run, `${JSON.stringify({ v: 1, run: 'r', seq: 0, at: openedAt, kind: 'run-open', session: 'me' })}\n`);
+    const edit = (session, path) => JSON.stringify({ v: 1, at: new Date(Date.now() - 30_000).toISOString(),
+      session, ownerPid: 1, ownerStartTime: '1', path, tool: 'Edit' });
+    return { root, run, edit };
+  }
+
+  test('a failure in a file this session edited is labelled mine; another session\'s is other', t => {
+    const { root, run, edit } = journal(t);
+    writeFileSync(resolve(root, '.eprfs/status/lsp/edits.jsonl'), `${edit('me', resolve(root, 'crate/src/head.rs'))}\n`);
+    const label = attributor({ run, dir: 'crate', root });
+    const failure = { kind: 'failure', project: 'p', failure: { class: 'test', locus: { file: 'src/head.rs', line: 3 } } };
+    assert.deepEqual(label(failure).failure.attribution, { label: 'mine', sessions: ['me'] });
+    writeFileSync(resolve(root, '.eprfs/status/lsp/edits.jsonl'), `${edit('peer', resolve(root, 'crate/src/head.rs'))}\n`);
+    assert.deepEqual(attributor({ run, dir: 'crate', root })(failure).failure.attribution, { label: 'other', sessions: ['peer'] });
+  });
+
+  test('a locus that resolves nowhere, or a run with no run-open, passes through unlabelled', t => {
+    const { root, run } = journal(t);
+    const failure = { kind: 'failure', project: 'p', failure: { class: 'test', locus: { file: 'src/missing.rs' } } };
+    assert.equal(attributor({ run, dir: 'crate', root })(failure).failure.attribution, undefined);
+    writeFileSync(run, '');
+    const head = { kind: 'failure', project: 'p', failure: { class: 'test', locus: { file: 'src/head.rs' } } };
+    assert.equal(attributor({ run, dir: 'crate', root })(head).failure.attribution, undefined);
+    assert.equal(attributor({ run: null })(head), head);
   });
 });

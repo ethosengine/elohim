@@ -341,7 +341,10 @@ export function formatEvent(raw) {
         ? `${locus.file}${locus.line != null ? `:${locus.line}` : ''}`
         : '';
       const failureClass = event.class ?? event.failure_class ?? event.failureClass ?? 'unknown';
-      const prefix = ['[gate-live] RED', event.project, failureClass, file, test]
+      const by = event.attribution && event.attribution.label !== 'unattributed'
+        ? `[${event.attribution.label}${event.attribution.label === 'mine' ? '' : `: ${event.attribution.sessions.map(s => s.slice(0, 8)).join(',')}`}]`
+        : '';
+      const prefix = ['[gate-live] RED', event.project, failureClass, file, test, by]
         .filter((part) => part !== undefined && part !== null && part !== '')
         .join(' ');
       return `${prefix} — ${(lines[0] ?? '').slice(0, 160)}`;

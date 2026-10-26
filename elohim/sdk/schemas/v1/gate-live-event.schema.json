@@ -1,0 +1,220 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://elohim.host/schemas/v1/gate-live-event.schema.json",
+  "title": "GateLiveEvent",
+  "description": "Source of truth: the device-local gate run journal (Private B), keyed by run and sequence. Live diagnostics and attribution decide nothing; the gate's exit status and brit attestation remain the verdict record. This v1 envelope includes the Task projection without requiring Task fields from existing non-Task writers. No event adds a DHT head or authorizes crossing to another device.",
+  "type": "object",
+  "unevaluatedProperties": false,
+  "required": ["v", "run", "seq", "at", "kind"],
+  "properties": {
+    "v": { "const": 1 },
+    "run": { "type": "string", "minLength": 1 },
+    "seq": { "type": "integer", "minimum": 0 },
+    "at": {
+      "type": "string",
+      "format": "date-time",
+      "pattern": "^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}\\.\\d{3}Z$",
+      "description": "The journal writer's RFC3339 UTC timestamp, with milliseconds."
+    },
+    "kind": {
+      "enum": ["run-open", "gate-start", "failure", "detail", "step-failed", "gate-verdict", "run-close"],
+      "description": "Source of truth: this device-local v1 event vocabulary; it is not a DNA enum."
+    }
+  },
+  "oneOf": [
+    {
+      "properties": {
+        "kind": { "const": "run-open" },
+        "candidate": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["sha", "target"],
+          "properties": {
+            "sha": { "type": ["string", "null"] },
+            "target": { "type": ["string", "null"] }
+          },
+          "description": "The candidate declared when the run opens; either field may be null for a local run."
+        },
+        "session": { "type": ["string", "null"] }
+      },
+      "required": ["candidate", "session"]
+    },
+    {
+      "properties": {
+        "kind": { "const": "gate-start" },
+        "project": { "$ref": "#/$defs/name" },
+        "attested": { "type": "boolean" }
+      },
+      "required": ["project"]
+    },
+    {
+      "properties": {
+        "kind": { "const": "failure" },
+        "project": { "$ref": "#/$defs/name" },
+        "step": { "$ref": "#/$defs/name" },
+        "failure": {
+          "type": "object",
+          "$ref": "#/$defs/diagnostic",
+          "properties": { "nth": { "type": "integer", "minimum": 1 } },
+          "required": ["nth"]
+        },
+        "attribution": { "$ref": "#/$defs/attribution" }
+      },
+      "required": ["project", "failure"]
+    },
+    {
+      "properties": {
+        "kind": { "const": "detail" },
+        "project": { "$ref": "#/$defs/name" },
+        "step": { "$ref": "#/$defs/name" },
+        "failure": { "$ref": "#/$defs/diagnostic" }
+      },
+      "required": ["project", "failure"]
+    },
+    {
+      "properties": {
+        "kind": { "const": "step-failed" },
+        "project": { "$ref": "#/$defs/name" },
+        "step": { "$ref": "#/$defs/name" },
+        "exit": { "type": "integer", "minimum": 1 }
+      },
+      "required": ["project", "step", "exit"]
+    },
+    {
+      "properties": {
+        "kind": { "const": "gate-verdict" },
+        "project": { "$ref": "#/$defs/name" },
+        "step": { "$ref": "#/$defs/name" },
+        "verdict": { "$ref": "#/$defs/verdict" },
+        "derivation": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["method", "input", "hit"],
+          "properties": {
+            "method": { "$ref": "#/$defs/cid" },
+            "input": { "$ref": "#/$defs/cid" },
+            "hit": { "type": "boolean" }
+          },
+          "description": "The Task's method and input-root identities, and whether an admissible derivation was reused; this wraps, never replaces, the brit verdict."
+        },
+        "status": {
+          "enum": ["Answered", "Unanswered"],
+          "description": "The Task answer status, when the writer has one. Answered includes failed executions; Unanswered names interruption or deferral, never success."
+        },
+        "unanswered": { "$ref": "objects/unanswered.schema.json" }
+      },
+      "required": ["project", "verdict"],
+      "dependentRequired": { "unanswered": ["status"] },
+      "allOf": [
+        {
+          "if": { "properties": { "status": { "const": "Unanswered" } }, "required": ["status"] },
+          "then": { "properties": { "unanswered": {} }, "required": ["unanswered"] }
+        },
+        {
+          "if": { "properties": { "status": { "const": "Answered" } }, "required": ["status"] },
+          "then": { "properties": { "unanswered": false } }
+        }
+      ]
+    },
+    {
+      "properties": {
+        "kind": { "const": "run-close" },
+        "outcome": {
+          "enum": ["passed", "failed", "interrupted", "gates-passed"],
+          "description": "Source of truth: the local run's closure vocabulary. gates-passed describes the gate loop only; later pre-push steps still decide the push."
+        },
+        "deferred": { "type": "integer", "minimum": 0 },
+        "unanswered": {
+          "$ref": "objects/unanswered.schema.json",
+          "description": "The shared three-part answer for an interrupted or deferred run, when supplied by the writer."
+        }
+      },
+      "required": ["outcome"]
+    }
+  ],
+  "$defs": {
+    "name": { "type": "string", "minLength": 1 },
+    "cid": {
+      "type": "string",
+      "pattern": "^baf[ky]rei[a-z2-7]{52}$",
+      "description": "A canonical CIDv1 sha2-256 address (dag-cbor or raw), not a bare digest or fingerprint."
+    },
+    "diagnostic": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["class", "fingerprint", "locus", "excerpt"],
+      "properties": {
+        "class": {
+          "enum": ["test", "compile", "lint", "format", "env"],
+          "description": "Source of truth: the v1 live recognizer's diagnostic classes. These differ from the verdict's code/environment/unknown classification."
+        },
+        "fingerprint": { "type": "string", "pattern": "^[0-9a-f]{12}$" },
+        "locus": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "file": { "$ref": "#/$defs/name" },
+            "line": { "type": "integer", "minimum": 1 },
+            "test": { "$ref": "#/$defs/name" }
+          },
+          "description": "Only locations actually printed by the tool. Empty is valid; a test name need not have a file. Paths may be repository-relative or absolute."
+        },
+        "nth": {
+          "type": "integer",
+          "minimum": 1,
+          "description": "The failure's ordinal in the recognizer; a later detail may omit it."
+        },
+        "excerpt": {
+          "type": "string",
+          "maxLength": 2048,
+          "description": "Device-only diagnostic text: it never crosses to another device, CI subscriber, or observation channel. The emitter bounds it to 20 lines and 2048 UTF-8 bytes; JSON Schema's character limit does not prove that byte bound."
+        }
+      }
+    },
+    "verdict": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["exit", "seconds"],
+      "properties": {
+        "exit": { "type": "integer", "minimum": 0 },
+        "seconds": { "type": "number", "minimum": 0 },
+        "failure_class": {
+          "enum": ["code", "environment", "unknown", null],
+          "description": "The gate-cycle classification; null for a passing gate, omitted when the writer has no classification."
+        },
+        "failures": { "type": ["integer", "null"], "minimum": 0 },
+        "overflow": { "type": "integer", "minimum": 0 },
+        "evidence": { "$ref": "#/$defs/name" },
+        "reused": { "type": "boolean" },
+        "deferred": { "type": "boolean" }
+      }
+    },
+    "attribution": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["label", "sessions"],
+      "description": "Ephemeral (C), device-local edit evidence. It decides nothing and never guesses authorship; anonymous session IDs remain distinct. Sessions are distinct and sorted by the producer.",
+      "properties": {
+        "label": {
+          "enum": ["mine", "other", "ambiguous", "unattributed"],
+          "description": "Source of truth: the v1 attribution vocabulary over exact file and inclusive time-window matches."
+        },
+        "sessions": { "type": "array", "uniqueItems": true, "items": { "$ref": "#/$defs/name" } }
+      },
+      "allOf": [
+        {
+          "if": { "properties": { "label": { "const": "unattributed" } } },
+          "then": { "properties": { "sessions": { "type": "array", "maxItems": 0 } } }
+        },
+        {
+          "if": { "properties": { "label": { "enum": ["mine", "other"] } } },
+          "then": { "properties": { "sessions": { "type": "array", "minItems": 1, "maxItems": 1 } } }
+        },
+        {
+          "if": { "properties": { "label": { "const": "ambiguous" } } },
+          "then": { "properties": { "sessions": { "type": "array", "minItems": 2 } } }
+        }
+      ]
+    }
+  }
+}

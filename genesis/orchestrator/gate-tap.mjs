@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 // Runs one gate command and reads its output as it prints, without changing it.
 //
-//   node gate-tap.mjs --project <name> [--run <gate-live run path>] -- <command> [args…]
+//   node gate-tap.mjs --project <name> [--run <gate-live run path>] [--dir <project dir>] -- <command> [args…]
 //
 // Bytes reach this process's stdout/stderr unchanged and the command's exit status (or
 // signal) is this process's. Failure-level lines (gate-failure-lines.mjs) are appended to
@@ -12,10 +12,11 @@
 // rakia-executor can also wrap: genesis/docs/superpowers/specs/2026-10-26-gate-live-failure-channel-design.md
 
 import { spawn } from 'child_process';
-import { writeSync } from 'fs';
-import { resolve } from 'path';
+import { existsSync, readFileSync, writeSync } from 'fs';
+import { dirname, isAbsolute, join, resolve } from 'path';
 import { createRecognizer } from './gate-failure-lines.mjs';
-import { appendEvent } from './gate-live.mjs';
+import { GATE_ATTRIBUTION_WINDOW_MS, attribute, readEdits } from './gate-attribution.mjs';
+import { appendEvent, liveRoot } from './gate-live.mjs';
 
 function parseArgs(argv) {
   const split = argv.indexOf('--');
@@ -25,7 +26,13 @@ function parseArgs(argv) {
     const i = own.indexOf(name);
     return i >= 0 ? own[i + 1] : undefined;
   };
-  return { project: opt('--project') || 'gate', run: opt('--run') || null, command: argv[split + 1], args: argv.slice(split + 2) };
+  return {
+    project: opt('--project') || 'gate',
+    run: opt('--run') || null,
+    dir: opt('--dir') || null,
+    command: argv[split + 1],
+    args: argv.slice(split + 2),
+  };
 }
 
 /** Split a byte stream into lines for the recognizer; the bytes themselves are forwarded elsewhere. */
@@ -71,16 +78,47 @@ export function tapChildEnv(env, isTTY) {
   return { CARGO_TERM_COLOR: 'always', FORCE_COLOR: '1', ...env };
 }
 
+/**
+ * Labels a failure with the sessions whose edits to its file fall inside the run's window
+ * (gate-attribution.mjs). A label is a hint for the reader and decides nothing; with no run,
+ * no run-open, or no edit journal, failures pass through unlabelled.
+ */
+export function attributor({ run, dir, root = process.cwd(), now = () => Date.now() }) {
+  if (!run) return event => event;
+  let opened = null;
+  try {
+    opened = JSON.parse(readFileSync(run, 'utf8').split('\n')[0]);
+  } catch { /* no run-open to anchor the window */ }
+  const openedAtMs = Date.parse(opened?.at ?? '');
+  if (!opened || opened.kind !== 'run-open' || !Number.isFinite(openedAtMs)) return event => event;
+  let edits = null;
+  return event => {
+    const file = event.failure?.locus?.file;
+    if (event.kind !== 'failure' || typeof file !== 'string') return event;
+    // A compiler names a file relative to the crate or workspace it built; try the gate's
+    // own directory, then the repository root, and label nothing that resolves nowhere.
+    const absolute = isAbsolute(file) ? file
+      : [dir, root].filter(Boolean).map(base => resolve(root, base, file)).find(path => existsSync(path));
+    if (!absolute) return event;
+    edits ??= readEdits(join(dirname(liveRoot(root)), 'lsp', 'edits.jsonl'));
+    const attribution = attribute({ failure: { ...event.failure, locus: { ...event.failure.locus, file: absolute } } }, edits, {
+      session: opened.session, windowStartMs: openedAtMs - GATE_ATTRIBUTION_WINDOW_MS, atMs: now(),
+    });
+    return { ...event, failure: { ...event.failure, attribution } };
+  };
+}
+
 function main() {
   const parsed = parseArgs(process.argv.slice(2));
   if (!parsed) {
-    process.stderr.write('usage: gate-tap.mjs --project <name> [--run <path>] -- <command> [args…]\n');
+    process.stderr.write('usage: gate-tap.mjs --project <name> [--run <path>] [--dir <project dir>] -- <command> [args…]\n');
     process.exit(2);
   }
-  const { project, run, command, args } = parsed;
+  const { project, run, dir, command, args } = parsed;
+  const label = attributor({ run, dir });
   const recognizer = createRecognizer({
     project,
-    emit: event => { if (run) appendEvent(run, event); },
+    emit: event => { if (run) appendEvent(run, label(event)); },
   });
   const child = spawn(command, args, {
     stdio: ['inherit', 'pipe', 'pipe'],
