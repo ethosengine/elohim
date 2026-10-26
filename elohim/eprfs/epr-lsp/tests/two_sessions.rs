@@ -10,6 +10,7 @@ use elohim_epr_lsp::attrib::{rfc3339, SessionKey};
 use elohim_epr_lsp::daemon::{bind, Bound, Clock, DeviceConfig, Resolver, ServerPlan};
 use elohim_epr_lsp::deliver::Snapshot;
 use elohim_epr_lsp::frame::{read_message, write_message, Decoder};
+use elohim_epr_lsp::gatefeed::{self, GateFeedConfig, Placer};
 use elohim_epr_lsp::limits::TOO_SLOW;
 use elohim_epr_lsp::mux::MuxConfig;
 use elohim_epr_lsp::server::{ServerIo, Spawner};
@@ -749,4 +750,190 @@ async fn a_root_the_device_cannot_plan_gets_the_null_server_with_the_reason() {
     assert_eq!(harness.spawned.load(Ordering::SeqCst), 0);
     stop.send(()).unwrap();
     daemon.await.unwrap().unwrap();
+}
+
+/// Places every run whose candidate is [`GATE_SHA`] in the fixture root, with the
+/// `core-gate` project in `core/`.
+struct FixturePlacer {
+    root: PathBuf,
+}
+
+const GATE_SHA: &str = "abcdef0123456789abcdef0123456789abcdef01";
+
+impl Placer for FixturePlacer {
+    fn checkouts(&self, sha: Option<&str>) -> Vec<PathBuf> {
+        if sha == Some(GATE_SHA) {
+            vec![self.root.clone()]
+        } else {
+            Vec::new()
+        }
+    }
+
+    fn project_dir(&self, _checkout: &Path, project: &str) -> Option<PathBuf> {
+        (project == "core-gate").then(|| PathBuf::from("core"))
+    }
+}
+
+fn gate_event(run: &str, seq: u64, body: &Value) -> String {
+    let mut event = json!({"v": 1, "run": run, "seq": seq, "at": "2026-10-26T10:00:00.000Z"});
+    for (key, value) in body.as_object().unwrap() {
+        event[key] = value.clone();
+    }
+    format!("{event}\n")
+}
+
+fn append(path: &Path, text: &str) {
+    use std::io::Write as _;
+    let mut file = std::fs::OpenOptions::new()
+        .create(true)
+        .append(true)
+        .open(path)
+        .unwrap();
+    file.write_all(text.as_bytes()).unwrap();
+}
+
+fn gate_publish(uri: &str, has: bool) -> impl Fn(&Value) -> bool + '_ {
+    move |m| {
+        publish_on(std::slice::from_ref(m), uri).is_some_and(|p| {
+            let list = p["params"]["diagnostics"].as_array().unwrap();
+            if has {
+                list.iter().any(|d| d["source"] == gatefeed::SOURCE)
+            } else {
+                list.is_empty()
+            }
+        })
+    }
+}
+
+#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+async fn a_gate_failure_reaches_every_session_on_its_root_with_its_attribution() {
+    let fx = Fixture::new();
+    std::fs::create_dir_all(fx.root.join(".git")).unwrap();
+    let runs = fx.root.join(".eprfs/status/gate-live/runs");
+    std::fs::create_dir_all(&runs).unwrap();
+    let harness = harness(&fx, no_script(), Duration::from_secs(600));
+    let clock = Arc::clone(&fx.clock);
+    let clock: Clock = Arc::new(move || clock.load(Ordering::SeqCst));
+    let resolver: Arc<dyn Resolver> = harness.resolver.clone();
+    let bound = bind(DeviceConfig {
+        runtime_dir: fx.runtime_dir.clone(),
+        clock,
+        resolver,
+    })
+    .unwrap()
+    .expect("the device mux binds");
+    let tail = tokio::spawn(gatefeed::tail(GateFeedConfig {
+        runs_dir: runs.clone(),
+        runtime_dir: fx.runtime_dir.clone(),
+        placer: Arc::new(FixturePlacer {
+            root: fx.root.clone(),
+        }),
+        feed: bound.external_feed(),
+    }));
+    let (stop, stopped) = oneshot::channel::<()>();
+    let daemon = tokio::spawn(bound.run(async move {
+        let _ = stopped.await;
+    }));
+
+    let core = fx.uri("core/src/lib.rs");
+    let mut a = Client::attach(&fx.sock(), &fx.root, SESSION_A).await;
+    let mut b = Client::attach(&fx.sock(), &fx.root, SESSION_B).await;
+    fx.write(
+        "core/src/lib.rs",
+        "pub struct T;\n\nfn f() -> u8 { \"x\" }\n",
+    );
+    for client in [&mut a, &mut b] {
+        client.open(&core, "").await;
+        client.request("textDocument/hover", json!({})).await;
+    }
+
+    // A's push opens a run; its failure line lands torn, then whole.
+    let first = "20261026T100000Z-abcdef012345-000001";
+    let log = runs.join(format!("{first}.jsonl"));
+    append(
+        &log,
+        &gate_event(
+            first,
+            0,
+            &json!({"kind": "run-open", "candidate": {"sha": GATE_SHA, "target": "dev"},
+                    "session": SESSION_A}),
+        ),
+    );
+    append(
+        &log,
+        &gate_event(
+            first,
+            1,
+            &json!({"kind": "gate-start", "project": "core-gate"}),
+        ),
+    );
+    let failure = gate_event(
+        first,
+        2,
+        &json!({"kind": "failure", "project": "core-gate", "failure": {
+            "class": "compile", "fingerprint": "0123456789ab",
+            "locus": {"file": "src/lib.rs", "line": 3}, "nth": 1,
+            "excerpt": "error[E0308]: mismatched types\n --> src/lib.rs:3:16",
+            "attribution": {"label": "mine", "sessions": [SESSION_A]}}}),
+    );
+    let (head, rest) = failure.split_at(failure.len() / 2);
+    append(&log, head);
+    tokio::time::sleep(gatefeed::POLL + Duration::from_millis(500)).await;
+    append(&log, rest);
+
+    for (who, client) in [("A", &mut a), ("B", &mut b)] {
+        let seen = client.until(who, gate_publish(&core, true)).await;
+        let list = &publish_on(&seen, &core).unwrap()["params"]["diagnostics"];
+        assert_eq!(list.as_array().unwrap().len(), 1, "{who}");
+        let d = &list[0];
+        assert_eq!(d["source"], "gate-live", "{who}");
+        assert_eq!(
+            d["message"], "error[E0308]: mismatched types [gate core-gate]",
+            "{who}"
+        );
+        assert_eq!(
+            d["range"]["start"],
+            json!({"line": 2, "character": 0}),
+            "{who}"
+        );
+        assert_eq!(d["data"]["epr"]["source"], "gate-live", "{who}");
+        let gate = &d["data"]["epr"]["gate"];
+        assert_eq!(gate["attribution"], "mine", "{who}");
+        assert_eq!(gate["sessions"], json!([SESSION_A]), "{who}");
+        assert_eq!(gate["session"], SESSION_A, "{who}");
+        assert_eq!(gate["run"], first, "{who}");
+        assert_eq!(gate["project"], "core-gate", "{who}");
+    }
+
+    // The run closes and the diagnostic stays; the next run of the project replaces it.
+    append(
+        &log,
+        &gate_event(first, 3, &json!({"kind": "run-close", "outcome": "failed"})),
+    );
+    let second = "20261026T100500Z-abcdef012345-000002";
+    let next = runs.join(format!("{second}.jsonl"));
+    append(
+        &next,
+        &gate_event(
+            second,
+            0,
+            &json!({"kind": "run-open", "candidate": {"sha": GATE_SHA, "target": "dev"},
+                    "session": SESSION_B}),
+        ),
+    );
+    append(
+        &next,
+        &gate_event(
+            second,
+            1,
+            &json!({"kind": "gate-start", "project": "core-gate"}),
+        ),
+    );
+    for (who, client) in [("A", &mut a), ("B", &mut b)] {
+        client.until(who, gate_publish(&core, false)).await;
+    }
+
+    stop.send(()).unwrap();
+    daemon.await.unwrap().unwrap();
+    tail.abort();
 }

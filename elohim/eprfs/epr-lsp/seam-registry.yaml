@@ -1,0 +1,89 @@
+# elohim/eprfs/epr-lsp/seam-registry.yaml
+#
+# Conforms to elohim/sdk/schemas/v1/manifest/seam-registry.schema.json. First registry for this
+# crate, minted 2026-10-26 with the gate-live feed under the birth rule: a decision surface is
+# registered when it is created.
+#
+# HONESTY CLAUSE — only the gate-live feed's decision points are registered here. The crate's
+# earlier surfaces (the mux's request routing, `attrib::Attributor::publish`'s ownership rule,
+# `deliver::session_view`'s full-or-fold split) qualify and are not yet registered: a declared
+# backlog, not an omission.
+
+seamRegistryVersion: 1
+crate: elohim-epr-lsp
+crateRoot: elohim/eprfs/epr-lsp
+seamLocus: >
+  The gate-live feed (src/gatefeed.rs): the device mux tails the device-local gate-live run
+  logs (<main checkout>/.eprfs/status/gate-live/runs/*.jsonl, written by
+  genesis/orchestrator/gate-live.mjs) and publishes each failure with a rust source locus as an
+  external `gate-live` diagnostic set per URI. Ephemeral (C): device-local, never notarized,
+  projected or sent off the device, and rebuilt from the run log whenever the mux starts (every
+  run inside gate-live's stale window is replayed). A root with no running server drops the set;
+  the run log still holds it. Nothing is decided from these diagnostics; the gate's exit status
+  stays the verdict.
+decisionPoints:
+- name: parse_line
+  kind: pure-decision-predicate
+  sourceLocation:
+    file: src/gatefeed.rs
+    modulePath: elohim_epr_lsp::gatefeed::parse_line
+  summary: Which run-log lines the feed acts on — run-open, gate-start, run-close, and a failure
+    whose locus names a file; a damaged line, any other kind, or a failure with no file is none.
+  concernIds:
+  - id: C0
+    status: answered
+    justification: Ephemeral (C) device-local read of a Private (B) run journal; no DHT head, no
+      route, no peer fact. Rebuildable from the run log.
+  - id: C4
+    status: answered
+    justification: A failure with no file is not shown rather than placed on a guessed file; a
+      damaged or torn line is skipped and never hides later lines.
+  - id: C5
+    status: answered
+    justification: The gate's attribution label rides along as evidence in data.epr.gate; the
+      mux re-derives its own attribution and nothing is decided from either.
+  - id: C6a
+    status: answered
+    justification: Lines are bounded (LINE_CAP), reads per poll (READ_CAP), failures per run
+      (RUN_CAP) and diagnostics per URI (URI_CAP).
+  contractTests:
+  - path: elohim/eprfs/epr-lsp/src/gatefeed.rs
+    testName: a_failure_without_a_file_is_nothing_to_show
+    kind: unit
+  - path: elohim/eprfs/epr-lsp/src/gatefeed.rs
+    testName: open_start_and_close_parse_and_other_kinds_are_ignored
+    kind: unit
+  - path: elohim/eprfs/epr-lsp/src/gatefeed.rs
+    testName: a_torn_line_waits_for_its_newline_and_an_oversized_one_is_dropped
+    kind: unit
+  - path: elohim/eprfs/epr-lsp/tests/two_sessions.rs
+    testName: a_gate_failure_reaches_every_session_on_its_root_with_its_attribution
+    kind: integration
+- name: diagnostic
+  kind: pure-decision-predicate
+  sourceLocation:
+    file: src/gatefeed.rs
+    modulePath: elohim_epr_lsp::gatefeed::diagnostic
+  summary: Maps a placed failure to an Error diagnostic, converting the run log's 1-based line and
+    column to LSP's 0-based range, tagged source gate-live with the run, project, attribution and
+    session in data.epr.gate.
+  concernIds:
+  - id: C0
+    status: answered
+    justification: The diagnostic is an Ephemeral (C) projection of the run log; it is never
+      stored past the mux's memory and the attribution snapshot.
+  - id: C5
+    status: answered
+    justification: The run's attribution is carried as labelled evidence for the reader; it confers
+      no ownership in the mux, which attributes from the C2 edit log.
+  contractTests:
+  - path: elohim/eprfs/epr-lsp/src/gatefeed.rs
+    testName: a_failure_with_a_locus_becomes_a_zero_based_error_on_its_line
+    kind: unit
+  - path: elohim/eprfs/epr-lsp/src/gatefeed.rs
+    testName: a_failure_without_a_line_covers_the_first_line_and_a_top_level_attribution_is_read
+    kind: unit
+  notes: The tailer's replacement rule (the newest run that started a project's gate holds that
+    project's set; it stays after run-close; an older run never overwrites it) and its placement
+    (checkouts whose HEAD is the run's candidate, then the gate's manifest dir) are pinned by the
+    integration test above but not registered as their own rows yet.

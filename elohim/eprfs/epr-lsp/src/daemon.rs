@@ -248,7 +248,7 @@ impl ClientConn {
     }
 }
 
-fn log(line: &str) {
+pub(crate) fn log(line: &str) {
     eprintln!(
         "{} epr lsp: {line}",
         chrono::Utc::now().to_rfc3339_opts(chrono::SecondsFormat::Millis, true)

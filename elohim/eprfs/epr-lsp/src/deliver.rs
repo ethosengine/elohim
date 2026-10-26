@@ -308,9 +308,13 @@ pub fn stamp(
         epr["source"] = json!(source);
     }
     match stamped.get_mut("data") {
-        Some(Value::Object(data)) => {
-            data.insert("epr".into(), epr);
-        }
+        // A publisher's own `data.epr` keys (a gate run's provenance) survive; the stamp's win.
+        Some(Value::Object(data)) => match (data.get_mut("epr"), epr) {
+            (Some(Value::Object(own)), Value::Object(stamp)) => own.extend(stamp),
+            (_, epr) => {
+                data.insert("epr".into(), epr);
+            }
+        },
         None | Some(Value::Null) => {
             stamped["data"] = json!({ "epr": epr });
         }
@@ -657,6 +661,25 @@ mod tests {
             "own diagnostics carry no prefix"
         );
         assert_eq!(unstamp(&stamped).unwrap(), d.diagnostic);
+    }
+
+    #[test]
+    fn a_publishers_own_epr_keys_survive_stamping() {
+        let mut d = owned("file:///u", "u", 1, &["A"]);
+        d.diagnostic["data"] = json!({"epr": {"gate": {"run": "r1"}, "attribution": "x"}});
+        let stamped = stamp(
+            &d.diagnostic,
+            &d.attribution,
+            Label::Mine,
+            "A",
+            Some("gate-live"),
+        );
+        assert_eq!(stamped["data"]["epr"]["gate"]["run"], "r1");
+        assert_eq!(
+            stamped["data"]["epr"]["attribution"], "mine",
+            "the stamp wins"
+        );
+        assert_eq!(stamped["data"]["epr"]["source"], "gate-live");
     }
 
     #[test]

@@ -18,6 +18,8 @@
 //! - [`socket`]: the runtime directory (C3), the serve lock, the hello line and the listener.
 //! - [`daemon`]: the serve loop that joins the socket, the child and the mux, with idle reap.
 //! - [`attach`]: the stdio shim's proxy and its null-server fallback (C4).
+//! - [`gatefeed`]: the device mux's tail of gate-live run logs, published as `gate-live`
+//!   diagnostics (its parser and line splitter are pure).
 //!
 //! Edit events and attributions are ephemeral and device-local: they are never notarized,
 //! projected or read by anything but this multiplexer and `epr lsp show`.
@@ -27,6 +29,7 @@ pub mod attrib;
 pub mod daemon;
 pub mod deliver;
 pub mod frame;
+pub mod gatefeed;
 pub mod limits;
 pub mod mux;
 pub mod server;

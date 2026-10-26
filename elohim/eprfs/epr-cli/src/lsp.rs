@@ -26,6 +26,7 @@ use elohim_epr_lsp::attach::{null_server, proxy, ProxyEnd};
 use elohim_epr_lsp::attrib::{rfc3339, SessionKey};
 use elohim_epr_lsp::daemon::{bind, system_clock, termination, DeviceConfig, Resolver, ServerPlan};
 use elohim_epr_lsp::deliver::{Delivered, Snapshot};
+use elohim_epr_lsp::gatefeed::{self, GateFeedConfig, Placer};
 use elohim_epr_lsp::mux::MuxConfig;
 use elohim_epr_lsp::server::{
     build_spec, toolchain, LspPolicy, PolicyError, ProcessSpawner, SpecInputs, POLICY_REL,
@@ -204,6 +205,80 @@ fn main_checkout(root: &Path) -> PathBuf {
 
 fn runtime_dir(root: &Path) -> PathBuf {
     main_checkout(root).join(".eprfs/status/lsp")
+}
+
+/// gate-live's run logs under the main checkout (`liveRoot` in genesis/orchestrator/gate-live.mjs).
+const GATE_RUNS_REL: &str = ".eprfs/status/gate-live/runs";
+
+/// Places a gate run from git: the run was gated in whichever checkout of the repository has
+/// its candidate commit checked out, and a gate project's directory is its build manifest's
+/// `gate.projects.<name>.dir`.
+struct GitPlacer {
+    main: PathBuf,
+}
+
+impl Placer for GitPlacer {
+    fn checkouts(&self, sha: Option<&str>) -> Vec<PathBuf> {
+        let Some(sha) = sha else {
+            return Vec::new();
+        };
+        crate::process::run("git", &["worktree", "list", "--porcelain"], &self.main)
+            .ok()
+            .filter(|output| output.success)
+            .map(|output| checkouts_at(&output.stdout, sha))
+            .unwrap_or_default()
+            .into_iter()
+            .filter_map(|path| path.canonicalize().ok())
+            .collect()
+    }
+
+    fn project_dir(&self, checkout: &Path, project: &str) -> Option<PathBuf> {
+        let listed = crate::process::run(
+            "git",
+            &["ls-files", "-z", "--", "*build-manifest.json"],
+            checkout,
+        )
+        .ok()
+        .filter(|output| output.success)?;
+        listed
+            .stdout
+            .split('\0')
+            .filter(|rel| !rel.is_empty())
+            .filter_map(|rel| std::fs::read(checkout.join(rel)).ok())
+            .filter_map(|bytes| serde_json::from_slice::<Value>(&bytes).ok())
+            .find_map(|manifest| gate_project_dir(&manifest, project))
+    }
+}
+
+/// The worktrees in `git worktree list --porcelain` output whose HEAD is `sha` (a full or
+/// abbreviated hex id of at least 7).
+fn checkouts_at(porcelain: &str, sha: &str) -> Vec<PathBuf> {
+    if sha.len() < 7 {
+        return Vec::new();
+    }
+    let mut found = Vec::new();
+    let mut current: Option<&str> = None;
+    for line in porcelain.lines() {
+        if let Some(path) = line.strip_prefix("worktree ") {
+            current = Some(path);
+        } else if let Some(head) = line.strip_prefix("HEAD ") {
+            if let Some(path) = current.filter(|_| head.starts_with(sha)) {
+                found.push(PathBuf::from(path));
+            }
+        }
+    }
+    found
+}
+
+/// `gate.projects.<project>.dir` in one build manifest.
+fn gate_project_dir(manifest: &Value, project: &str) -> Option<PathBuf> {
+    manifest
+        .get("gate")?
+        .get("projects")?
+        .get(project)?
+        .get("dir")?
+        .as_str()
+        .map(PathBuf::from)
 }
 
 /// This process's session (C1): `epr session`'s own resolver, else `anon-<pid>`, which is
@@ -394,7 +469,17 @@ fn serve(options: &Options) -> LspResult<ExitCode> {
         stdout.flush()?;
         drop(stdout);
         let heartbeat = berth.heartbeat();
+        // Only the device mux tails gate-live runs: one reader per device, as for the C2 log.
+        let gate_tail = tokio::spawn(gatefeed::tail(GateFeedConfig {
+            runs_dir: main_checkout(&checkout).join(GATE_RUNS_REL),
+            runtime_dir: runtime_dir.clone(),
+            placer: Arc::new(GitPlacer {
+                main: main_checkout(&checkout),
+            }),
+            feed: bound.external_feed(),
+        }));
         let served = bound.run(termination()).await;
+        gate_tail.abort();
         heartbeat.stop();
         berth.down();
         served.map_err(LspCliError::Io)
@@ -885,5 +970,41 @@ mod tests {
         let refusal = berth.claim().unwrap_err();
         assert!(refusal.contains("held by lsp-device-old"), "{refusal}");
         assert!(refusal.contains("exit status: 3"), "{refusal}");
+    }
+
+    #[test]
+    fn a_gate_run_is_placed_in_the_worktrees_at_its_candidate() {
+        let porcelain = "worktree /r\nHEAD 1111111111111111111111111111111111111111\nbranch \
+                         refs/heads/dev\n\nworktree /r/.worktrees/a\nHEAD \
+                         2222222222222222222222222222222222222222\ndetached\n\nworktree \
+                         /r/.worktrees/b\nHEAD 2222222222222222222222222222222222222222\n";
+        let sha = "2222222222222222222222222222222222222222";
+        assert_eq!(
+            checkouts_at(porcelain, sha),
+            vec![
+                PathBuf::from("/r/.worktrees/a"),
+                PathBuf::from("/r/.worktrees/b")
+            ]
+        );
+        assert_eq!(
+            checkouts_at(porcelain, "1111111"),
+            vec![PathBuf::from("/r")]
+        );
+        assert!(
+            checkouts_at(porcelain, "111").is_empty(),
+            "too short to name one"
+        );
+        assert!(checkouts_at(porcelain, "3333333").is_empty());
+    }
+
+    #[test]
+    fn a_gate_projects_dir_comes_from_its_manifest() {
+        let manifest = json!({"gate": {"projects": {"eprfs": {"dir": "elohim/eprfs"}}}});
+        assert_eq!(
+            gate_project_dir(&manifest, "eprfs"),
+            Some(PathBuf::from("elohim/eprfs"))
+        );
+        assert_eq!(gate_project_dir(&manifest, "app"), None);
+        assert_eq!(gate_project_dir(&json!({"name": "x"}), "eprfs"), None);
     }
 }
