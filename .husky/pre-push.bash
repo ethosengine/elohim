@@ -467,7 +467,9 @@ if echo "$CHANGED" | grep -qE "^\.claude/hooks/"; then
       [ -f "$hook_test" ] || continue
       hook_tests_ran=1
       echo "[pre-push] Running Claude hook boundary tests: $hook_test"
-      if ! python3 "$hook_test"; then
+      # Scrubbed like the library harnesses below: an inherited GIT_DIR turns a test's temp-repo
+      # `git commit` into a commit on the branch being pushed (2026-10-26, test_lsp_edit_event).
+      if ! env -u GIT_DIR -u GIT_WORK_TREE -u GIT_INDEX_FILE -u GIT_PREFIX python3 "$hook_test"; then
         echo ""
         echo "!!============================================================!!"
         echo "!! CLAUDE HOOK BOUNDARY TEST FAILED: $hook_test"

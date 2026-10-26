@@ -23,12 +23,15 @@ class EditEventTest(unittest.TestCase):
         tmp = tempfile.TemporaryDirectory()
         self.addCleanup(tmp.cleanup)
         self.root = Path(tmp.name) / 'main'
-        subprocess.run(['git', 'init', '-q', str(self.root)], check=True)
+        # Inside a git hook (pre-push runs this file) git exports GIT_DIR and friends; inherited,
+        # they would point `git init` and the hook's rev-parse at the real repository.
+        clean = {k: v for k, v in os.environ.items() if not k.startswith('GIT_')}
+        subprocess.run(['git', 'init', '-q', str(self.root)], check=True, env=clean)
         self.log = self.root / '.eprfs/status/lsp/edits.jsonl'
         self.stub = self.root / 'epr-stub'
         self.stub.write_text('#!/usr/bin/env python3\nraise SystemExit(1)\n')
         self.stub.chmod(0o755)
-        self.env = {**os.environ, 'CLAUDE_PROJECT_DIR': str(self.root),
+        self.env = {**clean, 'CLAUDE_PROJECT_DIR': str(self.root),
                     'EPR_BIN': str(self.stub), 'ELOHIM_SESSION_ID': 'env-session',
                     'ELOHIM_SESSION_OWNER_PID': str(os.getpid())}
 
@@ -96,9 +99,9 @@ class EditEventTest(unittest.TestCase):
 
     def test_worktree_uses_main_checkout_log_and_worktree_file_path(self):
         subprocess.run(['git', '-C', str(self.root), '-c', 'user.name=Fixture',
-                        '-c', 'user.email=fixture@example.test', 'commit', '--allow-empty', '-qm', 'fixture'], check=True)
+                        '-c', 'user.email=fixture@example.test', 'commit', '--allow-empty', '-qm', 'fixture'], check=True, env=self.env)
         worktree = self.root.parent / 'worktree'
-        subprocess.run(['git', '-C', str(self.root), 'worktree', 'add', '-q', '-b', 'fixture', str(worktree)], check=True)
+        subprocess.run(['git', '-C', str(self.root), 'worktree', 'add', '-q', '-b', 'fixture', str(worktree)], check=True, env=self.env)
         self.hook(self.payload(cwd=str(worktree)))
         self.assertEqual(self.events()[0]['path'], str(worktree / 'src/example.rs'))
         self.assertFalse((worktree / '.eprfs').exists())
