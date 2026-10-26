@@ -226,7 +226,19 @@ trap 'exit 143' TERM
 
 note="lsp flycheck $pkg"
 [[ $build_scripts == 0 ]] || note="lsp build-scripts $workspace"
+# One run at a time across the device. Berth cannot provide this: every resident
+# flycheck runs as the one session lsp-device, so a second claim only renews the
+# first run's lease, and the contention scan skips its own holder and marked
+# processes. The lock lives in the main checkout so that worktrees share it, and
+# cargo inherits the descriptor, so the lock is held for as long as the check runs.
+lock_dir="$(dirname "$(git -C "$root" rev-parse --path-format=absolute --git-common-dir)")/.eprfs/status/lsp"
+mkdir -p "$lock_dir"
+exec {run_lock}>"$lock_dir/flycheck.lock"
 while true; do
+  if ! flock -n "$run_lock"; then
+    wait_or_defer "another lsp flycheck (${lock_dir}/flycheck.lock)"
+    continue
+  fi
   claim_started="$(python3 -c 'import time; print(time.monotonic())')"
   claim_status=0
   claim_output="$("$SCRIPT_DIR/berth" claim cargo --class lsp --ttl "$ttl_s" --note "$note" 2>&1)" || claim_status=$?
@@ -238,6 +250,7 @@ while true; do
       ;;
     3)
       busy="$(busy_builds)"
+      flock -u "$run_lock"
       wait_or_defer "${busy:-$claim_output}"
       continue
       ;;
@@ -248,6 +261,7 @@ while true; do
   busy="$(busy_builds)"
   if [[ -n $busy ]]; then
     release_lease
+    flock -u "$run_lock"
     wait_or_defer "$busy"
     continue
   fi

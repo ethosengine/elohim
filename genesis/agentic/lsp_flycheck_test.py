@@ -264,6 +264,28 @@ def running_heavy():
         self.assertEqual(self.holders(), before)
         self.assert_claimed_before_scan_and_released()
 
+    def test_a_second_run_from_the_same_session_defers_while_the_first_compiles(self):
+        # Every resident flycheck runs as one session, so berth only renews the first lease;
+        # the run lock is what keeps two checks from stacking.
+        first = subprocess.Popen([str(self.flycheck), 'rust', str(self.saved)], cwd=self.root,
+                                 env={**self.env, 'CARGO_SLEEP': '3'}, text=True,
+                                 stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+        self.addCleanup(first.kill)
+        deadline = time.monotonic() + 8
+        while not self.capture.exists() and time.monotonic() < deadline:
+            time.sleep(0.05)
+        self.assertTrue(self.capture.exists(), 'the first check never started cargo')
+        second_capture = self.root / 'cargo-second.json'
+        second = self.run_check(CARGO_CAPTURE=str(second_capture))
+        self.assertEqual(second.returncode, 0, second.stderr)
+        message = json.loads(second.stdout)['message']['message']
+        self.assertTrue(message.startswith('flycheck deferred: build slot held by another lsp flycheck'),
+                        message)
+        self.assertFalse(second_capture.exists(), 'the second check ran cargo alongside the first')
+        _, stderr = first.communicate(timeout=10)
+        self.assertEqual(first.returncode, 0, stderr)
+        self.assertEqual(self.holders(), [])
+
     def test_claim_precedes_contention_scan_and_own_lease_does_not_defer(self):
         self.observe_contention()
         result = self.run_check()
