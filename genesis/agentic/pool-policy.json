@@ -107,10 +107,38 @@
       "RUST_TEST_THREADS": "1"
     }
   },
+  "lsp": {
+    "idle_ttl_s": 900,
+    "attribution_window_ms": 30000,
+    "servers": {
+      "rust": {
+        "command": ["rust-analyzer"],
+        "env": { "RUSTUP_TOOLCHAIN": "1.96.1", "CARGO_BUILD_JOBS": "1" },
+        "env_wasm_roots": { "RUSTUP_TOOLCHAIN": null },
+        "target_slot": "lsp",
+        "initialization_options": {
+          "cargo": {
+            "targetDir": false,
+            "buildScripts": {
+              "overrideCommand": ["genesis/agentic/bin/lsp-flycheck", "rust", "--build-scripts"]
+            }
+          },
+          "check": {
+            "workspace": false,
+            "overrideCommand": ["genesis/agentic/bin/lsp-flycheck", "rust", "$saved_file"]
+          },
+          "checkOnSave": true,
+          "cachePriming": { "enable": false },
+          "procMacro": { "enable": true }
+        }
+      }
+    }
+  },
   "berth": {
     "_comment": "Carrying capacity of THIS workspace as one tevah berth (genesis/agentic/bin/berth). Sessions moor (who: session, model, lab, runtime, principal; what: task, write_set), claim/release leases on the named resources, and leave deliberation notes on the record. Records are Ephemeral (C) locally and shaped for their protocol homes: mooring → delegates-compute Mishpat::Commitment, lease → REA `use` commitment, note → witnessed interaction, shed → tevah §5.3 breach event. capacity 1 = one holder at a time; a second claimant is REFUSED (exit 3) with the holder named, never queued. A resource entry is a capacity (container-scoped: this workspace's own, never consulting peers) or {capacity, scope: container|steward}. Steward-scoped resources are shared by every device of one person (spec 2026-10-23-workspaces-cooperate-as-devices-design.md §3.4): a claim on one asks `epr peer leases --json` and is effective only once every other admitted device has acknowledged it; `held by …` and `unconfirmed: …` exit 3, and --offline-ok overrides only `unconfirmed`, writing a `kind: override` row. A key ending in `:` names a prefix: `lane:` covers every `lane:<id>`.",
     "resources": {
       "mesh": 1,
+      "toolchain:lsp": 1,
       "cargo": 2,
       "disk-heavy": 1,
       "dev-integration": { "capacity": 1, "scope": "steward" },
@@ -128,7 +156,14 @@
       }
     },
     "classes": {
-      "_comment": "Lease classes per resource — the mesh lease is the dev berth's router (plan R4/R11). verify = a bounded lane (`just test mesh`), refused past max_ttl_s: a longer hold is a measure and must say so. measure = window/A-B/soak/proof runs, never on the dev berth: refused exit 3 naming the alternative; MEASURE_ON_DEV_BERTH=1 with --ttl is the declared override (ledger `kind: override` + dev-berth-held-by-measure@1 = ttl at once). mesh = the DAEMON lease, the household being up (`just mesh start`): it takes no ttl and is never taken over by expiry, only when its holder's mooring is dead; a test lane (`just test mesh`) claims only verify|measure and is fenced by its own deadline (timeout at its ttl), so an expired lane lease implies a dead lane. A holder's lane under its own daemon lease is covered; any other class change on a held lease is refused (release, then claim). A resource with no table (cargo, disk-heavy) takes any class and gets no default ttl.",
+      "_comment": "Lease classes per resource — the mesh lease is the dev berth's router (plan R4/R11). verify = a bounded lane (`just test mesh`), refused past max_ttl_s: a longer hold is a measure and must say so. measure = window/A-B/soak/proof runs, never on the dev berth: refused exit 3 naming the alternative; MEASURE_ON_DEV_BERTH=1 with --ttl is the declared override (ledger `kind: override` + dev-berth-held-by-measure@1 = ttl at once). mesh = the DAEMON lease, the household being up (`just mesh start`): it takes no ttl and is never taken over by expiry, only when its holder's mooring is dead; a test lane (`just test mesh`) claims only verify|measure and is fenced by its own deadline (timeout at its ttl), so an expired lane lease implies a dead lane. A holder's lane under its own daemon lease is covered; any other class change on a held lease is refused (release, then claim). The cargo verify row is empty so classless cargo claims retain their existing unbounded/default-free TTL behavior; lsp alone is bounded. A resource with no table (disk-heavy) takes any class and gets no default ttl.",
+      "cargo": {
+        "verify": {},
+        "lsp": { "default_ttl_s": 600, "max_ttl_s": 900 }
+      },
+      "toolchain:lsp": {
+        "lsp": { "daemon": true }
+      },
       "mesh": {
         "verify": { "default_ttl_s": 1800, "max_ttl_s": 3600 },
         "measure": { "allowed": false, "alternative": "just measure <scope>" },
