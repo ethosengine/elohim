@@ -176,11 +176,13 @@ impl Brit {
     }
 
     fn call(&self, args: &[&str]) -> CovResult<Value> {
+        // brit runs git itself, so it gets the device's declared trust as config variables.
         let output = Command::new(&self.bin)
             .arg("--repo")
             .arg(&self.repo)
             .arg("covenant")
             .args(args)
+            .envs(git::trust_env(&self.repo))
             .output()
             .map_err(|e| format!("cannot run {}: {e}", self.bin.display()))?;
         if !output.status.success() {

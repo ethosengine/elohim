@@ -239,15 +239,55 @@ fn classify(x: char, y: char) -> ChangeKind {
 /// A nested repository has its own boundary; trusting a parent never trusts its submodules.
 pub fn command(cwd: &Path) -> std::process::Command {
     let mut command = native_command(cwd);
-    if let Some(root) = checkout(cwd) {
-        if trust_file()
-            .ok()
-            .is_some_and(|file| declared_at(&root, &file))
-        {
-            command.args(["-c", &format!("safe.directory={}", root.display())]);
-        }
-    }
+    command.args(trust_args(cwd));
     command
+}
+
+/// The checkout holding `cwd`, when this device declared it trusted.
+fn declared_root(cwd: &Path) -> Option<PathBuf> {
+    let root = checkout(cwd)?;
+    trust_file()
+        .ok()
+        .is_some_and(|file| declared_at(&root, &file))
+        .then_some(root)
+}
+
+/// The arguments `command` adds, for a git spawned through another runner.
+pub(crate) fn trust_args(cwd: &Path) -> Vec<String> {
+    declared_root(cwd)
+        .map(|root| {
+            vec![
+                "-c".to_owned(),
+                format!("safe.directory={}", root.display()),
+            ]
+        })
+        .unwrap_or_default()
+}
+
+/// The same trust as `GIT_CONFIG_*` variables, for a child that runs git itself (brit).
+pub(crate) fn trust_env(cwd: &Path) -> Vec<(String, String)> {
+    let existing = std::env::var("GIT_CONFIG_COUNT").ok();
+    declared_root(cwd)
+        .map(|root| config_env(existing.as_deref(), &root))
+        .unwrap_or_default()
+}
+
+/// Append one `safe.directory` entry after any the caller already passes.
+fn config_env(existing: Option<&str>, root: &Path) -> Vec<(String, String)> {
+    let index = existing
+        .and_then(|count| count.trim().parse::<usize>().ok())
+        .unwrap_or(0);
+    vec![
+        (
+            format!("GIT_CONFIG_KEY_{index}"),
+            "safe.directory".to_owned(),
+        ),
+        (
+            format!("GIT_CONFIG_VALUE_{index}"),
+            root.display().to_string(),
+        ),
+        ("GIT_CONFIG_COUNT".to_owned(), (index + 1).to_string()),
+    ]
 }
 
 fn native_command(cwd: &Path) -> std::process::Command {
@@ -380,6 +420,24 @@ mod tests {
         assert_eq!(classify(' ', 'D'), ChangeKind::Deleted);
         assert_eq!(classify('R', ' '), ChangeKind::Renamed);
         assert_eq!(classify('M', 'M'), ChangeKind::Modified);
+    }
+
+    #[test]
+    fn trust_env_appends_after_the_callers_config_entries() {
+        let root = Path::new("/projects/elohim");
+        let fresh = config_env(None, root);
+        assert_eq!(
+            fresh[0],
+            ("GIT_CONFIG_KEY_0".into(), "safe.directory".into())
+        );
+        assert_eq!(
+            fresh[1],
+            ("GIT_CONFIG_VALUE_0".into(), "/projects/elohim".into())
+        );
+        assert_eq!(fresh[2], ("GIT_CONFIG_COUNT".into(), "1".into()));
+        let after_two = config_env(Some("2"), root);
+        assert_eq!(after_two[0].0, "GIT_CONFIG_KEY_2");
+        assert_eq!(after_two[2], ("GIT_CONFIG_COUNT".into(), "3".into()));
     }
 
     #[test]
