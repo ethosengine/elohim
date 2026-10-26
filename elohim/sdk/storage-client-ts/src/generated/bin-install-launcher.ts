@@ -23,5 +23,11 @@ export interface BinInstallLauncher {
   persistentAdopted: {
     [k: string]: string;
   };
+  /**
+   * Plain files at a launcher name that could not identify themselves, keyed by their path; each value is where their bytes are kept in the store. The launcher link replaced them.
+   */
+  retired: {
+    [k: string]: string;
+  };
   shadows: BinShadows;
 }

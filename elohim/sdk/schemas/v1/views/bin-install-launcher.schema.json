@@ -10,6 +10,7 @@
     "head",
     "adopted",
     "persistentAdopted",
+    "retired",
     "shadows"
   ],
   "properties": {
@@ -28,6 +29,13 @@
     },
     "persistentAdopted": {
       "type": "object",
+      "additionalProperties": {
+        "type": "string"
+      }
+    },
+    "retired": {
+      "type": "object",
+      "description": "Plain files at a launcher name that could not identify themselves, keyed by their path; each value is where their bytes are kept in the store. The launcher link replaced them.",
       "additionalProperties": {
         "type": "string"
       }
