@@ -170,3 +170,16 @@ How it composes with what exists. This is a mapping, not a design; the P2P desig
 Immediate step, separate from the design: recover the household's missing bundle from a running
 conductor (its stored wasm and its DNA definitions), check that the DNA hashes match, then cast adam
 to finish slice M's serving receipt.
+
+**The channel is an EPR, and it governs stories (operator, 2026-10-26).**
+
+> "and these channels.. are they eprs? because they become the governing artifacts for the
+> "stories" of features that are being goverened by those releases."
+
+They are. The spec makes a channel a content identity under the existing `Content` entry type, with
+releases as its versions and a declared canonical head. The operator adds that a release manifest
+cites the stories, the a2o features and their `@concern` tags, whose behaviour it governs. Attesting a
+candidate head then means those stories passing on that exact head, and reach is earned by story
+evidence. Slice M's serving receipt is the hand-run form: pre-push refuses the slice until its two
+dataplane stories pass on its exact source. Open question for the design gate: whether the release
+cites stories, the stories cite the release, or a habit's `checks:` joins them.
