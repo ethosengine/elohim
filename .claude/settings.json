@@ -306,6 +306,11 @@
             "type": "command",
             "command": "python3 \"$CLAUDE_PROJECT_DIR/.claude/hooks/jenkinsfile-method-size.py\"",
             "timeout": 3
+          },
+          {
+            "type": "command",
+            "command": "python3 \"$CLAUDE_PROJECT_DIR/.claude/hooks/lsp-edit-event.py\"",
+            "timeout": 2
           }
         ]
       },
@@ -331,6 +336,16 @@
             "type": "command",
             "command": "python3 \"$CLAUDE_PROJECT_DIR/.claude/hooks/ram-guard.py\" --event posttool",
             "timeout": 5
+          }
+        ]
+      },
+      {
+        "matcher": "MultiEdit|NotebookEdit",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python3 \"$CLAUDE_PROJECT_DIR/.claude/hooks/lsp-edit-event.py\"",
+            "timeout": 2
           }
         ]
       }
@@ -419,8 +434,15 @@
       "Bash(rm -*r* /)"
     ]
   },
+  "extraKnownMarketplaces": {
+    "elohim-workspace": {
+      "source": { "source": "directory", "path": "./.claude/marketplace" }
+    }
+  },
   "enabledPlugins": {
     "frontend-design@claude-plugins-official": true,
-    "typescript-lsp@claude-plugins-official": false
+    "typescript-lsp@claude-plugins-official": false,
+    "rust-analyzer-lsp@claude-plugins-official": false,
+    "elohim-lsp@elohim-workspace": true
   }
 }
