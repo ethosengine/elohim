@@ -18,6 +18,7 @@ import { runAttested } from './gate-attest.mjs';
 import { affectedPackages, loadMetadata } from './cargo-affected.mjs';
 import { readSet } from './gate-input-audit.mjs';
 import { appendEvent } from './gate-live.mjs';
+import { prepareTask, readTaskStatus, taskAnswer, taskEnabled } from './gate-task.mjs';
 
 // GATE_ROOT lets a fixture repository drive the CLI (the a2o pin-attestation story).
 const ROOT = process.env.GATE_ROOT
@@ -412,7 +413,29 @@ export function runProject(project, printOnly, namesOnly, { root = ROOT, env = p
   }
   write(`[gate] ${project.name} evidence: ${evidence.line}\n`);
   const enabled = loadPoolPolicy(root).gate_reuse?.projects;
-  const decision = reusableHit(evidence, {
+  // A Task (gate-task.mjs) carries the same reuse rules into ark's derivation look-up, which
+  // reads brit itself; the gate then runs through ark only on a miss.
+  let task = null;
+  if (taskEnabled(project, env)) {
+    const selfId = selfAgentId(root, spawn);
+    task = prepareTask(project, {
+      root, env, childEnv, args, evidence, spawn, device: selfId,
+      reuse: {
+        mode: env.GATE_EVIDENCE || null,
+        enabled: Array.isArray(enabled) && enabled.includes(project.name),
+        selfId: env.GATE_EVIDENCE === 'reuse' ? selfId : null,
+        dirty: evidence.dirty ?? null,
+        commit: gateCommit,
+      },
+    });
+    if (task.why) {
+      write(`gate-task: ark unavailable (${task.why}) — ran direct\n`);
+      task = null;
+    } else if (task.dropped.length > 0) {
+      write(`gate-task: not passed to the Task child (braces are ark template syntax): ${task.dropped.join(' ')}\n`);
+    }
+  }
+  const decision = task ? { reuse: false, why: 'decided by the Task' } : reusableHit(evidence, {
     mode: env.GATE_EVIDENCE,
     enabled: Array.isArray(enabled) && enabled.includes(project.name),
     selfId: env.GATE_EVIDENCE === 'reuse' ? selfAgentId(root, spawn) : null,
@@ -426,18 +449,42 @@ export function runProject(project, printOnly, namesOnly, { root = ROOT, env = p
     liveEvent(env, { kind: 'gate-verdict', project: project.name, verdict: { exit: 0, seconds: 0, reused: true } });
     return 0;
   }
-  if (env.GATE_EVIDENCE === 'reuse') write(`[gate] ${project.name} not reused: ${decision.why}\n`);
-  const { result, tapped } = gateSpawn(project, 'bash', [resolve(root, 'genesis/orchestrator/run-local-gate.sh'), ...args], {
+  if (env.GATE_EVIDENCE === 'reuse' && !task) write(`[gate] ${project.name} not reused: ${decision.why}\n`);
+  const direct = () => gateSpawn(project, 'bash', [resolve(root, 'genesis/orchestrator/run-local-gate.sh'), ...args], {
     cwd: root,
     stdio: 'inherit',
     env: childEnv,
   }, { spawn, env, tap });
+  let ran;
+  let answer = null;
+  if (task) {
+    ran = gateSpawn(project, task.bin, task.argv, { cwd: root, stdio: 'inherit', env: childEnv }, { spawn, env, tap });
+    answer = taskAnswer(readTaskStatus(task.status), ran.result.status);
+    if (answer.fallback) {
+      write(`gate-task: ${answer.fallback} — ran direct\n`);
+      task = null;
+      answer = null;
+      ran = direct();
+    }
+  } else {
+    ran = direct();
+  }
+  const { result, tapped } = ran;
+  const derivation = task ? { ...task.derivation, hit: answer.answered?.hit === true } : undefined;
+  if (answer?.answered?.hit) {
+    write(`[gate] ${project.name} reused: derivation hit (method ${derivation.method}, input ${derivation.input})\n`);
+    const seconds = Number(process.hrtime.bigint() - started) / 1e9;
+    recordCycle(project, seconds, 0, { ...cycleEnv, GATE_RUN_KIND: 'reused' }, cycleDeps);
+    liveEvent(env, { kind: 'gate-verdict', project: project.name, verdict: { exit: 0, seconds: 0, reused: true }, derivation, status: 'Answered' });
+    return 0;
+  }
   // The exit status is the verdict; what the tap recognized only classifies it.
   const status = result.status ?? 1;
   const seconds = Number(process.hrtime.bigint() - started) / 1e9;
   let evidenceCid = null;
   // The verdict is recorded against the closure — red too; a known-red closure is information.
-  if (evidence.key && evidence.buildRefBin) {
+  // An interrupted Task has no verdict, so nothing is recorded for it.
+  if (evidence.key && evidence.buildRefBin && !answer?.unanswered) {
     const put = recordEvidence(project, evidence.key, {
       success: status === 0,
       seconds,
@@ -465,7 +512,11 @@ export function runProject(project, printOnly, namesOnly, { root = ROOT, env = p
   liveEvent(env, { kind: 'gate-verdict', project: project.name, verdict: {
     exit: status, seconds: Math.round(seconds), failure_class: classifyFailure(status, signals) ?? null,
     failures: tapped?.failures ?? null, overflow: tapped?.overflow || undefined, evidence: evidenceCid || undefined,
-  } });
+  }, ...(task ? {
+    derivation,
+    status: answer.unanswered ? 'Unanswered' : 'Answered',
+    ...(answer.unanswered ? { unanswered: answer.unanswered } : {}),
+  } : {}) });
   return status;
 }
 

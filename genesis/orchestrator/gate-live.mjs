@@ -286,10 +286,15 @@ export function closeRun(path, outcome, {
         event.kind === 'gate-verdict' && event.verdict?.deferred === true).length;
     }
     if (deferred !== undefined && (!Number.isSafeInteger(deferred) || deferred < 0)) return null;
+    // An interrupted Task gave no verdict, so the run is interrupted whatever its loop concluded,
+    // and carries that Task's three-part answer.
+    const interrupted = events.find((event) => event.kind === 'gate-verdict'
+      && event.status === 'Unanswered' && event.verdict?.deferred !== true && event.unanswered);
     return appendEvent(path, {
       kind: 'run-close',
-      outcome,
+      outcome: interrupted ? 'interrupted' : outcome,
       ...(deferred === undefined ? {} : { deferred }),
+      ...(interrupted ? { unanswered: interrupted.unanswered } : {}),
     }, { now });
   } catch {
     return null;

@@ -205,11 +205,12 @@ function sortedObject(value) {
 }
 
 /**
- * The closure key: sha256 over the canonical JSON of everything the verdict is a function
- * of. It is an index key into brit's `inputs_hash` field, not a content address of its own.
+ * The closure material: the canonical JSON (sorted keys, no whitespace) of everything the
+ * verdict is a function of. A gate run as an ark Task names these exact bytes as its input
+ * (`ark task spec --material`), where they become an eprfs tree; CID math stays in Rust.
  */
-export function closureKey({ project, fingerprints, manifestBlob: blob, cargoEnv, nativeKey, recipeFile = null, runner = null, dirTree = null, cargoConfig = null, rustc = null, gitlinks = null, packages = [], reads = null }) {
-  const material = sortedObject({
+export function closureMaterial({ project, fingerprints, manifestBlob: blob, cargoEnv, nativeKey, recipeFile = null, runner = null, dirTree = null, cargoConfig = null, rustc = null, gitlinks = null, packages = [], reads = null }) {
+  return JSON.stringify(sortedObject({
     v: 3,
     ...(nativeKey ? { native: nativeKey } : {}),
     project: project.name,
@@ -225,8 +226,15 @@ export function closureKey({ project, fingerprints, manifestBlob: blob, cargoEnv
     gitlinks,
     packages,
     reads,
-  });
-  return createHash('sha256').update(JSON.stringify(material)).digest('hex');
+  }));
+}
+
+/**
+ * The closure key: sha256 over the closure material. It is an index key into brit's
+ * `inputs_hash` field, not a content address of its own.
+ */
+export function closureKey(closure) {
+  return createHash('sha256').update(closureMaterial(closure)).digest('hex');
 }
 
 /**
@@ -345,7 +353,7 @@ export function gateEvidence(project, { env = process.env, root, commit, cargoEn
     : { scope: 'tree', oid: tree };
   const scope = reads.scope === 'paths' ? `paths (${read.paths.length} reads)`
     : `tree (${read ? 'unresolved' : 'unknown'} reads)`;
-  const key = closureKey({
+  const material = closureMaterial({
     project, fingerprints: fp.fingerprints, manifestBlob: blob, cargoEnv, nativeKey,
     recipeFile: recipe.blob, runner, dirTree,
     cargoConfig: manifestBlob(root, commit, '.cargo/config.toml', spawn),
@@ -354,8 +362,9 @@ export function gateEvidence(project, { env = process.env, root, commit, cargoEn
     packages: (env.GATE_CARGO_PACKAGES || '').trim().split(/\s+/).filter(Boolean).sort(),
     reads,
   });
+  const key = createHash('sha256').update(material).digest('hex');
   const found = findEvidence(project, key, { buildRefBin, root, spawn });
-  if (found.error) return { key, line: `unavailable (${found.error}); closure scope ${scope}` };
+  if (found.error) return { key, material, line: `unavailable (${found.error}); closure scope ${scope}` };
   const dirty = dirtyPaths(project, { root, spawn, sources, recipePath: recipe.path, reads });
   let line = `${describeEvidence(found.rows, now)}; closure scope ${scope}`;
   if (dirty === null) line += '; working tree state unknown, nothing will be recorded';
@@ -364,6 +373,7 @@ export function gateEvidence(project, { env = process.env, root, commit, cargoEn
   if (checkoutMismatch) line += '; pushed commit is not checked out, nothing will be recorded';
   return {
     key,
+    material,
     rows: found.rows,
     line,
     buildRefBin,
