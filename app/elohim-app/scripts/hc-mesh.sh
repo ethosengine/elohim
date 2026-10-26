@@ -65,6 +65,11 @@
 #                   storage, and doorway-account state before a fresh start.
 #                   Without it, complete stopped state resumes in place and
 #                   partial state refuses rather than silently re-keying.
+#   MESH_ALLOW_BUNDLE_SKEW
+#                   1 permits a resumed household to start with a bundle whose
+#                   modifier-aware per-role DNA hashes differ from
+#                   $MESH_DIR/installed-cells.json. Loud, deliberate DHT-skew
+#                   override only; default 0 refuses before launch.
 #   MESH_TRANSPORT_BACKEND
 #                   elohim-storage Track-2 backend: libp2p (default), dual, or
 #                   iroh. This does NOT change the conductor's Holochain 0.7
@@ -382,6 +387,8 @@ HAPP_PATH="${MESH_HAPP_PATH:-$HAPP_WORKDIR/elohim.happ}"
 # choice (see happ_bundle_freshness): never repacked, never refused for staleness.
 HAPP_PATH_EXPLICIT=0
 [ -n "${MESH_HAPP_PATH:-}" ] && HAPP_PATH_EXPLICIT=1
+INSTALLED_CELLS_FILE="$MESH_DIR/installed-cells.json"
+BUNDLE_IDENTITY_CACHE_DIR="$MESH_DIR/bundle-identity-cache"
 # The node-local compute capability shared by a storage peer and the doorway whose
 # pool it backs. Storage refuses /api/v1/compute/* unless ELOHIM_COMPUTE_LOCAL_API=1
 # AND the bearer matches ELOHIM_COMPUTE_LOCAL_TOKEN (compute_tasks.rs local_token_
@@ -1419,7 +1426,7 @@ reset_household_state() {
   done
   rm -rf "$LOCAL_DEV_DIR/.hc" "$LOCAL_DEV_DIR/.sandbox_log" "$LOCAL_DEV_DIR/.sandbox_run_log"
   rm -rf "$MONGO_DIR" "$MESH_DIR/membership" "$MESH_DIR/state" "$MESH_DIR/storage-restart"
-  rm -f "$ARCHIVE_MODE_FILE"
+  rm -f "$ARCHIVE_MODE_FILE" "$INSTALLED_CELLS_FILE"
   # The doorways are not in $PEERS, so their node identities are removed by name:
   # a recast household must not keep the signing keys of the one it replaces.
   rm -f "$MESH_DIR/doorway-a-node.key" "$MESH_DIR/doorway-b-node.key" "$MESH_DIR/doorway-c-node.key"
@@ -2240,6 +2247,185 @@ happ_bundle_freshness() { # <mode>
   echo "hApp bundle: $HAPP_PATH$([ -n "$happ_mtime" ] && printf ', built %s' "$(_happ_fmt_ts "$happ_mtime")")${repacked_note}"
 
   [ "$any_refused" = "0" ]
+}
+
+# DNA hashes in a packed hApp are not the hashes its roles install when the
+# hApp manifest supplies modifiers. `hc dna hash <bundled.dna>` misses that
+# distinction. Reproduce the install input instead: unpack the hApp and each
+# DNA, apply the role's non-null network_seed/properties to dna.yaml, repack,
+# then ask the matching hc CLI for the hash. Results are content-addressed by
+# the hApp SHA256 so repeated preflights do not pay the unpack/repack cost.
+dna_hash_map_valid() { # <json>
+  jq -e '
+    type == "object" and length > 0 and
+    all(to_entries[];
+      (.key | type) == "string" and (.key | length) > 0 and
+      (.value | type) == "string" and (.value | test("^uhC0k[A-Za-z0-9_-]+$")))
+  ' >/dev/null 2>&1 <<<"$1"
+}
+
+bundle_dna_hashes() ( # <happ-path> -> canonical {role:dnaHash} JSON
+  local bundle="${1:-$HAPP_PATH}" digest cache scratch app_dir index_file
+  [ -f "$bundle" ] || { echo "bundle is absent: $bundle" >&2; return 1; }
+  digest="$(sha256sum "$bundle" 2>/dev/null | awk '{print $1}')"
+  [[ "$digest" =~ ^[a-f0-9]{64}$ ]] || { echo "cannot hash bundle: $bundle" >&2; return 1; }
+  mkdir -p "$BUNDLE_IDENTITY_CACHE_DIR" || return 1
+  cache="$BUNDLE_IDENTITY_CACHE_DIR/$digest.json"
+  if [ -f "$cache" ]; then
+    local cached
+    cached="$(jq -cS . "$cache" 2>/dev/null)"
+    if dna_hash_map_valid "$cached"; then printf '%s\n' "$cached"; return 0; fi
+  fi
+
+  scratch="$(mktemp -d "${TMPDIR:-/tmp}/hc-mesh-bundle-identity.XXXXXX")" || return 1
+  trap 'rm -rf "$scratch"' EXIT
+  app_dir="$scratch/app"
+  hc app unpack -o "$app_dir" "$bundle" >/dev/null || return 1
+  index_file="$scratch/roles.tsv"
+  python3 - "$app_dir/happ.yaml" "$scratch" > "$index_file" <<'PYROLES' || return 1
+import json, pathlib, re, sys, yaml
+
+manifest_path = pathlib.Path(sys.argv[1])
+scratch = pathlib.Path(sys.argv[2])
+root = manifest_path.parent.resolve()
+manifest = yaml.safe_load(manifest_path.read_text())
+roles = manifest.get("roles") if isinstance(manifest, dict) else None
+assert isinstance(roles, list) and roles, "hApp manifest has no roles"
+seen = set()
+for index, role in enumerate(roles):
+    assert isinstance(role, dict), "invalid hApp role"
+    name = role.get("name")
+    dna = role.get("dna")
+    assert isinstance(name, str) and re.fullmatch(r"[A-Za-z0-9_-]+", name), "invalid role name"
+    assert name not in seen, "duplicate role name"
+    seen.add(name)
+    assert isinstance(dna, dict) and isinstance(dna.get("path"), str), f"{name} has no bundled DNA"
+    assert "\t" not in dna["path"] and "\n" not in dna["path"], f"{name} DNA path is invalid"
+    relative = pathlib.PurePosixPath(dna["path"])
+    assert not relative.is_absolute() and ".." not in relative.parts, f"{name} DNA path escapes bundle"
+    dna_path = (root / relative).resolve()
+    assert dna_path.is_relative_to(root) and dna_path.is_file(), f"{name} bundled DNA is absent"
+    modifiers = dna.get("modifiers") or {}
+    assert isinstance(modifiers, dict), f"{name} modifiers are invalid"
+    modifier_path = scratch / f"modifiers-{index}.json"
+    modifier_path.write_text(json.dumps(modifiers, sort_keys=True, separators=(",", ":")) + "\n")
+    print(index, name, dna_path, modifier_path, sep="\t")
+PYROLES
+
+  local role_index role dna_path modifier_path dna_dir packed hash hashes="$scratch/hashes.tsv"
+  while IFS=$'\t' read -r role_index role dna_path modifier_path; do
+    [ -n "$role" ] || continue
+    dna_dir="$scratch/dna-$role_index"
+    packed="$scratch/repacked-$role_index.dna"
+    hc dna unpack -o "$dna_dir" "$dna_path" >/dev/null || return 1
+    python3 - "$dna_dir/dna.yaml" "$modifier_path" <<'PYMODIFIERS' || return 1
+import json, pathlib, sys, yaml
+
+manifest_path = pathlib.Path(sys.argv[1])
+manifest = yaml.safe_load(manifest_path.read_text())
+modifiers = json.loads(pathlib.Path(sys.argv[2]).read_text())
+assert isinstance(manifest, dict) and isinstance(manifest.get("integrity"), dict), "invalid DNA manifest"
+for key in ("network_seed", "properties"):
+    if modifiers.get(key) is not None:
+        manifest["integrity"][key] = modifiers[key]
+manifest_path.write_text(yaml.safe_dump(manifest, sort_keys=False))
+PYMODIFIERS
+    hc dna pack -o "$packed" "$dna_dir" >/dev/null || return 1
+    hash="$(hc dna hash "$packed" 2>/dev/null)" || return 1
+    [[ "$hash" =~ ^uhC0k[A-Za-z0-9_-]+$ ]] || { echo "invalid DNA hash for role $role: ${hash:-<empty>}" >&2; return 1; }
+    printf '%s\t%s\n' "$role" "$hash" >> "$hashes"
+  done < "$index_file"
+
+  local result
+  result="$(python3 - "$hashes" <<'PYHASHES'
+import json, pathlib, sys
+
+result = {}
+for line in pathlib.Path(sys.argv[1]).read_text().splitlines():
+    role, dna_hash = line.split("\t", 1)
+    assert role not in result, "duplicate role hash"
+    result[role] = dna_hash
+assert result, "no role hashes"
+print(json.dumps(result, sort_keys=True, separators=(",", ":")))
+PYHASHES
+)" || return 1
+  dna_hash_map_valid "$result" || return 1
+  local cache_tmp
+  cache_tmp="$(mktemp "$BUNDLE_IDENTITY_CACHE_DIR/.${digest}.XXXXXX")" || return 1
+  printf '%s\n' "$result" > "$cache_tmp" && mv "$cache_tmp" "$cache" || return 1
+  printf '%s\n' "$result"
+)
+
+# Compare only roles the running storage peer records. The hApp may contain
+# additional roles that storage does not supervise, while every recorded role
+# must be reproduced exactly by the candidate bundle.
+happ_bundle_identity() { # <start-mode>
+  local start_mode="$1"
+  if [ "$start_mode" = reset ]; then
+    echo "ok hApp bundle identity: deliberate recast (MESH_RESET=1; readiness will record running cells)"
+    return 0
+  fi
+  if [ ! -f "$INSTALLED_CELLS_FILE" ]; then
+    echo "ok hApp bundle identity: unrecorded ($INSTALLED_CELLS_FILE; readiness will record running cells)"
+    return 0
+  fi
+  local installed candidate mismatches detail="" role old new
+  installed="$(jq -cS . "$INSTALLED_CELLS_FILE" 2>/dev/null)"
+  if ! dna_hash_map_valid "$installed"; then
+    echo "REFUSED hApp bundle identity: installed record is invalid: $INSTALLED_CELLS_FILE" >&2
+    return 1
+  fi
+  candidate="$(bundle_dna_hashes "$HAPP_PATH")" || {
+    echo "REFUSED hApp bundle identity: could not derive role hashes from $HAPP_PATH" >&2
+    return 1
+  }
+  mismatches="$(jq -nr --argjson installed "$installed" --argjson candidate "$candidate" '
+    $installed | to_entries[] |
+    select($candidate[.key] != .value) |
+    [.key, .value[0:18], (($candidate[.key] // "<missing>")[0:18])] | @tsv
+  ')"
+  if [ -z "$mismatches" ]; then
+    echo "ok hApp bundle identity: $HAPP_PATH reproduces $INSTALLED_CELLS_FILE"
+    return 0
+  fi
+  while IFS=$'\t' read -r role old new; do
+    detail+="${detail:+; }$role installed=${old}... bundle=${new}..."
+  done <<< "$mismatches"
+  if [ "${MESH_ALLOW_BUNDLE_SKEW:-0}" = "1" ]; then
+    echo "WARN hApp bundle identity: $detail — MESH_ALLOW_BUNDLE_SKEW=1, proceeding with deliberate DHT skew"
+    return 0
+  fi
+  echo "REFUSED hApp bundle identity: $detail — point MESH_HAPP_PATH at a bundle that reproduces the installed cells, or set MESH_RESET=1 to recast deliberately (MESH_ALLOW_BUNDLE_SKEW=1 overrides deliberate skew)" >&2
+  return 1
+}
+
+record_installed_cells() {
+  local health live existing tmp
+  health="$(curl -fsS -m 5 "http://localhost:$(http_port 0)/health" 2>/dev/null)" || {
+    echo "REFUSED installed cells: ${PEERS[0]} /health is unavailable" >&2; return 1;
+  }
+  live="$(jq -cS '.dhtParticipation.dnaHashes' <<<"$health" 2>/dev/null)"
+  if ! dna_hash_map_valid "$live"; then
+    echo "REFUSED installed cells: ${PEERS[0]} /health has no valid .dhtParticipation.dnaHashes" >&2
+    return 1
+  fi
+  if [ -f "$INSTALLED_CELLS_FILE" ]; then
+    existing="$(jq -cS . "$INSTALLED_CELLS_FILE" 2>/dev/null)"
+    if [ "$existing" = "$live" ]; then
+      echo "installed cells: unchanged ($INSTALLED_CELLS_FILE)"
+      return 0
+    fi
+    echo "REFUSED installed cells: running hashes $live differ from recorded hashes ${existing:-<invalid>} — never overwriting $INSTALLED_CELLS_FILE without MESH_RESET=1" >&2
+    return 1
+  fi
+  mkdir -p "$MESH_DIR" || return 1
+  tmp="$(mktemp "$MESH_DIR/.installed-cells.json.XXXXXX")" || return 1
+  if printf '%s\n' "$live" > "$tmp" && mv "$tmp" "$INSTALLED_CELLS_FILE"; then
+    echo "installed cells: recorded $live ($INSTALLED_CELLS_FILE)"
+    return 0
+  fi
+  rm -f "$tmp"
+  return 1
 }
 
 assert_storage_transport_capability() { # <binary> <mode>
@@ -4573,6 +4759,7 @@ join_peer() { # <fresh-peer-name>
     echo "join-peer: hApp bundle is absent: $HAPP_PATH" >&2
     return 1
   }
+  happ_bundle_identity resume || return 1
   mkdir -p "$MESH_DIR" "$LOGDIR" "$PID_DIR"
 
   local netargs generate_log="$LOGDIR/$name.generate.log"
@@ -4880,7 +5067,13 @@ preflight() {
   #     Pure inspection here (mode=report) — never repacks; `start` does that.
   happ_bundle_freshness report || fail=1
 
-  # 5d. relay-addr-beacon binary, only when this shape stages the household's
+  # 5d. A resumed household's persisted cells are the authority. Reproduce
+  #     their role hashes from the bundle's integrity bytes PLUS happ.yaml
+  #     modifiers before anything launches. An unrecorded pre-fix household is
+  #     admitted once; the successful readiness boundary records it.
+  happ_bundle_identity "$start_mode" || fail=1
+
+  # 5e. relay-addr-beacon binary, only when this shape stages the household's
   #     public-name membership authority. A missing binary is REFUSED, not
   #     warned: without it the apex-transition feature has no routing apparatus
   #     to exercise and the lane reads as a doorway defect instead of an
@@ -5211,6 +5404,10 @@ EOF
   # FINDING-election-ordering-503.md). apply mode also prints the bundle
   # actually being installed, its mtime, and whether it was repacked this run.
   happ_bundle_freshness apply || exit 1
+  # Re-check after apply: the default path may just have been repacked. This is
+  # the foreground-start guard too (`MESH_FOREGROUND=1` deliberately skips the
+  # outer preflight), and it still runs before relay/doorway/conductor launch.
+  happ_bundle_identity "$start_mode" || exit 1
 
   if [ "$MESH_DOORWAYS_EFFECTIVE" = "1" ]; then
   # 0. mongod — the doorways' projection archive. Must be listening BEFORE a
@@ -5673,6 +5870,12 @@ EOF
       done
       [ "$ok" -ge ${#PEERS[@]} ] && break; sleep 2
     done
+  fi
+  # Foreground starts do not require a separate `mesh wait`; detached starts
+  # execute this same function. Persist identity once storage reaches the
+  # start path's readiness boundary in either mode.
+  if [[ "$start_mode" = continue-*initialization ]] || [ "${ok:-0}" -ge "${#PEERS[@]}" ]; then
+    record_installed_cells || return 1
   fi
   refresh_mesh_pidfiles
   reconcile_doorway_pool_performer
