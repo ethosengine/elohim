@@ -32,12 +32,14 @@ fn declaration_grammar_and_supersession_preserve_neighbours() {
             ManifestAct::Run {
                 tool: "epr".into(),
                 stop: false,
+                launch: RunLaunch::default(),
             },
         )
         .unwrap(),
         ManifestAct::Run {
             tool: "epr".into(),
             stop: true,
+            launch: RunLaunch::default(),
         },
     )
     .unwrap();
@@ -109,4 +111,126 @@ fn release_pin_requires_the_content_identity_even_when_the_head_exists() {
         require_release_pin(&manifest, "runtime:app-bundle:alpha:dev", Some("different")).is_err()
     );
     assert!(require_release_pin(&manifest, "runtime:app-bundle:alpha:dev", Some(&pin)).is_ok());
+}
+
+/// The chain stores manifests, not acts, so an act gains fields without a wire change. What
+/// must hold is that an act carrying no launch detail declares exactly the child it always
+/// did. The expected child is written out by hand here, independent of `RunLaunch::child`.
+#[test]
+fn a_run_act_without_launch_detail_keeps_its_historical_manifest_cid() {
+    let base = base();
+    let mut historical: serde_json::Value =
+        serde_json::to_value(&base).expect("base manifest encodes");
+    historical["supersedes"] = serde_json::Value::String(base.cid().unwrap());
+    historical["processes"] = serde_json::json!([{
+        "name": "epr",
+        "artifact": {"channel": {"channel_id": "bin:epr"}},
+        "argv": ["{artifact}"]
+    }]);
+    let historical = RuntimeManifest::from_json(&historical.to_string()).unwrap();
+    let next = supersede(
+        &base,
+        ManifestAct::Run {
+            tool: "epr".into(),
+            stop: false,
+            launch: RunLaunch::default(),
+        },
+    )
+    .unwrap();
+    assert_eq!(next, historical);
+    assert_eq!(next.cid().unwrap(), historical.cid().unwrap());
+    assert_eq!(
+        next.cid().unwrap(),
+        "bafyreib6r42fyl4pbsbfkedlwow4mq6vmypniasd5lstjx6ldqmi27z5bm",
+        "the hand-written historical child's CID, pinned when RunLaunch landed; a change here moves every chain that ran a tool"
+    );
+}
+
+#[test]
+fn run_launch_appends_args_and_declares_the_readiness_ladder_and_restart() {
+    use ark_core::manifest::{Probe, Restart};
+    let next = supersede(
+        &base(),
+        ManifestAct::Run {
+            tool: "epr".into(),
+            stop: false,
+            launch: RunLaunch {
+                args: vec!["lsp".into(), "serve".into(), "--device".into()],
+                ready_line: Some("lsp ready".into()),
+                restart: Some(Restart::Transient),
+            },
+        },
+    )
+    .unwrap();
+    let child = &next.processes[0];
+    assert_eq!(child.argv, ["{artifact}", "lsp", "serve", "--device"]);
+    assert_eq!(
+        child.readiness,
+        [
+            Probe::StdoutLine {
+                contains: "lsp ready".into(),
+                patience_ms: READY_LINE_PATIENCE_MS
+            },
+            Probe::ExecutableIdentity {
+                patience_ms: IDENTITY_PATIENCE_MS
+            }
+        ]
+    );
+    assert_eq!(child.policy.restart, Restart::Transient);
+    // A second run act replaces the child rather than adding a sibling.
+    let again = supersede(
+        &next,
+        ManifestAct::Run {
+            tool: "epr".into(),
+            stop: false,
+            launch: RunLaunch::default(),
+        },
+    )
+    .unwrap();
+    assert_eq!(again.processes.len(), 1);
+    assert_eq!(again.processes[0].argv, ["{artifact}"]);
+    assert_ne!(again.cid().unwrap(), next.cid().unwrap());
+}
+
+#[test]
+fn run_launch_refuses_what_it_cannot_honour() {
+    let act = |stop, launch| {
+        supersede(
+            &base(),
+            ManifestAct::Run {
+                tool: "epr".into(),
+                stop,
+                launch,
+            },
+        )
+    };
+    assert!(act(
+        true,
+        RunLaunch {
+            args: vec!["serve".into()],
+            ..RunLaunch::default()
+        }
+    )
+    .is_err());
+    assert!(act(
+        false,
+        RunLaunch {
+            ready_line: Some(String::new()),
+            ..RunLaunch::default()
+        }
+    )
+    .is_err());
+    assert!(act(
+        false,
+        RunLaunch {
+            args: vec!["a\0b".into()],
+            ..RunLaunch::default()
+        }
+    )
+    .is_err());
+    assert_eq!(
+        parse_restart("Transient"),
+        Ok(ark_core::manifest::Restart::Transient)
+    );
+    assert!(parse_restart("sometimes").is_err());
 }

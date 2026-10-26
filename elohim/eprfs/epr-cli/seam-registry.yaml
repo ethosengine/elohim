@@ -1748,3 +1748,70 @@ decisionPoints:
       testName: explicit_root_retains_its_base_and_refused_options_never_mutate
       kind: integration
       mirrorRisk: false
+  # Added 2026-10-26 (plan "native device floor", section 2): ark runs the device manifest.
+  # Every record is device-local. The berth, start record and ark's passport and witnesses
+  # under <main checkout>/.eprfs/status/ark/device are Ephemeral (C) projections of the Private
+  # (B) manifest chain: no DHT head, no route, no peer fact.
+  - name: device::supervise::supervise
+    kind: state-transition
+    sourceLocation:
+      file: src/device/supervise.rs
+      modulePath: elohim_epr_cli::device::supervise
+    summary: One ark per data root runs the head; the same head starts nothing, a moved head stops ark
+      gracefully and restarts it under the new CID with the incarnation carried.
+    concernIds:
+      - id: C0
+        status: answered
+        justification: Ephemeral (C) local supervision of a Private (B) declaration; no network head or route.
+      - id: C2
+        status: answered
+        justification: The start record binds pid to its kernel start tick and a /proc scan refuses a second
+          ark on the same berth, so a recycled pid or a foreign ark is never adopted.
+      - id: C3
+        status: answered
+        justification: Offline and alone the device supervises; with no berth or no session it proceeds unleased.
+      - id: C6a
+        status: partial
+        justification: Stop waits the longest declared grace plus 10 s and then refuses instead of escalating;
+          the lease is a daemon lease whose liveness is the holder's mooring, not a ttl.
+      - id: C6b
+        status: answered
+        justification: Re-running supervise at an unchanged head is a no-op; the incarnation is carried and an
+          unreadable passport refuses rather than resetting it.
+      - id: C7
+        status: answered
+        justification: Ark reports EffectiveTier None; supervision restarts and witnesses deaths and bounds nothing.
+    contractTests:
+      - path: elohim/eprfs/epr-cli/tests/device_supervise.rs
+        testName: ark_keeps_the_declared_resident_and_reloads_a_moved_head
+        kind: integration
+      - path: elohim/eprfs/epr-cli/src/device/supervise.rs
+        testName: a_stale_record_is_not_a_running_ark
+        kind: unit
+      - path: elohim/eprfs/epr-cli/src/device/supervise.rs
+        testName: an_unreadable_passport_refuses_to_reset_the_incarnation
+        kind: unit
+    gapNote: The integration story runs only when ARK_BIN names a built ark; the eprfs gate does not build
+      the elohim workspace's ark, so it is exercised by hand until one gate builds both.
+
+  - name: device::status::device_supervisor
+    kind: verdict-fn
+    sourceLocation:
+      file: src/device/arrival.rs
+      modulePath: elohim_epr_cli::device::arrival::supervisor_check
+    summary: Ok when ark runs the head with every child ready or the head declares nothing; otherwise
+      degraded with the cure epr device supervise, never refused.
+    concernIds:
+      - id: C0
+        status: answered
+        justification: Ephemeral device observation read from the local data root; never a network head.
+      - id: C4
+        status: answered
+        justification: An unreadable chain or record degrades with its reason; absence never refuses local work.
+    contractTests:
+      - path: elohim/eprfs/epr-cli/tests/device_arrival.rs
+        testName: status_keeps_dependency_order_and_does_not_mint_a_key
+        kind: integration
+      - path: elohim/eprfs/epr-cli/tests/device_supervise.rs
+        testName: ark_keeps_the_declared_resident_and_reloads_a_moved_head
+        kind: integration

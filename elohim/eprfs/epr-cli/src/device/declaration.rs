@@ -1,5 +1,5 @@
 //! Thin adapters for the device-private manifest chain.
-use ark_core::declaration::{self, FollowMode, ManifestAct};
+use ark_core::declaration::{self, FollowMode, ManifestAct, RunLaunch};
 use elohim_device_runtime::manifest_store::{self, ManifestStore, Projections};
 use std::{path::PathBuf, process::ExitCode};
 
@@ -85,15 +85,21 @@ pub(super) fn run(args: &[String]) -> Result<ExitCode, String> {
     let mut stop = false;
     let mut unfollow = false;
     let mut render = None;
+    let mut launch = RunLaunch::default();
     let mut i = 1;
     while i < args.len() {
         match args[i].as_str() {
+            // Everything after `--` is the tool's own argv, appended after `{artifact}`.
+            "--" if verb == "run" => {
+                launch.args = args[i + 1..].to_vec();
+                break;
+            }
             "--stop" => stop = true,
             "--unfollow" => unfollow = true,
             "--observed" => observed = true,
             "--json" => {}
             "--channels" | "--root" | "--runtime-config" | "--base" | "--mode" | "--pin"
-            | "--render" => {
+            | "--render" | "--ready-line" | "--restart" => {
                 let flag = &args[i];
                 i += 1;
                 let value = args.get(i).ok_or_else(|| format!("{flag} needs a value"))?;
@@ -105,6 +111,8 @@ pub(super) fn run(args: &[String]) -> Result<ExitCode, String> {
                     "--mode" => mode = FollowMode::parse(value)?,
                     "--pin" => pin = Some(value.clone()),
                     "--render" => render = Some(value.as_str()),
+                    "--ready-line" => launch.ready_line = Some(value.clone()),
+                    "--restart" => launch.restart = Some(declaration::parse_restart(value)?),
                     _ => unreachable!(),
                 }
             }
@@ -112,6 +120,9 @@ pub(super) fn run(args: &[String]) -> Result<ExitCode, String> {
             value => return Err(format!("unexpected argument {value}")),
         }
         i += 1;
+    }
+    if verb != "run" && launch != RunLaunch::default() {
+        return Err("--ready-line, --restart and `-- <args>` belong to run".into());
     }
     if render.is_some_and(|r| !matches!(r, "runtime-config" | "bin-tools" | "manifest")) {
         return Err("render must be runtime-config, bin-tools or manifest".into());
@@ -130,6 +141,7 @@ pub(super) fn run(args: &[String]) -> Result<ExitCode, String> {
         "run" => store.act(ManifestAct::Run {
             tool: name.ok_or("run needs a tool")?,
             stop,
+            launch,
         }),
         "show" => store.read(),
         "apply" => store.apply(),

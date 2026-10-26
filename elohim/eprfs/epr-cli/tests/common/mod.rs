@@ -54,10 +54,16 @@ pub fn write(root: &Path, rel: &str, text: &str) {
 /// `#[allow(dead_code)]`: `flow_memory_recall_sample.rs` (station 3, task 3.1) exercises
 /// `Contract::question_bank()` directly against `Contract::from_value`/bare temp-dir fixtures and
 /// never needs a git-backed [`repo`] — the same per-binary dead-code note [`view_in`] documents.
-#[allow(dead_code)]
+#[allow(
+    dead_code,
+    reason = "each test binary compiles this module; flow_memory_recall_sample.rs never builds a git-backed repo"
+)]
 pub const FIXTURE_DATE: &str = "2026-09-10T00:00:00+00:00";
 
-#[allow(dead_code)]
+#[allow(
+    dead_code,
+    reason = "each test binary compiles this module; only the git-backed fixtures call it"
+)]
 pub fn git(root: &Path, args: &[&str]) {
     let out = elohim_epr_cli::process::build_command("git", args, root, &[])
         .env("GIT_AUTHOR_NAME", "Fixture Author")

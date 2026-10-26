@@ -175,3 +175,46 @@ decisionPoints:
   - path: elohim/ark/core/src/rea.rs
     testName: memory_bound_distinguishes_folded_allocation_from_declared_root
     kind: unit
+# Added 2026-10-26 (plan "native device floor", section 2): the run act carries its launch.
+# Records are device-local: the act is in-memory, the manifest it produces is a Private (B)
+# version on the device's own chain, and nothing here mints a DHT head or a route.
+- name: RunLaunch::child
+  kind: pure-decision-predicate
+  sourceLocation:
+    file: core/src/declaration.rs
+    modulePath: ark_core::declaration::RunLaunch
+  summary: A run act's args, ready line and restart become the child's argv, StdoutLine then ExecutableIdentity
+    ladder and policy; an act without them declares the historical child byte for byte.
+  concernIds:
+  - id: C0
+    status: answered
+    justification: Private (B) device declaration on the offline chain; no DHT entry, head or route.
+  - id: C1
+    status: n-a
+    justification: The act selects no head and confers no authority; only the explicit local act supersedes.
+  - id: C4
+    status: answered
+    justification: Absent launch detail keeps the historical declaration; an empty ready line, a NUL argument
+      or launch detail on a stop is refused, never ignored.
+  - id: C7
+    status: answered
+    justification: Declaration is not enforcement; readiness and restart are supervision rules ark already
+      runs, and EffectiveTier stays None.
+  - id: C9
+    status: answered
+    justification: The manifest CID of an argument-less run act is pinned against a hand-written historical
+      child, so no existing chain version moves.
+  - id: C10
+    status: answered
+    justification: ChildSpec already carried argv, readiness and policy; the wire shape is unchanged and old
+      chain versions decode as before.
+  contractTests:
+  - path: elohim/ark/core/tests/declaration_contract.rs
+    testName: a_run_act_without_launch_detail_keeps_its_historical_manifest_cid
+    kind: unit
+  - path: elohim/ark/core/tests/declaration_contract.rs
+    testName: run_launch_appends_args_and_declares_the_readiness_ladder_and_restart
+    kind: unit
+  - path: elohim/ark/core/tests/declaration_contract.rs
+    testName: run_launch_refuses_what_it_cannot_honour
+    kind: unit

@@ -121,7 +121,21 @@ pub(crate) fn status_at(root: &Path) -> Vec<Check> {
         berth_check(&berth_dir(), identity.session.as_deref()),
         repository_check(root),
         peer_daemon_check(),
+        supervisor_check(root),
     ]
+}
+
+/// Whether ark runs the device's declared manifest at its head with every child ready.
+/// Absence degrades and never refuses: local work goes on without a supervisor, losing only
+/// restart and witnessed deaths (local-first). Like every arrival line, it is a read.
+fn supervisor_check(root: &Path) -> Check {
+    let (ok, detail, cure) = super::supervise::check(root);
+    Check::new(
+        "device supervisor",
+        if ok { State::Ok } else { State::Degraded },
+        detail,
+        cure,
+    )
 }
 
 fn peer_daemon_check() -> Check {

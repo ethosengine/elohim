@@ -382,6 +382,7 @@ fn secret_named_environment_is_refused_on_import_and_every_act() {
             ManifestAct::Run {
                 tool: "epr".into(),
                 stop: false,
+                launch: Default::default(),
             },
         )
         .unwrap();

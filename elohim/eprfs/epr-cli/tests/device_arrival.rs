@@ -115,13 +115,17 @@ fn status_keeps_dependency_order_and_does_not_mint_a_key() {
             "fold attested",
             "berth moored",
             "repository trusted",
-            "peer daemon"
+            "peer daemon",
+            "device supervisor"
         ]
     );
     assert_eq!(checks[2]["state"], "refused");
     assert_eq!(checks[4]["state"], "degraded");
     assert_eq!(checks[5]["state"], "degraded");
     assert_eq!(checks[6]["state"], "degraded");
+    // The committed base declares no process: nothing to supervise is not a lack.
+    assert_eq!(checks[9]["state"], "ok");
+    assert!(checks[9]["cure"].is_null());
     assert!(!temp.path().join("device/seed").exists());
 }
 #[test]
@@ -186,8 +190,16 @@ fn peer_daemon_status_compares_live_lease_with_current() {
     let peer = rows.iter().find(|r| r["name"] == "peer daemon").unwrap();
     assert_eq!(peer["state"], "degraded");
     assert!(peer["cure"].as_str().unwrap().contains("restart"));
+    let peer_state = |base: &Path| {
+        checks(base)
+            .1
+            .into_iter()
+            .find(|r| r["name"] == "peer daemon")
+            .unwrap()["state"]
+            .clone()
+    };
     write(&current, start);
-    assert_eq!(checks(base).1.last().unwrap()["state"], "ok");
+    assert_eq!(peer_state(base), "ok");
     write(&older, start + 1);
-    assert_eq!(checks(base).1.last().unwrap()["state"], "ok");
+    assert_eq!(peer_state(base), "ok");
 }

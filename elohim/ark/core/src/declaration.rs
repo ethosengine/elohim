@@ -1,5 +1,7 @@
 //! Pure device declarations, acts and projections. No filesystem or runtime authority.
-use crate::manifest::{ArtifactRef, ChildSpec, ManifestError, RuntimeManifest};
+use crate::manifest::{
+    ArtifactRef, ChildPolicy, ChildSpec, ManifestError, Probe, Restart, RuntimeManifest,
+};
 use serde::{Deserialize, Serialize};
 use std::collections::{BTreeMap, BTreeSet};
 
@@ -229,6 +231,83 @@ pub fn validate(manifest: &RuntimeManifest) -> Result<(), ManifestError> {
     }
     Ok(())
 }
+/// How long a declared ready line may take to appear. A cold `epr` that opens its stores
+/// before it serves is the slowest resident this ladder is written for.
+pub const READY_LINE_PATIENCE_MS: u64 = 120_000;
+/// The identity rung reads `/proc/<pid>/exe` once the service is ready; it is quick or the
+/// artifact is a wrapper that exec'd something else, which the rung exists to catch.
+pub const IDENTITY_PATIENCE_MS: u64 = 5_000;
+
+/// How a run act launches its tool. This is an in-memory act, never a wire record: the
+/// chain stores the [`RuntimeManifest`] the act produces. Every field left at its default
+/// reproduces the historical child declaration exactly, so an argument-less act keeps the
+/// manifest CID it always had.
+#[derive(Debug, Clone, Default, PartialEq)]
+pub struct RunLaunch {
+    /// Arguments appended after `{artifact}`; berth templates resolve at spawn.
+    pub args: Vec<String>,
+    /// A standard-output substring that declares the child ready. With it the readiness
+    /// ladder is `StdoutLine` then `ExecutableIdentity`; without it the child makes no
+    /// readiness claim and is supervised for death and shutdown only.
+    pub ready_line: Option<String>,
+    /// Restart eligibility; `None` keeps the policy default (permanent).
+    pub restart: Option<Restart>,
+}
+impl RunLaunch {
+    fn child(self, tool: &str) -> Result<ChildSpec, ManifestError> {
+        if self.args.iter().any(|arg| arg.contains('\0')) {
+            return Err(ManifestError::Invalid(format!(
+                "{tool}: an argument carries a NUL byte, which exec cannot pass"
+            )));
+        }
+        let readiness = match self.ready_line {
+            Some(line) if line.is_empty() => {
+                return Err(ManifestError::Invalid(format!(
+                    "{tool}: an empty ready line would match any output"
+                )))
+            }
+            Some(contains) => vec![
+                Probe::StdoutLine {
+                    contains,
+                    patience_ms: READY_LINE_PATIENCE_MS,
+                },
+                Probe::ExecutableIdentity {
+                    patience_ms: IDENTITY_PATIENCE_MS,
+                },
+            ],
+            None => Vec::new(),
+        };
+        let mut policy = ChildPolicy::default();
+        if let Some(restart) = self.restart {
+            policy.restart = restart;
+        }
+        let mut argv = vec!["{artifact}".to_owned()];
+        argv.extend(self.args);
+        Ok(ChildSpec {
+            name: tool.to_owned(),
+            artifact: ArtifactRef::Channel {
+                channel_id: format!("bin:{tool}"),
+            },
+            argv,
+            readiness,
+            policy,
+            ..ChildSpec::default()
+        })
+    }
+}
+
+/// Parse a restart policy as a person types it. Unknown words are refused, never defaulted.
+pub fn parse_restart(raw: &str) -> Result<Restart, String> {
+    match raw.trim().to_ascii_lowercase().as_str() {
+        "permanent" => Ok(Restart::Permanent),
+        "transient" => Ok(Restart::Transient),
+        "temporary" => Ok(Restart::Temporary),
+        _ => Err(format!(
+            "unknown restart policy '{raw}'; expected permanent, transient or temporary"
+        )),
+    }
+}
+
 /// An explicit private declaration act. Apply itself only repairs projections.
 #[derive(Debug, Clone)]
 pub enum ManifestAct {
@@ -238,8 +317,13 @@ pub enum ManifestAct {
         mode: Option<FollowMode>,
         pin: Option<String>,
     },
-    /// Run or stop a registered tool using its local current artifact.
-    Run { tool: String, stop: bool },
+    /// Run or stop a registered tool using its local current artifact. A stop carries the
+    /// default launch; any launch detail on a stop is refused rather than ignored.
+    Run {
+        tool: String,
+        stop: bool,
+        launch: RunLaunch,
+    },
     /// Replace the follow set from a verified config release.
     ReplaceFollows(Vec<Follow>),
 }
@@ -263,24 +347,22 @@ pub fn supersede(
                 (None, None) => {}
             }
         }
-        ManifestAct::Run { tool, stop } => {
+        ManifestAct::Run { tool, stop, launch } => {
             let spec = next
                 .tools
                 .get(&tool)
                 .ok_or_else(|| ManifestError::Invalid(format!("unknown tool {tool}")))?;
+            if stop && launch != RunLaunch::default() {
+                return Err(ManifestError::Invalid(format!(
+                    "a stop of {tool} carries no arguments, ready line or restart policy"
+                )));
+            }
+            if !stop && spec.bins.is_empty() {
+                return Err(ManifestError::Invalid("tool has no executable".into()));
+            }
             next.processes.retain(|p| p.name != tool);
             if !stop {
-                next.processes.push(ChildSpec {
-                    name: tool.clone(),
-                    artifact: ArtifactRef::Channel {
-                        channel_id: format!("bin:{tool}"),
-                    },
-                    argv: vec!["{artifact}".into()],
-                    ..ChildSpec::default()
-                });
-                if spec.bins.is_empty() {
-                    return Err(ManifestError::Invalid("tool has no executable".into()));
-                }
+                next.processes.push(launch.child(&tool)?);
             }
         }
         ManifestAct::ReplaceFollows(follows) => next.follows = follows,
