@@ -24,7 +24,7 @@ tags: [seed, design-session-input, devspace, peer-channel, jobs, collective-memo
 
 # Seed: the native peer dev channel
 
-This records what the operator asked for on 2026-10-01, in the order he gave it. It is input to a
+This records what the operator asked for on 2026-10-01, in the order they gave it. It is input to a
 design session. It proposes no entry types, routes or protocols; those go through the P2P design
 gate first.
 
@@ -47,7 +47,7 @@ first real consumer of that work, not a separate identity system.
 
 The operator's direction is that this is one concern, not several:
 
-- **Conversation** between agent sessions on his devices.
+- **Conversation** between agent sessions on their devices.
 - **Jobs.** Revisit with rakia, ark and berth: "we should be able to post those jobs, alongside the
   communication channel".
 - **Brit.** Pull it in: the tree with root integrity anywhere on the network is what the peers are
@@ -67,7 +67,7 @@ The shem workspace is deliberately not a second device in campaign 1.4.
 ## Constraints already on record, to carry into the design
 
 - **Fixtures and agents are an attribution boundary** (reach solutioning brief, §6a, 2026-10-01).
-  Messages and job results between the operator's devices are agentic labor accountable to his
+  Messages and job results between the operator's devices are agentic labor accountable to their
   stewardship. Each should carry which device and which agent session produced it, so it never
   reads as a second human.
 - **Thoughts are private; only what is said or done is judged** (constitutional ruling,
@@ -111,7 +111,7 @@ type. That was a search, not an audit.
 > push.. that.. is a rudementary communicatino channel itself."
 
 A root the operator authors, updated on one device and converged on the other, is a message: it
-is signed by a device bound to him, it carries its own history, and delegation decides who else
+is signed by a device bound to them, it carries its own history, and delegation decides who else
 may write to it. Once campaign 1.4's push lands, this answers question 5.
 
 Its limits, so the rudimentary form is not mistaken for the finished one:
@@ -188,3 +188,14 @@ candidate head then means those stories passing on that exact head, and reach is
 evidence. Slice M's serving receipt is the hand-run form: pre-push refuses the slice until its two
 dataplane stories pass on its exact source. Open question for the design gate: whether the release
 cites stories, the stories cite the release, or a habit's `checks:` joins them.
+
+**When the design gate runs (operator, 2026-10-26).** After R2 of the restart-to-connected sprint,
+on one entity. R2 adds no release head: "published" is git ancestry read from the device manifest's
+`publishedRef` (`genesis/orchestrator/manifests/runtime/workspace-device.manifest.json`, checked by
+`require_published` in `elohim/eprfs/device-runtime/src/bin_store/source.rs`), and the channel later
+replaces that one field. The 2026-09-01 spec's §5 already answers classification, entry type,
+head-plane cost and identity for the channel itself. The gate's slice is what is new here: the edge
+by which a release cites the stories it governs, and whether a device's green gate attestation
+counts as a soak attestation on a candidate. If R2 turns out to need its own notion of a release
+head, the gate runs before R2 instead. The conversation, jobs and collective-memory half serves no
+declared habit yet and waits for one.

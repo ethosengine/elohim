@@ -66,11 +66,16 @@ took 4717 s). From the worktree: `GATE_EVIDENCE=reuse git push origin HEAD:dev`.
 - **Canonical household** (`genesis/local-dev/household-dowell`): stopped, identities intact. Its
   bundle was never lost (see Traps); it is kept at
   `artifacts/installed-20261007/elohim.happ` (sha256 `b4f86c90…`) with a provenance README.
-  Its `environment.sh` points `MESH_HAPP_PATH`, `STORAGE_HAPP_PATH` and the doorway's
-  `HAPP_BUNDLE_PATH` at `campaign-1.4/coordinators/elohim.happ`, whose lamad and infrastructure do
-  NOT match the household's cells. A hosted human the doorway installs from it would likely land on
-  a different lamad/infrastructure network. Unverified on a running household; do not repoint
-  without the operator.
+  Its `environment.sh` now points all five bundle settings (`MESH_HAPP_PATH`, `STORAGE_HAPP_PATH`,
+  the doorway's `HAPP_BUNDLE_PATH`, and the `MESH_RESTART_ENV_OVERLAY` / `MESH_DOORWAY_ENV_SET`
+  strings) at the recovered bundle, at the operator's word. They previously named
+  `genesis/local-dev/campaign-1.4/coordinators/elohim.happ` (sha256 `86ac6567…`), which matches
+  imagodei, mishpat and node_registry but whose lamad and infrastructure integrity wasm differ
+  (`uhC0keuLMY…`, `uhC0kYVFIp…`): a different DHT for every hosted human the doorway installed, not
+  a coordinator hot-swap. The household's run log holds only the recovered bundle's five hashes.
+  Given up: campaign-1.4's 2026-10-01 credential/coordinator refresh for lamad and mishpat (not yet
+  diffed). If it must be live, build the household's integrity with those coordinators. The prior
+  file is kept as `environment-before-cell-lock.sh` (older) and in session scratch.
 - **Receipt household** `genesis/local-dev/household-receipt-m`: stopped, state kept. Removable once
   nobody needs slice M's receipt evidence.
 - **Shift journal** `.claude/shifts/2026-10-26T04-35-land-slice-m-household-receipt.journal.md` in
@@ -100,11 +105,22 @@ took 4717 s). From the worktree: `GATE_EVIDENCE=reuse git push origin HEAD:dev`.
 
 - **R3 threat model:** accepted for now, affirmation held until the security item lands and its
   re-review is done.
-- **Household `environment.sh`:** repoint the three bundle variables at the recovered bundle?
-  Changes runtime configuration, not identities.
-- **adam as a standing peer** of the canonical household: possible now with the recovered bundle
-  (`MESH_HAPP_PATH=<recovered> just mesh join-peer adam`); no longer blocking anything.
-- **Dev release channel design** (seed): goes to the P2P design gate when the operator schedules it.
+- **Household `environment.sh`:** repointed at the recovered bundle (see Live state). The defect
+  that let it drift, no check that a bundle reproduces the household's cells before launch, is
+  fixed in `hc-mesh.sh` preflight on this branch: readiness records `<mesh>/installed-cells.json`
+  from storage `/health`, and a resume refuses a bundle whose role-modified hashes differ. The
+  canonical household's record was written by hand from the verified run-log set; against the real
+  bundles the check passes the recovered one and refuses campaign-1.4 on lamad and infrastructure.
+- **adam as a standing peer:** no, not now. `join-peer` stages an unrecorded late joiner that
+  `mesh stop` sweeps and `mesh start` never relaunches (`DEFAULT_HOUSEHOLD_PEERS` is
+  matthew,jessica,james), so "standing" would mean a household roster redesign. adam is also the
+  identity of a real provider machine (shem), which the operator's workspace should not simulate;
+  no habit or a2o scenario needs a fourth peer. Revisit only when one does: a declared roster change
+  proven on a receipt household first. A real provider goes through shem and the `--on adam`
+  operator items.
+- **Dev release channel design:** the P2P design gate runs after R2, on one entity (the seed's
+  closing section says which). R2 must keep reading `publishedRef` and add no release head of its
+  own; if it needs one, the gate runs first.
 
 ## Traps this run paid for
 
@@ -120,6 +136,13 @@ took 4717 s). From the worktree: `GATE_EVIDENCE=reuse git push origin HEAD:dev`.
   epr refuse fixture sessions (40 failures, fixed in `19a8f0e05`).
 - **Hooks suggest `git config --global --add safe.directory`.** Never do it; run git from a
   worktree, which git trusts.
-- **Memory index:** `MEMORY.md` is generated and sits near its 24 KB budget; never hand-append. The
-  entry `project_hc_dna_hash_ignores_role_modifiers.md` awaits the operator's steward-of-record
-  claim before import.
+- **`epr covenant record` fails after a restart.** It calls `brit-build-ref --repo /projects/elohim`
+  without the trust `epr device trust` declared (`covenant.rs` `call`, unlike `git::command`), so
+  brit's git refuses "dubious ownership". Until fixed, give that one call path-scoped trust:
+  `GIT_CONFIG_COUNT=1 GIT_CONFIG_KEY_0=safe.directory GIT_CONFIG_VALUE_0=/projects/elohim`.
+- **Memory index:** `MEMORY.md` is generated; never hand-append. The entry
+  `project_hc_dna_hash_ignores_role_modifiers.md` is imported under the operator's
+  steward-of-record affirmation, but the index will not re-project: it is 24536 bytes against the
+  24000 hard watermark with or without that entry. That is the `cleanup:` trigger's backlog (155
+  against 120): run `memory-stasis-loop`, which can also graduate this entry, since `hc-mesh.sh`
+  preflight now enforces it.
