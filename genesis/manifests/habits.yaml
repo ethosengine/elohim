@@ -2188,10 +2188,10 @@ habits:
       - "node --test genesis/orchestrator/gate-cost.test.mjs (expected-cost fold over gate-cycle-seconds@1 and the defer decision's refusals)"
       - "a2o genesis/a2o/features/devflow/native-gate-evidence.feature reuse rule (this workspace's own green stands in; a red or an unadmitted signer never does)"
     evidence: >
-      DELTA 2026-10-25d (GREEN held; sprint gate-merge lane D4): an epr older than `epr bin source-state` now names itself. A peer's push 6 was refused because the bin-store `current` (sha256:0d4141…, landed 20:09Z from 0db953233) and every epr on PATH predate the verb, and the miss read as a red closure test. Now the evidence line prints `native evaluator <bin> predates …; set EPR_BIN`, and the closure fixture refuses with `environment:`. Probe: `evaluator_miss_names_the_device` (gate-evidence 39/39); the closure test fails with the environment line on the stale epr and passes on bafkreih7…; gate-runner 93 pass, with 11 failures, the known uninitialised-submodule set.
-    evidence-fingerprint: sha256:0bdb1acb8d9c20ea
-    evidence-bytes: 5448
-    evidence-entries: 6
+      DELTA 2026-10-26 (GREEN held; second workspace, ethosengine): reuse went live on ethosengine once brit landed in its store (bootstrap from a clean worktree, brit 0.1.5 at 76ba95d8a; every earlier push here printed `evidence: unavailable (brit not on BRIT_BIN…)`). The same commit bd7b1094a was pushed twice. Run 1 was cold: 7126 s, refused by schema-codegen because the gitignored `genesis/seeder/src/generated/` cache predated a rebase, and the verifier compares an ignored copy whenever one exists. Run 2: elohim-storage `reused` in 26 s (2669 s cold), steward-node 20 s (544 s), ALL CLEAR 1475 s (logs genesis/local-dev/device-runtime/runs/push-r3{c,d}.log). Still dark: eprfs and orchestrator key on the whole tree, and the hook-appended ledgers `.claude/data/{architecture,governance}-findings.jsonl` keep that tree dirty for a whole session, so neither ever records; brit is not durable here (launchers in /opt/rust/cargo/bin are wiped on restart; ethosengine/brit publishes no releases) — restart-to-connected lane R1.
+    evidence-fingerprint: sha256:39ab02b235cb4f01
+    evidence-bytes: 6478
+    evidence-entries: 7
     guard: >
       Regression risks: (1) reusing on a key that omits something the recipe reads — the recipe
       body, the project tree, a submodule pin, a repo file a test include_str!s; the input audit
