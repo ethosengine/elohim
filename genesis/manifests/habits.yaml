@@ -2069,6 +2069,28 @@ habits:
       when the lease view and the fold are served by the native peer runtime (lvi or storage) with no
       berth-specific code.
 
+  - id: edit-diagnostics-reach-every-session
+    declared: genesis/agentic/.epr-meta/edit-diagnostics-reach-every-session.habit.md
+    invariant: >
+      Sessions editing one checkout share one language server per toolchain and root. Each receives
+      its own and caused-by-me diagnostics in full, with foreign errors folded by area and owner.
+      Flychecks run one at a time on the device and defer while build capacity is held. An idle
+      root's server exits, while the one device mux keeps its single toolchain:lsp lease.
+    status: unwired
+    active: false
+    checks: []
+    evidence: >
+      DELTA 2026-10-26c (STAYS unwired; resident slice committed on feat/shared-toolchain-servers 01bae0c9d..97ea46685): `just gate eprfs` EXIT=0 and `just gate rust-style` EXIT=0 at c4bc5df0d (independent re-run); `cargo test -p elohim-epr-lsp` 51 unit + 7 integration (two sessions on one server, attribution/fold/ambiguity, crash, idle reap, pin change, slow client, oversize frame, null server) EXIT=0 and clippy -D warnings EXIT=0 at be6f3b4af; `lsp_flycheck_test` 18 EXIT=0 at 97ea46685, whose new same-session test fails on the prior script (two resident flychecks both ran cargo — fixed with a device-wide run lock). All against a fake server; never yet run against real rust-analyzer or under ark. Feature READY (blind-reader rounds 6–9). Wiring to red needs: the resident declaration and `epr device supervise` (feat/gate-live), step definitions, and the live two-session probe on elohim-storage.
+    evidence-fingerprint: sha256:4a6c503211374256
+    evidence-bytes: 2125
+    evidence-entries: 4
+    refs:
+      - "planned check: a2o @concern:edit-diagnostics-reach-every-session (genesis/a2o/features/devflow/edit-diagnostics-share-one-server.feature; step definitions and live probe pending)"
+    retire-when: >
+      when language servers are own children of the device root envelope under ark, through an
+      `epr lsp serve --device` resident in the device RuntimeManifest, and arrival reads them
+      from one berth.
+
   - id: measure-runs-on-a-peer
     declared: genesis/agentic/.epr-meta/measure-runs-on-a-peer.habit.md
     invariant: >
