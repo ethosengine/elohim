@@ -2050,16 +2050,16 @@ habits:
       other admitted device's current head is folded. Otherwise it is refused naming the holder, or
       `unconfirmed` naming the silent device. A push to `dev` from one device is refused while another
       device holds `dev-integration`.
-    status: red
+    status: green
     active: false
     checks:
       - "a2o @concern:devices-share-one-berth (genesis/a2o/features/devflow/devices-share-one-berth.feature, two devices in one container: a held claim refused naming the holder; a push stopped while the other device holds dev-integration, alpha-fleet or jenkins-dispatch; a silent device read as unconfirmed; an override that binds the returning device; concurrent claims settled once; a retired device's lease dropped without restart; @act:host; cd genesis/a2o && pnpm exec cucumber-js --tags '@concern:devices-share-one-berth and not @requires:shem and not @wip'. it selects all ten in-container scenarios)"
       - "a2o @concern:devices-share-one-berth and @requires:shem (the same feature's cross-workspace scenario: the held-claim refusal between the ethosengine and shem workspaces over their own link, no coordination record carried by git, a shared server or the operator; holder/contender halves selected by A2O_T8_ROLE, held when unset; green requires the joined real-workspace receipt)"
     evidence: >
-      DELTA 2026-10-25e (RED preserved; T8 run t8-20261025-02, found live): the holder's lease crossed and shem folded it (held_by on every one of 429 polls), but its mooring never did. Ethosengine had been admitted minutes earlier and had no cached channel root, so berth folded a mooring from its worktree into the worktree's own store, which no daemon serves. A mooring from a worktree with nothing cached now asks the device's view once. A device moors in its served store; a non-device keeps its checkout. Probe: `test_worktree_mooring_crosses_before_the_channel_is_cached` fails on the old berth (0 asks) and passes on the new; berth_test 101/101.
-    evidence-fingerprint: sha256:9ab0dcb8848afadc
-    evidence-bytes: 11764
-    evidence-entries: 14
+      DELTA 2026-10-26 (GREEN; T8 joined receipt, run t8-20261025-03): the cross-workspace scenario passed on both real devices over their own iroh link through relay.alpha.elohim.host. Holder ethosengine (did:key:z6MkpZRh…, node 95e41161…, dev b940dfe30 + fixture 9fab45cfb, epr bafkreifpvyu…): 10/10 steps. Contender shem (did:key:z6Mkm5de…, node 4370a806…, dev 5a9e9f5a5, epr bafkreih7…): 10/10 steps. The contender's claim exited 3 naming the holder's device and session; after the release crossed, its claim exited 0. `tsx scripts/t8-receipt.ts t8-20261025-03` printed PASS (receipt.json, holder.json sha256 71d8ca08…). Getting here needed: ethosengine's PeerEndpoint row (b940dfe30, steward-confirmed); worktree moorings crossing before the channel is cached (5a9e9f5a5); and the fixture declaring its moored session (9fab45cfb, landing from ethosengine).
+    evidence-fingerprint: sha256:967783e7fb1bdae9
+    evidence-bytes: 12634
+    evidence-entries: 15
     refs:
       - "spec: genesis/docs/superpowers/specs/2026-10-23-workspaces-cooperate-as-devices-design.md §3.4 (steward-scoped resources, effectiveness, tie-break, refusal wording), §3.5 (pre-push claims dev-integration), §6 (this habit)"
       - "plan: genesis/docs/superpowers/plans/2026-10-23-workspaces-cooperate-as-devices-plan.md (T0 story and habit; T6 lease view; T7 pre-push and status; T8 the cross-workspace receipt that flips this green)"
