@@ -533,10 +533,23 @@ pub(crate) fn check(checkout: &Path) -> (bool, String, Option<String>) {
             cure,
         );
     }
+    // A child declared without a ready line makes no readiness claim, so ark never marks it
+    // ready; it counts as waiting only while it has no live process.
+    let claims_readiness = |name: &str| {
+        head.processes
+            .iter()
+            .any(|child| child.name == name && !child.readiness.is_empty())
+    };
     let waiting: Vec<_> = status
         .processes
         .iter()
-        .filter(|p| !p.ready)
+        .filter(|p| {
+            if claims_readiness(&p.name) {
+                !p.ready
+            } else {
+                p.pid.is_none()
+            }
+        })
         .map(|p| p.name.as_str())
         .collect();
     if !waiting.is_empty() {
