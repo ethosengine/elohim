@@ -246,13 +246,13 @@ impl Store {
                 && old.owner_dead(admission_proc_root)
                 && proposed.identity.source == Source::RuntimeAncestor
             {
-                if old.device != proposed.device
-                    || old.steward != proposed.steward
-                    || old.repository != proposed.repository
-                {
+                // A resumed runtime may come back in another checkout of the same device.
+                // The successor binds to its own checkout; the predecessor's stays in the
+                // archived record. Device and steward are who the session is: never changed.
+                if old.device != proposed.device || old.steward != proposed.steward {
                     return Err(Refusal::new(
                         "session-conflict",
-                        "successor changes device/steward/checkout",
+                        "successor changes device/steward",
                     ));
                 }
                 // The exclusive opener repeats admission before archiving or changing the head.

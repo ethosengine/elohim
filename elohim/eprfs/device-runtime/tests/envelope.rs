@@ -282,6 +282,51 @@ fn successor_preserves_exact_legacy_bytes_seal_and_current_enumeration() {
 }
 
 #[test]
+fn successor_may_resume_in_another_checkout_but_never_on_another_device_or_steward() {
+    if !in_succession_fixture(
+        "successor_may_resume_in_another_checkout_but_never_on_another_device_or_steward",
+    ) {
+        return;
+    }
+    for change in ["device", "steward", "checkout"] {
+        let dir = resume_fixture();
+        let store = Store::lock(&dir.path().join("key")).unwrap();
+        let mut old = store
+            .open(binding(dir.path(), "resume"), dir.path())
+            .unwrap();
+        old.closed_at = Some(envelope::now());
+        store.save(&old).unwrap();
+        std::fs::remove_dir_all(dir.path().join("7")).unwrap();
+        let mut proposed = successor(dir.path());
+        match change {
+            "device" => proposed.device = "did:key:another-device".into(),
+            "steward" => proposed.steward = "human:someone-else".into(),
+            _ => proposed.repository = dir.path().join("worktree"),
+        }
+        let before = std::fs::read(store.path("resume").unwrap()).unwrap();
+        let result = store.open(proposed, dir.path());
+        if change == "checkout" {
+            // Checkout carries no authority: the successor inherits nothing from it.
+            let new = result.unwrap();
+            assert_eq!(new.generation, 2);
+            assert_eq!(new.repository, dir.path().join("worktree"));
+            assert_eq!(
+                std::fs::read(dir.path().join("sessions/resume.gen/1.json")).unwrap(),
+                before
+            );
+        } else {
+            assert_eq!(result.unwrap_err().kind, "session-conflict", "{change}");
+            assert_eq!(
+                std::fs::read(store.path("resume").unwrap()).unwrap(),
+                before,
+                "{change}"
+            );
+            assert!(!dir.path().join("sessions/resume.gen").exists(), "{change}");
+        }
+    }
+}
+
+#[test]
 fn successor_admission_refuses_unclosed_live_unknown_and_non_runtime_owners_without_writes() {
     if !in_succession_fixture(
         "successor_admission_refuses_unclosed_live_unknown_and_non_runtime_owners_without_writes",
