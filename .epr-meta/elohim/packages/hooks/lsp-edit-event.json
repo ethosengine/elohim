@@ -1,0 +1,47 @@
+{
+  "apiVersion": "elohim-agent/v1alpha1",
+  "kind": "HookPackage",
+  "metadata": {
+    "id": "lsp-edit-event",
+    "name": "lsp-edit-event",
+    "version": "1.0.0",
+    "description": "Append bounded, device-local edit events for shared language-server attribution.",
+    "sourceRuntime": "elohim-agent",
+    "master": "package",
+    "runtimeTargets": [
+      "claude"
+    ],
+    "event": "PostToolUse",
+    "matcher": "Edit|Write",
+    "interpreter": "python3",
+    "language": "python",
+    "assetRefs": [],
+    "governance": {
+      "eprRef": "epr:elohim-agent/hooks/lsp-edit-event",
+      "policy": "capability-governance@1",
+      "gates": [
+        "epr-meta-resolver",
+        "elohim-agent:packages:verify"
+      ],
+      "ledger": ".claude/data/governance-findings.jsonl"
+    }
+  },
+  "source": {
+    "language": "python",
+    "interpreter": "python3",
+    "path": ".claude/hooks/lsp-edit-event.py",
+    "body": "#!/usr/bin/env python3\n\"\"\"PostToolUse edit attribution: private, bounded, fail-open C2 events for the mux.\"\"\"\nfrom collections import deque\nfrom datetime import datetime, timezone\nimport fcntl\nimport json\nimport os\nfrom pathlib import Path\nimport subprocess\nimport sys\nimport time\n\n\nTOOLS = {\"Edit\", \"Write\", \"MultiEdit\", \"NotebookEdit\"}\n\n\ndef process_start(pid):\n    try:\n        return Path(f\"/proc/{pid}/stat\").read_text().rsplit(\")\", 1)[1].split()[19]\n    except (OSError, IndexError):\n        return \"\"\n\n\ndef session_identity(payload, cwd):\n    try:\n        result = subprocess.run(\n            [os.environ.get(\"EPR_BIN\") or \"epr\", \"session\", \"id\", \"--json\"],\n            cwd=cwd, capture_output=True, text=True, timeout=1, check=True,\n        )\n        identity = json.loads(result.stdout)\n        if (isinstance(identity, dict) and isinstance(identity.get(\"session\"), str)\n                and identity[\"session\"] and type(identity.get(\"ownerPid\")) is int\n                and identity[\"ownerPid\"] > 0\n                and isinstance(identity.get(\"ownerStartTime\"), str)):\n            return {key: identity[key] for key in (\"session\", \"ownerPid\", \"ownerStartTime\")}\n    except (OSError, ValueError, subprocess.SubprocessError):\n        pass\n    session = payload.get(\"session_id\") or os.environ.get(\"ELOHIM_SESSION_ID\")\n    try:\n        pid = int(os.environ.get(\"ELOHIM_SESSION_OWNER_PID\", \"\"))\n        if pid <= 0:\n            raise ValueError(\"invalid pid\")\n    except ValueError:\n        pid = os.getppid()\n    if not isinstance(session, str) or not session:\n        pid = os.getpid()\n        session = f\"anon-{pid}\"\n    return {\"session\": session, \"ownerPid\": pid, \"ownerStartTime\": process_start(pid)}\n\n\ndef live_root(cwd):\n    common = subprocess.check_output(\n        [\"git\", \"rev-parse\", \"--git-common-dir\"], cwd=cwd, text=True,\n        stderr=subprocess.DEVNULL, timeout=0.5,\n    ).strip()\n    git_dir = (cwd / common).resolve()\n    return git_dir.parent\n\n\ndef append_event(path, event):\n    path.parent.mkdir(parents=True, exist_ok=True)\n    fd = os.open(path, os.O_CREAT | os.O_RDWR | os.O_APPEND, 0o600)\n    try:\n        # Keep the inode stable across pruning so concurrent writers cannot append to an\n        # unlinked file. Brief contention is normal when sessions edit together;\n        # a stuck writer must still fit inside the hook's two-second budget.\n        deadline = time.monotonic() + 0.15\n        while True:\n            try:\n                fcntl.flock(fd, fcntl.LOCK_EX | fcntl.LOCK_NB)\n                break\n            except BlockingIOError:\n                if time.monotonic() >= deadline:\n                    return\n                time.sleep(0.005)\n        os.write(fd, (json.dumps(event, separators=(\",\", \":\")) + \"\\n\").encode())\n        if os.fstat(fd).st_size > 2 * 1024 * 1024:\n            os.lseek(fd, 0, os.SEEK_SET)\n            with os.fdopen(os.dup(fd), \"rb\") as stream:\n                tail = b\"\".join(deque(stream, maxlen=10_000))\n            os.ftruncate(fd, 0)\n            os.write(fd, tail)\n    finally:\n        os.close(fd)\n\n\ndef main():\n    try:\n        payload = json.load(sys.stdin)\n        tool = payload.get(\"tool_name\")\n        if tool not in TOOLS:\n            return\n        tool_input = payload.get(\"tool_input\") or {}\n        file_path = tool_input.get(\"file_path\") or tool_input.get(\"notebook_path\")\n        if not isinstance(file_path, str) or not file_path:\n            return\n        cwd = Path(payload.get(\"cwd\") or os.environ.get(\"CLAUDE_PROJECT_DIR\") or os.getcwd()).resolve()\n        root = live_root(cwd)\n        event = {\n            \"v\": 1,\n            \"at\": datetime.now(timezone.utc).isoformat(timespec=\"milliseconds\").replace(\"+00:00\", \"Z\"),\n            **session_identity(payload, cwd),\n            \"path\": str((cwd / file_path).resolve()),\n            \"tool\": tool,\n        }\n        append_event(root / \".eprfs/status/lsp/edits.jsonl\", event)\n    except Exception:\n        # Diagnostics must never block an edit or emit protocol bytes to stdout.\n        pass\n\n\nif __name__ == \"__main__\":\n    main()\n"
+  },
+  "registration": {
+    "event": "PostToolUse",
+    "matcher": "Edit|Write",
+    "command": "python3 \"$CLAUDE_PROJECT_DIR/.claude/hooks/lsp-edit-event.py\"",
+    "timeout": 2,
+    "type": "command"
+  },
+  "projections": {
+    "claude": {
+      "path": ".claude/hooks/lsp-edit-event.py"
+    }
+  }
+}

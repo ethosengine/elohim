@@ -30,7 +30,8 @@ Two deterministic rules (policy: genesis/agentic/pool-policy.json):
    build/test/check (or its rustc/rust-lld children) is already running in
    this container is DENIED, naming the pid to wait for. Two gates at once
    on a box whose storage is the bottleneck is what the operator asked us to
-   stop doing; the deny replaces "remember not to".
+   stop doing; the deny replaces "remember not to". Marked LSP flychecks
+   yield to builds: stop their wrappers and let their cleanup release leases.
 
 5. JOBS CAP — heavy cargo with no `-j/--jobs` and no CARGO_BUILD_JOBS (in the
    command or the environment) is DENIED with the exact prefix to use
@@ -68,8 +69,10 @@ import json
 import os
 import re
 import shlex
+import signal
 import subprocess
 import sys
+import time
 
 POOL_ROOT = os.environ.get("CARGO_TARGET_POOL_ROOT", "/projects/.cargo-target-pool")
 PROJECT_DIR = os.environ.get("CLAUDE_PROJECT_DIR", "/projects/elohim")
@@ -154,30 +157,121 @@ def host_psi_io():
         return None
 
 
+def proc_argv(pid):
+    try:
+        with open(os.path.join(PROC_DIR, str(pid), "cmdline"), "rb") as f:
+            return [a.decode("utf-8", "replace") for a in f.read().split(b"\0") if a]
+    except OSError:
+        return []
+
+
+def flycheck_marked(pid):
+    try:
+        with open(os.path.join(PROC_DIR, str(pid), "environ"), "rb") as f:
+            return b"ELOHIM_LSP_FLYCHECK=1" in f.read().split(b"\0")
+    except OSError:
+        # An unreadable environment is never evidence that a build may be killed.
+        return False
+
+
+def proc_stat(pid):
+    """State, parent and start time; comm may itself contain spaces or ')'."""
+    try:
+        with open(os.path.join(PROC_DIR, str(pid), "stat")) as f:
+            fields = f.read().rsplit(")", 1)[1].split()
+        return fields[0], int(fields[1]), fields[19]
+    except (OSError, ValueError, IndexError):
+        return None
+
+
+def flycheck_wrapper(pid):
+    argv = proc_argv(pid)
+    if not argv:
+        return False
+    head = os.path.basename(argv[0])
+    return head == "lsp-flycheck" or (
+        head == "bash" and len(argv) > 1 and os.path.basename(argv[1]) == "lsp-flycheck"
+    )
+
+
+def flycheck_root(pid):
+    """Climb only the marked tree, including its bash wrapper (bash exports
+    need not appear in the wrapper's own /proc environ until the next exec)."""
+    seen = {pid}
+    while (stat := proc_stat(pid)) is not None:
+        parent = stat[1]
+        if parent <= 1 or parent in seen:
+            break
+        if not (flycheck_marked(parent) or flycheck_wrapper(parent)):
+            break
+        seen.add(parent)
+        pid = parent
+    return pid
+
+
+def yield_flychecks(live):
+    """Signal each proven flycheck root once; share one three-second wait."""
+    roots = {flycheck_root(pid) for pid, _, yieldable in live if yieldable}
+    pending = {}
+    messages = []
+    for pid in sorted(roots):
+        before = proc_stat(pid)
+        if before is None or before[0] == "Z":
+            continue
+        # Revalidate immediately before signalling: a departed/reused PID must
+        # never turn a flycheck cancellation into another session's lost build.
+        if not (flycheck_marked(pid) or flycheck_wrapper(pid)):
+            continue
+        current = proc_stat(pid)
+        if current is None or current[2] != before[2]:
+            continue
+        try:
+            os.kill(pid, signal.SIGTERM)
+        except ProcessLookupError:
+            continue
+        except OSError as error:
+            messages.append(f"flycheck yield: could not stop pid {pid}: {error}")
+            continue
+        pending[pid] = before[2]
+    deadline = time.monotonic() + 3
+    while pending:
+        for pid, started in list(pending.items()):
+            stat = proc_stat(pid)
+            if stat is None or stat[0] == "Z" or stat[2] != started:
+                messages.append(f"yielded: stopped lsp flycheck pid {pid} for this build")
+                del pending[pid]
+        remaining = deadline - time.monotonic()
+        if not pending or remaining <= 0:
+            break
+        time.sleep(min(0.05, remaining))
+    messages.extend(f"flycheck yield: pid {pid} still stopping after 3 s" for pid in pending)
+    return messages
+
+
 def running_heavy():
     """Live cargo drivers (heavy verb) and compiler/linker children in this
-    container, excluding this hook's own process tree. [(pid, short cmd)]."""
+    container, excluding this hook and parent. [(pid, short cmd, yieldable)].
+    Also read by lsp-flycheck before it attempts berth admission."""
     me = {os.getpid(), os.getppid()}
     found = []
     try:
         for name in os.listdir(PROC_DIR):
             if not name.isdigit() or int(name) in me:
                 continue
-            try:
-                with open(os.path.join(PROC_DIR, name, "cmdline"), "rb") as f:
-                    argv = f.read().split(b"\0")
-            except Exception:
-                continue
-            argv = [a.decode("utf-8", "replace") for a in argv if a]
+            argv = proc_argv(name)
             if not argv:
                 continue
             head = os.path.basename(argv[0])
             if head == "cargo":
                 verb = next((a for a in argv[1:] if not a.startswith("+")), None)
                 if verb in HEAVY_VERBS:
-                    found.append((int(name), " ".join(argv[:4])))
+                    found.append((int(name), " ".join(argv[:4]), flycheck_marked(name)))
             elif head in ("rustc", "rust-lld", "ld.lld", "cc1", "gate-runner.mjs"):
-                found.append((int(name), head))
+                found.append((int(name), head, flycheck_marked(name)))
+            elif head in ("node", "nodejs"):
+                script = next((a for a in argv[1:] if not a.startswith("-")), "")
+                if os.path.basename(script) == "gate-runner.mjs":
+                    found.append((int(name), "gate-runner.mjs", flycheck_marked(name)))
     except Exception:
         return []
     return found
@@ -440,7 +534,8 @@ def main():
             )
 
     # Rule 4 — one build at a time in this container.
-    live = running_heavy()
+    processes = running_heavy()
+    live = [(pid, cmd) for pid, cmd, yieldable in processes if not yieldable]
     if live and len({p for p, _ in live}) >= int(io_pol["max_concurrent_heavy"]):
         drivers = [c for _, c in live if c.startswith("cargo") or c == "gate-runner.mjs"] or [live[0][1]]
         pids = ", ".join(str(p) for p, c in live if c.startswith("cargo") or c == "gate-runner.mjs") or str(live[0][0])
@@ -463,13 +558,18 @@ def main():
             f"(New workspaces get CARGO_BUILD_JOBS from devfile.yaml; this rule retires itself once the env is present.)"
         )
 
-    # Soft watermark — advisory only.
+    # Only cancel flychecks once all deny rules have passed: this build will run.
+    context = yield_flychecks(processes)
+
+    # Soft watermark — advisory only, sharing the hook's single context response.
     if pct is not None and soft <= pct < hard:
-        advise(
+        context.append(
             f"DISK SOFT WATERMARK: /projects at {pct}% (soft {soft}%, hard {hard}%). "
             f"Heavy builds still allowed; `cargo-pool enforce --yes` reclaims "
             f"per policy before the hard ceiling blocks builds."
         )
+    if context:
+        advise("\n".join(context))
 
 
 if __name__ == "__main__":

@@ -1,0 +1,11 @@
+{
+  "name": "elohim-workspace",
+  "owner": { "name": "Elohim Protocol" },
+  "plugins": [
+    {
+      "name": "elohim-lsp",
+      "source": "./plugins/elohim-lsp",
+      "description": "Attach to the workspace's one shared, session-attributed language server per toolchain (epr lsp attach)"
+    }
+  ]
+}

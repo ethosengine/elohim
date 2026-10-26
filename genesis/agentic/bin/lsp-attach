@@ -1,0 +1,30 @@
+#!/usr/bin/env bash
+# Resolve the attach client without shadowing rust-analyzer on PATH.
+# The device supervisor owns the server. Exec preserves attach's LSP output,
+# including "no diagnostics: device supervisor not running — epr device supervise".
+set -euo pipefail
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+# shellcheck source=pool-lib.sh
+source "$SCRIPT_DIR/pool-lib.sh"
+if [[ $# == 0 ]]; then
+  exec python3 "$SCRIPT_DIR/lsp-null.py" 'language missing: lsp-attach <lang> [args…]'
+fi
+lang="$1"
+shift
+
+if [[ -n ${EPR_BIN:-} ]] && resolved="$(command -v -- "$EPR_BIN")" && [[ -x $resolved ]]; then
+  exec "$resolved" lsp attach "$lang" "$@"
+fi
+launcher=/projects/.claude-config/tools/bin-store/bin/bin-launch
+if [[ -x $launcher ]]; then
+  exec "$launcher" epr lsp attach "$lang" "$@"
+fi
+root="$(find_worktree_root "$SCRIPT_DIR")"
+candidate="$(slot_path "$(detect_family "$root")" elohim/eprfs dev)/debug/epr"
+if [[ -x $candidate ]]; then
+  exec "$candidate" lsp attach "$lang" "$@"
+fi
+if resolved="$(command -v epr)" && [[ -x $resolved ]]; then
+  exec "$resolved" lsp attach "$lang" "$@"
+fi
+exec python3 "$SCRIPT_DIR/lsp-null.py" 'epr unresolved'

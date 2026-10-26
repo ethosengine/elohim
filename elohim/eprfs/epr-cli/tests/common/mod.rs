@@ -56,13 +56,13 @@ pub fn write(root: &Path, rel: &str, text: &str) {
 /// never needs a git-backed [`repo`] — the same per-binary dead-code note [`view_in`] documents.
 #[allow(
     dead_code,
-    reason = "each test binary compiles this module; flow_memory_recall_sample.rs never builds a git-backed repo"
+    reason = "shared by every flow_memory_recall* test binary; one that never calls this helper compiles it dead"
 )]
 pub const FIXTURE_DATE: &str = "2026-09-10T00:00:00+00:00";
 
 #[allow(
     dead_code,
-    reason = "each test binary compiles this module; only the git-backed fixtures call it"
+    reason = "shared by every flow_memory_recall* test binary; one that never calls this helper compiles it dead"
 )]
 pub fn git(root: &Path, args: &[&str]) {
     let out = elohim_epr_cli::process::build_command("git", args, root, &[])
@@ -77,7 +77,10 @@ pub fn git(root: &Path, args: &[&str]) {
     assert!(out.status.success(), "git {args:?}");
 }
 
-#[allow(dead_code)]
+#[allow(
+    dead_code,
+    reason = "shared by every flow_memory_recall* test binary; one that never calls this helper compiles it dead"
+)]
 pub fn edge(root: &Path, from: &str, to: &str) {
     let seal = Some(*BlobCid::compute_raw(b"old").as_cid());
     let record = DepEdge::new(
@@ -99,7 +102,10 @@ pub fn edge(root: &Path, from: &str, to: &str) {
 
 /// A synthetic repository whose declared source scope is `docs/` and whose two stale edges give the
 /// ceremony something real to select.
-#[allow(dead_code)]
+#[allow(
+    dead_code,
+    reason = "shared by every flow_memory_recall* test binary; one that never calls this helper compiles it dead"
+)]
 pub fn repo() -> TempDir {
     // The recall goldens pin a rendering whose line truncation counts the fixture root's bytes
     // (`<FIXTURE_ROOT>` is substituted only after rendering), so the root sits at a fixed-length
@@ -178,7 +184,10 @@ pub fn contract_value(with_measurements: bool) -> Value {
     contract
 }
 
-#[allow(dead_code)]
+#[allow(
+    dead_code,
+    reason = "shared by every flow_memory_recall* test binary; one that never calls this helper compiles it dead"
+)]
 pub fn save_contract(root: &Path, contract: Value) {
     write(
         root,
@@ -216,12 +225,18 @@ pub fn run_in(root: &Path, session: &str, args: &[&str]) -> Run {
     }
 }
 
-#[allow(dead_code)]
+#[allow(
+    dead_code,
+    reason = "shared by every flow_memory_recall* test binary; one that never calls this helper compiles it dead"
+)]
 pub fn run(root: &Path, args: &[&str]) -> Run {
     run_in(root, SESSION, args)
 }
 
-#[allow(dead_code)]
+#[allow(
+    dead_code,
+    reason = "shared by every flow_memory_recall* test binary; one that never calls this helper compiles it dead"
+)]
 pub fn ok(root: &Path, args: &[&str]) -> Value {
     let run = run(root, args);
     assert_eq!(
@@ -239,7 +254,10 @@ pub fn ok(root: &Path, args: &[&str]) -> Value {
 /// `#[allow(dead_code)]`: this shared fixture module is included by every `flow_memory_recall*`
 /// test binary, and not every one of them calls every helper — a binary that does not is not
 /// dead code in the sense this lint means.
-#[allow(dead_code)]
+#[allow(
+    dead_code,
+    reason = "shared by every flow_memory_recall* test binary; one that never calls this helper compiles it dead"
+)]
 pub fn view_in(root: &Path, session: &str, args: &[&str]) -> Value {
     let run = run_in(root, session, args);
     assert_eq!(
@@ -252,7 +270,10 @@ pub fn view_in(root: &Path, session: &str, args: &[&str]) -> Value {
 
 /// The same invocation as [`view_in`], but the HUMAN rendering (no `--json`) — for a caller
 /// asserting on the printed screen rather than the payload.
-#[allow(dead_code)]
+#[allow(
+    dead_code,
+    reason = "shared by every flow_memory_recall* test binary; one that never calls this helper compiles it dead"
+)]
 pub fn text_in(root: &Path, session: &str, args: &[&str]) -> String {
     let mut command = Command::new(env!("CARGO_BIN_EXE_epr"));
     command
@@ -274,7 +295,10 @@ pub fn text_in(root: &Path, session: &str, args: &[&str]) -> String {
 /// Register an actor claim against the fixture root — `epr actor claim --as <ref> --session <id>
 /// --root <root>`. Requires a committed HEAD (claims are dated by the tree, never by wall clock —
 /// see `elohim_epr_rea::ActorClaim`), which [`repo`] already provides.
-#[allow(dead_code)]
+#[allow(
+    dead_code,
+    reason = "shared by every flow_memory_recall* test binary; one that never calls this helper compiles it dead"
+)]
 pub fn claim_actor(root: &Path, claimed: &str, session: &str) {
     let out = Command::new(env!("CARGO_BIN_EXE_epr"))
         .args(["actor", "claim", "--as", claimed, "--session", session])
@@ -294,7 +318,10 @@ pub fn claim_actor(root: &Path, claimed: &str, session: &str) {
 ///
 /// `begin` selects a concern edge, which is the ceremony door; a focused journey has no edge to
 /// select and is the shape several assertions below are about.
-#[allow(dead_code)]
+#[allow(
+    dead_code,
+    reason = "shared by every flow_memory_recall* test binary; one that never calls this helper compiles it dead"
+)]
 pub fn begin_focused(root: &Path, about: &str) {
     ok(
         root,
@@ -313,7 +340,10 @@ pub fn begin_focused(root: &Path, about: &str) {
 /// this file uses — `--contract` is omitted so `Args::new()`'s own default resolves it, which is
 /// the only way `Contract::question_bank()` can climb back to a real repository root (its doc
 /// comment on this).
-#[allow(dead_code)]
+#[allow(
+    dead_code,
+    reason = "shared by every flow_memory_recall* test binary; one that never calls this helper compiles it dead"
+)]
 pub fn run_in_bank(root: &Path, session: &str, args: &[&str]) -> Run {
     let mut command = Command::new(env!("CARGO_BIN_EXE_epr"));
     command
@@ -330,7 +360,10 @@ pub fn run_in_bank(root: &Path, session: &str, args: &[&str]) -> Run {
 }
 
 /// [`run_in_bank`], asserting success and returning the parsed `--json` payload.
-#[allow(dead_code)]
+#[allow(
+    dead_code,
+    reason = "shared by every flow_memory_recall* test binary; one that never calls this helper compiles it dead"
+)]
 pub fn ok_in_bank(root: &Path, session: &str, args: &[&str]) -> Value {
     let run = run_in_bank(root, session, args);
     assert_eq!(
@@ -353,7 +386,10 @@ pub fn ok_in_bank(root: &Path, session: &str, args: &[&str]) -> Value {
 /// verdict note lands on the fixture's own `recall::CONTRACT_REL` file (fix round 1, Q5 — the
 /// governed method already loaded, never a separately-stubbed plan doc), which this fixture
 /// already writes below.
-#[allow(dead_code)]
+#[allow(
+    dead_code,
+    reason = "shared by every flow_memory_recall* test binary; one that never calls this helper compiles it dead"
+)]
 pub fn repo_with_bank() -> TempDir {
     let dir = tempfile::tempdir().expect("tempdir");
     let root = dir.path();
@@ -461,7 +497,10 @@ pub fn repo_with_bank() -> TempDir {
 /// JSON shape `flow_memory_recall_sample.rs`'s assertions read (`measure`, `value`, `unit`, `env`)
 /// — a minimal, test-local re-derivation of `flow::report::read_folds`'s slot-prefix convention,
 /// since that reader is `pub(super)` to the library crate and this is a separate test binary.
-#[allow(dead_code)]
+#[allow(
+    dead_code,
+    reason = "shared by every flow_memory_recall* test binary; one that never calls this helper compiles it dead"
+)]
 pub fn flows(root: &Path) -> Vec<Value> {
     let records = SidecarFlowStore::open(root)
         .expect("flows sidecar opens")

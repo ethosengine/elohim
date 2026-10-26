@@ -1358,6 +1358,7 @@ dependencies = [
  "elohim-device-runtime",
  "elohim-epr",
  "elohim-epr-index",
+ "elohim-epr-lsp",
  "elohim-epr-rea",
  "elohim-rust-style",
  "eprfs-agent",
@@ -1393,6 +1394,20 @@ dependencies = [
  "serde_json",
  "sha2 0.10.9",
  "thiserror 2.0.18",
+]
+
+[[package]]
+name = "elohim-epr-lsp"
+version = "0.3.0"
+dependencies = [
+ "chrono",
+ "rustix",
+ "serde",
+ "serde_json",
+ "sha2 0.10.9",
+ "tempfile",
+ "thiserror 2.0.18",
+ "tokio",
 ]
 
 [[package]]

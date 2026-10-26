@@ -21,6 +21,8 @@ pub mod git;
 pub mod govern;
 pub mod hint;
 pub mod integrate;
+#[cfg(feature = "lsp")]
+pub mod lsp;
 #[cfg(feature = "peer")]
 pub mod peer;
 pub mod process;

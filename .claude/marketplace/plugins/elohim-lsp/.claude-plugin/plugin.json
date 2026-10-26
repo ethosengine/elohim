@@ -1,0 +1,5 @@
+{
+  "name": "elohim-lsp",
+  "version": "0.1.0",
+  "description": "One shared language server per (language, toolchain pin, checkout root); each session attaches through epr lsp attach and receives its own, caused-by-me and folded others' diagnostics."
+}

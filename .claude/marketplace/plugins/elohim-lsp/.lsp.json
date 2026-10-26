@@ -1,0 +1,10 @@
+{
+  "rust": {
+    "command": "${CLAUDE_PROJECT_DIR}/genesis/agentic/bin/lsp-attach",
+    "args": ["rust"],
+    "extensionToLanguage": { ".rs": "rust" },
+    "startupTimeout": 15000,
+    "restartOnCrash": true,
+    "maxRestarts": 3
+  }
+}

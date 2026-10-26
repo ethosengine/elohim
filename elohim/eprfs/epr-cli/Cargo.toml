@@ -19,12 +19,16 @@ path = "src/main.rs"
 [features]
 # `epr peer` and `epr flow fold` (the steward channel). On for the `epr` binary; the bridges that
 # reuse this crate's library take it without them, so they carry no iroh stack.
-default = ["peer"]
+default = ["peer", "lsp"]
 peer = ["dep:eprfs-peer", "dep:tokio"]
+# `epr lsp`: one shared, session-attributed language server per toolchain per checkout root.
+lsp = ["dep:elohim-epr-lsp", "dep:tokio"]
 
 [dependencies]
 ark-core = { package = "elohim-ark-core", path = "../../ark/core" }
 elohim-device-runtime = { path = "../device-runtime" }
+# `epr lsp`: the multiplexer, its attribution and its daemon.
+elohim-epr-lsp = { path = "../epr-lsp", optional = true }
 elohim-rust-style = { path = "../../../genesis/orchestrator/rust-style" }
 eprfs-core = { path = "../eprfs-core" }
 eprfs-agent = { path = "../eprfs-agent" }
