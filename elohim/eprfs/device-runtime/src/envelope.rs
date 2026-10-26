@@ -242,6 +242,10 @@ impl Store {
             Path::new("/proc")
         };
         if let Some(old) = self.read(proposed.id())? {
+            // TODO(security): `is_live()` is false at the seal checkpoint, before close has
+            // released berth facets, so a successor of an interrupted close revives the dead
+            // session's leases. Re-review this threat model when fixed:
+            // genesis/data/timeline/backlog/security-session-successor-admitted-before-facet-release.md
             if !old.is_live()
                 && old.owner_dead(admission_proc_root)
                 && proposed.identity.source == Source::RuntimeAncestor
