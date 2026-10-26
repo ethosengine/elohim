@@ -54,12 +54,18 @@ and R2. R4 is ruled (2026-10-26) and can run alongside. R5 measures throughout.
 
 ### R1. The launcher travels in the store (device-runtime)
 
-`bin-launch` is ingested and landed with `epr`, as one record or as a sibling tool in
-`genesis/agentic/bin-tools.json`. `epr device arrive` then installs the launchers for every
-registered tool (`epr`, `brit`, `brit-build-ref`, `brit-verify`) from the store's `current`,
-with no `--launcher` and no cargo. It installs them into a persistent directory on PATH and
-replaces any named shadow it finds. (`~/.local/bin` survived this restart, but `/opt/rust/cargo/bin`
-did not. The install directory should be chosen and declared, not assumed.)
+Slice M already carries half of this. Each release carries `bin-launch` beside `epr`; `land`
+refuses a release missing either; and `epr bin --tool epr install-launcher` installs the landed
+launcher with no `--launcher` and never falls back to an unrelated one. What R1 adds:
+
+- `epr device arrive` calls install-launcher for every registered tool (`epr`, `brit`,
+  `brit-build-ref`, `brit-verify`) from `current`, with no cargo, and replaces any named shadow.
+- brit needs a landed release in each device's store first. ethosengine has none yet ("brit
+  binary: no executable candidate, pin, or committed head"), while shem's store has one.
+- The install directory is declared device state, not a new environment knob. Slice M gives the
+  RuntimeManifest a `tools` field, written through the device chain and projected to
+  `bin-tools.json` beside the launcher, and that field names it. (`~/.local/bin` survived this
+  restart; `/opt/rust/cargo/bin` did not.)
 
 Probe: `arrive_installs_launchers_from_the_store_without_building`. Delete the launchers and the
 `/tmp` target, run `epr device arrive`, and assert no cargo process ran and that
@@ -68,7 +74,9 @@ Probe: `arrive_installs_launchers_from_the_store_without_building`. Delete the l
 ### R2. Arrival follows dev's landed release (device-runtime)
 
 When the store's head is behind the newest release published from `refs/remotes/origin/dev`
-(the registry's `publishedRef`), arrival lands it. When no candidate for that commit exists, it
+(the registry's `publishedRef`), arrival lands it. Session-arrival `follow` already does this once a
+candidate exists; that is how ethosengine landed 8c97287ff at 18:38Z on 2026-10-25. So the gap
+is the path with no candidate yet. When no candidate for that commit exists, it
 queues the bootstrap build (today's behaviour) and says so in one line. A session pinned to an
 older release keeps its pin (`state: behind`). Only new sessions and the daemon move.
 
@@ -93,8 +101,10 @@ as owner. Hooks keyed by the payload's session id (the head notice) won't see th
 
 Probe: `resumed_session_opens_a_successor_generation_after_its_owner_died`. Open, kill the owner,
 `gc`, then resume under the same runtime-named id. A successor generation opens, the predecessor's
-seal is unchanged, and a berth claim from it exits 0. Two refusals hold: the same flow with only
-a declared id, and the same flow while the owner is still alive.
+seal is unchanged, a berth claim from it exits 0, and the head-notice hook, which is keyed by
+the runtime's session id, reads the successor's pin (the blind spot of the `-r2` workaround).
+Two refusals hold: the same flow with only a declared id, and the same flow while the owner is
+still alive.
 
 ### R4. The daemon starts with one command (device-runtime, then the devfile)
 
@@ -104,16 +114,19 @@ Today `devfile.base.yaml` `peer-serve` says serving is "on demand only … an op
 never workspace arrival". That comment is not a governed rule with an ID, so no `variesRule`
 clause applies. This lane rewrites the comment to match the ruling.
 
-The mechanism: one idempotent command, `epr peer up`, with the name to be settled in R4. It
-starts `epr peer serve` on the store's `current`, with the relay and listen address declared
-for the device (the devfile's `EPR_PEER_RELAY_URL` and `EPR_PEER_PORT`). It returns once the
+The mechanism: one idempotent command, `epr peer up`. It starts `epr peer serve` on the store's
+`current`. It reads the relay and listen port from the device's declaration (slice M's runtime
+manifest), with `EPR_PEER_RELAY_URL` and `EPR_PEER_PORT` as overrides, so two devices cannot drift
+on relay and the devfile only has to call it. It returns once the
 daemon is serving. When a daemon is already at `current`, it does nothing. When the running
 daemon is behind `current`, it restarts it, because `daemon-not-current` already refuses a stale
 one. On a device with no PeerEndpoint row on its steward's roster, it refuses and names
 `epr actor device endpoint`.
 
 Who calls it is configuration, not doctrine. The devfile's `postStart` may call it, so may
-`epr device arrive` when the device declares so, and so may an operator by hand. The arriving
+`epr device arrive` when the device declares so, and so may an operator by hand. A failed
+`postStart` command aborts the whole workspace start, so the devfile's call logs the refusal line
+and exits 0. `epr peer up` itself keeps its exit codes for operators. The arriving
 agent session never supervises the daemon.
 
 Probe: `a_restarted_device_is_heard_within_its_freshness`. After restart and arrival, the
@@ -137,8 +150,17 @@ across restarts.
 - After a restart, `epr peer up` (or whatever the device configures to call it) is the only step
   needed to be heard by the other device again.
 
+## Dependency: slice M
+
+R1's remaining half and R4 build on slice M (the bin-launch release pairing and the RuntimeManifest
+`tools` field). Slice M changes storage's `release_adoption` and `http.rs`, so it must pass the
+NO-SERVING-RECEIPT rule: the household stories `epr-app-deliverability` and
+`app-delivery-refuses-fast` must pass on its exact source before pre-push admits it. That chain
+was running on 2026-10-26 and takes hours. R3 starts on top of slice M's commit and rebases when M
+lands.
+
 ## Split between the two sessions
 
-The device-runtime session on ethosengine takes R1, R2 and R3, and R4's mechanism once ruled;
+The device-runtime session on ethosengine took R1–R4 on 2026-10-26, with the changes above;
 these are in `elohim/eprfs/{epr-cli,device-runtime}`. This side takes step 0 and R5, and runs
 the restart test on shem. Each lane lands by its own gated push.

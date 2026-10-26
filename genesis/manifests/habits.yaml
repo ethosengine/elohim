@@ -949,17 +949,17 @@ habits:
       model, fold and berth enhancements may be degraded. Every REFUSED line names the
       command that cures it. Nothing about arrival depends on a visitor's cache or on another
       workspace's keystore.
-    status: green
+    status: red
     active: false
     checks:
       - "just status device — exit 0 with eight ok/degraded lines on the live device; native checks: elohim/eprfs/epr-cli/src/device/arrival.rs and tests/device_arrival.rs"
       - "a2o @concern:workspace-device-arrival (genesis/a2o/features/devflow/workspace-device-arrival.feature — a keyless workspace is refused by name and nothing else blocks; a second device joins through the first with no key crossing; a missing model names its provisioner; @act:host @requires:epr-cli; all five scenarios are wired, including local candidates with degraded enhancements)"
       - "epr flow report --headline — the `index:` slot reads within the fold-lag ceiling on this device (index-fold-lag-ceiling@1; lag reached its limit once on 2026-10-16), and `participant:` names a standing human by the tracked roster"
     evidence: >
-      DELTA 2026-10-25b (GREEN held, a landing with no hand step): the push of 16af7710f (fc477d91c..16af7710f: pre-push delivers a receipt-attested eprfs build; berth leases from linked worktrees; strict envelope labels) passed every gate (ALL CLEAR 464 s, eprfs on its receipt). Pre-push's own land was refused `unpublished`, correctly: the commit is not on dev until the push completes. Session arrival's `follow` then landed the eprfs gate's ingested candidate bafkreie45mgd3gy2b5klx2qldsmm2xtrho52fridbx32wpwierr6wnsfvu at 13:23:59Z, with no rebuild, and a fresh session's `just status device` reads `epr binary: bafkreie45… vs head bafkreie45… (session-pin)`. Every earlier landing was by hand. Open: a release carries `epr` only, so arrival's install-launcher reinstalls the existing launcher; `bin-launch` stays at the 12:00 build until slice M declares it in the tool's bins.
-    evidence-fingerprint: sha256:8456aef9b76bd3e9
-    evidence-bytes: 7460
-    evidence-entries: 7
+      DELTA 2026-10-26 (RED, measured after a restart): shem's workspace restarted at 22:19:51Z on 2026-10-25 and did not re-arrive. At 02:25Z on 2026-10-26, `just status device` exits 1 with REFUSED epr binary and REFUSED brit binary (temporary links stand in front of a launcher that was never installed). `epr device arrive` refuses `pass --launcher PATH`, because `bin-launch` only ever lived in /tmp/eprfs-gate-target. Recovery took six manual steps, and the peer daemon was down for 2 h 14 min. The cure the REFUSED line names cannot run without a build. Plan: genesis/docs/superpowers/sprints/2026-10-26-restart-to-connected-sprint-plan.md (R1–R5); the R5 restart-to-connected receipt returns it to green.
+    evidence-fingerprint: sha256:975e78cd66df8f7d
+    evidence-bytes: 8169
+    evidence-entries: 8
     refs:
       - "spec: elohim/lvi/docs/specs/2026-10-10-workspace-arrival-as-declared-device.md (the mapping of every init surface onto DevspaceSeed / Berth / device key / model pin; the three enrollment layers; the record-without-witness seam §6.3)"
       - "the devfile's arrival commands: devfile.base.yaml `setup-embed-model` + `setup-device-memory` (postStart); the provisioners genesis/agentic/bin/{embed-model-provision,device-memory-sync}"

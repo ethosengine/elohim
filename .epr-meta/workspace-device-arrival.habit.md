@@ -11,7 +11,7 @@ invariant: >
   model, fold and berth enhancements may be degraded. Every REFUSED line names the
   command that cures it. Nothing about arrival depends on a visitor's cache or on another
   workspace's keystore.
-status: green
+status: red
 active: false
 checks:
   - "just status device — exit 0 with eight ok/degraded lines on the live device; native checks: elohim/eprfs/epr-cli/src/device/arrival.rs and tests/device_arrival.rs"
@@ -76,3 +76,4 @@ within hard 25 ✅` and `participant: human:matthew (… standing; witnessed …
 green end to end on 894eaf58f. Standing frontier, not a status question: the three conditions read
 on the device but not fixture-proven (the @wip scenario), and the record-without-witness seam named
 in the lvi arrival spec §6.3.
+DELTA 2026-10-26 (RED, measured after a restart): shem's workspace restarted at 22:19:51Z on 2026-10-25 and did not re-arrive. At 02:25Z on 2026-10-26, `just status device` exits 1 with REFUSED epr binary and REFUSED brit binary (temporary links stand in front of a launcher that was never installed). `epr device arrive` refuses `pass --launcher PATH`, because `bin-launch` only ever lived in /tmp/eprfs-gate-target. Recovery took six manual steps, and the peer daemon was down for 2 h 14 min. The cure the REFUSED line names cannot run without a build. Plan: genesis/docs/superpowers/sprints/2026-10-26-restart-to-connected-sprint-plan.md (R1–R5); the R5 restart-to-connected receipt returns it to green.
