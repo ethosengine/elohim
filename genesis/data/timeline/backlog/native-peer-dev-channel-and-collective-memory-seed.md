@@ -125,3 +125,48 @@ Its limits, so the rudimentary form is not mistaken for the finished one:
 
 This reframes the campaign: it may be mostly about what to add on top of converging roots
 (privacy, latency, volume) and little about inventing a transport.
+
+## The operator's direction, 2026-10-26: a dev release channel whose candidate heads earn reach
+
+Prompted by the canonical household losing its install bundle: its conductors run DNA hashes no
+bundle on disk reproduces, so `join-peer` cannot cast a new peer onto them.
+
+> "I feel like we should be able to... see the bundles FROM the network, and get the bundles' we're
+> deployed on.. when we're building/updating, we're building snapshot bundles that become options
+> for our local device-level dev channel, and become visible to the dev, peer-device channel, since
+> ethosengine and shem are matthew's stewarded peer devices.. something like that."
+
+> "building.. and earning reach for those channels.. (up the trust curve), give's the opportunity
+> for the devs in different workspaces to elect candidate heads to coordinate on..."
+
+How it composes with what exists. This is a mapping, not a design; the P2P design gate runs first.
+
+- **The channel is already specified.** `2026-09-01-runtime-artifacts-elected-content-design.md`
+  §3: `runtime:<class>:<network>:<channel>`, reach-scoped from birth, a staging-to-earned election,
+  and promotion up the reach ladder as a ceremony act. A self-reach `happ` (and coordinator,
+  binary) channel whose members are the operator's stewarded devices is the ladder's bottom rung,
+  not a new system.
+- **Every build is a candidate.** Each local or CI build publishes its bundle as a content-addressed
+  blob plus a release manifest, as a staging version. Each install records the channel version it
+  used, so a running peer's DNA hashes resolve to the exact bundle. A network then cannot lose the
+  bundle it is running.
+- **Workspaces elect heads by attestation.** Another device adopts the candidate in
+  `release_adoption`'s `canary` mode, soaks it (gates, household stories, live use) and signs a
+  SoakAttestation. A finding is a contest with evidence. Attestations from distinct devices that
+  meet the threshold promote the head to earned: a head the workspaces coordinate on. The R3
+  follow-ups of 2026-10-26 ran this loop by hand: shem verified R3 live, reported four findings over
+  a bridge message, and ethosengine fixed and announced them.
+- **Gate evidence becomes shareable.** Gate reuse (`GATE_EVIDENCE=reuse`) refuses another signer's
+  attestation, so each workspace pays for the same closure. A device's green gate attestation,
+  counted as a soak attestation on the candidate, would let one closure pay once across the
+  operator's devices.
+- **The bootstrap caveat may dissolve here.** The spec's §6 caveat says a fresh joiner cannot
+  resolve the channel that supplies its DNA. Carried on the eprfs peer channel between devices bound
+  to one steward, which needs no shared DNA, it can.
+- **Limits kept.** Adoption is consent, and a head never widens its own reach. Promotion beyond the
+  steward's devices is a ceremony act. No single device is terminal authority; contest and revert
+  stay open to any member.
+
+Immediate step, separate from the design: recover the household's missing bundle from a running
+conductor (its stored wasm and its DNA definitions), check that the DNA hashes match, then cast adam
+to finish slice M's serving receipt.
