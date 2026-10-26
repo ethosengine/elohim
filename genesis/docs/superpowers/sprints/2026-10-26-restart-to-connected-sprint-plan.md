@@ -8,7 +8,7 @@ habits: [workspace-device-arrival, devices-share-one-berth]
 cites:
   - .epr-meta/workspace-device-arrival.habit.md
   - genesis/agentic/.epr-meta/devices-share-one-berth.habit.md
-  - genesis/docs/superpowers/sprints/2026-10-25-gate-merge-sprint-plan.md
+  - gate-merge-sprint-plan-20261025 | Sprint plan | sha256:45b16a3ea7f20ce0 | path: genesis/docs/superpowers/sprints/2026-10-25-gate-merge-sprint-plan.md
 ---
 
 # Sprint plan — a restarted workspace returns to latest and to its peers in one step
