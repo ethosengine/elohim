@@ -355,7 +355,10 @@ async function registerHuman(
 async function verifyExisting(
   doorwayUrl: string,
   creds: { identifier: string; password: string; displayName: string },
-  displayName: string
+  displayName: string,
+  // Registration's 409 proves the account exists; an operator lookup proves nothing, and the
+  // doorway answers 401 alike for a missing account and a wrong password.
+  existenceProven = true
 ): Promise<RegisterResult> {
   try {
     const loginRes = await sendRetryingShed(() => fetch(`${doorwayUrl}/auth/login`, {
@@ -381,7 +384,9 @@ async function verifyExisting(
       displayName,
       identifier: creds.identifier,
       result: 'failed',
-      error: `Credential drift: exists but login failed (HTTP ${loginRes.status})`,
+      error: existenceProven
+        ? `Credential drift: exists but login failed (HTTP ${loginRes.status})`
+        : `login refused (HTTP ${loginRes.status}) for ${creds.identifier}: no doorway account, or a different password. An operator must be cast and registered first; a node-phase operator needs its own conductor named in CONDUCTOR_URLS`,
     };
   } catch (err) {
     return {
@@ -672,7 +677,7 @@ export async function operatorAgentKeysFromLogin(
   for (const id of new Set(humanIds)) {
     const human = humans.find(h => h.id === id);
     if (!human) throw new Error(`OPERATOR_HUMAN_MISSING: ${id}`);
-    const result = await verifyExisting(doorwayUrl, deriveCredentials(human), human.displayName);
+    const result = await verifyExisting(doorwayUrl, deriveCredentials(human), human.displayName, false);
     if (result.result === 'failed') {
       throw new Error(`OPERATOR_LOGIN_FAILED: ${id}: ${result.error}`);
     }
