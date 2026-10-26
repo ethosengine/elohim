@@ -1,0 +1,28 @@
+[package]
+name = "elohim-epr-lsp"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+authors.workspace = true
+repository.workspace = true
+description = "One shared, session-attributed language server per toolchain per checkout root"
+publish = false
+
+[lib]
+name = "elohim_epr_lsp"
+path = "src/lib.rs"
+
+[dependencies]
+# RFC 3339 timestamps on the C2 edit log and the attribution records.
+chrono = "0.4"
+# The device lock (`flock`), as a safe call.
+rustix = { version = "1", features = ["fs"] }
+serde.workspace = true
+serde_json.workspace = true
+# root12: the first 12 hex of sha256 over the canonical checkout root (contract C3).
+sha2 = "0.10"
+thiserror.workspace = true
+tokio = { workspace = true, features = ["fs", "io-std", "io-util", "net", "process", "rt-multi-thread", "signal", "sync", "time"] }
+
+[dev-dependencies]
+tempfile = "3"

@@ -29,6 +29,18 @@ fn main() -> ExitCode {
     if raw.first().map(String::as_str) == Some("bin") {
         std::process::exit(elohim_epr_cli::bin::run(&raw[1..]));
     }
+    // `lsp` is the editor's stdio endpoint and its daemon: it must answer before any session
+    // envelope work, renders its own output, and never lets a missing server fail an edit.
+    #[cfg(feature = "lsp")]
+    if raw.first().map(String::as_str) == Some("lsp") {
+        return match elohim_epr_cli::lsp::run(&raw[1..]) {
+            Ok(code) => code,
+            Err(error) => {
+                eprintln!("epr lsp: {error}");
+                ExitCode::from(2)
+            }
+        };
+    }
     if matches!(raw.first().map(String::as_str), Some("--version" | "-V")) {
         println!("{}", govern::evaluator_identity());
         return ExitCode::SUCCESS;
@@ -271,7 +283,7 @@ fn run() -> Result<(Report, bool)> {
 }
 
 /// Every top-level command, as a person types it.
-const COMMANDS: [&str; 13] = [
+const COMMANDS: [&str; 14] = [
     "setup",
     "doctor",
     "explain",
@@ -285,6 +297,7 @@ const COMMANDS: [&str; 13] = [
     "identity",
     "covenant",
     "peer",
+    "lsp",
 ];
 
 fn global_args(args: Vec<String>) -> Result<(Option<PathBuf>, Vec<String>)> {
@@ -379,5 +392,5 @@ fn print_human(report: &Report) {
 }
 
 fn usage() -> &'static str {
-    "epr session id|open [--model MODEL]|show|close|gc [--json]\n\nusage: epr [--repo PATH] [--json] <setup|doctor|explain PATH|check [PATH...]|govern --path REL ...|ready [--target REF] [--deep]|integrate --acceptance CID [--root DIR]|flow ...|actor <claim --as agent:<role>@<model> [--session ID]|current [--session ID]>|canon-lift [--check|--write]|device <ask|redeem|approve> ...|identity <begin|standing> ...|covenant <offer|show|check|record> [--session ID] ...|peer <id|serve|status> ...>"
+    "epr session id|open [--model MODEL]|show|close|gc [--json]\n\nusage: epr [--repo PATH] [--json] <setup|doctor|explain PATH|check [PATH...]|govern --path REL ...|ready [--target REF] [--deep]|integrate --acceptance CID [--root DIR]|flow ...|actor <claim --as agent:<role>@<model> [--session ID]|current [--session ID]>|canon-lift [--check|--write]|device <ask|redeem|approve> ...|identity <begin|standing> ...|covenant <offer|show|check|record> [--session ID] ...|peer <id|serve|status> ...|lsp <attach|serve|show> ...>"
 }

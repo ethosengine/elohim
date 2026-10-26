@@ -3,6 +3,7 @@ resolver = "2"
 members = [
     "device-runtime",
     "epr-cli",
+    "epr-lsp",
     "eprfs-agent",
     "eprfs-cli",
     "eprfs-core",
