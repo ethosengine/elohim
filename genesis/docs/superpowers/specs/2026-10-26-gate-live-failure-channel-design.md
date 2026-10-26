@@ -50,7 +50,8 @@ what it was: the brit `brit.gate-verdict` attestation against the gate's input c
 `gate-cycle-seconds@1` row (`push-gate-pays-once`).
 
 A run with no `run-close` reads `interrupted` once it is stale, and `running` before that. Silence is
-never read as `passed`.
+never read as `passed`. An interrupted Task gives no new verdict. Its `Unanswered` answer makes the
+run close `interrupted`, and the gate records no new brit evidence.
 
 ## 3. Local-first reading
 
@@ -64,9 +65,10 @@ never read as `passed`.
   an *observation*: stored on the device, read by the pushing session, pruned when the next run
   opens, never on a timer. The *published* verdict is unchanged. Live progress ("still compiling")
   is not carried; if it is ever wanted it is passing state on the live-session plane.
-- **Arrivals.** The steward's other devices (L1) add watching a push from elsewhere and learn
-  project, class, fingerprint, place and verdict, never excerpt text. A CI runner (L2) adds an
-  independent second witness inside its grant's reach. Subscribers to a reach-scoped channel (L3)
+- **Arrivals.** The steward's other devices (L1) would add watching a push from elsewhere.
+  Excerpts stay local; which places and paths may cross still needs a disclosure ruling.
+  A CI runner (L2) would add an independent second witness within its declared observation reach.
+  That reach is not supplied by a compute grant. Subscribers to a reach-scoped channel (L3)
   add collaborators following a candidate; a host carrying it adds capacity and gains no say over
   heads. Losing any of them leaves the device's own run log working.
 - **Shown to the person.** Each failure as it lands, each gate's verdict, and the run's outcome
@@ -89,9 +91,9 @@ push; the device keeps the last twenty runs.
 - **No zome, no route.** L3 graduates through the observation layer (signed per-observer log, cursor
   gossip, equal-peer pull), never a DHT entry per event.
 - **SDO/RWA.** The worst holder of the device sees failure excerpts, which can contain environment
-  values. Excerpts therefore never leave the device; a crossing event carries fingerprint, class,
-  place and verdict only (workspaces spec §3.3). A failure is not a sanction: no event feeds
-  standing or contribution.
+  values. Excerpts therefore never leave the device. Removing them does not authorize disclosure
+  of a place, path or test name. That ruling is still open (workspace-discipline backlog row 52).
+  A failure is not a sanction: no event feeds standing or contribution.
 - **Concerns.** C4: an unclosed run reads interrupted. C5: an event never gates. C6a: excerpts are
   capped at 20 lines and 2 KB, a run at 200 failures, with the overflow counted. C8: `first_red_s`.
 
@@ -106,13 +108,20 @@ push; the device keeps the last twenty runs.
               nth, excerpt },                       // failure, detail
   exit?,                                            // step-failed
   verdict?: { exit, seconds, failure_class, failures, overflow?, evidence?, reused?, deferred? },
-  outcome?: passed | failed | interrupted }         // run-close
+  derivation?: { method, input, hit },               // Task gate-verdict; method/input are CIDs
+  status?: Answered | Unanswered,                   // Task gate-verdict
+  unanswered?: { why, comeBack, meanwhile, escalation? }, // gate-verdict and interrupted run-close
+  outcome?: passed | gates-passed | failed | interrupted } // run-close
 ```
 
 `failure` is raised at the line that names it (cargo's `test x ... FAILED`), so it arrives before
 the panic block; the block follows as `detail` with the same fingerprint. Fingerprints use the
 ci-harvest normalization, so the same failure on two runs has one fingerprint. `excerpt` is
 device-only; every crossing rung removes it.
+
+Task fields wrap the existing verdict. `Answered` includes a completed red gate and a reused green
+verdict. `Unanswered` carries no new verdict. The full answer and derivation are in the run log;
+`follow` prints a shorter line. `gates-passed` closes the gate loop while later pre-push checks remain.
 
 ## 6. Graduation ladder
 
@@ -122,35 +131,84 @@ below it.
 | Rung | Reader | Transport |
 |---|---|---|
 | L0 (this slice) | the session holding the push lease | the run log on the device; `gate-live.mjs follow` |
-| L1 | the steward's other devices | a `gate-live-events@1` FlowEvent through `epr flow note`, added to `berth.channel.crosses`; `epr peer serve` gossips and folds it |
-| L2 | the same channel, a second witness | a CI runner, as a sponsored service agent, emits the same events from its stages (`ci-as-steward-channel-participant`). The native emitter becomes `rakia-executor`'s task stream, supervised by ark beside its death witnesses; the schema moves to rakia `schemas/v1/`; `gate-tap.mjs` and `gate-runner.mjs` become adapters, as Husky already is |
-| L3 | people subscribed to a candidate or branch at a declared reach | the observation layer: signed per-observer log, cursor gossip, pull by equal peers; channels named like release channels and widened by ceremony; "one bounded project/branch cursor, do not poll" |
+| L1 | the steward's other devices | proposed `gate-live-events@1` FlowEvents through `epr flow note` and `berth.channel.crosses`; waits on disclosure and retention bounds (row 52) |
+| L2 | the same channel, a second witness | a CI runner is a sponsored service agent. Publication waits on observation authority and a reach ceiling (row 51). Native emission also waits on provider acceptance, completion and receipt resolution (row 49). The SDK schema at `elohim/sdk/schemas/v1/gate-live-event.schema.json` owns the event vocabulary |
+| L3 | people subscribed to a candidate or branch at a declared reach | the observation layer: signed per-observer log, cursor gossip, pull by equal peers. Delivery waits on an authorized signer and a second-person subscriber (row 50); "one bounded project/branch cursor, do not poll" |
 
 The Scion/GitLab direction, latest code running on a server, lands at L2 and L3 inverted: the
 always-on host is a hub guest under a `delegates-compute` commitment that adds capacity, and the
 device's own run stays the floor.
 
-## 7. What this slice builds
+## 7. Built: local placement Task and derivation
 
-- `genesis/orchestrator/gate-failure-lines.mjs` — a line-at-a-time recognizer for cargo, rustc,
-  clippy, rustfmt, vitest, tsc, eslint, node test and just output. It raises failures, fills the
-  `classifyFailure` signals and counts the first red.
-- `genesis/orchestrator/gate-tap.mjs` — wraps one gate command: bytes forwarded unchanged, exit status
-  or signal passed through, failures appended to the run as they print, signals returned on fd 3.
-- `genesis/orchestrator/gate-live.mjs` — the run log: `open`, `event`, `close`, `follow`, `show`.
-  `follow` with no selector follows the caller's own session and waits past the previous push's
-  closed run.
-- `gate-runner.mjs` runs each gate (and its rust-style floor) through the tap, emits `gate-start` and
-  `gate-verdict`, and writes `failure_class` and `first_red_s` on the cycle row, which delivers the
-  output capture `push-gate-pays-once` named D2b. `GATE_TAP=off` runs untapped.
-- `.husky/pre-push.bash` opens a run before the gate loop, closes it `passed` or `failed` after, and
-  closes it `interrupted` from its exit trap.
+The orchestrator gate now runs through `ark task run`. `GATE_TASK` defaults on for that project
+only. `gate-task.mjs` prepares the Task; `gate-runner.mjs` runs it through the existing tap.
+Commits `adc2a2059` and `d453d99e7` built this path.
+
+The method family is `brit-gate:`. It derives `GrantScope::OwnEnvelope`. In
+`elohim/ark/cli/src/task.rs`, `decide_private` checks the device's choice to carry the Task.
+Placement then admits it against the device's own offer. It runs in that device's own envelope,
+offline, with no grant. Completion names the local device and time.
+
+The input root is a CID, a content identifier. `ark task spec` builds it from `gate-evidence.mjs`'s
+canonical closure material: sorted JSON with no whitespace. Rust builds an eprfs tree with one
+leaf per field. The tree's CID is the input root. The sha256 of the JSON stays brit's dedup key.
+A derivation pairs the method CID with that input root and points to the saved verdict.
+
+Before starting a gate child, ark asks the brit-backed `DerivationIndex` in `brit_index.rs`.
+An admissible hit runs no gate child. It still requires `GATE_EVIDENCE=reuse`, an enabled project,
+clean inputs, and the newest attestation to be green and signed by this workspace. Ark also
+requires an unchanged repository tree since that attestation. It does not ask rakia to judge
+changes outside the closure. On a miss, ark runs `run-local-gate.sh` under its native driver.
+
+The gate prints `reused: derivation hit` on a hit. Its `gate-verdict` event carries
+`derivation: { method, input, hit }` and `status: Answered`. A completed execution also has
+`Answered`, including a red result. The brit attestation stays the verdict record. The derivation
+wraps it. `DerivationIndex::record` writes no second store; the gate runner remains the writer.
+
+SIGINT or SIGTERM during execution produces `Unanswered`. The terminal names the interrupt.
+The run log carries three parts: `why` is `not-carried`; `comeBack` names `rerun-requested`;
+`meanwhile` says what is available now. `use-held` points to an existing attestation with a brit
+lookup command. It does not certify that attestation as reusable. With none held, `nothing`
+explains that this closure has no verdict and an interrupted run cannot supply one.
+`gate-live.mjs` carries this answer into `run-close` and sets its outcome to `interrupted`.
+The runner records no new verdict evidence for that interrupted gate.
+
+With no closure material, no usable ark, or ark exit 75, the runner prints one visible
+`gate-task: … — ran direct` line and takes the old path. The default ark lookup rejects a missing
+or stale pool binary; an explicit executable `ARK_BIN` overrides that lookup. Missing material
+can follow a dirty native closure. A dirty tree alone does not always remove material: the
+orchestrator path can retain it, run through ark, and refuse reuse and evidence recording.
+
+The live channel still uses the same parts:
+
+- `gate-failure-lines.mjs` recognizes each failure line and counts the first red.
+- `gate-tap.mjs` forwards output unchanged and appends failures as they print.
+- `gate-runner.mjs` emits gate events and records `failure_class` and `first_red_s` on the cycle row.
+  `GATE_TAP=off` runs untapped.
+- `gate-live.mjs` stores the run log and offers `open`, `event`, `close`, `follow` and `show`.
+  `follow` defaults to the caller's session and waits past its previous closed run.
+- `.husky/pre-push.bash` opens the log before the gate loop and closes it on completion or interruption.
+
+Ark also runs the device's declared residents through `epr device supervise`
+(`06dd6c51c`, `a3dfff3c7`). A gate Task needs no resident supervisor. Pre-push leaves the resident
+language server's rust-analyzer running when it carries `ELOHIM_SESSION_ID=lsp-device`
+(`5bb980361`). Its flycheck builds yield to a running gate (cargo-disk-guard Rule 4); stray servers are still paused.
+
+Commit `d453d99e7` records live proof in a scratch clone of this branch: a miss took 469 s;
+the unchanged rerun hit in 23 s with no child. SIGTERM produced the three-part `Unanswered`
+answer, closed the run `interrupted`, and recorded no evidence.
 
 ## 8. Frontier
 
-- L1–L3 as above. L2 waits on the runner-identity question in `ci-as-steward-channel-participant`;
-  moving rakia's pin rolls the fleet, so the schema lands upstream first.
-- Fail-at-end inside a project (cargo `--no-fail-fast`, recipes that continue past a red step) would
-  surface more trailing failures. It changes gate cost and meaning, so it is an operator decision.
-- Running likely-red gates first, ordered by the red rate in the gate-cycle rows, would bring the
-  first event forward.
+Commit `8d1fc89ed` puts the deferred work in rows 49–53 of
+`genesis/data/timeline/backlog/arch-workspace-discipline-backlog.md`.
+
+- Native emission waits on provider acceptance, completion and receipt resolution (row 49).
+  A local Task does not prove that provider path.
+- Observations reaching another person wait on an authorized signer and subscriber (row 50).
+- CI identity is settled: the runner is a sponsored service agent. Its observation authority and
+  publication reach ceiling remain open (row 51).
+- Device crossing waits on a disclosure ruling for paths and loci, and bounded retention (row 52).
+- Tests mode and red-first ordering wait on method identity covering every execution-changing
+  parameter. `all` mode is dropped because it would add a second recipe executor (row 53).

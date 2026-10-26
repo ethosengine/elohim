@@ -946,8 +946,8 @@ fi
 #
 # A rust-analyzer the device's resident language server started (`epr lsp serve --device`
 # marks each child ELOHIM_SESSION_ID=lsp-device) is never paused: it serves every attached
-# session, and freezing it stalls all of their editors. Its builds already yield to the
-# gate's cargo lease. Only strays — a per-session server, an editor's own — are paused.
+# session, and freezing it stalls all of their editors. Its flycheck builds already yield to a
+# running gate (cargo-disk-guard Rule 4). Only strays — a per-session server, an editor's own — are paused.
 ra_strays() {
   local pid
   for pid in $(pgrep -f rust-analyzer 2>/dev/null || true); do
