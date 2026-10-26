@@ -943,9 +943,24 @@ fi
 # SIGSTOP freezes the process (no new allocations, OS can reclaim pages).
 # SIGCONT resumes on any exit — normal, error, or signal.
 
+#
+# A rust-analyzer the device's resident language server started (`epr lsp serve --device`
+# marks each child ELOHIM_SESSION_ID=lsp-device) is never paused: it serves every attached
+# session, and freezing it stalls all of their editors. Its builds already yield to the
+# gate's cargo lease. Only strays — a per-session server, an editor's own — are paused.
+ra_strays() {
+  local pid
+  for pid in $(pgrep -f rust-analyzer 2>/dev/null || true); do
+    if { tr '\0' '\n' <"/proc/$pid/environ"; } 2>/dev/null | grep -qx 'ELOHIM_SESSION_ID=lsp-device'; then
+      continue
+    fi
+    echo "$pid"
+  done
+}
+
 RA_PIDS=""
 if command -v pgrep >/dev/null 2>&1; then
-  RA_PIDS=$(pgrep -f rust-analyzer 2>/dev/null || true)
+  RA_PIDS=$(ra_strays)
 fi
 
 resume_rust_analyzer() {
