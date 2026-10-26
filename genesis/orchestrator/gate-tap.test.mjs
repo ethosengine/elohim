@@ -1,0 +1,150 @@
+import { describe, test } from 'node:test';
+import { strict as assert } from 'node:assert';
+import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { spawnSync } from 'node:child_process';
+import { tmpdir } from 'node:os';
+import { resolve, dirname } from 'path';
+import { fileURLToPath } from 'url';
+import { lineSplitter, tapChildEnv } from './gate-tap.mjs';
+
+const TAP = resolve(dirname(fileURLToPath(import.meta.url)), 'gate-tap.mjs');
+
+// Two failing cargo tests, a panic for each, and the binary's verdict, the way cargo prints them.
+const CARGO_RED = [
+  'running 3 tests',
+  'test ok_one ... ok',
+  'test parses_head ... FAILED',
+  'test folds_twice ... FAILED',
+  '',
+  'failures:',
+  '',
+  '---- parses_head stdout ----',
+  "thread 'parses_head' panicked at src/head.rs:41:9:",
+  'assertion `left == right` failed',
+  '',
+  '---- folds_twice stdout ----',
+  "thread 'folds_twice' panicked at src/fold.rs:88:5:",
+  'already folded',
+  '',
+  'failures:',
+  '    folds_twice',
+  '    parses_head',
+  '',
+  'test result: FAILED. 1 passed; 2 failed; 0 ignored',
+].join('\n');
+
+function tap(t, script, { run = true } = {}) {
+  const dir = mkdtempSync(resolve(tmpdir(), 'gate-tap-'));
+  t.after(() => rmSync(dir, { recursive: true, force: true }));
+  const runPath = resolve(dir, 'run.jsonl');
+  if (run) writeFileSync(runPath, '');
+  const result = spawnSync(process.execPath, [TAP, '--project', 'fixture', ...(run ? ['--run', runPath] : []), '--', 'bash', '-c', script],
+    { encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe', 'pipe'], timeout: 15000 });
+  const events = run ? readFileSync(runPath, 'utf8').split('\n').filter(Boolean).map(line => JSON.parse(line)) : [];
+  const summary = JSON.parse(String(result.output[3]).trim());
+  return { result, events, summary };
+}
+
+describe('gate-tap', () => {
+  test('forwards bytes unchanged and keeps the exit status as the verdict', t => {
+    const script = `cat <<'EOF'\n${CARGO_RED}\nEOF\necho "warning: on stderr" >&2\nexit 101`;
+    const { result, events, summary } = tap(t, script);
+    assert.equal(result.status, 101);
+    assert.equal(result.stdout, `${CARGO_RED}\n`);
+    assert.equal(result.stderr, 'warning: on stderr\n');
+    const failures = events.filter(e => e.kind === 'failure');
+    assert.deepEqual(failures.map(e => e.failure.locus.test), ['parses_head', 'folds_twice']);
+    assert.equal(summary.failures, 2);
+    assert.equal(summary.signals.assertionFailed, true);
+    assert.equal(summary.signals.testOutput, true);
+  });
+
+  test('a green exit stays green whatever the output looked like', t => {
+    const { result, summary } = tap(t, 'echo "test looks_bad ... FAILED"; exit 0');
+    assert.equal(result.status, 0);
+    assert.equal(summary.failures, 1);
+  });
+
+  test('a red exit with nothing recognized stays red', t => {
+    const { result, events, summary } = tap(t, 'echo "something odd"; exit 3');
+    assert.equal(result.status, 3);
+    assert.equal(events.length, 0);
+    assert.equal(summary.failures, 0);
+    assert.equal(summary.firstRedSeconds, null);
+  });
+
+  test('runs with no live run open and still reports on fd 3', t => {
+    const { result, summary } = tap(t, 'echo "test x ... FAILED"; exit 1', { run: false });
+    assert.equal(result.status, 1);
+    assert.equal(summary.failures, 1);
+  });
+
+  test('carries a signal death through', t => {
+    const { result } = tap(t, 'kill -TERM $$');
+    assert.equal(result.signal, 'SIGTERM');
+  });
+
+  test('refuses a missing command with usage', () => {
+    const result = spawnSync(process.execPath, [TAP, '--project', 'x'], { encoding: 'utf8' });
+    assert.equal(result.status, 2);
+    assert.match(result.stderr, /usage: gate-tap/);
+  });
+
+  test('splits lines across chunk boundaries and keeps a trailing partial', () => {
+    const lines = [];
+    const split = lineSplitter(line => lines.push(line));
+    split.write(Buffer.from('test a ... FA'));
+    split.write(Buffer.from('ILED\nsecond\nthi'));
+    split.end();
+    split.write(Buffer.from('rd'));
+    split.end();
+    assert.deepEqual(lines, ['test a ... FAILED', 'second', 'thi', 'rd']);
+  });
+
+  test('keeps colour only for a terminal, and never over a declared value', () => {
+    assert.deepEqual(tapChildEnv({ A: '1' }, false), { A: '1' });
+    assert.equal(tapChildEnv({}, true).CARGO_TERM_COLOR, 'always');
+    assert.equal(tapChildEnv({ CARGO_TERM_COLOR: 'never' }, true).CARGO_TERM_COLOR, 'never');
+  });
+
+  test('caps an unterminated line at 64 KiB and drops its tail through the next newline', () => {
+    const lines = [];
+    const split = lineSplitter(line => lines.push(line));
+    const prefix = 'x'.repeat(64 * 1024);
+    split.write(Buffer.from(prefix));
+    assert.deepEqual(lines, []);
+    split.write(Buffer.from('overflow'));
+    assert.deepEqual(lines, [prefix]);
+    split.write(Buffer.from('test dropped ... FAILED'));
+    split.write(Buffer.from('\nnext\npartial'));
+    split.end();
+    assert.deepEqual(lines, [prefix, 'next', 'partial']);
+  });
+
+  test('caps partials in bytes across UTF-8 chunks and resets dropping at end', () => {
+    const lines = [];
+    const split = lineSplitter(line => lines.push(line));
+    const prefix = 'é'.repeat(32 * 1024);
+    const bytes = Buffer.from(prefix);
+    split.write(bytes.subarray(0, 3));
+    split.write(bytes.subarray(3));
+    split.write(Buffer.from('discard'));
+    split.end();
+    split.write(Buffer.from('fresh\n'));
+    split.end();
+    assert.deepEqual(lines, [prefix, 'fresh']);
+  });
+
+  test('truncates only the recognizer input while forwarding oversized lines unchanged', t => {
+    const { result, events } = tap(t,
+      `node -e 'const line = "not ok 1 - " + "x".repeat(70000) + "\\n"; process.stdout.write(line); process.stderr.write(line);'`);
+    const line = 'not ok 1 - ' + 'x'.repeat(70000) + '\n';
+    assert.equal(result.status, 0);
+    assert.equal(result.stdout.length, line.length);
+    assert.equal(result.stderr.length, line.length);
+    assert.ok(result.stdout === line, 'stdout bytes are unchanged');
+    assert.ok(result.stderr === line, 'stderr bytes are unchanged');
+    assert.equal(events.length, 1);
+    assert.equal(Buffer.byteLength(events[0].failure.excerpt), 64 * 1024);
+  });
+});

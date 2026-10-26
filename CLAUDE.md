@@ -122,6 +122,7 @@ Holochain packing requires their in-tree `./target`.
 - `GATE_NARROW=shadow|on|off`: eprfs tests only the reverse dependencies of changed packages. The default `shadow` prints the set and runs the full workspace.
 - `GATE_DEFER=off`: a gate whose p90 is at least 600 s and that has not failed locally in 10+ runs may defer to CI on a CI-built feature branch, never on dev or main. This switch disables that.
 - `HARNESS_JOBS`: agentic-library harness parallelism, default 4.
+- Live failures: every gate runs through `gate-tap.mjs`, which appends each failure-level line to a run log on this device as it prints (`GATE_TAP=off` runs untapped). To start RCA on the first red while later gates still run, push with `run_in_background` and arm Monitor on `node genesis/orchestrator/gate-live.mjs follow` (it follows your own session's run and exits when the run closes). Investigate read-only until the hook exits, because HEAD moves during pre-push. No decision is read from these events; the exit status is the verdict. Habit `gate-failures-arrive-live`.
 
 Habit `push-gate-pays-once` in `genesis/orchestrator/.epr-meta/`.
 

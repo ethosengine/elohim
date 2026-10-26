@@ -10,13 +10,14 @@ import { loadManifests } from './manifest-utils.mjs';
 import { loadGateRegistry } from './pipeline-registry.mjs';
 import { projectsFromStale, walkGraph } from './graph-walker.mjs';
 import { filterChanged } from './ci-ignore.mjs';
-import { recordCycle, subjectFor } from './gate-cycle.mjs';
+import { classifyFailure, recordCycle, subjectFor } from './gate-cycle.mjs';
 import { CI_BRANCH_PATTERN, costOf, deferDecision, formatExpectation, readCycleRows } from './gate-cost.mjs';
 import { ageOf, gateEvidence, recordEvidence, reusableHit, selfAgentId } from './gate-evidence.mjs';
 import { rakiaAffected, resolveRakiaBin } from './gate-oracle.mjs';
 import { runAttested } from './gate-attest.mjs';
 import { affectedPackages, loadMetadata } from './cargo-affected.mjs';
 import { readSet } from './gate-input-audit.mjs';
+import { appendEvent } from './gate-live.mjs';
 
 // GATE_ROOT lets a fixture repository drive the CLI (the a2o pin-attestation story).
 const ROOT = process.env.GATE_ROOT
@@ -219,7 +220,30 @@ export function costLineAndDefer(project, { rows, subjectFallback = null, env = 
 // `recipe` runs another recipe of the project in the gate's exact cargo slot and env, with no
 // evidence or cycle record: evidence carries a test verdict across commits, never the bytes, so
 // pre-push uses this to build what it lands (eprfs's `_eprfs-deliver`).
-export function runProject(project, printOnly, namesOnly, { root = ROOT, env = process.env, spawn = spawnSync, write = text => process.stdout.write(text), readsOf, recipe = null } = {}) {
+const TAP = resolve(dirname(fileURLToPath(import.meta.url)), 'gate-tap.mjs');
+
+/**
+ * Run a gate command through gate-tap.mjs, which forwards its bytes unchanged, keeps its
+ * exit status, appends failure lines to the live run (GATE_LIVE_RUN) as they print, and
+ * returns the classifyFailure signals on fd 3. `tap: false` (or GATE_TAP=off) runs the
+ * command directly, as an injected spawn in a fixture does.
+ */
+function gateSpawn(project, command, argv, options, { spawn, env, tap }) {
+  if (!tap || env.GATE_TAP === 'off') return { result: spawn(command, argv, options), tapped: null };
+  const live = env.GATE_LIVE_RUN ? ['--run', env.GATE_LIVE_RUN] : [];
+  const result = spawn(process.execPath, [TAP, '--project', project.name, ...live, '--', command, ...argv],
+    { ...options, stdio: ['inherit', 'inherit', 'inherit', 'pipe'] });
+  let tapped = null;
+  try { tapped = JSON.parse(String(result.output?.[3] || '').trim().split('\n').pop()); } catch { /* no summary */ }
+  return { result, tapped };
+}
+
+/** Lifecycle events for the live run; fail-open, and absent when no run is open. */
+function liveEvent(env, event) {
+  if (env.GATE_LIVE_RUN) appendEvent(env.GATE_LIVE_RUN, event);
+}
+
+export function runProject(project, printOnly, namesOnly, { root = ROOT, env = process.env, spawn = spawnSync, write = text => process.stdout.write(text), readsOf, recipe = null, tap = spawn === spawnSync } = {}) {
   const cargo = project.run.cargo || {};
   const targetDir = worktreeTargetDir(cargo.targetDir || '', root);
   const args = [
@@ -265,12 +289,15 @@ export function runProject(project, printOnly, namesOnly, { root = ROOT, env = p
     // No local recipe: the pinned commit's own upstream attestation is the gate.
     // Never reaches run-local-gate.sh (which keeps refusing unknown kinds).
     write(`\n[gate] ${project.name} (${project.dir}) — attested, no local recipe\n`);
-    return runAttested(project, {
+    liveEvent(env, { kind: 'gate-start', project: project.name, attested: true });
+    const attestedStatus = runAttested(project, {
       root,
       env,
       log: line => write(`${line}\n`),
       runEpr: eprArgs => spawn(env.EPR_BIN || 'epr', eprArgs, { cwd: root, stdio: 'ignore', timeout: 30000 }).status,
     });
+    liveEvent(env, { kind: 'gate-verdict', project: project.name, verdict: { exit: attestedStatus, seconds: 0 } });
+    return attestedStatus;
   }
 
   write(`\n[gate] ${project.name} (${project.dir})\n`);
@@ -318,17 +345,22 @@ export function runProject(project, printOnly, namesOnly, { root = ROOT, env = p
     write(`[gate] ${project.name} deferred to CI: ${costDecision.why}\n`);
     const seconds = Number(process.hrtime.bigint() - started) / 1e9;
     recordCycle(project, seconds, 0, { ...cycleEnv, GATE_RUN_KIND: 'deferred' }, cycleDeps);
+    liveEvent(env, { kind: 'gate-verdict', project: project.name, verdict: { exit: 0, seconds: 0, deferred: true } });
     return 0;
   }
 
   // Explicit crate gates carry the same style floor as changed-project selection.
+  liveEvent(env, { kind: 'gate-start', project: project.name });
   if (project.run.cargo && project.name !== 'rust-style') {
     const styleArgs = [resolve(root, 'genesis/orchestrator/rust-style.sh'), '--scope', project.dir];
     if (env.GATE_COMMIT) styleArgs.push('--head', env.GATE_COMMIT);
-    const style = spawn('bash', styleArgs, {
+    const { result: style } = gateSpawn(project, 'bash', styleArgs, {
       cwd: root, stdio: 'inherit', env: gateChildEnv(project, env, root),
-    });
-    if (style.status !== 0) return style.status || 2;
+    }, { spawn, env, tap });
+    if (style.status !== 0) {
+      liveEvent(env, { kind: 'gate-verdict', project: project.name, step: 'rust-style', verdict: { exit: style.status || 2, seconds: 0 } });
+      return style.status || 2;
+    }
   }
 
   // A selection belongs to this project and this push, never to the caller's environment.
@@ -391,16 +423,19 @@ export function runProject(project, printOnly, namesOnly, { root = ROOT, env = p
     write(`[gate] ${project.name} reused: green ${ageOf(row.attestation.builtAt)} at ${String(row.commit).slice(0, 9)} (signer this workspace)\n`);
     const seconds = Number(process.hrtime.bigint() - started) / 1e9;
     recordCycle(project, seconds, 0, { ...cycleEnv, GATE_RUN_KIND: 'reused' }, cycleDeps);
+    liveEvent(env, { kind: 'gate-verdict', project: project.name, verdict: { exit: 0, seconds: 0, reused: true } });
     return 0;
   }
   if (env.GATE_EVIDENCE === 'reuse') write(`[gate] ${project.name} not reused: ${decision.why}\n`);
-  const result = spawn('bash', [resolve(root, 'genesis/orchestrator/run-local-gate.sh'), ...args], {
+  const { result, tapped } = gateSpawn(project, 'bash', [resolve(root, 'genesis/orchestrator/run-local-gate.sh'), ...args], {
     cwd: root,
     stdio: 'inherit',
     env: childEnv,
-  });
+  }, { spawn, env, tap });
+  // The exit status is the verdict; what the tap recognized only classifies it.
   const status = result.status ?? 1;
   const seconds = Number(process.hrtime.bigint() - started) / 1e9;
+  let evidenceCid = null;
   // The verdict is recorded against the closure — red too; a known-red closure is information.
   if (evidence.key && evidence.buildRefBin) {
     const put = recordEvidence(project, evidence.key, {
@@ -420,11 +455,17 @@ export function runProject(project, printOnly, namesOnly, { root = ROOT, env = p
       ? `recorded ${String(put.stdout || '').trim().slice(0, 16)}…`
       : `not recorded (${String(put.stderr || '').trim().split('\n').pop() || `exit ${put.status}`})`;
     write(`[gate] ${project.name} evidence: ${note}\n`);
+    if (put.status === 0) evidenceCid = String(put.stdout || '').trim().split('\n').pop() || null;
   }
   // Cycle time is observed here because this is the one place every gate runs.
   // The ceiling, the reviewer and its charter are declared in measures.yaml.
-  // Inherited output is unavailable, not evidence that no tests ran.
-  recordCycle(project, seconds, status, cycleEnv, cycleDeps, { signal: result.signal });
+  // Untapped output is unavailable, not evidence that no tests ran.
+  const signals = { ...(tapped?.signals || {}), signal: result.signal, firstRedSeconds: tapped?.firstRedSeconds ?? undefined };
+  recordCycle(project, seconds, status, cycleEnv, cycleDeps, signals);
+  liveEvent(env, { kind: 'gate-verdict', project: project.name, verdict: {
+    exit: status, seconds: Math.round(seconds), failure_class: classifyFailure(status, signals) ?? null,
+    failures: tapped?.failures ?? null, overflow: tapped?.overflow || undefined, evidence: evidenceCid || undefined,
+  } });
   return status;
 }
 

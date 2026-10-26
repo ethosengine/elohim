@@ -1005,6 +1005,27 @@ echo "============================================"
 echo "  Projects: $DISPLAY_LIST"
 echo ""
 
+# Live gate events: every failure-level line a gate prints is appended to a run log on this
+# device as it prints, so the session that started the push can begin on the first red while
+# later gates still run (`gate-live.mjs follow`, Monitor-shaped). Nothing here decides the push;
+# the gates' exit statuses below do. A kill closes the run as interrupted, never passed.
+# Spec: genesis/docs/superpowers/specs/2026-10-26-gate-live-failure-channel-design.md
+# The close handler is registered before the run opens, so a signal during `open` cannot leave
+# a run with no close; it does nothing while no run is open.
+GATE_LIVE_RUN=""
+gate_live_close_interrupted() {
+  [ -n "$GATE_LIVE_RUN" ] || return 0
+  node genesis/orchestrator/gate-live.mjs close --run "$GATE_LIVE_RUN" --outcome interrupted >/dev/null 2>&1
+  return 0
+}
+HOOK_ON_EXIT="$HOOK_ON_EXIT gate_live_close_interrupted"
+GATE_LIVE_RUN=$(node genesis/orchestrator/gate-live.mjs open --sha "$GATE_COMMIT" --target "$GATE_PUSH_TARGETS" 2>/dev/null) || GATE_LIVE_RUN=""
+if [ -n "$GATE_LIVE_RUN" ]; then
+  export GATE_LIVE_RUN
+  echo "  Live failures: node genesis/orchestrator/gate-live.mjs follow --run $GATE_LIVE_RUN"
+  echo ""
+fi
+
 TOTAL_START=$(date +%s)
 FAILED=""
 RESULTS=""
@@ -1037,6 +1058,13 @@ TOTAL_ELAPSED=$((TOTAL_END - TOTAL_START))
 
 # Trim leading space from FAILED
 FAILED=$(echo "$FAILED" | sed 's/^ //')
+
+# The run describes the gate loop; later steps (cargo-deny, landing) can still refuse the push.
+if [ -n "$GATE_LIVE_RUN" ]; then
+  node genesis/orchestrator/gate-live.mjs close --run "$GATE_LIVE_RUN" \
+    --outcome "$([ -n "$FAILED" ] && echo failed || echo gates-passed)" \
+    --deferred-from-log >/dev/null 2>&1 || true
+fi
 
 if [ -n "$FAILED" ]; then
   echo "============================================"

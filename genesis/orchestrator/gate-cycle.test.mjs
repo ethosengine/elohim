@@ -157,6 +157,14 @@ test('successful observations omit even a supplied failure class', () => {
   assert.ok(!args.some(arg => arg.startsWith('failure_class=')));
 });
 
+test('a tapped run carries its first red beside the total, and the project slot stays last', () => {
+  const args = observationArgs('.', 738, { kind: 'pre-push', exit: 'fail', failureClass: 'code', firstRedSeconds: 41.6, project: 'storage' });
+  assert.ok(args.includes('first_red_s=42'));
+  assert.deepEqual(args.slice(-2), ['--env', 'project=storage']);
+  const untapped = observationArgs('.', 738, { kind: 'pre-push', exit: 'fail', firstRedSeconds: null });
+  assert.ok(!untapped.some(arg => arg.startsWith('first_red_s=')));
+});
+
 test('the subject is a FILE — the gate recipe itself — because the sidecar addresses a subject by its bytes', () => {
   const dir = mkdtempSync(join(tmpdir(), 'gate-cycle-subject-'));
   try {

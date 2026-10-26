@@ -59,6 +59,11 @@ export function observationArgs(subject, seconds, run) {
   ];
   if (run.jobs) args.push('--env', `jobs=${run.jobs}`);
   if (run.exit !== 'ok') args.push('--env', `failure_class=${run.failureClass || 'unknown'}`);
+  // Seconds from the gate's start to its first recognized failure (gate-tap.mjs): the wait
+  // a live run saves against `value`, which is when the pusher would otherwise have heard.
+  if (run.firstRedSeconds !== undefined && run.firstRedSeconds !== null) {
+    args.push('--env', `first_red_s=${Math.round(run.firstRedSeconds)}`);
+  }
   if (run.project) args.push('--env', `project=${run.project}`);
   return args;
 }
@@ -140,6 +145,7 @@ export function recordCycle(project, seconds, status, env, deps, signals = {}) {
       deps.runEpr(observationArgs(subject, seconds, {
         kind, exit, jobs: env.CARGO_BUILD_JOBS, project: project.name,
         failureClass: classifyFailure(status, signals),
+        firstRedSeconds: signals.firstRedSeconds,
       }));
     } catch { /* the observation is best-effort; the verdict below does not need it */ }
     if (exit !== 'ok') return;
