@@ -128,8 +128,13 @@ This reframes the campaign: it may be mostly about what to add on top of converg
 
 ## The operator's direction, 2026-10-26: a dev release channel whose candidate heads earn reach
 
-Prompted by the canonical household losing its install bundle: its conductors run DNA hashes no
-bundle on disk reproduces, so `join-peer` cannot cast a new peer onto them.
+Prompted by the canonical household's install bundle looking lost: no bundle on disk seemed to
+reproduce its five cells, so `join-peer` could not cast a new peer onto them. It was not lost. The
+comparison hashed each bundled `.dna` with `hc dna hash`, which ignores the hApp role's modifiers
+(here `properties: {progenitor_pubkey: null}`). Repacked with those modifiers, a bundle left in an
+unrelated worktree (`land-self-heal`) matched all five; the household's own `environment.sh` names a
+different, non-matching one. The point stands: the network could not say which bundle it runs, and
+finding it took a hand search across worktrees.
 
 > "I feel like we should be able to... see the bundles FROM the network, and get the bundles' we're
 > deployed on.. when we're building/updating, we're building snapshot bundles that become options
@@ -167,9 +172,9 @@ How it composes with what exists. This is a mapping, not a design; the P2P desig
   steward's devices is a ceremony act. No single device is terminal authority; contest and revert
   stay open to any member.
 
-Immediate step, separate from the design: recover the household's missing bundle from a running
-conductor (its stored wasm and its DNA definitions), check that the DNA hashes match, then cast adam
-to finish slice M's serving receipt.
+Recovered 2026-10-26: the matching bundle is kept beside the household at
+`household-dowell/artifacts/installed-20261007/elohim.happ` (sha256 b4f86c90…). The conductor's own
+wasm store is SQLCipher-encrypted, so reading code back from a running peer needs the conductor.
 
 **The channel is an EPR, and it governs stories (operator, 2026-10-26).**
 
