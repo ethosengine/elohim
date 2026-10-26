@@ -1,5 +1,6 @@
 """Isolated native envelope proof; the a2o steps drive these same state transitions."""
 import argparse
+from datetime import datetime, timezone
 import importlib.util
 import json
 import os
@@ -29,7 +30,7 @@ class Fixture:
         _, pid = RUNTIMES[runtime]
         return {**{k: v for k, v in os.environ.items() if not k.startswith(('EPR_', 'ELOHIM_', 'GIT_', 'CLAUDE_', 'CODEX_', 'BIN_STORE', 'BERTH_', 'BRIT_'))},
                 'EPR_BIN': str(self.base / 'hook-bin/epr'), 'EPR_BIN_TOOLS': str(self.base / 'registry.json'),
-                'EPR_AGENT_RUNTIMES': str(REPO / 'genesis/agentic/agent-runtimes.json'),
+                'EPR_UNDER_TEST': '1', 'EPR_AGENT_RUNTIMES': str(REPO / 'genesis/agentic/agent-runtimes.json'),
                 'BIN_STORE': str(self.base / 'stores'), 'EPR_PROC_ROOT': str(self.base / 'proc'),
                 'XDG_CONFIG_HOME': str(self.base / 'config-home'),
                 'CLAUDE_PROJECT_DIR': str(self.root), 'CLAUDE_CONFIG_DIR': str(self.base / 'config'),
@@ -49,7 +50,7 @@ class Fixture:
         out = self.run([self.base / 'launch/epr', *args], runtime, expected)
         return json.loads(out) if out.strip() else None
 
-    def setup(self):
+    def setup(self, human="matthew"):
         self.root.mkdir(parents=True, exist_ok=True)
         # An exec wrapper supplies a fake registered ancestor to every native command/shim.
         write(self.base / 'exec.py', '''import os, pathlib, sys
@@ -93,7 +94,7 @@ recipes:
         (self.root / 'genesis/agentic/bin/berth').symlink_to(REPO / 'genesis/agentic/bin/berth')
         for args in [('init','-q'), ('add','.epr-meta','docs','gap','.claude'), ('commit','-qm','fixture')]:
             self.run(['git', *args], native=False)
-        self.run([BINARY, 'actor','witness','--subject','human:matthew','--as','agent:reader@fixture','--session','enrollment','--basis','Fixture person present','--json'])
+        self.run([BINARY, 'actor','witness','--subject',f'human:{human}','--as','agent:reader@fixture','--session','enrollment','--basis','Fixture person present','--json'])
         candidate = self.base / 'cargo-target/debug/epr'
         candidate.parent.mkdir(parents=True)
         shutil.copy2(BINARY, candidate)
@@ -107,6 +108,24 @@ recipes:
             self.run([BINARY,'bin','pin','--tool','epr','--cid',cid,'--json'], runtime)
         # Unpinned context projection is set up before the launcher lazily opens an envelope.
         self.run([BINARY,'flow','project','--root',self.root,'--json'])
+
+    def runtime_child(self, session):
+        # Claude assigns its id after exec: the runtime's exec environment is empty,
+        # and its child exports the id. This is same-principal resolution, not authentication.
+        fields = ['0']*20; fields[0] = 'S'; fields[19] = '88'
+        write(self.base/'proc/4201/stat', '4201 (claude) '+' '.join(fields))
+        write(self.base/'proc/4201/environ', '')
+        return {'FIXTURE_OWNER': '4201', 'CLAUDE_SESSION_ID': session}
+
+    def resume_schema(self):
+        session = self.id('claude')
+        shutil.rmtree(self.base/'proc/4101')
+        env = self.runtime_child(session)
+        opened = json.loads(self.run([BINARY, 'session', 'open', '--json'], extra_env=env))
+        assert opened['generation'] == 2 and opened['predecessor'] is not None
+        write(self.base/'open-successor.json', json.dumps(opened))
+        view = self.run([BINARY, 'session', 'show', '--json'], extra_env=env)
+        write(self.base/'view-successor.json', view)
 
     def id(self, runtime):
         name, pid = RUNTIMES[runtime]
@@ -203,6 +222,366 @@ assert 'bootstrap: skipped' not in out,out
         assert (self.base/'cid').read_text() in contents, contents
         assert 'executor bytes changed' not in first+second
         write(self.base/'hook-proof.json',json.dumps({'session':self.id('claude'),'executor':(self.base/'cid').read_text()}))
+
+
+class ResumeEnvelopeTest(unittest.TestCase):
+    def test_memory_history_keeps_the_writing_generation(self):
+        from unittest.mock import patch
+        with tempfile.TemporaryDirectory(prefix='generation-history-') as base:
+            f = Fixture(base); f.setup(human='alice')
+            for rel in ('.epr-meta/collective.json', '.eprfs/status/affiliations.jsonl'):
+                write(f.root/rel, (REPO/rel).read_text())
+            spec = importlib.util.spec_from_file_location('memory_projection', REPO/'.claude/hooks/memory-index-projection.py')
+            hook = importlib.util.module_from_spec(spec); spec.loader.exec_module(hook)
+            session = f.epr('session', 'open', '--json')['identity']['session']
+            env = {}
+            def run(*args, expected=0):
+                out = f.run([BINARY, *args], extra_env=env, expected=expected)
+                return json.loads(out) if expected == 0 and out.strip() else out
+            def entry(name):
+                path = f.root/f'.claude/memory/{name}.md'
+                write(path, f'---\nname: {name}\ndescription: Generation history\ntype: feedback\n---\n{name}\n')
+                # The hook's production witness boundary must freeze the current envelope key.
+                # Deliberately date both witnesses after both claims: history must choose
+                # by the stored generation label even when time alone cannot disambiguate.
+                with patch.dict(os.environ, {**f.env(), **env}, clear=True), \
+                     patch.object(hook, '_now', return_value='2099-01-01T00:00:00.000Z'):
+                    hook.witness(f.root, path, hook.generation_key(session))
+                return str(path.relative_to(f.root))
+            def resume(pid):
+                nonlocal env
+                run('session', 'close', '--json')
+                shutil.rmtree(f.base/f'proc/{pid}')
+                env = f.runtime_child(session)
+                if pid == 4201:
+                    stat = f.base/'proc/4201/stat'
+                    stat.write_text(stat.read_text().rsplit(' ', 1)[0] + ' 89')
+                return run('session', 'open', '--json')
+            bob = run('actor', 'claim', '--as', 'human:bob', '--session', session, '--json')
+            run('flow', 'claim', '--on', 'envelope#1', '--session', session, '--json')
+            a = entry('generation-a')
+            assert resume(4101)['generation'] == 2
+            assert run('session', 'show', '--json')['claims'] == []
+            alice = run('actor', 'claim', '--as', 'human:alice', '--session', session, '--json')
+            run('flow', 'claim', '--on', 'envelope#2', '--session', session, '--json')
+            claims = run('session', 'show', '--json')['claims']
+            assert len(claims) == 1 and f'session:{session}/generations/2' in json.dumps(claims)
+            b = entry('generation-b')
+            # Actor attestations also retain the generation, independently of claim attribution.
+            attestation = run('actor', 'witness', '--subject', 'human:alice', '--as',
+                              'agent:reader@fixture', '--session', session, '--basis',
+                              'Generation two witness', '--again', '--json')
+            with self.subTest(writer='actor witness'):
+                assert attestation['session'] == f'{session}/generations/2', attestation
+            assert resume(4201)['generation'] == 3
+            assert run('session', 'show', '--json')['claims'] == []
+            closed_rows = (f.root/'.eprfs/status/flows.jsonl').read_text()
+            assert f'session {session}/generations/2 closed;' in closed_rows
+            c = entry('generation-unclaimed')
+            rows = run('flow', 'memory', 'attribution', '.claude/memory', '--json')['entries']
+            by = {r['path']: r for r in rows}
+            for path, claim, key in ((a, bob, session), (b, alice, f'{session}/generations/2')):
+                with self.subTest(writer=path):
+                    row = by[path]
+                    assert row['session'] == key and row['claim'] == claim['claimed'], row
+                    imported = run('flow', 'memory', 'import', path, '--session', key,
+                                   '--as-of', row['writtenAt'], '--json')
+                    assert imported['counts']['contributed'] == 1, imported
+                    flows = [json.loads(line) for line in (f.root/'.eprfs/status/flows.jsonl').read_text().splitlines()]
+                    assert f"actor-claim:{claim['recordCid']}" in json.dumps(flows[-1]), flows[-1]
+                    # Even a historical lookup AFTER both claims must match the exact key.
+                    request = f".eprfs/status/memory/contributions/{Path(path).stem}.json"
+                    later = run('flow', 'memory', 'contribute', '--input', request,
+                                '--session', key, '--as-of', datetime.now(timezone.utc).isoformat(), '--json')
+                    assert later['actorClaim'] == claim['recordCid'], later
+            assert by[c]['session'] == f'{session}/generations/3' and not by[c]['attributable'], by[c]
+            f.run([BINARY, 'flow', 'memory', 'import', c, '--json'], extra_env=env, expected=2)
+            assert not (f.root/'.eprfs/status/memory/contributions/generation-unclaimed.json').exists()
+
+    def test_runtime_child_resumes_without_inheriting_authority(self):
+        for death in ('absent-pid', 'new-boot'):
+            with self.subTest(death=death), tempfile.TemporaryDirectory(prefix='envelope-resume-') as base:
+                f = Fixture(base); f.setup(human='alice')
+                for rel in ('.epr-meta/collective.json', '.eprfs/status/affiliations.jsonl'):
+                    write(f.root/rel, (REPO/rel).read_text())
+                # A stateful brit adapter exercises real native covenant admission and reads.
+                write(f.base/'brit-stub', '''#!/usr/bin/env python3
+import datetime,hashlib,json,pathlib,sys
+args=sys.argv[1:]; verb=args[3]; args=args[4:]
+opts=dict(zip(args[::2],args[1::2]))
+path=pathlib.Path(__file__).parent/'clauses'/opts['--session']/'rows.json'
+rows=json.loads(path.read_text()) if path.exists() else []
+if verb=='put':
+ clause={'kind':opts['--kind'],'session':opts['--session'],'party':opts['--party'],
+         'quote':opts['--quote'],'payload':json.loads(opts['--payload-json']),
+         'validFrom':datetime.datetime.now(datetime.timezone.utc).isoformat(),'validUntil':None}
+ row={'cid':'fixture-'+hashlib.sha256(json.dumps(clause).encode()).hexdigest(), 'clause':clause}
+ rows.append(row); path.parent.mkdir(parents=True,exist_ok=True); path.write_text(json.dumps(rows))
+ print(json.dumps(row))
+else: print(json.dumps(rows))
+''')
+                opened = f.epr('session', 'open', '--json')
+                session = opened['identity']['session']
+                assert f.epr('actor', 'current', '--device', '--json')['standing']['subject'] == 'human:alice'
+                f.epr('actor', 'claim', '--as', 'human:matthew', '--session', session, '--json')
+                f.epr('flow', 'memory', 'affiliate', '--session', session,
+                      '--member', 'human:bob', '--kind', 'person', '--role', 'steward', '--json')
+                first_claim = f.epr('actor', 'claim', '--as', 'human:bob', '--session', session, '--json')
+                assert first_claim['session'] == session
+                actors_path = f.root/'.eprfs/status/actors.jsonl'
+                actor_bytes = actors_path.read_bytes()
+                history_at = datetime.now(timezone.utc).isoformat()
+                f.epr('flow', 'claim', '--on', 'envelope#1', '--session', session, '--json')
+                write(f.root/'genesis/evidence.json', '{"observed":"isolated succession"}')
+                collective = f.epr('flow', 'memory', 'pin', '--input', '.epr-meta/collective.json', '--json')['resource']
+                evidence = f.epr('flow', 'memory', 'pin', '--input', 'genesis/evidence.json', '--json')['resource']
+                write(f.root/'genesis/claim.json', json.dumps({
+                    'version': 1, 'collective': collective, 'author': 'human:bob',
+                    'steward': 'repo:fixture/envelope', 'scope': 'workspace', 'reach': 'workspace',
+                    'concern': 'session authority', 'claim': 'This isolated run has evidence',
+                    'uncertainty': ['No live proof'], 'sources': [{'resource': evidence, 'reach': 'workspace'}],
+                    'supersedes': [], 'contradicts': []}))
+                f.epr('flow', 'memory', 'contribute', '--input', 'genesis/claim.json', '--session', session, '--json')
+                write(f.root/'area/.epr-meta', '''---
+epr-meta-version: 1
+id: successor-variance
+rules:
+  - id: fresh-read
+    class: inject
+    parameters:
+      variance:
+        floor: one fresh read
+        requires: steward-of-record
+---
+''')
+                # Manifest discovery uses tracked paths, just like a real checked-in rule.
+                f.run(['git', 'add', 'area/.epr-meta'], native=False)
+                (f.base/'berth').mkdir(exist_ok=True)
+                f.epr('session', 'prepare-berth', '--session', session, '--store', str(f.base/'berth'))
+                f.epr('covenant', 'record', '--kind', 'affirmsStewardOfRecord',
+                      '--party', 'human:bob', '--quote', 'I stand for this work', '--json')
+                assert f.epr('covenant', 'show', '--json')['steward'] == 'human:bob'
+                f.epr('covenant', 'record', '--kind', 'variesRule', '--party', 'human:bob',
+                      '--quote', 'One fresh read for this run', '--rule', 'fresh-read',
+                      '--paths', 'area/**', '--json')
+                assert f.epr('covenant', 'check', '--rule', 'fresh-read',
+                             '--path', 'area/story.feature', '--json')['status'] == 'held'
+                clause_path = f.base/f'clauses/{session}/rows.json'
+                clause_bytes = clause_path.read_bytes()
+                assert len(json.loads(clause_bytes)) == 2
+                if death == 'absent-pid':
+                    shutil.rmtree(f.base/'proc/4101')
+                else:
+                    write(f.base/'proc/sys/kernel/random/boot_id', 'next boot')
+                collected = json.loads(f.run([BINARY, 'session', 'gc', '--json']))
+                assert len(collected['closed']) == 1
+                path = f.base/f'config-home/elohim/device/sessions/{session}.json'
+                before = path.read_bytes()
+                predecessor = json.loads(before)
+                seal = path.parent/f"seals/{predecessor['covenantSeal']}.json"
+                seal_bytes = seal.read_bytes()
+                resumed_env = f.runtime_child(session)
+                def run(*args):
+                    out = f.run([BINARY, *args], extra_env=resumed_env)
+                    return json.loads(out) if out.strip() else None
+                # Retained dead-owner facets are governed by berth expiry/takeover, not resume.
+                write(f.base/'berth/leases.json', '{"old-lease":{"holder":"'+session+'","pid":4101}}')
+                write(f.base/f'berth/moorings/{session}.json', '{"pid":4101}')
+                berth_before = {p: p.read_bytes() for p in (f.base/'berth').rglob('*') if p.is_file()}
+                resumed = run('session', 'open', '--json')
+                successor = json.loads(path.read_bytes())
+                assert successor['berthStore'] is None
+                assert predecessor['berthStore'] == str((f.base/'berth').resolve())
+                assert clause_path.read_bytes() == clause_bytes
+                assert not (f.base/f'clauses/{session}/generations/2/rows.json').exists()
+                assert {p: p.read_bytes() for p in (f.base/'berth').rglob('*') if p.is_file()} == berth_before
+                assert resumed['generation'] == 2 and resumed['identity']['ownerPid'] == 4201
+                assert resumed['predecessor']['covenantSeal'] == predecessor['covenantSeal']
+                archive = path.parent/f'{session}.gen/1.json'
+                assert archive.read_bytes() == before and seal.read_bytes() == seal_bytes
+                run('session', 'prepare-berth', '--session', session, '--store', str(f.base/'berth'))
+                run('session', 'validate', '--session', session)
+                assert all(p.read_bytes() == data for p, data in berth_before.items())
+                with self.subTest(reader='actor current'):
+                    assert run('actor', 'current', '--session', session, '--json')['claim'] is None
+                assert run('actor', 'current', '--device', '--json')['standing']['subject'] == 'human:alice'
+                # Each authority reader must refuse independently, without writing a facet.
+                for args, reason in [
+                    (['covenant', 'record', '--kind', 'affirmsStewardOfRecord', '--party', 'human:bob',
+                      '--quote', 'Not yet claimed in this generation', '--json'], 'has no standing'),
+                    (['flow', 'note', '--on', 'envelope#1', '--kind', 'verdict', '--verdict', 'approved',
+                      '--purpose', 'acceptance', '--session', session, '--reason', 'Fresh acceptance', '--json'],
+                     'acceptance requires a registered --session actor claim'),
+                    (['flow', 'memory', 'contribute', '--input', 'genesis/claim.json',
+                      '--session', session, '--json'], 'author differs from registered session claim'),
+                    (['flow', 'memory', 'affiliate', '--session', session, '--member', 'human:carol',
+                      '--kind', 'person', '--role', 'observer', '--json'], 'has no actor claim'),
+                ]:
+                    result = subprocess.run([sys.executable, str(f.base/'exec.py'), str(BINARY), *args],
+                                            cwd=f.root, env={**f.env(), **resumed_env},
+                                            text=True, capture_output=True, timeout=45)
+                    with self.subTest(reader=args[:3]):
+                        assert result.returncode != 0 and reason in result.stderr, result
+                note = run('flow', 'note', '--on', 'docs/spec.md', '--kind', 'verdict',
+                           '--verdict', 'approved', '--reason', 'Current review', '--session', session, '--json')
+                assert note['actor'] == 'human:alice' and note['actor_claim'] != first_claim['recordCid'], note
+                history = run('flow', 'memory', 'contribute', '--input', 'genesis/claim.json',
+                              '--session', session, '--as-of', history_at, '--json')
+                assert history['actorClaim'] == first_claim['recordCid'], history
+                flow_rows = [json.loads(line) for line in (f.root/'.eprfs/status/flows.jsonl').read_text().splitlines()]
+                historical_row = next(row for row in flow_rows if row['cid'] == history['event']['record_cid'])
+                assert 'source:claim-signed' not in json.dumps(historical_row), historical_row
+                assert actors_path.read_bytes() == actor_bytes
+                assert run('covenant', 'show', '--json')['clauses'] == []
+                offer = run('covenant', 'offer', '--json')
+                assert any(row['kind'] == 'affirmsStewardOfRecord' for row in offer['pending'])
+                second_claim = run('actor', 'claim', '--as', 'human:bob', '--session', session, '--json')
+                assert second_claim['session'] == f'{session}/generations/2'
+                assert second_claim['recordCid'] != first_claim['recordCid']
+                assert actors_path.read_bytes().startswith(actor_bytes)
+                assert run('actor', 'current', '--session', session, '--json')['claim']['session'] == f'{session}/generations/2'
+                sponsored = run('flow', 'memory', 'affiliate', '--session', session,
+                                '--member', 'human:carol', '--kind', 'person', '--role', 'observer', '--json')
+                assert sponsored['sponsor'] == 'human:bob'
+                contribution = run('flow', 'memory', 'contribute', '--input', 'genesis/claim.json',
+                                   '--session', session, '--json')
+                assert contribution['actorClaim'] == second_claim['recordCid'], contribution
+                # Restore Bob's standing before checking: a bare-key check would now honour
+                # the predecessor variance, so refusal cannot pass just because standing changed.
+                check = run('covenant', 'check', '--rule', 'fresh-read', '--path', 'area/story.feature', '--json')
+                assert check['status'] == 'not-held' and 'no variance clause' in check['reason'], check
+                run('covenant', 'record', '--kind', 'affirmsStewardOfRecord',
+                    '--party', 'human:bob', '--quote', 'I reaffirm for this generation', '--json')
+                assert len(run('covenant', 'show', '--json')['clauses']) == 1
+                assert clause_path.read_bytes() == clause_bytes
+                assert len(json.loads((f.base/f'clauses/{session}/generations/2/rows.json').read_bytes())) == 1
+                assert seal.read_bytes() == seal_bytes
+                assert run('session', 'gc', '--json')['closed'] == []
+                assert archive.read_bytes() == before
+                # Arrival overwrites P1's existing pin at the same payload-id path.
+                pin = f.base/f'stores/epr/sessions/{session}'
+                assert json.loads(pin.read_text())['ownerPid'] == 4101
+                run('bin', 'pin', '--tool', 'epr', '--cid', (f.base/'cid').read_text(), '--json')
+                assert json.loads(pin.read_text())['ownerPid'] == 4201
+                spec = importlib.util.spec_from_file_location('head_notice', REPO/'genesis/agentic/bin-head-notice.py')
+                notice = importlib.util.module_from_spec(spec); spec.loader.exec_module(notice)
+                assert pin == f.base/'stores/epr/sessions'/notice.pin_name(session)
+                write(f.base/'stores/epr/current.json', json.dumps({'cid': 'new-head', 'landedAt': 'later'}))
+                lines = notice.notices(str(f.base/'stores'), session)
+                assert len(lines) == 1 and f"pinned {(f.base/'cid').read_text()}" in lines[0], lines
+                successor_view = run('covenant', 'show', '--json')
+                run('session', 'close', '--json')
+                closed = json.loads(path.read_bytes())
+                successor_seal = json.loads((path.parent/f"seals/{closed['covenantSeal']}.json").read_bytes())
+                assert len(successor_seal['clauses']) == 1, successor_seal
+                assert successor_seal['clauses'] == successor_view['clauses']
+                assert successor_seal['clauses'][0]['quote'] == 'I reaffirm for this generation'
+                assert archive.read_bytes() == before and seal.read_bytes() == seal_bytes
+                assert clause_path.read_bytes() == clause_bytes
+
+    def test_leaked_proc_fixture_cannot_admit_successor_over_live_owner(self):
+        with tempfile.TemporaryDirectory(prefix='live-owner-') as base:
+            f = Fixture(base); f.setup()
+            session = 'real-live-owner'
+            env = {'EPR_UNDER_TEST': '0', 'EPR_PROC_ROOT': '/proc',
+                   'ELOHIM_SESSION_ID': session, 'ELOHIM_SESSION_OWNER_PID': str(os.getpid())}
+            opened = json.loads(f.run([BINARY, 'session', 'open', '--json'], extra_env=env, native=False))
+            assert opened['identity']['ownerPid'] == os.getpid()
+            f.run([BINARY, 'session', 'close', '--json'], extra_env=env, native=False)
+            sessions = f.base/'config-home/elohim/device/sessions'
+            before = {p: p.read_bytes() for p in sessions.rglob('*') if p.is_file()}
+            # A valid fixture successor sees a different boot and no live parent's PID.
+            # Neither an absent switch nor 0 may use that evidence to admit takeover.
+            child = {**f.env(), **f.runtime_child(session)}
+            args = [sys.executable, str(f.base/'exec.py'), str(BINARY), 'session', 'open', '--json']
+            for switch in (None, '0'):
+                child.pop('EPR_UNDER_TEST', None)
+                if switch is not None:
+                    child['EPR_UNDER_TEST'] = switch
+                result = subprocess.run(args, cwd=f.root, env=child,
+                                        text=True, capture_output=True, timeout=45)
+                assert result.returncode != 0 and 'envelope-owner-mismatch' in result.stderr, result
+                assert {p: p.read_bytes() for p in sessions.rglob('*') if p.is_file()} == before
+            # Positive control: only explicit fixture mode permits this simulated death.
+            resumed = json.loads(f.run([BINARY, 'session', 'open', '--json'],
+                                      extra_env=f.runtime_child(session)))
+            assert resumed['generation'] == 2 and resumed['identity']['ownerPid'] == 4201
+
+    def test_gc_honors_isolated_proc_root_without_test_switch(self):
+        with tempfile.TemporaryDirectory(prefix='gc-isolation-') as base:
+            f = Fixture(base); f.setup()
+            env = {'EPR_UNDER_TEST': '0', 'EPR_PROC_ROOT': '/proc',
+                   'ELOHIM_SESSION_ID': 'real-live-owner', 'ELOHIM_SESSION_OWNER_PID': str(os.getpid())}
+            opened = json.loads(f.run([BINARY, 'session', 'open', '--json'], extra_env=env, native=False))
+            assert opened['identity']['ownerPid'] == os.getpid()
+            # GC retains the supplied view, even when it hides a real live owner.
+            env['EPR_PROC_ROOT'] = str(f.base/'proc')
+            result = json.loads(f.run([BINARY, 'session', 'gc', '--json'], extra_env=env, native=False))
+            assert len(result['closed']) == 1
+
+    def test_prepare_berth_invalid_destination_does_not_publish_successor(self):
+        for destination in ('missing', 'regular-file'):
+            with self.subTest(destination=destination), tempfile.TemporaryDirectory(prefix='berth-refuse-') as base:
+                f = Fixture(base); f.setup()
+                opened = f.epr('session', 'open', '--json')
+                session = opened['identity']['session']
+                f.epr('session', 'close', '--json')
+                shutil.rmtree(f.base/'proc/4101')
+                env = f.runtime_child(session)
+                path = f.base/destination
+                if destination == 'regular-file':
+                    path.write_text('not a store')
+                sessions = f.base/'config-home/elohim/device/sessions'
+                before = {p: p.read_bytes() for p in sessions.rglob('*') if p.is_file()}
+                args = [BINARY, 'session', 'prepare-berth', '--session', session, '--store', str(path)]
+                result = subprocess.run([sys.executable, str(f.base/'exec.py'), *map(str, args)],
+                    cwd=f.root, env={**f.env(), **env}, capture_output=True, text=True, timeout=45)
+                assert result.returncode != 0 and 'envelope-berth-unreachable' in result.stderr, result
+                assert {p: p.read_bytes() for p in sessions.rglob('*') if p.is_file()} == before
+                # The same closed, dead predecessor is admissible once the destination is valid.
+                if path.exists():
+                    path.unlink()
+                path.mkdir()
+                f.run(args, extra_env=env)
+                current = json.loads((sessions/f'{session}.json').read_bytes())
+                assert current['generation'] == 2 and current['berthStore'] == str(path.resolve())
+
+    def test_resume_refusals_write_nothing(self):
+        for refusal in ('declared', 'live', 'unclosed', 'namespace', 'stat'):
+            with self.subTest(refusal=refusal), tempfile.TemporaryDirectory(prefix='envelope-refuse-') as base:
+                f = Fixture(base); f.setup()
+                opened = f.epr('session', 'open', '--json')
+                session = opened['identity']['session']
+                if refusal not in ('live', 'unclosed'):
+                    f.epr('session', 'close', '--json')
+                if refusal in ('declared', 'unclosed', 'namespace'):
+                    shutil.rmtree(f.base/'proc/4101')
+                if refusal == 'namespace':
+                    namespace = f.base/'proc/self/ns/pid'
+                    namespace.rename(namespace.with_suffix('.old'))
+                    namespace.write_text('different namespace')
+                if refusal == 'stat':
+                    stat = f.base/'proc/4101/stat'; stat.unlink(); stat.mkdir()
+                fields = ['0']*20; fields[0] = 'S'; fields[19] = '88'
+                write(f.base/'proc/4201/stat', '4201 (claude) '+' '.join(fields))
+                write(f.base/'proc/4201/environ', '')
+                env = {**f.env(), 'FIXTURE_OWNER': '4201', 'CLAUDE_SESSION_ID': session}
+                if refusal == 'declared':
+                    env.update(ELOHIM_SESSION_ID=session, ELOHIM_SESSION_OWNER_PID='4201')
+                sessions = f.base/'config-home/elohim/device/sessions'
+                before = {p: p.read_bytes() for p in sessions.rglob('*') if p.is_file()}
+                result = subprocess.run([sys.executable, str(f.base/'exec.py'), str(BINARY), 'session', 'open'],
+                    cwd=f.root, env=env, capture_output=True, text=True, timeout=45)
+                assert result.returncode != 0 and 'envelope-owner-mismatch' in result.stderr, result
+                assert {p: p.read_bytes() for p in sessions.rglob('*') if p.is_file()} == before
+                # Positive control: the refusal is selective, not a blanket ban on resuming.
+                if refusal == 'namespace':
+                    namespace.with_suffix('.old').replace(namespace)
+                shutil.rmtree(f.base/'proc/4101', ignore_errors=True)
+                env.pop('ELOHIM_SESSION_ID', None); env.pop('ELOHIM_SESSION_OWNER_PID', None)
+                f.run([BINARY, 'session', 'gc', '--json'], extra_env=env)
+                successor = json.loads(f.run([BINARY, 'session', 'open', '--json'], extra_env=env))
+                assert successor['generation'] == 2
 
 
 class EnvelopeTest(unittest.TestCase):

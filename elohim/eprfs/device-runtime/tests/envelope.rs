@@ -7,6 +7,8 @@ use std::path::Path;
 
 fn binding(home: &Path, id: &str) -> Envelope {
     Envelope {
+        generation: 1,
+        predecessor: None,
         identity: SessionIdentity {
             runtime: "codex".into(),
             session: Some(id.into()),
@@ -29,6 +31,9 @@ fn binding(home: &Path, id: &str) -> Envelope {
 }
 #[test]
 fn binding_is_idempotent_private_and_cannot_be_reused_or_traverse() {
+    if !in_succession_fixture("binding_is_idempotent_private_and_cannot_be_reused_or_traverse") {
+        return;
+    }
     let dir = tempfile::tempdir().unwrap();
     std::fs::create_dir_all(dir.path().join("self/ns")).unwrap();
     std::fs::write(dir.path().join("self/ns/pid"), "namespace").unwrap();
@@ -174,4 +179,213 @@ fn liveness_and_guard_agree_at_every_close_checkpoint() {
         assert_eq!(record.is_live(), !sealed && !closed);
         assert_eq!(Store::require_live(&record).is_ok(), record.is_live());
     }
+}
+
+fn process(root: &Path, pid: u32, start: u64) {
+    std::fs::create_dir_all(root.join(pid.to_string())).unwrap();
+    let mut fields = vec!["0".to_owned(); 20];
+    fields[0] = "S".into();
+    fields[19] = start.to_string();
+    std::fs::write(
+        root.join(format!("{pid}/stat")),
+        format!("{pid} (codex) {}", fields.join(" ")),
+    )
+    .unwrap();
+}
+
+// Set fixture mode in a child test process, never in the parallel harness environment.
+fn in_succession_fixture(name: &str) -> bool {
+    if std::env::var("EPR_UNDER_TEST").as_deref() == Ok("1") {
+        return true;
+    }
+    assert!(std::process::Command::new(std::env::current_exe().unwrap())
+        .args(["--exact", name, "--nocapture"])
+        .env("EPR_UNDER_TEST", "1")
+        .status()
+        .unwrap()
+        .success());
+    false
+}
+
+fn resume_fixture() -> tempfile::TempDir {
+    let dir = tempfile::tempdir().unwrap();
+    std::fs::create_dir_all(dir.path().join("self/ns")).unwrap();
+    std::fs::write(dir.path().join("self/ns/pid"), "namespace").unwrap();
+    std::fs::create_dir_all(dir.path().join("sys/kernel/random")).unwrap();
+    std::fs::write(dir.path().join("sys/kernel/random/boot_id"), "boot").unwrap();
+    process(dir.path(), 7, 42);
+    process(dir.path(), 8, 43);
+    dir
+}
+
+fn successor(root: &Path) -> Envelope {
+    let mut record = binding(root, "resume");
+    record.identity.owner_pid = Some(8);
+    record.identity.owner_start_time = Some(43);
+    record
+}
+
+#[test]
+fn successor_preserves_exact_legacy_bytes_seal_and_current_enumeration() {
+    if !in_succession_fixture("successor_preserves_exact_legacy_bytes_seal_and_current_enumeration")
+    {
+        return;
+    }
+    for checkpoint in ["closed", "sealed", "both"] {
+        let dir = resume_fixture();
+        let store = Store::lock(&dir.path().join("key")).unwrap();
+        let mut old = store
+            .open(binding(dir.path(), "resume"), dir.path())
+            .unwrap();
+        let seal = store
+            .seal_covenant(&json!({"clauses": ["original"]}))
+            .unwrap();
+        old.closed_at = (checkpoint != "sealed").then(envelope::now);
+        old.covenant_seal = (checkpoint != "closed").then(|| seal.clone());
+        old.berth_store = Some(dir.path().join("old-berth"));
+        // Keep the predecessor in legacy, pretty-printed form: reserialization changes its CID.
+        let mut legacy = serde_json::to_value(&old).unwrap();
+        legacy.as_object_mut().unwrap().remove("generation");
+        legacy.as_object_mut().unwrap().remove("predecessor");
+        let bytes = serde_json::to_vec_pretty(&legacy).unwrap();
+        std::fs::write(store.path("resume").unwrap(), &bytes).unwrap();
+        let seal_path = dir.path().join(format!("sessions/seals/{seal}.json"));
+        let sealed_bytes = std::fs::read(&seal_path).unwrap();
+        std::fs::remove_dir_all(dir.path().join("7")).unwrap();
+        let new = store.open(successor(dir.path()), dir.path()).unwrap();
+        assert_eq!(new.generation, 2);
+        assert!(new.is_live());
+        assert!(new.berth_store.is_none());
+        let predecessor = new.predecessor.as_ref().unwrap();
+        assert_eq!(
+            predecessor.record_cid,
+            eprfs_core::BlobCid::compute_raw(&bytes).to_string()
+        );
+        assert_eq!(predecessor.covenant_seal, old.covenant_seal);
+        assert_eq!(
+            std::fs::read(dir.path().join("sessions/resume.gen/1.json")).unwrap(),
+            bytes
+        );
+        assert_eq!(std::fs::read(&seal_path).unwrap(), sealed_bytes);
+        assert_eq!(store.records().unwrap().len(), 1);
+        assert_eq!(store.read("resume").unwrap().unwrap().generation, 2);
+        assert_eq!(
+            store
+                .open(successor(dir.path()), dir.path())
+                .unwrap()
+                .generation,
+            2
+        );
+        assert_eq!(new.covenant_session(), "resume/generations/2");
+        assert_eq!(old.covenant_session(), "resume");
+    }
+}
+
+#[test]
+fn successor_admission_refuses_unclosed_live_unknown_and_non_runtime_owners_without_writes() {
+    if !in_succession_fixture(
+        "successor_admission_refuses_unclosed_live_unknown_and_non_runtime_owners_without_writes",
+    ) {
+        return;
+    }
+    for reason in [
+        "unclosed",
+        "live",
+        "namespace",
+        "stat",
+        "declared",
+        "tty",
+        "none",
+    ] {
+        let dir = resume_fixture();
+        let store = Store::lock(&dir.path().join("key")).unwrap();
+        let mut old = store
+            .open(binding(dir.path(), "resume"), dir.path())
+            .unwrap();
+        if reason != "unclosed" {
+            old.closed_at = Some(envelope::now());
+        }
+        if reason == "namespace" {
+            old.owner_pid_namespace = Some("unobserved-namespace".into());
+        }
+        store.save(&old).unwrap();
+        if !matches!(reason, "live" | "stat") {
+            std::fs::remove_dir_all(dir.path().join("7")).unwrap();
+        }
+        if reason == "stat" {
+            std::fs::remove_file(dir.path().join("7/stat")).unwrap();
+            std::fs::create_dir(dir.path().join("7/stat")).unwrap();
+        }
+        let mut proposed = successor(dir.path());
+        proposed.identity.source = match reason {
+            "declared" => Source::Declared,
+            "tty" => Source::TtyLeader,
+            "none" => Source::None,
+            _ => Source::RuntimeAncestor,
+        };
+        let before = std::fs::read(store.path("resume").unwrap()).unwrap();
+        let error = store.open(proposed, dir.path()).unwrap_err();
+        assert_eq!(error.kind, "envelope-owner-mismatch", "{reason}");
+        assert_eq!(
+            std::fs::read(store.path("resume").unwrap()).unwrap(),
+            before,
+            "{reason}"
+        );
+        assert!(!dir.path().join("sessions/resume.gen").exists(), "{reason}");
+        // A blanket refusal must not satisfy this test: restore the three admission facts.
+        old.closed_at = Some(envelope::now());
+        old.owner_pid_namespace = envelope::owner_context(dir.path()).0;
+        store.save(&old).unwrap();
+        if dir.path().join("7").exists() {
+            std::fs::remove_dir_all(dir.path().join("7")).unwrap();
+        }
+        assert_eq!(
+            store
+                .open(successor(dir.path()), dir.path())
+                .unwrap()
+                .generation,
+            2,
+            "{reason} positive control"
+        );
+    }
+}
+
+#[test]
+fn successor_archive_retry_is_idempotent_and_conflicting_history_refuses() {
+    if !in_succession_fixture(
+        "successor_archive_retry_is_idempotent_and_conflicting_history_refuses",
+    ) {
+        return;
+    }
+    let dir = resume_fixture();
+    let store = Store::lock(&dir.path().join("key")).unwrap();
+    let mut old = store
+        .open(binding(dir.path(), "resume"), dir.path())
+        .unwrap();
+    old.closed_at = Some(envelope::now());
+    store.save(&old).unwrap();
+    let bytes = std::fs::read(store.path("resume").unwrap()).unwrap();
+    std::fs::remove_dir_all(dir.path().join("7")).unwrap();
+    let directory = dir.path().join("sessions/resume.gen");
+    std::fs::create_dir(&directory).unwrap();
+    let archive = directory.join("1.json");
+    std::fs::write(&archive, b"different history").unwrap();
+    assert_eq!(
+        store
+            .open(successor(dir.path()), dir.path())
+            .unwrap_err()
+            .kind,
+        "envelope-generation-conflict"
+    );
+    assert_eq!(std::fs::read(store.path("resume").unwrap()).unwrap(), bytes);
+    assert_eq!(std::fs::read(&archive).unwrap(), b"different history");
+    std::fs::write(&archive, &bytes).unwrap();
+    assert_eq!(
+        store
+            .open(successor(dir.path()), dir.path())
+            .unwrap()
+            .generation,
+        2
+    );
+    assert_eq!(std::fs::read(&archive).unwrap(), bytes);
 }

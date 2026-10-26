@@ -116,7 +116,10 @@ pub fn executor_cid() -> Result<String> {
     bin_store::file_cid(&std::env::current_exe().map_err(err)?).map_err(err)
 }
 
-/// Bind identity once and initialize recall under that same key.
+/// Bind once per generation and initialize recall under the same runtime id.
+/// Succession requires a closed predecessor and proven-dead owner. RuntimeAncestor guards
+/// against accidental takeover by stray declarations, not same-principal children.
+/// Safety comes from inheriting no authority: re-offer clauses and transfer no berth facets.
 pub fn open(model: Option<&str>) -> Result<Envelope> {
     let root = root()?;
     let key_path = persistent_home()?;
@@ -133,10 +136,11 @@ pub fn open(model: Option<&str>) -> Result<Envelope> {
     let model = envelope::model(model, &identity, &session::registry(), &|k| {
         std::env::var(k).ok()
     });
-    let proc_root =
-        PathBuf::from(std::env::var("EPR_PROC_ROOT").unwrap_or_else(|_| "/proc".into()));
+    let proc_root = proc_root();
     let (owner_pid_namespace, owner_boot_id) = envelope::owner_context(&proc_root);
     let proposed = Envelope {
+        generation: 1,
+        predecessor: None,
         identity,
         owner_pid_namespace,
         owner_boot_id,
@@ -155,7 +159,7 @@ pub fn open(model: Option<&str>) -> Result<Envelope> {
     // lifecycle guard. A fully initialized lazy open is a read, never a lock upgrade.
     {
         let store = Store::shared(&key_path).map_err(err)?;
-        if let Some(record) = store.existing(&proposed).map_err(err)? {
+        if let Some(record) = store.existing(&proposed, &proc_root).map_err(err)? {
             if root
                 .join(recall::RECALL_DIR_REL)
                 .join(record.id())
@@ -184,6 +188,24 @@ pub fn open(model: Option<&str>) -> Result<Envelope> {
 pub struct FacetGuard {
     pub root: PathBuf,
     _store: Option<Store>,
+}
+
+/// Read the current authority namespace (covenant clauses and actor claims) under a shared guard.
+/// Mutations also use live_guard; closure holds the exclusive store and passes its namespace.
+pub fn covenant_scope(id: &str) -> Result<(String, Option<Store>)> {
+    if !envelope::is_envelope_id(id) {
+        return Err(format!("session-invalid: {id}"));
+    }
+    let key = home()?;
+    if !key.parent().is_some_and(|p| p.join("sessions").is_dir()) {
+        return Ok((id.to_owned(), None));
+    }
+    let store = Store::shared(&key).map_err(err)?;
+    let scope = store
+        .read(id)
+        .map_err(err)?
+        .map_or_else(|| id.to_owned(), |record| record.covenant_session());
+    Ok((scope, Some(store)))
 }
 
 /// Resolve once, validate that destination, and retain it for the facet writer.
@@ -269,7 +291,7 @@ fn pins(record: &Envelope) -> Result<BTreeMap<String, String>> {
     Ok(pins)
 }
 fn proc_root() -> PathBuf {
-    PathBuf::from(std::env::var("EPR_PROC_ROOT").unwrap_or_else(|_| "/proc".into()))
+    session::proc_root()
 }
 
 // Resolve and validate the reference without ever recreating a lost authority store.
@@ -299,7 +321,23 @@ fn berth_path(record: &Envelope) -> Result<Option<PathBuf>> {
 /// other checkout a bound session is left as it is: re-proposing it there would read that
 /// repository's roster and refuse a session that is already open.
 pub fn open_lazily() -> Result<()> {
-    if let Some(record) = device_scoped_binding(&current_id()?)? {
+    let id = current_id()?;
+    let key = home()?;
+    let closed = if key.parent().is_some_and(|p| p.join("sessions").is_dir()) {
+        Store::shared(&key)
+            .map_err(err)?
+            .read(&id)
+            .map_err(err)?
+            .is_some_and(|record| !record.is_live())
+    } else {
+        false
+    };
+    // A closed record needs the exclusive opener's successor admission. Ordinary facet
+    // validation never performs a takeover and continues to require the current owner.
+    if closed {
+        return open(None).map(drop);
+    }
+    if let Some(record) = device_scoped_binding(&id)? {
         if root().ok().as_deref() != Some(record.repository.as_path()) {
             return Ok(());
         }
@@ -316,22 +354,23 @@ fn prepare_berth(id: &str, path: &Path) -> Result<()> {
     if current_id()? != id {
         return Err(format!("envelope-owner-mismatch: {id}"));
     }
-    if device_scoped_binding(id)?.is_none() {
-        open(None)?;
+    // Refuse an unusable destination before lazy opening can publish a successor.
+    let path = path
+        .canonicalize()
+        .map_err(|e| format!("envelope-berth-unreachable: {id}: {}: {e}", path.display()))?;
+    if !path.is_dir() || std::fs::read_dir(&path).is_err() {
+        return Err(format!(
+            "envelope-berth-unreachable: {id}: {}",
+            path.display()
+        ));
     }
+    open_lazily()?;
     let store = Store::lock(&home()?).map_err(err)?;
     let mut record = store
         .binding(id, &session::resolve(), &proc_root())
         .map_err(err)?
         .ok_or("session is not open")?;
     Store::require_live(&record).map_err(err)?;
-    let path = path.canonicalize().map_err(err)?;
-    if !path.is_dir() {
-        return Err(format!(
-            "envelope-berth-unreachable: {id}: {}",
-            path.display()
-        ));
-    }
     if let Some(original) = berth_path(&record)? {
         if original != path {
             return Err(format!(
@@ -391,7 +430,7 @@ fn claims(record: &Envelope) -> Result<Vec<Value>> {
         return Ok(vec![]);
     }
     let store = SidecarFlowStore::open(&record.repository).map_err(err)?;
-    let key = format!("session:{}", record.id());
+    let key = format!("session:{}", record.covenant_session());
     store
         .records()
         .map_err(err)?
@@ -408,8 +447,13 @@ fn claims(record: &Envelope) -> Result<Vec<Value>> {
 }
 /// Read model only: facet data is neither copied into the binding nor treated as new authority.
 pub fn view(record: &Envelope) -> Result<Value> {
-    let current =
-        actor::current_on_device(&record.repository, record.id(), Some(&home()?)).map_err(err)?;
+    let mut current = actor::current_on_device_scoped(
+        &record.repository,
+        &record.covenant_session(),
+        Some(&home()?),
+    )
+    .map_err(err)?;
+    current.session = Some(record.id().to_owned());
     let tier = current
         .claim
         .as_ref()
@@ -421,7 +465,7 @@ pub fn view(record: &Envelope) -> Result<Value> {
             }
         })
         .unwrap_or_else(|| "unknown".into());
-    let covenant = covenant::show(&record.repository, record.id())?;
+    let covenant = covenant::show(&record.repository, record.id(), &record.covenant_session())?;
     Ok(
         json!({"live": record.is_live(), "envelope": record, "berth": berth(record, "session-show")?,
         "claims": claims(record)?, "covenant": covenant, "standing": current,
@@ -435,7 +479,7 @@ fn close(store: &Store, mut record: Envelope) -> Result<Envelope> {
     berth_path(&record)?;
     // Checkpoint the seal before release. Retry reuses it and never invents a grant/revocation.
     if record.covenant_seal.is_none() {
-        let clauses = covenant::show(&record.repository, record.id())?;
+        let clauses = covenant::show(&record.repository, record.id(), &record.covenant_session())?;
         record.covenant_seal = Some(store.seal_covenant(&clauses).map_err(err)?);
         store.save(&record).map_err(err)?;
     }
@@ -443,7 +487,7 @@ fn close(store: &Store, mut record: Envelope) -> Result<Envelope> {
     if record.witness.is_none() {
         let reason = format!(
             "session {} closed; opened {}; covenant {}",
-            record.id(),
+            record.covenant_session(),
             record.opened_at,
             record.covenant_seal.as_deref().unwrap_or_default()
         );
@@ -529,8 +573,7 @@ pub fn run(args: &[String]) -> Result<ExitCode> {
     } else {
         let store = Store::lock(&home()?).map_err(err)?;
         if verb == "gc" {
-            let proc_root =
-                PathBuf::from(std::env::var("EPR_PROC_ROOT").unwrap_or_else(|_| "/proc".into()));
+            let proc_root = proc_root();
             let mut closed = Vec::new();
             for record in store.records().map_err(err)? {
                 if record.closed_at.is_none() && record.owner_dead(&proc_root) {

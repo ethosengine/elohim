@@ -25,6 +25,8 @@
       "type": "object",
       "additionalProperties": false,
       "required": [
+        "generation",
+        "predecessor",
         "identity",
         "device",
         "steward",
@@ -39,6 +41,22 @@
         "berthStore"
       ],
       "properties": {
+        "generation": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 4294967295,
+          "description": "Bound-once generation. Legacy records without this field read as generation 1."
+        },
+        "predecessor": {
+          "type": ["object", "null"],
+          "additionalProperties": false,
+          "required": ["recordCid", "covenantSeal"],
+          "properties": {
+            "recordCid": { "type": "string" },
+            "covenantSeal": { "type": ["string", "null"] }
+          },
+          "description": "Raw CID of the exact archived predecessor bytes and its untouched seal; null for the first generation."
+        },
         "identity": {
           "title": "SessionIdentity",
           "description": "P1 identity observed at opening and retained as a private binding. Current owner liveness is checked against pid and start time.",

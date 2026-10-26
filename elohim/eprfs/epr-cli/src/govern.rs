@@ -29,7 +29,7 @@ use std::{
     sync::OnceLock,
 };
 
-use elohim_epr_rea::{ActorClaim, ActorStore, SidecarActorStore};
+use elohim_epr_rea::ActorClaim;
 use eprfs_meta::{evaluate_path_with, resolve_decision, GovernanceWrite, ValidatorProvider};
 use serde_json::{json, Value};
 
@@ -39,7 +39,7 @@ use crate::{
 };
 
 /// The actor sidecar, relative to the repo root. Checked for EXISTENCE before it is opened:
-/// [`SidecarActorStore::open`] creates the tree, and a decision that merely READ the identity
+/// [`elohim_epr_rea::SidecarActorStore::open`] creates the tree, and a decision that merely READ the identity
 /// plane must not leave one behind in a repository that never had one.
 const ACTOR_LOG_REL: &str = ".eprfs/status/actors.jsonl";
 
@@ -170,14 +170,14 @@ fn actor_stamp(root: &Path, session: &str) -> Value {
         Some((cid, claim)) => json!({
             "claimCid": cid.to_string(),
             "claimed": claim.claimed.0,
-            "session": session,
+            "session": claim.session,
             "definitionCid": claim.definition_cid,
             "source": "claim",
         }),
         None => json!({
             "claimCid": Value::Null,
             "claimed": Value::Null,
-            "session": session,
+            "session": crate::session_envelope::covenant_scope(session).ok().map(|(key, _)| key),
             "definitionCid": Value::Null,
             "source": "unclaimed",
         }),
@@ -189,10 +189,7 @@ fn claimed_for(root: &Path, session: &str) -> Option<(cid::Cid, ActorClaim)> {
     if !root.join(ACTOR_LOG_REL).exists() {
         return None;
     }
-    SidecarActorStore::open(root)
-        .and_then(|store| store.current_for(session))
-        .ok()
-        .flatten()
+    crate::actor::current_claim(root, session).ok().flatten()
 }
 
 /// Evaluate the prospective write and return the decision payload.

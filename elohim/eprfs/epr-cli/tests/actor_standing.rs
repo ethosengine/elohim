@@ -153,6 +153,7 @@ fn epr_with_env(root: &Path, key_file: &Path, args: &[&str], envs: &[(&str, &str
         // This attribution fixture has an explicitly declared session and no live owner.
         // Inheriting the gate's process root cannot make the real test PID a fixture owner.
         .env_remove("ELOHIM_SESSION_OWNER_PID")
+        .env("EPR_UNDER_TEST", "1")
         .env("EPR_PROC_ROOT", root.join("empty-proc"));
     for (key, value) in envs {
         command.env(key, value);

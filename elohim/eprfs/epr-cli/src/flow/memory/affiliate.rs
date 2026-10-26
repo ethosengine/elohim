@@ -10,7 +10,7 @@
 use std::io::Write;
 use std::path::Path;
 
-use elohim_epr_rea::{parse_participant_ref, ActorStore, ParticipantRef, SidecarActorStore};
+use elohim_epr_rea::{parse_participant_ref, ParticipantRef};
 use eprfs_agent::memory::{Affiliation, AffiliationStanding, MemberKind, MembershipRole};
 use serde_json::{json, Value};
 
@@ -62,10 +62,11 @@ pub fn run(root: &Path, opts: &Options) -> FlowResult<Value> {
         .member
         .ok_or_else(|| refused("affiliate needs --member <participant ref>"))?;
 
-    // The sponsor: the session's claim, exactly as every other epr leg reads it.
+    let _envelope = crate::session_envelope::live_guard(Some(session), root).map_err(refused)?;
+    // The sponsor must claim in this generation before it can reach Fold::admit.
     let claim = if root.join(ACTORS_PATH).exists() {
-        SidecarActorStore::open(root)?
-            .current_for(session)?
+        crate::actor::current_claim(root, session)
+            .map_err(|e| refused(e.to_string()))?
             .map(|(_, claim)| claim)
     } else {
         None

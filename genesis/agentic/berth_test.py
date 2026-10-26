@@ -1708,7 +1708,7 @@ fi
         self.env.update({"BERTH_DIR": str(self.berth_dir), "EPR_BIN": "/nonexistent-epr",
                          "ELOHIM_DEVICE_KEY_FILE": str(root / "no-device" / "ed25519.seed"),
                          "PATH": f"{REPO / 'genesis/agentic/bin'}:/usr/local/bin:/usr/bin:/bin",
-                         "EPR_PROC_ROOT": str(root / "no-proc"), "MESH_DIR": str(root / "no-mesh")})
+                         "EPR_UNDER_TEST": "1", "EPR_PROC_ROOT": str(root / "no-proc"), "MESH_DIR": str(root / "no-mesh")})
 
     def just(self, *args, **env):
         e = dict(self.env, **env)

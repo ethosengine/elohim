@@ -53,8 +53,8 @@ use std::path::{Path, PathBuf};
 
 use cid::Cid;
 use elohim_epr_rea::{
-    parse_acting_participant, ActorStore, AgentRef, FlowEvent, FlowRecord, FlowStore, Magnitude,
-    ReaVerb, SidecarActorStore, SidecarFlowStore,
+    parse_acting_participant, AgentRef, FlowEvent, FlowRecord, FlowStore, Magnitude, ReaVerb,
+    SidecarFlowStore,
 };
 use serde::Serialize;
 
@@ -162,7 +162,7 @@ pub(crate) const SAMPLE_QUESTION_ENV_KEY: &str = "question";
 pub(crate) const SAMPLE_METHOD_ENV_KEY: &str = "recipe";
 
 /// The actor sidecar, relative to the root. Its EXISTENCE is checked before it is opened, because
-/// [`SidecarActorStore::open`] creates the tree — and a read path that leaves `.eprfs/` behind on
+/// [`elohim_epr_rea::SidecarActorStore::open`] creates the tree — and a read path that leaves `.eprfs/` behind on
 /// a repository that never had one has written a record of having looked.
 const ACTOR_LOG_REL: &str = ".eprfs/status/actors.jsonl";
 
@@ -846,6 +846,20 @@ fn note_with_claim_guard(
     let closes = resolve_closes(kind, closes)?;
     let named = named_identity(actor.as_ref.as_deref())?;
 
+    // Closure locks sessions before appending its flow witness. Keep that order here,
+    // and retain the generation through attribution and append.
+    // Historical labels already identify the writing generation; never resolve them against
+    // today's envelope (or reject their /generations/n suffix as a live session id).
+    let _scope = if as_of.is_none() {
+        actor
+            .session
+            .as_deref()
+            .map(crate::session_envelope::covenant_scope)
+            .transpose()
+            .map_err(FlowError::InvalidArguments)?
+    } else {
+        None
+    };
     let mut store = SidecarFlowStore::open(root)?.transaction()?;
     let records = store.records()?;
     // The repository-root subject is admitted on the STRUCTURED arm only. Scoping it to
@@ -870,16 +884,28 @@ fn note_with_claim_guard(
         ))
     })?;
 
-    let mut attribution = resolve_attribution(root, named, actor.session.as_deref(), &author);
+    let current_session = as_of
+        .is_none()
+        .then_some(actor.session.as_deref())
+        .flatten();
+    let mut attribution = resolve_attribution(root, named, current_session, &author);
     if let Some((cid, identity)) = as_of {
-        // Only the session arm is re-pinned; its steward and source slots stay as resolved.
-        if attribution.claim_cid.is_none() {
-            return Err(FlowError::InvalidArguments(
-                "a pinned claim needs the session arm: the session has no registered claim".into(),
-            ));
-        }
-        attribution.claim_cid = Some(cid);
-        attribution.actor = Some(identity);
+        // The caller validated this exact historical claim. A successor need not have
+        // a current claim to attribute an earlier act to its original author. Rebuild the
+        // session arm so device-standing fallback cannot label that author claim-signed.
+        let steward = attribution
+            .steward
+            .clone()
+            .unwrap_or_else(|| collective_steward(root));
+        attribution = Attribution {
+            claim_cid: Some(cid),
+            source: actor
+                .session
+                .as_deref()
+                .is_some_and(super::session_came_from_env)
+                .then_some(SESSION_ENV_SOURCE),
+            ..Attribution::claimed(identity, &steward)
+        };
     }
     if options.purpose.as_deref() == Some("acceptance") {
         let (pin, identity) = actor
@@ -1292,7 +1318,7 @@ pub(crate) fn collective_steward(root: &Path) -> String {
 
 /// Who registered for `session`, or `None` with one line on stderr saying why.
 ///
-/// The sidecar is only opened once its log is known to exist: [`SidecarActorStore::open`] creates
+/// The sidecar is only opened once its log is known to exist: [`elohim_epr_rea::SidecarActorStore::open`] creates
 /// the tree, and this leg must be able to ask the question in a repository that has never had an
 /// identity plane without leaving one behind.
 ///
@@ -1307,7 +1333,7 @@ fn claimed_for_session(root: &Path, session: &str) -> Option<(Cid, String)> {
         );
         return None;
     }
-    match SidecarActorStore::open(root).and_then(|store| store.current_for(session)) {
+    match crate::actor::current_claim(root, session) {
         Ok(Some((cid, claim))) => Some((cid, claim.claimed.0)),
         Ok(None) => {
             eprintln!(
@@ -1435,7 +1461,7 @@ fn is_known_atom(cid: &Cid, records: &[(Cid, FlowRecord)]) -> bool {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use elohim_epr_rea::atom_cid;
+    use elohim_epr_rea::{atom_cid, ActorStore, SidecarActorStore};
 
     #[test]
     fn the_kind_vocabulary_is_closed_and_refuses_a_fourth() {

@@ -408,6 +408,32 @@ class RouterCase(unittest.TestCase):
         self.assertEqual(seen[0]["session"], WRITER)
         self.assertTrue(seen[0]["observedAt"].endswith("Z"), seen[0])
 
+    def test_witness_labels_freeze_the_generation_in_one_envelope_read(self):
+        config = self.root / 'config'
+        envelope = config / 'elohim/device/sessions' / f'{WRITER}.json'
+        envelope.parent.mkdir(parents=True)
+        for record, expected in (({}, WRITER), ({'generation': 1}, WRITER),
+                                 ({'generation': 2}, f'{WRITER}/generations/2'),
+                                 ({'generation': 3}, f'{WRITER}/generations/3')):
+            envelope.write_text(json.dumps(record))
+            (self.root / '.claude/memory' / ENTRY).write_text(json.dumps(record))
+            self.run_hook(XDG_CONFIG_HOME=config, ELOHIM_DEVICE_KEY_FILE='')
+            self.assertEqual(self.witnesses()[-1]['session'], expected)
+        self.assertEqual([w['session'] for w in self.witnesses()],
+                         [WRITER, WRITER, f'{WRITER}/generations/2', f'{WRITER}/generations/3'])
+        with mock.patch.dict(os.environ, {'XDG_CONFIG_HOME': str(config), 'ELOHIM_DEVICE_KEY_FILE': ''}), \
+             mock.patch.object(Path, 'iterdir', side_effect=AssertionError('directory scan')), \
+             mock.patch.object(subprocess, 'run', side_effect=AssertionError('subprocess')):
+            self.assertEqual(self.mod.generation_key(WRITER), f'{WRITER}/generations/3')
+            for bad in ('broken', '[]', '{"generation": 0}', '{"generation": "2"}', '{"generation": true}'):
+                envelope.write_text(bad)
+                self.assertIsNone(self.mod.generation_key(WRITER))
+            envelope.unlink()
+            self.assertEqual(self.mod.generation_key(WRITER), WRITER)
+            envelope.write_text('{"generation": 4}')
+            with mock.patch.dict(os.environ, {'ELOHIM_DEVICE_KEY_FILE': str(envelope.parent.parent / 'custom.seed')}):
+                self.assertEqual(self.mod.generation_key(WRITER), f'{WRITER}/generations/4')
+
     def test_a_no_op_resave_is_not_witnessed_so_the_first_writer_stays_earliest(self):
         """Session A writes; session B re-saves the SAME bytes: no second witness, so the earliest
         (and only) witness of those bytes still names A. A real change by B is witnessed."""

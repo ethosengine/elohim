@@ -507,6 +507,9 @@ fn claim_bound(
     // participant kind may claim; only an AI agent has a package build to address.
     let participant = parse_acting_participant(claimed)?;
     let session = non_empty(session, "--session")?;
+    let (facet_session, _scope) =
+        crate::session_envelope::covenant_scope(session).map_err(ActorError::InvalidArguments)?;
+    let session = facet_session.as_str();
 
     // A claim is dated by the tree it was made against, never by wall clock — so a tree with no
     // HEAD is refused rather than dated with `now()`. The provenance call yields the git author
@@ -736,8 +739,8 @@ impl RootContest {
 
 /// `epr actor current --session <id>`, reading the session's claim only (no device).
 ///
-/// Reads the LAST claim appended for the session. An absent claim is an ANSWER (exit 0, `claim:
-/// null`); only a store that could not be read at all is a failure (exit 2).
+/// Reads the LAST claim appended for the current generation. An absent claim is an ANSWER
+/// (exit 0, `claim: null`); only a store that could not be read at all is a failure (exit 2).
 pub fn current(root: &Path, session: &str) -> ActorResult<CurrentOutcome> {
     current_on_device(root, session, None)
 }
@@ -754,6 +757,28 @@ pub fn current_on_device(
     key_file: Option<&Path>,
 ) -> ActorResult<CurrentOutcome> {
     let session = non_empty(session, "--session")?;
+    let (facet_session, _scope) =
+        crate::session_envelope::covenant_scope(session).map_err(ActorError::InvalidArguments)?;
+    let mut current = current_on_device_scoped(root, &facet_session, key_file)?;
+    current.session = Some(session.to_owned());
+    Ok(current)
+}
+
+/// Current authority only: resolve the envelope generation before reading its claim.
+/// Historical attribution uses ActorStore's explicit key/as-of readers instead.
+pub(crate) fn current_claim(root: &Path, session: &str) -> ActorResult<Option<(Cid, ActorClaim)>> {
+    let (facet_session, _scope) =
+        crate::session_envelope::covenant_scope(session).map_err(ActorError::InvalidArguments)?;
+    Ok(SidecarActorStore::open(root)?.current_for(&facet_session)?)
+}
+
+/// The caller already holds the lifecycle lock and resolved the generation key. Closure
+/// uses this seam under its exclusive lock; resolving again would deadlock on a shared lock.
+pub(crate) fn current_on_device_scoped(
+    root: &Path,
+    session: &str,
+    key_file: Option<&Path>,
+) -> ActorResult<CurrentOutcome> {
     let store = SidecarActorStore::open(root)?;
     let claim = store
         .current_for(session)?
@@ -1317,6 +1342,9 @@ pub fn witness_answering(
 
     // ── Phase 1: resolve. Shape before date, so a malformed witness never runs git. ──
     let session = non_empty(session, "--session")?;
+    let (facet_session, _scope) =
+        crate::session_envelope::covenant_scope(session).map_err(ActorError::InvalidArguments)?;
+    let session = facet_session.as_str();
     let shape = ActorWitness::new(subject, witness_as, session, basis, "shape-check")?;
     if let Some(contest) = answers {
         shape.answering(contest)?;
@@ -1628,6 +1656,9 @@ pub fn contest(
     };
     parse_acting_participant(contest_as)?;
     let session = non_empty(session, "--session")?;
+    let (facet_session, _scope) =
+        crate::session_envelope::covenant_scope(session).map_err(ActorError::InvalidArguments)?;
+    let session = facet_session.as_str();
     let basis = basis.trim();
     if basis.is_empty() {
         return Err(ActorError::InvalidArguments(

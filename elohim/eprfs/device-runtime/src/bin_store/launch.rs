@@ -465,11 +465,7 @@ pub fn launch_os(registry: &Registry, invoked: &Path, args: &[std::ffi::OsString
     if let Some(cid) = &resolved.cid {
         store.touch_used(cid)?;
         if daemon {
-            let _ = store.daemon_lease(
-                cid,
-                std::process::id(),
-                Path::new(&files::env("EPR_PROC_ROOT").unwrap_or_else(|| "/proc".into())),
-            );
+            let _ = store.daemon_lease(cid, std::process::id(), &session::proc_root());
         }
     }
     let mut command = Command::new(&resolved.path);

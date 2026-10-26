@@ -95,6 +95,7 @@ function run(
     env: {
       ...process.env,
       ...env,
+      EPR_UNDER_TEST: '1',
       EPR_PROC_ROOT: state.procRoot,
       EPR_FIXTURE_OWNER_PID: String(process.pid),
     },
@@ -156,6 +157,7 @@ function storeEnv(state: FollowFixture, extra: NodeJS.ProcessEnv = {}): NodeJS.P
     ELOHIM_RUNTIME_MANIFEST_PATH: undefined,
     ELOHIM_SESSION_ID: 'head-fixture',
     ELOHIM_SESSION_OWNER_PID: String(process.pid),
+    EPR_UNDER_TEST: '1',
     EPR_PROC_ROOT: state.procRoot,
     HOME: join(state.base, 'home'),
     ...extra,
@@ -809,6 +811,7 @@ When('that pinned session starts the peer daemon', { timeout: 30000 }, async fun
   appendFileSync(join(state.repo, '.git/info/exclude'), '\n.eprfs/\n');
   state.daemonEnv = {
     ...state.sessionEnv,
+    EPR_UNDER_TEST: '1',
     EPR_PROC_ROOT: state.procRoot,
     EPR_BIN_TOOLS: registrySource,
     ELOHIM_DEVICE_KEY_FILE: join(state.base, 'keys/seed'),

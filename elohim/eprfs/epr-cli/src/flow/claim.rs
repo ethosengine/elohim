@@ -140,6 +140,13 @@ pub fn claim(root: &Path, request: &ClaimRequest) -> FlowResult<ClaimOutcome> {
     let envelope = crate::session_envelope::live_guard(request.actor.session.as_deref(), root)
         .map_err(FlowError::InvalidArguments)?;
     let root = envelope.root.as_path();
+    let scope = request
+        .actor
+        .session
+        .as_deref()
+        .map(crate::session_envelope::covenant_scope)
+        .transpose()
+        .map_err(FlowError::InvalidArguments)?;
     let on = non_empty(request.on, "--on")?;
     let named = named_identity(request.actor.as_ref.as_deref())?;
 
@@ -199,7 +206,7 @@ pub fn claim(root: &Path, request: &ClaimRequest) -> FlowResult<ClaimOutcome> {
     if let Some(habit) = &habit {
         classified_as.push(format!("{HABIT_SLOT_PREFIX}{habit}"));
     }
-    if let Some(session) = &request.actor.session {
+    if let Some((session, _)) = &scope {
         classified_as.push(format!("session:{session}"));
     }
     attribution.append_slots(&mut classified_as);
