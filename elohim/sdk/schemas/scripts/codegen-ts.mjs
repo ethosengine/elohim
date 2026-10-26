@@ -37,7 +37,10 @@ const OUTPUT_DIR = VERIFY ? await mkdtemp(join(CACHE_DIR, '.verify-')) : CACHE_D
 // A distributed copy that git ignores is a local cache (genesis/seeder/src/generated/ is
 // gitignored apart from three early tracked files). A fresh worktree has never materialised
 // it, so its absence says nothing about drift: nothing stale can be committed from it.
-// Tracked outputs stay strict, and an ignored file that exists is still compared.
+// The same holds for an ignored copy left behind by an earlier run: after a rebase brings
+// in newer schemas it is stale, and it is still nothing a commit can carry (2026-10-26:
+// 19 such files refused a push of an unchanged commit). Both are counted and noted with
+// the command that refreshes them. Tracked outputs stay strict.
 function isGitIgnored(path) {
   try {
     execSync(`git check-ignore -q -- "${path}"`, { cwd: REPO_ROOT, stdio: 'ignore' });
@@ -767,6 +770,7 @@ async function main() {
   if (VERIFY) {
     let hasFailure = false;
     let skippedCache = 0;
+    let staleCache = 0;
 
     // Verify enum files
     for (const outPath of ENUM_OUTPUT_PATHS) {
@@ -783,6 +787,10 @@ async function main() {
         continue;
       }
       if (existing !== enumContent) {
+        if (isGitIgnored(outPath)) {
+          staleCache += 1;
+          continue;
+        }
         console.error(`FAIL: ${outPath} is stale. Run: pnpm run schema:codegen:ts`);
         hasFailure = true;
       }
@@ -803,6 +811,10 @@ async function main() {
         continue;
       }
       if (existing !== content) {
+        if (isGitIgnored(outPath)) {
+          staleCache += 1;
+          continue;
+        }
         console.error(`FAIL: ${outPath} is stale. Run: pnpm run schema:codegen:ts`);
         hasFailure = true;
       }
@@ -812,6 +824,11 @@ async function main() {
     if (skippedCache) {
       console.log(
         `note: ${skippedCache} gitignored generated file(s) not materialised here (local cache); run pnpm run schema:codegen:ts to create them`
+      );
+    }
+    if (staleCache) {
+      console.log(
+        `note: ${staleCache} gitignored generated file(s) stale here (local cache, never committed); run pnpm run schema:codegen:ts to refresh them`
       );
     }
     if (hasFailure) {
