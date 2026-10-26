@@ -419,6 +419,15 @@ pub fn launch(registry: &Registry, invoked: &Path, args: &[String]) -> Result<()
 /// Execute without converting filesystem arguments to UTF-8.
 pub fn launch_os(registry: &Registry, invoked: &Path, args: &[std::ffi::OsString]) -> Result<()> {
     let (tool, bin) = registry.invoked(invoked)?;
+    // A release carries the launcher as a bin so install can copy it, but the launcher is
+    // never a launch target: resolving `bin-launch` finds this executable and would exec
+    // itself with the same arguments forever.
+    if bin == "bin-launch" {
+        return Err(Refusal::new(
+            "launcher-name-invalid",
+            "bin-launch is the launcher; run a tool through its own name",
+        ));
+    }
     let store = Store::from_environment(&tool, registry)?;
     let daemon = store.config.long_running.iter().any(|prefix| {
         !prefix.is_empty()
