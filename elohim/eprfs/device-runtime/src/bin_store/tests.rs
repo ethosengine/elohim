@@ -172,7 +172,11 @@ impl Runner for Fake {
                     .as_ref()
                     .is_some_and(|cid| c.program.contains(cid));
         } else if c.args == ["--version"] {
-            if c.program.contains("cargo-bin") {
+            // The retired Python-era shim execs a store script beside it; staged elsewhere
+            // for adoption it finds none and fails, as on a real device.
+            if fs::read(&c.program).is_ok_and(|b| b.windows(12).any(|w| w == b"epr_store.py")) {
+                success = false;
+            } else if c.program.contains("cargo-bin") {
                 success = !s.install_fail;
             } else if self.tool == "brit" {
                 out = format!("brit fixture\nsource HEAD: {}\n", s.head);
@@ -1565,6 +1569,35 @@ fn install_preserves_plain_persistent_bin_as_candidate() {
     assert_ne!(persistent, destination);
     assert_eq!(fs::read(persistent).unwrap(), b"persistent plain");
     assert_eq!(fs::read(destination).unwrap(), b"destination plain");
+}
+
+const RETIRED_SHIM: &[u8] = b"#!/bin/sh\nexec python3 -I /store/bin/epr_store.py exec -- \"$@\"\n";
+
+#[test]
+fn install_retires_a_plain_shim_that_cannot_identify_itself() {
+    let f = Fixture::new("epr");
+    let r = f.release("a");
+    f.head(&r);
+    atomic_bytes(&f.path("bin/epr"), RETIRED_SHIM, 0o755).unwrap();
+    let result = f.install().unwrap();
+    assert!(result["persistentAdopted"].get("epr").is_none());
+    let retired = result["retired"].as_object().unwrap();
+    assert_eq!(retired.len(), 1);
+    let kept = Path::new(retired.values().next().unwrap().as_str().unwrap());
+    assert_eq!(fs::read(kept).unwrap(), RETIRED_SHIM);
+    assert!(f.path("bin/epr").is_symlink());
+}
+
+#[test]
+fn a_failed_install_restores_a_retired_shim_byte_for_byte() {
+    let f = Fixture::new("epr");
+    let r = f.release("a");
+    f.head(&r);
+    atomic_bytes(&f.path("bin/epr"), RETIRED_SHIM, 0o755).unwrap();
+    f.state.lock().unwrap().install_fail = true;
+    assert!(f.install().is_err());
+    assert!(!f.path("bin/epr").is_symlink());
+    assert_eq!(fs::read(f.path("bin/epr")).unwrap(), RETIRED_SHIM);
 }
 
 #[test]

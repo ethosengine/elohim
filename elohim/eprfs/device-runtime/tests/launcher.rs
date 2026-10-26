@@ -94,6 +94,40 @@ fn exec_keeps_pid_current_exe_and_daemon_lease_outside_checkout() {
     assert!(store.root().join(cid).join(".used").exists());
 }
 #[test]
+fn the_launcher_invoked_by_its_own_name_refuses_instead_of_exec_looping() {
+    let (tmp, store, bin, _) = setup("epr", Path::new("/bin/bash"));
+    // Releases list the launcher among epr's bins so install can copy it from current.
+    let registry = json!({"version":1,"tools":{"epr":{"bins":["epr","bin-launch"],"aliases":{},"longRunning":[["-c"]],"candidateEnv":{"epr":["EPR_BIN"]}}}});
+    fs::write(
+        bin.join("bin-tools.json"),
+        serde_json::to_vec(&registry).unwrap(),
+    )
+    .unwrap();
+    let mut child = Command::new(bin.join("bin-launch"))
+        .arg("--version")
+        .env_clear()
+        .env("BIN_STORE", store.root().parent().unwrap())
+        .current_dir(tmp.path())
+        .stderr(std::process::Stdio::piped())
+        .spawn()
+        .unwrap();
+    let deadline = std::time::Instant::now() + std::time::Duration::from_secs(5);
+    let status = loop {
+        if let Some(status) = child.try_wait().unwrap() {
+            break status;
+        }
+        if std::time::Instant::now() > deadline {
+            child.kill().unwrap();
+            panic!("bin-launch invoked by name did not exit within 5 s");
+        }
+        std::thread::sleep(std::time::Duration::from_millis(20));
+    };
+    let mut stderr = String::new();
+    std::io::Read::read_to_string(&mut child.stderr.take().unwrap(), &mut stderr).unwrap();
+    assert!(!status.success());
+    assert!(stderr.contains("launcher-name-invalid"), "{stderr}");
+}
+#[test]
 fn alias_argv_zero_and_non_utf8_arguments_survive_exec() {
     let (tmp, store, bin, _) = setup("brit", Path::new("/bin/bash"));
     let output = Command::new(bin.join("rakia"))

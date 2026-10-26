@@ -161,10 +161,7 @@ pub(crate) fn execute(args: &[String]) -> Result<String, Refusal> {
             }
             json!(status)
         }
-        "gc" => store.gc(
-            Path::new(&std::env::var("EPR_PROC_ROOT").unwrap_or_else(|_| "/proc".into())),
-            None,
-        )?,
+        "gc" => store.gc(&session::proc_root(), None)?,
         "shadows" => json!(store.shadows(&std::env::var("PATH").unwrap_or_default())),
         "source-state" => store.source_state(&repo()?)?,
         "bootstrap" => json!(store.bootstrap(&repo()?, closure)?),
@@ -225,7 +222,5 @@ pub(crate) fn daemon_store(
 
 /// Process table used to observe daemon owner lifetimes.
 pub(crate) fn daemon_proc_root() -> PathBuf {
-    std::env::var_os("EPR_PROC_ROOT")
-        .map(PathBuf::from)
-        .unwrap_or_else(|| PathBuf::from("/proc"))
+    session::proc_root()
 }

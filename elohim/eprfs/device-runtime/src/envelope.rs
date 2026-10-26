@@ -1,7 +1,7 @@
 //! Private device-local session binding. Facet authority stays in its original store.
 use crate::{
     bin_store::{files, Refusal, Result},
-    session::{self, SessionIdentity},
+    session::{self, SessionIdentity, Source},
 };
 use serde::{Deserialize, Serialize};
 use std::{
@@ -11,10 +11,16 @@ use std::{
     time::Duration,
 };
 
-/// One harness session, bound once and never reopened after closure.
+/// One harness session generation, bound once and never reopened after closure.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct Envelope {
+    /// Monotonic generation; bindings written before generations existed are generation one.
+    #[serde(default = "first_generation")]
+    pub generation: u32,
+    /// Exact archived predecessor and its untouched covenant seal.
+    #[serde(default)]
+    pub predecessor: Option<Predecessor>,
     /// P1 identity; its session string is the envelope key.
     pub identity: SessionIdentity,
     /// PID namespace inode observed through the configured proc root at opening.
@@ -43,7 +49,30 @@ pub struct Envelope {
     /// Content address of the single close witness.
     pub witness: Option<String>,
 }
+
+/// Content-addressed lineage of a private session binding, not a grant of its facets.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct Predecessor {
+    /// Raw CID over the exact archived record bytes.
+    pub record_cid: String,
+    /// Predecessor's covenant checkpoint, absent on a legacy closed-only record.
+    pub covenant_seal: Option<String>,
+}
+
+fn first_generation() -> u32 {
+    1
+}
+
 impl Envelope {
+    /// Private covenant namespace. A slash cannot collide with a valid envelope id.
+    pub fn covenant_session(&self) -> String {
+        if self.generation == 1 {
+            self.id().to_owned()
+        } else {
+            format!("{}/generations/{}", self.id(), self.generation)
+        }
+    }
     /// A seal fences new work even when closure has not finished releasing its facets.
     pub fn is_live(&self) -> bool {
         self.closed_at.is_none() && self.covenant_seal.is_none()
@@ -198,8 +227,37 @@ impl Store {
         Ok(())
     }
     /// Check an existing binding without creating state, including from a shared guard.
-    pub fn existing(&self, proposed: &Envelope) -> Result<Option<Envelope>> {
+    /// A successor is admitted when the predecessor is closed and its owner proven dead.
+    /// RuntimeAncestor guards against accidental takeover by a stray declaration; it does
+    /// not authenticate runtime authorship. Runtime and children are one device principal.
+    /// No authority is inherited: clauses must be re-offered and berth facets never transfer.
+    pub fn existing(&self, proposed: &Envelope, proc_root: &Path) -> Result<Option<Envelope>> {
+        // Only successor admission requires real process evidence: a leaked isolation
+        // root must not turn a live predecessor into permission to take over its id.
+        // Ordinary liveness/GC retain their caller's root. Fixtures opt in explicitly;
+        // this is an accident guard, not authentication against the same device user.
+        let admission_proc_root = if std::env::var("EPR_UNDER_TEST").as_deref() == Ok("1") {
+            proc_root
+        } else {
+            Path::new("/proc")
+        };
         if let Some(old) = self.read(proposed.id())? {
+            if !old.is_live()
+                && old.owner_dead(admission_proc_root)
+                && proposed.identity.source == Source::RuntimeAncestor
+            {
+                // A resumed runtime may come back in another checkout of the same device.
+                // The successor binds to its own checkout; the predecessor's stays in the
+                // archived record. Device and steward are who the session is: never changed.
+                if old.device != proposed.device || old.steward != proposed.steward {
+                    return Err(Refusal::new(
+                        "session-conflict",
+                        "successor changes device/steward",
+                    ));
+                }
+                // The exclusive opener repeats admission before archiving or changing the head.
+                return Ok(None);
+            }
             old.validate_owner(
                 &proposed.identity,
                 proposed.owner_pid_namespace.as_deref(),
@@ -220,12 +278,46 @@ impl Store {
         }
         Ok(None)
     }
-    /// Bind once. Another owner or a closed session cannot take over the id.
-    pub fn open(&self, proposed: Envelope, proc_root: &Path) -> Result<Envelope> {
+    /// Bind once per generation under `existing` admission; retain immutable history.
+    pub fn open(&self, mut proposed: Envelope, proc_root: &Path) -> Result<Envelope> {
         proposed.validate_proposed(proc_root)?;
-        if let Some(old) = self.existing(&proposed)? {
+        if let Some(old) = self.existing(&proposed, proc_root)? {
             return Ok(old);
         }
+        proposed.generation = 1;
+        proposed.predecessor = None;
+        if let Some(old) = self.read(proposed.id())? {
+            proposed.generation = old
+                .generation
+                .checked_add(1)
+                .ok_or_else(|| Refusal::new("envelope-generation-overflow", old.id()))?;
+            let bytes = fs::read(self.path(old.id())?)?;
+            let directory = self.directory.join(format!("{}.gen", old.id()));
+            let archive = directory.join(format!("{}.json", old.generation));
+            if directory.is_symlink() || archive.is_symlink() {
+                return Err(Refusal::new(
+                    "session-invalid",
+                    "generation must not be a symlink",
+                ));
+            }
+            // A crash after archival can retry, but can never replace different history.
+            match fs::read(&archive) {
+                Ok(retained) if retained == bytes => {}
+                Ok(_) => return Err(Refusal::new("envelope-generation-conflict", old.id())),
+                Err(e) if e.kind() == std::io::ErrorKind::NotFound => {
+                    files::atomic_bytes(&archive, &bytes, 0o600)?;
+                }
+                Err(e) => return Err(e.into()),
+            }
+            proposed.predecessor = Some(Predecessor {
+                record_cid: eprfs_core::BlobCid::compute_raw(&bytes).to_string(),
+                covenant_seal: old.covenant_seal,
+            });
+        }
+        proposed.berth_store = None;
+        proposed.closed_at = None;
+        proposed.covenant_seal = None;
+        proposed.witness = None;
         self.save(&proposed)?;
         Ok(proposed)
     }

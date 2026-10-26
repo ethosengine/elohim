@@ -125,11 +125,13 @@ impl Store {
                 }
             }
         }
-        let adopted = self.adopt_plain(&destination, repo)?;
+        let (adopted, mut retired) = self.adopt_plain(&destination, repo)?;
         let persistent_adopted = if destination == base {
             BTreeMap::new()
         } else {
-            self.adopt_plain(&base, repo)?
+            let (persistent, persistent_retired) = self.adopt_plain(&base, repo)?;
+            retired.extend(persistent_retired);
+            persistent
         };
         // Snapshot every shared installed file before any mutation, including absence.
         let managed = [launcher.clone(), base.join("agent-runtimes.json")];
@@ -245,10 +247,18 @@ impl Store {
             }
         }
         Ok(
-            json!({"launcher":launcher,"head":head,"adopted":adopted,"persistentAdopted":persistent_adopted,"shadows":self.shadows(&files::env("PATH").unwrap_or_default())}),
+            json!({"launcher":launcher,"head":head,"adopted":adopted,"persistentAdopted":persistent_adopted,"retired":retired,"shadows":self.shadows(&files::env("PATH").unwrap_or_default())}),
         )
     }
-    fn adopt_plain(&self, destination: &Path, repo: &Path) -> Result<BTreeMap<String, PathBuf>> {
+    /// Adopt each plain file at a launcher name as a dirty candidate release. A file that
+    /// cannot identify itself (`--version` fails, as with a retired Python-era shim that
+    /// execs the old store script) is no release: its bytes are kept under `retired/` and
+    /// the launcher link replaces it. Returns (adopted, retired) keyed by path.
+    fn adopt_plain(
+        &self,
+        destination: &Path,
+        repo: &Path,
+    ) -> Result<(BTreeMap<String, PathBuf>, BTreeMap<PathBuf, PathBuf>)> {
         let plain: BTreeMap<_, _> = self
             .config
             .bins
@@ -258,8 +268,9 @@ impl Store {
             .filter(|(_, p)| p.is_file() && !p.is_symlink())
             .collect();
         let mut adopted = BTreeMap::new();
+        let mut retired = BTreeMap::new();
         if plain.is_empty() {
-            return Ok(adopted);
+            return Ok((adopted, retired));
         }
         let current = self
             .resolve_current(None)?
@@ -317,11 +328,20 @@ impl Store {
                     Err(error) if error.kind == "identity-mismatch" && self.tool == "epr" => {
                         self.preserve_legacy_executable(&stage.join("epr"))?
                     }
+                    Err(error) if error.kind == "identity-failed" => {
+                        let kept = self
+                            .root
+                            .join("retired")
+                            .join(format!("{name}.{}", files::file_cid(path)?));
+                        files::atomic_bytes(&kept, &fs::read(path)?, 0o444)?;
+                        retired.insert(path.clone(), kept);
+                        continue;
+                    }
                     Err(error) => return Err(error),
                 };
                 adopted.insert(name.clone(), self.artifact(&release.cid)?.join(target));
             }
-            Ok(adopted)
+            Ok((adopted, retired))
         })();
         let _ = fs::remove_dir_all(stage);
         result

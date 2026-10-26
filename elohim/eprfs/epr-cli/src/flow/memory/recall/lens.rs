@@ -49,7 +49,7 @@
 
 use std::collections::BTreeMap;
 
-use elohim_epr_rea::{parse_agent_ref, ActorStore, AgentRef, SidecarActorStore};
+use elohim_epr_rea::{parse_agent_ref, AgentRef};
 
 use super::*;
 
@@ -188,7 +188,7 @@ pub(super) fn reader_from_session(root: &Path, session: &str) -> ReaderRef {
     if session.trim().is_empty() || !root.join(ACTOR_LOG_REL).is_file() {
         return ReaderRef::Unknown;
     }
-    match SidecarActorStore::open(root).and_then(|store| store.current_for(session)) {
+    match crate::actor::current_claim(root, session) {
         Ok(Some((_record_cid, claim))) => ReaderRef::Agent(claim.claimed),
         Ok(None) | Err(_) => ReaderRef::Unknown,
     }

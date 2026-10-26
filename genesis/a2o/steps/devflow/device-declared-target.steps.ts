@@ -40,6 +40,7 @@ Given('an isolated device with the committed workspace runtime base and no netwo
   mkdirSync(join(root, 'proc'));
   const env: NodeJS.ProcessEnv = {
     ...process.env,
+    EPR_UNDER_TEST: '1',
     EPR_PROC_ROOT: join(root, 'proc'),
     ELOHIM_DEVICE_KEY_FILE: join(root, 'device/key'),
     ELOHIM_SESSION_ID: 'target-fixture',

@@ -123,11 +123,12 @@ pub fn run(args: &[String]) -> CovResult<ExitCode> {
         Some(guard) => guard.root.clone(),
         None => git::discover_root(&start).map_err(|e| e.to_string())?,
     };
+    let (facet_session, _scope) = crate::session_envelope::covenant_scope(&session)?;
     let value = match verb {
-        "offer" => offer(&root, &session)?,
-        "show" => show(&root, &session)?,
-        "check" => check(&root, &session, &args)?,
-        _ => record(&root, &session, &args)?,
+        "offer" => offer(&root, &session, &facet_session)?,
+        "show" => show(&root, &session, &facet_session)?,
+        "check" => check(&root, &facet_session, &args)?,
+        _ => record(&root, &session, &facet_session, &args)?,
     };
     println!("{value}");
     Ok(ExitCode::SUCCESS)
@@ -140,11 +141,12 @@ pub fn run(args: &[String]) -> CovResult<ExitCode> {
 struct Brit {
     bin: PathBuf,
     repo: PathBuf,
+    session: String,
 }
 
 impl Brit {
     /// `BRIT_BUILD_REF_BIN` (which must then exist), else `brit-build-ref` on PATH.
-    fn resolve(repo: &Path) -> CovResult<Self> {
+    fn resolve(repo: &Path, session: &str) -> CovResult<Self> {
         let bin = match std::env::var_os(BRIT_BIN_ENV).filter(|v| !v.is_empty()) {
             Some(path) => {
                 let path = PathBuf::from(path);
@@ -169,6 +171,7 @@ impl Brit {
         Ok(Self {
             bin,
             repo: repo.to_path_buf(),
+            session: session.to_owned(),
         })
     }
 
@@ -198,8 +201,8 @@ impl Brit {
             .map_err(|e| format!("brit-build-ref covenant output is not JSON: {e}"))
     }
 
-    fn list(&self, session: &str) -> CovResult<Vec<Clause>> {
-        let value = self.call(&["list", "--session", session, "--output-json"])?;
+    fn list(&self) -> CovResult<Vec<Clause>> {
+        let value = self.call(&["list", "--session", &self.session, "--output-json"])?;
         let rows = value
             .as_array()
             .ok_or("brit-build-ref covenant list did not return an array")?;
@@ -211,12 +214,12 @@ impl Brit {
         Ok(clauses)
     }
 
-    fn put(&self, session: &str, put: &Put) -> CovResult<Value> {
+    fn put(&self, put: &Put) -> CovResult<Value> {
         let payload = put.payload.to_string();
         let mut args = vec![
             "put",
             "--session",
-            session,
+            &self.session,
             "--kind",
             put.kind,
             "--party",
@@ -465,7 +468,7 @@ fn manifest_cid(bytes: &[u8]) -> String {
 /// roster-bound standing (the same read `epr actor current` makes).
 fn standing_subject(root: &Path, session: &str) -> CovResult<Option<String>> {
     let key = device_key::resolve_path().ok();
-    let current = actor::current_on_device(root, session, key.as_deref())
+    let current = actor::current_on_device_scoped(root, session, key.as_deref())
         .map_err(|e| format!("cannot read standing: {e}"))?;
     if let Some(claim) = &current.claim {
         if claim.claimed.starts_with("human:") {
@@ -513,12 +516,12 @@ struct Covenant<'a> {
 }
 
 impl<'a> Covenant<'a> {
-    fn read(root: &'a Path, session: &str, brit: &Brit) -> CovResult<Self> {
+    fn read(root: &'a Path, brit: &Brit) -> CovResult<Self> {
         Ok(Self {
             root,
             now: Utc::now().fixed_offset(),
-            standing: standing_subject(root, session)?,
-            clauses: brit.list(session)?,
+            standing: standing_subject(root, &brit.session)?,
+            clauses: brit.list()?,
         })
     }
 
@@ -710,9 +713,9 @@ fn clause_json(clause: &Clause, verdict: &Verdict) -> Value {
 // offer
 // ---------------------------------------------------------------------------
 
-fn offer(root: &Path, session: &str) -> CovResult<Value> {
-    let brit = Brit::resolve(root)?;
-    let covenant = Covenant::read(root, session, &brit)?;
+fn offer(root: &Path, session: &str, facet_session: &str) -> CovResult<Value> {
+    let brit = Brit::resolve(root, facet_session)?;
+    let covenant = Covenant::read(root, &brit)?;
     let verdicts = covenant.verdicts()?;
     let honoured = |kind: &str| {
         covenant
@@ -787,9 +790,9 @@ fn offer(root: &Path, session: &str) -> CovResult<Value> {
 // show
 // ---------------------------------------------------------------------------
 
-pub(crate) fn show(root: &Path, session: &str) -> CovResult<Value> {
-    let brit = Brit::resolve(root)?;
-    let covenant = Covenant::read(root, session, &brit)?;
+pub(crate) fn show(root: &Path, session: &str, facet_session: &str) -> CovResult<Value> {
+    let brit = Brit::resolve(root, facet_session)?;
+    let covenant = Covenant::read(root, &brit)?;
     let verdicts = covenant.verdicts()?;
     let mut steward = Value::Null;
     let mut purpose = Value::Null;
@@ -878,10 +881,10 @@ fn not_held(variable: bool, reason: impl Into<String>) -> Value {
     })
 }
 
-fn check(root: &Path, session: &str, args: &Args) -> CovResult<Value> {
+fn check(root: &Path, facet_session: &str, args: &Args) -> CovResult<Value> {
     let rule_id = args.rule.as_deref().ok_or("check needs --rule ID")?;
     let raw_path = args.path.as_deref().ok_or("check needs --path P")?;
-    let brit = Brit::resolve(root)?;
+    let brit = Brit::resolve(root, facet_session)?;
     let Some(path) = repo_relative(root, raw_path) else {
         return Ok(not_held(
             true,
@@ -913,7 +916,7 @@ fn check(root: &Path, session: &str, args: &Args) -> CovResult<Value> {
         ));
     }
 
-    let covenant = Covenant::read(root, session, &brit)?;
+    let covenant = Covenant::read(root, &brit)?;
     let mut best: Option<(bool, String)> = None; // (path matched, reason) of the latest non-held
     for index in (0..covenant.clauses.len()).rev() {
         let clause = &covenant.clauses[index];
@@ -967,8 +970,8 @@ fn check(root: &Path, session: &str, args: &Args) -> CovResult<Value> {
 // record
 // ---------------------------------------------------------------------------
 
-fn record(root: &Path, session: &str, args: &Args) -> CovResult<Value> {
-    let brit = Brit::resolve(root)?;
+fn record(root: &Path, session: &str, facet_session: &str, args: &Args) -> CovResult<Value> {
+    let brit = Brit::resolve(root, facet_session)?;
     let kind = args.kind.as_deref().ok_or("record needs --kind")?;
     let kind: &'static str = KINDS
         .iter()
@@ -996,7 +999,7 @@ fn record(root: &Path, session: &str, args: &Args) -> CovResult<Value> {
         DateTime::parse_from_rfc3339(until)
             .map_err(|e| format!("--valid-until `{until}` is not RFC3339: {e}"))?;
     }
-    let covenant = Covenant::read(root, session, &brit)?;
+    let covenant = Covenant::read(root, &brit)?;
     if covenant.standing.as_deref() != Some(party.as_str()) {
         return Err(format!(
             "{party} has no standing on this device for session `{session}` (standing: {}); \
@@ -1041,7 +1044,7 @@ fn record(root: &Path, session: &str, args: &Args) -> CovResult<Value> {
         payload,
         valid_until: args.valid_until.clone(),
     };
-    let stored = brit.put(session, &put)?;
+    let stored = brit.put(&put)?;
     let cid = stored
         .get("cid")
         .cloned()

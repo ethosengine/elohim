@@ -295,4 +295,14 @@ describe('operator ruling and anchored issuance', () => {
       operatorAgentKeysFromLogin('http://doorway', ['human-matthew-manager']),
     ).rejects.toThrow('OPERATOR_LOGIN_FAILED');
   });
+
+  it('never calls an operator login failure credential drift, since nothing proved the account exists', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockResolvedValue(new Response('user not found', { status: 401 })),
+    );
+    const failure = operatorAgentKeysFromLogin('http://doorway', ['human-adam-firstman']);
+    await expect(failure).rejects.toThrow(/no doorway account, or a different password/);
+    await expect(failure).rejects.not.toThrow(/Credential drift/);
+  });
 });

@@ -351,10 +351,39 @@ def trim_witnesses(root: Path, max_lines: int = WITNESS_MAX, keep: int = WITNESS
         pass
 
 
+def generation_key(session: str | None) -> str | None:
+    """Freeze this writer's namespace with one envelope read, never a process/store walk.
+
+    Missing envelopes and pre-generation envelopes retain the legacy bare label. An unreadable
+    or malformed envelope cannot safely be treated as generation one: omit the witness instead.
+    This mirrors Envelope.covenant_session(), the native covenant/actor namespace helper.
+    """
+    if not session:
+        return None
+    if not re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9_.-]{0,95}", session):
+        return None
+    explicit = os.environ.get("ELOHIM_DEVICE_KEY_FILE")
+    config = Path(os.environ.get("XDG_CONFIG_HOME") or "")
+    if not config.is_absolute():
+        config = Path.home() / ".config"
+    key = Path(explicit) if explicit else config / "elohim/device/ed25519.seed"
+    try:
+        record = json.loads((key.parent / "sessions" / f"{session}.json").read_text())
+        generation = record.get("generation", 1)
+        if type(generation) is not int or not 1 <= generation <= 0xffffffff:
+            return None
+    except FileNotFoundError:
+        generation = 1
+    except (OSError, ValueError, AttributeError):
+        return None
+    return session if generation == 1 else f"{session}/generations/{generation}"
+
+
 def witness(root: Path, target: Path, session: str | None,
             max_lines: int = WITNESS_MAX, keep: int = WITNESS_KEEP) -> str | None:
     """The harness's write witness, appended AT the edit moment: `{path, sha256, session,
-    observedAt}` of the entry's exact bytes. The harness's own record — not an agent narrating —
+    observedAt}` of the entry's exact bytes. `session` is the already-frozen generation key.
+    The harness's own record — not an agent narrating —
     and the only write time the import trusts after the entry's own `modified`: a live mtime
     drifts forward (a checkout, a re-save) and could make a LATER claim look current.
 
@@ -740,7 +769,7 @@ def hook(payload_text: str) -> int:
 
     # (4) The harness's own record of this edit, FIRST and synchronously: the exact bytes, this
     # session, the instant it saw them. Nothing here reads the entry's frontmatter.
-    session = resolve_session_identity()["session"]
+    session = generation_key(resolve_session_identity()["session"])
     witness(root, target, session)
 
     report = attribution(binary, root, timeout=_budget())

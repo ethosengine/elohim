@@ -14,6 +14,7 @@ fn epr(root: &Path, args: &[&str]) -> Output {
         .env_remove("EPR_SESSION_LAZY")
         .env("ELOHIM_SESSION_ID", "declaration-fixture")
         .env("ELOHIM_DEVICE_KEY_FILE", root.join("key"))
+        .env("EPR_UNDER_TEST", "1")
         .env("EPR_PROC_ROOT", root.join("proc"))
         .env("BIN_STORE", root.join("bins"))
         .env("EPR_BIN_TOOLS", root.join("invalid-registry"))

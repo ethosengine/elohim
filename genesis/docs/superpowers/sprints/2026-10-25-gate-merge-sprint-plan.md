@@ -139,7 +139,14 @@ grant. A4 needs the other workspace, so it is the operator's item to schedule.
    eprfs gate on dev, until `5ac2681ef` sealed the cite. C1 selects that test from the docs
    change itself. Until C1 lands, run `epr flow cites seal <doc>` before pushing any doc with
    `cites:`.
-2. C2, memory-ceremony gets a real step and declared reads, and enrolls in reuse only after its
+2. C1b, hook ledgers stop dirtying the tree. Hooks append during a session to tracked files
+   (`.claude/data/{architecture,governance}-findings.jsonl`, and others). eprfs and orchestrator
+   are keyed on the whole tree, so a working session's main checkout is never clean for them, and
+   they never record or reuse evidence there. Ethosengine measured this on 2026-10-26, when its
+   first live reuse hit only elohim-storage and steward-node. The cure is to gitignore the hook
+   ledgers, or move them out of the tracked tree, rather than to weaken the dirty check. Probe:
+   a session's hooks fire, and the eprfs and orchestrator keys still resolve clean.
+3. C2, memory-ceremony gets a real step and declared reads, and enrolls in reuse only after its
    attribution parity check is snapshotted or excluded.
 
 ### D. Measurement (this session)

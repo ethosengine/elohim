@@ -1606,8 +1606,10 @@ decisionPoints:
         claims.
     - id: C9
       status: answered
-      justification: P1 owner evidence and the existing device did:key bind identity; unsafe local names
-        refuse.
+      justification: P1 owner evidence and the device did:key bind each generation; only a closed, proven-dead
+        owner can have a successor. RuntimeAncestor guards against accidental stray declarations,
+        not same-principal children. No authority is inherited (clauses re-offered, no berth facet
+        transfer); predecessor records and seals remain immutable history.
     - id: C10
       status: answered
       justification: Unprefixed P1 key; executor raw CID comes from the pinned release. Old hex requires
@@ -1815,3 +1817,20 @@ decisionPoints:
       - path: elohim/eprfs/epr-cli/tests/device_supervise.rs
         testName: ark_keeps_the_declared_resident_and_reloads_a_moved_head
         kind: integration
+
+  - name: session-covenant-generation
+    kind: verdict-fn
+    sourceLocation:
+      file: src/session_envelope.rs
+      modulePath: covenant_scope
+    summary: Resolve the current generation's private authority namespace under the sessions guard;
+      generation one retains legacy keys, successors require freshly offered clauses and actor claims.
+      Covenant standing, affiliation sponsorship, collective binding, steward import and acceptance
+      admission use the current claim key; historical attribution keeps its explicit key/as-of reads. Succession
+      requires closure and proven death; runtime ancestry guards accidents, not authentication.
+      No berth leases or moorings transfer; destination reachability is checked before publication.
+    concernIds: *a2_session_concerns
+    contractTests:
+    - path: elohim/eprfs/epr-cli/tests/session_envelope.rs
+      testName: runtime_child_resumes_without_inheriting_authority
+      kind: integration

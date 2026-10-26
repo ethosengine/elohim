@@ -56,13 +56,13 @@ pub fn write(root: &Path, rel: &str, text: &str) {
 /// never needs a git-backed [`repo`] — the same per-binary dead-code note [`view_in`] documents.
 #[allow(
     dead_code,
-    reason = "shared by every flow_memory_recall* test binary; one that never calls this helper compiles it dead"
+    reason = "shared by every integration test binary; each binary uses only some helpers"
 )]
 pub const FIXTURE_DATE: &str = "2026-09-10T00:00:00+00:00";
 
 #[allow(
     dead_code,
-    reason = "shared by every flow_memory_recall* test binary; one that never calls this helper compiles it dead"
+    reason = "shared by every integration test binary; each binary uses only some helpers"
 )]
 pub fn git(root: &Path, args: &[&str]) {
     let out = elohim_epr_cli::process::build_command("git", args, root, &[])
@@ -79,7 +79,7 @@ pub fn git(root: &Path, args: &[&str]) {
 
 #[allow(
     dead_code,
-    reason = "shared by every flow_memory_recall* test binary; one that never calls this helper compiles it dead"
+    reason = "shared by every integration test binary; each binary uses only some helpers"
 )]
 pub fn edge(root: &Path, from: &str, to: &str) {
     let seal = Some(*BlobCid::compute_raw(b"old").as_cid());
@@ -104,7 +104,7 @@ pub fn edge(root: &Path, from: &str, to: &str) {
 /// ceremony something real to select.
 #[allow(
     dead_code,
-    reason = "shared by every flow_memory_recall* test binary; one that never calls this helper compiles it dead"
+    reason = "shared by every integration test binary; each binary uses only some helpers"
 )]
 pub fn repo() -> TempDir {
     // The recall goldens pin a rendering whose line truncation counts the fixture root's bytes
@@ -186,7 +186,7 @@ pub fn contract_value(with_measurements: bool) -> Value {
 
 #[allow(
     dead_code,
-    reason = "shared by every flow_memory_recall* test binary; one that never calls this helper compiles it dead"
+    reason = "shared by every integration test binary; each binary uses only some helpers"
 )]
 pub fn save_contract(root: &Path, contract: Value) {
     write(
@@ -227,7 +227,7 @@ pub fn run_in(root: &Path, session: &str, args: &[&str]) -> Run {
 
 #[allow(
     dead_code,
-    reason = "shared by every flow_memory_recall* test binary; one that never calls this helper compiles it dead"
+    reason = "shared by every integration test binary; each binary uses only some helpers"
 )]
 pub fn run(root: &Path, args: &[&str]) -> Run {
     run_in(root, SESSION, args)
@@ -235,7 +235,7 @@ pub fn run(root: &Path, args: &[&str]) -> Run {
 
 #[allow(
     dead_code,
-    reason = "shared by every flow_memory_recall* test binary; one that never calls this helper compiles it dead"
+    reason = "shared by every integration test binary; each binary uses only some helpers"
 )]
 pub fn ok(root: &Path, args: &[&str]) -> Value {
     let run = run(root, args);
@@ -256,7 +256,7 @@ pub fn ok(root: &Path, args: &[&str]) -> Value {
 /// dead code in the sense this lint means.
 #[allow(
     dead_code,
-    reason = "shared by every flow_memory_recall* test binary; one that never calls this helper compiles it dead"
+    reason = "shared by every integration test binary; each binary uses only some helpers"
 )]
 pub fn view_in(root: &Path, session: &str, args: &[&str]) -> Value {
     let run = run_in(root, session, args);
@@ -272,7 +272,7 @@ pub fn view_in(root: &Path, session: &str, args: &[&str]) -> Value {
 /// asserting on the printed screen rather than the payload.
 #[allow(
     dead_code,
-    reason = "shared by every flow_memory_recall* test binary; one that never calls this helper compiles it dead"
+    reason = "shared by every integration test binary; each binary uses only some helpers"
 )]
 pub fn text_in(root: &Path, session: &str, args: &[&str]) -> String {
     let mut command = Command::new(env!("CARGO_BIN_EXE_epr"));
@@ -297,7 +297,7 @@ pub fn text_in(root: &Path, session: &str, args: &[&str]) -> String {
 /// see `elohim_epr_rea::ActorClaim`), which [`repo`] already provides.
 #[allow(
     dead_code,
-    reason = "shared by every flow_memory_recall* test binary; one that never calls this helper compiles it dead"
+    reason = "shared by every integration test binary; each binary uses only some helpers"
 )]
 pub fn claim_actor(root: &Path, claimed: &str, session: &str) {
     let out = Command::new(env!("CARGO_BIN_EXE_epr"))
@@ -320,7 +320,7 @@ pub fn claim_actor(root: &Path, claimed: &str, session: &str) {
 /// select and is the shape several assertions below are about.
 #[allow(
     dead_code,
-    reason = "shared by every flow_memory_recall* test binary; one that never calls this helper compiles it dead"
+    reason = "shared by every integration test binary; each binary uses only some helpers"
 )]
 pub fn begin_focused(root: &Path, about: &str) {
     ok(
@@ -342,7 +342,7 @@ pub fn begin_focused(root: &Path, about: &str) {
 /// comment on this).
 #[allow(
     dead_code,
-    reason = "shared by every flow_memory_recall* test binary; one that never calls this helper compiles it dead"
+    reason = "shared by every integration test binary; each binary uses only some helpers"
 )]
 pub fn run_in_bank(root: &Path, session: &str, args: &[&str]) -> Run {
     let mut command = Command::new(env!("CARGO_BIN_EXE_epr"));
@@ -362,7 +362,7 @@ pub fn run_in_bank(root: &Path, session: &str, args: &[&str]) -> Run {
 /// [`run_in_bank`], asserting success and returning the parsed `--json` payload.
 #[allow(
     dead_code,
-    reason = "shared by every flow_memory_recall* test binary; one that never calls this helper compiles it dead"
+    reason = "shared by every integration test binary; each binary uses only some helpers"
 )]
 pub fn ok_in_bank(root: &Path, session: &str, args: &[&str]) -> Value {
     let run = run_in_bank(root, session, args);
@@ -388,7 +388,7 @@ pub fn ok_in_bank(root: &Path, session: &str, args: &[&str]) -> Value {
 /// already writes below.
 #[allow(
     dead_code,
-    reason = "shared by every flow_memory_recall* test binary; one that never calls this helper compiles it dead"
+    reason = "shared by every integration test binary; each binary uses only some helpers"
 )]
 pub fn repo_with_bank() -> TempDir {
     let dir = tempfile::tempdir().expect("tempdir");
@@ -499,7 +499,7 @@ pub fn repo_with_bank() -> TempDir {
 /// since that reader is `pub(super)` to the library crate and this is a separate test binary.
 #[allow(
     dead_code,
-    reason = "shared by every flow_memory_recall* test binary; one that never calls this helper compiles it dead"
+    reason = "shared by every integration test binary; each binary uses only some helpers"
 )]
 pub fn flows(root: &Path) -> Vec<Value> {
     let records = SidecarFlowStore::open(root)

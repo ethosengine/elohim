@@ -2984,8 +2984,12 @@ decisionPoints:
     file: src/session.rs
     modulePath: elohim_device_runtime::session
   summary: Declared identity precedes the nearest registered ancestor, then controlling TTY leader, then successful
-    none. A native variable belongs to the nearest runtime only when absent or different in that
-    runtime's inherited environ; unreadable environ falls back to PID/start-time. The walk is bounded at 256 ancestors.
+    none. A caller-exported native variable is selected only when absent or different in that
+    runtime's exec environ; unreadable environ falls back to PID/start-time. This observes the
+    runtime/child convention, not authentication; both are one device principal. The walk is bounded
+    at 256 ancestors. EPR_PROC_ROOT and EPR_AGENT_RUNTIMES remain production isolation inputs.
+    Only successor admission requires real /proc evidence unless EPR_UNDER_TEST=1 explicitly
+    enables a caller-supplied proc root; ordinary liveness and GC keep their supplied root.
   concernIds:
   - id: C0
     status: answered
@@ -2993,6 +2997,9 @@ decisionPoints:
   contractTests:
   - path: elohim/eprfs/device-runtime/tests/session.rs
     testName: session_shared_fixture_cases
+    kind: integration
+  - path: elohim/eprfs/epr-cli/tests/session.rs
+    testName: process_and_registry_overrides_work_without_test_opt_in
     kind: integration
 - name: session::nonblank
   kind: pure-decision-predicate
@@ -3216,8 +3223,8 @@ decisionPoints:
       claims.
   - id: C9
     status: answered
-    justification: P1 owner evidence and the existing device did:key bind identity; unsafe local names
-      refuse.
+    justification: P1 owner evidence and the device did:key bind each generation; only a closed, proven-dead
+      owner can have a runtime-resolved successor. Predecessor bytes retain their raw CID.
   - id: C10
     status: answered
     justification: Unprefixed P1 key; executor raw CID comes from the pinned release. Old hex requires
@@ -3246,7 +3253,12 @@ decisionPoints:
   sourceLocation:
     file: src/envelope.rs
     modulePath: Store::open
-  summary: Idempotent matching live binding; refuse owner, device, steward, checkout or closed-state conflicts.
+  summary: Succession requires a closed predecessor and an owner proven dead through real /proc;
+    only EPR_UNDER_TEST=1 permits caller-supplied process evidence for that admission.
+    Ordinary envelope liveness and GC retain their caller's proc root. RuntimeAncestor is
+    an accident guard against stray declarations, not authentication of the same-principal runtime
+    and children. Successors inherit no authority (clauses re-offered, no berth facet transfer);
+    predecessor records and seals remain immutable history.
   concernIds: *a2_session_concerns
   contractTests:
   - path: elohim/eprfs/epr-cli/tests/session_envelope.rs
@@ -3254,6 +3266,18 @@ decisionPoints:
     kind: integration
   - path: elohim/eprfs/device-runtime/tests/envelope.rs
     testName: binding_is_idempotent_private_and_cannot_be_reused_or_traverse
+    kind: integration
+  - path: elohim/eprfs/device-runtime/tests/envelope.rs
+    testName: successor_preserves_exact_legacy_bytes_seal_and_current_enumeration
+    kind: integration
+  - path: elohim/eprfs/device-runtime/tests/envelope.rs
+    testName: successor_admission_refuses_unclosed_live_unknown_and_non_runtime_owners_without_writes
+    kind: integration
+  - path: elohim/eprfs/device-runtime/tests/envelope.rs
+    testName: successor_archive_retry_is_idempotent_and_conflicting_history_refuses
+    kind: integration
+  - path: elohim/eprfs/epr-cli/tests/session_envelope.rs
+    testName: runtime_child_resumes_without_inheriting_authority
     kind: integration
 - name: envelope-path-valid
   kind: verdict-fn

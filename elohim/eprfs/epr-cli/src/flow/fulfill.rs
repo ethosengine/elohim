@@ -545,6 +545,15 @@ fn gate_status(raw: &str) -> FlowResult<String> {
 /// Two phases, the idiom this family uses everywhere: Phase 1 resolves and refuses, Phase 2
 /// appends exactly one record or none.
 pub fn fulfill_on(root: &Path, request: &FulfillOnRequest) -> FlowResult<FulfillOnOutcome> {
+    // Current attribution reads the envelope; take its scope before the flow lock,
+    // matching closure's sessions-before-flow order.
+    let _scope = request
+        .actor
+        .session
+        .as_deref()
+        .map(crate::session_envelope::covenant_scope)
+        .transpose()
+        .map_err(FlowError::InvalidArguments)?;
     let on = non_empty(request.on, "--on")?;
     let report_rel = non_empty(request.report, "--report")?;
     let status = gate_status(request.status)?;

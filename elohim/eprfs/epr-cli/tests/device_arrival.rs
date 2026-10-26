@@ -15,6 +15,7 @@ fn epr(base: &Path, args: &[&str]) -> Output {
         .env("ELOHIM_DEVICE_KEY_FILE", base.join("device/seed"))
         .env("EPR_BIN_TOOLS", base.join("registry.json"))
         .env("BIN_STORE", base.join("store"))
+        .env("EPR_UNDER_TEST", "1")
         .env("EPR_PROC_ROOT", base.join("proc"))
         .env_remove("ELOHIM_SESSION_OWNER_PID")
         .env_remove("EPR_SESSION_LAZY")

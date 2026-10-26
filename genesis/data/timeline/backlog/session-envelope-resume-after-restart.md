@@ -32,28 +32,36 @@ anything keyed by the runtime's session id, such as the head-notice hook's
 ## Why this is not a one-line fix
 
 The refusal follows a deliberate rule: an envelope is "bound once and never reopened after
-closure". `Store::open` lets neither another owner nor a closed session take over an id. That rule
-is what keeps a dead session's id from being picked up by any process that declares it. Session-keyed
-records include covenant clauses, berth leases and moorings, and a successor that simply replaced a
-closed envelope would inherit all of them. Shem proposed letting `open` replace a closed envelope
-whose owner `owner_dead()` proves dead, keeping the old seal. That cure is sound only if the
-successor's claim to the id is as strong as the original's.
+closure". Replacing a closed envelope under the same id without isolating its facets could inherit
+covenant clauses, berth leases and moorings. The cure must preserve history and inherit no authority.
 
-## The cure (to be designed and reviewed)
+## The cure (R3, review round 1 ruling)
 
-A resumed session opens a successor generation of the same id, never an overwrite:
+A resumed session opens a successor generation of the same id. It is admitted when the predecessor
+is closed and its owner proven dead; the runtime-ancestor requirement guards against accidental
+takeover by a stray declaration; a successor inherits no authority (clauses re-offered, no facet
+transfer), which is what makes a same-principal takeover harmless.
 
-- It is admitted only when the old envelope is closed (seal checkpoint present) and
-  `owner_dead()` proves its owner dead, by an absent pid or a different boot.
-- The successor's identity must come from the runtime itself: source `runtimeAncestor`, where the
-  runtime process's own environment names the id. A bare `ELOHIM_SESSION_ID` declaration is not
-  enough, since anyone can write one.
-- The predecessor's record and seal are kept, as a generation under the id rather than replaced in
-  place. The successor records the predecessor's record CID and seal.
-- Facet writers (covenant, berth) see the successor. Whether its covenant clauses carry over or
-  must be re-offered is the open design question. Default to re-offer, so nothing is inherited
-  silently.
+- Closure means `closedAt` or the durable seal checkpoint is present. `owner_dead()` must prove death
+  by an absent pid or a different boot. Unknown liveness is never death.
+- `Source::RuntimeAncestor` is an accident guard, not authentication. Claude Code assigns its id
+  after exec and exports it to children; its exec-time environment does not name that id. A child
+  can export the same variable and resolve as `RuntimeAncestor`. Runtime and children run as the
+  same user and can read the same device key: they are one principal on this device.
+- A stray outer-shell `ELOHIM_SESSION_ID` declaration must not silently become a successor.
+  Successor admission proves owner death through real `/proc`; only `EPR_UNDER_TEST=1` permits
+  a caller-supplied proc root for that proof. `EPR_PROC_ROOT` and `EPR_AGENT_RUNTIMES` remain
+  production isolation inputs everywhere else, including ordinary envelope liveness and GC.
+  This switch prevents accidents; it is not a same-user security boundary.
+- Predecessor records and seals remain immutable history. The successor records the exact
+  predecessor bytes' raw CID and seal reference.
+- Covenant clauses are keyed by generation, never inherited, and must be re-offered.
+- Berth leases and moorings are not transferred. Dead-session leases remain governed by berth's
+  existing expiry and takeover rules, which already let any session take over an expired lease.
+  Validate the requested store before successor publication.
 
-Regression, at the native seam: open as runtime session X under owner P1, close it and GC it with
-P1 dead. A new owner P2 whose runtime environment names X opens a successor, the old record and seal
-survive, and a bare declaration of X from an unrelated process is still refused.
+Regression at the native seam: open X under P1, prove P1 dead, and close through GC. A child of P2
+exports X while P2's exec environment remains empty. Generation 2 opens with no predecessor clause
+or transferred berth facet; archived records, seals and old berth bytes remain unchanged. Bare
+declarations, live or unknown owners, and invalid berth destinations refuse without publishing.
+The successor's pin overwrites the old pin at the same id path consumed by the head-notice hook.

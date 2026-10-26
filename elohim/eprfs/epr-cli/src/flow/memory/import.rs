@@ -933,6 +933,8 @@ pub fn migrate_identity_reserve(root: &Path, opts: &Options) -> FlowResult<Value
     {
         return Err(refused("--basis is one non-empty line"));
     }
+    let (facet_session, _scope) =
+        crate::session_envelope::covenant_scope(session).map_err(refused)?;
     let root = std::fs::canonicalize(root)?;
     let dir = root.join(&contributions_rel);
 
@@ -1003,7 +1005,7 @@ pub fn migrate_identity_reserve(root: &Path, opts: &Options) -> FlowResult<Value
                 manifest_cid: &prior.manifest_cid,
                 count: prior.count,
                 directory: &rel_str(&contributions_rel),
-                session,
+                session: &facet_session,
                 basis: opts.basis,
                 corrects: &prior.acts,
             });
@@ -1038,7 +1040,7 @@ pub fn migrate_identity_reserve(root: &Path, opts: &Options) -> FlowResult<Value
         manifest_cid: &manifest_cid,
         count: lineage.moved.len(),
         directory: &rel_str(&contributions_rel),
-        session,
+        session: &facet_session,
         basis: opts.basis,
         corrects: &[],
     });
@@ -1184,7 +1186,15 @@ fn misattributed_migrations(root: &Path) -> FlowResult<Vec<Misattributed>> {
         else {
             continue;
         };
-        let expected = executing_session(slot).and_then(|s| acting_author(root, Some(s)).ok());
+        // This is a persisted execution label, never today's current envelope namespace.
+        let expected = executing_session(slot).and_then(|s| {
+            SidecarActorStore::open(root)
+                .ok()?
+                .current_for(s)
+                .ok()?
+                .map(|(_, claim)| claim.claimed.0)
+                .or_else(|| crate::actor::standing_here(root).map(|standing| standing.subject))
+        });
         let entry =
             by_manifest
                 .entry(manifest_cid)
@@ -1344,8 +1354,9 @@ fn steward_of_record(
     let session = opts
         .session
         .ok_or_else(|| refused("--steward-of-record needs the standing human's --session"))?;
-    let store = SidecarActorStore::open(root)?;
-    let Some((_, claim)) = store.current_for(session)? else {
+    let Some((_, claim)) =
+        crate::actor::current_claim(root, session).map_err(|e| refused(e.to_string()))?
+    else {
         return Err(refused(format!(
             "session `{session}` registered no actor claim; the standing human claims it first: \
              epr actor claim --as human:<handle> --session {session}"
@@ -1389,7 +1400,9 @@ fn acting_author_on(
     let session = session.ok_or_else(|| {
         refused("import writes contributions and needs a registered --session; identity remains a local claim")
     })?;
-    if let Some((_, claim)) = SidecarActorStore::open(root)?.current_for(session)? {
+    if let Some((_, claim)) =
+        crate::actor::current_claim(root, session).map_err(|e| refused(e.to_string()))?
+    {
         return Ok(claim.claimed.0);
     }
     if let Some(standing) = standing {

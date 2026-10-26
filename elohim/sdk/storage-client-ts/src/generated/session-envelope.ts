@@ -10,6 +10,17 @@ export interface SessionEnvelope {
    */
   live: boolean;
   envelope: {
+    /**
+     * Bound-once generation. Legacy records without this field read as generation 1.
+     */
+    generation: number;
+    /**
+     * Raw CID of the exact archived predecessor bytes and its untouched seal; null for the first generation.
+     */
+    predecessor: {
+      recordCid: string;
+      covenantSeal: string | null;
+    } | null;
     identity: SessionIdentity;
     device: string;
     steward: string;

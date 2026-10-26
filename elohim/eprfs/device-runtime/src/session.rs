@@ -31,7 +31,8 @@ pub struct SessionIdentity {
 pub enum Source {
     /// Explicit harness declaration.
     Declared,
-    /// Nearest registered runtime process.
+    /// Nearest registered runtime process; an accident guard, not authentication.
+    /// Runtime and children are one device principal; children can supply the id.
     RuntimeAncestor,
     /// Controlling terminal session leader.
     TtyLeader,
@@ -194,18 +195,22 @@ pub fn resolve_with(
     identity("none", None, None, Source::None)
 }
 
+/// Process table shared by identity resolution and ordinary owner-liveness checks.
+pub fn proc_root() -> std::path::PathBuf {
+    nonblank(std::env::var("EPR_PROC_ROOT").ok()).map_or_else(|| "/proc".into(), Into::into)
+}
+
 /// Resolve the current process using the environment and runtime registry.
 pub fn resolve() -> SessionIdentity {
     let env = |key: &str| std::env::var(key).ok();
-    let proc_root = nonblank(env("EPR_PROC_ROOT")).unwrap_or_else(|| "/proc".into());
+    let proc_root = proc_root();
     let registry = registry();
-    resolve_with(&env, Path::new(&proc_root), std::process::id(), &registry)
+    resolve_with(&env, &proc_root, std::process::id(), &registry)
 }
 
 /// Load the same runtime registry used by identity and model resolution.
 pub fn registry() -> Registry {
-    let env = |key: &str| std::env::var(key).ok();
-    let registry_path = nonblank(env("EPR_AGENT_RUNTIMES"))
+    let registry_path = nonblank(std::env::var("EPR_AGENT_RUNTIMES").ok())
         .map(std::path::PathBuf::from)
         .or_else(|| {
             let path = std::env::current_exe()

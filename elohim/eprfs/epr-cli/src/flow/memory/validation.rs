@@ -5,8 +5,8 @@ use std::path::{Component, Path, PathBuf};
 
 use cid::Cid;
 use elohim_epr_rea::{
-    atom_cid, parse_agent_ref, parse_participant_ref, ActorStore, FlowRecord, FlowStore,
-    ParticipantRef, SidecarActorStore, SidecarFlowStore, ROOT_COLLECTIVE_DECLARATION,
+    atom_cid, parse_agent_ref, parse_participant_ref, FlowRecord, FlowStore, ParticipantRef,
+    SidecarFlowStore, ROOT_COLLECTIVE_DECLARATION,
 };
 use eprfs_agent::memory::{
     agent_role, Affiliation, AffiliationStanding, Collective, Contribution, Feedback, FileRef,
@@ -939,7 +939,9 @@ impl Reader {
             return Ok(());
         }
         self.sidecar(".eprfs/status/actors.jsonl")?;
-        let Some((_, claim)) = SidecarActorStore::open(&self.root)?.current_for(session)? else {
+        let Some((_, claim)) =
+            crate::actor::current_claim(&self.root, session).map_err(|e| refused(e.to_string()))?
+        else {
             return Ok(());
         };
         let bound = claim.collective_of_record();
