@@ -1603,6 +1603,86 @@ habits:
       attention-witnessed-privately's retire-when — a row that cannot be appended unsigned leaves
       nothing to say "absent" about.
 
+  - id: device-supervises-its-manifest
+    declared: elohim/eprfs/.epr-meta/device-supervises-its-manifest.habit.md
+    invariant: >-
+      A developer can declare a resident offline on the device's private manifest chain
+      and supervise that head with one ark per data root. A killed permanent resident
+      returns ready with a death witness naming its exit reason. A later supervise
+      reloads a superseded head by graceful restart under the new CID, carrying the
+      incarnation; an unchanged head is a no-op, and stop ends ark and its children.
+      With residents declared, an absent or stale supervisor reads Degraded with the
+      cure epr device supervise, never Refused; at the head with every child ready it
+      reads Ok. Supervision enforces no resource bounds and provides no isolation.
+    status: red
+    active: false
+    checks:
+      - "@concern:device-supervises-its-manifest"
+      - >-
+        cargo test --manifest-path elohim/eprfs/Cargo.toml -p elohim-epr-cli
+        --test device_supervise ark_keeps_the_declared_resident_and_reloads_a_moved_head
+        -- --exact --nocapture (native CARGO_TARGET_DIR pool slot and RUSTFLAGS=;
+        ARK_BIN must name a built ark: without it this test returns successfully
+        without asserting the live story)
+    evidence: >
+      DELTA 2026-10-26 (born RED, inactive): commit `06dd6c51c` records that the live
+      story `ark_keeps_the_declared_resident_and_reloads_a_moved_head` passed with
+      `ARK_BIN` set against a fixture device, NOT this workspace's own chain. The
+      commit also records `just gate elohim-ark`, `eprfs` and `rust-style` with exit 0.
+      These are the commit's reported results, not new runs during this authoring pass.
+      Blind-reader loop (fresh `blind-reader` agent, a2o-story profile, path only):
+      round 1 READY, 0 correctness · 5 interpretability · 1 preference (EffectiveTier
+      jargon, chain/CID model, fixture vs product readiness, berth lease vs data-root
+      exclusivity, degraded vs REFUSED); all five repaired, the preference (split the
+      stop proof) declined. Round 1 also exposed a defect: a resident declared without
+      a ready line is never marked ready, so the arrival line would have stayed
+      degraded; `check()` now counts such a child as waiting only while it has no live
+      process. Round 2 (new reader) READY, 0 correctness · 5 interpretability · 2
+      preference; repaired restart-policy gloss, incarnation's purpose, the by-hand
+      `ark run` behind the singleton scenario, and the lease's role; declined chain
+      history (out of this story's scope) and a concrete path. Closed by judgment at two
+      READY rounds with zero correctness findings. Loop cost: 2 reader rounds, about
+      105k reader tokens.
+
+      The live story declares a resident, observes readiness, repeats supervise at the
+      same head, kills the resident with signal 9, reads its death witness, supersedes
+      the head, observes reload under the new CID with a greater incarnation, and stops
+      ark and its child. Its resident is a copy of bash registered as the fixture's
+      `epr` tool, not `epr lsp serve --device`. With `ARK_BIN` unset the live test returns
+      before those assertions; an ordinary green eprfs gate alone does not prove them.
+      The fixture also disables the berth lease. The duplicate-ark refusal is grounded
+      in `supervise.rs`; this live test does not exercise that refusal. The Gherkin
+      story remains `@wip` until its steps are wired.
+
+      Green requires evidence from this workspace's real device chain: declare the
+      resident `epr lsp serve --device`, supervise it and observe it ready at the head,
+      kill that resident and observe its replacement ready with a death witness naming
+      the killed process and cause, and record `berth status` showing `device-ark`.
+      Keep the manifest CID, process IDs, witness and lease observation with that delta.
+      Until that adoption is observed, the fixture pass leaves this habit red.
+    evidence-fingerprint: sha256:f191288cbd2c2b1a
+    evidence-bytes: 2539
+    evidence-entries: 1
+    guard: >-
+      Fixture evidence is not evidence of adoption on this workspace's real chain.
+      The fixture disables berth leasing with EPR_BERTH_BIN empty, so it cannot prove
+      a device-ark lease. With no berth tool or resolvable session, supervise proceeds
+      unleased. Ark reports EffectiveTier None: restart and death witnesses do not
+      establish resource bounds or process isolation. A conflicting ark started
+      outside supervise is refused by process ID; repeating supervise at its own
+      unchanged head succeeds without starting another ark.
+    refs:
+      - genesis/a2o/features/devflow/device-runs-its-own-manifest.feature
+      - elohim/eprfs/epr-cli/tests/device_supervise.rs
+      - elohim/eprfs/epr-cli/src/device/supervise.rs
+      - elohim/eprfs/epr-cli/src/device/arrival.rs
+      - elohim/ark/core/src/declaration.rs
+      - genesis/agentic/pool-policy.json
+    retire-when: >-
+      when a replacement device runtime owns manifest supervision, carries this
+      concern's restart, witness, reload, stop and singleton checks against a real
+      device in its required gate, and epr device supervise has been removed
+
   - id: materialize-what-is-read
     declared: elohim/eprfs/.epr-meta/materialize-what-is-read.habit.md
     invariant: >
@@ -2145,10 +2225,10 @@ habits:
       - "node --test genesis/orchestrator/prepush-gate-live.test.mjs (the hook opens, closes, and closes interrupted from its exit trap)"
       - "@concern:gate-failures-arrive-live"
     evidence: >
-      DELTA 2026-10-26 (born RED; checks green, invariant unproven on a real push): L0 slice in the working tree. Fixture e2e (gate-runner CLI, tapped, two cargo FAILED lines then 4 s more work, exit 101): `follow --session` printed the first RED 0.6 s after the gate started and the second at 2.6 s; the gate exited at 6.5 s; verdict `failure_class=code`; run closed `failed`. Green waits on a real push's `first_red_s` against its `value`.
-    evidence-fingerprint: sha256:e373fe9aadb5a400
-    evidence-bytes: 435
-    evidence-entries: 1
+      DELTA 2026-10-26b (still RED; evidence bar raised): the orchestrator gate now runs as a local placement Task (`adc2a2059`, `d453d99e7`); gate-verdict carries derivation {method, input, hit} and Answered|Unanswered, and an interrupt closes the run `interrupted` with three parts. Scratch-clone proof: miss 469 s, derivation hit 23 s with no child, SIGTERM Unanswered with no evidence recorded. Green now needs, on a real push: a red delivered while later gates still run (`first_red_s` well under `value`) AND a derivation hit on the corrected re-push. Story revised (reuse + interrupt scenarios): blind-reader rounds 3 and 4 (new readers), round 3 READY 1 correctness (reuse title overclaimed) · 3 interpretability · 5 preference, all correctness and interpretability repaired; round 4 READY 0 correctness · 5 interpretability · 2 preference, 4 repaired, title scope declined (the habit names the live-failure promise); about 113k reader tokens.
+    evidence-fingerprint: sha256:717c95800f652f91
+    evidence-bytes: 1386
+    evidence-entries: 2
     guard: >-
       Preserve output bytes, exit status, and termination signals. Keep excerpts
       device-only. Require real-push evidence of first_red_s, continued later
