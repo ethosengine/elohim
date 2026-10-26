@@ -23,6 +23,10 @@ REPO = Path(__file__).resolve().parents[2]
 # spawns, which inherits it) never folds a record into the checkout it lives in through the real
 # emitter. A suite that wants a fold injects an emitter or points the store at a scratch checkout.
 os.environ["BERTH_UNDER_TEST"] = "1"
+# A standalone berth, never this machine's device: with the variable unset the envelope guard
+# falls back to the real device key, and the real `epr` refuses fixture sessions such as "dev".
+# CI has no device key, so this only bit on a device. Tests that need a key patch it in.
+os.environ["ELOHIM_DEVICE_KEY_FILE"] = os.path.join(tempfile.mkdtemp(), "no-device", "ed25519.seed")
 
 _NS = runpy.run_path(str(Path(__file__).parent / "bin/berth"))
 Berth = _NS["Berth"]
@@ -1155,6 +1159,24 @@ class StewardClaimTest(unittest.TestCase):
         self.assertNotIn("alpha-fleet", section)
         self.assertEqual(len(self.calls()), 1)
 
+    def test_the_top_lease_list_names_a_holder_on_another_device_never_free(self):
+        # 2026-10-26: a peer's wait loop matched "dev-integration free" while another device held
+        # it, and pushed into that lease. The top line is what a waiting reader matches.
+        self.views(view(dev_integration=held_by_a()))
+        top = render_status(self.berth).split("\n  other devices", 1)[0]
+        self.assertIn(f"dev-integration held by {DEVICE_A}/claude-1 since 2026-10-23T15:28:09Z (another device)",
+                      " ".join(top.split()))
+        self.assertNotIn("dev-integration free", " ".join(top.split()))
+        self.assertEqual(len(self.calls()), 1)
+
+    def test_an_unreadable_view_never_reads_as_free_for_a_steward_scoped_resource(self):
+        self.views("EXIT 2 peer view unavailable")
+        top = render_status(self.berth).split("\n  other devices", 1)[0]
+        self.assertIn("dev-integration not held here — other devices unknown", " ".join(top.split()))
+        for res in ("alpha-fleet", "dev-integration", "jenkins-dispatch"):  # steward-scoped
+            line = next(l for l in top.splitlines() if l.split() and l.split()[0] == res)
+            self.assertNotRegex(line, r"\bfree\b")
+
     def test_a_folded_mooring_past_the_mooring_ttl_is_stale_not_live(self):
         out = view()
         out["others"] = {DEVICE_A: {"seq": 9, "last_seen": NOW_MS - 1_000, "moorings": {
@@ -1389,7 +1411,7 @@ class StewardClaimTest(unittest.TestCase):
         with contextlib.redirect_stderr(err):
             self.assertTrue(self.berth.owner_check("alpha-fleet", "other", "deploy")[0])
         self.assertEqual(len(err.getvalue().splitlines()), 1)
-        section = "\n".join(_NS["_other_devices_lines"](self.berth))
+        section = "\n".join(_NS["_other_devices_lines"](self.berth, *_NS["_steward_view"](self.berth)))
         self.assertIn("other devices: none — this workspace is not one of its steward's devices", section)
         self.assertIn(str(self.key), section)
 

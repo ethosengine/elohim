@@ -1389,6 +1389,12 @@ def render_status(b):
                      f"  for {m.get('principal') or '?'}  task={m.get('task') or '-'}  seen {_age(now - m.get('last_seen', now))} ago")
     leases = b.leases()
     caps = b.capacities
+    # Read the other devices once: a resource free here may be held on one of them, and the top
+    # list is what a waiting reader matches, so it names that holder instead of saying "free".
+    view, view_line = _steward_view(b)
+    now_ms = b._view_now(view) if view else round(now * 1000)
+    elsewhere = {res: verdict for res, verdict in (view or {}).items()
+                 if isinstance(verdict, dict) and verdict.get("verdict") == "held_by"}
     lines.append("  leases:")
     for res in sorted(set(caps) | {k.split('/')[0] for k in leases}):
         holder = b.who(res)
@@ -1407,9 +1413,13 @@ def render_status(b):
                 else:
                     lines.append(f"    {res:<11} EXPIRED {raw['holder']} — held {held}, mooring stale "
                                  f"(takeover on next claim)")
+            elif res in elsewhere:
+                lines.append(f"    {res:<11} {steward_reason(elsewhere[res], now_ms)} (another device)")
+            elif view_line and b.steward_scoped(res):
+                lines.append(f"    {res:<11} not held here — other devices unknown")
             else:
                 lines.append(f"    {res:<11} free")
-    lines += _other_devices_lines(b)
+    lines += _other_devices_lines(b, view, view_line)
     ram = _guard_state("ram-guard")
     io = _guard_state("io-guard")
     if ram:
@@ -1420,24 +1430,32 @@ def render_status(b):
     return "\n".join(lines)
 
 
-def _other_devices_lines(b):
-    """The other devices of this person, as this device has folded them (`epr peer leases --json`:
-    `others` and the `held_by` verdicts, replayed in each device's own record order): each one's last
-    head, its open moorings and its steward-scoped leases, lane claims among them. Only a berth whose
-    policy declares steward-scoped resources asks; a view it cannot read says so, never "none"."""
+def _steward_view(b):
+    """(view, None) when this device's fold of its steward's other devices was read, else (None, the
+    one status line that says why not). Only a berth whose policy declares steward-scoped resources
+    asks; a view it cannot read says so, never "none"."""
     if not (b.steward_names or b.steward_prefixes):
-        return []
+        return None, None
     if b.policy_error:
-        return [f"  other devices: unknown — pool-policy {b.policy_error}"]
+        return None, f"  other devices: unknown — pool-policy {b.policy_error}"
     view, err = b.peer_leases()
     if err:
-        return [f"  other devices: unknown — {err}"]
+        return None, f"  other devices: unknown — {err}"
     standing = view.get("standing")
     if standing == "not_a_device":
-        return [f"  other devices: none — this workspace is not one of its steward's devices ({view.get('why')}; "
-                f"run: just status device)"]
+        return None, (f"  other devices: none — this workspace is not one of its steward's devices "
+                      f"({view.get('why')}; run: just status device)")
     if standing != "device":
-        return [f"  other devices: none — {standing}: {view.get('why')}"]
+        return None, f"  other devices: none — {standing}: {view.get('why')}"
+    return view, None
+
+
+def _other_devices_lines(b, view, view_line):
+    """The other devices of this person, as this device has folded them (`epr peer leases --json`:
+    `others` and the `held_by` verdicts, replayed in each device's own record order): each one's last
+    head, its open moorings and its steward-scoped leases, lane claims among them."""
+    if view is None:
+        return [view_line] if view_line else []
     now_ms = b._view_now(view)
     others = view.get("others") if isinstance(view.get("others"), dict) else {}
     held = {}
