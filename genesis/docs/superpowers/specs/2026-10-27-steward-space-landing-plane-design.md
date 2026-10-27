@@ -92,7 +92,7 @@ Every act, from an S0 lease to an S4 amendment, has the same shape: **intent →
 
 Each slice ends with a DELTA line in the habit atom it moves (§3), followed by `habits-project.py`.
 
-**Minimum viable sprint path:** A0 → A1 → A2 → A3 → A4 → A5 → A6 → A9 (shadow, then on) → A10. After that: A7, A8, A11–A13.
+**Minimum viable sprint path:** A0 → A1 → A2 → A3 → A4 → A5 → A6 → A7 → A9 (shadow, then on) → A10. After that: A8, A11–A13.
 
 **Gate per slice:**
 - Rust: `just gate eprfs` (device-runtime is an eprfs workspace member; `just gate elohim/eprfs/device-runtime` resolves the same project).
@@ -106,7 +106,7 @@ Each slice ends with a DELTA line in the habit atom it moves (§3), followed by 
 3. **Direct path.** Can the two Che pods reach each other directly? Is today's path direct or relayed (`epr peer status --json`)?
 4. *(Closed by code read.)* A v1 fold lists and diffs only `channel/events` (`fold.rs:112-121`), so additive paths such as `channel/nacks/*` are ignored by v1 readers. The nack leaf is in-epoch.
 5. Is origin public?
-6. **Does the Jenkins multibranch source index `feat-*` / `claude/*` refs on origin?** A7a's carrier choice is gated on this.
+6. *(Closed by Jenkins `getJobs`, 2026-10-27.)* `elohim-orchestrator` indexes only `dev` and `PR-*`, but downstream multibranch jobs including `elohim-eprfs` discover and build `feat/*`, `fix/*`, `claude/*` and `dispatch/*`. A feature-branch offer therefore spends CI per offer.
 7. **Edge selection.** For the last 20 dev pushes, compare the orchestrator's changeset selection (graph-walker) with the tags present. This sizes A9/A10's derived-resource rule.
 
 **Baselines:** landings per 40 h; lease-hold seconds; re-gate seconds; duplicate claims; Jenkins waves per landed commit; link-down minutes; fold failures; daemon restarts; RSS; and `epr peer leases` latency. The earlier 448 MB and 0.22 s values are proposed baselines pending a durable measurement receipt.
@@ -227,13 +227,14 @@ Current `berth` uses exits 0, 1, 2, 3, and 4 (`genesis/agentic/bin/berth:82-87`)
 **Rollback:** stop the manifest and run `epr peer serve` by hand. **Wire:** none.
 
 ### A5. Durable actors, honest attribution, a safe inbox, halt, priced overrides
-**Attribution (fails closed):**
-- `_observation.py:187-196` passes `--as agent:<role>@<model> --session <id>`.
-- At `note.rs:1293`, `(None, Some(session))` gives `Attribution::unattributed`. The standing fallback survives only for `(None, None)`.
-- `ram-guard.py:379` takes its principal from `epr actor current --device`.
+**Attribution (provider principal, agent provenance):**
+- On the real network the only human is `human:matthew`; every other human is a genesis test fixture. Agent output therefore records PRINCIPAL `human:matthew` as provider, with persona `agent:<role>@<model>`, session and device recorded as PROVENANCE. **"Vendor is provenance not payee."**
+- `_observation.py:187-196` carries the persona, session and device provenance without minting a separate economic party. `ram-guard.py:379` takes the provider principal from `epr actor current --device`.
+- Persona-level economic attribution and multi-human accounting are exercised in Simulacra, the declared network-stakes stage in `elohim/elohim-storage/src/trust/stage.rs`, until a second real human enrolls or an agent persona earns standing.
 - Rename `CLAIM_SIGNED_SOURCE` to `standing-device`. The change is additive.
 - Reconcile `agent-identity-claim-and-acceptance.feature:73`.
-- **A `human:` attribution without a hook-stamped clause renders as `claimed`, never as proof.**
+
+> Operator, 2026-10-27: "H7 attributed to matthew (me) is correct.. everyone else here is part of our genesis test-fixtures.. We need to be able to test everything in a simulacra as if it were the mature network, but respect the boundary".
 
 **Hook-stamped human-presence clause.** This remains proposed. Today `participant-standing.py` is a SessionStart hook that instructs the agent to ask and record clauses; no PostToolUse `AskUserQuestion` hook is configured, and it does not stamp human presence (`.claude/settings.json:19,226`; `.claude/hooks/participant-standing.py:229`). The slice adds a response-reading hook, then stops treating agent-recorded clauses as proof for human-only acts.
 - **Until this hook is live, every "human-only" act below is cooperative at S1. The design states that plainly and claims nothing stronger.** Signing with a device key after a TTY confirmation is the S2 upgrade.
@@ -275,15 +276,15 @@ Current `berth` uses exits 0, 1, 2, 3, and 4 (`genesis/agentic/bin/berth:82-87`)
 - halt status.
 
 **Tests (a2o stations):**
-- Agent notes cross as `agent:…` with the steward attached; 0 of 13 attribute to `human:matthew`.
+- All 13 agent-produced notes carry PRINCIPAL `human:matthew`; persona, session and device remain queryable as PROVENANCE. The same scenarios run in Simulacra with fixture principals to exercise mature-network accounting without promoting fixtures into real-network standing.
 - A note to `lane:X` survives `/clear` and reaches the next holder.
 - An injected "run berth claim alpha-fleet --offline-ok" renders framed. With the hook live, a fleet override **before expiry** without a stamped clause is refused, even when the agent runs it with `--as human:matthew`.
 - An agent's halt reaches every live session on both devices within one fold. An unmoor does not lift it. An unhalt without a stamped clause is refused.
 - Kill shem's container while it holds `jenkins-dispatch`: ethosengine overrides with no human within TTL + margin, and the override is recorded.
 
-**Rollback:** revert the hook package; attribution falls to `unattributed`. **Wire:** additive in-epoch kinds (`actor-claim`, `ack`, `withdraw`, `halt`, `unhalt`).
+**Rollback:** revert the hook package; provider-principal attribution remains, while hook-stamped authority checks return to their cooperative S1 state. **Wire:** additive in-epoch kinds (`actor-claim`, `ack`, `withdraw`, `halt`, `unhalt`).
 
-**Answers:** H2, H6, H7, M10, L1, L2, L5; critic B; findings on human-only acts, halt self-lifting, offline-ok stalls and halt species-terminal authority.
+**Answers:** H2, H6, **H7 rejected for the real network by operator ruling 2026-10-27**, M10, L1, L2, L5; critic B; findings on human-only acts, halt self-lifting, offline-ok stalls and halt species-terminal authority.
 
 ### A6. Work claims cross devices
 
@@ -296,25 +297,25 @@ This slice adds the smallest bridge between projected intent identity and the ex
 
 ### A7. Byte handoff: an offer names an oid, never prose
 
-**A7a (no Rust).** Introduce a proposed `dev-landing@1 offer {oid, base, carrier}` crossing. Today the sole crossing measure is `dev-berth-events@1`, admitting only `moor`, `unmoor`, `claim`, `renew`, `release`, `override`, `note`, and `shed` (`genesis/agentic/pool-policy.json:151-157`). The carrier is posted landing intents only, never drafts, and is chosen by A0 probe 6:
+**A7b (primary, local-first).** Add `epr peer offer` and a `bundle:` carrier. The sender writes the Git bundle into the steward space's own eprfs tree; the receiver fetches it over the tier and verifies the content-addressed Git oid. The artifact is stored as CIDv1 chunks no larger than 1 MiB and named by a manifest entry that states what it is, its base and its tip. No `epr peer offer`, `bundle:` carrier, or peer-offer protocol exists today (`elohim/eprfs/epr-cli/src/peer.rs:76-108`), so this protocol lands before byte handoff is claimed.
 
-- If a normal feature branch is not indexed, use `feat/<lane>`.
-- The effect of `refs/offers/<lane>` on multibranch discovery is unverified because that configuration is external; require the live probe before selecting it.
-- If origin push is undesirable, wait for A7b.
+**A7a (fallback, no Rust).** Introduce a proposed `dev-landing@1 offer {oid, base, carrier}` crossing. Today the sole crossing measure is `dev-berth-events@1`, admitting only `moor`, `unmoor`, `claim`, `renew`, `release`, `override`, `note`, and `shed` (`genesis/agentic/pool-policy.json:151-157`). `refs/offers/<lane>` on origin is used only when the peer link is down. `feat/<lane>` branches are never offer carriers. The carrier is posted landing intents only, never drafts.
 
-The receiver fetches and verifies the content-addressed Git oid.
+The offer record carries `carrier: bundle:<cid> | ref:refs/offers/<lane>`. Switching carrier is data, not a branch convention.
 
-**A7b (local-first; follows A9).** No `epr peer offer`, `bundle:` carrier, or peer-offer protocol exists (`elohim/eprfs/epr-cli/src/peer.rs:76-108`). Add the protocol before claiming local-first byte handoff. Its tree design uses implemented defaults—nodes up to 4 MiB and 100,000 entries (`elohim/eprfs/eprfs-core/src/tree.rs:80-90`)—rather than a nonexistent 1 MiB leaf rule.
+**Rakia primitive.** The bundle is an artifact from day one: ≤1 MiB CIDv1 chunks on the dataplane, named by a manifest entry carrying kind, base and tip. The bundle emits a ValueFlows `produce` event beside the artifact, accounted to PRINCIPAL `human:matthew` with agent persona, session and device as provenance, and carries `depends-on` and `cites` edges to upstream contributions so later value tracing does not require reconstructing Git history.
 
-**Test:** land a sibling fix with identical `git diff --stat`; repeat with origin unreachable for A7b; measure a 50 MB bundle against actual TreeLimits.
+**Test:** land a sibling fix with identical `git diff --stat` over the tier; repeat with the peer link down through `refs/offers/<lane>`; measure a 40 h sprint's bundle set against the 1 MiB chunk bound and store growth.
 
-**Rollback:** revert. **Wire:** proposed in-epoch crossing (A7a); proposed additive ALPN request (A7b).
+**Rollback:** revert. **Wire:** proposed additive ALPN request (A7b); proposed in-epoch fallback crossing (A7a).
 
 ### A8. Sibling verdict reuse (strictly gated on A0 probe 1)
 
 Today reuse is strictly self-signed: `gate-evidence.mjs:283-296` refuses a row whose `attestation.agentId` is not this workspace, and tests expect `(signer this workspace)` (`genesis/orchestrator/gate-evidence.test.mjs:447-470,622-648`). There is no `binds-signer` participant row—current rows are `Genesis`, `Binding`, `Contest`, and `PeerEndpoint` (`elohim/epr-rea/src/participants.rs:42-111`)—and no independence field or k-of-n evidence count. The visible caller stores `{exit, seconds, jobs?}`; brit's schema is unverified while its submodule is uninitialized.
 
 The slice initializes and verifies brit, defines proposed `binds-signer` vocabulary (the current validated Mishpat action is `binds-identity`), specifies signer admission and signature verification, adds explicit sibling independence without counting siblings in governance quorums, and extends tests from current other-signer refusal to admitted-sibling reuse.
+
+**Rakia primitive.** The verdict is a brit attestation whose subject is the closure key and, when the run produced bytes, whose `output_cid` is the artifact CID; today that is a run-record CID under rakia ruling R12 c. Reusing a sibling's verdict is reusing an attested artifact: the build cache. It emits a ValueFlows `use` event beside the artifact, accounted to PRINCIPAL `human:matthew` with agent persona, session and device as provenance, and carries the artifact's `depends-on` and `cites` contribution edges.
 
 A8 remains blocked on A0 probe 1 and a reviewed participant-binding design.
 
@@ -323,6 +324,8 @@ A8 remains blocked on A0 probe 1 and a reviewed participant-binding design.
 Everything here is proposed unless identified as current. No landing queue, train absorption, change-class resolver, or landing trailers exist today. Current integration claims before gates, defaults to a 1,800-second TTL, renews every TTL/3, holds leases through gates, and then pushes (`.husky/pre-push.bash:115-145,194-227,255-327`). Current `BERTH_NEEDS` remains commit-tag-derived at lines 260-270; untagged storage or doorway paths do not add `alpha-fleet`.
 
 **Record:** introduce `dev-landing@1 intent {base, tip oid, carrier, per-gate closure keys + evidence hit/miss/signer, eta, actor, lane, state}`. The integrator recomputes class, paths, and dispatch from the fetched oid and base-tree manifests.
+
+**Rakia primitive.** A landing intent references closure CIDs and artifact CIDs; the queue orders the constellation, not branch names. It emits a ValueFlows `deliver-service` event beside the artifact, accounted to PRINCIPAL `human:matthew` with agent persona, session and device as provenance, and carries the artifact's `depends-on` and `cites` contribution edges.
 
 **Change-class resolver:** add one resolver behind a loosely coupled interface; none is currently declared in `genesis/orchestrator/.epr-meta/`, whose manifest adds no author-time rule (`manifest.md:18-32`). The proposed classes remain 0, low, channel, governance, high, and global.
 
@@ -348,6 +351,8 @@ Everything here is proposed unless identified as current. No landing queue, trai
 No ark-supervised `lane:ci-witness` process or lease exists. The current observer is `.claude/scripts/ci-harvest.py`, with cursor and JSONL state; its SessionStart hook runs unconditionally and does not inspect a witness lease or EPR fold (`.claude/settings.json:43`; `.claude/scripts/ci-harvest.py:913-926`). Its `--wait` mode performs bounded polling (`:27-28,932-942`), so witness reads are not the repository's only polling.
 
 The slice adds a non-LLM witness behind a replaceable observer interface. It records one verdict per orchestrator run, carries landing-intent references once trailers exist, and holds derived resources only while their wave is in flight. Until A9 lands, it cannot infer trains or trailer membership.
+
+**Rakia primitive.** The witness's tip verdict attests the same closure CIDs. Jenkins is one forge among many, and its outputs land as custodied artifacts. The verdict emits a ValueFlows `custody` event beside each artifact, accounted to PRINCIPAL `human:matthew` with agent persona, session and device as provenance, and carries the artifact's `depends-on` and `cites` contribution edges.
 
 **On a red tip:** re-gate locally with evidence reuse disabled; classify no-local-repro as environment/unknown; revert only on reproduced intent-specific evidence; allow at most one class-0 auto-revert per sprint; never auto-revert governance or higher classes.
 
@@ -485,7 +490,7 @@ The red-first evidence is recorded honestly before the green.
 | Work claim | B lease + C view | (resource, holder) | intimate | bounded work leases have TTLs; the `mesh` daemon lease is the explicit no-TTL exception | 0 | none | yes | free |
 | Landing intent | B (S1) → **B collective-space record held by members (S2)**; only the *landed release / ratified lineage* is notarised on the valve | event CID | intimate → space | landed + 30 d, then the `landed` row | 0 on any DHT | none | queue of one | class × reach |
 | Queue position | C | (resource, intent) | local | none | 0 | none | yes | none |
-| Offer | B | git oid / bundle root | intimate (A7a: `refs/offers` or `feat/`, posted only) | landed + 7 d | 0 | none | no-op | — |
+| Offer | B | git oid / bundle manifest CID | intimate (`bundle:<cid>` primary; `refs/offers/<lane>` only while the peer link is down) | landed + 7 d | 0 | none | written and readable locally | tier transfer; origin fallback only |
 | Sibling gate verdict | B2 brit-signed | closure key | intimate | per policy | 0 | none | unchanged | reuse only; refused in k-of-n |
 | proposed `binds-signer` (current Mishpat vocabulary is `binds-identity`) | B2 | (did, agentId) | self | until rotated | 0 | none | yes | enrolment = human act |
 | CI witness verdict | B, `service:jenkins`, actor = holder | CID | intimate | durable | 0 | none | lands unwitnessed, named | witness only |
@@ -647,6 +652,16 @@ The decision remains expand → contract: readers expand first, writers move onl
   - **S2:** reviewer eligibility for the low class.
   - **S3/S4:** roster eligibility through the epic's earned ceiling — never a sole signer, a majority, or a widener of its own power.
 
+### 5.7 Rakia: the system under its brand
+
+Rakia names the whole system: repository (brit refs and attestations), registry (manifest entries over CIDs, with channel heads as declared dependencies), build cache (attested closures → artifacts), CI/CD (stages forge stars; verdicts are weighted by independence and standing), and experience. Stars are artifacts: content-addressed blobs on the dataplane. Their dependency graph is the constellation.
+
+The experience is an asked-for, perspective-relative view: a Cybersyn control room showing algedonic signals such as breached bounds, a stalled queue head or a halt. It renders what the primitives already make true and owns no data. It shows your own grant in full, other grants only as their rulebooks allow, and siblings as one constellation, never as independent witnesses. No lever bypasses the holders except halting your own grant.
+
+Value flows back to every steward. Every forge, attest, review, use and custody act is an REA event. The aggregate sky is visible to all—**"everyone gets to look at the sky"**—while per-object detail requires reach or relationship: **"not having a telescope you might not see the intricacies of any particular object (anonymity in aggregate), but they're accounted for"**. This is SDO/RWA boundary 6: participation detail remains sensitive even when the aggregate is visible. Anyone with compute in a community can forge at S2/S3, inheriting the EPR primitives for governance, story, VSM, accountability and REA.
+
+**Guidestar (TBD, not designed):** Inbound value, including a donation, is not enclosed by the steward. It honestly initializes the commons pools and follows contribution edges to nascent contributor presences—dependencies, upstream projects and inspirations—where it can be claimed; those presences remain unclaimed or stewarded until then. The operator names the reason: **"that honesty is our network attractor, and is a part of our epic"**. The only near-term requirement is that artifacts and attestations carry their upstream contribution edges.
+
 ---
 
 ## 6. The forward-looking arm's standing home
@@ -737,7 +752,7 @@ These forks are not parked for the operator. Per the operator ruling of 2026-10-
 
 1. **§3 / habit milestone — WIP fence:** whether to mint `sprint-lands-each-closure-once` inactive upstream of `push-delivers-within-budget`, or swap it into an active slot.
 2. **A5 — hook write-set:** `_observation.py` attribution, the `ram-guard.py:379` principal, the new inbox-notice package, and the proposed response-reading human-presence hook.
-3. **A7 / after A0 probe 6 — carrier:** `feat/<lane>`, `refs/offers/<lane>`, or wait for A7b.
+3. **A7 — carrier (resolved: D3):** `bundle:<cid>` over the tier is primary; `refs/offers/<lane>` is the peer-link-down fallback; `feat/<lane>` is never used.
 4. **A4 — relay topology:** steward-owned relay versus direct plus alpha; whether n0 public relays are a last fallback. Alpha is never the only path.
 5. **§5.5 — Mishpat authority:** Mishpat-only progenitor key plus `CouncilRoster` integrity entry and roster-derived k, or all four roles in one rehearsed v1∥v2 window; standalone timing versus the next Mishpat crossing. The fleet DNA-hash move goes to the operator.
 6. **A10 — class-0 auto-revert:** retain or narrow the locally reproduced, one-per-sprint rule.
@@ -773,6 +788,15 @@ These forks are not parked for the operator. Per the operator ruling of 2026-10-
     - A grep of `genesis/docs` on 2026-10-27 found one use: "separately admitted steward spaces" at the planetary rung of `2026-10-16-commons-reach-spaces-physical-holon-design.md:154`.
     - That use means a membership-admitted space held by stewards, the same concept class as this one, so the falsifier does not fire.
   - **Interface:** older documents keep "steward channel" as a synonym until their next edit, so nothing is renamed in bulk. The horizon domain is a sources file plus a skill mode, so dropping it is one deletion.
+- **D3 (fork 3, A7 carrier, 2026-10-27): offers travel as a Git bundle written into the steward space's own eprfs tree and fetched over the tier. A7b is primary; `refs/offers/<lane>` on origin is fallback only while the peer link is down; `feat/<lane>` branches are never used.**
+  - **Alternatives:**
+    - `feat/<lane>` on origin.
+    - `refs/offers/<lane>` as the primary carrier.
+  - **Evidence that chose it:**
+    - A0 probe 6 (2026-10-27, Jenkins `getJobs`) found that `elohim-orchestrator` indexes only `dev` and `PR-*`, while downstream multibranch jobs such as `elohim-eprfs` discover and build `feat/*`, `fix/*`, `claude/*` and `dispatch/*`. A `feat/` offer therefore spends CI per offer.
+    - The operator describes GitHub branches, PRs and Jenkins branches as **"BIG friction"** that does not move toward native P2P CI/CD.
+  - **Falsifier:** the bundle path cannot carry a 40 h sprint's offers within the tier's limits—leaf size and store growth. Then `refs/offers/<lane>` becomes primary.
+  - **Interface:** carrier is a field of the offer record: `carrier: bundle:<cid> | ref:refs/offers/<lane>`. Switching is data.
 
 ## Appendix: minor findings and dispositions
 | Finding | Disposition |
@@ -785,7 +809,7 @@ These forks are not parked for the operator. Per the operator ruling of 2026-10-
 | CID tie-break grindable | Bounded: free fields excluded; stated as trustful-self at S1; S2 uses signed-head causality plus commit-reveal (A9, §5.2) |
 | Retention self-contradiction / unenforceable pruning | Fixed: §1.3 honest wording; milestone fork 9 reworded |
 | Standing ledger and trailers enable cross-holon join | Fixed: ledgers per space, holder-presented portability, per-space opaque trailer references (A9, §5.1, §5.6) |
-| `human:` forgeable at S1 | Fixed: hook-stamped clause; cooperative until shipped, stated in A5 and the threat model |
+| Human-only authority claim forgeable at S1 | Fixed: hook-stamped clause; cooperative until shipped, stated in A5 and the threat model. Provider-principal attribution is separate. |
 | Resubscribe limit plus governor can strand the daemon | Fixed: unbounded in-process backoff; exit only on local faults (A2) |
 | ci-witness MCP vs no-headless-sessions; unmetered tokens | A10 separates current `ci-harvest.py` from the proposed non-LLM witness and retains the declared budget |
-| A7a carrier spends Jenkins and forge reach | Fixed: gated on probe 6; the carrier remains a milestone decision because `refs/offers/*` discovery is unverified |
+| Branch carriers spend Jenkins and forge reach | Fixed by D3: eprfs bundle is primary; `refs/offers/<lane>` is fallback only while the peer link is down; `feat/<lane>` is never used |
