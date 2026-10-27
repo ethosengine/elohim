@@ -72,7 +72,62 @@ test('exports only the public run-log functions', () => {
     'openRun',
     'readRun',
     'resolveSession',
+    'unseen',
   ]);
+});
+
+const RED = { kind: 'failure', project: 'storage', class: 'test', test: 'adds', excerpt: 'test adds ... FAILED' };
+const GREEN_VERDICT = { kind: 'gate-verdict', project: 'ark', verdict: { exit: 0, seconds: 3 } };
+const RED_VERDICT = { kind: 'gate-verdict', project: 'storage', verdict: { exit: 101, seconds: 9, failure_class: 'code' } };
+
+test('unseen replays a running run on first look, then only what is new', (t) => {
+  const root = fixture(t);
+  const { path } = openRun({ root, sha: SHA, target: 'dev', session: 's-1' });
+  appendEvent(path, { kind: 'gate-start', project: 'storage' });
+  appendEvent(path, RED);
+  assert.deepEqual(live.unseen({ root, session: 's-1' }), [
+    '[gate-live] RED storage test adds — test adds ... FAILED',
+  ]);
+  assert.deepEqual(live.unseen({ root, session: 's-1' }), []);
+  appendEvent(path, GREEN_VERDICT);
+  appendEvent(path, RED_VERDICT);
+  closeRun(path, 'failed');
+  assert.deepEqual(live.unseen({ root, session: 's-1' }), [
+    '[gate-live] storage FAILED 9s failure_class=code',
+    '[gate-live] run failed',
+  ]);
+});
+
+test('unseen keeps one cursor per reader, so a subagent never consumes the main loop\'s red', (t) => {
+  const root = fixture(t);
+  const { path } = openRun({ root, sha: SHA, target: 'dev', session: 's-2' });
+  appendEvent(path, RED);
+  assert.equal(live.unseen({ root, session: 's-2', reader: 'agent-a' }).length, 1);
+  assert.equal(live.unseen({ root, session: 's-2' }).length, 1);
+  assert.equal(live.unseen({ root, session: 's-2', reader: 'agent-a' }).length, 0);
+});
+
+test('unseen treats a run already closed at first look as history', (t) => {
+  const root = fixture(t);
+  const { path } = openRun({ root, sha: SHA, target: 'dev', session: 's-3' });
+  appendEvent(path, RED);
+  closeRun(path, 'failed');
+  assert.deepEqual(live.unseen({ root, session: 's-3' }), []);
+  const next = openRun({ root, sha: SHA, target: 'dev', session: 's-3' }).path;
+  appendEvent(next, RED);
+  assert.equal(live.unseen({ root, session: 's-3' }).length, 1, 'the next run is news');
+});
+
+test('unseen is empty without a session or a run, and the CLI prints its lines', (t) => {
+  const root = fixture(t);
+  assert.deepEqual(live.unseen({ root, session: null }), []);
+  assert.deepEqual(live.unseen({ root, session: 'nobody' }), []);
+  const { path } = openRun({ root, sha: SHA, target: 'dev', session: 's-4' });
+  appendEvent(path, RED);
+  const result = cli(root, ['unseen', '--session', 's-4', '--reader', 'r']);
+  assert.equal(result.status, 0);
+  assert.equal(result.stdout, '[gate-live] RED storage test adds — test adds ... FAILED\n');
+  assert.equal(cli(root, ['unseen', '--session', 's-4', '--reader', 'r']).stdout, '');
 });
 
 test('liveRoot resolves the main checkout through git-common-dir', (t) => {
