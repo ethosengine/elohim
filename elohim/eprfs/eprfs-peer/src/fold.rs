@@ -10,6 +10,9 @@
 //! appends nothing.
 
 use std::collections::HashSet;
+use std::fs::{self, OpenOptions};
+use std::io::Write;
+use std::path::Path;
 
 use cid::Cid;
 use elohim_epr_rea::model::canonical_bytes;
@@ -19,9 +22,11 @@ use iroh::endpoint::{Connection, VarInt};
 use iroh::{Endpoint, NodeAddr};
 
 use crate::allow::{via_device, CrossingAllowList, VIA_SLOT};
-use crate::channel::CHANNEL_EVENTS;
+use crate::channel::{CHANNEL_EVENTS, CHANNEL_NACKS};
 use crate::error::PeerError;
 use crate::gate::SharedAdmission;
+use crate::head_table::{NackLeaf, MAX_NACK_CIDS};
+use crate::lease_view::{LeaseEvent, LeaseKind};
 use crate::tier::{tier_request, tier_request_capped, TierAnswer, TierRequest, TIER_ALPN};
 
 /// The most events one fold reads. A larger change is folded across successive heads: the fold
@@ -69,6 +74,15 @@ pub struct ChannelEvent {
     pub event: FlowEvent,
 }
 
+/// One channel leaf this device could address but would not fold.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct Quarantined {
+    pub cid: Cid,
+    pub path: String,
+    pub reason: String,
+    bytes: Option<Vec<u8>>,
+}
+
 /// What [`fetch_channel`] read.
 #[derive(Debug, Clone, Default)]
 pub struct Fetched {
@@ -80,10 +94,14 @@ pub struct Fetched {
     pub oversized: u64,
     /// Whether the fold stopped at the byte budget.
     pub over_budget: bool,
+    /// Leaves skipped without stopping the rest of the fold.
+    pub quarantined: Vec<Quarantined>,
+    /// The peer's nack leaf for this device, from the root being folded.
+    pub peer_nack: NackLeaf,
 }
 
 /// What [`fold_events`] did.
-#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
 pub struct FoldOutcome {
     /// Events appended to this device's flow store.
     pub appended: u64,
@@ -91,6 +109,8 @@ pub struct FoldOutcome {
     pub already: u64,
     /// Events this device's own allow-list does not admit; never appended.
     pub refused: u64,
+    /// Refused event CIDs, for this device's nack leaf for their author.
+    pub refused_cids: Vec<Cid>,
 }
 
 /// Read the events of the channel tree at `root` on an open tier connection that `known` does not
@@ -108,6 +128,18 @@ pub async fn fetch_channel(
     known: &HashSet<Cid>,
     tree: &TreeLimits,
     limits: &FoldLimits,
+) -> Result<Fetched, PeerError> {
+    fetch_channel_for(connection, since, root, known, tree, limits, None).await
+}
+
+async fn fetch_channel_for(
+    connection: &Connection,
+    since: Option<&BlobCid>,
+    root: &BlobCid,
+    known: &HashSet<Cid>,
+    tree: &TreeLimits,
+    limits: &FoldLimits,
+    reader: Option<&str>,
 ) -> Result<Fetched, PeerError> {
     let events_dir = TreePath::from_slash_bytes(CHANNEL_EVENTS.as_bytes())
         .map_err(|e| integrity(e.to_string()))?;
@@ -149,14 +181,19 @@ pub async fn fetch_channel(
         let path = events_dir.join(cid.to_string().as_bytes());
         let request = TierRequest::Read {
             root: root.clone(),
-            path,
+            path: path.clone(),
         };
         let read = match tier_request_capped(connection, &request, tree, answer_cap).await {
             Ok(TierAnswer::Read(read)) if read.bytes.len() <= limits.max_event_bytes => read,
             Ok(TierAnswer::Read(_)) | Err(PeerError::TierFrameTooLarge { .. }) => {
                 fetched.oversized += 1;
-                fetched.complete = false;
-                break;
+                fetched.quarantined.push(Quarantined {
+                    cid,
+                    path: path.to_string(),
+                    reason: "unread-oversize".into(),
+                    bytes: None,
+                });
+                continue;
             }
             Ok(other) => return Err(unanswered(format!("event {cid}"), &other)),
             Err(e) => return Err(e),
@@ -164,13 +201,86 @@ pub async fn fetch_channel(
         if read.cid != leaf {
             return Err(integrity(format!("event {cid} was served as {}", read.cid)));
         }
+        if BlobCid::compute_raw(&read.bytes) != read.cid {
+            return Err(integrity(format!("event {cid} bytes fail {}", read.cid)));
+        }
         read_bytes = read_bytes.saturating_add(read.bytes.len());
-        fetched.events.push(ChannelEvent {
-            cid,
-            event: decode_event(&cid, &read.bytes)?,
-        });
+        match decode_event(&cid, &read.bytes) {
+            Ok(event) => fetched.events.push(ChannelEvent { cid, event }),
+            Err(reason) => fetched.quarantined.push(Quarantined {
+                cid,
+                path: path.to_string(),
+                reason,
+                bytes: Some(read.bytes.to_vec()),
+            }),
+        }
+    }
+    if let Some(reader) = reader {
+        fetched.peer_nack = read_nack(connection, root, reader, tree).await?;
     }
     Ok(fetched)
+}
+
+async fn read_nack(
+    connection: &Connection,
+    root: &BlobCid,
+    reader: &str,
+    tree: &TreeLimits,
+) -> Result<NackLeaf, PeerError> {
+    // A peer that has refused nothing of ours writes no leaf, and the tier answers a missing path
+    // only as a failure string. Read the leaf only where the listings show it, so absence means
+    // "no nacks" and every real failure still aborts the fold.
+    if !lists_child(connection, root, "channel", "nacks", tree).await?
+        || !lists_child(connection, root, CHANNEL_NACKS, reader, tree).await?
+    {
+        return Ok(NackLeaf::default());
+    }
+    let path = TreePath::from_slash_bytes(format!("{CHANNEL_NACKS}/{reader}").as_bytes())
+        .map_err(|e| integrity(e.to_string()))?;
+    let request = TierRequest::Read {
+        root: root.clone(),
+        path,
+    };
+    match tier_request(connection, &request, tree).await? {
+        TierAnswer::Read(read) => {
+            if BlobCid::compute_raw(&read.bytes) != read.cid {
+                return Err(integrity("nack bytes fail their CID".into()));
+            }
+            let nack: NackLeaf = serde_json::from_slice(&read.bytes)
+                .map_err(|e| integrity(format!("nack leaf is not valid: {e}")))?;
+            let listed = nack.refused.len().saturating_add(nack.quarantined.len());
+            if listed > MAX_NACK_CIDS
+                || nack.refused_total < u64::try_from(listed).unwrap_or(u64::MAX)
+            {
+                return Err(integrity("nack leaf exceeds its declared bounds".into()));
+            }
+            Ok(nack)
+        }
+        TierAnswer::Unanswered { .. } => Ok(NackLeaf::default()),
+        other => Err(unanswered(format!("nack for {reader}"), &other)),
+    }
+}
+
+/// Whether the directory at `dir` under `root` lists an entry named `name`.
+async fn lists_child(
+    connection: &Connection,
+    root: &BlobCid,
+    dir: &str,
+    name: &str,
+    tree: &TreeLimits,
+) -> Result<bool, PeerError> {
+    let path = TreePath::from_slash_bytes(dir.as_bytes()).map_err(|e| integrity(e.to_string()))?;
+    let request = TierRequest::List {
+        root: root.clone(),
+        path,
+    };
+    match tier_request(connection, &request, tree).await? {
+        TierAnswer::List(listing) => Ok(listing
+            .entries
+            .iter()
+            .any(|entry| entry.name.as_slice() == name.as_bytes())),
+        other => Err(unanswered(format!("listing {dir} under {root}"), &other)),
+    }
 }
 
 /// The `(name, leaf)` pairs the diff from `old` to `new` adds under `channel/events`, or `None`
@@ -243,14 +353,12 @@ async fn list(
 
 /// The FlowEvent `bytes` hold, refused unless they are its canonical encoding and its atom CID is
 /// `cid`.
-fn decode_event(cid: &Cid, bytes: &[u8]) -> Result<FlowEvent, PeerError> {
-    let event: FlowEvent = serde_ipld_dagcbor::from_slice(bytes)
-        .map_err(|e| integrity(format!("event {cid} is not a FlowEvent: {e}")))?;
-    let canonical = canonical_bytes(&event).map_err(PeerError::FlowStore)?;
-    if canonical != bytes || atom_cid(&event).map_err(PeerError::FlowStore)? != *cid {
-        return Err(integrity(format!(
-            "event {cid} is not in its canonical encoding at its own CID"
-        )));
+fn decode_event(cid: &Cid, bytes: &[u8]) -> Result<FlowEvent, String> {
+    let event: FlowEvent =
+        serde_ipld_dagcbor::from_slice(bytes).map_err(|_| "decode".to_string())?;
+    let canonical = canonical_bytes(&event).map_err(|_| "canonical".to_string())?;
+    if canonical != bytes || atom_cid(&event).map_err(|_| "canonical".to_string())? != *cid {
+        return Err("canonical".into());
     }
     Ok(event)
 }
@@ -307,6 +415,7 @@ fn fold_events_admitted(
         }
         if !allow.admits(event) {
             outcome.refused += 1;
+            outcome.refused_cids.push(*cid);
             continue;
         }
         let folded = with_via(event, device);
@@ -350,10 +459,20 @@ pub struct FoldTarget<'a> {
     pub since: Option<&'a BlobCid>,
     pub root: &'a BlobCid,
     pub admission: Option<&'a SharedAdmission>,
+    /// The folding device itself: whose nack leaf the fold reads, and where it quarantines.
+    pub reader: FoldReader<'a>,
+}
+
+/// The folding device itself: whose nack leaf to read from the peer, and where its private
+/// quarantine lives.
+#[derive(Debug, Clone, Copy)]
+pub struct FoldReader<'a> {
+    pub device: &'a str,
+    pub state_dir: &'a Path,
 }
 
 /// What [`fold_root`] did.
-#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
 pub struct FoldReport {
     pub outcome: FoldOutcome,
     /// False when the fold stopped short ([`Fetched::complete`]); the head is then not recorded.
@@ -362,6 +481,10 @@ pub struct FoldReport {
     pub oversized: u64,
     /// Whether the fold stopped at its byte budget.
     pub over_budget: bool,
+    /// Leaves skipped by this fold.
+    pub quarantined: Vec<Quarantined>,
+    /// The author's nack leaf for this device at the folded root.
+    pub peer_nack: NackLeaf,
 }
 
 /// Fold `target` from the device whose tier answers at `peer`: dial it, fetch what this device has
@@ -385,17 +508,19 @@ pub async fn fold_root(
         .connect(peer, TIER_ALPN)
         .await
         .map_err(|e| PeerError::TierConnect(Box::new(e)))?;
-    let fetched = fetch_channel(
+    let fetched = fetch_channel_for(
         &connection,
         target.since,
         target.root,
         &known,
         tree,
         fold_limits,
+        Some(target.reader.device),
     )
     .await;
     connection.close(VarInt::from_u32(0), b"");
     let fetched = fetched?;
+    write_quarantine(target.reader.state_dir, target.device, &fetched.quarantined)?;
     let outcome = fold_events_admitted(
         store,
         target.device,
@@ -403,12 +528,97 @@ pub async fn fold_root(
         allow,
         target.admission,
     )?;
+    let complete = fetched.complete
+        && (fetched.quarantined.is_empty() || author_reads_nacks(store, target.device)?);
     Ok(FoldReport {
         outcome,
-        complete: fetched.complete,
+        complete,
         oversized: fetched.oversized,
         over_budget: fetched.over_budget,
+        quarantined: fetched.quarantined,
+        peer_nack: fetched.peer_nack,
     })
+}
+
+fn author_reads_nacks(store: &SidecarFlowStore, device: &str) -> Result<bool, PeerError> {
+    let mut latest = None;
+    for (written, (_, event)) in (1u64..).zip(store.events().map_err(PeerError::FlowStore)?) {
+        if via_device(&event) != Some(device) {
+            continue;
+        }
+        let Some(moor) =
+            LeaseEvent::from_event(&event, written).filter(|event| event.kind == LeaseKind::Moor)
+        else {
+            continue;
+        };
+        let order = (moor.dseq.is_some(), moor.dseq, moor.at, written);
+        if latest.as_ref().is_none_or(|(prior, _)| order > *prior) {
+            latest = Some((order, moor.reads_nacks));
+        }
+    }
+    Ok(latest.is_some_and(|(_, reads)| reads))
+}
+
+#[derive(serde::Serialize)]
+struct QuarantineLine<'a> {
+    cid: String,
+    path: &'a str,
+    reason: &'a str,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    bytes: Option<&'a [u8]>,
+}
+
+fn write_quarantine(
+    state_dir: &Path,
+    device: &str,
+    quarantined: &[Quarantined],
+) -> Result<(), PeerError> {
+    if quarantined.is_empty() {
+        return Ok(());
+    }
+    let dir = state_dir.join("quarantine");
+    fs::create_dir_all(&dir).map_err(|source| PeerError::HeadTableIo {
+        path: dir.clone(),
+        source,
+    })?;
+    let safe: String = device
+        .chars()
+        .map(|c| {
+            if c.is_ascii_alphanumeric() || ".:_-".contains(c) {
+                c
+            } else {
+                '_'
+            }
+        })
+        .collect();
+    let path = dir.join(format!("{safe}.jsonl"));
+    let mut file = OpenOptions::new()
+        .create(true)
+        .append(true)
+        .open(&path)
+        .map_err(|source| PeerError::HeadTableIo {
+            path: path.clone(),
+            source,
+        })?;
+    for entry in quarantined {
+        let line = QuarantineLine {
+            cid: entry.cid.to_string(),
+            path: &entry.path,
+            reason: &entry.reason,
+            bytes: entry.bytes.as_deref(),
+        };
+        serde_json::to_writer(&mut file, &line).map_err(|source| PeerError::HeadTableIo {
+            path: path.clone(),
+            source: std::io::Error::other(source),
+        })?;
+        file.write_all(b"\n")
+            .map_err(|source| PeerError::HeadTableIo {
+                path: path.clone(),
+                source,
+            })?;
+    }
+    file.sync_data()
+        .map_err(|source| PeerError::HeadTableIo { path, source })
 }
 
 fn with_via(event: &FlowEvent, device: &str) -> FlowEvent {

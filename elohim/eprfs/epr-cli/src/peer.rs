@@ -710,6 +710,9 @@ fn leases(options: &Options) -> PeerResult<ExitCode> {
             LeaseVerdict::Unconfirmed {
                 session, device, ..
             } => format!("unconfirmed for {session} here: {}", short(device)),
+            LeaseVerdict::RefusedBy { session, device } => {
+                format!("refused for {session} here by {}", short(device))
+            }
             LeaseVerdict::HeldBy {
                 device,
                 session,
@@ -831,8 +834,10 @@ pub fn fold(options: &Options, from: &str, root: &str) -> PeerResult<eprfs_peer:
     let key = PeerKey::load_or_generate(&device.peer_dir)?;
     let store = elohim_epr_rea::SidecarFlowStore::open(&options.root)
         .map_err(|e| PeerCliError::Peer(PeerError::FlowStore(e)))?;
+    let reader = device.key.did_key();
+    let state_dir = device.peer_dir.clone();
     let runtime = runtime()?;
-    runtime.block_on(async move {
+    let report = runtime.block_on(async move {
         let endpoint = eprfs_peer::bind(&key, relay, vec![]).await?;
         let target = eprfs_peer::FoldTarget {
             device: from,
@@ -840,6 +845,10 @@ pub fn fold(options: &Options, from: &str, root: &str) -> PeerResult<eprfs_peer:
             root: &root,
             // Admission was read from this checkout's roster at the start of this one-shot fold.
             admission: None,
+            reader: eprfs_peer::FoldReader {
+                device: &reader,
+                state_dir: &state_dir,
+            },
         };
         let folded = eprfs_peer::fold_root(
             &endpoint,
@@ -852,8 +861,18 @@ pub fn fold(options: &Options, from: &str, root: &str) -> PeerResult<eprfs_peer:
         )
         .await;
         endpoint.close().await;
-        Ok(folded?)
-    })
+        Ok::<_, PeerCliError>(folded?)
+    })?;
+    let mut table = HeadTable::load(&device.peer_dir)?;
+    let nacks = table.nacks.entry(from.to_string()).or_default();
+    nacks
+        .refused
+        .extend(report.outcome.refused_cids.iter().map(ToString::to_string));
+    nacks
+        .quarantined
+        .extend(report.quarantined.iter().map(|entry| entry.cid.to_string()));
+    table.save(&device.peer_dir)?;
+    Ok(report)
 }
 
 #[cfg(test)]

@@ -13,7 +13,7 @@ use elohim_epr_rea::{atom_cid, FlowEvent};
 use eprfs_core::BlobCid;
 use eprfs_peer::{
     other_devices, steward_lease_view, Admission, DeviceHead, HeadTable, LeaseStore, LeaseVerdict,
-    OwnAnnounce, PeerError, StewardScope, VIA_SLOT,
+    NackLeaf, OwnAnnounce, PeerError, StewardScope, VIA_SLOT,
 };
 use support::{binding, contest, endpoint_row, event_with, genesis, household, Household, MEASURE};
 
@@ -136,6 +136,7 @@ fn table(
                 folded,
                 folded_at,
                 events_folded: 1,
+                nack: Default::default(),
             },
         );
     }
@@ -184,6 +185,42 @@ fn a_claim_every_other_device_acknowledged_is_effective() {
         verdict(&h.a.did, &s, &heads, &h.admission(), ms(T0) + 2000),
         Some(effective("claude-1"))
     );
+}
+
+#[test]
+fn a_nacked_claim_is_refused_and_an_overflowed_nack_is_unconfirmed() {
+    let h = household();
+    let s = store(vec![own(claim("claude-1", T0))]);
+    let claim_cid = s.events[0].to_string();
+    let mut heads = table(&h.a.did, &[(3, 1)], &s, &[(&h.b.did, 3, ms(T0) + 500)]);
+    heads.devices.get_mut(&h.b.did).expect("B head").nack = NackLeaf {
+        refused: vec![],
+        quarantined: vec![claim_cid],
+        refused_total: 1,
+    };
+    assert_eq!(
+        verdict(&h.a.did, &s, &heads, &h.admission(), ms(T0) + 1000),
+        Some(LeaseVerdict::RefusedBy {
+            session: "claude-1".into(),
+            device: h.b.did.clone(),
+        })
+    );
+
+    heads.devices.get_mut(&h.b.did).expect("B head").nack = NackLeaf {
+        refused: vec![],
+        quarantined: vec![],
+        refused_total: 65,
+    };
+    assert!(matches!(
+        verdict(
+            &h.a.did,
+            &s,
+            &heads,
+            &h.admission(),
+            ms(T0) + 10_000
+        ),
+        Some(LeaseVerdict::Unconfirmed { ref device, .. }) if device == &h.b.did
+    ));
 }
 
 #[test]

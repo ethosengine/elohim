@@ -3,10 +3,13 @@
 
 mod support;
 
-use std::collections::BTreeSet;
+use std::collections::{BTreeMap, BTreeSet};
 
 use eprfs_core::{list_dir, read_path, BatchOptions, TreeLimits, TreePath};
-use eprfs_peer::{project_channel, ChannelStore, CrossingAllowList, PeerError, CHANNEL_EVENTS};
+use eprfs_peer::{
+    project_channel, project_channel_with_nacks, ChannelStore, CrossingAllowList, NackLeaf,
+    PeerError, CHANNEL_EVENTS, CHANNEL_NACKS,
+};
 use support::{berth_event, event_with, policy, Checkout, MEASURE};
 
 fn tp(path: &str) -> TreePath {
@@ -105,6 +108,56 @@ async fn an_empty_allow_list_projects_an_empty_channel() {
     .await
     .expect("the empty events directory is still there");
     assert!(listing.entries.is_empty());
+}
+
+#[tokio::test]
+async fn nack_leaves_are_additive_and_move_only_with_the_set() {
+    let checkout = Checkout::new();
+    let allow = CrossingAllowList::from_policy(&policy()).expect("policy");
+    let device = "did:key:zAuthor";
+    let nack = NackLeaf {
+        refused: vec!["bafy-refused".into()],
+        quarantined: vec!["bafy-quarantined".into()],
+        refused_total: 2,
+    };
+    let nacks = BTreeMap::from([(device.to_string(), nack.clone())]);
+    let first = project_channel_with_nacks(&checkout.store(), &allow, &nacks).expect("projects");
+    let again = project_channel_with_nacks(&checkout.store(), &allow, &nacks).expect("projects");
+    assert_eq!(
+        first.root(),
+        again.root(),
+        "the same set keeps the leaf stable"
+    );
+
+    let store = ChannelStore::default();
+    store.install(&first);
+    let leaf = read_path(
+        &store,
+        first.root(),
+        &tp(&format!("{CHANNEL_NACKS}/{device}")),
+        &BatchOptions::default(),
+        &TreeLimits::default(),
+    )
+    .await
+    .expect("reads nack");
+    assert_eq!(
+        serde_json::from_slice::<NackLeaf>(&leaf.bytes).expect("nack"),
+        nack
+    );
+
+    let changed = project_channel_with_nacks(
+        &checkout.store(),
+        &allow,
+        &BTreeMap::from([(
+            device.to_string(),
+            NackLeaf {
+                refused_total: 3,
+                ..nack
+            },
+        )]),
+    )
+    .expect("projects");
+    assert_ne!(first.root(), changed.root());
 }
 
 #[test]

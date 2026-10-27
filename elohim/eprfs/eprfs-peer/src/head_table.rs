@@ -11,8 +11,9 @@
 //!   "own_log": [ { "seq", "root", "at", "events", "last" } ],
 //!   "store": { "root", "log" },
 //!   "devices": {
-//!     "<did>": { "seq", "root", "at", "folded": {"<did>": seq}, "folded_at", "events_folded" }
+//!     "<did>": { "seq", "root", "at", "folded": {"<did>": seq}, "folded_at", "events_folded", "nack" }
 //!   },
+//!   "nacks": { "<author-did>": { "refused", "quarantined" } },
 //!   "dropped": { "unadmitted", "forged", "rollback", "replayed", "malformed" },
 //!   "channel": { "projection_failures", "last_projection_error", "fold_failures",
 //!                "oversized_events", "over_budget_folds" }
@@ -36,7 +37,7 @@
 //! `dropped` counts heads refused: from a device not admitted, failing their signature, with a
 //! lower `seq` than the last folded (rollback), the same `seq` again (replay), or not decoding.
 
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, BTreeSet};
 use std::fs::{self, File, OpenOptions};
 use std::io::{self, Write};
 use std::path::{Path, PathBuf};
@@ -53,6 +54,57 @@ pub const HEAD_TABLE_VERSION: u32 = 1;
 /// How many of this device's own announces [`HeadTable::own_log`] keeps.
 pub const OWN_LOG_LEN: usize = 1024;
 
+/// The most refused CIDs one nack leaf lists. The total remains exact when the list overflows.
+pub const MAX_NACK_CIDS: usize = 64;
+
+/// One nack leaf as it crosses at `channel/nacks/<author>`.
+#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
+pub struct NackLeaf {
+    #[serde(default)]
+    pub refused: Vec<String>,
+    #[serde(default)]
+    pub quarantined: Vec<String>,
+    #[serde(default)]
+    pub refused_total: u64,
+}
+
+impl NackLeaf {
+    pub fn contains(&self, cid: &str) -> bool {
+        self.refused.iter().any(|listed| listed == cid)
+            || self.quarantined.iter().any(|listed| listed == cid)
+    }
+
+    pub fn overflowed(&self) -> bool {
+        self.refused_total
+            > u64::try_from(self.refused.len().saturating_add(self.quarantined.len()))
+                .unwrap_or(u64::MAX)
+    }
+}
+
+/// This device's complete, private nack sets. Projection caps their public leaf.
+#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
+pub struct NackState {
+    #[serde(default)]
+    pub refused: BTreeSet<String>,
+    #[serde(default)]
+    pub quarantined: BTreeSet<String>,
+}
+
+impl NackState {
+    pub fn leaf(&self) -> NackLeaf {
+        let mut left = MAX_NACK_CIDS;
+        let refused: Vec<String> = self.refused.iter().take(left).cloned().collect();
+        left = left.saturating_sub(refused.len());
+        let quarantined = self.quarantined.iter().take(left).cloned().collect();
+        NackLeaf {
+            refused,
+            quarantined,
+            refused_total: u64::try_from(self.refused.len().saturating_add(self.quarantined.len()))
+                .unwrap_or(u64::MAX),
+        }
+    }
+}
+
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct HeadTable {
     pub version: u32,
@@ -66,6 +118,9 @@ pub struct HeadTable {
     pub store: Option<StorePlace>,
     /// The last head folded from each other device, by did:key.
     pub devices: BTreeMap<String, DeviceHead>,
+    /// CIDs this device refused from each author, projected into this device's channel tree.
+    #[serde(default)]
+    pub nacks: BTreeMap<String, NackState>,
     pub dropped: DroppedHeads,
     /// The daemon's own channel health: projection and fold failures.
     #[serde(default)]
@@ -105,6 +160,7 @@ impl Default for HeadTable {
             own_log: Vec::new(),
             store: None,
             devices: BTreeMap::new(),
+            nacks: BTreeMap::new(),
             dropped: DroppedHeads::default(),
             channel: ChannelCounters::default(),
         }
@@ -148,6 +204,9 @@ pub struct DeviceHead {
     pub folded_at: u64,
     /// Events appended from this device so far.
     pub events_folded: u64,
+    /// This peer's nack leaf for this device, read from the same signed channel root.
+    #[serde(default)]
+    pub nack: NackLeaf,
 }
 
 /// Heads refused, by reason. Refused heads are never folded and never re-announced.

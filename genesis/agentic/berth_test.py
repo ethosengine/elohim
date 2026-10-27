@@ -687,6 +687,11 @@ class IncarnationTest(unittest.TestCase):
         self.berth.touch("sess", pid=4242)  # the hook re-asserts: new incarnation recorded
         self.assertTrue(self.berth.is_live(self.berth.mooring("sess")))
 
+    def test_moor_records_nack_reader_capability(self):
+        self.berth.moor("sess")
+        moor = [row for row in self.berth.ledger(10) if row["kind"] == "moor"][-1]
+        self.assertEqual(moor["reads"], "nacks/1")
+
 
 class _FileObservation:
     """A cross-process fake emitter: every emit is one line in a file, slowly (widens the race)."""
@@ -826,6 +831,10 @@ def held_by_a(override=False):
 
 def unconfirmed_a(session="codex-1", last_seen=NOW_MS - 180_000):
     return {"verdict": "unconfirmed", "session": session, "device": DEVICE_A, "last_seen": last_seen}
+
+
+def refused_by_a(session="codex-1"):
+    return {"verdict": "refused_by", "session": session, "device": DEVICE_A}
 
 
 def pending(session="codex-1"):
@@ -1386,6 +1395,15 @@ class StewardClaimTest(unittest.TestCase):
         # A device never folded reads "never seen".
         self.views(view(), view(dev_integration=unconfirmed_a(last_seen=None)))
         self.assertEqual(self.claim()[2], f"unconfirmed: {DEVICE_A} never seen")
+
+    def test_steward_claim_nacked_by_a_peer_is_refused(self):
+        self.views(view(), view(dev_integration=pending()), view(dev_integration=refused_by_a()))
+        ok, lease, reason, _ = self.claim()
+        self.assertFalse(ok)
+        self.assertIsNone(lease)
+        self.assertEqual(reason, f"refused by {DEVICE_A}")
+        self.assertIsNone(self.berth.who("dev-integration"))
+        self.assertEqual(self.rows("release")[-1]["resource"], "dev-integration")
 
     def test_unconfirmed_age_reads_seconds_minutes_then_hours(self):
         fmt = _NS["steward_reason"]
