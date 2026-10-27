@@ -176,12 +176,18 @@ impl Brit {
     }
 
     fn call(&self, args: &[&str]) -> CovResult<Value> {
-        // brit runs git itself, so it gets the device's declared trust as config variables.
-        let output = Command::new(&self.bin)
+        // brit runs git itself, so it gets the device's declared trust as config variables, and
+        // never a hook's GIT_DIR pointing it at another repository than `--repo`.
+        let mut command = Command::new(&self.bin);
+        command
             .arg("--repo")
             .arg(&self.repo)
             .arg("covenant")
-            .args(args)
+            .args(args);
+        for key in crate::process::GIT_LOCATION_ENV {
+            command.env_remove(key);
+        }
+        let output = command
             .envs(git::trust_env(&self.repo))
             .output()
             .map_err(|e| format!("cannot run {}: {e}", self.bin.display()))?;

@@ -272,11 +272,17 @@ pub(crate) fn trust_env(cwd: &Path) -> Vec<(String, String)> {
         .unwrap_or_default()
 }
 
-/// Append one `safe.directory` entry after any the caller already passes.
+/// Append one `safe.directory` entry after any the caller already passes. A malformed count is
+/// left for git to refuse, never repaired over the caller's own entries.
 fn config_env(existing: Option<&str>, root: &Path) -> Vec<(String, String)> {
-    let index = existing
-        .and_then(|count| count.trim().parse::<usize>().ok())
-        .unwrap_or(0);
+    let index = match existing.map(|count| count.trim().parse::<usize>()) {
+        None => 0,
+        Some(Ok(count)) => count,
+        Some(Err(_)) => return Vec::new(),
+    };
+    let Some(count) = index.checked_add(1) else {
+        return Vec::new();
+    };
     vec![
         (
             format!("GIT_CONFIG_KEY_{index}"),
@@ -286,7 +292,7 @@ fn config_env(existing: Option<&str>, root: &Path) -> Vec<(String, String)> {
             format!("GIT_CONFIG_VALUE_{index}"),
             root.display().to_string(),
         ),
-        ("GIT_CONFIG_COUNT".to_owned(), (index + 1).to_string()),
+        ("GIT_CONFIG_COUNT".to_owned(), count.to_string()),
     ]
 }
 
@@ -438,6 +444,8 @@ mod tests {
         let after_two = config_env(Some("2"), root);
         assert_eq!(after_two[0].0, "GIT_CONFIG_KEY_2");
         assert_eq!(after_two[2], ("GIT_CONFIG_COUNT".into(), "3".into()));
+        assert!(config_env(Some("bogus"), root).is_empty());
+        assert!(config_env(Some(&usize::MAX.to_string()), root).is_empty());
     }
 
     #[test]
