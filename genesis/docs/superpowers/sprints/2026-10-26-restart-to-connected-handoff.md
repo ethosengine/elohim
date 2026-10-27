@@ -6,8 +6,8 @@ status: handoff
 author: "claude-opus-5-5 (Che workspace, ethosengine), at the operator's direction"
 habits: [workspace-device-arrival, devices-share-one-berth, push-gate-pays-once]
 cites:
-  - genesis/docs/superpowers/sprints/2026-10-26-restart-to-connected-sprint-plan.md
-  - genesis/docs/superpowers/sprints/2026-10-25-gate-merge-sprint-plan.md
+  - restart-to-connected-sprint-plan-20261026 | Sprint plan | sha256:d2c664288eedeaed | path: genesis/docs/superpowers/sprints/2026-10-26-restart-to-connected-sprint-plan.md
+  - gate-merge-sprint-plan-20261025 | Sprint plan | sha256:ebca07662b59ca75 | path: genesis/docs/superpowers/sprints/2026-10-25-gate-merge-sprint-plan.md
   - genesis/data/timeline/backlog/security-session-successor-admitted-before-facet-release.md
   - genesis/data/timeline/backlog/native-peer-dev-channel-and-collective-memory-seed.md
 ---
@@ -24,7 +24,7 @@ carries only what the plan does not: what landed, live state, decisions pending 
 
 > Carry on with the restart-to-connected sprint; read
 > genesis/docs/superpowers/sprints/2026-10-26-restart-to-connected-handoff.md first. Push the
-> unpushed docs batch, then take R1.
+> unpushed batch on fix/r3-followups, then take R1.
 
 ## What landed on `dev`
 
@@ -43,18 +43,23 @@ carries only what the plan does not: what landed, live state, decisions pending 
 
 Shem's session was told of the last four by bridge message; delivery was not confirmed.
 
-## Not pushed: one docs batch on `fix/r3-followups`
+## Not pushed: the batch on `fix/r3-followups`
 
-Worktree `/projects/elohim/.worktrees/device-runtime-r3`, four commits on `19a8f0e05`, plus this
-handoff:
+Worktree `/projects/elohim/.worktrees/device-runtime-r3`, on `19a8f0e05`:
 
 - `7fd61b01e` security backlog item, the R3 item's landed note, a `TODO(security)` pointer at the
   successor admission check in `device-runtime/src/envelope.rs`
 - `37ed7a522`, `1edcde2ab`, `b7670045c` the operator's direction for a dev release channel (seed)
+- this handoff, then its decisions and these follow-ups
+- `b65e13604` hc-mesh: a resumed household refuses a bundle that does not reproduce its cells
+- the epr declared-trust fix (`git.rs`, `covenant.rs`, the recall fold) and its review fixes
+- the docs naming `MESH_ALLOW_BUNDLE_SKEW` (root gospel package and the hc-dev-orchestrator skill)
 
-The `envelope.rs` comment selects the eprfs gate, so the push runs the full pre-push (the last one
-took 4717 s). From the worktree: `GATE_EVIDENCE=reuse git push origin HEAD:dev`. Never
-`git -c safe.directory=*`.
+The eprfs changes select the eprfs gate, so the push runs the full pre-push (the last one took
+4717 s). From the worktree: `GATE_EVIDENCE=reuse git push origin HEAD:dev`. Never
+`git -c safe.directory=*`. After it lands, arrival installs the fixed `epr`; until then the
+session-start `index:` line keeps reporting the fold as failed (2324 files behind at 2026-10-26,
+a backlog of the old bug, not a new one).
 
 ## Live state that has no other home
 
@@ -73,9 +78,15 @@ took 4717 s). From the worktree: `GATE_EVIDENCE=reuse git push origin HEAD:dev`.
   imagodei, mishpat and node_registry but whose lamad and infrastructure integrity wasm differ
   (`uhC0keuLMY…`, `uhC0kYVFIp…`): a different DHT for every hosted human the doorway installed, not
   a coordinator hot-swap. The household's run log holds only the recovered bundle's five hashes.
-  Given up: campaign-1.4's 2026-10-01 credential/coordinator refresh for lamad and mishpat (not yet
-  diffed). If it must be live, build the household's integrity with those coordinators. The prior
-  file is kept as `environment-before-cell-lock.sh` (older) and in session scratch.
+  Nothing the household ran was given up. campaign-1.4's 2026-10-01 refresh (`e9e0b3b63`,
+  "constrain FCT publication to witnessed device authority": new lamad `content_store` and `mishpat`
+  coordinators) was applied to the Che device's cells (`genesis/local-dev/che/credential-coordinator-refresh-20261001.json`),
+  never to the household's. To bring it here, the refreshed `mishpat` coordinator (`30066df3…`) was
+  built against the same `mishpat_integrity` the household runs (`f45c04bb…`) and is a hot-swap
+  candidate; the lamad one was built against a different integrity (`2b970c9a…` against the
+  household's `094f4601…`), so rebuild it from `e9e0b3b63`'s coordinator source against the
+  household's integrity first. The prior file is kept as `environment-before-cell-lock.sh` (older)
+  and in session scratch.
 - **Receipt household** `genesis/local-dev/household-receipt-m`: stopped, state kept. Removable once
   nobody needs slice M's receipt evidence.
 - **Shift journal** `.claude/shifts/2026-10-26T04-35-land-slice-m-household-receipt.journal.md` in
@@ -83,7 +94,7 @@ took 4717 s). From the worktree: `GATE_EVIDENCE=reuse git push origin HEAD:dev`.
 
 ## Next, in order
 
-1. **Push the docs batch** above.
+1. **Push the batch** above.
 2. **R1** per the plan. Remaining after slice M and today: `epr device arrive` installs every
    registered tool's launcher from `current` with no cargo, into the install directory the
    RuntimeManifest `tools` field declares (`~/.local/bin` survives a restart, `/opt/rust/cargo/bin`
@@ -136,13 +147,17 @@ took 4717 s). From the worktree: `GATE_EVIDENCE=reuse git push origin HEAD:dev`.
   epr refuse fixture sessions (40 failures, fixed in `19a8f0e05`).
 - **Hooks suggest `git config --global --add safe.directory`.** Never do it; run git from a
   worktree, which git trusts.
-- **`epr covenant record` fails after a restart.** It calls `brit-build-ref --repo /projects/elohim`
-  without the trust `epr device trust` declared (`covenant.rs` `call`, unlike `git::command`), so
-  brit's git refuses "dubious ownership". Until fixed, give that one call path-scoped trust:
+- **Two epr paths ignored the trust `epr device trust` declared**, so they failed "dubious
+  ownership" after every restart: `epr covenant record` (its `brit-build-ref` child) and the recall
+  fold's `git ls-files` (the session-start `index: skipped — fold status unreadable` line). Both
+  now take it from `git.rs` (`trust_env` for a child that runs git itself, `trust_args` for a git
+  spawned by another runner) on this branch. Until that lands in the installed `epr`, give the
+  covenant call path-scoped trust:
   `GIT_CONFIG_COUNT=1 GIT_CONFIG_KEY_0=safe.directory GIT_CONFIG_VALUE_0=/projects/elohim`.
 - **Memory index:** `MEMORY.md` is generated; never hand-append. The entry
   `project_hc_dna_hash_ignores_role_modifiers.md` is imported under the operator's
   steward-of-record affirmation, but the index will not re-project: it is 24536 bytes against the
   24000 hard watermark with or without that entry. That is the `cleanup:` trigger's backlog (155
   against 120): run `memory-stasis-loop`, which can also graduate this entry, since `hc-mesh.sh`
-  preflight now enforces it.
+  preflight now enforces it. Making the 536 bytes means consolidating entries other sessions
+  wrote, which needs that pass's maintenance authority, not a side edit.
