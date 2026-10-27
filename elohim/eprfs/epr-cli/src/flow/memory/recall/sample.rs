@@ -567,7 +567,7 @@ fn judge_inner(args: &Args, contract: &Contract) -> FlowResult<JudgeOutcome> {
 
     let seat_actor = note::NoteActor {
         as_ref: Some(seat.clone()),
-        session: Some(args.session.clone()),
+        session: (!args.session.is_empty()).then(|| args.session.clone()),
     };
     let plan_note = note::note(
         &args.root,

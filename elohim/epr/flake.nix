@@ -40,8 +40,9 @@
             rustToolchain
             pkg-config
             openssl
-            # The eprfs publisher uses tomllib in this shared CI devShell.
-            python311
+            # The publisher needs tomllib; session-envelope fixtures need PyYAML and just.
+            (python311.withPackages (ps: [ ps.pyyaml ]))
+            just
           ];
 
           # Native crate — the Holochain WASM getrandom flag must NOT leak in

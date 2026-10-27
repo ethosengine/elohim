@@ -130,6 +130,8 @@ impl Runner for Fake {
                 "cat-file" | "worktree" => {}
                 _ => success = false,
             }
+        } else if c.program.ends_with("/cargo-pool") && c.args == ["key"] {
+            out = format!("slot_dev={}\n", self.root.join("target").display());
         } else if c.program == "rustc" {
             out = "rustc 1.96.1\nhost: x86_64-unknown-linux-gnu\n".into();
         } else if c.program == "cargo" {
@@ -1235,11 +1237,7 @@ fn test_brit_follow_names_both_cures_when_no_bytes_source_exists() {
     assert_eq!(e.kind, "bootstrap-unavailable");
     assert!(e.detail.contains("--closure"));
     assert!(e.detail.contains("status"));
-    assert!(
-        e.detail.contains("bootstrap-pool-unavailable")
-            || e.detail.contains("git fetch")
-            || e.detail.contains("offline")
-    );
+    assert!(e.detail.contains("brit build offline failed"));
 }
 #[test]
 fn test_brit_headless_bootstrap_requires_attestation_and_uses_the_same_release_source() {

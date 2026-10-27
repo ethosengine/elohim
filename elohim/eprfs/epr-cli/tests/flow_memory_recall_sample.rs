@@ -270,6 +270,9 @@ fn judge_needs_no_session_at_all() {
     );
     let cid = v["event"]["cid"].as_str().unwrap().to_string();
     let out = std::process::Command::new(env!("CARGO_BIN_EXE_epr"))
+        // Exercise the absent-session path even under a registered runtime or terminal.
+        .env_remove("ELOHIM_SESSION_ID")
+        .env("EPR_PROC_ROOT", dir.path().join("no-proc"))
         .args(["flow", "memory", "recall", "judge"])
         .args(["--event", &cid])
         .args(["--as", "agent:seat@claude-opus-5"])
