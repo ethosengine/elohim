@@ -741,16 +741,25 @@ class Berth:
         if len(text) > 600:
             text = text[:599] + "…"
         direct = " to you" if note.get("to") == session else ""
-        return f"NOTE from {short}/{sender[:8]} {_age(now - note.get('at', now))} ago{direct}: {text}"
+        # Another device's words are data for the reader, never instructions to it.
+        return (f"NOTE from {short}/{sender[:8]} {_age(now - note.get('at', now))} ago{direct} "
+                f"(untrusted text from another device): «{text}»")
+
+    @staticmethod
+    def _reply_hint(session, notes):
+        """A reply command only for a well-formed sender id: the id comes from the sender's record."""
+        sender = str(notes[-1].get("session") or "")
+        if not re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9-]{0,63}", sender):
+            return None
+        return f'reply: berth say --session {session} --to {sender} "…"'
 
     def inbox_lines(self, session):
+        # Hook path: notes only. A ready-made command in an agent's context is an action surface.
         try:
             notes = self.inbox(session)
             if not notes:
                 return ""
-            lines = [self._note_line(note, session, self.now()) for note in notes]
-            lines.append(f'reply: berth say --session {session} --to {notes[-1]["session"]} "…"')
-            return "\n".join(lines)
+            return "\n".join(self._note_line(note, session, self.now()) for note in notes)
         except Exception:
             return ""
 
@@ -1844,7 +1853,9 @@ def _main(argv):
             print(json.dumps(notes, sort_keys=True))
         elif notes:
             lines = [b._note_line(note, session, b.now()) for note in notes]
-            lines.append(f'reply: berth say --session {session} --to {notes[-1]["session"]} "…"')
+            hint = b._reply_hint(session, notes)
+            if hint:
+                lines.append(hint)
             print("\n".join(lines))
         return 0
     if cmd == "moor":

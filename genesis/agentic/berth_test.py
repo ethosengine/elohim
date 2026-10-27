@@ -885,9 +885,17 @@ class BerthInboxTest(unittest.TestCase):
                                 text="hello   from\n the other device"))
         lines = self.berth.inbox_lines(self.SESSION)
         self.assertIn(f"NOTE from {DEVICE_A.split(':')[-1][:10]}…", lines)
-        self.assertIn(f"{self.SENDER[:8]} 5s ago to you: hello from the other device", lines)
-        self.assertIn(f'reply: berth say --session {self.SESSION} --to {self.SENDER} "…"', lines)
+        self.assertIn(f"{self.SENDER[:8]} 5s ago to you (untrusted text from another device): "
+                      "«hello from the other device»", lines)
+        # The hook path never hands an agent a ready-made command.
+        self.assertNotIn("reply:", lines)
         self.assertEqual(self.berth.inbox_lines(self.SESSION), "")
+
+    def test_reply_hint_only_for_a_well_formed_sender(self):
+        hint = self.berth._reply_hint(self.SESSION, [{"session": self.SENDER}])
+        self.assertEqual(hint, f'reply: berth say --session {self.SESSION} --to {self.SENDER} "…"')
+        for hostile in ['x"; rm -rf ~; echo "', "a b", "$(id)", "", "-rf"]:
+            self.assertIsNone(self.berth._reply_hint(self.SESSION, [{"session": hostile}]))
 
     def test_peek_does_not_mark(self):
         self.append(self.folded("peek-1", 996, to=self.SESSION))
