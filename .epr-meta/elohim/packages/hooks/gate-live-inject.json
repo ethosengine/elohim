@@ -12,7 +12,7 @@
       "claude"
     ],
     "event": "PostToolUse",
-    "matcher": "*",
+    "matcher": ".*",
     "interpreter": "python3",
     "language": "python",
     "assetRefs": [],
@@ -35,7 +35,7 @@
   },
   "registration": {
     "event": "PostToolUse",
-    "matcher": "*",
+    "matcher": ".*",
     "command": "python3 \"$CLAUDE_PROJECT_DIR/.claude/hooks/gate-live-inject.py\"",
     "timeout": 5,
     "type": "command"
