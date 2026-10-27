@@ -108,7 +108,10 @@ pub struct SignForAgentOutput {
 /// Holds a live `AppWebsocket`; dropping the client closes the connection.
 /// Thread-safe for concurrent `sign()` calls — `app_ws.call_zome` takes
 /// `&self`, and the underlying holochain_client handles request multiplexing.
-#[allow(dead_code)] // Used by /api/v1/signal/emit (Task C.2)
+#[allow(
+    dead_code,
+    reason = "no caller constructs it yet; /api/v1/signal/emit (Task C.2) is its intended caller"
+)]
 pub struct ConductorSigningClient {
     app_ws: AppWebsocket,
     cell_id: CellId,
