@@ -36,7 +36,12 @@ test-jenkinsfile-lints:
 # non-optional here: gate-runner.mjs / pipeline-registry.mjs / graph-walker.mjs
 # are now the ONLY local gate detector+executor, so a break in them aborts
 # every push in the repo. Pre-push calls `just gate` on any orchestrator change.
-gate: lint test-jenkinsfile-lints test-suite
+gate: lint test-jenkinsfile-lints test-suite test-berth
+
+# berth holds pre-push's dev-integration lease and every device's notes; its suite ran under no gate
+# until a pool-policy class (3899eb7f9) left one of its tests red unnoticed.
+test-berth:
+    cd ../.. && python3 -m unittest genesis/agentic/berth_test.py
 
 # Full orchestrator node --test suite (registry, gate runner, graph walker, …).
 test-suite:
