@@ -334,7 +334,11 @@ seams:
     # `qahal-types` (elohim/sdk/domains/qahal/types) — the pure InvocationMandate::check containment
     # predicate: what may be asked, of whom, within which exact bounds. Same admission side as
     # mishpat; routed 2026-10-09 (its registry was born unrouted at e9e0b3b63, 2026-10-01).
-    registry_crates: [mishpat, qahal-types]
+    # `elohim-placement-core` (elohim/placement/core) — the placement contract's pure eligibility
+    # floor: which grant scope a method spends and which carrier may be admitted for it. The same
+    # what-may-be-asked side of admission. Routed 2026-10-27; its registry was born unrouted with
+    # feat/gate-live (c832238fe).
+    registry_crates: [mishpat, qahal-types, elohim-placement-core]
     habits: [doorway-failover, operator-runtime-surface]
     n_a_concerns: []
 
@@ -459,6 +463,11 @@ seams:
     # CI/orchestrator this plane_note names: its receipt key decides whether a local gate result
     # may be reused for an identical source closure, a governance verdict over the tree. Both
     # routed in the commit that births their registries (device-runtime slice A, 2026-10-24).
-    registry_crates: [elohim-seam-contracts, elohim-epr-rea, elohim-epr-cli, eprfs-core, eprfs-local, eprfs-storage, eprfs-serve, eprfs-peer, elohim-device-runtime, gate-runner]
+    # `elohim-epr-lsp` (elohim/eprfs/epr-lsp) is the device mux's gate-live feed: which run-log
+    # lines become device-local diagnostics. It is ephemeral, never published, and decides nothing
+    # (the gate's exit status stays the verdict), which makes it a reading of the repo's own gate
+    # instrument, beside gate-runner. Routed 2026-10-27; its registry was born unrouted with
+    # feat/gate-live (c832238fe).
+    registry_crates: [elohim-seam-contracts, elohim-epr-rea, elohim-epr-cli, eprfs-core, eprfs-local, eprfs-storage, eprfs-serve, eprfs-peer, elohim-device-runtime, gate-runner, elohim-epr-lsp]
     habits: []
     n_a_concerns: []
