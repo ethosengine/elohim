@@ -2335,7 +2335,10 @@ fn bootstrap_upgrades_same_commit_legacy_current_to_complete_inventory() {
     f.land(&old).unwrap();
     f.store.config.bins.push("bin-launch".into());
     let pair = f.release("complete-pair");
-    assert!(f.store.verified(&old.cid), "the epr-only current still verifies");
+    assert!(
+        f.store.verified(&old.cid),
+        "the epr-only current still verifies"
+    );
     f.store.bootstrap(f.tmp.path(), None).unwrap();
     assert_eq!(f.store.head("current"), Some(pair.cid));
 }
