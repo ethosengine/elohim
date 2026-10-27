@@ -1296,6 +1296,22 @@ measures:
     default-authority: observation
     established_by: observability-epic-2026-10-08
     why: "the idle window should derive from the fold, not from berth's private file"
+  - id: gate-verdict
+    version: 1
+    family: gate
+    unit: verdicts
+    procedure: >
+      Emitted once after a clean completed local gate run (green or red) is recorded by brit:
+      value 1, subject `.`, reason `verdict`, and env slots naming project, closure, commit,
+      success and seconds, plus attestationId and agentId when brit returns them. The event crosses
+      only among one steward's admitted devices; sibling verdicts are reuse evidence and never an
+      independent witness or a k-of-n vote.
+    provenance: steward-space landing-plane design A8; decision D5
+    status: active
+    env-sensitivity: [project, closure, success, device]
+    default-authority: observation
+    established_by: steward-space-a8-2026-10-27
+    why: "a sibling gate can be paid once per identical closure without turning sibling evidence into quorum"
   - id: operator-claims-unobserved
     version: 1
     family: operator-effect

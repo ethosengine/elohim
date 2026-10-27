@@ -8,22 +8,23 @@ decisionPoints:
   sourceLocation:
     file: gate-evidence.mjs
     modulePath: reusableHit
-  summary: Under GATE_EVIDENCE=reuse, for a project listed in pool-policy gate_reuse, accept only the
-    newest attestation on the closure when it is green, signed by this workspace's own brit key, and the
-    declared inputs and read set are clean; otherwise run the gate and say why.
+  summary: Under GATE_EVIDENCE=reuse, for a project listed in pool-policy gate_reuse, retain the
+    existing newest-green self-signed path or accept a green crossing verdict from a roster-admitted
+    sibling device when no local or sibling red exists and the declared inputs and read set are clean;
+    otherwise run the gate and say why. Sibling evidence is labelled and never counts in k-of-n.
   concernIds:
   - id: C0
     status: answered
-    justification: Local private B evidence in brit's own git notes (refs/notes/brit/build/*, never fetched
-      or pushed); a clean input closure is not a release head or a DHT fact. No network head cost.
+    justification: Local brit notes remain Private B; the sibling form is a B2 gate-verdict@1 record in
+      one steward's admitted device channel. Neither is a release head or DHT fact; there is no DHT head cost.
   - id: C1
     status: answered
     justification: Only a run of the gate recipe records an attestation (recordEvidence after the run);
       a lookup or a reuse never mints one.
   - id: C2
     status: answered
-    justification: The newest attestation by builtAt decides; a newer red is never overruled by an older
-      green. Nothing advances a head.
+    justification: Local-only reuse retains newest-by-builtAt behavior. Cross-device verdicts are never
+      clock-ordered; any sibling red, or any local red when considering a sibling green, forces a local run.
   - id: C3
     status: answered
     justification: Every refusal, an absent attestation and any thrown read run the gate; a red or dirty
@@ -39,8 +40,8 @@ decisionPoints:
       closure) and needs an exact inputs-hash match.
   - id: C6a
     status: answered
-    justification: brit-build-ref find/put and git reads run with sixty-second deadlines; a timeout runs
-      the gate.
+    justification: brit-build-ref find/put and git reads run with sixty-second deadlines; the native sibling
+      read has a five-second deadline. A timeout runs the gate.
   - id: C6b
     status: answered
     justification: Attestations are content-addressed brit nodes; recording the same verdict twice
@@ -52,11 +53,12 @@ decisionPoints:
     status: answered
     justification: >-
       Each gate prints its evidence line, its closure scope, and either `reused` or
-      `not reused: <why>`; a reused run records gate-cycle-seconds@1 with run-kind=reused.
+      `not reused: <why>`; self reuse records run-kind=reused and sibling reuse records
+      run-kind=sibling-reused with `independence: sibling` on the visible line.
   - id: C9
     status: answered
-    justification: Only this workspace's own key is admitted; roster and named-key signers wait for
-      brit-build-ref to verify signatures before they can be admitted.
+    justification: Local rows still require this workspace's brit key. Sibling rows enter only through
+      `epr peer verdicts`, which keeps folded via provenance from roster-admitted non-self devices.
   - id: C10
     status: answered
     justification: Closure key v3 cannot collide with v1 or v2 keys; evidence recorded under an older key
@@ -70,8 +72,8 @@ decisionPoints:
       occurs.
   - id: C13
     status: n-a
-    justification: No social-tier authority gate. CI still runs every pipeline; local reuse does not
-      replace a remote attestation.
+    justification: A sibling verdict is explicitly independence=sibling and refused in every k-of-n count;
+      CI still runs every pipeline and local reuse does not replace a remote attestation.
   - id: C14
     status: partial
     justification: Unexpected read errors run the gate and print one line; no cross-device diagnostic
@@ -82,6 +84,76 @@ decisionPoints:
     kind: unit
   - path: genesis/orchestrator/gate-evidence.test.mjs
     testName: reuse_never_overrules_a_newer_red
+    kind: unit
+  - path: genesis/orchestrator/gate-evidence.test.mjs
+    testName: reuse_accepts_admitted_sibling_green
+    kind: unit
+  - path: genesis/orchestrator/gate-evidence.test.mjs
+    testName: sibling_red_forces_local_run
+    kind: unit
+- name: siblingGovernanceChange
+  kind: pure-decision-predicate
+  sourceLocation:
+    file: gate-evidence.mjs
+    modulePath: siblingGovernanceChange
+  summary: Refuse sibling reuse when HEAD changes the gate, its crossing/admission substrate, pool policy,
+    or measure declaration from the origin/dev (falling back to dev) merge base; an unavailable comparison
+    also refuses. D5's rule is that the space never rides what it upgrades.
+  concernIds:
+  - id: C0
+    status: answered
+    justification: Local git comparison only; it protects the B2 sibling verdict read without minting a fact.
+  - id: C1
+    status: answered
+    justification: The candidate gate bytes cannot elect their own sibling evidence path; a match forces execution.
+  - id: C2
+    status: answered
+    justification: Compares named trees from a merge base to HEAD; no timestamp or mutable latest value decides.
+  - id: C3
+    status: answered
+    justification: Refusal runs the local gate, preserving progress without sibling availability.
+  - id: C4
+    status: answered
+    justification: Missing integration refs, merge base or diff are explicit fail-closed refusals.
+  - id: C5
+    status: answered
+    justification: The predicate is evidence about changed governance paths, never authority to skip a gate.
+  - id: C6a
+    status: answered
+    justification: Two merge-base attempts and one bounded local diff; no unbounded walk or network call.
+  - id: C6b
+    status: n-a
+    justification: Pure read; it writes nothing.
+  - id: C7
+    status: n-a
+    justification: No advertised or served capability.
+  - id: C8
+    status: answered
+    justification: The first governance path, or unavailable comparison, is printed as the reuse refusal.
+  - id: C9
+    status: n-a
+    justification: Compares repository lineage, not participant identity lineage.
+  - id: C10
+    status: answered
+    justification: The protected path list is one exported constant and includes its own implementation.
+  - id: C11
+    status: n-a
+    justification: No externally supplied work queue or pressure source.
+  - id: C12
+    status: n-a
+    justification: Narrows local reuse only; it grants no capability.
+  - id: C13
+    status: answered
+    justification: Governance-class bytes always pay a local run; sibling evidence cannot lower that bar.
+  - id: C14
+    status: partial
+    justification: A failed comparison leaves only the visible refusal; no diagnostic capsule is retained.
+  contractTests:
+  - path: genesis/orchestrator/gate-evidence.test.mjs
+    testName: sibling_governance_class_fails_closed
+    kind: unit
+  - path: genesis/orchestrator/gate-evidence.test.mjs
+    testName: governance_change_runs_gate
     kind: unit
 - name: reuseSelector
   kind: pure-decision-predicate

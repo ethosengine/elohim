@@ -3,7 +3,9 @@ epr-habit-version: 1
 id: push-gate-pays-once
 invariant: >
   A local gate pays for a closure once. A push whose selected gate already carries this
-  workspace's green attestation for the same input closure runs no recipe and says so; an
+  workspace's green attestation, or an admitted sibling device's non-governance green verdict
+  with no red for the same input closure, runs no recipe and says so; sibling evidence is never
+  independent or counted in k-of-n; an
   eprfs push tests only the crates the change can reach; every gate states its expected
   cost and local fail rate before it runs; a long gate that has never failed locally may
   defer to CI on a feature-branch push, and never on a push to dev or main.
@@ -30,6 +32,8 @@ retire-when: >
   when gate verdicts are read from the dataplane (brit-native integrate) rather than from a
   pre-push hook, so a push no longer runs local gates at all.
 ---
+DELTA 2026-10-27 (GREEN held; A8 sibling verdict reuse implemented, live two-device receipt pending): a completed clean gate now records one crossing `gate-verdict@1` observation after brit `build put`; `epr peer verdicts` projects only matching folded rows from roster-admitted non-self devices; and the runner may reuse a sibling green only behind the existing project allow-list, exact closure, clean inputs, selector pass, all-device red veto, and D5 governance-class refusal. The visible line says `independence: sibling`, its cycle row says `run-kind=sibling-reused`, and no quorum surface consumes it. Evidence: `node --test genesis/orchestrator/gate-evidence.test.mjs` green, including admitted/unadmitted, red, dirty, selector, governance and native-read-failure cases; the Rust integration test is authored but intentionally not run in this Codex slice because the operator reserved Cargo. A live folded two-device verdict remains the next proof.
+
 DELTA 2026-10-26 (GREEN held; second workspace, ethosengine): reuse went live on ethosengine once brit landed in its store (bootstrap from a clean worktree, brit 0.1.5 at 76ba95d8a; every earlier push here printed `evidence: unavailable (brit not on BRIT_BIN…)`). The same commit bd7b1094a was pushed twice. Run 1 was cold: 7126 s, refused by schema-codegen because the gitignored `genesis/seeder/src/generated/` cache predated a rebase, and the verifier compares an ignored copy whenever one exists. Run 2: elohim-storage `reused` in 26 s (2669 s cold), steward-node 20 s (544 s), ALL CLEAR 1475 s (logs genesis/local-dev/device-runtime/runs/push-r3{c,d}.log). Still dark: eprfs and orchestrator key on the whole tree, and the hook-appended ledgers `.claude/data/{architecture,governance}-findings.jsonl` keep that tree dirty for a whole session, so neither ever records; brit is not durable here (launchers in /opt/rust/cargo/bin are wiped on restart; ethosengine/brit publishes no releases) — restart-to-connected lane R1.
 
 DELTA 2026-10-26 — D2b delivered in the working tree: every gate runs through `gate-tap.mjs`, whose recognizer (`gate-failure-lines.mjs`) fills the `classifyFailure` signals, so a red cycle row now carries `failure_class=code|environment` instead of `unknown`, plus `first_red_s`. Evidence: the e2e fixture run (two cargo FAILED lines, exit 101) closed `failure_class=code`; first real-push row pending. Live failures themselves are habit `gate-failures-arrive-live`.

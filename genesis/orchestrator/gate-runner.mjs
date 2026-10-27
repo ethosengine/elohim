@@ -12,7 +12,10 @@ import { projectsFromStale, walkGraph } from './graph-walker.mjs';
 import { filterChanged } from './ci-ignore.mjs';
 import { classifyFailure, recordCycle, subjectFor } from './gate-cycle.mjs';
 import { CI_BRANCH_PATTERN, costOf, deferDecision, formatExpectation, readCycleRows } from './gate-cost.mjs';
-import { ageOf, gateEvidence, recordEvidence, reusableHit, selfAgentId } from './gate-evidence.mjs';
+import {
+  ageOf, emitGateVerdict, gateEvidence, recordEvidence, reusableHit, selfAgentId,
+  siblingGovernanceChange, siblingVerdicts,
+} from './gate-evidence.mjs';
 import { rakiaAffected, resolveRakiaBin } from './gate-oracle.mjs';
 import { runAttested } from './gate-attest.mjs';
 import { affectedPackages, loadMetadata } from './cargo-affected.mjs';
@@ -38,6 +41,11 @@ export function oracleMode(env = process.env) {
 
 function nameSet(projects) {
   return new Set(projects.map(p => p.name));
+}
+
+function shortDid(did) {
+  const text = String(did || 'unknown');
+  return text.length > 24 ? `${text.slice(0, 16)}…${text.slice(-4)}` : text;
 }
 
 function oracleDiffLine(pathProjects, oracleProjects) {
@@ -244,7 +252,11 @@ function liveEvent(env, event) {
   if (env.GATE_LIVE_RUN) appendEvent(env.GATE_LIVE_RUN, event);
 }
 
-export function runProject(project, printOnly, namesOnly, { root = ROOT, env = process.env, spawn = spawnSync, write = text => process.stdout.write(text), readsOf, recipe = null, tap = spawn === spawnSync } = {}) {
+export function runProject(project, printOnly, namesOnly, {
+  root = ROOT, env = process.env, spawn = spawnSync,
+  write = text => process.stdout.write(text), warn = text => process.stderr.write(text),
+  readsOf, recipe = null, tap = spawn === spawnSync,
+} = {}) {
   const cargo = project.run.cargo || {};
   const targetDir = worktreeTargetDir(cargo.targetDir || '', root);
   const args = [
@@ -401,7 +413,8 @@ export function runProject(project, printOnly, namesOnly, { root = ROOT, env = p
   }
   // Evidence by input closure (gate-evidence.mjs): has THIS closure — the step's declared
   // input bytes at the pushed commit, the recipe, the resolved cargo env — already been
-  // gated, by whom, and when? Reuse requires an audited project and this workspace's signer.
+  // gated, by whom, and when? Reuse requires an audited project and either this workspace's
+  // signer or an admitted sibling verdict under D5's stricter fences.
   // GATE_COMMIT is the commit being pushed (pre-push exports it); a human
   // running `just gate` is asking about HEAD. Fail-open: an exception here is one line.
   const gateCommit = (env.GATE_COMMIT || '').trim() || 'HEAD';
@@ -435,17 +448,43 @@ export function runProject(project, printOnly, namesOnly, { root = ROOT, env = p
       write(`gate-task: not passed to the Task child (braces are ark template syntax): ${task.dropped.join(' ')}\n`);
     }
   }
-  const decision = task ? { reuse: false, why: 'decided by the Task' } : reusableHit(evidence, {
+  const reuseContext = {
     mode: env.GATE_EVIDENCE,
     enabled: Array.isArray(enabled) && enabled.includes(project.name),
     selfId: env.GATE_EVIDENCE === 'reuse' ? selfAgentId(root, spawn) : null,
     selectorCheck: reuseSelector(project, gateCommit, { root, env: childEnv, spawn }),
-  });
+  };
+  let decision = task ? { reuse: false, why: 'decided by the Task' }
+    : reusableHit(evidence, reuseContext);
+  // Preserve the local brit path exactly. Only a local miss asks the device channel, and the
+  // native read has already removed self, revoked and unadmitted devices.
+  if (!task && !decision.reuse && env.GATE_EVIDENCE === 'reuse'
+      && reuseContext.enabled && reuseContext.selfId && evidence.key) {
+    const sibling = siblingVerdicts(project, evidence.key, { root, env, spawn });
+    if (sibling.candidates.length > 0) {
+      const governance = siblingGovernanceChange({ root, spawn });
+      decision = governance.changed
+        ? { reuse: false, why: governance.why }
+        : reusableHit(evidence, {
+          ...reuseContext,
+          candidates: sibling.candidates,
+          // Admission is established by `epr peer verdicts`; this callback keeps the decision
+          // seam explicit and lets alternate candidate sources fail closed.
+          admitCandidate: candidate => candidate.source === 'sibling',
+        });
+    }
+  }
   if (decision.reuse) {
     const row = decision.row;
-    write(`[gate] ${project.name} reused: green ${ageOf(row.attestation.builtAt)} at ${String(row.commit).slice(0, 9)} (signer this workspace)\n`);
+    const sibling = decision.independence === 'sibling';
+    const signer = sibling
+      ? `signer sibling ${shortDid(row.device)}, independence: sibling`
+      : 'signer this workspace';
+    write(`[gate] ${project.name} reused: green ${ageOf(sibling ? row.at : row.attestation.builtAt)} at ${String(row.commit).slice(0, 9)} (${signer})\n`);
     const seconds = Number(process.hrtime.bigint() - started) / 1e9;
-    recordCycle(project, seconds, 0, { ...cycleEnv, GATE_RUN_KIND: 'reused' }, cycleDeps);
+    recordCycle(project, seconds, 0, {
+      ...cycleEnv, GATE_RUN_KIND: sibling ? 'sibling-reused' : 'reused',
+    }, cycleDeps);
     liveEvent(env, { kind: 'gate-verdict', project: project.name, verdict: { exit: 0, seconds: 0, reused: true } });
     return 0;
   }
@@ -502,7 +541,12 @@ export function runProject(project, printOnly, namesOnly, { root = ROOT, env = p
       ? `recorded ${String(put.stdout || '').trim().slice(0, 16)}…`
       : `not recorded (${String(put.stderr || '').trim().split('\n').pop() || `exit ${put.status}`})`;
     write(`[gate] ${project.name} evidence: ${note}\n`);
-    if (put.status === 0) evidenceCid = String(put.stdout || '').trim().split('\n').pop() || null;
+    if (put.status === 0) {
+      evidenceCid = String(put.stdout || '').trim().split('\n').pop() || null;
+      emitGateVerdict(project, evidence.key, {
+        success: status === 0, seconds, commit: gateCommit, put, root, env, spawn, warn,
+      });
+    }
   }
   // Cycle time is observed here because this is the one place every gate runs.
   // The ceiling, the reviewer and its charter are declared in measures.yaml.
