@@ -52,8 +52,8 @@ while remaining; do
   IFS='|' read -r uid deleting phase actual_image ready container_id restarts <<< "$state"
   if [[ "$uid" =~ ^[a-f0-9-]+$ && -z "$deleting" && "$phase" == Running && "$ready" == true && "$actual_image" == "$image" && "$container_id" =~ ^[a-z0-9-]+://[a-zA-Z0-9._-]+$ && "$restarts" =~ ^[0-9]+$ ]]; then
     remaining || break
-    # PID 1 becomes worker.mjs only AFTER the current bootstrap writes its grant.
-    # This prevents a retained receipt from greening a still-starting container.
+    # Only worker.mjs (after bootstrap), never its supervisor or a retained receipt,
+    # proves activation. The read runs in the worker's existing pinned Node runtime.
     if timeout --signal=KILL "${left}s" kubectl --request-timeout="${left}s" \
       exec -i "$pod" -n "$namespace" -c compute-worker -- /usr/local/bin/node - \
       "$provider" "$recipient" "$image" "$namespace" "$pod" "$uid" "$container_id" "$restarts" "$cpu" "$memory" \
@@ -109,9 +109,27 @@ function observeCapacity() {
     declaredCpuMillis: Number(declaredCpu), declaredMemoryBytes: Number(declaredMemory), hierarchy,
     measurement: 'activation snapshot; memory.peak is cgroup lifetime peak, not stage peak' };
 }
+function workerProcess(pid) {
+  try {
+    const command = fs.readFileSync(`/proc/${pid}/cmdline`, 'utf8').split('\0');
+    if (command[1] !== '/opt/compute/worker.mjs') return null;
+    const stat = fs.readFileSync(`/proc/${pid}/stat`, 'utf8');
+    const fields = stat.slice(stat.lastIndexOf(')') + 2).split(' ');
+    if (['Z', 'X'].includes(fields[0])) return null;
+    // setsid keeps the supervised worker as PID 1's child and its own group/session.
+    if (pid !== '1' && (fields[1] !== '1' || fields[2] !== pid || fields[3] !== pid)) return null;
+    return `${pid}:${fields[19]}`; // start time prevents PID reuse from hiding a retry.
+  } catch (error) {
+    if (error.code === 'ENOENT' || error.code === 'ESRCH') return null;
+    throw error;
+  }
+}
 try {
-  const command = fs.readFileSync('/proc/1/cmdline', 'utf8').split('\0');
-  if (command[1] !== '/opt/compute/worker.mjs') process.exit(75);
+  const candidates = workerProcess('1') ? ['1'] :
+    fs.readFileSync('/proc/1/task/1/children', 'utf8').trim().split(/\s+/).filter(pid => /^[1-9][0-9]*$/.test(pid));
+  const workers = candidates.map(pid => [pid, workerProcess(pid)]).filter(([, identity]) => identity);
+  if (workers.length !== 1) process.exit(75);
+  const [pid, identity] = workers[0];
   const declaration = JSON.parse(process.env.COMPUTE_RUNNER_GRANT_JSON || 'null');
   if (declaration?.enabled !== true || declaration.provider !== provider ||
       declaration.recipient !== recipient || declaration.stewardOfRecord !== 'human:matthew' ||
@@ -128,6 +146,7 @@ try {
       !/^uhCkk[A-Za-z0-9_-]{48}$/.test(receipt.grantActionHash || '') ||
       !/^uhCkk[A-Za-z0-9_-]{48}$/.test(receipt.consentActionHash || '')) process.exit(65);
   const capacity = observeCapacity();
+  if (workerProcess(pid) !== identity) process.exit(75);
   // Whitelist public evidence; never spread receipt/config/env into the artifact.
   console.log(JSON.stringify({
     observedAt: new Date().toISOString(),
