@@ -10,6 +10,7 @@ use std::time::Duration;
 
 use elohim_epr_rea::{ParticipantRow, SidecarRoster};
 use eprfs_peer::{via_device, CrossingAllowList, HeadTable, PeerConfig, PeerDaemon, PeerKey};
+use futures_lite::StreamExt;
 use support::{
     berth_event, binding, contest, device, endpoint_row, genesis, policy, verifier, Checkout,
     Device, HANDLE,
@@ -309,6 +310,261 @@ async fn two_daemons_find_each_other_through_the_relay_with_no_peer_address() {
     .await;
     daemon_a.shutdown().await;
     daemon_b.shutdown().await;
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn changed_then_unchanged_heads_reuse_the_index_and_skip_idle_fold_work() {
+    let a = device("DeviceA", 1);
+    let b = device("DeviceB", 2);
+    let (key_dir_a, key_dir_b) = (tempfile::tempdir().unwrap(), tempfile::tempdir().unwrap());
+    let (key_a, key_b) = (load_key(key_dir_a.path()), load_key(key_dir_b.path()));
+    let rows = vec![
+        genesis(&a),
+        binding(&a, &b),
+        endpoint_row(&a, &a, &key_a),
+        endpoint_row(&a, &b, &key_b),
+    ];
+    let id_a = key_a.node_id();
+    let side_a = Side::new(&rows);
+    let b_checkout = Checkout::new();
+    b_checkout.append(berth_event("claim", "dev-integration", "sb", "1.0"));
+    let allow = CrossingAllowList::from_policy(&policy()).expect("policy");
+    let b_store = Arc::new(eprfs_peer::ChannelStore::default());
+    let first = eprfs_peer::project_channel(&b_checkout.store(), &allow).expect("projects");
+    b_store.install(&first);
+    let b_admission = Arc::new(std::sync::RwLock::new(eprfs_peer::Admission::from_roster(
+        &rows,
+        &a.did,
+        &*verifier(&[&a, &b]),
+    )));
+    let endpoint_b = eprfs_peer::bind(
+        &key_b,
+        None,
+        vec![eprfs_peer::TIER_ALPN.to_vec(), iroh_gossip::ALPN.to_vec()],
+    )
+    .await
+    .expect("bind B");
+    let addr_b = support::loopback(&endpoint_b);
+    let gossip_b = iroh_gossip::net::Gossip::builder().spawn(endpoint_b.clone());
+    let router_b = iroh::protocol::Router::builder(endpoint_b.clone())
+        .accept(
+            eprfs_peer::TIER_ALPN,
+            eprfs_peer::TierProtocol::new(
+                eprfs_peer::channel_tier_id(),
+                b_store.clone(),
+                b_admission,
+                eprfs_peer::TierLimits::default(),
+            )
+            .expect("tier"),
+        )
+        .accept(iroh_gossip::ALPN, gossip_b.clone())
+        .spawn();
+    let port_a = free_port();
+    let daemon_a = PeerDaemon::start(config(
+        &a,
+        &a.did,
+        key_a,
+        &side_a,
+        &[&a, &b],
+        vec![addr_b],
+        local(port_a),
+    ))
+    .await
+    .expect("A starts");
+    endpoint_b
+        .add_node_addr(
+            iroh::NodeAddr::new(id_a)
+                .with_direct_addresses([std::net::SocketAddr::V4(local(port_a))]),
+        )
+        .expect("A's address");
+    let (sender_b, mut receiver_b) = gossip_b
+        .subscribe(eprfs_peer::topic_for(&a.did), vec![id_a])
+        .await
+        .expect("B joins")
+        .split();
+    let joined = tokio::time::timeout(WITHIN, async {
+        loop {
+            match receiver_b.next().await {
+                Some(Ok(iroh_gossip::api::Event::NeighborUp(node))) if node == id_a => break true,
+                Some(_) => {}
+                None => break false,
+            }
+        }
+    })
+    .await
+    .expect("B sees A as a gossip neighbour");
+    assert!(joined, "B's gossip stream stays open after joining A");
+    let signer_b = b.signer();
+    let send = |seq, root: &eprfs_core::BlobCid| {
+        eprfs_peer::ChannelHead::sign(
+            b.did.clone(),
+            root.clone(),
+            seq,
+            seq,
+            Default::default(),
+            &signer_b,
+        )
+        .expect("signs")
+        .to_wire()
+        .expect("wire")
+    };
+    sender_b
+        .broadcast(send(1, first.root()).into())
+        .await
+        .expect("first head");
+    eventually("A folds B's first head", || {
+        side_a
+            .table()
+            .devices
+            .get(&b.did)
+            .is_some_and(|head| head.seq >= 1)
+    })
+    .await;
+    assert_eq!(daemon_a.fold_stats().store_parses, 1);
+
+    b_checkout.append(berth_event("release", "dev-integration", "sb", "2.0"));
+    let second = eprfs_peer::project_channel(&b_checkout.store(), &allow).expect("projects");
+    b_store.install(&second);
+    sender_b
+        .broadcast(send(2, second.root()).into())
+        .await
+        .expect("second head");
+    eventually("A folds B's changed second head", || {
+        side_a
+            .table()
+            .devices
+            .get(&b.did)
+            .is_some_and(|head| head.seq >= 2)
+    })
+    .await;
+    let after_changed = daemon_a.fold_stats();
+    assert_eq!(
+        after_changed.store_parses, 1,
+        "the held-CID index was reused"
+    );
+
+    sender_b
+        .broadcast(send(3, second.root()).into())
+        .await
+        .expect("unchanged head");
+    eventually("A records B's unchanged third head", || {
+        side_a
+            .table()
+            .devices
+            .get(&b.did)
+            .is_some_and(|head| head.seq >= 3)
+    })
+    .await;
+    assert_eq!(
+        daemon_a.fold_stats(),
+        after_changed,
+        "an unchanged root starts no task and parses no store"
+    );
+
+    daemon_a.shutdown().await;
+    router_b.shutdown().await.expect("shutdown B");
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn a_running_daemon_folds_a_neighbours_head_after_that_neighbour_restarts() {
+    let a = device("DeviceA", 1);
+    let b = device("DeviceB", 2);
+    let (key_dir_a, key_dir_b) = (tempfile::tempdir().unwrap(), tempfile::tempdir().unwrap());
+    let key_a = load_key(key_dir_a.path());
+    let key_b = load_key(key_dir_b.path());
+    let rows = vec![
+        genesis(&a),
+        binding(&a, &b),
+        endpoint_row(&a, &a, &key_a),
+        endpoint_row(&a, &b, &key_b),
+    ];
+    let (id_a, id_b) = (key_a.node_id(), key_b.node_id());
+    let (side_a, side_b) = (Side::new(&rows), Side::new(&rows));
+    side_b
+        .checkout
+        .append(berth_event("claim", "dev-integration", "sb", "1.0"));
+    let (port_a, port_b) = (free_port(), free_port());
+    let addr = |id, port| {
+        iroh::NodeAddr::new(id).with_direct_addresses([std::net::SocketAddr::V4(local(port))])
+    };
+    let daemon_a = PeerDaemon::start(config(
+        &a,
+        &a.did,
+        key_a,
+        &side_a,
+        &[&a, &b],
+        vec![addr(id_b, port_b)],
+        local(port_a),
+    ))
+    .await
+    .expect("A starts");
+    let daemon_b = PeerDaemon::start(config(
+        &b,
+        &a.did,
+        key_b,
+        &side_b,
+        &[&a, &b],
+        vec![addr(id_a, port_a)],
+        local(port_b),
+    ))
+    .await
+    .expect("B starts");
+    eventually("A folds B before the restart", || {
+        side_a.table().devices.contains_key(&b.did)
+    })
+    .await;
+    let before = side_a.table().devices[&b.did].seq;
+
+    daemon_b.shutdown().await;
+    side_b
+        .checkout
+        .append(berth_event("release", "dev-integration", "sb", "2.0"));
+    let restarted_b = PeerDaemon::start(config(
+        &b,
+        &a.did,
+        load_key(key_dir_b.path()),
+        &side_b,
+        &[&a, &b],
+        vec![addr(id_a, port_a)],
+        local(port_b),
+    ))
+    .await
+    .expect("B restarts on the same key and port");
+    tokio::time::timeout(Duration::from_secs(60), async {
+        loop {
+            let newer = side_a
+                .table()
+                .devices
+                .get(&b.did)
+                .is_some_and(|head| head.seq > before);
+            let crossed = side_a
+                .checkout
+                .events()
+                .iter()
+                .filter(|(_, event)| via_device(event) == Some(b.did.as_str()))
+                .count()
+                >= 2;
+            if newer && crossed {
+                break;
+            }
+            tokio::time::sleep(Duration::from_millis(100)).await;
+        }
+    })
+    .await
+    .expect("A re-joins and folds B's new head within 60 seconds");
+    assert!(
+        side_a
+            .checkout
+            .events()
+            .iter()
+            .filter(|(_, event)| via_device(event) == Some(b.did.as_str()))
+            .count()
+            >= 2,
+        "the post-restart event crossed without restarting A"
+    );
+
+    daemon_a.shutdown().await;
+    restarted_b.shutdown().await;
 }
 
 /// A device whose tier accepts a connection and never answers: an admitted peer that stalls.

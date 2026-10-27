@@ -60,15 +60,16 @@ pub use channel::{
 };
 pub use connections::{ConnectionBook, NOT_ADMITTED};
 pub use daemon::{
-    PeerConfig, PeerDaemon, ProjectionRetry, FOLD_DEADLINE, PROJECTION_RETRY_FIRST,
-    PROJECTION_RETRY_MAX, TICK,
+    FoldStats, PeerConfig, PeerDaemon, ProjectionRetry, RetryBackoff, FOLD_DEADLINE,
+    PROJECTION_RETRY_FIRST, PROJECTION_RETRY_MAX, REJOIN_RETRY_FIRST, REJOIN_RETRY_MAX,
+    STREAM_RETRY_FIRST, STREAM_RETRY_MAX, TICK,
 };
 pub use endpoint::{bind, bind_on, peer_from_arg, relay_from_env, relay_from_value, RELAY_ENV};
 pub use error::PeerError;
 pub use fold::{
-    fetch_channel, fold_events, fold_root, folded_from, ChannelEvent, Fetched, FoldLimits,
-    FoldOutcome, FoldReader, FoldReport, FoldTarget, Quarantined, MAX_EVENT_BYTES, MAX_FOLD_BYTES,
-    MAX_FOLD_EVENTS,
+    fetch_channel, fold_events, fold_root, fold_root_planned, folded_from, ChannelEvent, Fetched,
+    FoldLimits, FoldOutcome, FoldPlan, FoldReader, FoldReport, FoldTarget, Quarantined,
+    MAX_EVENT_BYTES, MAX_FOLD_BYTES, MAX_FOLD_EVENTS,
 };
 pub use gate::{SharedAdmission, StewardDevicesGate};
 pub use gossip::GatedGossip;

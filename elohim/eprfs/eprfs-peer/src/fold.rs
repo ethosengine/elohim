@@ -56,6 +56,15 @@ pub struct FoldLimits {
     pub max_fold_bytes: usize,
 }
 
+/// Per-call fold inputs that vary for the daemon but not for standalone callers.
+#[derive(Debug, Clone, Copy, Default)]
+pub struct FoldPlan<'a> {
+    /// Resource bounds for this fold.
+    pub limits: FoldLimits,
+    /// Original event CIDs already held from the target device; `None` rebuilds from the store.
+    pub known: Option<&'a HashSet<Cid>>,
+}
+
 impl Default for FoldLimits {
     fn default() -> FoldLimits {
         FoldLimits {
@@ -111,6 +120,8 @@ pub struct FoldOutcome {
     pub refused: u64,
     /// Refused event CIDs, for this device's nack leaf for their author.
     pub refused_cids: Vec<Cid>,
+    /// Original CIDs now held from this device, whether appended by this fold or already present.
+    pub held_cids: Vec<Cid>,
 }
 
 /// Read the events of the channel tree at `root` on an open tier connection that `known` does not
@@ -422,11 +433,13 @@ fn fold_events_admitted(
         let folded_cid = atom_cid(&folded).map_err(PeerError::FlowStore)?;
         if !held.insert(folded_cid) {
             outcome.already += 1;
+            outcome.held_cids.push(*cid);
             continue;
         }
         tx.append(FlowRecord::Event(folded))
             .map_err(PeerError::FlowStore)?;
         outcome.appended += 1;
+        outcome.held_cids.push(*cid);
     }
     Ok(outcome)
 }
@@ -485,6 +498,12 @@ pub struct FoldReport {
     pub quarantined: Vec<Quarantined>,
     /// The author's nack leaf for this device at the folded root.
     pub peer_nack: NackLeaf,
+    /// Whole-store parses used to build the per-device held-CID index for this fold.
+    pub store_parses: u64,
+    /// Quarantine, rather than a work budget, kept this fold at its prior head.
+    pub quarantine_blocks: bool,
+    /// The held-CID index after this successful fold, for the daemon's next fold from the device.
+    pub known: HashSet<Cid>,
 }
 
 /// Fold `target` from the device whose tier answers at `peer`: dial it, fetch what this device has
@@ -503,7 +522,44 @@ pub async fn fold_root(
     tree: &TreeLimits,
     fold_limits: &FoldLimits,
 ) -> Result<FoldReport, PeerError> {
-    let known = folded_from(store, target.device)?;
+    fold_root_planned(
+        endpoint,
+        peer,
+        target,
+        store,
+        allow,
+        tree,
+        FoldPlan {
+            limits: *fold_limits,
+            known: None,
+        },
+    )
+    .await
+}
+
+/// [`fold_root`] with a snapshot of the original event CIDs already held from this device.
+/// `None` rebuilds the snapshot from the store, preserving the standalone caller's behaviour.
+///
+/// # Errors
+///
+/// The same dial, fetch, append, quarantine, and store errors as [`fold_root`].
+pub async fn fold_root_planned(
+    endpoint: &Endpoint,
+    peer: NodeAddr,
+    target: FoldTarget<'_>,
+    store: &SidecarFlowStore,
+    allow: &CrossingAllowList,
+    tree: &TreeLimits,
+    plan: FoldPlan<'_>,
+) -> Result<FoldReport, PeerError> {
+    let rebuilt;
+    let (known, store_parses) = match plan.known {
+        Some(known) => (known, 0),
+        None => {
+            rebuilt = folded_from(store, target.device)?;
+            (&rebuilt, 1)
+        }
+    };
     let connection = endpoint
         .connect(peer, TIER_ALPN)
         .await
@@ -512,9 +568,9 @@ pub async fn fold_root(
         &connection,
         target.since,
         target.root,
-        &known,
+        known,
         tree,
-        fold_limits,
+        &plan.limits,
         Some(target.reader.device),
     )
     .await;
@@ -528,8 +584,11 @@ pub async fn fold_root(
         allow,
         target.admission,
     )?;
-    let complete = fetched.complete
-        && (fetched.quarantined.is_empty() || author_reads_nacks(store, target.device)?);
+    let quarantine_blocks =
+        !fetched.quarantined.is_empty() && !author_reads_nacks(store, target.device)?;
+    let complete = fetched.complete && !quarantine_blocks;
+    let mut known_after = (*known).clone();
+    known_after.extend(outcome.held_cids.iter().copied());
     Ok(FoldReport {
         outcome,
         complete,
@@ -537,6 +596,9 @@ pub async fn fold_root(
         over_budget: fetched.over_budget,
         quarantined: fetched.quarantined,
         peer_nack: fetched.peer_nack,
+        store_parses,
+        quarantine_blocks,
+        known: known_after,
     })
 }
 

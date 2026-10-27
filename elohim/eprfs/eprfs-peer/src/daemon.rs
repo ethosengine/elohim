@@ -19,9 +19,10 @@
 //! steward lease view read what the daemon knows. Nothing here logs a key: the log sink sees
 //! device did:keys, seqs, roots and counts only.
 
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 use std::net::{SocketAddr, SocketAddrV4};
 use std::path::PathBuf;
+use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::{Arc, RwLock};
 use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
 
@@ -44,7 +45,7 @@ use crate::channel::{channel_tier_id, project_channel_with_nacks, ChannelStore};
 use crate::connections::ConnectionBook;
 use crate::endpoint::bind_on;
 use crate::error::PeerError;
-use crate::fold::{fold_root, FoldLimits, FoldReader, FoldReport, FoldTarget};
+use crate::fold::{fold_root_planned, FoldLimits, FoldPlan, FoldReader, FoldReport, FoldTarget};
 use crate::gate::SharedAdmission;
 use crate::gossip::GatedGossip;
 use crate::head::{ChannelHead, HeadSigner};
@@ -60,6 +61,133 @@ pub const PROJECTION_RETRY_FIRST: Duration = Duration::from_secs(1);
 
 /// The longest wait between retries of one failing state of the flow store.
 pub const PROJECTION_RETRY_MAX: Duration = Duration::from_secs(30);
+
+/// The first wait after a dropped neighbour before another join attempt.
+pub const REJOIN_RETRY_FIRST: Duration = Duration::from_secs(2);
+/// The longest wait between join attempts for one dropped neighbour.
+pub const REJOIN_RETRY_MAX: Duration = Duration::from_secs(60);
+
+/// The first wait before replacing a failed gossip subscription.
+pub const STREAM_RETRY_FIRST: Duration = Duration::from_secs(1);
+/// The longest wait between attempts to replace a failed gossip subscription.
+pub const STREAM_RETRY_MAX: Duration = Duration::from_secs(60);
+
+/// How often stale admitted devices are considered for re-join, and how old their last head may
+/// be before the link is refreshed.
+const REJOIN_SWEEP_EVERY: Duration = Duration::from_secs(30);
+const HEAD_STALE_AFTER: Duration = Duration::from_secs(90);
+
+/// A pure capped retry clock. Scheduling consumes the current delay; resetting restores the
+/// first delay. The owner decides what success means (a join call is not yet a neighbour-up).
+#[derive(Debug, Clone)]
+pub struct RetryBackoff {
+    first: Duration,
+    max: Duration,
+    next_delay: Duration,
+    at: Option<Instant>,
+}
+
+impl RetryBackoff {
+    /// A retry clock beginning at `first` and doubling no farther than `max`.
+    pub fn new(first: Duration, max: Duration) -> RetryBackoff {
+        RetryBackoff {
+            first,
+            max,
+            next_delay: first,
+            at: None,
+        }
+    }
+
+    /// Schedule after the current delay and double the following one up to the cap.
+    pub fn schedule(&mut self, now: Instant) -> Duration {
+        let delay = self.next_delay;
+        self.at = Some(now + delay);
+        self.next_delay = delay.saturating_mul(2).min(self.max);
+        delay
+    }
+
+    /// Schedule on the current tick without consuming a delay (used by the stale-head sweep).
+    pub fn schedule_now(&mut self, now: Instant) {
+        self.at = Some(now);
+    }
+
+    #[must_use]
+    /// Whether the scheduled retry is due at `now`.
+    pub fn due(&self, now: Instant) -> bool {
+        self.at.is_some_and(|at| now >= at)
+    }
+
+    fn scheduled(&self) -> bool {
+        self.at.is_some()
+    }
+
+    /// A join request was accepted; wait for neighbour-up, a head, or the stale-head sweep.
+    pub fn requested(&mut self) {
+        self.at = None;
+    }
+
+    /// Forget the schedule and restore the first delay.
+    pub fn reset(&mut self) {
+        self.next_delay = self.first;
+        self.at = None;
+    }
+}
+
+#[derive(Debug)]
+struct RejoinState {
+    retry: RetryBackoff,
+    failure_logged: bool,
+}
+
+impl RejoinState {
+    fn delayed(now: Instant) -> RejoinState {
+        let mut retry = RetryBackoff::new(REJOIN_RETRY_FIRST, REJOIN_RETRY_MAX);
+        retry.schedule(now);
+        RejoinState {
+            retry,
+            failure_logged: false,
+        }
+    }
+
+    fn immediate(now: Instant) -> RejoinState {
+        let mut retry = RetryBackoff::new(REJOIN_RETRY_FIRST, REJOIN_RETRY_MAX);
+        retry.schedule_now(now);
+        RejoinState {
+            retry,
+            failure_logged: false,
+        }
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum GossipDisposition {
+    Handle,
+    ResubscribeLater,
+}
+
+/// What a gossip event means for the subscription: a lag, an error or the end of the stream all
+/// drop the receiver and resubscribe on the tick with backoff, never end the daemon.
+fn gossip_disposition<E>(event: Option<&Result<Event, E>>) -> GossipDisposition {
+    match event {
+        Some(Ok(Event::Lagged)) | Some(Err(_)) | None => GossipDisposition::ResubscribeLater,
+        Some(Ok(_)) => GossipDisposition::Handle,
+    }
+}
+
+/// In-memory evidence of fold work, deliberately absent from heads and the persisted table.
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
+pub struct FoldStats {
+    /// Fold tasks started; unchanged roots do not increment this.
+    pub tasks: u64,
+    /// Calls to `folded_from` made to build a device's lazy held-CID index.
+    pub store_parses: u64,
+}
+
+#[derive(Debug, Default)]
+struct RunStats {
+    tasks: AtomicU64,
+    store_parses: AtomicU64,
+}
 
 /// When a projection that failed is tried again. A projection re-parses the whole flow store, so a
 /// state of the store that keeps failing is retried after [`PROJECTION_RETRY_FIRST`], then after
@@ -146,6 +274,7 @@ pub struct PeerDaemon {
     router: Router,
     stop: Option<oneshot::Sender<()>>,
     task: Option<JoinHandle<Result<(), PeerError>>>,
+    stats: Arc<RunStats>,
 }
 
 impl PeerDaemon {
@@ -218,6 +347,7 @@ impl PeerDaemon {
         let (sender, receiver) = subscribe(&gossip, topic, bootstrap.clone()).await?;
         let (folds_tx, folds_rx) = mpsc::unbounded_channel();
 
+        let stats = Arc::new(RunStats::default());
         let run = Run {
             channel: Channel::new(config.device.clone(), table),
             admission,
@@ -231,6 +361,10 @@ impl PeerDaemon {
             sender,
             peers,
             joined: bootstrap,
+            rejoins: HashMap::new(),
+            last_heard: HashMap::new(),
+            last_rejoin_sweep: Instant::now(),
+            resubscriptions: 0,
             roster_stamp: stamp(&config.roster),
             flow_stamp: None,
             nacks_dirty: true,
@@ -239,6 +373,8 @@ impl PeerDaemon {
             folds_tx,
             in_flight: HashMap::new(),
             waiting: HashMap::new(),
+            held: HashMap::new(),
+            stats: stats.clone(),
             config,
         };
         let (stop, stopped) = oneshot::channel();
@@ -247,6 +383,7 @@ impl PeerDaemon {
             router,
             stop: Some(stop),
             task: Some(task),
+            stats,
         })
     }
 
@@ -260,12 +397,21 @@ impl PeerDaemon {
         self.router.endpoint().bound_sockets()
     }
 
+    /// In-memory fold work since this daemon started. This is a test/diagnostic surface only;
+    /// neither counter enters a head or the persisted head table.
+    pub fn fold_stats(&self) -> FoldStats {
+        FoldStats {
+            tasks: self.stats.tasks.load(Ordering::Relaxed),
+            store_parses: self.stats.store_parses.load(Ordering::Relaxed),
+        }
+    }
+
     /// Run until the loop ends. It ends on its own only for a reason worth a non-zero exit.
     ///
     /// # Errors
     ///
-    /// [`PeerError::DaemonEnded`] naming why the loop ended (its gossip stream ended, a head could
-    /// not be persisted before it was announced, or the loop task failed).
+    /// [`PeerError::DaemonEnded`] naming a local fault (a head could not be persisted before it
+    /// was announced, or the loop task failed). Gossip loss is recovered in-process.
     pub async fn wait(&mut self) -> Result<(), PeerError> {
         let Some(task) = self.task.take() else {
             return Ok(());
@@ -400,6 +546,13 @@ struct Run {
     sender: GossipSender,
     peers: HashMap<NodeId, NodeAddr>,
     joined: Vec<NodeId>,
+    /// Dropped or stale admitted nodes awaiting another join request.
+    rejoins: HashMap<NodeId, RejoinState>,
+    /// Last verified head received per admitted device, deliberately not persisted.
+    last_heard: HashMap<String, Instant>,
+    last_rejoin_sweep: Instant,
+    /// Successful in-process replacements of the gossip subscription.
+    resubscriptions: u64,
     roster_stamp: Stamp,
     flow_stamp: Stamp,
     /// A changed nack set reprojects even when the flow log itself did not move.
@@ -414,21 +567,51 @@ struct Run {
     in_flight: HashMap<String, (u64, tokio::task::AbortHandle)>,
     /// Per device, the newest head that arrived while its fold was in flight.
     waiting: HashMap<String, ChannelHead>,
+    /// Original event CIDs held from each device, rebuilt lazily after start or any uncertain fold.
+    held: HashMap<String, Arc<HashSet<cid::Cid>>>,
+    stats: Arc<RunStats>,
 }
 
 impl Run {
     async fn run(
         mut self,
-        mut receiver: GossipReceiver,
+        receiver: GossipReceiver,
         mut folds: mpsc::UnboundedReceiver<FoldDone>,
         mut stopped: oneshot::Receiver<()>,
     ) -> Result<(), PeerError> {
         let mut tick = tokio::time::interval(TICK);
         tick.set_missed_tick_behavior(tokio::time::MissedTickBehavior::Delay);
+        let mut receiver = Some(receiver);
+        let mut stream_retry = RetryBackoff::new(STREAM_RETRY_FIRST, STREAM_RETRY_MAX);
+        let mut stream_failure_logged = false;
+        let mut resubscribe_failure_logged = false;
         let ended = loop {
             tokio::select! {
                 _ = &mut stopped => break Ok(()),
                 _ = tick.tick() => {
+                    let now = Instant::now();
+                    if receiver.is_none() && stream_retry.due(now) {
+                        match self.resubscribe().await {
+                            Ok(fresh) => {
+                                receiver = Some(fresh);
+                                stream_retry.reset();
+                                stream_failure_logged = false;
+                                resubscribe_failure_logged = false;
+                                self.resubscriptions += 1;
+                                self.log(&format!(
+                                    "gossip resubscribed ({} in this run)",
+                                    self.resubscriptions
+                                ));
+                            }
+                            Err(e) => {
+                                if !resubscribe_failure_logged {
+                                    self.log(&format!("gossip resubscribe failed: {e}"));
+                                    resubscribe_failure_logged = true;
+                                }
+                                stream_retry.schedule(now);
+                            }
+                        }
+                    }
                     if let Err(e) = self.tick().await {
                         break Err(e);
                     }
@@ -438,24 +621,44 @@ impl Run {
                         break Err(e);
                     }
                 }
-                event = receiver.next() => match event {
+                event = async {
+                    match receiver.as_mut() {
+                        Some(receiver) => receiver.next().await,
+                        None => std::future::pending().await,
+                    }
+                } => {
+                    let disposition = gossip_disposition(event.as_ref());
+                    match event {
                     Some(Ok(Event::Received(message))) => {
                         if let Err(e) = self.heard(&message.content) {
                             break Err(e);
                         }
                     }
-                    Some(Ok(Event::NeighborUp(_))) => self.channel.neighbor_up(Instant::now()),
+                    Some(Ok(Event::NeighborUp(node))) => self.neighbor_up(node),
                     Some(Ok(Event::Lagged)) => {
-                        // iroh-gossip closes a lagging subscription; it is to be re-opened.
-                        self.log("gossip lagged; resubscribing to the steward topic");
-                        match self.resubscribe().await {
-                            Ok(fresh) => receiver = fresh,
-                            Err(e) => break Err(ended(format!("resubscribing after lag: {e}"))),
+                        if !stream_failure_logged {
+                            self.log("gossip lagged; resubscribing to the steward topic");
                         }
                     }
-                    Some(Ok(Event::NeighborDown(_))) => {}
-                    Some(Err(e)) => break Err(ended(format!("the steward topic's gossip failed: {e}"))),
-                    None => break Err(ended("the steward topic's gossip stream ended")),
+                    Some(Ok(Event::NeighborDown(node))) => self.neighbor_down(node),
+                    Some(Err(e)) => {
+                        if !stream_failure_logged {
+                            self.log(&format!("the steward topic's gossip failed: {e}"));
+                        }
+                    }
+                    None => {
+                        if !stream_failure_logged {
+                            self.log("the steward topic's gossip stream ended");
+                        }
+                    }
+                    }
+                    if disposition == GossipDisposition::ResubscribeLater {
+                        receiver = None;
+                        stream_failure_logged = true;
+                        resubscribe_failure_logged = false;
+                        stream_retry.reset();
+                        stream_retry.schedule(Instant::now());
+                    }
                 },
             }
         };
@@ -481,12 +684,148 @@ impl Run {
         let bootstrap = others(&self.admission, self.endpoint.node_id());
         let (sender, receiver) = subscribe(&self.gossip, self.topic, bootstrap.clone()).await?;
         self.sender = sender;
+        for node in &bootstrap {
+            if let Some(state) = self.rejoins.get_mut(node) {
+                state.retry.requested();
+            }
+        }
         self.joined = bootstrap;
         Ok(receiver)
     }
 
+    fn neighbor_up(&mut self, node: NodeId) {
+        let admitted = self
+            .admission
+            .read()
+            .is_ok_and(|admission| admission.admits(&node).is_some());
+        if admitted {
+            self.rejoins.remove(&node);
+            if !self.joined.contains(&node) {
+                self.joined.push(node);
+            }
+        }
+        self.channel.neighbor_up(Instant::now());
+    }
+
+    fn neighbor_down(&mut self, node: NodeId) {
+        let admitted = self
+            .admission
+            .read()
+            .is_ok_and(|admission| admission.admits(&node).is_some());
+        if !admitted {
+            return;
+        }
+        self.joined.retain(|joined| *joined != node);
+        let now = Instant::now();
+        let state = self
+            .rejoins
+            .entry(node)
+            .or_insert_with(|| RejoinState::delayed(now));
+        if !state.retry.scheduled() {
+            state.retry.schedule(now);
+        }
+    }
+
+    fn heard_device(&mut self, device: &str, now: Instant) {
+        self.last_heard.insert(device.to_string(), now);
+        let nodes = self
+            .admission
+            .read()
+            .map(|admission| {
+                admission
+                    .nodes()
+                    .into_iter()
+                    .filter(|node| admission.admits(node) == Some(device))
+                    .collect::<Vec<_>>()
+            })
+            .unwrap_or_default();
+        for node in nodes {
+            self.rejoins.remove(&node);
+            if !self.joined.contains(&node) {
+                self.joined.push(node);
+            }
+        }
+    }
+
+    async fn maintain_rejoins(&mut self) {
+        let now = Instant::now();
+        if now.duration_since(self.last_rejoin_sweep) >= REJOIN_SWEEP_EVERY {
+            self.last_rejoin_sweep = now;
+            let stale: Vec<NodeId> = self
+                .admission
+                .read()
+                .map(|admission| {
+                    admission
+                        .nodes()
+                        .into_iter()
+                        .filter(|node| *node != self.endpoint.node_id())
+                        .filter(|node| {
+                            admission.admits(node).is_some_and(|device| {
+                                self.last_heard.get(device).is_none_or(|heard| {
+                                    now.duration_since(*heard) >= HEAD_STALE_AFTER
+                                })
+                            })
+                        })
+                        .collect()
+                })
+                .unwrap_or_default();
+            for node in stale {
+                self.joined.retain(|joined| *joined != node);
+                let state = self
+                    .rejoins
+                    .entry(node)
+                    .or_insert_with(|| RejoinState::immediate(now));
+                if !state.retry.scheduled() {
+                    state.retry.schedule_now(now);
+                }
+            }
+        }
+
+        let due: Vec<NodeId> = self
+            .rejoins
+            .iter()
+            .filter_map(|(node, state)| state.retry.due(now).then_some(*node))
+            .collect();
+        for node in due {
+            let admitted = self
+                .admission
+                .read()
+                .is_ok_and(|admission| admission.admits(&node).is_some());
+            if !admitted {
+                self.rejoins.remove(&node);
+                continue;
+            }
+            match self.sender.join_peers(vec![node]).await {
+                Ok(()) => {
+                    if !self.joined.contains(&node) {
+                        self.joined.push(node);
+                    }
+                    if let Some(state) = self.rejoins.get_mut(&node) {
+                        state.retry.requested();
+                    }
+                }
+                Err(e) => {
+                    let first_failure = {
+                        let state = self
+                            .rejoins
+                            .entry(node)
+                            .or_insert_with(|| RejoinState::delayed(now));
+                        let first = !state.failure_logged;
+                        state.failure_logged = true;
+                        state.retry.schedule(now);
+                        first
+                    };
+                    if first_failure {
+                        self.log(&format!("neighbour {node} not re-joined: {e}"));
+                    }
+                }
+            }
+        }
+    }
+
     async fn tick(&mut self) -> Result<(), PeerError> {
         self.reload_roster().await;
+        self.maintain_rejoins().await;
         // Refused connections reach the head table `epr peer status` reads: kept in memory every
         // tick, written with the next announce, or on their own at most once per re-announce
         // interval — never once per refused connection.
@@ -566,11 +905,21 @@ impl Run {
             }
         }
         self.drop_unadmitted_folds();
+        let admission = self.admission.clone();
+        let admitted_device = |device: &str| {
+            admission
+                .read()
+                .is_ok_and(|admission| admission.admits_device(device))
+        };
+        self.held.retain(|device, _| admitted_device(device));
+        self.last_heard.retain(|device, _| admitted_device(device));
         if read {
             self.forget_unadmitted_heads();
         }
         let me = self.endpoint.node_id();
         let admitted = others(&self.admission, me);
+        self.joined.retain(|node| admitted.contains(node));
+        self.rejoins.retain(|node, _| admitted.contains(node));
         seed_endpoint(
             &self.endpoint,
             self.config.relay.as_ref(),
@@ -586,8 +935,23 @@ impl Run {
             return;
         }
         match self.sender.join_peers(fresh.clone()).await {
-            Ok(()) => self.joined.extend(fresh),
-            Err(e) => self.log(&format!("newly admitted devices not joined: {e}")),
+            Ok(()) => {
+                for node in fresh {
+                    self.joined.push(node);
+                    if let Some(state) = self.rejoins.get_mut(&node) {
+                        state.retry.requested();
+                    }
+                }
+            }
+            Err(e) => {
+                self.log(&format!("newly admitted devices not joined: {e}"));
+                let now = Instant::now();
+                for node in fresh {
+                    self.rejoins
+                        .entry(node)
+                        .or_insert_with(|| RejoinState::delayed(now));
+                }
+            }
         }
     }
 
@@ -616,6 +980,8 @@ impl Run {
                 ));
             }
             self.waiting.remove(&device);
+            self.held.remove(&device);
+            self.last_heard.remove(&device);
         }
     }
 
@@ -704,10 +1070,16 @@ impl Run {
             |_| Admission::from_roster(&[], &self.config.chain_root, &*self.config.verifier),
             |admission| admission.clone(),
         );
-        match self
+        let verdict = self
             .channel
-            .judge(&head, &admission, &*self.config.verifier)
-        {
+            .judge(&head, &admission, &*self.config.verifier);
+        if matches!(
+            verdict,
+            HeadVerdict::Fold | HeadVerdict::Rollback | HeadVerdict::Replayed
+        ) {
+            self.heard_device(&head.device, Instant::now());
+        }
+        match verdict {
             HeadVerdict::Fold => self.fold(head),
             HeadVerdict::Own => return Ok(()),
             refused => self.log(&format!(
@@ -730,6 +1102,20 @@ impl Run {
             if newer {
                 self.waiting.insert(head.device.clone(), head);
             }
+            return;
+        }
+        let unchanged = self
+            .channel
+            .last_folded(&head.device)
+            .is_some_and(|(_, root)| root == &head.root);
+        if unchanged {
+            let nack = self
+                .channel
+                .last_peer_nack(&head.device)
+                .cloned()
+                .unwrap_or_default();
+            self.channel
+                .folded(&head, 0, nack, unix_ms(), Instant::now());
             return;
         }
         let node = self
@@ -761,6 +1147,8 @@ impl Run {
         let allow = self.config.allow.clone();
         let tree = self.tree;
         let done = self.folds_tx.clone();
+        let known = self.held.get(&device).cloned();
+        self.stats.tasks.fetch_add(1, Ordering::Relaxed);
         let task = tokio::spawn(async move {
             let folding = async {
                 let store = SidecarFlowStore::open(&flow_root).map_err(PeerError::FlowStore)?;
@@ -775,14 +1163,17 @@ impl Run {
                         state_dir: &state_dir,
                     },
                 };
-                fold_root(
+                fold_root_planned(
                     &endpoint,
                     peer,
                     target,
                     &store,
                     &allow,
                     &tree,
-                    &FoldLimits::default(),
+                    FoldPlan {
+                        limits: FoldLimits::default(),
+                        known: known.as_deref(),
+                    },
                 )
                 .await
             };
@@ -813,6 +1204,9 @@ impl Run {
         }
         match result {
             Ok(report) => {
+                self.stats
+                    .store_parses
+                    .fetch_add(report.store_parses, Ordering::Relaxed);
                 let counters = self.channel.counters_mut();
                 counters.oversized_events += report.oversized;
                 counters.over_budget_folds += u64::from(report.over_budget);
@@ -822,6 +1216,12 @@ impl Run {
                     report.quarantined.iter().map(|entry| entry.cid.to_string()),
                 );
                 self.nacks_dirty |= nack_changed;
+                if report.complete {
+                    self.held
+                        .insert(head.device.clone(), Arc::new(report.known.clone()));
+                } else {
+                    self.held.remove(&head.device);
+                }
                 let outcome = report.outcome;
                 if report.complete {
                     self.channel.folded(
@@ -841,15 +1241,31 @@ impl Run {
                             outcome.refused
                         ));
                     }
+                } else if report.quarantine_blocks {
+                    self.log(&format!(
+                        "folded {} seq {} in part ({} appended, {} quarantined); held at the \
+                         prior head until that device's daemon reads nacks",
+                        head.device,
+                        head.seq,
+                        outcome.appended,
+                        report.quarantined.len()
+                    ));
+                } else if report.over_budget {
+                    self.log(&format!(
+                        "folded {} seq {} in part ({} appended, byte budget reached); the rest \
+                         on its next head",
+                        head.device, head.seq, outcome.appended
+                    ));
                 } else {
                     self.log(&format!(
-                        "folded {} seq {} in part ({} appended, {} oversized); the rest on its \
-                         next head",
-                        head.device, head.seq, outcome.appended, report.oversized
+                        "folded {} seq {} in part ({} appended, event bound reached); the rest \
+                         on its next head",
+                        head.device, head.seq, outcome.appended
                     ));
                 }
             }
             Err(e) => {
+                self.held.remove(&head.device);
                 self.channel.counters_mut().fold_failures += 1;
                 self.log(&format!(
                     "fold of {} seq {} failed, retried on its next head: {e}",
@@ -883,4 +1299,53 @@ fn roster_named_nodes(rows: &[ParticipantRow], chain_root: &str) -> Vec<String> 
             _ => None,
         })
         .collect()
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn delays(first: Duration) -> Vec<Duration> {
+        let now = Instant::now();
+        let mut retry = RetryBackoff::new(first, Duration::from_secs(60));
+        (0..8).map(|_| retry.schedule(now)).collect()
+    }
+
+    #[test]
+    fn retry_backoffs_double_to_sixty_seconds_and_reset() {
+        assert_eq!(
+            delays(REJOIN_RETRY_FIRST),
+            [2, 4, 8, 16, 32, 60, 60, 60].map(Duration::from_secs)
+        );
+        assert_eq!(
+            delays(STREAM_RETRY_FIRST),
+            [1, 2, 4, 8, 16, 32, 60, 60].map(Duration::from_secs)
+        );
+
+        let now = Instant::now();
+        let mut retry = RetryBackoff::new(REJOIN_RETRY_FIRST, REJOIN_RETRY_MAX);
+        retry.schedule(now);
+        retry.schedule(now);
+        retry.reset();
+        assert_eq!(retry.schedule(now), REJOIN_RETRY_FIRST);
+    }
+
+    #[test]
+    fn broken_gossip_streams_always_resubscribe_later() {
+        let failed: Result<Event, ()> = Err(());
+        let lagged: Result<Event, ()> = Ok(Event::Lagged);
+        let ended: Option<&Result<Event, ()>> = None;
+        assert_eq!(
+            gossip_disposition(Some(&failed)),
+            GossipDisposition::ResubscribeLater
+        );
+        assert_eq!(
+            gossip_disposition(Some(&lagged)),
+            GossipDisposition::ResubscribeLater
+        );
+        assert_eq!(
+            gossip_disposition(ended),
+            GossipDisposition::ResubscribeLater
+        );
+    }
 }

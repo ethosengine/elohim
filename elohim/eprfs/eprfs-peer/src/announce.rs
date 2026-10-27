@@ -122,6 +122,12 @@ impl Channel {
             .map(|head| (head.seq, &head.root))
     }
 
+    /// The nack leaf read from `device`'s last folded head. An unchanged root carries the same
+    /// leaf, so a periodic head can advance its acknowledgement without reading the tier again.
+    pub fn last_peer_nack(&self, device: &str) -> Option<&NackLeaf> {
+        self.table.devices.get(device).map(|head| &head.nack)
+    }
+
     /// Judge a head heard on the topic, counting every refusal in the table. The signature is
     /// checked before the order, so a forged head with a high `seq` counts as forged.
     pub fn judge(

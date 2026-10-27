@@ -17,10 +17,10 @@ use eprfs_core::{
     TreePath,
 };
 use eprfs_peer::{
-    bind, channel_tier_id, fetch_channel, fold_events, fold_root, folded_from, project_channel,
-    tier_call, via_device, ChannelEvent, ChannelStore, ChannelTree, CrossingAllowList, FoldLimits,
-    FoldReader, FoldTarget, TierAnswer, TierLimits, TierProtocol, TierRequest, CHANNEL_EVENTS,
-    TIER_ALPN,
+    bind, channel_tier_id, fetch_channel, fold_events, fold_root, fold_root_planned, folded_from,
+    project_channel, tier_call, via_device, ChannelEvent, ChannelStore, ChannelTree,
+    CrossingAllowList, FoldLimits, FoldPlan, FoldReader, FoldTarget, TierAnswer, TierLimits,
+    TierProtocol, TierRequest, CHANNEL_EVENTS, TIER_ALPN,
 };
 use iroh::endpoint::Connection;
 use iroh::protocol::Router;
@@ -244,6 +244,71 @@ async fn fold_is_idempotent_by_event_cid() {
     assert_eq!(a_checkout.events().len(), 3);
 
     drop(connection);
+    a.close().await;
+    b.router.shutdown().await.expect("shutdown");
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn a_second_fold_uses_the_held_cid_index_without_a_store_parse() {
+    let h = household();
+    let b = serve_b(&h).await;
+    b.checkout
+        .append(berth_event("claim", "dev-integration", "sb", "1.0"));
+    let first = b.project(&allow());
+    let a = bind(&h.key_a, None, vec![]).await.expect("bind A");
+    let a_checkout = Checkout::new();
+    let state = tempfile::tempdir().expect("state");
+    let first_report = fold_root_planned(
+        &a,
+        b.addr.clone(),
+        FoldTarget {
+            device: &h.b.did,
+            since: None,
+            root: first.root(),
+            admission: None,
+            reader: FoldReader {
+                device: &h.a.did,
+                state_dir: state.path(),
+            },
+        },
+        &a_checkout.store(),
+        &allow(),
+        &TreeLimits::default(),
+        FoldPlan::default(),
+    )
+    .await
+    .expect("first fold");
+    assert_eq!(first_report.store_parses, 1);
+
+    b.checkout
+        .append(berth_event("release", "dev-integration", "sb", "2.0"));
+    let second = b.project(&allow());
+    let second_report = fold_root_planned(
+        &a,
+        b.addr.clone(),
+        FoldTarget {
+            device: &h.b.did,
+            since: Some(first.root()),
+            root: second.root(),
+            admission: None,
+            reader: FoldReader {
+                device: &h.a.did,
+                state_dir: state.path(),
+            },
+        },
+        &a_checkout.store(),
+        &allow(),
+        &TreeLimits::default(),
+        FoldPlan {
+            limits: FoldLimits::default(),
+            known: Some(&first_report.known),
+        },
+    )
+    .await
+    .expect("second fold");
+    assert_eq!(second_report.store_parses, 0);
+    assert_eq!(second_report.outcome.appended, 1);
+
     a.close().await;
     b.router.shutdown().await.expect("shutdown");
 }
