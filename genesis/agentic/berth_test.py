@@ -1449,7 +1449,10 @@ class StewardClaimTest(unittest.TestCase):
         from _lib import epr_client
         b = self.make()
         b.epr = None
-        with mock.patch.object(epr_client, "resolve_binary", return_value=str(self.epr)) as resolve:
+        # The shim path only: a caller's exported EPR_BIN (every gated push sets one) answers first.
+        with mock.patch.dict(os.environ), \
+                mock.patch.object(epr_client, "resolve_binary", return_value=str(self.epr)) as resolve:
+            os.environ.pop("EPR_BIN", None)
             self.assertEqual(b.epr_bin(), str(self.epr))
             resolve.assert_called_once()
         with mock.patch.dict(os.environ, {"ELOHIM_DEVICE_KEY_FILE": str(self.key)}):
