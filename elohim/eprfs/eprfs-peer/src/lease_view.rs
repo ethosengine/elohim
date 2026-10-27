@@ -39,14 +39,24 @@
 //! same store, which each entry proves by naming the CID of the last event it counted. (A head
 //! announced after a claim's stamp can still have been projected before the claim reached the
 //! store; a time comparison would take that head's acknowledgement for the claim's.) A claim older
-//! than the oldest logged head takes that head, conservatively. An offline-ok override, berth's
-//! `override` record naming the device it overrode, makes its holder's lease effective at once;
-//! on the other devices it is an ordinary lease and binds them.
+//! than the oldest logged head takes that head, conservatively. Even after confirmation, a bounded
+//! lease remains effective only while every other admitted device has supplied a head within
+//! `ttl_s - fence_margin_s` and that head acknowledges the first own head carrying the latest
+//! renew. A no-ttl daemon lease has no time fence, but its latest renew still needs coverage.
 //!
-//! Clocks: only a ttl and the confirm wait compare times. The wait compares this device's clock
-//! with its own claim's stamp. A folded lease's ttl counts from its holder's stamp but is read
-//! against this device's clock, so skew between the two shifts that expiry on this side only — by
-//! the skew, small beside a ttl of minutes.
+//! An offline-ok override, berth's `override` record naming a silent device, becomes effective only
+//! `ttl_s + max_skew_s + fence_margin_s` after this device last folded that device (or after the
+//! claim when it never did). The named silent device is the override's one exception to confirmation
+//! and the holder fence; every other admitted device must still cover the latest renew and remain
+//! fresh. A no-ttl lease can never become effective by override. On other devices an override is an
+//! ordinary lease and binds them.
+//!
+//! Clocks: a ttl, confirmation, holder fence and override wait compare times. Own waits and folds use
+//! this device's clock. A folded lease's ttl counts from its holder's stamp but is read against this
+//! device's clock; the override wait therefore budgets the rulebook's explicit `max_skew_s` before a
+//! second holder can become effective. The silent holder self-demotes by `TTL - margin` after last
+//! hearing the claimant; the claimant waits `TTL + skew + margin` after last hearing the holder, so
+//! at most one is effective during a partition, not merely after it.
 
 use std::collections::{BTreeMap, BTreeSet};
 
@@ -58,6 +68,7 @@ use crate::admission::Admission;
 use crate::allow::{single_slot, slots, via_device, KIND_SLOT, MEASURE_SLOT};
 use crate::error::PeerError;
 use crate::head_table::{HeadTable, OwnAnnounce};
+use crate::steward_scope::Settlement;
 
 /// The measure berth records are folded under (T1).
 pub const BERTH_EVENTS_MEASURE: &str = "dev-berth-events@1";
@@ -284,6 +295,10 @@ pub enum LeaseVerdict {
         session: String,
         device: String,
         last_seen: Option<u64>,
+        /// True when a formerly confirmed holder demoted itself at the holder fence.
+        fenced: bool,
+        /// When an offline override becomes eligible, unix milliseconds.
+        override_at: Option<u64>,
     },
     /// A peer acknowledged the carrying head but explicitly refused this claim CID.
     RefusedBy { session: String, device: String },
@@ -309,8 +324,10 @@ struct Lease {
     ttl_s: Option<u64>,
     /// The claim record's position in its store and its write time.
     written: u64,
+    /// The latest renew record's position, or the claim position before the first renew.
+    renewed_written: u64,
     claim_at: u64,
-    overriding: bool,
+    overrode: Option<String>,
     seen: BTreeMap<String, u64>,
     claim_cid: Cid,
 }
@@ -355,8 +372,9 @@ fn replay<'e>(
                 },
                 ttl_s: event.ttl_s,
                 written: event.written,
+                renewed_written: event.written,
                 claim_at: event.at,
-                overriding: false,
+                overrode: None,
                 seen: event.seen.clone(),
                 claim_cid: event.cid,
             }
@@ -372,6 +390,7 @@ fn replay<'e>(
                 Some(lease) => {
                     lease.since = event.at;
                     lease.ttl_s = event.ttl_s;
+                    lease.renewed_written = event.written;
                 }
                 None => {
                     open.insert(key, opened(event));
@@ -389,7 +408,7 @@ fn replay<'e>(
                     if event.overrode.is_some()
                         && event.claimed_at.is_none_or(|at| at == lease.claimed_at)
                     {
-                        lease.overriding = true;
+                        lease.overrode.clone_from(&event.overrode);
                     }
                 }
             }
@@ -418,7 +437,7 @@ pub fn steward_lease_view(
     heads: &HeadTable,
     admitted: &Admission,
     now: u64,
-    confirm_wait_s: u64,
+    settlement: Settlement,
 ) -> Result<BTreeMap<Resource, LeaseVerdict>, PeerError> {
     if !admitted.admits_device(me) {
         return Err(PeerError::NotAdmitted {
@@ -491,13 +510,30 @@ pub fn steward_lease_view(
                     .filter(|logged| logged.events >= lease.written)
                     .map(|logged| logged.seq)
                     .min();
+                // The first own head that carried the claim or its latest renew.
+                let renewed_carried = usable
+                    .iter()
+                    .filter(|logged| logged.events >= lease.renewed_written)
+                    .map(|logged| logged.seq)
+                    .min();
                 let preceding = theirs
                     .into_iter()
                     .filter(|other| precedes(other, &lease, carried, me))
                     .min_by(|x, y| x.precedence().cmp(&y.precedence()));
                 match preceding {
                     Some(other) => held_by(other),
-                    None => own_verdict(lease, carried, me, &others, heads, now, confirm_wait_s),
+                    None => own_verdict(
+                        lease,
+                        Carried {
+                            claim: carried,
+                            renew: renewed_carried,
+                        },
+                        me,
+                        &others,
+                        heads,
+                        now,
+                        settlement,
+                    ),
                 }
             }
             None => match theirs
@@ -611,20 +647,28 @@ fn held_by(lease: Lease) -> LeaseVerdict {
         device: lease.device,
         session: lease.session,
         since: lease.claimed_at,
-        overriding: lease.overriding,
+        overriding: lease.overrode.is_some(),
     }
 }
 
+/// The first own heads that carried a lease's claim and its latest renew (the claim's, before any
+/// renew), over this store.
+#[derive(Debug, Clone, Copy)]
+struct Carried {
+    claim: Option<u64>,
+    renew: Option<u64>,
+}
+
 /// This device's lease, preceded by no other: effective once every other admitted device
-/// acknowledged `carried`, the first own head that carried its claim.
+/// acknowledged the head that carried its claim, and its holder fence holds.
 fn own_verdict(
     lease: Lease,
-    carried: Option<u64>,
+    carried: Carried,
     me: &str,
     others: &BTreeSet<&str>,
     heads: &HeadTable,
     now: u64,
-    confirm_wait_s: u64,
+    settlement: Settlement,
 ) -> LeaseVerdict {
     let claim_cid = lease.claim_cid.to_string();
     if let Some(device) = others.iter().find(|device| {
@@ -653,30 +697,80 @@ fn own_verdict(
             session: lease.session,
             last_seen: heads.devices.get(*device).map(|head| head.folded_at),
             device: (*device).to_string(),
+            fenced: false,
+            override_at: None,
         };
     }
-    if lease.overriding {
-        return LeaseVerdict::Effective {
-            session: lease.session,
-        };
+    let override_at = lease.overrode.as_ref().and_then(|silent| {
+        lease.ttl_s.map(|ttl| {
+            let last_seen = heads
+                .devices
+                .get(silent)
+                .map_or(lease.claim_at, |head| head.folded_at);
+            let wait_s = ttl
+                .saturating_add(settlement.max_skew_s)
+                .saturating_add(settlement.fence_margin_s);
+            last_seen.saturating_add(wait_s.saturating_mul(1000))
+        })
+    });
+    let override_effective = override_at.is_some_and(|at| now >= at);
+    if let Some(silent) = lease.overrode.clone() {
+        if !override_effective {
+            return LeaseVerdict::Unconfirmed {
+                session: lease.session,
+                last_seen: heads.devices.get(&silent).map(|head| head.folded_at),
+                device: silent,
+                fenced: false,
+                override_at,
+            };
+        }
     }
     let waiting_on: Vec<String> = others
         .iter()
+        .filter(|device| lease.overrode.as_deref() != Some(**device) || !override_effective)
         .filter(|device| {
             let head = heads.devices.get(**device);
             let acked = head.and_then(|head| head.folded.get(me));
-            !matches!((carried, acked), (Some(seq), Some(&acked)) if acked >= seq)
+            !matches!((carried.claim, acked), (Some(seq), Some(&acked)) if acked >= seq)
         })
         .map(|device| (*device).to_string())
         .collect();
     let Some(silent) = waiting_on.first().cloned() else {
-        return LeaseVerdict::Effective {
-            session: lease.session,
+        let fence_after_s = lease
+            .ttl_s
+            .map(|ttl| ttl.saturating_sub(settlement.fence_margin_s));
+        let stale = others.iter().find(|device| {
+            if lease.overrode.as_deref() == Some(**device) && override_effective {
+                return false;
+            }
+            let Some(head) = heads.devices.get(**device) else {
+                return true;
+            };
+            let fresh = fence_after_s.is_none_or(|window| {
+                now.saturating_sub(head.folded_at) <= window.saturating_mul(1000)
+            });
+            let covered = matches!(
+                (carried.renew, head.folded.get(me)),
+                (Some(seq), Some(&acked)) if acked >= seq
+            );
+            !fresh || !covered
+        });
+        return match stale {
+            Some(device) => LeaseVerdict::Unconfirmed {
+                session: lease.session,
+                last_seen: heads.devices.get(*device).map(|head| head.folded_at),
+                device: (*device).to_string(),
+                fenced: true,
+                override_at: None,
+            },
+            None => LeaseVerdict::Effective {
+                session: lease.session,
+            },
         };
     };
     let deadline = lease
         .claim_at
-        .saturating_add(confirm_wait_s.saturating_mul(1000));
+        .saturating_add(settlement.confirm_wait_s.saturating_mul(1000));
     if now < deadline {
         LeaseVerdict::Pending {
             session: lease.session,
@@ -687,6 +781,8 @@ fn own_verdict(
             session: lease.session,
             last_seen: heads.devices.get(&silent).map(|head| head.folded_at),
             device: silent,
+            fenced: false,
+            override_at: None,
         }
     }
 }

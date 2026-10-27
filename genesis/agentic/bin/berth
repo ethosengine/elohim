@@ -52,14 +52,16 @@ Steward-scoped resources (pool-policy.json `berth.resources.<name>.scope: stewar
 device of one person, not this workspace alone: dev-integration, jenkins-dispatch, alpha-fleet and every
 `lane:<id>`. A claim on one writes its lease (a crossing record), then reads `epr peer leases --json`
 every 250 ms until the verdict leaves pending, at most `berth.channel.confirm_wait_s` (10 s): it is
-effective once every other admitted device has acknowledged it, at once when no other device is
-admitted. Otherwise it releases the lease and exits 3 with one reason line:
+effective once every other admitted device has acknowledged it and the holder fence has a recent
+head covering its latest renew, at once when no other device is admitted. A fenced renewal stays
+recorded but self-demotes and exits non-zero. A refused claim releases with one reason line:
   held by <device-did>/<session> since <YYYY-MM-DDTHH:MM:SSZ>
   unconfirmed: <device-did> last seen <n>s|<n>m|<n>h ago   (or: never seen)
---offline-ok takes an `unconfirmed` lease anyway and writes a `kind: override` row naming the silent
-device; it never overrides `held by`. `owner-check` reads the same view. A missing `epr` or a view it
-cannot compute refuses: an absent device is never read as a free resource. Container-scoped resources
-never ask a peer.
+--offline-ok writes a `kind: override` row naming the silent device; the lease remains unconfirmed
+until ttl + max skew + fence margin after that device was last seen, and a no-ttl lease never becomes
+effective by override. It never overrides `held by`. `owner-check` reads the same view. A missing
+`epr` or a view it cannot compute refuses: an absent device is never read as a free resource.
+Container-scoped resources never ask a peer.
 
 Lease classes (pool-policy.json `berth.classes.<resource>`; a resource with no table takes any class
 and gets no default ttl). The mesh lease is the dev berth's router:
@@ -107,6 +109,8 @@ DEFAULT_RESOURCES = {"mesh": 1, "cargo": 1, "disk-heavy": 1}
 DEFAULT_CLASS = "verify"
 DEFAULT_CONFIRM_WAIT_S = 10
 DEFAULT_FRESHNESS_S = 90
+DEFAULT_FENCE_MARGIN_S = 30
+DEFAULT_MAX_SKEW_S = 30
 POLL_S = 1.0  # how often a steward claim re-reads the lease view (each read parses the whole flow store)
 PEER_TIMEOUT_S = 10
 OVERRUN_MEASURE = "dev-berth-held-by-measure@1"
@@ -281,20 +285,21 @@ def load_capacities(path=POLICY_FILE):
 
 
 def load_steward(path=POLICY_FILE):
-    """(names, prefixes, confirm_wait_s, freshness_s, error): the steward-scoped resources
+    """(names, prefixes, confirm_wait_s, freshness_s, fence_margin_s, max_skew_s, error): the steward-scoped resources
     pool-policy.json declares (`berth.resources.<name>.scope: steward`; a key ending in `:` is a
     prefix) and the channel's waits. An absent file declares none. A file that does not parse, or an
     entry that is neither a capacity nor `{capacity, scope: container|steward}`, is an `error`: the
     policy can then not say which resources are shared, so every claim refuses naming it."""
     names, prefixes = set(), set()
     wait, fresh = DEFAULT_CONFIRM_WAIT_S, DEFAULT_FRESHNESS_S
+    margin, skew = DEFAULT_FENCE_MARGIN_S, DEFAULT_MAX_SKEW_S
     try:
         with open(path) as f:
             berth = json.load(f).get("berth") or {}
     except FileNotFoundError:
-        return names, prefixes, wait, fresh, None
+        return names, prefixes, wait, fresh, margin, skew, None
     except (OSError, ValueError, AttributeError) as e:
-        return names, prefixes, wait, fresh, f"{path} does not parse: {e}"
+        return names, prefixes, wait, fresh, margin, skew, f"{path} does not parse: {e}"
     try:
         for k, v in (berth.get("resources") or {}).items():
             if k.startswith("_") or isinstance(v, int):
@@ -309,9 +314,11 @@ def load_steward(path=POLICY_FILE):
         channel = berth.get("channel") or {}
         wait = int(channel.get("confirm_wait_s", wait))
         fresh = int(channel.get("freshness_s", fresh))
+        margin = int(channel.get("fence_margin_s", margin))
+        skew = int(channel.get("max_skew_s", skew))
     except (AttributeError, TypeError, ValueError) as e:
-        return set(), set(), wait, fresh, f"{path}: {e}"
-    return names, prefixes, wait, fresh, None
+        return set(), set(), wait, fresh, margin, skew, f"{path}: {e}"
+    return names, prefixes, wait, fresh, margin, skew, None
 
 
 def _rfc3339(ms):
@@ -325,7 +332,7 @@ def _peer_age(ms):
     return f"{secs}s" if secs < 120 else (f"{secs // 60}m" if secs < 7200 else f"{secs // 3600}h")
 
 
-def steward_reason(verdict, now_ms):
+def steward_reason(verdict, now_ms, fence_after_s=None):
     """The one reason line a refused steward claim prints, from its `epr peer leases` verdict:
     `held by <device>/<session> since <time>` or `unconfirmed: <device> last seen <age> ago`. The a2o
     steps for devices-share-one-berth match these words; this is their only formatter."""
@@ -333,6 +340,12 @@ def steward_reason(verdict, now_ms):
         return f"held by {verdict['device']}/{verdict['session']} since {_rfc3339(verdict['since'])}"
     if verdict.get("verdict") == "refused_by":
         return f"refused by {verdict['device']}"
+    if verdict.get("fenced"):
+        window = f" within {fence_after_s}s" if fence_after_s is not None else " recently"
+        return f"self-demoted: no head from {verdict['device']}{window}"
+    if verdict.get("override_at") is not None:
+        return (f"unconfirmed: {verdict['device']} — override effective at "
+                f"{_rfc3339(verdict['override_at'])}")
     seen = verdict.get("last_seen")
     if seen is None:
         return f"unconfirmed: {verdict['device']} never seen"
@@ -357,7 +370,8 @@ class Berth:
         self.policy_path = policy_path
         self.capacities, self.mooring_ttl_s, self.classes = load_policy(policy_path)
         (self.steward_names, self.steward_prefixes,
-         self.confirm_wait_s, self.freshness_s, self.policy_error) = load_steward(policy_path)
+         self.confirm_wait_s, self.freshness_s, self.fence_margin_s,
+         self.max_skew_s, self.policy_error) = load_steward(policy_path)
         self.epr = None  # injectable: the `epr` a steward claim asks; else resolved like the fold emitter
         # The device's channel store (`epr peer leases` names it): steward records are written there,
         # so they cross. None until the view was read, or when this workspace is not a device.
@@ -1069,7 +1083,7 @@ class Berth:
         alternative unless `override` (MEASURE_ON_DEV_BERTH=1) declares the hold — then it claims,
         writes a `kind: override` row and emits dev-berth-held-by-measure@1 = ttl immediately.
         A steward-scoped resource is then settled across this person's devices (`_settle_steward`);
-        `offline_ok` takes an `unconfirmed` one anyway, on the record.
+        `offline_ok` records a delayed override of an `unconfirmed` one.
         A steward record that cannot reach the device's channel store refuses a claim, and leaves a
         renew held but returns ok=None: kept here, not confirmed to the other devices.
         Raises BerthUsage for a mis-stated claim (unknown class, override without --ttl)."""
@@ -1099,8 +1113,9 @@ class Berth:
             steward, seen, renewing, refused = self._steward_precheck(resource, session, klass)
             if refused:
                 return False, None, refused
-            if renewing == "effective":
-                # Effective once, effective for its life: a renew does not settle again.
+            if renewing == "unreadable":
+                # Preserve a held lease when the view itself is unavailable. The renew is still
+                # recorded, and the fold failure below says it was not confirmed elsewhere.
                 steward = False
         with self._locked():
             ok, lease, reason = self._claim_locked(resource, session, note, ttl_s if explicit_ttl else None,
@@ -1260,6 +1275,13 @@ class Berth:
                     self.record("refuse", resource=resource, session=session, reason="owner", action=action,
                                 holder=f"{verdict['device']}/{verdict['session']}")
                     return False, [verdict], steward_reason(verdict, self._view_now(view))
+                if verdict.get("verdict") == "unconfirmed":
+                    mine = self._mine(resource, session)
+                    fence_after_s = None
+                    if verdict.get("fenced") and mine and mine.get("ttl_s") is not None:
+                        fence_after_s = max(0, int(mine["ttl_s"]) - self.fence_margin_s)
+                    return False, [verdict], steward_reason(
+                        verdict, self._view_now(view), fence_after_s)
         with self._locked():
             live = self.live_leases(self.leases(), resource)
             others = [l for l in live if l.get("holder") != session]
@@ -1413,15 +1435,16 @@ class Berth:
 
     def _steward_precheck(self, resource, session, klass):
         """Before any steward lease is written: (steward, seen, renewing, refusal). A lease this session
-        already holds as effective is renewed locally (renewing = "effective"). Otherwise the view is
-        read first: a workspace that is not a device claims container-scoped, with one line; a revoked
-        device, a view that cannot be read, or another device's lease already in it refuses, and nothing
-        is written. `seen` is what this device had folded, carried by the claim it writes."""
+        already holds is still read and settled after its renew; an unreadable view preserves the old
+        effective lease but reports that its renew was not confirmed. A workspace that is not a device
+        claims container-scoped, with one line; a revoked device or another device's lease already in
+        the view refuses, and nothing is written. `seen` is what this device had folded, carried by the
+        claim it writes."""
         mine = self._mine(resource, session)
-        if mine and mine.get("effective"):
-            return True, None, "effective", None
         view, err = self.peer_leases()
         if err:
+            if mine and mine.get("effective"):
+                return True, None, "unreadable", None
             if not self.epr_bin():
                 self.record("refuse", resource=resource, session=session, reason="no-epr", **{"class": klass})
             return True, None, False, err
@@ -1445,23 +1468,29 @@ class Berth:
                 self._release(resource, session, reason=f"steward: {reason}")
             return True, None, False, reason
         seen = view.get("seen") if isinstance(view.get("seen"), dict) else {}
-        return True, seen, "pending" if mine else False, None
+        return True, seen, "renewing" if mine else False, None
 
-    def _mark_effective(self, resource, session):
+    def _mark_effective(self, resource, session, effective=True):
         with self._locked():
             leases = self.leases()
             for lease in [leases.get(resource)] + leases.get(resource + "/slots", []):
                 if isinstance(lease, dict) and lease.get("holder") == session:
-                    lease["effective"] = True
+                    lease["effective"] = effective
             self._write_leases(leases)
+
+    def _has_offline_override(self, resource, session, claimed_at):
+        return any(row.get("kind") == "override" and row.get("resource") == resource
+                   and row.get("session") == session and row.get("claimed_at") == claimed_at
+                   and row.get("overrode") for row in self.ledger(0))
 
     def _settle_steward(self, resource, session, lease, offline_ok, renewal=False):
         """The lease is written (it crosses on this device's next head); read the view until it leaves
         pending, within confirm_wait_s (plus one second's grace; each read is given only the time left).
-        Effective → claimed, and remembered as effective. held by → refused. unconfirmed → refused, or
-        with offline_ok taken anyway with an override row naming the silent device. A refusal releases
-        the lease, so a claim that did not hold never blocks anyone — except that a renew is released
-        only when another device's lease holds it, never on a view it could not read or confirm."""
+        Effective → claimed, and remembered as effective. held by → refused. unconfirmed → refused;
+        offline_ok keeps it unconfirmed and writes the delayed override naming the silent device. A
+        refusal releases the lease, so a claim that did not hold never blocks anyone — except that a
+        renew is released only when another device's lease holds it, never on a view it could not read
+        or confirm."""
         deadline = self.now() + self.confirm_wait_s + 1
         while True:
             view, err = self.peer_leases(timeout=min(PEER_TIMEOUT_S, deadline - self.now()))
@@ -1486,8 +1515,13 @@ class Berth:
             self._mark_effective(resource, session)
             return True, lease, "renewed" if renewal else "claimed"
         elif kind == "unconfirmed":
-            reason = steward_reason(verdict, self._view_now(view))
-            if offline_ok:
+            fence_after_s = None
+            if verdict.get("fenced") and lease.get("ttl_s") is not None:
+                fence_after_s = max(0, int(lease["ttl_s"]) - self.fence_margin_s)
+                self._mark_effective(resource, session, False)
+            reason = steward_reason(verdict, self._view_now(view), fence_after_s)
+            if (offline_ok and not verdict.get("fenced")
+                    and not self._has_offline_override(resource, session, lease.get("claimed_at"))):
                 self.record("override", resource=resource, session=session, holder=session,
                             claimed_at=lease.get("claimed_at"), overrode=verdict.get("device"),
                             last_seen=verdict.get("last_seen"), reason=f"--offline-ok over {reason}",
@@ -1496,8 +1530,13 @@ class Berth:
                 if failed:
                     self._release(resource, session, reason=f"steward: {failed[0]}")
                     return False, None, failed[0]
-                self._mark_effective(resource, session)
-                return True, lease, f"claimed over a silent device; {reason} — override on the record"
+                delayed, delayed_err = self.peer_leases()
+                delayed_verdict = (delayed or {}).get(resource)
+                if delayed_err:
+                    reason = f"override on the record, but {delayed_err}"
+                elif isinstance(delayed_verdict, dict):
+                    reason = steward_reason(delayed_verdict, self._view_now(delayed))
+                return False, None, f"{reason} — override on the record"
         else:
             waiting = (verdict.get("waiting_on") or ["another device"])[0]
             reason = f"unconfirmed: {waiting} did not acknowledge within {self.confirm_wait_s}s"
@@ -1572,7 +1611,15 @@ def render_status(b):
             desc = ", ".join(_lease_description(lease, now) for lease in holder) or "free"
             lines.append(f"    {res:<11} {len(holder)}/{caps.get(res, 1)}  {desc}")
         elif holder:
-            lines.append(f"    {res:<11} {_lease_description(holder, now)}")
+            verdict = (view or {}).get(res)
+            if (isinstance(verdict, dict) and verdict.get("verdict") == "unconfirmed"
+                    and verdict.get("session") == holder.get("holder")):
+                fence_after_s = None
+                if verdict.get("fenced") and holder.get("ttl_s") is not None:
+                    fence_after_s = max(0, int(holder["ttl_s"]) - b.fence_margin_s)
+                lines.append(f"    {res:<11} {steward_reason(verdict, now_ms, fence_after_s)}")
+            else:
+                lines.append(f"    {res:<11} {_lease_description(holder, now)}")
         else:
             raw = b.raw_lease(res)
             if raw and raw.get("holder"):

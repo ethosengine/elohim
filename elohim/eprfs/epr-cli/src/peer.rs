@@ -608,9 +608,12 @@ fn leases(options: &Options) -> PeerResult<ExitCode> {
         )));
     }
     let now = unix_ms();
+    let settlement = scope.settlement();
     let mut out = serde_json::Map::new();
     out.insert("now".into(), now.into());
-    out.insert("confirm_wait_s".into(), scope.confirm_wait_s().into());
+    out.insert("confirm_wait_s".into(), settlement.confirm_wait_s.into());
+    out.insert("fence_margin_s".into(), settlement.fence_margin_s.into());
+    out.insert("max_skew_s".into(), settlement.max_skew_s.into());
     let standing = match standing(&root, options.handle.as_deref())? {
         Standing::Device(device) => device,
         Standing::NotADevice(why) => {
@@ -647,14 +650,7 @@ fn leases(options: &Options) -> PeerResult<ExitCode> {
     let store = elohim_epr_rea::SidecarFlowStore::open(&root)
         .map_err(|e| PeerCliError::Peer(PeerError::FlowStore(e)))?;
     let events = lease_events(&store)?;
-    let mut view = steward_lease_view(
-        &did,
-        &events,
-        &table,
-        &admission,
-        now,
-        scope.confirm_wait_s(),
-    )?;
+    let mut view = steward_lease_view(&did, &events, &table, &admission, now, settlement)?;
     // The other devices as this one has folded them (berth status lists their moorings beside
     // the leases above), replayed in each device's own order, as the leases are.
     let others = other_devices(&did, &events, &table, &admission)?;
