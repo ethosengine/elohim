@@ -282,7 +282,8 @@ class LeaseClassTest(unittest.TestCase):
         self.assertEqual(b.classes["mesh"]["verify"], {"default_ttl_s": 1800, "max_ttl_s": 3600})
         self.assertIs(b.classes["mesh"]["measure"]["allowed"], False)
         self.assertEqual(b.mooring_ttl_s, 10800)
-        self.assertNotIn("cargo", b.classes)
+        # cargo declares the language server's short class beside plain verify (3899eb7f9).
+        self.assertEqual(b.classes["cargo"], {"verify": {}, "lsp": {"default_ttl_s": 600, "max_ttl_s": 900}})
 
     def test_defaults_on_mesh_not_cargo(self):
         ok, lease, _ = self.berth.claim("mesh", "dev")
@@ -934,6 +935,34 @@ class WorktreeIntentTest(unittest.TestCase):
         self.answer(not_a_device())
         self.berth.say("session", "/intent local")
         self.assertEqual(self.obs.events[-1]["root"], str(self.worktree))
+
+    def test_say_names_a_note_that_did_not_cross(self):
+        out = view()
+        out["store"] = str(self.main)
+        self.answer(out)
+        main = _NS["main"]
+        g = main.__globals__
+        saved = g["Berth"]
+        g["Berth"] = lambda *a, **k: self.berth
+        self.addCleanup(g.__setitem__, "Berth", saved)
+
+        def say(text):
+            err = io.StringIO()
+            with contextlib.redirect_stderr(err):
+                rc = main(["berth", "say", "--session", "session", "--to", "peer-2", text])
+            return rc, err.getvalue()
+
+        rc, err = say("hello")
+        self.assertEqual(rc, 0, err)
+        self.assertEqual(self.obs.events[-1]["root"], str(self.main))
+        # The emitter writes nothing (no `epr` resolved): the note stays in this berth's ledger, and
+        # the exit says no other device will read it.
+        self.obs.emit = lambda *a, **k: False
+        rc, err = say("unheard")
+        self.assertEqual(rc, 1, err)
+        self.assertIn("berth say: said here, but the note record did not reach this device's channel store", err)
+        self.assertIn("no other device will read it", err)
+        self.assertEqual([r["text"] for r in self.berth.ledger(10) if r["kind"] == "note"], ["hello", "unheard"])
 
 
 class StewardClaimTest(unittest.TestCase):

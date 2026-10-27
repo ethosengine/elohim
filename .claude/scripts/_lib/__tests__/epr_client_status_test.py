@@ -16,6 +16,14 @@ def test_native_status_supplies_exact_path_and_cid():
     assert run.call_args.kwargs['env']['BIN_STORE'] == '/private/store'
 
 
+def test_a_multi_binary_release_resolves_by_its_manifest_cid():
+    # epr + bin-launch releases are addressed by their DAG-CBOR sums manifest (bafyrei…). Accepting
+    # only bafkrei… left every hook on such a device with no epr at all.
+    value = '{"resolved":"/device/cid/epr","resolvedCid":"bafyreifixture"}'
+    with patch.object(subprocess, 'run', return_value=subprocess.CompletedProcess([], 0, value, '')):
+        assert epr_client.resolve({}) == ('/device/cid/epr', 'bafyreifixture')
+
+
 def test_absent_or_legacy_identity_is_absence():
     for value in ['{}', '{"resolved":"/x","resolvedCid":"sha256:abc"}']:
         with patch.object(subprocess, 'run', return_value=subprocess.CompletedProcess([], 0, value, '')):

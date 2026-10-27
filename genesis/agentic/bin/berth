@@ -80,7 +80,8 @@ ancestry or runtime environment key participates. A mooring expires
 `ttl` seconds after its last touch (pool-policy `berth.mooring_ttl_s`, default 3 h); a lease expires
 `ttl_s` after its last claim or renew. An expired lease can be taken over, and the takeover is on the
 record with `expired_after_s`. Exit codes: 0 ok · 1 a renew, release or unmoor done here whose record
-did not reach this device's channel store (named; the other devices still hold the earlier terms) · 2 usage · 3 refused (held by a live mooring, a class
+did not reach this device's channel store (named; the other devices still hold the earlier terms), or a
+note said here that no other device will read · 2 usage · 3 refused (held by a live mooring, a class
 this berth does not run, a ttl past the class's cap, a class transition, an owner check) · 4 no session
 resolvable (or ambiguous), or the store itself cannot be opened (a guest sandbox: EACCES/ENOENT on
 the lock or dir) — the only code a wrapper may proceed past, unleased.
@@ -535,7 +536,10 @@ class Berth:
                 landed = bool(obs.emit(EVENTS_MEASURE, ".", 1, reason=kind, env=env, root=root))
         except Exception:
             landed = False
-        if not landed and steward and self.channel_root and root == self.channel_root:
+        # A note bound for the channel store is a crossing record too: one the emitter could not write
+        # (no `epr` resolved, a refusal) stays in this berth's ledger, where no other device reads it.
+        crossing = steward or (kind == "note" and resource is None)
+        if not landed and crossing and self.channel_root and root == self.channel_root:
             self._fold_failed(kind, ev, "`epr flow note` did not write it")
         return landed
 
@@ -1738,6 +1742,10 @@ def _main(argv):
             print("usage: berth say --session S [--to SESSION] TEXT", file=sys.stderr)
             return 2
         b.say(session, text, to=to)
+        failed = b.take_fold_failures(None)
+        if failed:
+            print(f"berth say: said here, but {failed[0]} — no other device will read it", file=sys.stderr)
+            return 1
         return 0
     print(__doc__.split("Commands:")[1].split("Resources")[0])
     return 2

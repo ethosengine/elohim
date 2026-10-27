@@ -65,7 +65,9 @@ def resolve(env: dict[str, str] | None = None) -> tuple[str | None, str | None]:
             return None, None
         status = json.loads(result.stdout)
         path, cid = status.get("resolved"), status.get("resolvedCid")
-        if isinstance(path, str) and isinstance(cid, str) and cid.startswith("bafkrei"):
+        # A release is addressed bafkrei… (one binary, raw) or bafyrei… (a DAG-CBOR sums manifest:
+        # epr with bin-launch); anything else is a legacy sha256 identity, an absence.
+        if isinstance(path, str) and isinstance(cid, str) and cid.startswith(("bafkrei", "bafyrei")):
             return path, cid
         return None, None
     except Exception:  # noqa: BLE001 — resolution is best-effort; absence is a valid answer

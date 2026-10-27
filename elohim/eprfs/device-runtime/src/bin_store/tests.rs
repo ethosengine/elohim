@@ -2329,6 +2329,18 @@ fn epr_release_carries_its_launcher_and_resolves_from_explicit_custody() {
 }
 
 #[test]
+fn bootstrap_upgrades_same_commit_legacy_current_to_complete_inventory() {
+    let mut f = Fixture::new("epr");
+    let old = f.release("epr-only");
+    f.land(&old).unwrap();
+    f.store.config.bins.push("bin-launch".into());
+    let pair = f.release("complete-pair");
+    assert!(f.store.verified(&old.cid), "the epr-only current still verifies");
+    f.store.bootstrap(f.tmp.path(), None).unwrap();
+    assert_eq!(f.store.head("current"), Some(pair.cid));
+}
+
+#[test]
 fn historical_pin_resolves_but_land_and_bootstrap_require_full_inventory() {
     let mut f = Fixture::new("epr");
     let old = f.release("legacy-only");

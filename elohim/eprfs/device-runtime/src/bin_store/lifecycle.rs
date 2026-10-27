@@ -123,7 +123,9 @@ impl Store {
         self.repair_heads()?;
         if let Some(cid) = self
             .head("current")
-            .filter(|c| self.root.join("current.json").is_file() && self.verified(c))
+            // Admissible, not merely verified: a same-commit epr-only current would otherwise
+            // stand forever once the declaration adds bin-launch.
+            .filter(|c| self.root.join("current.json").is_file() && self.admissible(c))
         {
             return self
                 .record(&cid)
