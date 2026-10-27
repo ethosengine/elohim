@@ -372,7 +372,7 @@ dev action="status" profile="isolated" seed="false" build="false":
     esac
 
 # Manage or measure the local multi-peer mesh. Safe default: status.
-mesh action="status" *args:
+mesh action="status" *args="":
     #!/usr/bin/env bash
     set -euo pipefail
     case "{{ action }}" in
