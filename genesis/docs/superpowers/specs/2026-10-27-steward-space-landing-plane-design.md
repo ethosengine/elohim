@@ -823,6 +823,16 @@ These forks are not parked for the operator. Per the operator ruling of 2026-10-
     - The operator describes GitHub branches, PRs and Jenkins branches as **"BIG friction"** that does not move toward native P2P CI/CD.
   - **Falsifier:** the bundle path cannot carry a 40 h sprint's offers within the tier's limits—leaf size and store growth. Then `refs/offers/<lane>` becomes primary.
   - **Interface:** carrier is a field of the offer record: `carrier: bundle:<cid> | ref:refs/offers/<lane>`. Switching is data.
+- **D4 (A0 probe 1, A8 gate, 2026-10-27): A8 proceeds. Sibling devices compute identical closure keys for a clean commit, so a sibling's green verdict names the same inputs. The only remaining barrier is the self-signer check in `reusableHit` (`genesis/orchestrator/gate-evidence.mjs`), which A8's `binds-signer` roster row replaces.**
+  - **Alternatives:**
+    - Hold A8 until closure keys are printed by `gate-runner` itself rather than a probe script.
+    - Drop sibling reuse and let each device gate every closure.
+  - **Evidence that chose it:**
+    - Ethosengine and shem each computed the six `gate_reuse` closure keys at `c827533ab` in fresh detached worktrees with brit, rakia and sophia checked out. All six matched to 16 hex: elohim-storage `21e704c38ac63719`, doorway `81ca83d8f1374e93`, steward-node `20d11c751837eece`, elohim-epr `1e5b86ad0a9a1219`, eprfs `d020d86776011b2a`, orchestrator `726df8d68401e390`.
+    - Shem wrote its probe from the described method; no code crossed in a note, so the match is not one script agreeing with itself.
+  - **Caveats the probe found:** a full 40-hex SHA as the commit fails every cargo fingerprint, while `HEAD` in a clean worktree works; a dirty checkout reads `source closure dirty`. Both belong in a future `gate-runner --closure` print mode.
+  - **Falsifier:** any later probe or A8 reuse where the two devices disagree on a key at the same clean commit. Reuse then refuses for that project until the input that differs is declared.
+  - **Interface:** reuse stays per project behind `pool-policy.json gate_reuse`, and every reused verdict is labelled `independence: sibling` and never counted in k-of-n, so withdrawing it is a policy edit.
 
 ## Appendix: minor findings and dispositions
 | Finding | Disposition |
