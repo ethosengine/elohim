@@ -55,7 +55,8 @@ pub use announce::{
     topic_for, Channel, HeadVerdict, ANNOUNCE_DEBOUNCE, REANNOUNCE_EVERY, TOPIC_PREFIX,
 };
 pub use channel::{
-    channel_tier_id, project_channel, ChannelStore, ChannelTree, CHANNEL_EVENTS, RETAINED_ROOTS,
+    channel_tier_id, project_channel, project_channel_with_nacks, ChannelStore, ChannelTree,
+    CHANNEL_EVENTS, CHANNEL_NACKS, RETAINED_ROOTS,
 };
 pub use connections::{ConnectionBook, NOT_ADMITTED};
 pub use daemon::{
@@ -66,14 +67,15 @@ pub use endpoint::{bind, bind_on, peer_from_arg, relay_from_env, relay_from_valu
 pub use error::PeerError;
 pub use fold::{
     fetch_channel, fold_events, fold_root, folded_from, ChannelEvent, Fetched, FoldLimits,
-    FoldOutcome, FoldReport, FoldTarget, MAX_EVENT_BYTES, MAX_FOLD_BYTES, MAX_FOLD_EVENTS,
+    FoldOutcome, FoldReader, FoldReport, FoldTarget, Quarantined, MAX_EVENT_BYTES, MAX_FOLD_BYTES,
+    MAX_FOLD_EVENTS,
 };
 pub use gate::{SharedAdmission, StewardDevicesGate};
 pub use gossip::GatedGossip;
 pub use head::{ChannelHead, HeadSigner, MAX_HEAD_BYTES};
 pub use head_table::{
-    ChannelCounters, DeviceHead, DroppedHeads, HeadTable, OwnAnnounce, StorePlace,
-    HEAD_TABLE_VERSION, OWN_LOG_LEN,
+    ChannelCounters, DeviceHead, DroppedHeads, HeadTable, NackLeaf, NackState, OwnAnnounce,
+    StorePlace, HEAD_TABLE_VERSION, MAX_NACK_CIDS, OWN_LOG_LEN,
 };
 /// The iroh address types a dialer names peers with, so a consumer needs no iroh dependency of
 /// its own.

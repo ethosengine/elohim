@@ -290,6 +290,7 @@ async fn flow_fold_folds_a_devices_channel_root_once_and_status_reads_it() {
             folded: Default::default(),
             folded_at: 1,
             events_folded: 1,
+            nack: Default::default(),
         },
     );
     // Connections A refused: three of B's (say after a Contest), and strangers' in one total.

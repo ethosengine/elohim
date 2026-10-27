@@ -863,7 +863,10 @@ else: b.touch(session,pid=4101)
                 r=subprocess.run([sys.executable,str(f.base/'exec.py'),str(BINARY),'session','gc','--json'],
                     cwd=f.root,env={**f.env(),'BERTH_DIR':str(store_b)},capture_output=True,text=True)
                 if missing:
-                    assert r.returncode!=0 and 'envelope-berth-unreachable' in r.stderr and f.id('claude') in r.stderr,r
+                    # gc reports an unclosable record in `failed` and keeps sweeping the rest.
+                    failed=json.loads(r.stdout)['failed']
+                    assert r.returncode!=0 and [x['session'] for x in failed]==[f.id('claude')],r
+                    assert 'envelope-berth-unreachable' in failed[0]['error'],r
                     assert path.read_bytes()==before
                     (f.base/'unreachable-berth').rename(store_a)
                     f.run([BINARY,'session','gc','--json'],extra_env={'BERTH_DIR':str(store_b)})

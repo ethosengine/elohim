@@ -18,7 +18,9 @@ use iroh_gossip::proto::TopicId;
 use crate::admission::Admission;
 use crate::error::PeerError;
 use crate::head::{ChannelHead, HeadSigner};
-use crate::head_table::{ChannelCounters, DeviceHead, HeadTable, OwnAnnounce, OWN_LOG_LEN};
+use crate::head_table::{
+    ChannelCounters, DeviceHead, HeadTable, NackLeaf, OwnAnnounce, OWN_LOG_LEN,
+};
 
 /// How long a change waits for others before it is announced.
 pub const ANNOUNCE_DEBOUNCE: Duration = Duration::from_secs(1);
@@ -91,6 +93,20 @@ impl Channel {
 
     pub fn table(&self) -> &HeadTable {
         &self.table
+    }
+
+    /// Add refusals for `author`. True only when the projected nack set changed.
+    pub fn nack(
+        &mut self,
+        author: &str,
+        refused: impl IntoIterator<Item = String>,
+        quarantined: impl IntoIterator<Item = String>,
+    ) -> bool {
+        let state = self.table.nacks.entry(author.to_string()).or_default();
+        let before = state.clone();
+        state.refused.extend(refused);
+        state.quarantined.extend(quarantined);
+        *state != before
     }
 
     /// The channel-health counters, for the daemon to record projection and fold failures in.
@@ -169,7 +185,14 @@ impl Channel {
     /// Record that `head` (judged [`HeadVerdict::Fold`]) was folded, appending `appended` events,
     /// at `folded_at` (this device's clock, unix milliseconds). When its root moved, a
     /// re-announce is scheduled so the acknowledgement reaches its device.
-    pub fn folded(&mut self, head: &ChannelHead, appended: u64, folded_at: u64, now: Instant) {
+    pub fn folded(
+        &mut self,
+        head: &ChannelHead,
+        appended: u64,
+        nack: NackLeaf,
+        folded_at: u64,
+        now: Instant,
+    ) {
         let previous = self.table.devices.get(&head.device);
         let moved = previous.is_none_or(|previous| previous.root != head.root);
         let events_folded = previous.map_or(0, |previous| previous.events_folded) + appended;
@@ -182,6 +205,7 @@ impl Channel {
                 folded: head.folded.clone(),
                 folded_at,
                 events_folded,
+                nack,
             },
         );
         if moved {

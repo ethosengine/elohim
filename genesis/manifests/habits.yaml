@@ -2137,10 +2137,10 @@ habits:
       - "a2o @concern:devices-share-one-berth (genesis/a2o/features/devflow/devices-share-one-berth.feature, two devices in one container: a held claim refused naming the holder; a push stopped while the other device holds dev-integration, alpha-fleet or jenkins-dispatch; a silent device read as unconfirmed; an override that binds the returning device; concurrent claims settled once; a retired device's lease dropped without restart; @act:host; cd genesis/a2o && pnpm exec cucumber-js --tags '@concern:devices-share-one-berth and not @requires:shem and not @wip'. it selects all ten in-container scenarios)"
       - "a2o @concern:devices-share-one-berth and @requires:shem (the same feature's cross-workspace scenario: the held-claim refusal between the ethosengine and shem workspaces over their own link, no coordination record carried by git, a shared server or the operator; holder/contender halves selected by A2O_T8_ROLE, held when unset; green requires the joined real-workspace receipt)"
     evidence: >
-      DELTA 2026-10-26 (GREEN; T8 joined receipt, run t8-20261025-03): the cross-workspace scenario passed on both real devices over their own iroh link through relay.alpha.elohim.host. Holder ethosengine (did:key:z6MkpZRh…, node 95e41161…, dev b940dfe30 + fixture 9fab45cfb, epr bafkreifpvyu…): 10/10 steps. Contender shem (did:key:z6Mkm5de…, node 4370a806…, dev 5a9e9f5a5, epr bafkreih7…): 10/10 steps. The contender's claim exited 3 naming the holder's device and session; after the release crossed, its claim exited 0. `tsx scripts/t8-receipt.ts t8-20261025-03` printed PASS (receipt.json, holder.json sha256 71d8ca08…). Getting here needed: ethosengine's PeerEndpoint row (b940dfe30, steward-confirmed); worktree moorings crossing before the channel is cached (5a9e9f5a5); and the fixture declaring its moored session (9fab45cfb, landing from ethosengine).
-    evidence-fingerprint: sha256:bc0c8f8d3b3978b3
-    evidence-bytes: 13926
-    evidence-entries: 16
+      DELTA 2026-10-27 (GREEN preserved; steward-space spec A2a + gc): one oversized or newer-schema record no longer wedges a peer's fold. Faulty leaves are quarantined per record (bytes device-private), each device projects `channel/nacks/<author>` so a head ack reads "folded you to s, except these", a nacked claim reads `refused by <peer>` (never effective), and an author's fold advances past a quarantined leaf only when its mooring carries `env:reads=nacks/1`. `cargo test -p eprfs-peer` incl. `fold_quarantine_and_nack` and daemon 8/8; `just gate eprfs` green. Also `epr session gc` now closes every dead owner it can and names the rest (four leaked T8 holder sessions had kept every dead envelope open). The inbox now frames another device's words as untrusted text and its hook output carries no command.
+    evidence-fingerprint: sha256:0c963e9ee28fc324
+    evidence-bytes: 15595
+    evidence-entries: 18
     refs:
       - "spec: genesis/docs/superpowers/specs/2026-10-23-workspaces-cooperate-as-devices-design.md §3.4 (steward-scoped resources, effectiveness, tie-break, refusal wording), §3.5 (pre-push claims dev-integration), §6 (this habit)"
       - "plan: genesis/docs/superpowers/plans/2026-10-23-workspaces-cooperate-as-devices-plan.md (T0 story and habit; T6 lease view; T7 pre-push and status; T8 the cross-workspace receipt that flips this green)"
@@ -2373,3 +2373,33 @@ habits:
     retire-when: >
       when all first-party crates have zero active-rule debt and the ordinary compiler/governance
       gates enforce these same properties without a separate Git debt ratchet
+
+  - id: sprint-lands-each-closure-once
+    declared: genesis/orchestrator/.epr-meta/sprint-lands-each-closure-once.habit.md
+    invariant: >
+      Within one steward's grant: a closure is gated once across his devices; a backlog item is
+      claimed by one actor; a handoff carries bytes, never prose; dev-integration is held only for the
+      CAS window; a dormant author never blocks the queue; every dev tip names the landing intents it
+      carries; the one Jenkins verdict on that tip reaches every device's fold; no change to the gate is
+      judged by its own candidate bytes; and a said obligation reaches an actor who can act on it, or its
+      sender learns by exit code that it did not.
+    status: red
+    active: false
+    checks:
+      - "a2o @concern:sprint-lands-each-closure-once (genesis/a2o/features/devflow/landing-queue.feature, @act:host): duplicate claim refused naming holder; offer fetched by oid; sibling green reused and labelled independence:sibling; intent queues, never refused; dormant head skipped and the next lands within dormant_after_s+600s; CAS lease < 120 s; edge-selecting train waits on alpha-fleet during an edge wave; governance-class change judged by base recipe; red with no local repro reverts nothing; note to lane:X reaches its current holder"
+      - "the same tag and @requires:shem (joined real-workspace receipt)"
+      - "node --test genesis/orchestrator/gate-evidence.test.mjs (sibling-signer cases)"
+      - "per-sprint bounds over gate-cycle-seconds@1 + delivery-series.mjs: duplicate gated closures = 0, duplicate claims = 0, lease p90 < 120 s, >= 2 intents per Jenkins wave (unwired until A0)"
+    evidence: >
+      DELTA 2026-10-27 (BORN red, inactive): nothing in the invariant is kept yet. The 2026-10-27 overnight evidence: both devices fixed the same eprfs reds (no claim crossed), a fix crossed as prose and was re-typed, shem's push held dev-integration for 3 h+ and was refused three times, and the orchestrator ran 8 consecutive FAILUREs at 2.4-4.7 h each. landing-queue.feature is not written. Inactive because the WIP fence is full; it is the upstream station of push-delivers-within-budget.
+    evidence-fingerprint: sha256:2d1ebe69da6cfcdc
+    evidence-bytes: 486
+    evidence-entries: 1
+    refs:
+      - "spec: genesis/docs/superpowers/specs/2026-10-27-steward-space-landing-plane-design.md (§2 Arm A slices A0-A13; §3 this habit and the WIP fence)"
+      - "upstream of: genesis/orchestrator/.epr-meta/push-delivers-within-budget.habit.md (active red; A9/A10 move its measured ratio)"
+      - "sibling: genesis/agentic/.epr-meta/devices-share-one-berth.habit.md (channel reliability stations)"
+    retire-when: >
+      landing intents, verdicts and change-class acceptance are served by brit-native integrate over the
+      dataplane in a collective space (S2), so this repo-local queue adds no information; or it retires
+      together with push-delivers-within-budget.

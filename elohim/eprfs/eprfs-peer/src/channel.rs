@@ -1,10 +1,11 @@
-//! The channel tree: a projection of this device's crossing events, and the store the tier ALPN
-//! serves it from (spec §3.3).
+//! The channel tree: a projection of this device's crossing events and nack leaves, and the store
+//! the tier ALPN serves them from (spec §3.3).
 //!
-//! The tree is `channel/events/<event-cid>`; each leaf is one FlowEvent's canonical dag-cbor
+//! Events sit at `channel/events/<event-cid>`; each leaf is one FlowEvent's canonical dag-cbor
 //! bytes, held under the raw codec eprfs-core requires of leaves, so a leaf's digest is the digest
-//! of the event's own atom CID, which names it. It is rebuilt from the flow store and the
-//! allow-list, never edited: Ephemeral (C), with the flow store as its source of truth.
+//! of the event's own atom CID, which names it. Nacks sit at `channel/nacks/<author>` and name the
+//! event CIDs this device refused from that author. The tree is rebuilt from the flow store, the
+//! allow-list and private nack state, never edited: Ephemeral (C), with those records as its source.
 //!
 //! [`ChannelStore`] is the only store `epr peer serve` hands the tier. It holds channel trees and
 //! nothing else — never the repository's eprfs store, never recall, session or memory stores — so
@@ -12,7 +13,7 @@
 //! a peer can diff from the root it last folded; an older base is answered as unknown and the peer
 //! lists the new root instead.
 
-use std::collections::{HashMap, HashSet, VecDeque};
+use std::collections::{BTreeMap, HashMap, HashSet, VecDeque};
 use std::sync::RwLock;
 
 use async_trait::async_trait;
@@ -27,9 +28,13 @@ use eprfs_core::{
 
 use crate::allow::CrossingAllowList;
 use crate::error::PeerError;
+use crate::head_table::NackLeaf;
 
 /// Where the events sit in a channel tree.
 pub const CHANNEL_EVENTS: &str = "channel/events";
+
+/// Where this device tells each author which records it did not accept.
+pub const CHANNEL_NACKS: &str = "channel/nacks";
 
 /// How many recent roots a [`ChannelStore`] keeps by default.
 pub const RETAINED_ROOTS: usize = 16;
@@ -47,6 +52,7 @@ pub struct ChannelTree {
     root: BlobCid,
     nodes: Vec<(BlobCid, Bytes)>,
     leaves: Vec<(BlobCid, Bytes)>,
+    events: usize,
     /// How many flow events of the store the tree was projected from, crossing or not.
     read: u64,
     /// The CID of the last of them.
@@ -60,7 +66,7 @@ impl ChannelTree {
 
     /// How many events crossed.
     pub fn events(&self) -> usize {
-        self.leaves.len()
+        self.events
     }
 
     /// How many flow events of the store it was projected from, crossing or not: the store is
@@ -93,6 +99,19 @@ pub fn project_channel<S>(store: &S, allow: &CrossingAllowList) -> Result<Channe
 where
     S: FlowStore + ?Sized,
 {
+    project_channel_with_nacks(store, allow, &BTreeMap::new())
+}
+
+/// [`project_channel`] with this device's nack leaves. A leaf is present only for an author with
+/// a non-empty refusal set, and its canonical JSON changes only when that set changes.
+pub fn project_channel_with_nacks<S>(
+    store: &S,
+    allow: &CrossingAllowList,
+    nacks: &BTreeMap<String, NackLeaf>,
+) -> Result<ChannelTree, PeerError>
+where
+    S: FlowStore + ?Sized,
+{
     let tree_error = |reason: String| PeerError::ChannelTree { reason };
     let mut leaves = Vec::new();
     let mut entries = Vec::new();
@@ -122,22 +141,57 @@ where
         });
         leaves.push((leaf, Bytes::from(bytes)));
     }
-    let mut nodes = Vec::with_capacity(3);
-    let mut child = node(entries, &mut nodes)?;
-    // channel/events, then channel, then the root: each a directory of the one below it.
-    for name in ["events", "channel"] {
-        child = node(
-            vec![TreeEntry {
-                name: name.as_bytes().to_vec(),
-                kind: TreeEntryKind::Directory { tree: child.into() },
-            }],
-            &mut nodes,
-        )?;
+    let mut nodes = Vec::with_capacity(4);
+    let events = leaves.len();
+    let events_node = node(entries, &mut nodes)?;
+    let mut nack_entries = Vec::new();
+    for (device, nack) in nacks {
+        if nack.refused_total == 0 {
+            continue;
+        }
+        let bytes = serde_json::to_vec(nack).map_err(|e| tree_error(e.to_string()))?;
+        let leaf = BlobCid::compute_raw(&bytes);
+        nack_entries.push(TreeEntry {
+            name: device.as_bytes().to_vec(),
+            kind: TreeEntryKind::File {
+                blob: leaf.clone().into(),
+                executable: false,
+            },
+        });
+        leaves.push((leaf, Bytes::from(bytes)));
     }
+    let nacks_node = node(nack_entries, &mut nodes)?;
+    let channel = node(
+        vec![
+            TreeEntry {
+                name: b"events".to_vec(),
+                kind: TreeEntryKind::Directory {
+                    tree: events_node.into(),
+                },
+            },
+            TreeEntry {
+                name: b"nacks".to_vec(),
+                kind: TreeEntryKind::Directory {
+                    tree: nacks_node.into(),
+                },
+            },
+        ],
+        &mut nodes,
+    )?;
+    let child = node(
+        vec![TreeEntry {
+            name: b"channel".to_vec(),
+            kind: TreeEntryKind::Directory {
+                tree: channel.into(),
+            },
+        }],
+        &mut nodes,
+    )?;
     Ok(ChannelTree {
         root: child,
         nodes,
         leaves,
+        events,
         read,
         last,
     })

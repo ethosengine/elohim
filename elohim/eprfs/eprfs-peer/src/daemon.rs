@@ -40,11 +40,11 @@ use url::Url;
 use crate::admission::{roster_rows_from_file, Admission};
 use crate::allow::CrossingAllowList;
 use crate::announce::{topic_for, Channel, HeadVerdict, REANNOUNCE_EVERY};
-use crate::channel::{channel_tier_id, project_channel, ChannelStore};
+use crate::channel::{channel_tier_id, project_channel_with_nacks, ChannelStore};
 use crate::connections::ConnectionBook;
 use crate::endpoint::bind_on;
 use crate::error::PeerError;
-use crate::fold::{fold_root, FoldLimits, FoldReport, FoldTarget};
+use crate::fold::{fold_root, FoldLimits, FoldReader, FoldReport, FoldTarget};
 use crate::gate::SharedAdmission;
 use crate::gossip::GatedGossip;
 use crate::head::{ChannelHead, HeadSigner};
@@ -233,6 +233,7 @@ impl PeerDaemon {
             joined: bootstrap,
             roster_stamp: stamp(&config.roster),
             flow_stamp: None,
+            nacks_dirty: true,
             retry: ProjectionRetry::default(),
             tree: limits.tree,
             folds_tx,
@@ -401,6 +402,8 @@ struct Run {
     joined: Vec<NodeId>,
     roster_stamp: Stamp,
     flow_stamp: Stamp,
+    /// A changed nack set reprojects even when the flow log itself did not move.
+    nacks_dirty: bool,
     /// The state of the log the last failed projection read, counted once and retried with a
     /// growing wait rather than re-parsed every tick.
     retry: ProjectionRetry<Stamp>,
@@ -643,17 +646,25 @@ impl Run {
     /// `epr peer status` reads it; the last good root stays served and announced.
     fn reproject(&mut self) -> Result<(), PeerError> {
         let now = stamp(self.flow.log_path());
-        if now.is_some() && now == self.flow_stamp {
+        if !self.nacks_dirty && now.is_some() && now == self.flow_stamp {
             return Ok(());
         }
         if !self.retry.due(&now, Instant::now()) {
             return Ok(());
         }
-        match project_channel(&self.flow, &self.config.allow) {
+        let nacks = self
+            .channel
+            .table()
+            .nacks
+            .iter()
+            .map(|(device, state)| (device.clone(), state.leaf()))
+            .collect();
+        match project_channel_with_nacks(&self.flow, &self.config.allow, &nacks) {
             Ok(tree) => {
                 // Only a projection that succeeded settles this state of the log; a failed one
                 // is retried after a growing wait, or at once when the log changes.
                 self.flow_stamp = now;
+                self.nacks_dirty = false;
                 self.retry.succeeded();
                 self.store.install(&tree);
                 self.channel.changed(tree.root().clone(), Instant::now());
@@ -745,6 +756,8 @@ impl Run {
         let admission = self.admission.clone();
         let endpoint = self.endpoint.clone();
         let flow_root = self.config.flow_root.clone();
+        let reader = self.config.device.clone();
+        let state_dir = self.config.state_dir.clone();
         let allow = self.config.allow.clone();
         let tree = self.tree;
         let done = self.folds_tx.clone();
@@ -757,6 +770,10 @@ impl Run {
                     root: &head.root,
                     // Re-checked under the append lock: a Contest folded meanwhile appends nothing.
                     admission: Some(&admission),
+                    reader: FoldReader {
+                        device: &reader,
+                        state_dir: &state_dir,
+                    },
                 };
                 fold_root(
                     &endpoint,
@@ -799,10 +816,21 @@ impl Run {
                 let counters = self.channel.counters_mut();
                 counters.oversized_events += report.oversized;
                 counters.over_budget_folds += u64::from(report.over_budget);
+                let nack_changed = self.channel.nack(
+                    &head.device,
+                    report.outcome.refused_cids.iter().map(ToString::to_string),
+                    report.quarantined.iter().map(|entry| entry.cid.to_string()),
+                );
+                self.nacks_dirty |= nack_changed;
                 let outcome = report.outcome;
                 if report.complete {
-                    self.channel
-                        .folded(&head, outcome.appended, unix_ms(), Instant::now());
+                    self.channel.folded(
+                        &head,
+                        outcome.appended,
+                        report.peer_nack,
+                        unix_ms(),
+                        Instant::now(),
+                    );
                     if outcome.appended > 0 || outcome.refused > 0 {
                         self.log(&format!(
                             "folded {} seq {}: {} appended, {} already, {} refused",

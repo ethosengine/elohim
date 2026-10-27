@@ -31,8 +31,8 @@
 //! on its device or not: a pending lease counts as live, and an absent device is never free.
 //!
 //! This device's lease is [`LeaseVerdict::Effective`] once every other admitted device has
-//! acknowledged the first own head that carried its claim; until then it is
-//! [`LeaseVerdict::Pending`], and [`LeaseVerdict::Unconfirmed`] once `confirm_wait_s` has passed
+//! acknowledged the first own head that carried its claim and none nacks its claim CID; until then
+//! it is [`LeaseVerdict::Pending`], and [`LeaseVerdict::Unconfirmed`] once `confirm_wait_s` has passed
 //! since the claim was written. The head that carried a claim is read from
 //! [`HeadTable::own_log`] by store position, not by time: a claim written as the store's `n`th
 //! flow event is in the first own head projected from at least `n` events — counted over this
@@ -100,6 +100,8 @@ impl LeaseKind {
 /// One lease-bearing berth record, read from a flow event.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct LeaseEvent {
+    /// The record CID in this store. For an own claim this is what peers nack.
+    pub cid: Cid,
     pub kind: LeaseKind,
     /// The device it was folded from (`via:<did>`); `None` for this device's own.
     pub via: Option<String>,
@@ -126,6 +128,8 @@ pub struct LeaseEvent {
     /// A claim's acknowledgement vector when it was written: for each other device, the highest
     /// of its heads the claimant had folded (`env:seen`, compact JSON).
     pub seen: BTreeMap<String, u64>,
+    /// This mooring's author understands the nack leaf protocol.
+    pub reads_nacks: bool,
 }
 
 impl LeaseEvent {
@@ -168,6 +172,7 @@ impl LeaseEvent {
                 .unwrap_or_default()
         };
         Some(LeaseEvent {
+            cid: atom_cid_without_via(event)?,
             kind,
             via: via_device(event).map(str::to_string),
             resource,
@@ -184,8 +189,17 @@ impl LeaseEvent {
                 .get("seen")
                 .and_then(|seen| serde_json::from_str(seen).ok())
                 .unwrap_or_default(),
+            reads_nacks: env.get("reads").is_some_and(|reads| *reads == "nacks/1"),
         })
     }
+}
+
+fn atom_cid_without_via(event: &FlowEvent) -> Option<Cid> {
+    let mut original = event.clone();
+    original
+        .classified_as
+        .retain(|slot| !slot.starts_with(crate::allow::VIA_SLOT));
+    elohim_epr_rea::atom_cid(&original).ok()
 }
 
 /// Unix seconds as berth writes them (`1792769518.961`) in milliseconds.
@@ -271,6 +285,8 @@ pub enum LeaseVerdict {
         device: String,
         last_seen: Option<u64>,
     },
+    /// A peer acknowledged the carrying head but explicitly refused this claim CID.
+    RefusedBy { session: String, device: String },
     /// Another device's lease wins: `device`/`session`, claimed at `since` (that device's clock,
     /// unix ms); `override` when it was taken over a silent device with offline-ok.
     HeldBy {
@@ -296,6 +312,7 @@ struct Lease {
     claim_at: u64,
     overriding: bool,
     seen: BTreeMap<String, u64>,
+    claim_cid: Cid,
 }
 
 impl Lease {
@@ -341,6 +358,7 @@ fn replay<'e>(
                 claim_at: event.at,
                 overriding: false,
                 seen: event.seen.clone(),
+                claim_cid: event.cid,
             }
         };
         match event.kind {
@@ -608,7 +626,36 @@ fn own_verdict(
     now: u64,
     confirm_wait_s: u64,
 ) -> LeaseVerdict {
-    if lease.overriding || others.is_empty() {
+    let claim_cid = lease.claim_cid.to_string();
+    if let Some(device) = others.iter().find(|device| {
+        heads
+            .devices
+            .get(**device)
+            .is_some_and(|head| head.nack.contains(&claim_cid))
+    }) {
+        return LeaseVerdict::RefusedBy {
+            session: lease.session,
+            device: (*device).to_string(),
+        };
+    }
+    if others.is_empty() {
+        return LeaseVerdict::Effective {
+            session: lease.session,
+        };
+    }
+    if let Some(device) = others.iter().find(|device| {
+        heads
+            .devices
+            .get(**device)
+            .is_some_and(|head| head.nack.overflowed())
+    }) {
+        return LeaseVerdict::Unconfirmed {
+            session: lease.session,
+            last_seen: heads.devices.get(*device).map(|head| head.folded_at),
+            device: (*device).to_string(),
+        };
+    }
+    if lease.overriding {
         return LeaseVerdict::Effective {
             session: lease.session,
         };
@@ -616,10 +663,8 @@ fn own_verdict(
     let waiting_on: Vec<String> = others
         .iter()
         .filter(|device| {
-            let acked = heads
-                .devices
-                .get(**device)
-                .and_then(|head| head.folded.get(me));
+            let head = heads.devices.get(**device);
+            let acked = head.and_then(|head| head.folded.get(me));
             !matches!((carried, acked), (Some(seq), Some(&acked)) if acked >= seq)
         })
         .map(|device| (*device).to_string())

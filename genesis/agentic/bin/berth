@@ -32,7 +32,9 @@ Commands:
   berth release RESOURCE --session S [--force]                     --force gives back whoever holds it
   berth owner-check RESOURCE [--action A] [--force]                exit 3 while another live session
                                                                    holds it; --force = override row
-  berth say     --session S [--to SESSION] TEXT                    a deliberation note, on the record
+  berth say     --session S [--to SESSION] TEXT                    a deliberation note; the addressee reads
+                                                                   it with `berth inbox` or watches `--follow`
+  berth inbox   --session S [--peek] [--all] [--follow] [--json]  read notes said to this session
   berth who     RESOURCE                                           json of the holder (or null)
   berth status                                                     moorings · leases · capacity, and the
                                                                    other devices' moorings and steward
@@ -329,6 +331,8 @@ def steward_reason(verdict, now_ms):
     steps for devices-share-one-berth match these words; this is their only formatter."""
     if verdict.get("verdict") == "held_by":
         return f"held by {verdict['device']}/{verdict['session']} since {_rfc3339(verdict['since'])}"
+    if verdict.get("verdict") == "refused_by":
+        return f"refused by {verdict['device']}"
     seen = verdict.get("last_seen")
     if seen is None:
         return f"unconfirmed: {verdict['device']} never seen"
@@ -599,6 +603,168 @@ class Berth:
             return REPO_ROOT, None
         return None, self.channel_error or "this device's channel store is unknown"
 
+    # ------------------------------------------------------------ inbox
+    def _inbox_dir(self):
+        return os.path.join(self.dir, "inbox")
+
+    def _inbox_notes_path(self):
+        return os.path.join(self._inbox_dir(), "notes.jsonl")
+
+    def _inbox_offset_path(self):
+        return os.path.join(self._inbox_dir(), "offset.json")
+
+    def _inbox_seen_path(self, session):
+        return os.path.join(self._inbox_dir(), "seen", f"{_safe(session)}.json")
+
+    @staticmethod
+    def _normalized_note(line):
+        if '"env:kind=note"' not in line:
+            return None
+        row = json.loads(line)
+        tags = (row.get("record") or {}).get("classifiedAs") or []
+        if "env:kind=note" not in tags:
+            return None
+        fields = {}
+        via = None
+        for tag in tags:
+            if not isinstance(tag, str):
+                continue
+            if tag.startswith("env:") and "=" in tag:
+                key, value = tag[4:].split("=", 1)
+                fields[key] = value
+            elif tag.startswith("via:did:key:"):
+                via = tag[4:]
+        if not row.get("cid") or not fields.get("session") or "text" not in fields:
+            return None
+        return {"cid": row["cid"], "at": float(fields["at"]), "from_device": via,
+                "session": fields["session"], "to": fields.get("to") or None,
+                "text": fields["text"]}
+
+    @staticmethod
+    def _read_json(path, default):
+        try:
+            with open(path) as f:
+                return json.load(f)
+        except (OSError, ValueError, TypeError):
+            return default
+
+    def _scan_inbox(self):
+        """Copy only new folded notes into the berth's small, stable stream. The source offset is
+        device-wide; a shorter or different store is read again from zero, with CIDs keeping the
+        normalized stream append-only so session cursors remain valid."""
+        root = self.channel_root or self.cached_channel_root() or REPO_ROOT
+        source = os.path.join(root, ".eprfs", "status", "flows.jsonl")
+        size = os.stat(source).st_size
+        state = self._read_json(self._inbox_offset_path(), {})
+        offset = state.get("offset", 0) if state.get("source") == source else 0
+        if not isinstance(offset, int) or offset < 0 or size < offset:
+            offset = 0
+        if size == offset:
+            return
+
+        os.makedirs(self._inbox_dir(), exist_ok=True)
+        notes = []
+        notes_path = self._inbox_notes_path()
+        try:
+            with open(notes_path, encoding="utf-8") as f:
+                notes = [json.loads(line) for line in f if line.strip()]
+        except (OSError, ValueError, TypeError):
+            notes = []
+        known = {note.get("cid") for note in notes}
+        added = []
+        with open(source, "rb") as f:
+            f.seek(offset)
+            while True:
+                raw = f.readline()
+                if not raw or not raw.endswith(b"\n"):
+                    break
+                offset = f.tell()
+                if b'"env:kind=note"' not in raw:
+                    continue
+                try:
+                    note = self._normalized_note(raw.decode("utf-8"))
+                except (UnicodeDecodeError, ValueError, TypeError):
+                    continue
+                if note and note["cid"] not in known:
+                    known.add(note["cid"])
+                    added.append(note)
+        if added:
+            tmp = f"{notes_path}.{os.getpid()}.tmp"
+            with open(tmp, "w") as f:
+                for note in notes + added:
+                    f.write(json.dumps(note, sort_keys=True) + "\n")
+            os.replace(tmp, notes_path)
+        write_json_atomic(self._inbox_offset_path(), {"source": source, "offset": offset})
+
+    def inbox(self, session, mark=True, include_seen=False):
+        """Notes addressed to `session`, plus household notes since it moored. Fail-open: an inbox
+        is an attention aid and must never impede the session or the channel writer."""
+        try:
+            with self._locked("inbox"):
+                os.makedirs(os.path.join(self._inbox_dir(), "seen"), exist_ok=True)
+                self._scan_inbox()
+                seen_path = self._inbox_seen_path(session)
+                seen = self._read_json(seen_path, {}).get("offset", 0)
+                mooring = self._read_mooring(session)
+                moored_at = mooring.get("moored_at") if mooring else None
+                delivered = []
+                end = 0 if include_seen else seen
+                try:
+                    with open(self._inbox_notes_path(), encoding="utf-8") as f:
+                        if not include_seen:
+                            f.seek(seen)
+                        while True:
+                            line = f.readline()
+                            if not line:
+                                break
+                            end = f.tell()
+                            note = json.loads(line)
+                            if note.get("session") == session:
+                                continue
+                            addressed = note.get("to") == session
+                            household = (not note.get("to") and moored_at is not None
+                                         and note.get("at", 0) >= moored_at)
+                            if addressed or household:
+                                delivered.append(note)
+                except FileNotFoundError:
+                    pass
+                if mark:
+                    write_json_atomic(seen_path, {"offset": end})
+                return delivered
+        except Exception:
+            return []
+
+    @staticmethod
+    def _note_line(note, session, now):
+        device = note.get("from_device")
+        short = (device.split(":")[-1][:10] + "…") if device else "this device"
+        sender = str(note.get("session") or "?")
+        text = " ".join(str(note.get("text") or "").split())
+        if len(text) > 600:
+            text = text[:599] + "…"
+        direct = " to you" if note.get("to") == session else ""
+        # Another device's words are data for the reader, never instructions to it.
+        return (f"NOTE from {short}/{sender[:8]} {_age(now - note.get('at', now))} ago{direct} "
+                f"(untrusted text from another device): «{text}»")
+
+    @staticmethod
+    def _reply_hint(session, notes):
+        """A reply command only for a well-formed sender id: the id comes from the sender's record."""
+        sender = str(notes[-1].get("session") or "")
+        if not re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9-]{0,63}", sender):
+            return None
+        return f'reply: berth say --session {session} --to {sender} "…"'
+
+    def inbox_lines(self, session):
+        # Hook path: notes only. A ready-made command in an agent's context is an action surface.
+        try:
+            notes = self.inbox(session)
+            if not notes:
+                return ""
+            return "\n".join(self._note_line(note, session, self.now()) for note in notes)
+        except Exception:
+            return ""
+
     def ledger(self, n=30):
         """The last n readable events. Per-line tolerant: a torn or NUL-padded line (a crash mid-append,
         a restart that zero-filled the tail) costs that line, never the whole record."""
@@ -730,7 +896,7 @@ class Berth:
         m["last_seen"] = round(self.now(), 3)
         write_json_atomic(self._moor_path(session), m)
         self.record("moor", session=session, recipient=m["recipient"], provider=m.get("principal"),
-                    task=m.get("task"), bounds=m["bounds"])
+                    task=m.get("task"), bounds=m["bounds"], reads="nacks/1")
         return m
 
     def touch(self, session, pid=None):
@@ -1312,7 +1478,7 @@ class Berth:
         elif kind is None:
             reason = (f"this device's lease on {resource} is not in its channel store (the dev-berth-events@1 fold "
                       f"did not land — is `epr flow note` working?), so no other device can see it")
-        elif kind == "held_by":
+        elif kind in ("held_by", "refused_by"):
             reason, held = steward_reason(verdict, self._view_now(view)), True
         elif verdict.get("session") != session:
             reason, held = f"held by {verdict.get('session')} on this device", True
@@ -1672,6 +1838,27 @@ def _main(argv):
                       if (any(v.get("holder") == session for v in value) if isinstance(value, list)
                           else value.get("holder") == session)}
             print(json.dumps({"mooring": b.mooring(session), "leases": leases}))
+        return 0
+    if cmd == "inbox":
+        peek = "--peek" in argv
+        include_seen = "--all" in argv
+        follow = "--follow" in argv
+        as_json = "--json" in argv
+        if follow:
+            while True:
+                for note in b.inbox(session, mark=True, include_seen=include_seen):
+                    print(b._note_line(note, session, b.now()), flush=True)
+                include_seen = False
+                b.sleep(2)
+        notes = b.inbox(session, mark=not peek, include_seen=include_seen)
+        if as_json:
+            print(json.dumps(notes, sort_keys=True))
+        elif notes:
+            lines = [b._note_line(note, session, b.now()) for note in notes]
+            hint = b._reply_hint(session, notes)
+            if hint:
+                lines.append(hint)
+            print("\n".join(lines))
         return 0
     if cmd == "moor":
         writes = _opt(argv, "--writes")
