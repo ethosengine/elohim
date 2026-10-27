@@ -12,7 +12,7 @@ priority: "high"
 area: "scm / brit / rakia / steward space"
 tags: [brit, scm, handoff, rakia, landing-plane, attestation, change-id, walkthrough, cas]
 cites:
-  - "steward-space-landing-plane-design | The steward space | sha256:6ef574355778bebd | path: genesis/docs/superpowers/specs/2026-10-27-steward-space-landing-plane-design.md"
+  - "steward-space-landing-plane-design | the spec whose slices A6-A9 each win in this handoff serves (change ids, verdict reuse, walkthroughs, proposal notes, CAS heads) | sha256:6ef574355778bebd | path: genesis/docs/superpowers/specs/2026-10-27-steward-space-landing-plane-design.md"
   - genesis/data/timeline/backlog/gate-merge-gradient-reading-2026-10-25.md
   - genesis/data/timeline/backlog/brit-act-level-attribution-identity-chain.md
   - genesis/data/timeline/backlog/native-peer-dev-channel-and-collective-memory-seed.md
