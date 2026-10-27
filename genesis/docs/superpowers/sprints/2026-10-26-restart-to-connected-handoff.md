@@ -154,6 +154,15 @@ a backlog of the old bug, not a new one).
   spawned by another runner) on this branch. Until that lands in the installed `epr`, give the
   covenant call path-scoped trust:
   `GIT_CONFIG_COUNT=1 GIT_CONFIG_KEY_0=safe.directory GIT_CONFIG_VALUE_0=/projects/elohim`.
+- **A steward lease with no ttl, held by a session with no mooring, binds every device until its
+  own device releases it.** On 2026-10-26 `dev-integration` was held from 21:51Z by
+  `did:key:z6Mkm5de…/ad47214c-…` with no ttl (a pre-push lease carries 1800 s and would have
+  lapsed at 22:21Z) and no mooring on that live device, so ethosengine's push refused. This device
+  cannot clear it: `berth release --force` touches only local leases, `owner-check --force` still
+  refuses another device's lease, and `--offline-ok` covers only a silent device. The cure runs on
+  the holding device: `berth release dev-integration --session ad47214c-da31-418d-8ae3-c6ad4a074e58`.
+  The defect is that the lease view (`eprfs-peer/src/lease_view.rs`) lapses a folded lease only by
+  ttl, never by its holder's mooring the way berth lapses a local one.
 - **Memory index:** `MEMORY.md` is generated; never hand-append. The entry
   `project_hc_dna_hash_ignores_role_modifiers.md` is imported under the operator's
   steward-of-record affirmation, but the index will not re-project: it is 24536 bytes against the
