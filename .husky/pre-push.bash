@@ -950,10 +950,11 @@ fi
 # marks each child ELOHIM_SESSION_ID=lsp-device) is never paused: it serves every attached
 # session, and freezing it stalls all of their editors. Its flycheck builds already yield to a
 # running gate (cargo-disk-guard Rule 4). Only strays — a per-session server, an editor's own — are paused.
+# Read environ without a pipe so grep's early exit cannot trigger SIGPIPE under pipefail.
 ra_strays() {
   local pid
   for pid in $(pgrep -f rust-analyzer 2>/dev/null || true); do
-    if { tr '\0' '\n' <"/proc/$pid/environ"; } 2>/dev/null | grep -qx 'ELOHIM_SESSION_ID=lsp-device'; then
+    if grep -qxz -- 'ELOHIM_SESSION_ID=lsp-device' "/proc/$pid/environ" 2>/dev/null; then
       continue
     fi
     echo "$pid"
