@@ -140,6 +140,10 @@ spec:
       steps {
         container('builder') {
           sh '''
+            # The root `prepare` script (.husky/hooks-path.mjs) asks git about the
+            # checkout; checkout ran as a different UID, so without this git answers
+            # "dubious ownership" and the install refuses before any test runs.
+            git config --global --add safe.directory "*"
             corepack enable
             pnpm install --frozen-lockfile --filter @elohim/epr
             pnpm --filter @elohim/epr test
