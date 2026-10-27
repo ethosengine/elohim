@@ -752,7 +752,7 @@ fn with_no_other_admitted_device_a_claim_is_effective_at_once() {
 #[test]
 fn override_waits_ttl_plus_skew_plus_margin() {
     let h = household();
-    let events = vec![
+    let events = [
         claim_ttl("codex-1", T0, 60),
         override_of("codex-1", T0, T0 + 10.0, &h.a.did),
         renew("codex-1", T0, T0 + 20.0, 60),
