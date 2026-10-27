@@ -698,6 +698,9 @@ _gate-memory-ceremony:
     # gated below by --test flow_memory_footprint, whose pinned normalized digest is asserted
     # unconditionally and does not need the Python oracle to be present.
     cargo build --manifest-path elohim/eprfs/Cargo.toml -p elohim-epr-cli
+    # The hooks suite's session-envelope fixture copies bin-launch from beside debug/epr. Only
+    # the eprfs gate built it, so a fresh worktree slot whose eprfs verdict was reused refused here.
+    cargo build --manifest-path elohim/eprfs/Cargo.toml -p elohim-device-runtime --bin bin-launch
     # Station five (2026-09-10): the recall executor and the identity-closed corrections view are
     # native. These two binaries carry the 60 Python recall cases (54 counterparts + 6 retired as
     # out-of-process artefacts); the Python suite and its scripts are gone.
