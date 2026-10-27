@@ -13,6 +13,7 @@ checks:
   - "node --test genesis/orchestrator/gate-tap.test.mjs (bytes forwarded unchanged; exit status and signal carried; a green exit stays green whatever printed)"
   - "node --test genesis/orchestrator/gate-live.test.mjs (run log open/append/close, prune at open, follow waits past the previous push, unclosed reads interrupted)"
   - "node --test genesis/orchestrator/prepush-gate-live.test.mjs (the hook opens, closes, and closes interrupted from its exit trap)"
+  - "python3 .claude/hooks/tests/test_gate_live_inject.py (every agent hears a red at its next tool call, one cursor per agent; a background push gets the Monitor command)"
   - "@concern:gate-failures-arrive-live"
 guard: >-
   Preserve output bytes, exit status, and termination signals. Keep excerpts
@@ -25,8 +26,11 @@ refs:
   - genesis/orchestrator/gate-live.mjs
   - genesis/orchestrator/gate-tap.mjs
   - genesis/orchestrator/gate-runner.mjs
+  - .claude/hooks/gate-live-inject.py
 retire-when: "rakia-executor emits gate events natively and the gate-tap/gate-runner adapter is deleted"
 ---
+
+DELTA 2026-10-27 (still RED; delivery no longer opt-in): push 9 (de1d22eab) proved the tap and the gap. The tap logged elohim-storage's red (`request_metrics_guard_observes_a_dropped_unfinished_request`, metrics.rs:7900) at 19:40:00Z, 7 min before the gate's verdict, but no agent heard it: delivery needed the pushing agent to arm `follow`, and it had not. Now the native `gate-live-inject` PostToolUse hook (every tool, package-mastered) adds each new red from the session's run to the next tool call with a cursor per agent, and a background push or gate gets the Monitor command for an idle wait. `gate-live.mjs unseen` formats and moves the cursor; the hook spawns node only when the run file grew (77 ms silent path, replayed push 9's storage red verbatim against the live log). Checks: gate-live 44/44, hook 6/6. Green still needs a real push whose first red reaches the agent mid-run.
 
 DELTA 2026-10-26b (still RED; evidence bar raised): the orchestrator gate now runs as a local placement Task (`adc2a2059`, `d453d99e7`); gate-verdict carries derivation {method, input, hit} and Answered|Unanswered, and an interrupt closes the run `interrupted` with three parts. Scratch-clone proof: miss 469 s, derivation hit 23 s with no child, SIGTERM Unanswered with no evidence recorded. Green now needs, on a real push: a red delivered while later gates still run (`first_red_s` well under `value`) AND a derivation hit on the corrected re-push. Story revised (reuse + interrupt scenarios): blind-reader rounds 3 and 4 (new readers), round 3 READY 1 correctness (reuse title overclaimed) · 3 interpretability · 5 preference, all correctness and interpretability repaired; round 4 READY 0 correctness · 5 interpretability · 2 preference, 4 repaired, title scope declined (the habit names the live-failure promise); about 113k reader tokens.
 
