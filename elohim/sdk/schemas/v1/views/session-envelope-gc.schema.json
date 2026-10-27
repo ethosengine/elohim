@@ -5,12 +5,25 @@
   "description": "Actual epr session gc --json output; private device-local lifecycle result.",
   "type": "object",
   "additionalProperties": false,
-  "required": ["closed"],
+  "required": ["closed", "failed"],
   "properties": {
     "closed": {
       "type": "array",
       "items": {
         "$ref": "epr:schema:view:session-envelope#/properties/envelope"
+      }
+    },
+    "failed": {
+      "description": "Dead-owner envelopes gc could not close; gc exits non-zero when any are listed.",
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["session", "error"],
+        "properties": {
+          "session": { "type": "string" },
+          "error": { "type": "string" }
+        }
       }
     }
   }

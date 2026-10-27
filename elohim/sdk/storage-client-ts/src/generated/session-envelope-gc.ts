@@ -39,6 +39,13 @@ export interface SessionEnvelopeGc {
      */
     berthStore: string | null;
   }[];
+  /**
+   * Dead-owner envelopes gc could not close; gc exits non-zero when any are listed.
+   */
+  failed: {
+    session: string;
+    error: string;
+  }[];
 }
 /**
  * P1 identity observed at opening and retained as a private binding. Current owner liveness is checked against pid and start time.

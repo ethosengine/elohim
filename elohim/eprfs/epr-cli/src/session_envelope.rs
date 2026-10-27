@@ -575,12 +575,25 @@ pub fn run(args: &[String]) -> Result<ExitCode> {
         if verb == "gc" {
             let proc_root = proc_root();
             let mut closed = Vec::new();
+            let mut failed = Vec::new();
             for record in store.records().map_err(err)? {
                 if record.closed_at.is_none() && record.owner_dead(&proc_root) {
-                    closed.push(close(&store, record)?);
+                    let session = record.id().to_owned();
+                    // One unclosable record must not keep every other dead owner's envelope open.
+                    match close(&store, record) {
+                        Ok(record) => closed.push(record),
+                        Err(error) => failed.push(json!({"session": session, "error": error})),
+                    }
                 }
             }
-            json!({"closed": closed})
+            let succeeded = failed.is_empty();
+            let value = json!({"closed": closed, "failed": failed});
+            println!("{}", serde_json::to_string_pretty(&value).map_err(err)?);
+            return Ok(if succeeded {
+                ExitCode::SUCCESS
+            } else {
+                ExitCode::FAILURE
+            });
         } else {
             let record = store
                 .binding(&current_id()?, &session::resolve(), &proc_root())
