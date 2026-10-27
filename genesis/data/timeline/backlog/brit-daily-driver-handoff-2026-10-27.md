@@ -79,7 +79,18 @@ following brit has never been exercised here.
 - bytes: `gh release download`;
 - naming: the `release-github` profile and Actions-built release.
 
-**The native path, using the landing plane's own primitives:**
+**Step 1, now: constant latest snapshot artifacts from the existing pipeline.**
+
+> Operator, 2026-10-27: *"we might reuse.. but just start getting constant latest snapshot artifacts from that pipeline going."*
+
+- Reuse brit's current CI.
+- Make it publish a `brit-build-<sha12>` snapshot release (the three bins) for EVERY commit that passes on
+  its integration branch, not only for pins.
+- With a snapshot always present, the bin store's download leg never strands, and `follows bin:brit apply`
+  can run on every pin move on both devices.
+- Measure it as "pin moved → both devices follow".
+
+**Step 2, then: the native path, using the landing plane's own primitives:**
 - **The device that builds brit at the pin publishes the release into the steward space** as a rakia
   artifact. It is the bin-store release manifest by CID (bins `brit`, `brit-build-ref`, `brit-verify`),
   chunked on the dataplane, and its sibling fetches it over the eprfs tier. The `gh release download`
@@ -101,8 +112,10 @@ following brit has never been exercised here.
   - keep a fallback to the last admissible release;
   - land a release only after its declared bins are complete (the `bootstrap admissible()` stranding).
 
-**Done when:** a brit pin bump on dev reaches both devices' bin stores with no `gh` call and no GitHub
-check in the admission path, and either device can revert to the predecessor.
+**Done when:**
+- **Step 1:** every passing brit commit has a snapshot release, and a brit pin bump on dev reaches both
+  devices' bin stores, with either device able to revert to the predecessor.
+- **Step 2:** the same holds with no `gh` call and no GitHub check in the admission path.
 
 ## The wins, in order (each small, each on the landing plane's critical path)
 
