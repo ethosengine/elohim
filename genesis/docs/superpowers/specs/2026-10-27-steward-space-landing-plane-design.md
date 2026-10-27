@@ -833,6 +833,24 @@ These forks are not parked for the operator. Per the operator ruling of 2026-10-
   - **Caveats the probe found:** a full 40-hex SHA as the commit fails every cargo fingerprint, while `HEAD` in a clean worktree works; a dirty checkout reads `source closure dirty`. Both belong in a future `gate-runner --closure` print mode.
   - **Falsifier:** any later probe or A8 reuse where the two devices disagree on a key at the same clean commit. Reuse then refuses for that project until the input that differs is declared.
   - **Interface:** reuse stays per project behind `pool-policy.json gate_reuse`, and every reused verdict is labelled `independence: sibling` and never counted in k-of-n, so withdrawing it is a policy edit.
+- **D5 (A8 participant-binding design, 2026-10-27): a sibling's gate verdict crosses the steward space as a measured record (`gate-verdict@1`, kind `verdict`: project, closure key, commit, success, seconds, brit attestation id and `agentId`). Its provenance is the admitted device whose signed head carried it. No `binds-signer` participant row at S1; that row is an S2 entry condition.**
+  - **Alternatives:**
+    - (a) A `binds-signer` row binding each device's brit signer to its did:key, with attestation notes shared through origin.
+    - (c) Derive the brit signer from the device key.
+  - **Evidence that chose it:**
+    - Brit gate notes never leave a device today: `genesis/orchestrator/seam-registry.yaml` declares them Local Private B, "never fetched or pushed", and origin carries no `refs/notes/brit/*`. Option (a) would make the forge part of the sibling path, against D3 and the operator's "BIG friction" ruling.
+    - `participants.rs` has four row kinds, each with dual-signed admission, sequencing and equivocation rules (`Binding` at `:668`). A fifth is an identity-protocol extension, which is not proportionate inside one steward's grant.
+    - Option (c) merges two key domains: brit-key rotation would become coupled to device enrolment, and build tooling would touch device-key material.
+    - At S1 the space has one principal, so the admitted device that served a record is the provenance that matters. Each verdict is labelled `independence: sibling` and counted in no quorum.
+  - **Known gaps, accepted at S1 and blocking S2** (the decision agent's read; backlog `steward-space-crossing-integrity-before-s2`):
+    1. A local writer can put a `via:` slot into its own `flows.jsonl` and have readers take it as folded (`allow.rs:132`, `lease_view.rs:135`).
+    2. Fetched leaves are CID-checked one by one but not proven to sit under the root the signed head commits (`tier.rs:444`, and `Diff` at `:486`).
+    3. The pinned `brit-build-ref build find` returns note JSON that matches `inputsHash` without verifying the signature.
+    - Each gap needs either an admitted device of the same steward or a local writer acting against its own device. Both can already bypass a gate, so none escalates anything within one principal. Once a second principal is admitted, each one forges provenance. S2 therefore needs root-membership proofs, sealed crossing receipts, and a fail-closed brit `find` first.
+  - **Ordering rule:** across devices, a red verdict for the same closure that the green does not supersede forces a local run. Verdicts are never ordered by `builtAt`, because the clocks are display-only.
+  - **Governance class runs locally:** a candidate that changes the reuse predicate, the crossing or provenance code, or this vocabulary is never judged by a sibling's verdict.
+  - **Falsifier:** a device outside the admitted chain-root roster causes a sibling reuse, or a reused verdict cannot be traced to one admitted device's signed head and one brit attestation id.
+  - **Interface:** `reusableHit` takes normalised candidates from a `GateEvidenceSource` (local brit or steward space) through an admission callback. The S2 policy that also requires `binds-signer` replaces the callback without changing gate-runner or the record shape.
 
 ## Appendix: minor findings and dispositions
 | Finding | Disposition |
