@@ -175,6 +175,8 @@ Current `berth` uses exits 0, 1, 2, 3, and 4 (`genesis/agentic/bin/berth:82-87`)
 
 **Override timing.** A peer may override a silent holder only after `TTL + max_skew + margin` has elapsed since it last heard the holder's head. Combined with the fence, this gives at most one effective holder *during* a partition, not only after it.
 
+**One head move, one expected prior.** Every shared head move—lease, lane, landing tip, rakia channel head, or bin-store `current`—is one compare-and-swap that names its expected prior head. Content writes remain immutable and separate from the move. A stale writer is refused; it never silently replaces a head. This is the cure class for the 2026-10-27 launcher stranding: two readers had disagreed about one `current`, while [Anthropic Scion](https://www.anthropic.com/engineering/redesigning-source-control) and [code.storage's `expectedHeadSha`](https://code.storage/docs/guides/capture-agent-state.md) make that disagreement explicit at the move.
+
 **Rules are advisory, computed where they are enforced.**
 - The daemon computes `rules = sha256(canonical{crosses kinds, steward-scope names})` over **the allow-list it has loaded**, with comments stripped. It advertises this in `epr peer status`, and from A12 in the head.
 - `berth` reads it from the daemon, never from a session's worktree. The digest is per device, not per session moor.
@@ -204,6 +206,7 @@ Current `berth` uses exits 0, 1, 2, 3, and 4 (`genesis/agentic/bin/berth:82-87`)
 **Exec floor proven first:**
 - Add a candidate-path preflight using existing `epr check`, `epr ready [--target REF] [--deep]`, and `epr peer serve`; there is no current `serve --check` (`elohim/eprfs/epr-cli/src/main.rs:394-395`). It proves exec floor, roster, head-table parse, store open, and loaded-rules digest without binding or writing a lease.
 - Extend `bin_store/landing.rs:226` `health()` (called from `land` at `:114`) to run that preflight, so `current` never moves to a release that fails it.
+- Move bin-store `current` by the A3 compare-and-swap, naming the expected prior release CID. Candidate bytes land immutably before that move; a launcher holding a stale prior gets a refusal it can diagnose rather than a stranded split view ([Anthropic Scion](https://www.anthropic.com/engineering/redesigning-source-control); [code.storage](https://code.storage/docs/guides/capture-agent-state.md)).
 - Packaging carries a nonempty `envelope.wireEpochs` (`genesis/a2o/scripts/epr-release-package.ts:1733-1738`; `elohim/elohim-storage/src/services/release_adoption/verify.rs:436-440`). Epoch negotiation and drop-epoch refusal remain proposed and require verification against the initialized rakia pin.
 
 **Fallback (corrected target):**
@@ -231,6 +234,7 @@ Current `berth` uses exits 0, 1, 2, 3, and 4 (`genesis/agentic/bin/berth:82-87`)
 - On the real network the only human is `human:matthew`; every other human is a genesis test fixture. Agent output therefore records PRINCIPAL `human:matthew` as provider, with persona `agent:<role>@<model>`, session and device recorded as PROVENANCE. **"Vendor is provenance not payee."**
 - `_observation.py:187-196` carries the persona, session and device provenance without minting a separate economic party. `ram-guard.py:379` takes the provider principal from `epr actor current --device`.
 - Persona-level economic attribution and multi-human accounting are exercised in Simulacra, the declared network-stakes stage in `elohim/elohim-storage/src/trust/stage.rs`, until a second real human enrolls or an agent persona earns standing.
+- A session's effective capability is the intersection of `human:matthew`'s grant and the `agent:<role>@<model>` role capability, never the whole device. This is capability attenuation, not a second principal: attribution remains PRINCIPAL `human:matthew`, with role, session and device as PROVENANCE. [GitLab's composite identity](https://docs.gitlab.com/user/duo_agent_platform/) supplies the intersection rule; this design keeps the A5 principal ruling.
 - Rename `CLAIM_SIGNED_SOURCE` to `standing-device`. The change is additive.
 - Reconcile `agent-identity-claim-and-acceptance.feature:73`.
 
@@ -292,6 +296,8 @@ Current `berth claim` accepts resource, class, TTL, note, closure, and offline o
 
 This slice adds the smallest bridge between projected intent identity and the existing berth resource claim. Failure-fingerprint claims remain a later extension.
 
+Each projected work item also gets a stable change id. It is carried as a commit trailer, survives amend and rebase, and is distinct from the content-specific commit oid. Claims key on this id, not on a SHA. The model is [jj's change id](https://docs.jj-vcs.dev/latest/glossary/) and Gerrit's [`Change-Id`](https://gerrit-review.googlesource.com/Documentation/user-changeid.html); Tangled independently keys stacked rounds by jj change id ([source](https://blog.tangled.org/stacking)).
+
 - **Test:** two devices claim one projected gap within 30 s; the second is refused, naming the holder, before any build.
 - **Rollback:** revert. **Wire:** in-epoch.
 
@@ -302,6 +308,10 @@ This slice adds the smallest bridge between projected intent identity and the ex
 **A7a (fallback, no Rust).** Introduce a proposed `dev-landing@1 offer {oid, base, carrier}` crossing. Today the sole crossing measure is `dev-berth-events@1`, admitting only `moor`, `unmoor`, `claim`, `renew`, `release`, `override`, `note`, and `shed` (`genesis/agentic/pool-policy.json:151-157`). `refs/offers/<lane>` on origin is used only when the peer link is down. `feat/<lane>` branches are never offer carriers. The carrier is posted landing intents only, never drafts.
 
 The offer record carries `carrier: bundle:<cid> | ref:refs/offers/<lane>`. Switching carrier is data, not a branch convention.
+
+The offer carries the A6 stable change id as a commit trailer and keys the handoff on it, not on the offered oid. The oid still identifies the exact bytes for verification; the change id identifies the claim across rebases ([jj glossary](https://docs.jj-vcs.dev/latest/glossary/); [Gerrit Change-Id](https://gerrit-review.googlesource.com/Documentation/user-changeid.html)).
+
+Every offer also carries a `walkthrough` record: claims, proof entries by kind (`attestation_cid`, `gate_verdict`, `build_number`), and an explicit `unproven` list. The walkthrough is frozen with the landed revision and cites the stable change id plus the exact offered oid. Garden's walkthroughs make claims and `unproven` first-class ([source](https://docs.gardenscm.ai/concepts/walkthroughs/)); the overnight re-typed prose fix would have been checkable under this shape.
 
 **Rakia primitive.** The bundle is an artifact from day one: ≤1 MiB CIDv1 chunks on the dataplane, named by a manifest entry carrying kind, base and tip. The bundle emits a ValueFlows `produce` event beside the artifact, accounted to PRINCIPAL `human:matthew` with agent persona, session and device as provenance, and carries `depends-on` and `cites` edges to upstream contributions so later value tracing does not require reconstructing Git history.
 
@@ -323,13 +333,17 @@ A8 remains blocked on A0 probe 1 and a reviewed participant-binding design.
 
 Everything here is proposed unless identified as current. No landing queue, train absorption, change-class resolver, or landing trailers exist today. Current integration claims before gates, defaults to a 1,800-second TTL, renews every TTL/3, holds leases through gates, and then pushes (`.husky/pre-push.bash:115-145,194-227,255-327`). Current `BERTH_NEEDS` remains commit-tag-derived at lines 260-270; untagged storage or doorway paths do not add `alpha-fleet`.
 
-**Record:** introduce `dev-landing@1 intent {base, tip oid, carrier, per-gate closure keys + evidence hit/miss/signer, eta, actor, lane, state}`. The integrator recomputes class, paths, and dispatch from the fetched oid and base-tree manifests.
+**Record:** introduce `dev-landing@1 intent {change_id, base, tip oid, carrier, per-gate closure keys + evidence hit/miss/signer, eta, actor, lane, state}`. The `change_id` is the A6 stable trailer identity, so the intent and its attestations survive rebase; base and tip still bind the exact candidate bytes. The integrator recomputes class, paths, and dispatch from the fetched oid and base-tree manifests.
+
+The first working form is a brit note in `refs/notes/brit/proposal`: a forge-independent proposal written by agents and invisible to Jenkins. It is the implementable precursor to brit's planned `MergeProposalContentNode`, carrying the intent, walkthrough and evidence links around the commit. Governance tallies do not enter brit: brit reads the consent requirements, while qahal owns deliberation and tallies. Git notes are already demonstrated as a mergeable review and CI sidecar by [git-appraise](https://github.com/google/git-appraise).
 
 **Rakia primitive.** A landing intent references closure CIDs and artifact CIDs; the queue orders the constellation, not branch names. It emits a ValueFlows `deliver-service` event beside the artifact, accounted to PRINCIPAL `human:matthew` with agent persona, session and device as provenance, and carries the artifact's `depends-on` and `cites` contribution edges.
 
 **Change-class resolver:** add one resolver behind a loosely coupled interface; none is currently declared in `genesis/orchestrator/.epr-meta/`, whose manifest adds no author-time rule (`manifest.md:18-32`). The proposed classes remain 0, low, channel, governance, high, and global.
 
 **Queue:** add a landing-intent projection. `lease_view.rs` currently projects steward leases and tie-breaks concurrent leases by `claimed_at`, device DID, then session (`elohim/eprfs/eprfs-peer/src/lease_view.rs:16-28`); it does not implement causal landing order or `env:order=cid-1`.
+
+Each landing-tip advance is the A3 compare-and-swap over one expected prior tip. The proposal note and candidate content are immutable writes completed before that move; queue projection never turns a set of content writes into an implicit multi-head transaction ([Anthropic Scion](https://www.anthropic.com/engineering/redesigning-source-control)).
 
 **Liveness:** current heads contain only `device`, `root`, `seq`, `at`, `folded`, and `signature` (`elohim/eprfs/eprfs-peer/src/head.rs:26-40`). Proposed `dormant_after_s`, `live[]`, dormant skipping, and absorption require A12 first.
 
@@ -373,6 +387,8 @@ This slice designs a tolerant reader and dual-v2 subscription explicitly. It cho
 Only v1 `ChannelHead {device, root, seq, at, folded, signature}` exists today. There is no `HeadV2`, `live/1`, top-level `epr space`, or native `say|inbox|ack|view`. `berth say` remains Python and already exits 1 when its note does not reach the channel store. Berth and pre-push continue renewal records.
 
 The proposed contract remains: HeadV2 adds epoch, capabilities, advisory rules, nack digest, liveness, and binary hints; topic v2 is space-derived; native space verbs replace wrappers only after the CLI exists; renewals stop only after measured deployed liveness on every admitted peer; mixed-epoch and partition tests gate contraction.
+
+HeadV2 does not weaken A3: publishing a new signed space head is one compare-and-swap naming the exact prior head. The records and content root are immutable writes; lease, lane, landing and rakia-channel consumers each reject a stale expected prior rather than reconciling two notions of `current` after the fact ([Anthropic Scion](https://www.anthropic.com/engineering/redesigning-source-control)).
 
 Current bin status exposes `head` as a release CID plus `resolvedCid` and `resolved`; binary members live in `Release.bins`. There is no current `head.bins.epr` or head `caps` (`device-runtime/src/bin_store/mod.rs:213-221,276-293`).
 
@@ -538,6 +554,7 @@ Each rung works with the rungs above absent. Triggers are evidence, never dates.
 - **Sibling space.** It links to `collective:ethosengine/elohim` (`familiar`), with admission by `Membership`. Matthew's personal space continues. One store serves both topics.
 - **Willow shape.** The collective space is owned; each member owns a communal subspace `space/<plane>/<origin>`.
 - **Resources move one at a time with a dual window:** first `dev-integration`, then `jenkins-dispatch` and `alpha-fleet`. This is this design's proposed order; `genesis/docs/superpowers/specs/2026-10-04-commons-pool-as-collective-party-design.md:110-118` specifies draw admission, not this migration.
+- **Lock-free where divergence is cheap.** Notes, threads, lane-local heads and other reversible records accept concurrent writes and surface divergence for resolution. Leases remain only for irreversible or expensive acts such as Jenkins dispatch, alpha-fleet use and canonical landing. [jj's operation log](https://docs.jj-vcs.dev/latest/technical/concurrency/) proves the detect-and-resolve shape; a refusal is not the default coordination mechanism.
 - **Rulebook as a governed EPR:**
   - `rulebook-amend` records take effect on fold. Git is a mirror (G4).
   - **Narrowing your own grant is immediate.** A narrowing that cuts another member's resources, kinds or standing is priced as a widening of the narrower's power: it needs a non-author Steward verdict and expires after a short window unless confirmed.
@@ -553,9 +570,12 @@ Each rung works with the rungs above absent. Triggers are evidence, never dates.
   - The **unhalt and pre-expiry fleet override** acts move from hook-stamped clauses to a device-key signature behind a TTY confirmation.
 - **brit + rakia as the integration and review plane:**
   - brit-native integrate is the CAS, and the forge is a mirror. Canonical `dev` is a cref with threshold 2 including one non-author.
+  - Issues, reviews, threads and proposals are typed collective-space records on the same dataplane replication as code. Git refs or notes are only the degraded carrier, never a third transport. This follows Radicle's [Collaborative Objects](https://radicle.dev/guides/protocol) and git-bug's [operation model](https://raw.githubusercontent.com/git-bug/git-bug/master/doc/design/data-model.md) while keeping conversation, commitment and presence as different record types.
   - **Landing intents, review records (`brit attest`, `Reviewed-By:`) and walkthroughs stay collective-space B records held by members.** They are never on the lamad `Content` valve, whose custody is every content-DHT arc holder and whose head plane is global. Only outcomes that need public reach — a landed release manifest, a ratified lineage — are notarised (valve or mishpat), at a few per release.
   - Cross-member verdicts are recomputed, or confirmed by a different-lineage builder.
   - rakia reach climbs by ceremony.
+- **Derived views are pure functions of CIDs.** eprfs folds, rakia indexes and brit attribution take content CIDs plus parent-derived CIDs and produce verifiable derived CIDs. Any peer may compute or cache them without trusting the server that served them; this is [Anthropic Scion's derived-data model](https://www.anthropic.com/engineering/redesigning-source-control).
+- **Want-based sparse fetch.** Rakia serves a session the root manifest and then only requested subtrees and blobs. The human's device remains the local-first unit and can hold the full set; an agent session is a sparse client of that device and needs no full clone ([Anthropic Scion](https://www.anthropic.com/engineering/redesigning-source-control)).
 - **Standing:**
   - Ledgers are **held per space**; there is no global aggregator.
   - Portability is presented by the holder and consented per space.
@@ -656,6 +676,10 @@ The decision remains expand → contract: readers expand first, writers move onl
 
 Rakia names the whole system: repository (brit refs and attestations), registry (manifest entries over CIDs, with channel heads as declared dependencies), build cache (attested closures → artifacts), CI/CD (stages forge stars; verdicts are weighted by independence and standing), and experience. Stars are artifacts: content-addressed blobs on the dataplane. Their dependency graph is the constellation.
 
+brit does not replace git transport. Git over p2p and fork governance stay off the critical path. brit owns the social and evidence layer around commits—proposals, reviews, attestations and walkthroughs—on the signed, content-addressed note store CI already trusts. Radicle shows social objects beside code ([source](https://radicle.dev/guides/protocol)); git-appraise shows reviews and CI in namespaced notes ([source](https://github.com/google/git-appraise)).
+
+The field has split three ways: agent-scale centralisation ([Anthropic Scion](https://www.anthropic.com/engineering/redesigning-source-control), [GitLab](https://about.gitlab.com/blog/scaling-git-for-agentic-software-engineering/), [Garden](https://docs.gardenscm.ai/) and [code.storage](https://code.storage/docs/getting-started/introduction)); social objects replicated beside code ([Radicle](https://radicle.dev/guides/protocol), [git-bug](https://raw.githubusercontent.com/git-bug/git-bug/master/doc/design/data-model.md), [jj](https://docs.jj-vcs.dev/latest/technical/concurrency/), [Willow](https://willowprotocol.org/) and [Keyhive](https://www.inkandswitch.com/keyhive/notebook/)); and agent provenance as a git sidecar ([Entire](https://docs.entire.com/guides/sessions/overview) and GitLab agent governance). This design composes all three under governance: sparse agent-scale reads, peer-replicated typed objects and brit evidence linked to commits. The scans found no other design doing all three. Entire's transcript capture and GitLab's reasoning visibility remain rejected: thoughts are private; fruit is judged.
+
 The experience is an asked-for, perspective-relative view: a Cybersyn control room showing algedonic signals such as breached bounds, a stalled queue head or a halt. It renders what the primitives already make true and owns no data. It shows your own grant in full, other grants only as their rulebooks allow, and siblings as one constellation, never as independent witnesses. No lever bypasses the holders except halting your own grant.
 
 Value flows back to every steward. Every forge, attest, review, use and custody act is an REA event. The aggregate sky is visible to all—**"everyone gets to look at the sky"**—while per-object detail requires reach or relationship: **"not having a telescope you might not see the intricacies of any particular object (anonymity in aggregate), but they're accounted for"**. This is SDO/RWA boundary 6: participation detail remains sensitive even when the aggregate is visible. Anyone with compute in a community can forge at S2/S3, inheriting the EPR primitives for governance, story, VSM, accountability and REA.
@@ -666,6 +690,8 @@ Value flows back to every steward. Every forge, attest, review, use and custody 
 
 ## 6. The forward-looking arm's standing home
 **No new instrument.** Extend the packaged `mem-horizon-scan` skill with `domain: scm-coordination`.
+
+“Scion (Anthropic)” is Anthropic's internal source-control system, confirmed by Anthropic's 2026-10-13 engineering post, [“Redesigning source control at Anthropic”](https://www.anthropic.com/engineering/redesigning-source-control). [Google Cloud's Scion](https://github.com/GoogleCloudPlatform/scion) is unrelated: an agent hypervisor with a hub and messaging plane, and the closest prior art here to `berth say/inbox` ([docs](https://googlecloudplatform.github.io/scion/)).
 
 **Sources:** `genesis/agentic/horizon/scm-coordination-sources.md`, append-only. Seeds:
 - Scion;
@@ -705,7 +731,7 @@ Value flows back to every steward. Every forge, attest, review, use and custody 
 - Speculative parallel trains, bisection on Jenkins, or culprit search with evidence reuse.
 - An `agent:ci-runner-*` persona, or an LLM witness session.
 - Device-key signatures per act at S1, or agent keys at S1.
-- A git-notes or sealed second carrier, or home-grown group encryption.
+- A git-notes byte carrier or sealed second byte carrier, or home-grown group encryption. `refs/notes/brit/proposal` carries social and evidence records, not offered code bytes.
 - ark `RevertToPreviousClosure`.
 - qahal entry or link types; extension of `Discussion`; per-message notarization; landing intents or review records on the lamad `Content` valve.
 - `amends-constitution` as a coordinator-only action; any lineage "quorum" validated only by count of keys; keying `progenitor_pubkey` in roles other than mishpat as part of this plan.
@@ -736,7 +762,7 @@ Each correction is recorded through the governed flow; managed citations use `ep
 5. Mishpat quorum caveats remain: no integrity arm, unchecked coordinator signers, payload-controlled k, and no authoritative integrity roster.
 6. The receive-side allow-list exists at `fold.rs:308`; ack/fold and per-leaf failure behavior are the defects under repair.
 7. Current participant standing is attribution, “not a gate” (`elohim/epr-rea/src/participants.rs:14-17`). Space admission and S2 caps remain proposed.
-8. No Horizon Scan 3 Scion refutation exists in `genesis/docs/analysis/horizon-scans/2026-09-06.md`.
+8. “Scion (Anthropic)” is Anthropic's internal source-control system, confirmed by Anthropic's 2026-10-13 engineering post, [“Redesigning source control at Anthropic”](https://www.anthropic.com/engineering/redesigning-source-control). [Google Cloud's Scion](https://github.com/GoogleCloudPlatform/scion) is an unrelated agent hypervisor with a messaging plane, the closest prior art here to `berth say/inbox`.
 9. Pre-push target/message collection is `.husky/pre-push.bash:238-253`; tag-derived `alpha-fleet` and `jenkins-dispatch` are at `:260-267`.
 10. The Python resolver accepts both `bafkrei…` and `bafyrei…` since `6c0c4f7e7`.
 11. No committed `sprint-lands-each-closure-once` habit exists. The active habits are `dataplane-convergence` and `push-delivers-within-budget`; 57 are declared.
