@@ -38,6 +38,21 @@ export GIT_WORK_TREE="$HOOK_WORK_TREE"
 export GIT_DIR="$HOOK_GIT_DIR"
 # ── Git context anchored ────────────────────────────────────────
 
+# ── Attested submodules checked out ─────────────────────────────
+# brit, rakia and sophia declare their attested gate projects in manifests that
+# live inside each submodule. A tree without them runs every gate, then the
+# orchestrator gate's registry and oracle tests fail (2026-10-27: refused at
+# 104 s, after eprfs had spent 5231 s). Refuse before any gate starts.
+attested_submodules_missing() {
+  git submodule status -- elohim/brit elohim/rakia sophia 2>/dev/null | awk '/^-/ { print $2 }'
+}
+MISSING_SUBMODULES=$(attested_submodules_missing | xargs)
+if [ -n "$MISSING_SUBMODULES" ]; then
+  echo "[pre-push] REFUSED: not checked out: $MISSING_SUBMODULES. Run: git submodule update --init $MISSING_SUBMODULES" >&2
+  exit 1
+fi
+# ── Attested submodules present ─────────────────────────────────
+
 # Detects projects and executes typed gate recipes from build-manifest.json.
 # The shared runner supplies cargo-pool/RUSTFLAGS context for native workspaces.
 # Representative projects:
