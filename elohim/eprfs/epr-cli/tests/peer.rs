@@ -436,6 +436,33 @@ fn berth_record(
     event
 }
 
+fn gate_verdict_record(
+    project: &str,
+    closure: &str,
+    commit: &str,
+    success: bool,
+    via: Option<&str>,
+) -> FlowEvent {
+    let mut event = claim("gate");
+    event.classified_as = vec![
+        "run:observation".into(),
+        ".".into(),
+        "reason:verdict".into(),
+        "measure:gate-verdict@1".into(),
+        format!("env:project={project}"),
+        format!("env:closure={closure}"),
+        format!("env:commit={commit}"),
+        format!("env:success={success}"),
+        "env:seconds=12".into(),
+        "env:attestationId=bafyattestation".into(),
+        "env:agentId=agent-key".into(),
+    ];
+    if let Some(device) = via {
+        event.classified_as.push(format!("via:{device}"));
+    }
+    event
+}
+
 fn steward_policy(dir: &Path) -> PathBuf {
     let policy = dir.join("steward-policy.json");
     std::fs::write(
@@ -533,6 +560,59 @@ fn peer_leases_prints_the_steward_view_while_serve_holds_its_lock() {
         })
     );
     assert!(view.get("cargo").is_none(), "container-scoped: {view}");
+}
+
+#[test]
+fn peer_verdicts_reads_only_matching_folded_admitted_siblings() {
+    let (keys, a, b) = household();
+    let a_did = a.key.did_key();
+    let stranger = Device::new(&keys, "stranger-verdict");
+    append(
+        b.checkout.path(),
+        [
+            gate_verdict_record("eprfs", "closure-a", "commit-a", true, Some(&a_did)),
+            gate_verdict_record("eprfs", "closure-b", "commit-b", false, Some(&a_did)),
+            gate_verdict_record("eprfs", "closure-a", "own", false, None),
+            gate_verdict_record(
+                "eprfs",
+                "closure-a",
+                "stranger",
+                false,
+                Some(&stranger.key.did_key()),
+            ),
+        ],
+    );
+    let out = b.epr(&[
+        "peer",
+        "verdicts",
+        "--project",
+        "eprfs",
+        "--closure",
+        "closure-a",
+        "--json",
+        "--root",
+        b.root(),
+    ]);
+    assert!(
+        out.status.success(),
+        "{}",
+        String::from_utf8_lossy(&out.stderr)
+    );
+    let rows: serde_json::Value = serde_json::from_slice(&out.stdout).unwrap();
+    assert_eq!(
+        rows,
+        serde_json::json!([{
+            "device": a_did,
+            "project": "eprfs",
+            "closure": "closure-a",
+            "commit": "commit-a",
+            "success": true,
+            "seconds": 12.0,
+            "attestationId": "bafyattestation",
+            "agentId": "agent-key",
+            "at": "2026-10-23T15:28:09Z"
+        }])
+    );
 }
 
 #[test]

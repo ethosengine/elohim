@@ -12,6 +12,8 @@
 //!   names, whether this device's lease is effective, pending or unconfirmed, or another device
 //!   holds it. It reads the flow store and the head table only, never the network, so it answers
 //!   while `serve` runs; berth polls it to settle a steward-scoped claim.
+//! - `verdicts` reads completed gate verdicts folded from admitted sibling devices. It is a pure
+//!   local projection read; sibling evidence never becomes an independent witness or quorum vote.
 //!
 //! The iroh key lives at `$XDG_CONFIG_HOME/epr/peer/iroh.key` (mode 0600). Neither it nor the
 //! device key is ever printed, logged or copied: the device key is reached only as a signer.
@@ -23,11 +25,11 @@ use std::process::ExitCode;
 use std::sync::Arc;
 use std::time::{SystemTime, UNIX_EPOCH};
 
-use elohim_epr_rea::ParticipantRow;
+use elohim_epr_rea::{FlowEvent, FlowStore, ParticipantRow};
 use eprfs_peer::{
-    lease_events, other_devices, peer_from_arg, relay_from_env, roster_rows_from_file,
-    steward_lease_view, Admission, CrossingAllowList, HeadTable, LeaseVerdict, NodeAddr,
-    PeerConfig, PeerDaemon, PeerError, PeerKey, StewardScope,
+    lease_events, other_devices, peer_from_arg, relay_from_env, roster_rows_from_file, slots,
+    steward_lease_view, via_device, Admission, CrossingAllowList, HeadTable, LeaseVerdict,
+    NodeAddr, PeerConfig, PeerDaemon, PeerError, PeerKey, StewardScope, KIND_SLOT, MEASURE_SLOT,
 };
 use serde::Serialize;
 
@@ -38,6 +40,9 @@ use crate::device_key::{self, DeviceKey};
 
 /// Where the crossing allow-list is read from, under the checkout.
 pub const POLICY_REL: &str = "genesis/agentic/pool-policy.json";
+
+/// The crossing measure carrying completed gate runs between one steward's devices.
+const GATE_VERDICT_MEASURE: &str = "gate-verdict@1";
 
 /// Why an `epr peer` verb could not run.
 #[derive(Debug, thiserror::Error)]
@@ -86,7 +91,9 @@ pub fn usage() -> String {
      | leases [--root DIR] [--handle H] [--policy PATH] [--json] \
      (the steward lease view: per steward-scoped resource, effective | pending | unconfirmed | \
      held_by, read from the flow store and the head table; exits non-zero only when it cannot \
-     be computed)>"
+     be computed)\n  \
+     | verdicts --project P --closure K [--root DIR] [--handle H] [--json] \
+     (completed gate verdicts folded from admitted sibling devices only)>"
         .to_string()
 }
 
@@ -101,9 +108,14 @@ pub fn run(args: &[String]) -> PeerResult<ExitCode> {
         Some("serve") => serve(Options::parse(&args[1..])?),
         Some("status") => status(&Options::parse(&args[1..])?),
         Some("leases") => leases(&Options::parse(&args[1..])?),
+        Some("verdicts") => verdicts(&Options::parse(&args[1..])?),
         Some(other) => Err(PeerCliError::InvalidArguments(format!(
             "unknown peer verb `{other}`{}\n{}",
-            crate::hint::did_you_mean(other, "epr peer", &["id", "serve", "status", "leases"]),
+            crate::hint::did_you_mean(
+                other,
+                "epr peer",
+                &["id", "serve", "status", "leases", "verdicts"],
+            ),
             usage()
         ))),
         None => Err(PeerCliError::InvalidArguments(usage())),
@@ -118,6 +130,8 @@ pub struct Options {
     pub listen: Option<SocketAddrV4>,
     pub peers: Vec<String>,
     pub policy: Option<PathBuf>,
+    pub project: Option<String>,
+    pub closure: Option<String>,
     pub json: bool,
 }
 
@@ -142,6 +156,8 @@ impl Options {
                 "--root" => options.root = PathBuf::from(value),
                 "--handle" => options.handle = Some(value),
                 "--policy" => options.policy = Some(PathBuf::from(value)),
+                "--project" => options.project = Some(value),
+                "--closure" => options.closure = Some(value),
                 "--peer" => options.peers.push(value),
                 "--listen" => {
                     options.listen = Some(value.parse().map_err(|e| {
@@ -725,6 +741,156 @@ fn leases(options: &Options) -> PeerResult<ExitCode> {
             ),
         };
         println!("{resource:<18} {line}");
+    }
+    Ok(ExitCode::SUCCESS)
+}
+
+/// One completed gate verdict folded from an admitted sibling device.
+#[derive(Debug, Serialize)]
+#[serde(rename_all = "camelCase")]
+struct GateVerdict {
+    device: String,
+    project: String,
+    closure: String,
+    commit: String,
+    success: bool,
+    seconds: f64,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    attestation_id: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    agent_id: Option<String>,
+    at: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    head_seq: Option<u64>,
+}
+
+fn one_slot<'a>(event: &'a FlowEvent, prefix: &str) -> Option<&'a str> {
+    let mut values = slots(event).filter_map(|slot| slot.strip_prefix(prefix));
+    let value = values.next()?;
+    values.next().is_none().then_some(value)
+}
+
+fn verdict_from_event(
+    event: &FlowEvent,
+    me: &str,
+    project: &str,
+    closure: &str,
+    admission: &Admission,
+    heads: &HeadTable,
+) -> Option<GateVerdict> {
+    let device = via_device(event)?;
+    if device == me || !admission.admits_device(device) {
+        return None;
+    }
+    if one_slot(event, MEASURE_SLOT)? != GATE_VERDICT_MEASURE
+        || one_slot(event, KIND_SLOT)? != "verdict"
+    {
+        return None;
+    }
+    let env: std::collections::BTreeMap<&str, &str> = slots(event)
+        .filter_map(|slot| slot.strip_prefix("env:")?.split_once('='))
+        .collect();
+    if env.get("project").copied()? != project || env.get("closure").copied()? != closure {
+        return None;
+    }
+    let success = match env.get("success").copied()? {
+        "true" => true,
+        "false" => false,
+        _ => return None,
+    };
+    let seconds = env.get("seconds")?.parse::<f64>().ok()?;
+    if !seconds.is_finite() || seconds < 0.0 {
+        return None;
+    }
+    Some(GateVerdict {
+        device: device.to_string(),
+        project: project.to_string(),
+        closure: closure.to_string(),
+        commit: (*env.get("commit")?).to_string(),
+        success,
+        seconds,
+        attestation_id: env.get("attestationId").map(|value| (*value).to_string()),
+        agent_id: env.get("agentId").map(|value| (*value).to_string()),
+        at: event.occurred_at.clone(),
+        head_seq: heads.devices.get(device).map(|head| head.seq),
+    })
+}
+
+/// `epr peer verdicts`: matching verdicts folded from admitted devices other than this one.
+fn verdicts(options: &Options) -> PeerResult<ExitCode> {
+    let project = options
+        .project
+        .as_deref()
+        .filter(|value| !value.is_empty())
+        .ok_or_else(|| {
+            PeerCliError::InvalidArguments(format!("--project needs a value\n{}", usage()))
+        })?;
+    let closure = options
+        .closure
+        .as_deref()
+        .filter(|value| !value.is_empty())
+        .ok_or_else(|| {
+            PeerCliError::InvalidArguments(format!("--closure needs a value\n{}", usage()))
+        })?;
+    let table = HeadTable::load(&peer_dir()?)?;
+    let root = table
+        .store
+        .as_ref()
+        .map_or_else(|| options.root.clone(), |place| place.root.clone());
+    if let Some(place) = table.store.as_ref().filter(|place| !place.log.is_file()) {
+        return Err(PeerCliError::InvalidArguments(format!(
+            "the channel store `{}` that epr peer serve recorded is gone; restart epr peer serve \
+             on this device's checkout",
+            place.log.display()
+        )));
+    }
+    let (device, admission) = match standing(&root, options.handle.as_deref())? {
+        Standing::Device(device) => *device,
+        Standing::NotADevice(why) => return Err(PeerCliError::InvalidArguments(why)),
+        Standing::Revoked(did) => {
+            return Err(PeerCliError::InvalidArguments(format!(
+                "{did} is revoked: this device's binding is contested"
+            )))
+        }
+    };
+    let did = device.key.did_key();
+    if !admission.admits_device(&did) {
+        return Err(PeerCliError::InvalidArguments(
+            "no PeerEndpoint row names this device's peer (run: epr actor device endpoint)".into(),
+        ));
+    }
+    let log = root.join(".eprfs/status/flows.jsonl");
+    if !log.is_file() {
+        return Err(PeerCliError::InvalidArguments(format!(
+            "this checkout has no flow store at `{}`; nothing of this device's channel is here",
+            log.display()
+        )));
+    }
+    let store = elohim_epr_rea::SidecarFlowStore::open(&root)
+        .map_err(|e| PeerCliError::Peer(PeerError::FlowStore(e)))?;
+    let rows: Vec<_> = store
+        .events()
+        .map_err(|e| PeerCliError::Peer(PeerError::FlowStore(e)))?
+        .into_iter()
+        .filter_map(|(_, event)| {
+            verdict_from_event(&event, &did, project, closure, &admission, &table)
+        })
+        .collect();
+    if options.json {
+        println!("{}", serde_json::to_string_pretty(&rows)?);
+    } else if rows.is_empty() {
+        println!("no sibling verdict for {project} closure {closure}");
+    } else {
+        for row in rows {
+            println!(
+                "{}  {}  {}  {}s  commit {}",
+                short(&row.device),
+                if row.success { "green" } else { "red" },
+                row.at,
+                row.seconds,
+                row.commit
+            );
+        }
     }
     Ok(ExitCode::SUCCESS)
 }

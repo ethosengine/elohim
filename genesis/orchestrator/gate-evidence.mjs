@@ -9,9 +9,10 @@
 // — a rebase, a docs-only commit, the integrator's fast-forward — can read the evidence
 // instead of paying the recipe again (elohim-storage: 1875 s on average, measured).
 //
-// Reuse is opt-in and accepts only this workspace's newest green attestation. Evidence
-// reads are fail-open; a missing brit, fingerprint, or required git object reads as
-// `unavailable (<reason>)`, and the gate runs as it always has.
+// Reuse is opt-in. The local path accepts this workspace's newest green attestation unchanged;
+// after a local miss, an admitted sibling device's crossing verdict may stand in under D5's
+// red, dirt, selector and governance fences. Evidence reads are fail-open; a missing brit,
+// fingerprint, device read, or required git object runs the gate as it always has.
 
 import { nativeGateKey, nativeGateState, usesNativeClosure } from './gate-source-state.mjs';
 import { spawnSync } from 'child_process';
@@ -279,21 +280,96 @@ export function ageOf(iso, now = Date.now()) {
   return `${Math.round(s / 86_400)}d ago`;
 }
 
+// D5: "the space never rides what it upgrades". A sibling verdict cannot judge candidate
+// bytes that change the gate, its crossing substrate, admission, or measure vocabulary.
+export const SIBLING_REUSE_GOVERNANCE_PATHS = Object.freeze([
+  'genesis/orchestrator/gate-evidence.mjs',
+  'genesis/orchestrator/gate-runner.mjs',
+  'genesis/orchestrator/gate-*.mjs',
+  'genesis/agentic/pool-policy.json',
+  'elohim/eprfs/eprfs-peer/**',
+  'elohim/eprfs/epr-cli/src/peer.rs',
+  '.claude/epr-meta/measures.yaml',
+]);
+
+function isSiblingGovernancePath(path) {
+  return SIBLING_REUSE_GOVERNANCE_PATHS.some(rule => {
+    if (rule.endsWith('/**')) return path.startsWith(rule.slice(0, -2));
+    if (rule.includes('*')) {
+      const [before, after] = rule.split('*');
+      return path.startsWith(before) && path.endsWith(after);
+    }
+    return path === rule;
+  });
+}
+
+/** Whether HEAD changes sibling-reuse governance from its integration merge base. Fail closed. */
+export function siblingGovernanceChange({ root, spawn = spawnSync }) {
+  let base = gitRead(root, ['merge-base', 'HEAD', 'origin/dev'], spawn)?.trim();
+  if (!base) base = gitRead(root, ['merge-base', 'HEAD', 'dev'], spawn)?.trim();
+  if (!base) return { changed: true, why: 'integration merge base unavailable' };
+  const names = gitRead(root, ['diff', '--name-only', base, 'HEAD'], spawn);
+  if (names === null) return { changed: true, why: 'governance diff unavailable' };
+  const paths = names.split('\n').filter(Boolean).filter(isSiblingGovernancePath);
+  return paths.length > 0
+    ? { changed: true, why: `governance-class change: ${paths[0]}`, paths }
+    : { changed: false, paths: [] };
+}
+
+/** Admitted sibling verdict rows from the native device-channel read. Any failure is a miss. */
+export function siblingVerdicts(project, key, { root, env = process.env, spawn = spawnSync }) {
+  try {
+    const r = spawn(env.EPR_BIN || 'epr', [
+      'peer', 'verdicts', '--project', project.name, '--closure', key, '--json', '--root', root,
+    ], { cwd: root, encoding: 'utf8', timeout: 5_000 });
+    if (r.status !== 0) return { candidates: [], error: 'epr peer verdicts failed' };
+    const rows = JSON.parse(r.stdout);
+    if (!Array.isArray(rows)) return { candidates: [], error: 'epr peer verdicts: not an array' };
+    return { candidates: rows.map(row => ({ source: 'sibling', ...row })) };
+  } catch {
+    return { candidates: [], error: 'epr peer verdicts unavailable' };
+  }
+}
+
 /** A green older than a red is not a reusable verdict, even if the report shows it. */
-export function reusableHit(evidence, { selfId, enabled, mode, selectorCheck }) {
+export function reusableHit(evidence, {
+  selfId, enabled, mode, selectorCheck, candidates = [], admitCandidate = () => false,
+}) {
   if (mode !== 'reuse') return { reuse: false, why: 'report-only' };
   if (!enabled) return { reuse: false, why: 'project not enabled for reuse' };
   if (selfId == null) return { reuse: false, why: 'no workspace key' };
   const row = [...(evidence.rows || [])].sort(
     (a, b) => Date.parse(b.attestation?.builtAt || 0) - Date.parse(a.attestation?.builtAt || 0)
   )[0];
-  if (!row) return { reuse: false, why: 'no attestation for this closure yet' };
-  if (row.attestation?.success !== true) return { reuse: false, why: 'newest attestation is red' };
-  if (row.attestation.agentId !== selfId) return { reuse: false, why: `signer ${String(row.attestation.agentId || 'unsigned').slice(0, 12)} is not this workspace` };
+  if (row?.attestation?.success === true && row.attestation.agentId === selfId) {
+    if (evidence.dirty !== false) return { reuse: false, why: evidence.dirty === true ? 'declared inputs dirty' : 'working tree state unknown' };
+    const selected = selectorCheck(row.commit);
+    if (!selected.ok) return { reuse: false, why: selected.message };
+    return { reuse: true, row };
+  }
+
+  const siblings = candidates.filter(candidate =>
+    candidate?.source === 'sibling'
+    && candidate.project === evidence.project
+    && candidate.closure === evidence.key
+    && admitCandidate(candidate));
+  if (siblings.length === 0) {
+    if (!row) return { reuse: false, why: 'no attestation for this closure yet' };
+    if (row.attestation?.success !== true) return { reuse: false, why: 'newest attestation is red' };
+    return { reuse: false, why: `signer ${String(row.attestation.agentId || 'unsigned').slice(0, 12)} is not this workspace` };
+  }
+  // Cross-device clocks are display-only. Any red is a veto; verdicts are never time-ordered.
+  if (siblings.some(candidate => candidate.success !== true)) {
+    return { reuse: false, why: 'sibling verdict is red' };
+  }
+  if ((evidence.rows || []).some(local => local.attestation?.success === false)) {
+    return { reuse: false, why: 'local attestation is red' };
+  }
   if (evidence.dirty !== false) return { reuse: false, why: evidence.dirty === true ? 'declared inputs dirty' : 'working tree state unknown' };
-  const selected = selectorCheck(row.commit);
+  const candidate = siblings[0];
+  const selected = selectorCheck(candidate.commit);
   if (!selected.ok) return { reuse: false, why: selected.message };
-  return { reuse: true, row };
+  return { reuse: true, row: candidate, independence: 'sibling' };
 }
 
 /**
@@ -372,6 +448,7 @@ export function gateEvidence(project, { env = process.env, root, commit, cargoEn
   const checkoutMismatch = env.GATE_EVIDENCE_RECORD === '0';
   if (checkoutMismatch) line += '; pushed commit is not checked out, nothing will be recorded';
   return {
+    project: project.name,
     key,
     material,
     rows: found.rows,
@@ -413,5 +490,66 @@ export function recordEvidence(project, key, { success, seconds, commit, buildRe
     return spawn(buildRefBin, args, { cwd: root, encoding: 'utf8', timeout: 60_000 });
   } catch (error) {
     return { status: 1, stdout: '', stderr: String(error) };
+  }
+}
+
+function buildPutIdentity(stdout) {
+  const text = String(stdout || '').trim();
+  if (!text) return {};
+  try {
+    const value = JSON.parse(text);
+    return {
+      ...(value.attestationId || value.id || value.cid ? { attestationId: value.attestationId || value.id || value.cid } : {}),
+      ...(value.agentId || value.attestation?.agentId ? { agentId: value.agentId || value.attestation.agentId } : {}),
+    };
+  } catch {
+    return { attestationId: text.split('\n').pop() };
+  }
+}
+
+/** Append one completed gate verdict to this device's crossing flow. Best effort, never a gate. */
+export function emitGateVerdict(project, key, {
+  success, seconds, commit, put, root, env = process.env, spawn = spawnSync,
+  warn = line => process.stderr.write(line),
+}) {
+  const epr = env.EPR_BIN || 'epr';
+  const failed = reason => {
+    warn(`[gate] ${project.name} verdict crossing: not emitted (${reason})\n`);
+    return false;
+  };
+  let standing;
+  try {
+    const leases = spawn(epr, ['peer', 'leases', '--json', '--root', root], {
+      cwd: root, encoding: 'utf8', timeout: 5_000,
+    });
+    if (leases.status !== 0) return failed('device standing unavailable');
+    standing = JSON.parse(leases.stdout);
+  } catch {
+    return failed('device standing unavailable');
+  }
+  if (standing?.standing !== 'device') return true;
+  // A sibling checks the commit against its own tree, so `HEAD` must cross as the sha it named here.
+  const sha = gitRead(root, ['rev-parse', '--verify', `${commit}^{commit}`], spawn)?.trim();
+  if (!sha) return failed(`commit ${commit} does not resolve`);
+  const identity = buildPutIdentity(put?.stdout);
+  const fields = {
+    project: project.name,
+    closure: key,
+    commit: sha,
+    success: success ? 'true' : 'false',
+    seconds: String(Math.round(seconds)),
+    ...identity,
+  };
+  const args = [
+    'flow', 'note', '--kind', 'observation', '--measure', 'gate-verdict@1', '--subject', '.',
+    '--value', '1', '--reason', 'verdict',
+  ];
+  for (const [name, value] of Object.entries(fields)) args.push('--env', `${name}=${value}`);
+  args.push('--root', root);
+  try {
+    const emitted = spawn(epr, args, { cwd: root, encoding: 'utf8', timeout: 5_000 });
+    return emitted.status === 0 || failed((emitted.stderr || '').trim().split('\n').pop() || `exit ${emitted.status}`);
+  } catch (error) {
+    return failed(String(error?.message || error).split('\n')[0]);
   }
 }

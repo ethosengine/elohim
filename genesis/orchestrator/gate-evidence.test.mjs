@@ -1,6 +1,7 @@
 /**
  * Gate evidence by input closure — the gate asks "has THIS closure been built?" before it
- * pays the recipe, and records its own verdict after. Reuse is opt-in and self-signed.
+ * pays the recipe, and records its own verdict after. Reuse is opt-in: local self-signed first,
+ * then an admitted sibling verdict under the D5 fences.
  *
  * Run:
  *   node --test genesis/orchestrator/gate-evidence.test.mjs
@@ -17,12 +18,14 @@ import {
   closureKey,
   describeEvidence,
   dirtyPaths,
+  emitGateVerdict,
   findEvidence,
   gateEvidence,
   recordEvidence,
   reusableHit,
   resolveBin,
   selfAgentId,
+  siblingGovernanceChange,
   stepFingerprints,
 } from './gate-evidence.mjs';
 
@@ -58,6 +61,8 @@ const isRevParse = (bin, args) => bin === 'git' && args[0] === 'rev-parse';
 const isStatus = (bin, args) => bin === 'git' && args[0] === 'status';
 const isFind = (bin, args) => bin.endsWith('brit-build-ref') && args[2] === 'build' && args[3] === 'find';
 const isPut = (bin, args) => bin.endsWith('brit-build-ref') && args[2] === 'build' && args[3] === 'put';
+const isPeerVerdicts = (bin, args) => bin === 'epr' && args[0] === 'peer' && args[1] === 'verdicts';
+const isMergeBase = (bin, args) => bin === 'git' && args[0] === 'merge-base';
 const sources = ['elohim/elohim-storage/src/**', '.claude/data/**', 'elohim/brit'];
 const isShow = (bin, args) => bin === 'git' && args[0] === 'show';
 const isTree = (bin, args) => bin === 'git' && args[0] === 'ls-tree';
@@ -259,6 +264,62 @@ test('recordEvidence puts the verdict against the closure with the manifest file
   assert.equal(findEvidence(project, 'k', { buildRefBin: '/x/brit-build-ref', root: '/repo', spawn: () => ({ status: 0, stdout: 'nope', stderr: '' }) }).error, 'build find: not JSON');
 });
 
+test('a completed brit record emits one device-gated crossing verdict and failures stay advisory', () => {
+  const isLeases = (bin, args) => bin === 'epr' && args[0] === 'peer' && args[1] === 'leases';
+  const isNote = (bin, args) => bin === 'epr' && args[0] === 'flow' && args[1] === 'note';
+  const isRevParse = (bin, args) => bin === 'git' && args.includes('rev-parse');
+  const sha = 'abc0000000000000000000000000000000000000';
+  const landed = fakeSpawn([
+    [isLeases, { status: 0, stdout: '{"standing":"device"}' }],
+    [isRevParse, { status: 0, stdout: `${sha}\n` }],
+    [isNote, { status: 0, stdout: '' }],
+  ]);
+  assert.equal(emitGateVerdict(project, 'closure', {
+    success: false, seconds: 12.6, commit: 'abc',
+    put: { stdout: '{"attestationId":"bafyatt","agentId":"agent"}' },
+    root: '/repo', spawn: landed.spawn,
+  }), true);
+  const note = landed.calls.find(call => isNote(call.bin, call.args));
+  assert.ok(note);
+  for (const slot of [
+    'project=elohim-storage', 'closure=closure', `commit=${sha}`, 'success=false', 'seconds=13',
+    'attestationId=bafyatt', 'agentId=agent',
+  ]) assert.ok(note.args.includes(slot), slot);
+
+  const skipped = fakeSpawn([[isLeases, { status: 0, stdout: '{"standing":"not_a_device"}' }]]);
+  const warnings = [];
+  assert.equal(emitGateVerdict(project, 'closure', {
+    success: true, seconds: 1, commit: 'abc', put: {}, root: '/repo', spawn: skipped.spawn,
+    warn: line => warnings.push(line),
+  }), true);
+  assert.equal(skipped.calls.length, 1);
+  assert.deepEqual(warnings, []);
+
+  // `HEAD` crosses as the sha it named here; a commit that does not resolve is not emitted.
+  const unresolved = fakeSpawn([
+    [isLeases, { status: 0, stdout: '{"standing":"device"}' }],
+    [isRevParse, { status: 128, stdout: '' }],
+  ]);
+  assert.equal(emitGateVerdict(project, 'closure', {
+    success: true, seconds: 1, commit: 'HEAD', put: {}, root: '/repo', spawn: unresolved.spawn,
+    warn: line => warnings.push(line),
+  }), false);
+  assert.ok(!unresolved.calls.some(call => isNote(call.bin, call.args)));
+  assert.match(warnings.pop(), /commit HEAD does not resolve/);
+
+  const failed = fakeSpawn([
+    [isLeases, { status: 0, stdout: '{"standing":"device"}' }],
+    [isRevParse, { status: 0, stdout: `${sha}\n` }],
+    [isNote, { status: 2, stdout: '', stderr: 'refused\n' }],
+  ]);
+  assert.equal(emitGateVerdict(project, 'closure', {
+    success: true, seconds: 1, commit: 'abc', put: {}, root: '/repo', spawn: failed.spawn,
+    warn: line => warnings.push(line),
+  }), false);
+  assert.equal(warnings.length, 1);
+  assert.match(warnings[0], /not emitted \(refused\)/);
+});
+
 const seed = '9d61b19deffd5a60ba844af492ec2cc44449c5697b326919703bac031cae7f60';
 const publicKey = 'd75a980182b10ab7d54bfed3c964073a0ee172f3daa62325af021a68f707511a';
 
@@ -420,6 +481,10 @@ const greenRow = { commit: 'aaaaaaaaa1', attestation: { success: true, agentId: 
 const cleanEvidence = { rows: [greenRow], key: 'closure', dirty: false };
 const reuseContext = { selfId: publicKey, enabled: true, mode: 'reuse', selectorCheck: () => ({ ok: true }) };
 const unexpectedSelector = () => { throw new Error('selector must not be consulted'); };
+const siblingGreen = {
+  source: 'sibling', device: 'did:key:z6Mksibling0001', project: project.name, closure: 'closure',
+  commit: 'siblings1', success: true, seconds: 12, at: '2026-10-24T12:00:00Z', headSeq: 7,
+};
 
 test('reusableHit refuses report mode before all other checks', () => {
   assert.deepEqual(reusableHit({}, { mode: 'report', enabled: false, selfId: null, selectorCheck: unexpectedSelector }), { reuse: false, why: 'report-only' });
@@ -471,6 +536,74 @@ test('reusableHit accepts only the newest green self-signed row without mutating
   const rows = Object.freeze([older, greenRow]);
   assert.deepEqual(reusableHit({ ...cleanEvidence, rows }, reuseContext), { reuse: true, row: greenRow });
   assert.equal(rows[0], older);
+});
+
+test('reusableHit accepts an admitted sibling green and labels its independence', function reuse_accepts_admitted_sibling_green() {
+  assert.deepEqual(reusableHit(
+    { rows: [], key: 'closure', project: project.name, dirty: false },
+    { ...reuseContext, candidates: [siblingGreen], admitCandidate: () => true },
+  ), { reuse: true, row: siblingGreen, independence: 'sibling' });
+});
+
+test('reusableHit refuses a sibling candidate the admission callback does not admit', () => {
+  assert.deepEqual(reusableHit(
+    { rows: [], key: 'closure', project: project.name, dirty: false },
+    { ...reuseContext, candidates: [siblingGreen], admitCandidate: () => false, selectorCheck: unexpectedSelector },
+  ), { reuse: false, why: 'no attestation for this closure yet' });
+});
+
+test('a sibling red forces a local run without ordering device clocks', function sibling_red_forces_local_run() {
+  const red = { ...siblingGreen, success: false, at: '2020-01-01T00:00:00Z' };
+  assert.deepEqual(reusableHit(
+    { rows: [], key: 'closure', project: project.name, dirty: false },
+    { ...reuseContext, candidates: [siblingGreen, red], admitCandidate: () => true, selectorCheck: unexpectedSelector },
+  ), { reuse: false, why: 'sibling verdict is red' });
+});
+
+test('a local red and sibling green force a local run', () => {
+  const localRed = { commit: 'local-red', attestation: { success: false, agentId: publicKey } };
+  assert.deepEqual(reusableHit(
+    { rows: [localRed], key: 'closure', project: project.name, dirty: false },
+    { ...reuseContext, candidates: [siblingGreen], admitCandidate: () => true, selectorCheck: unexpectedSelector },
+  ), { reuse: false, why: 'local attestation is red' });
+});
+
+test('dirty inputs force a run despite an admitted sibling green', () => {
+  assert.deepEqual(reusableHit(
+    { rows: [], key: 'closure', project: project.name, dirty: true },
+    { ...reuseContext, candidates: [siblingGreen], admitCandidate: () => true, selectorCheck: unexpectedSelector },
+  ), { reuse: false, why: 'declared inputs dirty' });
+});
+
+test('a selector-changing sibling commit forces a run', () => {
+  assert.deepEqual(reusableHit(
+    { rows: [], key: 'closure', project: project.name, dirty: false },
+    { ...reuseContext, candidates: [siblingGreen], admitCandidate: () => true, selectorCheck: commit => {
+      assert.equal(commit, siblingGreen.commit);
+      return { ok: false, message: 'changed since sibling verdict' };
+    } },
+  ), { reuse: false, why: 'changed since sibling verdict' });
+});
+
+test('the sibling governance class is data-driven and fails closed', function sibling_governance_class_fails_closed() {
+  for (const path of [
+    'genesis/orchestrator/gate-evidence.mjs',
+    'genesis/orchestrator/gate-anything.mjs',
+    'genesis/agentic/pool-policy.json',
+    'elohim/eprfs/eprfs-peer/src/fold.rs',
+    'elohim/eprfs/epr-cli/src/peer.rs',
+    '.claude/epr-meta/measures.yaml',
+  ]) {
+    const { spawn } = fakeSpawn([
+      [(bin, args) => bin === 'git' && args[0] === 'merge-base', { status: 0, stdout: 'base\n' }],
+      [(bin, args) => bin === 'git' && args[0] === 'diff', { status: 0, stdout: `${path}\n` }],
+    ]);
+    assert.deepEqual(siblingGovernanceChange({ root: '/repo', spawn }), {
+      changed: true, why: `governance-class change: ${path}`, paths: [path],
+    });
+  }
+  const absent = siblingGovernanceChange({ root: '/repo', spawn: () => ({ status: 1, stdout: '' }) });
+  assert.deepEqual(absent, { changed: true, why: 'integration merge base unavailable' });
 });
 
 test('closure key v3 includes every new piece of material and is deterministic', () => {
@@ -646,6 +779,91 @@ test('runProject reuses without executing or attesting and observes run-kind=reu
   assert.ok(note.args.includes('run-kind=reused'));
   assert.ok(note.args.includes('exit=ok'));
   assert.equal(note.args[note.args.indexOf('--value') + 1], '0');
+});
+
+test('runProject reuses a sibling green, labels it sibling, and records sibling reuse', async t => {
+  const { runProject } = await import('./gate-runner.mjs');
+  const { root, env } = evidenceFixture(t);
+  mkdirSync(join(root, 'genesis/agentic'), { recursive: true });
+  writeFileSync(join(root, 'genesis/agentic/pool-policy.json'), JSON.stringify({ gate_reuse: { projects: [project.name] } }));
+  mkdirSync(join(root, '.git/brit'), { recursive: true });
+  writeFileSync(join(root, '.git/brit/agent-key'), Buffer.from(seed, 'hex'));
+  const { spawn, calls } = fakeSpawn([
+    [isFingerprint, fingerprintReply('bafy-a')],
+    [(bin, args) => isRevParse(bin, args) && args[1] === '--git-common-dir', { status: 0, stdout: '.git\n' }],
+    ...closureReplies,
+    [isStatus, { status: 0, stdout: '' }],
+    [isFind, { status: 0, stdout: '[]' }],
+    [isPeerVerdicts, (_bin, args) => ({ status: 0, stdout: JSON.stringify([{
+      ...siblingGreen,
+      closure: args[args.indexOf('--closure') + 1],
+    }]) })],
+    [isMergeBase, { status: 0, stdout: 'base\n' }],
+    [(bin, args) => bin === 'git' && args[0] === 'diff', { status: 0, stdout: '' }],
+    [(bin) => bin === 'epr', { status: 0, stdout: '' }],
+  ]);
+  const lines = [];
+  assert.equal(runProject({ ...project, run: { kind: 'just', recipe: 'gate' } }, false, false, {
+    root, env: { ...env, GATE_EVIDENCE: 'reuse' }, spawn, write: line => lines.push(line),
+  }), 0);
+  assert.match(lines.join(''), /reused: green .* \(signer sibling did:key:z6Mksibling0001, independence: sibling\)/);
+  assert.equal(calls.filter(c => c.bin === 'bash' || isPut(c.bin, c.args)).length, 0);
+  const cycle = calls.find(c => c.bin === 'epr' && c.args.includes('run-kind=sibling-reused'));
+  assert.ok(cycle, 'sibling reuse has its own gate-cycle run kind');
+});
+
+test('a governance-class change refuses a sibling verdict and runs the gate', async function governance_change_runs_gate(t) {
+  const { runProject } = await import('./gate-runner.mjs');
+  const { root, env } = evidenceFixture(t);
+  mkdirSync(join(root, 'genesis/agentic'), { recursive: true });
+  writeFileSync(join(root, 'genesis/agentic/pool-policy.json'), JSON.stringify({ gate_reuse: { projects: [project.name] } }));
+  mkdirSync(join(root, '.git/brit'), { recursive: true });
+  writeFileSync(join(root, '.git/brit/agent-key'), Buffer.from(seed, 'hex'));
+  const { spawn, calls } = fakeSpawn([
+    [isFingerprint, fingerprintReply('bafy-a')],
+    [(bin, args) => isRevParse(bin, args) && args[1] === '--git-common-dir', { status: 0, stdout: '.git\n' }],
+    ...closureReplies,
+    [isStatus, { status: 0, stdout: '' }],
+    [isFind, { status: 0, stdout: '[]' }],
+    [isPeerVerdicts, (_bin, args) => ({ status: 0, stdout: JSON.stringify([{
+      ...siblingGreen, closure: args[args.indexOf('--closure') + 1],
+    }]) })],
+    [isMergeBase, { status: 0, stdout: 'base\n' }],
+    [(bin, args) => bin === 'git' && args[0] === 'diff', { status: 0, stdout: 'genesis/orchestrator/gate-runner.mjs\n' }],
+    [(bin) => bin === 'bash', { status: 0, stdout: '', stderr: '' }],
+    [isPut, { status: 0, stdout: 'bafyrecorded\n', stderr: '' }],
+    [(bin) => bin === 'epr', { status: 0, stdout: '' }],
+  ]);
+  const lines = [];
+  assert.equal(runProject({ ...project, run: { kind: 'just', recipe: 'gate' } }, false, false, {
+    root, env: { ...env, GATE_EVIDENCE: 'reuse' }, spawn, write: line => lines.push(line), warn: () => {},
+  }), 0);
+  assert.match(lines.join(''), /not reused: governance-class change: genesis\/orchestrator\/gate-runner\.mjs/);
+  assert.equal(calls.filter(c => c.bin === 'bash').length, 1);
+});
+
+test('epr peer verdicts failure is a miss and the gate runs', async t => {
+  const { runProject } = await import('./gate-runner.mjs');
+  const { root, env } = evidenceFixture(t);
+  mkdirSync(join(root, 'genesis/agentic'), { recursive: true });
+  writeFileSync(join(root, 'genesis/agentic/pool-policy.json'), JSON.stringify({ gate_reuse: { projects: [project.name] } }));
+  mkdirSync(join(root, '.git/brit'), { recursive: true });
+  writeFileSync(join(root, '.git/brit/agent-key'), Buffer.from(seed, 'hex'));
+  const { spawn, calls } = fakeSpawn([
+    [isFingerprint, fingerprintReply('bafy-a')],
+    [(bin, args) => isRevParse(bin, args) && args[1] === '--git-common-dir', { status: 0, stdout: '.git\n' }],
+    ...closureReplies,
+    [isStatus, { status: 0, stdout: '' }],
+    [isFind, { status: 0, stdout: '[]' }],
+    [isPeerVerdicts, { status: 2, stdout: '', stderr: 'not a device' }],
+    [(bin) => bin === 'bash', { status: 0, stdout: '', stderr: '' }],
+    [isPut, { status: 0, stdout: 'bafyrecorded\n', stderr: '' }],
+    [(bin) => bin === 'epr', { status: 0, stdout: '' }],
+  ]);
+  assert.equal(runProject({ ...project, run: { kind: 'just', recipe: 'gate' } }, false, false, {
+    root, env: { ...env, GATE_EVIDENCE: 'reuse' }, spawn, write: () => {}, warn: () => {},
+  }), 0);
+  assert.equal(calls.filter(c => c.bin === 'bash').length, 1);
 });
 
 test('runProject keeps running and recording in report mode or with an unreadable policy', async t => {

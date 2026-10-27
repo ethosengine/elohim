@@ -2310,7 +2310,9 @@ habits:
     declared: genesis/orchestrator/.epr-meta/push-gate-pays-once.habit.md
     invariant: >
       A local gate pays for a closure once. A push whose selected gate already carries this
-      workspace's green attestation for the same input closure runs no recipe and says so; an
+      workspace's green attestation, or an admitted sibling device's non-governance green verdict
+      with no red for the same input closure, runs no recipe and says so; sibling evidence is never
+      independent or counted in k-of-n; an
       eprfs push tests only the crates the change can reach; every gate states its expected
       cost and local fail rate before it runs; a long gate that has never failed locally may
       defer to CI on a feature-branch push, and never on a push to dev or main.
@@ -2323,10 +2325,10 @@ habits:
       - "node --test genesis/orchestrator/gate-cost.test.mjs (expected-cost fold over gate-cycle-seconds@1 and the defer decision's refusals)"
       - "a2o genesis/a2o/features/devflow/native-gate-evidence.feature reuse rule (this workspace's own green stands in; a red or an unadmitted signer never does)"
     evidence: >
-      DELTA 2026-10-26 — D2b delivered in the working tree: every gate runs through `gate-tap.mjs`, whose recognizer (`gate-failure-lines.mjs`) fills the `classifyFailure` signals, so a red cycle row now carries `failure_class=code|environment` instead of `unknown`, plus `first_red_s`. Evidence: the e2e fixture run (two cargo FAILED lines, exit 101) closed `failure_class=code`; first real-push row pending. Live failures themselves are habit `gate-failures-arrive-live`.
-    evidence-fingerprint: sha256:03f1ada938220313
-    evidence-bytes: 6949
-    evidence-entries: 8
+      DELTA 2026-10-27 (GREEN held; A8 sibling verdict reuse implemented, live two-device receipt pending): a completed clean gate now records one crossing `gate-verdict@1` observation after brit `build put`; `epr peer verdicts` projects only matching folded rows from roster-admitted non-self devices; and the runner may reuse a sibling green only behind the existing project allow-list, exact closure, clean inputs, selector pass, all-device red veto, and D5 governance-class refusal. The visible line says `independence: sibling`, its cycle row says `run-kind=sibling-reused`, and no quorum surface consumes it. Evidence: `node --test genesis/orchestrator/gate-evidence.test.mjs` green, including admitted/unadmitted, red, dirty, selector, governance and native-read-failure cases; the Rust integration test is authored but intentionally not run in this Codex slice because the operator reserved Cargo. A live folded two-device verdict remains the next proof.
+    evidence-fingerprint: sha256:79e7c00889c235d8
+    evidence-bytes: 7907
+    evidence-entries: 9
     guard: >
       Regression risks: (1) reusing on a key that omits something the recipe reads — the recipe
       body, the project tree, a submodule pin, a repo file a test include_str!s; the input audit

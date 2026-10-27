@@ -1834,3 +1834,65 @@ decisionPoints:
     - path: elohim/eprfs/epr-cli/tests/session_envelope.rs
       testName: runtime_child_resumes_without_inheriting_authority
       kind: integration
+
+  - name: peer::verdict_from_event
+    kind: pure-decision-predicate
+    sourceLocation:
+      file: src/peer.rs
+      modulePath: verdict_from_event
+    summary: Project a gate-verdict@1 row only from a folded via device that the current roster admits,
+      excluding this device, with exact project and closure and a complete typed verdict payload. The row
+      is sibling reuse evidence only and carries no independent-witness or quorum status.
+    concernIds:
+      - id: C0
+        status: answered
+        justification: Attested-Private B2 evidence in one steward's device channel; pure local projection read, no DHT head.
+      - id: C1
+        status: answered
+        justification: Own events and non-via records are refused, so a local row cannot self-elect as a sibling.
+      - id: C2
+        status: answered
+        justification: Exact project and closure select rows; no timestamp orders verdicts across devices.
+      - id: C3
+        status: answered
+        justification: A missing or malformed row yields no candidate and the caller runs the gate locally.
+      - id: C4
+        status: answered
+        justification: Missing measure, kind, provenance, required env slot or valid typed value is honest absence.
+      - id: C5
+        status: answered
+        justification: The row is evidence only; gate-runner independently applies dirt, selector, red and governance checks.
+      - id: C6a
+        status: partial
+        justification: The local append-only flow store is scanned once; the channel's existing fold limits bound what peers add.
+      - id: C6b
+        status: answered
+        justification: Pure read with no effect; repeated reads return the same stored rows.
+      - id: C7
+        status: n-a
+        justification: Reads the already-folded store; it advertises and serves nothing.
+      - id: C8
+        status: answered
+        justification: Machine rows name device, closure, commit, verdict, duration, provenance ids, event time and known head seq.
+      - id: C9
+        status: answered
+        justification: Provenance is the admitted did:key from via; cross-namespace brit agentId remains optional evidence, never joined.
+      - id: C10
+        status: answered
+        justification: Additive gate-verdict@1 measure and CLI row; existing flow and head persisted formats are unchanged.
+      - id: C11
+        status: answered
+        justification: Pure local read; peer writes remain bounded by the existing channel fold budgets.
+      - id: C12
+        status: answered
+        justification: Admission reuses the signed roster and excludes contested or absent devices before projection.
+      - id: C13
+        status: answered
+        justification: Output is explicitly sibling evidence and cannot represent an independent lineage or k-of-n vote.
+      - id: C14
+        status: partial
+        justification: Malformed individual events are omitted; the CLI reports store/admission failures but no per-event capsule.
+    contractTests:
+      - path: elohim/eprfs/epr-cli/tests/peer.rs
+        testName: peer_verdicts_reads_only_matching_folded_admitted_siblings
+        kind: integration
