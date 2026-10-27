@@ -16,13 +16,38 @@ use crate::error::PeerError;
 /// How long a steward-scoped claim waits for every other device's acknowledgement when the policy
 /// does not say: `berth.channel.confirm_wait_s`.
 pub const DEFAULT_CONFIRM_WAIT_S: u64 = 10;
+/// How far before ttl expiry a holder stops trusting a silent peer.
+pub const DEFAULT_FENCE_MARGIN_S: u64 = 30;
+/// The clock skew the offline override wait covers.
+pub const DEFAULT_MAX_SKEW_S: u64 = 30;
+
+/// The rulebook's numeric settlement thresholds, in seconds.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct Settlement {
+    /// How long an unacknowledged claim remains pending.
+    pub confirm_wait_s: u64,
+    /// How far before ttl expiry a holder self-demotes without a fresh covering head.
+    pub fence_margin_s: u64,
+    /// The bounded clock skew included in an offline override's delay.
+    pub max_skew_s: u64,
+}
+
+impl Default for Settlement {
+    fn default() -> Self {
+        Self {
+            confirm_wait_s: DEFAULT_CONFIRM_WAIT_S,
+            fence_margin_s: DEFAULT_FENCE_MARGIN_S,
+            max_skew_s: DEFAULT_MAX_SKEW_S,
+        }
+    }
+}
 
 /// The steward-scoped resources a policy declares.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct StewardScope {
     names: BTreeSet<String>,
     prefixes: BTreeSet<String>,
-    confirm_wait_s: u64,
+    settlement: Settlement,
 }
 
 impl StewardScope {
@@ -62,7 +87,7 @@ impl StewardScope {
         let mut scope = StewardScope {
             names: BTreeSet::new(),
             prefixes: BTreeSet::new(),
-            confirm_wait_s: DEFAULT_CONFIRM_WAIT_S,
+            settlement: Settlement::default(),
         };
         let resources = berth.and_then(|b| b.get("resources"));
         if let Some(resources) = resources {
@@ -101,13 +126,19 @@ impl StewardScope {
                 }
             }
         }
-        if let Some(wait) = berth
-            .and_then(|b| b.get("channel"))
-            .and_then(|c| c.get("confirm_wait_s"))
-        {
-            scope.confirm_wait_s = wait.as_u64().ok_or_else(|| {
-                invalid("berth.channel.confirm_wait_s: not a whole number of seconds".into())
-            })?;
+        let channel = berth.and_then(|b| b.get("channel"));
+        for (name, target) in [
+            ("confirm_wait_s", &mut scope.settlement.confirm_wait_s),
+            ("fence_margin_s", &mut scope.settlement.fence_margin_s),
+            ("max_skew_s", &mut scope.settlement.max_skew_s),
+        ] {
+            if let Some(value) = channel.and_then(|c| c.get(name)) {
+                *target = value.as_u64().ok_or_else(|| {
+                    invalid(format!(
+                        "berth.channel.{name}: not a whole number of seconds"
+                    ))
+                })?;
+            }
         }
         Ok(scope)
     }
@@ -123,6 +154,11 @@ impl StewardScope {
 
     /// How long a steward-scoped claim waits for every other device's acknowledgement, seconds.
     pub fn confirm_wait_s(&self) -> u64 {
-        self.confirm_wait_s
+        self.settlement.confirm_wait_s
+    }
+
+    /// The settlement thresholds this scope's channel declares.
+    pub fn settlement(&self) -> Settlement {
+        self.settlement
     }
 }

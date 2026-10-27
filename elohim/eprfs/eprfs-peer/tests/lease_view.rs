@@ -13,7 +13,7 @@ use elohim_epr_rea::{atom_cid, FlowEvent};
 use eprfs_core::BlobCid;
 use eprfs_peer::{
     other_devices, steward_lease_view, Admission, DeviceHead, HeadTable, LeaseStore, LeaseVerdict,
-    NackLeaf, OwnAnnounce, PeerError, StewardScope, VIA_SLOT,
+    NackLeaf, OwnAnnounce, PeerError, Settlement, StewardScope, VIA_SLOT,
 };
 use support::{binding, contest, endpoint_row, event_with, genesis, household, Household, MEASURE};
 
@@ -21,6 +21,14 @@ const RESOURCE: &str = "dev-integration";
 /// 2026-10-23T15:28:09Z, in unix seconds as berth stamps it.
 const T0: f64 = 1_792_769_289.0;
 const WAIT_S: u64 = 10;
+const FENCE_MARGIN_S: u64 = 30;
+const MAX_SKEW_S: u64 = 30;
+
+const SETTLEMENT: Settlement = Settlement {
+    confirm_wait_s: WAIT_S,
+    fence_margin_s: FENCE_MARGIN_S,
+    max_skew_s: MAX_SKEW_S,
+};
 
 fn ms(seconds: f64) -> u64 {
     (seconds * 1000.0).round() as u64
@@ -42,6 +50,32 @@ fn record(kind: &str, session: &str, at: f64, extra: &[(&str, String)]) -> FlowE
 
 fn claim(session: &str, claimed_at: f64) -> FlowEvent {
     claim_seen(session, claimed_at, &[])
+}
+
+fn claim_ttl(session: &str, claimed_at: f64, ttl_s: u64) -> FlowEvent {
+    record(
+        "claim",
+        session,
+        claimed_at,
+        &[
+            ("claimed_at", format!("{claimed_at:.3}")),
+            ("class", "verify".to_string()),
+            ("ttl_s", ttl_s.to_string()),
+        ],
+    )
+}
+
+fn renew(session: &str, claimed_at: f64, at: f64, ttl_s: u64) -> FlowEvent {
+    record(
+        "renew",
+        session,
+        at,
+        &[
+            ("claimed_at", format!("{claimed_at:.3}")),
+            ("class", "verify".to_string()),
+            ("ttl_s", ttl_s.to_string()),
+        ],
+    )
 }
 
 /// A claim carrying the claimant's acknowledgement vector when it wrote: for each other device,
@@ -150,7 +184,7 @@ fn verdict(
     admission: &Admission,
     now: u64,
 ) -> Option<LeaseVerdict> {
-    steward_lease_view(me, store, heads, admission, now, WAIT_S)
+    steward_lease_view(me, store, heads, admission, now, SETTLEMENT)
         .expect("this device is admitted")
         .remove(RESOURCE)
 }
@@ -183,6 +217,59 @@ fn a_claim_every_other_device_acknowledged_is_effective() {
     );
     assert_eq!(
         verdict(&h.a.did, &s, &heads, &h.admission(), ms(T0) + 2000),
+        Some(effective("claude-1"))
+    );
+}
+
+#[test]
+fn fenced_holder_self_demotes_when_a_peer_goes_silent() {
+    let h = household();
+    let s = store(vec![own(claim_ttl("claude-1", T0, 120))]);
+    let admission = h.admission();
+    let stale = table(&h.a.did, &[(3, 1)], &s, &[(&h.b.did, 3, ms(T0))]);
+    assert!(matches!(
+        verdict(&h.a.did, &s, &stale, &admission, ms(T0) + 90_001),
+        Some(LeaseVerdict::Unconfirmed {
+            ref device,
+            fenced: true,
+            ..
+        }) if device == &h.b.did
+    ));
+
+    let fresh = table(&h.a.did, &[(3, 1)], &s, &[(&h.b.did, 3, ms(T0) + 90_001)]);
+    assert_eq!(
+        verdict(&h.a.did, &s, &fresh, &admission, ms(T0) + 90_001),
+        Some(effective("claude-1"))
+    );
+}
+
+#[test]
+fn renew_must_be_covered() {
+    let h = household();
+    let s = store(vec![
+        own(claim_ttl("claude-1", T0, 120)),
+        own(renew("claude-1", T0, T0 + 30.0, 120)),
+    ]);
+    let admission = h.admission();
+    let not_covered = table(
+        &h.a.did,
+        &[(3, 1), (4, 2)],
+        &s,
+        &[(&h.b.did, 3, ms(T0) + 30_500)],
+    );
+    assert!(matches!(
+        verdict(&h.a.did, &s, &not_covered, &admission, ms(T0) + 31_000),
+        Some(LeaseVerdict::Unconfirmed { fenced: true, .. })
+    ));
+
+    let covered = table(
+        &h.a.did,
+        &[(3, 1), (4, 2)],
+        &s,
+        &[(&h.b.did, 4, ms(T0) + 31_000)],
+    );
+    assert_eq!(
+        verdict(&h.a.did, &s, &covered, &admission, ms(T0) + 31_000),
         Some(effective("claude-1"))
     );
 }
@@ -244,6 +331,8 @@ fn an_unacknowledged_claim_is_pending_then_unconfirmed_naming_the_device() {
             session: "claude-1".into(),
             device: h.b.did.clone(),
             last_seen: Some(last_seen),
+            fenced: false,
+            override_at: None,
         })
     );
 
@@ -255,6 +344,8 @@ fn an_unacknowledged_claim_is_pending_then_unconfirmed_naming_the_device() {
             session: "claude-1".into(),
             device: h.b.did.clone(),
             last_seen: None,
+            fenced: false,
+            override_at: None,
         })
     );
 }
@@ -467,6 +558,16 @@ fn concurrent(
     b: Vec<FlowEvent>,
     now: u64,
 ) -> [Option<LeaseVerdict>; 2] {
+    concurrent_with_last_seen(h, a, b, now, now - 500)
+}
+
+fn concurrent_with_last_seen(
+    h: &Household,
+    a: Vec<FlowEvent>,
+    b: Vec<FlowEvent>,
+    now: u64,
+    last_seen: u64,
+) -> [Option<LeaseVerdict>; 2] {
     let admission = h.admission();
     let side = |me: &str, mine: &[FlowEvent], other: &str, theirs: &[FlowEvent]| {
         let s = store(
@@ -478,7 +579,7 @@ fn concurrent(
         );
         // Each has announced its own records and the other has acknowledged them.
         let covered = mine.len() as u64;
-        let heads = table(me, &[(4, covered)], &s, &[(other, 4, now - 500)]);
+        let heads = table(me, &[(4, covered)], &s, &[(other, 4, last_seen)]);
         verdict(me, &s, &heads, &admission, now)
     };
     [
@@ -529,16 +630,18 @@ fn a_concurrent_pair_is_settled_the_same_way_on_both_devices() {
 fn two_overrides_taken_while_the_link_was_down_are_settled_by_the_tie_break() {
     let h = household();
     let a = vec![
-        claim("claude-1", T0 + 0.2),
+        claim_ttl("claude-1", T0 + 0.2, 60),
         override_of("claude-1", T0 + 0.2, T0 + 10.2, &h.b.did),
+        renew("claude-1", T0 + 0.2, T0 + 250.0, 60),
     ];
     let b = vec![
-        claim("codex-1", T0 + 0.7),
+        claim_ttl("codex-1", T0 + 0.7, 60),
         override_of("codex-1", T0 + 0.7, T0 + 10.7, &h.a.did),
+        renew("codex-1", T0 + 0.7, T0 + 250.0, 60),
     ];
     // Exactly one holds once both have folded the other's override: the earlier claim.
     assert_eq!(
-        concurrent(&h, a, b, ms(T0 + 30.0)),
+        concurrent_with_last_seen(&h, a, b, ms(T0 + 300.0), ms(T0)),
         [
             Some(effective("claude-1")),
             Some(held(&h.a.did, "claude-1", T0 + 0.2, true))
@@ -627,7 +730,7 @@ fn a_contested_devices_leases_are_ignored_and_it_is_not_waited_for() {
             &HeadTable::default(),
             &admission,
             ms(T0),
-            WAIT_S
+            SETTLEMENT
         ),
         Err(PeerError::NotAdmitted { .. })
     ));
@@ -647,13 +750,49 @@ fn with_no_other_admitted_device_a_claim_is_effective_at_once() {
 }
 
 #[test]
-fn an_offline_ok_override_is_effective_for_its_holder_and_binds_the_other_device() {
+fn override_waits_ttl_plus_skew_plus_margin() {
+    let h = household();
+    let events = vec![
+        claim_ttl("codex-1", T0, 60),
+        override_of("codex-1", T0, T0 + 10.0, &h.a.did),
+        renew("codex-1", T0, T0 + 20.0, 60),
+        renew("codex-1", T0, T0 + 40.0, 60),
+        renew("codex-1", T0, T0 + 60.0, 60),
+        renew("codex-1", T0, T0 + 80.0, 60),
+        renew("codex-1", T0, T0 + 100.0, 60),
+        renew("codex-1", T0, T0 + 120.0, 60),
+    ];
+    let on_b = store(events.iter().cloned().map(own).collect());
+    let last_seen = ms(T0) + 5_000;
+    let heads = table(
+        &h.b.did,
+        &[(4, 2), (10, 8)],
+        &on_b,
+        &[(&h.a.did, 1, last_seen)],
+    );
+    assert_eq!(
+        verdict(&h.b.did, &on_b, &heads, &h.admission(), last_seen + 119_999),
+        Some(LeaseVerdict::Unconfirmed {
+            session: "codex-1".into(),
+            device: h.a.did.clone(),
+            last_seen: Some(last_seen),
+            fenced: false,
+            override_at: Some(last_seen + 120_000),
+        })
+    );
+    assert_eq!(
+        verdict(&h.b.did, &on_b, &heads, &h.admission(), last_seen + 120_000),
+        Some(effective("codex-1"))
+    );
+}
+
+#[test]
+fn a_no_ttl_override_never_becomes_effective_by_override_but_binds_the_other_device() {
     let h = household();
     let events = [
         claim("codex-1", T0),
         override_of("codex-1", T0, T0 + 10.0, &h.a.did),
     ];
-    // On B, the silent device A never acknowledged: the override makes it effective anyway.
     let on_b = store(events.iter().cloned().map(own).collect());
     let heads = table(
         &h.b.did,
@@ -661,10 +800,15 @@ fn an_offline_ok_override_is_effective_for_its_holder_and_binds_the_other_device
         &on_b,
         &[(&h.a.did, 1, ms(T0) - 180_000)],
     );
-    assert_eq!(
-        verdict(&h.b.did, &on_b, &heads, &h.admission(), ms(T0) + 10_500),
-        Some(effective("codex-1"))
-    );
+    assert!(matches!(
+        verdict(&h.b.did, &on_b, &heads, &h.admission(), ms(T0) + 86_400_000),
+        Some(LeaseVerdict::Unconfirmed {
+            override_at: None,
+            fenced: false,
+            ..
+        })
+    ));
+
     // On A, once folded, it is a lease held by B, marked as an override.
     let on_a = store(
         events
@@ -682,6 +826,96 @@ fn an_offline_ok_override_is_effective_for_its_holder_and_binds_the_other_device
 }
 
 #[test]
+fn partition_longer_than_ttl_never_has_two_effective_holders() {
+    const TTL_S: u64 = 90;
+    let h = household();
+    let admission = h.admission();
+    let mut a_events = vec![claim_ttl("claude-1", T0, TTL_S)];
+    let a_claim = a_events[0].clone();
+    let mut b_events = Vec::new();
+    let mut b_claimed_at = None;
+    let mut b_claimed_elapsed = None;
+    let mut b_override_written = false;
+
+    for elapsed_s in 0..=TTL_S * 3 {
+        let real_now = ms(T0) + elapsed_s * 1000;
+        let b_now = real_now + MAX_SKEW_S * 1000;
+        if elapsed_s > 0 && elapsed_s % (TTL_S / 3) == 0 {
+            a_events.push(renew("claude-1", T0, T0 + elapsed_s as f64, TTL_S));
+        }
+
+        let a_store = store(a_events.iter().cloned().map(own).collect());
+        let a_log: Vec<(u64, u64)> = (1..=a_events.len() as u64)
+            .map(|events| (events, events))
+            .collect();
+        let a_heads = table(&h.a.did, &a_log, &a_store, &[(&h.b.did, 1, ms(T0))]);
+        let a_effective = matches!(
+            verdict(&h.a.did, &a_store, &a_heads, &admission, real_now),
+            Some(LeaseVerdict::Effective { .. })
+        );
+
+        if b_claimed_at.is_none() {
+            let before = store(vec![from(&h.a.did, a_claim.clone())]);
+            let heads = table(
+                &h.b.did,
+                &[],
+                &before,
+                &[(&h.a.did, 0, ms(T0) + MAX_SKEW_S * 1000)],
+            );
+            if !matches!(
+                verdict(&h.b.did, &before, &heads, &admission, b_now),
+                Some(LeaseVerdict::HeldBy { .. })
+            ) {
+                let claimed_at = T0 + (elapsed_s + MAX_SKEW_S) as f64;
+                b_events.push(claim_ttl("codex-1", claimed_at, TTL_S));
+                b_claimed_at = Some(claimed_at);
+                b_claimed_elapsed = Some(elapsed_s);
+            }
+        } else if let (Some(claimed_at), Some(claimed_elapsed)) = (b_claimed_at, b_claimed_elapsed)
+        {
+            if !b_override_written && elapsed_s >= claimed_elapsed + WAIT_S {
+                b_events.push(override_of(
+                    "codex-1",
+                    claimed_at,
+                    T0 + (elapsed_s + MAX_SKEW_S) as f64,
+                    &h.a.did,
+                ));
+                b_override_written = true;
+            }
+            if elapsed_s > claimed_elapsed && (elapsed_s - claimed_elapsed) % (TTL_S / 3) == 0 {
+                b_events.push(renew(
+                    "codex-1",
+                    claimed_at,
+                    T0 + (elapsed_s + MAX_SKEW_S) as f64,
+                    TTL_S,
+                ));
+            }
+        }
+
+        let mut on_b = vec![from(&h.a.did, a_claim.clone())];
+        on_b.extend(b_events.iter().cloned().map(own));
+        let b_store = store(on_b);
+        let b_log: Vec<(u64, u64)> = (2..=b_events.len() as u64 + 1)
+            .map(|events| (events, events))
+            .collect();
+        let b_heads = table(
+            &h.b.did,
+            &b_log,
+            &b_store,
+            &[(&h.a.did, 0, ms(T0) + MAX_SKEW_S * 1000)],
+        );
+        let b_effective = matches!(
+            verdict(&h.b.did, &b_store, &b_heads, &admission, b_now),
+            Some(LeaseVerdict::Effective { .. })
+        );
+        assert!(
+            !(a_effective && b_effective),
+            "both effective {elapsed_s}s into the partition"
+        );
+    }
+}
+
+#[test]
 fn the_steward_scope_reads_names_and_lane_prefix_from_the_policy() {
     let policy = serde_json::json!({
         "berth": {
@@ -692,7 +926,12 @@ fn the_steward_scope_reads_names_and_lane_prefix_from_the_policy() {
                 "cargo": {"capacity": 2, "scope": "container"},
                 "lane:": {"capacity": 1, "scope": "steward"}
             },
-            "channel": {"confirm_wait_s": 7, "freshness_s": 90}
+            "channel": {
+                "confirm_wait_s": 7,
+                "freshness_s": 90,
+                "fence_margin_s": 17,
+                "max_skew_s": 23
+            }
         }
     });
     let scope = StewardScope::from_policy(&policy).expect("reads");
@@ -704,10 +943,19 @@ fn the_steward_scope_reads_names_and_lane_prefix_from_the_policy() {
     assert!(!scope.covers("cargo"));
     assert!(!scope.covers("jenkins-dispatch"));
     assert_eq!(scope.confirm_wait_s(), 7);
+    assert_eq!(
+        scope.settlement(),
+        Settlement {
+            confirm_wait_s: 7,
+            fence_margin_s: 17,
+            max_skew_s: 23,
+        }
+    );
     // A policy that declares none: nothing is steward-scoped, and the wait is the spec's 10 s.
     let none = StewardScope::from_policy(&serde_json::json!({})).expect("reads");
     assert!(!none.covers("dev-integration"));
     assert_eq!(none.confirm_wait_s(), 10);
+    assert_eq!(none.settlement(), SETTLEMENT);
 }
 
 /// A berth mooring record (`moor` or `unmoor`) by `session`, written at `at` as the device's

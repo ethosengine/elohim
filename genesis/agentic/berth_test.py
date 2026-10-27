@@ -776,6 +776,7 @@ STEWARD_POLICY = {"berth": {
                   "alpha-fleet": {"capacity": 1, "scope": "steward"},
                   "lane:": {"capacity": 1, "scope": "steward"}},
     "channel": {"freshness_s": 90, "confirm_wait_s": 10,
+                "fence_margin_s": 30, "max_skew_s": 30,
                 "crosses": {"dev-berth-events@1": ["claim", "release", "override"]}}}}
 DEVICE_A = "did:key:z6MkDeviceA"
 DEVICE_B = "did:key:z6MkDeviceB"
@@ -813,7 +814,8 @@ CHANNEL_STORE = "/projects/elohim"  # where this device's `epr peer serve` proje
 
 def view(**resources):
     """A device's view, as `epr peer leases --json` prints it for a device of its steward."""
-    out = {"now": NOW_MS, "confirm_wait_s": 10, "standing": "device", "device": DEVICE_B,
+    out = {"now": NOW_MS, "confirm_wait_s": 10, "fence_margin_s": 30, "max_skew_s": 30,
+           "standing": "device", "device": DEVICE_B,
            "store": CHANNEL_STORE, "seen": {DEVICE_A: 7}}
     out.update({k.replace("_", "-"): v for k, v in resources.items()})
     return out
@@ -829,8 +831,9 @@ def held_by_a(override=False):
             "override": override}
 
 
-def unconfirmed_a(session="codex-1", last_seen=NOW_MS - 180_000):
-    return {"verdict": "unconfirmed", "session": session, "device": DEVICE_A, "last_seen": last_seen}
+def unconfirmed_a(session="codex-1", last_seen=NOW_MS - 180_000, fenced=False, override_at=None):
+    return {"verdict": "unconfirmed", "session": session, "device": DEVICE_A,
+            "last_seen": last_seen, "fenced": fenced, "override_at": override_at}
 
 
 def refused_by_a(session="codex-1"):
@@ -1372,6 +1375,8 @@ class StewardClaimTest(unittest.TestCase):
             self.assertFalse(b.steward_scoped(name), name)
         self.assertEqual(b.confirm_wait_s, 10)
         self.assertEqual(b.freshness_s, 90)
+        self.assertEqual(b.fence_margin_s, 30)
+        self.assertEqual(b.max_skew_s, 30)
         self.assertEqual(b.capacities["cargo"], 2)
         self.assertEqual(b.capacities["dev-integration"], 1)
 
@@ -1440,20 +1445,27 @@ class StewardClaimTest(unittest.TestCase):
         self.assertEqual([e for e in self.obs.events if e["reason"] == "claim"], [])
 
     def test_offline_ok_writes_override(self):
-        self.views(view(), view(dev_integration=unconfirmed_a()))
-        ok, lease, reason, _ = self.claim(offline_ok=True)
-        self.assertTrue(ok, reason)
-        self.assertEqual(self.berth.who("dev-integration")["holder"], "codex-1")
-        self.assertTrue(self.berth.who("dev-integration").get("effective"))
+        override_at = NOW_MS + 120_000
+        self.views(view(), view(dev_integration=unconfirmed_a()),
+                   view(dev_integration=unconfirmed_a(override_at=override_at)))
+        ok, lease, reason, _ = self.claim(offline_ok=True, ttl_s=60)
+        self.assertFalse(ok)
+        self.assertIsNone(lease)
+        local = self.berth.who("dev-integration")
+        self.assertEqual(local["holder"], "codex-1")
+        self.assertFalse(local.get("effective", False))
+        self.assertIn("override effective at", reason)
         row = self.rows("override")[-1]
         self.assertEqual((row["resource"], row["session"], row["holder"]), ("dev-integration", "codex-1", "codex-1"))
         self.assertEqual(row["overrode"], DEVICE_A)
-        self.assertEqual(row["claimed_at"], lease["claimed_at"])
+        self.assertEqual(row["claimed_at"], local["claimed_at"])
         self.assertIn(f"unconfirmed: {DEVICE_A} last seen 3m ago", row["reason"])
         # The override row crosses like any berth record, from the channel store.
         self.assertEqual(self.obs.events[-1]["reason"], "override")
         self.assertEqual(self.obs.events[-1]["env"]["overrode"], DEVICE_A)
         self.assertEqual(self.obs.events[-1]["root"], CHANNEL_STORE)
+        self.views(view(dev_integration=unconfirmed_a(override_at=override_at)))
+        self.assertIn("override effective at", render_status(self.berth))
 
     def test_a_steward_claim_lands_in_the_channel_store_carrying_what_it_had_folded(self):
         # This berth's own checkout is not where the device's peer projects from: the claim, and its
@@ -1479,17 +1491,25 @@ class StewardClaimTest(unittest.TestCase):
         self.assertEqual(self.slept, [], "no other admitted device: effective at once, no wait")
         self.assertEqual(self.berth.who("lane:t6")["holder"], "codex-1")
 
-    def test_a_renew_of_an_effective_lease_does_not_settle_again_and_is_never_released(self):
+    def test_a_renew_of_an_effective_lease_self_demotes_when_the_fence_fails(self):
         self.views(view(), view(dev_integration=effective()))
-        self.assertTrue(self.claim()[0])
-        # The other device then goes silent; the view can no longer even be read. Renewing keeps
-        # the lease: effective once, effective for its life.
-        self.views("EXIT 1 epr peer: the steward lease view is unavailable")
-        ok, lease, reason, _ = self.claim()
-        self.assertTrue(ok, reason)
-        self.assertEqual(reason, "renewed")
-        self.assertEqual(self.berth.who("dev-integration")["holder"], "codex-1")
+        self.assertTrue(self.claim(ttl_s=120)[0])
+        fenced = unconfirmed_a(fenced=True)
+        # Renewal re-reads the view after writing the renew. The peer's stale head does not cover
+        # that latest renew, so the lease remains recorded but is no longer effective.
+        self.views(view(dev_integration=effective()), view(dev_integration=fenced))
+        ok, lease, reason, _ = self.claim(ttl_s=120)
+        self.assertFalse(ok)
+        self.assertIsNone(lease)
+        self.assertEqual(reason, f"self-demoted: no head from {DEVICE_A} within 90s")
+        local = self.berth.who("dev-integration")
+        self.assertEqual(local["holder"], "codex-1")
+        self.assertFalse(local.get("effective"))
         self.assertEqual(self.rows("release"), [])
+        self.views(view(dev_integration=fenced))
+        self.assertIn(f"self-demoted: no head from {DEVICE_A} within 90s", render_status(self.berth))
+        self.views(view(dev_integration=fenced))
+        self.assertFalse(self.berth.owner_check("dev-integration", "codex-1", "deploy")[0])
 
     def test_a_renew_that_reads_unconfirmed_is_refused_but_keeps_its_lease(self):
         # A lease written but never settled (a claim interrupted mid-wait) is renewed.
@@ -1589,10 +1609,13 @@ class StewardClaimTest(unittest.TestCase):
         # A view that cannot say (an older epr) adds nothing.
         self.views(view(), view(dev_integration=unconfirmed_a()))
         self.assertEqual(self.claim()[2], f"unconfirmed: {DEVICE_A} last seen 3m ago")
-        # --offline-ok still overrides: the line is for a refusal only.
-        self.views(view(), view(dev_integration=unconfirmed_a(), serving=False))
-        ok, _, reason, _ = self.claim(offline_ok=True)
-        self.assertTrue(ok, reason)
+        # --offline-ok records an override, but it remains unconfirmed until its delayed time.
+        override_at = NOW_MS + 120_000
+        self.views(view(), view(dev_integration=unconfirmed_a(), serving=False),
+                   view(dev_integration=unconfirmed_a(override_at=override_at)))
+        ok, _, reason, _ = self.claim(offline_ok=True, ttl_s=60)
+        self.assertFalse(ok)
+        self.assertIn("override effective at", reason)
 
     def test_a_failed_epr_call_reports_its_first_line_and_names_a_binary_older_than_the_peer_verbs(self):
         stale = Path(self.directory.name) / "stale-epr"

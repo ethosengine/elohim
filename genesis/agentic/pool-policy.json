@@ -149,9 +149,11 @@
     },
     "mooring_ttl_s": 10800,
     "channel": {
-      "_comment": "The steward channel between one person's devices (spec 2026-10-23-workspaces-cooperate-as-devices-design.md §3.3). `crosses` is the crossing allow-list `epr peer serve` projects each device's channel tree from: {measure: [kinds]}, default deny. Only the berth records the spec names cross (moor, unmoor, claim, renew, release, override, note = a `berth say`, shed); refuse and overrun stay local. Recall sessions and receipts, private memory, session transcripts and every other measure never cross. The env:<k>=<v> slots a berth record carries are its own fields, never process environment. `confirm_wait_s` is how long a steward-scoped claim waits for every other admitted device to acknowledge it before it reads `unconfirmed`; `freshness_s` only sets when `berth status` reports a device as silent.",
+      "_comment": "The steward channel between one person's devices (spec 2026-10-23-workspaces-cooperate-as-devices-design.md §3.3; settlement fence 2026-10-27-steward-space-landing-plane-design.md §A3). `crosses` is the crossing allow-list `epr peer serve` projects each device's channel tree from: {measure: [kinds]}, default deny. Only the berth records the spec names cross (moor, unmoor, claim, renew, release, override, note = a `berth say`, shed); refuse and overrun stay local. Recall sessions and receipts, private memory, session transcripts and every other measure never cross. The env:<k>=<v> slots a berth record carries are its own fields, never process environment. `confirm_wait_s` is how long a steward-scoped claim waits for every other admitted device to acknowledge it before it reads `unconfirmed`; `fence_margin_s` is how far before ttl expiry a holder self-demotes without a fresh peer head covering its latest renew; `max_skew_s` is the clock budget in an offline override's ttl + skew + margin delay; `freshness_s` only sets when `berth status` reports a device as silent.",
       "freshness_s": 90,
       "confirm_wait_s": 10,
+      "fence_margin_s": 30,
+      "max_skew_s": 30,
       "crosses": {
         "dev-berth-events@1": ["moor", "unmoor", "claim", "renew", "release", "override", "note", "shed"]
       }

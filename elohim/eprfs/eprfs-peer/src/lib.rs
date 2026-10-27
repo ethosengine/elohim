@@ -86,7 +86,9 @@ pub use lease_view::{
     lease_events, other_devices, steward_lease_view, LeaseEvent, LeaseKind, LeaseStore,
     LeaseVerdict, OtherDevice, Resource, BERTH_EVENTS_MEASURE,
 };
-pub use steward_scope::{StewardScope, DEFAULT_CONFIRM_WAIT_S};
+pub use steward_scope::{
+    Settlement, StewardScope, DEFAULT_CONFIRM_WAIT_S, DEFAULT_FENCE_MARGIN_S, DEFAULT_MAX_SKEW_S,
+};
 pub use tier::{
     tier_call, tier_request, TierAnswer, TierCountersSnapshot, TierLimits, TierProtocol,
     TierRequest, FRAME_DEADLINE, MAX_ANSWER_FRAME_BYTES, MAX_CONCURRENT_STREAMS,
