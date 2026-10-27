@@ -836,6 +836,98 @@ def effective(session="codex-1"):
     return {"verdict": "effective", "session": session}
 
 
+class BerthInboxTest(unittest.TestCase):
+    SESSION = "5d815440-048a-4134-99ec-68103f1ae736"
+    SENDER = "2de19c76-ec8d-45ee-bab6-dd4501afcb9e"
+
+    def setUp(self):
+        self.directory = tempfile.TemporaryDirectory()
+        self.addCleanup(self.directory.cleanup)
+        root = Path(self.directory.name)
+        self.checkout = root / "channel"
+        self.flow = self.checkout / ".eprfs" / "status" / "flows.jsonl"
+        self.flow.parent.mkdir(parents=True)
+        self.flow.touch()
+        self.clock = [1000.0]
+        self.env = mock.patch.dict(os.environ, {
+            "BERTH_DIR": str(root / "berth"),
+            "ELOHIM_SESSION_ID": self.SESSION,
+            "EPR_PROC_ROOT": str(root / "no-proc"),
+            "ELOHIM_DEVICE_KEY_FILE": str(root / "no-device" / "ed25519.seed"),
+        })
+        self.env.start()
+        self.addCleanup(self.env.stop)
+        globals_ = Berth._scan_inbox.__globals__
+        self.repo = mock.patch.dict(globals_, {"REPO_ROOT": str(self.checkout)})
+        self.repo.start()
+        self.addCleanup(self.repo.stop)
+        self.berth = Berth(str(root / "berth"), now=lambda: self.clock[0],
+                           obs=FakeObservation(), policy_path=MISSING_POLICY)
+        self.berth.channel_root = str(self.checkout)
+        self.berth.moor(self.SESSION)
+
+    def folded(self, cid, at, *, sender=None, to=None, text="hello", via=DEVICE_A):
+        tags = ["run:observation", ".", "reason:note", "measure:dev-berth-events@1",
+                f"env:at={at}", "env:dseq=1", "env:kind=note",
+                f"env:session={sender or self.SENDER}", f"env:text={text}"]
+        if to is not None:
+            tags.append(f"env:to={to}")
+        if via is not None:
+            tags.append(f"via:{via}")
+        return json.dumps({"cid": cid, "record": {"classifiedAs": tags}}) + "\n"
+
+    def append(self, *lines):
+        with self.flow.open("a") as f:
+            f.writelines(lines)
+
+    def test_folded_note_to_session_is_shown_once_then_marked(self):
+        self.append(self.folded("remote-1", 995, to=self.SESSION,
+                                text="hello   from\n the other device"))
+        lines = self.berth.inbox_lines(self.SESSION)
+        self.assertIn(f"NOTE from {DEVICE_A.split(':')[-1][:10]}…", lines)
+        self.assertIn(f"{self.SENDER[:8]} 5s ago to you: hello from the other device", lines)
+        self.assertIn(f'reply: berth say --session {self.SESSION} --to {self.SENDER} "…"', lines)
+        self.assertEqual(self.berth.inbox_lines(self.SESSION), "")
+
+    def test_peek_does_not_mark(self):
+        self.append(self.folded("peek-1", 996, to=self.SESSION))
+        main = _NS["main"]
+        first = io.StringIO()
+        second = io.StringIO()
+        with mock.patch.dict(main.__globals__, {"Berth": lambda: self.berth}), \
+                contextlib.redirect_stdout(first):
+            self.assertEqual(main(["berth", "inbox", "--session", self.SESSION, "--peek", "--json"]), 0)
+        with mock.patch.dict(main.__globals__, {"Berth": lambda: self.berth}), \
+                contextlib.redirect_stdout(second):
+            self.assertEqual(main(["berth", "inbox", "--session", self.SESSION, "--json"]), 0)
+        self.assertEqual(json.loads(first.getvalue()), json.loads(second.getvalue()))
+        self.assertEqual(self.berth.inbox(self.SESSION), [])
+
+    def test_household_note_must_be_newer_than_the_mooring(self):
+        self.append(self.folded("house-old", 999, text="old household note"),
+                    self.folded("house-new", 1001, text="new household note"))
+        notes = self.berth.inbox(self.SESSION, mark=False)
+        self.assertEqual([note["cid"] for note in notes], ["house-new"])
+
+    def test_sessions_own_note_is_never_shown(self):
+        self.append(self.folded("own-1", 1001, sender=self.SESSION, to=None, via=None))
+        self.assertEqual(self.berth.inbox(self.SESSION, mark=False), [])
+
+    def test_truncated_store_rescans_from_zero(self):
+        self.append(self.folded("first", 1001, to=self.SESSION, text="x" * 800))
+        self.assertEqual([n["cid"] for n in self.berth.inbox(self.SESSION)], ["first"])
+        self.flow.write_text(self.folded("after-truncate", 1002, to=self.SESSION, text="new"))
+        self.assertEqual([n["cid"] for n in self.berth.inbox(self.SESSION)], ["after-truncate"])
+
+    def test_note_to_another_session_is_not_shown(self):
+        self.append(self.folded("other-1", 1001, to="another-session"))
+        self.assertEqual(self.berth.inbox(self.SESSION, mark=False), [])
+
+    def test_inbox_lines_is_empty_when_channel_store_is_missing(self):
+        self.flow.unlink()
+        self.assertEqual(self.berth.inbox_lines(self.SESSION), "")
+
+
 class WorktreeIntentTest(unittest.TestCase):
     def setUp(self):
         self.directory = tempfile.TemporaryDirectory()
