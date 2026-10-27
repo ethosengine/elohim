@@ -56,6 +56,54 @@ with expected-prior head, walkthrough records, sparse fetch, derived data). This
 - **Daily-drive means brit is on every device's path.** A pinned `brit` and `brit-build-ref` must resolve
   through the bin store like `epr` (the session pin already reports a brit CID), on both ethosengine and shem.
 
+## Operational agility: brit off GitHub, and auto-update on both devices
+
+> Operator, 2026-10-27: *"resolving brit's gh dependence on releases/artifacts and getting our auto-update action going on for brit in both our workspaces too for that operational agility."*
+
+**Today, as read from code.** The device manifest
+(`genesis/orchestrator/manifests/runtime/workspace-device.manifest.json`) declares
+`follows: [{channel: bin:brit, mode: apply}]`. brit's source is `kind: gitlink` at `elohim/brit` with
+`releasePrefix: brit-build-` and admission attestation `github-checks ethosengine/brit "Tests pass"`.
+
+When the pin moves, the bin store (`elohim/eprfs/device-runtime/src/bin_store/lifecycle.rs:440-510`) gets
+the bytes in one of two ways:
+1. Build from the exact pin: cargo offline, then anonymous, then authenticated, `--profile release-github`,
+   using the Nexus cargo registry (`source.rs:407`).
+2. Fall back to `gh release download brit-build-<pin12> --repo ethosengine/brit`.
+
+On ethosengine the brit store holds one release (`current.json`: landed 2026-10-26, `previous: null`), so
+following brit has never been exercised here.
+
+**GitHub sits on the path in three places:**
+- admission: the GitHub check API;
+- bytes: `gh release download`;
+- naming: the `release-github` profile and Actions-built release.
+
+**The native path, using the landing plane's own primitives:**
+- **The device that builds brit at the pin publishes the release into the steward space** as a rakia
+  artifact. It is the bin-store release manifest by CID (bins `brit`, `brit-build-ref`, `brit-verify`),
+  chunked on the dataplane, and its sibling fetches it over the eprfs tier. The `gh release download`
+  fallback becomes "fetch the sibling's release by CID", and GitHub releases become one more source.
+- **Admission is a brit attestation of that build** (A8's shape: subject = pin closure, output = release CID):
+  - On the real network of one, a sibling's attestation is enough to *adopt* a release on another of the
+    steward's devices. It is labelled `independence: sibling`, and the trust is the steward's own.
+  - The upstream GitHub check stays as one witness. It becomes evidence, no longer the gate.
+  - Promotion beyond the grant (S2+) still needs independent attestation.
+- **Auto-update on both devices** is the existing `follows bin:brit apply`, driven by pin moves on dev.
+  Exercise it for real:
+  - a pin bump lands on dev;
+  - each device's bin store follows within one session start;
+  - `just status device` reads `brit binary … (current)` on ethosengine and shem;
+  - the predecessor stays available for revert.
+
+  Apply the 2026-10-27 lessons from the epr follow:
+  - prove the new release's exec floor before switching;
+  - keep a fallback to the last admissible release;
+  - land a release only after its declared bins are complete (the `bootstrap admissible()` stranding).
+
+**Done when:** a brit pin bump on dev reaches both devices' bin stores with no `gh` call and no GitHub
+check in the admission path, and either device can revert to the predecessor.
+
 ## The wins, in order (each small, each on the landing plane's critical path)
 
 | # | Win | Integrates with | Borrowed from | Done when |
