@@ -191,12 +191,14 @@ fn git_tracked(root: &Path, contract: &Contract, surface: &Surface) -> Result<Li
     let listing_bytes = contract
         .positive_limit("fold_listing_bytes")
         .map_err(|error| error.to_string())? as usize;
-    let args = vec![
+    // The device's declared trust comes first: `git -C` alone refuses a checkout another uid owns.
+    let mut args = crate::git::trust_args(root);
+    args.extend([
         "-C".to_string(),
         root.to_string_lossy().into_owned(),
         "ls-files".to_string(),
         "-z".to_string(),
-    ];
+    ]);
     let outcome = bounded_process(
         "git",
         &args,

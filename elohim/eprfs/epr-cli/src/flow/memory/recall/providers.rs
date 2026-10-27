@@ -169,7 +169,14 @@ pub fn bounded_process(
     seconds: f64,
     input: Option<&[u8]>,
 ) -> std::io::Result<ProcessOutcome> {
-    let mut child = Command::new(program)
+    let mut command = Command::new(program);
+    if program == "git" {
+        // A hook's GIT_DIR would override the `-C` root the caller named.
+        for key in crate::process::GIT_LOCATION_ENV {
+            command.env_remove(key);
+        }
+    }
+    let mut child = command
         .args(args)
         .stdin(if input.is_some() {
             Stdio::piped()

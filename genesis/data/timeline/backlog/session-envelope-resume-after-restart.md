@@ -7,7 +7,7 @@ title: "A resumed harness session can never reopen its envelope after a workspac
 slug: "session-envelope-resume-after-restart"
 written: "2026-10-26"
 author: "claude-opus-5-5 (device-runtime, slice M landing)"
-status: "open"
+status: "partial"
 priority: "high"
 tags: [session-envelope, device-runtime, resume, berth, security]
 cites:
@@ -65,3 +65,13 @@ exports X while P2's exec environment remains empty. Generation 2 opens with no 
 or transferred berth facet; archived records, seals and old berth bytes remain unchanged. Bare
 declarations, live or unknown owners, and invalid berth destinations refuse without publishing.
 The successor's pin overwrites the old pin at the same id path consumed by the head-notice hook.
+
+## Landed, threat model held for re-review (2026-10-26)
+
+R3 landed on dev in 66e8ea380. Follow-ups: 9292dc7f1 lets a successor resume in another checkout of
+the same device, and 19a8f0e05 fixes the berth status line. The operator accepts the threat model for
+now and holds affirmation until
+[security-session-successor-admitted-before-facet-release](security-session-successor-admitted-before-facet-release.md)
+lands. That item is the one known way the no-transfer guarantee fails: a successor admitted at the
+seal checkpoint, before unmoor, revives the dead session's leases. Its "Re-review" section is the
+checklist for affirming.
