@@ -59,7 +59,7 @@ spec:
   options {
     overrideIndexTriggers(false)  // Only orchestrator or manual triggers — no webhook/branch indexing.
     buildDiscarder(logRotator(numToKeepStr: '30'))
-    timeout(time: 30, unit: 'MINUTES')
+    timeout(time: 45, unit: 'MINUTES')  // #77 took 26.4 min; #76 aborted at the 30 min limit.
   }
 
   // Accepted so the orchestrator can propagate its dispatch params uniformly
