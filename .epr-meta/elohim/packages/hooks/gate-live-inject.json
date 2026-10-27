@@ -1,0 +1,48 @@
+{
+  "apiVersion": "elohim-agent/v1alpha1",
+  "kind": "HookPackage",
+  "metadata": {
+    "id": "gate-live-inject",
+    "name": "gate-live-inject",
+    "version": "1.0.0",
+    "description": "PostToolUse, every tool: a gate red reaches the agent at its next tool call, unasked.",
+    "sourceRuntime": "elohim-agent",
+    "master": "package",
+    "runtimeTargets": [
+      "claude"
+    ],
+    "event": "PostToolUse",
+    "matcher": ".*",
+    "interpreter": "python3",
+    "language": "python",
+    "assetRefs": [],
+    "governance": {
+      "eprRef": "epr:elohim-agent/hooks/gate-live-inject",
+      "policy": "capability-governance@1",
+      "gates": [
+        "epr-meta-resolver",
+        "elohim-agent:packages:verify"
+      ],
+      "ledger": ".claude/data/governance-findings.jsonl"
+    },
+    "composedBy": "claude-opus-5-5"
+  },
+  "source": {
+    "language": "python",
+    "interpreter": "python3",
+    "path": ".claude/hooks/gate-live-inject.py",
+    "body": "#!/usr/bin/env python3\n\"\"\"PostToolUse, every tool: a gate red reaches the agent at its next tool call, unasked.\n\nReads only this session's gate-live pointer and this reader's cursor (one per agent, so a\nsubagent never consumes its parent's news) and spawns node only when the run log has grown\nsince this reader last looked; gate-live.mjs `unseen` formats the lines and moves the cursor.\nA background push or gate also gets the one Monitor command that wakes an idle agent on the\nnext red, since no hook fires while an agent waits. Fail-open: any error is silence.\nHabit gate-failures-arrive-live (genesis/orchestrator/.epr-meta/).\n\"\"\"\nimport json\nimport os\nfrom pathlib import Path\nimport re\nimport shlex\nimport subprocess\nimport sys\n\nCODE = Path(__file__).resolve().parents[2]\nROOT = Path(os.environ.get(\"CLAUDE_PROJECT_DIR\") or CODE)\nGATE_LIVE = CODE / \"genesis\" / \"orchestrator\" / \"gate-live.mjs\"\nSEGMENT = re.compile(r\"&&|\\|\\||[;|&\\n()]\")\n\n\ndef filename(value):\n    \"\"\"gate-live.mjs sessionFilename: the same sanitizing, so both name one file.\"\"\"\n    return re.sub(r\"[^A-Za-z0-9._-]\", \"_\", str(value))\n\n\ndef live_root(root=ROOT):\n    \"\"\"The main checkout's run log, from a linked worktree too (gate-live.mjs liveRoot).\"\"\"\n    main = root\n    dot_git = root / \".git\"\n    try:\n        if dot_git.is_file():\n            gitdir = Path(dot_git.read_text().split(\"gitdir:\", 1)[1].strip())\n            gitdir = gitdir if gitdir.is_absolute() else (root / gitdir)\n            common = (gitdir / \"commondir\").read_text().strip()\n            main = (gitdir / common).resolve().parent\n    except (OSError, IndexError):\n        pass\n    return main / \".eprfs\" / \"status\" / \"gate-live\"\n\n\ndef has_news(live, session, reader):\n    \"\"\"True when this reader's cursor no longer describes the session's run file.\"\"\"\n    try:\n        run = (live / \"by-session\" / filename(session)).read_text().strip()\n        size = os.stat(run).st_size\n    except OSError:\n        return False\n    try:\n        cursor = json.loads((live / \"cursors\" / f\"{filename(session)}--{filename(reader)}.json\").read_text())\n    except (OSError, ValueError):\n        return True\n    return cursor.get(\"run\") != run or cursor.get(\"size\") != size\n\n\ndef unseen(session, reader):\n    result = subprocess.run(\n        [\"node\", str(GATE_LIVE), \"unseen\", \"--session\", session, \"--reader\", reader],\n        cwd=str(ROOT), capture_output=True, text=True, timeout=4,\n        # A hook inherits nothing from git normally, but never let a pinned GIT_DIR move the log.\n        env={k: v for k, v in os.environ.items() if not k.startswith(\"GIT_\")},\n    )\n    return [line for line in result.stdout.splitlines() if line.strip()]\n\n\ndef starts_gate_run(command):\n    \"\"\"A `git push` (any global options before the verb) or a `just gate` / gate-runner call.\"\"\"\n    for segment in SEGMENT.split(command or \"\"):\n        try:\n            words = shlex.split(segment)\n        except ValueError:\n            words = segment.split()\n        words = [w for w in words if not re.match(r\"^[A-Za-z_][A-Za-z0-9_]*=\", w)] if words else []\n        if not words:\n            continue\n        if words[0] == \"git\":\n            rest = words[1:]\n            while rest and rest[0].startswith(\"-\"):\n                rest = rest[2:] if rest[0] in (\"-C\", \"-c\") else rest[1:]\n            if rest and rest[0] == \"push\":\n                return True\n        if words[:2] == [\"just\", \"gate\"] or any(w.endswith(\"gate-runner.mjs\") for w in words):\n            return True\n    return False\n\n\ndef arm_line(session):\n    return (\n        \"[gate-live] This gate run is in the background. Its reds arrive here at your next tool call; \"\n        \"if you are about to wait idle, arm Monitor now so the first red wakes you: \"\n        f\"`node {GATE_LIVE} follow --session {session}` (load it with ToolSearch select:Monitor). \"\n        \"Investigate read-only until the push exits.\"\n    )\n\n\ndef main():\n    try:\n        payload = json.load(sys.stdin)\n    except (ValueError, OSError):\n        return\n    session = payload.get(\"session_id\") or os.environ.get(\"ELOHIM_SESSION_ID\") or \"\"\n    if not isinstance(session, str) or not session.strip():\n        return\n    session = session.strip()\n    reader = payload.get(\"agent_id\") or \"main\"\n    lines = []\n\n    tool_input = payload.get(\"tool_input\") or {}\n    if (payload.get(\"tool_name\") == \"Bash\" and tool_input.get(\"run_in_background\")\n            and starts_gate_run(tool_input.get(\"command\", \"\"))):\n        lines.append(arm_line(session))\n\n    live = live_root()\n    if has_news(live, session, reader):\n        lines.extend(unseen(session, str(reader)))\n\n    if lines:\n        print(json.dumps({\"hookSpecificOutput\": {\n            \"hookEventName\": \"PostToolUse\",\n            \"additionalContext\": \"\\n\".join(lines),\n        }}))\n\n\nif __name__ == \"__main__\":\n    try:\n        main()\n    except Exception:  # noqa: BLE001 \u2014 a hook on every tool call must never break the call\n        pass\n"
+  },
+  "registration": {
+    "event": "PostToolUse",
+    "matcher": ".*",
+    "command": "python3 \"$CLAUDE_PROJECT_DIR/.claude/hooks/gate-live-inject.py\"",
+    "timeout": 5,
+    "type": "command"
+  },
+  "projections": {
+    "claude": {
+      "path": ".claude/hooks/gate-live-inject.py"
+    }
+  }
+}

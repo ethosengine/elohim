@@ -737,7 +737,8 @@ _gate-hc-dbtool:
 
 _gate-epr-storage:
     cd elohim/elohim-storage && cargo build && cargo test --test schema_contract && cargo test --test schema_contract_diesel_epr
-    cd elohim/sdk/storage-client-ts && pnpm test
+    # public-api.test.ts imports the built package, and a fresh checkout has no dist/.
+    cd elohim/sdk/storage-client-ts && pnpm build && pnpm test
 
 _gate-elohim-sdk:
     bash scripts/ci/elohim-sdk-feature-matrix.sh

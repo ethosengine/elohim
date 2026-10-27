@@ -446,6 +446,51 @@ export async function follow({
   }
 }
 
+// What an agent hears without asking: every red, a failed verdict, and the close.
+function noteworthy(event) {
+  if (event.kind !== 'gate-verdict') {
+    return ['failure', 'detail', 'step-failed', 'run-close'].includes(event.kind);
+  }
+  const verdict = event.verdict && typeof event.verdict === 'object' ? event.verdict : null;
+  return verdict
+    ? verdict.exit !== 0 && !verdict.reused && !verdict.deferred
+    : String(event.verdict ?? event.outcome ?? '') === 'failed';
+}
+
+// The lines this reader has not yet been shown from its session's run. Every agent sharing a
+// session (a main loop and its subagents) keeps its own cursor, so one hearing a red never
+// consumes it for another. A run already over at first contact is history, not news: the cursor
+// starts at its end. The cursor records the size stat'd BEFORE reading, so a write racing this
+// read leaves the size stale and the next look re-reads instead of skipping it.
+export function unseen({ root = process.cwd(), session, reader = 'main' } = {}) {
+  if (session == null || session === '') return [];
+  const checkout = resolve(root);
+  const directory = liveRoot(checkout);
+  const path = findAt(checkout, directory, { session });
+  if (!path) return [];
+  const { size } = statSync(path);
+  const { events, outcome } = readRun(path);
+
+  const cursors = join(directory, 'cursors');
+  const cursorPath = join(cursors, `${sessionFilename(session)}--${sessionFilename(reader)}.json`);
+  let cursor = null;
+  try {
+    cursor = JSON.parse(readFileSync(cursorPath, 'utf8'));
+  } catch {
+    // No cursor yet: this reader's first look at its session.
+  }
+  const fresh = cursor?.run === path
+    ? events.filter((event) => Number.isInteger(event.seq) && event.seq > cursor.seq)
+    : outcome === 'running' ? events : [];
+  const seq = events.reduce(
+    (last, event) => (Number.isInteger(event.seq) && event.seq > last ? event.seq : last),
+    cursor?.run === path ? cursor.seq : -1,
+  );
+  mkdirSync(cursors, { recursive: true });
+  writeFileSync(cursorPath, JSON.stringify({ run: path, seq, size }), 'utf8');
+  return fresh.filter(noteworthy).map(formatEvent).filter((line) => line !== null);
+}
+
 function closedBefore(path, instant) {
   try {
     const { events } = readRun(path);
@@ -461,6 +506,7 @@ const USAGE = `Usage:
   node gate-live.mjs close --run PATH --outcome passed|gates-passed|failed|interrupted [--deferred N | --deferred-from-log]
   node gate-live.mjs follow [--session S | --run R | --latest] [--timeout-ms N]
   node gate-live.mjs show (--run R | --session S | --latest) [--seq N]
+  node gate-live.mjs unseen --session S [--reader R]
 `;
 
 function parseArguments(argv) {
@@ -471,6 +517,7 @@ function parseArguments(argv) {
     close: ['run', 'outcome', 'deferred', 'deferred-from-log'],
     follow: ['session', 'run', 'latest', 'timeout-ms'],
     show: ['session', 'run', 'latest', 'seq'],
+    unseen: ['session', 'reader'],
   };
   if (!Object.hasOwn(allowed, verb)) throw new Error('unknown verb');
 
@@ -496,6 +543,7 @@ function parseArguments(argv) {
     close: ['run', 'outcome'],
     follow: [],
     show: [],
+    unseen: ['session'],
   };
   if (required[verb].some((name) => !Object.hasOwn(options, name))) {
     throw new Error('missing required option');
@@ -603,13 +651,18 @@ async function main(argv) {
         }
         return 0;
       }
+      case 'unseen':
+        for (const line of unseen({ root, session: options.session, reader: options.reader })) {
+          process.stdout.write(`${line}\n`);
+        }
+        return 0;
       default:
         return 2;
     }
   } catch (error) {
     const message = String(error?.message ?? error).replace(/[\r\n]+/g, ' ');
     process.stderr.write(`[gate-live] ${message}\n`);
-    if (verb === 'open' || verb === 'event' || verb === 'close') return 0;
+    if (verb === 'open' || verb === 'event' || verb === 'close' || verb === 'unseen') return 0;
     return verb === 'follow' ? 3 : 1;
   }
 }

@@ -4476,6 +4476,7 @@ pub struct RequestMetricsGuard {
     start: std::time::Instant,
     route_class: &'static str,
     status: Option<u16>,
+    in_flight: &'static IntGauge,
 }
 
 impl RequestMetricsGuard {
@@ -4484,11 +4485,19 @@ impl RequestMetricsGuard {
     /// gauge automatically, including ones added later without touching this
     /// file.
     pub fn start(path: &str) -> Self {
-        HTTP_REQUESTS_IN_FLIGHT.inc();
+        Self::start_counting_on(path, &HTTP_REQUESTS_IN_FLIGHT)
+    }
+
+    /// `start` against a named in-flight gauge. Production counts on the
+    /// process-global gauge; a test counts on its own, because handler tests
+    /// running in parallel move the global one between a test's reads.
+    fn start_counting_on(path: &str, in_flight: &'static IntGauge) -> Self {
+        in_flight.inc();
         Self {
             start: std::time::Instant::now(),
             route_class: classify_http_route(path),
             status: None,
+            in_flight,
         }
     }
 
@@ -4509,7 +4518,7 @@ impl Drop for RequestMetricsGuard {
         HTTP_REQUEST_DURATION_MS
             .with_label_values(&[self.route_class, status_class(status)])
             .observe(elapsed.as_secs_f64() * 1_000.0);
-        HTTP_REQUESTS_IN_FLIGHT.dec();
+        self.in_flight.dec();
     }
 }
 
@@ -7884,30 +7893,43 @@ mod tests {
     /// coordinated-omission gap the doorway-breaker incident hit: storage
     /// exported nothing for the stalled request because nothing observed it
     /// before it was gone.
+    /// An unregistered in-flight gauge only this test moves. The global one is
+    /// bumped by every handler test that runs alongside (elohim-storage gate,
+    /// 2026-10-27: the global read 2 where this test expected 1).
+    fn private_in_flight_gauge() -> &'static IntGauge {
+        Box::leak(Box::new(
+            IntGauge::new(
+                "test_http_requests_in_flight",
+                "test-private in-flight gauge",
+            )
+            .expect("valid gauge opts"),
+        ))
+    }
+
     #[test]
     fn request_metrics_guard_observes_a_dropped_unfinished_request() {
         let route_class = "other";
         let path = "/__test_request_metrics_guard_dropped__";
         assert_eq!(classify_http_route(path), route_class);
 
-        let before_in_flight = HTTP_REQUESTS_IN_FLIGHT.get();
+        let in_flight = private_in_flight_gauge();
         let before_count = HTTP_REQUEST_DURATION_MS
             .with_label_values(&[route_class, "5xx"])
             .get_sample_count();
 
         {
-            let guard = RequestMetricsGuard::start(path);
+            let guard = RequestMetricsGuard::start_counting_on(path, in_flight);
             assert_eq!(
-                HTTP_REQUESTS_IN_FLIGHT.get(),
-                before_in_flight + 1,
+                in_flight.get(),
+                1,
                 "starting a guard must bump in-flight immediately"
             );
             drop(guard); // never called .finish() — simulates cancellation
         }
 
         assert_eq!(
-            HTTP_REQUESTS_IN_FLIGHT.get(),
-            before_in_flight,
+            in_flight.get(),
+            0,
             "Drop must release the in-flight permit even without finish()"
         );
         assert_eq!(
@@ -7932,9 +7954,9 @@ mod tests {
         let before_count = HTTP_REQUEST_DURATION_MS
             .with_label_values(&[route_class, "5xx"])
             .get_sample_count();
-        let before_in_flight = HTTP_REQUESTS_IN_FLIGHT.get();
+        let in_flight = private_in_flight_gauge();
 
-        let guard = RequestMetricsGuard::start(path);
+        let guard = RequestMetricsGuard::start_counting_on(path, in_flight);
         guard.finish(503);
 
         assert_eq!(
@@ -7945,8 +7967,8 @@ mod tests {
             "an explicit error status must be observed under its own status_class"
         );
         assert_eq!(
-            HTTP_REQUESTS_IN_FLIGHT.get(),
-            before_in_flight,
+            in_flight.get(),
+            0,
             "finish() must release the in-flight permit via Drop, same as any other exit"
         );
     }
