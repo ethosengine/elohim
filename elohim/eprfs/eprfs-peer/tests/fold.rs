@@ -3,35 +3,267 @@
 
 mod support;
 
-use std::collections::HashMap;
-use std::sync::Arc;
+use std::collections::{HashMap, HashSet};
+use std::sync::{Arc, Mutex};
 use std::time::Duration;
 
 use async_trait::async_trait;
 use bytes::Bytes;
 use cid::Cid;
-use elohim_epr_rea::{atom_cid, model::canonical_bytes};
+use elohim_epr_rea::{atom_cid, model::canonical_bytes, FlowEvent, SidecarRoster};
 use eprfs_core::{
-    encode_tree, AttestationDraft, BlobCid, BlobHandle, BlobPresence, EprRecord, EprRef,
-    EprfsError, EprfsStorage, FetchPolicy, TreeEntry, TreeEntryKind, TreeLimits, TreeNode,
-    TreePath,
+    encode_tree, AttestationDraft, BlobCid, BlobHandle, BlobPresence, DirListing, EprRecord,
+    EprRef, EprfsError, EprfsStorage, FetchPolicy, LeafKind, ReadLeaf, TreeChange, TreeEntry,
+    TreeEntryKind, TreeLimits, TreeNode, TreePath,
 };
 use eprfs_peer::{
     bind, channel_tier_id, fetch_channel, fold_events, fold_root, fold_root_planned, folded_from,
-    project_channel, tier_call, via_device, ChannelEvent, ChannelStore, ChannelTree,
-    CrossingAllowList, FoldLimits, FoldPlan, FoldReader, FoldTarget, TierAnswer, TierLimits,
-    TierProtocol, TierRequest, CHANNEL_EVENTS, TIER_ALPN,
+    project_channel, tier_call, via_device, ChannelEvent, ChannelHead, ChannelStore, ChannelTree,
+    CrossingAllowList, FoldLimits, FoldPlan, FoldReader, FoldTarget, HeadTable, NackLeaf,
+    PeerConfig, PeerDaemon, PeerError, Rules, TierAnswer, TierLimits, TierProtocol, TierRequest,
+    CHANNEL_EVENTS, TIER_ALPN,
 };
+use futures_lite::StreamExt;
 use iroh::endpoint::Connection;
-use iroh::protocol::Router;
+use iroh::protocol::{AcceptError, ProtocolHandler, Router};
 use iroh::{Endpoint, NodeAddr};
-use support::{berth_event, household, loopback, policy, Checkout, Household};
+use support::{berth_event, household, loopback, policy, Checkout, Household, HANDLE};
 
 const WITHIN: Duration = Duration::from_secs(20);
 
 #[derive(Debug)]
 struct RawTreeStore {
     blobs: HashMap<BlobCid, Bytes>,
+}
+
+#[derive(Debug, Clone)]
+struct TestChannel {
+    root: BlobCid,
+    listings: HashMap<String, DirListing>,
+    reads: HashMap<String, ReadLeaf>,
+}
+
+impl TestChannel {
+    fn answer(&self, request: &TierRequest) -> TierAnswer {
+        match request {
+            TierRequest::List { path, .. } => self
+                .listings
+                .get(&path.to_string())
+                .cloned()
+                .map(TierAnswer::List)
+                .unwrap_or_else(|| TierAnswer::Failed {
+                    reason: format!("no listing for {path}"),
+                }),
+            TierRequest::Read { path, .. } => self
+                .reads
+                .get(&path.to_string())
+                .cloned()
+                .map(TierAnswer::Read)
+                .unwrap_or_else(|| TierAnswer::Failed {
+                    reason: format!("no leaf for {path}"),
+                }),
+            TierRequest::Diff { .. } => TierAnswer::Failed {
+                reason: "no diff".into(),
+            },
+        }
+    }
+
+    fn listing(&self, path: &str) -> DirListing {
+        self.listings[path].clone()
+    }
+
+    fn read(&self, path: &str) -> ReadLeaf {
+        self.reads[path].clone()
+    }
+
+    fn event_kind(&self, cid: &Cid) -> TreeEntryKind {
+        self.listing(CHANNEL_EVENTS)
+            .entries
+            .into_iter()
+            .find(|entry| entry.name.as_slice() == cid.to_string().as_bytes())
+            .expect("event entry")
+            .kind
+    }
+}
+
+fn test_channel(events: Vec<FlowEvent>, nacks: Vec<(String, NackLeaf)>) -> TestChannel {
+    let limits = TreeLimits::default();
+    let mut reads = HashMap::new();
+    let mut event_entries = Vec::new();
+    for event in events {
+        let cid = atom_cid(&event).expect("event cid");
+        let bytes = canonical_bytes(&event).expect("event bytes");
+        let leaf = BlobCid::compute_raw(&bytes);
+        let path = TreePath::from_slash_bytes(format!("{CHANNEL_EVENTS}/{cid}").as_bytes())
+            .expect("event path");
+        reads.insert(
+            path.to_string(),
+            ReadLeaf::new(
+                path,
+                leaf.clone(),
+                LeafKind::File { executable: false },
+                Bytes::from(bytes),
+            ),
+        );
+        event_entries.push(TreeEntry {
+            name: cid.to_string().into_bytes(),
+            kind: TreeEntryKind::File {
+                blob: leaf.into(),
+                executable: false,
+            },
+        });
+    }
+
+    let mut nack_entries = Vec::new();
+    for (device, nack) in nacks {
+        let bytes = serde_json::to_vec(&nack).expect("nack bytes");
+        let leaf = BlobCid::compute_raw(&bytes);
+        let path = TreePath::from_slash_bytes(format!("channel/nacks/{device}").as_bytes())
+            .expect("nack path");
+        reads.insert(
+            path.to_string(),
+            ReadLeaf::new(
+                path,
+                leaf.clone(),
+                LeafKind::File { executable: false },
+                Bytes::from(bytes),
+            ),
+        );
+        nack_entries.push(TreeEntry {
+            name: device.into_bytes(),
+            kind: TreeEntryKind::File {
+                blob: leaf.into(),
+                executable: false,
+            },
+        });
+    }
+
+    let listing = |path: TreePath, entries: Vec<TreeEntry>| {
+        let node = TreeNode::new(entries.clone()).expect("tree");
+        let (cid, _) = encode_tree(&node, &limits).expect("tree cid");
+        (cid.clone(), DirListing::new(path, cid, entries))
+    };
+    let events_path = TreePath::from_slash_bytes(CHANNEL_EVENTS.as_bytes()).expect("events path");
+    let (events_cid, events_listing) = listing(events_path, event_entries);
+    let nacks_path = TreePath::from_slash_bytes(b"channel/nacks").expect("nacks path");
+    let (nacks_cid, nacks_listing) = listing(nacks_path, nack_entries);
+    let channel_entries = vec![
+        TreeEntry {
+            name: b"events".to_vec(),
+            kind: TreeEntryKind::Directory {
+                tree: events_cid.into(),
+            },
+        },
+        TreeEntry {
+            name: b"nacks".to_vec(),
+            kind: TreeEntryKind::Directory {
+                tree: nacks_cid.into(),
+            },
+        },
+    ];
+    let channel_path = TreePath::from_slash_bytes(b"channel").expect("channel path");
+    let (channel_cid, channel_listing) = listing(channel_path, channel_entries);
+    let root_entries = vec![TreeEntry {
+        name: b"channel".to_vec(),
+        kind: TreeEntryKind::Directory {
+            tree: channel_cid.into(),
+        },
+    }];
+    let (root, root_listing) = listing(TreePath::root(), root_entries);
+    let listings = [root_listing, channel_listing, events_listing, nacks_listing]
+        .into_iter()
+        .map(|listing| (listing.path.to_string(), listing))
+        .collect();
+    TestChannel {
+        root,
+        listings,
+        reads,
+    }
+}
+
+type StubAnswer = dyn Fn(&TierRequest) -> TierAnswer + Send + Sync;
+
+#[derive(Clone)]
+struct StubTier {
+    answer: Arc<StubAnswer>,
+    requests: Arc<Mutex<Vec<TierRequest>>>,
+}
+
+impl std::fmt::Debug for StubTier {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("StubTier").finish_non_exhaustive()
+    }
+}
+
+impl ProtocolHandler for StubTier {
+    async fn accept(&self, connection: Connection) -> Result<(), AcceptError> {
+        while let Ok((mut send, mut recv)) = connection.accept_bi().await {
+            let Ok(frame) = recv.read_to_end(16 * 1024 * 1024).await else {
+                continue;
+            };
+            if frame.len() < 4 {
+                continue;
+            }
+            let Ok(request) = serde_ipld_dagcbor::from_slice::<TierRequest>(&frame[4..]) else {
+                continue;
+            };
+            self.requests
+                .lock()
+                .expect("request log")
+                .push(request.clone());
+            let answer = (self.answer)(&request);
+            let body = serde_ipld_dagcbor::to_vec(&answer).expect("answer frame");
+            let len = u32::try_from(body.len()).expect("small answer");
+            let mut frame = len.to_be_bytes().to_vec();
+            frame.extend_from_slice(&body);
+            let _ = send.write_all(&frame).await;
+            let _ = send.finish();
+        }
+        Ok(())
+    }
+}
+
+struct MountedStub {
+    router: Router,
+    addr: NodeAddr,
+}
+
+struct MountedGossipStub {
+    router: Router,
+    endpoint: Endpoint,
+    gossip: iroh_gossip::net::Gossip,
+    addr: NodeAddr,
+}
+
+async fn mount_stub(key: &eprfs_peer::PeerKey, tier: StubTier) -> MountedStub {
+    let endpoint = bind(key, None, vec![TIER_ALPN.to_vec()])
+        .await
+        .expect("bind stub");
+    let addr = loopback(&endpoint);
+    let router = Router::builder(endpoint).accept(TIER_ALPN, tier).spawn();
+    MountedStub { router, addr }
+}
+
+async fn mount_gossip_stub(key: &eprfs_peer::PeerKey, tier: StubTier) -> MountedGossipStub {
+    let endpoint = bind(
+        key,
+        None,
+        vec![TIER_ALPN.to_vec(), iroh_gossip::ALPN.to_vec()],
+    )
+    .await
+    .expect("bind gossip stub");
+    let addr = loopback(&endpoint);
+    let gossip = iroh_gossip::net::Gossip::builder().spawn(endpoint.clone());
+    let router = Router::builder(endpoint.clone())
+        .accept(TIER_ALPN, tier)
+        .accept(iroh_gossip::ALPN, gossip.clone())
+        .spawn();
+    MountedGossipStub {
+        router,
+        endpoint,
+        gossip,
+        addr,
+    }
 }
 
 #[async_trait]
@@ -686,4 +918,539 @@ async fn a_fold_appends_nothing_once_its_device_is_no_longer_admitted() {
 
     a.close().await;
     b.router.shutdown().await.expect("shutdown");
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn a_listing_whose_cid_is_not_the_requested_root_is_refused() {
+    let h = household();
+    let foreign = test_channel(
+        vec![berth_event("claim", "foreign-root", "sb", "31.0")],
+        vec![],
+    );
+    let signed_root = BlobCid::compute(b"the root named by the signed head");
+    assert_ne!(foreign.root, signed_root);
+    let requests = Arc::new(Mutex::new(Vec::new()));
+    let served = foreign.clone();
+    let mounted = mount_stub(
+        &h.key_b,
+        StubTier {
+            answer: Arc::new(move |request| served.answer(request)),
+            requests,
+        },
+    )
+    .await;
+    let a = bind(&h.key_a, None, vec![]).await.expect("bind A");
+    let connection = a
+        .connect(mounted.addr.clone(), TIER_ALPN)
+        .await
+        .expect("connects");
+
+    let fetched = fetch_channel(
+        &connection,
+        None,
+        &signed_root,
+        &Default::default(),
+        &TreeLimits::default(),
+        &FoldLimits::default(),
+    )
+    .await;
+    assert!(matches!(fetched, Err(PeerError::FoldIntegrity { .. })));
+
+    drop(connection);
+    a.close().await;
+    mounted.router.shutdown().await.expect("shutdown");
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn a_self_consistent_tree_other_than_the_signed_root_is_refused_and_the_head_is_not_recorded()
+{
+    let h = household();
+    let foreign = test_channel(
+        vec![berth_event("claim", "foreign-head", "sb", "32.0")],
+        vec![],
+    );
+    let signed_root = BlobCid::compute(b"signed but not served");
+    let served = foreign.clone();
+    let mounted = mount_gossip_stub(
+        &h.key_b,
+        StubTier {
+            answer: Arc::new(move |request| served.answer(request)),
+            requests: Arc::new(Mutex::new(Vec::new())),
+        },
+    )
+    .await;
+    let roster_root = Checkout::new();
+    let roster = SidecarRoster::open(roster_root.dir.path(), HANDLE).expect("roster");
+    for row in &h.rows {
+        roster.append(row.clone()).expect("roster row");
+    }
+    let checkout = Checkout::new();
+    let state = tempfile::tempdir().expect("state");
+    let signer = Arc::new(h.a.signer());
+    let daemon = PeerDaemon::start(PeerConfig {
+        key: h.key_a,
+        device: h.a.did.clone(),
+        chain_root: h.a.did.clone(),
+        flow_root: checkout.dir.path().to_path_buf(),
+        roster: roster.log_path().to_path_buf(),
+        state_dir: state.path().to_path_buf(),
+        rules: Rules::from_policy(&policy()).expect("rules"),
+        policy: None,
+        relay: None,
+        listen: None,
+        peers: vec![mounted.addr.clone()],
+        signer,
+        verifier: h.verify.clone(),
+        log: Arc::new(|_line: &str| {}),
+    })
+    .await
+    .expect("A daemon starts");
+    mounted
+        .endpoint
+        .add_node_addr(
+            NodeAddr::new(daemon.node_id()).with_direct_addresses(daemon.bound_sockets()),
+        )
+        .expect("A address");
+    let (sender, mut receiver) = mounted
+        .gossip
+        .subscribe(eprfs_peer::topic_for(&h.a.did), vec![daemon.node_id()])
+        .await
+        .expect("B joins")
+        .split();
+    let joined = tokio::time::timeout(WITHIN, async {
+        loop {
+            match receiver.next().await {
+                Some(Ok(iroh_gossip::api::Event::NeighborUp(node))) if node == daemon.node_id() => {
+                    break true;
+                }
+                Some(_) => {}
+                None => break false,
+            }
+        }
+    })
+    .await
+    .expect("B sees A as a gossip neighbour");
+    assert!(joined, "B's gossip stream stays open after joining A");
+    let head = ChannelHead::sign(
+        h.b.did.clone(),
+        signed_root,
+        1,
+        1,
+        Default::default(),
+        &h.b.signer(),
+    )
+    .expect("head signs");
+    sender
+        .broadcast(head.to_wire().expect("head wire").into())
+        .await
+        .expect("head broadcasts");
+    tokio::time::timeout(WITHIN, async {
+        loop {
+            let table = HeadTable::load(state.path()).expect("head table");
+            if table.channel.fold_failures > 0 {
+                break;
+            }
+            tokio::time::sleep(Duration::from_millis(50)).await;
+        }
+    })
+    .await
+    .expect("the rejected fold is persisted");
+    assert!(
+        checkout.events().is_empty(),
+        "no foreign event was appended"
+    );
+    let table = HeadTable::load(state.path()).expect("head table");
+    assert!(
+        !table.devices.contains_key(&h.b.did),
+        "a failed fold leaves the peer head unrecorded"
+    );
+
+    daemon.shutdown().await;
+    mounted.router.shutdown().await.expect("shutdown");
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn a_diff_with_an_invalid_blob_codec_falls_back_to_the_verified_listing() {
+    let h = household();
+    let first_event = berth_event("claim", "diff-base", "sb", "33.0");
+    let second_event = berth_event("release", "diff-base", "sb", "34.0");
+    let stranger_event = berth_event("claim", "diff-stranger", "sb", "35.0");
+    let first_cid = atom_cid(&first_event).expect("first cid");
+    let second_cid = atom_cid(&second_event).expect("second cid");
+    let stranger_cid = atom_cid(&stranger_event).expect("stranger cid");
+    let old = test_channel(vec![first_event.clone()], vec![]);
+    let new = test_channel(vec![first_event, second_event], vec![]);
+    let change = TreeChange::new(
+        TreePath::from_slash_bytes(format!("{CHANNEL_EVENTS}/{stranger_cid}").as_bytes())
+            .expect("stranger path"),
+        None,
+        Some(TreeEntryKind::File {
+            blob: old.root.clone().into(),
+            executable: false,
+        }),
+    );
+    let served_old = old.clone();
+    let served_new = new.clone();
+    let old_root = old.root.clone();
+    let new_root = new.root.clone();
+    let requests = Arc::new(Mutex::new(Vec::new()));
+    let mounted = mount_stub(
+        &h.key_b,
+        StubTier {
+            answer: Arc::new(move |request| match request {
+                TierRequest::Diff { old, new, .. } if old == &old_root && new == &new_root => {
+                    TierAnswer::Diff(vec![change.clone()])
+                }
+                TierRequest::List { root, .. } | TierRequest::Read { root, .. }
+                    if root == &old_root =>
+                {
+                    served_old.answer(request)
+                }
+                TierRequest::List { root, .. } | TierRequest::Read { root, .. }
+                    if root == &new_root =>
+                {
+                    served_new.answer(request)
+                }
+                _ => TierAnswer::Failed {
+                    reason: "unexpected request".into(),
+                },
+            }),
+            requests: requests.clone(),
+        },
+    )
+    .await;
+    let a = bind(&h.key_a, None, vec![]).await.expect("bind A");
+    let connection = a
+        .connect(mounted.addr.clone(), TIER_ALPN)
+        .await
+        .expect("connects");
+    fetch_channel(
+        &connection,
+        None,
+        &old.root,
+        &Default::default(),
+        &TreeLimits::default(),
+        &FoldLimits::default(),
+    )
+    .await
+    .expect("base root verifies");
+
+    let known = HashSet::from([first_cid]);
+    let fetched = fetch_channel(
+        &connection,
+        Some(&old.root),
+        &new.root,
+        &known,
+        &TreeLimits::default(),
+        &FoldLimits::default(),
+    )
+    .await
+    .expect("the verified full listing replaces the refused diff");
+    assert_eq!(fetched.events.len(), 1);
+    assert_eq!(fetched.events[0].cid, second_cid);
+    assert!(fetched.events.iter().all(|event| event.cid != stranger_cid));
+    assert!(requests.lock().expect("request log").iter().any(|request| {
+        matches!(request, TierRequest::List { root, path }
+            if root == &new.root && path.to_string() == CHANNEL_EVENTS)
+    }));
+
+    drop(connection);
+    a.close().await;
+    mounted.router.shutdown().await.expect("shutdown");
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn a_diff_adding_an_event_not_in_the_new_events_node_is_refused() {
+    let h = household();
+    let first_event = berth_event("claim", "foreign-diff-base", "sb", "33.0");
+    let second_event = berth_event("release", "foreign-diff-base", "sb", "34.0");
+    let stranger_event = berth_event("claim", "foreign-diff-stranger", "sb", "35.0");
+    let first_cid = atom_cid(&first_event).expect("first cid");
+    let second_cid = atom_cid(&second_event).expect("second cid");
+    let stranger_cid = atom_cid(&stranger_event).expect("stranger cid");
+    let old = test_channel(vec![first_event.clone()], vec![]);
+    let new = test_channel(vec![first_event, second_event], vec![]);
+    let stranger = test_channel(vec![stranger_event], vec![]);
+    let stranger_path = format!("{CHANNEL_EVENTS}/{stranger_cid}");
+    let change = TreeChange::new(
+        TreePath::from_slash_bytes(stranger_path.as_bytes()).expect("stranger path"),
+        None,
+        Some(stranger.event_kind(&stranger_cid)),
+    );
+    let served_old = old.clone();
+    let served_new = new.clone();
+    let served_stranger = stranger.clone();
+    let old_root = old.root.clone();
+    let new_root = new.root.clone();
+    let requests = Arc::new(Mutex::new(Vec::new()));
+    let mounted = mount_stub(
+        &h.key_b,
+        StubTier {
+            answer: Arc::new(move |request| match request {
+                TierRequest::Diff { old, new, .. } if old == &old_root && new == &new_root => {
+                    TierAnswer::Diff(vec![change.clone()])
+                }
+                TierRequest::Read { root, path }
+                    if root == &new_root && path.to_string() == stranger_path =>
+                {
+                    served_stranger.answer(request)
+                }
+                TierRequest::List { root, .. } | TierRequest::Read { root, .. }
+                    if root == &old_root =>
+                {
+                    served_old.answer(request)
+                }
+                TierRequest::List { root, .. } | TierRequest::Read { root, .. }
+                    if root == &new_root =>
+                {
+                    served_new.answer(request)
+                }
+                _ => TierAnswer::Failed {
+                    reason: "unexpected request".into(),
+                },
+            }),
+            requests: requests.clone(),
+        },
+    )
+    .await;
+    let a = bind(&h.key_a, None, vec![]).await.expect("bind A");
+    let connection = a
+        .connect(mounted.addr.clone(), TIER_ALPN)
+        .await
+        .expect("connects");
+    fetch_channel(
+        &connection,
+        None,
+        &old.root,
+        &Default::default(),
+        &TreeLimits::default(),
+        &FoldLimits::default(),
+    )
+    .await
+    .expect("base root verifies");
+
+    let known = HashSet::from([first_cid]);
+    let fetched = fetch_channel(
+        &connection,
+        Some(&old.root),
+        &new.root,
+        &known,
+        &TreeLimits::default(),
+        &FoldLimits::default(),
+    )
+    .await
+    .expect("the verified full listing replaces the foreign diff");
+    assert_eq!(fetched.events.len(), 1);
+    assert_eq!(fetched.events[0].cid, second_cid);
+    assert!(fetched.events.iter().all(|event| event.cid != stranger_cid));
+    assert!(requests.lock().expect("request log").iter().any(|request| {
+        matches!(request, TierRequest::List { root, path }
+            if root == &new.root && path.to_string() == CHANNEL_EVENTS)
+    }));
+
+    drop(connection);
+    a.close().await;
+    mounted.router.shutdown().await.expect("shutdown");
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn a_diff_that_recomputes_to_the_verified_events_cid_reads_no_full_listing() {
+    let h = household();
+    let first_event = berth_event("claim", "verified-diff", "sb", "36.0");
+    let second_event = berth_event("release", "verified-diff", "sb", "37.0");
+    let second_cid = atom_cid(&second_event).expect("second cid");
+    let old = test_channel(vec![first_event.clone()], vec![]);
+    let new = test_channel(vec![first_event, second_event], vec![]);
+    let change = TreeChange::new(
+        TreePath::from_slash_bytes(format!("{CHANNEL_EVENTS}/{second_cid}").as_bytes())
+            .expect("second path"),
+        None,
+        Some(new.event_kind(&second_cid)),
+    );
+    let requests = Arc::new(Mutex::new(Vec::new()));
+    let served_old = old.clone();
+    let served_new = new.clone();
+    let old_root = old.root.clone();
+    let new_root = new.root.clone();
+    let mounted = mount_stub(
+        &h.key_b,
+        StubTier {
+            answer: Arc::new(move |request| match request {
+                TierRequest::Diff { old, new, .. } if old == &old_root && new == &new_root => {
+                    TierAnswer::Diff(vec![change.clone()])
+                }
+                TierRequest::List { root, .. } | TierRequest::Read { root, .. }
+                    if root == &old_root =>
+                {
+                    served_old.answer(request)
+                }
+                TierRequest::List { root, .. } | TierRequest::Read { root, .. }
+                    if root == &new_root =>
+                {
+                    served_new.answer(request)
+                }
+                _ => TierAnswer::Failed {
+                    reason: "unexpected request".into(),
+                },
+            }),
+            requests: requests.clone(),
+        },
+    )
+    .await;
+    let a = bind(&h.key_a, None, vec![]).await.expect("bind A");
+    let connection = a
+        .connect(mounted.addr.clone(), TIER_ALPN)
+        .await
+        .expect("connects");
+    fetch_channel(
+        &connection,
+        None,
+        &old.root,
+        &Default::default(),
+        &TreeLimits::default(),
+        &FoldLimits::default(),
+    )
+    .await
+    .expect("base root verifies");
+    let before = requests.lock().expect("request log").len();
+
+    let fetched = fetch_channel(
+        &connection,
+        Some(&old.root),
+        &new.root,
+        &Default::default(),
+        &TreeLimits::default(),
+        &FoldLimits::default(),
+    )
+    .await
+    .expect("verified diff");
+    assert_eq!(fetched.events.len(), 1);
+    assert_eq!(fetched.events[0].cid, second_cid);
+    {
+        let requests = requests.lock().expect("request log");
+        let delta_requests = &requests[before..];
+        assert!(delta_requests
+            .iter()
+            .any(|request| matches!(request, TierRequest::Diff { .. })));
+        assert!(
+            !delta_requests.iter().any(|request| {
+                matches!(request, TierRequest::List { path, .. } if path.to_string() == CHANNEL_EVENTS)
+            }),
+            "a matching diff does not read the full events listing"
+        );
+    }
+
+    drop(connection);
+    a.close().await;
+    mounted.router.shutdown().await.expect("shutdown");
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn a_nack_leaf_not_under_the_root_is_refused() {
+    let h = household();
+    let under_root = NackLeaf {
+        refused: vec!["under-root".into()],
+        quarantined: vec![],
+        refused_total: 1,
+    };
+    let foreign = NackLeaf {
+        refused: vec!["foreign".into()],
+        quarantined: vec![],
+        refused_total: 1,
+    };
+    let tree = test_channel(vec![], vec![(h.a.did.clone(), under_root)]);
+    let foreign_tree = test_channel(vec![], vec![(h.a.did.clone(), foreign)]);
+    let nack_path = format!("channel/nacks/{}", h.a.did);
+    let foreign_read = foreign_tree.read(&nack_path);
+    let served = tree.clone();
+    let requested_nack = nack_path.clone();
+    let mounted = mount_stub(
+        &h.key_b,
+        StubTier {
+            answer: Arc::new(move |request| match request {
+                TierRequest::Read { path, .. } if path.to_string() == requested_nack => {
+                    TierAnswer::Read(foreign_read.clone())
+                }
+                _ => served.answer(request),
+            }),
+            requests: Arc::new(Mutex::new(Vec::new())),
+        },
+    )
+    .await;
+    let a = bind(&h.key_a, None, vec![]).await.expect("bind A");
+    let checkout = Checkout::new();
+    let state = tempfile::tempdir().expect("state");
+
+    let folded = fold_root(
+        &a,
+        mounted.addr.clone(),
+        FoldTarget {
+            device: &h.b.did,
+            since: None,
+            root: &tree.root,
+            admission: None,
+            reader: FoldReader {
+                device: &h.a.did,
+                state_dir: state.path(),
+            },
+        },
+        &checkout.store(),
+        &allow(),
+        &TreeLimits::default(),
+        &FoldLimits::default(),
+    )
+    .await;
+    assert!(matches!(folded, Err(PeerError::FoldIntegrity { .. })));
+
+    a.close().await;
+    mounted.router.shutdown().await.expect("shutdown");
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn an_unmodified_v1_peer_still_folds_and_receives_no_new_request_kind() {
+    let h = household();
+    let event = berth_event("claim", "v1-peer", "sb", "38.0");
+    let cid = atom_cid(&event).expect("event cid");
+    let tree = test_channel(vec![event], vec![]);
+    let served = tree.clone();
+    let requests = Arc::new(Mutex::new(Vec::new()));
+    let mounted = mount_stub(
+        &h.key_b,
+        StubTier {
+            answer: Arc::new(move |request| served.answer(request)),
+            requests: requests.clone(),
+        },
+    )
+    .await;
+    let a = bind(&h.key_a, None, vec![]).await.expect("bind A");
+    let connection = a
+        .connect(mounted.addr.clone(), TIER_ALPN)
+        .await
+        .expect("connects");
+    let checkout = Checkout::new();
+
+    let fetched = fetch_channel(
+        &connection,
+        None,
+        &tree.root,
+        &Default::default(),
+        &TreeLimits::default(),
+        &FoldLimits::default(),
+    )
+    .await
+    .expect("v1 requests are sufficient");
+    let outcome = fold_events(&checkout.store(), &h.b.did, &fetched.events, &allow())
+        .expect("v1 event folds");
+    assert_eq!(outcome.appended, 1);
+    assert_eq!(fetched.events[0].cid, cid);
+    assert!(requests.lock().expect("request log").iter().all(|request| {
+        matches!(
+            request,
+            TierRequest::Read { .. } | TierRequest::List { .. } | TierRequest::Diff { .. }
+        )
+    }));
+
+    drop(connection);
+    a.close().await;
+    mounted.router.shutdown().await.expect("shutdown");
 }

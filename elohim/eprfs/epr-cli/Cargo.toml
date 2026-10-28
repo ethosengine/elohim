@@ -39,7 +39,7 @@ elohim-epr-rea = { path = "../../epr-rea" }
 # iroh peer; this binary supplies the device key as a signer and verifier, never the key itself.
 eprfs-peer = { path = "../eprfs-peer", optional = true }
 # The peer daemon's runtime (`epr peer serve`, `epr flow fold`).
-tokio = { workspace = true, features = ["rt-multi-thread", "time"], optional = true }
+tokio = { workspace = true, features = ["rt-multi-thread", "signal", "time"], optional = true }
 # The canonical CID codec. `canon_lift` mints every atom through `elohim_epr::cid::compute_cid`
 # — the same function the P0.4 liftability gate proved — never a second implementation.
 elohim-epr = { path = "../../epr" }

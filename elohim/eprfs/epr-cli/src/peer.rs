@@ -42,6 +42,9 @@ use crate::device_key::{self, DeviceKey};
 /// Where the crossing allow-list is read from, under the checkout.
 pub const POLICY_REL: &str = "genesis/agentic/pool-policy.json";
 
+/// The stdout prefix a supervisor waits for before treating `epr peer serve` as ready.
+pub const SERVING_LINE: &str = "epr peer: serving";
+
 /// The crossing measure carrying completed gate runs between one steward's devices.
 const GATE_VERDICT_MEASURE: &str = "gate-verdict@1";
 
@@ -82,11 +85,12 @@ pub type PeerResult<T> = Result<T, PeerCliError>;
 pub fn usage() -> String {
     "usage: epr peer <\n  \
      id [--json]\n  \
-     | serve [--root DIR] [--handle H] [--listen IP:PORT] [--peer NODE_ID@IP:PORT]... \
-     [--policy PATH] \
+     | serve [--check] [--root DIR] [--handle H] [--listen IP:PORT] \
+     [--peer NODE_ID@IP:PORT]... [--policy PATH] [--json] \
      (the device peer: the tier ALPN over this device's channel tree and the steward topic, \
-     admitted devices only; runs until stopped. EPR_PEER_RELAY_URL homes it to a relay; \
-     --peer names a device's direct address when there is none)\n  \
+     admitted devices only; runs until stopped. --check validates its read-only start floor; \
+     EPR_PEER_RELAY_URL homes it to a relay; --peer names a device's direct address when there \
+     is none)\n  \
      | status [--root DIR] [--handle H] [--json] \
      (one line per admitted device: its last folded head, its age and the events folded)\n  \
      | leases [--root DIR] [--handle H] [--policy PATH] [--json] \
@@ -134,6 +138,8 @@ pub struct Options {
     pub project: Option<String>,
     pub closure: Option<String>,
     pub json: bool,
+    /// Validate the serve start floor without taking the lock, binding, or writing.
+    pub check: bool,
 }
 
 impl Options {
@@ -145,8 +151,12 @@ impl Options {
         let mut i = 0;
         while i < args.len() {
             let flag = args[i].as_str();
-            if flag == "--json" {
-                options.json = true;
+            if matches!(flag, "--json" | "--check") {
+                if flag == "--json" {
+                    options.json = true;
+                } else {
+                    options.check = true;
+                }
                 i += 1;
                 continue;
             }
@@ -331,7 +341,303 @@ fn runtime() -> PeerResult<tokio::runtime::Runtime> {
         .build()?)
 }
 
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+struct ServeCheckOutcome {
+    ok: bool,
+    executable_cid: String,
+    device: String,
+    node_id: String,
+    heads: &'static str,
+    flows: &'static str,
+    rules_digest: String,
+    rules: &'static str,
+    loaded_rules_digest: Option<String>,
+}
+
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+struct ServeCheckRefusal<'a> {
+    ok: bool,
+    kind: &'a str,
+    reason: String,
+}
+
+enum ServeCheckDeviceError {
+    NotADevice(PeerCliError),
+    Invalid(PeerCliError),
+}
+
+fn validate_rosters_for_check(root: &Path) -> PeerResult<()> {
+    let directory = root.join(".eprfs/status/participants");
+    let entries = match std::fs::read_dir(&directory) {
+        Ok(entries) => entries,
+        Err(error) if error.kind() == std::io::ErrorKind::NotFound => return Ok(()),
+        Err(error) => return Err(PeerCliError::Io(error)),
+    };
+    for entry in entries {
+        let path = entry?.path();
+        if path
+            .extension()
+            .is_some_and(|extension| extension == "jsonl")
+        {
+            let bytes = std::fs::read(&path)?;
+            if !bytes.is_empty() && !bytes.ends_with(b"\n") {
+                return Err(PeerCliError::InvalidArguments(format!(
+                    "roster `{}` has an unterminated record; bytes preserved, repair requires \
+                     review",
+                    path.display()
+                )));
+            }
+            roster_rows_from_file(&path)?;
+        }
+    }
+    Ok(())
+}
+
+fn device_for_check(options: &Options) -> Result<Device, ServeCheckDeviceError> {
+    let key_file = device_key::resolve_path().map_err(|error| {
+        let missing = error.kind() == std::io::ErrorKind::NotFound;
+        let error = PeerCliError::InvalidArguments(format!(
+            "this device has no device key ({error}) — enroll it first with `epr actor witness` \
+             or `epr actor device enroll`"
+        ));
+        if missing {
+            ServeCheckDeviceError::NotADevice(error)
+        } else {
+            ServeCheckDeviceError::Invalid(error)
+        }
+    })?;
+    let key = DeviceKey::load(&key_file).map_err(|error| {
+        let missing = error.kind() == std::io::ErrorKind::NotFound;
+        let error = PeerCliError::InvalidArguments(format!(
+            "this device has no device key ({error}) — enroll it first with `epr actor witness` \
+             or `epr actor device enroll`"
+        ));
+        if missing {
+            ServeCheckDeviceError::NotADevice(error)
+        } else {
+            ServeCheckDeviceError::Invalid(error)
+        }
+    })?;
+    let did = key.did_key();
+    if options.handle.is_none() {
+        validate_rosters_for_check(&options.root).map_err(ServeCheckDeviceError::Invalid)?;
+    }
+    let lineage = steward_lineage(&options.root, options.handle.as_deref(), &did, &key_file)
+        .map_err(|error| {
+            let absent = matches!(&error, ActorError::InvalidArguments(_))
+                && matches!(
+                    channel_standing(&options.root, options.handle.as_deref(), &did),
+                    Ok(ChannelStanding::NotADevice(_) | ChannelStanding::Revoked { .. })
+                );
+            let error = PeerCliError::Actor(error);
+            if absent {
+                ServeCheckDeviceError::NotADevice(error)
+            } else {
+                ServeCheckDeviceError::Invalid(error)
+            }
+        })?;
+    let peer_dir = peer_dir().map_err(ServeCheckDeviceError::Invalid)?;
+    Ok(Device {
+        key,
+        lineage,
+        peer_dir,
+    })
+}
+
+fn peer_key(device: &Device) -> PeerResult<PeerKey> {
+    let did = device.key.did_key();
+    let admission = device.admission()?;
+    let expected = admission.node_for(&did).ok_or_else(|| {
+        PeerCliError::InvalidArguments(format!(
+            "peer-key-mismatch: {}'s roster names no admitted peer key for this device; expected \
+             a PeerEndpoint row before serving from `{}`",
+            device.lineage.handle,
+            device.peer_dir.display()
+        ))
+    })?;
+    let key = PeerKey::load(&device.peer_dir).map_err(|error| {
+        PeerCliError::InvalidArguments(format!(
+            "peer-key-mismatch: roster node {expected}, peer dir `{}` has no matching key \
+             ({error}); run `epr peer id`, then replace the PeerEndpoint row deliberately",
+            device.peer_dir.display()
+        ))
+    })?;
+    let actual = key.node_id();
+    if actual != expected {
+        return Err(PeerCliError::InvalidArguments(format!(
+            "peer-key-mismatch: roster node {expected}, peer dir `{}` holds node {actual}; \
+             restore the declared key or replace the PeerEndpoint row deliberately",
+            device.peer_dir.display()
+        )));
+    }
+    Ok(key)
+}
+
+fn checked_executable() -> PeerResult<String> {
+    let executable = std::env::current_exe()?;
+    let store = crate::bin::daemon_store()?;
+    let cid = store.executable_cid(&executable)?;
+    let explicit_candidate = std::env::var_os("EPR_BIN")
+        .as_deref()
+        .map(Path::new)
+        .and_then(|path| path.canonicalize().ok())
+        .zip(executable.canonicalize().ok())
+        .is_some_and(|(candidate, running)| candidate == running);
+    if !explicit_candidate && !store.verified(&cid) {
+        return Err(PeerCliError::InvalidArguments(format!(
+            "exec-floor: running executable `{}` is neither a verified epr release nor the exact \
+             EPR_BIN candidate",
+            executable.display()
+        )));
+    }
+    Ok(cid)
+}
+
+fn flow_store_probe(root: &Path) -> PeerResult<&'static str> {
+    elohim_epr_rea::SidecarFlowStore::probe(root)
+        .map(|present| if present { "readable" } else { "absent" })
+        .map_err(|error| PeerCliError::Peer(PeerError::FlowStore(error)))
+}
+
+fn check_refusal(
+    options: &Options,
+    code: u8,
+    kind: &str,
+    error: impl fmt::Display,
+) -> PeerResult<ExitCode> {
+    let reason = error.to_string();
+    if options.json {
+        println!(
+            "{}",
+            serde_json::to_string_pretty(&ServeCheckRefusal {
+                ok: false,
+                kind,
+                reason,
+            })?
+        );
+    } else {
+        eprintln!("REFUSED {kind}: {reason}");
+    }
+    Ok(ExitCode::from(code))
+}
+
+fn serve_check(options: &Options) -> PeerResult<ExitCode> {
+    let executable_cid = match checked_executable() {
+        Ok(cid) => cid,
+        Err(error) => return check_refusal(options, 1, "exec-floor", error),
+    };
+    let device = match device_for_check(options) {
+        Ok(device) => device,
+        Err(ServeCheckDeviceError::NotADevice(error)) => {
+            return check_refusal(options, 3, "not-a-device", error)
+        }
+        Err(ServeCheckDeviceError::Invalid(error)) => {
+            return check_refusal(options, 1, "invalid-device-state", error)
+        }
+    };
+    let key = match peer_key(&device) {
+        Ok(key) => key,
+        Err(error) => return check_refusal(options, 1, "peer-key-mismatch", error),
+    };
+    let heads_path = device.peer_dir.join(HeadTable::FILE_NAME);
+    let heads = if heads_path.is_file() {
+        "readable"
+    } else {
+        "absent"
+    };
+    let table = match HeadTable::load(&device.peer_dir) {
+        Ok(table) => table,
+        Err(error) => return check_refusal(options, 1, "heads-invalid", error),
+    };
+    let flows = match flow_store_probe(&options.root) {
+        Ok(state) => state,
+        Err(error) => return check_refusal(options, 1, "flows-unreadable", error),
+    };
+    let policy = options
+        .policy
+        .clone()
+        .unwrap_or_else(|| options.root.join(POLICY_REL));
+    let rules = match Rules::from_policy_file(&policy) {
+        Ok(rules) => rules,
+        Err(error) => return check_refusal(options, 1, "policy-invalid", error),
+    };
+    let digest = rules.digest();
+    let loaded_rules_digest = table.rules.as_ref().map(|state| state.digest.to_string());
+    let rules_state = match table.rules.as_ref() {
+        Some(loaded) if loaded.digest.as_str() != digest.as_str() => "skew",
+        Some(_) => "match",
+        None => "unrecorded",
+    };
+    let outcome = ServeCheckOutcome {
+        ok: true,
+        executable_cid,
+        device: device.key.did_key(),
+        node_id: key.node_id().to_string(),
+        heads,
+        flows,
+        rules_digest: digest.to_string(),
+        rules: rules_state,
+        loaded_rules_digest,
+    };
+    if options.json {
+        println!("{}", serde_json::to_string_pretty(&outcome)?);
+    } else {
+        println!("check: ok");
+        println!("executable: {}", outcome.executable_cid);
+        println!("device: {}", short(&outcome.device));
+        println!("peer: {}", outcome.node_id);
+        println!("heads: {}", outcome.heads);
+        println!("flows: {}", outcome.flows);
+        match outcome.loaded_rules_digest.as_deref() {
+            Some(loaded) if outcome.rules == "skew" => println!(
+                "rules: skew (policy {}, loaded {})",
+                outcome.rules_digest, loaded
+            ),
+            _ => println!("rules: {} ({})", outcome.rules, outcome.rules_digest),
+        }
+    }
+    Ok(ExitCode::SUCCESS)
+}
+
+fn termination() -> impl std::future::Future<Output = ()> {
+    use tokio::signal::unix::{signal, SignalKind};
+
+    let signals = (
+        signal(SignalKind::terminate()),
+        signal(SignalKind::interrupt()),
+    );
+    async move {
+        match signals {
+            (Ok(mut terminate), Ok(mut interrupt)) => {
+                tokio::select! {
+                    _ = terminate.recv() => {}
+                    _ = interrupt.recv() => {}
+                }
+            }
+            _ => std::future::pending::<()>().await,
+        }
+    }
+}
+
 fn serve(options: Options) -> PeerResult<ExitCode> {
+    if options.check {
+        return serve_check(&options);
+    }
+    let device = Device::open(&options.root, options.handle.as_deref())?;
+    let key = peer_key(&device)?;
+    let policy = options
+        .policy
+        .clone()
+        .unwrap_or_else(|| options.root.join(POLICY_REL));
+    let rules = Rules::from_policy_file(&policy)?;
+    let peers = options
+        .peers
+        .iter()
+        .map(|arg| peer_from_arg(arg))
+        .collect::<Result<Vec<_>, _>>()?;
+    let relay = relay_from_env()?;
     crate::bin::daemon_store()?.record_running_daemon(
         &std::env::current_exe()?,
         std::process::id(),
@@ -340,25 +646,13 @@ fn serve(options: Options) -> PeerResult<ExitCode> {
             .as_deref()
             .map(std::path::Path::new),
     )?;
-    let device = Device::open(&options.root, options.handle.as_deref())?;
     let _serving = ServeLock::acquire(&device.peer_dir)?;
-    let policy = options
-        .policy
-        .clone()
-        .unwrap_or_else(|| options.root.join(POLICY_REL));
-    let rules = Rules::from_policy_file(&policy)?;
     if rules.allow().is_empty() {
         eprintln!(
             "epr peer: the crossing allow-list is empty — nothing of this device crosses until \
              {POLICY_REL} declares berth.channel.crosses"
         );
     }
-    let peers = options
-        .peers
-        .iter()
-        .map(|arg| peer_from_arg(arg))
-        .collect::<Result<Vec<_>, _>>()?;
-    let key = PeerKey::load_or_generate(&device.peer_dir)?;
     let did = device.key.did_key();
     let signer_key = device.key;
     let config = PeerConfig {
@@ -370,7 +664,7 @@ fn serve(options: Options) -> PeerResult<ExitCode> {
         state_dir: device.peer_dir.clone(),
         rules,
         policy: Some(policy),
-        relay: relay_from_env()?,
+        relay,
         listen: options.listen,
         peers,
         signer: Arc::new(move |message: &[u8]| signer_key.sign(message)),
@@ -380,22 +674,29 @@ fn serve(options: Options) -> PeerResult<ExitCode> {
     let runtime = runtime()?;
     runtime.block_on(async move {
         let mut daemon = PeerDaemon::start(config).await?;
+        let stop = termination();
+        tokio::pin!(stop);
         let sockets: Vec<String> = daemon
             .bound_sockets()
             .iter()
             .map(ToString::to_string)
             .collect();
-        eprintln!(
-            "epr peer: serving {} as {} on {} for {}'s devices",
+        println!(
+            "{SERVING_LINE} {} as {} on {} for {}'s devices",
             short(&did),
             daemon.node_id(),
             sockets.join(", "),
             device.lineage.handle
         );
-        // The loop ends on its own only for a reason worth a non-zero exit; it is named.
-        let ended = daemon.wait().await;
+        let ended = tokio::select! {
+            ended = daemon.wait() => Some(ended),
+            _ = &mut stop => None,
+        };
         daemon.shutdown().await;
-        ended.map_err(PeerCliError::Peer)
+        match ended {
+            Some(ended) => ended.map_err(PeerCliError::Peer),
+            None => Ok(()),
+        }
     })?;
     Ok(ExitCode::SUCCESS)
 }

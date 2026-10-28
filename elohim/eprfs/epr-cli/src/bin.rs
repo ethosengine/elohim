@@ -41,8 +41,8 @@ pub(crate) fn execute(args: &[String]) -> Result<String, Refusal> {
         }
         match arg.as_str() {
             "--repair"|"--json"|"--revert"|"--current"|"--pin"|"--provisional"=>{ flags.insert(arg.as_str()); },
-            "--tool"|"--registry"|"--store"|"--repo"|"--source-commit"|"--gate-run"|"--tree-clean"|"--commit"|"--invoked"|"--cid"|"--closure"|"--launcher"|"--destination"=>{ options.insert(arg.as_str(),iter.next().ok_or_else(|| argument(format!("{arg} needs a value")))?.as_str()); },
-            "--help"|"-h"=>return Ok("epr bin <ingest|land|pin|resolve|status|gc|bootstrap|follow|shadows|source-state|launch|install-launcher|migrate> --tool <name> [--registry PATH] [--store PATH] [--json]".into()),
+            "--tool"|"--registry"|"--store"|"--repo"|"--source-commit"|"--gate-run"|"--tree-clean"|"--commit"|"--expect"|"--invoked"|"--cid"|"--closure"|"--launcher"|"--destination"=>{ options.insert(arg.as_str(),iter.next().ok_or_else(|| argument(format!("{arg} needs a value")))?.as_str()); },
+            "--help"|"-h"=>return Ok("epr bin <ingest|land|pin|resolve|status|gc|bootstrap|follow|shadows|source-state|launch|install-launcher|migrate> --tool <name> [--registry PATH] [--store PATH] [--json]; land requires --expect <cid|none>".into()),
             _ if arg.starts_with('-')=>return Err(argument(format!("unknown flag {arg}"))),
             _=>positional.push(arg.as_str()),
         }
@@ -103,17 +103,24 @@ pub(crate) fn execute(args: &[String]) -> Result<String, Refusal> {
                 }
             )?)
         }
-        "land" => json!(store.land(
-            positional
-                .get(1)
-                .or_else(|| options.get("--cid"))
-                .ok_or_else(|| argument("land requires cid"))?,
-            options
-                .get("--commit")
-                .ok_or_else(|| argument("land requires --commit"))?,
-            &repo()?,
-            flags.contains("--revert")
-        )?),
+        "land" => {
+            let expected = options
+                .get("--expect")
+                .copied()
+                .ok_or_else(|| argument("land requires --expect <cid|none>"))?;
+            json!(store.land_expected(
+                positional
+                    .get(1)
+                    .or_else(|| options.get("--cid"))
+                    .ok_or_else(|| argument("land requires cid"))?,
+                options
+                    .get("--commit")
+                    .ok_or_else(|| argument("land requires --commit"))?,
+                &repo()?,
+                flags.contains("--revert"),
+                (expected != "none").then_some(expected)
+            )?)
+        }
         "pin" => json!(store.pin(
             &identity,
             options.get("--cid").copied(),
