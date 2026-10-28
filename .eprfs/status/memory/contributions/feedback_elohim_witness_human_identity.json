@@ -4,14 +4,15 @@
     "path": ".epr-meta/collective.json",
     "cid": "bafkreihdh5j5y4mkjijuekeknoyspyjgv2u23e5ecmso67b3f5ehpbmtai"
   },
-  "author": "agent:orchestrator@claude-fable-5-1",
+  "author": "human:matthew",
   "steward": "repo:ethosengine/elohim",
   "scope": "repository",
   "reach": "repository",
   "concern": "feedback_elohim_witness_human_identity",
   "claim": "Operator 2026-09-24: a present agent witnesses human:<handle> from the device with a basis, contestable; never Che/git/email-derived, never a hook's inference.",
   "uncertainty": [
-    "Imported verbatim from .claude/memory/feedback_elohim_witness_human_identity.md; the claim is the entry's own one-line description and the entry body is the pinned source, not restated here."
+    "Imported verbatim from .claude/memory/feedback_elohim_witness_human_identity.md; the claim is the entry's own one-line description and the entry body is the pinned source, not restated here.",
+    "authorship: steward-of-record — human:matthew stands for this entry; no agent author was witnessed writing it, and this record does not say human:matthew wrote it. Origin session: 8e88ae01-a389-45ee-a961-31b36b2c793a."
   ],
   "sources": [
     {

@@ -4,14 +4,15 @@
     "path": ".epr-meta/collective.json",
     "cid": "bafkreihcq3q7qgwncossxf6q7rowjsysgw3wqt2lpu2w6mnoosd7abmfku"
   },
-  "author": "agent:integrator@claude-fable-5-1",
+  "author": "human:matthew",
   "steward": "repo:ethosengine/elohim",
   "scope": "repository",
   "reach": "repository",
   "concern": "project_dataplane_pain_points_sprint_2026_09_02",
   "claim": "2026-09-02: quiesce leg bounded, federation Act II re-acted, device-peer launcher streamlined, wave 2 = handshake.",
   "uncertainty": [
-    "Imported verbatim from .claude/memory/project_dataplane_pain_points_sprint_2026_09_02.md; the claim is the entry's own one-line description and the entry body is the pinned source, not restated here."
+    "Imported verbatim from .claude/memory/project_dataplane_pain_points_sprint_2026_09_02.md; the claim is the entry's own one-line description and the entry body is the pinned source, not restated here.",
+    "authorship: steward-of-record — human:matthew stands for this entry; no agent author was witnessed writing it, and this record does not say human:matthew wrote it. Origin session: e316e847-8c4b-4da1-bea6-84b2dcf29a75."
   ],
   "sources": [
     {

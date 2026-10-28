@@ -4,14 +4,15 @@
     "path": ".epr-meta/collective.json",
     "cid": "bafkreihcq3q7qgwncossxf6q7rowjsysgw3wqt2lpu2w6mnoosd7abmfku"
   },
-  "author": "agent:integrator@claude-fable-5-1",
+  "author": "human:matthew",
   "steward": "repo:ethosengine/elohim",
   "scope": "repository",
   "reach": "repository",
   "concern": "feedback_pvc_deferral_hides_gate_debt",
   "claim": "Chronic 85%+ disk pressure defers HEAVY_GATES — dev 'green' = deferred, not passed; triage integration reds by origin/dev byte-identity.",
   "uncertainty": [
-    "Imported verbatim from .claude/memory/feedback_pvc_deferral_hides_gate_debt.md; the claim is the entry's own one-line description and the entry body is the pinned source, not restated here."
+    "Imported verbatim from .claude/memory/feedback_pvc_deferral_hides_gate_debt.md; the claim is the entry's own one-line description and the entry body is the pinned source, not restated here.",
+    "authorship: steward-of-record — human:matthew stands for this entry; no agent author was witnessed writing it, and this record does not say human:matthew wrote it. Origin session: fb007ca7-2e24-46d8-bded-e3284050d0e1."
   ],
   "sources": [
     {

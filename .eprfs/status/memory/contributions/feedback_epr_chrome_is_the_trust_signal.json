@@ -4,14 +4,15 @@
     "path": ".epr-meta/collective.json",
     "cid": "bafkreihcq3q7qgwncossxf6q7rowjsysgw3wqt2lpu2w6mnoosd7abmfku"
   },
-  "author": "agent:integrator@claude-fable-5-1",
+  "author": "human:matthew",
   "steward": "repo:ethosengine/elohim",
   "scope": "repository",
   "reach": "repository",
   "concern": "feedback_epr_chrome_is_the_trust_signal",
   "claim": "Operator 2026-09-12: chrome signals governance, fair trade, redress, owed response — a concierge to the commons.",
   "uncertainty": [
-    "Imported verbatim from .claude/memory/feedback_epr_chrome_is_the_trust_signal.md; the claim is the entry's own one-line description and the entry body is the pinned source, not restated here."
+    "Imported verbatim from .claude/memory/feedback_epr_chrome_is_the_trust_signal.md; the claim is the entry's own one-line description and the entry body is the pinned source, not restated here.",
+    "authorship: steward-of-record — human:matthew stands for this entry; no agent author was witnessed writing it, and this record does not say human:matthew wrote it. Origin session: dcddc033-024b-4dfa-8d13-39fa5f75b9ef."
   ],
   "sources": [
     {

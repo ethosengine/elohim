@@ -4,14 +4,15 @@
     "path": ".epr-meta/collective.json",
     "cid": "bafkreihcq3q7qgwncossxf6q7rowjsysgw3wqt2lpu2w6mnoosd7abmfku"
   },
-  "author": "agent:integrator@claude-fable-5-1",
+  "author": "human:matthew",
   "steward": "repo:ethosengine/elohim",
   "scope": "repository",
   "reach": "repository",
   "concern": "project_storybook_smoke_test_story_budget",
   "claim": "Smoke-Test Stories share a cumulative timeout budget — a fat matrix fails the WHOLE build; keep Library A+B to ~3-4 trimmed-fixture stories.",
   "uncertainty": [
-    "Imported verbatim from .claude/memory/project_storybook_smoke_test_story_budget.md; the claim is the entry's own one-line description and the entry body is the pinned source, not restated here."
+    "Imported verbatim from .claude/memory/project_storybook_smoke_test_story_budget.md; the claim is the entry's own one-line description and the entry body is the pinned source, not restated here.",
+    "authorship: steward-of-record — human:matthew stands for this entry; no agent author was witnessed writing it, and this record does not say human:matthew wrote it. Origin session: ca4a672a-d664-44dd-b21f-64d780015b5d."
   ],
   "sources": [
     {

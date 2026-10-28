@@ -4,14 +4,15 @@
     "path": ".epr-meta/collective.json",
     "cid": "bafkreihcq3q7qgwncossxf6q7rowjsysgw3wqt2lpu2w6mnoosd7abmfku"
   },
-  "author": "agent:integrator@claude-fable-5-1",
+  "author": "human:matthew",
   "steward": "repo:ethosengine/elohim",
   "scope": "repository",
   "reach": "repository",
   "concern": "project_self_healing_control_plane_vision",
   "claim": "Four-pillar actuatable no-overwhelm control plane (observe + REA actuation); plans A-D merged to dev — verify in-tree, not on the deleted branch.",
   "uncertainty": [
-    "Imported verbatim from .claude/memory/project_self_healing_control_plane_vision.md; the claim is the entry's own one-line description and the entry body is the pinned source, not restated here."
+    "Imported verbatim from .claude/memory/project_self_healing_control_plane_vision.md; the claim is the entry's own one-line description and the entry body is the pinned source, not restated here.",
+    "authorship: steward-of-record — human:matthew stands for this entry; no agent author was witnessed writing it, and this record does not say human:matthew wrote it. Origin session: 07f6a581-cb81-4bc1-bcdf-6cbc304abfda."
   ],
   "sources": [
     {

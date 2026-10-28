@@ -4,14 +4,15 @@
     "path": ".epr-meta/collective.json",
     "cid": "bafkreihcq3q7qgwncossxf6q7rowjsysgw3wqt2lpu2w6mnoosd7abmfku"
   },
-  "author": "agent:integrator@claude-fable-5-1",
+  "author": "human:matthew",
   "steward": "repo:ethosengine/elohim",
   "scope": "repository",
   "reach": "repository",
   "concern": "conductor-signal-msgpack-decode-class",
   "claim": "holo_hash in conductor msgpack signals = raw bytes; Value pre-pass or String mirrors silently drop the signal — decode typed HoloHashB64 (closed 2026-06-13).",
   "uncertainty": [
-    "Imported verbatim from .claude/memory/project_conductor_signal_msgpack_decode_class.md; the claim is the entry's own one-line description and the entry body is the pinned source, not restated here."
+    "Imported verbatim from .claude/memory/project_conductor_signal_msgpack_decode_class.md; the claim is the entry's own one-line description and the entry body is the pinned source, not restated here.",
+    "authorship: steward-of-record — human:matthew stands for this entry; no agent author was witnessed writing it, and this record does not say human:matthew wrote it. Origin session: da9eca9d-9d7f-4a87-83f4-1f4197e6beba."
   ],
   "sources": [
     {

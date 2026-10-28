@@ -4,14 +4,15 @@
     "path": ".epr-meta/collective.json",
     "cid": "bafkreihcq3q7qgwncossxf6q7rowjsysgw3wqt2lpu2w6mnoosd7abmfku"
   },
-  "author": "agent:integrator@claude-fable-5-1",
+  "author": "human:matthew",
   "steward": "repo:ethosengine/elohim",
   "scope": "repository",
   "reach": "repository",
   "concern": "project_iroh_dataplane_actual_state",
   "claim": "Iroh dataplane: dual-stack live; convergence codepath gated ELOHIM_ADOPT_BEFORE_AUTHOR; ingest drain solved.",
   "uncertainty": [
-    "Imported verbatim from .claude/memory/project_iroh_dataplane_actual_state.md; the claim is the entry's own one-line description and the entry body is the pinned source, not restated here."
+    "Imported verbatim from .claude/memory/project_iroh_dataplane_actual_state.md; the claim is the entry's own one-line description and the entry body is the pinned source, not restated here.",
+    "authorship: steward-of-record — human:matthew stands for this entry; no agent author was witnessed writing it, and this record does not say human:matthew wrote it. Origin session: cf766280-b0c4-495e-8e66-6e752749f7f2."
   ],
   "sources": [
     {

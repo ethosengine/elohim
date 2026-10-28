@@ -4,14 +4,15 @@
     "path": ".epr-meta/collective.json",
     "cid": "bafkreihcq3q7qgwncossxf6q7rowjsysgw3wqt2lpu2w6mnoosd7abmfku"
   },
-  "author": "agent:integrator@claude-fable-5-1",
+  "author": "human:matthew",
   "steward": "repo:ethosengine/elohim",
   "scope": "repository",
   "reach": "repository",
   "concern": "project_automerge_content_sync_plane_lit",
   "claim": "Automerge plane lit; iroh dual-stack; ghost declared heads deadlocked batch-3.",
   "uncertainty": [
-    "Imported verbatim from .claude/memory/project_automerge_content_sync_plane_lit.md; the claim is the entry's own one-line description and the entry body is the pinned source, not restated here."
+    "Imported verbatim from .claude/memory/project_automerge_content_sync_plane_lit.md; the claim is the entry's own one-line description and the entry body is the pinned source, not restated here.",
+    "authorship: steward-of-record — human:matthew stands for this entry; no agent author was witnessed writing it, and this record does not say human:matthew wrote it. Origin session: b43fc98d-a01d-42eb-a935-abbc1f66659f."
   ],
   "sources": [
     {

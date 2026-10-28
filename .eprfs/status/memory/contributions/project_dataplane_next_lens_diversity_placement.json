@@ -4,14 +4,15 @@
     "path": ".epr-meta/collective.json",
     "cid": "bafkreihcq3q7qgwncossxf6q7rowjsysgw3wqt2lpu2w6mnoosd7abmfku"
   },
-  "author": "agent:integrator@claude-fable-5-1",
+  "author": "human:matthew",
   "steward": "repo:ethosengine/elohim",
   "scope": "repository",
   "reach": "repository",
   "concern": "project_dataplane_next_lens_diversity_placement",
   "claim": "Diversity-aware salvage placement (1a+1b landed) is INERT in prod — household_id NULL from identity-coherence gaps, not scope reads; degrades safely to XOR.",
   "uncertainty": [
-    "Imported verbatim from .claude/memory/project_dataplane_next_lens_diversity_placement.md; the claim is the entry's own one-line description and the entry body is the pinned source, not restated here."
+    "Imported verbatim from .claude/memory/project_dataplane_next_lens_diversity_placement.md; the claim is the entry's own one-line description and the entry body is the pinned source, not restated here.",
+    "authorship: steward-of-record — human:matthew stands for this entry; no agent author was witnessed writing it, and this record does not say human:matthew wrote it. Origin session: a0632634-fa0a-4b7a-8546-a7e1a5d6f0ab."
   ],
   "sources": [
     {
