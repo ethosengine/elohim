@@ -155,6 +155,57 @@ class CapacityTransitionTest(unittest.TestCase):
         self.assertTrue(self.berth.claim("cargo", "third")[0])
         self.assertEqual(self.holders(), {"second", "third"})
 
+    def test_operator_release_records_each_generation_removed_after_a_capacity_change(self):
+        first = self.berth.claim("cargo", "first", ttl_s=1)[1]
+        self.berth.now = lambda: 102
+        self.berth.capacities["cargo"] = 2
+        second = self.berth.claim("cargo", "first", ttl_s=1)[1]
+
+        self.assertTrue(self.berth.release("cargo", "first"))
+
+        releases = [row for row in self.berth.ledger(100) if row["kind"] == "release"]
+        self.assertEqual(
+            {row["claimed_at"] for row in releases},
+            {first["claimed_at"], second["claimed_at"]},
+        )
+        self.assertEqual(self.holders(), set())
+
+    def test_forced_release_records_each_generation_of_the_same_holder(self):
+        first = self.berth.claim("cargo", "first", ttl_s=1)[1]
+        self.berth.now = lambda: 102
+        self.berth.capacities["cargo"] = 2
+        second = self.berth.claim("cargo", "first", ttl_s=1)[1]
+
+        self.assertTrue(self.berth.release("cargo", "second", force=True))
+
+        releases = [row for row in self.berth.ledger(100) if row["kind"] == "release"]
+        self.assertEqual(
+            {row["forced_claimed_at"]["first"] for row in releases},
+            {first["claimed_at"], second["claimed_at"]},
+        )
+        self.assertTrue(all(row["forced_from"] == "first" for row in releases))
+        self.assertEqual(self.holders(), set())
+
+    def test_forced_release_cannot_emit_an_unbound_release_for_a_retained_caller(self):
+        other = self.berth.claim("cargo", "first")[1]
+        self.berth.now = lambda: 200
+        self.berth.capacities["cargo"] = 2
+        operator = self.berth.claim("cargo", "second")[1]
+
+        self.assertTrue(self.berth.release(
+            "cargo", "second", force=True, expected_claimed_at=other["claimed_at"],
+        ))
+
+        self.assertEqual(self.holders(), {"second"})
+        self.assertEqual(
+            self.berth.leases()["cargo/slots"][0]["claimed_at"], operator["claimed_at"],
+        )
+        release = [row for row in self.berth.ledger(100) if row["kind"] == "release"][-1]
+        self.assertEqual(release["session"], "second")
+        self.assertEqual(release["claimed_at"], other["claimed_at"])
+        self.assertEqual(release["forced_from"], "first")
+        self.assertEqual(release["forced_claimed_at"], {"first": other["claimed_at"]})
+
     def test_each_slot_shows_renewal_expiry_and_closure(self):
         self.berth.capacities["cargo"] = 2
         for session in ("first", "second"):
@@ -432,6 +483,76 @@ class LeaseClassTest(unittest.TestCase):
         self.assertEqual((stored["claimed_at"], stored["since"]), (1000.0, 1300.0))
         renew = self.rows("renew")[-1]
         self.assertEqual((renew["seat"], renew["claimed_at"], renew["class"]), ("che-a", 1000.0, "verify"))
+
+    def test_release_with_the_matching_generation_deletes_and_records_that_generation(self):
+        ok, lease, reason = self.berth.claim("mesh", "dev", ttl_s=60)
+        self.assertTrue(ok, reason)
+
+        self.assertTrue(self.berth.release(
+            "mesh", "dev", expected_claimed_at=lease["claimed_at"],
+        ))
+
+        self.assertIsNone(self.berth.raw_lease("mesh"))
+        release = self.rows("release")[-1]
+        self.assertEqual(release["claimed_at"], lease["claimed_at"])
+
+    def test_release_with_a_stale_generation_deletes_and_records_nothing(self):
+        ok, first, reason = self.berth.claim("mesh", "dev", ttl_s=10)
+        self.assertTrue(ok, reason)
+        self.clock[0] += 11
+        self.berth.touch("dev")
+        ok, second, reason = self.berth.claim("mesh", "dev", ttl_s=10)
+        self.assertTrue(ok, reason)
+        before = list(self.rows("release"))
+
+        self.assertFalse(self.berth.release(
+            "mesh", "dev", expected_claimed_at=first["claimed_at"],
+        ))
+
+        self.assertEqual(self.berth.raw_lease("mesh")["claimed_at"], second["claimed_at"])
+        self.assertEqual(self.rows("release"), before)
+
+    def test_operator_release_without_a_token_stamps_the_removed_generation(self):
+        ok, lease, reason = self.berth.claim("mesh", "dev", ttl_s=60)
+        self.assertTrue(ok, reason)
+
+        self.assertTrue(self.berth.release("mesh", "dev"))
+
+        release = self.rows("release")[-1]
+        self.assertEqual(release["claimed_at"], lease["claimed_at"])
+
+    def test_cli_release_passes_the_expected_generation(self):
+        ok, lease, reason = self.berth.claim("mesh", "dev", ttl_s=60)
+        self.assertTrue(ok, reason)
+        main = _NS["main"]
+
+        with mock.patch.dict(main.__globals__, {"Berth": lambda: self.berth}):
+            with contextlib.redirect_stdout(io.StringIO()):
+                rc = main([
+                    "berth", "release", "mesh", "--session", "dev",
+                    "--expected-claimed-at", str(lease["claimed_at"]),
+                ])
+
+        self.assertEqual(rc, 0)
+        self.assertIsNone(self.berth.raw_lease("mesh"))
+        self.assertEqual(self.rows("release")[-1]["claimed_at"], lease["claimed_at"])
+
+    def test_cli_release_rejects_an_expected_generation_option_without_a_value(self):
+        ok, lease, reason = self.berth.claim("mesh", "dev", ttl_s=60)
+        self.assertTrue(ok, reason)
+        before = list(self.rows("release"))
+        main = _NS["main"]
+
+        with mock.patch.dict(main.__globals__, {"Berth": lambda: self.berth}):
+            with contextlib.redirect_stderr(io.StringIO()):
+                rc = main([
+                    "berth", "release", "mesh", "--session", "dev",
+                    "--expected-claimed-at",
+                ])
+
+        self.assertEqual(rc, 2)
+        self.assertEqual(self.berth.raw_lease("mesh")["claimed_at"], lease["claimed_at"])
+        self.assertEqual(self.rows("release"), before)
 
     def test_renewed_lease_renders_last_renew_and_expiry_after_original_ttl(self):
         self.berth.claim("mesh", "dev", ttl_s=1800, note="pre-push to dev", closure="key-a3")
@@ -723,6 +844,7 @@ class DaemonClassTest(unittest.TestCase):
 
     def test_owner_check_refuses_a_stop_under_another_holder_and_force_is_on_the_record(self):
         self.berth.claim("mesh", "other", klass="mesh")
+        generation = self.berth.raw_lease("mesh")["claimed_at"]
         ok, _, reason = self.berth.owner_check("mesh", "dev", "stop")
         self.assertFalse(ok)
         self.assertIn("held by other", reason)
@@ -733,7 +855,9 @@ class DaemonClassTest(unittest.TestCase):
         self.assertEqual((row["action"], row["holder"]), ("stop", "other"))
         self.assertTrue(self.berth.release("mesh", "dev", force=True))
         self.assertIsNone(self.berth.raw_lease("mesh"))
-        self.assertEqual([r for r in self.berth.ledger(100) if r["kind"] == "release"][-1]["forced_from"], "other")
+        release = [r for r in self.berth.ledger(100) if r["kind"] == "release"][-1]
+        self.assertEqual(release["forced_from"], "other")
+        self.assertEqual(release["forced_claimed_at"], {"other": generation})
 
 
 class IncarnationTest(unittest.TestCase):

@@ -526,10 +526,10 @@ decisionPoints:
         justification: "An acknowledgement counts only for an own head projected from a store already holding the claim (own_log.events >= the claim's store position) and counted over this same store (own_log.last is the store's event at that position); a head announced after the claim's stamp but projected before it reached the store, or counted over a reset store, confirms nothing."
       - id: C3
         status: answered
-        justification: "A device that does not acknowledge within confirm_wait_s reads Unconfirmed, naming it and when it was last folded; an absent device is never a free resource."
+        justification: "A device that does not acknowledge within confirm_wait_s reads Unconfirmed, naming it and when it was last folded; an absent device is never a free resource. A folded legacy release without a claim generation retains a bounded lease only through its remaining TTL, while an own legacy release remains authoritative and a folded no-TTL lease honors the legacy release because it has no bounded recovery point."
       - id: C4
         status: answered
-        justification: "Effective, Pending, Unconfirmed and HeldBy are distinct verdicts; HeldBy wins over Unconfirmed."
+        justification: "Effective, Pending, Unconfirmed and HeldBy are distinct verdicts; HeldBy wins over Unconfirmed. Folded legacy ambiguity cannot create honest absence early for a bounded lease: the view keeps HeldBy until TTL instead of reporting the resource free."
       - id: C5
         status: answered
         justification: "Only folded leases of admitted devices count; a Contest removes the device's leases and its acknowledgement duty together."
@@ -550,7 +550,7 @@ decisionPoints:
         justification: "A head table written before own_log existed loads with an empty log: claims then read Pending, never Effective, until the next announce."
       - id: C10
         status: answered
-        justification: "New; reads the T1 berth record fields and the T5 head table."
+        justification: "Release records add claimed_at, and forced releases add forced_claimed_at per holder. Older rows still decode: own unbound releases remain authoritative; folded unbound releases retain bounded claims until TTL and close no-TTL claims. Older readers ignore the additive fields and retain their release behavior."
       - id: C11
         status: n-a
         justification: "No fan-out."
@@ -596,6 +596,21 @@ decisionPoints:
         kind: integration
       - path: elohim/eprfs/eprfs-peer/tests/lease_view.rs
         testName: another_devices_records_are_replayed_in_its_order_not_the_order_they_were_folded
+        kind: integration
+      - path: elohim/eprfs/eprfs-peer/tests/lease_view.rs
+        testName: an_older_fence_release_without_claim_identity_cannot_make_a_live_lease_free
+        kind: integration
+      - path: elohim/eprfs/eprfs-peer/tests/lease_view.rs
+        testName: a_stale_cleanup_bound_to_an_older_generation_cannot_release_a_reclaim
+        kind: integration
+      - path: elohim/eprfs/eprfs-peer/tests/lease_view.rs
+        testName: berth_release_rejects_a_stale_generation_before_deleting_or_recording
+        kind: integration
+      - path: elohim/eprfs/eprfs-peer/tests/lease_view.rs
+        testName: forced_release_preserves_the_callers_newer_generation_in_producer_and_replay
+        kind: integration
+      - path: elohim/eprfs/eprfs-peer/tests/lease_view.rs
+        testName: forced_releases_match_each_target_generation_and_fail_closed_for_bounded_legacy_claims
         kind: integration
       - path: elohim/eprfs/epr-cli/tests/peer.rs
         testName: peer_leases_prints_the_steward_view_while_serve_holds_its_lock

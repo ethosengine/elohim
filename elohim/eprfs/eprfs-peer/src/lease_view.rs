@@ -7,11 +7,13 @@
 //! record time, first) — since a fold appends a head's events in its tree's (CID) order, and two
 //! berth processes on one device can reach its store in the other order from the one they
 //! recorded in: a `claim` opens it, a
-//! `renew` extends it, a `release` (its own, or a forced one naming it) and an `unmoor` close it,
-//! and a claim that took over from another session closes that session's lease. A lease with a
-//! ttl stops binding `ttl_s` after it was claimed or last renewed. Leases folded from a device the
-//! roster no longer admits are ignored entirely (spec §3.1): a revoked device cannot keep a
-//! resource pinned, and it is not a device to wait for.
+//! `renew` extends it, a generation-matching `release` (its own, or a forced one naming it) and an
+//! `unmoor` close it, and a claim that took over from another session closes that session's lease.
+//! An own legacy release without a generation remains authoritative. A folded legacy release
+//! closes a no-ttl lease, but keeps a bounded lease through its ttl because it cannot prove which
+//! generation it ends. A lease with a ttl stops binding `ttl_s` after it was claimed or last
+//! renewed. Leases folded from a device the roster no longer admits are ignored entirely (spec
+//! §3.1): a revoked device cannot keep a resource pinned, and it is not a device to wait for.
 //!
 //! Per resource, this device's own live lease is held unless another device's live lease
 //! precedes it. A claim *saw* another lease when it was written with that lease already known:
@@ -136,6 +138,8 @@ pub struct LeaseEvent {
     pub took_over_from: Option<String>,
     /// A forced release names the holders it gave the resource back for.
     pub forced_from: Vec<String>,
+    /// A forced release binds each named holder to the claim generation it gave back.
+    pub forced_claimed_at: BTreeMap<String, u64>,
     /// An offline-ok override names the silent device it overrode.
     pub overrode: Option<String>,
     /// A claim's acknowledgement vector when it was written: for each other device, the highest
@@ -197,6 +201,23 @@ impl LeaseEvent {
             written,
             took_over_from: env.get("took_over_from").map(|s| (*s).to_string()),
             forced_from: names("forced_from"),
+            forced_claimed_at: env
+                .get("forced_claimed_at")
+                .and_then(|claims| serde_json::from_str::<serde_json::Value>(claims).ok())
+                .and_then(|claims| claims.as_object().cloned())
+                .map(|claims| {
+                    claims
+                        .into_iter()
+                        .filter_map(|(session, claimed_at)| {
+                            let claimed_at = claimed_at
+                                .as_str()
+                                .map(str::to_string)
+                                .unwrap_or_else(|| claimed_at.to_string());
+                            unix_ms(&claimed_at).map(|claimed_at| (session, claimed_at))
+                        })
+                        .collect()
+                })
+                .unwrap_or_default(),
             overrode: env.get("overrode").map(|s| (*s).to_string()),
             seen: env
                 .get("seen")
@@ -357,11 +378,25 @@ impl Lease {
     }
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum ReplayOrigin {
+    Own,
+    Folded,
+}
+
+fn release_applies(claimed_at: Option<u64>, lease: &Lease, origin: ReplayOrigin) -> bool {
+    claimed_at.map_or_else(
+        || origin == ReplayOrigin::Own || lease.ttl_s.is_none(),
+        |claimed_at| claimed_at == lease.claimed_at,
+    )
+}
+
 /// Replay one device's lease records, in the order it wrote them, into its open leases by
 /// `(resource, session)`.
 fn replay<'e>(
     device: &str,
     events: impl IntoIterator<Item = &'e LeaseEvent>,
+    origin: ReplayOrigin,
 ) -> BTreeMap<(Resource, String), Lease> {
     let mut open: BTreeMap<(Resource, String), Lease> = BTreeMap::new();
     for event in events {
@@ -420,9 +455,21 @@ fn replay<'e>(
                 }
             },
             LeaseKind::Release => {
-                open.remove(&key);
+                if open
+                    .get(&key)
+                    .is_some_and(|lease| release_applies(event.claimed_at, lease, origin))
+                {
+                    open.remove(&key);
+                }
                 for holder in &event.forced_from {
-                    open.remove(&(resource.clone(), holder.clone()));
+                    let forced_key = (resource.clone(), holder.clone());
+                    let claimed_at = event.forced_claimed_at.get(holder).copied();
+                    if open
+                        .get(&forced_key)
+                        .is_some_and(|lease| release_applies(claimed_at, lease, origin))
+                    {
+                        open.remove(&forced_key);
+                    }
                 }
             }
             LeaseKind::Moor => {}
@@ -489,7 +536,7 @@ pub fn steward_lease_view(
         .collect();
     mine.sort_by_key(|event| device_order(event));
     let mut own: BTreeMap<Resource, Lease> = BTreeMap::new();
-    for (resource, lease) in live(replay(me, mine)) {
+    for (resource, lease) in live(replay(me, mine, ReplayOrigin::Own)) {
         match own.get(&resource) {
             Some(held) if held.precedence() <= lease.precedence() => {}
             _ => {
@@ -507,7 +554,7 @@ pub fn steward_lease_view(
     let mut folded: BTreeMap<Resource, Vec<Lease>> = BTreeMap::new();
     for (device, mut events) in by_device {
         events.sort_by_key(|event| device_order(event));
-        for (resource, lease) in live(replay(device, events)) {
+        for (resource, lease) in live(replay(device, events, ReplayOrigin::Folded)) {
             folded.entry(resource).or_default().push(lease);
         }
     }

@@ -1,7 +1,7 @@
 // The pre-push hook's integration claims (spec 2026-10-23-workspaces-cooperate-as-devices-design.md
 // §3.5): a push to dev or main claims dev-integration through berth for the life of the push, a
-// pushed `[build:edge]` also alpha-fleet, any `[build:*]` also jenkins-dispatch, and every claim the
-// push took is released on every exit. Like serving-receipt.test.mjs, this runs the ACTUAL hook's
+// pushed `[build:edge]` also alpha-fleet, any `[build:*]` also jenkins-dispatch, and every claim whose
+// generation reached the hook is released with that token. Like serving-receipt.test.mjs, this runs the ACTUAL hook's
 // block (sliced between its markers), here against a stub `berth` that logs each call and answers
 // from a table, against deterministic commit-message and identity reads.
 import { test } from "node:test";
@@ -37,9 +37,15 @@ printf '%s %s %s\\n' "$1" "\${ELOHIM_SESSION_ID-}" "\${ELOHIM_SESSION_OWNER_PID-
 if [ "$1" = claim ]; then
   n=$(grep -c "^claim $2 " "$here/calls.log")
   code=$(awk -v r="$2" -v n="$n" '$1 == r { print $((n + 1 <= NF) ? n + 1 : NF) }' "$here/answers" 2>/dev/null | head -1)
+  case "$2" in
+    dev-integration) claimed_at=1001.125 ;;
+    alpha-fleet) claimed_at=1002.250 ;;
+    jenkins-dispatch) claimed_at=1003.375 ;;
+    *) claimed_at=1004.500 ;;
+  esac
   case "\${code:-0}" in
-    0) echo "$2: claimed by codex-1 (session from env)"; exit 0 ;;
-    R) echo "$2: renewed by codex-1 (session from env)"; exit 0 ;;
+    0) echo "$2: claimed by codex-1 (session from env) claimed_at=$claimed_at"; exit 0 ;;
+    R) echo "$2: renewed by codex-1 (session from env) claimed_at=$claimed_at"; exit 0 ;;
     3) echo "$2: REFUSED — held by did:key:z6MkDeviceA/claude-1 since 2026-10-23T15:28:09Z" >&2; exit 3 ;;
     4) echo "berth: no session (pass --session, or set ELOHIM_SESSION_ID / CLAUDE_SESSION_ID)" >&2; exit 4 ;;
     I) kill -INT "$HOOK_PID"; exit 130 ;;
@@ -122,6 +128,13 @@ function runBlock(fx, { ref = "refs/heads/dev", local = fx.head, after = "echo G
 }
 
 const CLAIM = (resource) => `claim ${resource} --class verify --ttl 1800`;
+const TOKENS = {
+  "dev-integration": "1001.125",
+  "alpha-fleet": "1002.250",
+  "jenkins-dispatch": "1003.375",
+};
+const RELEASE = (resource) =>
+  `release ${resource} --expected-claimed-at ${TOKENS[resource]}`;
 
 test("prepush_refuses_while_peer_holds_dev_integration", (t) => {
   const fx = fixture(t, "feat: land it", { "dev-integration": 3 });
@@ -155,8 +168,8 @@ test("prepush_releases_on_gate_failure", (t) => {
   assert.deepEqual(failed.calls.map((c) => c.split(" --note")[0]), [
     CLAIM("dev-integration"),
     CLAIM("jenkins-dispatch"),
-    "release dev-integration",
-    "release jenkins-dispatch",
+    RELEASE("dev-integration"),
+    RELEASE("jenkins-dispatch"),
   ]);
 
   // Ctrl-C mid-gate: the same release, and the push does not go on.
@@ -165,24 +178,32 @@ test("prepush_releases_on_gate_failure", (t) => {
   assert.notEqual(interrupted.status, 0, interrupted.out);
   assert.ok(!interrupted.out.includes("NOT-REACHED"));
   assert.deepEqual(interrupted.calls.slice(-2), [
-    "release dev-integration",
-    "release jenkins-dispatch",
+    RELEASE("dev-integration"),
+    RELEASE("jenkins-dispatch"),
   ]);
 
-  // Ctrl-C while a claim is in flight: the lease it may have written is given back too.
+  // Ctrl-C while a claim is in flight: cleanup has no generation token for that claim, so it
+  // leaves the bounded lease to ttl rather than guessing at the session's generation.
   const midClaim = runBlock(fixture(t, "feat: a build [build:app]", { "jenkins-dispatch": "I" }));
   assert.notEqual(midClaim.status, 0, midClaim.out);
   assert.ok(!midClaim.out.includes("GATES-RAN"));
-  assert.deepEqual(midClaim.calls.slice(-2).sort(), [
-    "release dev-integration",
-    "release jenkins-dispatch",
-  ]);
+  assert.deepEqual(midClaim.calls.slice(-1), [RELEASE("dev-integration")]);
 
   // A passing push releases too: the hook holds its claims only while the push runs.
   const fx3 = fixture(t, "feat: land it");
   const passed = runBlock(fx3);
   assert.equal(passed.status, 0, passed.out);
-  assert.deepEqual(passed.calls.slice(-1), ["release dev-integration"]);
+  assert.deepEqual(passed.calls.slice(-1), [RELEASE("dev-integration")]);
+});
+
+test("prepush_passes_each_claims_generation_token_to_its_release", (t) => {
+  const r = runBlock(fixture(t, "deploy [build:edge]"));
+  assert.equal(r.status, 0, r.out);
+  assert.deepEqual(r.calls.filter((call) => call.startsWith("release")), [
+    RELEASE("dev-integration"),
+    RELEASE("alpha-fleet"),
+    RELEASE("jenkins-dispatch"),
+  ]);
 });
 
 test("prepush_releases_once_when_renewer_stops_before_trap_reset", (t) => {
@@ -206,8 +227,8 @@ exit 1`,
   assert.deepEqual(failed.calls.map((c) => c.split(" --note")[0]), [
     CLAIM("dev-integration"),
     CLAIM("jenkins-dispatch"),
-    "release dev-integration",
-    "release jenkins-dispatch",
+    RELEASE("dev-integration"),
+    RELEASE("jenkins-dispatch"),
   ]);
 });
 
@@ -231,7 +252,7 @@ test("build_edge_requires_alpha_fleet", (t) => {
   assert.deepEqual(refused.calls.map((c) => c.split(" --note")[0]), [
     CLAIM("dev-integration"),
     CLAIM("alpha-fleet"),
-    "release dev-integration",
+    RELEASE("dev-integration"),
   ]);
 
   // A build tag that names the edge among others, and [build:all], deploy too.
@@ -270,7 +291,7 @@ test("prepush_no_session_claims_with_a_hook_holder", (t) => {
       `${CLAIM("dev-integration")} --note pre-push to ${ref.split("/").at(-1)}`,
       `moor --session ${holder} --pid ${pid} --runtime git-hook --principal fixture@example.test --task pre-push to ${ref.split("/").at(-1)}`,
       `${CLAIM("dev-integration")} --note pre-push to ${ref.split("/").at(-1)}`,
-      "release dev-integration",
+      RELEASE("dev-integration"),
       `unmoor --session ${holder}`,
     ]);
     assert.ok(owners.slice(1).every(([, session, owner]) => session === holder && owner === pid),
@@ -302,7 +323,7 @@ test("prepush_hook_holder_is_cleaned_up_on_failure_and_interrupt", (t) => {
     const r = runBlock(fixture(t, "feat: land it", { "dev-integration": [4, 0] }), { after });
     assert.notEqual(r.status, 0, r.out);
     assert.ok(!r.out.includes("NOT-REACHED"));
-    assert.equal(r.calls.at(-2), "release dev-integration");
+    assert.equal(r.calls.at(-2), RELEASE("dev-integration"));
     assert.match(r.calls.at(-1), /^unmoor --session pre-push-/);
     assert.equal(r.calls.filter((c) => c.startsWith("unmoor")).length, 1);
   }
@@ -329,7 +350,7 @@ test("prepush_integration_requires_berth_and_every_requested_lease", (t) => {
   const lost = runBlock(fixture(t, "deploy [build:edge]", { "alpha-fleet": 4 }));
   assert.equal(lost.status, 1, lost.out);
   assert.ok(!lost.out.includes("GATES-RAN"));
-  assert.deepEqual(lost.calls.filter((c) => c.startsWith("release")), ["release dev-integration"]);
+  assert.deepEqual(lost.calls.filter((c) => c.startsWith("release")), [RELEASE("dev-integration")]);
   assert.ok(!lost.calls.some((c) => c.startsWith("moor")), "never switch an existing holder");
 });
 
@@ -361,8 +382,8 @@ test("prepush_offline_ok_and_a_renewed_watch", (t) => {
   const watch = runBlock(fixture(t, "deploy [build:edge]", { "alpha-fleet": "R" }));
   assert.equal(watch.status, 0, watch.out);
   assert.deepEqual(watch.calls.filter((c) => c.startsWith("release")), [
-    "release dev-integration",
-    "release jenkins-dispatch",
+    RELEASE("dev-integration"),
+    RELEASE("jenkins-dispatch"),
   ]);
 });
 
@@ -394,8 +415,7 @@ test("prepush_exit_1_is_a_renew_only_on_berths_own_line", (t) => {
   assert.ok(!crashed.out.includes("GATES-RAN"));
   assert.match(crashed.out, /REFUSED: berth claim alpha-fleet failed/);
   assert.deepEqual(crashed.calls.filter((c) => c.startsWith("release")), [
-    "release dev-integration",
-    "release alpha-fleet",
+    RELEASE("dev-integration"),
   ]);
 });
 
@@ -424,7 +444,7 @@ test("prepush_renews_its_claims_while_the_gates_run", (t) => {
     renews.every((c) => c === RENEW("dev-integration") || c === RENEW("jenkins-dispatch")),
     `${calls}`,
   );
-  assert.deepEqual(calls.slice(-2), ["release dev-integration", "release jenkins-dispatch"]);
+  assert.deepEqual(calls.slice(-2), [RELEASE("dev-integration"), RELEASE("jenkins-dispatch")]);
   assert.deepEqual(settledCalls(fx), r.calls, "nothing renews after the push ends");
 
   // A gate that fails, and an interrupt mid-gate, stop the renewing the same way.
@@ -433,7 +453,7 @@ test("prepush_renews_its_claims_while_the_gates_run", (t) => {
     const fx2 = fixture(t, "feat: land it");
     const ended = runBlock(fx2, { after, env: SHORT_TTL });
     assert.notEqual(ended.status, 0, ended.out);
-    assert.deepEqual(ended.calls.slice(-1), ["release dev-integration"]);
+    assert.deepEqual(ended.calls.slice(-1), [RELEASE("dev-integration")]);
     assert.deepEqual(settledCalls(fx2), ended.calls, `${after}: nothing renews after the push ends`);
   }
 });
@@ -447,7 +467,7 @@ test("prepush_renews_a_lease_it_already_held_and_leaves_it_held", (t) => {
   assert.ok(r.out.includes("GATES-RAN"));
   const calls = r.calls.map((c) => c.split(" --note")[0]);
   assert.ok(calls.filter((c) => c === RENEW("dev-integration")).length >= 3, `renewed while the gates ran: ${calls}`);
-  assert.ok(!calls.includes("release dev-integration"), `a lease the push did not take stays held: ${calls}`);
+  assert.ok(!calls.includes(RELEASE("dev-integration")), `a lease the push did not take stays held: ${calls}`);
   assert.deepEqual(settledCalls(fx), r.calls, "nothing renews after the push ends");
 });
 
@@ -467,7 +487,7 @@ test("prepush_renew_refused_outright_stops_the_push", (t) => {
   assert.ok(!r.out.includes("PUSHED"), r.out);
   assert.ok(r.out.split("\n").includes(HELD_LINE), `berth's reason line verbatim:\n${r.out}`);
   assert.match(r.out, /REFUSED: renewing dev-integration while the gates ran was refused/);
-  assert.deepEqual(r.calls.slice(-1), ["release dev-integration"]);
+  assert.deepEqual(r.calls.slice(-1), [RELEASE("dev-integration")]);
   assert.deepEqual(settledCalls(fx), r.calls, "nothing renews after the push ends");
 });
 
@@ -489,5 +509,5 @@ test("signal between sleeper spawn and assignment leaves no orphan or held pipe"
   let state = '';
   try { state = readFileSync(`/proc/${pid}/stat`, 'utf8').split(') ')[1][0]; } catch {}
   assert.ok(!state || state === 'Z', `orphan sleeper ${pid} is still ${state}`);
-  assert.deepEqual(result.calls.slice(-1), ['release dev-integration']);
+  assert.deepEqual(result.calls.slice(-1), [RELEASE("dev-integration")]);
 });
