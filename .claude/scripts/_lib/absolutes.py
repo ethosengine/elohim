@@ -496,6 +496,26 @@ def _delta(prior: str, post: str) -> tuple[set[int], set[int]]:
     return added, removed
 
 
+def _context_changed(prior: str, post: str, kind: str, root: Path, atom: dict,
+                     ontology: dict) -> set[int]:
+    """0-based lines of `post` whose absolute became uncited with no text change on that line:
+    the enforcer citation sat on an adjacent line or elsewhere in the sentence and was removed,
+    so a line-multiset delta alone would never rescan it. Compares the full uncited hits of both
+    versions (keyed by phrase and line text) and returns the lines of `post` hits the prior lacks."""
+    before: dict[tuple[str, str], int] = {}
+    for h in scan(prior, kind, root, atom, ontology):
+        key = (h["phrase"], h["text"])
+        before[key] = before.get(key, 0) + 1
+    changed: set[int] = set()
+    for h in scan(post, kind, root, atom, ontology):
+        key = (h["phrase"], h["text"])
+        if before.get(key, 0) > 0:
+            before[key] -= 1
+        else:
+            changed.add(h["line"] - 1)
+    return changed
+
+
 def classify(rel: str, post: str, prior: str, root: Path | None = None) -> dict | None:
     """The net-new uncited absolutes a write introduces on a trust surface, or None.
 
@@ -523,6 +543,7 @@ def classify(rel: str, post: str, prior: str, root: Path | None = None) -> dict 
     cap = atom["recall_signal"]["scan_cap_bytes"]
     post_s, prior_s = post[:cap], prior[:cap]
     added, removed = _delta(prior_s, post_s)
+    added |= _context_changed(prior_s, post_s, kind, root, atom, ontology)
     if not added:
         return None
     gained = scan(post_s, kind, root, atom, ontology, added)

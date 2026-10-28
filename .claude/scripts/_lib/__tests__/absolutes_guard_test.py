@@ -151,6 +151,22 @@ check("unreadable prior surfaces (advisory fails toward surfacing)",
       GUARD({"content": "It is guaranteed.\n", "is_new": False,
              "path": str(REPO / "genesis/docs/specs/zz-missing-absolutes.md")}) is not None, True)
 
+# ── 4b. removing an adjacent citation is net-new ──────────────────────────────────────────────
+_CITE = "(enforced: .claude/scripts/_lib/absolutes.py)"
+check("removing a citation on the preceding line (html) surfaces the unchanged absolute",
+      hits(HTML, "<p>Consent is always asked.</p>\n", f"<!-- absolute: {_CITE[11:-1]} -->\n<p>Consent is always asked.</p>\n"),
+      [(1, "always")])
+check("removing the wrapped-sentence citation line (md) surfaces the unchanged absolute",
+      hits(MD, "Consent is always\nasked first.\n", f"Consent is always\nasked first {_CITE}.\n"),
+      [(1, "always")])
+check("removing a citation line only (md, no added line) surfaces",
+      hits(MD, "Consent is always asked.\n\nOther.\n", f"Consent is always asked\n{_CITE}.\n\nOther.\n"),
+      [(1, "always")])
+check("an unchanged cited absolute stays quiet",
+      hits(MD, f"Consent is always\nasked first {_CITE}.\nNew line.\n", f"Consent is always\nasked first {_CITE}.\n"), [])
+check("an unchanged uncited absolute is not re-surfaced by an unrelated edit",
+      hits(MD, "Consent is always asked.\nNew line.\n", "Consent is always asked.\n"), [])
+
 # ── 6. the atom pin and the policy row ────────────────────────────────────────────────────────
 _frames = frame_atoms.load_frames(REPO)
 check("atom CID pinned", _frames["epr:validator-absolutes-guard"][1], ATOM_CID)
