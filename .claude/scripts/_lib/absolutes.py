@@ -501,15 +501,16 @@ def _context_changed(prior: str, post: str, kind: str, root: Path, atom: dict,
     """0-based lines of `post` whose absolute became uncited with no text change on that line:
     the enforcer citation sat on an adjacent line or elsewhere in the sentence and was removed,
     so a line-multiset delta alone would never rescan it. Compares the full uncited hits of both
-    versions (keyed by phrase and line text) and returns the (0-based line, col) of each `post` hit
+    versions (keyed by phrase, line text and column, so a repeated phrase on one line is two
+    occurrences, not one) and returns the (0-based line, col) of each `post` hit
     the prior lacks, so a line's unchanged sibling hits are not re-reported."""
-    before: dict[tuple[str, str], int] = {}
+    before: dict[tuple[str, str, int], int] = {}
     for h in scan(prior, kind, root, atom, ontology):
-        key = (h["phrase"], h["text"])
+        key = (h["phrase"], h["text"], h["col"])
         before[key] = before.get(key, 0) + 1
     changed: set[tuple[int, int]] = set()
     for h in scan(post, kind, root, atom, ontology):
-        key = (h["phrase"], h["text"])
+        key = (h["phrase"], h["text"], h["col"])
         if before.get(key, 0) > 0:
             before[key] -= 1
         else:
@@ -561,7 +562,14 @@ def classify(rel: str, post: str, prior: str, root: Path | None = None) -> dict 
     net_new = len(gained) - len(lost)
     if net_new < atom["recall_signal"]["min_net_new"]:
         return None
-    hits = [h for h in gained if surplus.get(h["phrase"], 0) > 0]
+    # Each lost hit cancels one gained hit of its phrase, so report only the surplus per phrase
+    # (the latest gained occurrences), never more hits than the net-new count they explain.
+    keep: list[dict] = []
+    for h in reversed(gained):
+        if surplus.get(h["phrase"], 0) > 0:
+            surplus[h["phrase"]] -= 1
+            keep.append(h)
+    hits = keep[::-1]
     return {"frameRef": ref, "verdict": "abstain", "netNew": net_new, "hits": hits,
             "kind": kind, "reason": frame_atoms.reason_line(atom, ref, None, "abstain")}
 

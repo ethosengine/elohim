@@ -171,6 +171,18 @@ check("removing a citation does not re-report an unchanged sibling absolute on t
 check("an unchanged uncited absolute is not re-surfaced by an unrelated edit",
       hits(MD, "Consent is always asked.\nNew line.\n", "Consent is always asked.\n"), [])
 
+_ENF = "(enforced: .claude/scripts/_lib/absolutes.py)"
+_REP = "Consent is never skipped. Copies are never lost"
+check("a repeated phrase on one line: the newly exposed first occurrence is reported, not its sibling",
+      hits(MD, _REP + "\n", _ENF + "\n" + _REP + "\n"),
+      [(1, "never")])
+_r = absolutes.classify(MD, _REP + "\n", _ENF + "\n" + _REP + "\n", REPO)
+check("repeated phrase: the reported occurrence is the first (col 12), netNew 1",
+      (_r["netNew"], [h["col"] for h in _r["hits"]]), (1, [12]))
+_r = absolutes.classify(MD, "Data is never rented. Keys are never shared.\n", "Data is never sold.\n", REPO)
+check("duplicates: a lost hit cancels one gained hit once; hits never exceed netNew",
+      (_r["netNew"], len(_r["hits"]), [h["col"] for h in _r["hits"]]), (1, 1, [32]))
+
 # ── 6. the atom pin and the policy row ────────────────────────────────────────────────────────
 _frames = frame_atoms.load_frames(REPO)
 check("atom CID pinned", _frames["epr:validator-absolutes-guard"][1], ATOM_CID)
