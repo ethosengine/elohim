@@ -19,8 +19,9 @@
 //! - **Time spent is a `Consume` of the time resource** scoped to the habit; time returned is a
 //!   gauge part's recurring saving as a `Rate`; payback is [`coverage_time`].
 //!
-//! Everything is derived from git — the first-parent history of the habit atoms, dated by author
-//! date — so two clones mint the same records and a historical window reads the same tomorrow.
+//! Everything is derived from git — the first-parent history of the habit atoms, dated when they
+//! arrived on that line — so two clones mint the same records and a historical window reads the
+//! same tomorrow.
 //! Lane reports never enter as live state: a lane's result becomes a reading when it is recorded
 //! in the atom with its run id as evidence.
 
@@ -174,7 +175,7 @@ pub struct HabitState {
     pub declaration_issues: Vec<String>,
 }
 
-/// Read one habit atom's text. `recorded_at` is the author date of the commit that records it
+/// Read one habit atom's text. `recorded_at` is the commit's history-arrival timestamp
 /// (normalized UTC); a reading dated after it is refused as future-dated. `None` skips that check
 /// (an uncommitted tree has no recording commit).
 pub fn evaluate(text: &str, recorded_at: Option<&str>) -> Result<HabitState, String> {
@@ -513,11 +514,14 @@ pub struct HabitHistory {
     pub episodes: Vec<(Cid, Commitment)>,
     /// The habits standing at HEAD.
     pub current: BTreeMap<String, Standing>,
+    /// Transient versions of changed habits, rebuilt from the same first-parent history.
+    /// A `None` standing records retirement; no register snapshots or new identities are stored.
+    versions: BTreeMap<String, Vec<(String, Option<Standing>)>>,
     /// `<sha12>:<path>: why` for every revision that could not be read. Skipped, never zero.
     pub unreadable: Vec<String>,
 }
 
-/// One habit at HEAD: its state, where it lives, when it was born, and its open episode if red.
+/// One habit at a revision: its state, path, birth, and open episode if red.
 #[derive(Debug, Clone)]
 pub struct Standing {
     pub state: HabitState,
@@ -538,8 +542,8 @@ struct Revision {
 /// Walk the first-parent history of every habit atom and derive the habit records.
 ///
 /// First-parent, because a merged side branch's intermediate states never stood on this
-/// line — the merge commit is where they arrived. Author dates, normalized to UTC, as every other
-/// timestamp on this path. Renames are read as a removal plus an addition in the same commit and
+/// line — the merge commit is where they arrived. Committer dates are normalized to UTC and
+/// clamped to history order. Renames are read as a removal plus an addition in the same commit and
 /// reconciled by id, so moving an atom between directories is not a retirement.
 pub fn walk_history(root: &Path) -> FlowResult<HabitHistory> {
     let repository = super::repository_agent(root)?;
@@ -592,6 +596,11 @@ pub fn walk_history(root: &Path) -> FlowResult<HabitHistory> {
         for (id, (state, path)) in arrived {
             let prior = history.current.remove(&id);
             let standing = advance(&context, &id, prior, state, path, &mut history)?;
+            history
+                .versions
+                .entry(id.clone())
+                .or_default()
+                .push((revision.at.clone(), Some(standing.clone())));
             history.current.insert(id, standing);
         }
         for id in removed {
@@ -601,6 +610,11 @@ pub fn walk_history(root: &Path) -> FlowResult<HabitHistory> {
             }
             if let Some(prior) = history.current.remove(&id) {
                 retire(&context, &id, prior, &mut history)?;
+                history
+                    .versions
+                    .entry(id)
+                    .or_default()
+                    .push((revision.at.clone(), None));
             }
         }
     }
@@ -1006,10 +1020,19 @@ pub fn reading(
     window: &Window,
 ) -> FlowResult<HabitsReading> {
     let time = time_resource()?;
-    let mut rows = Vec::with_capacity(history.current.len());
-    // A habit retired inside the window has no row — it no longer stands — but its drain is an
-    // event, so the register's stock still carries it.
-    for (id, standing) in &history.current {
+    let mut rows = Vec::new();
+    // Select then-standing state, including habits retired after this window. A retirement
+    // before the exclusive end removes the row, while its drain remains in the stock's events.
+    // Reverse history order also preserves causality when commits share a clamped timestamp.
+    for (id, versions) in &history.versions {
+        let Some(standing) = versions
+            .iter()
+            .rev()
+            .find(|(at, _)| at.as_str() < window.end.as_str())
+            .and_then(|(_, standing)| standing.as_ref())
+        else {
+            continue;
+        };
         let resource = habit_resource(id)?;
         let mut start = 0.0;
         let mut end = 0.0;
@@ -1130,16 +1153,9 @@ pub fn reading(
             returns_claim = Some(returns_claim.map_or(claim, |c| c.weaker(claim)));
         }
     }
-    // Counted as of the window's end, like the red mass beside them: a habit born after it did
-    // not exist in the window, and counting it would make the two numbers disagree.
-    let existed = |r: &&HabitRow| r.born.as_str() < window.end.as_str();
     Ok(HabitsReading {
-        habits: rows.iter().filter(existed).count(),
-        non_green: rows
-            .iter()
-            .filter(existed)
-            .filter(|r| r.state.status != "green")
-            .count(),
+        habits: rows.len(),
+        non_green: rows.iter().filter(|r| r.state.status != "green").count(),
         red_mass: rows.iter().map(|r| r.red_mass_at_end).sum(),
         hours_spent_in_window: rows.iter().map(|r| r.spent.in_window).sum(),
         hours_returned_per_week: rows.iter().map(|r| r.state.returns_hours_per_week).sum(),

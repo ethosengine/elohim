@@ -206,6 +206,13 @@ fn a_window_reads_fills_and_drains_as_events_not_rounded_quantities() {
     assert_eq!(report.verdict, EquilibriumVerdict::Draining);
 
     let habits = report.habits.as_ref().expect("the per-habit reading");
+    assert_eq!(habits.red_mass, m.level);
+    assert_eq!(habits.habits, 3);
+    assert_eq!(habits.non_green, 2);
+    let beta = habits.rows.iter().find(|r| r.id == "beta").unwrap();
+    assert_eq!(beta.state.status, "red", "beta was not retired yet");
+    let gamma = habits.rows.iter().find(|r| r.id == "gamma").unwrap();
+    assert_eq!(gamma.path, GAMMA, "gamma had not moved yet");
     let alpha = habits.rows.iter().find(|r| r.id == "alpha").unwrap();
     assert_eq!(
         alpha.red_mass_at_start, 1.0,
@@ -223,6 +230,94 @@ fn a_window_reads_fills_and_drains_as_events_not_rounded_quantities() {
     assert!((m.outflow * 3.0 - 1.0).abs() < 1e-9);
     assert_eq!(m.inflow, 0.0);
     assert!((m.level - 1.0).abs() < 1e-9, "only gamma remains red");
+    let habits = later.habits.as_ref().unwrap();
+    assert_eq!((habits.habits, habits.non_green), (2, 1));
+    assert_eq!(habits.red_mass, m.level);
+    assert_eq!(
+        habits.rows.iter().find(|r| r.id == "gamma").unwrap().path,
+        GAMMA_MOVED
+    );
+}
+
+#[test]
+fn later_edits_do_not_rewrite_a_historical_reading() {
+    let dir = history();
+    let root = dir.path();
+    let actor = NoteActor {
+        as_ref: Some("agent:implementer@test-model".into()),
+        session: None,
+    };
+    habits::spend(root, "gamma", 1.9, "gate", "historical-budget", &actor).unwrap();
+    let past = red_mass(root, "2026-10-15..2026-10-16").habits.unwrap();
+    let gamma = past.rows.iter().find(|r| r.id == "gamma").unwrap();
+    assert_eq!(gamma.state.status, "red");
+    assert_eq!(gamma.promised_budget.as_ref().unwrap().limit, 2.0);
+    assert_eq!(gamma.spent.in_episode, 1.9);
+    assert!(gamma.budget_pain.is_some());
+
+    // Later edits change every part of the standing state, including its open episode.
+    let future = "rea:\n  budget:\n    hours: 40\n  parts:\n    - part: wait\n      unit: s\n      baseline: 43\n      target: 12\n      reading: 10\n      at: 2026-10-18\n      evidence: future-gate\n      per_week: 40\n";
+    write(root, GAMMA_MOVED, &atom("gamma", "green", future));
+    write(
+        root,
+        "e/.epr-meta/later.habit.md",
+        &atom("later", "green", future),
+    );
+    commit(root, "18", "gamma green and a new returning habit");
+    write(root, GAMMA_MOVED, &atom("gamma", "red", future));
+    commit(root, "19", "gamma opens a different budgeted episode");
+    std::fs::create_dir_all(root.join("f/.epr-meta")).unwrap();
+    std::fs::rename(
+        root.join(GAMMA_MOVED),
+        root.join("f/.epr-meta/gamma.habit.md"),
+    )
+    .unwrap();
+    commit(root, "20", "gamma moves again");
+
+    let reread = red_mass(root, "2026-10-15..2026-10-16").habits.unwrap();
+    assert_eq!(
+        serde_json::to_value(&past).unwrap(),
+        serde_json::to_value(&reread).unwrap()
+    );
+    // Older windows retain then-live beta and alpha's pre-green state as well.
+    let older = red_mass(root, "2026-10-04..2026-10-11");
+    let reading = older.habits.unwrap();
+    assert_eq!(reading.red_mass, older.measures.unwrap().level);
+    assert_eq!((reading.habits, reading.non_green), (3, 3));
+    assert_eq!(reading.hours_returned_per_week, 0.0);
+    assert_eq!(
+        reading.rows.iter().find(|r| r.id == "gamma").unwrap().path,
+        GAMMA
+    );
+
+    // A current window must still read the new path, episode, budget and returns.
+    let current = red_mass(root, "2026-10-18..2026-10-21").habits.unwrap();
+    let gamma = current.rows.iter().find(|r| r.id == "gamma").unwrap();
+    assert_eq!(gamma.path, "f/.epr-meta/gamma.habit.md");
+    assert_eq!(gamma.promised_budget.as_ref().unwrap().limit, 40.0);
+    assert_eq!(
+        gamma.episode_opened.as_deref(),
+        Some("2026-10-19T12:00:00Z")
+    );
+    assert_eq!(gamma.spent.in_episode, 0.0);
+    assert!(current.hours_returned_per_week > 0.0);
+    assert_eq!((current.habits, current.non_green), (3, 1));
+}
+
+#[test]
+fn standing_changes_at_the_exclusive_end_are_not_in_the_window() {
+    let dir = history();
+    let mut before_retirement = window("2026-10-13..2026-10-15");
+    before_retirement.end = "2026-10-14T12:00:00Z".into();
+    let history = habits::walk_history(dir.path()).unwrap();
+    let before = habits::reading(&history, &[], &before_retirement).unwrap();
+    assert_eq!(
+        (before.habits, before.non_green, before.red_mass),
+        (3, 2, 2.0)
+    );
+    before_retirement.end = "2026-10-14T12:00:01Z".into();
+    let after = habits::reading(&history, &[], &before_retirement).unwrap();
+    assert_eq!((after.habits, after.non_green, after.red_mass), (2, 1, 1.0));
 }
 
 #[test]
