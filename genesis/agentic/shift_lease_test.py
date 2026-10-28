@@ -4,6 +4,7 @@ import json
 import os
 from pathlib import Path
 import runpy
+import shutil
 import socket
 import struct
 import subprocess
@@ -19,6 +20,7 @@ sys.path.insert(0, str(Path(__file__).parent))
 import shift_lease as lease
 import shift_supervisor as supervisor
 from shift_state import Refused
+import shift_state as state
 
 ROOT = Path(__file__).resolve().parents[2]
 BERTH = ROOT / 'genesis/agentic/bin/berth'
@@ -111,14 +113,15 @@ class ShiftLease(unittest.TestCase):
                 patch.object(launcher, 'native_context'), \
                 patch.object(launcher, 'bounded', side_effect=bounded), \
                 patch.object(launcher, 'run', return_value='fixture\tfixture'), \
-                patch.object(launcher, 'host_berth', return_value='null') as inspect, \
                 patch.object(launcher.time, 'monotonic', side_effect=lambda: elapsed[0]), \
                 patch.object(launcher, 'lease') as claim:
             with self.assertRaisesRegex(Refused, 'mesh readiness lease expired'):
                 launcher.preflight(spec, root / '.claude/shifts/fixture')
-            self.assertEqual([call.args[2] for call in inspect.call_args_list], ['cargo', 'disk-heavy', 'mesh'])
-            self.assertEqual(claim.call_args_list, [unittest.mock.call(spec, ['mesh', 'cargo']),
-                                                   unittest.mock.call(spec, ['mesh', 'cargo'], release=True)])
+            self.assertEqual(claim.call_args_list, [
+                unittest.mock.call(spec, ['cargo', 'disk-heavy', 'mesh']),
+                unittest.mock.call(spec, ['cargo', 'disk-heavy', 'mesh'], release=True),
+                unittest.mock.call(spec, ['mesh', 'cargo']),
+                unittest.mock.call(spec, ['mesh', 'cargo'], release=True)])
 
     def test_multiple_resources_preserve_each_original_lease_and_refuse_expansion(self):
         self.berth.claim('cargo', self.session)
@@ -395,6 +398,162 @@ class ShiftLease(unittest.TestCase):
         self.assertEqual(process.returncode, 0, list(fixture.directory.glob('refusal-*.json')))
         for resource in ['cargo', 'mesh']:
             self.assertIsNone(host.who(resource))
+
+
+class ReadinessCapacity(unittest.TestCase):
+    """Real berth CLI and private capacity policy; runtime/native evidence is mocked."""
+
+    def setUp(self):
+        import shift as launcher
+        self.launcher = launcher
+        temporary = tempfile.TemporaryDirectory(prefix='shift-readiness-capacity-')
+        self.addCleanup(temporary.cleanup)
+        self.root = Path(temporary.name)
+        (self.root / '.git').touch()
+        (self.root / 'ark').touch()
+        agentic = self.root / 'genesis/agentic'
+        (agentic / 'bin').mkdir(parents=True)
+        shutil.copy2(BERTH, agentic / 'bin/berth')
+        policy = agentic / 'pool-policy.json'
+        state.atomic(policy, {'berth': {'resources': {'cargo': 2, 'mesh': 1, 'disk-heavy': 1}}})
+        self.store = self.root / 'berth'
+        env = patch.dict(os.environ, {'BERTH_DIR': str(self.store), 'CLAUDE_PROJECT_DIR': str(self.root),
+                                     lease.PROXY_ENV[0]: '@absent-parent', lease.PROXY_ENV[1]: 'fixture'})
+        env.start()
+        self.addCleanup(env.stop)
+        self.berth = Berth(d=str(self.store), policy_path=str(policy))
+        self.directory = state.home(self.root, 'capacity-fixture')
+        self.directory.mkdir(parents=True)
+        self.spec = {'id': 'capacity-fixture', 'worktree': str(self.root), 'ark': str(self.root / 'ark'),
+                     'allowed_tools': [], 'verification': ['fixture'], 'measurement_resource': 'cargo',
+                     'started_at': dt.datetime.fromtimestamp(time.time() - 1, dt.timezone.utc).isoformat(),
+                     'deadline': dt.datetime.fromtimestamp(time.time() + 120, dt.timezone.utc).isoformat(),
+                     'objective_path': 'objective.json',
+                     'steps': [{'id': 'agent', 'kind': 'agent', 'prompt': 'Fixture only', 'resource': 'cargo'}]}
+        state.atomic(self.root / 'objective.json', {'budget': {'iterations': 3}, 'measure': {'run': 'true'}})
+        state.atomic(self.directory / 'objective.json', state.read(self.root / 'objective.json'))
+        self.spec['objective_sha256'] = state.digest(self.directory / 'objective.json')
+        grant = self.directory / 'authority.json'
+        state.atomic(grant, {'build': True, 'source': 'fixture authorization', 'deadline': self.spec['deadline']})
+        state.atomic(self.directory / 'revocation.json', {'revoked': False})
+        self.spec['authority'] = {'path': str(grant.relative_to(self.root)), 'sha256': state.digest(grant),
+                                  'revocation': str((self.directory / 'revocation.json').relative_to(self.root))}
+        self.freeze()
+        self.baseline_holders = []
+        def bounded(argv, cwd, timeout, log, *args, **kwargs):
+            if 'genesis/agentic/readiness.mjs' in argv:
+                self.baseline_holders = self.berth.who('cargo')
+                state.atomic(log, {'ready': True, 'baseline': 1})
+        for name, replacement in [('native_context', None), ('session_from', 'session'),
+                                   ('completed', True), ('run', 'fixture\tfixture'), ('revision', 'a' * 40)]:
+            patcher = patch.object(launcher, name, return_value=replacement)
+            patcher.start()
+            self.addCleanup(patcher.stop)
+        patcher = patch.object(launcher.shutil, 'which', return_value='/fixture/tool')
+        patcher.start()
+        self.addCleanup(patcher.stop)
+        patcher = patch.object(launcher, 'bounded', side_effect=bounded)
+        self.bounded = patcher.start()
+        self.addCleanup(patcher.stop)
+
+    def freeze(self):
+        state.atomic(self.directory / 'initialization.json', {
+            'version': 1, 'spec': self.spec,
+            'objective_source_sha256': state.digest(self.root / 'objective.json')})
+        state.atomic(self.directory / 'initialization-checkpoint.json', {
+            'version': 1, 'phase': 'preflight', 'attempt': 1, 'last_wall': time.time(),
+            'initialization_sha256': state.digest(self.directory / 'initialization.json')})
+
+    def incumbent(self, name, resource='cargo'):
+        self.berth.moor(name, pid=os.getpid())
+        self.assertTrue(self.berth.claim(resource, name)[0])
+        return self.berth.who(resource)
+
+    def test_one_of_two_slots_allows_readiness_and_preserves_incumbent(self):
+        before = self.incumbent('incumbent')
+        mooring = (self.store / 'moorings/incumbent.json').read_bytes()
+        result = self.launcher.preflight(self.spec, self.directory)
+        self.assertEqual(result['measured'], 1)
+        self.assertEqual({row['holder'] for row in self.baseline_holders},
+                         {'incumbent', 'shift-capacity-fixture'})
+        self.assertEqual(self.berth.who('cargo'), before)
+        self.assertEqual((self.store / 'moorings/incumbent.json').read_bytes(), mooring)
+
+    def test_full_capacity_refuses_before_canaries_or_baseline(self):
+        self.incumbent('first')
+        before = self.incumbent('second')
+        with self.assertRaisesRegex(Refused, 'claim exited 3'):
+            self.launcher.preflight(self.spec, self.directory)
+        self.bounded.assert_not_called()
+        self.assertEqual(self.berth.who('cargo'), before)
+
+    def test_later_resource_refusal_rolls_back_probe_without_releasing_incumbents(self):
+        cargo = self.incumbent('cargo-holder')
+        mesh = self.incumbent('mesh-holder', 'mesh')
+        self.spec['steps'][0]['resource'] = ['mesh', 'cargo']
+        self.freeze()
+        with self.assertRaisesRegex(Refused, 'claim exited 3'):
+            self.launcher.preflight(self.spec, self.directory)
+        self.bounded.assert_not_called()
+        self.assertEqual(self.berth.who('cargo'), cargo)
+        self.assertEqual(self.berth.who('mesh'), mesh)
+        events = self.berth.ledger(0)
+        self.assertTrue(any(e['kind'] == 'claim' and e.get('session') == 'shift-capacity-fixture'
+                            and e.get('resource') == 'cargo' for e in events), events)
+
+    def test_probe_release_failure_refuses_before_canaries_or_baseline(self):
+        original = self.launcher.lease
+        def failed_release(contract, resource, release=False):
+            original(contract, resource, release=release)
+            if release:
+                raise Refused('fixture release acknowledgement lost')
+        with patch.object(self.launcher, 'lease', side_effect=failed_release):
+            with self.assertRaisesRegex(Refused, 'release acknowledgement lost'):
+                self.launcher.preflight(self.spec, self.directory)
+        self.bounded.assert_not_called()
+        self.assertIsNone(self.berth.who('cargo'))
+
+    def test_missing_or_corrupt_initialization_refuses_before_any_lease_or_runtime(self):
+        for name in ['initialization.json', 'initialization-checkpoint.json', 'authority.json', 'revocation.json']:
+            path = self.directory / name
+            original = path.read_bytes()
+            for missing in [True, False]:
+                with self.subTest(name=name, missing=missing):
+                    if missing:
+                        path.unlink()
+                    else:
+                        path.write_text('{corrupt')
+                    with patch.object(self.launcher, 'lease') as claim, self.assertRaises((Refused, OSError)):
+                        self.launcher.preflight(self.spec, self.directory)
+                    claim.assert_not_called()
+                    self.bounded.assert_not_called()
+                    path.write_bytes(original)
+
+    def test_authority_refusal_after_claim_still_releases_probe(self):
+        remaining = self.launcher.initialization_remaining
+        def revoked(directory):
+            left = remaining(directory)
+            held = self.berth.who('cargo') or []
+            if any(row['holder'] == 'shift-capacity-fixture' for row in held):
+                raise Refused('fixture authority revoked during probe')
+            return left
+        with patch.object(self.launcher, 'initialization_remaining', side_effect=revoked):
+            with self.assertRaisesRegex(Refused, 'authority revoked during probe'):
+                self.launcher.preflight(self.spec, self.directory)
+        self.bounded.assert_not_called()
+        self.assertIsNone(self.berth.who('cargo'))
+
+    def test_shared_capacity_does_not_weaken_exclusive_owner_check(self):
+        incumbent = self.incumbent('incumbent')
+        supervisor.lease(self.spec, 'cargo')
+        try:
+            result = lease.handle_request(self.spec, 'cargo', time.monotonic(),
+                ['owner-check', 'cargo', '--session', 'shift-capacity-fixture', '--action', 'build'])
+            self.assertEqual(result['exit'], 3, result)
+            self.assertIn('another host session', result['stderr'])
+        finally:
+            supervisor.lease(self.spec, 'cargo', release=True)
+        self.assertEqual(self.berth.who('cargo'), incumbent)
 
 
 if __name__ == '__main__':

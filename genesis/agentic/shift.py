@@ -15,7 +15,7 @@ import time
 
 from shift_ops import execute, validate_steps
 from shift_inputs import normalize_inputs, verify_inputs
-from shift_lease import host_berth, resources
+from shift_lease import resources
 from shift_runtime import command, completed, session_from
 from shift_state import (Refused, alive, atomic, authority, check_clock, digest, finite_number, home, incarnation,
                          load, lock, native_context, read, revision, run, signal_handle,
@@ -79,6 +79,19 @@ def preflight(spec, directory, *, checks=None):
     directory.mkdir(parents=True, exist_ok=True, mode=0o700)
     checks = checks or directory / 'readiness'
     checks.mkdir(parents=True, exist_ok=True)
+    measurement_resource = spec.get('measurement_resource')
+    required_resources = set(resources(measurement_resource))
+    for step in spec['steps']:
+        required_resources.update(resources(step.get('resource')))
+    required_resources = sorted(required_resources)
+    remaining()
+    # Native claims decide capacity; an occupied multi-slot resource may still fit.
+    lease(spec, required_resources)
+    try:
+        remaining()
+    finally:
+        lease(spec, required_resources, release=True)
+    remaining()
     environment = spec.get('workload_env', {})
     bounded(['true'], root, min(10, remaining()), checks / 'namespace.log', env=environment, check=remaining)
     for runtime, argv in [('claude', ['claude', 'auth', 'status']), ('codex', ['codex', 'login', 'status'])]:
@@ -94,14 +107,6 @@ def preflight(spec, directory, *, checks=None):
     available = {line.split('\t')[0] for line in gates.splitlines()}
     if not spec['verification'] or not set(spec['verification']) <= available:
         raise Refused('required gates absent from manifest-selected registry')
-    measurement_resource = spec.get('measurement_resource')
-    required_resources = set(resources(measurement_resource))
-    for step in spec['steps']:
-        required_resources.update(resources(step.get('resource')))
-    for resource in sorted(required_resources):
-        holder = host_berth(spec, 'who', resource)
-        if holder and holder != 'null':
-            raise Refused(f'resource lease unavailable: {resource}: {holder}')
     remaining()
     measurement_started = time.monotonic()
     lease(spec, measurement_resource)

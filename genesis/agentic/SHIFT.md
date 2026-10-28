@@ -85,6 +85,8 @@ namespace support, actual Claude/Codex authentication, successful tool canaries
 under their normal approval/sandbox policies, available resource leases,
 manifest-selected gates, and a completed numeric baseline. No permission bypass
 flags are used. Each failed initialization retains its own evidence directory.
+Before paid canaries, readiness probes native capacity by claiming and releasing
+the required leases; an occupied resource is not necessarily full.
 Retrying `start` with the identical input is allowed only before publication of
 execution state. Changed input, corrupt state or an expired deadline refuses.
 

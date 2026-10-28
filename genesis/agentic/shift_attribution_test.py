@@ -59,12 +59,10 @@ class AttributionReadiness(unittest.TestCase):
                 patch.object(launcher, 'initialization_remaining', return_value=100), \
                 patch.object(state, 'run', return_value=self.payload()), \
                 patch.object(launcher, 'bounded') as execute, \
-                patch.object(launcher, 'host_berth') as inspect_leases, \
                 patch.object(launcher, 'lease') as claim:
             with self.assertRaisesRegex(state.Refused, 'not acceptance-eligible'):
                 launcher.preflight(self.spec, self.root / '.claude/shifts/fixture')
             execute.assert_not_called()
-            inspect_leases.assert_not_called()
             claim.assert_not_called()
         self.assertFalse((self.root / '.claude').exists())
 
