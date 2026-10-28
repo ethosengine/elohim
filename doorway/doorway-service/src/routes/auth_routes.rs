@@ -40,8 +40,8 @@ use crate::routes::service_agent::{
     SERVICE_AGENT_PHASE,
 };
 use crate::routes::zome_helpers::{
-    call_create_human, call_create_human_on_conductor, call_get_my_human, get_agent_pub_key,
-    CreateHumanInput, CreateSelfRevocationInput, KeyRevocationOutput, ACCOUNT_CLOSED_REASON,
+    get_agent_pub_key, CreateHumanInput, CreateSelfRevocationInput, KeyRevocationOutput,
+    ACCOUNT_CLOSED_REASON,
 };
 use crate::server::AppState;
 use crate::types::DoorwayError;
@@ -1014,6 +1014,240 @@ fn password_too_weak(password: &str) -> bool {
     password.len() < MIN_PASSWORD_LEN
 }
 
+/// May this registration be handed the Human that ALREADY EXISTS on the
+/// doorway's own conductor agent?
+///
+/// # What this closes
+///
+/// `agencyPhase: "doorway"` (and `hosted` with no conductor pool) authors the
+/// Human on the doorway's SINGLETON agent — the operator's. `create_human` is
+/// idempotent: once that Human exists, every later registration on that path
+/// is answered with it, successfully. The agency phase comes from the
+/// unauthenticated request body, so any caller was given an account row and a
+/// session token whose `human_id` is the operator's Human. The registration
+/// now ASKS whether the agent has a Human before creating one
+/// (`routes::human_binding::bind_human`), and this predicate is the evidence
+/// required when it does.
+///
+/// # The gate, by the auth-posture questions
+///
+/// 1. *Whose question?* "Is this caller MY admin?" — the Human on this
+///    doorway's own agent is the operator's, so the operator credential
+///    (`API_KEY_ADMIN`, supplied as `adminBootstrapKey`) is the one that
+///    answers it. Not the seed credential, not a permission level.
+/// 2. *Stage?* None: it is never cheaper at a lower stage.
+/// 3. *Fail closed?* Yes — no configured key, an empty key, or no supplied key
+///    is a refusal.
+/// 4. *Narrower than Admin?* It grants nothing but this one recovery.
+/// 5. *Expires?* It applies only while a Human already exists on the agent.
+/// 6. *Could the p2p plane answer?* Not today: the doorway holds no proof of
+///    control of the operator's key from the caller.
+/// 7. *Which developer mode?* All of them, identically.
+/// 8. *Whose account?* The caller is claiming the OPERATOR's Human — someone
+///    else's unless they are the operator. That is exactly why it is gated.
+pub(crate) fn operator_identity_recovery_authorized(
+    supplied_admin_key: Option<&str>,
+    configured_admin_key: Option<&str>,
+) -> bool {
+    match (supplied_admin_key, configured_admin_key) {
+        (Some(supplied), Some(configured)) => !configured.is_empty() && supplied == configured,
+        _ => false,
+    }
+}
+
+/// May a HOSTED registration be handed the Human that already exists on the
+/// agent provisioned for it?
+///
+/// Only when this doorway provisioned that agent for EXACTLY this identifier —
+/// a live intent record naming the same conductor, app and agent key
+/// (`AgentProvisioner::provisioned_for`). That is the honest case: an earlier
+/// attempt by this person whose `create_human` landed and whose answer was
+/// lost. An app reached any other way is not evidence, and its Human is not
+/// attached. Question 8: the caller is acting on their own account only if
+/// that record says so.
+async fn hosted_identity_recovery_authorized(
+    state: &AppState,
+    identifier: &str,
+    provisioned: &ProvisionedAgent,
+) -> bool {
+    match &state.conductor_registry {
+        Some(registry) => {
+            AgentProvisioner::new(Arc::clone(registry))
+                .provisioned_for(identifier, provisioned)
+                .await
+        }
+        None => false,
+    }
+}
+
+/// Whether attaching an existing Human to a registration needs evidence:
+/// `DOORWAY_PROVISIONING_STORE_GATE`, read from the conductor registry this
+/// doorway built from it (the arguments, where there is no registry).
+fn identity_recovery_gated(state: &AppState) -> bool {
+    match &state.conductor_registry {
+        Some(registry) => registry.store_gate(),
+        None => state.args.provisioning_store_gate,
+    }
+}
+
+/// Why a registration could not be bound to a Human.
+enum RegistrationBindError {
+    /// A finished HTTP refusal: the recovery was not authorised (403), or the
+    /// agent is busy with another registration (503).
+    Refused(Response<BoxBody>),
+    /// The conductor failed; the arm decides what that means for it.
+    Conductor(crate::types::DoorwayError),
+}
+
+/// Bind this registration to the Human on its agent: the doorway's own agent
+/// (`provisioned` is `None`), or the app provisioned for a hosted person.
+///
+/// Asks whether the agent already has a Human BEFORE creating one. If it does,
+/// attaching it to this account is a recovery. With the store gate on
+/// (`DOORWAY_PROVISIONING_STORE_GATE`) it needs evidence: the operator
+/// credential for the doorway's own agent, this doorway's provisioning record
+/// for a hosted agent; without it: 403, nothing created, no row, no token.
+/// With the gate off (the default) the existing Human is re-attached, as dev
+/// did before the gate.
+async fn bind_registration_human(
+    state: &AppState,
+    arm: &str,
+    body: &RegisterRequest,
+    provisioned: Option<&ProvisionedAgent>,
+    input: CreateHumanInput,
+) -> Result<crate::routes::zome_helpers::HumanOutput, RegistrationBindError> {
+    use crate::routes::human_binding::{
+        agent_key, agent_lock_wait, agent_locks, bind_human, log_bound, recovery_evidence,
+        BindError, ZomeCallerAuthor,
+    };
+
+    // The refusal below is gated (`DOORWAY_PROVISIONING_STORE_GATE`); the read
+    // that asks whether a Human exists is not.
+    let gated = identity_recovery_gated(state);
+    let bound = match provisioned {
+        Some(p) => {
+            let caller = crate::services::ZomeCaller::new(
+                &p.admin_url,
+                &p.conductor_url,
+                &p.installed_app_id,
+            );
+            bind_human(
+                &ZomeCallerAuthor(&caller),
+                agent_locks(),
+                &agent_key(&p.admin_url, &p.installed_app_id),
+                agent_lock_wait(),
+                input,
+                || {
+                    recovery_evidence(gated, || {
+                        hosted_identity_recovery_authorized(state, &body.identifier, p)
+                    })
+                },
+            )
+            .await
+        }
+        None => {
+            let Some(caller) = state.zome_caller.as_ref() else {
+                return Err(RegistrationBindError::Conductor(
+                    crate::types::DoorwayError::Internal(
+                        "ZomeCaller not available - conductor not configured?".into(),
+                    ),
+                ));
+            };
+            let authorized = operator_identity_recovery_authorized(
+                body.admin_bootstrap_key.as_deref(),
+                state.args.api_key_admin.as_deref(),
+            );
+            bind_human(
+                &ZomeCallerAuthor(caller),
+                agent_locks(),
+                &agent_key(state.args.admin_url(), &state.args.installed_app_id),
+                agent_lock_wait(),
+                input,
+                || recovery_evidence(gated, || async move { authorized }),
+            )
+            .await
+        }
+    };
+
+    match bound {
+        Ok(bound) => {
+            log_bound(arm, &body.identifier, &bound);
+            Ok(bound.into_output())
+        }
+        Err(BindError::RecoveryRefused) => {
+            warn!(
+                arm,
+                identifier = %body.identifier,
+                "Refusing to attach the Human that already exists on this agent to a \
+                 registration with no evidence that it is this registrant's"
+            );
+            Err(RegistrationBindError::Refused(identity_recovery_refused()))
+        }
+        Err(BindError::Busy) => Err(RegistrationBindError::Refused(json_response(
+            StatusCode::SERVICE_UNAVAILABLE,
+            &ErrorResponse {
+                error: "Another registration is creating an identity on this agent; try again"
+                    .into(),
+                code: Some("IDENTITY_BUSY".into()),
+            },
+        ))),
+        Err(BindError::Conductor(e)) => Err(RegistrationBindError::Conductor(e)),
+    }
+}
+
+/// The refusal both recovery branches answer with.
+///
+/// 403, NOT 409. Registration's 409 means "an account with this identifier
+/// already exists", and both seeders (`seed-humans.ts`, `seed-hosted-humans.ts`)
+/// answer any 409 by logging in. In the case this recovery exists for — the
+/// doorway's database cleared, the conductor's state kept — there is no account
+/// row to log in to, so a 409 here would surface a missing or wrong operator
+/// credential as a confusing login failure. This is an authorization refusal,
+/// and says so.
+fn identity_recovery_refused() -> Response<BoxBody> {
+    json_response(
+        StatusCode::FORBIDDEN,
+        &ErrorResponse {
+            error: "An identity already exists on the agent this registration would use, and \
+                    this doorway has no evidence that it belongs to this registrant"
+                .into(),
+            code: Some("IDENTITY_RECOVERY_REFUSED".into()),
+        },
+    )
+}
+
+/// A node/device registration naming an identifier this doorway hosts a
+/// person under, with no account for it. Same code and status as the other
+/// identity-recovery refusals: an authorization refusal, never the 409 that
+/// callers read as "the account already exists, log in".
+fn node_device_claim_refused() -> Response<BoxBody> {
+    json_response(
+        StatusCode::FORBIDDEN,
+        &ErrorResponse {
+            error: "This doorway hosts an identity under this identifier, and a node or device \
+                    registration has no evidence that it belongs to this registrant"
+                .into(),
+            code: Some("IDENTITY_RECOVERY_REFUSED".into()),
+        },
+    )
+}
+
+/// Note in the provisioning intent log how far a registration got AFTER
+/// provisioning. Best-effort and forward-only; a person this doorway never
+/// provisioned has no record and gets none. Nothing is decided on these marks —
+/// whether a human exists is the DHT's to say, not this log's.
+async fn mark_provisioning_progress(
+    state: &AppState,
+    identifier: &str,
+    progress: crate::conductor::IntentState,
+) {
+    if let Some(registry) = &state.conductor_registry {
+        AgentProvisioner::new(Arc::clone(registry))
+            .record_progress(identifier, progress)
+            .await;
+    }
+}
+
 /// Whether a hosted registrant gets their own provisioned cell.
 ///
 /// WHY NOT `dev_mode`: that flag is `"true"` on every deployed manifest
@@ -1034,6 +1268,146 @@ fn password_too_weak(password: &str) -> bool {
 pub(crate) fn should_provision(registry_configured: bool, dev_mode: bool) -> bool {
     let _ = dev_mode; // deliberately unread: see above
     registry_configured
+}
+
+/// Is `app_id` an app this doorway provisioned for someone (a hosted cell), as
+/// opposed to a member's own pod app?
+///
+/// A pod runs the hApp under the doorway's configured `installed_app_id`; every
+/// app the doorway provisions carries a derived id (`{app}-{conductor}-{hash}`).
+/// The same split the conductor walk uses to count hosted apps. An app under any
+/// other id is treated as hosted: the refusals it feeds fail closed.
+fn is_doorway_hosted_app(app_id: &str, installed_app_id: &str) -> bool {
+    app_id != installed_app_id
+}
+
+/// The agent key a new account answers to: the provisioned cell's key for a
+/// hosted registrant who got one; the caller's own (resolved) key for a node or
+/// device registrant; otherwise the doorway-minted custodial key. The
+/// registration response and the stored row both take it from here.
+fn registration_agent_key(
+    agency_phase: &str,
+    provisioned: Option<&ProvisionedAgent>,
+    resolved_agent_key: &str,
+    custodial_public_key: &str,
+) -> String {
+    match provisioned {
+        Some(p) => p.agent_pub_key.clone(),
+        None if matches!(agency_phase, "node" | "device") => resolved_agent_key.to_string(),
+        None => custodial_public_key.to_string(),
+    }
+}
+
+fn agent_key_already_bound() -> Response<BoxBody> {
+    json_response(
+        StatusCode::FORBIDDEN,
+        &ErrorResponse {
+            error: "This agent key belongs to an agent this doorway hosts or to another \
+                    account; a node or device registration cannot claim it"
+                .into(),
+            code: Some("AGENT_KEY_ALREADY_BOUND".into()),
+        },
+    )
+}
+
+/// Why a node/device registration may NOT carry `agent_pub_key`, if it may not.
+///
+/// The key arrives in an unauthenticated body with no proof that the caller
+/// holds it. Stored, it is what login resolves to a conductor and app, and what
+/// the session names. So it is refused (403 `AGENT_KEY_ALREADY_BOUND`) when it:
+///
+/// - maps, in this doorway's registry, to an app this doorway hosts — someone
+///   else's hosted cell; or
+/// - is the key of another live account row (a member's own pod agent, a hosted
+///   person, the operator).
+///
+/// A member's own pod agent with no account yet is NOT refused: nothing here can
+/// tell its holder from anyone else without a signature by the key. That is the
+/// residual a proof-of-possession check closes.
+///
+/// An account lookup that fails is unknown, and refused as 503 rather than
+/// treated as "nobody holds it".
+async fn node_device_key_refusal(
+    state: &AppState,
+    users: Option<&crate::db::MongoCollection<UserDoc>>,
+    agent_pub_key: &str,
+) -> Option<Response<BoxBody>> {
+    if let Some(registry) = &state.conductor_registry {
+        if let Some(entry) = registry.get_conductor_for_agent(agent_pub_key) {
+            if is_doorway_hosted_app(&entry.app_id, &state.args.installed_app_id) {
+                warn!(
+                    agent = %agent_pub_key,
+                    conductor = %entry.conductor_id,
+                    "Node/device registration refused: the supplied key is an agent this \
+                     doorway hosts"
+                );
+                return Some(agent_key_already_bound());
+            }
+        }
+    }
+    if let Some(users) = users {
+        let forms = crate::conductor::agent_key::lookup_forms_of(agent_pub_key);
+        match users
+            .find_one(doc! { "agent_pub_key": { "$in": forms }, "is_active": true })
+            .await
+        {
+            Ok(Some(_)) => {
+                warn!(
+                    agent = %agent_pub_key,
+                    "Node/device registration refused: the supplied key is another account's"
+                );
+                return Some(agent_key_already_bound());
+            }
+            Ok(None) => {}
+            Err(e) => {
+                return Some(json_response(
+                    StatusCode::SERVICE_UNAVAILABLE,
+                    &ErrorResponse {
+                        error: format!("Could not check whether this agent key is taken: {e}"),
+                        code: Some("DB_ERROR".into()),
+                    },
+                ))
+            }
+        }
+    }
+    None
+}
+
+/// Refuse a login whose node/device account key names an app this doorway hosts.
+///
+/// A node/device account carries its own peer's key; a hosted app under it means
+/// the key was claimed without proof (before [`node_device_key_refusal`] existed,
+/// or by a path that skipped it). Hosted and legacy accounts are not judged here.
+fn node_device_login_refusal(
+    state: &AppState,
+    agency_phase: Option<&str>,
+    agent_pub_key: &str,
+) -> Option<Response<BoxBody>> {
+    if !matches!(agency_phase, Some("node" | "device")) {
+        return None;
+    }
+    let registry = state.conductor_registry.as_ref()?;
+    // Gated (`DOORWAY_PROVISIONING_STORE_GATE`): accounts registered before the
+    // provisioning records existed may carry the key of an app this doorway
+    // hosts, and only the records (backfilled when the gate is on) say which of
+    // them were hosted for that account. Off, no login is refused here; on, not
+    // until the backfill has completed since boot.
+    if !registry.store_gate() || !registry.records_backfilled() {
+        return None;
+    }
+    let entry = registry.get_conductor_for_agent(agent_pub_key)?;
+    if !is_doorway_hosted_app(&entry.app_id, &state.args.installed_app_id) {
+        return None;
+    }
+    Some(json_response(
+        StatusCode::FORBIDDEN,
+        &ErrorResponse {
+            error: "This node or device account's key names an agent this doorway hosts, and \
+                    nothing shows it was hosted for this account"
+                .into(),
+            code: Some("ACCOUNT_KEY_HOSTED_HERE".into()),
+        },
+    ))
 }
 
 /// Carry the exact conductor/app provisioned for this registered agent into
@@ -1422,8 +1796,11 @@ async fn handle_register(
                 uuid::Uuid::new_v4().to_string()
             };
 
-            let zome_result = call_create_human(
+            let zome_result = match bind_registration_human(
                 &state,
+                "doorway",
+                &body,
+                None,
                 CreateHumanInput {
                     id: generated_human_id.clone(),
                     display_name: display_name.clone(),
@@ -1433,7 +1810,12 @@ async fn handle_register(
                     location: body.location.clone(),
                 },
             )
-            .await;
+            .await
+            {
+                Ok(human_output) => Ok(human_output),
+                Err(RegistrationBindError::Refused(response)) => return response,
+                Err(RegistrationBindError::Conductor(e)) => Err(e),
+            };
 
             match zome_result {
                 Ok(human_output) => {
@@ -1467,69 +1849,10 @@ async fn handle_register(
                     (human_output.human.id, agent_key, Some(profile), None)
                 }
                 Err(e) => {
-                    let err_str = e.to_string();
-                    if err_str.contains("Agent already has a Human profile") {
-                        // Conductor not reset but DB was cleared — recover.
-                        warn!(
-                            identifier = %body.identifier,
-                            "Doorway: agent already has Human profile in DHT — recovering for DB re-registration"
-                        );
-                        match call_get_my_human(&state).await {
-                            Ok(Some(existing)) => {
-                                let agent_key = match get_agent_pub_key(&state) {
-                                    Ok(k) => k,
-                                    Err(e2) => {
-                                        warn!(
-                                            "Failed to get agent_pub_key during recovery: {}",
-                                            e2
-                                        );
-                                        return json_response(
-                                            StatusCode::INTERNAL_SERVER_ERROR,
-                                            &ErrorResponse {
-                                                error:
-                                                    "Failed to get agent identity during recovery"
-                                                        .into(),
-                                                code: Some("AGENT_KEY_ERROR".into()),
-                                            },
-                                        );
-                                    }
-                                };
-                                let profile = HumanProfileResponse {
-                                    id: existing.human.id.clone(),
-                                    display_name: existing.human.display_name,
-                                    bio: existing.human.bio,
-                                    affinities: existing.human.affinities,
-                                    profile_reach: existing.human.profile_reach,
-                                    location: existing.human.location,
-                                    created_at: existing.human.created_at,
-                                    updated_at: existing.human.updated_at,
-                                };
-                                (existing.human.id, agent_key, Some(profile), None)
-                            }
-                            Ok(None) => {
-                                warn!(
-                                    "get_my_human returned None despite 'already has profile' error"
-                                );
-                                return json_response(
-                                    StatusCode::SERVICE_UNAVAILABLE,
-                                    &ErrorResponse {
-                                        error: format!("Failed to create Holochain identity: {e}"),
-                                        code: Some("IDENTITY_CREATION_FAILED".into()),
-                                    },
-                                );
-                            }
-                            Err(e2) => {
-                                warn!("Failed to recover existing Human profile: {}", e2);
-                                return json_response(
-                                    StatusCode::SERVICE_UNAVAILABLE,
-                                    &ErrorResponse {
-                                        error: format!("Failed to create Holochain identity: {e}"),
-                                        code: Some("IDENTITY_CREATION_FAILED".into()),
-                                    },
-                                );
-                            }
-                        }
-                    } else if synthetic_identity_fallback_allowed(state.network_stage) {
+                    // (An existing Human is not an error: `create_human` is
+                    // idempotent. `bind_registration_human` asks before it
+                    // creates, and gates the recovery there.)
+                    if synthetic_identity_fallback_allowed(state.network_stage) {
                         warn!(
                             "Doorway: imagodei zome unavailable, using the Simulacra \
                              synthetic-identity fallback (declared stage only): {}",
@@ -1585,7 +1908,15 @@ async fn handle_register(
                             Some(p)
                         }
                         Err(e) => {
+                            // `e.code()` separates two different things to
+                            // tell a person: PROVISIONING_FAILED (nothing was
+                            // left behind) and PROVISIONING_UNRESOLVED (an app
+                            // for them may already exist on the named
+                            // conductor and could not be confirmed — the
+                            // doorway refuses to mint a second identity
+                            // elsewhere; retrying later resolves it).
                             error!(
+                                code = e.code(),
                                 "Hosted: agent provisioning failed — cannot complete registration: {}",
                                 e
                             );
@@ -1593,7 +1924,7 @@ async fn handle_register(
                                 StatusCode::SERVICE_UNAVAILABLE,
                                 &ErrorResponse {
                                     error: format!("Agent provisioning failed: {e}"),
-                                    code: Some("PROVISIONING_FAILED".into()),
+                                    code: Some(e.code().into()),
                                 },
                             );
                         }
@@ -1628,40 +1959,35 @@ async fn handle_register(
                 uuid::Uuid::new_v4().to_string()
             };
 
-            let zome_result = if let Some(ref p) = provisioner_result {
-                call_create_human_on_conductor(
-                    &p.conductor_url,
-                    &p.admin_url,
-                    &p.installed_app_id,
-                    CreateHumanInput {
-                        id: generated_human_id.clone(),
-                        display_name: display_name.clone(),
-                        bio: body.bio.clone(),
-                        affinities: body.affinities.clone(),
-                        profile_reach: body.profile_reach.clone(),
-                        location: body.location.clone(),
-                    },
-                )
-                .await
-            } else {
-                // No conductor registry (dev mode or not configured) — fall back
-                // to singleton ZomeCaller
-                call_create_human(
-                    &state,
-                    CreateHumanInput {
-                        id: generated_human_id.clone(),
-                        display_name: display_name.clone(),
-                        bio: body.bio.clone(),
-                        affinities: body.affinities.clone(),
-                        profile_reach: body.profile_reach.clone(),
-                        location: body.location.clone(),
-                    },
-                )
-                .await
+            let zome_result = match bind_registration_human(
+                &state,
+                "hosted",
+                &body,
+                provisioner_result.as_ref(),
+                CreateHumanInput {
+                    id: generated_human_id.clone(),
+                    display_name: display_name.clone(),
+                    bio: body.bio.clone(),
+                    affinities: body.affinities.clone(),
+                    profile_reach: body.profile_reach.clone(),
+                    location: body.location.clone(),
+                },
+            )
+            .await
+            {
+                Ok(human_output) => Ok(human_output),
+                Err(RegistrationBindError::Refused(response)) => return response,
+                Err(RegistrationBindError::Conductor(e)) => Err(e),
             };
 
             match zome_result {
                 Ok(human_output) => {
+                    mark_provisioning_progress(
+                        &state,
+                        &body.identifier,
+                        crate::conductor::IntentState::HumanCreated,
+                    )
+                    .await;
                     // Prefer the provisioned agent key; fall back to zome config
                     let agent_key = if let Some(ref p) = provisioner_result {
                         p.agent_pub_key.clone()
@@ -1702,98 +2028,7 @@ async fn handle_register(
                     )
                 }
                 Err(e) => {
-                    let err_str = e.to_string();
-                    if err_str.contains("Agent already has a Human profile") {
-                        // Recover existing identity — conductor wasn't reset but DB was cleared.
-                        warn!(
-                            identifier = %body.identifier,
-                            "Hosted: agent already has Human profile in DHT — recovering for DB re-registration"
-                        );
-                        // Use a temporary ZomeCaller on the provisioned conductor if available
-                        let recovery_result = if let Some(ref p) = provisioner_result {
-                            let caller = crate::services::ZomeCaller::new(
-                                &p.admin_url,
-                                &p.conductor_url,
-                                &p.installed_app_id,
-                            );
-                            caller
-                                .call::<(), Option<crate::routes::zome_helpers::HumanOutput>>(
-                                    "imagodei",
-                                    "imagodei",
-                                    "get_my_human",
-                                    &(),
-                                )
-                                .await
-                                .map_err(|e2| {
-                                    crate::types::DoorwayError::Holochain(format!(
-                                        "get_my_human on conductor failed: {e2}"
-                                    ))
-                                })
-                        } else {
-                            call_get_my_human(&state).await
-                        };
-
-                        match recovery_result {
-                            Ok(Some(existing)) => {
-                                let agent_key = if let Some(ref p) = provisioner_result {
-                                    p.agent_pub_key.clone()
-                                } else {
-                                    match get_agent_pub_key(&state) {
-                                        Ok(k) => k,
-                                        Err(e2) => {
-                                            warn!(
-                                                "Hosted: failed to get agent_pub_key during recovery: {}",
-                                                e2
-                                            );
-                                            return json_response(
-                                                StatusCode::INTERNAL_SERVER_ERROR,
-                                                &ErrorResponse {
-                                                    error: "Failed to get agent identity during recovery".into(),
-                                                    code: Some("AGENT_KEY_ERROR".into()),
-                                                },
-                                            );
-                                        }
-                                    }
-                                };
-                                let profile = HumanProfileResponse {
-                                    id: existing.human.id.clone(),
-                                    display_name: existing.human.display_name,
-                                    bio: existing.human.bio,
-                                    affinities: existing.human.affinities,
-                                    profile_reach: existing.human.profile_reach,
-                                    location: existing.human.location,
-                                    created_at: existing.human.created_at,
-                                    updated_at: existing.human.updated_at,
-                                };
-                                (
-                                    existing.human.id,
-                                    agent_key,
-                                    Some(profile),
-                                    provisioner_result,
-                                )
-                            }
-                            Ok(None) => {
-                                warn!("Hosted: get_my_human returned None despite 'already has profile' error");
-                                return json_response(
-                                    StatusCode::SERVICE_UNAVAILABLE,
-                                    &ErrorResponse {
-                                        error: format!("Failed to create Holochain identity: {e}"),
-                                        code: Some("IDENTITY_CREATION_FAILED".into()),
-                                    },
-                                );
-                            }
-                            Err(e2) => {
-                                warn!("Hosted: failed to recover existing Human profile: {}", e2);
-                                return json_response(
-                                    StatusCode::SERVICE_UNAVAILABLE,
-                                    &ErrorResponse {
-                                        error: format!("Failed to create Holochain identity: {e}"),
-                                        code: Some("IDENTITY_CREATION_FAILED".into()),
-                                    },
-                                );
-                            }
-                        }
-                    } else if synthetic_identity_fallback_allowed(state.network_stage) {
+                    if synthetic_identity_fallback_allowed(state.network_stage) {
                         warn!(
                             "Hosted: imagodei zome unavailable, using the Simulacra \
                              synthetic-identity fallback (declared stage only): {}",
@@ -1830,42 +2065,61 @@ async fn handle_register(
         // We only create a DB record so doorway can issue JWTs and route traffic.
         // No create_human zome call — their conductor already has it.
         "node" | "device" => {
-            // Look up an existing app only — never install one. A node/device
-            // human's identity lives on their own conductor; this operator's
-            // pool does not host them, so finding nothing is the normal case.
-            let provisioner_result = if let Some(registry) = &state.conductor_registry {
+            // Never install, and never adopt. A node/device human's identity
+            // lives on their own conductor; installing for them minted a second
+            // agent on the operator's conductor (household 2026-10-14). Nor is an
+            // agent this doorway hosts handed to an unauthenticated registration
+            // body on the strength of an identifier: the doorway asks only its
+            // own provisioning record whether it hosts anyone under this
+            // identifier.
+            //
+            // - Nobody: the account carries the caller's own key.
+            // - Someone: a hosted identity for this identifier exists here with
+            //   no account — a lost account row or a hosted registration in
+            //   flight. Claiming that identifier as node/device would strand it,
+            //   and the doorway cannot tell its holder from anyone else: 403.
+            // - Unknown (the log is unreadable, or was empty at boot over
+            //   conductors that host people or have not all answered): "no
+            //   record" is not "nobody", so refuse with the provisioning code.
+            if let Some(registry) = &state.conductor_registry {
                 if should_provision(true, state.args.dev_mode) {
                     let provisioner = AgentProvisioner::new(Arc::clone(registry))
                         .with_app_id(state.args.installed_app_id.clone());
-                    let found = provisioner.find_agent(&body.identifier).await;
-                    if let Some(p) = &found {
-                        info!(
-                            conductor = %p.conductor_id,
-                            agent = %p.agent_pub_key,
-                            agency_phase = %agency_phase,
-                            "Node/device: found existing agent on conductor"
-                        );
+                    match provisioner.hosted_here(&body.identifier).await {
+                        Ok(None) => {}
+                        Ok(Some(conductor_id)) => {
+                            warn!(
+                                identifier = %body.identifier,
+                                conductor = %conductor_id,
+                                agency_phase = %agency_phase,
+                                "Node/device: this doorway holds a hosted identity for the \
+                                 identifier and no account — refusing to claim it"
+                            );
+                            return node_device_claim_refused();
+                        }
+                        Err(e) => {
+                            warn!(
+                                identifier = %body.identifier,
+                                code = e.code(),
+                                "Node/device: cannot tell whether this doorway hosts the \
+                                 identifier — refusing: {}",
+                                e
+                            );
+                            return json_response(
+                                StatusCode::SERVICE_UNAVAILABLE,
+                                &ErrorResponse {
+                                    error: format!("Registration cannot be decided yet: {e}"),
+                                    code: Some(e.code().into()),
+                                },
+                            );
+                        }
                     }
-                    found
-                } else {
-                    None
                 }
-            } else {
-                None
-            };
-
+            }
             // Use caller-supplied human_id/agent_pub_key if available; otherwise
             // derive deterministic identifiers from the email.
             let resolved_human_id = if !body.human_id.is_empty() {
                 body.human_id.clone()
-            } else if let Some(ref p) = provisioner_result {
-                // Use conductor agent key as deterministic human_id seed
-                use sha2::{Digest, Sha256};
-                let mut hasher = Sha256::new();
-                hasher.update(p.agent_pub_key.as_bytes());
-                hasher.update(b"human_id_salt");
-                let hash = hasher.finalize();
-                format!("uhCHk{}", hex::encode(&hash[..20]))
             } else {
                 use sha2::{Digest, Sha256};
                 let mut hasher = Sha256::new();
@@ -1875,9 +2129,7 @@ async fn handle_register(
                 format!("uhCHk{}", hex::encode(&hash[..20]))
             };
 
-            let resolved_agent_key = if let Some(ref p) = provisioner_result {
-                p.agent_pub_key.clone()
-            } else if !body.agent_pub_key.is_empty() {
+            let resolved_agent_key = if !body.agent_pub_key.is_empty() {
                 body.agent_pub_key.clone()
             } else {
                 use sha2::{Digest, Sha256};
@@ -1888,19 +2140,25 @@ async fn handle_register(
                 format!("uhCAk{}", hex::encode(&hash[..20]))
             };
 
+            // The key is the caller's word, with no proof of possession. Never
+            // let it name an agent this doorway hosts or another account holds:
+            // login would resolve it to that agent's app and mint a session
+            // naming it.
+            if let Some(refusal) =
+                node_device_key_refusal(&state, user_collection.as_ref(), &resolved_agent_key).await
+            {
+                return refusal;
+            }
+
             info!(
                 agency_phase = %agency_phase,
                 human_id = %resolved_human_id,
                 "Node/device: DB-only registration (no create_human zome call)"
             );
 
-            // No profile returned — identity lives on their own conductor
-            (
-                resolved_human_id,
-                resolved_agent_key,
-                None,
-                provisioner_result,
-            )
+            // No profile returned — identity lives on their own conductor, and
+            // nothing was provisioned here.
+            (resolved_human_id, resolved_agent_key, None, None)
         }
 
         _ => {
@@ -1981,12 +2239,14 @@ async fn handle_register(
         }
     };
 
-    // Use conductor-generated key if provisioned, otherwise use custodial key
-    let actual_agent_pub_key = if let Some(ref p) = provisioned {
-        p.agent_pub_key.clone()
-    } else {
-        custodial_key.public_key.clone()
-    };
+    // The key this account answers to — returned in the registration response
+    // AND stored on the row, so the two can never disagree.
+    let actual_agent_pub_key = registration_agent_key(
+        agency_phase,
+        provisioned.as_ref(),
+        &agent_pub_key,
+        &custodial_key.public_key,
+    );
 
     // ── The hosted cell becomes a notarized promise (D2) ───────────────────
     //
@@ -2044,7 +2304,7 @@ async fn handle_register(
     // carries THAT key (looked up, or supplied by the caller), never the
     // doorway-minted custodial one.
     if matches!(agency_phase, "node" | "device") {
-        user.agent_pub_key = agent_pub_key.clone();
+        user.agent_pub_key = actual_agent_pub_key.clone();
     }
     if let Some(ref grant) = hosted_cell {
         user.hosted_cell_grant_cid = Some(grant.grant_cid.clone());
@@ -2152,6 +2412,12 @@ async fn handle_register(
         "Registered new user: {} with custodial key",
         body.identifier
     );
+    mark_provisioning_progress(
+        &state,
+        &body.identifier,
+        crate::conductor::IntentState::AccountRecorded,
+    )
+    .await;
 
     // The JOIN. A registrant who NAMED a canonical human (`humanId` on the
     // request body — the household prologue passes `human-james-son`) has just
@@ -2536,7 +2802,12 @@ async fn handle_login(
                     let provisioner = AgentProvisioner::new(Arc::clone(registry))
                         .with_app_id(state.args.installed_app_id.clone())
                         .with_bundle_path(state.args.happ_bundle_path.clone());
-                    match provisioner.provision_agent(&body.identifier).await {
+                    // The account row's own key is the evidence that an app
+                    // from before the intent log is this person's.
+                    match provisioner
+                        .provision_agent_for_account(&body.identifier, Some(&user.agent_pub_key))
+                        .await
+                    {
                         Ok(p) => {
                             info!(
                                 "Auto-provisioned {} on {} (app: {})",
@@ -2579,6 +2850,35 @@ async fn handle_login(
                 .unwrap_or((None, user.conductor_id.clone()));
             (user.agent_pub_key.clone(), app_id, cid)
         };
+
+    // A node/device account's key was the caller's word at registration. If it
+    // names an app this doorway hosts, the session would carry that hosted
+    // agent: refuse rather than mint it.
+    //
+    // One exemption: this doorway's own provisioning record for EXACTLY this
+    // identifier names that agent on that app (an account an operator's
+    // recovery re-bound to the app it was provisioned).
+    if let Some(refusal) =
+        node_device_login_refusal(&state, user.agency_phase.as_deref(), &user.agent_pub_key)
+    {
+        let recorded_for_this_account = match &state.conductor_registry {
+            Some(registry) => {
+                AgentProvisioner::new(Arc::clone(registry))
+                    .with_app_id(state.args.installed_app_id.clone())
+                    .records_agent_for(&user.identifier, &user.agent_pub_key)
+                    .await
+            }
+            None => false,
+        };
+        if !recorded_for_this_account {
+            warn!(
+                identifier = %body.identifier,
+                "Login refused: a node/device account's key names an agent this doorway \
+                 hosts, and no provisioning record for this identifier names it"
+            );
+            return refusal;
+        }
+    }
 
     info!(
         "Login successful: {} (permission: {:?})",
@@ -3259,6 +3559,16 @@ async fn handle_close_account(
         } else {
             warnings.push("No conductor pool is configured; the cell was not uninstalled".into());
         }
+    }
+    // The provisioning record holds this person's identifier and the agent key
+    // generated for them. Closing means the doorway keeps nothing that would
+    // host them — and a record left behind would hand the closed account's app
+    // to whoever registers the released identifier next. Forget it, whether or
+    // not the cell could be uninstalled.
+    if let Some(registry) = &state.conductor_registry {
+        AgentProvisioner::new(Arc::clone(registry))
+            .forget(&session_identifier)
+            .await;
     }
 
     // ── (3) End the row ────────────────────────────────────────────────────
@@ -4027,6 +4337,7 @@ async fn handle_confirm_stewardship(
                 );
             }
         }
+        provisioner.forget(&user.identifier).await;
     }
 
     // Deactivate ALL cached signing keys for this user
@@ -6129,6 +6440,53 @@ mod tests {
         assert_eq!(MIN_PASSWORD_LEN, 8, "WEAK_PASSWORD message quotes this");
     }
 
+    /// THE CLASS: a registration that names `agencyPhase: "doorway"` (or lands
+    /// on the singleton fallback) is answered with the operator's Human once it
+    /// exists — `create_human` is idempotent and succeeds. Attaching that Human
+    /// to the new account is refused unless the caller presents the operator
+    /// credential — and refused when none is configured. (That the gate is
+    /// actually reached is `routes::human_binding`'s tests' business.)
+    #[test]
+    fn a_registration_cannot_recover_the_operators_human_without_the_operator_credential() {
+        let configured = Some("the-admin-key");
+        assert!(operator_identity_recovery_authorized(
+            Some("the-admin-key"),
+            configured
+        ));
+        assert!(
+            !operator_identity_recovery_authorized(None, configured),
+            "an ordinary registration presents no credential"
+        );
+        assert!(!operator_identity_recovery_authorized(
+            Some("a-guess"),
+            configured
+        ));
+        // Fail closed: an unconfigured or empty key authorizes nobody, and an
+        // empty supplied key never matches an empty configured one.
+        assert!(!operator_identity_recovery_authorized(
+            Some("the-admin-key"),
+            None
+        ));
+        assert!(!operator_identity_recovery_authorized(Some(""), Some("")));
+        assert!(!operator_identity_recovery_authorized(Some(""), None));
+        assert!(!operator_identity_recovery_authorized(None, None));
+    }
+
+    /// The refusal is its own code, so a client (and an operator reading logs)
+    /// can tell it from a conductor failure — and it is a 403, never the 409
+    /// that registration uses for "this account already exists" (which the
+    /// seeders answer by logging in).
+    #[tokio::test]
+    async fn an_identity_recovery_refusal_is_forbidden_not_an_existing_account() {
+        use http_body_util::BodyExt;
+        let response = identity_recovery_refused();
+        assert_eq!(response.status(), StatusCode::FORBIDDEN);
+        assert_ne!(response.status(), StatusCode::CONFLICT);
+        let body = response.into_body().collect().await.unwrap().to_bytes();
+        let json: serde_json::Value = serde_json::from_slice(&body).unwrap();
+        assert_eq!(json["code"], "IDENTITY_RECOVERY_REFUSED");
+    }
+
     #[test]
     fn normalize_identifier_is_idempotent_and_gateway_scoped() {
         let d = "alpha.elohim.host";
@@ -6964,5 +7322,197 @@ mod tests {
         // A real promise, but the peer never named itself: unnamed, not
         // "doorway-alpha" and not "alpha.elohim.host".
         assert_eq!(household_steward_key(Some("uhCEkHostedCell"), None), None);
+    }
+}
+
+#[cfg(test)]
+mod node_device_key_guard_tests {
+    use super::*;
+    use crate::conductor::ConductorRegistry;
+
+    const HOSTED: &str = "uhCAkhostedvictim";
+    const POD: &str = "uhCAkmemberpod";
+
+    async fn state_with_agents() -> AppState {
+        state_with_agents_gated(true).await
+    }
+
+    async fn state_with_agents_gated(store_gate: bool) -> AppState {
+        use clap::Parser;
+        let args = crate::config::Args::parse_from(["doorway", "--listen", "127.0.0.1:0"]);
+        let mut state = AppState::new(args);
+        let registry = ConductorRegistry::new(None)
+            .await
+            .with_store_gate(store_gate);
+        if store_gate {
+            registry.mark_records_backfilled();
+        }
+        registry
+            .register_agent(HOSTED, "conductor-0", "elohim-conductor-0-abcdef")
+            .await
+            .unwrap();
+        registry
+            .register_agent(POD, "conductor-1", "elohim")
+            .await
+            .unwrap();
+        state.conductor_registry = Some(Arc::new(registry));
+        state
+    }
+
+    async fn code_of(response: Response<BoxBody>) -> (u16, String) {
+        let status = response.status().as_u16();
+        let bytes = response.into_body().collect().await.unwrap().to_bytes();
+        let value: serde_json::Value = serde_json::from_slice(&bytes).unwrap();
+        (
+            status,
+            value["code"].as_str().unwrap_or_default().to_string(),
+        )
+    }
+
+    #[test]
+    fn a_node_device_account_answers_to_the_callers_key_in_response_and_row() {
+        assert_eq!(
+            registration_agent_key("device", None, "uhCAkpeer", "uhCAkcustodial"),
+            "uhCAkpeer"
+        );
+        assert_eq!(
+            registration_agent_key("node", None, "uhCAkpeer", "uhCAkcustodial"),
+            "uhCAkpeer"
+        );
+        assert_eq!(
+            registration_agent_key("hosted", None, "uhCAkignored", "uhCAkcustodial"),
+            "uhCAkcustodial"
+        );
+        let provisioned = ProvisionedAgent {
+            agent_pub_key: "uhCAkcell".into(),
+            conductor_id: "conductor-0".into(),
+            conductor_url: "ws://c0:4445".into(),
+            admin_url: "ws://c0:4444".into(),
+            installed_app_id: "elohim-conductor-0-x".into(),
+        };
+        assert_eq!(
+            registration_agent_key("hosted", Some(&provisioned), "uhCAkx", "uhCAkcustodial"),
+            "uhCAkcell"
+        );
+    }
+
+    #[test]
+    fn only_the_installed_app_id_is_a_pod() {
+        assert!(!is_doorway_hosted_app("elohim", "elohim"));
+        assert!(is_doorway_hosted_app("elohim-conductor-0-abcdef", "elohim"));
+        assert!(is_doorway_hosted_app("something-else", "elohim"));
+    }
+
+    #[tokio::test]
+    async fn a_node_device_registration_cannot_carry_a_hosted_agents_key() {
+        let state = state_with_agents().await;
+        let refused = node_device_key_refusal(&state, None, HOSTED)
+            .await
+            .expect("a hosted agent's key is refused");
+        assert_eq!(
+            code_of(refused).await,
+            (403, "AGENT_KEY_ALREADY_BOUND".to_string())
+        );
+    }
+
+    #[tokio::test]
+    async fn a_members_own_pod_key_and_an_unknown_key_are_not_refused_here() {
+        let state = state_with_agents().await;
+        assert!(node_device_key_refusal(&state, None, POD).await.is_none());
+        assert!(node_device_key_refusal(&state, None, "uhCAkunknown")
+            .await
+            .is_none());
+    }
+
+    #[tokio::test]
+    async fn a_node_device_login_onto_a_hosted_app_is_refused() {
+        let state = state_with_agents().await;
+        for phase in ["node", "device"] {
+            let refused = node_device_login_refusal(&state, Some(phase), HOSTED).expect("refused");
+            assert_eq!(
+                code_of(refused).await,
+                (403, "ACCOUNT_KEY_HOSTED_HERE".to_string()),
+                "{phase}"
+            );
+            assert!(node_device_login_refusal(&state, Some(phase), POD).is_none());
+            assert!(node_device_login_refusal(&state, Some(phase), "uhCAkunknown").is_none());
+        }
+        // Hosted and legacy accounts are not judged by this guard.
+        assert!(node_device_login_refusal(&state, Some("hosted"), HOSTED).is_none());
+        assert!(node_device_login_refusal(&state, None, HOSTED).is_none());
+    }
+
+    /// With the store gate off (the default) no login is refused here: an
+    /// account registered before the provisioning records existed may carry a
+    /// hosted app's key, and logs in today.
+    #[tokio::test]
+    async fn with_the_store_gate_off_a_node_device_login_is_not_refused() {
+        let state = state_with_agents_gated(false).await;
+        for phase in ["node", "device"] {
+            assert!(node_device_login_refusal(&state, Some(phase), HOSTED).is_none());
+        }
+    }
+
+    /// With the gate on, the record-dependent login check waits for the boot
+    /// backfill: until every account a conductor confirms has its record, a
+    /// legacy node/device row carrying a hosted key is not refused.
+    #[tokio::test]
+    async fn the_node_device_login_check_waits_for_the_backfill() {
+        use clap::Parser;
+        let args = crate::config::Args::parse_from(["doorway", "--listen", "127.0.0.1:0"]);
+        let mut state = AppState::new(args);
+        let registry = ConductorRegistry::new(None).await.with_store_gate(true);
+        registry
+            .register_agent(HOSTED, "conductor-0", "elohim-conductor-0-abcdef")
+            .await
+            .unwrap();
+        state.conductor_registry = Some(Arc::new(registry));
+        assert!(node_device_login_refusal(&state, Some("node"), HOSTED).is_none());
+
+        state
+            .conductor_registry
+            .as_ref()
+            .unwrap()
+            .mark_records_backfilled();
+        assert!(node_device_login_refusal(&state, Some("node"), HOSTED).is_some());
+    }
+
+    /// The Human recovery refusal follows the same gate: the registry this
+    /// doorway built from `DOORWAY_PROVISIONING_STORE_GATE`, or the argument
+    /// itself where there is no registry. Off is dev's re-attach.
+    #[tokio::test]
+    async fn the_identity_recovery_refusal_follows_the_store_gate() {
+        assert!(!identity_recovery_gated(
+            &state_with_agents_gated(false).await
+        ));
+        assert!(identity_recovery_gated(
+            &state_with_agents_gated(true).await
+        ));
+
+        use clap::Parser;
+        let off = AppState::new(crate::config::Args::parse_from([
+            "doorway",
+            "--listen",
+            "127.0.0.1:0",
+        ]));
+        assert!(!identity_recovery_gated(&off), "off by default");
+        let on = AppState::new(crate::config::Args::parse_from([
+            "doorway",
+            "--listen",
+            "127.0.0.1:0",
+            "--provisioning-store-gate",
+        ]));
+        assert!(identity_recovery_gated(&on));
+    }
+
+    /// The registration guard is not gated: a NEW node/device account may not
+    /// claim a hosted agent's key whatever the store gate says.
+    #[tokio::test]
+    async fn the_registration_key_guard_holds_with_the_store_gate_off() {
+        let state = state_with_agents_gated(false).await;
+        assert!(node_device_key_refusal(&state, None, HOSTED)
+            .await
+            .is_some());
+        assert!(node_device_key_refusal(&state, None, POD).await.is_none());
     }
 }

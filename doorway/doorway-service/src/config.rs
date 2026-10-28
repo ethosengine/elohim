@@ -400,6 +400,32 @@ pub struct Args {
     #[arg(long, env = "HAPP_BUNDLE_PATH", default_value = "/app/elohim.happ")]
     pub happ_bundle_path: String,
 
+    /// Let hosted provisioning REFUSE on what this doorway's own records can
+    /// and cannot prove. Default `false`.
+    ///
+    /// Off: the provisioning intent log is written and read for everyone
+    /// provisioned from now on, and the startup store verdict (were the records
+    /// lost while the conductors kept their people?) is computed, logged and
+    /// published — but nothing is refused on it. A person with no record is
+    /// resolved as before the log existed (an app under their legacy id is
+    /// theirs), no node/device login is refused for want of a record, and a
+    /// registration onto an agent that already has a Human re-attaches it (the
+    /// doorway still asks whether one exists before creating one).
+    ///
+    /// On: a person with no record is not provisioned as new while the verdict
+    /// is `unknown` (503 `PROVISIONING_NOT_READY`) or `wiped` (503
+    /// `PROVISIONING_UNRESOLVED`); an app without a record is adopted only when
+    /// the account row's own agent key equals the conductor's; and a node/device
+    /// login whose key names a hosted app needs this doorway's record for the
+    /// identifier; and an existing Human is attached to a registration only on
+    /// evidence (this doorway's record, or the operator credential), else 403
+    /// `IDENTITY_RECOVERY_REFUSED`. On the first boot with the log, the doorway backfills the
+    /// records itself from account rows a conductor confirms
+    /// (`AgentProvisioner::migrate_from_accounts`); only a database that lost
+    /// its accounts too waits for `POST /admin/provisioning/recover`.
+    #[arg(long, env = "DOORWAY_PROVISIONING_STORE_GATE", default_value_t = false)]
+    pub provisioning_store_gate: bool,
+
     /// Admin port for orchestrator mDNS advertisement (defaults to conductor admin port)
     #[arg(long, env = "ORCHESTRATOR_ADMIN_PORT", default_value = "8888")]
     pub orchestrator_admin_port: u16,

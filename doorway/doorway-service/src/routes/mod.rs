@@ -28,6 +28,7 @@ pub mod federation;
 pub mod freshness;
 pub mod health;
 pub mod hosted_cell;
+pub mod human_binding;
 pub mod identity;
 pub mod import;
 pub mod import_ws;
@@ -58,6 +59,7 @@ pub use admin_conductors::{
     handle_agent_conductor, handle_assign_agent, handle_conductor_agents, handle_deprovision_user,
     handle_force_graduation, handle_graduation_completed, handle_graduation_pending,
     handle_list_conductors, handle_list_hosted_users, handle_provision_user,
+    handle_provisioning_recover, handle_provisioning_status,
 };
 pub use admin_users::{
     check_quota_if_user,

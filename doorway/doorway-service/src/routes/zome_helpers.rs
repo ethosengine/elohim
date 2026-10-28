@@ -3,7 +3,6 @@
 //! Provides helper functions for calling specific zome functions from the
 //! doorway's HTTP handlers, particularly for identity management operations.
 
-use holo_hash::ActionHash;
 use serde::{Deserialize, Serialize};
 use tracing::{debug, warn};
 
@@ -52,84 +51,12 @@ pub struct KeyRevocationOutput {
 // Zome Call Functions
 // =============================================================================
 
-/// Call imagodei::create_human via ZomeCaller
-///
-/// This creates a new Human profile in the imagodei DNA, bound to the
-/// calling agent's public key.
-///
-/// Uses ZomeCaller which passes role_name directly to the conductor
-/// (the conductor resolves role_name to cell_id internally). This avoids
-/// depending on discovery populating zome_configs.
-///
-/// # Arguments
-/// * `state` - AppState containing ZomeCaller
-/// * `input` - CreateHumanInput with profile data
-///
-/// # Returns
-/// * `Ok(HumanOutput)` - Created human with action_hash
-/// * `Err(DoorwayError)` - If ZomeCaller unavailable or zome call fails
-pub async fn call_create_human(state: &AppState, input: CreateHumanInput) -> Result<HumanOutput> {
-    let zome_caller = state.zome_caller.as_ref().ok_or_else(|| {
-        DoorwayError::Internal("ZomeCaller not available - conductor not configured?".into())
-    })?;
-
-    debug!(
-        human_id = %input.id,
-        display_name = %input.display_name,
-        "Calling create_human on imagodei zome via ZomeCaller"
-    );
-
-    // create_human now returns the bare ActionHash so its wire shape can be
-    // read by sweettests as either typed ActionHash or serde_json::Value.
-    // Chase with get_my_human to recover the full HumanOutput projection.
-    let action_hash: ActionHash = zome_caller
-        .call("imagodei", "imagodei", "create_human", &input)
-        .await
-        .map_err(|e| DoorwayError::Holochain(format!("create_human failed: {e}")))?;
-
-    let projected: Option<HumanOutput> = zome_caller
-        .call("imagodei", "imagodei", "get_my_human", &())
-        .await
-        .map_err(|e| {
-            DoorwayError::Holochain(format!(
-                "create_human ok but get_my_human projection failed: {e}"
-            ))
-        })?;
-
-    let result = projected.ok_or_else(|| {
-        DoorwayError::Internal(
-            "create_human ok but get_my_human returned None — DHT projection lag?".into(),
-        )
-    })?;
-
-    debug!(
-        human_id = %result.human.id,
-        action_hash = %action_hash,
-        "Successfully created human in imagodei zome"
-    );
-
-    Ok(result)
-}
-
-/// Call imagodei::get_my_human via ZomeCaller
-///
-/// Returns the existing Human profile for the calling agent, or None if not found.
-/// Used to recover an existing identity when create_human is rejected because the
-/// agent already has a profile (e.g. doorway DB cleared but conductor not reset).
-pub async fn call_get_my_human(state: &AppState) -> Result<Option<HumanOutput>> {
-    let zome_caller = state.zome_caller.as_ref().ok_or_else(|| {
-        DoorwayError::Internal("ZomeCaller not available - conductor not configured?".into())
-    })?;
-
-    debug!("Calling get_my_human on imagodei zome via ZomeCaller");
-
-    let result: Option<HumanOutput> = zome_caller
-        .call("imagodei", "imagodei", "get_my_human", &())
-        .await
-        .map_err(|e| DoorwayError::Holochain(format!("get_my_human failed: {e}")))?;
-
-    Ok(result)
-}
+// `create_human` and `get_my_human` are NOT called from here any more. A helper
+// that calls `create_human` and reads back whatever Human the agent has cannot
+// tell "created" from "already existed" — the zome is idempotent and answers
+// both with success — and that is how a registration came to be handed an
+// existing identity. The only caller of those two externs for registration is
+// `routes::human_binding::bind_human`, which asks before it creates.
 
 /// Call `imagodei::get_human_by_agent_key` — whose Human is this key?
 ///
@@ -162,56 +89,6 @@ pub async fn call_get_human_by_agent_key(
         .call("imagodei", "imagodei", "get_human_by_agent_key", &parsed)
         .await
         .map_err(|e| DoorwayError::Holochain(format!("get_human_by_agent_key failed: {e}")))?;
-
-    Ok(result)
-}
-
-/// Call imagodei::create_human on a specific conductor (not the singleton ZomeCaller).
-///
-/// Used for `hosted` registrations where the human's identity is created on
-/// the operator's conductor (identified during provisioning), not the doorway's
-/// default ZomeCaller target.
-pub async fn call_create_human_on_conductor(
-    conductor_url: &str,
-    admin_url: &str,
-    installed_app_id: &str,
-    input: CreateHumanInput,
-) -> crate::types::Result<HumanOutput> {
-    debug!(
-        conductor_url = %conductor_url,
-        admin_url = %admin_url,
-        installed_app_id = %installed_app_id,
-        human_id = %input.id,
-        "Creating temporary ZomeCaller for hosted registration"
-    );
-
-    let caller = crate::services::ZomeCaller::new(admin_url, conductor_url, installed_app_id);
-
-    // Same chase pattern as call_create_human — see that helper for rationale.
-    let action_hash: ActionHash = caller
-        .call("imagodei", "imagodei", "create_human", &input)
-        .await
-        .map_err(|e| {
-            crate::types::DoorwayError::Holochain(format!("create_human on conductor failed: {e}"))
-        })?;
-
-    let projected: Option<HumanOutput> = caller
-        .call("imagodei", "imagodei", "get_my_human", &())
-        .await
-        .map_err(|e| {
-            crate::types::DoorwayError::Holochain(format!(
-                "create_human on conductor ok but get_my_human projection failed: {e}"
-            ))
-        })?;
-
-    let result = projected.ok_or_else(|| {
-        crate::types::DoorwayError::Internal(
-            "create_human on conductor ok but get_my_human returned None — DHT projection lag?"
-                .into(),
-        )
-    })?;
-
-    debug!(action_hash = %action_hash, "create_human on conductor succeeded");
 
     Ok(result)
 }
