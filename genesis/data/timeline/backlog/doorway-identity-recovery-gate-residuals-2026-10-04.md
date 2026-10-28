@@ -116,6 +116,8 @@ Residuals the gate leaves:
 3. **A partial loss is not detected.** The migration clears `wiped` on one proven account; hosted apps no account claims are reported (`appsWithoutAnAccount`) and assigned to nobody, as in the operator's recovery.
 4. **Historical node/device accounts.** Backfill writes a record for any account whose key a conductor confirms, including a node/device row that carries a hosted app's key, so with the gate on such a row keeps logging in (`records_agent_for`). Whether it should is the open login-policy question in `hosted-provisioning-stop-damage-held-for-operator`.
 5. **Not yet measured on a household.** No live run has exercised a first boot with the gate on.
+6. **Adoption by full-hash app id with the gate off.** With no Mongo, the log is process memory, so after a restart the gate-off lookup adopts an app under the person's full-hash id (as it adopts one under the legacy short id) with no record to prove it. This is the same class as dev's legacy adoption: accepted while the gate is off, and gone when it is on. The same lookup runs when the log cannot be read at all with the gate off.
+7. **A refusal that cannot be written.** When a refused install's withdrawal of `absent_before_send` cannot be written, the request is answered unresolved and the refusal is latched in process memory, and no request adopts on that record until the withdrawal is written. A doorway restart before the write lands loses the latch, and the stored record then still carries the absence.
 
 ## What was reachable before the branch (the class, now closed)
 

@@ -108,6 +108,10 @@ pub struct ConductorRegistry {
     /// recovery). Until it has, nothing that depends on a record existing for
     /// an account is enforced.
     records_backfilled: AtomicBool,
+    /// Refused installs whose withdrawal of the pre-send absence could not be
+    /// written: identifier → (installed app id, an app was under the id). No
+    /// request adopts on such a record until the withdrawal is written.
+    unrecorded_refusals: DashMap<String, (String, bool)>,
 }
 
 /// The facts the wiped-store verdict is computed from.
@@ -253,6 +257,7 @@ impl ConductorRegistry {
             store_loss: Mutex::new(None),
             store_gate: AtomicBool::new(false),
             records_backfilled: AtomicBool::new(false),
+            unrecorded_refusals: DashMap::new(),
         };
 
         // Load persisted agent mappings if MongoDB is available
@@ -293,6 +298,26 @@ impl ConductorRegistry {
     /// Whether the store verdict may refuse anyone. See [`Self::with_store_gate`].
     pub fn store_gate(&self) -> bool {
         self.store_gate.load(Ordering::Relaxed)
+    }
+
+    /// Latch a refused install whose withdrawal could not be written.
+    pub fn latch_refusal(&self, identifier: &str, installed_app_id: &str, conflict: bool) {
+        self.unrecorded_refusals.insert(
+            identifier.to_string(),
+            (installed_app_id.to_string(), conflict),
+        );
+    }
+
+    /// The latched refusal for `identifier`, if one is still unwritten.
+    pub fn latched_refusal(&self, identifier: &str) -> Option<(String, bool)> {
+        self.unrecorded_refusals
+            .get(identifier)
+            .map(|entry| entry.value().clone())
+    }
+
+    /// The refusal is written (or the record moved on): drop the latch.
+    pub fn clear_refusal(&self, identifier: &str) {
+        self.unrecorded_refusals.remove(identifier);
     }
 
     /// Every account a conductor confirms now has a record (the backfill or a

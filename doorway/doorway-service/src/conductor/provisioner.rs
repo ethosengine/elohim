@@ -272,6 +272,9 @@ pub struct AgentProvisioner {
     app_id: String,
     bundle_path: String,
     connector: Arc<dyn AdminConnector>,
+    /// Writes nothing to the intent log (`Self::unrecorded`): store gate off
+    /// and the log unreadable.
+    unrecorded: bool,
 }
 
 impl AgentProvisioner {
@@ -282,6 +285,7 @@ impl AgentProvisioner {
             app_id: DEFAULT_APP_ID.to_string(),
             bundle_path: DEFAULT_BUNDLE_PATH.to_string(),
             connector: Arc::new(LiveAdminConnector),
+            unrecorded: false,
         }
     }
 
@@ -407,18 +411,66 @@ impl AgentProvisioner {
         account_agent_key: Option<&str>,
     ) -> Result<ProvisionedAgent, ProvisionError> {
         for _ in 0..CLAIM_ROUNDS {
-            let recorded = self
-                .registry
-                .intents()
-                .get(user_identifier)
-                .await
-                .map_err(log_unavailable)?;
+            let recorded = match self.registry.intents().get(user_identifier).await {
+                Ok(recorded) => recorded,
+                // Gate on: provisioning without the record is provisioning
+                // without the one thing that prevents a second identity.
+                Err(e) if self.registry.store_gate() => return Err(log_unavailable(e)),
+                // Gate off (the default): the log cannot be read, so resolve
+                // the person as dev did before it existed, writing nothing.
+                Err(e) => {
+                    warn!(
+                        user = %user_identifier,
+                        error = %e,
+                        "Provisioning intent log unreadable — resolving without a record \
+                         (store gate off)"
+                    );
+                    return self
+                        .unrecorded()
+                        .provision_without_record(user_identifier)
+                        .await;
+                }
+            };
+            // A refusal this process could not write down: write it before the
+            // record is acted on, or answer unresolved.
+            let recorded = match recorded {
+                Some(mut intent) => {
+                    if !self.heal_latched_refusal(&mut intent).await {
+                        return Err(ProvisionError::unresolved(
+                            &intent.conductor_id,
+                            format!(
+                                "an install of '{}' on {} was refused and that refusal is not \
+                                 yet recorded; nothing is adopted under the id until it is",
+                                intent.installed_app_id, intent.conductor_id
+                            ),
+                        ));
+                    }
+                    Some(intent)
+                }
+                None => None,
+            };
 
             let step = match recorded {
                 // An install was written, or seen installed: only the conductor
                 // the record names can say what became of it.
                 // An app conflict holds until an operator's recovery proves
                 // whose the app is: never adopted, never re-offered elsewhere.
+                // Gate off: the latch holds only while the conflicting app is
+                // there. Gone on re-check, the attempt is over and the person
+                // is provisioned afresh, as dev would.
+                Some(mut intent)
+                    if intent.is_live()
+                        && intent.stuck == Some(StuckReason::AppConflict)
+                        && !self.registry.store_gate()
+                        && self.conflicting_app_is_gone(&intent).await =>
+                {
+                    self.abandon_if_live(
+                        Some(&mut intent),
+                        "the conflicting app is no longer on the conductor (store gate off)",
+                    )
+                    .await;
+                    Step::Again
+                }
                 Some(intent)
                     if intent.is_live() && intent.stuck == Some(StuckReason::AppConflict) =>
                 {
@@ -647,6 +699,50 @@ impl AgentProvisioner {
         None
     }
 
+    /// Store gate off: did the conductor a conflicted record names ANSWER that
+    /// nothing is under its id any more? An unreachable conductor or a failed
+    /// lookup is not "gone".
+    async fn conflicting_app_is_gone(&self, intent: &ProvisionIntent) -> bool {
+        let Some(conductor) = self.registry.get_conductor_info(&intent.conductor_id) else {
+            return false;
+        };
+        match self.connector.connect(&conductor.admin_url).await {
+            Ok(admin) => matches!(admin.find_app(&intent.installed_app_id).await, Ok(None)),
+            Err(_) => false,
+        }
+    }
+
+    /// This provisioner, writing nothing to the intent log: every save is
+    /// taken as written. Only for [`Self::provision_without_record`].
+    fn unrecorded(&self) -> Self {
+        Self {
+            registry: Arc::clone(&self.registry),
+            app_id: self.app_id.clone(),
+            bundle_path: self.bundle_path.clone(),
+            connector: Arc::clone(&self.connector),
+            unrecorded: true,
+        }
+    }
+
+    /// Store gate off and the log unreadable: dev's resolution. An app under
+    /// the person's id is theirs; otherwise one is installed, with no record.
+    async fn provision_without_record(
+        &self,
+        user_identifier: &str,
+    ) -> Result<ProvisionedAgent, ProvisionError> {
+        if let Some(agent) = self.legacy_find_existing_app(user_identifier).await {
+            return Ok(agent);
+        }
+        match self.offer(user_identifier, None).await {
+            Step::Done(result) => result,
+            Step::Again => Err(ProvisionError::NotReady(
+                "the provisioning intent log is not available and the attempt could not \
+                 settle without it"
+                    .to_string(),
+            )),
+        }
+    }
+
     /// Whether the store gate (`DOORWAY_PROVISIONING_STORE_GATE`) is on.
     pub fn store_gate(&self) -> bool {
         self.registry.store_gate()
@@ -704,6 +800,7 @@ impl AgentProvisioner {
                 &installed_app_id,
             );
             let claimed = match &held {
+                None if self.unrecorded => Ok(true),
                 None => store.insert_new(&intent).await,
                 Some(previous) => {
                     intent.version = previous.version + 1;
@@ -889,9 +986,17 @@ impl AgentProvisioner {
                         // A DEFINITE refusal: this record's install did not
                         // land. The absence it recorded before sending is no
                         // evidence about anything under the id from now on, so
-                        // it is withdrawn — persisted, so a later request can
-                        // never adopt what is there on the strength of it.
+                        // it is withdrawn — and the withdrawal must be WRITTEN
+                        // before this request may end any other way, or a later
+                        // request could adopt what is there on its strength.
                         intent.absent_before_send = false;
+                        let conflict = matches!(found, Ok(Some(_)));
+                        if conflict {
+                            intent.stuck = Some(StuckReason::AppConflict);
+                        }
+                        if let Err(unwritten) = self.withdraw_absence(intent, conflict).await {
+                            return Err(AttemptError::Final(unwritten));
+                        }
                         match found {
                             // Nothing there: a definite refusal that left nothing.
                             Ok(None) => AttemptFault::verdict(message).into(),
@@ -900,33 +1005,26 @@ impl AgentProvisioner {
                             // an id is not a person: a conflict — never an
                             // adoption, on this request or any later one, until an
                             // operator's recovery proves whose it is.
-                            Ok(Some(_)) => {
-                                intent.stuck = Some(StuckReason::AppConflict);
-                                self.note(intent).await;
-                                AttemptError::Final(ProvisionError::unresolved(
-                                    &conductor.conductor_id,
-                                    format!(
+                            Ok(Some(_)) => AttemptError::Final(ProvisionError::unresolved(
+                                &conductor.conductor_id,
+                                format!(
                                     "an app appeared on {} under '{installed_app_id}' while this \
                                      doorway's own install of it was refused, so this doorway \
                                      has no evidence it belongs to this person; an operator \
                                      must resolve it",
                                     conductor.conductor_id
                                 ),
-                                ))
-                            }
+                            )),
                             // The lookup itself failed: nothing is known about what
                             // is on the conductor. Never abandon on an unknown.
-                            Err(lookup) => {
-                                self.note(intent).await;
-                                AttemptError::Final(ProvisionError::unresolved(
-                                    &conductor.conductor_id,
-                                    format!(
-                                        "{message}; and {} did not answer whether \
+                            Err(lookup) => AttemptError::Final(ProvisionError::unresolved(
+                                &conductor.conductor_id,
+                                format!(
+                                    "{message}; and {} did not answer whether \
                                      '{installed_app_id}' exists ({lookup})",
-                                        conductor.conductor_id
-                                    ),
-                                ))
-                            }
+                                    conductor.conductor_id
+                                ),
+                            )),
                         }
                     }
                 });
@@ -2121,6 +2219,67 @@ impl AgentProvisioner {
 
     // ── the log ─────────────────────────────────────────────────────────────
 
+    /// Write the withdrawal of a refused install's pre-send absence (and the
+    /// conflict, when an app is under the id). If it cannot be written, the
+    /// stored record still carries the absence; so the refusal is LATCHED in
+    /// this process (`ConductorRegistry::latch_refusal`) — no request adopts on
+    /// that record until the withdrawal is written — and the caller is answered
+    /// unresolved. A doorway restart before the write lands loses the latch:
+    /// that is the residual named in the recovery-gate backlog.
+    async fn withdraw_absence(
+        &self,
+        intent: &mut ProvisionIntent,
+        conflict: bool,
+    ) -> Result<(), ProvisionError> {
+        match self.save(intent).await {
+            Ok(true) => {
+                self.registry.clear_refusal(&intent.identifier);
+                Ok(())
+            }
+            outcome => {
+                self.registry
+                    .latch_refusal(&intent.identifier, &intent.installed_app_id, conflict);
+                let why = match outcome {
+                    Err(e) => e,
+                    _ => "another writer changed the record".to_string(),
+                };
+                warn!(
+                    user = %intent.identifier,
+                    app_id = %intent.installed_app_id,
+                    error = %why,
+                    "A refused install's withdrawal could not be recorded — latched in memory"
+                );
+                Err(ProvisionError::unresolved(
+                    &intent.conductor_id,
+                    format!(
+                        "the install of '{}' on {} was refused, and that refusal could not be \
+                         recorded ({why}); nothing is adopted under the id until it is",
+                        intent.installed_app_id, intent.conductor_id
+                    ),
+                ))
+            }
+        }
+    }
+
+    /// A refusal this process could not write down earlier: write it now, on
+    /// the record as it reads today. `true` = written (or nothing latched):
+    /// resolve normally; `false` = still unwritten: the answer is `Unresolved`.
+    async fn heal_latched_refusal(&self, intent: &mut ProvisionIntent) -> bool {
+        let Some((app_id, conflict)) = self.registry.latched_refusal(&intent.identifier) else {
+            return true;
+        };
+        if app_id != intent.installed_app_id || !intent.is_live() {
+            // The record has moved on to another attempt; the latch is stale.
+            self.registry.clear_refusal(&intent.identifier);
+            return true;
+        }
+        intent.absent_before_send = false;
+        if conflict {
+            intent.stuck = Some(StuckReason::AppConflict);
+        }
+        self.withdraw_absence(intent, conflict).await.is_ok()
+    }
+
     /// Write `intent` against the version it was read at. `Ok(false)` = another
     /// writer moved the record; `intent` is left as it was.
     async fn save(&self, intent: &mut ProvisionIntent) -> Result<bool, String> {
@@ -2128,7 +2287,11 @@ impl AgentProvisioner {
         let mut next = intent.clone();
         next.version = expected + 1;
         next.updated_at = intent_now();
-        let written = self.registry.intents().replace(expected, &next).await?;
+        let written = if self.unrecorded {
+            true
+        } else {
+            self.registry.intents().replace(expected, &next).await?
+        };
         if written {
             *intent = next;
         }
@@ -2250,7 +2413,17 @@ impl AgentProvisioner {
         user_identifier: &str,
     ) -> Result<Option<String>, ProvisionError> {
         match self.registry.intents().get(user_identifier).await {
-            Err(e) => Err(log_unavailable(e)),
+            Err(e) if self.registry.store_gate() => Err(log_unavailable(e)),
+            // Gate off: an unreadable log refuses nobody, as before it existed.
+            Err(e) => {
+                warn!(
+                    user = %user_identifier,
+                    error = %e,
+                    "Provisioning intent log unreadable — treating the identifier as hosted by \
+                     nobody (store gate off)"
+                );
+                Ok(None)
+            }
             Ok(Some(intent)) if intent.is_live() => Ok(Some(intent.conductor_id)),
             Ok(_) => match self.store_refusal() {
                 Some(refusal) => Err(refusal),
@@ -5277,6 +5450,237 @@ mod tests {
         );
         assert_eq!(report.records_kept, vec![MALLORY.to_string()]);
         assert_eq!(intent_of(&store, MALLORY).await, mallory, "never replaced");
+    }
+
+    /// An intent store that reads and inserts, but refuses every `replace`
+    /// from the `fail_from`-th on until `healed`.
+    struct WritesFailAfter {
+        inner: MemoryIntentStore,
+        replaces: std::sync::atomic::AtomicU32,
+        fail_from: u32,
+        healed: std::sync::atomic::AtomicBool,
+    }
+
+    #[async_trait]
+    impl IntentStore for WritesFailAfter {
+        async fn get(&self, who: &str) -> Result<Option<ProvisionIntent>, String> {
+            self.inner.get(who).await
+        }
+        async fn insert_new(&self, intent: &ProvisionIntent) -> Result<bool, String> {
+            self.inner.insert_new(intent).await
+        }
+        async fn replace(&self, expected: i64, intent: &ProvisionIntent) -> Result<bool, String> {
+            use std::sync::atomic::Ordering::SeqCst;
+            let n = self.replaces.fetch_add(1, SeqCst) + 1;
+            if n >= self.fail_from && !self.healed.load(SeqCst) {
+                return Err("write refused: mongod unavailable".into());
+            }
+            self.inner.replace(expected, intent).await
+        }
+        async fn delete(&self, who: &str) -> Result<(), String> {
+            self.inner.delete(who).await
+        }
+        async fn delete_by_agent(&self, key: &str) -> Result<u64, String> {
+            self.inner.delete_by_agent(key).await
+        }
+        async fn purge_expired(&self, now: chrono::DateTime<chrono::Utc>) -> Result<u64, String> {
+            self.inner.purge_expired(now).await
+        }
+        async fn stuck_records(&self) -> Result<Vec<ProvisionIntent>, String> {
+            self.inner.stuck_records().await
+        }
+        async fn total(&self) -> Result<u64, String> {
+            self.inner.total().await
+        }
+        async fn counts(
+            &self,
+            stale_before: chrono::DateTime<chrono::Utc>,
+        ) -> Result<crate::conductor::provision_intent::IntentCounts, String> {
+            self.inner.counts(stale_before).await
+        }
+    }
+
+    /// A doorway over `pool` (A_FIRST loads) with its log in `store`.
+    async fn doorway_on_store(
+        pool: &Arc<FakePool>,
+        store: Arc<dyn IntentStore>,
+        gated: bool,
+    ) -> AgentProvisioner {
+        let registry = ConductorRegistry::new(None)
+            .await
+            .with_store_gate(gated)
+            .with_intent_store(store);
+        for (id, used) in A_FIRST {
+            registry.register_conductor(ConductorInfo {
+                conductor_id: id.to_string(),
+                conductor_url: format!("ws://{id}:8888"),
+                admin_url: admin_url(id),
+                capacity_used: used,
+                capacity_max: 10,
+            });
+            pool.conductors
+                .lock()
+                .unwrap()
+                .entry(admin_url(id))
+                .or_insert_with(FakeConductor::healthy);
+        }
+        AgentProvisioner::new(Arc::new(registry))
+            .with_connector(Arc::new(FakeConnector(Arc::clone(pool))))
+    }
+
+    /// BLOCKER (re-review): the refused install's withdrawal cannot be
+    /// written. The request stops unresolved, the refusal is latched, and no
+    /// later request adopts the competing app — before or after the store
+    /// recovers. Once it recovers, the withdrawal and the conflict are
+    /// written.
+    #[tokio::test]
+    async fn a_refusal_that_cannot_be_recorded_stops_the_request_and_never_adopts() {
+        use std::sync::atomic::Ordering::SeqCst;
+        for gated in [true, false] {
+            let pool = Arc::new(FakePool::default());
+            let store = Arc::new(WritesFailAfter {
+                inner: MemoryIntentStore::new(),
+                replaces: Default::default(),
+                // Replace #1 records the send; #2 is the withdrawal.
+                fail_from: 2,
+                healed: Default::default(),
+            });
+            let doorway =
+                doorway_on_store(&pool, Arc::clone(&store) as Arc<dyn IntentStore>, gated).await;
+            pool.with("conductor-a", |c| c.lands_before_next_install = true);
+
+            for request in 1..=2 {
+                let error = doorway.provision_agent(USER).await.expect_err("unrecorded");
+                assert_eq!(error.code(), "PROVISIONING_UNRESOLVED", "{gated} {request}");
+                assert!(
+                    error.to_string().contains("could not be recorded")
+                        || error.to_string().contains("not yet recorded"),
+                    "{error}"
+                );
+                let stored = store.inner.get(USER).await.unwrap().unwrap();
+                assert!(
+                    stored.agent_pub_key.is_none(),
+                    "{gated} {request}: not adopted"
+                );
+            }
+
+            store.healed.store(true, SeqCst);
+            let error = doorway.provision_agent(USER).await.expect_err("conflict");
+            assert_eq!(error.code(), "PROVISIONING_UNRESOLVED");
+            let stored = store.inner.get(USER).await.unwrap().unwrap();
+            assert!(
+                !stored.absent_before_send,
+                "{gated}: the withdrawal is written"
+            );
+            assert_eq!(stored.stuck, Some(StuckReason::AppConflict));
+            assert!(stored.agent_pub_key.is_none(), "{gated}: never adopted");
+            assert!(doorway.registry.latched_refusal(USER).is_none());
+            assert_eq!(pool.total_installs_received(), 1, "{gated}");
+        }
+    }
+
+    /// An intent log that cannot be read at all.
+    struct Unreadable;
+
+    #[async_trait]
+    impl IntentStore for Unreadable {
+        async fn get(&self, _: &str) -> Result<Option<ProvisionIntent>, String> {
+            Err("connection refused".into())
+        }
+        async fn insert_new(&self, _: &ProvisionIntent) -> Result<bool, String> {
+            Err("connection refused".into())
+        }
+        async fn replace(&self, _: i64, _: &ProvisionIntent) -> Result<bool, String> {
+            Err("connection refused".into())
+        }
+        async fn delete(&self, _: &str) -> Result<(), String> {
+            Err("connection refused".into())
+        }
+        async fn delete_by_agent(&self, _: &str) -> Result<u64, String> {
+            Err("connection refused".into())
+        }
+        async fn purge_expired(&self, _: chrono::DateTime<chrono::Utc>) -> Result<u64, String> {
+            Err("connection refused".into())
+        }
+        async fn stuck_records(&self) -> Result<Vec<ProvisionIntent>, String> {
+            Err("connection refused".into())
+        }
+        async fn total(&self) -> Result<u64, String> {
+            Err("connection refused".into())
+        }
+        async fn counts(
+            &self,
+            _: chrono::DateTime<chrono::Utc>,
+        ) -> Result<crate::conductor::provision_intent::IntentCounts, String> {
+            Err("connection refused".into())
+        }
+        fn available(&self) -> bool {
+            false
+        }
+    }
+
+    /// Re-review 2: with the store gate OFF an unreadable log refuses nobody —
+    /// dev's resolution runs (an existing app is found, else one is installed)
+    /// and nothing is written. ON, it is refused, as it must be.
+    #[tokio::test]
+    async fn an_unreadable_log_falls_back_to_devs_path_only_with_the_gate_off() {
+        let pool = Arc::new(FakePool::default());
+        let doorway = doorway_on_store(&pool, Arc::new(Unreadable), false).await;
+        let fresh = doorway
+            .provision_agent(USER)
+            .await
+            .expect("gate off: provisioned");
+        assert_eq!(fresh.installed_app_id, app_on("conductor-a"));
+        let again = doorway.provision_agent(USER).await.expect("found again");
+        assert_eq!(again.agent_pub_key, fresh.agent_pub_key);
+        assert_eq!(pool.total_installs_received(), 1);
+        assert_eq!(doorway.hosted_here("someone@example.com").await, Ok(None));
+
+        let pool = Arc::new(FakePool::default());
+        let gated = doorway_on_store(&pool, Arc::new(Unreadable), true).await;
+        let refused = gated
+            .provision_agent(USER)
+            .await
+            .expect_err("gate on: refused");
+        assert_eq!(refused.code(), "PROVISIONING_NOT_READY");
+        assert!(gated.hosted_here(USER).await.is_err());
+        assert_eq!(pool.total_installs_received(), 0);
+    }
+
+    /// Re-review 3: with the store gate OFF an app conflict holds only while
+    /// the conflicting app is there; gone on re-check, the person is
+    /// provisioned afresh. ON, the conflict holds until an operator acts.
+    #[tokio::test]
+    async fn an_app_conflict_clears_on_recheck_only_with_the_gate_off() {
+        for gated in [false, true] {
+            let pool = Arc::new(FakePool::default());
+            let store = Arc::new(MemoryIntentStore::new());
+            let doorway =
+                doorway_on_store(&pool, Arc::clone(&store) as Arc<dyn IntentStore>, gated).await;
+            pool.with("conductor-a", |c| c.lands_before_next_install = true);
+            doorway.provision_agent(USER).await.expect_err("conflict");
+            assert_eq!(
+                intent_of(&store, USER).await.stuck,
+                Some(StuckReason::AppConflict)
+            );
+
+            // The conflicting app goes away.
+            pool.with("conductor-a", |c| c.apps.clear());
+            let outcome = doorway.provision_agent(USER).await;
+            if gated {
+                assert_eq!(outcome.expect_err("held").code(), "PROVISIONING_UNRESOLVED");
+                assert_eq!(
+                    intent_of(&store, USER).await.stuck,
+                    Some(StuckReason::AppConflict)
+                );
+            } else {
+                let agent = outcome.expect("gate off: provisioned afresh");
+                assert_eq!(
+                    intent_of(&store, USER).await.agent_pub_key.as_deref(),
+                    Some(agent.agent_pub_key.as_str())
+                );
+            }
+        }
     }
 
     fn wiped(doorway: &AgentProvisioner) {
