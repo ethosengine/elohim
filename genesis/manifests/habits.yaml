@@ -114,9 +114,9 @@ habits:
       - "a2o @device-declared-target (genesis/a2o/features/devflow/device-declared-target.feature, @concern:dataplane-convergence) — offline private declaration, projection replay, pinned-session notice and committed-base recovery; slice M"
     evidence: >
       DELTA 2026-10-25-M-review-4 (RED preserved): boot and adoption now share owner-aware declaration discovery; a headless default rereads its base under the writer lock; prompt notices prefer the runtime payload over ownerless inherited declarations; renderer EPR_BIN requires an absolute executable-file path. The external-projection regression invokes the lane CLI with --pin A and proves B is refused, then freshly applied through the real config vehicle after unpinning; restoring the old watcher applies B despite A (exit 101). Restoring the stale headless-base code fails both native and CLI adapter regressions (exit 101); restoring the old hook fails the shared native runtime-boundary fixture, and restoring the old renderer fails EPR_BIN=epr. Seven notice tests, 18 adapted renderer tests, 21 manifest contracts, four CLI adapter tests and package fidelity pass. Gate exits and sandbox restrictions: genesis/a2o/reports/recovery/device-runtime-m/report.md. No commit, push, live-device/store write or habit-status change.
-    evidence-fingerprint: sha256:6f96f27c71d56132
-    evidence-bytes: 268941
-    evidence-entries: 176
+    evidence-fingerprint: sha256:8536205b8528a1a5
+    evidence-bytes: 278564
+    evidence-entries: 180
     guard: >
       Regression risk = the fleet-safety invariants in sync/projector.rs
       (empty-never-projects, reconcile-offers/events-assert, broadcast-tier reach
