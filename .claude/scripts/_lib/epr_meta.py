@@ -679,6 +679,39 @@ def _ownership_ontology_guard(write: dict) -> Verdict | None:
     return _frame_guard(write, "epr:validator-ownership-ontology-guard")
 
 
+# ── Absolutes guard (`epr:validator-absolutes-guard`, bound by absolutes-guard@1). The sibling of
+# the frame guards above for a different defect: prose on a TRUST SURFACE (stories, specs, UI copy,
+# the content chrome) that promises always / never / forever / no one can, where the protocol is
+# graduated, governed, revocable and plural. The lexicon and citation markers live in the frame
+# atom `frame-absolute-promise`; `_lib/absolutes.py` owns the word-bounded, prose-only, net-new
+# scan and the exemptions (a resolving `(enforced: <ref>)` / `absolute: <ref>` citation in the
+# same sentence or line, testimony, quoted speech). Python-only (governance-validators.json):
+# the native host returns DeclaredElsewhere. `class: dispatch` — advisory, never ask or deny.
+def _absolutes_guard(write: dict) -> Verdict | None:
+    from _lib import absolutes, frame_atoms  # lazy: frame_atoms computes refs through this module
+
+    rel = _repo_rel(write.get("path") or "")
+    if absolutes.surface_kind(rel) is None:
+        return None
+    post = write.get("content")
+    if post is None:
+        return None
+    prior = _prior_text(write)
+    try:
+        result = absolutes.classify(rel, post, prior if prior is not None else "",
+                                    find_repo_root(Path(write.get("path") or ".")))
+    except frame_atoms.FrameAtomError as exc:
+        return Verdict(None, f"frame atom unreadable — the guard cannot classify ({exc})",
+                       None, "unresolvable-validator")
+    if result is None:
+        return None
+    reason = (f"{result['reason']} — {result['netNew']} net-new: "
+              f"{absolutes.describe(result['hits'])}. Repair: {absolutes.REPAIRS}")
+    evidence = {k: result[k] for k in ("frameRef", "verdict", "netNew", "hits")}
+    evidence["classificationCid"] = None
+    return Verdict(None, reason, None, None, evidence)
+
+
 # ── Archetype resource alignment (a validator-EPR). Fires an `ask` when deployments.json carries
 # INTRA-ARCHETYPE resource drift: a consolidated human whose edgenode* budget != its
 # deviceArchetype's CANONICAL value in archetype-resource-budgets.json, WITHOUT an explicit
@@ -1809,6 +1842,7 @@ REFERENCE_VALIDATORS = {
     "epr:validator-brand-vocabulary-boundary": _brand_vocabulary_boundary,
     "epr:validator-sovereignty-ontology-guard": _sovereignty_ontology_guard,
     "epr:validator-ownership-ontology-guard": _ownership_ontology_guard,
+    "epr:validator-absolutes-guard": _absolutes_guard,
     "epr:validator-archetype-resource-alignment": _archetype_resource_alignment,
     "epr:validator-test-bench-aggregate-capacity": _test_bench_aggregate_capacity,
     "epr:validator-escalation-ladder": _escalation_ladder,

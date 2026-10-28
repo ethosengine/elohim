@@ -1,0 +1,66 @@
+{
+  "id": "frame-absolute-promise",
+  "version": 1,
+  "validator": "epr:validator-absolutes-guard",
+  "apex_concept": "unenforced-absolute",
+  "family": "defeater",
+  "polarity": "incriminating",
+  "cost_class": "high-fp-cost",
+  "binding": "binding-local",
+  "linguistic_definition": "An absolute promise is prose on a trust surface (a story, a spec, UI copy, the content chrome) that states a property holds always, never, forever, for everyone, without exception or at all times, or that no one can do a thing. The protocol is graduated, governed, revocable and plural: reach narrows, gates re-admit, stewards act under a StewardshipGrant for people who hold their rights through others, and trust lags delivery, so most absolutes promise more than the system keeps. An absolute is a member of this frame unless it names the invariant's enforcer on the same sentence or line: a test, a refusing predicate, a registered policy, a seam or a schema constraint. Quoted speech and declared testimony report what someone said and are not members.",
+  "reason_clause": "net-new absolute promise needs its enforcer cited or an honest qualifier",
+  "rubric": {
+    "question": "Does the net-new passage promise that a property holds without exception, and if so does it cite the code that enforces it?",
+    "legitimate_frames": [
+      {
+        "id": "enforced",
+        "description": "The absolute names its enforcer on the same sentence or line: `(enforced: <repo path | policy:<id>@<v> | seam:<id>>)` in prose, `absolute: <enforcer>` in a comment beside a UI string. The cited enforcer must resolve."
+      },
+      {
+        "id": "testimony",
+        "description": "Quoted speech or declared testimony: what a person said, reported as said (the ontology atom's testimony_exempt, a blockquote, a quotation)."
+      },
+      {
+        "id": "qualified",
+        "description": "The sentence says what actually holds instead: by default, unless, until, as far as this device knows."
+      }
+    ],
+    "apex_answer": "apex"
+  },
+  "recall_signal": {
+    "phrases": [
+      "always",
+      "never",
+      "forever",
+      "guaranteed",
+      "guarantees",
+      "impossible",
+      "every time",
+      "at all times",
+      "no one can",
+      "nobody can",
+      "no one will ever",
+      "nobody will ever",
+      "cannot ever",
+      "everyone",
+      "100%",
+      "without exception",
+      "under no circumstances",
+      "in all cases"
+    ],
+    "markers": [
+      "enforced:",
+      "absolute:"
+    ],
+    "min_net_new": 1,
+    "scan_cap_bytes": 262144,
+    "cosine_floor_permille": 350,
+    "probe_min_net_new_bytes": 400
+  },
+  "cites": [
+    "genesis/docs/architecture/stewardship-over-sovereignty.md",
+    "genesis/docs/architecture/cradle-to-grave-capability-gradient.md",
+    "genesis/docs/content/elohim-protocol/values-forward.md"
+  ],
+  "established_by": "requested-operator-2026-10-15+agents"
+}

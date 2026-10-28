@@ -45,6 +45,8 @@ rules:
     when: { write: "manifest.md" }
   - id: brand-vocabulary-boundary
     policy: brand-vocabulary-boundary@1
+  - id: absolutes-guard
+    policy: absolutes-guard@1
   - id: habit-declaration-at-birth
     policy: habit-declaration-at-birth@1
   - id: dev-lifecycle-context-sync-npm
