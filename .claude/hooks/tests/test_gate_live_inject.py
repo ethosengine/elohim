@@ -88,6 +88,91 @@ class GateLiveInjectTest(unittest.TestCase):
         for command in ('git stash push -m t', 'git log --grep push', 'echo git push', 'just test mesh', ''):
             self.assertFalse(starts(command), command)
 
+    def test_executed_gates_get_one_background_reminder(self):
+        commands = (
+            'git push origin abc:refs/heads/dev',
+            '(cd /x && export A=1 && git push origin s:refs/heads/dev > log 2>&1; echo X)',
+            'git -C /x push',
+            'just gate elohim-storage',
+            'node genesis/orchestrator/gate-runner.mjs run elohim-storage',
+            'export A=1 && git push origin abc',
+            'A="hello world" git push origin abc',
+            'git -C "/x y" push origin abc',
+            'cd /x\ngit push origin abc',
+            './genesis/orchestrator/gate-runner.mjs run',
+            'git push --dry-run && just gate',
+            'just gate && git push origin abc',
+            '/usr/bin/git -c core.hooksPath=.husky push',
+            'git --git-dir /x/.git --work-tree /x push',
+            'git --git-dir=/x/.git --work-tree=/x push',
+            '/usr/bin/just gate',
+            '/usr/bin/node /x/genesis/orchestrator/gate-runner.mjs run',
+            'git ' + '\\\n' + 'push',
+        )
+        for command in commands:
+            for background in (True, False, None):
+                with self.subTest(command=command, background=background):
+                    tool_input = {'command': command}
+                    if background is not None:
+                        tool_input['run_in_background'] = background
+                    context = self.hook({'session_id': 's-main', 'tool_name': 'Bash',
+                                         'tool_input': tool_input})
+                    if background is True:
+                        self.assertEqual(context.count('select:Monitor'), 1)
+                        self.assertIn('gate-live.mjs follow --session s-main', context)
+                        self.assertIn('Investigate read-only until the push exits.', context)
+                    else:
+                        self.assertIsNone(context)
+
+    def test_dry_runs_and_quoted_mentions_do_not_start_a_gate(self):
+        commands = (
+            'git push --dry-run',
+            'git -C /x push origin abc --dry-run',
+            'git push -n origin abc',
+            "grep 'git push' file",
+            'echo "just gate"',
+            "echo 'git' 'push'",
+            "echo ';' git push",
+            'echo "cd /x && git push"',
+            "grep 'genesis/orchestrator/gate-runner.mjs' file",
+            'echo done # git push',
+            'git log --grep push',
+            'just test app',
+            "git 'push",
+            None,
+        )
+        for command in commands:
+            with self.subTest(command=command):
+                self.assertFalse(MODULE['starts_gate_run'](command))
+                self.assertIsNone(self.hook({'session_id': 's-main', 'tool_name': 'Bash',
+                                            'tool_input': {'command': command,
+                                                           'run_in_background': True}}))
+
+    def test_only_a_boolean_true_background_bash_gets_a_reminder(self):
+        for background in ('true', 1):
+            with self.subTest(background=background):
+                self.assertIsNone(self.hook({'session_id': 's-main', 'tool_name': 'Bash',
+                                            'tool_input': {'command': 'git push',
+                                                           'run_in_background': background}}))
+        self.assertIsNone(self.hook({'session_id': 's-main', 'tool_name': 'Read',
+                                    'tool_input': {'command': 'git push',
+                                                   'run_in_background': True}}))
+
+    def test_malformed_command_does_not_suppress_automatic_red_delivery(self):
+        self.red(self.open_run())
+        context = self.hook({'session_id': 's-main', 'tool_name': 'Bash',
+                             'tool_input': {'command': "git 'push", 'run_in_background': True}})
+        self.assertIn('RED storage test adds', context)
+        self.assertNotIn('select:Monitor', context)
+
+    def test_invalid_payloads_fail_open(self):
+        for raw in ('not json', '', 'null', '[]', '{"tool_name":"Bash"}',
+                    '{"session_id":"s-main","tool_name":"Bash","tool_input":42}'):
+            with self.subTest(raw=raw):
+                result = subprocess.run([sys.executable, str(HOOK)], cwd=self.root, env=self.env,
+                                        input=raw, text=True, capture_output=True, timeout=10)
+                self.assertEqual((result.returncode, result.stdout, result.stderr), (0, '', ''))
+
 
 if __name__ == '__main__':
     unittest.main()

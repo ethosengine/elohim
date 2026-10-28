@@ -19,7 +19,9 @@ import sys
 CODE = Path(__file__).resolve().parents[2]
 ROOT = Path(os.environ.get("CLAUDE_PROJECT_DIR") or CODE)
 GATE_LIVE = CODE / "genesis" / "orchestrator" / "gate-live.mjs"
-SEGMENT = re.compile(r"&&|\|\||[;|&\n()]")
+OPERATORS = "();&|\n"
+ASSIGNMENT = re.compile(r"^[A-Za-z_][A-Za-z0-9_]*=")
+RUNNER = "genesis/orchestrator/gate-runner.mjs"
 
 
 def filename(value):
@@ -66,24 +68,53 @@ def unseen(session, reader):
     return [line for line in result.stdout.splitlines() if line.strip()]
 
 
+def command_segments(command):
+    """Best-effort shell boundaries; retain quotes so echo ';' is not a separator."""
+    lexer = shlex.shlex(command.replace("\\\n", ""), posix=False,
+                        punctuation_chars=OPERATORS)
+    lexer.whitespace = " \t\r"
+    lexer.whitespace_split = True
+    segment = []
+    for token in lexer:
+        if all(char in OPERATORS for char in token):
+            if segment:
+                yield shlex.split(" ".join(segment))
+            segment = []
+        else:
+            segment.append(token)
+    if segment:
+        yield shlex.split(" ".join(segment))
+
+
 def starts_gate_run(command):
-    """A `git push` (any global options before the verb) or a `just gate` / gate-runner call."""
-    for segment in SEGMENT.split(command or ""):
-        try:
-            words = shlex.split(segment)
-        except ValueError:
-            words = segment.split()
-        words = [w for w in words if not re.match(r"^[A-Za-z_][A-Za-z0-9_]*=", w)] if words else []
+    """Recognize executed gates without mistaking quoted mentions or dry runs for one."""
+    if not isinstance(command, str):
+        return False
+    try:
+        segments = list(command_segments(command))
+    except ValueError:
+        return False
+    for words in segments:
+        while words and ASSIGNMENT.match(words[0]):
+            words = words[1:]
         if not words:
             continue
-        if words[0] == "git":
-            rest = words[1:]
-            while rest and rest[0].startswith("-"):
-                rest = rest[2:] if rest[0] in ("-C", "-c") else rest[1:]
-            if rest and rest[0] == "push":
+        head, args = os.path.basename(words[0]), words[1:]
+        if head == "git":
+            # Global git options precede the subcommand; -C and -c consume a value.
+            while args and args[0].startswith("-"):
+                if args[0] in ("-C", "-c", "--git-dir", "--work-tree"):
+                    args = args[2:]
+                else:
+                    args = args[1:]
+            if args and args[0] == "push" and not {"--dry-run", "-n"}.intersection(args[1:]):
                 return True
-        if words[:2] == ["just", "gate"] or any(w.endswith("gate-runner.mjs") for w in words):
+        elif head == "just" and args[:1] == ["gate"]:
             return True
+        else:
+            script = args[0] if head == "node" and args else words[0]
+            if script == RUNNER or script.endswith("/" + RUNNER):
+                return True
     return False
 
 
@@ -109,7 +140,7 @@ def main():
     lines = []
 
     tool_input = payload.get("tool_input") or {}
-    if (payload.get("tool_name") == "Bash" and tool_input.get("run_in_background")
+    if (payload.get("tool_name") == "Bash" and tool_input.get("run_in_background") is True
             and starts_gate_run(tool_input.get("command", ""))):
         lines.append(arm_line(session))
 
