@@ -515,3 +515,23 @@ Changing the shared builder changes the declared SUT, so the repair requires a
 new truthful source pin and local receipt even though native application source
 trees and dependency pins remain unchanged. The earlier source receipts remain
 historical evidence.
+
+### Activation refusal evidence station (2026-10-28)
+
+Chain `measure-runs-on-a-peer`, between **activation refused → operator reads
+archived outcome**: the capture wrapper must retain a classified refusal after
+removing an unverified `activation.json`. Edge #1743's investigation identified
+that the wrapper deleted both files selected by the edge archive step. The
+repair writes `REFUSED: <classification>` to `status.txt` before rethrowing,
+with 0755 evidence directories and a 0644 status file. It never archives the
+exception text or promotes a failed bootstrap receipt to activation evidence.
+
+Proposed observability scenario for `ci-runner-stewarded.feature` (`@wip`):
+Given Matthew's worker activation cannot prove its current grant receipt, when
+Jenkins captures activation, then Matthew can read a classified refusal in the
+archive and no activation artifact claims success. Probe:
+`runner-capture-activation.test.mjs` checks stale success removal, first-attempt
+directory creation, all three classified capture failures, and earlier
+declaration/transport refusals. Current state: **12 local refusal cases GREEN;
+live Jenkins archive proof pending**. The full suite's existing subprocess and
+distinct-UID checks cannot complete in this workspace sandbox (EPERM/EINVAL).

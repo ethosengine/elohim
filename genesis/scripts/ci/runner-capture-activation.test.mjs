@@ -101,7 +101,10 @@ for (const mode of [
   "late-expiry",
   "read-failure",
   "bootstrap-timeout",
+  "worker-state-timeout",
+  "capacity-mismatch",
   "transport-failure",
+  "first-attempt-refusal",
 ])
   test(`capture ${mode} has no stale success on refusal`, (t) => {
     const root = mkdtempSync(join(tmpdir(), "capture-window-"));
@@ -137,22 +140,32 @@ for (const mode of [
     chmodSync(join(root, "compute-worker-evidence"), 0o700);
     chmodSync(join(root, "compute-worker-evidence/ns--adam"), 0o700);
     chmodSync(statusFile, 0o600);
+    if (mode === "first-attempt-refusal")
+      rmSync(join(root, "compute-worker-evidence"), { recursive: true });
     let reads = 0;
     const execute = (cmd, args, options) => {
       assert.equal(options.env.KUBECONFIG, "/private/selected-context");
       if (cmd === "kubectl" && args.at(-1) === "name") {
         assert.equal(options.timeout, 20000);
-        if (mode === "transport-failure")
+        if (["transport-failure", "first-attempt-refusal"].includes(mode))
           throw new Error("transport unavailable");
         return "pod/adam-0\n";
       }
       if (cmd === "bash") {
         assert.equal(options.env.COMPUTE_WORKER_PROVIDER, provider);
         assert.equal(options.env.COMPUTE_WORKER_IMAGE, pod.image);
-        if (mode === "bootstrap-timeout") {
+        const refusal = {
+          "bootstrap-timeout":
+            "startup budget 900s exhausted: worker bootstrap or grant receipt unavailable",
+          "worker-state-timeout":
+            "startup budget 900s exhausted: worker missing, not Ready, terminating, or image differs",
+          "capacity-mismatch":
+            "public receipt, running worker, or enforced capacity differs",
+        }[mode];
+        if (refusal) {
           writeFileSync(
             statusFile,
-            "REFUSED compute worker receipt: startup budget 900s exhausted: worker bootstrap or grant receipt unavailable",
+            `REFUSED compute worker receipt: ${refusal}`,
           );
           throw new Error("private child error");
         }
@@ -206,14 +219,24 @@ for (const mode of [
         false,
       );
     } else {
-      assert.throws(
-        go,
-        (error) =>
-          mode !== "bootstrap-timeout" ||
-          error.activationReason === "bootstrap-or-grant-receipt-timeout",
-      );
+      const reason =
+        {
+          "bootstrap-timeout": "bootstrap-or-grant-receipt-timeout",
+          "worker-state-timeout": "worker-state-or-image-timeout",
+          "capacity-mismatch": "receipt-worker-or-capacity-mismatch",
+        }[mode] || "declaration-window-or-incarnation-unproven";
+      assert.throws(go, (error) => error.activationReason === reason);
       assert.equal(existsSync(artifact), false);
-      assert.equal(existsSync(statusFile), false);
+      assert.equal(readFileSync(statusFile, "utf8"), `REFUSED: ${reason}\n`);
+      assert.equal(statSync(statusFile).mode & 0o777, 0o644);
+      assert.equal(
+        statSync(join(root, "compute-worker-evidence")).mode & 0o777,
+        0o755,
+      );
+      assert.equal(
+        statSync(join(root, "compute-worker-evidence/ns--adam")).mode & 0o777,
+        0o755,
+      );
     }
   });
 

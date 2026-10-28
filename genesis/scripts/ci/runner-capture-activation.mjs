@@ -212,7 +212,13 @@ export function captureActivation({
     }
     error.activationReason = reason;
     rmSync(artifact, { force: true });
-    rmSync(statusFile, { force: true });
+    // Keep only the classified refusal, readable by Jenkins' separate archive UID.
+    const directory = resolve(root, output, `${namespace}--${workload}`);
+    mkdirSync(directory, { recursive: true, mode: 0o755 });
+    chmodSync(resolve(root, output), 0o755);
+    chmodSync(directory, 0o755);
+    writeFileSync(statusFile, `REFUSED: ${reason}\n`, { mode: 0o644 });
+    chmodSync(statusFile, 0o644);
     throw error;
   }
 }
