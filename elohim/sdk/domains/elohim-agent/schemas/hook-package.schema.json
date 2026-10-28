@@ -64,10 +64,19 @@
       },
       "additionalProperties": true
     },
+    "registrations": {
+      "type": "object",
+      "properties": {
+        "claude": { "$ref": "#/properties/registration" },
+        "codex": { "$ref": "#/properties/registration" }
+      },
+      "additionalProperties": false
+    },
     "projections": {
       "type": "object",
       "required": ["claude"],
       "properties": {
+        "codex": { "$ref": "#/properties/projections/properties/claude" },
         "claude": {
           "type": "object",
           "required": ["path"],

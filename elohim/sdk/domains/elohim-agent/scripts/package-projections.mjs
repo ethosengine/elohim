@@ -987,11 +987,14 @@ function packagePathFor(pkg) {
 }
 
 function projectionFixturePathsFor(pkg) {
-  // A hook has a SINGLE projected artifact (the code) and no codex target — the
-  // returned object has only a `claude` key, and the write/verify loops iterate
-  // Object.keys(...) so they naturally do the right thing for one or two runtimes.
+  // Hook bodies are verbatim in every declared runtime; wiring stays read-only.
   if (pkg.kind === HOOK_KIND) {
-    return { claude: resolve(PROJECTION_DIR, 'claude/hooks', basename(pkg.projections.claude.path)) };
+    return Object.fromEntries(
+      Object.entries(pkg.projections).map(([runtime, projection]) => [
+        runtime,
+        resolve(PROJECTION_DIR, runtime, 'hooks', basename(projection.path)),
+      ]),
+    );
   }
   if (pkg.kind === AGENT_DOC_KIND) {
     // An agent-doc has ONE projection for the plant case (its native runtime), but
@@ -1046,7 +1049,12 @@ function runtimePathsFor(pkg) {
     );
   }
   if (pkg.kind === HOOK_KIND) {
-    return { claude: resolve(REPO_ROOT, pkg.projections.claude.path) };
+    return Object.fromEntries(
+      Object.entries(pkg.projections).map(([runtime, projection]) => [
+        runtime,
+        resolve(REPO_ROOT, projection.path),
+      ]),
+    );
   }
   if (pkg.kind === AGENT_DOC_KIND) {
     const out = {};
@@ -1321,6 +1329,7 @@ async function verifyPackage(pkg, validators, settings, packageCatalog, qualityB
     await verifyHookPackage(pkg, {
       assert,
       settings,
+      codexSettings: JSON.parse((await readIfExists(resolve(REPO_ROOT, '.codex/hooks.json'))) ?? '{}'),
       lodge: ({ assertionClass, detail }) =>
         lodgeGovernanceFinding({
           fingerprint: governanceFingerprint(pkg.kind, pkg.metadata.id, assertionClass),
@@ -1334,9 +1343,11 @@ async function verifyPackage(pkg, validators, settings, packageCatalog, qualityB
       `${pkg.metadata.id} has metadata.governance.eprRef`,
     );
     // Byte-identity: the projected fixture and the runtime `.py` must equal
-    // source.body exactly (strict `===`, transform-free). Claude-only for hooks.
-    await verifyProjectionFixture(pkg, 'claude');
-    await verifyRuntimeProjectionIfPresent(pkg, 'claude');
+    // source.body exactly (strict `===`, transform-free), in every declared runtime.
+    for (const runtime of Object.keys(pkg.projections)) {
+      await verifyProjectionFixture(pkg, runtime);
+      await verifyRuntimeProjectionIfPresent(pkg, runtime);
+    }
     return;
   }
 

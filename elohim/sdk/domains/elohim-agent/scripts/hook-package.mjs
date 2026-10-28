@@ -162,26 +162,50 @@ export function projectHook(pkg) {
 // projectHook(pkg) === on-disk with strict `===`). This function adds what is
 // unique to hooks: a non-empty verbatim body and the READ-ONLY registration
 // reconcile. It NEVER writes settings.json.
-export async function verifyHookPackage(pkg, { assert, settings, lodge }) {
+export async function verifyHookPackage(pkg, { assert, settings, codexSettings, lodge }) {
   assert(
     typeof pkg.source?.body === 'string' && pkg.source.body.length > 0,
     `${pkg.metadata.id} has verbatim source body`,
   );
 
-  const live = registrationFromSettings(settings, pkg.projections.claude.path);
-  const recorded = pkg.registration ?? null;
-  const coherent = registrationsCoherent(live, recorded);
   assert(
-    coherent,
-    `${pkg.metadata.id} recorded registration matches live settings.json (read-only reconcile — settings.json is NEVER auto-written)`,
+    JSON.stringify([...pkg.metadata.runtimeTargets].sort()) ===
+      JSON.stringify(Object.keys(pkg.projections).sort()),
+    `${pkg.metadata.id} hook projection runtimes match runtimeTargets`,
   );
-  if (!coherent && lodge) {
-    await lodge({
-      assertionClass: 'registration-drift',
-      detail:
-        `hook registration drift: recorded registration for ${pkg.projections.claude.path} ` +
-        `does not match the live .claude/settings.json entry (reconcile is read-only; ` +
-        `resolve by re-recording the package registration, never by auto-editing settings.json)`,
-    });
+  if (pkg.registrations) {
+    assert(
+      JSON.stringify(Object.keys(pkg.registrations).sort()) ===
+        JSON.stringify(Object.keys(pkg.projections).sort()),
+      `${pkg.metadata.id} hook registrations cover every declared runtime`,
+    );
+    assert(
+      registrationsCoherent(pkg.registration, pkg.registrations.claude),
+      `${pkg.metadata.id} legacy Claude registration matches its runtime registration`,
+    );
+  }
+  for (const [runtime, projection] of Object.entries(pkg.projections)) {
+    const config = runtime === 'claude' ? settings : codexSettings;
+    const live = registrationFromSettings(config, projection.path);
+    const recorded =
+      pkg.registrations?.[runtime] ?? (runtime === 'claude' ? pkg.registration : null);
+    assert(
+      runtime === 'claude' || Object.hasOwn(pkg.registrations ?? {}, runtime),
+      `${pkg.metadata.id} ${runtime} registration is recorded`,
+    );
+    const coherent = registrationsCoherent(live, recorded);
+    assert(
+      coherent,
+      `${pkg.metadata.id} recorded ${runtime} registration matches live config (read-only reconcile)`,
+    );
+    if (!coherent && lodge) {
+      await lodge({
+        assertionClass: runtime === 'claude' ? 'registration-drift' : `${runtime}-registration-drift`,
+        detail:
+          `hook registration drift: recorded registration for ${projection.path} ` +
+          `does not match the live ${runtime} config entry (reconcile is read-only; ` +
+          `resolve by re-recording the package registration, never by auto-editing config)`,
+      });
+    }
   }
 }
