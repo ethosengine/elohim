@@ -259,6 +259,12 @@ ids, discriminators, and wire literals should be renamed too. The rule is net-ne
 blocks, so cleanup can proceed as each existing surface is touched without turning legacy vocabulary
 into a maintenance toll.
 
+The vocabulary includes two voice words that complete Micah 6:8 beside mishpat ("do justice, love
+kindness, walk humbly"): **chesed**, how the protocol says love (steadfast, two-handed: it forgives
+and it can decline), and **hatznea** (short for *ve'hatznea lechet*), the humble, unshowy posture we
+build with. Neither names a pillar or a capability. Use them in prose, glossed on first use for an
+outside reader; in code, name what is meant (care, decline, restraint, quiet).
+
 ## Developer-valueflow authoring — briefs, reports, and rulings (inject class)
 
 The three authoring signals keep orchestration artifacts joined to the valueflow they change: a task
