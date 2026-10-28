@@ -159,7 +159,7 @@ const git=(where,...cmd)=>cp.execFileSync('git',['-C',where,...cmd],{encoding:'u
 const fork=p.join(repo,'elohim/holochain-conductor');
 const times=JSON.parse(fs.readFileSync(p.join(repo,'.compute-source-times.json'),'utf8'));
 const native=times.sources.map(entry=>({...entry,mtime:Math.floor(fs.statSync(p.join(repo,entry.path,'lib.rs')).mtimeMs/1000),source:fs.readFileSync(p.join(repo,entry.path,'lib.rs'),'utf8')}));
-fs.writeFileSync(process.env.BUILD_OBSERVATION,JSON.stringify({builder,args,times,native,source:fs.readFileSync(p.join(repo,'source.txt'),'utf8'),privateFile:fs.existsSync(p.join(repo,'private-token')),root:git(repo,'rev-parse','HEAD'),rakia:git(p.join(repo,'elohim/rakia'),'rev-parse','HEAD'),remotes:git(repo,'remote'),config:fs.readFileSync(p.join(repo,'.git/config'),'utf8'),shallow:git(repo,'rev-parse','--is-shallow-repository'),sourceMtime:Math.floor(fs.statSync(p.join(repo,'source.txt')).mtimeMs/1000),commitTime:Number(git(repo,'show','-s','--format=%ct','HEAD')),fork:git(fork,'rev-parse','HEAD'),forkConfig:fs.readFileSync(p.join(fork,'.git/config'),'utf8'),forkSource:fs.readFileSync(p.join(fork,'crates/hc/Cargo.toml'),'utf8'),forkPrivate:fs.existsSync(p.join(fork,'private-token'))}));
+fs.writeFileSync(process.env.BUILD_OBSERVATION,JSON.stringify({builder,args,times,native,source:fs.readFileSync(p.join(repo,'source.txt'),'utf8'),privateFile:fs.existsSync(p.join(repo,'private-token')),root:git(repo,'rev-parse','HEAD'),rakia:git(p.join(repo,'elohim/rakia'),'rev-parse','HEAD'),remotes:git(repo,'remote'),config:fs.readFileSync(p.join(repo,'.git/config'),'utf8'),shallow:git(repo,'rev-parse','--is-shallow-repository'),sourceMode:fs.statSync(p.join(repo,'source.txt')).mode&0o777,repoMode:fs.statSync(repo).mode&0o777,sourceMtime:Math.floor(fs.statSync(p.join(repo,'source.txt')).mtimeMs/1000),commitTime:Number(git(repo,'show','-s','--format=%ct','HEAD')),fork:git(fork,'rev-parse','HEAD'),forkConfig:fs.readFileSync(p.join(fork,'.git/config'),'utf8'),forkSource:fs.readFileSync(p.join(fork,'crates/hc/Cargo.toml'),'utf8'),forkPrivate:fs.existsSync(p.join(fork,'private-token'))}));
 if(builder==='buildctl' && process.env.BUILD_SKIP_METADATA!=='1') fs.writeFileSync(args[args.indexOf('--metadata-file')+1],JSON.stringify({'containerimage.digest':'sha256:'+'b'.repeat(64)}));
 process.exit(Number(process.env.BUILD_EXIT||0));
 `;
@@ -602,4 +602,21 @@ test("source image RUN bodies parse before a costly native build", () => {
     checked++;
   }
   assert(checked > 0);
+});
+
+test("source snapshot is guest-readable even under a private caller umask", (t) => {
+  const f = fixture(t);
+  const previous = process.umask(0o077);
+  let result;
+  try {
+    result = build(f, ["--source", base, "compute-worker:test"]);
+  } finally {
+    process.umask(previous);
+  }
+  assert.equal(result.status, 0, result.stderr);
+  const observation = JSON.parse(
+    readFileSync(join(f.root, "observed.json"), "utf8"),
+  );
+  assert.equal(observation.sourceMode & 0o044, 0o044);
+  assert.equal(observation.repoMode & 0o055, 0o055);
 });

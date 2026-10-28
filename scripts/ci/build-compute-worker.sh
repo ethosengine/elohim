@@ -27,6 +27,10 @@ if [[ "$compute_source" == 1 ]]; then
   compute_conductor=$(git -C "$compute_repo" ls-tree "$compute_commit" -- elohim/holochain-conductor | awk '$1 == "160000" { print $3 }')
   [[ "$compute_rakia" =~ ^[a-f0-9]{40}$ ]] || { echo 'Committed rakia gitlink required' >&2; exit 2; }
   [[ "$compute_conductor" =~ ^[a-f0-9]{40}$ ]] || { echo 'Committed conductor gitlink required' >&2; exit 2; }
+  # The caller may run under a private umask (077); the snapshot ships into an image
+  # whose worker runs as another UID, so its files must be guest-readable (0644/0755).
+  # Only the metadata receipt below is private.
+  umask 022
   # A fresh shallow object store preserves SUT's git identity without copying local
   # credentials, hooks, remotes, index changes, untracked files, or worktree state.
   git -c init.templateDir= init -q "$compute_context/repo"

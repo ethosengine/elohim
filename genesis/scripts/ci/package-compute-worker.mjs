@@ -8,6 +8,7 @@ import {
   mkdtempSync,
   copyFileSync,
   rmSync,
+  chmodSync,
 } from "node:fs";
 import { join, resolve } from "node:path";
 import { createHash } from "node:crypto";
@@ -76,6 +77,13 @@ function main() {
   const root = read("git", ["rev-parse", "--show-toplevel"]);
   const output = join(root, "compute-worker-image");
   mkdirSync(output, { recursive: true });
+  // Public artifact directory: Jenkins must be able to archive it. Credentials and
+  // exporter metadata stay in the private ctx below.
+  chmodSync(output, 0o755);
+  const publish = (name, data) => {
+    writeFileSync(join(output, name), data);
+    chmodSync(join(output, name), 0o644);
+  };
   for (const name of ["image.json", "inputs.json", "registry-preflight.json"])
     rmSync(join(output, name), { force: true });
   const [flag, path, extra] = process.argv.slice(2);
@@ -177,8 +185,8 @@ function main() {
     });
     assert.equal(actualProof.toString(), proof);
     remaining(deadline);
-    writeFileSync(
-      join(output, "registry-preflight.json"),
+    publish(
+      "registry-preflight.json",
       JSON.stringify(
         {
           outcome: "passed",
@@ -260,7 +268,7 @@ function main() {
       join(root, "genesis/agentic/compute/Dockerfile.mesh"),
       join(ctx, "Dockerfile"),
     );
-    copyFileSync(join(ctx, "inputs.json"), join(output, "inputs.json"));
+    publish("inputs.json", readFileSync(join(ctx, "inputs.json")));
     const metadata = join(ctx, "image-metadata.json");
     const args = [
       "--opt",
@@ -287,8 +295,8 @@ function main() {
       "org.opencontainers.image.revision": inputs.sourceCommit,
       "org.elohim.assembly.revision": assemblyCommit,
     }).image;
-    writeFileSync(
-      join(output, "image.json"),
+    publish(
+      "image.json",
       JSON.stringify({ image, ...provenance }, null, 2) + "\n",
     );
     console.log(`compute worker packaged: ${image}`);

@@ -54,6 +54,7 @@ import {
   mkdirSync,
   writeFileSync,
   chmodSync,
+  statSync,
   symlinkSync,
   existsSync,
   rmSync,
@@ -257,6 +258,14 @@ test("integration publishes by BuildKit and verifies immutable registry bytes wi
     readFileSync(join(r.root, "compute-worker-image/registry-preflight.json")),
   );
   assert.equal(preflight.outcome, "passed");
+  // Jenkins archives these as another user: public artifacts are 0755/0644.
+  assert.equal(statSync(join(r.root, "compute-worker-image")).mode & 0o777, 0o755);
+  for (const name of ["image.json", "inputs.json", "registry-preflight.json"])
+    assert.equal(
+      statSync(join(r.root, "compute-worker-image", name)).mode & 0o777,
+      0o644,
+      name,
+    );
   assert.equal(preflight.image, r.images.preflight.image);
   assert(!JSON.stringify(preflight).includes("PRIVATE_CONFIG"));
   assert(!r.result.stdout.includes("PRIVATE_CONFIG"));
