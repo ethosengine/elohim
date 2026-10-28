@@ -632,10 +632,10 @@ habits:
       - "cargo test -p elohim-epr-cli --test governance_parity_vectors — the Rust half of the correspondence theorem over governance-parity-vectors.json, run against the COMPOSED evaluator (library + ElohimRepositoryValidators). GREEN at 12/12, 0 skips. The Python half (python3 .claude/scripts/_lib/__tests__/test_governance_parity.py) is GREEN at 12/12 / 52 assertions. Both hosts now derive the same verdict from the same corpus — correspondence, which is necessary and NOT sufficient for this habit."
       - "cargo test -p elohim-epr-cli --test live_manifest_integrity — the native integrity layer over the LIVE corpus (43 manifests), guarding against an over-strict check that would false-block every write under a subtree. GREEN."
     evidence: >
-      DELTA 2026-10-16 — `python3 .claude/scripts/_lib/__tests__/validator_registry_parity_test.py` reports `11 validator-accounting assertions passed ✅`; the Python leg holds, cargo legs were not run and remain unmeasured this run. Habit status remains green.
-    evidence-fingerprint: sha256:fadf3283edc24b97
-    evidence-bytes: 10784
-    evidence-entries: 5
+      DELTA 2026-10-28 — Native seam evaluator ported onto dev from rescue snapshot 0ee5dfde8 (the 2026-10-12 DELTAs above described it, but only the hook wrappers had reached dev, so every write reported "native evaluator unavailable"). `epr govern seam` and `epr:validator-native-seam-guidance` are back, with the algorithm artifact, four owner-local declarations, schemas, the registry row and eprfs-meta object-form validator parameters. Proof: just gate eprfs EXIT=0 (1,740 tests, 0 failed; seam_guidance 8/8); a smoke `govern seam` Write naming Automerge.save/indexedDB.open returns one AutomergeSync candidate with no coverage gaps. The root binding commit keeps rust-style RS-GOV-04 red: a root manifest edit marks every crate touched. Package-side registration (mergeNativeRegistration) is not ported; port/a-small restored the package with its own registration check. Habit status remains green.
+    evidence-fingerprint: sha256:6729a6398b52edc8
+    evidence-bytes: 11687
+    evidence-entries: 6
     guard: >
       Risk 1 — "parity" achieved by deleting the divergent validators rather
       than by unifying the evaluators. That would make the check green and the
