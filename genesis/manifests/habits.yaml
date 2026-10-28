@@ -2189,8 +2189,10 @@ habits:
       - 2026-10-22 DELTA: Edge #1685 published worker sha256:742f3ded663a429fcec704e63954fd0bd68476cdd72f83a0673c0724a99c5a32 from original source04ef on the pinned v2 base. All 52 exact-image-binary CLI/ELF checks passed on the E5-2667 host using host libraries; this is distinct from full-image bootstrap proof. Adam activation now selects that digest without changing the fixed commissioning grant. Native G2 and peer-stage evidence remain unobserved; habit RED.
 
       - 2026-10-27 DELTA (status stays RED; readiness decoupling prepared, not landed): `fix/compute-worker-supervise` renders an in-container supervisor after edge #1739's worker CrashLoopBackOff took adam's :8090 endpoint and #1740 read `https://elohim.host/epr-head/*` HTTP 502; activation and the authority probe now accept only the live `worker.mjs` child, never the supervisor or a retained receipt. Run on the workspace (outside a sandbox) at 2026-10-27T16Z: compute-worker 16/16, capture-compute-worker-grant 34/34, runner-capture-activation 27/27, runner-authority-transport 7/7. No live Adam recovery is claimed; landing rolls adam's pod and awaits the steward.
-    evidence-fingerprint: sha256:872941ccd0c7958e
-    evidence-bytes: 12040
+
+      - 2026-10-28 DELTA (status stays RED; worker-image port prepared): direct-publication work from a3f974a7f is restored with legacy builders retained, source selection advances to origin/dev 084fdd742 (contains native grant reader 435a81350), and activation refusal retains a classified archive status. `node --test --test-isolation=none` passes 35 dispatch/grant/registry checks and 12 focused refusal cases; full subprocess suites remain blocked by sandbox EPERM/EINVAL (receipts: genesis/local-dev/port-e-worker-image/verification.json). Git staging is refused by the read-only worktree index. No image digest, deployment, native G2 success or off-host BDD is claimed.
+    evidence-fingerprint: sha256:80821687e89f60c4
+    evidence-bytes: 12711
     evidence-entries: 14
     guard: >
       Regression risks: (1) a RUN_CLASSES vocabulary that drifts from `pipeline-registry.mjs:45`

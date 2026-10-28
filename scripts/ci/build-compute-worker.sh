@@ -3,7 +3,9 @@
 # Source mode builds both native tools in their immutable runtime userspace:
 #   build-compute-worker.sh --source BASE@sha256:DIGEST OUTPUT_TAG [COMMIT]
 # Legacy packaging remains: BASE@sha256:DIGEST EXECUTOR ARK OUTPUT_TAG.
-# This script builds a local image only. The owning CI stage publishes its digest.
+# Default nerdctl/docker modes build a local image only. Explicit buildctl mode
+# publishes directly and writes COMPUTE_WORKER_METADATA_FILE for the owning CI
+# stage to verify against the registry; it does not import into host containerd.
 set -euo pipefail
 
 compute_source=0
@@ -11,8 +13,10 @@ if [[ "${1:-}" == --source ]]; then compute_source=1; shift; fi
 compute_base=${1:?immutable compatible runtime image required}
 [[ "$compute_base" =~ @sha256:[a-f0-9]{64}$ ]] || { echo 'Base image must be pinned by digest' >&2; exit 2; }
 compute_context=$(mktemp -d)
-trap 'rm -rf "$compute_context"' EXIT
-compute_args=(--build-arg "WORKER_BASE_IMAGE=$compute_base")
+compute_metadata=''
+compute_metadata_pending=0
+trap 'rm -rf "$compute_context"; if [[ "$compute_metadata_pending" == 1 ]]; then rm -f -- "$compute_metadata"; fi' EXIT
+compute_build_args=("WORKER_BASE_IMAGE=$compute_base")
 
 if [[ "$compute_source" == 1 ]]; then
   compute_tag=${2:?output image tag required}
@@ -23,6 +27,10 @@ if [[ "$compute_source" == 1 ]]; then
   compute_conductor=$(git -C "$compute_repo" ls-tree "$compute_commit" -- elohim/holochain-conductor | awk '$1 == "160000" { print $3 }')
   [[ "$compute_rakia" =~ ^[a-f0-9]{40}$ ]] || { echo 'Committed rakia gitlink required' >&2; exit 2; }
   [[ "$compute_conductor" =~ ^[a-f0-9]{40}$ ]] || { echo 'Committed conductor gitlink required' >&2; exit 2; }
+  # The caller may run under a private umask (077); the snapshot ships into an image
+  # whose worker runs as another UID, so its files must be guest-readable (0644/0755).
+  # Only the metadata receipt below is private.
+  umask 022
   # A fresh shallow object store preserves SUT's git identity without copying local
   # credentials, hooks, remotes, index changes, untracked files, or worktree state.
   git -c init.templateDir= init -q "$compute_context/repo"
@@ -96,7 +104,7 @@ if [[ "$compute_source" == 1 ]]; then
   printf ']}\n' >> "$compute_times"
   compute_dockerfile="$compute_context/repo/genesis/agentic/compute/Dockerfile.source"
   [[ -f "$compute_dockerfile" ]] || { echo 'Committed source worker Dockerfile required' >&2; exit 2; }
-  compute_args+=(--build-arg "SOURCE_COMMIT=$compute_commit" --build-arg "RAKIA_COMMIT=$compute_rakia" --build-arg "CONDUCTOR_COMMIT=$compute_conductor")
+  compute_build_args+=("SOURCE_COMMIT=$compute_commit" "RAKIA_COMMIT=$compute_rakia" "CONDUCTOR_COMMIT=$compute_conductor")
   echo "compute worker source: $compute_commit rakia: $compute_rakia conductor: $compute_conductor"
 else
   compute_executor=${2:?prebuilt compute-executor required}
@@ -117,15 +125,51 @@ fi
 case "$compute_builder" in
   nerdctl) compute_command=(nerdctl -n k8s.io build);;
   docker) compute_command=(docker build);;
-  *) echo 'COMPUTE_WORKER_BUILDER must be nerdctl or docker' >&2; exit 2;;
+  buildctl)
+    # The caller supplies a private output directory; metadata is not deployment approval.
+    compute_metadata=${COMPUTE_WORKER_METADATA_FILE:-}
+    [[ "$compute_metadata" == /* && -d "$(dirname "$compute_metadata")" && ! -L "$compute_metadata" && ( ! -e "$compute_metadata" || -f "$compute_metadata" ) ]] || {
+      echo 'buildctl requires an absolute COMPUTE_WORKER_METADATA_FILE in an existing directory, not a symlink or directory' >&2; exit 2;
+    }
+    # The exporter parses comma-separated attributes, independently of shell quoting.
+    [[ "$compute_tag" =~ ^[^,[:space:]]+$ ]] || { echo 'buildctl output image must not contain commas or whitespace' >&2; exit 2; }
+    export BUILDKIT_HOST=${BUILDKIT_HOST:-unix:///run/buildkit/buildkitd.sock}
+    # This commissioning flavor is x86-64; no cross-architecture execution is implied.
+    compute_command=(buildctl --addr "$BUILDKIT_HOST" build --frontend dockerfile.v0 --progress plain
+      --local "context=$compute_context" --local "dockerfile=$(dirname "$compute_dockerfile")"
+      --opt "filename=$(basename "$compute_dockerfile")" --opt platform=linux/amd64)
+    ;;
+  *) echo 'COMPUTE_WORKER_BUILDER must be nerdctl, docker or buildctl' >&2; exit 2;;
 esac
-compute_command+=("${compute_args[@]}" --tag "$compute_tag" --file "$compute_dockerfile" "$compute_context")
+for compute_arg in "${compute_build_args[@]}"; do
+  if [[ "$compute_builder" == buildctl ]]; then
+    compute_command+=(--opt "build-arg:$compute_arg")
+  else
+    compute_command+=(--build-arg "$compute_arg")
+  fi
+done
+if [[ "$compute_builder" == buildctl ]]; then
+  compute_command+=(--output "type=image,name=$compute_tag,push=true" --metadata-file "$compute_metadata")
+else
+  compute_command+=(--tag "$compute_tag" --file "$compute_dockerfile" "$compute_context")
+fi
 if [[ "${COMPUTE_WORKER_BUILD_DRY_RUN:-0}" == 1 ]]; then
   printf 'compute worker build:'; printf ' %q' "${compute_command[@]}"; printf '\n'
   exit 0
 fi
-if [[ "$compute_builder" == nerdctl ]]; then
+if [[ "$compute_builder" == buildctl ]]; then
+  umask 077
+  compute_metadata_pending=1
+  rm -f -- "$compute_metadata"
+fi
+if [[ "$compute_builder" == nerdctl || "$compute_builder" == buildctl ]]; then
   export BUILDKIT_HOST=${BUILDKIT_HOST:-unix:///run/buildkit/buildkitd.sock}
   buildctl --addr "$BUILDKIT_HOST" debug workers >/dev/null
 fi
 "${compute_command[@]}"
+if [[ "$compute_builder" == buildctl ]]; then
+  [[ -s "$compute_metadata" && -f "$compute_metadata" && ! -L "$compute_metadata" ]] || {
+    echo 'REFUSED compute image publication: BuildKit did not write metadata' >&2; exit 2;
+  }
+  compute_metadata_pending=0
+fi

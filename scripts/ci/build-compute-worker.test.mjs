@@ -5,6 +5,8 @@ import {
   writeFileSync,
   readFileSync,
   rmSync,
+  statSync,
+  symlinkSync,
 } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -147,20 +149,22 @@ function fixture(t, executor = true) {
   );
   const bin = join(root, "test-bin");
   mkdirSync(bin);
-  writeFileSync(join(bin, "buildctl"), "#!/bin/sh\nexit 0\n", { mode: 0o755 });
-  writeFileSync(
-    join(bin, "nerdctl"),
-    `#!/usr/bin/env node
+  const builderStub = `#!/usr/bin/env node
 const fs=require('node:fs'); const cp=require('node:child_process'); const p=require('node:path');
-const args=process.argv.slice(2); const context=args.at(-1); const repo=p.join(context,'repo');
+const args=process.argv.slice(2); const builder=p.basename(process.argv[1]);
+fs.appendFileSync(process.env.BUILD_CALLS,JSON.stringify({builder,args})+'\\n');
+if(builder==='buildctl' && args.includes('debug')) process.exit(Number(process.env.BUILD_DEBUG_EXIT||0));
+const context=builder==='buildctl'?args[args.indexOf('--local')+1].slice('context='.length):args.at(-1); const repo=p.join(context,'repo');
 const git=(where,...cmd)=>cp.execFileSync('git',['-C',where,...cmd],{encoding:'utf8'}).trim();
 const fork=p.join(repo,'elohim/holochain-conductor');
 const times=JSON.parse(fs.readFileSync(p.join(repo,'.compute-source-times.json'),'utf8'));
 const native=times.sources.map(entry=>({...entry,mtime:Math.floor(fs.statSync(p.join(repo,entry.path,'lib.rs')).mtimeMs/1000),source:fs.readFileSync(p.join(repo,entry.path,'lib.rs'),'utf8')}));
-fs.writeFileSync(process.env.BUILD_OBSERVATION,JSON.stringify({args,times,native,source:fs.readFileSync(p.join(repo,'source.txt'),'utf8'),privateFile:fs.existsSync(p.join(repo,'private-token')),root:git(repo,'rev-parse','HEAD'),rakia:git(p.join(repo,'elohim/rakia'),'rev-parse','HEAD'),remotes:git(repo,'remote'),config:fs.readFileSync(p.join(repo,'.git/config'),'utf8'),shallow:git(repo,'rev-parse','--is-shallow-repository'),sourceMtime:Math.floor(fs.statSync(p.join(repo,'source.txt')).mtimeMs/1000),commitTime:Number(git(repo,'show','-s','--format=%ct','HEAD')),fork:git(fork,'rev-parse','HEAD'),forkConfig:fs.readFileSync(p.join(fork,'.git/config'),'utf8'),forkSource:fs.readFileSync(p.join(fork,'crates/hc/Cargo.toml'),'utf8'),forkPrivate:fs.existsSync(p.join(fork,'private-token'))}));
-`,
-    { mode: 0o755 },
-  );
+fs.writeFileSync(process.env.BUILD_OBSERVATION,JSON.stringify({builder,args,times,native,source:fs.readFileSync(p.join(repo,'source.txt'),'utf8'),privateFile:fs.existsSync(p.join(repo,'private-token')),root:git(repo,'rev-parse','HEAD'),rakia:git(p.join(repo,'elohim/rakia'),'rev-parse','HEAD'),remotes:git(repo,'remote'),config:fs.readFileSync(p.join(repo,'.git/config'),'utf8'),shallow:git(repo,'rev-parse','--is-shallow-repository'),sourceMode:fs.statSync(p.join(repo,'source.txt')).mode&0o777,repoMode:fs.statSync(repo).mode&0o777,sourceMtime:Math.floor(fs.statSync(p.join(repo,'source.txt')).mtimeMs/1000),commitTime:Number(git(repo,'show','-s','--format=%ct','HEAD')),fork:git(fork,'rev-parse','HEAD'),forkConfig:fs.readFileSync(p.join(fork,'.git/config'),'utf8'),forkSource:fs.readFileSync(p.join(fork,'crates/hc/Cargo.toml'),'utf8'),forkPrivate:fs.existsSync(p.join(fork,'private-token'))}));
+if(builder==='buildctl' && process.env.BUILD_SKIP_METADATA!=='1') fs.writeFileSync(args[args.indexOf('--metadata-file')+1],JSON.stringify({'containerimage.digest':'sha256:'+'b'.repeat(64)}));
+process.exit(Number(process.env.BUILD_EXIT||0));
+`;
+  for (const builder of ["nerdctl", "docker", "buildctl"])
+    writeFileSync(join(bin, builder), builderStub, { mode: 0o755 });
   return { root, bin, commit, pin, forkPin, rakiaRemote, forkRemote };
 }
 function build(f, args, extra = {}) {
@@ -172,6 +176,7 @@ function build(f, args, extra = {}) {
       PATH: `${f.bin}:${process.env.PATH}`,
       COMPUTE_WORKER_BUILDER: "nerdctl",
       BUILD_OBSERVATION: join(f.root, "observed.json"),
+      BUILD_CALLS: join(f.root, "calls.jsonl"),
       ...extra,
     },
   });
@@ -199,6 +204,201 @@ test("source build uses exact committed gitlinks and excludes worktree state and
   assert.deepEqual(observation.args.slice(0, 3), ["-n", "k8s.io", "build"]);
   assert.ok(observation.args.includes(`SOURCE_COMMIT=${f.commit}`));
   assert.ok(observation.args.includes(`CONDUCTOR_COMMIT=${f.forkPin}`));
+});
+
+test("explicit Docker and default nerdctl retain local build arguments", (t) => {
+  for (const builder of ["docker", ""]) {
+    const f = fixture(t);
+    const result = build(f, ["--source", base, "compute-worker:test"], {
+      COMPUTE_WORKER_BUILDER: builder,
+    });
+    assert.equal(result.status, 0, result.stderr);
+    const observation = JSON.parse(
+      readFileSync(join(f.root, "observed.json"), "utf8"),
+    );
+    const prefix = builder === "docker" ? ["build"] : ["-n", "k8s.io", "build"];
+    assert.deepEqual(observation.args.slice(0, prefix.length), prefix);
+    assert.deepEqual(observation.args.slice(prefix.length, -5), [
+      "--build-arg",
+      `WORKER_BASE_IMAGE=${base}`,
+      "--build-arg",
+      `SOURCE_COMMIT=${f.commit}`,
+      "--build-arg",
+      `RAKIA_COMMIT=${f.pin}`,
+      "--build-arg",
+      `CONDUCTOR_COMMIT=${f.forkPin}`,
+    ]);
+    assert.equal(observation.args.at(-5), "--tag");
+    assert.equal(observation.args.at(-4), "compute-worker:test");
+    assert.equal(observation.args.at(-3), "--file");
+    assert.equal(observation.source, "committed source\n");
+    assert(!observation.args.includes("--output"));
+    assert(!observation.args.includes("--metadata-file"));
+  }
+});
+
+test("buildctl publishes the exact sanitized source with explicit platform and digest metadata", (t) => {
+  const f = fixture(t);
+  const metadata = join(f.root, "publication metadata.json");
+  writeFileSync(metadata, "old success must not survive");
+  const tag = "registry.example/compute-worker:assembly";
+  const result = build(f, ["--source", base, tag], {
+    COMPUTE_WORKER_BUILDER: "buildctl",
+    COMPUTE_WORKER_METADATA_FILE: metadata,
+    BUILDKIT_HOST: "unix:///test/buildkit.sock",
+  });
+  assert.equal(result.status, 0, result.stderr);
+  const observation = JSON.parse(
+    readFileSync(join(f.root, "observed.json"), "utf8"),
+  );
+  const context = observation.args[
+    observation.args.indexOf("--local") + 1
+  ].slice("context=".length);
+  assert.deepEqual(observation.args, [
+    "--addr",
+    "unix:///test/buildkit.sock",
+    "build",
+    "--frontend",
+    "dockerfile.v0",
+    "--progress",
+    "plain",
+    "--local",
+    `context=${context}`,
+    "--local",
+    `dockerfile=${join(context, "repo/genesis/agentic/compute")}`,
+    "--opt",
+    "filename=Dockerfile.source",
+    "--opt",
+    "platform=linux/amd64",
+    "--opt",
+    `build-arg:WORKER_BASE_IMAGE=${base}`,
+    "--opt",
+    `build-arg:SOURCE_COMMIT=${f.commit}`,
+    "--opt",
+    `build-arg:RAKIA_COMMIT=${f.pin}`,
+    "--opt",
+    `build-arg:CONDUCTOR_COMMIT=${f.forkPin}`,
+    "--output",
+    `type=image,name=${tag},push=true`,
+    "--metadata-file",
+    metadata,
+  ]);
+  assert.equal(observation.root, f.commit);
+  assert.equal(observation.rakia, f.pin);
+  assert.equal(observation.fork, f.forkPin);
+  assert.equal(observation.source, "committed source\n");
+  assert.equal(observation.privateFile, false);
+  assert.equal(observation.forkPrivate, false);
+  assert.doesNotMatch(
+    observation.config + observation.forkConfig,
+    /credential|private/,
+  );
+  assert.deepEqual(JSON.parse(readFileSync(metadata, "utf8")), {
+    "containerimage.digest": `sha256:${"b".repeat(64)}`,
+  });
+  assert.equal(statSync(metadata).mode & 0o777, 0o600);
+  const calls = readFileSync(join(f.root, "calls.jsonl"), "utf8")
+    .trim()
+    .split("\n")
+    .map(JSON.parse);
+  assert.deepEqual(
+    calls.map((call) => call.builder),
+    ["buildctl", "buildctl"],
+  );
+  assert.deepEqual(calls[0].args, [
+    "--addr",
+    "unix:///test/buildkit.sock",
+    "debug",
+    "workers",
+  ]);
+});
+
+test("buildctl refuses missing, relative and symlink metadata paths before publishing", (t) => {
+  for (const kind of ["missing", "relative", "symlink"]) {
+    const f = fixture(t);
+    const target = join(f.root, "retained.json");
+    writeFileSync(target, "retained");
+    const link = join(f.root, "metadata-link.json");
+    symlinkSync(target, link);
+    const metadata =
+      kind === "symlink" ? link : kind === "relative" ? "relative.json" : "";
+    const result = build(
+      f,
+      ["--source", base, "registry.example/worker:test"],
+      {
+        COMPUTE_WORKER_BUILDER: "buildctl",
+        COMPUTE_WORKER_METADATA_FILE: metadata,
+      },
+    );
+    assert.equal(result.status, 2, result.stderr);
+    assert.match(result.stderr, /absolute COMPUTE_WORKER_METADATA_FILE/);
+    assert.equal(readFileSync(target, "utf8"), "retained");
+    assert.throws(() => readFileSync(join(f.root, "calls.jsonl")), {
+      code: "ENOENT",
+    });
+  }
+});
+
+test("buildctl cannot inject exporter attributes through the output image", (t) => {
+  const f = fixture(t);
+  const result = build(f, ["--source", base, "worker:test,push=false"], {
+    COMPUTE_WORKER_BUILDER: "buildctl",
+    COMPUTE_WORKER_METADATA_FILE: join(f.root, "metadata.json"),
+  });
+  assert.equal(result.status, 2, result.stderr);
+  assert.match(result.stderr, /must not contain commas or whitespace/);
+  assert.throws(() => readFileSync(join(f.root, "calls.jsonl")), {
+    code: "ENOENT",
+  });
+});
+
+test("failed BuildKit publication removes stale and partial metadata and preserves failure", (t) => {
+  for (const failure of ["BUILD_DEBUG_EXIT", "BUILD_EXIT"]) {
+    const f = fixture(t);
+    const metadata = join(f.root, "metadata.json");
+    writeFileSync(metadata, "old success");
+    const result = build(
+      f,
+      ["--source", base, "registry.example/worker:test"],
+      {
+        COMPUTE_WORKER_BUILDER: "buildctl",
+        COMPUTE_WORKER_METADATA_FILE: metadata,
+        [failure]: "37",
+      },
+    );
+    assert.equal(result.status, 37, result.stderr);
+    assert.throws(() => readFileSync(metadata), { code: "ENOENT" });
+  }
+});
+
+test("buildctl success without metadata is refused", (t) => {
+  const f = fixture(t);
+  const metadata = join(f.root, "metadata.json");
+  const result = build(f, ["--source", base, "registry.example/worker:test"], {
+    COMPUTE_WORKER_BUILDER: "buildctl",
+    COMPUTE_WORKER_METADATA_FILE: metadata,
+    BUILD_SKIP_METADATA: "1",
+  });
+  assert.equal(result.status, 2, result.stderr);
+  assert.match(result.stderr, /BuildKit did not write metadata/);
+  assert.throws(() => readFileSync(metadata), { code: "ENOENT" });
+});
+
+test("buildctl dry run does not publish or modify existing metadata", (t) => {
+  const f = fixture(t);
+  const metadata = join(f.root, "metadata.json");
+  writeFileSync(metadata, "retained");
+  const result = build(f, ["--source", base, "registry.example/worker:test"], {
+    COMPUTE_WORKER_BUILDER: "buildctl",
+    COMPUTE_WORKER_METADATA_FILE: metadata,
+    COMPUTE_WORKER_BUILD_DRY_RUN: "1",
+  });
+  assert.equal(result.status, 0, result.stderr);
+  assert.match(result.stdout, /compute worker build: buildctl/);
+  assert.equal(readFileSync(metadata, "utf8"), "retained");
+  assert.throws(() => readFileSync(join(f.root, "calls.jsonl")), {
+    code: "ENOENT",
+  });
 });
 
 test("source build refuses a pin without the executor before building", (t) => {
@@ -402,4 +602,21 @@ test("source image RUN bodies parse before a costly native build", () => {
     checked++;
   }
   assert(checked > 0);
+});
+
+test("source snapshot is guest-readable even under a private caller umask", (t) => {
+  const f = fixture(t);
+  const previous = process.umask(0o077);
+  let result;
+  try {
+    result = build(f, ["--source", base, "compute-worker:test"]);
+  } finally {
+    process.umask(previous);
+  }
+  assert.equal(result.status, 0, result.stderr);
+  const observation = JSON.parse(
+    readFileSync(join(f.root, "observed.json"), "utf8"),
+  );
+  assert.equal(observation.sourceMode & 0o044, 0o044);
+  assert.equal(observation.repoMode & 0o055, 0o055);
 });
