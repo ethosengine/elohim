@@ -251,8 +251,7 @@ fn selected_rulebook_from_args(args: impl IntoIterator<Item = OsString>) -> Opti
 
 fn last_option(args: &[OsString], name: &str) -> Option<PathBuf> {
     args.windows(2)
-        .filter(|pair| pair[0].to_str() == Some(name))
-        .next_back()
+        .rfind(|pair| pair[0].to_str() == Some(name))
         .map(|pair| PathBuf::from(&pair[1]))
 }
 
