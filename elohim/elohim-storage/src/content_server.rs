@@ -158,7 +158,10 @@ pub struct ContentServerBridge {
     /// Cell ID (dna_hash + agent_pubkey) - cached after first discovery
     cell_id: Option<Vec<u8>>,
     /// Agent public key
-    #[allow(dead_code)]
+    #[allow(
+        dead_code,
+        reason = "the constructor records the agent this bridge registers for; no method reads it yet"
+    )]
     agent_pubkey: String,
     /// Registered content servers (action_hash by content_hash)
     registrations: std::collections::HashMap<String, Vec<u8>>,
