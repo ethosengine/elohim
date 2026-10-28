@@ -379,6 +379,11 @@ class ReadinessResourceTests(unittest.TestCase):
             def bounded(argv, cwd, timeout, log, text=None, *, env=None, check=None):
                 calls.append((argv, env))
                 if 'genesis/agentic/readiness.mjs' in argv:
+                    self.assertEqual(lease.call_args_list, [
+                        unittest.mock.call(spec, ['cargo']),
+                        unittest.mock.call(spec, ['cargo'], release=True),
+                        unittest.mock.call(spec, 'cargo'),
+                    ])
                     raise state.Refused('baseline failed')
             def run(argv, root):
                 return 'storage\tfixture' if '--list' in argv else 'null'
@@ -389,12 +394,15 @@ class ReadinessResourceTests(unittest.TestCase):
                     patch.object(launcher, 'native_context'), \
                     patch.object(launcher, 'bounded', side_effect=bounded), \
                     patch.object(launcher, 'run', side_effect=run), \
-                    patch.object(launcher, 'host_berth', return_value='null'), \
                     patch.object(launcher, 'lease') as lease:
                 with self.assertRaisesRegex(state.Refused, 'baseline failed'):
                     launcher.preflight(spec, directory)
-                self.assertEqual(lease.call_args_list, [unittest.mock.call(spec, 'cargo'),
-                                                       unittest.mock.call(spec, 'cargo', release=True)])
+                self.assertEqual(lease.call_args_list, [
+                    unittest.mock.call(spec, ['cargo']),
+                    unittest.mock.call(spec, ['cargo'], release=True),
+                    unittest.mock.call(spec, 'cargo'),
+                    unittest.mock.call(spec, 'cargo', release=True),
+                ])
             self.assertTrue(all(env == spec['workload_env'] for _, env in calls))
             self.assertEqual(spec['deadline'], 'unchanged-original-deadline')
 
