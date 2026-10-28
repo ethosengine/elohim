@@ -43,7 +43,7 @@ Feature: An app follows its person without making the hub a dependency
     Then the release is not available offline
 
   @wip
-  Scenario: Che exposes an authorized runtime without a private launcher link
+  Scenario: Che exposes an authorized runtime only through Matthew's authenticated session
     # Category: authority and execution.
     Given Matthew's workspace has device consent and permission to run Rakia
     And Jessica is another person with no permission on Matthew's workspace
