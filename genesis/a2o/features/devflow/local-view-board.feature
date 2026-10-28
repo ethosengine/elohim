@@ -1,4 +1,4 @@
-@e2e @devflow @concern:idle-is-free @requires:epr-cli @act:host
+@e2e @devflow @wip @concern:idle-is-free @requires:epr-cli @act:host
 Feature: Read authored work and native acceptance on my device
   As an engineer choosing work from a declared local collection
   I want independent authored and evidence readings that I can deliberately keep offline

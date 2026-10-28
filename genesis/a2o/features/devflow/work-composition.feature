@@ -1,4 +1,4 @@
-@e2e @devflow @concern:idle-is-free @requires:epr-cli @act:host
+@e2e @devflow @wip @concern:idle-is-free @requires:epr-cli @act:host
 Feature: Read progress through a domain composition
   As a person coordinating work in a declared commons
   I want one unchanged set of work views to read progress in any domain's evidence
