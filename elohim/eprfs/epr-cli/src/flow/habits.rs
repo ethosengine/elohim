@@ -1153,11 +1153,41 @@ pub fn reading(
             returns_claim = Some(returns_claim.map_or(claim, |c| c.weaker(claim)));
         }
     }
+    // Time spent inside the window is aggregated independently of whether the habit still stands
+    // at the window's end: a habit retired inside the window has no row, but the hours already
+    // spent on it were still spent in that window.
+    let standing_ids: std::collections::BTreeSet<&str> =
+        rows.iter().map(|r| r.id.as_str()).collect();
+    let mut retired_spent_in_window = 0.0;
+    for id in history.versions.keys() {
+        if standing_ids.contains(id.as_str()) {
+            continue;
+        }
+        let resource = habit_resource(id)?;
+        for (_, record) in records {
+            let FlowRecord::Event(event) = record else {
+                continue;
+            };
+            if event.resource != time
+                || event.in_scope_of != resource
+                || event.action != ReaVerb::Consume
+                || !window.contains(&event.occurred_at)
+            {
+                continue;
+            }
+            if let Magnitude::Count { value, unit } = &event.quantity {
+                if unit == HOUR_UNIT {
+                    retired_spent_in_window += value;
+                }
+            }
+        }
+    }
     Ok(HabitsReading {
         habits: rows.len(),
         non_green: rows.iter().filter(|r| r.state.status != "green").count(),
         red_mass: rows.iter().map(|r| r.red_mass_at_end).sum(),
-        hours_spent_in_window: rows.iter().map(|r| r.spent.in_window).sum(),
+        hours_spent_in_window: rows.iter().map(|r| r.spent.in_window).sum::<f64>()
+            + retired_spent_in_window,
         hours_returned_per_week: rows.iter().map(|r| r.state.returns_hours_per_week).sum(),
         hours_returned_claim: returns_claim,
         rows,

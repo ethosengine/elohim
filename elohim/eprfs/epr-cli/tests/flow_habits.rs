@@ -404,3 +404,35 @@ fn time_spent_is_scoped_to_the_habit_and_judged_against_its_episode_budget() {
         _ => true,
     }));
 }
+
+#[test]
+fn time_spent_on_a_habit_retired_in_the_window_still_counts_in_the_window() {
+    let dir = tempfile::TempDir::new().unwrap();
+    let root = dir.path();
+    write(
+        root,
+        ".epr-meta/repository.yaml",
+        "version: 1\nagent: repo:ethosengine/elohim\n",
+    );
+    git_at(root, "2026-10-01T00:00:00+00:00", &["init", "-q"]);
+    write(root, BETA, &atom("beta", "red", ""));
+    commit(root, "02", "beta born red");
+    let actor = NoteActor {
+        as_ref: Some("agent:implementer@test-model".into()),
+        session: None,
+    };
+    habits::spend(root, "beta", 1.5, "gate", "retired-spend", &actor).unwrap();
+    std::fs::remove_file(root.join(BETA)).unwrap();
+    commit(root, "04", "beta retired");
+
+    let reading = red_mass(root, "2026-10-01..2026-10-10").habits.unwrap();
+    assert!(
+        reading.rows.iter().all(|r| r.id != "beta"),
+        "beta no longer stands at the window's end"
+    );
+    assert!(
+        (reading.hours_spent_in_window - 1.5).abs() < 1e-9,
+        "hours spent before retirement stay in the window, got {}",
+        reading.hours_spent_in_window
+    );
+}
