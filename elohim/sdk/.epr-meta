@@ -13,6 +13,16 @@ purpose: >
 
 # elohim/sdk — source-of-record governance
 
+## Portable app contract
+
+`crates/elohim-sdk/src/lifecycle` and `storage-client-ts/src/app-lifecycle.ts` expose the portable
+app interfaces. The wire types live together in `crates/elohim-views/src/app_lifecycle.rs`,
+conform to the `schemas/v1/views/app-*` schemas and generate TypeScript. Missing implementations
+refuse explicitly. Bounded demand leases are a lower-level Rust primitive, not a client scheduler.
+Peer hosts retain app/session admission; doorway mounts browser ingress. A Che adapter must not
+tunnel a loopback-only SDK route or spoof its caller. The live-session standard owns passing-state
+channels; durable private observation reconciliation remains a different concern.
+
 ## Application lifecycle contract
 
 The [root composition map](../../.epr-meta/manifest.md#application-lifecycle--authoritative-homes-and-composition)

@@ -10,6 +10,15 @@ purpose: >
 ---
 # crates/elohim-sdk — Rust client SDK
 
+The [application lifecycle composition map](../../.epr-meta/manifest.md#application-lifecycle--authoritative-homes-and-composition)
+and [SDK contract home](../../elohim/sdk/.epr-meta) also govern the Rust client surface.
+Mirror the shared working-version, sync-state and publication semantics as they are
+implemented; do not fork their vocabulary or make HTTP availability a prerequisite
+for work the caller can keep locally. This crate remains a client, not a replication
+server or authority engine. Proposed working-version verbs are a target contract,
+not a claim about today's API. Common conformance cases should exercise both client
+implementations; runtime-specific persistence stays an explicit adapter capability.
+
 What belongs here: the client (`src/client`), its cache, reach and sync helpers, the traits a
 consumer implements, and the tests that pin its documented behaviour. The README's "Rough
 edges" section is part of the contract: a change that alters one of those edges updates the

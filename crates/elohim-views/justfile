@@ -1,0 +1,9 @@
+# The manifest gate runner supplies the native pool slot and toolchain.
+gate:
+    rustfmt --edition 2021 --check src/app_lifecycle.rs tests/app_lifecycle.rs
+    cargo clippy --locked --all-targets -- -D warnings
+    cargo test --locked --test app_lifecycle
+    node --test ../../elohim/sdk/schemas/tests/app-lifecycle.test.mjs
+    pnpm --dir ../../elohim/sdk/storage-client-ts exec tsc -p tsconfig.lifecycle-contract.json
+    pnpm --dir ../../elohim/sdk/storage-client-ts exec vitest run tests/app-lifecycle.test.ts
+    pnpm --dir ../../genesis/a2o exec cucumber-js --profile app-lifecycle

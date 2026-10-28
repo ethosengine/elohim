@@ -8,8 +8,6 @@ use crate::infrastructure::*;
 use crate::lamad::*;
 use crate::shared::*;
 use serde::{Deserialize, Serialize};
-#[allow(unused_imports)]
-use serde_json::Value;
 use ts_rs::TS;
 
 /// Coupling legs for an EPR envelope. All legs are optional at the wire level;

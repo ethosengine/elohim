@@ -54,6 +54,13 @@ export default function () {
       format: ['progress'],
     },
     default: { ...base, paths: ['features/**/*.feature'] },
+    'app-lifecycle': {
+      requireModule: ['tsx'],
+      require: ['steps/devflow/portable-app-lifecycle.steps.ts'],
+      paths: ['features/devflow/portable-app-lifecycle.feature'],
+      tags: '@lifecycle-contract and not @wip',
+      format: ['progress'],
+    },
     // The real-workspace half uses existing peer daemons; local scenarios keep their own fixtures.
     'devices-share-one-berth': {
       requireModule: ['tsx'],

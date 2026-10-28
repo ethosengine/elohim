@@ -19,6 +19,7 @@
 //! migration history.
 
 pub mod acquisition;
+pub mod app_lifecycle;
 pub mod bounds;
 pub mod content_search;
 pub mod element_registry;

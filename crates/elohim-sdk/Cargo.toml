@@ -58,7 +58,7 @@ elohim-views = { path = "../elohim-views", version = "0.1.0" }
 # deps, std-only default, so this adds nothing to the SDK's dependency weight.
 # The `harness` feature stays off here — an implementor enables it in its own
 # dev-dependencies.
-elohim-seam-contracts = { path = "../seam-contracts", version = "0.1.0" }
+elohim-seam-contracts = { path = "../seam-contracts", version = "0.1.2" }
 
 # Native-only
 rusqlite = { version = "0.31", optional = true }
