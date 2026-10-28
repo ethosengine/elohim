@@ -420,6 +420,8 @@ commands:
         # device's own fold indexes it and nothing tracked ever carries it.
         bash genesis/agentic/bin/device-memory-sync || true
 
+  # DORMANT: not in postStart. The shift launcher runs only when invoked (`just dev shift ...`);
+  # see genesis/data/timeline/backlog/shift-launcher-lease-and-session-adaptation.md.
   - id: recover-authorized-shifts
     exec:
       component: tools
@@ -449,5 +451,4 @@ events:
     - setup-claude-mcp
     - setup-embed-model
     - setup-device-memory
-    - recover-authorized-shifts
  #   - setup-mempalace

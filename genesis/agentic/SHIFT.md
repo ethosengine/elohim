@@ -1,5 +1,9 @@
 # Bounded delivery shifts
 
+> **Status: dormant.** Nothing starts a shift automatically (no devfile `postStart`, no hook). It runs only when
+> invoked, and its publication leg is not yet adapted to dev's `dev-integration` lease or native session
+> envelope: see `genesis/data/timeline/backlog/shift-launcher-lease-and-session-adaptation.md`.
+
 The shift launcher carries one authorized task through a retained worktree, durable
 evidence, independent native acceptance, and publication. Claude and Codex share
 the launcher and its private `.claude/shifts/<id>/` state. The deadline is an
