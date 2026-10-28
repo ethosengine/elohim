@@ -39,8 +39,12 @@ receiver verification and earned authority; an appointment in this checkout cann
 
 The native developer through-line reuses `epr flow` for intent, commitment, actor
 attribution, review, acceptance and gates. A developer journal in brit is an adapter
-to these existing records, not a second ledger. This crate does not interpret Git
-index/OIDs/worktrees or elect a release from storage possession.
+to these existing records, not a second ledger. The Brit-facing `integrate` adapter
+reads Git revisions and worktree state only to validate an accepted, gated local
+fast-forward and apply its expected-old ref transaction. It reuses native acceptance
+and reconciliation under their append lock, refuses a checked-out target, and never
+pushes. General Git index and worktree interpretation stays in brit; storage
+possession never elects a release.
 
 `covers: subtree` claims the whole `elohim-epr-cli` crate: the `epr` sources under `src/` (where
 `src/.epr-meta` adds the recall-seam rule) and the integration tests under `tests/`. Those tests
