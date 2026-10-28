@@ -1,0 +1,14 @@
+---
+epr-meta-version: 1
+id: browser-lifecycle-bridge
+covers: subtree
+purpose: >
+  Translate authenticated browser-origin requests to the shared peer-owned app lifecycle.
+  Consumed by the native messaging host in steward/device. No session authority, observation
+  storage, installation policy or process supervisor belongs in this library.
+---
+
+The host obtains caller origin from its transport, never a page-provided field. A configured
+origin match is necessary but not sufficient: the peer AppRuntime checks resource authority.
+The extension is an external adapter, replaceable without changing the runtime contracts.
+Unsupported operations refuse. The foundation does not yet ship a native messaging host.
