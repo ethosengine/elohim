@@ -4523,11 +4523,27 @@ mod tests {
         let record = intent_of(&store, USER).await;
         assert!(record.is_live(), "never abandon on an unknown");
         assert!(
-            record.absent_before_send,
-            "the evidence for the sent install is kept"
+            !record.absent_before_send,
+            "a definite refusal withdraws the absence recorded before the send"
         );
         assert!(record.install_sent_at.is_some());
         assert_untouched(&pool, "conductor-b");
+
+        // The conductor answers again, and an app IS under the id: the refused
+        // install was not it, so it is not adopted.
+        pool.with("conductor-a", |c| c.lookup_fault = None);
+        place_app(
+            &pool,
+            "conductor-a",
+            &record.installed_app_id,
+            &raw_agent_key(252),
+            "running",
+        );
+        let error = doorway.provision_agent(USER).await.expect_err("unproven");
+        assert_eq!(error.code(), "PROVISIONING_UNRESOLVED");
+        let record = intent_of(&store, USER).await;
+        assert!(record.agent_pub_key.is_none(), "nothing adopted");
+        assert_eq!(record.stuck, Some(StuckReason::NoUsableKey));
     }
 
     /// 4a. A re-send the conductor keeps refusing, with the app verifiably
