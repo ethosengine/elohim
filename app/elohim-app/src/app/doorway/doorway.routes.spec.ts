@@ -70,11 +70,14 @@ describe('DOORWAY_ROUTES', () => {
         expect(route).toBeDefined();
       });
 
+      // This route's import graph is the heaviest of the three: a cold transform takes ~9 s on
+      // a loaded workspace, so the 10 s default timed out though the import succeeds. The test
+      // proves the route lazy-loads, not how fast, so it gets its own budget.
       it('should lazy-load ElohimConfigComponent', async () => {
         const route = children.find(r => r.path === 'elohim')!;
         const mod = await (route.loadComponent as () => Promise<unknown>)();
         expect((mod as { name: string }).name).toContain('ElohimConfigComponent');
-      });
+      }, 60_000);
 
       it('should carry a title', () => {
         const route = children.find(r => r.path === 'elohim')!;
