@@ -1485,6 +1485,37 @@ measures:
     env-sensitivity: [measure, class]
     default-authority: observation
     established_by: sense-organ-2026-10-22
+  # ── algedonic-designer firing 2026-10-28 (seed 3121389215; effort-with-no-fruit,
+  # interruption, contradiction / 7d). Edge rolls whose Dataplane Validation found the apex
+  # handing a visitor no page: eight of them (#1677–#1697) sat in the CI ledger with no concern
+  # while the doorway-failover atom still read "fleet served-shell-boots … unmeasured".
+  - id: edge-apex-root-unserved
+    version: 1
+    family: delivery
+    unit: builds
+    procedure: >
+      Over the newest ten completed elohim-edge dev builds that ran Dataplane Validation (an
+      `[edge:validate-only]` run counts; NOT_BUILT and builds that never reached the stage do
+      not), count the builds whose console (Jenkins `consoleText` or MCP `searchBuildLog`) holds
+      a served-shell-boots failure on the apex: a line starting
+      `AssertionError [ERR_ASSERTION]: elohim.host: GET https://elohim.host/ returned 5` or
+      `AssertionError [ERR_ASSERTION]: elohim.host: the app threw while starting at
+      https://elohim.host/` (the step `a visitor asks peer {string} for the page at {string}` in
+      genesis/a2o/steps/dataplane.steps.ts, which already rides catch-up before it asserts).
+      Fold the count on subject `elohim.host` with `--env job=elohim-edge --env first_build=<n>
+      --env last_build=<n>`. Ledger fallback when Jenkins is unreachable: the largest `seen` over
+      open `.claude/data/ci-findings.jsonl` rows with `job: elohim-edge` whose `line` starts
+      `AssertionError [ERR_ASSERTION]: elohim.host:`, with that row's first_build/last_build as
+      env; the fallback spans the row's build range, not ten builds, and says so in its reason.
+    provenance: ".claude/data/ci-findings.jsonl (ts 2026-10-22): fp 16b82ec09dc5 `elohim.host: the app threw while starting … navigation returned 503` seen 8, fp 45e72bbbd9a9 `GET https://elohim.host/ returned 503 … handed no page at all` seen 7, both elohim-edge builds 1677–1697, status open, no concern; fp 5994059e5a38 the same after a transient catching-up shed, seen 1 (#1689); .claude/data/ci-cursor.json elohim-edge recent 15 = 5 FAILURE + 1 ABORTED + 6 UNSTABLE + 3 SUCCESS"
+    default-authority: observation
+    status: active
+    established_by: algedonic-designer-2026-10-28
+    why: >
+      An edge roll ends in Dataplane Validation, and the apex answering 503 at `/` means that roll
+      delivered nothing a visitor could open. Nothing counted it: the ledger rows carry no
+      concern, concern_routes.route() returns None for them, no measure reads elohim-edge
+      results, and the habit that owns the clause still described the fleet check as unmeasured.
 
 lenses:
   - id: resource-limit-raise-recurrence
@@ -2429,3 +2460,27 @@ lenses:
     superseded_reason: "a concern is a declared entity; the open set is unresolved joins, not grammar variants"
     established_by: sense-organ-2026-10-22
     why: "an open candidate is review owed; zero is the only honest ceiling"
+  - id: edge-apex-root-unserved-ceiling
+    version: 1
+    binding: binding-local
+    class: measure
+    consumes: [edge-apex-root-unserved@1]
+    subject: elohim.host
+    compare: at-or-above
+    context: session-headline
+    soft: 1
+    hard: 2
+    concern: doorway-failover
+    retire-when: >
+      when the apex no longer depends on a doorway pair (doorway-failover's own exit): a client
+      resolves the declared head from the mesh, so an edge roll can no longer leave the root
+      unserved
+    status: active
+    established_by: algedonic-designer-2026-10-28
+    why: >
+      The doorway-failover invariant prices an unserved apex at zero, and the served-shell-boots
+      step already rides catch-up before it asserts, so a 503 that survives the ride is not restart
+      churn. One build in ten is the soft line, since one transient shed has been seen (#1689,
+      5994059e5a38). The second is hard, because two edge rolls in ten leaving `/` empty is a
+      pattern, not luck. The ledger reading was 8 builds in #1677–#1697 (16b82ec09dc5), 4× the
+      hard line.
