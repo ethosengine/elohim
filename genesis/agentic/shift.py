@@ -187,7 +187,7 @@ def start(path, runtime):
     spec.setdefault('ci_policy', 'success')
     spec['input_files'] = normalize_inputs(root, spec.get('input_files', []))
     verify_inputs(spec)
-    # These six generated hook ledgers are operational state, never a source-clean
+    # These exact generated observer ledgers are operational state, never a source-clean
     # exemption selected by an agent. Pin their exact set into the frozen contract.
     spec['observer_paths'] = read(Path(__file__).with_name('shift-observer-paths.json'))
     if spec.get('mode') not in {'delivery', 'rehearsal'}:

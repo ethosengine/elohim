@@ -1,4 +1,5 @@
 [
+  ".claude/data/architecture-findings.jsonl",
   ".claude/data/ci-cursor.json",
   ".claude/data/ci-findings.jsonl",
   ".claude/data/governance-findings.jsonl",

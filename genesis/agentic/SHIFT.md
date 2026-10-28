@@ -88,12 +88,14 @@ flags are used. Each failed initialization retains its own evidence directory.
 Retrying `start` with the identical input is allowed only before publication of
 execution state. Changed input, corrupt state or an expired deadline refuses.
 
-The exact six generated session and governance-gate observer ledgers in
+The exact generated session and governance-gate observer ledgers in
 `shift-observer-paths.json` may remain modified and unstaged. Their set is pinned
 in the contract. Their bytes are preserved; they are never staged with source.
 All other source changes make readiness unclean, as do staged observer edits.
 This exception is needed because authenticated runtime canaries execute the
-repository's normal observation hooks. It does not waive any source gate.
+repository's normal observation hooks and successful gates update architecture
+findings, including below-ceiling recovery observations. It does not waive any
+source gate or permit neighboring files to change.
 
 Each operation has a frozen ID and arguments. Available kinds are:
 
