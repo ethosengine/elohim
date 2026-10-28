@@ -945,9 +945,18 @@ mod tests {
 
     // ── against a real mongod ───────────────────────────────────────────────
     //
-    // Run when `DOORWAY_TEST_MONGODB_URI` names a mongod. Each test uses a
-    // throwaway database and drops it. With the variable unset they print that
-    // they did not run — they do not pretend to have passed the Mongo path.
+    // IGNORED by default, so the gate's `cargo test` reports them as ignored
+    // (counted, visible) instead of passing them without a mongod. Run them
+    // with a mongod named by `DOORWAY_TEST_MONGODB_URI`:
+    //
+    //   DOORWAY_TEST_MONGODB_URI=mongodb://127.0.0.1:27017 \
+    //     cargo test --lib -- --ignored conductor::provision_intent::tests::mongo_
+    //
+    // Run that way without the variable, each one FAILS: a Mongo test that
+    // passes without a mongod is the lie this section exists to avoid. Each
+    // test uses a throwaway database and drops it. Wiring an isolated mongod
+    // into the doorway gate is backlog item
+    // `doorway-intent-log-mongo-tests-not-in-the-gate`.
 
     const MONGO_TEST_ENV: &str = "DOORWAY_TEST_MONGODB_URI";
 
@@ -959,10 +968,10 @@ mod tests {
     impl ThrowawayDb {
         async fn open(test: &str) -> Option<Self> {
             let Ok(uri) = std::env::var(MONGO_TEST_ENV) else {
-                eprintln!(
-                    "NOT RUN ({test}): {MONGO_TEST_ENV} is not set — no mongod was exercised"
+                panic!(
+                    "{test}: {MONGO_TEST_ENV} is not set — this Mongo test was asked to run \
+                     and no mongod was named; it does not pass without one"
                 );
-                return None;
             };
             let client = mongodb::Client::with_uri_str(&uri)
                 .await
@@ -996,6 +1005,7 @@ mod tests {
     }
 
     #[tokio::test]
+    #[ignore = "needs a mongod: set DOORWAY_TEST_MONGODB_URI and run with --ignored"]
     async fn mongo_the_unique_index_makes_the_first_writer_win() {
         let Some(db) = ThrowawayDb::open("unique index").await else {
             return;
@@ -1040,6 +1050,7 @@ mod tests {
     }
 
     #[tokio::test]
+    #[ignore = "needs a mongod: set DOORWAY_TEST_MONGODB_URI and run with --ignored"]
     async fn mongo_concurrent_first_inserts_yield_one_record() {
         let Some(db) = ThrowawayDb::open("concurrent insert").await else {
             return;
@@ -1068,6 +1079,7 @@ mod tests {
     }
 
     #[tokio::test]
+    #[ignore = "needs a mongod: set DOORWAY_TEST_MONGODB_URI and run with --ignored"]
     async fn mongo_a_versioned_replace_under_contention_has_one_winner() {
         let Some(db) = ThrowawayDb::open("versioned replace").await else {
             return;
@@ -1109,6 +1121,7 @@ mod tests {
     }
 
     #[tokio::test]
+    #[ignore = "needs a mongod: set DOORWAY_TEST_MONGODB_URI and run with --ignored"]
     async fn mongo_counts_stale_stuck_and_expiry_match_the_memory_store() {
         let Some(db) = ThrowawayDb::open("counts").await else {
             return;
@@ -1188,6 +1201,7 @@ mod tests {
     }
 
     #[tokio::test]
+    #[ignore = "needs a mongod: set DOORWAY_TEST_MONGODB_URI and run with --ignored"]
     async fn mongo_a_reopened_store_finds_what_the_last_one_wrote() {
         let Some(db) = ThrowawayDb::open("reopen").await else {
             return;
