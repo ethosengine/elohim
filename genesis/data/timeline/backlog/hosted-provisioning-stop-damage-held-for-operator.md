@@ -65,3 +65,15 @@ The operator chooses one of three paths:
 - re-scope the branch.
 
 Whichever path is chosen, each landing needs a household receipt for every story pre-push names. Pre-push's own `t2-receipt.sh` lists those stories.
+
+## Ported 2026-10-28 (`port/c-hosted`): landed dormant
+
+The series was ported onto dev `084fdd742` from `land/hosted-provisioning-1019`, so the operator no longer has to choose between the three paths above to get the functionality onto dev:
+
+- **On:** typed install outcomes, lazy per-role credentials, the intent log for everyone provisioned from now on, full-hash app ids, the node/device registration guards (never install, never adopt, never claim a hosted or bound key), consistent response/account keys, intent retention after a failed uninstall, and the Human pre-read gate.
+- **Gated, default off (`DOORWAY_PROVISIONING_STORE_GATE`):** the store-verdict refusals (`PROVISIONING_NOT_READY` / `PROVISIONING_UNRESOLVED` for a person with no record), proof-only adoption of a pre-log app, and the node/device login refusal (`ACCOUNT_KEY_HOSTED_HERE`). Decision 2 above therefore no longer locks anyone out on landing.
+- **Decision 1, removed when the gate is on:** the first boot with the gate backfills records from account rows a conductor confirms and clears `wiped` without an operator. Only a database that lost its accounts too still needs `POST /admin/provisioning/recover`.
+- **Key minting:** dev's conductor-minted keys are kept; see the 2026-10-28 update in `doorway-identity-recovery-gate-residuals-2026-10-04`.
+
+Turning the gate on for alpha is the remaining operator decision. Measure a household first boot with `DOORWAY_PROVISIONING_STORE_GATE=true` before doing so.
+
