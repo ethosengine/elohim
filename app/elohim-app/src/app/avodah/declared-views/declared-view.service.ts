@@ -152,34 +152,46 @@ export class DeclaredViewService {
       return `Binary source (${bytes.length} bytes)\nBase64: ${this.bundles[reading.observation.snapshotCid].objects[cid]}`;
     }
   }
+  /** Retention mutations (keep, forget) run one at a time, in call order, so a save still in
+   * flight can never complete after Forget and resurrect the copy Forget removed. */
+  private retention: Promise<void> = Promise.resolve();
+  private serialize(work: () => Promise<void>): Promise<void> {
+    const run = this.retention.then(work, work);
+    this.retention = run.catch(() => undefined);
+    return run;
+  }
   async keepOffline(): Promise<void> {
     if (this.busy() || !this.readings().length) return;
     this.busy.set(true);
-    let candidate: string | undefined;
-    try {
-      candidate = await this.repository.pinBuild(this.viewId);
-      await this.repository.save({
-        viewId: this.viewId,
-        observations: this.readings().map(r => r.observation),
-        bundles: this.bundles,
-        buildCache: candidate,
-      });
-      this.retained.set(true);
-      this.retainedSequence.set(this.readings().at(-1)?.observation.sequence ?? 0);
-      this.error.set('');
-    } catch (error) {
-      if (candidate) await caches.delete(candidate);
-      this.error.set(String(error));
-    } finally {
-      this.busy.set(false);
-    }
+    await this.serialize(async () => {
+      let candidate: string | undefined;
+      try {
+        candidate = await this.repository.pinBuild(this.viewId);
+        await this.repository.save({
+          viewId: this.viewId,
+          observations: this.readings().map(r => r.observation),
+          bundles: this.bundles,
+          buildCache: candidate,
+        });
+        this.retained.set(true);
+        this.retainedSequence.set(this.readings().at(-1)?.observation.sequence ?? 0);
+        this.error.set('');
+      } catch (error) {
+        if (candidate) await caches.delete(candidate);
+        this.error.set(String(error));
+      } finally {
+        this.busy.set(false);
+      }
+    });
   }
   async forget(): Promise<void> {
-    try {
-      await this.repository.forget(this.viewId);
-      this.retained.set(false);
-    } catch (error) {
-      this.error.set(String(error));
-    }
+    await this.serialize(async () => {
+      try {
+        await this.repository.forget(this.viewId);
+        this.retained.set(false);
+      } catch (error) {
+        this.error.set(String(error));
+      }
+    });
   }
 }

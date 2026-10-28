@@ -70,3 +70,72 @@ describe('replaceable projection feed', () => {
     expect(view.error()).toContain('malformed');
   });
 });
+
+describe('offline retention ordering', () => {
+  it('Forget during an in-flight save leaves no retained copy once the save finishes', async () => {
+    const source = JSON.stringify({
+      presentation: { titleField: '$identity', statusField: '$identity' },
+    });
+    const sourceCid = await address(source);
+    const projection = {
+      version: 1,
+      purpose: 'retention',
+      declaration: 'view.json',
+      declaration_cid: sourceCid,
+      method: 'test',
+      reader_versions: {},
+      subjects: [],
+      sources: { 'view.json': sourceCid },
+      input_versions: { 'view.json': sourceCid },
+      governance: {},
+      diagnostics: [],
+    };
+    const envelope = JSON.stringify({ version: 1, projection });
+    const snapshotCid = await address(envelope);
+    const bundle = { snapshotCid, envelope, objects: { [sourceCid]: btoa(source) } };
+    const observation = {
+      sequence: 1,
+      observedAt: '2026-10-13T10:00:00Z',
+      snapshotCid,
+      declarationCid: sourceCid,
+    };
+    const feed = {
+      open: vi.fn(),
+      capture: vi.fn(),
+      history: vi.fn().mockResolvedValue([observation]),
+      snapshot: vi.fn().mockResolvedValue(bundle),
+    };
+    let store: unknown;
+    let finishSave: () => void = () => undefined;
+    const saveGate = new Promise<void>(resolve => {
+      finishSave = resolve;
+    });
+    const repository = {
+      load: vi.fn().mockResolvedValue(undefined),
+      pinBuild: vi.fn().mockResolvedValue('cache-1'),
+      save: vi.fn(async (copy: unknown) => {
+        await saveGate;
+        store = copy;
+      }),
+      forget: vi.fn(async () => {
+        store = undefined;
+      }),
+    };
+    TestBed.configureTestingModule({
+      providers: [
+        DeclaredViewService,
+        { provide: PROJECTION_FEED, useValue: feed },
+        { provide: OfflineViewRepository, useValue: repository },
+      ],
+    });
+    const view = TestBed.inject(DeclaredViewService);
+    await view.open('test');
+    const keeping = view.keepOffline();
+    await vi.waitFor(() => expect(repository.save).toHaveBeenCalled());
+    const forgetting = view.forget();
+    finishSave();
+    await Promise.all([keeping, forgetting]);
+    expect(store).toBeUndefined();
+    expect(view.retained()).toBe(false);
+  });
+});
