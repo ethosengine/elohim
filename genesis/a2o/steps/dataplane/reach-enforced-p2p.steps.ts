@@ -14,7 +14,7 @@ const pending = (): 'pending' => 'pending';
 Given('household storage peer {string} holds scoped reach fixture {string}', pending);
 
 Given(
-  'peer {string} serves the fixture bytes and derives its head for the fixture\'s steward',
+  "peer {string} serves the fixture bytes and derives its head for the fixture's steward",
   pending
 );
 
@@ -27,11 +27,6 @@ Given('a reach probe with a fresh ephemeral transport key dials peer {string}', 
 Given('the probe key is absent from every household roster and identity binding', pending);
 
 Given(
-  'every unknown control is shape-matched, syntactically valid, and absent from peer {string} and its public lookup planes',
-  pending
-);
-
-Given(
   'the probe compares result kind, refusal or status code, payload bytes, and address or provider metadata',
   pending
 );
@@ -41,10 +36,7 @@ Given(
   pending
 );
 
-Given(
-  'Matthew retrieves the scoped fixture from peer {string} over single EPR resolve',
-  pending
-);
+Given('Matthew retrieves the scoped fixture from peer {string} over single EPR resolve', pending);
 
 When(
   'the stranger resolves the scoped fixture and an unknown EPR over the EPR resolve protocol',
@@ -55,15 +47,9 @@ Then('the EPR resolve answers are indistinguishable', pending);
 
 Then("neither answer contains the scoped fixture's head or bytes", pending);
 
-Given(
-  'Matthew retrieves the scoped fixture from peer {string} over batch EPR resolve',
-  pending
-);
+Given('Matthew retrieves the scoped fixture from peer {string} over batch EPR resolve', pending);
 
-Given(
-  'peer {string} holds open reach fixture {string} with no audience restriction',
-  pending
-);
+Given('peer {string} holds open reach fixture {string} with no audience restriction', pending);
 
 When(
   'the stranger batch-resolves the scoped fixture, an unknown EPR, and the open fixture',
@@ -105,10 +91,7 @@ When(
   pending
 );
 
-Then(
-  'the iroh get answer for the scoped blob is indistinguishable from its get control',
-  pending
-);
+Then('the iroh get answer for the scoped blob is indistinguishable from its get control', pending);
 
 Then(
   'the iroh get-many answer for the scoped blob is indistinguishable from its get-many control',
@@ -136,14 +119,11 @@ Then(
 Then('no shard answer reveals the scoped manifest, availability, or bytes', pending);
 
 Given(
-  'peer {string} retained the fixture\'s wider sync document from before Matthew narrowed its audience',
+  "peer {string} retained the fixture's wider sync document from before Matthew narrowed its audience",
   pending
 );
 
-When(
-  'peer {string} attempts to project that stale document back to peer {string}',
-  pending
-);
+When('peer {string} attempts to project that stale document back to peer {string}', pending);
 
 Then('peer {string} rejects that stale projection', pending);
 
@@ -208,27 +188,18 @@ Given(
   pending
 );
 
-Given(
-  'doorway comparisons include status, content or address headers, and body bytes',
-  pending
-);
+Given('doorway comparisons include status, content or address headers, and body bytes', pending);
 
 Given("doorway {string} has observed the scoped fixture's signal projection", pending);
 
-Given(
-  'doorway {string} serves an open signal control through the same projection cache',
-  pending
-);
+Given('doorway {string} serves an open signal control through the same projection cache', pending);
 
 When(
   'an anonymous client and a client claiming {string} ask the projection cache for the scoped fixture and an unknown EPR',
   pending
 );
 
-Then(
-  "each client's scoped answer is indistinguishable from that client's unknown answer",
-  pending
-);
+Then("each client's scoped answer is indistinguishable from that client's unknown answer", pending);
 
 Then('no answer contains the scoped signal document or its address', pending);
 
@@ -276,5 +247,34 @@ Then(
 
 Then(
   "the fixture's verified author can retrieve the scoped atom through the same doorway API",
+  pending
+);
+
+Given("Matthew narrows the fixture's audience on peer {string}", pending);
+
+Given(
+  "Matthew's transport binding receives a nonempty Cluster view for Matthew's local agent on peer {string}",
+  pending
+);
+
+Given(
+  'every unknown control is generated from fresh randomness in the same shape as the scoped identifier it stands beside',
+  pending
+);
+
+Given(
+  "peer {string} answers each unknown control with that plane's not-found result before any comparison runs",
+  pending
+);
+
+Given(
+  'peer {string} rejects the stale projection and keeps the excluded sync projection absent',
+  pending
+);
+
+Given("peer {string} retained the fixture's wider sync document", pending);
+
+When(
+  "the stranger requests a Cluster view naming Matthew's local agent on peer {string} and an unknown agent",
   pending
 );

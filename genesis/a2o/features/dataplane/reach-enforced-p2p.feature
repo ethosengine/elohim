@@ -14,15 +14,18 @@ Feature: Listed P2P protocol fields reveal no more for a scoped subject than for
   their head, so a negative answer cannot pass merely because the fixture is
   absent from the peer being probed.
 
-  A head is the signed address of the resource version a peer can serve. James
-  derives the scoped head locally, but reach forbids publishing it into the
-  public Kademlia routing plane. An open head on that plane proves the lookup
+  A head is the signed address of the resource version a peer can serve. Single
+  resolve, batch resolve, and Kademlia carry the same signed head representation.
+  James derives the scoped head locally, but reach forbids publishing it into
+  the public Kademlia routing plane. An open head on that plane proves the lookup
   works while the scoped EPR identifier correctly resolves like an unknown one.
 
   Matthew authored and stewards the fixture for an audience that does not
-  include this stranger. The fixture's local agent represents Matthew on the
-  storage peer. Preserving Matthew's audience choice protects both the resource
-  and its existence within the protocol fields measured here.
+  include this stranger. The scoped fixture is a notarized EPR resource with
+  blob content, a derivable EPR atom, and a sync projection. Matthew's local
+  agent on James is the separate subject used for the Cluster-view comparison.
+  Preserving Matthew's audience choice protects both the resource and its
+  existence within the protocol fields measured here.
 
   A stranger is a probe that creates a fresh transport key for this scenario.
   The key is absent from the steward's roster and from every identity binding.
@@ -50,15 +53,18 @@ Feature: Listed P2P protocol fields reveal no more for a scoped subject than for
 
   Sync is the exception to the positive retrieval paths: audience narrowing
   removes the wider derived document from James's sync store while the canonical
-  fixture bytes and derivable head remain on that same peer. Rejecting stale
-  re-ingress must leave that projection absent rather than recreate it.
+  fixture bytes and derivable head remain on that same peer. Jessica is the
+  household peer that retained the stale wider document. Rejecting her stale
+  re-ingress must leave that projection absent rather than recreate it. Each sync
+  scenario establishes this state independently.
 
   Background:
     Given household storage peer "james" holds scoped reach fixture "reach-witness-scoped"
     And peer "james" serves the fixture bytes and derives its head for the fixture's steward
     And a reach probe with a fresh ephemeral transport key dials peer "james"
     And the probe key is absent from every household roster and identity binding
-    And every unknown control is shape-matched, syntactically valid, and absent from peer "james" and its public lookup planes
+    And every unknown control is generated from fresh randomness in the same shape as the scoped identifier it stands beside
+    And peer "james" answers each unknown control with that plane's not-found result before any comparison runs
     And the probe compares result kind, refusal or status code, payload bytes, and address or provider metadata
 
   @regression
@@ -104,14 +110,18 @@ Feature: Listed P2P protocol fields reveal no more for a scoped subject than for
 
   @regression
   Scenario: A stale wider sync document cannot undo Matthew's audience narrowing
-    Given peer "jessica" retained the fixture's wider sync document from before Matthew narrowed its audience
+    Given peer "jessica" retained the fixture's wider sync document
+    And Matthew narrows the fixture's audience on peer "james"
     When peer "jessica" attempts to project that stale document back to peer "james"
     Then peer "james" rejects that stale projection
     And the excluded sync projection remains absent from peer "james" after stale re-ingress
 
   @regression
   Scenario: Sync hides an audience-narrowed document from a transport stranger
-    Given the excluded sync projection is absent from peer "james" after audience narrowing and stale re-ingress rejection
+    Given peer "jessica" retained the fixture's wider sync document
+    And Matthew narrows the fixture's audience on peer "james"
+    And peer "jessica" attempts to project that stale document back to peer "james"
+    And peer "james" rejects the stale projection and keeps the excluded sync projection absent
     When the stranger synchronizes the scoped document and an unknown document from peer "james"
     Then the sync answers for the scoped and unknown documents are indistinguishable
 
@@ -124,8 +134,8 @@ Feature: Listed P2P protocol fields reveal no more for a scoped subject than for
 
   @regression
   Scenario: View federation does not trust an agent identifier named by a stranger
-    Given Matthew's transport binding receives a nonempty Cluster view for the fixture's local agent
-    When the stranger requests a Cluster view naming the fixture's local agent and an unknown agent
+    Given Matthew's transport binding receives a nonempty Cluster view for Matthew's local agent on peer "james"
+    When the stranger requests a Cluster view naming Matthew's local agent on peer "james" and an unknown agent
     Then the Cluster answers for the local and unknown agents are indistinguishable
     And neither answer reveals the local cluster or peer topology
 
