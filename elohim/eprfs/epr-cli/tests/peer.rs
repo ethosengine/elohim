@@ -5,10 +5,12 @@
 //! `XDG_CONFIG_HOME`, so no test touches this workspace's real device or peer key.
 #![cfg(feature = "peer")]
 
+use std::io::{BufRead, BufReader};
 use std::net::{Ipv4Addr, SocketAddrV4, UdpSocket};
 use std::path::{Path, PathBuf};
-use std::process::{Command, Output};
+use std::process::{Child, Command, Output, Stdio};
 use std::sync::Arc;
+use std::time::{Duration, Instant};
 
 use elohim_epr_cli::actor::{
     device_authorize, device_bind, device_endpoint, device_enroll, witness,
@@ -20,7 +22,7 @@ use elohim_epr_rea::{
 };
 use eprfs_peer::{
     project_channel, via_device, CrossingAllowList, DeviceHead, HeadTable, PeerConfig, PeerDaemon,
-    PeerKey, StorePlace,
+    PeerKey, Rules, RulesState, StorePlace,
 };
 use tempfile::TempDir;
 
@@ -72,17 +74,16 @@ impl Device {
         }
     }
 
+    fn command(&self) -> Command {
+        command_for(
+            &self.key_file,
+            self.config.path(),
+            &self.config.path().join("epr-store"),
+        )
+    }
+
     fn epr(&self, args: &[&str]) -> Output {
-        Command::new(env!("CARGO_BIN_EXE_epr"))
-            .args(args)
-            .env(device_key::DEVICE_KEY_ENV, &self.key_file)
-            .env("XDG_CONFIG_HOME", self.config.path())
-            .env_remove("EPR_PEER_RELAY_URL")
-            .env_remove("CLAUDE_CODE_SESSION_ID")
-            .env_remove("CLAUDE_SESSION_ID")
-            .env_remove("ELOHIM_SESSION_ID")
-            .output()
-            .expect("epr runs")
+        self.command().args(args).output().expect("epr runs")
     }
 
     fn root(&self) -> &str {
@@ -102,6 +103,20 @@ impl Device {
         );
         String::from_utf8(out.stdout).unwrap().trim().to_string()
     }
+}
+
+fn command_for(key_file: &Path, config: &Path, store: &Path) -> Command {
+    let mut command = Command::new(env!("CARGO_BIN_EXE_epr"));
+    command
+        .env(device_key::DEVICE_KEY_ENV, key_file)
+        .env("XDG_CONFIG_HOME", config)
+        .env("EPR_STORE", store)
+        .env("EPR_BIN", env!("CARGO_BIN_EXE_epr"))
+        .env_remove("EPR_PEER_RELAY_URL")
+        .env_remove("CLAUDE_CODE_SESSION_ID")
+        .env_remove("CLAUDE_SESSION_ID")
+        .env_remove("ELOHIM_SESSION_ID");
+    command
 }
 
 fn policy(dir: &Path) -> PathBuf {
@@ -410,6 +425,396 @@ fn flow_fold_refuses_while_this_devices_peer_serves() {
     assert!(stderr.contains("folds every newer head"), "{stderr}");
     // A second serve is refused the same way.
     assert!(elohim_epr_cli::peer::ServeLock::acquire(&a.peer_dir()).is_err());
+}
+
+#[test]
+fn serve_check_takes_no_serve_lock_and_writes_nothing() {
+    let (keys, a, _b) = household();
+    let policy = policy(keys.path());
+    let table = HeadTable {
+        store: Some(StorePlace {
+            root: a.checkout.path().to_path_buf(),
+            log: a.checkout.path().join(".eprfs/status/flows.jsonl"),
+        }),
+        ..HeadTable::default()
+    };
+    table.save(&a.peer_dir()).unwrap();
+    let heads = a.peer_dir().join(HeadTable::FILE_NAME);
+    let heads_before = std::fs::read(&heads).unwrap();
+    let modified_before = std::fs::metadata(&heads).unwrap().modified().unwrap();
+    let key = a.peer_dir().join(PeerKey::FILE_NAME);
+    let key_before = std::fs::read(&key).unwrap();
+    let flows = a.checkout.path().join(".eprfs/status/flows.jsonl");
+    assert!(!flows.exists());
+
+    let _serving = elohim_epr_cli::peer::ServeLock::acquire(&a.peer_dir()).expect("held lock");
+    let out = a.epr(&[
+        "peer",
+        "serve",
+        "--check",
+        "--root",
+        a.root(),
+        "--policy",
+        policy.to_str().unwrap(),
+        "--json",
+    ]);
+    assert!(
+        out.status.success(),
+        "{}",
+        String::from_utf8_lossy(&out.stderr)
+    );
+    let result: serde_json::Value = serde_json::from_slice(&out.stdout).unwrap();
+    assert_eq!(result["ok"], true, "{result}");
+    assert_eq!(result["flows"], "absent", "{result}");
+    assert_eq!(std::fs::read(&heads).unwrap(), heads_before);
+    assert_eq!(
+        std::fs::metadata(&heads).unwrap().modified().unwrap(),
+        modified_before
+    );
+    assert_eq!(std::fs::read(&key).unwrap(), key_before);
+    assert!(!flows.exists(), "check never creates flows.jsonl");
+    assert!(
+        !a.config.path().join("epr-store/sessions").exists(),
+        "check never records a daemon lease"
+    );
+}
+
+#[test]
+fn serve_check_refuses_bad_heads_policy_and_an_off_roster_device() {
+    let (keys, a, _b) = household();
+    let valid_policy = policy(keys.path());
+    std::fs::write(a.peer_dir().join(HeadTable::FILE_NAME), "{bad heads").unwrap();
+    let bad_heads = a.epr(&[
+        "peer",
+        "serve",
+        "--check",
+        "--root",
+        a.root(),
+        "--policy",
+        valid_policy.to_str().unwrap(),
+    ]);
+    assert_eq!(bad_heads.status.code(), Some(1));
+    assert!(
+        String::from_utf8_lossy(&bad_heads.stderr).contains("heads-invalid"),
+        "{}",
+        String::from_utf8_lossy(&bad_heads.stderr)
+    );
+
+    HeadTable::default().save(&a.peer_dir()).unwrap();
+    let bad_policy = keys.path().join("bad-policy.json");
+    std::fs::write(&bad_policy, "{bad policy").unwrap();
+    let refused = a.epr(&[
+        "peer",
+        "serve",
+        "--check",
+        "--root",
+        a.root(),
+        "--policy",
+        bad_policy.to_str().unwrap(),
+    ]);
+    assert_eq!(refused.status.code(), Some(1));
+    assert!(
+        String::from_utf8_lossy(&refused.stderr).contains("policy-invalid"),
+        "{}",
+        String::from_utf8_lossy(&refused.stderr)
+    );
+
+    let stranger = Device::new(&keys, "off-roster");
+    let off_roster = stranger.epr(&[
+        "peer",
+        "serve",
+        "--check",
+        "--root",
+        a.root(),
+        "--policy",
+        valid_policy.to_str().unwrap(),
+    ]);
+    assert_eq!(off_roster.status.code(), Some(3));
+    assert!(
+        String::from_utf8_lossy(&off_roster.stderr).contains("not-a-device"),
+        "{}",
+        String::from_utf8_lossy(&off_roster.stderr)
+    );
+}
+
+#[test]
+fn serve_check_blocks_malformed_or_inconsistent_device_state() {
+    let (keys, a, b) = household();
+    let policy = policy(keys.path());
+    let roster = a
+        .checkout
+        .path()
+        .join(format!(".eprfs/status/participants/{HANDLE}.jsonl"));
+    let valid_roster = std::fs::read(&roster).unwrap();
+    std::fs::write(&roster, "{malformed roster").unwrap();
+
+    let malformed = a.epr(&[
+        "peer",
+        "serve",
+        "--check",
+        "--root",
+        a.root(),
+        "--handle",
+        HANDLE,
+        "--policy",
+        policy.to_str().unwrap(),
+    ]);
+    assert_eq!(malformed.status.code(), Some(1));
+    assert!(
+        String::from_utf8_lossy(&malformed.stderr).contains("invalid-device-state"),
+        "{}",
+        String::from_utf8_lossy(&malformed.stderr)
+    );
+    let malformed_without_handle = a.epr(&[
+        "peer",
+        "serve",
+        "--check",
+        "--root",
+        a.root(),
+        "--policy",
+        policy.to_str().unwrap(),
+    ]);
+    assert_eq!(malformed_without_handle.status.code(), Some(1));
+    assert!(
+        String::from_utf8_lossy(&malformed_without_handle.stderr).contains("invalid-device-state"),
+        "{}",
+        String::from_utf8_lossy(&malformed_without_handle.stderr)
+    );
+
+    let unterminated = valid_roster
+        .strip_suffix(b"\n")
+        .expect("fixture roster ends with a record terminator");
+    std::fs::write(&roster, unterminated).unwrap();
+    let unterminated_without_handle = a.epr(&[
+        "peer",
+        "serve",
+        "--check",
+        "--root",
+        a.root(),
+        "--policy",
+        policy.to_str().unwrap(),
+    ]);
+    assert_eq!(unterminated_without_handle.status.code(), Some(1));
+    let stderr = String::from_utf8_lossy(&unterminated_without_handle.stderr);
+    assert!(stderr.contains("invalid-device-state"), "{stderr}");
+    assert!(stderr.contains("unterminated record"), "{stderr}");
+
+    std::fs::write(&roster, valid_roster).unwrap();
+    device_key::write_root_pin(&a.key_file, HANDLE, &b.key.did_key()).unwrap();
+    let inconsistent = a.epr(&[
+        "peer",
+        "serve",
+        "--check",
+        "--root",
+        a.root(),
+        "--handle",
+        HANDLE,
+        "--policy",
+        policy.to_str().unwrap(),
+    ]);
+    assert_eq!(inconsistent.status.code(), Some(1));
+    assert!(
+        String::from_utf8_lossy(&inconsistent.stderr).contains("invalid-device-state"),
+        "{}",
+        String::from_utf8_lossy(&inconsistent.stderr)
+    );
+}
+
+#[test]
+fn serve_check_reports_rules_skew_without_failing() {
+    let (keys, a, _b) = household();
+    let loaded_policy = policy(keys.path());
+    let checked_policy = keys.path().join("checked-policy.json");
+    std::fs::write(
+        &checked_policy,
+        r#"{"berth":{"resources":{"lane:":{"capacity":1,"scope":"steward"}},"channel":{"crosses":{"gate-verdict@1":["verdict"]}}}}"#,
+    )
+    .unwrap();
+    let table = HeadTable {
+        rules: Some(RulesState {
+            digest: Rules::from_policy_file(&loaded_policy).unwrap().digest(),
+            policy: loaded_policy,
+            loaded_at: 1,
+            pending: None,
+        }),
+        ..HeadTable::default()
+    };
+    table.save(&a.peer_dir()).unwrap();
+
+    let out = a.epr(&[
+        "peer",
+        "serve",
+        "--check",
+        "--root",
+        a.root(),
+        "--policy",
+        checked_policy.to_str().unwrap(),
+    ]);
+    assert!(
+        out.status.success(),
+        "{}",
+        String::from_utf8_lossy(&out.stderr)
+    );
+    assert!(
+        String::from_utf8_lossy(&out.stdout).contains("rules: skew"),
+        "{}",
+        String::from_utf8_lossy(&out.stdout)
+    );
+}
+
+#[test]
+fn refused_start_writes_no_daemon_lease_or_stranger_peer_key() {
+    let (keys, a, _b) = household();
+    let policy = policy(keys.path());
+    let empty_config = TempDir::new().unwrap();
+    let empty_store = empty_config.path().join("store");
+    let checked = command_for(&a.key_file, empty_config.path(), &empty_store)
+        .args([
+            "peer",
+            "serve",
+            "--check",
+            "--root",
+            a.root(),
+            "--policy",
+            policy.to_str().unwrap(),
+        ])
+        .output()
+        .unwrap();
+    assert_eq!(checked.status.code(), Some(1));
+    assert!(
+        String::from_utf8_lossy(&checked.stderr).contains("peer-key-mismatch"),
+        "{}",
+        String::from_utf8_lossy(&checked.stderr)
+    );
+    assert!(!empty_config.path().join("epr/peer/iroh.key").exists());
+    assert!(!empty_store.join("sessions").exists());
+
+    let out = command_for(&a.key_file, empty_config.path(), &empty_store)
+        .args([
+            "peer",
+            "serve",
+            "--root",
+            a.root(),
+            "--policy",
+            policy.to_str().unwrap(),
+            "--listen",
+            "127.0.0.1:0",
+        ])
+        .output()
+        .unwrap();
+    assert_eq!(out.status.code(), Some(2));
+    assert!(
+        String::from_utf8_lossy(&out.stderr).contains("peer-key-mismatch"),
+        "{}",
+        String::from_utf8_lossy(&out.stderr)
+    );
+    assert!(
+        !empty_config.path().join("epr/peer/iroh.key").exists(),
+        "serve never mints a key behind the roster"
+    );
+    assert!(
+        !empty_store.join("sessions").exists(),
+        "the key guard runs before record_running_daemon"
+    );
+}
+
+#[test]
+fn no_handle_refuses_clearly_when_the_device_stands_on_two_rosters() {
+    let (keys, a, _b) = household();
+    witness(
+        a.checkout.path(),
+        "human:ronald",
+        "agent:orchestrator@claude-opus-5-5",
+        "s2",
+        "operator of this second fixture roster; present in this session",
+        false,
+        &a.key,
+    )
+    .unwrap();
+    let policy = policy(keys.path());
+    let out = a.epr(&[
+        "peer",
+        "serve",
+        "--check",
+        "--root",
+        a.root(),
+        "--policy",
+        policy.to_str().unwrap(),
+    ]);
+    assert_eq!(out.status.code(), Some(1));
+    assert!(
+        String::from_utf8_lossy(&out.stderr).contains("invalid-device-state"),
+        "{}",
+        String::from_utf8_lossy(&out.stderr)
+    );
+    assert!(String::from_utf8_lossy(&out.stderr).contains("more than one participant roster"));
+    assert!(String::from_utf8_lossy(&out.stderr).contains("--handle"));
+}
+
+fn spawn_serve(device: &Device, policy: &Path) -> Child {
+    device
+        .command()
+        .args([
+            "peer",
+            "serve",
+            "--root",
+            device.root(),
+            "--policy",
+            policy.to_str().unwrap(),
+            "--listen",
+            "127.0.0.1:0",
+        ])
+        .stdout(Stdio::piped())
+        .stderr(Stdio::piped())
+        .spawn()
+        .expect("serve starts")
+}
+
+fn wait_for_serving(child: &mut Child) -> String {
+    let stdout = child.stdout.take().expect("piped stdout");
+    let (send, receive) = std::sync::mpsc::channel();
+    std::thread::spawn(move || {
+        let mut line = String::new();
+        let result = BufReader::new(stdout).read_line(&mut line).map(|_| line);
+        let _ = send.send(result);
+    });
+    receive
+        .recv_timeout(Duration::from_secs(10))
+        .expect("serving line within 10 seconds")
+        .expect("read serving line")
+}
+
+fn signal_and_wait(child: &mut Child, signal: i32) {
+    // SAFETY: `child.id()` is the live child started by this test, and kill does not retain the pid.
+    let sent = unsafe { libc::kill(child.id() as i32, signal) };
+    assert_eq!(sent, 0, "send signal {signal}");
+    let deadline = Instant::now() + Duration::from_secs(10);
+    loop {
+        if let Some(status) = child.try_wait().expect("wait for serve") {
+            assert!(status.success(), "serve exits cleanly on signal {signal}");
+            return;
+        }
+        if Instant::now() >= deadline {
+            child.kill().expect("kill timed-out serve");
+            panic!("serve did not stop on signal {signal}");
+        }
+        std::thread::sleep(Duration::from_millis(20));
+    }
+}
+
+#[test]
+fn the_serving_line_is_on_stdout_and_sigterm_sigint_stop_cleanly() {
+    let (keys, a, _b) = household();
+    let policy = policy(keys.path());
+    for signal in [libc::SIGTERM, libc::SIGINT] {
+        let mut child = spawn_serve(&a, &policy);
+        let line = wait_for_serving(&mut child);
+        assert!(
+            line.starts_with(elohim_epr_cli::peer::SERVING_LINE),
+            "stdout readiness line: {line:?}"
+        );
+        signal_and_wait(&mut child, signal);
+    }
 }
 
 /// A berth record as T1 folds it, `via` another device when folded from it.

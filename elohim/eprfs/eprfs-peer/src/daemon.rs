@@ -422,21 +422,14 @@ impl PeerDaemon {
     }
 
     /// Run until the loop ends. It ends on its own only for a reason worth a non-zero exit.
+    /// Cancelling this wait retains the loop's join handle so [`Self::shutdown`] can still join it.
     ///
     /// # Errors
     ///
     /// [`PeerError::DaemonEnded`] naming a local fault (a head could not be persisted before it
     /// was announced, or the loop task failed). Gossip loss is recovered in-process.
     pub async fn wait(&mut self) -> Result<(), PeerError> {
-        let Some(task) = self.task.take() else {
-            return Ok(());
-        };
-        match task.await {
-            Ok(ended) => ended,
-            Err(e) => Err(PeerError::DaemonEnded {
-                reason: format!("the loop task failed: {e}"),
-            }),
-        }
+        wait_for_task(&mut self.task).await
     }
 
     /// Stop the loop, then the router (which closes the endpoint and both protocols).
@@ -449,6 +442,22 @@ impl PeerDaemon {
         let _ = self.wait().await;
         // Best effort: the endpoint is closing either way.
         let _ = self.router.shutdown().await;
+    }
+}
+
+async fn wait_for_task(
+    task: &mut Option<JoinHandle<Result<(), PeerError>>>,
+) -> Result<(), PeerError> {
+    let Some(task_handle) = task.as_mut() else {
+        return Ok(());
+    };
+    let joined = task_handle.await;
+    *task = None;
+    match joined {
+        Ok(ended) => ended,
+        Err(error) => Err(PeerError::DaemonEnded {
+            reason: format!("the loop task failed: {error}"),
+        }),
     }
 }
 
@@ -1386,6 +1395,27 @@ fn roster_named_nodes(rows: &[ParticipantRow], chain_root: &str) -> Vec<String> 
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[tokio::test]
+    async fn cancelling_wait_keeps_the_daemon_task_joinable() {
+        let (release, held) = oneshot::channel();
+        let mut task = Some(tokio::spawn(async move {
+            let _ = held.await;
+            Ok(())
+        }));
+
+        assert!(
+            tokio::time::timeout(Duration::from_millis(1), wait_for_task(&mut task))
+                .await
+                .is_err(),
+            "the first wait remains pending"
+        );
+        assert!(task.is_some(), "cancellation retains the join handle");
+
+        release.send(()).expect("release daemon task");
+        wait_for_task(&mut task).await.expect("join daemon task");
+        assert!(task.is_none(), "a completed wait consumes the join handle");
+    }
 
     fn delays(first: Duration) -> Vec<Duration> {
         let now = Instant::now();
