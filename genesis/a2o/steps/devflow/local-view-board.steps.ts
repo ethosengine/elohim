@@ -41,7 +41,7 @@ Then(
       assert.equal(receipt[key], true, key);
   }
 );
-Then('interrupted, exhausted and corrupt replacements preserve the previous usable copy', () => {
+Then('interrupted, exhausted, corrupt and failed replacements preserve the previous usable copy', () => {
   for (const key of [
     'interruptedSavePreserved',
     'storageExhaustionPreserved',

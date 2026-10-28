@@ -29,7 +29,7 @@ Feature: An app follows its person without making the hub a dependency
   an unpinned app may stay inactive before its executable bytes are reclaimed.
 
   @lifecycle-contract
-  Scenario: An unavailable adapter cannot claim a running app
+  Scenario: An adapter with no runtime reports unsupported instead of opening a release
     # Category: execution.
     Given a portable app adapter with no runtime implementation
     When a client asks it to open a release
@@ -39,6 +39,7 @@ Feature: An app follows its person without making the hub a dependency
   Scenario: Held application bytes alone do not promise offline use
     # Category: held bytes.
     Given a release whose artifacts are verified but whose data is not
+    When a client asks whether the release is available offline
     Then the release is not available offline
 
   @wip

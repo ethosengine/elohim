@@ -7,7 +7,8 @@ Feature: Read authored work and native acceptance on my device
   Vocabulary. Avodah is the work pillar of the Elohim client. The native local-view node is the
   process started on the engineer's own machine by `just dev view <declaration>`; it reads the
   declared files with the `epr view` reader and serves the production Avodah build to the browser
-  through a single-use launcher link. That link carries its capability (the permission to open
+  through a launcher link that the launcher issues for one use and expires after five minutes (its
+  own tests prove reuse is refused; this story does not). That link carries its capability (the permission to open
   the private view) in the URL fragment, the part after the "#"; removing the fragment from the
   address bar keeps the capability out of browser history and shared screens.
   A capture reads the declared files once and records one observation (the captured projection
@@ -39,7 +40,7 @@ Feature: Read authored work and native acceptance on my device
     # Proves phases 5-6: cold restart, offline, exact source and observation time.
     And before forgetting the retained source bytes and observation time are unchanged and the reading is visibly offline
     # Proves phase 4.
-    And interrupted, exhausted and corrupt replacements preserve the previous usable copy
+    And interrupted, exhausted, corrupt and failed replacements preserve the previous usable copy
     # Proves phases 2 and 6: reading creates no acceptance act.
     And viewing and reopening leave captured source files unchanged and create no workflow acts
     # Proves the end of phase 6.
