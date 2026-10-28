@@ -312,10 +312,6 @@ fn resolve_closes(kind: NoteKind, closes: Option<&str>) -> FlowResult<Option<Str
 /// tag, subject, `reason:`, optional `switched-to:`, optional `verdict:`, optional `steward:`
 /// LAST. The order is ADDITIVE — a note that carries no verdict emits the same vector it always
 /// did, which is what keeps every existing note's content address where it is.
-#[allow(
-    clippy::too_many_arguments,
-    reason = "The positional persisted note slots are assembled in one function to preserve their ordering"
-)]
 fn note_slots(
     kind: NoteKind,
     subject: &str,
@@ -845,6 +841,12 @@ fn note_with_claim_guard(
     let verdict = resolve_verdict(kind, verdict)?;
     let closes = resolve_closes(kind, closes)?;
     let named = named_identity(actor.as_ref.as_deref())?;
+    if options.bind_actor.is_some() && (on.parse::<Cid>().is_err() || observation.is_some()) {
+        return Err(FlowError::InvalidArguments(
+            "actor binding requires --on <exact-commitment-cid> without measurement metadata"
+                .into(),
+        ));
+    }
 
     // Closure locks sessions before appending its flow witness. Keep that order here,
     // and retain the generation through attribution and append.
@@ -907,23 +909,37 @@ fn note_with_claim_guard(
             ..Attribution::claimed(identity, &steward)
         };
     }
-    if options.purpose.as_deref() == Some("acceptance") {
+    if options.purpose.as_deref() == Some("acceptance") || options.bind_actor.is_some() {
+        let purpose = if options.bind_actor.is_some() {
+            "actor binding"
+        } else {
+            "acceptance"
+        };
         let (pin, identity) = actor
             .session
             .as_deref()
             .and_then(|session| claimed_for_session(root, session))
             .ok_or_else(|| {
-                FlowError::InvalidArguments(
-                    "acceptance requires a registered --session actor claim".into(),
-                )
+                FlowError::InvalidArguments(format!(
+                    "{purpose} requires a registered --session actor claim"
+                ))
             })?;
         if actor
             .as_ref
             .as_deref()
             .is_some_and(|named| named.trim() != identity)
         {
+            return Err(FlowError::InvalidArguments(format!(
+                "{purpose} --as differs from session actor claim"
+            )));
+        }
+        if options
+            .bind_actor
+            .as_deref()
+            .is_some_and(|named| named != pin.to_string())
+        {
             return Err(FlowError::InvalidArguments(
-                "acceptance --as differs from session actor claim".into(),
+                "actor binding must name the exact current registered session claim".into(),
             ));
         }
         // The steward the resolver chose (the standing handle, or the collective) is kept.
@@ -979,7 +995,7 @@ fn note_with_claim_guard(
         occurred_at: occurred_at.clone(),
     };
 
-    if options.appoint.is_some() || options.purpose.is_some() {
+    if options.appoint.is_some() || options.purpose.is_some() || options.bind_actor.is_some() {
         super::acceptance::validate_record(root, &records, &event)?;
     }
     let record = FlowRecord::Event(event);

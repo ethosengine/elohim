@@ -12,6 +12,7 @@ use super::{body_cid_of_file, confine_under, rel_to_root, FlowError, FlowResult}
 #[derive(Debug, Default, Clone)]
 pub struct AcceptanceOptions {
     pub appoint: Option<String>,
+    pub bind_actor: Option<String>,
     pub purpose: Option<String>,
     pub appointment: Option<String>,
     pub fulfillment: Option<String>,
@@ -75,6 +76,148 @@ fn actor_identity(root: &Path, id: &Cid) -> FlowResult<String> {
         .ok_or_else(|| refused("actor claim is not registered"))
 }
 
+/// Native eligibility projection. It resolves exact local claims, never peer qualification.
+#[derive(Debug, serde::Serialize)]
+pub struct AttributionEligibility {
+    pub eligible: bool,
+    pub actor_claim: Option<String>,
+    pub witness: Option<String>,
+    pub issues: Vec<String>,
+}
+
+pub fn attribution_eligibility(
+    root: &Path,
+    records: &[(Cid, FlowRecord)],
+    target: &Cid,
+) -> AttributionEligibility {
+    match implementer_attribution(root, records, target) {
+        Ok((actor, witness)) => AttributionEligibility {
+            eligible: true,
+            actor_claim: Some(actor.to_string()),
+            witness: witness.map(|cid| cid.to_string()),
+            issues: vec![],
+        },
+        Err(error) => AttributionEligibility {
+            eligible: false,
+            actor_claim: None,
+            witness: None,
+            issues: vec![error.to_string()],
+        },
+    }
+}
+
+/// Exact original pin or one explicit additive binding; no name matching or newest-wins.
+/// Session rollover does not rewrite a historical claim that was current at admission.
+fn implementer_attribution(
+    root: &Path,
+    records: &[(Cid, FlowRecord)],
+    target: &Cid,
+) -> FlowResult<(Cid, Option<Cid>)> {
+    let promise = commitment(records, target)?;
+    let pins: Vec<_> = promise
+        .resource_spec
+        .classified_as
+        .iter()
+        .filter_map(|s| s.strip_prefix("actor-claim:"))
+        .collect();
+    if pins.len() > 1 {
+        return Err(refused("duplicate implementer actor-claim:"));
+    }
+    let bindings: Vec<_> = records
+        .iter()
+        .filter_map(|(id, record)| match record {
+            FlowRecord::Event(event)
+                if event.resource == *target && slot(event, "bind-actor:").is_some() =>
+            {
+                Some((*id, event))
+            }
+            _ => None,
+        })
+        .collect();
+    // Do not filter invalid purported authority away, even when a direct pin exists.
+    for (_, binding) in &bindings {
+        validate_binding(root, records, binding)?;
+    }
+    if let Some(pin) = pins.first() {
+        let actor = cid(pin)?;
+        if actor_identity(root, &actor)? != promise.provider.0 {
+            return Err(refused(
+                "implementer actor claim differs from original provider",
+            ));
+        }
+        return Ok((actor, None));
+    }
+    match bindings.as_slice() {
+        [] => Err(refused("implementer has no exact registered actor claim; an explicit --bind-actor ruling is required")),
+        [(witness, binding)] => Ok((cid(required(binding, "bind-actor:")?)?, Some(*witness))),
+        _ => Err(refused("conflicting attribution witnesses; one exact binding ruling is required")),
+    }
+}
+
+fn validate_binding(
+    root: &Path,
+    records: &[(Cid, FlowRecord)],
+    binding: &FlowEvent,
+) -> FlowResult<()> {
+    validate_note_shape(binding)?;
+    if binding.classified_as.first().map(String::as_str) != Some("run:ruling")
+        || [
+            "appoint:",
+            "purpose:",
+            "appointment:",
+            "fulfillment:",
+            "review:",
+            "report-path:",
+            "report-cid:",
+            "supersedes:",
+            "implementer-binding:",
+            "verdict:",
+            "closes:",
+            "switched-to:",
+            "measure:",
+        ]
+        .iter()
+        .any(|prefix| slot(binding, prefix).is_some())
+        || binding.process.is_some()
+        || !matches!(&binding.quantity, elohim_epr_rea::Magnitude::Count { value, unit }
+            if *value == 1.0 && unit == "run-note")
+    {
+        return Err(refused(
+            "actor binding must be an attribution-only non-discharging ruling",
+        ));
+    }
+    if required(binding, "reason:")?.trim().is_empty()
+        || binding.receiver != super::repository_agent(root)?
+        || binding.in_scope_of != super::repository_scope(root)?
+    {
+        return Err(refused(
+            "actor binding needs an authored reason and the original repository note scope",
+        ));
+    }
+    let promise = commitment(records, &binding.resource)?;
+    if promise
+        .resource_spec
+        .classified_as
+        .iter()
+        .any(|s| s.starts_with("actor-claim:"))
+    {
+        return Err(refused(
+            "actor binding cannot override an original actor-claim pin",
+        ));
+    }
+    let actor = cid(required(binding, "bind-actor:")?)?;
+    if cid(required(binding, "actor-claim:")?)? != actor
+        || actor_identity(root, &actor)? != promise.provider.0
+        || binding.provider.0 != promise.provider.0
+        || cid(required(binding, "scope-cid:")?)? != promise.in_scope_of
+    {
+        return Err(refused(
+            "actor binding author, original provider, claim or scope differs",
+        ));
+    }
+    Ok(())
+}
+
 fn independent_actor(
     root: &Path,
     records: &[(Cid, FlowRecord)],
@@ -82,13 +225,7 @@ fn independent_actor(
     actor: &Cid,
 ) -> FlowResult<String> {
     let promise = commitment(records, target)?;
-    let implementer = promise
-        .resource_spec
-        .classified_as
-        .iter()
-        .find_map(|s| s.strip_prefix("actor-claim:"))
-        .ok_or_else(|| refused("implementer has no exact registered actor claim"))?;
-    let implementer = cid(implementer)?;
+    let (implementer, _) = implementer_attribution(root, records, target)?;
     let identity = actor_identity(root, actor)?;
     let implementer_identity = actor_identity(root, &implementer)?;
     if implementer_identity != promise.provider.0
@@ -185,12 +322,28 @@ impl AcceptanceOptions {
             || self.review.is_some()
             || self.report.is_some()
             || self.supersedes.is_some();
+        if let Some(actor) = &self.bind_actor {
+            if kind != "run:ruling" || has_acceptance || self.appoint.is_some() {
+                return Err(refused(
+                    "--bind-actor belongs only to an attribution-only ruling",
+                ));
+            }
+            cid(actor)?;
+            return Ok(vec![
+                format!("bind-actor:{actor}"),
+                format!("scope-cid:{}", commitment(records, target)?.in_scope_of),
+            ]);
+        }
         if let Some(actor) = &self.appoint {
             if kind != "run:ruling" || has_acceptance {
                 return Err(refused("--appoint belongs only to a ruling"));
             }
             independent_actor(root, records, target, &cid(actor)?)?;
-            return Ok(vec![format!("appoint:{actor}")]);
+            let mut slots = vec![format!("appoint:{actor}")];
+            if let (_, Some(witness)) = implementer_attribution(root, records, target)? {
+                slots.push(format!("implementer-binding:{witness}"));
+            }
+            return Ok(slots);
         }
         if !has_acceptance {
             return Ok(vec![]);
@@ -234,6 +387,13 @@ impl AcceptanceOptions {
 fn validate_note_shape(current: &FlowEvent) -> FlowResult<()> {
     for prefix in [
         "appoint:",
+        "bind-actor:",
+        "implementer-binding:",
+        "reason:",
+        "steward:",
+        "source:",
+        "closes:",
+        "switched-to:",
         "purpose:",
         "appointment:",
         "fulfillment:",
@@ -273,11 +433,36 @@ pub fn validate_structure(
     current: &FlowEvent,
 ) -> FlowResult<()> {
     validate_note_shape(current)?;
+    if slot(current, "bind-actor:").is_some() {
+        validate_binding(root, records, current)?;
+        let current_id = FlowRecord::Event(current.clone()).cid()?;
+        for (id, record) in records {
+            if let FlowRecord::Event(other) = record {
+                if other.resource == current.resource && slot(other, "bind-actor:").is_some() {
+                    validate_binding(root, records, other)?;
+                    if *id != current_id {
+                        return Err(refused("conflicting attribution witnesses; one exact binding ruling is required"));
+                    }
+                }
+            }
+        }
+        return Ok(());
+    }
     if let Some(actor) = slot(current, "appoint:") {
         if current.classified_as.first().map(String::as_str) != Some("run:ruling") {
             return Err(refused("appointment is not a ruling"));
         }
         let identity = independent_actor(root, records, &current.resource, &cid(actor)?)?;
+        let (_, witness) = implementer_attribution(root, records, &current.resource)?;
+        match (witness, slot(current, "implementer-binding:")) {
+            (Some(expected), Some(pin)) if cid(pin)? == expected => {}
+            (None, None) => {}
+            _ => {
+                return Err(refused(
+                    "appointment must pin its exact implementer-binding witness",
+                ))
+            }
+        }
         if identity == current.provider.0 || slot(current, "actor-claim:") == Some(actor) {
             return Err(refused("acceptor cannot appoint itself"));
         }
@@ -348,7 +533,7 @@ pub fn validate_record(
     current: &FlowEvent,
 ) -> FlowResult<()> {
     validate_structure(root, records, current)?;
-    if slot(current, "appoint:").is_some() {
+    if slot(current, "appoint:").is_some() || slot(current, "bind-actor:").is_some() {
         return Ok(());
     }
     let fulfillment = event(records, &cid(required(current, "fulfillment:")?)?)?;

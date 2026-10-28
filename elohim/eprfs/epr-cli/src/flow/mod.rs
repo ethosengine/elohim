@@ -20,6 +20,7 @@ pub mod fulfill;
 pub mod gaps;
 pub mod governor;
 mod habit_census;
+pub mod habits;
 pub mod ledger;
 pub mod measures;
 pub mod memory;
@@ -118,9 +119,9 @@ fn flag_hint(word: &str, own: &[&str]) -> String {
 }
 
 /// Every flow subcommand, as a person types it.
-const SUBCOMMANDS: [&str; 18] = [
+const SUBCOMMANDS: [&str; 19] = [
     "project", "walk", "status", "seal", "reseal", "hold", "claim", "context", "ledger", "fulfill",
-    "note", "report", "stocks", "concerns", "memory", "cites", "retract", "sense",
+    "note", "report", "stocks", "concerns", "memory", "cites", "retract", "sense", "habit",
 ];
 
 /// Entry point invoked by `main` for `epr flow …`.
@@ -257,6 +258,7 @@ pub fn run(args: &[String]) -> FlowResult<ExitCode> {
         "retract" => run_retract(&args[1..]),
         "sense" => run_sense(&args[1..]),
         "fold" => run_fold(&args[1..]),
+        "habit" => run_habit(&args[1..]),
         other => Err(FlowError::InvalidArguments(format!(
             "unknown flow subcommand `{other}`{}\n{}",
             crate::hint::did_you_mean(other, "epr flow", &SUBCOMMANDS),
@@ -1237,6 +1239,7 @@ pub fn note_usage() -> String {
      PROSE arm (--on names the target):\n    \
      --on <commitment-cid|gap-id|path>   what the note is about\n    \
      --reason <text>                     the authored body (required)\n    \
+     --bind-actor <actor-claim-cid>       attribution-only ruling on an exact commitment CID;\n                                        requires explicit --session and original provider identity\n    \
      --switched-to <text>                the consequence, on --kind failed-approach\n    \
      --closes <correction-cid>           the correction this note discharges; refused on\n                                        \
      --kind failed-approach\n    \
@@ -1262,13 +1265,103 @@ fn wants_help(args: &[String]) -> bool {
     args.iter().any(|a| a == "--help" || a == "-h")
 }
 
+/// `epr flow habit spend --habit <id> --hours <h> --meter <pipeline|gate|session|other>
+/// --evidence <ref> [--as …] [--session …]` — record hours spent on a habit.
+///
+/// The one authored write the habit plane has: progress is read from the atoms' history and
+/// needs no verb, but time spent leaves no trace in a tree unless someone records it. It names no
+/// promise, so it can never discharge one (`habits::spend`).
+fn run_habit(args: &[String]) -> FlowResult<ExitCode> {
+    const USAGE: &str = "usage: epr flow habit spend --habit <id> --hours <h> \
+        --meter <pipeline|gate|session|other> --evidence <ref> [--as agent:<role>@<model>] \
+        [--session <id>] [--json] [--root DIR]";
+    let (opts, rest) = parse_global(args)?;
+    if wants_help(&rest) {
+        println!("{USAGE}");
+        return Ok(ExitCode::SUCCESS);
+    }
+    let Some(("spend", tail)) = rest.split_first().map(|(verb, tail)| (verb.as_str(), tail)) else {
+        return Err(FlowError::InvalidArguments(USAGE.into()));
+    };
+    let tail = tail.to_vec();
+    let mut i = 0;
+    while i < tail.len() {
+        match tail[i].as_str() {
+            "--habit" | "--hours" | "--meter" | "--evidence" | "--as" | "--session" => i += 2,
+            other => {
+                return Err(FlowError::InvalidArguments(format!(
+                    "unknown habit spend argument `{other}`{}\n{USAGE}",
+                    flag_hint(
+                        other,
+                        &[
+                            "--habit",
+                            "--hours",
+                            "--meter",
+                            "--evidence",
+                            "--as",
+                            "--session"
+                        ]
+                    )
+                )))
+            }
+        }
+    }
+    let required = |flag: &str| -> FlowResult<String> {
+        take_opt(&tail, flag)?.ok_or_else(|| {
+            FlowError::InvalidArguments(format!("habit spend needs {flag}\n{USAGE}"))
+        })
+    };
+    let habit = required("--habit")?;
+    let hours_raw = required("--hours")?;
+    let hours: f64 = hours_raw.trim().parse().map_err(|_| {
+        FlowError::InvalidArguments(format!("--hours `{hours_raw}` is not a number"))
+    })?;
+    let meter = required("--meter")?;
+    let evidence = required("--evidence")?;
+    let actor = note::NoteActor {
+        as_ref: take_opt(&tail, "--as")?,
+        session: resolve_session(take_opt(&tail, "--session")?),
+    };
+    let outcome = habits::spend(&opts.root, &habit, hours, &meter, &evidence, &actor)?;
+    if opts.json {
+        println!("{}", serde_json::to_string_pretty(&outcome)?);
+    } else {
+        println!(
+            "epr flow habit spend — {} h on {} ({}, {}) at {} {}",
+            outcome.hours,
+            outcome.habit,
+            outcome.meter,
+            serde_json::to_value(outcome.claim)?.as_str().unwrap_or("?"),
+            outcome.occurred_at,
+            if outcome.appended {
+                "recorded"
+            } else {
+                "already recorded"
+            }
+        );
+    }
+    Ok(ExitCode::SUCCESS)
+}
+
 fn run_note(args: &[String]) -> FlowResult<ExitCode> {
     let (opts, rest) = parse_global(args)?;
     if wants_help(&rest) {
         println!("{}", note_usage());
         return Ok(ExitCode::SUCCESS);
     }
+    let bind_actor = take_opt(&rest, "--bind-actor")?;
+    let explicit_session = take_opt(&rest, "--session")?;
+    if bind_actor.is_some() && explicit_session.is_none() {
+        return Err(FlowError::InvalidArguments(
+            "actor binding requires an explicit registered --session".into(),
+        ));
+    }
     if let Some(measure) = take_opt(&rest, "--measure")? {
+        if bind_actor.is_some() {
+            return Err(FlowError::InvalidArguments(
+                "actor binding cannot be combined with a measurement".into(),
+            ));
+        }
         return run_observation(&opts, &rest, &measure);
     }
     let on = take_opt(&rest, "--on")?.ok_or_else(|| {
@@ -1288,9 +1381,10 @@ fn run_note(args: &[String]) -> FlowResult<ExitCode> {
     let verdict = take_opt(&rest, "--verdict")?;
     let actor = note::NoteActor {
         as_ref: take_opt(&rest, "--as")?,
-        session: resolve_session(take_opt(&rest, "--session")?),
+        session: resolve_session(explicit_session),
     };
     let acceptance = acceptance::AcceptanceOptions {
+        bind_actor,
         appoint: take_opt(&rest, "--appoint")?,
         purpose: take_opt(&rest, "--purpose")?,
         appointment: take_opt(&rest, "--appointment")?,
@@ -1602,6 +1696,7 @@ fn usage() -> String {
      --reason <text> [--switched-to <text>] [--closes <correction-cid>] \
      [--verdict approved|changes-requested (required by --kind verdict, refused on every other kind)] \
      [--appoint <actor-claim-cid> (ruling only)] \
+     [--bind-actor <actor-claim-cid> --session <id> (attribution ruling only)] \
      [--purpose acceptance --appointment <ruling-cid> --fulfillment <event-cid> \
      --review <technical-verdict-cid> --report <json-path> [--supersedes <acceptance-cid>]] \
      [--as agent:<role>@<model>] [--session <id>] [--json] [--root DIR] \
@@ -1670,10 +1765,15 @@ fn usage() -> String {
      | memory collective|pin|contribute|project|feedback|graduate [--input PATH] [--session ID] [--json] [--root DIR] \
      (collective explains local declaration and strict input contracts; no network publication)\n  \
      | stocks --window START..END --per <second|minute|hour|day|week> \
-     [--stock commitments|active-habits] [--check] [--json] [--root DIR] \
+     [--stock commitments|active-habits|red-mass] [--check] [--json] [--root DIR] \
      (--check exits non-zero when a stock is filling, when a bounded stock is over its limit, \
      OR when nothing could be measured; active-habits is a PROJECTED level read from \
-     genesis/manifests/habits.yaml and judged against the WIP fence commitment's Bound)\n>"
+     genesis/manifests/habits.yaml and judged against the WIP fence commitment's Bound; \
+     red-mass folds every non-green habit's distance from green from the habit atoms' \
+     first-parent history, with per-habit progress, hours spent and hours returned)\n  \
+     | habit spend --habit <id> --hours <h> --meter <pipeline|gate|session|other> \
+     --evidence <ref> [--as …] [--session …] [--json] [--root DIR] \
+     (one Consume of the time resource scoped to the habit; names no promise)\n>"
         .to_string()
 }
 

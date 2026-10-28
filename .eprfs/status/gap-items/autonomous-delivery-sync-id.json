@@ -1,0 +1,9 @@
+{
+  "doc": "genesis/data/timeline/backlog/content-id-with-spaces-unreachable-by-id.md",
+  "items": [
+    {
+      "id": "autonomous-delivery-sync-id",
+      "state": "OPEN"
+    }
+  ]
+}

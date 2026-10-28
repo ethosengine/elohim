@@ -1,0 +1,9 @@
+[
+  ".claude/data/architecture-findings.jsonl",
+  ".claude/data/ci-cursor.json",
+  ".claude/data/ci-findings.jsonl",
+  ".claude/data/governance-findings.jsonl",
+  ".claude/data/quiesce-timeline.jsonl",
+  ".claude/data/runtime-cursor.json",
+  ".claude/data/runtime-findings.jsonl"
+]

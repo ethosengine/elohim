@@ -757,3 +757,15 @@ lands on the RUNNING peer within one poll, no restart.
 To build and package an Angular EPR app, run `just dev package app/elohim-app` (or the app directory). The command builds first and stamps both outputs after success. The SDK packager checks browser assets, version context and the SSR entry contract before producing content-addressed archives. It leaves the build directory intact and does not upload or author a head. Local packaging and CI staging use the same packing implementation. Package checks establish artifact structure; `just test mesh` remains the proof of peer propagation, doorway rendering/cache behavior and browser boot. See `elohim/sdk/scripts/package-app.mjs --help` for checking existing builds, explicit output and single-bundle options.
 
 The built-in adapter is Angular, not a universal EPR-app requirement. `EPR_APP_ADAPTER=./my-adapter.mjs just dev package ./my-client` supplies a local adapter with build, layout, package validation and runtime-check hooks. The common layer archives and hashes; adapter checks own framework/host compatibility. Native desktop and non-browser Wasm do not inherit SSR or browser bootstrap requirements. Packaging does not execute the separate runtime check or certify delivery; the SDK guide at `elohim/sdk/scripts/package-app.md` defines the extension contract and its verification API.
+
+## Bounded autonomous shifts
+
+`just dev shift start|resume|status|stop|recover` manages a retained-worktree task
+through the shared host launcher. See `genesis/agentic/SHIFT.md`. The host guardian
+owns the immutable deadline and leases; agents never own household lifecycle or
+publication. Shift containment does not change conductor supervision defaults.
+
+For a canonical seed prerequisite, `just seed apply mesh content '' '<logical-id>'`
+forwards the exact ID with `--content-only`; deployment bindings and projections
+remain unchanged. `SKIP_BLOB_SYNC=true` additionally excludes the global blob sync.
+Run `just seed validate` first. An omitted final ID retains ordinary seeding behavior.

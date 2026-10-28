@@ -80,7 +80,16 @@ impl FulfillmentStatus {
 /// assembled field-by-field, the extra-evidence-key edge — a `threshold_pct` riding on breach
 /// evidence, which the wire coherence check in `elohim_epr::algedonic` refuses — stays
 /// theoretical on this path. `bound_ref` is the bounding commitment's CID and nothing else.
-fn bound_evidence(commitment_cid: &Cid, bound: &Bound, stock: f64) -> Option<AlgedonicEvidence> {
+///
+/// Public because [`fulfillment`] is not the only way a level against a promise's bound gets
+/// measured: a reader that folds the level some other way (a stock over a scope, a projected
+/// count) judges it here rather than re-implementing the crossing — and inherits the floor
+/// withholding below instead of inventing its own floor semantics.
+pub fn level_evidence(
+    commitment_cid: &Cid,
+    bound: &Bound,
+    stock: f64,
+) -> Option<AlgedonicEvidence> {
     // A FLOOR bound mints no evidence yet, and that silence is deliberate.
     // `elohim_epr::algedonic::AlgedonicEvidence` is ceiling-signed IN THE TYPE: its `crossed()`
     // is `stock >= band_edge`, so a floor breach emitted through it would produce a signal whose
@@ -179,7 +188,7 @@ pub fn fulfillment(
         pain: commitment
             .bound
             .as_ref()
-            .and_then(|bound| bound_evidence(commitment_cid, bound, bound_stock)),
+            .and_then(|bound| level_evidence(commitment_cid, bound, bound_stock)),
     }
 }
 
@@ -199,15 +208,10 @@ pub enum FoldError {
     Empty,
 }
 
-/// Rank claim kinds weakest-last so a fold can take the minimum honestly.
+/// Rank claim kinds weakest-last so a fold can take the minimum honestly — [`ClaimKind::rank`],
+/// the one definition every claim reduction shares.
 fn claim_rank(c: ClaimKind) -> u8 {
-    match c {
-        ClaimKind::Witnessed => 0,
-        ClaimKind::InstrumentMeasured => 1,
-        ClaimKind::Estimated => 2,
-        ClaimKind::Modelled => 3,
-        ClaimKind::Imputed => 4,
-    }
+    c.rank()
 }
 
 /// The closure law (L5): a fold over interval-carrying quantities RETURNS an

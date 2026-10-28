@@ -27,7 +27,9 @@ fn frontmatter(path: &Path) -> FlowResult<String> {
     }
     Err(invalid(path, "unterminated frontmatter"))
 }
-fn keep(path: &Path) -> bool {
+/// Whether `path` is a habit declaration the census reads — shared with the history walk in
+/// [`super::habits`], so a path the census ignores is never derived from either.
+pub(super) fn keep(path: &Path) -> bool {
     path.parent()
         .and_then(Path::file_name)
         .is_some_and(|name| name == ".epr-meta")

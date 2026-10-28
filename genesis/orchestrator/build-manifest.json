@@ -48,6 +48,25 @@
   },
   "gate": {
     "projects": {
+      "agentic-shift": {
+        "dir": ".",
+        "inputs": {
+          "sources": [
+            "genesis/agentic/shift*.py",
+            "genesis/agentic/shift-observer-paths.json",
+            "genesis/agentic/seed-target.test.mjs",
+            "genesis/agentic/bin/berth",
+            "genesis/agentic/berth_test.py",
+            "genesis/agentic/objective*.mjs",
+            "genesis/agentic/readiness*.mjs",
+            ".claude/schemas/objective.schema.json",
+            "justfile",
+            "devfile.base.yaml"
+          ],
+          "buildProcess": []
+        },
+        "run": { "kind": "root-just", "recipe": "_gate-agentic-shift" }
+      },
       "orchestrator": {
         "dir": "genesis/orchestrator",
         "steps": ["lint-jenkinsfiles"],

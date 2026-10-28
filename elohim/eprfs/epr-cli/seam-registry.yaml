@@ -693,6 +693,77 @@ decisionPoints:
 
   # Acceptance-aware local reconciliation; peer authority remains explicitly partial.
 
+  - name: acceptance::attribution_eligibility / implementer_attribution
+    kind: pure-decision-predicate
+    sourceLocation:
+      file: src/flow/acceptance.rs
+    summary: Resolves one exact original actor pin or explicit append-only attribution ruling without changing commitment or stock semantics.
+    concernIds:
+    - id: C0
+      status: answered
+      justification: Existing repository-local FlowEvent and ActorClaim records; no new DHT entity, distributed head, route, or store.
+    - id: C1
+      status: partial
+      justification: Binding establishes implementer attribution only; exact independent acceptor and self-appointment restrictions remain. Local actor claims do not prove independent human control.
+    - id: C2
+      status: answered
+      justification: Original commitment and fulfillment bytes remain unchanged. One exact witness is required; conflicting or invalid witnesses refuse instead of newest-wins.
+    - id: C3
+      status: partial
+      justification: Existing nonblocking actor-store reads and flow transaction remain local; missing or busy stores refuse. Large local ledgers remain a resource limit.
+    - id: C4
+      status: answered
+      justification: Missing, corrupt, unregistered, stale-at-admission, or malformed attribution is an explicit ineligible result and named refusal.
+    - id: C5
+      status: answered
+      justification: An attribution ruling is neither acceptance nor publication authority and never discharges commitment stock.
+    - id: C6a
+      status: partial
+      justification: One finite local record snapshot is read; no network polling. This slice introduces no new hard ledger byte or time budget.
+    - id: C6b
+      status: answered
+      justification: Identical content-addressed retries append once under the existing flow transaction. Distinct binding rulings refuse.
+    - id: C7
+      status: answered
+      justification: Native reconciliation eligibility, appointment admission and acceptance reading share the exact same attribution resolver.
+    - id: C8
+      status: partial
+      justification: Existing ruling CID and derived eligibility expose precise reasons; no new telemetry ledger or counter is introduced.
+    - id: C9
+      status: partial
+      justification: Exact registered actor bytes, provider, scope and witness CID preserve historical identity through ordinary session rollover; cross-peer lineage is outside this local seam.
+    - id: C10
+      status: answered
+      justification: Direct original claim pins and named --as semantics remain unchanged. A fresh appointment pins the consumed binding, so a later binding cannot rehabilitate old invalid records.
+    - id: C11
+      status: partial
+      justification: No queue or executor is added; existing transaction contention applies. External compute and memory backpressure remain outside this predicate.
+    - id: C12
+      status: partial
+      justification: The explicit registered session must currently own the exact named claim at admission. This is repository-local accountable declaration, not peer-verified consent.
+    - id: C13
+      status: answered
+      justification: Attribution alone grants no acceptance, push permission or verification discount; independent appointed acceptance still exercises its own evidence.
+    - id: C14
+      status: answered
+      justification: The missing native binding remains an explicit unfinished frontier until an authorized ruling exists; no inferred identity or unsupported green status.
+    contractTests:
+    - path: elohim/eprfs/epr-cli/tests/flow_attribution.rs
+      testName: named_session_claim_needs_explicit_binding_before_independent_appointment
+      kind: integration
+    - path: elohim/eprfs/epr-cli/tests/flow_attribution.rs
+      testName: binding_requires_exact_current_session_provider_and_is_attribution_only
+      kind: integration
+    - path: elohim/eprfs/epr-cli/tests/flow_attribution.rs
+      testName: historical_binding_survives_session_rollover_without_reassigning_the_original_actor
+      kind: integration
+    - path: elohim/eprfs/epr-cli/tests/flow_attribution.rs
+      testName: malformed_or_forged_witnesses_are_not_filtered_out_of_the_shared_reader
+      kind: integration
+    - path: elohim/eprfs/epr-cli/tests/flow_attribution.rs
+      testName: later_binding_cannot_rehabilitate_unpinned_earlier_appointment_or_acceptance
+      kind: integration
+
   - name: acceptance::validate_record
     kind: pure-decision-predicate
     sourceLocation:

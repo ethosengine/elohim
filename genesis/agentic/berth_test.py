@@ -38,6 +38,43 @@ CLASSES = {"mesh": {"verify": {"default_ttl_s": 1800, "max_ttl_s": 3600},
                     "mesh": {"daemon": True}}}
 
 
+_PROXY_KEYS = ("ELOHIM_SHIFT_BERTH_ADDRESS", "ELOHIM_SHIFT_BERTH_TOKEN")
+_saved_proxy_env = {}
+
+
+def setUpModule():
+    # These fixtures exercise their own BERTH_DIR, including direct main() calls.
+    # A gate worker's guardian proxy belongs to the enclosing workload instead.
+    _saved_proxy_env.clear()
+    for key in _PROXY_KEYS:
+        if key in os.environ:
+            _saved_proxy_env[key] = os.environ.pop(key)
+
+
+def tearDownModule():
+    for key in _PROXY_KEYS:
+        os.environ.pop(key, None)
+    os.environ.update(_saved_proxy_env)
+
+
+def guest_uid_unavailable_reason():
+    if os.geteuid() != 0:
+        return "needs root to drop to the stage guest uid"
+    for kind in ("uid", "gid"):
+        rows = Path(f"/proc/self/{kind}_map").read_text().splitlines()
+        if not any(int(start) <= 65534 < int(start) + int(count)
+                   for start, _outside, count in (row.split() for row in rows)):
+            return f"stage guest {kind} 65534 is not mapped in this user namespace"
+    setgroups = Path("/proc/self/setgroups")
+    if setgroups.exists() and setgroups.read_text().strip() != "allow":
+        return "this user namespace denies setgroups required for the stage guest"
+    status = Path("/proc/self/status").read_text().splitlines()
+    caps = int(next(row.split()[1] for row in status if row.startswith("CapEff:")), 16)
+    if caps & ((1 << 6) | (1 << 7)) != ((1 << 6) | (1 << 7)):
+        return "needs CAP_SETGID and CAP_SETUID to drop to the stage guest uid"
+    return None
+
+
 class CapacityTransitionTest(unittest.TestCase):
     def setUp(self):
         self.directory = tempfile.TemporaryDirectory()
@@ -1838,8 +1875,10 @@ class StoreUnavailableTest(unittest.TestCase):
         return subprocess.run([sys.executable, str(REPO / "genesis/agentic/bin/berth"), *args], env=e,
                               capture_output=True, text=True, timeout=30, preexec_fn=preexec, cwd="/")
 
-    @unittest.skipUnless(os.geteuid() == 0, "needs root to drop to the stage guest uid")
     def test_guest_uid_meeting_the_hosts_root_owned_lock_exits_4_and_names_the_path(self):
+        reason = guest_uid_unavailable_reason()
+        if reason:
+            self.skipTest(reason)
         def as_guest():
             os.setgroups([])
             os.setgid(65534)

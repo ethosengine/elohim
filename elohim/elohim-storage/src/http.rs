@@ -5761,8 +5761,6 @@ impl HttpServer {
         {
             // Pure-iroh mode: the pull leg's status rides here so `pull.caughtUp` /
             // `replication` read the same on iroh as on libp2p (parity, 2026-08-28).
-            // `mut` is consumed only by the iroh-book enrichment below.
-            #[cfg_attr(not(feature = "p2p-iroh"), allow(unused_mut))]
             let mut body = serde_json::json!({ "peerId": peer_id, "irohNodeId": peer_id });
             #[cfg(feature = "p2p-iroh")]
             if let Some(core) = self.iroh_pull.as_ref() {
@@ -7301,24 +7299,24 @@ impl HttpServer {
 
         // /sync/v1/{h_app_id}/docs/{doc_id}
         if parts.len() == 3 && parts[1] == "docs" {
-            let doc_id = parts[2];
+            let doc_id = decode_path_id(parts[2]);
             return self
-                .handle_sync_doc(method, h_app_id, doc_id, req, sync_manager)
+                .handle_sync_doc(method, h_app_id, &doc_id, req, sync_manager)
                 .await;
         }
 
         // /sync/v1/{h_app_id}/docs/{doc_id}/{action}
         if parts.len() == 4 && parts[1] == "docs" {
-            let doc_id = parts[2];
+            let doc_id = decode_path_id(parts[2]);
             let action = parts[3];
 
             return match action {
                 "heads" => {
-                    self.handle_sync_heads(method, h_app_id, doc_id, sync_manager)
+                    self.handle_sync_heads(method, h_app_id, &doc_id, sync_manager)
                         .await
                 }
                 "changes" => {
-                    self.handle_sync_changes(method, h_app_id, doc_id, req, sync_manager)
+                    self.handle_sync_changes(method, h_app_id, &doc_id, req, sync_manager)
                         .await
                 }
                 _ => Ok(Response::builder()

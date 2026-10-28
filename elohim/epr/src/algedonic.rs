@@ -68,7 +68,7 @@
 //!    read as a ceiling by every consumer calling [`AlgedonicEvidence::crossed`], which is
 //!    unconditionally `stock >= band_edge`. Silent acceptance of a meaning nobody declared is the
 //!    C4 shape this family exists to make unrepresentable. Until `Sense` lives in the type, the
-//!    only thing preventing it is that `elohim_epr_rea::fold::bound_evidence` withholds floor
+//!    only thing preventing it is that `elohim_epr_rea::fold::level_evidence` withholds floor
 //!    evidence at the mint.
 
 use crate::error::{EprError, Result};

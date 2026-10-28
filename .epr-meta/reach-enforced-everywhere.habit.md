@@ -34,6 +34,20 @@ evidence:
   - "2026-08-20: flipped unwired -> RED on measured violation, which is stronger evidence than an absent check. Live on doorway-alpha, verified twice: anonymous GET /db/content?limit=1000&offset=1000 returned 90 rows (all commons); the identical request carrying the literal header 'Authorization: Bearer bogus' returned 1000 — familiar 906, commons 90, private 3, intimate 1 — every row with its contentBody. Cause: http.rs:5272 decided reach from header PRESENCE, never validation."
   - "2026-08-20: HTTP-plane cure committed (41f7780aa) — the listing now resolves the requester and authorizes per row via epr_service::authorize_reach_for_human_with_own_trust, deny-by-default when unresolvable; the same header-presence check on the single-item route's Layer 1 is cured too; and reach_level_index's `_ => 0` fail-open (an UNRECOGNIZED tier read as the most permissive, making the authorizer's own `_ => Err` unreachable) now fails closed to u8::MAX. Stays RED until the scenario runs green against a deploy carrying the fix — a flip needs a build number, not a commit."
   - "2026-08-20 scope, held honestly: the doorway strips client-supplied identity headers (probed: X-Agent-Cid/X-Agent-Id return the anonymous result), so the cure closes the bypass for doorway-fronted traffic. It does NOT make identity unforgeable — extract_agent_cid returns the header verbatim — so a caller reaching elohim-storage directly in-cluster can still assert an identity and receive that identity's authorized reach. That residual is identity-cross-signed's, not this habit's."
+rea:
+  composition: sum
+  budget:                     # 4 h per part short of target at 2026-10-22: 4 unwired planes
+    hours: 16
+    threshold_pct: 85
+  parts:                      # the invariant's five egress planes; HTTP is the one wired today
+    - part: reach-enforced-http
+      reading: 3/3
+      at: 2026-10-18
+      evidence: sprint-report-household-20261018T114938Z-80db9208 (24/24 steps on dev 80db9208b; DELTA 2026-10-18)
+    - part: crdt-sync-plane
+    - part: shard-plane
+    - part: dht-plane
+    - part: doorway-plane
 retire-when: >
   when every egress plane derives authorization from one shared verifier it cannot bypass
   by construction — so a NEW plane is enforced the moment it exists, rather than after
@@ -48,3 +62,4 @@ DELTA 2026-10-08 (slug-leftovers lane C; RED preserved): PUT /epr-head/{id} is n
 DELTA 2026-10-09a (RED preserved; household evidence for lane C): reach-enforced-http.feature 3/3 twice (run 2292a2e2, 01:06Z) on storage rebuilt from 1291fc0d3, including "An anonymous PUT of a declared head is refused"; the restricted-app-bundle scenario stays @wip (no restricted html5-app fixture in any corpus). The flip needs a fleet build carrying both halves.
 
 DELTA 2026-10-18 (RED preserved; household lane C re-measured on the merged tree): reach-enforced-http.feature 3/3, 24/24 steps (sprint-report-household-20261018T114938Z-80db9208) on dev 80db9208b — storage built with p2p+p2p-iroh, conductors on fork 96bcd2bee; the three @wip scenarios stay @wip. The flip still needs the fleet build and its Dataplane Validation leg.
+DELTA 2026-10-22 (operator delegated the declaration choices): `rea.budget` 16 h at 85 % (4 h per part short of target: the crdt-sync, shard, dht and doorway planes). It binds the next red episode; the open one keeps the bound it was minted with. Status unchanged.
