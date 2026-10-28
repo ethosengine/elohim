@@ -104,7 +104,7 @@ test('step fingerprints come from brit per declared step; gate-only projects are
   assert.deepEqual(stepFingerprints(gateOnly, 'abc123', { britBin: '/x/brit', root: '/repo', spawn }), { error: 'gate-only inputs, no step fingerprint' });
 
   const failing = fakeSpawn([[isFingerprint, { status: 1, stdout: '', stderr: 'could not resolve commit' }]]);
-  assert.match(stepFingerprints(project, 'nope', { britBin: '/x/brit', root: '/repo', spawn: failing.spawn }).error, /fingerprint of cargo-build-storage failed: could not resolve commit/);
+  assert.match(stepFingerprints(project, 'nope', { britBin: '/x/brit', root: '/repo', env: {}, spawn: failing.spawn }).error, /fingerprint of cargo-build-storage failed: could not resolve commit/);
 });
 
 test('describeEvidence prefers the newest green, names signer, age and commit, and calls a miss a miss', () => {
@@ -188,7 +188,7 @@ test('a dirty working tree under the project is named on the line and blocks the
     assert.equal(put.status, 1);
     assert.match(put.stderr, /working tree dirty/);
     assert.equal(calls.filter(c => isPut(c.bin, c.args)).length, 0, 'no attestation is written for bytes that are not the commit\'s');
-    assert.equal(dirtyPaths(project, { root: '/repo', spawn: () => ({ status: 128, stdout: '', stderr: 'fatal' }) }), null);
+    assert.equal(dirtyPaths(project, { root: '/repo', env: {}, spawn: () => ({ status: 128, stdout: '', stderr: 'fatal' }) }), null);
   } finally {
     rmSync(dir, { recursive: true, force: true });
   }
@@ -261,7 +261,7 @@ test('recordEvidence puts the verdict against the closure with the manifest file
   assert.equal(args[args.indexOf('--success') + 1], 'false');
   assert.equal(args[args.indexOf('--duration-ms') + 1], '1875400');
   assert.equal(args[args.indexOf('--commit') + 1], 'abc123');
-  assert.equal(findEvidence(project, 'k', { buildRefBin: '/x/brit-build-ref', root: '/repo', spawn: () => ({ status: 0, stdout: 'nope', stderr: '' }) }).error, 'build find: not JSON');
+  assert.equal(findEvidence(project, 'k', { buildRefBin: '/x/brit-build-ref', root: '/repo', env: {}, spawn: () => ({ status: 0, stdout: 'nope', stderr: '' }) }).error, 'build find: not JSON');
 });
 
 test('a completed brit record emits one device-gated crossing verdict and failures stay advisory', () => {
@@ -277,7 +277,7 @@ test('a completed brit record emits one device-gated crossing verdict and failur
   assert.equal(emitGateVerdict(project, 'closure', {
     success: false, seconds: 12.6, commit: 'abc',
     put: { stdout: '{"attestationId":"bafyatt","agentId":"agent"}' },
-    root: '/repo', spawn: landed.spawn,
+    root: '/repo', env: {}, spawn: landed.spawn,
   }), true);
   const note = landed.calls.find(call => isNote(call.bin, call.args));
   assert.ok(note);
@@ -289,7 +289,7 @@ test('a completed brit record emits one device-gated crossing verdict and failur
   const skipped = fakeSpawn([[isLeases, { status: 0, stdout: '{"standing":"not_a_device"}' }]]);
   const warnings = [];
   assert.equal(emitGateVerdict(project, 'closure', {
-    success: true, seconds: 1, commit: 'abc', put: {}, root: '/repo', spawn: skipped.spawn,
+    success: true, seconds: 1, commit: 'abc', put: {}, root: '/repo', env: {}, spawn: skipped.spawn,
     warn: line => warnings.push(line),
   }), true);
   assert.equal(skipped.calls.length, 1);
@@ -301,7 +301,7 @@ test('a completed brit record emits one device-gated crossing verdict and failur
     [isRevParse, { status: 128, stdout: '' }],
   ]);
   assert.equal(emitGateVerdict(project, 'closure', {
-    success: true, seconds: 1, commit: 'HEAD', put: {}, root: '/repo', spawn: unresolved.spawn,
+    success: true, seconds: 1, commit: 'HEAD', put: {}, root: '/repo', env: {}, spawn: unresolved.spawn,
     warn: line => warnings.push(line),
   }), false);
   assert.ok(!unresolved.calls.some(call => isNote(call.bin, call.args)));
@@ -313,7 +313,7 @@ test('a completed brit record emits one device-gated crossing verdict and failur
     [isNote, { status: 2, stdout: '', stderr: 'refused\n' }],
   ]);
   assert.equal(emitGateVerdict(project, 'closure', {
-    success: true, seconds: 1, commit: 'abc', put: {}, root: '/repo', spawn: failed.spawn,
+    success: true, seconds: 1, commit: 'abc', put: {}, root: '/repo', env: {}, spawn: failed.spawn,
     warn: line => warnings.push(line),
   }), false);
   assert.equal(warnings.length, 1);
@@ -602,7 +602,7 @@ test('the sibling governance class is data-driven and fails closed', function si
       changed: true, why: `governance-class change: ${path}`, paths: [path],
     });
   }
-  const absent = siblingGovernanceChange({ root: '/repo', spawn: () => ({ status: 1, stdout: '' }) });
+  const absent = siblingGovernanceChange({ root: '/repo', env: {}, spawn: () => ({ status: 1, stdout: '' }) });
   assert.deepEqual(absent, { changed: true, why: 'integration merge base unavailable' });
 });
 
@@ -711,7 +711,7 @@ test('dirtyPaths passes declared source pathspecs and the recipe, including hook
     'status', '--porcelain', '--untracked-files=normal', '--', project.dir, project.manifestPath,
     'elohim/elohim-storage/src/', '.claude/data/', 'elohim/brit', 'elohim/elohim-storage/justfile', '.',
   ]);
-  assert.equal(dirtyPaths(project, { root: '/repo', spawn: () => { throw new Error('unreadable'); } }), null);
+  assert.equal(dirtyPaths(project, { root: '/repo', env: {}, spawn: () => { throw new Error('unreadable'); } }), null);
 });
 
 test('an unreadable step declaration leaves the working tree state unknown', t => {
