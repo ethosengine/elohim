@@ -2497,7 +2497,7 @@ dependencies = [
 
 [[package]]
 name = "elohim-device-runtime"
-version = "0.3.1"
+version = "0.3.2"
 dependencies = [
  "elohim-ark-core",
  "elohim-settings",
@@ -2889,7 +2889,7 @@ dependencies = [
 
 [[package]]
 name = "eprfs-core"
-version = "0.3.1"
+version = "0.3.2"
 dependencies = [
  "async-trait",
  "bytes",
@@ -2905,7 +2905,7 @@ dependencies = [
 
 [[package]]
 name = "eprfs-serve"
-version = "0.3.1"
+version = "0.3.2"
 dependencies = [
  "async-trait",
  "bytes",

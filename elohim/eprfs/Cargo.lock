@@ -1249,7 +1249,7 @@ dependencies = [
 
 [[package]]
 name = "elohim-agent-adapter"
-version = "0.3.1"
+version = "0.3.2"
 dependencies = [
  "bytes",
  "eprfs-core",
@@ -1313,7 +1313,7 @@ dependencies = [
 
 [[package]]
 name = "elohim-device-runtime"
-version = "0.3.1"
+version = "0.3.2"
 dependencies = [
  "elohim-ark-core",
  "elohim-settings",
@@ -1347,7 +1347,7 @@ dependencies = [
 
 [[package]]
 name = "elohim-epr-cli"
-version = "0.3.1"
+version = "0.3.2"
 dependencies = [
  "base64 0.22.1",
  "chrono",
@@ -1379,6 +1379,7 @@ dependencies = [
  "tempfile",
  "thiserror 2.0.18",
  "tokio",
+ "ts-rs",
  "unicode-normalization",
 ]
 
@@ -1398,7 +1399,7 @@ dependencies = [
 
 [[package]]
 name = "elohim-epr-lsp"
-version = "0.3.1"
+version = "0.3.2"
 dependencies = [
  "chrono",
  "rustix",
@@ -1526,7 +1527,7 @@ dependencies = [
 
 [[package]]
 name = "eprfs-agent"
-version = "0.3.1"
+version = "0.3.2"
 dependencies = [
  "bytes",
  "eprfs-core",
@@ -1542,14 +1543,14 @@ dependencies = [
 
 [[package]]
 name = "eprfs-cli"
-version = "0.3.1"
+version = "0.3.2"
 dependencies = [
  "eprfs-core",
 ]
 
 [[package]]
 name = "eprfs-core"
-version = "0.3.1"
+version = "0.3.2"
 dependencies = [
  "async-trait",
  "bytes",
@@ -1566,14 +1567,14 @@ dependencies = [
 
 [[package]]
 name = "eprfs-host"
-version = "0.3.1"
+version = "0.3.2"
 dependencies = [
  "serde",
 ]
 
 [[package]]
 name = "eprfs-local"
-version = "0.3.1"
+version = "0.3.2"
 dependencies = [
  "async-trait",
  "bytes",
@@ -1589,7 +1590,7 @@ dependencies = [
 
 [[package]]
 name = "eprfs-meta"
-version = "0.3.1"
+version = "0.3.2"
 dependencies = [
  "eprfs-core",
  "serde",
@@ -1602,7 +1603,7 @@ dependencies = [
 
 [[package]]
 name = "eprfs-peer"
-version = "0.3.1"
+version = "0.3.2"
 dependencies = [
  "async-trait",
  "blake3",
@@ -1629,7 +1630,7 @@ dependencies = [
 
 [[package]]
 name = "eprfs-serve"
-version = "0.3.1"
+version = "0.3.2"
 dependencies = [
  "async-trait",
  "bytes",
@@ -1642,7 +1643,7 @@ dependencies = [
 
 [[package]]
 name = "eprfs-storage"
-version = "0.3.1"
+version = "0.3.2"
 dependencies = [
  "async-trait",
  "bytes",
@@ -5663,6 +5664,7 @@ checksum = "e640d9b0964e9d39df633548591090ab92f7a4567bc31d3891af23471a3365c6"
 dependencies = [
  "chrono",
  "lazy_static",
+ "serde_json",
  "thiserror 2.0.18",
  "ts-rs-macros",
 ]

@@ -1805,6 +1805,13 @@ pub fn parse_frontmatter(text: &str) -> Frontmatter {
             if val.is_empty() {
                 fm.lists.entry(key.clone()).or_default();
                 pending = Some(key);
+            } else if val.starts_with('[') {
+                if let Ok(items) = serde_yaml::from_str::<Vec<String>>(&val) {
+                    fm.lists.insert(key, items);
+                } else {
+                    fm.scalars.insert(key, val);
+                }
+                pending = None;
             } else {
                 fm.scalars
                     .insert(key, val.trim_matches('"').trim_matches('\'').to_string());

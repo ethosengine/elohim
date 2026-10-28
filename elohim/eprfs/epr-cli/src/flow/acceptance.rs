@@ -75,8 +75,35 @@ fn actor_identity(root: &Path, id: &Cid) -> FlowResult<String> {
         .ok_or_else(|| refused("actor claim is not registered"))
 }
 
+/// Explicit evidence boundary shared by repository commands and immutable views.
+/// Missing resources remain errors; implementations must never fetch implicitly.
+pub trait EvidenceResources {
+    fn read_text(&self, path: &str) -> FlowResult<String>;
+    fn actor_identity(&self, id: &Cid) -> FlowResult<String>;
+}
+
+impl EvidenceResources for Path {
+    fn read_text(&self, path: &str) -> FlowResult<String> {
+        let root = std::fs::canonicalize(self)?;
+        let path = confine_under(&root, &root.join(path))?;
+        Ok(std::fs::read_to_string(path)?)
+    }
+    fn actor_identity(&self, id: &Cid) -> FlowResult<String> {
+        actor_identity(self, id)
+    }
+}
+
+impl EvidenceResources for std::path::PathBuf {
+    fn read_text(&self, path: &str) -> FlowResult<String> {
+        self.as_path().read_text(path)
+    }
+    fn actor_identity(&self, id: &Cid) -> FlowResult<String> {
+        self.as_path().actor_identity(id)
+    }
+}
+
 fn independent_actor(
-    root: &Path,
+    root: &(impl EvidenceResources + ?Sized),
     records: &[(Cid, FlowRecord)],
     target: &Cid,
     actor: &Cid,
@@ -89,8 +116,8 @@ fn independent_actor(
         .find_map(|s| s.strip_prefix("actor-claim:"))
         .ok_or_else(|| refused("implementer has no exact registered actor claim"))?;
     let implementer = cid(implementer)?;
-    let identity = actor_identity(root, actor)?;
-    let implementer_identity = actor_identity(root, &implementer)?;
+    let identity = root.actor_identity(actor)?;
+    let implementer_identity = root.actor_identity(&implementer)?;
     if implementer_identity != promise.provider.0
         || implementer == *actor
         || identity == promise.provider.0
@@ -118,6 +145,12 @@ struct Evidence {
     cid: String,
 }
 
+/// Explicit byte dependencies of an acceptance report; discovery does not validate acceptance.
+pub fn report_dependencies(text: &str) -> FlowResult<Vec<String>> {
+    let report: Report = serde_json::from_str(text)?;
+    Ok(report.evidence.into_iter().map(|e| e.path).collect())
+}
+
 fn pinned_file(root: &Path, path: &str, pin: Option<&str>) -> FlowResult<(String, Cid)> {
     let root = std::fs::canonicalize(root)?;
     let path = confine_under(&root, &root.join(path))?;
@@ -135,13 +168,16 @@ fn pinned_file(root: &Path, path: &str, pin: Option<&str>) -> FlowResult<(String
 }
 
 fn validate_report(
-    root: &Path,
+    root: &(impl EvidenceResources + ?Sized),
     path: &str,
     pin: &str,
     fulfillment_resource: &Cid,
 ) -> FlowResult<()> {
-    let (path, _) = pinned_file(root, path, Some(pin))?;
-    let report: Report = serde_json::from_str(&std::fs::read_to_string(root.join(path))?)?;
+    let text = root.read_text(path)?;
+    if super::body_cid(&text) != cid(pin)? {
+        return Err(refused(format!("evidence changed: {path}")));
+    }
+    let report: Report = serde_json::from_str(&text)?;
     if [&report.intent, &report.revision, &report.environment]
         .iter()
         .any(|s| s.trim().is_empty())
@@ -165,7 +201,9 @@ fn validate_report(
         return Err(refused("report evidence must pin the fulfillment resource"));
     }
     for evidence in report.evidence {
-        pinned_file(root, &evidence.path, Some(&evidence.cid))?;
+        if super::body_cid(&root.read_text(&evidence.path)?) != cid(&evidence.cid)? {
+            return Err(refused(format!("evidence changed: {}", evidence.path)));
+        }
     }
     Ok(())
 }
@@ -268,7 +306,7 @@ fn validate_note_shape(current: &FlowEvent) -> FlowResult<()> {
 /// Immutable authority/link checks, separate from artifact availability. A lost
 /// report invalidates current acceptance, not its explicit supersession history.
 pub fn validate_structure(
-    root: &Path,
+    root: &(impl EvidenceResources + ?Sized),
     records: &[(Cid, FlowRecord)],
     current: &FlowEvent,
 ) -> FlowResult<()> {
@@ -343,7 +381,7 @@ pub fn validate_structure(
 
 /// Recheck the same evidence on admission and reconciliation. Never infer fitness from fields.
 pub fn validate_record(
-    root: &Path,
+    root: &(impl EvidenceResources + ?Sized),
     records: &[(Cid, FlowRecord)],
     current: &FlowEvent,
 ) -> FlowResult<()> {

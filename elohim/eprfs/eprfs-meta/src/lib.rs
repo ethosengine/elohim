@@ -109,6 +109,32 @@ pub fn resolve_path(
         records.push(authored.to_record(Some(repo_root), &meta, subject_path)?);
     }
 
+    resolve_records(path, records)
+}
+
+/// Resolve an explicit nearest-first captured cascade, without opening any filesystem input.
+/// The caller confines paths and captures absence; this preserves root-stop and nearest-wins.
+pub fn resolve_captured_cascade(
+    repo_root: &Path,
+    target: &Path,
+    manifests: &[(PathBuf, String)],
+) -> Result<EprMetaResolution> {
+    let path = projection_path(repo_root, target)?;
+    let mut records = Vec::new();
+    for (meta, text) in manifests.iter().take(MAX_CASCADE_DEPTH) {
+        let authored = parse_authored_meta(meta, text)?;
+        let subject_path =
+            meta_subject_dir(meta).and_then(|parent| relative_path(repo_root, parent));
+        records.push(authored.to_record(Some(repo_root), meta, subject_path)?);
+        if authored.root {
+            break;
+        }
+    }
+    records.reverse();
+    resolve_records(path, records)
+}
+
+fn resolve_records(path: ProjectionPath, records: Vec<EprMetaRecord>) -> Result<EprMetaResolution> {
     let mut rules = BTreeMap::new();
     let mut policies = BTreeMap::new();
     let mut validators = BTreeMap::new();
@@ -224,8 +250,18 @@ fn read_authored_meta(path: &Path) -> Result<AuthoredMeta> {
         path: path.to_path_buf(),
         source,
     })?;
+    parse_authored_meta(path, &text)
+}
+
+fn parse_authored_meta(path: &Path, text: &str) -> Result<AuthoredMeta> {
+    if text.len() > MAX_MANIFEST_BYTES {
+        return Err(EprMetaError::ManifestTooLarge {
+            path: path.into(),
+            limit: MAX_MANIFEST_BYTES,
+        });
+    }
     let frontmatter =
-        frontmatter(&text).ok_or_else(|| EprMetaError::MissingFrontmatter(path.into()))?;
+        frontmatter(text).ok_or_else(|| EprMetaError::MissingFrontmatter(path.into()))?;
     if !flow_depth_ok(frontmatter) {
         return Err(EprMetaError::NestingTooDeep(path.to_path_buf()));
     }
@@ -458,6 +494,7 @@ struct AuthoredRule {
     max_files: Option<serde_yaml::Value>,
     measure: Option<serde_yaml::Value>,
     validator: Option<String>,
+    parameters: Option<serde_yaml::Value>,
 }
 
 impl AuthoredRule {
@@ -525,7 +562,12 @@ impl AuthoredRule {
         } else if let Some(value) = self.measure.as_ref() {
             yaml_to_json(Some(value))
         } else if let Some(value) = self.validator.as_ref() {
-            Value::String(value.clone())
+            match self.parameters.as_ref() {
+                Some(arguments) => {
+                    serde_json::json!({"ref": value, "arguments": yaml_to_json(Some(arguments))})
+                }
+                None => Value::String(value.clone()),
+            }
         } else {
             Value::Null
         }
