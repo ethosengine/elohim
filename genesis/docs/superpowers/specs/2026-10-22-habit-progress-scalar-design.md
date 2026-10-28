@@ -19,8 +19,8 @@ informed-by:
   - elohim/epr-rea/src/lib.rs
   - elohim/eprfs/epr-cli/src/flow/stocks.rs
 cites:
-  - genesis/docs/superpowers/sprints/2026-10-18-marathon-retrospective.md
-  - genesis/docs/superpowers/specs/2026-08-04-middot-measure-primitive-design.md
+  - marathon-retrospective-20261018 | Retrospective | sha256:cbef898ec7bda733 | path: genesis/docs/superpowers/sprints/2026-10-18-marathon-retrospective.md
+  - middot-measure-primitive-design | Middot | sha256:336ab2b4619b9144 | path: genesis/docs/superpowers/specs/2026-08-04-middot-measure-primitive-design.md
   - .epr-meta/dev-system-equilibrium.habit.md
 ---
 
