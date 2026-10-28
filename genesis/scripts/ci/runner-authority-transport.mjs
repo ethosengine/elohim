@@ -25,17 +25,29 @@ const allowed = ${allowed.toString()};
   const raw = fs.readFileSync(0, 'utf8'); if (raw.length > 32768) throw Error();
   const {activation:a, profile, method, path, body} = JSON.parse(raw);
   if (!allowed(method,path)) throw Error();
-  const cmd = fs.readFileSync('/proc/1/cmdline','utf8').split('\\0');
+  const running = pid => {
+    try { return fs.readFileSync('/proc/' + pid + '/cmdline','utf8').split('\\0')[1] === '/opt/compute/worker.mjs'; }
+    catch (error) { if (error.code === 'ENOENT' || error.code === 'ESRCH') return false; throw error; }
+  };
+  const candidates = running('1') ? ['1'] : fs.readFileSync('/proc/1/task/1/children','utf8').trim().split(/\\s+/).filter(pid => /^[1-9][0-9]*$/.test(pid));
+  const workers = candidates.filter(running);
+  if (workers.length !== 1) throw Error();
+  const workerRoot = '/proc/' + workers[0];
+  const identity = () => {
+    const stat = fs.readFileSync(workerRoot + '/stat','utf8');
+    return stat.slice(stat.lastIndexOf(')') + 2).split(' ')[19];
+  };
+  const started = identity();
   const d = JSON.parse(process.env.COMPUTE_RUNNER_GRANT_JSON || 'null');
   const r = JSON.parse(fs.readFileSync('/var/lib/compute/runner-grant.json','utf8'));
-  if (cmd[1] !== '/opt/compute/worker.mjs' || d?.enabled !== true ||
+  if (d?.enabled !== true ||
       d.provider !== a.provider || d.recipient !== a.recipient ||
       d.fixtureProvider !== 'adam' || d.stewardOfRecord !== 'human:matthew' ||
       process.env.COMPUTE_PERFORMER !== a.provider ||
       process.env.COMPUTE_RUNTIME_IMAGE !== a.worker.image.split('@')[1] ||
       r.grantActionHash !== a.grantActionHash || r.grantCid !== a.grantCid ||
       r.provider !== a.provider || r.recipient !== a.recipient) throw Error();
-  if(profile && fs.realpathSync('/proc/1/cwd') !== fs.realpathSync(profile.repoRoot)) throw Error();
+  if(profile && fs.realpathSync(workerRoot + '/cwd') !== fs.realpathSync(profile.repoRoot)) throw Error();
   const base = new URL(process.env.COMPUTE_API_URL || 'http://127.0.0.1:8090');
   if (base.protocol !== 'http:' || !['localhost','127.0.0.1','[::1]'].includes(base.hostname) || base.username || base.password) throw Error();
   const token = process.env.ELOHIM_COMPUTE_LOCAL_TOKEN || ''; if(token.length < 32) throw Error();
@@ -46,6 +58,7 @@ const allowed = ${allowed.toString()};
   };
   const health = await fetch(new URL('/health',base),{redirect:'error',signal:AbortSignal.timeout(10000)});
   if(!health.ok || (await read(health)).dhtParticipation?.agentKeys?.lamad !== a.provider) throw Error();
+  if(!running(workers[0]) || identity() !== started) throw Error();
   if(path === '/api/v1/compute/grants') {
     if(body.revoke === true) { if(body.grantCid === a.grantCid) throw Error(); }
     else if(body.scope !== 'measure-stage' || body.bounds?.epr_scope?.length !== 1 || body.bounds.epr_scope[0] !== '*') throw Error();

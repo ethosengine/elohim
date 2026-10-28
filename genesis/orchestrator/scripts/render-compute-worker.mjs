@@ -12,6 +12,66 @@ const SCRIPT_DIR = dirname(fileURLToPath(import.meta.url));
 const DEFAULT_REPO_ROOT = resolve(SCRIPT_DIR, "..", "..", "..");
 const MI = 1024 * 1024;
 
+// Worker failures must not withdraw the healthy storage container's Service endpoint.
+// Keep this in the pod command so recovery does not depend on rebuilding the image.
+const WORKER_SUPERVISOR = `set -u
+set +m
+state="\${COMPUTE_STATE_ROOT:-/var/lib/compute}"
+start="\${COMPUTE_SUPERVISOR_BACKOFF_START:-10}"
+cap="\${COMPUTE_SUPERVISOR_BACKOFF_CAP:-300}"
+grace="\${COMPUTE_SUPERVISOR_STOP_GRACE:-2}"
+delay=$start
+attempt=0
+worker=
+sleeper=
+stopping=0
+mkdir -p "$state"
+stop() {
+  stopping=1
+  if [[ -n "$worker" ]]; then
+    kill -"$1" -- "-$worker" "$worker" 2>/dev/null || true
+  fi
+  if [[ -n "$sleeper" ]]; then
+    kill -TERM "$sleeper" 2>/dev/null || true
+  fi
+}
+trap 'stop TERM' TERM
+trap 'stop INT' INT
+while (( !stopping )); do
+  attempt=$((attempt + 1))
+  began=$SECONDS
+  setsid bash /opt/compute/worker-start.sh &
+  worker=$!
+  # A signal between launch and PID assignment still has to reach this attempt.
+  if (( stopping )); then stop TERM; fi
+  wait "$worker"
+  code=$?
+  elapsed=$((SECONDS - began))
+  line="$(date -u +%Y-%m-%dT%H:%M:%SZ) exit=$code attempt=$attempt"
+  printf '%s\\n' "$line" > "$state/supervisor-status.txt"
+  printf '%s\\n' "$line" >&2
+  # Descendants may outlive the entrypoint and retain its worker.lock descriptor.
+  if kill -TERM -- "-$worker" 2>/dev/null; then
+    sleep "$grace" &
+    sleeper=$!
+    wait "$sleeper" || true
+    sleeper=
+    kill -KILL -- "-$worker" 2>/dev/null || true
+  fi
+  wait "$worker" 2>/dev/null || true
+  worker=
+  (( stopping )) && break
+  if (( elapsed > cap )); then delay=$start; fi
+  sleep "$delay" &
+  sleeper=$!
+  if (( stopping )); then stop TERM; fi
+  wait "$sleeper" || true
+  sleeper=
+  delay=$((delay * 2))
+  if (( delay > cap )); then delay=$cap; fi
+done
+exit 0`;
+
 // Mirrors bridges/k8s/src/lib.rs `quantity(value: &str, memory: bool)` exactly — same
 // vocabulary (Ti/Gi/Mi/Ki for memory, `m`-suffixed or plain whole-units-times-1000 for
 // cpu millis), same exact-integer-math refusal of anything that would round or overflow.
@@ -305,7 +365,7 @@ async function renderEnabled(source, config, overrides) {
   pod.containers.push({
     name: "compute-worker",
     image: config.image,
-    command: ["bash", "/opt/compute/worker-start.sh"],
+    command: ["bash", "-c", WORKER_SUPERVISOR],
     env: [
       // Kubernetes expands env references in order; carry the token's input too.
       ...(config.localTokenSource === "storage"

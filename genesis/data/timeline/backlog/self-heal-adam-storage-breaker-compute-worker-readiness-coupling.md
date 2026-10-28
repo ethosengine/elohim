@@ -57,6 +57,16 @@ sample 6  elohim-adam-alpha  open  errorStreak 128
 sample 7  elohim-adam-alpha  open  errorStreak 292   (the filing poll)
 ```
 
+Recurrence evidence, **2026-10-27** (same readiness-coupling concern as fingerprint
+`ccce437a2ecf`):
+
+- Edge [#1739](https://jenkins.ethosengine.com/job/elohim-edge/job/dev/1739/consoleText):
+  `back-off 5m0s restarting failed container=compute-worker ... CrashLoopBackOff`
+  and `ERROR: Adam compute worker activation unproven` on `elohim-adam-alpha-0`.
+- Edge [#1740](https://jenkins.ethosengine.com/job/elohim-edge/job/dev/1740/consoleText):
+  `https://elohim.host/epr-head/autonomous-entity-epic: HTTP 502`. Adam's storage
+  process remains healthy while the failed worker removes the pod's :8090 endpoint.
+
 While the circuit was Open, `/p2p/status` on elohim.host answered with peer
 `12D3KooWPF5c…`, which is matthew (`doorway-alpha.elohim.host/p2p/status` reports
 the same id). The doorway's pool upstream took over for the routes that can move to
@@ -107,13 +117,16 @@ storage out of service. The options, best first:
 - **A. Supervise the worker inside its container.** Change line 289 from
   `["bash", "/opt/compute/worker-start.sh"]` to a small supervisor. It runs
   `worker-start.sh` in its own process group (`setsid`), records the exit in
-  `status.txt` on the compute PVC, kills the process group so no orphans survive
+  `supervisor-status.txt` on the compute PVC, kills the process group so its children cannot survive
   (a container restart gave that for free), waits with exponential backoff
   (capped near 300 s), and loops. The container then stays Running, the pod stays
   Ready, and the Service keeps adam's endpoint. Worker health stays visible through
-  its own channel: `genesis/scripts/ci/runner-capture-activation.mjs` already refuses
-  activation from `status.txt`, as edge #1686 shows ("REFUSED compute worker
-  activation"). Cost: `kubectl rollout status` stops failing on a broken worker,
+  its own channel: `genesis/scripts/ci/runner-capture-activation.mjs` invokes
+  `scripts/ci/capture-compute-worker-grant.sh`, which verifies the live worker
+  process, public grant receipt and enforced capacity before writing `status.txt`
+  as CI evidence. Its former PID 1 check must follow the supervised child; a
+  Running supervisor or retained receipt alone cannot prove activation.
+  Cost: `kubectl rollout status` stops failing on a broken worker,
   which is correct. A broken worker is a worker problem, not a storage rollout
   problem.
 - **B. Put a readiness gate on the storage side.** This does not work. Kubernetes
@@ -133,16 +146,19 @@ worker's own process lifetime.
 
 ## Current decision
 
-**Blocked: this needs the Adam compute-worker campaign to change its render.** That
-campaign is the `measure-runs-on-a-peer` habit, branch `feat/jenkins-native-bdd-land`.
-It is pushing `[deploy-only] [build:edge]` commits against this render and its
-activation evidence right now (e1967b598, 30e8c2197, e73b67092). Option A changes
-how that campaign's deploy evidence reads (rollout status vs. activation refusal).
-Editing the render from a sibling branch while the campaign iterates would race it
-and could hide the signal it is using. The campaign owner should take option A
-(or C) as its next worker change.
+**2026-10-27:** The blocking campaign branch `feat/jenkins-native-bdd-land` is no
+longer on origin; the render has been untouched since 2026-10-23 (`9dcd88757`).
+Option A is implemented on `fix/compute-worker-supervise`, awaiting the steward's
+landing decision. Landing rolls Adam's pod. The inline supervisor needs no image
+rebuild; activation and the downstream authority probe verify the actual worker
+child, preserving refusal during bootstrap, failure and retry.
 
-Until then, every time the worker crash-loops on shem, this condition comes back
+The 2026-10-22 decision deferred this change to the `measure-runs-on-a-peer`
+campaign while it was actively changing the render and activation evidence
+(e1967b598, 30e8c2197, e73b67092). That branch conflict is gone; deployment proof
+is still outstanding.
+
+Until landing, every time the worker crash-loops on shem, this condition comes back
 (`circuit:…elohim-adam-alpha…:8090` Open on `alpha-b`, and `GET https://elohim.host/`
 answers 503). A recurrence is this concern, not a new one. Extend `fingerprints:`
 here.
@@ -171,3 +187,23 @@ The ledger line will close when the poller stops seeing it. Nothing has fixed th
 underlying coupling. Re-check after the next worker change: with the worker
 deliberately failing, `elohim-adam-alpha-0` must stay `Ready`, and the elohim.host
 upstream to adam must stay `closed`.
+
+Deployment regression still to measure (proposed station in
+`genesis/a2o/features/compute/measure-on-a-peer.feature`):
+
+```gherkin
+@wip @regression @requires:shem
+Scenario: Adam keeps serving content when its compute worker fails
+  Given Adam's storage is healthy and serves a known epr-head
+  When the compute worker exits with code 1
+  Then Adam's pod stays Ready and the same epr-head still returns HTTP 200
+  And compute activation remains REFUSED until a live worker completes bootstrap
+  # Retry delay: 10 seconds, doubling to 300; process-group TERM grace: 2 seconds.
+```
+
+The local render tests exercise the emitted command with a failing worker and
+TERM-resistant children, checking retry, lock release, exit evidence and prompt
+SIGTERM/SIGINT cleanup. They do not establish fleet readiness. Private-mesh
+services deliberately started in separate sessions by `hc-mesh.sh` are outside
+the worker's process group; their resume/cleanup behavior remains a live
+deployment check.

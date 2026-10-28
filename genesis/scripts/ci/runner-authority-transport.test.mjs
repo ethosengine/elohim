@@ -85,69 +85,102 @@ test("exact route allowlist excludes arbitrary paths, query strings and producti
   ])
     assert(!allowed("POST", path));
 });
-test("fixed in-pod program keeps token local and strips unknown server fields", async () => {
-  const secret = "pod-only-capability-never-output-123456789";
-  const input = {
-    activation,
-    method: "POST",
-    path: `/api/v1/compute/tasks/${ref}/accept`,
-    body: { attemptId: "x" },
-  };
-  const files = {
-    0: JSON.stringify(input),
-    "/proc/1/cmdline": "node\0/opt/compute/worker.mjs\0",
-    "/var/lib/compute/runner-grant.json": JSON.stringify({ ...activation }),
-  };
-  let output = "",
-    writes = 0;
-  const context = {
-    Buffer,
-    URL,
-    AbortSignal,
-    console: {
-      log: (s) => {
-        output += s;
+for (const mode of ["legacy", "supervised", "backoff", "retry"]) {
+  test(`fixed in-pod program keeps token local and checks the worker (${mode})`, async () => {
+    const secret = "pod-only-capability-never-output-123456789";
+    const input = {
+      activation,
+      method: "POST",
+      path: `/api/v1/compute/tasks/${ref}/accept`,
+      body: { attemptId: "x" },
+      profile: { repoRoot: "/provider/repo" },
+    };
+    const files = {
+      0: JSON.stringify(input),
+      "/proc/1/cmdline":
+        mode === "legacy"
+          ? "node\0/opt/compute/worker.mjs\0"
+          : "bash\0-c\0supervisor\0",
+      "/proc/1/task/1/children": "42 ",
+      "/proc/42/cmdline":
+        mode === "backoff" ? "sleep\0" : "node\0/opt/compute/worker.mjs\0",
+      "/var/lib/compute/runner-grant.json": JSON.stringify({ ...activation }),
+    };
+    let output = "",
+      writes = 0,
+      statReads = 0;
+    const context = {
+      Buffer,
+      URL,
+      AbortSignal,
+      console: {
+        log: (s) => {
+          output += s;
+        },
+        error: () => {},
       },
-      error: () => {},
-    },
-    process: {
-      env: {
-        COMPUTE_RUNNER_GRANT_JSON: JSON.stringify({
-          enabled: true,
-          provider,
-          recipient,
-          fixtureProvider: "adam",
-          stewardOfRecord: "human:matthew",
-        }),
-        COMPUTE_PERFORMER: provider,
-        COMPUTE_RUNTIME_IMAGE: activation.worker.image.split("@")[1],
-        ELOHIM_COMPUTE_LOCAL_TOKEN: secret,
+      process: {
+        env: {
+          COMPUTE_RUNNER_GRANT_JSON: JSON.stringify({
+            enabled: true,
+            provider,
+            recipient,
+            fixtureProvider: "adam",
+            stewardOfRecord: "human:matthew",
+          }),
+          COMPUTE_PERFORMER: provider,
+          COMPUTE_RUNTIME_IMAGE: activation.worker.image.split("@")[1],
+          ELOHIM_COMPUTE_LOCAL_TOKEN: secret,
+        },
       },
-    },
-    require: () => ({ readFileSync: (p) => files[p] }),
-    fetch: async (url, options) => {
-      const health = url.pathname === "/health";
-      if (!health) {
-        writes++;
-        assert.equal(options.headers["x-elohim-compute-token"], secret);
-      }
-      const data = health
-        ? { dhtParticipation: { agentKeys: { lamad: provider } } }
-        : { reason: "compute-grant-refused", token: secret };
-      return {
-        ok: true,
-        status: health ? 200 : 403,
-        body: (async function* () {
-          yield Buffer.from(JSON.stringify(data));
-        })(),
-      };
-    },
-  };
-  await vm.runInNewContext(podProgram, context);
-  assert.equal(writes, 1);
-  assert(!output.includes(secret));
-  assert.deepEqual(JSON.parse(output), {
-    status: 403,
-    body: { reason: "compute-grant-refused" },
+      require: () => ({
+        readFileSync: (p) =>
+          p.endsWith?.("/stat")
+            ? "42 (node) S " +
+              Array(18).fill("0").join(" ") +
+              " " +
+              (mode === "retry" ? ++statReads : 100)
+            : files[p],
+        realpathSync: (p) => {
+          assert.ok(
+            [
+              "/provider/repo",
+              `/proc/${mode === "legacy" ? 1 : 42}/cwd`,
+            ].includes(p),
+          );
+          return "/provider/repo";
+        },
+      }),
+      fetch: async (url, options) => {
+        const health = url.pathname === "/health";
+        if (!health) {
+          writes++;
+          assert.equal(options.headers["x-elohim-compute-token"], secret);
+        }
+        const data = health
+          ? { dhtParticipation: { agentKeys: { lamad: provider } } }
+          : { reason: "compute-grant-refused", token: secret };
+        return {
+          ok: true,
+          status: health ? 200 : 403,
+          body: (async function* () {
+            yield Buffer.from(JSON.stringify(data));
+          })(),
+        };
+      },
+    };
+    await vm.runInNewContext(podProgram, context);
+    if (["backoff", "retry"].includes(mode)) {
+      assert.equal(writes, 0);
+      assert.equal(context.process.exitCode, 1);
+      assert.equal(output, "");
+      return;
+    }
+    assert.equal(writes, 1);
+    assert(!output.includes(secret));
+    assert.deepEqual(JSON.parse(output), {
+      status: 403,
+      body: { reason: "compute-grant-refused" },
+    });
   });
-});
+}

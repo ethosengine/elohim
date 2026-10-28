@@ -5,6 +5,9 @@ import { spawnSync } from "node:child_process";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
+import fs from "node:fs";
+import path from "node:path";
+import vm from "node:vm";
 
 const script = fileURLToPath(
   new URL("./capture-compute-worker-grant.sh", import.meta.url),
@@ -50,9 +53,24 @@ async function fixture(t) {
 const fs = require('node:fs');
 const read = fs.readFileSync, stat = fs.lstatSync, directoryStat = fs.statSync;
 const cgroup = JSON.parse(read(process.env.FIXTURE + '/cgroup.json', 'utf8'));
+const mode = process.env.MODE;
+let workerReads = 0;
 fs.readFileSync = function(path, ...args) {
-  if (path === '/proc/1/cmdline') return process.env.MODE === 'starting'
-    ? 'bash\\0/opt/compute/worker-start.sh\\0' : 'node\\0/opt/compute/worker.mjs\\0';
+  if (path === '/proc/1/cmdline') return mode.startsWith('supervised-')
+    ? 'bash\\0-c\\0supervisor\\0' : mode === 'starting'
+      ? 'bash\\0/opt/compute/worker-start.sh\\0' : 'node\\0/opt/compute/worker.mjs\\0';
+  if (path === '/proc/1/task/1/children') return mode === 'starting' ? '' : '42 ';
+  if (path === '/proc/42/cmdline') return mode === 'supervised-backoff' ? 'sleep\\0' + '10\\0'
+    : mode === 'supervised-starting' ? 'bash\\0/opt/compute/worker-start.sh\\0' : 'node\\0/opt/compute/worker.mjs\\0';
+  if (path === '/proc/1/stat' || path === '/proc/42/stat') {
+    const pid = path.split('/')[2];
+    const fields = Array(20).fill('0');
+    fields[0] = mode === 'supervised-zombie' ? 'Z' : 'S';
+    fields[1] = mode === 'supervised-unrelated' ? '99' : '1';
+    fields[2] = fields[3] = pid;
+    fields[19] = mode === 'supervised-retry' ? String(++workerReads) : '12345';
+    return pid + ' (node) ' + fields.join(' ');
+  }
   if (path === '/var/lib/compute/runner-grant.json') path = process.env.FIXTURE + '/receipt.json';
   if (path === '/proc/self/cgroup' || String(path).startsWith('/sys/fs/cgroup')) {
     if (cgroup[path] === undefined) { const error = new Error('missing'); error.code = 'ENOENT'; throw error; }
@@ -124,6 +142,58 @@ if (args.includes('get')) {
     dir,
     cgroup,
     artifact,
+    observe: async (mode) => {
+      const preload = await readFile(join(dir, "preload.cjs"), "utf8");
+      const program = (await readFile(script, "utf8"))
+        .split("<<'NODE'\n")[1]
+        .split("\nNODE")[0];
+      const virtualFs = { ...fs };
+      let output = "";
+      let exited;
+      const context = {
+        require: (name) => (name === "node:fs" ? virtualFs : path),
+        process: {
+          argv: [
+            "node",
+            "-",
+            provider,
+            recipient,
+            image,
+            "test-ns",
+            "adam-0",
+            "uid",
+            "containerd://original",
+            "0",
+            "8000",
+            "25769803776",
+          ],
+          env: {
+            ...env,
+            MODE: mode,
+            COMPUTE_RUNNER_GRANT_JSON: JSON.stringify({
+              enabled: true,
+              provider,
+              recipient,
+              stewardOfRecord: "human:matthew",
+              fixtureProvider: "adam",
+            }),
+            COMPUTE_PERFORMER: provider,
+            COMPUTE_RUNTIME_IMAGE: image.split("@")[1],
+          },
+          exit: (code) => {
+            exited = code;
+            throw new Error("process.exit");
+          },
+        },
+        console: {
+          log: (value) => {
+            output += value;
+          },
+        },
+      };
+      vm.runInNewContext(`(function() { ${preload} })();\n${program}`, context);
+      return { code: exited ?? context.process.exitCode ?? 0, output };
+    },
     run: (extra = {}) =>
       spawnSync("bash", [script, "adam", "test-ns", output], {
         env: { ...env, ...extra },
@@ -167,6 +237,29 @@ test("captures only validated public grant fields and the running worker incarna
   assert.ok(calls.every((args) => args[0].startsWith("--request-timeout=")));
 });
 
+for (const [mode, expected] of [
+  ["ready", 0],
+  ["supervised-ready", 0],
+  ["supervised-backoff", 75],
+  ["supervised-starting", 75],
+  ["supervised-zombie", 75],
+  ["supervised-unrelated", 75],
+  ["supervised-retry", 75],
+]) {
+  test(`in-container activation observer checks process truth (${mode})`, async (t) => {
+    const f = await fixture(t);
+    const result = await f.observe(mode);
+    assert.equal(result.code, expected);
+    if (expected === 0) {
+      assert.equal(
+        JSON.parse(result.output).grantActionHash,
+        receipt.grantActionHash,
+      );
+      assert.doesNotMatch(result.output, /SECRET-/);
+    } else assert.equal(result.output, "");
+  });
+}
+
 test("disabled worker does not query Kubernetes and removes stale success", async (t) => {
   const f = await fixture(t);
   const result = f.run({ COMPUTE_WORKER_ENABLED: "false" });
@@ -176,6 +269,15 @@ test("disabled worker does not query Kubernetes and removes stale success", asyn
   await assert.rejects(readFile(f.artifact), { code: "ENOENT" });
 });
 
+test("a supervised live worker can prove activation after bootstrap", async (t) => {
+  const f = await fixture(t);
+  const result = f.run({ MODE: "supervised-ready" });
+  assert.equal(result.status, 0, result.stderr);
+  const captured = JSON.parse(await readFile(f.artifact, "utf8"));
+  assert.equal(captured.worker.command, "/opt/compute/worker.mjs");
+  assert.equal(captured.grantActionHash, receipt.grantActionHash);
+});
+
 for (const mode of [
   "missing",
   "unready",
@@ -183,6 +285,11 @@ for (const mode of [
   "starting",
   "forbidden",
   "restart",
+  "supervised-backoff",
+  "supervised-starting",
+  "supervised-zombie",
+  "supervised-unrelated",
+  "supervised-retry",
 ]) {
   test(`${mode} cannot produce activation evidence or reuse a retained receipt`, async (t) => {
     const f = await fixture(t);
