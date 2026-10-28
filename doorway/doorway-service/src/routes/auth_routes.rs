@@ -1390,8 +1390,9 @@ fn node_device_login_refusal(
     // Gated (`DOORWAY_PROVISIONING_STORE_GATE`): accounts registered before the
     // provisioning records existed may carry the key of an app this doorway
     // hosts, and only the records (backfilled when the gate is on) say which of
-    // them were hosted for that account. Off, no login is refused here.
-    if !registry.store_gate() {
+    // them were hosted for that account. Off, no login is refused here; on, not
+    // until the backfill has completed since boot.
+    if !registry.store_gate() || !registry.records_backfilled() {
         return None;
     }
     let entry = registry.get_conductor_for_agent(agent_pub_key)?;
@@ -7343,6 +7344,9 @@ mod node_device_key_guard_tests {
         let registry = ConductorRegistry::new(None)
             .await
             .with_store_gate(store_gate);
+        if store_gate {
+            registry.mark_records_backfilled();
+        }
         registry
             .register_agent(HOSTED, "conductor-0", "elohim-conductor-0-abcdef")
             .await
@@ -7447,6 +7451,30 @@ mod node_device_key_guard_tests {
         for phase in ["node", "device"] {
             assert!(node_device_login_refusal(&state, Some(phase), HOSTED).is_none());
         }
+    }
+
+    /// With the gate on, the record-dependent login check waits for the boot
+    /// backfill: until every account a conductor confirms has its record, a
+    /// legacy node/device row carrying a hosted key is not refused.
+    #[tokio::test]
+    async fn the_node_device_login_check_waits_for_the_backfill() {
+        use clap::Parser;
+        let args = crate::config::Args::parse_from(["doorway", "--listen", "127.0.0.1:0"]);
+        let mut state = AppState::new(args);
+        let registry = ConductorRegistry::new(None).await.with_store_gate(true);
+        registry
+            .register_agent(HOSTED, "conductor-0", "elohim-conductor-0-abcdef")
+            .await
+            .unwrap();
+        state.conductor_registry = Some(Arc::new(registry));
+        assert!(node_device_login_refusal(&state, Some("node"), HOSTED).is_none());
+
+        state
+            .conductor_registry
+            .as_ref()
+            .unwrap()
+            .mark_records_backfilled();
+        assert!(node_device_login_refusal(&state, Some("node"), HOSTED).is_some());
     }
 
     /// The Human recovery refusal follows the same gate: the registry this

@@ -103,6 +103,11 @@ pub struct ConductorRegistry {
     /// them before the intent log existed, and no node/device login is
     /// refused for want of a record. See [`Self::with_store_gate`].
     store_gate: AtomicBool,
+    /// The account-key-verified backfill has completed since boot
+    /// (`AgentProvisioner::migrate_from_accounts`, or a complete operator
+    /// recovery). Until it has, nothing that depends on a record existing for
+    /// an account is enforced.
+    records_backfilled: AtomicBool,
 }
 
 /// The facts the wiped-store verdict is computed from.
@@ -247,6 +252,7 @@ impl ConductorRegistry {
             persisted_mappings_at_boot: 0,
             store_loss: Mutex::new(None),
             store_gate: AtomicBool::new(false),
+            records_backfilled: AtomicBool::new(false),
         };
 
         // Load persisted agent mappings if MongoDB is available
@@ -287,6 +293,17 @@ impl ConductorRegistry {
     /// Whether the store verdict may refuse anyone. See [`Self::with_store_gate`].
     pub fn store_gate(&self) -> bool {
         self.store_gate.load(Ordering::Relaxed)
+    }
+
+    /// Every account a conductor confirms now has a record (the backfill or a
+    /// recovery completed since boot).
+    pub fn mark_records_backfilled(&self) {
+        self.records_backfilled.store(true, Ordering::Relaxed);
+    }
+
+    /// Whether the account-key-verified backfill has completed since boot.
+    pub fn records_backfilled(&self) -> bool {
+        self.records_backfilled.load(Ordering::Relaxed)
     }
 
     /// The provisioning intent log.

@@ -622,24 +622,24 @@ async fn async_main(worker_threads: usize) -> anyhow::Result<()> {
                 tokio::time::sleep(doorway::conductor::provisioner::walk_backoff(attempt)).await;
                 attempt = attempt.saturating_add(1);
             }
-            // First use of the log on a doorway that already hosts people reads
-            // `wiped`. With the gate on, backfill the records from the account
-            // rows a conductor confirms before anyone without a record is
-            // admitted; a database that lost its accounts too proves nobody and
-            // stays wiped for an operator.
-            if let Some(mongo) = mongo {
+            // With the store gate on, backfill a record for every account row
+            // whose agent key a conductor confirms — at every boot, whatever the
+            // verdict, and before anything that needs a record is enforced. On
+            // a first use of the log that is also what clears `wiped`; a
+            // database that lost its accounts too proves nobody and stays
+            // wiped for an operator.
+            if let Some(mongo) = mongo.filter(|_| walker.store_gate()) {
                 let mut attempt = 0u32;
-                while walker.recovery_required() {
+                loop {
                     match doorway::routes::admin_conductors::account_agent_keys(&mongo).await {
                         Ok(accounts) => {
-                            let report = walker.migrate_from_accounts(&accounts).await;
-                            if !walker.recovery_required() || report.complete {
+                            if walker.migrate_from_accounts(&accounts).await.complete {
                                 break;
                             }
                         }
                         Err(e) => warn!(
                             error = %e,
-                            "First-use provisioning migration could not read the account rows"
+                            "Provisioning backfill could not read the account rows"
                         ),
                     }
                     tokio::time::sleep(doorway::conductor::provisioner::walk_backoff(attempt))

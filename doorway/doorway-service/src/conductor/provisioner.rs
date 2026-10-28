@@ -417,6 +417,20 @@ impl AgentProvisioner {
             let step = match recorded {
                 // An install was written, or seen installed: only the conductor
                 // the record names can say what became of it.
+                // An app conflict holds until an operator's recovery proves
+                // whose the app is: never adopted, never re-offered elsewhere.
+                Some(intent)
+                    if intent.is_live() && intent.stuck == Some(StuckReason::AppConflict) =>
+                {
+                    Step::Done(Err(ProvisionError::unresolved(
+                        &intent.conductor_id,
+                        format!(
+                            "an app under '{}' on {} is not one this doorway can show is this \
+                             person's (app conflict); an operator must resolve it",
+                            intent.installed_app_id, intent.conductor_id
+                        ),
+                    )))
+                }
                 Some(intent) if intent.may_have_landed() => self.resolve_recorded(intent).await,
                 // A conductor was chosen and nothing sent. If that is recent,
                 // another call (another process — this process is serialized
@@ -596,34 +610,46 @@ impl AgentProvisioner {
     /// the intent log existed, kept so that turning the log on changes nothing
     /// for people provisioned before it.
     ///
-    /// Asks each pool conductor for an app under the person's LEGACY short id
-    /// and adopts the first it finds. A conductor that cannot be asked is
-    /// skipped, as it always was. This is adoption by app id — the very thing
+    /// Asks each pool conductor for an app under the person's id — the current
+    /// full-hash id, then the LEGACY short id — and adopts the first it finds.
+    /// The full-hash id matters on a doorway with no Mongo (the log is process
+    /// memory): after a restart its records are gone, and the apps it installed
+    /// under full-hash ids must still be found, on whichever conductor holds
+    /// them, as dev found its short-id apps. A conductor that cannot be asked
+    /// is skipped, as it always was. This is adoption by app id — the very thing
     /// [`Self::finish_forward`] refuses — and it runs only while the store gate
     /// is off; with the gate on, an app without a record is adopted only on
     /// proof ([`Self::resolve_account_mapping`]). No record is written for what
     /// it finds: an app id is not proof, and a record is.
     async fn legacy_find_existing_app(&self, user_identifier: &str) -> Option<ProvisionedAgent> {
         for conductor in &self.registry.list_conductors() {
-            let app_id =
-                legacy_short_app_id(&self.app_id, &conductor.conductor_id, user_identifier);
             let Ok(admin) = self.connector.connect(&conductor.admin_url).await else {
                 continue;
             };
-            if let Ok(Some(existing)) = admin.find_app(&app_id).await {
-                info!(
-                    conductor = %conductor.conductor_id,
-                    app_id = %app_id,
-                    user = %user_identifier,
-                    "Reusing an app under this person's legacy id (store gate off)"
-                );
-                return Some(
-                    self.adopt_existing(conductor, app_id, &existing.agent_pub_key)
-                        .await,
-                );
+            for app_id in [
+                generate_app_id(&self.app_id, &conductor.conductor_id, user_identifier),
+                legacy_short_app_id(&self.app_id, &conductor.conductor_id, user_identifier),
+            ] {
+                if let Ok(Some(existing)) = admin.find_app(&app_id).await {
+                    info!(
+                        conductor = %conductor.conductor_id,
+                        app_id = %app_id,
+                        user = %user_identifier,
+                        "Reusing an app under this person's id with no record (store gate off)"
+                    );
+                    return Some(
+                        self.adopt_existing(conductor, app_id, &existing.agent_pub_key)
+                            .await,
+                    );
+                }
             }
         }
         None
+    }
+
+    /// Whether the store gate (`DOORWAY_PROVISIONING_STORE_GATE`) is on.
+    pub fn store_gate(&self) -> bool {
+        self.registry.store_gate()
     }
 
     /// Whether a person with no record is refused until the records are
@@ -858,37 +884,51 @@ impl AgentProvisioner {
                     }
                     // The conductor answered. What is on it now decides the
                     // rest, and only the conductor can say.
-                    FaultClass::Refused => match admin.find_app(&installed_app_id).await {
-                        // Nothing there: a definite refusal that left nothing.
-                        Ok(None) => AttemptFault::verdict(message).into(),
-                        // An app exists under this id now. THIS install was
-                        // refused, so it is not the one this record sent, and
-                        // an id is not a person: a conflict — never an
-                        // adoption.
-                        Ok(Some(_)) => {
-                            self.mark_stuck(intent, StuckReason::AppConflict).await;
-                            AttemptError::Final(ProvisionError::unresolved(
-                                &conductor.conductor_id,
-                                format!(
+                    FaultClass::Refused => {
+                        let found = admin.find_app(&installed_app_id).await;
+                        // A DEFINITE refusal: this record's install did not
+                        // land. The absence it recorded before sending is no
+                        // evidence about anything under the id from now on, so
+                        // it is withdrawn — persisted, so a later request can
+                        // never adopt what is there on the strength of it.
+                        intent.absent_before_send = false;
+                        match found {
+                            // Nothing there: a definite refusal that left nothing.
+                            Ok(None) => AttemptFault::verdict(message).into(),
+                            // An app exists under this id now. THIS install was
+                            // refused, so it is not the one this record sent, and
+                            // an id is not a person: a conflict — never an
+                            // adoption, on this request or any later one, until an
+                            // operator's recovery proves whose it is.
+                            Ok(Some(_)) => {
+                                intent.stuck = Some(StuckReason::AppConflict);
+                                self.note(intent).await;
+                                AttemptError::Final(ProvisionError::unresolved(
+                                    &conductor.conductor_id,
+                                    format!(
                                     "an app appeared on {} under '{installed_app_id}' while this \
                                      doorway's own install of it was refused, so this doorway \
                                      has no evidence it belongs to this person; an operator \
                                      must resolve it",
                                     conductor.conductor_id
                                 ),
-                            ))
+                                ))
+                            }
+                            // The lookup itself failed: nothing is known about what
+                            // is on the conductor. Never abandon on an unknown.
+                            Err(lookup) => {
+                                self.note(intent).await;
+                                AttemptError::Final(ProvisionError::unresolved(
+                                    &conductor.conductor_id,
+                                    format!(
+                                        "{message}; and {} did not answer whether \
+                                     '{installed_app_id}' exists ({lookup})",
+                                        conductor.conductor_id
+                                    ),
+                                ))
+                            }
                         }
-                        // The lookup itself failed: nothing is known about what
-                        // is on the conductor. Never abandon on an unknown.
-                        Err(lookup) => AttemptError::Final(ProvisionError::unresolved(
-                            &conductor.conductor_id,
-                            format!(
-                                "{message}; and {} did not answer whether \
-                                 '{installed_app_id}' exists ({lookup})",
-                                conductor.conductor_id
-                            ),
-                        )),
-                    },
+                    }
                 });
             }
         };
@@ -1373,7 +1413,10 @@ impl AgentProvisioner {
             // this id" immediately before this record's install was written, so
             // the app now under the id on this conductor is that install. Record
             // its key; from here on the key is the proof.
-            None if intent.absent_before_send && intent.install_sent_at.is_some() => {
+            None if intent.absent_before_send
+                && intent.install_sent_at.is_some()
+                && intent.stuck != Some(StuckReason::AppConflict) =>
+            {
                 info!(
                     conductor = %conductor_id,
                     app_id = %installed_app_id,
@@ -1384,7 +1427,9 @@ impl AgentProvisioner {
                 conductors_key.clone()
             }
             None => {
-                self.mark_stuck(intent, StuckReason::NoUsableKey).await;
+                if intent.stuck != Some(StuckReason::AppConflict) {
+                    self.mark_stuck(intent, StuckReason::NoUsableKey).await;
+                }
                 return Err(ProvisionError::unresolved(
                     conductor_id,
                     format!(
@@ -1794,9 +1839,10 @@ impl AgentProvisioner {
     /// The walk clears `recovery_required` only if it is COMPLETE: every
     /// conductor answered and every record an account proved was written.
     pub async fn rebuild_from_conductors(&self, accounts: &[(String, String)]) -> RecoveryReport {
-        let mut report = self.rebuild_records(accounts).await;
+        let mut report = self.rebuild_records(accounts, RecordWrite::Replace).await;
         if report.complete {
             self.registry.mark_recovered();
+            self.registry.mark_records_backfilled();
         }
         self.fill_store_state(&mut report);
         self.fill_log_state(&mut report).await;
@@ -1810,9 +1856,16 @@ impl AgentProvisioner {
         report
     }
 
-    /// AUTOMATIC FIRST-USE MIGRATION — the same walk as the operator's
-    /// recovery, run by the doorway itself when the store gate is on and the
-    /// verdict reads `Wiped`.
+    /// AUTOMATIC BACKFILL — the same walk as the operator's recovery, run by
+    /// the doorway itself at every boot with the store gate on, whatever the
+    /// verdict, and before the record-dependent node/device login check is
+    /// enforced (`ConductorRegistry::records_backfilled`). It only INSERTS a
+    /// record where none exists.
+    ///
+    /// On a normal upgrade the agent mappings survive and the verdict reads
+    /// `not_wiped`, yet no account has a record; without this, every legacy
+    /// node/device account whose key names a hosted app would be refused at
+    /// login the moment the gate is on.
     ///
     /// `Wiped` means "no records at boot, and the conductors host apps". That
     /// is also exactly what the FIRST boot with the intent log looks like on a
@@ -1832,7 +1885,14 @@ impl AgentProvisioner {
     /// An app no account claims is assigned to nobody, as in the operator's
     /// recovery.
     pub async fn migrate_from_accounts(&self, accounts: &[(String, String)]) -> RecoveryReport {
-        let mut report = self.rebuild_records(accounts).await;
+        let mut report = self
+            .rebuild_records(accounts, RecordWrite::InsertOnly)
+            .await;
+        // Records now exist for every account a conductor confirms: from here
+        // the record-dependent node/device login check may be enforced.
+        if report.complete {
+            self.registry.mark_records_backfilled();
+        }
         let cleared = report.complete && report.accounts_proven > 0;
         if cleared {
             self.registry.mark_recovered();
@@ -1854,7 +1914,11 @@ impl AgentProvisioner {
 
     /// The walk both recoveries share: rebuild mappings from every conductor,
     /// and records from the accounts a conductor confirms. Marks nothing.
-    async fn rebuild_records(&self, accounts: &[(String, String)]) -> RecoveryReport {
+    async fn rebuild_records(
+        &self,
+        accounts: &[(String, String)],
+        write: RecordWrite,
+    ) -> RecoveryReport {
         let mut report = RecoveryReport::default();
         // canonical agent key → (conductor, app id)
         let mut seen: std::collections::HashMap<String, (String, String)> =
@@ -1938,8 +2002,15 @@ impl AgentProvisioner {
                 {
                     Ok(true)
                 }
+                // The automatic backfill writes only where nothing is
+                // recorded: it runs at every boot with the gate on, over
+                // records that are live and moving.
+                Ok(Some(_)) if write == RecordWrite::InsertOnly => {
+                    report.records_kept.push(identifier.clone());
+                    continue;
+                }
                 // Abandoned, stuck, or pointing elsewhere: the conductor-
-                // confirmed account key wins.
+                // confirmed account key wins (the operator's recovery only).
                 Ok(Some(existing)) => {
                     rebuilt.version = existing.version + 1;
                     rebuilt.created_at = existing.created_at;
@@ -2316,6 +2387,16 @@ fn install_in_flight_bound() -> std::time::Duration {
     super::typed_admin::admin_request_timeout()
 }
 
+/// How a recovery walk writes the records it has proof for.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum RecordWrite {
+    /// The automatic backfill: only where there is no record at all.
+    InsertOnly,
+    /// The operator's recovery: the conductor-confirmed account key replaces
+    /// an abandoned, stuck or differing record.
+    Replace,
+}
+
 /// What the operator's recovery found and did.
 #[derive(Debug, Default, Clone, serde::Serialize)]
 #[serde(rename_all = "camelCase")]
@@ -2349,6 +2430,9 @@ pub struct RecoveryReport {
     pub records_not_written: Vec<String>,
     /// Accounts whose agent key no conductor reported.
     pub accounts_without_an_app: Vec<String>,
+    /// Accounts a conductor confirmed whose existing record the automatic
+    /// backfill left as it was (it never replaces a record).
+    pub records_kept: Vec<String>,
     /// `conductor/app id` of hosted apps no account row claims. Assigned to
     /// nobody: the doorway has no evidence whose they are.
     pub apps_without_an_account: Vec<String>,
@@ -4851,7 +4935,15 @@ mod tests {
         pool: &Arc<FakePool>,
         store: &Arc<MemoryIntentStore>,
     ) -> AgentProvisioner {
-        let gated = doorway_over(pool, store, A_FIRST).await;
+        ungated_doorway_loaded(pool, store, A_FIRST).await
+    }
+
+    async fn ungated_doorway_loaded(
+        pool: &Arc<FakePool>,
+        store: &Arc<MemoryIntentStore>,
+        loads: [(&str, usize); 2],
+    ) -> AgentProvisioner {
+        let gated = doorway_over(pool, store, loads).await;
         let registry = Arc::new(
             ConductorRegistry::new(None)
                 .await
@@ -5032,6 +5124,143 @@ mod tests {
         let operator = doorway.rebuild_from_conductors(&accounts).await;
         assert!(!operator.complete);
         assert!(doorway.recovery_required());
+    }
+
+    /// BLOCKER (review rev-5): the conductor answers the id absent, a
+    /// competing install lands under it, and ours is refused. That app is not
+    /// this person's — and stays not theirs on the NEXT request, which must not
+    /// adopt it on the absence the first request recorded. Gate on and off.
+    #[tokio::test]
+    async fn a_refused_first_install_never_adopts_the_competing_app_on_any_request() {
+        for gated in [true, false] {
+            let pool = Arc::new(FakePool::default());
+            let store = Arc::new(MemoryIntentStore::new());
+            let doorway = if gated {
+                doorway_over(&pool, &store, A_FIRST).await
+            } else {
+                ungated_doorway_over(&pool, &store).await
+            };
+            pool.with("conductor-a", |c| c.lands_before_next_install = true);
+
+            for request in 1..=2 {
+                let error = doorway
+                    .provision_agent(USER)
+                    .await
+                    .expect_err("the app under the id is not this person's");
+                assert_eq!(
+                    unresolved_on(&error),
+                    vec!["conductor-a".to_string()],
+                    "gated={gated} request {request}"
+                );
+                let record = intent_of(&store, USER).await;
+                assert_eq!(record.stuck, Some(StuckReason::AppConflict), "{request}");
+                assert!(record.agent_pub_key.is_none(), "{request}: nothing adopted");
+                assert!(!record.absent_before_send, "{request}: refusal persisted");
+            }
+            assert_eq!(pool.total_installs_received(), 1, "no re-send onto it");
+            assert_eq!(pool.total_keys_generated(), 1, "only the competitor's key");
+            assert_untouched(&pool, "conductor-b");
+        }
+    }
+
+    /// MAJOR (review rev-5): store gate off and no Mongo — the log is process
+    /// memory. After a restart the records are gone; a person provisioned
+    /// under a full-hash id must get their ORIGINAL identity back, whichever
+    /// conductor is now least loaded, as dev found its short-id apps.
+    #[tokio::test]
+    async fn without_mongo_a_restart_keeps_the_identity_with_the_gate_off() {
+        for loads in [A_FIRST, B_FIRST] {
+            let pool = Arc::new(FakePool::default());
+            let before = ungated_doorway_over(&pool, &Arc::new(MemoryIntentStore::new())).await;
+            let original = before.provision_agent(USER).await.expect("first");
+            assert_eq!(original.conductor_id, "conductor-a");
+
+            // Restart: a fresh process-memory log over the same conductors.
+            let after =
+                ungated_doorway_loaded(&pool, &Arc::new(MemoryIntentStore::new()), loads).await;
+            let again = after.provision_agent(USER).await.expect("found again");
+
+            assert_eq!(again.agent_pub_key, original.agent_pub_key, "{loads:?}");
+            assert_eq!(again.installed_app_id, original.installed_app_id);
+            assert_eq!(
+                pool.total_installs_received(),
+                1,
+                "{loads:?}: no new install"
+            );
+            assert_untouched(&pool, "conductor-b");
+        }
+    }
+
+    /// MAJOR (review rev-5): a normal upgrade keeps the agent mappings, so the
+    /// verdict reads not_wiped and no account has a record. With the gate on,
+    /// the boot backfill still writes a record for every account a conductor
+    /// confirms — including a legacy node/device row carrying a hosted key —
+    /// and only then is the record-dependent login check enforceable. It never
+    /// replaces a record that exists.
+    #[tokio::test]
+    async fn the_backfill_runs_on_a_normal_upgrade_before_login_needs_a_record() {
+        let pool = Arc::new(FakePool::default());
+        let store = Arc::new(MemoryIntentStore::new());
+        let doorway = doorway_over(&pool, &store, A_FIRST).await;
+        let node_key = raw_agent_key(250);
+        let node_app = legacy_short_app_id(DEFAULT_APP_ID, "conductor-a", ALICE);
+        place_app(&pool, "conductor-a", &node_app, &node_key, "running");
+        let mallory_key = raw_agent_key(251);
+        place_app(
+            &pool,
+            "conductor-b",
+            "elohim-conductor-b-mallory",
+            &mallory_key,
+            "running",
+        );
+        // Mappings survived the upgrade: the verdict is not_wiped.
+        let upgraded = AgentProvisioner::new(Arc::new(
+            ConductorRegistry::new(None)
+                .await
+                .with_store_gate(true)
+                .with_intent_store(Arc::clone(&store) as Arc<dyn IntentStore>),
+        ))
+        .with_connector(Arc::new(FakeConnector(Arc::clone(&pool))));
+        for conductor in doorway.registry.list_conductors() {
+            upgraded.registry.register_conductor(conductor);
+        }
+        upgraded
+            .registry
+            .register_agent(&provisioned_agent_key(&node_key), "conductor-a", &node_app)
+            .await
+            .unwrap();
+        upgraded.registry.track_store_loss(Some(1));
+        assert_eq!(upgraded.registry.store_state().verdict, Verdict::NotWiped);
+
+        // A live record for a confirmed account that differs from what the
+        // conductor holds: the automatic backfill must not replace it.
+        let mallory =
+            ProvisionIntent::intended(MALLORY, "conductor-b", &app_for("conductor-b", MALLORY));
+        store.insert_new(&mallory).await.unwrap();
+
+        assert!(!upgraded.registry.records_backfilled());
+        assert!(
+            !upgraded
+                .records_agent_for(ALICE, &provisioned_agent_key(&node_key))
+                .await
+        );
+
+        let report = upgraded
+            .migrate_from_accounts(&[
+                (ALICE.to_string(), provisioned_agent_key(&node_key)),
+                (MALLORY.to_string(), provisioned_agent_key(&mallory_key)),
+            ])
+            .await;
+
+        assert!(report.complete, "{report:?}");
+        assert!(upgraded.registry.records_backfilled());
+        assert!(
+            upgraded
+                .records_agent_for(ALICE, &provisioned_agent_key(&node_key))
+                .await
+        );
+        assert_eq!(report.records_kept, vec![MALLORY.to_string()]);
+        assert_eq!(intent_of(&store, MALLORY).await, mallory, "never replaced");
     }
 
     fn wiped(doorway: &AgentProvisioner) {
