@@ -476,6 +476,42 @@ The correction reads the pinned Create shape, binds the returned action hash,
 requires an App entry containing `delegates-compute`, and retains the coordinator's
 native signature and entry-identity verification. Probe the actual wire shape,
 malformed/unsupported records and provider mismatch through the runner and
-authority-probe tests. Current state: **25 focused tests GREEN; live authority
-observation pending**. This fixes a later observation defect; it does not establish
-the cause of Edge 1699's provider bootstrap failure.
+authority-probe tests. Current state: **25 focused tests GREEN and a real local
+native read verified; Adam authority observation pending**. On October 23 at
+05:44 UTC, the existing Dowell household issued one fixed fifteen-minute
+Jessica-to-Matthew grant (HTTP 200, 897 ms), then withdrew that exact grant
+(HTTP 200, 263 ms). At 05:45 UTC, the corrected reader used Matthew's own
+conductor and retained credentials to verify its signed record, exact grant
+and party bindings, and withdrawn native state. Private evidence is retained
+under `genesis/local-dev/jenkins-native-bdd/live-evidence/local-native-grant/`.
+The probe checked process incarnation and household ownership, but did not
+attest the running native binary's source digest. It issued no Adam grant,
+restarted no peer, and released its household lease. This proves the observed
+local lifecycle and reader; it does not establish the cause of Edge 1699's
+provider bootstrap failure or an Adam completion.
+
+### Publication transport station (2026-10-23)
+
+Chain `measure-runs-on-a-peer`, between **compatible tools built → immutable
+worker available**: compilation and CLI checks must be followed by a completed,
+verified publication within the packaging budget. Edge **1703** built source
+`9f379209b244e7317917f2fbd0f7c25a9ee97ffe` under assembly
+`ab5b58548e0d829fd25a88c28d11a64b0b48af04`. The conductor build completed in
+35m56s, the companion CLI in 10m42s, and the tools-image checks passed. The
+`nerdctl` Docker-image export then stopped advancing at `sending tarball` and
+the existing 90-minute packaging timeout aborted the run. No replacement image
+was published or deployed. The agent remained online; the underlying host
+containerd, disk or memory cause was not observed. Edge 1698 had completed the
+comparable export in 28.2 seconds.
+
+Probe the publication path before another cold compile: publish one tiny proof
+artifact directly from BuildKit to the existing registry, then verify its
+exporter-bound manifest, config and content under a finite deadline. The same
+path must preserve the worker's exact source, component and hApp bindings and
+verify the final immutable image. This avoids the observed host-import step;
+it does not establish why that host import stalled. Current state: **RED for
+Edge 1703 publication; direct-publication repair and live proof pending**.
+Changing the shared builder changes the declared SUT, so the repair requires a
+new truthful source pin and local receipt even though native application source
+trees and dependency pins remain unchanged. The earlier source receipts remain
+historical evidence.
