@@ -47,6 +47,7 @@ mod head;
 mod head_table;
 mod key;
 mod lease_view;
+mod proof;
 mod rules;
 mod steward_scope;
 mod tier;

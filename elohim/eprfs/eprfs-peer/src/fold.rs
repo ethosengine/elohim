@@ -1,13 +1,13 @@
 //! The fold: another device's crossing events, read from its tier and appended to this device's
 //! own flow store with provenance `via:<device>` (spec §3.3).
 //!
-//! Fetching asks the device's tier for the diff between the root last folded from it and the new
-//! one, and lists the new root's `channel/events` when the diff cannot be answered (the device no
-//! longer holds the old root, or this is the first fold). Every leaf is checked three ways before
-//! it is folded: the tier client checks its bytes hash to its CID and that it is at the path
-//! asked; here its name must be that CID, and its bytes must be a FlowEvent whose canonical
-//! encoding they are. Appending is idempotent by event CID: a replay or a duplicate announce
-//! appends nothing.
+//! Fetching first verifies the directory spine from the announced root to `channel/events`. A diff
+//! is accepted only when applying it to the cached node for its exact base root reproduces the
+//! verified new events-node CID; otherwise a full, CID-checked listing is used. Every leaf is then
+//! checked three ways before it is folded: the tier client checks its bytes hash to its CID and
+//! that it is at the path asked; here its name must be that CID, and its bytes must be a FlowEvent
+//! whose canonical encoding they are. Appending is idempotent by event CID: a replay or duplicate
+//! announce appends nothing.
 
 use std::collections::HashSet;
 use std::fs::{self, OpenOptions};
@@ -17,7 +17,7 @@ use std::path::Path;
 use cid::Cid;
 use elohim_epr_rea::model::canonical_bytes;
 use elohim_epr_rea::{atom_cid, FlowEvent, FlowRecord, FlowStore, SidecarFlowStore};
-use eprfs_core::{BlobCid, TreeEntryKind, TreeLimits, TreePath, View};
+use eprfs_core::{BlobCid, TreeEntry, TreeEntryKind, TreeLimits, TreePath, View};
 use iroh::endpoint::{Connection, VarInt};
 use iroh::{Endpoint, NodeAddr};
 
@@ -27,6 +27,10 @@ use crate::error::PeerError;
 use crate::gate::SharedAdmission;
 use crate::head_table::{NackLeaf, MAX_NACK_CIDS};
 use crate::lease_view::{LeaseEvent, LeaseKind};
+use crate::proof::{
+    cached_events_node, recompute_events_node, remember_events_node, verified_listing,
+    verify_spine, VerifiedEventsNode,
+};
 use crate::tier::{tier_request, tier_request_capped, TierAnswer, TierRequest, TIER_ALPN};
 
 /// The most events one fold reads. A larger change is folded across successive heads: the fold
@@ -154,22 +158,17 @@ async fn fetch_channel_for(
 ) -> Result<Fetched, PeerError> {
     let events_dir = TreePath::from_slash_bytes(CHANNEL_EVENTS.as_bytes())
         .map_err(|e| integrity(e.to_string()))?;
+    let events_cid = verify_spine(connection, root, &events_dir, tree).await?;
     let offered = match since {
         Some(old) if old == root => Vec::new(),
-        Some(old) => match diff(connection, old, root, &events_dir, tree).await? {
+        Some(old) => match diff(connection, old, root, &events_cid, &events_dir, tree).await? {
             Some(added) => added,
-            None => list(connection, root, &events_dir, tree).await?,
+            None => list(connection, root, &events_cid, &events_dir, tree).await?,
         },
-        None => list(connection, root, &events_dir, tree).await?,
+        None => list(connection, root, &events_cid, &events_dir, tree).await?,
     };
     let mut fresh = Vec::new();
-    for (name, leaf) in offered {
-        let cid = Cid::try_from(name.as_str())
-            .map_err(|e| integrity(format!("entry `{name}` is not a CID: {e}")))?;
-        // The leaf holds the event's bytes under the raw codec: one digest, two codecs.
-        if leaf.as_cid().hash() != cid.hash() {
-            return Err(integrity(format!("entry {cid} holds leaf {leaf}")));
-        }
+    for (cid, leaf) in offered {
         if !known.contains(&cid) {
             fresh.push((cid, leaf));
         }
@@ -238,22 +237,34 @@ async fn read_nack(
     reader: &str,
     tree: &TreeLimits,
 ) -> Result<NackLeaf, PeerError> {
-    // A peer that has refused nothing of ours writes no leaf, and the tier answers a missing path
-    // only as a failure string. Read the leaf only where the listings show it, so absence means
-    // "no nacks" and every real failure still aborts the fold.
-    if !lists_child(connection, root, "channel", "nacks", tree).await?
-        || !lists_child(connection, root, CHANNEL_NACKS, reader, tree).await?
-    {
-        return Ok(NackLeaf::default());
-    }
-    let path = TreePath::from_slash_bytes(format!("{CHANNEL_NACKS}/{reader}").as_bytes())
+    let nacks_dir = TreePath::from_slash_bytes(CHANNEL_NACKS.as_bytes())
         .map_err(|e| integrity(e.to_string()))?;
+    let nacks_cid = verify_spine(connection, root, &nacks_dir, tree).await?;
+    let listing = verified_listing(connection, root, &nacks_dir, &nacks_cid, tree).await?;
+    let Some(entry) = listing
+        .entries
+        .into_iter()
+        .find(|entry| entry.name.as_slice() == reader.as_bytes())
+    else {
+        return Ok(NackLeaf::default());
+    };
+    let TreeEntryKind::File { blob, .. } = entry.kind else {
+        return Err(integrity(format!("nack `{reader}` is not a file")));
+    };
+    let expected_leaf = blob.as_blob_cid().clone();
+    let path = nacks_dir.join(reader.as_bytes());
     let request = TierRequest::Read {
         root: root.clone(),
         path,
     };
     match tier_request(connection, &request, tree).await? {
         TierAnswer::Read(read) => {
+            if read.cid != expected_leaf {
+                return Err(integrity(format!(
+                    "nack `{reader}` was served as {} but the verified root names {expected_leaf}",
+                    read.cid
+                )));
+            }
             if BlobCid::compute_raw(&read.bytes) != read.cid {
                 return Err(integrity("nack bytes fail their CID".into()));
             }
@@ -267,43 +278,33 @@ async fn read_nack(
             }
             Ok(nack)
         }
-        TierAnswer::Unanswered { .. } => Ok(NackLeaf::default()),
         other => Err(unanswered(format!("nack for {reader}"), &other)),
     }
 }
 
-/// Whether the directory at `dir` under `root` lists an entry named `name`.
-async fn lists_child(
-    connection: &Connection,
-    root: &BlobCid,
-    dir: &str,
-    name: &str,
-    tree: &TreeLimits,
-) -> Result<bool, PeerError> {
-    let path = TreePath::from_slash_bytes(dir.as_bytes()).map_err(|e| integrity(e.to_string()))?;
-    let request = TierRequest::List {
-        root: root.clone(),
-        path,
-    };
-    match tier_request(connection, &request, tree).await? {
-        TierAnswer::List(listing) => Ok(listing
-            .entries
-            .iter()
-            .any(|entry| entry.name.as_slice() == name.as_bytes())),
-        other => Err(unanswered(format!("listing {dir} under {root}"), &other)),
-    }
-}
-
 /// The `(name, leaf)` pairs the diff from `old` to `new` adds under `channel/events`, or `None`
-/// when the diff is not answered or reports anything but added files there (a whole directory
-/// added, a kind changed), which a listing answers instead.
+/// when the old root has no cached verified node, the diff is not answered, its changes are not
+/// direct file additions or removals, or applying it does not reproduce `events_cid`. A verified
+/// full listing answers every `None` case instead.
 async fn diff(
     connection: &Connection,
     old: &BlobCid,
     new: &BlobCid,
+    events_cid: &BlobCid,
     events_dir: &TreePath,
     tree: &TreeLimits,
-) -> Result<Option<Vec<(String, BlobCid)>>, PeerError> {
+) -> Result<Option<Vec<(Cid, BlobCid)>>, PeerError> {
+    let Some(previous) = cached_events_node(old) else {
+        return Ok(None);
+    };
+    if previous.cid == *events_cid {
+        remember_events_node(VerifiedEventsNode {
+            root: new.clone(),
+            cid: previous.cid,
+            entries: previous.entries,
+        });
+        return Ok(Some(Vec::new()));
+    }
     let request = TierRequest::Diff {
         old: old.clone(),
         new: new.clone(),
@@ -312,24 +313,14 @@ async fn diff(
     let TierAnswer::Diff(changes) = tier_request(connection, &request, tree).await? else {
         return Ok(None);
     };
-    let mut added = Vec::new();
-    for change in changes {
-        let parts = change.path.components();
-        let under_events = parts.len() == events_dir.components().len() + 1
-            && parts.starts_with(events_dir.components());
-        match (&change.old, &change.new) {
-            // An event that left the tree (a narrower allow-list) is not unfolded.
-            (Some(TreeEntryKind::File { .. }), None) if under_events => {}
-            (None, Some(TreeEntryKind::File { blob, .. })) if under_events => {
-                let Some(name) = parts.last().and_then(|n| String::from_utf8(n.clone()).ok())
-                else {
-                    return Ok(None);
-                };
-                added.push((name, blob.as_blob_cid().clone()));
-            }
-            _ => return Ok(None),
-        }
+    let Some(recomputed) = recompute_events_node(&previous, new, &changes, events_dir, tree) else {
+        return Ok(None);
+    };
+    if recomputed.node.cid != *events_cid {
+        return Ok(None);
     }
+    let added = event_entries(recomputed.added)?;
+    remember_events_node(recomputed.node);
     Ok(Some(added))
 }
 
@@ -337,25 +328,38 @@ async fn diff(
 async fn list(
     connection: &Connection,
     root: &BlobCid,
+    events_cid: &BlobCid,
     events_dir: &TreePath,
     tree: &TreeLimits,
-) -> Result<Vec<(String, BlobCid)>, PeerError> {
-    let request = TierRequest::List {
+) -> Result<Vec<(Cid, BlobCid)>, PeerError> {
+    let listing = verified_listing(connection, root, events_dir, events_cid, tree).await?;
+    let offered = event_entries(listing.entries.clone())?;
+    remember_events_node(VerifiedEventsNode {
         root: root.clone(),
-        path: events_dir.clone(),
-    };
-    let listing = match tier_request(connection, &request, tree).await? {
-        TierAnswer::List(listing) => listing,
-        other => return Err(unanswered(format!("root {root}"), &other)),
-    };
-    listing
-        .entries
+        cid: listing.cid,
+        entries: listing.entries.clone(),
+    });
+    Ok(offered)
+}
+
+fn event_entries(entries: Vec<TreeEntry>) -> Result<Vec<(Cid, BlobCid)>, PeerError> {
+    entries
         .into_iter()
         .map(|entry| {
             let name = String::from_utf8(entry.name)
                 .map_err(|_| integrity("an entry name is not UTF-8".into()))?;
+            let cid = Cid::try_from(name.as_str())
+                .map_err(|error| integrity(format!("entry `{name}` is not a CID: {error}")))?;
             match entry.kind {
-                TreeEntryKind::File { blob, .. } => Ok((name, blob.as_blob_cid().clone())),
+                TreeEntryKind::File { blob, .. }
+                    if blob.as_blob_cid().as_cid().hash() == cid.hash() =>
+                {
+                    Ok((cid, blob.as_blob_cid().clone()))
+                }
+                TreeEntryKind::File { blob, .. } => Err(integrity(format!(
+                    "entry {cid} holds leaf {}",
+                    blob.as_blob_cid()
+                ))),
                 _ => Err(integrity(format!("entry `{name}` is not an event file"))),
             }
         })
