@@ -164,6 +164,10 @@ check("removing a citation line only (md, no added line) surfaces",
       [(1, "always")])
 check("an unchanged cited absolute stays quiet",
       hits(MD, f"Consent is always\nasked first {_CITE}.\nNew line.\n", f"Consent is always\nasked first {_CITE}.\n"), [])
+check("removing a citation does not re-report an unchanged sibling absolute on the same line",
+      hits(MD, "Consent is always asked. Copies are never lost.\n",
+           f"Consent is always asked. Copies are never lost\n{_CITE}.\n"),
+      [(1, "never")])
 check("an unchanged uncited absolute is not re-surfaced by an unrelated edit",
       hits(MD, "Consent is always asked.\nNew line.\n", "Consent is always asked.\n"), [])
 
