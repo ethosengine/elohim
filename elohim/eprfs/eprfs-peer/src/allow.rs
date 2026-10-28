@@ -129,6 +129,11 @@ impl CrossingAllowList {
             .get(measure)
             .is_some_and(|kinds| kinds.contains(kind))
     }
+
+    /// The ordered crossing map used to encode the rules digest.
+    pub(crate) fn crosses(&self) -> &BTreeMap<String, BTreeSet<String>> {
+        &self.crosses
+    }
 }
 
 /// The device an event was folded from, when it carries a [`VIA_SLOT`].

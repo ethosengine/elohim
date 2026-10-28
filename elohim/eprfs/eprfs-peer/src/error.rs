@@ -83,10 +83,9 @@ pub enum PeerError {
     #[error("the peer's tier served an object that fails its address or path: {cid}")]
     TierLeafIntegrity { cid: eprfs_core::BlobCid },
 
-    /// The crossing allow-list (`berth.channel.crosses` in pool-policy.json) could not be read or
-    /// is not `{measure: [kind, …]}`. Refused, never widened: a list that does not parse lets
-    /// nothing cross.
-    #[error("the crossing allow-list at `{}` is invalid: {reason}", path.display())]
+    /// The crossing allow-list or steward scope in `pool-policy.json` could not be read or is
+    /// malformed. Refused, never widened: the daemon keeps its previously loaded rules.
+    #[error("the peer rules at `{}` are invalid: {reason}", path.display())]
     Policy { path: PathBuf, reason: String },
 
     /// The device's flow store could not be read or appended to.
