@@ -47,6 +47,46 @@ seamLocus: >
   above as pending.
 
 decisionPoints:
+  - name: seam::classify::classify
+    kind: pure-decision-predicate
+    sourceLocation:
+      file: src/seam/classify.rs
+      modulePath: elohim_epr_cli::seam::classify
+    summary: >
+      Governed algorithm-content classifies explicit owner-local declarations into advisory
+      candidates. The native method and application policy are pinned beside verified source
+      spans. Composition remains a candidate, not immunity or a placement verdict.
+    concernIds:
+      - id: C0
+        status: answered
+        justification: "Ephemeral local report; no DHT entry, head, contribution or persisted draft."
+      - id: C4
+        status: partial
+        justification: "Invalid input is a named coverage gap; lexical hints cannot establish semantic correctness."
+      - id: C6a
+        status: answered
+        justification: "512 KiB proposal, at most three injected candidates, 8 KiB packet, two-second hook deadline."
+    contractTests:
+      - path: elohim/eprfs/epr-cli/tests/seam_guidance.rs
+        testName: labeled_corpus_and_harness_parity
+        kind: integration
+      - path: elohim/eprfs/epr-cli/tests/seam_guidance.rs
+        testName: governed_method_and_application_are_pinned_and_executed
+        kind: integration
+  - name: seam::review::validate
+    kind: pure-decision-predicate
+    sourceLocation:
+      file: src/seam/review.rs
+      modulePath: elohim_epr_cli::seam::review
+    summary: "Checks exact proposal association and freshly verified citations without certifying agent judgment."
+    concernIds:
+      - id: C4
+        status: answered
+        justification: "Changed proposal, governing declarations, application or source bytes invalidate prior reviews."
+    contractTests:
+      - path: elohim/eprfs/epr-cli/tests/seam_guidance.rs
+        testName: reviews_bind_exact_proposal_declarations_contracts_and_citations
+        kind: integration
   - name: integrate::integrate
     kind: state-transition
     sourceLocation:

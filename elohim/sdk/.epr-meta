@@ -13,6 +13,23 @@ purpose: >
 
 # elohim/sdk — source-of-record governance
 
+## Application lifecycle contract
+
+The [root composition map](../../.epr-meta/manifest.md#application-lifecycle--authoritative-homes-and-composition)
+routes local work, collaboration, publication and serving. The existing
+[working-version standard](../../genesis/docs/superpowers/specs/2026-10-04-working-version-sdk-standard-design.md)
+owns their client lifecycle semantics: author schema vocabulary in `schemas/v1`,
+domain choices in `domains/`, and reusable TypeScript behavior in `storage-client-ts`.
+Keep the Rust SDK contract aligned. Browser persistence and offline resumption belong
+in shared client support; UI frameworks bind it rather than implementing independent
+queues, publication state machines or admission rules. Peer storage implements custody
+and authorized sync; the notary decides publication authority.
+
+The standard remains Draft: `AutomergeSync.load/save/sync` is not the full working-version
+API. A sprint implementing a missing primitive must include its declared alone/offline
+behavior and a consumer journey. Do not advertise proposed manifest fields as accepted
+schema until the schema and its consumers implement them together.
+
 This subtree is where vocabularies are BORN. The reach reconciliation (slices 1-3) and the
 ontology keel (2026-07-23) are the case law: hand-typed vocabulary values outside a declared
 source-of-record are the recurring defect class here.

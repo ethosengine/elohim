@@ -72,6 +72,11 @@
       "ref": "epr:validator-rust-style-strict",
       "runtime": "rust",
       "why": "RS-GOV-04 syntax diagnostics from the shared native Rust style checker; strict scopes admit no unexplained suppressions."
+    },
+    {
+      "ref": "epr:validator-native-seam-guidance",
+      "runtime": "rust",
+      "why": "Single native advisory classifier over explicit owner-local declarations. Compatibility hosts report native unavailability without duplicating classification."
     }
   ]
 }

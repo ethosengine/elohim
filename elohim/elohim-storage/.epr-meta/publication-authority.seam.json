@@ -1,0 +1,54 @@
+{
+  "version": 1,
+  "id": "publication-authority",
+  "responsibility": "Working values, presence and merged fields do not grant publication authority; explicit authorized publication composes notarization.",
+  "owner": [
+    "elohim/elohim-storage/src/epr_head.rs",
+    "elohim/holochain/dna/*"
+  ],
+  "allowedConsumers": [
+    "app/*",
+    "elohim/sdk/*",
+    "doorway/*",
+    "elohim/elohim-storage/*"
+  ],
+  "authoritativeContracts": [
+    {
+      "path": "genesis/docs/superpowers/specs/2026-10-04-working-version-sdk-standard-design.md",
+      "needle": "**The merging layer carries values, not authority.**",
+      "status": "planned"
+    },
+    {
+      "path": ".epr-meta/manifest.md",
+      "needle": "Editor admission comes from signed authorization, never a merged field.",
+      "status": "contract"
+    }
+  ],
+  "reusableInterfaces": [
+    {
+      "path": "elohim/elohim-storage/src/epr_head.rs",
+      "needle": "pub fn derive_epr_head(",
+      "status": "implemented"
+    }
+  ],
+  "detection": [
+    "merged.published",
+    "presence.isPublisher",
+    "doc.isPublished",
+    "publish_from_presence",
+    "canonical_head = merged",
+    "publishAuthorized("
+  ],
+  "composition": [
+    "publishAuthorized("
+  ],
+  "exclusions": [
+    "*/tests/*",
+    "*.spec.ts"
+  ],
+  "appliesTo": [
+    "*.rs",
+    "*.ts",
+    "*.js"
+  ]
+}

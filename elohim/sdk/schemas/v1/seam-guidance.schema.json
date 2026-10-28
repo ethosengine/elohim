@@ -1,0 +1,124 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "epr:seam-guidance:v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "version",
+    "id",
+    "responsibility",
+    "owner",
+    "allowedConsumers",
+    "detection",
+    "composition",
+    "exclusions",
+    "appliesTo",
+    "authoritativeContracts",
+    "reusableInterfaces"
+  ],
+  "properties": {
+    "version": {
+      "const": 1
+    },
+    "id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "responsibility": {
+      "type": "string",
+      "minLength": 1
+    },
+    "owner": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "minLength": 1
+      },
+      "minItems": 1
+    },
+    "allowedConsumers": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "minLength": 1
+      },
+      "minItems": 0
+    },
+    "detection": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "minLength": 1
+      },
+      "minItems": 1
+    },
+    "composition": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "minLength": 1
+      },
+      "minItems": 0
+    },
+    "exclusions": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "minLength": 1
+      },
+      "minItems": 0
+    },
+    "appliesTo": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "minLength": 1
+      },
+      "minItems": 1
+    },
+    "authoritativeContracts": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["path", "needle", "status"],
+        "properties": {
+          "path": {
+            "type": "string",
+            "minLength": 1
+          },
+          "needle": {
+            "type": "string",
+            "minLength": 1
+          },
+          "status": {
+            "enum": ["implemented", "contract", "planned"]
+          }
+        }
+      },
+      "minItems": 1
+    },
+    "reusableInterfaces": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["path", "needle", "status"],
+        "properties": {
+          "path": {
+            "type": "string",
+            "minLength": 1
+          },
+          "needle": {
+            "type": "string",
+            "minLength": 1
+          },
+          "status": {
+            "enum": ["implemented", "contract", "planned"]
+          }
+        }
+      },
+      "minItems": 0
+    }
+  }
+}

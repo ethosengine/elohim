@@ -1,0 +1,198 @@
+[
+  {
+    "label": "working-version-reuse/misplaced",
+    "family": "working-version-reuse",
+    "path": "app/new.ts",
+    "content": "const db = indexedDB.open('draft');\n",
+    "expected": "placement-candidate"
+  },
+  {
+    "label": "working-version-reuse/reuse",
+    "family": "working-version-reuse",
+    "path": "app/new.ts",
+    "content": "const sync = new AutomergeSync(client);\n",
+    "expected": "composition-candidate"
+  },
+  {
+    "label": "working-version-reuse/owner",
+    "family": "working-version-reuse",
+    "path": "elohim/sdk/new.ts",
+    "content": "const db = indexedDB.open('draft');\n",
+    "expected": "owner-implementation"
+  },
+  {
+    "label": "working-version-reuse/ambiguous-split",
+    "family": "working-version-reuse",
+    "path": "app/new.ts",
+    "content": "const db = indexedDB.open('draft');\nconst sync = new AutomergeSync(client);\n",
+    "expected": "composition-candidate"
+  },
+  {
+    "label": "working-version-reuse/comment",
+    "family": "working-version-reuse",
+    "path": "app/new.ts",
+    "content": "// const db = indexedDB.open('draft');\n",
+    "expected": null
+  },
+  {
+    "label": "working-version-reuse/example",
+    "family": "working-version-reuse",
+    "path": "app/new.ts",
+    "content": "/*\nconst db = indexedDB.open('draft');\n*/\n",
+    "expected": null
+  },
+  {
+    "label": "working-version-reuse/unrelated",
+    "family": "working-version-reuse",
+    "path": "app/new.ts",
+    "content": "const value = 1;\n",
+    "expected": null
+  },
+  {
+    "label": "publication-authority/misplaced",
+    "family": "publication-authority",
+    "path": "app/new.ts",
+    "content": "const published = merged.published;\n",
+    "expected": "placement-candidate"
+  },
+  {
+    "label": "publication-authority/reuse",
+    "family": "publication-authority",
+    "path": "app/new.ts",
+    "content": "publishAuthorized(request);\n",
+    "expected": "composition-candidate"
+  },
+  {
+    "label": "publication-authority/owner",
+    "family": "publication-authority",
+    "path": "elohim/holochain/dna/new.rs",
+    "content": "const published = merged.published;\n",
+    "expected": "owner-implementation"
+  },
+  {
+    "label": "publication-authority/ambiguous-split",
+    "family": "publication-authority",
+    "path": "app/new.ts",
+    "content": "const published = merged.published;\npublishAuthorized(request);\n",
+    "expected": "composition-candidate"
+  },
+  {
+    "label": "publication-authority/comment",
+    "family": "publication-authority",
+    "path": "app/new.ts",
+    "content": "// const published = merged.published;\n",
+    "expected": null
+  },
+  {
+    "label": "publication-authority/example",
+    "family": "publication-authority",
+    "path": "app/new.ts",
+    "content": "/*\nconst published = merged.published;\n*/\n",
+    "expected": null
+  },
+  {
+    "label": "publication-authority/unrelated",
+    "family": "publication-authority",
+    "path": "app/new.ts",
+    "content": "const value = 1;\n",
+    "expected": null
+  },
+  {
+    "label": "peer-native-serving/misplaced",
+    "family": "peer-native-serving",
+    "path": "doorway/new.rs",
+    "content": "fn serve_peer_blob() {}\n",
+    "expected": "placement-candidate"
+  },
+  {
+    "label": "peer-native-serving/reuse",
+    "family": "peer-native-serving",
+    "path": "doorway/new.rs",
+    "content": "storage_client.register_content_server();\n",
+    "expected": "composition-candidate"
+  },
+  {
+    "label": "peer-native-serving/owner",
+    "family": "peer-native-serving",
+    "path": "elohim/elohim-storage/new.rs",
+    "content": "fn serve_peer_blob() {}\n",
+    "expected": "owner-implementation"
+  },
+  {
+    "label": "peer-native-serving/ambiguous-split",
+    "family": "peer-native-serving",
+    "path": "doorway/new.rs",
+    "content": "fn serve_peer_blob() {}\nstorage_client.register_content_server();\n",
+    "expected": "composition-candidate"
+  },
+  {
+    "label": "peer-native-serving/comment",
+    "family": "peer-native-serving",
+    "path": "doorway/new.rs",
+    "content": "// fn serve_peer_blob() {}\n",
+    "expected": null
+  },
+  {
+    "label": "peer-native-serving/example",
+    "family": "peer-native-serving",
+    "path": "doorway/new.rs",
+    "content": "/*\nfn serve_peer_blob() {}\n*/\n",
+    "expected": null
+  },
+  {
+    "label": "peer-native-serving/unrelated",
+    "family": "peer-native-serving",
+    "path": "doorway/new.rs",
+    "content": "const value = 1;\n",
+    "expected": null
+  },
+  {
+    "label": "developer-domain-composition/misplaced",
+    "family": "developer-domain-composition",
+    "path": "elohim/eprfs/eprfs-core/new.rs",
+    "content": "fn f() { git::update_ref(); }\n",
+    "expected": "placement-candidate"
+  },
+  {
+    "label": "developer-domain-composition/reuse",
+    "family": "developer-domain-composition",
+    "path": "elohim/eprfs/epr-cli/new.rs",
+    "content": "govern::evaluate(root, args);\n",
+    "expected": "composition-candidate"
+  },
+  {
+    "label": "developer-domain-composition/owner",
+    "family": "developer-domain-composition",
+    "path": "elohim/eprfs/epr-cli/src/integrate.rs",
+    "content": "fn f() { git::update_ref(); }\n",
+    "expected": "owner-implementation"
+  },
+  {
+    "label": "developer-domain-composition/ambiguous-split",
+    "family": "developer-domain-composition",
+    "path": "elohim/eprfs/epr-cli/new.rs",
+    "content": "fn f() { git::update_ref(); }\ngovern::evaluate(root, args);\n",
+    "expected": "composition-candidate"
+  },
+  {
+    "label": "developer-domain-composition/comment",
+    "family": "developer-domain-composition",
+    "path": "elohim/eprfs/eprfs-core/new.rs",
+    "content": "// fn f() { git::update_ref(); }\n",
+    "expected": null
+  },
+  {
+    "label": "developer-domain-composition/example",
+    "family": "developer-domain-composition",
+    "path": "elohim/eprfs/eprfs-core/new.rs",
+    "content": "/*\nfn f() { git::update_ref(); }\n*/\n",
+    "expected": null
+  },
+  {
+    "label": "developer-domain-composition/unrelated",
+    "family": "developer-domain-composition",
+    "path": "elohim/eprfs/eprfs-core/new.rs",
+    "content": "const value = 1;\n",
+    "expected": null
+  }
+]
