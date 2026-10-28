@@ -20,7 +20,7 @@ testing = ["dep:serde_json"]
 [dependencies]
 async-trait.workspace = true
 bytes.workspace = true
-eprfs-core = { version = "0.3.0", path = "../eprfs-core", registry = "elohim" }
+eprfs-core = { version = "0.3.1", path = "../eprfs-core", registry = "elohim" }
 elohim-seam-contracts = { version = "0.1.0", path = "../../../crates/seam-contracts", registry = "elohim", features = ["serde"] }
 # The outer-tier contract proves no indexical `own` crosses the wire by serializing every answer
 # (`TierId::own` refuses to serialize). Harness only.
