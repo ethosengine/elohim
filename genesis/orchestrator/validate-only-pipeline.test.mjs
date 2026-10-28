@@ -10,6 +10,7 @@
 import { describe, test } from "node:test";
 import { strict as assert } from "node:assert";
 import { readFileSync } from "node:fs";
+import { createHash } from "node:crypto";
 
 const orchestrator = readFileSync(
   new URL("./Jenkinsfile", import.meta.url),
@@ -124,7 +125,7 @@ function assertEdgeStageContract(text) {
     if (allowed.has(name)) continue;
     assert.match(
       body,
-      /!isValidateOnly\(\)|!skipBuildStage\(\)/,
+      /!isValidateOnly\(\)|!skipBuildStage\(\)|!skipPublishStage\(\)/,
       `${name} must skip during validate-only runs or be consciously allowlisted`,
     );
   }
@@ -385,13 +386,183 @@ function whenOf(stage) {
   return balancedBlock(stage, stage.indexOf("{", at));
 }
 
+// Evaluate the actual small Groovy guards using their JS-equivalent syntax;
+// keep the dispatch/stage wiring source-asserted as in the validate-only lane.
+function guardExpression(body) {
+  return body.replaceAll("?:", "||").replaceAll(".contains(", ".includes(").trim();
+}
+
+describe("PR edge gate-only isolation", () => {
+  const tagApplies = new Function("commitMsg", "env",
+    `return Boolean(${guardExpression(topLevelDef(orchestrator, "gateOnlyTagApplies"))})`);
+  const gateOnly = new Function("params", "env",
+    `return Boolean(${guardExpression(topLevelDef(edge, "isGateOnly"))})`);
+  const pr = { CHANGE_ID: "215", BRANCH_NAME: "ci/edge-gate-only" };
+  const stages = staticStages(edge);
+
+  test("tag parsing is case-insensitive, PR-only, and inert on dev/main", () => {
+    for (const message of ["[edge:gate-only]", "ci: gates\n\n[EDGE:GATE-ONLY]"]) {
+      assert.equal(tagApplies(message, pr), true);
+      for (const branch of ["dev", "main"]) {
+        assert.equal(tagApplies(message, { ...pr, BRANCH_NAME: branch }), false);
+      }
+      assert.equal(tagApplies(message, { BRANCH_NAME: pr.BRANCH_NAME }), false);
+    }
+    for (const message of [null, "", "[build:edge]", "[edge:validate-only]", "[edge:gate-only-extra]"]) {
+      assert.equal(tagApplies(message, pr), false);
+    }
+    assert.equal(gateOnly({ GATE_ONLY: true }, pr), true);
+    for (const params of [{}, { GATE_ONLY: false }]) {
+      assert.equal(gateOnly(params, pr), false);
+    }
+    for (const env of [{ BRANCH_NAME: "ci/manual" }, { ...pr, BRANCH_NAME: "dev" }, { ...pr, BRANCH_NAME: "main" }]) {
+      assert.equal(gateOnly({ GATE_ONLY: true }, env), false);
+    }
+  });
+
+  test("conflicting tags and an old edge revision fail before dispatch", () => {
+    const rule = topLevelDef(orchestrator, "applyGateOnlyTag");
+    assert.ok(rule.indexOf("if (!gateOnlyTagApplies(commitMsg)) return") < rule.indexOf("readFile("));
+    assert.match(rule, /EDGE_VALIDATE_ONLY_FROM_TAG == 'true'[\s\S]*error\(/);
+    assert.match(rule, /if \(!readFile\('elohim\/holochain\/Jenkinsfile'\)\.contains\("name: 'GATE_ONLY'"\)\) \{\s*error\(/);
+    assert.ok(rule.indexOf("readFile(") < rule.indexOf("env.EDGE_GATE_ONLY_FROM_TAG = 'true'"));
+    const checkout = stageBlock(orchestrator, "Checkout");
+    assert.ok(checkout.indexOf("applyGateOnlyTag(commitMsg)") < checkout.indexOf("if (env.BUILD_TRIGGER == 'WEBHOOK')"));
+  });
+
+  test("edge fails closed on a lost parameter, missing tag or conflicting mode", () => {
+    const body = guardExpression(topLevelDef(edge, "checkGateOnlyRequest"))
+      .replace("boolean tagged =", "const tagged =")
+      .replace(/^\s*echo .*$/gm, "");
+    const check = new Function("commitMsg", "env", "params", "isGateOnly", "isValidateOnly", "error", body);
+    const request = (message, params = {}, env = pr, validate = false) =>
+      check(message, env, params, () => gateOnly(params, env), () => validate, (message) => { throw new Error(message); });
+    assert.throws(() => request("[edge:gate-only]"), /requires a PR dispatch/);
+    assert.throws(() => request("[EDGE:GATE-ONLY]", { GATE_ONLY: false }), /requires a PR dispatch/);
+    assert.throws(() => request("ordinary commit", { GATE_ONLY: true }), /requires an \[edge:gate-only\]/);
+    assert.throws(() => request("[edge:gate-only]", { GATE_ONLY: true, DEPLOY_ONLY: true }), /conflicts/);
+    assert.throws(() => request("[edge:gate-only]", { GATE_ONLY: true }, pr, true), /conflicts/);
+    assert.throws(() => request("[edge:gate-only]", { GATE_ONLY: true }, { BRANCH_NAME: "ci/manual" }), /requires a PR dispatch/);
+    assert.doesNotThrow(() => request("[edge:gate-only]", { GATE_ONLY: true }));
+    assert.doesNotThrow(() => request("ordinary commit"));
+    for (const branch of ["dev", "main"]) {
+      assert.doesNotThrow(() => request("[edge:gate-only]", {}, { BRANCH_NAME: branch }));
+    }
+    const compute = topLevelDef(edge, "computeValidateOnly");
+    assert.ok(compute.indexOf("checkGateOnlyRequest(commitMsg)") < compute.indexOf("boolean packageTag"));
+  });
+
+  test("final routing overrides other builds, deploy-only and run-class caps", () => {
+    const plan = stageBlock(orchestrator, "Determine Build Plan");
+    const isolate = plan.indexOf("graphPipelines = applyGateOnlyOverride(graphPipelines)");
+    assert.ok(isolate > plan.indexOf("if (deployOnly)"));
+    assert.ok(isolate > plan.indexOf("if (env.EDGE_VALIDATE_ONLY_FROM_TAG"));
+    assert.ok(isolate < plan.indexOf("env.PIPELINES_TO_RUN ="));
+    const rule = topLevelDef(orchestrator, "applyGateOnlyOverride");
+    assert.match(rule, /if \(!gateOnlyRun\(\)\) return graphPipelines/);
+    assert.match(rule, /env\.PIPELINE_RUN_CLASSES = 'elohim-edge=build'/);
+    assert.match(rule, /return \['elohim-edge'\]/);
+    assert.match(topLevelDef(orchestrator, "applyDeployPendingPass"), /if \(gateOnlyRun\(\)\) suppressed =/);
+  });
+
+  test("dispatch names the PR job before logging and carries only safe parameters", () => {
+    const trigger = topLevelDef(orchestrator, "triggerPipeline");
+    assert.match(trigger, /gateOnlyDownstream = name == 'elohim-edge' && gateOnlyRun\(\)/);
+    const rewrite = trigger.indexOf('if (gateOnlyDownstream) jobBranch = "PR-${env.CHANGE_ID}"');
+    assert.ok(rewrite > -1 && rewrite < trigger.indexOf('echo "▶️ Triggering'));
+    for (const param of ["FORCE_BUILD", "FORCE_DEPLOY"]) {
+      assert.ok(trigger.includes(`${param}', value: !belowDeploy && !gateOnlyDownstream`));
+    }
+    assert.match(trigger, /deployOnlyDownstream = !gateOnlyDownstream && \(/);
+    assert.match(trigger, /VALIDATE_ONLY', value: validateOnlyDownstream/);
+    assert.match(trigger, /if \(gateOnlyDownstream\) \{\s*buildParams.add\(booleanParam\(name: 'GATE_ONLY', value: true\)\)\s*buildParams.add\(booleanParam\(name: 'SKIP_LEGACY_IMAGES', value: true\)\)\s*buildParams.add\(stringParam\(name: 'STEPS', value: 'all'\)\)/);
+    assert.match(stages.get("Checkout"), /if \(isGateOnly\(\)\) \{ checkout scm \} else \{\s*checkout\(\[/);
+    assert.match(stages.get("Checkout"), /refspec: "\+refs\/heads\/\$\{env\.BRANCH_NAME \?: 'dev'\}/);
+  });
+
+  test("both cargo gate failures propagate only for gate-only; current parallel scheduling stays", () => {
+    for (const name of ["runStorageQualityGate", "runDoorwayQualityGate"]) {
+      const body = topLevelDef(edge, name);
+      assert.match(body, /catch \(Exception e\) \{\s*if \(isGateOnly\(\)\) \{ throw e \}/);
+      assert.ok(body.indexOf("throw e") < body.indexOf("unstable("));
+      assert.match(body, /sh "bash '\$\{env.WORKSPACE\}\/scripts\/ci\/.+-quality-gate.sh'"/);
+    }
+    assert.match(topLevelDef(edge, "runQualityGates"), /parallel gates/);
+    assert.match(topLevelDef(edge, "runQualityGates"), /env.STORAGE_GATE_DONE = 'true'/);
+    assert.match(topLevelDef(edge, "runStorageStageBody"), /env.STORAGE_GATE_DONE != 'true'/);
+    assert.doesNotMatch(topLevelDef(edge, "skipBuildStage"), /isGateOnly/);
+    assert.match(stages.get("Build Storage"), /runStorageStageBody/);
+    assert.match(stages.get("Build Doorway"), /!skipBuildStage\(\)/);
+  });
+
+  function assertNoGateOnlyPublication(text) {
+    for (const name of ["Package Compute Worker", "Deploy Edge Node - Alpha", "Deploy Edge Node - Staging", "Deploy Edge Node - Prod", "Dataplane Validation"]) {
+      assert.match(whenOf(stageBlock(text, name)), /!isGateOnly\(\)/, `${name} must skip gate-only`);
+    }
+    assert.match(whenOf(stageBlock(text, "Push to Harbor")), /!skipPublishStage\(\)/);
+    assert.match(topLevelDef(text, "skipPublishStage"), /skipBuildStage\(\) \|\| isGateOnly\(\)/);
+  }
+
+  test("every publication/deploy/measurement path is suppressed, including both worker paths", () => {
+    assertNoGateOnlyPublication(edge);
+    assert.match(stages.get("Push to Harbor"), /publishComputeWorkerIfRequested\(\)/);
+    assert.match(stages.get("Package Compute Worker"), /packageComputeWorker\(\)/);
+    for (const name of ["Verify Deployment", "E2E Federation Smoke (Advisory)"]) {
+      assert.match(whenOf(stageBlock(orchestrator, name)), /!gateOnlyRun\(\)/);
+    }
+    const sibling = topLevelDef(orchestrator, "dispatchValidationSibling");
+    assert.ok(sibling.indexOf("gateOnlyRun()") < sibling.indexOf("build("));
+    assert.match(whenOf(stageBlock(edge, "Dataplane Validation")), /!isGateOnly\(\) && \(isValidateOnly\(\) \|\| !owesValidationToSibling/);
+  });
+
+  test("negative control: a worker publication guard cannot silently disappear", () => {
+    const unsafe = edge.replace("!isGateOnly() && env.EDGE_PACKAGE_REQUESTED", "env.EDGE_PACKAGE_REQUESTED");
+    assert.throws(() => assertNoGateOnlyPublication(unsafe), /Package Compute Worker must skip/);
+  });
+
+  test("ordinary stage decisions stay identical, including validation debt side effects", () => {
+    const skipBuild = new Function("params", "isValidateOnly", `return ${topLevelDef(edge, "skipBuildStage").trim()}`);
+    const skipPublish = new Function("skipBuildStage", "isGateOnly", `return ${topLevelDef(edge, "skipPublishStage").trim()}`);
+    const validation = whenOf(stageBlock(edge, "Dataplane Validation")).match(/expression \{ (!isGateOnly\(\) && \(isValidateOnly\(\) \|\| !owesValidationToSibling\(params.RUN_CLASS\)\)) \}/)[1];
+    const due = new Function("isGateOnly", "isValidateOnly", "owesValidationToSibling", "params", `return ${validation}`);
+    for (const deploy of [undefined, false, true]) {
+      for (const validate of [false, true]) {
+        assert.equal(skipBuild({ DEPLOY_ONLY: deploy }, () => validate), deploy === true || validate);
+        assert.equal(skipPublish(() => deploy === true || validate, () => false), deploy === true || validate);
+        assert.equal(skipPublish(() => deploy === true || validate, () => true), true);
+        let calls = 0;
+        assert.equal(due(() => false, () => validate, () => { calls++; return true; }, {}), validate);
+        assert.equal(calls, validate ? 0 : 1);
+        calls = 0;
+        assert.equal(due(() => true, () => validate, () => { calls++; return true; }, {}), false);
+        assert.equal(calls, 0, "gate-only never records a validation debt");
+      }
+    }
+  });
+
+  test("ordinary pod YAML stays byte-identical; only opted-in PRs get the larger budget", () => {
+    const pod = topLevelDef(edge, "edgePodYaml");
+    const template = pod.match(/String yaml = '''([\s\S]+?)'''/)[1];
+    const replacements = [...pod.matchAll(/\.replace\('([^']+)', g \? '([^']+)' : '([^']+)'\)/g)];
+    assert.equal(replacements.length, 8);
+    const render = (g) => replacements.reduce((yaml, [, token, large, normal]) => yaml.replace(token, g ? large : normal), template);
+    // Snapshot of current dev's literal, before moving it into edgePodYaml().
+    assert.equal(createHash("sha256").update(render(false)).digest("hex"), "2185196952cc717f369fade5c8f2cf576d029b2bedeeaf5f2eb3d1098b0b77cf");
+    assert.doesNotMatch(render(true), /@[BK](?:REQ|LIM)_/);
+    assert.match(render(true), /memory: "12Gi"/);
+    assert.match(render(true), /memory: "16Gi"/);
+    assert.match(pod, /boolean g = isGateOnly\(\)/);
+    assert.match(edge.slice(edge.indexOf("pipeline {")), /yaml edgePodYaml\(\)/);
+  });
+});
+
 describe("Dataplane Validation runs beside app and genesis (Lane C3)", () => {
   const dvWhen = whenOf(stageBlock(edge, "Dataplane Validation"));
 
   test("edge: the stage's when names RUN_CLASS and skips a deploy-bearing class", () => {
     assert.match(
       dvWhen,
-      /expression \{ isValidateOnly\(\) \|\| !owesValidationToSibling\(params\.RUN_CLASS\) \}/,
+      /expression \{ !isGateOnly\(\) && \(isValidateOnly\(\) \|\| !owesValidationToSibling\(params\.RUN_CLASS\)\) \}/,
     );
     // Evaluated LAST inside allOf (which short-circuits), so the debt is
     // recorded only when every other condition would have run the stage here.
