@@ -4,14 +4,15 @@
     "path": ".epr-meta/collective.json",
     "cid": "bafkreihcq3q7qgwncossxf6q7rowjsysgw3wqt2lpu2w6mnoosd7abmfku"
   },
-  "author": "agent:integrator@claude-fable-5-1",
+  "author": "human:matthew",
   "steward": "repo:ethosengine/elohim",
   "scope": "repository",
   "reach": "repository",
   "concern": "feedback-limit-raises-are-design-signals-not-capacity",
   "claim": "Operator 2026-09-13: a conductor limit raise is an emergent loop in a capacity costume — run a VSM design pass.",
   "uncertainty": [
-    "Imported verbatim from .claude/memory/feedback_limit_raises_are_design_signals_not_capacity.md; the claim is the entry's own one-line description and the entry body is the pinned source, not restated here."
+    "Imported verbatim from .claude/memory/feedback_limit_raises_are_design_signals_not_capacity.md; the claim is the entry's own one-line description and the entry body is the pinned source, not restated here.",
+    "authorship: steward-of-record — human:matthew stands for this entry; no agent author was witnessed writing it, and this record does not say human:matthew wrote it. Origin session: dcddc033-024b-4dfa-8d13-39fa5f75b9ef."
   ],
   "sources": [
     {

@@ -4,14 +4,15 @@
     "path": ".epr-meta/collective.json",
     "cid": "bafkreihcq3q7qgwncossxf6q7rowjsysgw3wqt2lpu2w6mnoosd7abmfku"
   },
-  "author": "agent:integrator@claude-fable-5-1",
+  "author": "human:matthew",
   "steward": "repo:ethosengine/elohim",
   "scope": "repository",
   "reach": "repository",
   "concern": "feedback_che_devworkspaces_direct_to_main",
   "claim": "che-devworkspaces (CI/image infra) pushes straight to main, inert-by-default; elohim monorepo main is reviewed dev→main only — surface classifier blocks.",
   "uncertainty": [
-    "Imported verbatim from .claude/memory/feedback_che_devworkspaces_direct_to_main.md; the claim is the entry's own one-line description and the entry body is the pinned source, not restated here."
+    "Imported verbatim from .claude/memory/feedback_che_devworkspaces_direct_to_main.md; the claim is the entry's own one-line description and the entry body is the pinned source, not restated here.",
+    "authorship: steward-of-record — human:matthew stands for this entry; no agent author was witnessed writing it, and this record does not say human:matthew wrote it. Origin session: efcfeef6-e1eb-4f9a-bc62-4a561c22b8b9."
   ],
   "sources": [
     {

@@ -4,14 +4,15 @@
     "path": ".epr-meta/collective.json",
     "cid": "bafkreihcq3q7qgwncossxf6q7rowjsysgw3wqt2lpu2w6mnoosd7abmfku"
   },
-  "author": "agent:integrator@claude-fable-5-1",
+  "author": "human:matthew",
   "steward": "repo:ethosengine/elohim",
   "scope": "repository",
   "reach": "repository",
   "concern": "project_civic_ai_outreach_thread",
   "claim": "Warm outreach to Audrey Tang (au@civic.ai) + Caroline Green (Oxford Ethics in AI), cc Nicky Case + Amber Hu — civic.ai '6-Pack of Care'/Kami ↔ Elohim commons.",
   "uncertainty": [
-    "Imported verbatim from .claude/memory/project_civic_ai_outreach_thread.md; the claim is the entry's own one-line description and the entry body is the pinned source, not restated here."
+    "Imported verbatim from .claude/memory/project_civic_ai_outreach_thread.md; the claim is the entry's own one-line description and the entry body is the pinned source, not restated here.",
+    "authorship: steward-of-record — human:matthew stands for this entry; no agent author was witnessed writing it, and this record does not say human:matthew wrote it. Origin session: dd92ea53-45bb-4dba-bf69-b4b5b86362dd."
   ],
   "sources": [
     {

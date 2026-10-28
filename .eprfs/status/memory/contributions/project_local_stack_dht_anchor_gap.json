@@ -4,14 +4,15 @@
     "path": ".epr-meta/collective.json",
     "cid": "bafkreihcq3q7qgwncossxf6q7rowjsysgw3wqt2lpu2w6mnoosd7abmfku"
   },
-  "author": "agent:integrator@claude-fable-5-1",
+  "author": "human:matthew",
   "steward": "repo:ethosengine/elohim",
   "scope": "repository",
   "reach": "repository",
   "concern": "local-stack-dht-anchor-gap",
   "claim": "Local bulk seed never DHT-anchors → provenance gate 404s all reads by design; dev repair = p2p_published_at backfill; real fix = import anchor step",
   "uncertainty": [
-    "Imported verbatim from .claude/memory/project_local_stack_dht_anchor_gap.md; the claim is the entry's own one-line description and the entry body is the pinned source, not restated here."
+    "Imported verbatim from .claude/memory/project_local_stack_dht_anchor_gap.md; the claim is the entry's own one-line description and the entry body is the pinned source, not restated here.",
+    "authorship: steward-of-record — human:matthew stands for this entry; no agent author was witnessed writing it, and this record does not say human:matthew wrote it. Origin session: 52e75242-0c09-464a-9a0d-613667fc14e0."
   ],
   "sources": [
     {
