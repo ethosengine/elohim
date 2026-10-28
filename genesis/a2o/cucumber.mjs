@@ -54,6 +54,12 @@ export default function () {
       format: ['progress'],
     },
     default: { ...base, paths: ['features/**/*.feature'] },
+    'work-composition': {
+      requireModule: ['tsx'],
+      require: ['steps/devflow/work-composition.steps.ts'],
+      paths: ['features/devflow/work-composition.feature'],
+      format: ['progress'],
+    },
     'local-view-board': {
       requireModule: ['tsx'],
       require: ['steps/devflow/local-view-board.steps.ts'],

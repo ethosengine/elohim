@@ -396,10 +396,10 @@ habits:
       - "epr flow stocks --window <START..END> --per week --stock commitments --check --root /projects/elohim (exit 0 = every declared stock draining; fail-closed: refusals exit non-zero, never green-on-nothing)"
       - "a2o @concern:dev-system-equilibrium (genesis/a2o/features/devflow/run-plane.feature — 4 scenarios: filling exits non-zero, drain>=inflow exits zero, an unmeasurable window refuses rather than reporting equilibrium, and the @regression guard that a discharge counts as outflow and never as inflow. WIRED 2026-09-11: steps/devflow/run-plane.steps.ts drives them through the real `epr flow` CLI over a throwaway git fixture repo (mint instant = artifact commit date, discharge instant = HEAD commit provenance); runs in the mesh and default profiles, and scoped: `cd genesis/a2o && npx cucumber-js --config '' --require-module tsx --require steps/devflow/epr-cli.guard.ts --require steps/devflow/run-plane.steps.ts features/devflow/run-plane.feature --tags 'not @wip'` → 8 scenarios passed (these 4 + the 4 @concern:run-plane-note write-leg scenarios). The 4 @concern:run-plane-projection emitter scenarios stay @wip (they need scratch registers the run-projection.py emitter cannot yet be pointed at). Where `epr` is absent (the genesis CI image) the @requires:epr-cli guard reports SKIPPED, never a false red — not measured, not green.)"
     evidence: >
-      DELTA 2026-10-16 (RED preserved; window unmeasurable): at origin/dev@42941449e, `epr flow stocks --window 2026-09-21..2026-10-16 --per week --stock commitments --check --root .` exited 1 with `verdict: REFUSED` because no commitment events of this unit fall inside the window; this is absence, not a drained stock, and red holds.
-    evidence-fingerprint: sha256:19555f3738a63c85
-    evidence-bytes: 42273
-    evidence-entries: 50
+      DELTA 2026-10-28 (rescue contracts restored; RED preserved): ported the shared-working-version, daily-life and portable-lifecycle contracts from 0ee5dfde8, retaining current placement/manifest-needs authority. Work-composition schema checks pass (2 tests, exit 0) and existing manifest checks pass (15, exit 0); work-composition Cucumber dry-run resolves all 16 steps (exit 0), without native execution. The epic's fresh-context manifesto review returned READY in one round (0 correctness, 0 interpretability, 1 optional wording preference); features await this shift's blind-reader pass. Runtime proof and stock-drain acceptance remain owed.
+    evidence-fingerprint: sha256:f9b4d8289f3d1d4d
+    evidence-bytes: 42917
+    evidence-entries: 51
     guard: >
       Regression risks: (1) the outflow classifier keys on `fulfills` — a new
       discharge path that forgets the field silently under-drains (the level
