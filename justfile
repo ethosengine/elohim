@@ -773,6 +773,7 @@ _gate-dna-extern-lints:
 
 _gate-schema-validate:
     pnpm run schema:validate
+    node --test elohim/sdk/schemas/tests/work-composition.test.mjs
 
 _gate-schema-codegen:
     pnpm run schema:codegen:ts -- --verify

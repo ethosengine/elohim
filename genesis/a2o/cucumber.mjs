@@ -54,6 +54,18 @@ export default function () {
       format: ['progress'],
     },
     default: { ...base, paths: ['features/**/*.feature'] },
+    'work-composition': {
+      requireModule: ['tsx'],
+      require: ['steps/devflow/work-composition.steps.ts'],
+      paths: ['features/devflow/work-composition.feature'],
+      format: ['progress'],
+    },
+    'local-view-board': {
+      requireModule: ['tsx'],
+      require: ['steps/devflow/local-view-board.steps.ts'],
+      paths: ['features/devflow/local-view-board.feature'],
+      format: ['progress'],
+    },
     // The real-workspace half uses existing peer daemons; local scenarios keep their own fixtures.
     'devices-share-one-berth': {
       requireModule: ['tsx'],

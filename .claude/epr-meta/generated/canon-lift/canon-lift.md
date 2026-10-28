@@ -2,7 +2,7 @@
 
 # Concern canon — brit lift
 
-**40 rows across both registry homes -> 40 CIDv1(dag-cbor, sha2-256) atoms** (40 pin-verified, 29 declared heads).
+**41 rows across both registry homes -> 41 CIDv1(dag-cbor, sha2-256) atoms** (41 pin-verified, 30 declared heads).
 
 The content plane (`canon-atoms.json`) and the standing plane (`precedent-standing.json`) are what the v1 YAML row deliberately conflates; `declared-heads.json` carries the brit declared-head-over-DAG primitive at resolution mode `pinned`. Every CID is a codec wrap of the exact bytes the registry's own `sha256` pin already covers — the digests below are the same 32 bytes, rendered twice.
 
@@ -12,6 +12,7 @@ The `sha256` column is the registry's own live pin; the `CID` is that same diges
 
 | Policy id | Head | Content sha256 pin | Content CID |
 |---|---|---|---|
+| `absolutes-guard` | `policies.yaml@1` | `sha256:a480a7427312653946e2e5d045c05eaf111f900cc43b7f9bc7aba2e104f65fe6` | `bafyreifeqctue4ysmu4unyxf2bc4axvpcepzadgehn7zxr5lulqqj5s74y` |
 | `archetype-resource-alignment` | `policies.yaml@1` | `sha256:a62c78e26c81446263e2b6478d45e11d8f9d49685c2e93e82d7a1f98b529b795` | `bafyreifgfr4oe3ebirrghyvwi6gulyi5r6ous2c4f2j6qll2d6mlkknxsu` |
 | `brand-vocabulary-boundary` | `policies.yaml@1` | `sha256:e57794fb9a49b28b8fa30b463da87b36ead31df9d829b7eb54457b8f09307c63` | `bafyreihfo6kpxgsjwkfy7iyliy62q6zw5ljr36oyfg36wvcfpohqsmd4mm` |
 | `c0-plane-location` | `concerns.yaml@1` | `sha256:df38bb561769ff552e76d63391996e41093a70621a47fae47ac25fcfa3500505` | `bafyreig7hc5vmf3j75ks45wwgoizs3sbbe5hayq2i75oi6wcl7h2guafau` |
