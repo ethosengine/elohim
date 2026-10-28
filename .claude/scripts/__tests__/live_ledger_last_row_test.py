@@ -1,6 +1,6 @@
 """Live-set ledgers (ci/deprecations/architecture/runtime findings) are read last-row-per-fp.
 A recovered older row appended after dev's triaged/closed row for the same fp reopens it.
-Asserts no fp's last row changed versus the merge-base with origin/dev (the integration target).
+Asserts no fp's last row changed versus origin/dev itself (the integration target).
 Run: python3 .claude/scripts/__tests__/live_ledger_last_row_test.py (exit 0 = pass)."""
 import json
 import subprocess
@@ -27,11 +27,12 @@ def last_rows(text):
     return out
 
 
-base = git("merge-base", "HEAD", "origin/dev")
-if base.returncode != 0:
+# Compare directly against origin/dev (not the merge-base): fingerprints and dispositions
+# added on dev after this branch forked must also survive unchanged.
+base = "origin/dev"
+if git("rev-parse", "--verify", base).returncode != 0:
     print("skip: no origin/dev")
     sys.exit(0)
-base = base.stdout.strip()
 for name in LEDGERS:
     rel = f".claude/data/{name}.jsonl"
     old = git("show", f"{base}:{rel}")
