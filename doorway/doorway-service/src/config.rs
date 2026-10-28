@@ -408,14 +408,18 @@ pub struct Args {
     /// lost while the conductors kept their people?) is computed, logged and
     /// published — but nothing is refused on it. A person with no record is
     /// resolved as before the log existed (an app under their legacy id is
-    /// theirs), and no node/device login is refused for want of a record.
+    /// theirs), no node/device login is refused for want of a record, and a
+    /// registration onto an agent that already has a Human re-attaches it (the
+    /// doorway still asks whether one exists before creating one).
     ///
     /// On: a person with no record is not provisioned as new while the verdict
     /// is `unknown` (503 `PROVISIONING_NOT_READY`) or `wiped` (503
     /// `PROVISIONING_UNRESOLVED`); an app without a record is adopted only when
     /// the account row's own agent key equals the conductor's; and a node/device
     /// login whose key names a hosted app needs this doorway's record for the
-    /// identifier. On the first boot with the log, the doorway backfills the
+    /// identifier; and an existing Human is attached to a registration only on
+    /// evidence (this doorway's record, or the operator credential), else 403
+    /// `IDENTITY_RECOVERY_REFUSED`. On the first boot with the log, the doorway backfills the
     /// records itself from account rows a conductor confirms
     /// (`AgentProvisioner::migrate_from_accounts`); only a database that lost
     /// its accounts too waits for `POST /admin/provisioning/recover`.

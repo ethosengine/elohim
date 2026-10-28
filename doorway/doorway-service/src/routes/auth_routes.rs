@@ -1080,6 +1080,16 @@ async fn hosted_identity_recovery_authorized(
     }
 }
 
+/// Whether attaching an existing Human to a registration needs evidence:
+/// `DOORWAY_PROVISIONING_STORE_GATE`, read from the conductor registry this
+/// doorway built from it (the arguments, where there is no registry).
+fn identity_recovery_gated(state: &AppState) -> bool {
+    match &state.conductor_registry {
+        Some(registry) => registry.store_gate(),
+        None => state.args.provisioning_store_gate,
+    }
+}
+
 /// Why a registration could not be bound to a Human.
 enum RegistrationBindError {
     /// A finished HTTP refusal: the recovery was not authorised (403), or the
@@ -1093,9 +1103,12 @@ enum RegistrationBindError {
 /// (`provisioned` is `None`), or the app provisioned for a hosted person.
 ///
 /// Asks whether the agent already has a Human BEFORE creating one. If it does,
-/// attaching it to this account is a recovery and needs evidence: the operator
+/// attaching it to this account is a recovery. With the store gate on
+/// (`DOORWAY_PROVISIONING_STORE_GATE`) it needs evidence: the operator
 /// credential for the doorway's own agent, this doorway's provisioning record
-/// for a hosted agent. Without it: 403, nothing created, no row, no token.
+/// for a hosted agent; without it: 403, nothing created, no row, no token.
+/// With the gate off (the default) the existing Human is re-attached, as dev
+/// did before the gate.
 async fn bind_registration_human(
     state: &AppState,
     arm: &str,
@@ -1104,9 +1117,13 @@ async fn bind_registration_human(
     input: CreateHumanInput,
 ) -> Result<crate::routes::zome_helpers::HumanOutput, RegistrationBindError> {
     use crate::routes::human_binding::{
-        agent_key, agent_lock_wait, agent_locks, bind_human, log_bound, BindError, ZomeCallerAuthor,
+        agent_key, agent_lock_wait, agent_locks, bind_human, log_bound, recovery_evidence,
+        BindError, ZomeCallerAuthor,
     };
 
+    // The refusal below is gated (`DOORWAY_PROVISIONING_STORE_GATE`); the read
+    // that asks whether a Human exists is not.
+    let gated = identity_recovery_gated(state);
     let bound = match provisioned {
         Some(p) => {
             let caller = crate::services::ZomeCaller::new(
@@ -1120,7 +1137,11 @@ async fn bind_registration_human(
                 &agent_key(&p.admin_url, &p.installed_app_id),
                 agent_lock_wait(),
                 input,
-                || hosted_identity_recovery_authorized(state, &body.identifier, p),
+                || {
+                    recovery_evidence(gated, || {
+                        hosted_identity_recovery_authorized(state, &body.identifier, p)
+                    })
+                },
             )
             .await
         }
@@ -1142,7 +1163,7 @@ async fn bind_registration_human(
                 &agent_key(state.args.admin_url(), &state.args.installed_app_id),
                 agent_lock_wait(),
                 input,
-                || async move { authorized },
+                || recovery_evidence(gated, || async move { authorized }),
             )
             .await
         }
@@ -7426,6 +7447,34 @@ mod node_device_key_guard_tests {
         for phase in ["node", "device"] {
             assert!(node_device_login_refusal(&state, Some(phase), HOSTED).is_none());
         }
+    }
+
+    /// The Human recovery refusal follows the same gate: the registry this
+    /// doorway built from `DOORWAY_PROVISIONING_STORE_GATE`, or the argument
+    /// itself where there is no registry. Off is dev's re-attach.
+    #[tokio::test]
+    async fn the_identity_recovery_refusal_follows_the_store_gate() {
+        assert!(!identity_recovery_gated(
+            &state_with_agents_gated(false).await
+        ));
+        assert!(identity_recovery_gated(
+            &state_with_agents_gated(true).await
+        ));
+
+        use clap::Parser;
+        let off = AppState::new(crate::config::Args::parse_from([
+            "doorway",
+            "--listen",
+            "127.0.0.1:0",
+        ]));
+        assert!(!identity_recovery_gated(&off), "off by default");
+        let on = AppState::new(crate::config::Args::parse_from([
+            "doorway",
+            "--listen",
+            "127.0.0.1:0",
+            "--provisioning-store-gate",
+        ]));
+        assert!(identity_recovery_gated(&on));
     }
 
     /// The registration guard is not gated: a NEW node/device account may not

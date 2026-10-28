@@ -6211,6 +6211,9 @@ decisionPoints:
       run unserialised. Comparing the returned Human's id with a requested id is not evidence.
       Called from every registration arm that creates or attaches a Human
       (routes::auth_routes::bind_registration_human).
+      The refusal is gated by DOORWAY_PROVISIONING_STORE_GATE (default false) through
+      routes::human_binding::recovery_evidence: off, the existing Human is re-attached without
+      evidence, as dev did before the gate; the read before create runs either way.
     concernIds:
       - id: C0
         status: answered

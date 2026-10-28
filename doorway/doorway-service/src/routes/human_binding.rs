@@ -160,6 +160,24 @@ pub fn agent_locks() -> &'static KeyedLock {
     LOCKS.get_or_init(KeyedLock::new)
 }
 
+/// The evidence a recovery needs, under the store gate
+/// (`DOORWAY_PROVISIONING_STORE_GATE`).
+///
+/// Gate ON: an existing Human is handed to a registration only on `evidence`
+/// (this doorway's provisioning record for a hosted agent, the operator
+/// credential for the doorway's own agent). Gate OFF, the default: it is handed
+/// over as dev handed it over before this gate existed — a registration onto an
+/// agent that already has a Human re-attaches it (the "conductor kept, database
+/// cleared" recovery). `evidence` is not consulted then. The read that asks
+/// whether a Human exists runs either way; only the refusal is gated.
+pub async fn recovery_evidence<Evidence, EvidenceFut>(gated: bool, evidence: Evidence) -> bool
+where
+    Evidence: FnOnce() -> EvidenceFut,
+    EvidenceFut: Future<Output = bool>,
+{
+    !gated || evidence().await
+}
+
 /// Is `human` exactly what `sent` asked the zome to create?
 fn is_what_was_sent(human: &Human, sent: &CreateHumanInput) -> bool {
     human.id == sent.id
@@ -484,6 +502,48 @@ mod tests {
             "{outcome:?}"
         );
         assert_eq!(fake.creates(), 0);
+    }
+
+    /// The store gate decides whether the refusal applies. OFF (the default):
+    /// an existing Human is re-attached without evidence, as dev does, and the
+    /// evidence is not even consulted. ON: no evidence, no Human. Either way the
+    /// existing Human is READ first and nothing is created.
+    #[tokio::test]
+    async fn the_recovery_refusal_applies_only_with_the_store_gate_on() {
+        for gated in [false, true] {
+            let fake = ZomeFake::with_existing(&operator());
+            let locks = KeyedLock::new();
+            let consulted = AtomicU32::new(0);
+
+            let outcome = bind_human(
+                &fake,
+                &locks,
+                "agent",
+                WAIT,
+                newcomer("human-someone-new"),
+                || {
+                    recovery_evidence(gated, || async {
+                        consulted.fetch_add(1, Ordering::SeqCst);
+                        false
+                    })
+                },
+            )
+            .await;
+
+            if gated {
+                assert!(
+                    matches!(outcome, Err(BindError::RecoveryRefused)),
+                    "{outcome:?}"
+                );
+                assert_eq!(consulted.load(Ordering::SeqCst), 1);
+            } else {
+                let bound = outcome.expect("gate off re-attaches, as dev does");
+                assert!(bound.was_recovered());
+                assert_eq!(bound.into_output().human.id, "human-matthew-manager");
+                assert_eq!(consulted.load(Ordering::SeqCst), 0, "evidence not asked");
+            }
+            assert_eq!(fake.creates(), 0, "{gated}: a recovery creates nothing");
+        }
     }
 
     /// With evidence, the existing Human is recovered — and it is reported as a

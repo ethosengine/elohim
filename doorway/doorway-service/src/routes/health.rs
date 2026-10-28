@@ -91,8 +91,10 @@ pub struct ProvisioningHealth {
     /// The intent store is available and nothing is refused on the store
     /// verdict: it is `not_wiped`, or the store gate is off.
     pub ready: bool,
-    /// `DOORWAY_PROVISIONING_STORE_GATE`: whether the store verdict may refuse.
-    /// Off (the default), the verdict below is observed, never enforced.
+    /// `DOORWAY_PROVISIONING_STORE_GATE`: whether the store verdict may refuse,
+    /// and whether attaching an existing Human to a registration needs
+    /// evidence (`IDENTITY_RECOVERY_REFUSED`). Off (the default), the verdict
+    /// below is observed, never enforced, and an existing Human is re-attached.
     pub store_gate: bool,
     /// `unknown` | `not_wiped` | `wiped`. `unknown` = the store was empty at
     /// boot and some conductor has not yet answered what it hosts; it settles
