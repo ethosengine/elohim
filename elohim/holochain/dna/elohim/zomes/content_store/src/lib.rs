@@ -9430,7 +9430,10 @@ fn content_exists_by_id(id: &str) -> ExternResult<bool> {
 }
 
 /// DEPRECATED: LearningPath entries are deprecated. Retained for potential migration use.
-#[allow(dead_code)]
+#[allow(
+    dead_code,
+    reason = "LearningPath entries are deprecated; the helper is retained for potential migration use, per its doc comment"
+)]
 fn path_exists_by_id(id: &str) -> ExternResult<bool> {
     let anchor = StringAnchor::new("path_id", id);
     let anchor_hash = hash_entry(&EntryTypes::StringAnchor(anchor))?;

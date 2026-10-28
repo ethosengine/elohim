@@ -131,7 +131,10 @@ pub fn proof_holds(
 /// What one node asks of another over a carrier.
 // One message is built per send and dropped after it; the ask's size is
 // not worth an indirection on the wire type.
-#[allow(clippy::large_enum_variant)]
+#[allow(
+    clippy::large_enum_variant,
+    reason = "one message is built per send and dropped after it; the ask's size is not worth an indirection on the wire type"
+)]
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase", tag = "kind")]
 pub enum CarryRequest {

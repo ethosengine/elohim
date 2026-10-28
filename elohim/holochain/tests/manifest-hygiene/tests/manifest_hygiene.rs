@@ -35,7 +35,10 @@ struct DnaManifest {
     name: String,
     integrity: IntegritySection,
     #[serde(default)]
-    #[allow(dead_code)]
+    #[allow(
+        dead_code,
+        reason = "deserialized so the manifest's coordinator key is accepted, but the tests never read the field"
+    )]
     coordinator: Option<serde_yaml::Value>,
 }
 

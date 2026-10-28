@@ -112,7 +112,10 @@ pub struct ContentClient {
     /// App ID for multi-tenant scoping (e.g., "lamad", "elohim")
     app_id: String,
     /// elohim-storage HTTP client (for sync operations in native/node modes)
-    #[allow(dead_code)]
+    #[allow(
+        dead_code,
+        reason = "the constructor stores the StorageClient for native/node sync, but no method reads the field yet"
+    )]
     storage: Option<StorageClient>,
     /// Write buffer for backpressure protection
     write_buffer: WriteBuffer,

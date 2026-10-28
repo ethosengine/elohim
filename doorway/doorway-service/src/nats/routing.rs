@@ -20,7 +20,10 @@ pub struct HostRouter {
     /// Cached list of available hosts
     hosts: Arc<RwLock<HashMap<String, CachedHost>>>,
     /// Last time the host list was refreshed (for future NATS-based refresh)
-    #[allow(dead_code)]
+    #[allow(
+        dead_code,
+        reason = "`last_refresh` is held for the future NATS-based host refresh its doc comment names; nothing reads it yet"
+    )]
     last_refresh: Arc<RwLock<Option<Instant>>>,
     /// NATS client for messaging (for future NATS-based routing)
     #[allow(dead_code)]

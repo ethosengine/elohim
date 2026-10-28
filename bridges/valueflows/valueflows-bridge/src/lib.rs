@@ -106,7 +106,10 @@ pub enum BridgeError {
     BuildResponse(String),
 }
 
-#[allow(clippy::expect_used)]
+#[allow(
+    clippy::expect_used,
+    reason = "the builder is given a StatusCode, a static header and an in-memory body, so build() cannot fail (see the comment at the expect)"
+)]
 fn error_response(status: StatusCode, code: &str, message: &str) -> Response<Full<Bytes>> {
     let body = serde_json::json!({
         "errors": [{
