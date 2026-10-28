@@ -43,6 +43,10 @@ class PublishError(Exception):
     pass
 
 
+class RegistryUnavailable(PublishError):
+    pass
+
+
 class NoRedirect(HTTPRedirectHandler):
     def redirect_request(self, request, fp, code, message, headers, newurl):
         return None
@@ -77,9 +81,10 @@ def get(url: str, limit: int, label: str, *, missing_ok: bool = False) -> bytes 
     except HTTPError as error:
         if missing_ok and error.code == 404:
             return None
-        raise PublishError(f"{label}: registry HTTP {error.code}") from None
+        error_type = PublishError if error.code == 404 else RegistryUnavailable
+        raise error_type(f"{label}: registry HTTP {error.code}") from None
     except (OSError, URLError) as error:
-        raise PublishError(f"{label}: registry read failed ({type(error).__name__})") from None
+        raise RegistryUnavailable(f"{label}: registry read failed ({type(error).__name__})") from None
     if len(data) > limit:
         raise PublishError(f"{label}: registry response exceeds size limit")
     return data
@@ -335,6 +340,65 @@ def cargo(workspace: Path, arguments: list[str], env: dict[str, str]) -> bool:
     return result.returncode == 0
 
 
+def precheck(repo: Path) -> None:
+    eprfs_workspace = repo / "elohim/eprfs"
+    manifest = tomllib.loads((eprfs_workspace / "Cargo.toml").read_text())
+    eprfs_version = manifest["workspace"]["package"]["version"]
+    index_base = registry_base(repo)
+    try:
+        download = download_base(index_base)
+        for name in CRATES:
+            crate = repo / "crates/seam-contracts" if name == "elohim-seam-contracts" else eprfs_workspace / name
+            if not crate.is_dir():
+                raise PublishError(f"{name}: crate directory is absent")
+            if name == "elohim-seam-contracts":
+                manifest = tomllib.loads((crate / "Cargo.toml").read_text())
+                version = manifest["package"]["version"]
+            else:
+                version = eprfs_version
+            record = index_record(index_base, name, version)
+            if record is None:
+                print(f"absent: {name} {version}", flush=True)
+                continue
+            remote = get(f"{download}/{name}/{version}/download", MAX_ARCHIVE, f"{name} {version} archive")
+            if hashlib.sha256(remote).hexdigest() != record["cksum"]:
+                raise PublishError(f"{name} {version}: registry archive checksum differs from index")
+            files, _ = archive_contents(remote, name, version)
+            differences = []
+            for path, (kind, digest, _mode) in files.items():
+                if path in ("Cargo.toml", ".cargo_vcs_info.json", "Cargo.lock"):
+                    continue
+                local = crate / ("Cargo.toml" if path == "Cargo.toml.orig" else path)
+                if kind == "directory":
+                    matches = local.is_dir()
+                else:
+                    matches = local.is_file() and hashlib.sha256(local.read_bytes()).hexdigest() == digest
+                if not matches:
+                    differences.append(path)
+            tracked = subprocess.run(
+                ["git", "ls-files", "-z", "--", crate.relative_to(repo).as_posix()],
+                cwd=repo, capture_output=True,
+            )
+            if tracked.returncode:
+                raise PublishError(f"{name} {version}: git ls-files failed")
+            # Tracked files excluded by Cargo's include/exclude rules can produce false positives.
+            for path in tracked.stdout.split(b"\0"):
+                if not path:
+                    continue
+                relative = (repo / os.fsdecode(path)).relative_to(crate).as_posix()
+                if relative != "Cargo.toml" and relative not in files:
+                    differences.append(relative)
+            if differences:
+                raise PublishError(
+                    f"{name} {version}: packaged source differs from the published {version} "
+                    f"({sorted(differences)[0]}); bump the version"
+                )
+            print(f"verified existing: {name} {version}", flush=True)
+    except RegistryUnavailable as error:
+        print(f"precheck: claimed (registry unreachable: {error})", file=sys.stderr)
+    print("eprfs precheck complete")
+
+
 def run(repo: Path, publish: bool) -> None:
     eprfs_workspace = repo / "elohim/eprfs"
     manifest = tomllib.loads((eprfs_workspace / "Cargo.toml").read_text())
@@ -403,10 +467,14 @@ def main() -> int:
     mode = parser.add_mutually_exclusive_group(required=True)
     mode.add_argument("--check", action="store_true", help="package and compare without upload")
     mode.add_argument("--publish", action="store_true", help="publish absent versions after checks")
+    mode.add_argument("--precheck", action="store_true", help="compare working tree without Cargo or credentials")
     args = parser.parse_args()
     repo = Path(__file__).resolve().parents[2]
     try:
-        run(repo, args.publish)
+        if args.precheck:
+            precheck(repo)
+        else:
+            run(repo, args.publish)
     except (PublishError, OSError, KeyError, ValueError) as error:
         print(f"ERROR: {error}", file=sys.stderr)
         return 1

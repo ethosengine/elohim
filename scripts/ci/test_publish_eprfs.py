@@ -13,7 +13,7 @@ import tempfile
 import unittest
 from pathlib import Path
 from unittest import mock
-from urllib.error import HTTPError
+from urllib.error import HTTPError, URLError
 
 sys.path.insert(0, str(Path(__file__).parent))
 import publish_eprfs as publisher
@@ -264,6 +264,145 @@ class ArchiveTests(unittest.TestCase):
         with mock.patch.object(publisher, "MAX_MEMBERS", 1):
             with self.assertRaisesRegex(publisher.PublishError, "too many"):
                 publisher.archive_files(archive(), NAME, VERSION)
+
+
+class PrecheckTests(unittest.TestCase):
+    def setUp(self):
+        self.root = Path(self.enterContext(tempfile.TemporaryDirectory()))
+        self.workspace = self.root / "elohim/eprfs"
+        self.crate = self.workspace / NAME
+        (self.crate / "src").mkdir(parents=True)
+        (self.workspace / "Cargo.toml").write_text('[workspace.package]\nversion="0.1.0"\n')
+        self.files = {
+            "Cargo.toml": b"[package]\nname='eprfs-core'\nversion='0.1.0'\n",
+            "Cargo.toml.orig": b"[package]\nname='eprfs-core'\nversion.workspace=true\n",
+            "Cargo.lock": b"generated lock",
+            ".cargo_vcs_info.json": b"published revision",
+            "src/lib.rs": b"pub fn x() {}",
+        }
+        (self.crate / "Cargo.toml").write_bytes(self.files["Cargo.toml.orig"])
+        (self.crate / "Cargo.lock").write_bytes(b"local lock")
+        (self.crate / "src/lib.rs").write_bytes(self.files["src/lib.rs"])
+        self.name = NAME
+        self.enterContext(mock.patch.dict(os.environ, {}, clear=True))
+        self.enterContext(mock.patch.object(publisher, "__file__", str(self.root / "scripts/ci/publish_eprfs.py")))
+        self.enterContext(mock.patch.object(sys, "argv", ["publish_eprfs.py", "--precheck"]))
+        self.enterContext(mock.patch.object(publisher, "registry_base", return_value=BASE))
+        self.enterContext(mock.patch.object(publisher, "cargo", side_effect=AssertionError("no Cargo in precheck")))
+        self.git = self.enterContext(mock.patch.object(publisher.subprocess, "run", return_value=mock.Mock(
+            returncode=0,
+            stdout=b"elohim/eprfs/eprfs-core/Cargo.toml\0elohim/eprfs/eprfs-core/Cargo.lock\0elohim/eprfs/eprfs-core/src/lib.rs\0",
+        )))
+
+    def responses(self):
+        payload = archive(self.files, name=self.name)
+        return [
+            Response(json.dumps({"dl": BASE + "/crates"}).encode()),
+            Response(json.dumps(record(payload, self.name)).encode()),
+            Response(payload),
+        ]
+
+    def run_precheck(self, responses=None):
+        with mock.patch.object(publisher, "CRATES", (self.name,)), mock.patch.object(
+            publisher.OPENER, "open", side_effect=responses if responses is not None else self.responses()
+        ), mock.patch.object(sys, "stdout", new_callable=io.StringIO) as stdout, mock.patch.object(
+            sys, "stderr", new_callable=io.StringIO
+        ) as stderr:
+            status = publisher.main()
+        return status, stdout.getvalue(), stderr.getvalue()
+
+    def test_matching_published_tree_passes_without_credentials_or_target(self):
+        status, stdout, stderr = self.run_precheck()
+        self.assertEqual(status, 0, stderr)
+        self.assertEqual(stdout, f"verified existing: {NAME} {VERSION}\neprfs precheck complete\n")
+        self.assertEqual(stderr, "")
+        self.git.assert_called_once_with(
+            ["git", "ls-files", "-z", "--", "elohim/eprfs/eprfs-core"],
+            cwd=self.root, capture_output=True,
+        )
+
+    def test_changed_source_or_original_manifest_refuses(self):
+        for path in ("src/lib.rs", "Cargo.toml"):
+            with self.subTest(path=path):
+                local = self.crate / path
+                original = local.read_bytes()
+                local.write_bytes(b"changed")
+                status, _, stderr = self.run_precheck()
+                local.write_bytes(original)
+                self.assertEqual(status, 1)
+                self.assertIn("packaged source differs", stderr)
+                self.assertIn(f"({path + '.orig' if path == 'Cargo.toml' else path}); bump the version", stderr)
+
+    def test_missing_local_source_refuses(self):
+        (self.crate / "src/lib.rs").unlink()
+        status, _, stderr = self.run_precheck()
+        self.assertEqual(status, 1)
+        self.assertIn("packaged source differs", stderr)
+        self.assertIn("(src/lib.rs)", stderr)
+
+    def test_tracked_file_missing_from_archive_refuses(self):
+        (self.crate / "src/new file.rs").write_bytes(b"new")
+        self.git.return_value.stdout += b"elohim/eprfs/eprfs-core/src/new file.rs\0"
+        status, _, stderr = self.run_precheck()
+        self.assertEqual(status, 1)
+        self.assertIn("packaged source differs", stderr)
+        self.assertIn("(src/new file.rs)", stderr)
+
+    def test_absent_version_passes(self):
+        responses = self.responses()
+        responses[1] = HTTPError(BASE, 404, "missing", {}, None)
+        status, stdout, stderr = self.run_precheck(responses)
+        self.assertEqual(status, 0, stderr)
+        self.assertEqual(stdout, f"absent: {NAME} {VERSION}\neprfs precheck complete\n")
+        self.git.assert_not_called()
+
+    def test_unreachable_registry_is_claimed(self):
+        for stage in range(3):
+            for error in (OSError("offline"), URLError("offline"), HTTPError(BASE, 503, "unavailable", {}, None)):
+                with self.subTest(stage=stage, error=type(error).__name__):
+                    responses = self.responses()
+                    responses[stage] = error
+                    status, stdout, stderr = self.run_precheck(responses)
+                    self.assertEqual(status, 0)
+                    self.assertIn("precheck: claimed (registry unreachable:", stderr)
+                    self.assertEqual(stdout, "eprfs precheck complete\n")
+
+    def test_checksum_malformed_index_and_missing_archive_refuse(self):
+        for stage, response, message in (
+            (2, Response(archive()), "checksum"),
+            (1, Response(b"not-json"), "malformed"),
+            (2, HTTPError(BASE, 404, "missing", {}, None), "HTTP 404"),
+        ):
+            with self.subTest(message=message):
+                responses = self.responses()
+                responses[stage] = response
+                status, _, stderr = self.run_precheck(responses)
+                self.assertEqual(status, 1)
+                self.assertIn(message, stderr)
+                self.assertNotIn("claimed", stderr)
+
+    def test_missing_crate_directory_refuses(self):
+        self.name = "eprfs-host"
+        status, _, stderr = self.run_precheck()
+        self.assertEqual(status, 1)
+        self.assertIn("crate directory is absent", stderr)
+
+    def test_seam_contracts_uses_its_own_directory_and_version(self):
+        self.name = "elohim-seam-contracts"
+        self.crate = self.root / "crates/seam-contracts"
+        (self.crate / "src").mkdir(parents=True)
+        (self.workspace / "Cargo.toml").write_text('[workspace.package]\nversion="0.2.0"\n')
+        self.files["Cargo.toml.orig"] = b"[package]\nname='elohim-seam-contracts'\nversion='0.1.0'\n"
+        (self.crate / "Cargo.toml").write_bytes(self.files["Cargo.toml.orig"])
+        (self.crate / "src/lib.rs").write_bytes(self.files["src/lib.rs"])
+        self.git.return_value.stdout = b"crates/seam-contracts/Cargo.toml\0crates/seam-contracts/src/lib.rs\0"
+        status, stdout, stderr = self.run_precheck()
+        self.assertEqual(status, 0, stderr)
+        self.assertIn(f"verified existing: {self.name} 0.1.0", stdout)
+        self.git.assert_called_once_with(
+            ["git", "ls-files", "-z", "--", "crates/seam-contracts"],
+            cwd=self.root, capture_output=True,
+        )
 
 
 class PublicationTests(unittest.TestCase):

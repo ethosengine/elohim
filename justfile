@@ -644,7 +644,9 @@ _gate-epr-ts:
 
 # elohim/eprfs is its own native workspace with no per-project justfile; the
 # recipe lives here so the manifest's typed contract has a real target.
+# Refuse published version collisions before building, without Cargo registry credentials.
 _gate-eprfs:
+    python3 scripts/ci/publish_eprfs.py --precheck
     cd elohim/eprfs && cargo fmt --check
     @set -- --workspace; \
       if [ -n "${GATE_CARGO_PACKAGES:-}" ]; then set --; for package in $GATE_CARGO_PACKAGES; do set -- "$@" -p "$package"; done; fi; \
