@@ -10,6 +10,7 @@
 //!   "own": { "device", "root", "seq", "at", "folded": {"<did>": seq}, "signature" },
 //!   "own_log": [ { "seq", "root", "at", "events", "last" } ],
 //!   "store": { "root", "log" },
+//!   "rules": { "digest", "policy", "loadedAt", "pending" },
 //!   "devices": {
 //!     "<did>": { "seq", "root", "at", "folded": {"<did>": seq}, "folded_at", "events_folded", "nack" }
 //!   },
@@ -47,6 +48,7 @@ use serde::{Deserialize, Serialize};
 
 use crate::error::PeerError;
 use crate::head::ChannelHead;
+use crate::rules::RulesState;
 
 /// The table's format version.
 pub const HEAD_TABLE_VERSION: u32 = 1;
@@ -116,6 +118,10 @@ pub struct HeadTable {
     /// The flow store this device's channel is projected from, once `epr peer serve` has run.
     #[serde(default)]
     pub store: Option<StorePlace>,
+    /// The rules the daemon loaded, so `epr peer status` and berth read them from the daemon,
+    /// never from a session's worktree.
+    #[serde(default)]
+    pub rules: Option<RulesState>,
     /// The last head folded from each other device, by did:key.
     pub devices: BTreeMap<String, DeviceHead>,
     /// CIDs this device refused from each author, projected into this device's channel tree.
@@ -159,6 +165,7 @@ impl Default for HeadTable {
             own: None,
             own_log: Vec::new(),
             store: None,
+            rules: None,
             devices: BTreeMap::new(),
             nacks: BTreeMap::new(),
             dropped: DroppedHeads::default(),

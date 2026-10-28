@@ -95,6 +95,11 @@ impl Channel {
         &self.table
     }
 
+    /// The persisted rules state for daemon reload bookkeeping.
+    pub(crate) fn rules_state_mut(&mut self) -> &mut Option<crate::rules::RulesState> {
+        &mut self.table.rules
+    }
+
     /// Add refusals for `author`. True only when the projected nack set changed.
     pub fn nack(
         &mut self,

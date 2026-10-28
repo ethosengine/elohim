@@ -18,7 +18,8 @@
 //!   lineage, carrying its acknowledgement vector; [`Channel`] keeps the announce rhythm and judges
 //!   the heads it hears; [`fold_root`] folds another device's events into this device's flow store
 //!   `via` that device; [`HeadTable`] persists what was folded; [`PeerDaemon`] runs it all behind
-//!   `epr peer serve`.
+//!   `epr peer serve`. [`Rules`] loads the crossing list and [`StewardScope`] together and gives
+//!   the daemon-loaded pair one advisory digest for status readers.
 //! - The steward lease view (§3.4): [`steward_lease_view`] reads, for each steward-scoped
 //!   resource ([`StewardScope`]), whether this device's lease is effective, pending or
 //!   unconfirmed, or another device's lease holds it, from the berth records ([`LeaseEvent`]) and
@@ -46,6 +47,7 @@ mod head;
 mod head_table;
 mod key;
 mod lease_view;
+mod rules;
 mod steward_scope;
 mod tier;
 
@@ -86,6 +88,7 @@ pub use lease_view::{
     lease_events, other_devices, steward_lease_view, LeaseEvent, LeaseKind, LeaseStore,
     LeaseVerdict, OtherDevice, Resource, BERTH_EVENTS_MEASURE,
 };
+pub use rules::{Rules, RulesDigest, RulesState};
 pub use steward_scope::{
     Settlement, StewardScope, DEFAULT_CONFIRM_WAIT_S, DEFAULT_FENCE_MARGIN_S, DEFAULT_MAX_SKEW_S,
 };

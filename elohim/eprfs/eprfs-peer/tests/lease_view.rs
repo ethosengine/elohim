@@ -236,40 +236,66 @@ fn fenced_holder_self_demotes_when_a_peer_goes_silent() {
         }) if device == &h.b.did
     ));
 
-    let fresh = table(&h.a.did, &[(3, 1)], &s, &[(&h.b.did, 3, ms(T0) + 90_001)]);
+    // A peer heard recently that acknowledged a renew inside the window keeps the holder.
+    let renewed = store(vec![
+        own(claim_ttl("claude-1", T0, 120)),
+        own(renew("claude-1", T0, T0 + 40.0, 120)),
+    ]);
+    let fresh = table(
+        &h.a.did,
+        &[(3, 1), (4, 2)],
+        &renewed,
+        &[(&h.b.did, 4, ms(T0) + 90_001)],
+    );
     assert_eq!(
-        verdict(&h.a.did, &s, &fresh, &admission, ms(T0) + 90_001),
+        verdict(&h.a.did, &renewed, &fresh, &admission, ms(T0) + 90_001),
         Some(effective("claude-1"))
     );
 }
 
 #[test]
-fn renew_must_be_covered() {
+fn a_renew_in_flight_rides_on_the_last_acknowledged_one() {
+    // The holder re-reads its lease right after writing a renew, before any head carrying it was
+    // acknowledged: the claim B did acknowledge still binds B, so the holder stays effective.
     let h = household();
     let s = store(vec![
         own(claim_ttl("claude-1", T0, 120)),
-        own(renew("claude-1", T0, T0 + 30.0, 120)),
+        own(renew("claude-1", T0, T0 + 60.0, 120)),
     ]);
     let admission = h.admission();
-    let not_covered = table(
-        &h.a.did,
-        &[(3, 1), (4, 2)],
-        &s,
-        &[(&h.b.did, 3, ms(T0) + 30_500)],
+    let claim_only = |now| table(&h.a.did, &[(3, 1), (4, 2)], &s, &[(&h.b.did, 3, now)]);
+    assert_eq!(
+        verdict(
+            &h.a.did,
+            &s,
+            &claim_only(ms(T0) + 60_500),
+            &admission,
+            ms(T0) + 61_000
+        ),
+        Some(effective("claude-1"))
     );
+
+    // Once the acknowledged claim is older than ttl - fence_margin (120 - 30 s), B may soon read
+    // the lease as lapsed: the holder demotes itself although B is still heard.
     assert!(matches!(
-        verdict(&h.a.did, &s, &not_covered, &admission, ms(T0) + 31_000),
+        verdict(
+            &h.a.did,
+            &s,
+            &claim_only(ms(T0) + 90_001),
+            &admission,
+            ms(T0) + 90_001
+        ),
         Some(LeaseVerdict::Unconfirmed { fenced: true, .. })
     ));
 
-    let covered = table(
+    let renew_acked = table(
         &h.a.did,
         &[(3, 1), (4, 2)],
         &s,
-        &[(&h.b.did, 4, ms(T0) + 31_000)],
+        &[(&h.b.did, 4, ms(T0) + 90_001)],
     );
     assert_eq!(
-        verdict(&h.a.did, &s, &covered, &admission, ms(T0) + 31_000),
+        verdict(&h.a.did, &s, &renew_acked, &admission, ms(T0) + 90_001),
         Some(effective("claude-1"))
     );
 }

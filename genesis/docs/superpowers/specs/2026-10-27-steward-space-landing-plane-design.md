@@ -171,7 +171,7 @@ Current `berth` uses exits 0, 1, 2, 3, and 4 (`genesis/agentic/bin/berth:82-87`)
 **Answers:** H4, M3, critic I; codebase-truth and adversary quarantine findings; gradient "fail closed on the lease, not the fold".
 
 ### A3. Settlement holds under partition and skew
-**Holder-side fence.** A holder treats its own lease as effective only while, from every other admitted device, it has a head received within `TTL − skew_margin` (margin 30 s) whose `folded[me]` covers its latest renew. Otherwise it **self-demotes to `unconfirmed`**, and phase L, dispatch and deploy refuse. Renew cadence is ≤ TTL/3.
+**Holder-side fence.** A holder treats its own lease as effective only while, from every other admitted device, it has a head received within `TTL − skew_margin` (margin 30 s), and the newest claim or renew that head's `folded[me]` covers was stamped within `TTL − skew_margin` (D6). Otherwise it **self-demotes to `unconfirmed`**, and phase L, dispatch and deploy refuse. Renew cadence is ≤ TTL/3.
 
 **Override timing.** A peer may override a silent holder only after `TTL + max_skew + margin` has elapsed since it last heard the holder's head. Combined with the fence, this gives at most one effective holder *during* a partition, not only after it.
 
@@ -851,6 +851,17 @@ These forks are not parked for the operator. Per the operator ruling of 2026-10-
   - **Governance class runs locally:** a candidate that changes the reuse predicate, the crossing or provenance code, or this vocabulary is never judged by a sibling's verdict.
   - **Falsifier:** a device outside the admitted chain-root roster causes a sibling reuse, or a reused verdict cannot be traced to one admitted device's signed head and one brit attestation id.
   - **Interface:** `reusableHit` takes normalised candidates from a `GateEvidenceSource` (local brit or steward space) through an admission callback. The S2 policy that also requires `binds-signer` replaces the callback without changing gate-runner or the record shape.
+
+- **D6 (A3 holder fence anchor, 2026-10-28): the fence is anchored on the newest claim or renew each other device has acknowledged, valid while it is younger than `TTL − fence_margin`; it does not require the latest renew to be covered.**
+  - **Alternatives:**
+    - (a) The as-landed rule: every other device must acknowledge the head carrying the latest renew.
+    - (b) Make berth wait after writing a renew until the peer acknowledges it, as a claim waits `confirm_wait_s`.
+  - **Evidence that chose it:**
+    - Rule (a) demoted every holder at each renew: berth re-reads the view right after writing a renew, before any head carries it. Live on 2026-10-28 at about 14:39Z, the rules-digest push was refused at its first renew ("self-demoted: no head from <shem> within 1770s") while shem's head was 1 s old and acknowledged every head of ours. Every push longer than ttl/3 (600 s) failed the same way on both devices.
+    - What binds the other device is the newest record it has folded; until it folds the new renew, the previous one binds it to that record's stamp plus TTL. Anchoring on that record keeps the fence exactly as tight as the other device's view, with no wait added to the renew.
+    - Option (b) adds latency to every renew and still demotes a holder whose peer is briefly slow, which the partition story does not require.
+  - **Falsifier:** two devices each read an effective lease on one resource at the same instant, in `partition_longer_than_ttl_never_has_two_effective_holders` or live; or a holder whose peer is heard and acknowledging is demoted within the window of its last acknowledged renew (`a_renew_in_flight_rides_on_the_last_acknowledged_one`).
+  - **Interface:** `lease_view::own_verdict` alone; the berth renew path and the wire are unchanged.
 
 ## Appendix: minor findings and dispositions
 | Finding | Disposition |

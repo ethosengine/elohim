@@ -161,4 +161,14 @@ impl StewardScope {
     pub fn settlement(&self) -> Settlement {
         self.settlement
     }
+
+    /// The ordered exact resource names used to encode the rules digest.
+    pub(crate) fn names(&self) -> &BTreeSet<String> {
+        &self.names
+    }
+
+    /// The ordered resource prefixes used to encode the rules digest.
+    pub(crate) fn prefixes(&self) -> &BTreeSet<String> {
+        &self.prefixes
+    }
 }
