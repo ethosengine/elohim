@@ -2,7 +2,7 @@
  "n_concerns": 16,
  "n_seams": 16,
  "n_cells": 256,
- "n_points_routed": 454,
+ "n_points_routed": 464,
  "plane_groups": [
   {
    "id": "control-truth",
@@ -1417,6 +1417,62 @@
      "status": "answered",
      "verified": true,
      "file": "src/server/http.rs"
+    },
+    {
+     "crate": "doorway",
+     "point": "classify_request_error",
+     "status": "answered",
+     "verified": true,
+     "file": "src/conductor/typed_admin.rs"
+    },
+    {
+     "crate": "doorway",
+     "point": "ProvisionError",
+     "status": "answered",
+     "verified": true,
+     "file": "src/conductor/provisioner.rs"
+    },
+    {
+     "crate": "doorway",
+     "point": "before_install",
+     "status": "answered",
+     "verified": true,
+     "file": "src/conductor/provisioner.rs"
+    },
+    {
+     "crate": "doorway",
+     "point": "provision_from_record",
+     "status": "answered",
+     "verified": true,
+     "file": "src/conductor/provisioner.rs"
+    },
+    {
+     "crate": "doorway",
+     "point": "finish_forward",
+     "status": "answered",
+     "verified": true,
+     "file": "src/conductor/provisioner.rs"
+    },
+    {
+     "crate": "doorway",
+     "point": "store_verdict",
+     "status": "answered",
+     "verified": true,
+     "file": "src/conductor/registry.rs"
+    },
+    {
+     "crate": "doorway",
+     "point": "operator_identity_recovery_authorized",
+     "status": "answered",
+     "verified": true,
+     "file": "src/routes/auth_routes.rs"
+    },
+    {
+     "crate": "doorway",
+     "point": "bind_human",
+     "status": "answered",
+     "verified": true,
+     "file": "src/routes/human_binding.rs"
     }
    ]
   },
@@ -3563,6 +3619,13 @@
      "status": "n-a",
      "verified": true,
      "file": "src/server/http.rs"
+    },
+    {
+     "crate": "doorway",
+     "point": "provision_from_record",
+     "status": "answered",
+     "verified": true,
+     "file": "src/conductor/provisioner.rs"
     }
    ]
   },
@@ -5395,6 +5458,13 @@
      "status": "n-a",
      "verified": true,
      "file": "src/routes/service_agent.rs"
+    },
+    {
+     "crate": "doorway",
+     "point": "provision_from_record",
+     "status": "partial",
+     "verified": true,
+     "file": "src/conductor/provisioner.rs"
     }
    ]
   },
@@ -7157,6 +7227,34 @@
      "status": "partial",
      "verified": true,
      "file": "src/routes/service_agent.rs"
+    },
+    {
+     "crate": "doorway",
+     "point": "ProvisionError",
+     "status": "partial",
+     "verified": true,
+     "file": "src/conductor/provisioner.rs"
+    },
+    {
+     "crate": "doorway",
+     "point": "provision_from_record",
+     "status": "partial",
+     "verified": true,
+     "file": "src/conductor/provisioner.rs"
+    },
+    {
+     "crate": "doorway",
+     "point": "StuckReason",
+     "status": "partial",
+     "verified": true,
+     "file": "src/conductor/provision_intent.rs"
+    },
+    {
+     "crate": "doorway",
+     "point": "store_verdict",
+     "status": "partial",
+     "verified": true,
+     "file": "src/conductor/registry.rs"
     }
    ]
   },
@@ -9555,6 +9653,69 @@
      "status": "answered",
      "verified": true,
      "file": "src/server/http.rs"
+    },
+    {
+     "crate": "doorway",
+     "point": "classify_request_error",
+     "status": "answered",
+     "verified": true,
+     "file": "src/conductor/typed_admin.rs"
+    },
+    {
+     "crate": "doorway",
+     "point": "ProvisionError",
+     "status": "answered",
+     "verified": true,
+     "file": "src/conductor/provisioner.rs"
+    },
+    {
+     "crate": "doorway",
+     "point": "provision_from_record",
+     "status": "answered",
+     "verified": true,
+     "file": "src/conductor/provisioner.rs"
+    },
+    {
+     "crate": "doorway",
+     "point": "finish_forward",
+     "status": "answered",
+     "verified": true,
+     "file": "src/conductor/provisioner.rs"
+    },
+    {
+     "crate": "doorway",
+     "point": "StuckReason",
+     "status": "answered",
+     "verified": true,
+     "file": "src/conductor/provision_intent.rs"
+    },
+    {
+     "crate": "doorway",
+     "point": "store_verdict",
+     "status": "answered",
+     "verified": true,
+     "file": "src/conductor/registry.rs"
+    },
+    {
+     "crate": "doorway",
+     "point": "hosted_here",
+     "status": "answered",
+     "verified": true,
+     "file": "src/conductor/provisioner.rs"
+    },
+    {
+     "crate": "doorway",
+     "point": "operator_identity_recovery_authorized",
+     "status": "answered",
+     "verified": true,
+     "file": "src/routes/auth_routes.rs"
+    },
+    {
+     "crate": "doorway",
+     "point": "bind_human",
+     "status": "answered",
+     "verified": true,
+     "file": "src/routes/human_binding.rs"
     }
    ]
   },
@@ -11639,6 +11800,27 @@
      "status": "answered",
      "verified": true,
      "file": "src/server/http.rs"
+    },
+    {
+     "crate": "doorway",
+     "point": "provision_from_record",
+     "status": "answered",
+     "verified": true,
+     "file": "src/conductor/provisioner.rs"
+    },
+    {
+     "crate": "doorway",
+     "point": "finish_forward",
+     "status": "answered",
+     "verified": true,
+     "file": "src/conductor/provisioner.rs"
+    },
+    {
+     "crate": "doorway",
+     "point": "bind_human",
+     "status": "answered",
+     "verified": true,
+     "file": "src/routes/human_binding.rs"
     }
    ]
   },
@@ -13737,6 +13919,41 @@
      "status": "answered",
      "verified": true,
      "file": "src/routes/hosted_cell.rs"
+    },
+    {
+     "crate": "doorway",
+     "point": "before_install",
+     "status": "answered",
+     "verified": true,
+     "file": "src/conductor/provisioner.rs"
+    },
+    {
+     "crate": "doorway",
+     "point": "provision_from_record",
+     "status": "answered",
+     "verified": true,
+     "file": "src/conductor/provisioner.rs"
+    },
+    {
+     "crate": "doorway",
+     "point": "StuckReason",
+     "status": "answered",
+     "verified": true,
+     "file": "src/conductor/provision_intent.rs"
+    },
+    {
+     "crate": "doorway",
+     "point": "store_verdict",
+     "status": "answered",
+     "verified": true,
+     "file": "src/conductor/registry.rs"
+    },
+    {
+     "crate": "doorway",
+     "point": "bind_human",
+     "status": "answered",
+     "verified": true,
+     "file": "src/routes/human_binding.rs"
     }
    ]
   },
@@ -15611,6 +15828,27 @@
      "status": "partial",
      "verified": true,
      "file": "src/routes/service_agent.rs"
+    },
+    {
+     "crate": "doorway",
+     "point": "before_install",
+     "status": "partial",
+     "verified": true,
+     "file": "src/conductor/provisioner.rs"
+    },
+    {
+     "crate": "doorway",
+     "point": "provision_from_record",
+     "status": "partial",
+     "verified": true,
+     "file": "src/conductor/provisioner.rs"
+    },
+    {
+     "crate": "doorway",
+     "point": "bind_human",
+     "status": "partial",
+     "verified": true,
+     "file": "src/routes/human_binding.rs"
     }
    ]
   },
@@ -19359,6 +19597,41 @@
      "status": "partial",
      "verified": true,
      "file": "src/routes/service_agent.rs"
+    },
+    {
+     "crate": "doorway",
+     "point": "classify_request_error",
+     "status": "unbound",
+     "verified": true,
+     "file": "src/conductor/typed_admin.rs"
+    },
+    {
+     "crate": "doorway",
+     "point": "ProvisionError",
+     "status": "partial",
+     "verified": true,
+     "file": "src/conductor/provisioner.rs"
+    },
+    {
+     "crate": "doorway",
+     "point": "provision_from_record",
+     "status": "partial",
+     "verified": true,
+     "file": "src/conductor/provisioner.rs"
+    },
+    {
+     "crate": "doorway",
+     "point": "StuckReason",
+     "status": "answered",
+     "verified": true,
+     "file": "src/conductor/provision_intent.rs"
+    },
+    {
+     "crate": "doorway",
+     "point": "store_verdict",
+     "status": "answered",
+     "verified": true,
+     "file": "src/conductor/registry.rs"
     }
    ]
   },
@@ -21072,6 +21345,41 @@
      "status": "n-a",
      "verified": true,
      "file": "src/routes/service_agent.rs"
+    },
+    {
+     "crate": "doorway",
+     "point": "before_install",
+     "status": "partial",
+     "verified": true,
+     "file": "src/conductor/provisioner.rs"
+    },
+    {
+     "crate": "doorway",
+     "point": "provision_from_record",
+     "status": "partial",
+     "verified": true,
+     "file": "src/conductor/provisioner.rs"
+    },
+    {
+     "crate": "doorway",
+     "point": "finish_forward",
+     "status": "answered",
+     "verified": true,
+     "file": "src/conductor/provisioner.rs"
+    },
+    {
+     "crate": "doorway",
+     "point": "store_verdict",
+     "status": "partial",
+     "verified": true,
+     "file": "src/conductor/registry.rs"
+    },
+    {
+     "crate": "doorway",
+     "point": "hosted_here",
+     "status": "partial",
+     "verified": true,
+     "file": "src/conductor/provisioner.rs"
     }
    ]
   },
@@ -22785,6 +23093,20 @@
      "status": "answered",
      "verified": true,
      "file": "src/server/http.rs"
+    },
+    {
+     "crate": "doorway",
+     "point": "classify_request_error",
+     "status": "partial",
+     "verified": true,
+     "file": "src/conductor/typed_admin.rs"
+    },
+    {
+     "crate": "doorway",
+     "point": "provision_from_record",
+     "status": "partial",
+     "verified": true,
+     "file": "src/conductor/provisioner.rs"
     }
    ]
   },
@@ -26519,6 +26841,41 @@
      "status": "answered",
      "verified": true,
      "file": "src/server/http.rs"
+    },
+    {
+     "crate": "doorway",
+     "point": "provision_from_record",
+     "status": "n-a",
+     "verified": true,
+     "file": "src/conductor/provisioner.rs"
+    },
+    {
+     "crate": "doorway",
+     "point": "finish_forward",
+     "status": "partial",
+     "verified": true,
+     "file": "src/conductor/provisioner.rs"
+    },
+    {
+     "crate": "doorway",
+     "point": "hosted_here",
+     "status": "answered",
+     "verified": true,
+     "file": "src/conductor/provisioner.rs"
+    },
+    {
+     "crate": "doorway",
+     "point": "operator_identity_recovery_authorized",
+     "status": "partial",
+     "verified": true,
+     "file": "src/routes/auth_routes.rs"
+    },
+    {
+     "crate": "doorway",
+     "point": "bind_human",
+     "status": "partial",
+     "verified": true,
+     "file": "src/routes/human_binding.rs"
     }
    ]
   },
@@ -28302,6 +28659,13 @@
      "status": "n-a",
      "verified": true,
      "file": "src/server/http.rs"
+    },
+    {
+     "crate": "doorway",
+     "point": "operator_identity_recovery_authorized",
+     "status": "partial",
+     "verified": true,
+     "file": "src/routes/auth_routes.rs"
     }
    ]
   },
@@ -30036,6 +30400,27 @@
      "status": "partial",
      "verified": true,
      "file": "src/routes/service_agent.rs"
+    },
+    {
+     "crate": "doorway",
+     "point": "ProvisionError",
+     "status": "partial",
+     "verified": true,
+     "file": "src/conductor/provisioner.rs"
+    },
+    {
+     "crate": "doorway",
+     "point": "provision_from_record",
+     "status": "partial",
+     "verified": true,
+     "file": "src/conductor/provisioner.rs"
+    },
+    {
+     "crate": "doorway",
+     "point": "StuckReason",
+     "status": "partial",
+     "verified": true,
+     "file": "src/conductor/provision_intent.rs"
     }
    ]
   },
