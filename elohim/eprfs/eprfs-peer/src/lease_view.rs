@@ -41,14 +41,16 @@
 //! store; a time comparison would take that head's acknowledgement for the claim's.) A claim older
 //! than the oldest logged head takes that head, conservatively. Even after confirmation, a bounded
 //! lease remains effective only while every other admitted device has supplied a head within
-//! `ttl_s - fence_margin_s` and that head acknowledges the first own head carrying the latest
-//! renew. A no-ttl daemon lease has no time fence, but its latest renew still needs coverage.
+//! `ttl_s - fence_margin_s`, and the newest claim or renew that head acknowledges was stamped
+//! within `ttl_s - fence_margin_s`: that is the record binding the other device, so a renew not yet
+//! acknowledged rides on the previous one rather than demoting the holder the moment it is
+//! written. A no-ttl daemon lease has no time fence, but it still needs an acknowledged claim.
 //!
 //! An offline-ok override, berth's `override` record naming a silent device, becomes effective only
 //! `ttl_s + max_skew_s + fence_margin_s` after this device last folded that device (or after the
 //! claim when it never did). The named silent device is the override's one exception to confirmation
-//! and the holder fence; every other admitted device must still cover the latest renew and remain
-//! fresh. A no-ttl lease can never become effective by override. On other devices an override is an
+//! and the holder fence; every other admitted device must still acknowledge a claim or renew
+//! inside the window and remain fresh. A no-ttl lease can never become effective by override. On other devices an override is an
 //! ordinary lease and binds them.
 //!
 //! Clocks: a ttl, confirmation, holder fence and override wait compare times. Own waits and folds use
@@ -313,6 +315,17 @@ pub enum LeaseVerdict {
     },
 }
 
+/// How many of a lease's claim and renews the holder fence considers: the newest acknowledged
+/// one decides, and a holder renews every ttl/3, so older ones have long left the window.
+const EXTENSIONS_KEPT: usize = 16;
+
+/// A claim or renew record: where it sits in its store and the time a ttl counts from.
+#[derive(Debug, Clone, Copy)]
+struct Extension {
+    written: u64,
+    since: u64,
+}
+
 /// One live lease.
 #[derive(Debug, Clone)]
 struct Lease {
@@ -324,8 +337,8 @@ struct Lease {
     ttl_s: Option<u64>,
     /// The claim record's position in its store and its write time.
     written: u64,
-    /// The latest renew record's position, or the claim position before the first renew.
-    renewed_written: u64,
+    /// The claim and its latest renews, oldest first, at most [`EXTENSIONS_KEPT`].
+    extensions: Vec<Extension>,
     claim_at: u64,
     overrode: Option<String>,
     seen: BTreeMap<String, u64>,
@@ -361,18 +374,22 @@ fn replay<'e>(
         let key = (resource.clone(), event.session.clone());
         let opened = |event: &LeaseEvent| {
             let claimed_at = event.claimed_at.unwrap_or(event.at);
+            let since = if event.kind == LeaseKind::Claim {
+                claimed_at
+            } else {
+                event.at
+            };
             Lease {
                 device: device.to_string(),
                 session: event.session.clone(),
                 claimed_at,
-                since: if event.kind == LeaseKind::Claim {
-                    claimed_at
-                } else {
-                    event.at
-                },
+                since,
                 ttl_s: event.ttl_s,
                 written: event.written,
-                renewed_written: event.written,
+                extensions: vec![Extension {
+                    written: event.written,
+                    since,
+                }],
                 claim_at: event.at,
                 overrode: None,
                 seen: event.seen.clone(),
@@ -390,7 +407,13 @@ fn replay<'e>(
                 Some(lease) => {
                     lease.since = event.at;
                     lease.ttl_s = event.ttl_s;
-                    lease.renewed_written = event.written;
+                    lease.extensions.push(Extension {
+                        written: event.written,
+                        since: event.at,
+                    });
+                    if lease.extensions.len() > EXTENSIONS_KEPT {
+                        lease.extensions.remove(0);
+                    }
                 }
                 None => {
                     open.insert(key, opened(event));
@@ -510,12 +533,19 @@ pub fn steward_lease_view(
                     .filter(|logged| logged.events >= lease.written)
                     .map(|logged| logged.seq)
                     .min();
-                // The first own head that carried the claim or its latest renew.
-                let renewed_carried = usable
+                // The first own head that carried the claim and each kept renew.
+                let extensions = lease
+                    .extensions
                     .iter()
-                    .filter(|logged| logged.events >= lease.renewed_written)
-                    .map(|logged| logged.seq)
-                    .min();
+                    .map(|extension| {
+                        let seq = usable
+                            .iter()
+                            .filter(|logged| logged.events >= extension.written)
+                            .map(|logged| logged.seq)
+                            .min();
+                        (seq, extension.since)
+                    })
+                    .collect();
                 let preceding = theirs
                     .into_iter()
                     .filter(|other| precedes(other, &lease, carried, me))
@@ -526,7 +556,7 @@ pub fn steward_lease_view(
                         lease,
                         Carried {
                             claim: carried,
-                            renew: renewed_carried,
+                            extensions,
                         },
                         me,
                         &others,
@@ -651,12 +681,12 @@ fn held_by(lease: Lease) -> LeaseVerdict {
     }
 }
 
-/// The first own heads that carried a lease's claim and its latest renew (the claim's, before any
-/// renew), over this store.
-#[derive(Debug, Clone, Copy)]
+/// The first own heads that carried a lease's claim, and its claim and kept renews each with the
+/// time its ttl counts from, over this store.
+#[derive(Debug, Clone)]
 struct Carried {
     claim: Option<u64>,
-    renew: Option<u64>,
+    extensions: Vec<(Option<u64>, u64)>,
 }
 
 /// This device's lease, preceded by no other: effective once every other admitted device
@@ -749,10 +779,21 @@ fn own_verdict(
             let fresh = fence_after_s.is_none_or(|window| {
                 now.saturating_sub(head.folded_at) <= window.saturating_mul(1000)
             });
-            let covered = matches!(
-                (carried.renew, head.folded.get(me)),
-                (Some(seq), Some(&acked)) if acked >= seq
-            );
+            // The newest claim or renew this device has acknowledged is what binds it, so a renew
+            // still in flight rides on the last acknowledged one until that one leaves the window.
+            let acked = head.folded.get(me).copied();
+            let anchor = carried
+                .extensions
+                .iter()
+                .filter(
+                    |(seq, _)| matches!((seq, acked), (Some(seq), Some(acked)) if acked >= *seq),
+                )
+                .map(|(_, since)| *since)
+                .max();
+            let covered = anchor.is_some_and(|since| {
+                fence_after_s
+                    .is_none_or(|window| now.saturating_sub(since) <= window.saturating_mul(1000))
+            });
             !fresh || !covered
         });
         return match stale {

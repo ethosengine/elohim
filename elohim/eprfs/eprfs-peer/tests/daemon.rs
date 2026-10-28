@@ -5,15 +5,17 @@
 mod support;
 
 use std::path::Path;
-use std::sync::Arc;
+use std::sync::{Arc, Mutex};
 use std::time::Duration;
 
 use elohim_epr_rea::{ParticipantRow, SidecarRoster};
-use eprfs_peer::{via_device, CrossingAllowList, HeadTable, PeerConfig, PeerDaemon, PeerKey};
+use eprfs_peer::{
+    via_device, CrossingAllowList, HeadTable, PeerConfig, PeerDaemon, PeerKey, Rules,
+};
 use futures_lite::StreamExt;
 use support::{
-    berth_event, binding, contest, device, endpoint_row, genesis, policy, verifier, Checkout,
-    Device, HANDLE,
+    berth_event, binding, contest, device, endpoint_row, event_with, genesis, policy, verifier,
+    Checkout, Device, HANDLE,
 };
 
 const WITHIN: Duration = Duration::from_secs(20);
@@ -65,7 +67,8 @@ fn config(
         flow_root: side.checkout.dir.path().to_path_buf(),
         roster: side.roster_path(),
         state_dir: side.state.path().to_path_buf(),
-        allow: CrossingAllowList::from_policy(&policy()).expect("policy"),
+        rules: Rules::from_policy(&policy()).expect("policy"),
+        policy: None,
         relay: None,
         listen: Some(listen),
         peers,
@@ -98,6 +101,233 @@ async fn eventually(what: &str, mut check: impl FnMut() -> bool) {
 
 fn load_key(dir: &Path) -> PeerKey {
     PeerKey::load_or_generate(dir).expect("key")
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn a_policy_edit_reloads_the_rules_and_a_comment_only_edit_does_not_flap() {
+    let a = device("DeviceA", 1);
+    let key_dir = tempfile::tempdir().expect("key dir");
+    let key = load_key(key_dir.path());
+    let rows = vec![genesis(&a), endpoint_row(&a, &a, &key)];
+    let side = Side::new(&rows);
+    let policy_file = tempfile::NamedTempFile::new().expect("policy file");
+    let initial = policy();
+    std::fs::write(
+        policy_file.path(),
+        serde_json::to_vec_pretty(&initial).expect("policy JSON"),
+    )
+    .expect("write policy");
+    let logs = Arc::new(Mutex::new(Vec::<String>::new()));
+    let mut cfg = config(
+        &a,
+        &a.did,
+        key,
+        &side,
+        &[&a],
+        Vec::new(),
+        local(free_port()),
+    );
+    cfg.rules = Rules::from_policy_file(policy_file.path()).expect("initial rules");
+    cfg.policy = Some(policy_file.path().to_path_buf());
+    let captured = logs.clone();
+    cfg.log = Arc::new(move |line| captured.lock().expect("logs").push(line.to_string()));
+    let daemon = PeerDaemon::start(cfg).await.expect("daemon starts");
+
+    eventually("the daemon records its loaded rules", || {
+        side.table().rules.is_some() && side.table().own.is_some()
+    })
+    .await;
+    let before = side.table();
+    let digest_one = before.rules.expect("rules state").digest;
+    let seq_one = before.own.expect("own head").seq;
+    let mut comment_only = initial.clone();
+    comment_only["_comment"] = serde_json::json!(
+        "a longer comment changes the file stamp without changing enforced rules"
+    );
+    comment_only["berth"]["channel"]["confirm_wait_s"] = serde_json::json!(77);
+    std::fs::write(
+        policy_file.path(),
+        serde_json::to_vec_pretty(&comment_only).expect("comment policy JSON"),
+    )
+    .expect("write comment policy");
+    tokio::time::sleep(Duration::from_millis(750)).await;
+    let after_comment = side.table();
+    assert_eq!(after_comment.rules.expect("rules state").digest, digest_one);
+    assert_eq!(after_comment.own.expect("own head").seq, seq_one);
+    assert!(logs
+        .lock()
+        .expect("logs")
+        .iter()
+        .all(|line| !line.contains("rules reloaded")));
+
+    let mut changed = comment_only.clone();
+    changed["berth"]["channel"]["crosses"]["dev-berth-events@1"]
+        .as_array_mut()
+        .expect("kinds")
+        .push(serde_json::json!("refuse"));
+    std::fs::write(
+        policy_file.path(),
+        serde_json::to_vec_pretty(&changed).expect("changed policy JSON"),
+    )
+    .expect("write changed policy");
+    eventually("the semantic policy edit reloads", || {
+        side.table()
+            .rules
+            .as_ref()
+            .is_some_and(|state| state.digest != digest_one)
+    })
+    .await;
+    let digest_two = side.table().rules.expect("rules state").digest;
+    assert!(logs
+        .lock()
+        .expect("logs")
+        .iter()
+        .any(|line| line.contains("rules reloaded")));
+
+    std::fs::write(policy_file.path(), "{malformed").expect("write malformed policy");
+    eventually("the malformed replacement is pending", || {
+        side.table()
+            .rules
+            .as_ref()
+            .is_some_and(|state| state.pending.is_some() && state.digest == digest_two)
+    })
+    .await;
+    tokio::time::sleep(Duration::from_millis(750)).await;
+    assert_eq!(
+        logs.lock()
+            .expect("logs")
+            .iter()
+            .filter(|line| line.contains("rules not reloaded"))
+            .count(),
+        1
+    );
+    std::fs::write(
+        policy_file.path(),
+        serde_json::to_vec_pretty(&changed).expect("restored policy JSON"),
+    )
+    .expect("restore policy");
+    eventually("the restored policy clears pending", || {
+        side.table()
+            .rules
+            .as_ref()
+            .is_some_and(|state| state.pending.is_none() && state.digest == digest_two)
+    })
+    .await;
+
+    daemon.shutdown().await;
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn skewed_allow_lists_settle_on_nacks_not_digest() {
+    let a = device("DeviceA", 1);
+    let b = device("DeviceB", 2);
+    let (key_dir_a, key_dir_b) = (
+        tempfile::tempdir().expect("A key dir"),
+        tempfile::tempdir().expect("B key dir"),
+    );
+    let (key_a, key_b) = (load_key(key_dir_a.path()), load_key(key_dir_b.path()));
+    let (id_a, id_b) = (key_a.node_id(), key_b.node_id());
+    let rows = vec![
+        genesis(&a),
+        binding(&a, &b),
+        endpoint_row(&a, &a, &key_a),
+        endpoint_row(&a, &b, &key_b),
+    ];
+    let (side_a, side_b) = (Side::new(&rows), Side::new(&rows));
+    let policy_a = tempfile::NamedTempFile::new().expect("A policy");
+    let policy_b = tempfile::NamedTempFile::new().expect("B policy");
+    let broad = serde_json::json!({
+        "berth": {"channel": {"crosses": {
+            "dev-berth-events@1": ["claim", "release"],
+            "gate-verdict@1": ["verdict"]
+        }}}
+    });
+    let narrow = serde_json::json!({
+        "berth": {"channel": {"crosses": {
+            "dev-berth-events@1": ["claim", "release"]
+        }}}
+    });
+    for (file, value) in [(&policy_a, &broad), (&policy_b, &narrow)] {
+        std::fs::write(
+            file.path(),
+            serde_json::to_vec_pretty(value).expect("policy JSON"),
+        )
+        .expect("write policy");
+    }
+    let (port_a, port_b) = (free_port(), free_port());
+    let addr = |id, port| {
+        iroh::NodeAddr::new(id).with_direct_addresses([std::net::SocketAddr::V4(local(port))])
+    };
+    let mut cfg_a = config(
+        &a,
+        &a.did,
+        key_a,
+        &side_a,
+        &[&a, &b],
+        vec![addr(id_b, port_b)],
+        local(port_a),
+    );
+    cfg_a.rules = Rules::from_policy_file(policy_a.path()).expect("A rules");
+    cfg_a.policy = Some(policy_a.path().to_path_buf());
+    let mut cfg_b = config(
+        &b,
+        &a.did,
+        key_b,
+        &side_b,
+        &[&a, &b],
+        vec![addr(id_a, port_a)],
+        local(port_b),
+    );
+    cfg_b.rules = Rules::from_policy_file(policy_b.path()).expect("B rules");
+    cfg_b.policy = Some(policy_b.path().to_path_buf());
+    let daemon_a = PeerDaemon::start(cfg_a).await.expect("A starts");
+    let daemon_b = PeerDaemon::start(cfg_b).await.expect("B starts");
+    eventually("both rule digests are recorded", || {
+        side_a.table().rules.is_some() && side_b.table().rules.is_some()
+    })
+    .await;
+    assert_ne!(
+        side_a.table().rules.expect("A rules").digest,
+        side_b.table().rules.expect("B rules").digest
+    );
+
+    side_a
+        .checkout
+        .append(berth_event("claim", "dev-integration", "sa", "1.0"));
+    eventually("B folds A's admitted claim", || {
+        side_b
+            .checkout
+            .events()
+            .iter()
+            .any(|(_, event)| via_device(event) == Some(a.did.as_str()))
+    })
+    .await;
+    let a_seq = side_b.table().devices[&a.did].seq;
+    eventually("A sees B acknowledge the admitted claim", || {
+        side_a
+            .table()
+            .devices
+            .get(&b.did)
+            .and_then(|head| head.folded.get(&a.did))
+            .is_some_and(|seq| *seq >= a_seq)
+    })
+    .await;
+
+    let gate = event_with("gate-verdict@1", "verdict", Vec::new());
+    let refused = side_a.checkout.append(gate);
+    eventually("A sees B's nack for the refused gate verdict", || {
+        side_a
+            .table()
+            .devices
+            .get(&b.did)
+            .is_some_and(|head| head.nack.contains(&refused.to_string()))
+    })
+    .await;
+    // Settlement reads acknowledgements and nacks; the deliberately different digests are
+    // advisory and never enter the fold or lease verdict.
+
+    daemon_a.shutdown().await;
+    daemon_b.shutdown().await;
 }
 
 #[tokio::test(flavor = "multi_thread")]

@@ -187,6 +187,7 @@ async fn flow_fold_folds_a_devices_channel_root_once_and_status_reads_it() {
     let (keys, a, b) = household();
     let policy = policy(keys.path());
     let allow = CrossingAllowList::from_policy_file(&policy).unwrap();
+    let rules = eprfs_peer::Rules::from_policy_file(&policy).unwrap();
 
     // B's own claim, and B's peer serving it.
     let mut b_store = SidecarFlowStore::open(b.checkout.path()).unwrap();
@@ -205,7 +206,8 @@ async fn flow_fold_folds_a_devices_channel_root_once_and_status_reads_it() {
             .path()
             .join(format!(".eprfs/status/participants/{HANDLE}.jsonl")),
         state_dir: b.peer_dir(),
-        allow,
+        rules,
+        policy: Some(policy.clone()),
         relay: None,
         listen: Some(SocketAddrV4::new(Ipv4Addr::LOCALHOST, port)),
         peers: Vec::new(),

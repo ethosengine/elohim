@@ -1300,6 +1300,24 @@ class StewardClaimTest(unittest.TestCase):
         self.assertNotIn("alpha-fleet", section)
         self.assertEqual(len(self.calls()), 1)
 
+    def test_status_prints_loaded_daemon_rules(self):
+        out = view()
+        out["rules"] = {"digest": "a" * 64, "short": "aaaaaaaa", "state": "loaded",
+                        "policy": "/device/pool-policy.json", "reason": None}
+        self.views(out)
+        self.assertIn("  rules: aaaaaaaa", render_status(self.berth))
+
+    def test_status_prints_rules_reload_reason(self):
+        out = view()
+        out["rules"] = {"digest": "a" * 64, "short": "aaaaaaaa", "state": "reloading",
+                        "policy": "/device/pool-policy.json", "reason": "malformed JSON"}
+        self.views(out)
+        self.assertIn("  rules: reloading — malformed JSON", render_status(self.berth))
+
+    def test_status_omits_rules_from_an_older_daemon(self):
+        self.views(view())
+        self.assertNotIn("  rules:", render_status(self.berth))
+
     def test_the_top_lease_list_names_a_holder_on_another_device_never_free(self):
         # 2026-10-26: a peer's wait loop matched "dev-integration free" while another device held
         # it, and pushed into that lease. The top line is what a waiting reader matches.

@@ -1601,6 +1601,9 @@ def render_status(b):
     # Read the other devices once: a resource free here may be held on one of them, and the top
     # list is what a waiting reader matches, so it names that holder instead of saying "free".
     view, view_line = _steward_view(b)
+    rules_line = _rules_line(view)
+    if rules_line:
+        lines.append(rules_line)
     now_ms = b._view_now(view) if view else round(now * 1000)
     elsewhere = {res: verdict for res, verdict in (view or {}).items()
                  if isinstance(verdict, dict) and verdict.get("verdict") == "held_by"}
@@ -1645,6 +1648,18 @@ def render_status(b):
         lines.append(f"  io-guard:  {io.get('level', '?')} write={io.get('write_mb_s', '?')}MB/s ({io.get('window_s', '?')}s)"
                      f" psi_full10={io.get('psi_full_avg10', '?')}% mode={io.get('mode', '?')} paused={len(io.get('paused', []))}")
     return "\n".join(lines)
+
+
+def _rules_line(view):
+    """The daemon-loaded advisory rules line from `epr peer leases --json`, when available."""
+    rules = view.get("rules") if isinstance(view, dict) else None
+    if not isinstance(rules, dict):
+        return None
+    if rules.get("state") == "loaded" and rules.get("short"):
+        return f"  rules: {rules['short']}"
+    if rules.get("state") == "reloading":
+        return f"  rules: reloading — {rules.get('reason') or 'policy changed'}"
+    return None
 
 
 def _steward_view(b):

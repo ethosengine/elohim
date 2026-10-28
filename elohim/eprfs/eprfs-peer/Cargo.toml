@@ -37,6 +37,8 @@ rand = "0.8"
 serde.workspace = true
 # pool-policy.json's crossing allow-list and the persisted head table.
 serde_json.workspace = true
+# The loaded rules digest uses SHA-256 so every checkout can compare one canonical rule set.
+sha2 = "0.10"
 # The canonical DAG-CBOR codec eprfs-core already encodes trees with; the tier frames use it too.
 serde_ipld_dagcbor = "0.6"
 thiserror.workspace = true

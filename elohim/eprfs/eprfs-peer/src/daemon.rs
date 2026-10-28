@@ -5,6 +5,8 @@
 //!
 //! - re-reads the roster when the file changed, so a Contest written in this checkout drops its
 //!   device at once, with no restart;
+//! - re-reads the policy when it changed, keeping the last loaded rules on an unreadable or
+//!   malformed replacement and re-projecting when the enforced rules change;
 //! - re-projects the channel tree when the flow store changed, and installs it in the store the
 //!   tier serves (a failure is recorded in the head table, where `epr peer status` reads it, and
 //!   the same state of the store is retried with a growing wait: [`ProjectionRetry`]);
@@ -39,7 +41,6 @@ use tokio::task::JoinHandle;
 use url::Url;
 
 use crate::admission::{roster_rows_from_file, Admission};
-use crate::allow::CrossingAllowList;
 use crate::announce::{topic_for, Channel, HeadVerdict, REANNOUNCE_EVERY};
 use crate::channel::{channel_tier_id, project_channel_with_nacks, ChannelStore};
 use crate::connections::ConnectionBook;
@@ -51,6 +52,7 @@ use crate::gossip::GatedGossip;
 use crate::head::{ChannelHead, HeadSigner};
 use crate::head_table::{HeadTable, StorePlace};
 use crate::key::PeerKey;
+use crate::rules::{Rules, RulesState};
 use crate::tier::{TierLimits, TierProtocol, TIER_ALPN};
 
 /// How often the daemon looks at its roster and flow store and asks whether a head is due.
@@ -253,7 +255,11 @@ pub struct PeerConfig {
     pub roster: PathBuf,
     /// Where the head table is persisted.
     pub state_dir: PathBuf,
-    pub allow: CrossingAllowList,
+    /// The crossing and steward-scope rules this device enforces.
+    pub rules: Rules,
+    /// The `pool-policy.json` the rules are reloaded from when it changes; `None` holds them fixed
+    /// and records no reloadable rules state in the head table.
+    pub policy: Option<PathBuf>,
     /// The relay to home to; `None` for direct addresses only.
     pub relay: Option<Url>,
     /// A fixed address to listen on; an ephemeral port when `None`.
@@ -297,6 +303,14 @@ impl PeerDaemon {
         // The one flow store this device's channel is projected from: recorded before anything
         // is announced, so the lease view and berth read and write this store, not their own.
         table.store = Some(store_place(&config.flow_root, flow.log_path()));
+        if let Some(policy) = &config.policy {
+            table.rules = Some(RulesState {
+                digest: config.rules.digest(),
+                policy: std::fs::canonicalize(policy).unwrap_or_else(|_| policy.clone()),
+                loaded_at: unix_ms(),
+                pending: None,
+            });
+        }
         table.save(&config.state_dir)?;
         let store = Arc::new(ChannelStore::default());
         let limits = TierLimits::default();
@@ -366,8 +380,9 @@ impl PeerDaemon {
             last_rejoin_sweep: Instant::now(),
             resubscriptions: 0,
             roster_stamp: stamp(&config.roster),
+            policy_stamp: config.policy.as_deref().and_then(stamp),
             flow_stamp: None,
-            nacks_dirty: true,
+            reproject: true,
             retry: ProjectionRetry::default(),
             tree: limits.tree,
             folds_tx,
@@ -554,9 +569,10 @@ struct Run {
     /// Successful in-process replacements of the gossip subscription.
     resubscriptions: u64,
     roster_stamp: Stamp,
+    policy_stamp: Stamp,
     flow_stamp: Stamp,
-    /// A changed nack set reprojects even when the flow log itself did not move.
-    nacks_dirty: bool,
+    /// A changed rule or nack set reprojects even when the flow log itself did not move.
+    reproject: bool,
     /// The state of the log the last failed projection read, counted once and retried with a
     /// growing wait rather than re-parsed every tick.
     retry: ProjectionRetry<Stamp>,
@@ -825,6 +841,7 @@ impl Run {
 
     async fn tick(&mut self) -> Result<(), PeerError> {
         self.reload_roster().await;
+        self.reload_rules()?;
         self.maintain_rejoins().await;
         // Refused connections reach the head table `epr peer status` reads: kept in memory every
         // tick, written with the next announce, or on their own at most once per re-announce
@@ -955,6 +972,71 @@ impl Run {
         }
     }
 
+    /// Re-read both enforced rule sets when their policy file changed. A bad replacement keeps
+    /// the loaded rules and is recorded for status readers.
+    fn reload_rules(&mut self) -> Result<(), PeerError> {
+        let Some(policy) = self.config.policy.clone() else {
+            return Ok(());
+        };
+        let now = stamp(&policy);
+        if now == self.policy_stamp {
+            return Ok(());
+        }
+        self.policy_stamp = now;
+        match Rules::from_policy_file(&policy) {
+            Ok(rules) => {
+                let old = self.config.rules.digest();
+                let new = rules.digest();
+                if old == new {
+                    let pending = self
+                        .channel
+                        .rules_state_mut()
+                        .as_mut()
+                        .is_some_and(|state| state.pending.take().is_some());
+                    if pending {
+                        self.save()?;
+                    }
+                    return Ok(());
+                }
+                self.log(&format!(
+                    "rules reloaded: {} -> {}",
+                    old.short(),
+                    new.short()
+                ));
+                self.config.rules = rules;
+                self.reproject = true;
+                *self.channel.rules_state_mut() = Some(RulesState {
+                    digest: new,
+                    policy: std::fs::canonicalize(&policy).unwrap_or(policy),
+                    loaded_at: unix_ms(),
+                    pending: None,
+                });
+                self.save()
+            }
+            Err(error) => {
+                let reason = error.to_string();
+                let digest = self.config.rules.digest();
+                let already_pending = self
+                    .channel
+                    .table()
+                    .rules
+                    .as_ref()
+                    .is_some_and(|state| state.pending.as_deref() == Some(reason.as_str()));
+                if already_pending {
+                    return Ok(());
+                }
+                self.log(&format!(
+                    "rules not reloaded, keeping {}: {reason}",
+                    digest.short()
+                ));
+                if let Some(state) = self.channel.rules_state_mut().as_mut() {
+                    state.pending = Some(reason);
+                }
+                self.save()
+            }
+        }
+    }
+
     /// Whether `device` is admitted now. Fail closed: a poisoned admission admits nobody.
     fn admitted(&self, device: &str) -> bool {
         self.admission
@@ -1012,7 +1094,7 @@ impl Run {
     /// `epr peer status` reads it; the last good root stays served and announced.
     fn reproject(&mut self) -> Result<(), PeerError> {
         let now = stamp(self.flow.log_path());
-        if !self.nacks_dirty && now.is_some() && now == self.flow_stamp {
+        if !self.reproject && now.is_some() && now == self.flow_stamp {
             return Ok(());
         }
         if !self.retry.due(&now, Instant::now()) {
@@ -1025,12 +1107,12 @@ impl Run {
             .iter()
             .map(|(device, state)| (device.clone(), state.leaf()))
             .collect();
-        match project_channel_with_nacks(&self.flow, &self.config.allow, &nacks) {
+        match project_channel_with_nacks(&self.flow, self.config.rules.allow(), &nacks) {
             Ok(tree) => {
                 // Only a projection that succeeded settles this state of the log; a failed one
                 // is retried after a growing wait, or at once when the log changes.
                 self.flow_stamp = now;
-                self.nacks_dirty = false;
+                self.reproject = false;
                 self.retry.succeeded();
                 self.store.install(&tree);
                 self.channel.changed(tree.root().clone(), Instant::now());
@@ -1144,7 +1226,7 @@ impl Run {
         let flow_root = self.config.flow_root.clone();
         let reader = self.config.device.clone();
         let state_dir = self.config.state_dir.clone();
-        let allow = self.config.allow.clone();
+        let allow = self.config.rules.allow().clone();
         let tree = self.tree;
         let done = self.folds_tx.clone();
         let known = self.held.get(&device).cloned();
@@ -1215,7 +1297,7 @@ impl Run {
                     report.outcome.refused_cids.iter().map(ToString::to_string),
                     report.quarantined.iter().map(|entry| entry.cid.to_string()),
                 );
-                self.nacks_dirty |= nack_changed;
+                self.reproject |= nack_changed;
                 if report.complete {
                     self.held
                         .insert(head.device.clone(), Arc::new(report.known.clone()));

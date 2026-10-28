@@ -29,7 +29,8 @@ use elohim_epr_rea::{FlowEvent, FlowStore, ParticipantRow};
 use eprfs_peer::{
     lease_events, other_devices, peer_from_arg, relay_from_env, roster_rows_from_file, slots,
     steward_lease_view, via_device, Admission, CrossingAllowList, HeadTable, LeaseVerdict,
-    NodeAddr, PeerConfig, PeerDaemon, PeerError, PeerKey, StewardScope, KIND_SLOT, MEASURE_SLOT,
+    NodeAddr, PeerConfig, PeerDaemon, PeerError, PeerKey, Rules, RulesState, StewardScope,
+    KIND_SLOT, MEASURE_SLOT,
 };
 use serde::Serialize;
 
@@ -341,8 +342,12 @@ fn serve(options: Options) -> PeerResult<ExitCode> {
     )?;
     let device = Device::open(&options.root, options.handle.as_deref())?;
     let _serving = ServeLock::acquire(&device.peer_dir)?;
-    let allow = allow_list(&options)?;
-    if allow.is_empty() {
+    let policy = options
+        .policy
+        .clone()
+        .unwrap_or_else(|| options.root.join(POLICY_REL));
+    let rules = Rules::from_policy_file(&policy)?;
+    if rules.allow().is_empty() {
         eprintln!(
             "epr peer: the crossing allow-list is empty — nothing of this device crosses until \
              {POLICY_REL} declares berth.channel.crosses"
@@ -363,7 +368,8 @@ fn serve(options: Options) -> PeerResult<ExitCode> {
         flow_root: options.root.clone(),
         roster: device.lineage.roster.clone(),
         state_dir: device.peer_dir.clone(),
-        allow,
+        rules,
+        policy: Some(policy),
         relay: relay_from_env()?,
         listen: options.listen,
         peers,
@@ -420,6 +426,7 @@ struct StatusOutcome {
     device: String,
     node_id: Option<String>,
     own_seq: Option<u64>,
+    rules: Option<RulesStatus>,
     devices: Vec<DeviceStatus>,
     dropped: eprfs_peer::DroppedHeads,
     channel: eprfs_peer::ChannelCounters,
@@ -437,6 +444,49 @@ struct RefusedConnections {
     node_id: String,
     device: Option<String>,
     count: u64,
+}
+
+/// The daemon's loaded rules and whether the policy file is ready to replace them.
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+struct RulesStatus {
+    digest: String,
+    short: String,
+    state: String,
+    policy: PathBuf,
+    reason: Option<String>,
+}
+
+fn rules_status(loaded: Option<&RulesState>) -> Option<RulesStatus> {
+    let loaded = loaded?;
+    let mut status = RulesStatus {
+        digest: loaded.digest.to_string(),
+        short: loaded.digest.short().to_string(),
+        state: "loaded".into(),
+        policy: loaded.policy.clone(),
+        reason: None,
+    };
+    if let Some(reason) = &loaded.pending {
+        status.state = "reloading".into();
+        status.reason = Some(reason.clone());
+        return Some(status);
+    }
+    match Rules::from_policy_file(&loaded.policy) {
+        Ok(on_disk) if on_disk.digest().as_str() == loaded.digest.as_str() => {}
+        Ok(on_disk) => {
+            status.state = "reloading".into();
+            status.reason = Some(format!(
+                "policy digest {} differs from loaded {}",
+                on_disk.digest().short(),
+                loaded.digest.short()
+            ));
+        }
+        Err(error) => {
+            status.state = "reloading".into();
+            status.reason = Some(format!("policy cannot be read: {error}"));
+        }
+    }
+    Some(status)
 }
 
 fn status(options: &Options) -> PeerResult<ExitCode> {
@@ -502,6 +552,7 @@ fn status(options: &Options) -> PeerResult<ExitCode> {
         device: did,
         node_id,
         own_seq: table.own.as_ref().map(|own| own.seq),
+        rules: rules_status(table.rules.as_ref()),
         devices,
         dropped: table.dropped,
         channel: table.channel,
@@ -541,6 +592,16 @@ fn render(outcome: &StatusOutcome) {
             .map_or_else(|| "none yet".to_string(), |seq| seq.to_string()),
         outcome.handle
     );
+    match &outcome.rules {
+        Some(rules) if rules.state == "loaded" => {
+            println!("rules: {} ({})", rules.short, rules.policy.display())
+        }
+        Some(rules) => println!(
+            "rules: reloading — {}",
+            rules.reason.as_deref().unwrap_or("policy changed")
+        ),
+        None => println!("rules: unknown — no daemon has recorded the rules it loaded"),
+    }
     if outcome.devices.is_empty() {
         println!("no other device is admitted on this roster");
     }
@@ -610,10 +671,12 @@ fn leases(options: &Options) -> PeerResult<ExitCode> {
         .store
         .as_ref()
         .map_or_else(|| options.root.clone(), |place| place.root.clone());
-    let policy = options
-        .policy
-        .clone()
-        .unwrap_or_else(|| options.root.join(POLICY_REL));
+    let policy = options.policy.clone().unwrap_or_else(|| {
+        table.rules.as_ref().map_or_else(
+            || options.root.join(POLICY_REL),
+            |state| state.policy.clone(),
+        )
+    });
     let scope = StewardScope::from_policy_file(&policy)?;
     // A recorded channel store that is gone is never read as an empty (free) one.
     if let Some(place) = table.store.as_ref().filter(|place| !place.log.is_file()) {
@@ -626,6 +689,10 @@ fn leases(options: &Options) -> PeerResult<ExitCode> {
     let now = unix_ms();
     let settlement = scope.settlement();
     let mut out = serde_json::Map::new();
+    out.insert(
+        "rules".into(),
+        serde_json::to_value(rules_status(table.rules.as_ref()))?,
+    );
     out.insert("now".into(), now.into());
     out.insert("confirm_wait_s".into(), settlement.confirm_wait_s.into());
     out.insert("fence_margin_s".into(), settlement.fence_margin_s.into());
@@ -1052,6 +1119,7 @@ mod status_contract {
             device: "device".into(),
             node_id: None,
             own_seq: None,
+            rules: None,
             devices: vec![DeviceStatus {
                 device: "other".into(),
                 node_id: "node".into(),
@@ -1087,5 +1155,46 @@ mod status_contract {
         let mut bad = value;
         bad["daemonCids"] = serde_json::json!(["sha256:legacy"]);
         assert!(!validator.is_valid(&bad));
+    }
+
+    #[test]
+    // Status reads the daemon's recorded policy from the per-device head table, never a
+    // checkout's own pool-policy.json, so every worktree on a device reports one digest.
+    fn status_reports_the_daemons_loaded_rules_and_reloading_on_change() {
+        use super::*;
+        let policy = tempfile::NamedTempFile::new().expect("policy");
+        let first = serde_json::json!({
+            "berth": {"channel": {"crosses": {"dev-berth-events@1": ["claim"]}}}
+        });
+        std::fs::write(
+            policy.path(),
+            serde_json::to_vec_pretty(&first).expect("policy JSON"),
+        )
+        .expect("write policy");
+        let loaded = Rules::from_policy_file(policy.path())
+            .expect("rules")
+            .digest();
+        let state = RulesState {
+            digest: loaded.clone(),
+            policy: policy.path().to_path_buf(),
+            loaded_at: 1,
+            pending: None,
+        };
+        let loaded_status = rules_status(Some(&state)).expect("rules status");
+        assert_eq!(loaded_status.digest, loaded.as_str());
+        assert_eq!(loaded_status.state, "loaded");
+
+        let changed = serde_json::json!({
+            "berth": {"channel": {"crosses": {
+                "dev-berth-events@1": ["claim", "release"]
+            }}}
+        });
+        std::fs::write(
+            policy.path(),
+            serde_json::to_vec_pretty(&changed).expect("changed policy JSON"),
+        )
+        .expect("change policy");
+        let reloading = rules_status(Some(&state)).expect("rules status");
+        assert_eq!(reloading.state, "reloading");
     }
 }

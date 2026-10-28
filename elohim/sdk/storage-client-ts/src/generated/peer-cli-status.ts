@@ -13,6 +13,13 @@ export interface PeerCliStatus {
   device: string;
   nodeId: string | null;
   ownSeq: number | null;
+  rules: null | {
+    digest: string;
+    short: string;
+    state: 'loaded' | 'reloading';
+    policy: string;
+    reason: string | null;
+  };
   devices: {
     device: string;
     nodeId: string;
