@@ -416,7 +416,10 @@ supervisor.checkpoint=host_checkpoint_failure
                 if reason == 'revoked':
                     state.atomic(self.directory / 'revocation.json', {'revoked': True})
                 else:
-                    (self.directory / 'checkpoint.json').write_text('{corrupt')
+                    # Inject after any in-flight checkpoint replacement, so it
+                    # cannot overwrite the corruption before the guardian reads it.
+                    with state.lock(self.directory / 'state.lock'):
+                        (self.directory / 'checkpoint.json').write_text('{corrupt')
                 process.wait(timeout=8)
                 self.assertEqual(process.returncode, 3)
                 deadline = time.monotonic() + 5
