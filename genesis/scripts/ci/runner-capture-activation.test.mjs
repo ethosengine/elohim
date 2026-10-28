@@ -20,6 +20,110 @@ import {
   readPersistedLogs,
   verifyDeclaration,
 } from "./runner-capture-activation.mjs";
+// Namespace UID 0 does not imply that Node can set a child's UID/GID to 65534.
+function mapsGuest(mapping) {
+  return mapping
+    .trim()
+    .split("\n")
+    .some((row) => {
+      const fields = row.trim().split(/\s+/).map(Number);
+      if (fields.length !== 3 || !fields.every(Number.isSafeInteger))
+        return false;
+      const [inside, outside, count] = fields;
+      return (
+        inside >= 0 &&
+        outside >= 0 &&
+        count > 0 &&
+        65534 >= inside &&
+        65534 - inside < count
+      );
+    });
+}
+
+function distinctUidPrerequisite(uid, platform, readProc) {
+  if (uid !== 0)
+    return "distinct-UID read prerequisite unavailable: root is required";
+  if (platform !== "linux") return false;
+  const missing = ["uid_map", "gid_map"].filter(
+    (name) => !mapsGuest(readProc(name)),
+  );
+  if (missing.length) {
+    return `distinct-UID read prerequisite unavailable: ID 65534 is not mapped in ${missing.map((name) => `/proc/self/${name}`).join(" and ")}`;
+  }
+  // Node/libuv ignores setgroups failure; errors setting UID/GID still fail the test.
+  return false;
+}
+
+const distinctUidOnly = distinctUidPrerequisite(
+  process.getuid?.(),
+  process.platform,
+  (name) => readFileSync(`/proc/self/${name}`, "utf8"),
+);
+const fullMap = "0 0 4294967295\n";
+const singleMap = "0 0 1\n";
+const prerequisite = (uidMap, gidMap) =>
+  distinctUidPrerequisite(0, "linux", (name) => {
+    assert(["uid_map", "gid_map"].includes(name));
+    return { uid_map: uidMap, gid_map: gidMap }[name];
+  });
+
+test("distinct-UID prerequisite uses both inside namespace mappings", () => {
+  assert.equal(prerequisite(fullMap, fullMap), false);
+  assert.equal(
+    prerequisite("0 1000 1\n65534 2000 1\n", "65534 3000 1\n"),
+    false,
+  );
+  assert.match(prerequisite(singleMap, singleMap), /uid_map.*gid_map/);
+  assert.match(prerequisite(singleMap, fullMap), /uid_map/);
+  assert.doesNotMatch(prerequisite(singleMap, fullMap), /gid_map/);
+  assert.match(prerequisite(fullMap, singleMap), /gid_map/);
+  assert.doesNotMatch(prerequisite(fullMap, singleMap), /uid_map/);
+});
+
+test("distinct-UID mapping guards range boundaries and malformed rows", () => {
+  for (const mapping of ["65534 42 1", "65533 42 2", "0 42 65535"]) {
+    assert.equal(mapsGuest(mapping), true, mapping);
+  }
+  for (const mapping of [
+    "0 65534 1",
+    "65535 42 1",
+    "65533 42 1",
+    "65534 42 0",
+    "0 0 65534",
+    "",
+    "invalid",
+    "65534 -1 1",
+    "65534 0 1.5",
+    "65534 0 1 2",
+  ]) {
+    assert.equal(mapsGuest(mapping), false, mapping);
+  }
+});
+
+test("distinct-UID prerequisite retains non-root and non-Linux behavior", () => {
+  const unread = () => assert.fail("namespace maps must not be read");
+  assert.match(
+    distinctUidPrerequisite(1000, "linux", unread),
+    /root is required/,
+  );
+  assert.match(
+    distinctUidPrerequisite(undefined, "win32", unread),
+    /root is required/,
+  );
+  assert.equal(distinctUidPrerequisite(0, "darwin", unread), false);
+});
+
+test("distinct-UID prerequisite does not hide proc read errors", () => {
+  const error = new Error("uid_map read failed");
+  assert.throws(
+    () =>
+      distinctUidPrerequisite(0, "linux", () => {
+        throw error;
+      }),
+    (actual) => actual === error,
+  );
+});
+
 const now = Date.parse("2026-10-22T04:00:00Z");
 const provider = "uhCAk" + "a".repeat(48),
   recipient = "uhCAk" + "b".repeat(48);
@@ -103,7 +207,7 @@ for (const mode of [
   "bootstrap-timeout",
   "transport-failure",
 ])
-  test(`capture ${mode} has no stale success on refusal`, (t) => {
+  test(`capture ${mode} has no stale success on refusal`, async (t) => {
     const root = mkdtempSync(join(tmpdir(), "capture-window-"));
     t.after(() => rmSync(root, { recursive: true, force: true }));
     const config = structuredClone(declaration);
@@ -193,14 +297,22 @@ for (const mode of [
       go();
       assert.equal(statSync(artifact).mode & 0o777, 0o644);
       assert.equal(statSync(statusFile).mode & 0o777, 0o644);
-      if (process.getuid?.() === 0) {
-        chmodSync(root, 0o755);
-        execFileSync(
-          process.execPath,
-          ["-e", "require('node:fs').readFileSync(process.argv[1])", artifact],
-          { uid: 65534, gid: 65534 },
-        );
-      }
+      await t.test(
+        "activation.json is readable by UID/GID 65534",
+        { skip: distinctUidOnly },
+        () => {
+          chmodSync(root, 0o755);
+          execFileSync(
+            process.execPath,
+            [
+              "-e",
+              "require('node:fs').readFileSync(process.argv[1])",
+              artifact,
+            ],
+            { uid: 65534, gid: 65534 },
+          );
+        },
+      );
       assert.equal(
         JSON.parse(readFileSync(artifact)).nativeStatusChecked,
         false,
@@ -269,14 +381,18 @@ test("failure diagnostics are bounded read-only worker observations and redact c
     assert(content.includes("bootstrap failed"));
     const file = join(oldDirectory, name);
     assert.equal(statSync(file).mode & 0o777, 0o644);
-    if (process.getuid?.() === 0) {
-      chmodSync(root, 0o755);
-      execFileSync(
-        process.execPath,
-        ["-e", "require('node:fs').readFileSync(process.argv[1])", file],
-        { uid: 65534, gid: 65534 },
-      );
-    }
+    await t.test(
+      `${name} is readable by UID/GID 65534`,
+      { skip: distinctUidOnly },
+      () => {
+        chmodSync(root, 0o755);
+        execFileSync(
+          process.execPath,
+          ["-e", "require('node:fs').readFileSync(process.argv[1])", file],
+          { uid: 65534, gid: 65534 },
+        );
+      },
+    );
   }
   const providerErrors = JSON.parse(
     readFileSync(join(oldDirectory, "provider-errors.json"), "utf8"),
