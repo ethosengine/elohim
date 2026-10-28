@@ -20,6 +20,9 @@ refs:
   - "genesis/data/timeline/backlog/doorway-hosted-cell-grant-minted-before-row-insert-2026-09-11.md · commitment-read-fallback-created-at-is-projection-time-2026-09-11.md"
 rea:
   composition: sum
+  budget:                     # 4 h per part short of target at 2026-10-22: 2 parts
+    hours: 8
+    threshold_pct: 85
   parts:
     - part: hosted-compute-contracted
       reading: 0/3
@@ -83,3 +86,4 @@ DELTA 2026-09-12 (precondition ladder climbed; RED preserved, one real red left 
 
 DELTA 2026-10-18 (RED preserved; both checks measured on the household, dev 80db9208b): 07-hosted-by-a-household 0/3 (sprint-report-household-20261018T114946Z-80db9208) — every account creation was refused `Conductor conductor-0 at capacity (17/14)`: the household archive carries 16–17 hosted agents on matthew's conductor against the 14 ceiling (`just mesh status`: "hosted matthew: REFUSED 16 agent(s), over the operator ceiling 14"; "hosted jessica: REFUSED 1 agent(s) on a member's conductor"), i.e. story-created humans that registered and never closed. doorway-humans-served 0/4 (…114956Z): humansServed=14 while only 3 registrants hold a live hosted-cell commitment read from a non-doorway peer (the invariant's disagreement, wider than 09-12's 14 vs 13); beta reports 1 where none is owed; the re-cast of prologue-hosted-1 failed. Cure order: (1) a household verb that reconciles hosted agents against live commitments and closes the agents no promise names, so the ceiling counts living promises; (2) re-run both lanes. Red holds.
 
+DELTA 2026-10-22 (operator delegated the declaration choices): `rea.budget` 8 h at 85 % (4 h per part short of target: hosted-compute-contracted, humans-served). It binds the next red episode; the open one keeps the bound it was minted with. Status unchanged.

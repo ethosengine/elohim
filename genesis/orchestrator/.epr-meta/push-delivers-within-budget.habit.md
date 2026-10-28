@@ -22,7 +22,19 @@ refs:
   - "genesis/data/timeline/backlog/upgrade-propagation-p2p-design-arc.md (change-class delivery vehicles)"
 rea:
   composition: sum
+  budget:                     # 4 h per part short of target at 2026-10-22: 4 parts
+    hours: 16
+    threshold_pct: 85
   parts:
+    - part: station-2-window  # restart → app ready; a lower-is-better time gauge
+      unit: s
+      baseline: 43
+      target: 12              # the conductor's own cell join (~10 s) plus one 2 s presence cadence
+      reading: 10
+      at: 2026-10-18
+      evidence: cucumber-mesh-20261018T132741Z-3a0ad3b8, …133049Z-3a0ad3b8, …133316Z-6e260987 (10.0 / 6.9 / 9.6 s; DELTA 2026-10-18)
+      per_week: 4             # a floor: fleet rolls only; household lane restarts are uncounted
+      per_week_evidence: "[build:edge] commits on origin/dev first-parent, 2026-10-08..15 and 2026-10-15..22: 4 each"
     - part: push-delivers-within-budget
       reading: 4/4
       at: 2026-10-18
@@ -106,3 +118,4 @@ DELTA 2026-09-25h (RED preserved; the step is cured, the receipt is not minted):
 DELTA 2026-09-25i (RED preserved; the household station is proven on the cured tree): storage rebuilt past 08b0a5844 (p2p p2p-iroh, CARGO_BUILD_JOBS=1, mesh-bin sha256 d02366bd…) and loaded by storage-restart at 15:29:23Z; doorway not stale. Refuses-fast 4/4, 50/50 steps (sprint-report-household-20260925T152943Z-b6ff7d53): the conductor-restart window answered storage-refused from 15:29:57.96Z and closed on its own by 15:30:20.94Z (about 23 s); the ready-within-120 s poll after caughtUp measured timeToReadyMs 485, asks 1, lastNotReadyFace null; the three ready-within-30 s polls measured 560, 461 and 455 ms, 1 ask each. Deliverability 5/5, 102/102 (sprint-report-household-20260925T153355Z-adaa6b7c). t2-receipt over origin/dev..HEAD admits both: "every epr-app-deliverability.feature station passed on current source" and "every app-delivery-refuses-fast.feature station passed on current source". TREE1 adaa6b7c0 (TREE0 b67066969; b6ff7d531 berth, 4be594596 measure.sh, adaa6b7c0 a2o scripts/lib/habit-delta.ts: none a serving path, and each report was minted on its own HEAD). Still no evidence for the live series, budget arithmetic, measurement-liveness, no-op-roll and ledger checks, so the habit stays red.
 
 DELTA 2026-09-30 (Edge #1511 deploy-only prerequisite; status remains RED): Adam rendering failed with ERR_MODULE_NOT_FOUND for yaml because deploy-only skipped incidental frontend dependency installs. The renderer owner now declares existing yaml 2.8.3 and the shared human deployment entry provisions its frozen workspace before parallel storage rolls. Offline frozen provisioning and eight renderer tests pass, including CLI fixture bytes and deploy-only ordering. This is local repair evidence, not a successful fleet rollout; #1511 also used floating dev-latest storage tags and restarted six storage peers, while Adam did not apply.
+DELTA 2026-10-22 (operator delegated the declaration choices): `rea.budget` 16 h at 85 % (4 h per part short of target: delivery-series, measurement-liveness, no-op-rolls, ledger). Station 2 became a declared time gauge (43 s baseline → 12 s target, reading 10 s from the 10-18 runs), with `per_week: 4` evidenced by `[build:edge]` commits on dev first-parent, 4 in each of the last two weeks. That is a floor, since household restarts are uncounted, so the habit now reads time returned at about 0.04 h/week. The budget binds the next red episode; the open one keeps the bound it was minted with. Status unchanged.
