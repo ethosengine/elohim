@@ -462,7 +462,55 @@ async fn async_main(worker_threads: usize) -> anyhow::Result<()> {
             .database(m.db_name())
             .collection::<bson::Document>("conductor_registry")
     });
-    let registry = ConductorRegistry::new(registry_collection).await;
+    let mut registry = ConductorRegistry::new(registry_collection)
+        .await
+        .with_store_gate(args.provisioning_store_gate);
+    info!(
+        store_gate = args.provisioning_store_gate,
+        "Provisioning store gate (DOORWAY_PROVISIONING_STORE_GATE): {}",
+        if args.provisioning_store_gate {
+            "ON — a person with no record is refused while this doorway's records are unproven"
+        } else {
+            "off — the store verdict is observed and reported, never enforced"
+        }
+    );
+
+    // The provisioning intent log lives beside the mappings, in the same
+    // database.
+    //
+    // THREE POSTURES, and the middle one is a refusal:
+    //   - Mongo configured and answering → the durable log.
+    //   - Mongo configured, log not usable → STILL the Mongo log: its every
+    //     operation fails, so hosted provisioning is refused honestly and heals
+    //     when Mongo returns. Never a quiet fall back to memory — an attempt
+    //     forgotten at the next restart is the second identity the log prevents.
+    //   - No Mongo configured at all (`state.mongo` is `None` only in that case;
+    //     a configured-but-unreachable Mongo fails startup above) → process
+    //     memory, on purpose: a local-first developer's box persists nothing.
+    match state.mongo.as_ref() {
+        Some(mongo) => {
+            let store = Arc::new(doorway::conductor::MongoIntentStore::new(
+                mongo.inner(),
+                mongo.db_name(),
+            ));
+            match store.ensure_indexes().await {
+                Ok(()) => info!(
+                    db = %mongo.db_name(),
+                    "Provisioning intent log: durable (Mongo `provisioning_intents`)"
+                ),
+                Err(e) => error!(
+                    error = %e,
+                    "Provisioning intent log is NOT usable — hosted provisioning is refused \
+                     until it is (it is not kept in memory instead)"
+                ),
+            }
+            registry = registry.with_intent_store(store);
+        }
+        None => warn!(
+            "Provisioning intent log: PROCESS MEMORY (no MongoDB configured) — local-first \
+             developer mode; provisioning attempts are not remembered across a restart"
+        ),
+    }
 
     // Hosted-agent ceiling, read ONCE at startup and threaded into BOTH capacity
     // gates below (registry `capacity_max` = the provisioning gate; ConductorPoolMap
@@ -530,8 +578,111 @@ async fn async_main(worker_threads: usize) -> anyhow::Result<()> {
     // doorway) otherwise keeps counting every agent it ever hosted.
     discover_existing_agents(&registry, &conductor_urls).await;
 
+    // Were this doorway's records lost while its conductors kept their people?
+    // A doorway that persists (Mongo configured) tracks that from here. The
+    // verdict starts UNKNOWN and settles only as conductors ANSWER what they
+    // host — a conductor that cannot be reached yet is not a conductor that
+    // hosts nobody. The doorway routinely starts before its conductor; the
+    // walk below, and its retries, are what make that order safe.
+    if state.mongo.is_some() {
+        let intent_records = match registry.intents().total().await {
+            Ok(total) => Some(total),
+            Err(e) => {
+                warn!(error = %e, "Could not read the provisioning intent log at startup");
+                None
+            }
+        };
+        registry.track_store_loss(intent_records);
+    }
+
     let registry = Arc::new(registry);
     state.conductor_registry = Some(Arc::clone(&registry));
+
+    // Walk the conductors until every one has answered what it hosts: at once,
+    // then with backoff. This is what settles the store verdict; until it does,
+    // a person with no record is not provisioned as new.
+    {
+        let walker = doorway::conductor::AgentProvisioner::new(Arc::clone(&registry))
+            .with_app_id(args.installed_app_id.clone());
+        let mongo = state.mongo.clone();
+        tokio::spawn(async move {
+            let mut attempt = 0u32;
+            loop {
+                let unwalked = walker.walk_unwalked_conductors().await;
+                if unwalked.is_empty() {
+                    break;
+                }
+                if attempt == 0 {
+                    warn!(
+                        unwalked = ?unwalked,
+                        "Some conductors have not yet answered what they host — the \
+                         provisioning store verdict stays open until they do"
+                    );
+                }
+                tokio::time::sleep(doorway::conductor::provisioner::walk_backoff(attempt)).await;
+                attempt = attempt.saturating_add(1);
+            }
+            // First use of the log on a doorway that already hosts people reads
+            // `wiped`. With the gate on, backfill the records from the account
+            // rows a conductor confirms before anyone without a record is
+            // admitted; a database that lost its accounts too proves nobody and
+            // stays wiped for an operator.
+            if let Some(mongo) = mongo {
+                let mut attempt = 0u32;
+                while walker.recovery_required() {
+                    match doorway::routes::admin_conductors::account_agent_keys(&mongo).await {
+                        Ok(accounts) => {
+                            let report = walker.migrate_from_accounts(&accounts).await;
+                            if !walker.recovery_required() || report.complete {
+                                break;
+                            }
+                        }
+                        Err(e) => warn!(
+                            error = %e,
+                            "First-use provisioning migration could not read the account rows"
+                        ),
+                    }
+                    tokio::time::sleep(doorway::conductor::provisioner::walk_backoff(attempt))
+                        .await;
+                    attempt = attempt.saturating_add(1);
+                }
+            }
+            doorway::conductor::provisioner::log_store_verdict(&walker);
+        });
+    }
+
+    // Publish the intent log's counts and readiness OFF the request path: a
+    // periodic task, each pass bounded by its own period. It also walks any
+    // conductor that is unwalked — one that joined the pool after the loop
+    // above finished.
+    {
+        let registry = Arc::clone(&registry);
+        let walker = doorway::conductor::AgentProvisioner::new(Arc::clone(&registry))
+            .with_app_id(args.installed_app_id.clone());
+        tokio::spawn(async move {
+            let period = doorway::conductor::provisioner::INTENT_COUNTS_PERIOD;
+            let mut tick = tokio::time::interval(period);
+            loop {
+                tick.tick().await;
+                if !registry.store_state().unwalked.is_empty()
+                    && tokio::time::timeout(period, walker.walk_unwalked_conductors())
+                        .await
+                        .is_err()
+                {
+                    warn!("Walking the unwalked conductors did not finish within the period");
+                }
+                if tokio::time::timeout(
+                    period,
+                    doorway::conductor::provisioner::publish_intent_counts(&registry),
+                )
+                .await
+                .is_err()
+                {
+                    warn!("Provisioning intent counts did not finish within their period");
+                }
+            }
+        });
+    }
     info!(
         "Conductor registry initialized: {} conductor(s), {} agent mapping(s)",
         registry.conductor_count(),

@@ -29,8 +29,8 @@ use std::time::Instant;
 
 use lazy_static::lazy_static;
 use prometheus::{
-    Encoder, Histogram, HistogramOpts, HistogramVec, IntCounter, IntCounterVec, IntGauge, Opts,
-    Registry, TextEncoder,
+    Encoder, Histogram, HistogramOpts, HistogramVec, IntCounter, IntCounterVec, IntGauge,
+    IntGaugeVec, Opts, Registry, TextEncoder,
 };
 
 // ── Reconnect-reason label values (M2). The close *cause*, a non-overlapping
@@ -288,6 +288,101 @@ lazy_static! {
     pub static ref ADMISSION_SHED_TOTAL: IntCounter = IntCounter::new(
         "doorway_admission_shed_total",
         "Inbound requests shed by the global admission gate (at ceiling).",
+    )
+    .unwrap();
+
+    // ── Provisioning intent log — the saga's visible debt ────────────────────
+
+    /// Records in the provisioning intent log, by state. `abandoned` is the
+    /// count of attempts that ended leaving nothing behind; nothing reaps
+    /// them, so this is where that debt shows. Refreshed after each
+    /// provisioning call (event-driven, like every other series here).
+    pub static ref PROVISION_INTENTS: IntGaugeVec = IntGaugeVec::new(
+        Opts::new(
+            "doorway_provision_intents",
+            "Provisioning intent log records, by state.",
+        ),
+        &["state"],
+    )
+    .unwrap();
+
+    /// Live intent records the doorway cannot finish on its own, by reason
+    /// (`key_mismatch`, `app_conflict`, `conductor_not_in_pool`, `app_unusable`,
+    /// `cells_not_ready`, `no_usable_key`). Each is an operator's to resolve.
+    pub static ref PROVISION_INTENTS_STUCK: IntGaugeVec = IntGaugeVec::new(
+        Opts::new(
+            "doorway_provision_intents_stuck",
+            "Live provisioning intents that need an operator, by reason.",
+        ),
+        &["reason"],
+    )
+    .unwrap();
+
+    /// 1 when hosted provisioning can run: the intent store answers and no
+    /// recovery is outstanding. 0 refuses new hosted registrations.
+    pub static ref PROVISIONING_READY: IntGauge = IntGauge::new(
+        "doorway_provisioning_ready",
+        "1 when hosted provisioning can run (intent store available, no recovery outstanding).",
+    )
+    .unwrap();
+
+    /// 1 when this doorway's records were empty at startup while its conductors
+    /// already host apps, and an operator has not yet run recovery.
+    pub static ref PROVISIONING_RECOVERY_REQUIRED: IntGauge = IntGauge::new(
+        "doorway_provisioning_recovery_required",
+        "1 when the doorway's provisioning records were empty at boot while conductors host apps.",
+    )
+    .unwrap();
+
+    /// The wiped-store verdict, one series per value (`unknown`, `not_wiped`,
+    /// `wiped`); exactly one is 1.
+    pub static ref PROVISIONING_STORE_VERDICT: IntGaugeVec = IntGaugeVec::new(
+        Opts::new(
+            "doorway_provisioning_store_verdict",
+            "Whether the doorway's provisioning records were lost: unknown, not_wiped or wiped.",
+        ),
+        &["verdict"],
+    )
+    .unwrap();
+
+    /// Pool conductors that have not answered what they host since boot. While
+    /// this is non-zero over an empty store, the verdict is `unknown`.
+    pub static ref PROVISIONING_CONDUCTORS_UNWALKED: IntGauge = IntGauge::new(
+        "doorway_provisioning_conductors_unwalked",
+        "Pool conductors not yet successfully asked what they host since boot.",
+    )
+    .unwrap();
+
+    /// Hosted apps the walked conductors report.
+    pub static ref HOSTED_APPS_SEEN: IntGauge = IntGauge::new(
+        "doorway_hosted_apps_seen",
+        "Hosted apps reported by the conductors walked since boot.",
+    )
+    .unwrap();
+
+    /// Hosted apps seen minus records in the intent log, floored at zero: at
+    /// least this many hosted apps have no record here.
+    pub static ref HOSTED_APPS_UNRECORDED: IntGauge = IntGauge::new(
+        "doorway_hosted_apps_unrecorded",
+        "Hosted apps on conductors in excess of provisioning records (a count difference).",
+    )
+    .unwrap();
+
+    /// Credential mints the doorway stopped waiting for. The conductor does not
+    /// cancel them, so each may have authored a `CapGrant` the doorway holds no
+    /// credential for. The durable cure is an idempotent grant (fork work).
+    pub static ref SIGNING_MINTS_ABANDONED_TOTAL: IntCounter = IntCounter::new(
+        "doorway_signing_mints_abandoned_total",
+        "Credential mints whose outcome is unknown (timed out or dropped after being sent).",
+    )
+    .unwrap();
+
+    /// Live intent records that never reached `enabled` and have not moved for
+    /// longer than the in-flight bound: attempts nobody finished. The work a
+    /// reaper would have, were there one.
+    pub static ref PROVISION_INTENTS_STALE: IntGauge = IntGauge::new(
+        "doorway_provision_intents_stale",
+        "Live provisioning intents not yet enabled and unchanged past the in-flight bound.",
     )
     .unwrap();
 
@@ -742,6 +837,16 @@ pub fn register_all() {
             BLOB_PANTRY_TOTAL.with_label_values(&[outcome]).inc_by(0);
         }
         let _ = REGISTRY.register(Box::new(BLOB_TARGET_FAILOVER_TOTAL.clone()));
+        let _ = REGISTRY.register(Box::new(PROVISION_INTENTS.clone()));
+        let _ = REGISTRY.register(Box::new(PROVISION_INTENTS_STALE.clone()));
+        let _ = REGISTRY.register(Box::new(PROVISION_INTENTS_STUCK.clone()));
+        let _ = REGISTRY.register(Box::new(PROVISIONING_READY.clone()));
+        let _ = REGISTRY.register(Box::new(PROVISIONING_RECOVERY_REQUIRED.clone()));
+        let _ = REGISTRY.register(Box::new(SIGNING_MINTS_ABANDONED_TOTAL.clone()));
+        let _ = REGISTRY.register(Box::new(PROVISIONING_STORE_VERDICT.clone()));
+        let _ = REGISTRY.register(Box::new(PROVISIONING_CONDUCTORS_UNWALKED.clone()));
+        let _ = REGISTRY.register(Box::new(HOSTED_APPS_SEEN.clone()));
+        let _ = REGISTRY.register(Box::new(HOSTED_APPS_UNRECORDED.clone()));
         let _ = REGISTRY.register(Box::new(UPSTREAM_BREAKER_OPEN_TOTAL.clone()));
         let _ = REGISTRY.register(Box::new(UPSTREAM_BACKPRESSURE_HONORED_TOTAL.clone()));
         let _ = REGISTRY.register(Box::new(ADMISSION_SHED_TOTAL.clone()));
@@ -964,6 +1069,53 @@ pub fn inc_breaker_open() {
 /// M4: upstream backpressure (429/503) was honored by shedding to the client.
 pub fn inc_backpressure_honored() {
     UPSTREAM_BACKPRESSURE_HONORED_TOTAL.inc();
+}
+
+/// Provisioning intent log: how many records are in `state`.
+pub fn set_provision_intents(state: &str, count: u64) {
+    PROVISION_INTENTS
+        .with_label_values(&[state])
+        .set(i64::try_from(count).unwrap_or(i64::MAX));
+}
+
+/// Provisioning intent log: live records stuck for `reason`.
+pub fn set_provision_intents_stuck(reason: &str, count: u64) {
+    PROVISION_INTENTS_STUCK
+        .with_label_values(&[reason])
+        .set(i64::try_from(count).unwrap_or(i64::MAX));
+}
+
+/// Whether hosted provisioning can run, and whether recovery is outstanding.
+pub fn set_provisioning_readiness(ready: bool, recovery_required: bool) {
+    PROVISIONING_READY.set(i64::from(ready));
+    PROVISIONING_RECOVERY_REQUIRED.set(i64::from(recovery_required));
+}
+
+/// The wiped-store verdict (`unknown` | `not_wiped` | `wiped`) and how many
+/// conductors are still unwalked.
+pub fn set_store_verdict(verdict: &str, conductors_unwalked: usize) {
+    for value in ["unknown", "not_wiped", "wiped"] {
+        PROVISIONING_STORE_VERDICT
+            .with_label_values(&[value])
+            .set(i64::from(value == verdict));
+    }
+    PROVISIONING_CONDUCTORS_UNWALKED.set(i64::try_from(conductors_unwalked).unwrap_or(i64::MAX));
+}
+
+/// Hosted apps the conductors report, and how many exceed the log's records.
+pub fn set_hosted_apps(seen: usize, unrecorded: u64) {
+    HOSTED_APPS_SEEN.set(i64::try_from(seen).unwrap_or(i64::MAX));
+    HOSTED_APPS_UNRECORDED.set(i64::try_from(unrecorded).unwrap_or(i64::MAX));
+}
+
+/// A credential mint was given up on with its outcome unknown.
+pub fn inc_signing_mint_abandoned() {
+    SIGNING_MINTS_ABANDONED_TOTAL.inc();
+}
+
+/// Provisioning intent log: live records unfinished past the in-flight bound.
+pub fn set_provision_intents_stale(count: u64) {
+    PROVISION_INTENTS_STALE.set(i64::try_from(count).unwrap_or(i64::MAX));
 }
 
 /// M4: an inbound request was shed by the global admission gate.

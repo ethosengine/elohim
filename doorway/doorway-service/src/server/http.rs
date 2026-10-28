@@ -3229,6 +3229,9 @@ mod shakeout_tests {
         // never shadow the admin surface. (It is POST-only, so the GET-only EPR
         // router would not shadow it regardless — this locks the coverage.)
         assert!(is_service_path("/admin/ssr-bundle/refresh"));
+        // The GET half of the provisioning recovery route must not be shadowed
+        // by the EPR router into the SPA bundle.
+        assert!(is_service_path("/admin/provisioning/recover"));
     }
     #[test]
     fn shakeout_service_path_identity_narrowed_to_did() {
@@ -8678,6 +8681,19 @@ async fn handle_request(
             ));
         }
 
+        // Provisioning recovery — operator-only: the handler checks the admin
+        // credential, and the POST also passes the operator-actuator gate above.
+        // GET reads the intent log's state; POST rebuilds records and mappings
+        // from the conductors. Covered by is_service_path via "/admin".
+        (Method::GET, "/admin/provisioning/recover") => {
+            to_boxed(routes::handle_provisioning_status(&req, Arc::clone(&state)).await)
+        }
+        (Method::POST, "/admin/provisioning/recover") => {
+            return Ok(to_boxed(
+                routes::handle_provisioning_recover(req, Arc::clone(&state)).await,
+            ));
+        }
+
         // Hosted users — list users with conductor assignments
         (Method::GET, "/admin/hosted-users") => {
             to_boxed(routes::handle_list_hosted_users(Arc::clone(&state)).await)
@@ -12680,6 +12696,7 @@ mod root_projection_shadow_regression_tests {
             ("POST", "/admin/federation/peers/refresh"),
             ("POST", "/admin/steward-peers/refresh"),
             ("POST", "/admin/ssr-bundle/refresh"),
+            ("POST", "/admin/provisioning/recover"),
         ] {
             assert_eq!(send_actuator(addr, m, p, None).await, 401, "{m} {p} anon");
             assert_eq!(
@@ -12704,6 +12721,134 @@ mod root_projection_shadow_regression_tests {
                 );
             }
         }
+    }
+
+    // ── /auth/register node/device arm, through the real dispatch ──────────
+
+    async fn register_through(
+        addr: SocketAddr,
+        body: serde_json::Value,
+    ) -> (u16, serde_json::Value) {
+        let response = tokio::time::timeout(
+            std::time::Duration::from_secs(10),
+            reqwest::Client::new()
+                .post(format!("http://{addr}/auth/register"))
+                .json(&body)
+                .send(),
+        )
+        .await
+        .expect("register answered within 10s")
+        .expect("register transport");
+        let status = response.status().as_u16();
+        let value = response
+            .json::<serde_json::Value>()
+            .await
+            .unwrap_or(serde_json::Value::Null);
+        (status, value)
+    }
+
+    async fn doorway_over_registry(registry: crate::conductor::ConductorRegistry) -> SocketAddr {
+        let mut args = Args::parse_from(["doorway", "--listen", "127.0.0.1:0"]);
+        // dev mode with no Mongo: the registration's simplified flow answers
+        // after the agency-phase arm has decided, so the arm is what is tested.
+        args.dev_mode = true;
+        args.jwt_secret = Some("test-secret-that-is-at-least-32-characters-long".to_string());
+        let mut state = AppState::new(args);
+        state.conductor_registry = Some(Arc::new(registry));
+        spawn_test_doorway(Arc::new(state)).await
+    }
+
+    fn device_registration(identifier: &str, agent_pub_key: &str) -> serde_json::Value {
+        serde_json::json!({
+            "identifier": identifier,
+            "password": "a-long-enough-password-1",
+            "agencyPhase": "device",
+            "agentPubKey": agent_pub_key,
+        })
+    }
+
+    #[tokio::test]
+    async fn node_device_registration_answers_201_403_or_503_through_dispatch() {
+        use crate::conductor::provision_intent::ProvisionIntent;
+        use crate::conductor::{ConductorInfo, ConductorRegistry};
+
+        // 201: records intact, nobody hosted under the identifier, a key nobody
+        // holds. The account answers to the caller's own key.
+        let addr = doorway_over_registry(ConductorRegistry::new(None).await).await;
+        let (status, body) = register_through(
+            addr,
+            device_registration("pod@example.com", "uhCAkpeerownkey"),
+        )
+        .await;
+        assert_eq!(status, 201, "{body}");
+        assert_eq!(body["agentPubKey"], "uhCAkpeerownkey", "{body}");
+
+        // 403: this doorway holds a live hosted record for the identifier.
+        let registry = ConductorRegistry::new(None).await;
+        assert!(registry
+            .intents()
+            .insert_new(&ProvisionIntent::intended(
+                "hosted@example.com",
+                "conductor-0",
+                "elohim-conductor-0-hosted",
+            ))
+            .await
+            .unwrap());
+        registry
+            .register_agent(
+                "uhCAkhostedvictim",
+                "conductor-0",
+                "elohim-conductor-0-victim",
+            )
+            .await
+            .unwrap();
+        let addr = doorway_over_registry(registry).await;
+        let (status, body) = register_through(
+            addr,
+            device_registration("hosted@example.com", "uhCAkpeer2"),
+        )
+        .await;
+        assert_eq!(status, 403, "{body}");
+        assert_eq!(body["code"], "IDENTITY_RECOVERY_REFUSED", "{body}");
+
+        // 403: a fresh identifier naming someone else's hosted agent key.
+        let (status, body) = register_through(
+            addr,
+            device_registration("fresh@example.com", "uhCAkhostedvictim"),
+        )
+        .await;
+        assert_eq!(status, 403, "{body}");
+        assert_eq!(body["code"], "AGENT_KEY_ALREADY_BOUND", "{body}");
+
+        // 503: the store gate is on, the records were empty at boot and a
+        // conductor has not answered what it hosts — "no record" is not
+        // "nobody".
+        let unanswered = || async {
+            let registry = ConductorRegistry::new(None).await;
+            registry.register_conductor(ConductorInfo {
+                conductor_id: "conductor-0".to_string(),
+                conductor_url: "ws://c0:4445".to_string(),
+                admin_url: "ws://c0:4444".to_string(),
+                capacity_used: 0,
+                capacity_max: 10,
+            });
+            registry.track_store_loss(Some(0));
+            registry
+        };
+        let addr = doorway_over_registry(unanswered().await.with_store_gate(true)).await;
+        let (status, body) =
+            register_through(addr, device_registration("later@example.com", "uhCAkpeer3")).await;
+        assert_eq!(status, 503, "{body}");
+        assert_eq!(body["code"], "PROVISIONING_NOT_READY", "{body}");
+
+        // 201: the same unanswered verdict with the store gate off (the
+        // default) refuses nobody — the registration that works today still
+        // works.
+        let addr = doorway_over_registry(unanswered().await).await;
+        let (status, body) =
+            register_through(addr, device_registration("later@example.com", "uhCAkpeer3")).await;
+        assert_eq!(status, 201, "{body}");
+        assert_eq!(body["agentPubKey"], "uhCAkpeer3", "{body}");
     }
 
     // ── Story 2.2: public-name standing through a real listener ────────────
